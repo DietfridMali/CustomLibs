@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <!-- Ordner dieser Datei = Repo-/Lösungsroot -->
+    <RootDir>$(MSBuildThisFileDirectory)</RootDir>
+    <BinDir>$(RootDir)bin\$(Configuration)\</BinDir>
+    <LibDir>$(RootDir)lib\$(Configuration)\</LibDir>
+    <ObjDir>$(ProjectDir)..\obj\$(Configuration)\</ObjDir>
+  </PropertyGroup>
+</Project>
+
