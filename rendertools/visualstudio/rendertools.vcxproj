@@ -67,7 +67,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>..\..\..\external\SDL2_ttf-2.0.15\include;..\..\..\external\SDL2-2.30.10\include;..\..\..\external\SDL2_image-2.0.5\include;..\..\..\external\glm;..\..\..\external\glew-2.2.0\include\GL;..\include;..\..\basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\external\SDL2_ttf-2.0.15\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_image-2.0.5\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;..\include;$(ProjectDir)..\..\basetools\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
@@ -88,7 +88,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\..\..\external\SDL2_ttf-2.0.15\include;..\..\..\external\SDL2-2.30.10\include;..\..\..\external\SDL2_image-2.0.5\include;..\..\..\external\glm;..\..\..\external\glew-2.2.0\include\GL;..\include;..\..\basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\external\SDL2_ttf-2.0.15\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_image-2.0.5\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;..\include;$(ProjectDir)..\..\basetools\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
