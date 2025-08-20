@@ -251,19 +251,8 @@ void FBO::ReleaseBuffers(void) {
 }
 
 
-Viewport FBO::SetViewport(void) {
-    m_viewportSave = new Viewport(baseRenderer.Viewport());
+void FBO::SetViewport(void) {
     baseRenderer.SetViewport(m_viewport, false);
-    return *m_viewportSave;
-}
-
-
-void FBO::RestoreViewport(void) {
-    if (m_viewportSave != nullptr) {
-        baseRenderer.SetViewport(*m_viewportSave, false);
-        delete m_viewportSave;
-        m_viewportSave = nullptr;
-    }
 }
 
 
@@ -280,6 +269,8 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
     }
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0);
+    if (params.rotation)
+        baseRenderer.Rotate(params.rotation, 0, 0, 1);
     if (params.flipVertically)
         baseRenderer.Scale(params.scale, params.scale * params.flipVertically, 1);
     else if (params.source & 1)

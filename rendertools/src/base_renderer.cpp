@@ -9,6 +9,8 @@
 //#include "quad.h"
 #include "base_renderer.h"
 
+List<::Viewport> BaseRenderer::viewportStack;
+
 // =================================================================================================
 // basic renderer class. Initializes display and OpenGL and sets up projections and view transformation
 // the renderer enforces window width >= window height, so for portrait screen mode, the window contents

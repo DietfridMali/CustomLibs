@@ -378,6 +378,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
         if (not fbo)
             RenderText(text, textWidth, offset.x, offset.y, alignment, flipVertically);
         else if (fbo->Enable(0, true)) {
+            baseRenderer.PushViewport();
             fbo->SetViewport();
             if (outlineWidth > 0) {
                 offset.x -= outlineWidth / float(fbo->m_width);
@@ -392,7 +393,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
                 else if (ApplyAA())
                     AntiAlias(fbo, m_decoration.aaMethod);
             }
-            fbo->RestoreViewport();
+            baseRenderer.PopViewport();
         }
     }
 }

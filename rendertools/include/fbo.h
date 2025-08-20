@@ -67,6 +67,7 @@ public:
         int destination = -1;
         bool clearBuffer = true;
         int flipVertically = 0; // -1: flip, 1: don't flip, 0: renderer decides
+        float rotation = 0.0f; 
         float scale = 1.0f;
         Shader* shader = nullptr;
     };
@@ -87,9 +88,7 @@ public:
 
     void Disable(void);
 
-    Viewport SetViewport(void);
-
-    void RestoreViewport(void);
+    void SetViewport(void);
 
     inline void Reenable(void) {
         if (m_lastBufferIndex != INVALID_BUFFER_INDEX)

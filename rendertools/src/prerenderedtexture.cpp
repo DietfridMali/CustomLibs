@@ -45,11 +45,12 @@ bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignmen
 
 void PrerenderedText::RenderOutline(const TextRenderer::TextDecoration& decoration) {
     if (decoration.HaveOutline()) {
+        baseRenderer.PushViewport();
         m_fbo.SetViewport();
         m_fbo.SetLastDestination(0);
         textRenderer.SetDecoration(decoration);
         textRenderer.RenderOutline(&m_fbo, decoration);
-        m_fbo.RestoreViewport();
+        baseRenderer.PopViewport();
     }
 }
 

@@ -47,7 +47,8 @@ class BaseRenderer
         GLVersion               m_glVersion;
         MovingFrameCounter      m_frameCounter;
 
-    public:
+        static List<::Viewport> viewportStack;
+public:
         BaseRenderer()
             : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
             , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f)
@@ -119,6 +120,16 @@ class BaseRenderer
         template <typename T>
         inline void Fill(T&& color, float alpha, float scale = 1.0f) {
             Fill(RGBAColor(std::forward<T>(color), alpha), scale);
+        }
+
+        void PushViewport(void) {
+            viewportStack.Append(m_viewport);
+        }
+
+        void PopViewport(void) {
+            ::Viewport viewport;
+            viewportStack.Pop(viewport);
+            SetViewport(viewport);
         }
 
         inline GLVersion GetGLVersion(void) {
