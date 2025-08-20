@@ -99,6 +99,10 @@ public:
 
         inline int SceneHeight(void) { return m_sceneHeight; }
 
+        inline int SceneLeft(void) { return m_sceneLeft; }
+
+        inline int SceneTop(void) { return m_sceneTop; }
+
         inline float AspectRatio(void) { return m_aspectRatio; }
 #if 0
         typedef struct {

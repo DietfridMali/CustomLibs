@@ -71,6 +71,8 @@ public:
     inline static const RGBAColor   Black = RGBAColor{ 0, 0, 0, 1 };
     inline static const RGBAColor   White = RGBAColor{ 1, 1, 1, 1 };
     inline static const RGBAColor   Gray = RGBAColor{ 0.5f, 0.5f, 0.5f, 1 };
+    inline static const RGBAColor   LightGray = RGBAColor{ 0.75f, 0.75f, 0.75f, 1 };
+    inline static const RGBAColor   DarkGray = RGBAColor{ 0.25f, 0.25f, 0.25f, 1 };
     inline static const RGBAColor   Gold = RGBAColor{ 1.0f, 0.8f, 0.0f, 1 };
     inline static const RGBAColor   Yellow = RGBAColor{ 1.0f, 1.0f, 0.0f, 1 };
     inline static const RGBAColor   Orange = RGBAColor{1.0f, 0.5f, 0.0f, 1 };
