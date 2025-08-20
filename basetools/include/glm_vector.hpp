@@ -215,6 +215,23 @@ public:
         return other - (*this * 2.0f * this->Dot(other));
     }
 
+    inline Vector Abs(void) {
+        Vector v;
+        for (int i = 0; i < VEC_TYPE::length(); ++i)
+            v[i] = fabs(*this[i]);
+        return v;
+    }
+
+    static inline Vector& Abs(Vector& v) {
+        for (int i = 0; i < VEC_TYPE::length(); ++i)
+            v[i] = fabs(v[i]);
+        return v;
+    }
+
+    static inline Vector& Abs(Vector&& v) {
+        return Abs(static_cast<Vector&>(v));
+    }
+
     static int Compare(Vector& v0, Vector& v1) {
         for (int i = 0; i < VEC_TYPE::length(); ++i) {
             if (v0[i] < v1[i])
