@@ -5,6 +5,7 @@
 #include "texture.h"
 #include "viewport.h"
 #include "fbo.h"
+#include "base_renderer.h"
 #include "textrenderer.h"
 #include "prerenderedtexture.h"
 

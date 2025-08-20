@@ -111,6 +111,16 @@ public:
 
         void SetViewport(::Viewport viewport, bool flipVertically = false); // , bool isFBO = false);
 
+        void PushViewport(void) {
+            viewportStack.Append(m_viewport);
+        }
+
+        void PopViewport(void) {
+            ::Viewport viewport;
+            viewportStack.Pop(viewport);
+            SetViewport(viewport);
+        }
+
         void Fill(const RGBAColor& color, float scale = 1.0f);
 
         void Fill(RGBAColor&& color, float scale = 1.0f) {
@@ -120,16 +130,6 @@ public:
         template <typename T>
         inline void Fill(T&& color, float alpha, float scale = 1.0f) {
             Fill(RGBAColor(std::forward<T>(color), alpha), scale);
-        }
-
-        void PushViewport(void) {
-            viewportStack.Append(m_viewport);
-        }
-
-        void PopViewport(void) {
-            ::Viewport viewport;
-            viewportStack.Pop(viewport);
-            SetViewport(viewport);
         }
 
         inline GLVersion GetGLVersion(void) {
