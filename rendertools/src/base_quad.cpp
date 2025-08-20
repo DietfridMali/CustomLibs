@@ -180,7 +180,7 @@ void BaseQuad::Render(Texture* texture) {
 
 
 // fill 2D area defined by x and y components of vertices with color color
-void BaseQuad::Fill(RGBAColor color) {
+void BaseQuad::Fill(const RGBAColor& color) {
     if (UpdateVAO()) {
         Render(LoadShader(false, color), nullptr, false);
         //baseShaderHandler.StopShader();

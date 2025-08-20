@@ -83,7 +83,11 @@ class BaseQuad
     void Render(Texture* texture);
 
     // fill 2D area defined by x and y components of vertices with color color
-    void Fill(RGBAColor color);
+    void Fill(const RGBAColor& color);
+
+    void Fill(RGBAColor&& color) {
+        Fill(static_cast<const RGBAColor&>(color));
+    }
 
     inline void Fill(RGBColor color, float alpha = 1.0f) {
         return Fill(RGBAColor (color, alpha));
