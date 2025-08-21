@@ -277,7 +277,8 @@ bool Texture::Load(List<String>& fileNames, bool flipVertically) {
 #endif
             SDL_Surface* image = IMG_Load(fileName.Data());
             if (not image) {
-                fprintf(stderr, "Couldn't find '%s'\n", (char*)(fileName));
+                const char* imgError = IMG_GetError();
+                fprintf(stderr, "Couldn't load '%s (%s)'\n", (char*)(fileName), imgError);
                 return false;
             }
             texBuf = new TextureBuffer();
