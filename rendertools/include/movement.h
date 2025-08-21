@@ -6,7 +6,7 @@
 
 class Movement {
 public:
-    Vector3f    direction;
+    Vector3f    velocity;
     Vector3f    scale;
     float       length;
     Vector3f    normal;
@@ -70,12 +70,12 @@ public:
     }
 
     inline Movement operator*(const float scale) {
-        Movement m(direction * scale);
+        Movement m(direction * scale, m_scale);
         return m;
     }
 
     inline Movement operator/(const float scale) {
-        Movement m(direction / scale);
+        Movement m(direction / scale, m_scale);
         return m;
     }
 
