@@ -252,6 +252,33 @@ void Texture::Deploy(int bufferIndex) {
 // for a uniformly textured sphere. The latter case will however be also taken into regard by the cubemap class.
 // It allows to pass a single texture which it will use for all faces of the cubemap
 
+#include <cstdio>
+#include <cerrno>
+#include <cstring>
+#include <iostream>
+
+#ifdef _DEBUG
+
+void CheckFileOpen(const std::string& path) {
+    errno = 0;
+    FILE* f = std::fopen(path.c_str(), "rb");
+    if (!f) {
+        std::cerr << "fopen failed for \"" << path << "\"\n";
+        std::cerr << "errno=" << errno << " (" << std::strerror(errno) << ")\n";
+        std::cerr << "bytes:";
+        for (auto c : path) {
+            std::cerr << " " << std::hex << (int)c;
+        }
+        std::cerr << std::dec << "\n";
+    }
+    else {
+        std::cout << "fopen OK for \"" << path << "\"\n";
+        std::fclose(f);
+    }
+}
+
+#endif
+
 bool Texture::Load(List<String>& fileNames, bool flipVertically) {
     // load texture from file
     m_filenames = fileNames;
@@ -274,6 +301,7 @@ bool Texture::Load(List<String>& fileNames, bool flipVertically) {
         else {
 #ifdef _DEBUG
             bufferName = fileName;
+            CheckFileOpen(fileName);
 #endif
             SDL_Surface* image = IMG_Load(fileName.Data());
             if (not image) {
