@@ -22,12 +22,38 @@ void BaseFrameCounter::Draw(bool update) {
 
 // -------------------------------------------------------------------------------------------------
 
+float MovingFrameCounter::GetFps(void) const {
+    return (m_movingTotalTicks == 0) ? 0.0f : float(double(m_movingFrameCount) * double(m_frequency) / double(m_movingTotalTicks));
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool MovingFrameCounter::Start(void) {
+    if (not BaseFrameCounter::Start())
+        return false;
+    m_frequency = SDL_GetPerformanceFrequency();
+    return true;
+}
+    
+// -------------------------------------------------------------------------------------------------
+
+void MovingFrameCounter::Reset(void) {
+    BaseFrameCounter::Reset();
+    m_movingFrameTimes.fill(0);
+    m_movingTotalTicks = 0;
+    m_movingFrameIndex = 0;
+    m_movingFrameCount = 0;
+}
+
+// -------------------------------------------------------------------------------------------------
+
 void MovingFrameCounter::Update(void) {
-    size_t t = SDL_GetTicks();
+    uint64_t t = SDL_GetPerformanceCounter();
     if (m_renderStartTime > 0) {
-        float dt = float(t - m_renderStartTime) * 0.001f;
-        if ((dt < 1.0f) and (dt > 0.0f)) {
-            m_movingTotalTime -= m_movingFrameTimes[m_movingFrameIndex] - dt;
+        uint64_t dt = t - m_renderStartTime;
+        if ((dt <= 1000000) and (dt > 0)) {
+            m_movingTotalTicks -= m_movingFrameTimes[m_movingFrameIndex]; // remove oldest frame time from total
+            m_movingTotalTicks += dt; // add in current frame time
             m_movingFrameTimes[m_movingFrameIndex] = dt;
             m_movingFrameIndex = (m_movingFrameIndex + 1) % FrameWindowSize;
             if (m_movingFrameCount < FrameWindowSize)

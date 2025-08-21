@@ -67,29 +67,24 @@ class MovingFrameCounter
     : public BaseFrameCounter
 {
 private:
-    SimpleArray<float, FrameWindowSize> m_movingFrameTimes;
-    float                               m_movingTotalTime{ 0.0f };
-    int                                 m_movingFrameIndex{ 0 };
-    int                                 m_movingFrameCount{ 0 };
+    SimpleArray<uint64_t, FrameWindowSize>  m_movingFrameTimes;
+    uint64_t                                m_movingTotalTicks{ 0 };
+    int                                     m_movingFrameIndex{ 0 };
+    int                                     m_movingFrameCount{ 0 };
+    uint64_t                                m_frequency;
 
 public:
     MovingFrameCounter() = default;
 
     virtual ~MovingFrameCounter() = default;
 
-    virtual void Reset(void) {
-        BaseFrameCounter::Reset();
-        m_movingFrameTimes.fill(0.0f);
-        m_movingTotalTime = 0.0f;
-        m_movingFrameIndex = 0;
-        m_movingFrameCount = 0;
-    }
+    virtual bool Start(void);
+
+    virtual void Reset(void);
 
     virtual void Update(void);
 
-    virtual float GetFps(void) const {
-        return (m_movingTotalTime == 0.0f) ? 0.0f : float(m_movingFrameCount / m_movingTotalTime);
-    }
+    virtual float GetFps(void) const;
 };
 
 // -------------------------------------------------------------------------------------------------
