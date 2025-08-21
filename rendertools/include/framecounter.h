@@ -42,6 +42,14 @@ public:
 
     void ShowFps(bool showFps) { m_showFps = showFps; }
 
+    void Toggle(void) {
+        m_showFps = not m_showFps;
+        if (m_showFps) {
+            Reset();
+            Start();
+        }
+    }
+
     virtual void Reset(void) {
         m_renderStartTime = 0;
     }

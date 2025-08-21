@@ -144,6 +144,10 @@ public:
             m_frameCounter.ShowFps(showFps);
         }
 
+        inline void ToggleFps(void) {
+            m_frameCounter.Toggle();
+        }
+
         static void ClearGLError(void);
 
         static bool CheckGLError (const char* operation = "");
