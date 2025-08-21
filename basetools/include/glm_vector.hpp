@@ -82,6 +82,28 @@ public:
         return v;
     }
 
+    Vector& operator*=(const Vector& other) {
+        for (int i = 0; i < VEC_TYPE::length(); ++i)
+            (*this)[i] *= other[i];
+        return *this;
+    }
+
+    inline Vector& operator*=(Vector&& other) {
+        *this *= static_cast<Vector&>(other);
+        return *this;
+    }
+     
+    Vector& operator/=(const Vector& other) {
+        for (int i = 0; i < VEC_TYPE::length(); ++i)
+            (*this)[i] /= other[i];
+        return *this;
+    }
+
+    inline Vector& operator/=(Vector&& other) {
+        *this /= static_cast<const Vector&>(other);
+        return *this;
+    }
+
     Vector operator/(float scalar) const {
         return Vector(static_cast<VEC_TYPE>(*this) / scalar);
     }
