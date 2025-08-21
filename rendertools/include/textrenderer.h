@@ -66,7 +66,7 @@ private:
     bool                        m_isAvailable;
     RGBAColor                   m_color;
     float                       m_scale;
-    bool                        m_centerText;
+    eTextAlignments             m_textAlignment;
     struct TextDecoration       m_decoration;
     struct GlyphSize            m_maxGlyphSize;
     VAO                         m_vao;
@@ -122,8 +122,8 @@ public:
         m_decoration.aaMethod = aaMethod;
     }
 
-    inline void CenterText(bool centerText) {
-        m_centerText = centerText;
+    inline void SetTextAlignment(eTextAlignments alignment) {
+        m_textAlignment = alignment;
     }
 
     inline void SetOutline(float outlineWidth = 0.0f, RGBAColor outlineColor = ColorData::Invisible) {
