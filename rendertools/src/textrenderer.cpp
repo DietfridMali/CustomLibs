@@ -30,7 +30,7 @@ int TextRenderer::CompareTextures(void* context, const char& key1, const char& k
 
 
 TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, float scale)
-    : m_color(color), m_scale(scale), m_font(nullptr), m_centerText(true), m_decoration(decoration), m_isAvailable(false)
+    : m_color(color), m_scale(scale), m_font(nullptr), m_textAlignment(taCenter), m_decoration(decoration), m_isAvailable(false)
 {
     Setup();
 }
