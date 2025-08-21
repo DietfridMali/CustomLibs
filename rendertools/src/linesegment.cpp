@@ -11,9 +11,9 @@ float LineSegment::ComputeNearestPoint(const Vector3f& p, Vector3f& nearestPoint
 		nearestPoint = p0;
 	else {
 		// Projektion von (p - p0) auf die Linie (p0, p1)
-		float t = (p - p0).Dot(properties.direction) / len2;
+		float t = (p - p0).Dot(properties.velocity) / len2;
 		// Punkt auf der Linie bestimmen
-		nearestPoint = p0 + Direction() * t;
+		nearestPoint = p0 + Velocity() * t;
 		// Abstand zurückgeben
 	}
 	return (p - nearestPoint).Length();
@@ -30,8 +30,8 @@ int LineSegment::ComputeNearestPointsAt(const Vector3f& p, float radius, const C
     // Unterschiedsvektor zum Referenzpunkt
     Vector3f delta = p0 - p;
 
-    float A = Direction().Dot(Direction());
-    float B = 2.0f * Direction().Dot(delta);
+    float A = Velocity().Dot(Velocity());
+    float B = 2.0f * Velocity().Dot(delta);
     float C = delta.Dot(delta) - radius * radius;
 
     float D = B * B - 4.0f * A * C;
@@ -58,8 +58,8 @@ int LineSegment::ComputeNearestPointsAt(const Vector3f& p, float radius, const C
 
 
 float LineSegment::ComputeNearestPoints(LineSegment& other, LineSegment& nearestPoints) {
-    Vector3f d1 = Direction(); // Ihr Segment: p0 -> p1
-    Vector3f d2 = other.Direction(); // anderes Segment: q0 -> q1
+    Vector3f d1 = Velocity(); // Ihr Segment: p0 -> p1
+    Vector3f d2 = other.Velocity(); // anderes Segment: q0 -> q1
     Vector3f r = p0 - other.p0;
     float a = d1.Dot(d1); // Länge^2 von this
     float e = d2.Dot(d2); // Länge^2 von other
@@ -115,8 +115,8 @@ float LineSegment::ComputeNearestPoints(LineSegment& other, LineSegment& nearest
 
 
 int LineSegment::ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits) {
-    const Vector3f& d = this->Direction();
-    const Vector3f& e = other.Direction();
+    const Vector3f& d = this->Velocity();
+    const Vector3f& e = other.Velocity();
     Vector3f m = this->p0 - other.p0;
 
     float dd = d.Dot(d);

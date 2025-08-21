@@ -133,7 +133,7 @@ int Plane::LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vP
 // find point on line p0 - p1 with distance d to plane
 // returns: -1 -> no point found, 0: line is parallel to plane, 1: point returned in vPlanePoint
 int Plane::PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint) {
-    float denom = line.Normal().Dot(line.Direction());
+    float denom = line.Normal().Dot(line.Velocity());
     float dist = m_normal.Dot(line.p0 - m_vertices[0]);
 
     if (fabs(denom) < m_tolerance)  // Linie parallel zur Ebene
@@ -282,7 +282,7 @@ bool Plane::SphereIntersection(lineSegment line, float r, Vector3f& vCollide, Ve
     float d0 = Distance(line.p0);
     float d1 = Distance(line.p1);
 
-    if ((d0 * d1 > 0.0f) and (m_normal.Dot(line.Direction()) > 0))
+    if ((d0 * d1 > 0.0f) and (m_normal.Dot(line.Velocity()) > 0))
         return false; // both points on same side of plane and moving away
     float delta = d1 - d0;
     if (std::abs(delta) > m_tolerance) {
@@ -310,17 +310,17 @@ bool Plane::SphereIntersection(lineSegment line, float r, Vector3f& vCollide, Ve
 
 
     for (int i = 0; i < 4; ++i) {
-        UpdateCollision(SweepSphereEdge(line.p0, line.Direction(), m_vertices[i], m_vertices[(i + 1) % 4], r));
+        UpdateCollision(SweepSphereEdge(line.p0, line.Velocity(), m_vertices[i], m_vertices[(i + 1) % 4], r));
     }
     // Ecken
     for (int i = 0; i < 4; ++i) {
-        UpdateCollision(SweepSpherePoint(line.p0, line.Direction(), m_vertices[i], r));
+        UpdateCollision(SweepSpherePoint(line.p0, line.Velocity(), m_vertices[i], r));
     }
 
     if (tCollide > 1.0f)
         return false;
 
-    float d = m_normal.Dot(line.Direction());
+    float d = m_normal.Dot(line.Velocity());
     if ((tCollide < m_tolerance) and (m_normal.Dot(line.Normal()) > 0)) // at start of movement, moving away from wall
         return false;
 
@@ -484,12 +484,12 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
     }
 
     // 1. Schnittpunkt mit Ebene in Abstand radius prüfen (Projektion im Quad)
-    float denom = m_normal.Dot(line.Direction());
+    float denom = m_normal.Dot(line.Velocity());
     if (fabs(denom) > m_tolerance) {
         float r = (d0 >= 0) ? radius : -radius;
         float t = (r - d0) / denom;
         if (limits.Contains(t)) {
-            Vector3f candidate = line.p0 + line.Direction() * t;
+            Vector3f candidate = line.p0 + line.Velocity() * t;
             float d = Distance(candidate);
             Vector3f vPlane = candidate - m_normal * d;
             if (Contains(vPlane)) {
@@ -534,7 +534,7 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
     else
         return -1;
 
-    endPoint = line.p0 + line.Direction() * t;
+    endPoint = line.p0 + line.Velocity() * t;
     if (line.Normal().Dot(m_normal) > 0) // just touching quad and moving away
         return 0;
     return 1;

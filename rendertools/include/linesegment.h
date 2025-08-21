@@ -41,7 +41,7 @@ public:
 	}
 
 
-	inline Vector3f& Direction(void) { return properties.direction;  }
+	inline Vector3f& Velocity(void) { return properties.velocity;  }
 
 	inline float Length(void) { return properties.length; }
 
@@ -56,7 +56,7 @@ public:
 	int ComputeNearestPointsAt(const Vector3f& p, float radius, const Conversions::FloatInterval& limits);
 	
 	inline Vector3f NearestPointAt(int i) {
-		return (i < solutions) ? p0 + Direction() * offsets[i] : Vector3f::NONE;
+		return (i < solutions) ? p0 + Velocity() * offsets[i] : Vector3f::NONE;
 	}
 
 	float ComputeNearestPoints(LineSegment& other, LineSegment& nearestPoints);

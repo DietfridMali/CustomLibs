@@ -20,7 +20,7 @@ public:
     } eMovementTypes;
 
     Movement()
-        : direction(Vector3f::ZERO), scale(Vector3f::ONE), length(0.0f), normal(Vector3f::ZERO)
+        : velocity(Vector3f::ZERO), scale(Vector3f::ONE), length(0.0f), normal(Vector3f::ZERO)
     {
     }
 
@@ -36,7 +36,7 @@ public:
     }
 
     Movement& Copy(const Movement& m) {
-        direction = m.direction;
+        velocity = m.velocity;
         scale = m.scale;
         length = m.length;
         normal = m.normal;
@@ -44,19 +44,19 @@ public:
     }
 
     Movement& Refresh(float l = -1.0f) {
-        length = (l < 0) ? direction.Length() : l;
-        normal = (length > Conversions::NumericTolerance) ? direction / length : Vector3f::ZERO;
+        length = (l < 0) ? velocity.Length() : l;
+        normal = (length > Conversions::NumericTolerance) ? velocity / length : Vector3f::ZERO;
         return *this;
     }
 
     template <typename T>
     inline Movement& Update(T&& v, float l = -1.0f) {
-        direction = v * scale;
+        velocity = v * scale;
         return Refresh(l);
     }
 
     inline void Reset(void) {
-        direction = Vector3f::ZERO;
+        velocity = Vector3f::ZERO;
         normal = Vector3f::ZERO;
         length = 0.0f;
     }
@@ -69,41 +69,41 @@ public:
         return this->Copy(m);
     }
 
-    inline Movement operator*(const float scale) {
-        Movement m(direction * scale, m_scale);
+    inline Movement operator*(const float n) {
+        Movement m(velocity * n, scale);
         return m;
     }
 
-    inline Movement operator/(const float scale) {
-        Movement m(direction / scale, m_scale);
+    inline Movement operator/(const float n) {
+        Movement m(velocity / n, scale);
         return m;
     }
 
-    inline Movement& operator*=(const float scale) {
-        direction *= scale;
-        length *= scale;
+    inline Movement& operator*=(const float n) {
+        velocity *= n;
+        length *= n;
         return *this;
     }
 
-    inline Movement& operator/=(const float scale) {
-        direction /= scale;
-        length /= scale;
+    inline Movement& operator/=(const float n) {
+        velocity /= n;
+        length /= n;
         return *this;
     }
 
     inline Movement& operator+=(const Movement& m) {
-        direction += m.direction;
+        velocity += m.velocity;
         return Refresh();
     }
 
     inline Movement& operator-=(const Movement& m) {
-        direction -= m.direction;
+        velocity -= m.velocity;
         return Refresh();
     }
 
-    inline operator Vector3f() const { return direction; }
+    inline operator Vector3f() const { return velocity; }
 
-    inline operator const Vector3f& () const { return direction; }
+    inline operator const Vector3f& () const { return velocity; }
 };
 
 // =================================================================================================
