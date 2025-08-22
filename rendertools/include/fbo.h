@@ -43,7 +43,9 @@ public:
         dbColor,
         dbExtra,
         dbSingle,
-        dbCount
+        dbCustom,
+        dbCount,
+        dbNone = -1
     } eDrawBufferGroups;
 
     String                      m_name;
@@ -52,18 +54,20 @@ public:
     int                         m_height;
     int                         m_scale;
     int                         m_bufferCount;
+    int                         m_vertexBufferOffset;
     int                         m_vertexBufferIndex;
     int                         m_depthBufferIndex;
+    int                         m_activeBufferIndex;
     ManagedArray<BufferInfo>    m_bufferInfo;
-    DrawBufferList              m_drawBuffers[dbCount]; // [0]: incl. color buffers, [1]: excl. color buffers, [2]: single render target
+    DrawBufferList              m_drawBuffers[2]; // [0]: all draw buffers, [1]: working set of draw buffers
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
     bool                        m_pingPong;
     bool                        m_isAvailable;
     bool                        m_isEnabled;
-    int                         m_lastBufferIndex;
     int                         m_lastDestination;
     BaseQuad                    m_viewportArea;
+    eDrawBufferGroups           m_drawBufferGroup;
 
     struct FBOBufferParams {
         String name = "";
@@ -93,22 +97,22 @@ public:
 
     void Destroy(void);
 
-    bool Enable(int bufferIndex = -1, bool clearBuffer = false, bool reenable = false, eDrawBufferGroups drawBufferGroup = dbAll);
+    bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = false, bool reenable = false);
 
-    bool EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable, eDrawBufferGroups drawBufferGroup);
+    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
 
     void Disable(void);
 
     void SetViewport(void);
 
     inline void Reenable(void) {
-        if (m_lastBufferIndex != INVALID_BUFFER_INDEX)
-            Enable(m_lastBufferIndex, false, true);
+        if (m_activeBufferIndex != INVALID_BUFFER_INDEX)
+            Enable(m_activeBufferIndex, m_drawBufferGroup, false, true);
     }
 
     void Fill(RGBAColor color);
 
-    void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clearBuffer);
+    void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
     bool RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color);
 
@@ -194,7 +198,11 @@ public:
 
     void ReleaseBuffers(void);
 
-    void SelectDrawBuffers(int bufferIndex = -1, bool reenable = false, eDrawBufferGroups drawBufferGroup = dbAll);
+    bool SetDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool reenable = false);
+
+    bool SelectDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll);
+
+    void SelectCustomDrawBuffers(DrawBufferList& drawBuffers);
 
     SharedTextureHandle& BufferHandle(int bufferIndex) {
 #ifdef _DEBUG
@@ -234,7 +242,7 @@ private:
 
     bool AttachBuffers(bool hasMRTs);
 
-    bool ReattachBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup);
+    bool ReattachBuffers();
 
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
         
