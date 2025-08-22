@@ -35,6 +35,8 @@ public:
 
 class FBO {
 public:
+    using DrawBufferList = ManagedArray <GLuint>;
+
     String                      m_name;
     SharedFramebufferHandle     m_handle;
     int                         m_width;
@@ -44,7 +46,7 @@ public:
     int                         m_vertexBufferIndex;
     int                         m_depthBufferIndex;
     ManagedArray<BufferInfo>    m_bufferInfo;
-    ManagedArray<GLuint>        m_drawBuffers;
+    DrawBufferList              m_drawBuffers[3]; // [0]: incl. color buffers, [1]: excl. color buffers, [2]: single render target
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
     bool                        m_pingPong;
@@ -82,7 +84,7 @@ public:
 
     void Destroy(void);
 
-    bool Enable(int bufferIndex = 0, bool clearBuffer = false, bool reenable = false);
+    bool Enable(int bufferIndex = -1, bool clearBuffer = false, bool reenable = false);
 
     bool EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable);
 
@@ -183,6 +185,8 @@ public:
 
     void ReleaseBuffers(void);
 
+    void SelectDrawBuffers(int bufferIndex = .1, bool reenable = false, bool noColorAttachments = false);
+
     SharedTextureHandle& BufferHandle(int bufferIndex) {
 #ifdef _DEBUG
         if (bufferIndex < m_bufferCount)
@@ -222,8 +226,6 @@ private:
     bool AttachBuffers(bool hasMRTs);
 
     void CreateRenderArea(void);
-
-    void SelectDrawBuffer(int bufferIndex = 0, bool reenable = false);
 };
 
 // =================================================================================================

@@ -129,11 +129,16 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
     if (not AttachBuffers(params.hasMRTs))
         return false;
     int vertexBufferOffset = params.hasMRTs ? params.colorBufferCount : 1;
-    m_drawBuffers.Resize(vertexBufferOffset + params.vertexBufferCount);
-    for (int i = 0; i < vertexBufferOffset; i++)
-        m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
+    m_drawBuffers[0].Resize(vertexBufferOffset + params.vertexBufferCount);
+    m_drawBuffers[1].Resize(vertexBufferOffset + params.vertexBufferCount);
+    m_drawBuffers[2].Resize(1);
+    for (int i = 0; i < vertexBufferOffset; i++) {
+        m_drawBuffers[0][i] = m_bufferInfo[i].m_attachment;
+        m_drawBuffers[1][i] = GL_NONE;
+    }
     for (int i = 0; i < params.vertexBufferCount; i++)
-        m_drawBuffers[vertexBufferOffset + i] = m_bufferInfo[m_vertexBufferIndex + i].m_attachment;
+        m_drawBuffers[0][vertexBufferOffset + i] = 
+        m_drawBuffers[1][vertexBufferOffset + i] = m_bufferInfo[m_vertexBufferIndex + i].m_attachment;
     m_name = params.name;
     return true;
 }
@@ -152,18 +157,20 @@ void FBO::Destroy(void) {
 // The renderer keeps track of draw buffers and FBOs and stores those being temporarily overriden
 // by other FBOs in a stack. Basically, the current OpenGL draw buffer is set using
 // Renderer::SetDrawBuffers. However, when disabling a temporary render target (FBO), the 
-// previous render target is automatically restored, which means calling its SelectDrawBuffer
-// function. To avoid FBO::SelectDrawBuffer and Renderer::SetDrawBuffers looping forever,
-// in that case, true is passed for reenable, causing SelectDrawBuffer to directly call
+// previous render target is automatically restored, which means calling its SelectDrawBuffers
+// function. To avoid FBO::SelectDrawBuffers and Renderer::SetDrawBuffers looping forever,
+// in that case, true is passed for reenable, causing SelectDrawBuffers to directly call
 // glDrawBuffers. The effect of that construction is that you can transparently nest 
 // multiple FBO draw buffers.
-void FBO::SelectDrawBuffer(int bufferIndex, bool reenable) {
+void FBO::SelectDrawBuffers(int bufferIndex, bool reenable, bool noColorAttachments) {
     glBindTexture(GL_TEXTURE_2D, 0);
-    m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
+    DrawBufferList& drawBuffers = (bufferIndex >= 0) ? m_drawBuffers[2] : m_drawBuffers[noColorAttachments];
+    if (bufferIndex >= 0)
+        drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
     if (reenable)
-        glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
+        glDrawBuffers(drawBuffers.Length(), drawBuffers.Data());
     else
-        baseRenderer.SetDrawBuffers(this, &m_drawBuffers);
+        baseRenderer.SetDrawBuffers(this, &drawBuffers);
 }
 
 
@@ -181,7 +188,7 @@ void FBO::Clear(int bufferIndex, bool clearBuffer) { // clear color has been set
 bool FBO::EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable) {
     if (not AttachBuffer(bufferIndex))
         return false;
-    SelectDrawBuffer(bufferIndex, reenable);
+    SelectDrawBuffers(bufferIndex, reenable);
     if (m_depthBufferIndex >= 0)
         glEnable(GL_DEPTH_TEST);
     else

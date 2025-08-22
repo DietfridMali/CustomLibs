@@ -12,7 +12,7 @@
 class DrawBufferInfo {
 public:
     FBO*                    m_fbo;
-    ManagedArray<GLuint>*   m_drawBuffers;
+    ManagedArray<GLuint>* m_drawBuffers;
 
 public:
     DrawBufferInfo(FBO* fbo = nullptr, ManagedArray<GLuint>* drawBuffers = nullptr) {
