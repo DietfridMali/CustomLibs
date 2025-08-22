@@ -145,26 +145,42 @@ public:
 
     void DisableTexture(void);
 
-    inline void AddVertex(Vector3f& v) {
+    inline void AddVertex(const Vector3f& v) {
         m_vertices.Append(v);
         m_vMin.Minimize(v);
         m_vMax.Maximize(v);
     }
 
-    inline void AddTexCoord(TexCoord& tc) {
+    inline void AddVertex(Vector3f& v) {
+        AddVertex(static_cast<const Vector3f&>(v));
+    }
+
+    inline void AddTexCoord(const TexCoord& tc) {
         m_texCoords.m_appData.Append(tc);
+    }
+
+    inline void AddTexCoord(TexCoord&& tc) {
+        m_texCoords.m_appData.Append(const_cast<const TexCoord&>(tc));
     }
 
     inline void AddTexCoord(SegmentedList<TexCoord>& tc) {
         m_texCoords.m_appData += tc;
     }
 
-    inline void AddColor(RGBAColor& c) {
+    inline void AddColor(const RGBAColor& c) {
         m_vertexColors.Append(c);
     }
 
-    inline void AddNormal(Vector3f& n) {
+    inline void AddColor(RGBAColor&& c) {
+        m_vertexColors.Append(static_cast<const RGBAColor&>(c));
+    }
+
+    inline void AddNormal(const Vector3f& n) {
         m_normals.Append(n);
+    }
+
+    inline void AddNormal(Vector3f&& n) {
+        m_normals.Append(static_cast<const Vector3f&>(n));
     }
 
     inline void AddIndices(ManagedArray<GLuint>& i) {
