@@ -377,7 +377,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
 
         if (not fbo)
             RenderText(text, textWidth, offset.x, offset.y, alignment, flipVertically);
-        else if (fbo->Enable(0, true)) {
+        else if (fbo->Enable(-1, FBO::dbAll, true)) {
             baseRenderer.PushViewport();
             fbo->SetViewport();
             if (outlineWidth > 0) {

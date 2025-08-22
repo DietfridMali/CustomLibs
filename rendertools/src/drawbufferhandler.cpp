@@ -21,7 +21,7 @@ bool DrawBufferHandler::SetActiveBuffer(FBO* buffer, bool clearBuffer) {
             m_activeBuffer->Disable();
         m_activeBuffer = buffer;
     }
-    bool b = m_activeBuffer and (m_activeBuffer->IsEnabled() or m_activeBuffer->Enable(-1, clearBuffer, FBO::dbAll));
+    bool b = m_activeBuffer and (m_activeBuffer->IsEnabled() or m_activeBuffer->Enable(-1, FBO::dbAll, clearBuffer));
     return b;
 }
 

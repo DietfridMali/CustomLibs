@@ -3,6 +3,8 @@
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 
+GLuint FBO::m_activeHandle = GL_NONE;
+
 // =================================================================================================
 
 #define INVALID_BUFFER_INDEX 0x7FFFFFFF // (max int32_t)
@@ -15,8 +17,7 @@ FBO::FBO() {
     m_bufferCount = 0;
     m_pingPong = true;
     m_isAvailable = false;
-    m_isEnabled = false;
-    m_vertexBufferOffset = -1;
+    m_colorBufferCount = -1;
     m_vertexBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_lastDestination = -1;
@@ -133,25 +134,14 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
     }
     m_vertexBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
+    // depth buffer must be created last or draw buffer management will fail as it relies on all draw buffers being stored in bufferInfo contiguously, starting at index 0
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.colorBufferCount ? params.depthBufferCount : 0);
     CreateRenderArea();
     if (not AttachBuffers(params.hasMRTs))
         return false;
-    m_vertexBufferOffset = params.hasMRTs ? params.colorBufferCount : 1;
-    m_drawBuffers[dbAll].Resize(m_vertexBufferOffset + params.vertexBufferCount);
-    m_drawBuffers[dbColor].Resize(m_vertexBufferOffset + params.vertexBufferCount);
-    m_drawBuffers[dbExtra].Resize(m_vertexBufferOffset + params.vertexBufferCount);
-    m_drawBuffers[dbSingle].Resize(1);
-    for (int i = 0; i < m_vertexBufferOffset; i++) {
-        m_drawBuffers[dbAll][i] = 
-        m_drawBuffers[dbColor][i] = m_bufferInfo[i].m_attachment;
-        m_drawBuffers[dbExtra][i] = GL_NONE;
-    }
-    for (int i = 0; i < params.vertexBufferCount; i++) {
-        m_drawBuffers[dbAll][m_vertexBufferOffset + i] =
-        m_drawBuffers[dbExtra][m_vertexBufferOffset + i] = m_bufferInfo[m_vertexBufferIndex + i].m_attachment;
-        m_drawBuffers[dbColor][m_vertexBufferOffset + i] = GL_NONE;
-    }
+    m_colorBufferCount = params.hasMRTs ? params.colorBufferCount : 1;
+    m_vertexBufferCount = params.vertexBufferCount;
+    m_drawBuffers.Resize(m_colorBufferCount + m_vertexBufferCount);
     m_name = params.name;
     return true;
 }
@@ -167,24 +157,34 @@ void FBO::Destroy(void) {
 
 
 bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
-    if ((bufferIndex >= 0) and (m_activeBufferIndex != bufferIndex)) {
+    int l = m_drawBuffers.Length();
+    if ((m_activeBufferIndex != bufferIndex) and (bufferIndex >= 0) and (bufferIndex < l)) {
         m_activeBufferIndex = bufferIndex;
         m_drawBufferGroup = dbSingle;
-        m_drawBuffers[1][0] = m_bufferInfo[bufferIndex].m_attachment;
-        for (int i = 1; i < m_drawBuffers[0].Length(); i++)
-            m_drawBuffers[1][i] = GL_NONE;
+        m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
+        for (int i = 1; i < l; i++)
+            m_drawBuffers[i] = GL_NONE;
     }
     else if ((drawBufferGroup != dbCustom) and (m_drawBufferGroup != drawBufferGroup)) {
         m_activeBufferIndex = -1;
         m_drawBufferGroup = drawBufferGroup;
-        m_drawBuffers[1] = m_drawBuffers[0];
-        if (drawBufferGroup == dbColor) {
-            for (int i = m_vertexBufferOffset; i < m_drawBuffers[0].Length(); i++)
-                m_drawBuffers[1][i] = GL_NONE;
+        if (drawBufferGroup == dbAll) {
+            for (int i = 0; i < l; ++i)
+                m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
+        }
+        else if (drawBufferGroup == dbColor) {
+            int i = 0;
+            for ( ; i < m_colorBufferCount; ++i) 
+                m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
+            for ( ; i < l; ++i)
+                m_drawBuffers[i] = GL_NONE;
         }
         else if (drawBufferGroup == dbExtra) {
-            for (int i = 0; i < m_vertexBufferOffset; i++)
-                m_drawBuffers[1][i] = GL_NONE;
+            int i = 0;
+            for (; i < m_colorBufferCount; ++i) 
+                m_drawBuffers[i] = GL_NONE;
+            for (; i < l; ++i)
+                m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
         }
     }
     return ReattachBuffers();
@@ -192,7 +192,7 @@ bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) 
 
 
 void FBO::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
-    m_drawBuffers[1] = drawBuffers;
+    m_drawBuffers = drawBuffers;
     m_activeBufferIndex = -1;
     m_drawBufferGroup = dbCustom;
 }
@@ -212,9 +212,9 @@ bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, boo
         return false;
     glBindTexture(GL_TEXTURE_2D, 0);
     if (reenable)
-        glDrawBuffers(m_drawBuffers[1].Length(), m_drawBuffers[1].Data());
+        glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
     else
-        baseRenderer.SetDrawBuffers(this, &m_drawBuffers[1]);
+        baseRenderer.SetDrawBuffers(this, &m_drawBuffers);
     return true;
 }
 
@@ -242,7 +242,7 @@ void FBO::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) 
 
 
 bool FBO::ReattachBuffers(void) {
-    for (int i = 0; i < m_drawBuffers[1].Length(); i++)
+    for (int i = 0; i < m_drawBuffers.Length(); i++)
         if (not AttachBuffer(i))
             return false;
     return true;
@@ -252,7 +252,7 @@ bool FBO::ReattachBuffers(void) {
 bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
-    if (m_depthBufferIndex >= 0)
+    if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
         glEnable(GL_DEPTH_TEST);
     else
         glDisable(GL_DEPTH_TEST);
@@ -264,29 +264,33 @@ bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool
 bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not m_isAvailable)
         return false;
-    if (not reenable and (bufferIndex == m_activeBufferIndex))
+#if 0
+    if (not reenable and ((m_drawBufferGroup != dbSingle) or ((m_activeBufferIndex >= 0) and (bufferIndex == m_activeBufferIndex))))
         return true;
+#endif
     //BaseRenderer::ClearGLError();
     if (bufferIndex == INVALID_BUFFER_INDEX)
         Disable();
     else {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
-        if (not (m_isEnabled = baseRenderer.CheckGLError()))
+        if (not baseRenderer.CheckGLError())
             return false;
+        m_activeHandle = m_handle.get();
         if (not EnableBuffers(bufferIndex, drawBufferGroup, reenable, clear))
             return false;
     }
-    return m_isEnabled;
+    return true;
 }
 
 
 void FBO::Disable(void) {
     if (m_activeBufferIndex != INVALID_BUFFER_INDEX) {
         m_activeBufferIndex = INVALID_BUFFER_INDEX;
+        if (IsEnabled())
+            m_activeHandle = GL_NONE;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         ReleaseBuffers();
         baseRenderer.RestoreDrawBuffer();
-        m_isEnabled = false;
     }
 }
 

@@ -54,20 +54,22 @@ public:
     int                         m_height;
     int                         m_scale;
     int                         m_bufferCount;
-    int                         m_vertexBufferOffset;
+    int                         m_colorBufferCount;
+    int                         m_vertexBufferCount;
     int                         m_vertexBufferIndex;
     int                         m_depthBufferIndex;
     int                         m_activeBufferIndex;
     ManagedArray<BufferInfo>    m_bufferInfo;
-    DrawBufferList              m_drawBuffers[2]; // [0]: all draw buffers, [1]: working set of draw buffers
+    DrawBufferList              m_drawBuffers; 
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
     bool                        m_pingPong;
     bool                        m_isAvailable;
-    bool                        m_isEnabled;
     int                         m_lastDestination;
     BaseQuad                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
+
+    static GLuint               m_activeHandle;
 
     struct FBOBufferParams {
         String name = "";
@@ -171,7 +173,7 @@ public:
     }
 
     inline bool IsEnabled(void) {
-        return m_isEnabled;
+        return (m_activeHandle != GL_NONE) and (m_activeHandle == m_handle.get());
     }
 
     inline int GetLastDestination(void) {
