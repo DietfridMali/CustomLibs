@@ -7,8 +7,6 @@ GLuint FBO::m_activeHandle = GL_NONE;
 
 // =================================================================================================
 
-#define INVALID_BUFFER_INDEX 0x7FFFFFFF // (max int32_t)
-
 FBO::FBO() {
     m_handle = 0;
     m_width = 0;
@@ -21,7 +19,6 @@ FBO::FBO() {
     m_vertexBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_lastDestination = -1;
-    m_activeBufferIndex = INVALID_BUFFER_INDEX; // some invalid drawbuffer id value
     m_activeBufferIndex = -1;
     m_drawBufferGroup = dbNone;
 }
@@ -165,21 +162,21 @@ bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) 
         for (int i = 1; i < l; i++)
             m_drawBuffers[i] = GL_NONE;
     }
-    else if ((drawBufferGroup != dbCustom) and (m_drawBufferGroup != drawBufferGroup)) {
+    else if ((drawBufferGroup != dbCustom) and ((drawBufferGroup == dbNone) or (m_drawBufferGroup != drawBufferGroup))) {
         m_activeBufferIndex = -1;
-        m_drawBufferGroup = drawBufferGroup;
-        if (drawBufferGroup == dbAll) {
+        m_drawBufferGroup = (drawBufferGroup == dbNone) ? dbAll : drawBufferGroup;
+        if (m_drawBufferGroup == dbAll) {
             for (int i = 0; i < l; ++i)
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
         }
-        else if (drawBufferGroup == dbColor) {
+        else if (m_drawBufferGroup == dbColor) {
             int i = 0;
             for ( ; i < m_colorBufferCount; ++i) 
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
             for ( ; i < l; ++i)
                 m_drawBuffers[i] = GL_NONE;
         }
-        else if (drawBufferGroup == dbExtra) {
+        else if (m_drawBufferGroup == dbExtra) {
             int i = 0;
             for (; i < m_colorBufferCount; ++i) 
                 m_drawBuffers[i] = GL_NONE;
@@ -230,6 +227,8 @@ bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup
 
 void FBO::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) { // clear color has been set in Renderer.SetupOpenGL()
     if (clear) {
+        if (m_name == "scene")
+            fprintf(stderr, "clearing scene\n");
         baseRenderer.PushViewport();
         glViewport(0, 0, m_width * m_scale, m_height * m_scale);
         if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
@@ -264,32 +263,22 @@ bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool
 bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not m_isAvailable)
         return false;
-#if 0
-    if (not reenable and ((m_drawBufferGroup != dbSingle) or ((m_activeBufferIndex >= 0) and (bufferIndex == m_activeBufferIndex))))
-        return true;
-#endif
     //BaseRenderer::ClearGLError();
-    if (bufferIndex == INVALID_BUFFER_INDEX)
-        Disable();
-    else {
+    if (not IsEnabled()) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
         if (not baseRenderer.CheckGLError())
             return false;
         m_activeHandle = m_handle.get();
-        if (not EnableBuffers(bufferIndex, drawBufferGroup, reenable, clear))
-            return false;
     }
-    return true;
+    return EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable);
 }
 
 
 void FBO::Disable(void) {
-    if (m_activeBufferIndex != INVALID_BUFFER_INDEX) {
-        m_activeBufferIndex = INVALID_BUFFER_INDEX;
-        if (IsEnabled())
-            m_activeHandle = GL_NONE;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (IsEnabled()) {
         ReleaseBuffers();
+        m_activeHandle = GL_NONE;
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         baseRenderer.RestoreDrawBuffer();
     }
 }

@@ -21,7 +21,7 @@ bool DrawBufferHandler::SetActiveBuffer(FBO* buffer, bool clearBuffer) {
             m_activeBuffer->Disable();
         m_activeBuffer = buffer;
     }
-    bool b = m_activeBuffer and (m_activeBuffer->IsEnabled() or m_activeBuffer->Enable(-1, FBO::dbAll, clearBuffer));
+    bool b = m_activeBuffer and m_activeBuffer->Reenable(clearBuffer);
     return b;
 }
 
@@ -65,7 +65,7 @@ void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
     glBindTexture(GL_TEXTURE_2D, 0);
     if (m_drawBufferInfo.m_fbo != nullptr)
-        m_drawBufferInfo.m_fbo->Reenable();
+        m_drawBufferInfo.m_fbo->Reenable(false, true);
     else
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     SetActiveDrawBuffers();

@@ -10,7 +10,7 @@
 
 // =================================================================================================
 
-#define INVALID_BUFFER_INDEX 0x7FFFFFFF
+#define INVALID_BUFFER_INDEX 0x80000000
 
 class BufferInfo {
 public:
@@ -99,18 +99,17 @@ public:
 
     void Destroy(void);
 
-    bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = false, bool reenable = false);
+    bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
 
     bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
+
+    inline bool Reenable(bool clear = false, bool reenable = false) {
+        return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, reenable);
+    }
 
     void Disable(void);
 
     void SetViewport(void);
-
-    inline void Reenable(void) {
-        if (m_activeBufferIndex != INVALID_BUFFER_INDEX)
-            Enable(m_activeBufferIndex, m_drawBufferGroup, false, true);
-    }
 
     void Fill(RGBAColor color);
 
