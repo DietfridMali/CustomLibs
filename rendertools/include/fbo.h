@@ -108,7 +108,7 @@ public:
 
     void Fill(RGBAColor color);
 
-    void Clear(int bufferIndex, bool clearBuffer);
+    void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clearBuffer);
 
     bool RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color);
 
@@ -235,6 +235,8 @@ private:
     bool AttachBuffers(bool hasMRTs);
 
     bool ReattachBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup);
+
+    bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
         
     void CreateRenderArea(void);
 };

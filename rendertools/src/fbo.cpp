@@ -70,7 +70,7 @@ int FBO::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmen
 
 bool FBO::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
-    if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment = GL_NONE))
+    if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
         return true;
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
@@ -80,7 +80,7 @@ bool FBO::DetachBuffer(int bufferIndex) {
 
 bool FBO::AttachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
-    if (bufferInfo.m_isAttached or (bufferInfo.m_attachment = GL_NONE))
+    if (bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
         return true;
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
     return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
@@ -195,10 +195,19 @@ void FBO::SelectDrawBuffers(int bufferIndex, bool reenable, eDrawBufferGroups dr
 }
 
 
-void FBO::Clear(int bufferIndex, bool clearBuffer) { // clear color has been set in Renderer.SetupOpenGL()
+bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
+    if (m_depthBufferIndex < 0)
+        return false;
+    if (bufferIndex >= 0)
+        return m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor;
+    return (drawBufferGroup == dbAll) or (drawBufferGroup == dbColor);
+}
+
+
+void FBO::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clearBuffer) { // clear color has been set in Renderer.SetupOpenGL()
     if (clearBuffer) {
         glViewport(0, 0, m_width * m_scale, m_height * m_scale);
-        if ((m_depthBufferIndex >= 0) or (bufferIndex < 0))
+        if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         else
             glClear(GL_COLOR_BUFFER_BIT);
@@ -214,7 +223,7 @@ bool FBO::EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable, eDrawBu
         glEnable(GL_DEPTH_TEST);
     else
         glDisable(GL_DEPTH_TEST);
-    Clear(m_bufferInfo[bufferIndex].m_attachment, clearBuffer);
+    Clear(bufferIndex, drawBufferGroup, clearBuffer);
     m_lastBufferIndex = bufferIndex;
     return baseRenderer.CheckGLError();
 }
