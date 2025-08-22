@@ -25,9 +25,10 @@ public:
     int                 m_attachment;
     int                 m_tmuIndex;
     eBufferType         m_type;
+    bool                m_isAttached;
 
     BufferInfo(GLuint handle = 0, int attachment = 0)
-        : m_handle(handle), m_attachment(attachment), m_tmuIndex(-1), m_type(btColor)
+        : m_handle(handle), m_attachment(attachment), m_tmuIndex(-1), m_type(btColor), m_isAttached(false)
     { }
 };
 
@@ -36,6 +37,14 @@ public:
 class FBO {
 public:
     using DrawBufferList = ManagedArray <GLuint>;
+
+    typedef enum {
+        dbAll,
+        dbColor,
+        dbExtra,
+        dbSingle,
+        dbCount
+    } eDrawBufferGroups;
 
     String                      m_name;
     SharedFramebufferHandle     m_handle;
@@ -46,7 +55,7 @@ public:
     int                         m_vertexBufferIndex;
     int                         m_depthBufferIndex;
     ManagedArray<BufferInfo>    m_bufferInfo;
-    DrawBufferList              m_drawBuffers[3]; // [0]: incl. color buffers, [1]: excl. color buffers, [2]: single render target
+    DrawBufferList              m_drawBuffers[dbCount]; // [0]: incl. color buffers, [1]: excl. color buffers, [2]: single render target
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
     bool                        m_pingPong;
@@ -84,9 +93,9 @@ public:
 
     void Destroy(void);
 
-    bool Enable(int bufferIndex = -1, bool clearBuffer = false, bool reenable = false);
+    bool Enable(int bufferIndex = -1, bool clearBuffer = false, bool reenable = false, eDrawBufferGroups drawBufferGroup = dbAll);
 
-    bool EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable);
+    bool EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable, eDrawBufferGroups drawBufferGroup);
 
     void Disable(void);
 
@@ -185,7 +194,7 @@ public:
 
     void ReleaseBuffers(void);
 
-    void SelectDrawBuffers(int bufferIndex = .1, bool reenable = false, bool noColorAttachments = false);
+    void SelectDrawBuffers(int bufferIndex = -1, bool reenable = false, eDrawBufferGroups drawBufferGroup = dbAll);
 
     SharedTextureHandle& BufferHandle(int bufferIndex) {
 #ifdef _DEBUG
@@ -225,6 +234,8 @@ private:
 
     bool AttachBuffers(bool hasMRTs);
 
+    bool ReattachBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup);
+        
     void CreateRenderArea(void);
 };
 

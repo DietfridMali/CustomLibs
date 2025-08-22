@@ -25,17 +25,17 @@ FBO::FBO() {
 
 
 void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType, bool isMRT) {
-    BufferInfo& bi = m_bufferInfo[bufferIndex];
+    BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (bufferType == BufferInfo::btDepth)
-        bi.m_attachment = GL_DEPTH_ATTACHMENT;
+        bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
     else if (isMRT)
-        bi.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
+        bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
     else
-        bi.m_attachment = GL_COLOR_ATTACHMENT0; // color buffer for ping pong rendering; these will be bound alternatingly when needed as render target
-    bi.m_handle = SharedTextureHandle();
-    bi.m_handle.Claim();
-    bi.m_type = bufferType;
-    glBindTexture(GL_TEXTURE_2D, bi.m_handle);
+        bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0; // color buffer for ping pong rendering; these will be bound alternatingly when needed as render target
+    bufferInfo.m_handle = SharedTextureHandle();
+    bufferInfo.m_handle.Claim();
+    bufferInfo.m_type = bufferType;
+    glBindTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -62,21 +62,38 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
 int FBO::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount) {
     if (not bufferCount)
         return -1;
-    for (int i = 0; i < bufferCount; i++)
+    for (int i = 0; i < bufferCount; ++i)
         CreateBuffer(m_bufferCount, attachmentIndex, bufferType, bufferType != BufferInfo::btDepth);
     return m_bufferCount - bufferCount;
 }
 
 
 bool FBO::DetachBuffer(int bufferIndex) {
-    glFramebufferTexture2D(GL_FRAMEBUFFER, m_bufferInfo[bufferIndex].m_attachment, GL_TEXTURE_2D, 0, 0);
+    BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
+    if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment = GL_NONE))
+        return true;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
+    bufferInfo.m_isAttached = false;
     return BaseRenderer::CheckGLError();
 }
 
 
 bool FBO::AttachBuffer(int bufferIndex) {
-    glFramebufferTexture2D(GL_FRAMEBUFFER, m_bufferInfo[bufferIndex].m_attachment, GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, 0);
-    return BaseRenderer::CheckGLError();
+    BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
+    if (bufferInfo.m_isAttached or (bufferInfo.m_attachment = GL_NONE))
+        return true;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
+    return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
+}
+
+
+bool FBO::ReattachBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
+    if (bufferIndex >= 0)
+        return AttachBuffer(bufferIndex);
+    for (int i = 0; i < m_drawBuffers[drawBufferGroup].Length(); i++)
+        if (not AttachBuffer(i))
+            return false;
+    return true;
 }
 
 
@@ -124,21 +141,25 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
     }
     m_vertexBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
-    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
+    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.colorBufferCount ? params.depthBufferCount : 0);
     CreateRenderArea();
     if (not AttachBuffers(params.hasMRTs))
         return false;
     int vertexBufferOffset = params.hasMRTs ? params.colorBufferCount : 1;
-    m_drawBuffers[0].Resize(vertexBufferOffset + params.vertexBufferCount);
-    m_drawBuffers[1].Resize(vertexBufferOffset + params.vertexBufferCount);
-    m_drawBuffers[2].Resize(1);
+    m_drawBuffers[dbAll].Resize(vertexBufferOffset + params.vertexBufferCount);
+    m_drawBuffers[dbColor].Resize(vertexBufferOffset + params.vertexBufferCount);
+    m_drawBuffers[dbExtra].Resize(vertexBufferOffset + params.vertexBufferCount);
+    m_drawBuffers[dbSingle].Resize(1);
     for (int i = 0; i < vertexBufferOffset; i++) {
-        m_drawBuffers[0][i] = m_bufferInfo[i].m_attachment;
-        m_drawBuffers[1][i] = GL_NONE;
+        m_drawBuffers[dbAll][i] = 
+        m_drawBuffers[dbColor][i] = m_bufferInfo[i].m_attachment;
+        m_drawBuffers[dbExtra][i] = GL_NONE;
     }
-    for (int i = 0; i < params.vertexBufferCount; i++)
-        m_drawBuffers[0][vertexBufferOffset + i] = 
-        m_drawBuffers[1][vertexBufferOffset + i] = m_bufferInfo[m_vertexBufferIndex + i].m_attachment;
+    for (int i = 0; i < params.vertexBufferCount; i++) {
+        m_drawBuffers[dbAll][vertexBufferOffset + i] =
+        m_drawBuffers[dbExtra][vertexBufferOffset + i] = m_bufferInfo[m_vertexBufferIndex + i].m_attachment;
+        m_drawBuffers[dbColor][vertexBufferOffset + i] = GL_NONE;
+    }
     m_name = params.name;
     return true;
 }
@@ -162,9 +183,9 @@ void FBO::Destroy(void) {
 // in that case, true is passed for reenable, causing SelectDrawBuffers to directly call
 // glDrawBuffers. The effect of that construction is that you can transparently nest 
 // multiple FBO draw buffers.
-void FBO::SelectDrawBuffers(int bufferIndex, bool reenable, bool noColorAttachments) {
+void FBO::SelectDrawBuffers(int bufferIndex, bool reenable, eDrawBufferGroups drawBufferGroup) {
     glBindTexture(GL_TEXTURE_2D, 0);
-    DrawBufferList& drawBuffers = (bufferIndex >= 0) ? m_drawBuffers[2] : m_drawBuffers[noColorAttachments];
+    DrawBufferList& drawBuffers = (bufferIndex >= 0) ? m_drawBuffers[dbSingle] : m_drawBuffers[drawBufferGroup];
     if (bufferIndex >= 0)
         drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
     if (reenable)
@@ -185,8 +206,8 @@ void FBO::Clear(int bufferIndex, bool clearBuffer) { // clear color has been set
 }
 
 
-bool FBO::EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable) {
-    if (not AttachBuffer(bufferIndex))
+bool FBO::EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable, eDrawBufferGroups drawBufferGroup) {
+    if (not ReattachBuffers(bufferIndex, drawBufferGroup))
         return false;
     SelectDrawBuffers(bufferIndex, reenable);
     if (m_depthBufferIndex >= 0)
@@ -199,19 +220,19 @@ bool FBO::EnableBuffer(int bufferIndex, bool clearBuffer, bool reenable) {
 }
 
 
-bool FBO::Enable(int bufferIndex, bool clearBuffer, bool reenable) {
+bool FBO::Enable(int bufferIndex, bool clearBuffer, bool reenable, eDrawBufferGroups drawBufferGroup) {
     if (not m_isAvailable)
         return false;
     if (not reenable and (bufferIndex == m_lastBufferIndex))
         return true;
     //BaseRenderer::ClearGLError();
-    if (bufferIndex < 0)
+    if (bufferIndex == INVALID_BUFFER_INDEX)
         Disable();
     else {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
         if (not (m_isEnabled = baseRenderer.CheckGLError()))
             return false;
-        if (not EnableBuffer(bufferIndex, clearBuffer, reenable))
+        if (not EnableBuffer(bufferIndex, clearBuffer, reenable, drawBufferGroup))
             return false;
     }
     return m_isEnabled;
