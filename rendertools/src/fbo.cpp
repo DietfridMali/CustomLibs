@@ -206,11 +206,13 @@ bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup
 
 void FBO::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clearBuffer) { // clear color has been set in Renderer.SetupOpenGL()
     if (clearBuffer) {
+        baseRenderer.PushViewport();
         glViewport(0, 0, m_width * m_scale, m_height * m_scale);
         if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         else
             glClear(GL_COLOR_BUFFER_BIT);
+        baseRenderer.PopViewport();
     }
 }
 
