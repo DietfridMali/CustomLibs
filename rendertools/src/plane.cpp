@@ -248,7 +248,7 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
     bool checkPenetration = true;
     bool isPenetrating = SpherePenetratesQuad(line, radius);
 
-    const auto CheckPenetration = [this, &checkPenetration, &isPenetrating, &line, radius]() noexcept -> bool {
+    const auto CheckPenetration = [&]() noexcept -> bool {
         if (checkPenetration) {
             checkPenetration = false;
             isPenetrating = SpherePenetratesQuad(line, radius);
