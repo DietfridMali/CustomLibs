@@ -258,12 +258,15 @@ int LineSegment::ComputeCapsuleIntersection(LineSegment& other,  LineSegment& co
     // ---------- 2) Kappen (Endpunkte g0, g1) ----------
     if (ee > tol) {
         float tSel;
-        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) keepBestT(tSel);
-        if (CapCheckOnP(other.p1, d, dd, radius, limits, tSel)) keepBestT(tSel);
+        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) 
+            keepBestT(tSel);
+        if (CapCheckOnP(other.p1, d, dd, radius, limits, tSel)) 
+            keepBestT(tSel);
     }
     else {
         float tSel;
-        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) keepBestT(tSel);
+        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) 
+            keepBestT(tSel);
     }
 
     return collisionPoints.solutions; // 1 bei Treffer, sonst 0

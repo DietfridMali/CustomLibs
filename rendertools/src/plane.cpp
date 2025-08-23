@@ -300,39 +300,26 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
 
     // 2. Kanten durchgehen
     LineSegment bestPoints;
-    bestPoints.offsets = { std::numeric_limits<float>::lowest(), std::numeric_limits<float>::max() }; // > permissible values
+    float bestOffset = std::numeric_limits<float>::lowest(); // > permissible values
+    Vector3f bestPoint;
 
     for (int i = 0; i < 4; ++i) {
         LineSegment edge(m_vertices[i], m_vertices[(i + 1) % 4]), collisionPoints;
         line.ComputeCapsuleIntersection(edge, collisionPoints, radius, limits);
         for (int j = 0; j < collisionPoints.solutions; ++j) {
-            if (collisionPoints.offsets[j] < 0.0f) {
-                if (collisionPoints.offsets[j] > bestPoints.offsets[0]) {
-                    bestPoints.offsets[0] = collisionPoints.offsets[j];
-                    bestPoints.p0 = collisionPoints.endPoints[j];
-                }
-            }
-            else {
-                if (collisionPoints.offsets[j] < bestPoints.offsets[1]) {
-                    bestPoints.offsets[1] = collisionPoints.offsets[j];
-                    bestPoints.p1 = collisionPoints.endPoints[j];
-                }
+            if (collisionPoints.offsets[j] > bestOffsets) {
+                bestOffsets = collisionPoints.offsets[j];
+                bestPoints = collisionPoints.endPoints[j];
             }
         }
     }
 
-    if (bestPoints.offsets[1] != std::numeric_limits<float>::max()) {
-        t = bestPoints.offsets[1];
-        collisionPoint = bestPoints.p1;
-    }
-    else if (bestPoints.offsets[0] != std::numeric_limits<float>::lowest()) {
-        t = bestPoints.offsets[0];
-        collisionPoint = bestPoints.p0;
-        }
-    else
+    if (bestOffset == std::numeric_limits<float>::max())
         return -1;
-
-    endPoint = line.p0 + line.Velocity() * t;
+    if ((bestOffset < 0) and not SpherePenetratesQuad(line, radius)))
+        return -1;
+    collisionPoint = bestPoint;
+    endPoint = line.p0 + line.Velocity() * bestOffset;
     if (line.Normal().Dot(m_normal) > 0) // just touching quad and moving away
         return 0;
     return 1;
