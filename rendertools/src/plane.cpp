@@ -94,6 +94,28 @@ float Plane::NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f
 }
 
 // -------------------------------------------------------------------------------------------------
+
+float Plane::PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared) {
+    Vector3f v = p1;
+    v -= p0;
+    float l2 = v.Dot(v);
+
+    Vector3f u = p2;
+    u -= p0;
+
+    if (l2 > m_toleranceSquared) { // otherwise line too short, compute point to point distance p0 <-> p2
+        // u = p2 - (p0 + v * t) -> u = p2 - p0 - v * t;
+        float t = u.Dot(v) / l2;
+        if (clampToSegment)
+            t = std::clamp(t, 0.0f, 1.0f);
+        v *= t;
+        u -= v; 
+    }
+    float l = u.Dot(u);
+    return squared ? l : std::sqrtf(l);
+}
+
+// -------------------------------------------------------------------------------------------------
 // compute the intersection of a vector v between two points with a plane
 // Will return None if v parallel to the plane or doesn't intersect with plane 
 // (i.e. both points are on the same side of the plane)
@@ -190,286 +212,25 @@ bool Plane::Contains(Vector3f& p, bool barycentric) {
 
 // -------------------------------------------------------------------------------------------------
 
-#if 0
-
-inline bool Plane::SolveQuadratic(float a, float b, float c, float& t0, float& t1)
-{
-    float discr = b * b - 4 * a * c;
-    if (discr < 0) 
-        return false;
-    float sqrtDiscr = std::sqrt(discr);
-    float inv2a = 0.5f / a;
-    t0 = (-b - sqrtDiscr) * inv2a;
-    t1 = (-b + sqrtDiscr) * inv2a;
-    if (t0 > t1) std::swap(t0, t1);
-    return true;
-}
-
-
-// Kugel gegen Liniensegment (edge) analytisch: Liefert frühesten t in [0,1] mit Abstand == r
-float Plane::SweepSphereEdge(const Vector3f& p0, const Vector3f& vLine, const Vector3f& a, const Vector3f& b, float r)
-{
-    Vector3f e = b - a;       // Kante
-
-    Vector3f w0 = p0 - a;
-    float vv = vLine.Dot(vLine);
-    float ee = e.Dot(e);
-    float ve = vLine.Dot(e);
-
-    float denom = vv * ee - ve * ve;
-    if (std::abs(denom) < 1e-6f)
-        return -1.0f; // Parallel
-
-    // Parameter s und t mit Minimalabstand berechnen
-    // Abstandsquadrat: |w0 + t*vLine - s*e|^2 = r^2, s in [0,1]
-    // => d/ds=0, löst s in t auf (s = clamp(...))
-    // Setze für jedes t (zwei Lösungen, Eintritt/Austritt)
-    float a_ = vv * ee - ve * ve;
-    float b_ = 2.0f * (w0.Dot(vLine) * ee - w0.Dot(e) * ve);
-    float c_ = w0.Dot(w0) * ee - 2.0f * w0.Dot(e) * w0.Dot(e) + w0.Dot(e) * w0.Dot(e) - r * r * ee;
-
-    float t0, t1;
-    if (not SolveQuadratic(a_, b_, c_, t0, t1))
-        return -1.0f;
-
-    // Teste beide Lösungen
-    for (float tCandidate : {t0, t1}) {
-        if (tCandidate < 0.0f or tCandidate > 1.0f) 
-            continue;
-        // Berechne s für diesen t, clamp auf [0,1]
-        Vector3f c = p0 + vLine * tCandidate;
-        Vector3f ap = c - a;
-        float s = e.Dot(ap) / ee;
-        s = std::clamp(s, 0.0f, 1.0f);
-        Vector3f q = a + e * s;
-        float dist2 = (c - q).LengthSquared();
-        if (std::abs(dist2 - r * r) < m_tolerance)
-            return tCandidate;
-        }
-    return -1.0f;
-}
-
-
-// Kugel gegen Punkt analytisch: Liefert frühesten t in [0,1] mit Abstand == r
-float Plane::SweepSpherePoint(const Vector3f& p0, const Vector3f& vLine, const Vector3f& c, float r)
-{
-    Vector3f w = p0 - c;
-    float a = vLine.Dot(vLine);
-    float b = 2.0f * w.Dot(vLine);
-    float c_ = w.Dot(w) - r * r;
-
-    float t0, t1;
-    if (not SolveQuadratic(a, b, c_, t0, t1))
-        return -1.0f;
-    for (float tCandidate : {t0, t1}) {
-        if (tCandidate < 0.0f or tCandidate > 1.0f) 
-            continue;
-        Vector3f pos = p0 + vLine * tCandidate;
-        float dist2 = (pos - c).LengthSquared();
-        if (std::abs(dist2 - r * r) < m_tolerance) 
-            return tCandidate;
-        }
-    return -1.0f;
-}
-
-
-bool Plane::SphereIntersection(lineSegment line, float r, Vector3f& vCollide, Vector3f& vEndPoint)
-{
-    float tCollide = std::numeric_limits<float>::max();
-    Vector3f vFirstCollide;
-
-    // Fläche
-    float d0 = Distance(line.p0);
-    float d1 = Distance(line.p1);
-
-    if ((d0 * d1 > 0.0f) and (m_normal.Dot(line.Velocity()) > 0))
-        return false; // both points on same side of plane and moving away
-    float delta = d1 - d0;
-    if (std::abs(delta) > m_tolerance) {
-        float t1 = (r - d0) / delta;
-        float t2 = (-r - d0) / delta;
-        for (float tEntry : {t1, t2}) {
-            if ((tEntry >= 0.0f) and (tEntry <= 1.0f) and (tEntry < tCollide)) {
-                Vector3f centerHit = line.p0 + line.Normal() * tEntry;
-                Vector3f planeHit = centerHit - m_normal * Distance(centerHit);
-                if (Contains(planeHit)) {
-                    tCollide = tEntry;
-                    vFirstCollide = centerHit;
-                }
-            }
-        }
+bool Plane::SpherePenetratesQuad(LineSegment& line, float radius) {
+    // Projektion von p0 in die Ebene und Innen-Test
+    if (std::fabs(planeDistance) <= radius + m_tolerance) {
+        Vector3f p;
+        Project(line.p0, p);
+        if (Contains(pr))
+            return true;
     }
-
-    // Kanten
-    const auto UpdateCollision = [&](float t) {
-        if ((t >= 0.0f) and (t <= 1.0f) and (t < tCollide)) {
-            tCollide = t;
-            vFirstCollide = line.p0 + line.Normal() * t;
-            }
-        };
-
-
+    // Falls noch nicht innen: Abstand zu Kanten prüfen
+    radius *= radius;
+    radius += m_toleranceSquared;
     for (int i = 0; i < 4; ++i) {
-        UpdateCollision(SweepSphereEdge(line.p0, line.Velocity(), m_vertices[i], m_vertices[(i + 1) % 4], r));
+        if (PointToSegmentDistanceSquared(m_vertices[i], m_vertices[(i + 1) % 4], line.p0) <= radius)
+            return true;
     }
-    // Ecken
-    for (int i = 0; i < 4; ++i) {
-        UpdateCollision(SweepSpherePoint(line.p0, line.Velocity(), m_vertices[i], r));
-    }
-
-    if (tCollide > 1.0f)
-        return false;
-
-    float d = m_normal.Dot(line.Velocity());
-    if ((tCollide < m_tolerance) and (m_normal.Dot(line.Normal()) > 0)) // at start of movement, moving away from wall
-        return false;
-
-    vCollide = vFirstCollide;
-    vEndPoint = line.p0 + line.Normal() * tCollide;
-    tCollide = tCollide;
-    return true;
+    return false;
 }
 
-#elif 0 // -------------------------------------------------------------------------------------------------
-// returns collision point of sphere with quad closest to p0 (start point of movement) in collisionPoint
-// and point on vector p0,p1 at which that collision occurs in endPoint. That point may lie behind p0 as
-// seen from p1 (i.e. requires to move backwards).
-// If p0,p1 penetrates the plane, collisions will only be checked from p0 to the penetration point.
-// if p0 ~= p1, use projection point of p0 on plane as p1 (forces a perpendicular move away from the plane 
-// if the sphere is too close, but not moving)
-// function returns: -1 no collision, 0: collision, but moving away, 1: collision and moving towards quad
-int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint)
-{
-    Vector3f dir = p1 - p0;
-    float dirLen = dir.Length();
-
-    // Spezialfall: Gerade zu kurz
-    if (dirLen > m_tolerance)
-        dir /= dirLen;
-    else {
-        float d = Project(p0, collisionPoint); // collisionPoint = Lotfußpunkt auf die Ebene
-        if (fabs(d) < m_tolerance) {
-            // p0 liegt bereits auf der Ebene, normale zeigt sinnhaft raus
-            endPoint = collisionPoint + m_normal * radius;
-            return 1;
-        }
-        // Sonst wie gehabt: Gerade als Lot weiterverarbeiten
-        p1 = collisionPoint;
-        dir = p1 - p0;
-        dirLen = dir.Length();
-        if (dirLen < m_tolerance)
-            return -1;
-        dir /= dirLen;
-    }
-
-    // Prüfen, ob Gerade die Ebene schneidet (Schnittpunkt bestimmen)
-    float d0 = Distance(p0);
-    float d1 = Distance(p1);
-    fprintf(stderr, "wall distances = %1.6f / %1.6f, side = %d\n", d0, d1, (d0 < 0.0f) ? -1 : 1);
-    if (d0 * d1 > 0) {
-        if (std::min(fabs(d0), fabs(d1)) > radius) {
-            collisionPoint = Vector3f::NONE;
-            endPoint = p1;
-            return -1;
-        }
-    }
-    else {
-        float t = d0 / (d0 - d1);
-        p1 = p0 + (p1 - p0) * t;
-    }
-
-    // Minimalabstand Linie ↔ Quad bestimmen (Kanten, Ecken, Fläche)
-    Vector3f qMin, gMin;
-    float minDist2 = std::numeric_limits<float>::max();
-
-    // 1. Projektion auf die Ebene (Flächenlot)
-    Vector3f vPlane;
-    float dp = Project(p0, vPlane);
-    if (Contains(vPlane)) {
-        Vector3f g;
-        NearestPointOnLineToPoint(vPlane, p0, p1, g);
-        float d2 = (vPlane - g).LengthSquared();
-        if (d2 < minDist2) {
-            minDist2 = d2;
-            qMin = vPlane;
-            gMin = g;
-        }
-    }
-
-    // 2. Kanten
-    for (int i = 0; i < 4; ++i) {
-        Vector3f s0 = m_vertices[i];
-        Vector3f s1 = m_vertices[(i + 1) % 4];
-        Vector3f g, s;
-        NearestPointOnLineToSegment(p0, p1, s0, s1, g, s);
-        float d2 = (g - s).LengthSquared();
-        if (d2 < minDist2) {
-            minDist2 = d2;
-            qMin = s;
-            gMin = g;
-        }
-    }
-
-    // 3. Ecken
-    for (int i = 0; i < 4; ++i) {
-        Vector3f g;
-        NearestPointOnLineToPoint(m_vertices[i], p0, p1, g);
-        float d2 = (g - m_vertices[i]).LengthSquared();
-        if (d2 < minDist2) {
-            minDist2 = d2;
-            qMin = m_vertices[i];
-            gMin = g;
-        }
-    }
-
-    // Kein Treffer: Abstand zu groß?
-    float minDist = sqrtf(minDist2);
-    if (minDist - radius > m_tolerance)
-        return -1;
-
-    // Parallelitätsprüfung: Gerade annähernd parallel zur Ebene?
-    if (fabs(dir.Dot(m_normal)) < m_tolerance) {
-        // pr soll möglichst nahe bei p0 liegen (minimiere |pr - p0| unter |pr - qMin| = r)
-        Vector3f v = dir.Normal() * r;
-        // Punkt auf Geraden mit Abstand r zu qMin:
-        // pr = gMin ± v * r, wähle Richtung, dass |pr - p0| minimal ist
-        Vector3f pr1 = gMin + v;
-        Vector3f pr2 = gMin - v;
-
-        float d1 = (pr1 - p0).LengthSquared();
-        float d2 = (pr2 - p0).LengthSquared();
-
-        endPoint = (d1 < d2) ? pr1 : pr2;
-        collisionPoint = qMin;
-        return 1; // Da explizit der nächstliegende Punkt zu p0 gesucht ist
-    }
-
-
-    // Berechne den Punkt auf der Geraden mit Abstand radius zum Quad
-    Vector3f vQuad = qMin - gMin;
-    float quadDist = vQuad.Length();
-
-    if (quadDist < m_tolerance) {
-        // Richtung der Suche: auf Seite von p0
-        endPoint = qMin + m_normal * ((d0 >= 0.0f) ? radius : -radius);
-        collisionPoint = qMin;
-    }
-    else {
-        float s = sqrtf(radius * radius - minDist2);
-        float tdir = dir.Dot(p0 - gMin);
-        if (tdir < 0) s = -s; // In Richtung p0 (rückwärts)
-        endPoint = gMin + dir * s;
-        collisionPoint = qMin;
-    }
-
-    // Prüfe, ob Richtung von p0 zu p1 auf das Quad zu zeigt
-    if ((p1 - collisionPoint).Length() - (p0 - collisionPoint).Length() > m_tolerance)
-        return 0; // Richtung weg vom Quad
-
-    return 1; // Richtung auf Quad zu (oder gleichbleibend)
-}
-
-#else // -------------------------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 
 int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
 {

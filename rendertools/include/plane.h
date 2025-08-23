@@ -45,6 +45,24 @@ class Plane : public Vector3f {
         // so that a vector from that point to p is parallel to the plane's normal)
         float Project(const Vector3f& p, Vector3f& vPlanePoint);
 
+        float PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared);
+
+        inline float Plane::PointToLineDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, false, false);
+        }
+
+        inline float Plane::PointToLineDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, false, true);
+        }
+
+        inline float Plane::PointToSegmentDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, true, false);
+        }
+
+        inline float Plane::PointToSegmentDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, true, true);
+        }
+
         float NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint);
 
         // compute the intersection of a vector v between two points with a plane
@@ -73,12 +91,7 @@ class Plane : public Vector3f {
         };
 
     private:
-        bool SolveQuadratic(float a, float b, float c, float& t0, float& t1);
-
-        float SweepSphereEdge(const Vector3f& p0, const Vector3f& vLine, const Vector3f& a, const Vector3f& b, float r);
-
-        float SweepSpherePoint(const Vector3f& p0, const Vector3f& vLine, const Vector3f& c, float r);
-
+        bool SpherePenetratesQuad(LineSegment& line, float radius);
     };
 
 // =================================================================================================

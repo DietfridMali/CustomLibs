@@ -51,7 +51,7 @@ public:
 
 	inline Movement& Properties(void) { return properties; }
 
-	float ComputeNearestPoint(const Vector3f& p, Vector3f& nearestPoint);
+	float Project(const Vector3f& p, Vector3f& f);
 
 	int ComputeNearestPointsAt(const Vector3f& p, float radius, const Conversions::FloatInterval& limits);
 	
@@ -63,11 +63,12 @@ public:
 
 	int ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits);
 
-
+	// compute t so that q = p0 + dir * t is the foot point of a perpendicular on p0,dir through p1
 	static inline float ScalarProjection(const Vector3f& p0, const Vector3f& p1, const Vector3f& dir) {
 		float d = dir.Dot(dir);
 		return (d < Conversions::NumericTolerance) ? 0.0f : (p1 - p0).Dot(dir) / d;
 	}
+
 };
 
 // =================================================================================================
