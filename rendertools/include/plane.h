@@ -19,6 +19,7 @@ class Plane : public Vector3f {
         Vector3f        m_refEdges[2];
         float           m_refDots[2];
         float           m_tolerance;
+        float           m_toleranceSquared;
 
         Plane ();
 
@@ -47,20 +48,20 @@ class Plane : public Vector3f {
 
         float PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared);
 
-        inline float Plane::PointToLineDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-            return PointToLineDistanceEx(p0, p1, false, false);
+        inline float PointToLineDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, p2, false, false);
         }
 
-        inline float Plane::PointToLineDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-            return PointToLineDistanceEx(p0, p1, false, true);
+        inline float PointToLineDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, p2, false, true);
         }
 
-        inline float Plane::PointToSegmentDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-            return PointToLineDistanceEx(p0, p1, true, false);
+        inline float PointToSegmentDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, p2, true, false);
         }
 
-        inline float Plane::PointToSegmentDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-            return PointToLineDistanceEx(p0, p1, true, true);
+        inline float PointToSegmentDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+            return PointToLineDistanceEx(p0, p1, p2, true, true);
         }
 
         float NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint);

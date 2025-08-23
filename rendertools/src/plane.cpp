@@ -10,7 +10,7 @@
 // Geometric computations in planes and rectangles in a plane
 
 Plane::Plane() 
-    : m_tolerance(Conversions::NumericTolerance)
+    : m_tolerance(Conversions::NumericTolerance), m_toleranceSquared(Conversions::NumericTolerance * Conversions::NumericTolerance)
 {
     m_refDots[0] = m_refDots[1] = 0.0f;
 }
@@ -214,12 +214,13 @@ bool Plane::Contains(Vector3f& p, bool barycentric) {
 
 bool Plane::SpherePenetratesQuad(LineSegment& line, float radius) {
     // Projektion von p0 in die Ebene und Innen-Test
-    if (std::fabs(planeDistance) <= radius + m_tolerance) {
-        Vector3f p;
-        Project(line.p0, p);
-        if (Contains(pr))
-            return true;
-    }
+    Vector3f p;
+    float d = Project(line.p0, p);
+    if (std::fabs(d) > radius + m_tolerance)
+        return false;
+    if (Contains(p))
+        return true;
+
     // Falls noch nicht innen: Abstand zu Kanten prüfen
     radius *= radius;
     radius += m_toleranceSquared;
@@ -234,7 +235,6 @@ bool Plane::SpherePenetratesQuad(LineSegment& line, float radius) {
 
 bool LineSegment::CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const
 {
-    const float m_tolerance = m_tolerance;
     const float r2 = radius * radius;
 
     // δ_c^2 = ||(p0 - c) × d||^2 / ||d||^2
@@ -306,16 +306,16 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
         LineSegment edge(m_vertices[i], m_vertices[(i + 1) % 4]), collisionPoints;
         line.ComputeCapsuleIntersection(edge, collisionPoints, radius, limits);
         for (int j = 0; j < collisionPoints.solutions; ++j) {
-            if (collisionPoints.offsets[j] > bestOffsets) {
-                bestOffsets = collisionPoints.offsets[j];
-                bestPoints = collisionPoints.endPoints[j];
+            if (collisionPoints.offsets[j] > bestOffset) {
+                bestOffset = collisionPoints.offsets[j];
+                bestPoint = collisionPoints.endPoints[j];
             }
         }
     }
 
     if (bestOffset == std::numeric_limits<float>::max())
         return -1;
-    if ((bestOffset < 0) and not SpherePenetratesQuad(line, radius)))
+    if ((bestOffset < 0) and not SpherePenetratesQuad(line, radius))
         return -1;
     collisionPoint = bestPoint;
     endPoint = line.p0 + line.Velocity() * bestOffset;
@@ -323,8 +323,5 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
         return 0;
     return 1;
 }
-
-
-#endif 
 
 // =================================================================================================
