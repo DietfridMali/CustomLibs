@@ -299,7 +299,7 @@ bool Texture::Load(List<String>& fileNames, bool flipVertically) {
             }
         }
         else {
-#ifdef _DEBUG
+#if 0 // def _DEBUG
             bufferName = fileName;
             CheckFileOpen(fileName);
 #endif

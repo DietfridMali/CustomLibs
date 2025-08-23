@@ -141,8 +141,6 @@ int LineSegment::ComputeCapsuleIntersection(LineSegment& other, LineSegment& col
     float t0 = (-B - sqrtD) / (2.0f * A);
     float t1 = (-B + sqrtD) / (2.0f * A);
 
-    collisionPoints.solutions = 0;
-
     // t0 prüfen
     if (limits.Contains(t0)) {
         collisionPoints.offsets[collisionPoints.solutions] = t0;
