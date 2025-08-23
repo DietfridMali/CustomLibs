@@ -233,42 +233,6 @@ bool Plane::SpherePenetratesQuad(LineSegment& line, float radius) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool LineSegment::CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const
-{
-    const float r2 = radius * radius;
-
-    // δ_c^2 = ||(p0 - c) × d||^2 / ||d||^2
-    Vector3f w = this->p0; 
-    w -= c;
-    Vector3f wxd = w.Cross(d);
-    float delta2 = wxd.Dot(wxd) / dd;
-    if (delta2 > r2 + m_tolerance) 
-        return false;
-
-    // Fußpunkt auf P und Pythagoras-Offset
-    float tFoot = ScalarProjection(this->p0, c, d);
-    float inside = r2 - delta2;
-    float dt = (inside > 0.0f) ? std::sqrt(inside / dd) : 0.0f;
-
-    float tA = tFoot - dt;
-    float tB = tFoot + dt;
-
-    // größtes t ≤ 1, innerhalb limits
-    bool ok = false;
-    tSel = -std::numeric_limits<float>::infinity();
-    if (limits.Contains(tA) and tA <= 1.0f + m_tolerance) { 
-        tSel = std::max(tSel, tA); 
-        ok = true; 
-    }
-    if (std::fabs(tB - tA) > m_tolerance and limits.Contains(tB) and tB <= 1.0f + m_tolerance) { 
-        tSel = std::max(tSel, tB); 
-        ok = true; 
-    }
-    return ok;
-}
-
-// -------------------------------------------------------------------------------------------------
-
 int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
 {
     float d0 = Distance(line.p0);
