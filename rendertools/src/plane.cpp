@@ -313,7 +313,7 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
         }
     }
 
-    if (bestOffset == std::numeric_limits<float>::max())
+    if (bestOffset == std::numeric_limits<float>::lowest())
         return -1;
     if ((bestOffset < 0) and not SpherePenetratesQuad(line, radius))
         return -1;
