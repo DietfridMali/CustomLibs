@@ -299,7 +299,6 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
     }
 
     // 2. Kanten durchgehen
-    LineSegment bestPoints;
     float bestOffset = std::numeric_limits<float>::lowest(); // > permissible values
     Vector3f bestPoint;
 
