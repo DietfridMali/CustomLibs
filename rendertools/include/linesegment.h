@@ -51,6 +51,8 @@ public:
 
 	inline Movement& Properties(void) { return properties; }
 
+	float Distance(const Vector3f& p);
+
 	float Project(const Vector3f& p, Vector3f& f);
 
 	int ComputeNearestPointsAt(const Vector3f& p, float radius, const Conversions::FloatInterval& limits);
@@ -68,6 +70,9 @@ public:
 		float d = dir.Dot(dir);
 		return (d < Conversions::NumericTolerance) ? 0.0f : (p1 - p0).Dot(dir) / d;
 	}
+
+private:
+	bool CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const;
 
 };
 

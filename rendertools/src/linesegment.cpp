@@ -145,8 +145,39 @@ float LineSegment::ComputeNearestPoints(LineSegment& other, LineSegment& nearest
     return (pClosest - qClosest).Length();
 }
 
+// -------------------------------------------------------------------------------------------------
 
-int LineSegment::ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits)
+bool LineSegment::CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const
+{
+    const float r2 = radius * radius;
+
+    // δ_c^2 = ||(p0 - c) × d||^2 / ||d||^2
+    Vector3f w = this->p0; w -= c;
+    Vector3f wxd = w.Cross(d);
+    float delta2 = wxd.Dot(wxd) / dd;
+    if (delta2 > r2 + Conversions::NumericTolerance)
+        return false;
+
+    // Fußpunkt + Pythagoras entlang P
+    float tFoot = ScalarProjection(this->p0, c, d);
+    float inside = r2 - delta2;
+    float dt = (inside > 0.0f) ? std::sqrt(inside / dd) : 0.0f;
+
+    float tA = tFoot - dt;
+    float tB = tFoot + dt;
+
+    // größtes t ≤ 1, innerhalb limits
+    tSel = -std::numeric_limits<float>::infinity();
+    if (limits.Contains(tA) and (tA <= 1.0f + Conversions::NumericTolerance))
+        tSel = std::max(tSel, tA); 
+    if ((std::fabs(tB - tA) > Conversions::NumericTolerance) and limits.Contains(tB) and (tB <= 1.0f + Conversions::NumericTolerance))
+        tSel = std::max(tSel, tB); 
+    return tSel != -std::numeric_limits<float>::infinity();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+int LineSegment::ComputeCapsuleIntersection(LineSegment& other,  LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits)
 {
     collisionPoints.solutions = 0;
 
@@ -154,118 +185,88 @@ int LineSegment::ComputeCapsuleIntersection(LineSegment& other, LineSegment& col
     const Vector3f e = other.Velocity();     // G: g0 -> g1
     const float    dd = d.Dot(d);
     const float    ee = e.Dot(e);
+    const float    tol = m_tolerance;
     const float    r2 = radius * radius;
 
-    // on-the-fly: behalte den besten (größten) gültigen t (mit t <= 1, t darf < 0)
-    auto keepIfBetter = [&](float t) {
-        if (not limits.Contains(t)) return;
-        if (t > 1.0f + m_tolerance) return;
+    if (dd <= tol) return 0;                  // P degeneriert
+
+    // kleine lokale Helfer
+    auto acceptS01 = [&](float s) -> bool { return s >= -tol and s <= 1.0f + tol; };
+    auto acceptT = [&](float t) -> bool {
+        if (not limits.Contains(t)) return false;
+        if (t > 1.0f + tol)         return false;     // nur t ≤ 1
+        return true;                                   // t kann < 0 sein – Filter später in Plane::SphereIntersection
+        };
+    auto keepBestT = [&](float t) {
+        if (not acceptT(t)) return;
         Vector3f w = this->p0 + d * t;
         if (collisionPoints.solutions == 0 or t > collisionPoints.offsets[0]) {
-            collisionPoints.endPoints[0] = w;
-            collisionPoints.offsets[0] = t;
+            collisionPoints.endPoints[0] = w;   // Punkt auf *this*
+            collisionPoints.offsets[0] = t;   // Parameter t
             collisionPoints.solutions = 1;
         }
         };
 
-    // Degeneriert: P ist Punkt -> nur t=0 möglich
-    if (dd <= m_tolerance) {
-        // Abstand p0 zu Segment G (Projektion auf G, dann clamp)
-        float sLin = (ee > m_tolerance) ? ScalarProjection(other.p0, this->p0, e) : 0.0f;
-        float sSeg = (ee > m_tolerance) ? std::clamp(sLin, 0.0f, 1.0f) : 0.0f;
-        Vector3f q = other.p0 + e * sSeg;
-        float dist = (this->p0 - q).Length();
-        if (std::fabs(dist - radius) <= m_tolerance and limits.Contains(0.0f)) {
-            collisionPoints.endPoints[0] = this->p0;
-            collisionPoints.offsets[0] = 0.0f;
-            collisionPoints.solutions = 1;
-        }
-        return collisionPoints.solutions; // 0 oder 1
-    }
-
-    // ==========================================================
-    // 1) Mantel: erst Nächstpunkt(e) P<->G über ComputeNearestPoints holen
-    //    - nicht parallel: 1 Punkt p* auf P (t*), Linienabstand δ
-    //      -> Kandidaten t = t* ± Δt, nur wenn s(t) ∈ [0,1]
-    //    - parallel: 2 Parameter (Projektionen von other-Endpunkten auf P)
-    //      -> falls δ ≈ r, alle t im Intervall sind gültig -> nimm größtes zulässiges t
+    // ---------- 1) Mantel via ComputeNearestPoints ----------
     {
         LineSegment nearest;
-        float delta = this->ComputeNearestPoints(other, nearest); // füllt offsets/punkte auf *this*
-        if (ee > m_tolerance) {
+        float delta = this->ComputeNearestPoints(other, nearest); // liefert t* auf *this*; bei Parallelität 2 Parameter
+
+        if (ee > tol) {
             if (nearest.solutions == 1) {
-                // nicht parallel (oder other ist Punkt -> Kappen regeln)
-                const float tStar = nearest.offsets[0];
+                const float    tStar = nearest.offsets[0];
                 const Vector3f pStar = nearest.endPoints[0];
 
-                float sStar = ScalarProjection(other.p0, pStar, e); // Projektion von p* auf G-Linie
-                if (sStar >= -m_tolerance and sStar <= 1.0f + m_tolerance and delta <= radius + m_tolerance) {
+                float sStar = ScalarProjection(other.p0, pStar, e); // Projektion auf G
+                if (acceptS01(sStar) and delta <= radius + tol) {
                     Vector3f cx = d.Cross(e);
-                    float c2 = cx.Dot(cx);            // |d×e|^2
-                    if (c2 > m_tolerance) {
+                    float   c2 = cx.Dot(cx);          // |d×e|^2
+                    if (c2 > tol) {
                         float inside = r2 - delta * delta;
                         float dt = (inside > 0.0f) ? std::sqrt(inside * ee / c2) : 0.0f;
 
-                        // s(t) ist linear in t: s(t) = s* + beta (t - t*)
+                        // s(t) = s* + beta (t - t*)
                         float beta = d.Dot(e) / ee;
-                        auto tryCand = [&](float tCand) {
-                            float sCand = sStar + beta * (tCand - tStar);
-                            if (sCand >= -m_tolerance and sCand <= 1.0f + m_tolerance)
-                                keepIfBetter(tCand);
-                            };
-                        tryCand(tStar - dt);
-                        if (dt > m_tolerance) tryCand(tStar + dt);
+
+                        float tCand = tStar - dt;
+                        float sCand = sStar + beta * (tCand - tStar);
+                        if (acceptS01(sCand)) keepBestT(tCand);
+
+                        if (dt > tol) {
+                            tCand = tStar + dt;
+                            sCand = sStar + beta * (tCand - tStar);
+                            if (acceptS01(sCand)) keepBestT(tCand);
+                        }
                     }
                 }
             }
             else if (nearest.solutions == 2) {
-                // parallel: konstante Linien-Distanz delta
-                if (std::fabs(delta - radius) <= m_tolerance) {
+                // parallel: delta konstant
+                if (std::fabs(delta - radius) <= tol) {
                     float tMin = std::min(nearest.offsets[0], nearest.offsets[1]);
                     float tMax = std::max(nearest.offsets[0], nearest.offsets[1]);
-                    // größtes t in Schnittmenge [tMin, tMax] ∩ [limits.min, min(limits.max, 1)]
                     float upper = std::min(1.0f, limits.max);
                     float lower = limits.min;
                     float hi = std::min(tMax, upper);
                     float lo = std::max(tMin, lower);
-                    if (hi >= lo - m_tolerance) keepIfBetter(hi);
+                    if (hi >= lo - tol) keepBestT(hi); // größtes zulässiges t im Intervall
                 }
             }
         }
     }
 
-    // ==========================================================
-    // 2) Kappen: Endpunkte g0,g1 als Sphären prüfen (Project/Pythagoras),
-    //    pro Kappe sofort den größten zulässigen t ≤ 1 behalten
-    auto capOnP = [&](const Vector3f& c) {
-        Vector3f w = this->p0 - c;
-        Vector3f wxd = w.Cross(d);
-        float delta2 = wxd.Dot(wxd) / dd;       // Abstand^2 c -> P-Linie
-        if (delta2 > r2 + m_tolerance) return;
-
-        float tFoot = ScalarProjection(this->p0, c, d);
-        float dt = 0.0f;
-        if (r2 > delta2) dt = std::sqrt((r2 - delta2) / dd);
-
-        float tA = tFoot - dt;
-        float tB = tFoot + dt;
-
-        if (tA <= 1.0f + m_tolerance) keepIfBetter(tA);
-        if (std::fabs(tB - tA) > m_tolerance and tB <= 1.0f + m_tolerance) keepIfBetter(tB);
-        };
-
-    if (ee > m_tolerance) {
-        capOnP(other.p0);
-        capOnP(other.p1);
+    // ---------- 2) Kappen (Endpunkte g0, g1) ----------
+    if (ee > tol) {
+        float tSel;
+        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) keepBestT(tSel);
+        if (CapCheckOnP(other.p1, d, dd, radius, limits, tSel)) keepBestT(tSel);
     }
     else {
-        // other degeneriert (Punkt) -> nur eine "Kappe"
-        capOnP(other.p0);
+        float tSel;
+        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) keepBestT(tSel);
     }
 
-    return collisionPoints.solutions; // 1 bei Erfolg, sonst 0
+    return collisionPoints.solutions; // 1 bei Treffer, sonst 0
 }
-
-#endif
 
 // =================================================================================================
