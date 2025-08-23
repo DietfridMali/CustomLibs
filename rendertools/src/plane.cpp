@@ -245,20 +245,14 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
         line.Refresh();
     }
 
-    bool checkPenetration = true;
-    bool isPenetrating = SpherePenetratesQuad(line, radius);
-
-    const auto CheckPenetration = [&]() noexcept -> bool {
-        if (checkPenetration) {
-            checkPenetration = false;
-            isPenetrating = SpherePenetratesQuad(line, radius);
-            }
-        return isPenetrating;
-
-        };
+    int isPenetrating = -1;
 
     auto AllowMovement = [&](float t) noexcept -> bool {
-        return (t >= 0.0f) or CheckPenetration();
+        if (t >= 0.0f)
+            return true;
+        if (isPenetrating < 0)
+            isPenetrating = SpherePenetratesQuad(line, radius);
+        return isPenetrating != 0;
         };
 
     // 1. Schnittpunkt mit Ebene in Abstand radius prüfen (Projektion im Quad)
