@@ -245,12 +245,18 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
         line.Refresh();
     }
 
+    bool isPenetrating = SpherePenetratesQuad(line, radius);
+
+    const auto AllowMovement(float t) = [isPenetrating](float t) noexcept -> bool {
+        return (t >= 0.0f) or isPenetrating;
+        };
+
     // 1. Schnittpunkt mit Ebene in Abstand radius prüfen (Projektion im Quad)
     float denom = m_normal.Dot(line.Velocity());
     if (fabs(denom) > m_tolerance) {
         float r = (d0 >= 0) ? radius : -radius;
         float t = (r - d0) / denom;
-        if (limits.Contains(t)) {
+        if (AllowMovement(t) and limits.Contains(t)) {
             Vector3f candidate = line.p0 + line.Velocity() * t;
             float d = Distance(candidate);
             Vector3f vPlane = candidate - m_normal * d;
@@ -279,7 +285,7 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
 
     if (bestOffset == std::numeric_limits<float>::lowest())
         return -1;
-    if ((bestOffset < 0) and not SpherePenetratesQuad(line, radius))
+    if (not AllowMovement(bestOffset))
         return -1;
     collisionPoint = bestPoint;
     endPoint = line.p0 + line.Velocity() * bestOffset;
