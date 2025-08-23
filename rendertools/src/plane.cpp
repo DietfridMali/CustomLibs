@@ -257,7 +257,7 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
 
         };
 
-    auto AllowMovement = [&CheckPenetration](float t) noexcept -> bool {
+    auto AllowMovement = [&](float t) noexcept -> bool {
         return (t >= 0.0f) or CheckPenetration();
         };
 
