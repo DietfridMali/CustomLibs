@@ -267,7 +267,7 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
             if (Contains(vPlane)) {
                 endPoint = candidate;
                 collisionPoint = vPlane;
-                return (line.Normal().Dot(m_normal) > 0) ? 0 : 1;
+                return (line.Normal().Dot(m_normal) >= 0) ? 0 : 1;
             }
         }
     }
@@ -293,7 +293,7 @@ int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisio
         return -1;
     collisionPoint = bestPoint;
     endPoint = line.p0 + line.Velocity() * bestOffset;
-    if (line.Normal().Dot(m_normal) > 0) // just touching quad and moving away
+    if (line.Normal().Dot(m_normal) >= 0) // just touching quad and moving away
         return 0;
     return 1;
 }
