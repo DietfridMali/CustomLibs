@@ -44,6 +44,8 @@ class BaseRenderer
         int                     m_sceneTop;
         float                   m_aspectRatio;
 
+        RGBAColor               m_backgroundColor;
+
         GLVersion               m_glVersion;
         MovingFrameCounter      m_frameCounter;
 
@@ -51,7 +53,7 @@ class BaseRenderer
 public:
         BaseRenderer()
             : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
-            , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f)
+            , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f), m_backgroundColor(ColorData::Black)
             , m_screenIsAvailable(false)
         { 
             //_instance = this;
@@ -104,6 +106,23 @@ public:
         inline int SceneTop(void) { return m_sceneTop; }
 
         inline float AspectRatio(void) { return m_aspectRatio; }
+
+        template <typename T>
+        inline void SetBackgroundColor(T&& backgroundColor) {
+            m_backgroundColor = std::forward<T>(backgroundColor);
+        }
+
+        inline void SetClearColor(const RGBAColor& color) const {
+            glClearColor(color.R(), color.G(), color.B(), color.A());
+        }
+
+        inline void SetClearColor(RGBAColor&& color) {
+            SetClearColor(static_cast<const RGBAColor&>(color));
+        }
+
+        inline void ResetClearColor(void) {
+            glClearColor(0, 0, 0, 0);
+        }
 #if 0
         typedef struct {
             int width, height;

@@ -110,12 +110,14 @@ bool BaseRenderer::Start2DScene(void) {
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) 
         return false;
 #endif
+    SetClearColor(m_backgroundColor);
     ResetDrawBuffers(m_screenBuffer, not m_screenIsAvailable);
     m_screenIsAvailable = true;
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight), false);
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    ResetClearColor();
     return true;
 }
 
