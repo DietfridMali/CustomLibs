@@ -55,14 +55,20 @@ public:
     List() = default;
     ~List() = default;
 
-    List(std::initializer_list<ItemType> initList) {
-        for (const auto& elem : initList)
+    List(std::initializer_list<ItemType> itemList) {
+        for (const auto& elem : itemList)
             m_list.push_back(elem);
     }
 
     inline operator std::list<ItemType>& () { return m_list; }
 
     inline operator const std::list<ItemType>& () const { return m_list; }
+
+    List& operator=(std::initializer_list<ItemType> itemList) {
+        m_list.clear();
+        m_list.insert(m_list.end(), itemList.begin(), itemList.end());
+        return *this;
+    }
 
     // ----------------------------------------------------------
 

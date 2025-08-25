@@ -9,10 +9,21 @@ private:
     std::map<KEY_T, DATA_T> m_map;
 
 public:
-    using tComparator = int(*)(void* context, const KEY_T& k1, const KEY_T& k2);
-
     StdMap(int /*capacity*/ = 0) {}
     ~StdMap() = default;
+
+    using tComparator = int(*)(void* context, const KEY_T& k1, const KEY_T& k2);
+    using iterator = typename std::map<KEY_T, DATA_T>::iterator;
+    using const_iterator = typename std::map<KEY_T, DATA_T>::const_iterator;
+
+    iterator begin() { return m_map.begin(); }
+    iterator end() { return m_map.end(); }
+
+    const_iterator begin() const { return m_map.begin(); }
+    const_iterator end()   const { return m_map.end(); }
+
+    const_iterator cbegin() const { return m_map.cbegin(); }
+    const_iterator cend()   const { return m_map.cend(); }
 
     inline int Size() const {
         return static_cast<int>(m_map.size());
