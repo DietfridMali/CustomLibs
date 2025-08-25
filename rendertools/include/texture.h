@@ -234,32 +234,24 @@ public:
 
     virtual bool Create(void);
 
-    virtual void Destroy(void)
-        noexcept;
+    virtual void Destroy(void);
 
-    virtual bool IsAvailable(void)
-        noexcept;
+    virtual bool IsAvailable(void);
 
-    virtual void Bind(void)
-        noexcept;
+    virtual void Bind(void);
 
-    virtual void Release(void)
-        noexcept;
+    virtual void Release(void);
 
-    void SetParams(void)
-        noexcept;
+    virtual void SetParams(void);
 
     void Wrap(void)
         noexcept;
 
-    virtual void Enable(int tmu = 0)
-        noexcept;
+    virtual void Enable(int tmu = 0);
 
-    virtual void Disable(void)
-        noexcept;
+    virtual void Disable(void);
 
-    virtual void Deploy(int bufferIndex = 0)
-        noexcept;
+    virtual void Deploy(int bufferIndex = 0);
 
     virtual bool Load(List<String>& fileNames, bool flipVertically);
 

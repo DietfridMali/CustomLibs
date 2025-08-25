@@ -13,33 +13,33 @@
 // a well defined and controlled way at program termination without having to bother about releasing
 // textures at a dozen places in the game
 
-class TextureHandler 
+class TextureHandler
     : public BaseSingleton<TextureHandler>
 {
-    public:
-        TextureList m_textures;
+public:
+    TextureList m_textures;
 
-        typedef Texture* (*tGetter) (void);
+    typedef Texture* (*tGetter) (void);
 
-        TextureHandler() = default;
+    TextureHandler() = default;
 
-        ~TextureHandler() { Destroy (); }
+    ~TextureHandler() noexcept { Destroy(); }
 
-        void Destroy(void);
+    void Destroy(void) noexcept;
 
-        Texture* GetTexture(void);
+    Texture* GetTexture(void);
 
-        Cubemap* GetCubemap(void);
+    Cubemap* GetCubemap(void);
 
-        bool Remove(Texture* texture);
+    bool Remove(Texture* texture);
 
-        TextureList Create(String textureFolder, List<String>& textureNames, GLenum textureType);
+    TextureList Create(String textureFolder, List<String>& textureNames, GLenum textureType);
 
-        TextureList CreateTextures(String textureFolder, List<String>& textureNames);
+    TextureList CreateTextures(String textureFolder, List<String>& textureNames);
 
-        TextureList CreateCubemaps(String textureFolder, List<String>& textureNames);
+    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames);
 
-        TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType);
+    TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType);
 
 };
 

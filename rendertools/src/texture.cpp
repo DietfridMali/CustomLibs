@@ -136,7 +136,6 @@ bool Texture::Create(void) {
 
 
 void Texture::Destroy(void)
-noexcept
 {
 #if USE_SHARED_HANDLES
     m_handle.Release();
@@ -195,7 +194,6 @@ noexcept
 }
 
 bool Texture::IsAvailable(void)
-noexcept
 {
     return
 #if USE_SHARED_HANDLES
@@ -208,7 +206,6 @@ noexcept
 
 
 void Texture::Bind(void)
-noexcept
 {
     if (IsAvailable()) {
         glEnable(GL_TEXTURE_2D);
@@ -223,7 +220,6 @@ noexcept
 
 
 void Texture::Release(void)
-noexcept
 {
     if (IsAvailable())
         glBindTexture(m_type, 0);
@@ -231,7 +227,6 @@ noexcept
 
 
 void Texture::SetParams(void)
-noexcept
 {
     if (m_useMipMaps) {
         glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
@@ -255,7 +250,6 @@ noexcept
 
 
 void Texture::Enable(int tmu)
-noexcept
 {
     glActiveTexture(GL_TEXTURE0 + tmu);
     glEnable(m_type);
@@ -266,7 +260,6 @@ noexcept
 
 
 void Texture::Disable(void)
-noexcept
 {
     Release();
     glDisable(m_type);
@@ -274,7 +267,6 @@ noexcept
 
 
 void Texture::Deploy(int bufferIndex)
-noexcept
 {
     if (IsAvailable()) {
         Bind();
@@ -307,7 +299,7 @@ noexcept
 
 #ifdef _DEBUG
 
-void CheckFileOpen(const std::string& path) {
+static void CheckFileOpen(const std::string& path) {
     errno = 0;
     FILE* f = std::fopen(path.c_str(), "rb");
     if (!f) {

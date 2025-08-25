@@ -1,4 +1,3 @@
-#pragma once
 
 #include "texturehandler.h"
 
@@ -8,9 +7,10 @@
 // a well defined and controlled way at program termination without having to bother about releasing
 // textures at a dozen places in the game
 
-void TextureHandler::Destroy(void) {
-    for (auto& t : m_textures) 
+void TextureHandler::Destroy(void) noexcept {
+    for (auto& t : m_textures)
         delete t;
+    m_textures.Clear(); // verhindert Double-Delete bei wiederholtem Destroy
 }
 
 
@@ -24,11 +24,12 @@ Texture* TextureHandler::GetTexture(void) {
 
 
 bool TextureHandler::Remove(Texture* texture) {
-	if (not texture)
-		return false;
+    if (not texture)
+        return false;
     m_textures.Remove(texture);
-	texture->Destroy ();
-	return true;
+    texture->Destroy();
+    delete texture; // BUGFIX: Speicherleck beseitigt (Objekt selbst freigeben)
+    return true;
 }
 
 
@@ -40,7 +41,7 @@ Cubemap* TextureHandler::GetCubemap(void) {
 
 
 TextureList TextureHandler::Create(String textureFolder, List<String>& textureNames, GLenum textureType) {
-    return (textureType == GL_TEXTURE_CUBE_MAP) ? CreateCubemaps (textureFolder, textureNames) : CreateTextures (textureFolder, textureNames);
+    return (textureType == GL_TEXTURE_CUBE_MAP) ? CreateCubemaps(textureFolder, textureNames) : CreateTextures(textureFolder, textureNames);
 }
 
 
@@ -62,9 +63,9 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
 
 TextureList TextureHandler::CreateCubemaps(String textureFolder, List<String>& textureNames) {
     TextureList textures;
-	List<String> fileNames;
+    List<String> fileNames;
     for (auto& n : textureNames) {
-        Cubemap* t = GetCubemap ();
+        Cubemap* t = GetCubemap();
         if (not t)
             break;
         textures.Append(t);
@@ -77,7 +78,7 @@ TextureList TextureHandler::CreateCubemaps(String textureFolder, List<String>& t
 
 
 TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType) {
-    return Create (textureFolder, textureNames, textureType);
+    return Create(textureFolder, textureNames, textureType);
 }
 
 // =================================================================================================
