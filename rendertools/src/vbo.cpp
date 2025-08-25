@@ -7,7 +7,9 @@
 // dataSize: buffer size in bytes
 // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
 // componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
-VBO::VBO(const char* type, GLint bufferType, bool isDynamic) {
+VBO::VBO(const char* type, GLint bufferType, bool isDynamic)
+noexcept
+{
     m_index = -1;
     m_type = type;
     m_bufferType = bufferType;
@@ -26,16 +28,18 @@ VBO::VBO(const char* type, GLint bufferType, bool isDynamic) {
 }
 
 
-size_t VBO::ComponentSize (size_t componentType) {
+size_t VBO::ComponentSize(size_t componentType)
+noexcept
+{
     switch (componentType) {
-        case GL_FLOAT:
-            return 4;
-        case GL_UNSIGNED_INT:
-            return 4;
-        case GL_UNSIGNED_SHORT:
-            return 2;
-        default:
-            return 4;
+    case GL_FLOAT:
+        return 4;
+    case GL_UNSIGNED_INT:
+        return 4;
+    case GL_UNSIGNED_SHORT:
+        return 2;
+    default:
+        return 4;
     }
 }
 
@@ -58,7 +62,9 @@ VBO& VBO::Copy(VBO const& other) {
 }
 
 
-VBO& VBO::Move(VBO& other) {
+VBO& VBO::Move(VBO& other)
+noexcept
+{
     if (this != &other) {
         m_index = other.m_index;
         m_type = other.m_type;
@@ -80,12 +86,18 @@ VBO& VBO::Move(VBO& other) {
 }
 
 
-bool VBO::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount) {
+bool VBO::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+#if USE_SHARED_HANDLES
+noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
+#else
+noexcept(noexcept(Bind()) && noexcept(Describe()))
+#endif
+{
     bool update;
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable()) {
 #else
-    if (m_handle != 0)
+    if (m_handle != 0) {                     // BUGFIX: fehlende Klammer im #else-Zweig ergänzt
 #endif
         if (m_isDynamic)
             update = m_size == dataSize;
@@ -124,10 +136,12 @@ bool VBO::Update(const char* type, GLint bufferType, int index, void* data, size
         glBufferData(m_bufferType, dataSize, data, m_isDynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
     Describe();
     return true;
-}
+    }
 
 
-void VBO::Destroy(void) {
+void VBO::Destroy(void)
+noexcept
+{
     if (m_handle) {
         Release();
 #if USE_SHARED_HANDLES

@@ -7,6 +7,7 @@
 // =================================================================================================
 
 Matrix4f Projection::Create(float aspectRatio, float fov, bool rowMajor)
+noexcept
 {
     m_aspectRatio = aspectRatio;
     m_fov = fov;
@@ -15,6 +16,7 @@ Matrix4f Projection::Create(float aspectRatio, float fov, bool rowMajor)
 
 
 Matrix4f Projection::ComputeProjection(bool rowMajor)
+noexcept
 {
     //m_projection.Create (16);
     float yMax = m_zNear * tanf(Conversions::DegToRad(m_fov / 2));
@@ -26,6 +28,7 @@ Matrix4f Projection::ComputeProjection(bool rowMajor)
 
 
 Matrix4f Projection::ComputeFrustum(float left, float right, float bottom, float top, bool rowMajor)
+noexcept
 {
     float nearPlane = 2.0f * m_zNear;
     float depth = m_zFar - m_zNear;
@@ -34,10 +37,10 @@ Matrix4f Projection::ComputeFrustum(float left, float right, float bottom, float
     // symmetric frustum, i.e. left == -right and bottom == -top
     m_projection =
         Matrix4f(
-            Vector4f{m_zNear / right, 0.0f, 0.0f, 0.0f},
-            Vector4f{0.0f, m_zNear / top, 0.0f, 0.0f},
-            Vector4f{0.0f, 0.0f, -{m_zFar + m_zNear} / depth, -1.0f},
-            Vector4f{0.0f, 0.0f, {-nearPlane * m_zFar} / depth, 0.0f}
+            Vector4f{ m_zNear / right, 0.0f, 0.0f, 0.0f },
+            Vector4f{ 0.0f, m_zNear / top, 0.0f, 0.0f },
+            Vector4f{ 0.0f, 0.0f, -{m_zFar + m_zNear} / depth, -1.0f },
+            Vector4f{ 0.0f, 0.0f, {-nearPlane * m_zFar} / depth, 0.0f }
         );
 #else
     float width = right - left;
@@ -51,7 +54,7 @@ Matrix4f Projection::ComputeFrustum(float left, float right, float bottom, float
         });
     return m;
 #else
-    Matrix4f m ({
+    Matrix4f m({
         Vector4f{ nearPlane / width,               0.0f,        (left + right) / width,  0.0f },
         Vector4f{              0.0f, nearPlane / height,       (top + bottom) / height,  0.0f },
         Vector4f{              0.0f,               0.0f,   -(m_zFar + m_zNear) / depth, -1.0f },
@@ -63,25 +66,30 @@ Matrix4f Projection::ComputeFrustum(float left, float right, float bottom, float
 }
 
 
-Matrix4f Projection::ComputeOrthoProjection(float left, float right, float bottom, float top, float zNear, float zFar, bool rowMajor) {
+Matrix4f Projection::ComputeOrthoProjection(float left, float right, float bottom, float top, float zNear, float zFar, bool rowMajor)
+noexcept
+{
 #if USE_GLM
 #   if 1
-    Matrix4f m (glm::ortho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0));
+    Matrix4f m(glm::ortho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0));
+#       if 0 // erst aufrufenden Code überprüfen!
+    Matrix4f m(glm::ortho(left, right, bottom, top, zNear, zFar));
+#       endif
     return m;
 #else
     m = Matrix4f({ Vector4f{ 2.0f,  0.0f,  0.0f, -1.0f },  // erste Zeile
-                 Vector4f{ 0.0f,  2.0f,  0.0f, -1.0f },  // zweite Zeile
-                 Vector4f{ 0.0f,  0.0f, -1.0f,  0.0f },  // dritte Zeile
-                 Vector4f{ 0.0f,  0.0f,  0.0f,  1.0f }   // vierte Zeile
+                   Vector4f{ 0.0f,  2.0f,  0.0f, -1.0f },  // zweite Zeile
+                   Vector4f{ 0.0f,  0.0f, -1.0f,  0.0f },  // dritte Zeile
+                   Vector4f{ 0.0f,  0.0f,  0.0f,  1.0f }   // vierte Zeile
         });
 #   endif
 #else
-    Matrix4f m ({ Vector4f{ 2.0f,  0.0f,  0.0f,  0.0f },  // erste Zeile
+    Matrix4f m({ Vector4f{ 2.0f,  0.0f,  0.0f,  0.0f },  // erste Zeile
                   Vector4f{ 0.0f,  2.0f,  0.0f,  0.0f },  // zweite Zeile
                   Vector4f{ 0.0f,  0.0f, -1.0f,  0.0f },  // dritte Zeile
                   Vector4f{-1.0f, -1.0f,  0.0f,  1.0f }   // vierte Zeile
-                }, 
-                false);
+        },
+        false);
 #endif
 #if 0
     float rl = right - left;

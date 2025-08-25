@@ -1,5 +1,4 @@
 #pragma once
-
 #define NOMINMAX
 
 #include <limits>
@@ -23,6 +22,8 @@ public:
     virtual void Destroy(void) = 0;
 
     virtual void Render(Shader* shader, Texture* texture) = 0;
+
+    virtual ~AbstractMesh() = default;
 };
 
 // =================================================================================================
@@ -35,18 +36,15 @@ public:
         m_colors.Append(color);
     }
 
-
     void Pop(void) {
         m_colors.Extract(-1);
     }
-
 
     RGBAColor Get(void) {
         if (not m_colors.IsEmpty())
             return m_colors[-1];
         return RGBAColor{ 1, 1, 1, 1 };
     }
-
 
     void Destroy(void) {
         m_colors.Clear();
@@ -93,7 +91,9 @@ public:
         m_vao.SetDynamic(isDynamic);
     }
 
-    inline uint32_t ShapeSize(void) {
+    inline uint32_t ShapeSize(void)
+        noexcept
+    {
         if (m_shape == GL_QUADS)
             return 4;
         if (m_shape == GL_TRIANGLES)
@@ -114,6 +114,7 @@ public:
     inline void UpdateColorBuffer(void) {
         m_vao.UpdateVertexBuffer("Color", m_vertexColors.GLData(), m_vertexColors.GLDataSize(), GL_FLOAT, 4);
     }
+
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(void) {
         m_vao.UpdateVertexBuffer("Normal", m_normals.GLData(), m_normals.GLDataSize(), GL_FLOAT, 3);
@@ -129,7 +130,9 @@ public:
 
     void CreateVertexIndices(void);
 
-    inline VAO& VAO(void) {
+    inline VAO& VAO(void)
+        noexcept
+    {
         return m_vao;
     }
 
@@ -139,11 +142,14 @@ public:
 
     virtual void PopTexture(void);
 
-    virtual Texture* GetTexture(void);
+    virtual Texture* GetTexture(void)
+        noexcept;
 
-    bool EnableTexture(void);
+    bool EnableTexture(void)
+        noexcept;
 
-    void DisableTexture(void);
+    void DisableTexture(void)
+        noexcept;
 
     inline void AddVertex(const Vector3f& v) {
         m_vertices.Append(v);
@@ -191,7 +197,9 @@ public:
         m_indices.SetGLData(i);
     }
 
-    inline bool IsEmpty(void) {
+    inline bool IsEmpty(void)
+        noexcept(noexcept(m_vertices.IsEmpty()))
+    {
         return m_vertices.IsEmpty();
     }
 

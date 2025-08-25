@@ -31,140 +31,170 @@
 
 #define USE_SHARED_HANDLES 1
 
-class VAO 
+class VAO
 {
-    public:
-        List<VBO*>          m_dataBuffers;
-        VBO                 m_indexBuffer;
+public:
+    List<VBO*>          m_dataBuffers;
+    VBO                 m_indexBuffer;
 #if USE_SHARED_HANDLES
-        SharedGLHandle      m_handle;
+    SharedGLHandle      m_handle;
 #else
-        GLuint              m_handle;
+    GLuint              m_handle;
 #endif
-        GLuint              m_shape;
-        bool                m_isDynamic;
-        bool                m_isBound;
+    GLuint              m_shape;
+    bool                m_isDynamic;
+    bool                m_isBound;
 
-        static VAO*         activeVAO;
-        static List<VAO*>   vaoStack;
+    static VAO* activeVAO;
+    static List<VAO*>   vaoStack;
 
-        VAO(bool isDynamic = true)
-            : m_isDynamic(isDynamic), m_isBound(false), m_shape(0)
+    VAO(bool isDynamic = true)
+        : m_isDynamic(isDynamic), m_isBound(false), m_shape(0)
 #if USE_SHARED_HANDLES
-            , m_handle (SharedGLHandle(0, glGenVertexArrays, glDeleteVertexArrays))
+        , m_handle(SharedGLHandle(0, glGenVertexArrays, glDeleteVertexArrays))
 #else
-            , m_handle(0)
+        , m_handle(0)
 #endif
-        { 
-            SetDynamic(isDynamic);
-        }
+    {
+        SetDynamic(isDynamic);
+    }
 
-        static inline void PushVAO(VAO* vao) {
-            vaoStack.Append(vao);
-        }
+    static inline void PushVAO(VAO* vao)
+        noexcept
+    {
+        vaoStack.Append(vao);
+    }
 
-        static inline VAO* PopVAO(void) {
-            if (not vaoStack.Length())
-                return nullptr;
-            VAO* vao;
-            vaoStack.Pop(vao);
-            return vao;
-        }
+    static inline VAO* PopVAO(void)
+        noexcept
+    {
+        if (not vaoStack.Length())
+            return nullptr;
+        VAO* vao;
+        vaoStack.Pop(vao);
+        return vao;
+    }
 
-        inline void SetDynamic(bool isDynamic) {
-            m_isDynamic = isDynamic;
-            for (auto vbo : m_dataBuffers)
-                vbo->SetDynamic(isDynamic);
-            m_indexBuffer.SetDynamic(m_isDynamic);
-        }
+    inline void SetDynamic(bool isDynamic)
+        noexcept
+    {
+        m_isDynamic = isDynamic;
+        for (auto vbo : m_dataBuffers)
+            vbo->SetDynamic(isDynamic);
+        m_indexBuffer.SetDynamic(m_isDynamic);
+    }
 
-        bool Init (GLuint shape);
+    bool Init(GLuint shape)
+        noexcept;
 
-        ~VAO () {
-            Destroy ();
-        }
+    ~VAO() {
+        Destroy();
+    }
 
-        VAO(VAO const& other) {
-            Copy (other);
-        }
+    VAO(VAO const& other) {
+        Copy(other);
+    }
 
-        VAO(VAO&& other) noexcept {
-            Move(other);
-        }
+    VAO(VAO&& other) noexcept {
+        Move(other);
+    }
 
-        VAO& operator=(const VAO& other) {
-            return Copy(other);
-        }
+    VAO& operator=(const VAO& other) {
+        return Copy(other);
+    }
 
-        VAO& operator=(VAO&& other) noexcept {
-            return Move(other);
-        }
+    VAO& operator=(VAO&& other) noexcept {
+        return Move(other);
+    }
 
-        VAO& Copy (VAO const& other);
+    VAO& Copy(VAO const& other);
 
-        VAO& Move(VAO& other);
+    VAO& Move(VAO& other)
+        noexcept;
 
-        void Destroy(void);
+    void Destroy(void)
+        noexcept;
 
-        void Reset (void);
+    void Reset(void)
+        noexcept;
 
-        inline bool IsValid(void) {
+    inline bool IsValid(void)
+        noexcept
+    {
 #if USE_SHARED_HANDLES
-            return m_handle.IsAvailable();
+        return m_handle.IsAvailable();
 #else
-            return m_handle != 0;
+        return m_handle != 0;
 #endif
+    }
+
+    inline bool IsBound(void)
+        noexcept
+    {
+        return IsValid() and m_isBound;
+    }
+
+    inline bool IsActive(void)
+        noexcept
+    {
+        return this == activeVAO;
+    }
+
+    inline void Activate(void)
+        noexcept
+    {
+        if (not IsActive()) {
+            PushVAO(activeVAO);
+            activeVAO = this;
         }
+    }
 
-        inline bool IsBound(void) {
-            return IsValid() and m_isBound;
+    inline void Deactivate(void)
+        noexcept
+    {
+        if (IsActive()) {
+            activeVAO = PopVAO();
+            if (activeVAO and activeVAO->IsBound())
+                activeVAO->Enable();
         }
+    }
 
-        inline bool IsActive(void) {
-            return this == activeVAO;
-        }
+    void Enable(void)
+        noexcept;
 
-        inline void Activate(void) {
-            if (not IsActive()) {
-                PushVAO(activeVAO);
-                activeVAO = this;
-            }
-        }
+    void Disable(void)
+        noexcept;
 
-        inline void Deactivate(void) {
-            if (IsActive()) {
-                activeVAO = PopVAO();
-                if (activeVAO and activeVAO->IsBound())
-                    activeVAO->Enable();
-            }
-        }
+    inline Texture* EnableTexture(Texture* texture)
+        noexcept
+    {
+        if (texture != nullptr)
+            texture->Enable();
+        return texture;
+    }
 
-        void Enable(void);
+    inline void DisableTexture(Texture* texture)
+        noexcept
+    {
+        if (texture != nullptr)
+            texture->Disable();
+    }
 
-        void Disable(void);
+    VBO* FindBuffer(const char* type, int& index)
+        noexcept;
 
-        inline Texture* EnableTexture(Texture* texture) {
-            if (texture != nullptr)
-                texture->Enable();
-            return texture;
-        }
+    // add a vertex or index data buffer
+    bool UpdateBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0)
+        noexcept;
 
-        inline void DisableTexture(Texture* texture) {
-            if (texture != nullptr)
-                texture->Disable();
-        }
+    bool UpdateVertexBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+        noexcept;
 
+    void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
+        noexcept;
 
-        VBO* FindBuffer(const char* type, int& index);
-
-        // add a vertex or index data buffer
-        bool UpdateBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0);
-
-        bool UpdateVertexBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount);
-
-        void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType);
-
-        void Render(Shader* shader, Texture* texture = nullptr);
+    void Render(Shader* shader, Texture* texture = nullptr)
+        noexcept;
 };
 
 // =================================================================================================

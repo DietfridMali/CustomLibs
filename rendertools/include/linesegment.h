@@ -24,56 +24,87 @@ public:
 
 	LineSegment(Vector3f p0 = Vector3f::ZERO, Vector3f p1 = Vector3f::ZERO)
 		: m_tolerance(Conversions::NumericTolerance)
-	{ 
+	{
 		Init(p0, p1);
 	}
 
-
-	inline void Refresh(void) {
+	inline void Refresh(void)
+		noexcept
+	{
 		properties = p1 - p0;
 	}
 
-	void Init (Vector3f p0 = Vector3f::ZERO, Vector3f p1 = Vector3f::ZERO) {
+	void Init(Vector3f p0 = Vector3f::ZERO, Vector3f p1 = Vector3f::ZERO)
+		noexcept
+	{
 		this->p0 = p0;
 		this->p1 = p1;
 		solutions = 0;
 		Refresh();
 	}
 
+	inline Vector3f& Velocity(void)
+		noexcept
+	{
+		return properties.velocity;
+	}
 
-	inline Vector3f& Velocity(void) { return properties.velocity;  }
+	inline float Length(void)
+		noexcept
+	{
+		return properties.length;
+	}
 
-	inline float Length(void) { return properties.length; }
+	inline float LengthSquared(void)
+		noexcept
+	{
+		return properties.length * properties.length;
+	}
 
-	inline float LengthSquared(void) { return properties.length * properties.length; }
+	inline Vector3f& Normal(void)
+		noexcept
+	{
+		return properties.normal;
+	}
 
-	inline Vector3f& Normal(void) { return properties.normal; }
+	inline Movement& Properties(void)
+		noexcept
+	{
+		return properties;
+	}
 
-	inline Movement& Properties(void) { return properties; }
+	float Distance(const Vector3f& p)
+		noexcept;
 
-	float Distance(const Vector3f& p);
+	float Project(const Vector3f& p, Vector3f& f)
+		noexcept;
 
-	float Project(const Vector3f& p, Vector3f& f);
+	int ComputeNearestPointsAt(const Vector3f& p, float radius, const Conversions::FloatInterval& limits)
+		noexcept;
 
-	int ComputeNearestPointsAt(const Vector3f& p, float radius, const Conversions::FloatInterval& limits);
-	
-	inline Vector3f NearestPointAt(int i) {
+	inline Vector3f NearestPointAt(int i)
+		noexcept
+	{
 		return (i < solutions) ? p0 + Velocity() * offsets[i] : Vector3f::NONE;
 	}
 
-	float ComputeNearestPoints(LineSegment& other, LineSegment& nearestPoints);
+	float ComputeNearestPoints(LineSegment& other, LineSegment& nearestPoints)
+		noexcept;
 
-	int ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits);
+	int ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits)
+		noexcept;
 
 	// compute t so that q = p0 + dir * t is the foot point of a perpendicular on p0,dir through p1
-	static inline float ScalarProjection(const Vector3f& p0, const Vector3f& p1, const Vector3f& dir) {
+	static inline float ScalarProjection(const Vector3f& p0, const Vector3f& p1, const Vector3f& dir)
+		noexcept
+	{
 		float d = dir.Dot(dir);
 		return (d < Conversions::NumericTolerance) ? 0.0f : (p1 - p0).Dot(dir) / d;
 	}
 
 private:
-	bool CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const;
-
+	bool CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const
+		noexcept;
 };
 
 // =================================================================================================

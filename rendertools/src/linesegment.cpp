@@ -4,20 +4,21 @@
 
 // Project p on line, return projected point on line in f and distance p,f as function result
 float LineSegment::Project(const Vector3f& p, Vector3f& f)
+noexcept
 {
-	float l2 = properties.length * properties.length;
+    float l2 = properties.length * properties.length;
 
     if (l2 < m_tolerance) {// line too short, projection may fail due to numerical limitations
         f = p0;
         return 0.0f;
     }
     float t = (p - p0).Dot(properties.velocity) / l2; // project (p - p0) on (p0,p1)
-	f = p0 + Velocity() * t; // determine foot point on line
-	return (p - f).Length();
+    f = p0 + Velocity() * t; // determine foot point on line
+    return (p - f).Length();
 }
 
-
 float LineSegment::Distance(const Vector3f& p)
+noexcept
 {
     float l2 = properties.length * properties.length;
 
@@ -29,12 +30,12 @@ float LineSegment::Distance(const Vector3f& p)
     return Length() * t;
 }
 
-
 // Findet den/alle Punkt(e) auf der Geraden durch das Segment (*this),
 // der/die im Abstand 'radius' zu 'refPoint' liegen.
 // Gibt true zurück, falls mindestens eine Lösung im gewünschten t-Bereich existiert.
 // Optional: Gibt den Punkt mit dem kleinsten |t| zurück (d. h. den, der p0 am nächsten liegt).
 int LineSegment::ComputeNearestPointsAt(const Vector3f& p, float radius, const Conversions::FloatInterval& limits)
+noexcept
 {
     // Unterschiedsvektor zum Referenzpunkt
     Vector3f delta = p0 - p;
@@ -65,8 +66,8 @@ int LineSegment::ComputeNearestPointsAt(const Vector3f& p, float radius, const C
     return solutions;
 }
 
-
 float LineSegment::ComputeNearestPoints(LineSegment& other, LineSegment& nearestPoints)
+noexcept
 {
     nearestPoints.solutions = 0;
 
@@ -148,6 +149,7 @@ float LineSegment::ComputeNearestPoints(LineSegment& other, LineSegment& nearest
 // -------------------------------------------------------------------------------------------------
 
 bool LineSegment::CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const
+noexcept
 {
     const float r2 = radius * radius;
 
@@ -169,15 +171,16 @@ bool LineSegment::CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, fl
     // größtes t ≤ 1, innerhalb limits
     tSel = -std::numeric_limits<float>::infinity();
     if (limits.Contains(tA) and (tA <= 1.0f + Conversions::NumericTolerance))
-        tSel = std::max(tSel, tA); 
+        tSel = std::max(tSel, tA);
     if ((std::fabs(tB - tA) > Conversions::NumericTolerance) and limits.Contains(tB) and (tB <= 1.0f + Conversions::NumericTolerance))
-        tSel = std::max(tSel, tB); 
+        tSel = std::max(tSel, tB);
     return tSel != -std::numeric_limits<float>::infinity();
 }
 
 // -------------------------------------------------------------------------------------------------
 
-int LineSegment::ComputeCapsuleIntersection(LineSegment& other,  LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits)
+int LineSegment::ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits)
+noexcept
 {
     collisionPoints.solutions = 0;
 
@@ -258,14 +261,14 @@ int LineSegment::ComputeCapsuleIntersection(LineSegment& other,  LineSegment& co
     // ---------- 2) Kappen (Endpunkte g0, g1) ----------
     if (ee > tol) {
         float tSel;
-        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) 
+        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel))
             keepBestT(tSel);
-        if (CapCheckOnP(other.p1, d, dd, radius, limits, tSel)) 
+        if (CapCheckOnP(other.p1, d, dd, radius, limits, tSel))
             keepBestT(tSel);
     }
     else {
         float tSel;
-        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel)) 
+        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel))
             keepBestT(tSel);
     }
 

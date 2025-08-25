@@ -19,7 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\apptools\include\timer.h" />
     <ClInclude Include="..\include\allocator.h" />
     <ClInclude Include="..\include\array.hpp" />
     <ClInclude Include="..\include\avlnode.hpp" />
@@ -60,6 +59,7 @@
     <ClInclude Include="..\include\string.hpp" />
     <ClInclude Include="..\include\stringutils.hpp" />
     <ClInclude Include="..\include\tabledimensions.h" />
+    <ClInclude Include="..\include\timer.h" />
     <ClInclude Include="..\include\type_helper.hpp" />
     <ClInclude Include="..\include\vector.hpp" />
   </ItemGroup>

@@ -1,6 +1,10 @@
+#pragma once
+
 #include <map>
 #include <initializer_list>
 #include <utility>
+
+// =================================================================================================
 
 template <typename KEY_T, typename DATA_T>
 class StdMap
@@ -9,23 +13,26 @@ private:
     std::map<KEY_T, DATA_T> m_map;
 
 public:
-    StdMap(int /*capacity*/ = 0) {}
+    StdMap(int /*capacity*/ = 0) noexcept {}
     ~StdMap() = default;
 
     using tComparator = int(*)(void* context, const KEY_T& k1, const KEY_T& k2);
     using iterator = typename std::map<KEY_T, DATA_T>::iterator;
     using const_iterator = typename std::map<KEY_T, DATA_T>::const_iterator;
 
-    iterator begin() { return m_map.begin(); }
-    iterator end() { return m_map.end(); }
+    iterator begin() noexcept { return m_map.begin(); }
 
-    const_iterator begin() const { return m_map.begin(); }
-    const_iterator end()   const { return m_map.end(); }
+    iterator end() noexcept { return m_map.end(); }
 
-    const_iterator cbegin() const { return m_map.cbegin(); }
-    const_iterator cend()   const { return m_map.cend(); }
+    const_iterator begin() const noexcept { return m_map.begin(); }
 
-    inline int Size() const {
+    const_iterator end()   const noexcept { return m_map.end(); }
+
+    const_iterator cbegin() const noexcept { return m_map.cbegin(); }
+
+    const_iterator cend()   const noexcept { return m_map.cend(); }
+
+    inline int Size() const noexcept {
         return static_cast<int>(m_map.size());
     }
 
@@ -33,12 +40,12 @@ public:
         auto it = m_map.find(key);
         return (it != m_map.end()) ? &it->second : nullptr;
     }
-    // const
+
     const DATA_T* Find(const KEY_T& key) const {
         auto it = m_map.find(key);
         return (it != m_map.end()) ? &it->second : nullptr;
     }
-    // rvalue-Key delegiert
+
     DATA_T* Find(KEY_T&& key) { return Find(static_cast<const KEY_T&>(key)); }
 
     template <typename Predicate>
@@ -79,9 +86,8 @@ public:
         return Extract(static_cast<const KEY_T&>(key), data);
     }
 
-    // Fügt nur ein, wenn der Key noch nicht existiert
     template<typename K = KEY_T, typename D = DATA_T>
-        requires std::constructible_from<KEY_T, K&&> && std::constructible_from<DATA_T, D&&>
+        requires std::constructible_from<KEY_T, K&&>&& std::constructible_from<DATA_T, D&&>
     bool Insert(K&& key, D&& data) {
         return m_map.emplace(std::forward<K>(key), std::forward<D>(data)).second;
     }
@@ -92,7 +98,7 @@ public:
         return m_map.erase(std::forward<K>(key)) > 0;
     }
 
-    void Destroy() {
+    void Destroy() noexcept {
         m_map.clear();
     }
 
@@ -138,7 +144,6 @@ public:
         return true;
     }
 
-    // Update: Ersetzt vorhandene Daten oder fügt ein neues Element ein (immer true)
     bool Update(const KEY_T& key, const DATA_T& data) {
         m_map[key] = data;
         return true;
@@ -156,7 +161,9 @@ public:
     }
 
     StdMap(const StdMap& other) = default;
+    StdMap(StdMap&& other) noexcept = default;
     StdMap& operator=(const StdMap& other) = default;
+    StdMap& operator=(StdMap&& other) noexcept = default;
 
     StdMap& operator+=(const StdMap& other) {
         m_map.insert(other.m_map.begin(), other.m_map.end());
@@ -168,3 +175,5 @@ public:
         return *this;
     }
 };
+
+// =================================================================================================

@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <stdexcept>
 
+// =================================================================================================
+
 template <typename DATA_T>
 class SharedPointer {
     std::variant<std::shared_ptr<DATA_T>, std::shared_ptr<DATA_T[]>> m_ptr;
@@ -12,25 +14,20 @@ class SharedPointer {
 public:
     bool m_isArray = false;
 
-    // Default
     SharedPointer() = default;
 
-    // Heapobjekt/Array direkt anlegen
     explicit SharedPointer(std::size_t count) { Claim(count); }
 
-    // Copy-Konstruktor
-    SharedPointer(const SharedPointer& other)
+    SharedPointer(const SharedPointer& other) noexcept
         : m_ptr(other.m_ptr), m_isArray(other.m_isArray) {
     }
 
-    // Move-Konstruktor
     SharedPointer(SharedPointer&& other) noexcept
         : m_ptr(std::move(other.m_ptr)), m_isArray(other.m_isArray) {
         other.m_isArray = false;
     }
 
-    // Copy-Assignment
-    SharedPointer& operator=(const SharedPointer& other) {
+    SharedPointer& operator=(const SharedPointer& other) noexcept {
         if (this != &other) {
             m_ptr = other.m_ptr;
             m_isArray = other.m_isArray;
@@ -38,7 +35,6 @@ public:
         return *this;
     }
 
-    // Move-Assignment
     SharedPointer& operator=(SharedPointer&& other) noexcept {
         if (this != &other) {
             m_ptr = std::move(other.m_ptr);
@@ -48,7 +44,6 @@ public:
         return *this;
     }
 
-    // Allokation/Reset
     DATA_T* Claim(std::size_t count = 1) {
         if (count > 1) {
             m_ptr = std::shared_ptr<DATA_T[]>(new DATA_T[count]());
@@ -65,66 +60,88 @@ public:
         return nullptr;
     }
 
-    void Release() {
+    void Release() noexcept {
         m_ptr = {};
         m_isArray = false;
     }
 
-    // Zugriff
-    DATA_T* get() {
+    DATA_T* get() noexcept {
         if (m_isArray) {
-            return std::get<std::shared_ptr<DATA_T[]>>(m_ptr).get();
+            if (auto p = std::get_if<std::shared_ptr<DATA_T[]>>(&m_ptr)) return p->get();
+            return nullptr;
         }
         else {
-            return std::get<std::shared_ptr<DATA_T>>(m_ptr).get();
-        }
-    }
-    const DATA_T* get() const {
-        if (m_isArray) {
-            return std::get<std::shared_ptr<DATA_T[]>>(m_ptr).get();
-        }
-        else {
-            return std::get<std::shared_ptr<DATA_T>>(m_ptr).get();
+            if (auto p = std::get_if<std::shared_ptr<DATA_T>>(&m_ptr)) return p->get();
+            return nullptr;
         }
     }
 
-    // Array-Zugriff
+    const DATA_T* get() const noexcept {
+        if (m_isArray) {
+            if (auto p = std::get_if<std::shared_ptr<DATA_T[]>>(&m_ptr)) return p->get();
+            return nullptr;
+        }
+        else {
+            if (auto p = std::get_if<std::shared_ptr<DATA_T>>(&m_ptr)) return p->get();
+            return nullptr;
+        }
+    }
+
     DATA_T& operator[](std::size_t i) {
         if (!m_isArray) throw std::logic_error("Kein Array verwaltet!");
-        return std::get<std::shared_ptr<DATA_T[]>>(m_ptr)[i];
-    }
-    const DATA_T& operator[](std::size_t i) const {
-        if (!m_isArray) throw std::logic_error("Kein Array verwaltet!");
-        return std::get<std::shared_ptr<DATA_T[]>>(m_ptr)[i];
+        return std::get<std::shared_ptr<DATA_T[]>>(m_ptr).get()[i];
     }
 
-    // Einzelobjekt-Zugriff
+    const DATA_T& operator[](std::size_t i) const {
+        if (!m_isArray) throw std::logic_error("Kein Array verwaltet!");
+        return std::get<std::shared_ptr<DATA_T[]>>(m_ptr).get()[i];
+    }
+
     DATA_T& operator*() {
         if (m_isArray) throw std::logic_error("Array-Modus: Kein Einzelobjekt dereferenzierbar!");
         DATA_T* ptr = get();
         if (!ptr) throw std::runtime_error("Nullpointer!");
         return *ptr;
     }
+
     DATA_T* operator->() {
         if (m_isArray) throw std::logic_error("Array-Modus: Kein Einzelobjekt dereferenzierbar!");
         return get();
     }
 
-    inline bool IsValid(void) const { return get() != nullptr; }
-    // Bool-Test
-    operator bool() const { return IsValid(); }
+    inline bool IsValid(void) const noexcept { return get() != nullptr; }
 
-    bool operator!() const { return not IsValid(); }
+    operator bool() const noexcept { return IsValid(); }
 
-    // Für C-APIs:
-    operator DATA_T*() { return static_cast<DATA_T*>(get()); }
+    bool operator!() const noexcept { return not IsValid(); }
 
-    operator const DATA_T*() const { return static_cast<const DATA_T*>(get()); }
+    operator DATA_T* () noexcept { return static_cast<DATA_T*>(get()); }
 
-    operator void*() { return static_cast<void*>(get()); }
+    operator const DATA_T* () const noexcept { return static_cast<const DATA_T*>(get()); }
 
-    operator const void*() const { return static_cast<const void*>(get()); }
+    operator void* () noexcept { return static_cast<void*>(get()); }
 
-    // Abfrage Array/Objekt
-    bool isArray() const { return m_isArray; }
+    operator const void* () const noexcept { return static_cast<const void*>(get()); }
+
+    bool isArray() const noexcept { return m_isArray; }
+
+    // ---- nur noexcept ergänzt (kein Umbau) ----
+
+    bool operator==(const SharedPointer& other) const
+        noexcept
+    {
+        if (!m_isArray && !other.m_isArray)
+            return get() == other.get();
+        if (m_isArray != other.m_isArray)
+            return false;
+        return get() == other.get();
+    }
+
+    inline bool operator!=(const SharedPointer& other) const
+        noexcept
+    {
+        return !(*this == other);
+    }
 };
+
+// =================================================================================================

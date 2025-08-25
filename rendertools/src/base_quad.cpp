@@ -12,7 +12,7 @@
 
 // caution: the VAO shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this vao is initialized.
 // VAO::Init takes care of that by first assigning a handle-less shared gl handle 
-VAO* BaseQuad::m_vao = nullptr; 
+VAO* BaseQuad::m_vao = nullptr;
 
 // =================================================================================================
 
@@ -29,7 +29,9 @@ BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
 }
 
 
-BaseQuad& BaseQuad::Move(BaseQuad& other) {
+BaseQuad& BaseQuad::Move(BaseQuad& other)
+noexcept
+{
     if (this != &other) {
         m_vertexBuffer = std::move(other.m_vertexBuffer);
         m_texCoordBuffer = std::move(other.m_texCoordBuffer);
@@ -52,7 +54,8 @@ void BaseQuad::CreateTexCoords(void) {
             m_maxTexCoord = TexCoord{ 0, 0 };
             for (auto& v : m_vertexBuffer.m_appData) {
                 m_texCoordBuffer.Append(TexCoord({ v.X(), v.Z() }));
-                m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), v.X()), std::max(m_maxTexCoord.V(), v.Y()) });
+                // BUGFIX: zweiter Max-Vergleich muss Z-Komponente verwenden (nicht Y), da oben Z in die Texcoords geschrieben wird.
+                m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), v.X()), std::max(m_maxTexCoord.V(), v.Z()) });
             }
         }
         else {
@@ -73,7 +76,7 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     CreateTexCoords();
     m_vertexBuffer.Setup();
     m_texCoordBuffer.Setup();
-    if (not CreateVAO ())
+    if (not CreateVAO())
         return false;
     m_vao->Init(GL_QUADS);
     m_texture = texture;
@@ -106,7 +109,9 @@ bool BaseQuad::UpdateVAO(void) {
 }
 
 
-float BaseQuad::ComputeAspectRatio(void) {
+float BaseQuad::ComputeAspectRatio(void)
+noexcept
+{
     Vector3f vMin = Vector3f{ 1e6, 1e6, 1e6 };
     Vector3f vMax = Vector3f{ -1e6, -1e6, -1e6 };
     for (auto& v : m_vertexBuffer.m_appData) {
@@ -204,7 +209,9 @@ void BaseQuad::Fill(const RGBAColor& color) {
 }
 
 
-void BaseQuad::Destroy(void) {
+void BaseQuad::Destroy(void)
+noexcept
+{
     if constexpr (not is_static_member_v<&BaseQuad::m_vao>) {
         m_vao->Destroy(); // don't destroy static members as they may be reused by other resources any time during program execution. Will be automatically destroyed at program termination
     }

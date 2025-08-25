@@ -11,25 +11,25 @@
 
 // =================================================================================================
 
-class BaseQuad 
+class BaseQuad
     : public Plane
 {
-    public:
-        static VAO*     m_vao;
+public:
+    static VAO* m_vao;
 
-        VertexBuffer    m_vertexBuffer;
-        TexCoordBuffer  m_texCoordBuffer;
-        TexCoord        m_maxTexCoord;
-        Texture*        m_texture;
-        RGBAColor       m_color;
-        float           m_aspectRatio;
-        float           m_offset;
-        bool            m_isAvailable;
+    VertexBuffer    m_vertexBuffer;
+    TexCoordBuffer  m_texCoordBuffer;
+    TexCoord        m_maxTexCoord;
+    Texture* m_texture;
+    RGBAColor       m_color;
+    float           m_aspectRatio;
+    float           m_offset;
+    bool            m_isAvailable;
 
-    BaseQuad() 
-        : m_texture (nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false)
-    { }
-
+    BaseQuad()
+        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false)
+    {
+    }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {}, Texture* texture = nullptr, RGBAColor color = ColorData::White)
         : Plane(vertices), m_texture(texture), m_color(color), /*m_borderWidth(borderWidth),*/ m_isAvailable(true), m_offset(0)
@@ -37,9 +37,8 @@ class BaseQuad
         Setup(vertices, texCoords, texture, color/*, borderWidth*/);
     }
 
-
     BaseQuad(const BaseQuad& other) {
-		Copy(other);
+        Copy(other);
     }
 
     bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {}, Texture* texture = nullptr, RGBAColor color = ColorData::White);
@@ -48,29 +47,34 @@ class BaseQuad
 
     BaseQuad& Copy(const BaseQuad& other);
 
-    BaseQuad& Move(BaseQuad& other);
+    BaseQuad& Move(BaseQuad& other)
+        noexcept;
 
     BaseQuad& operator= (const BaseQuad& other) {
-		return Copy(other);
+        return Copy(other);
     }
 
-    BaseQuad operator= (BaseQuad&& other) noexcept {
+    BaseQuad& operator= (BaseQuad&& other) noexcept {
         return Move(other);
     }
 
-    void Destroy(void);
+    void Destroy(void)
+        noexcept;
 
     void CreateTexCoords(void);
 
     bool UpdateVAO(void);
 
-    float ComputeAspectRatio(void);
+    float ComputeAspectRatio(void)
+        noexcept;
 
     inline void SetTexture(Texture* texture) {
         m_texture = texture;
     }
 
-    void SetColor(RGBAColor color) {
+    inline void SetColor(RGBAColor color)
+        noexcept
+    {
         m_color = color;
     }
 
@@ -90,9 +94,8 @@ class BaseQuad
     }
 
     inline void Fill(RGBColor color, float alpha = 1.0f) {
-        return Fill(RGBAColor (color, alpha));
+        return Fill(RGBAColor(color, alpha));
     }
-
 
     ~BaseQuad() {
         Destroy();

@@ -1,3 +1,4 @@
+
 #include "vao.h"
 #include "base_shaderhandler.h"
 
@@ -23,7 +24,9 @@ List<VAO*> VAO::vaoStack;
 // TODO: Expand shader for all kinds of inputs (texture coordinates, normals)
 // See also https://qastack.com.de/programming/8704801/glvertexattribpointer-clarification
 
-bool VAO::Init (GLuint shape) {
+bool VAO::Init(GLuint shape)
+noexcept
+{
     m_shape = shape;
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable())
@@ -39,7 +42,9 @@ bool VAO::Init (GLuint shape) {
 }
 
 
-void VAO::Destroy(void) {
+void VAO::Destroy(void)
+noexcept
+{
     Disable();
     for (auto& vbo : m_dataBuffers)
         vbo->Destroy();
@@ -56,7 +61,7 @@ void VAO::Destroy(void) {
 }
 
 
-VAO& VAO::Copy (VAO const& other) {
+VAO& VAO::Copy(VAO const& other) {
     if (this != &other) {
         m_dataBuffers = other.m_dataBuffers;
         m_indexBuffer = other.m_indexBuffer;
@@ -67,7 +72,9 @@ VAO& VAO::Copy (VAO const& other) {
 }
 
 
-VAO& VAO::Move(VAO& other) {
+VAO& VAO::Move(VAO& other)
+noexcept
+{
     if (this != &other) {
         m_dataBuffers = std::move(other.m_dataBuffers);
         m_indexBuffer = std::move(other.m_indexBuffer);
@@ -78,7 +85,9 @@ VAO& VAO::Move(VAO& other) {
 }
 
 
-VBO* VAO::FindBuffer(const char* type, int& index) {
+VBO* VAO::FindBuffer(const char* type, int& index)
+noexcept
+{
     int i = 0;
     for (auto vbo : m_dataBuffers) {
         if (vbo->IsType(type)) {
@@ -91,7 +100,9 @@ VBO* VAO::FindBuffer(const char* type, int& index) {
 }
 
 // add a vertex or index data buffer
-bool VAO::UpdateBuffer(const char* type, void * data, size_t dataSize, size_t componentType, size_t componentCount) {
+bool VAO::UpdateBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+noexcept
+{
     if (strcmp(type, "Index"))
         return UpdateVertexBuffer(type, data, dataSize, componentType, componentCount);
     UpdateIndexBuffer(data, dataSize, componentType);
@@ -99,7 +110,9 @@ bool VAO::UpdateBuffer(const char* type, void * data, size_t dataSize, size_t co
 }
 
 
-bool VAO::UpdateVertexBuffer(const char* type, void * data, size_t dataSize, size_t componentType, size_t componentCount) {
+bool VAO::UpdateVertexBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+noexcept
+{
     int index;
     VBO* vbo = FindBuffer(type, index);
     if (not vbo) { // otherwise index has been initialized by FindBuffer()
@@ -115,7 +128,9 @@ bool VAO::UpdateVertexBuffer(const char* type, void * data, size_t dataSize, siz
 }
 
 
-void VAO::UpdateIndexBuffer(void * data, size_t dataSize, size_t componentType) {
+void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
+noexcept
+{
     bool inactive = not IsActive();
     bool unbound = not IsBound();
     if (inactive or unbound)
@@ -126,7 +141,9 @@ void VAO::UpdateIndexBuffer(void * data, size_t dataSize, size_t componentType) 
 }
 
 
-void VAO::Enable(void) {
+void VAO::Enable(void)
+noexcept
+{
     Activate();
     if (not IsBound()) {
 #if USE_SHARED_HANDLES
@@ -134,12 +151,15 @@ void VAO::Enable(void) {
         m_isBound = true;
 #else
         glBindVertexArray(m_handle);
+        m_isBound = true; // BUGFIX: m_isBound wurde im !USE_SHARED_HANDLES-Zweig nicht gesetzt
 #endif
     }
 }
 
 
-void VAO::Disable(void) {
+void VAO::Disable(void)
+noexcept
+{
     Deactivate();
     if (IsBound()) {
         glBindVertexArray(0);
@@ -148,7 +168,9 @@ void VAO::Disable(void) {
 }
 
 
-void VAO::Render(Shader* shader, Texture* texture) {
+void VAO::Render(Shader* shader, Texture* texture)
+noexcept
+{
 #if 1
     if (baseShaderHandler.ShaderIsActive()) {
         EnableTexture(texture);
@@ -164,7 +186,7 @@ void VAO::Render(Shader* shader, Texture* texture) {
     if (shader != nullptr)
         //baseShaderHandler.StopShader();
 #endif
-    DisableTexture(texture);
+        DisableTexture(texture);
 }
 
 // =================================================================================================

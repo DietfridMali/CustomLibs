@@ -20,9 +20,8 @@ void Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String 
     SetupTexture(texture, textureFolder, textureNames, textureType);
 }
 
-
 void Mesh::CreateVertexIndices(void) {
-    uint32_t l = m_vertices.AppDataLength(); // number of quads
+    uint32_t l = m_vertices.AppDataLength(); // number of vertices
     uint32_t* pi = m_indices.m_glData.Resize((l / 2) * 3); // 6 indices for 4 vertices
     l /= 4; // quad count
     for (uint32_t i = 0, j = 0; i < l; i++, j += 4) {
@@ -30,7 +29,6 @@ void Mesh::CreateVertexIndices(void) {
             *pi++ = quadTriangleIndices[k] + j;
     }
 }
-
 
 void Mesh::UpdateVAO(bool createVertexIndex) {
     if (m_shape != GL_QUADS)
@@ -66,7 +64,6 @@ void Mesh::UpdateVAO(bool createVertexIndex) {
     m_vao.Disable();
 }
 
-
 void Mesh::ResetVAO(void) {
     m_indices.Reset();
     m_vertices.Reset();
@@ -75,20 +72,17 @@ void Mesh::ResetVAO(void) {
     m_normals.Reset();
 }
 
-
 void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {
     if (not textureNames.IsEmpty())
-        m_textures += textureHandler.CreateByType (textureFolder, textureNames, textureType);
+        m_textures += textureHandler.CreateByType(textureFolder, textureNames, textureType);
     else if (texture != nullptr)
         m_textures.Append(texture);
 }
-
 
 void Mesh::PushTexture(Texture* texture) {
     if (texture != nullptr)
         m_textures.Append(texture);
 }
-
 
 void Mesh::PopTexture(void) {
     if (not m_textures.IsEmpty()) {
@@ -96,15 +90,17 @@ void Mesh::PopTexture(void) {
     }
 }
 
-
-Texture* Mesh::GetTexture(void) {
+Texture* Mesh::GetTexture(void)
+noexcept
+{
     if (m_textures.Length())
         return m_textures.Last();
     return nullptr;
 }
 
-
-bool Mesh::EnableTexture(void) {
+bool Mesh::EnableTexture(void)
+noexcept
+{
     Texture* texture = GetTexture();
     if (not texture)
         return false;
@@ -112,13 +108,13 @@ bool Mesh::EnableTexture(void) {
     return true;
 }
 
-
-void Mesh::DisableTexture(void) {
+void Mesh::DisableTexture(void)
+noexcept
+{
     Texture* texture = GetTexture();
     if (texture)
         texture->Disable();
 }
-
 
 void Mesh::Render(Shader* shader, Texture* texture) {
     if (m_vao.IsValid()) {
@@ -126,21 +122,28 @@ void Mesh::Render(Shader* shader, Texture* texture) {
         SetTexture();
         SetColor();
         SetOutlineColor();
-		SetMaxDistance(maxDistance);
+        SetMaxDistance(maxDistance);
 #endif
         m_vao.Render(shader, texture);
     }
 }
 
-
-void Mesh::Destroy (void) {
-    m_vertices.Destroy ();
-    m_normals.Destroy ();
-    m_texCoords.Destroy ();
-    m_vertexColors.Destroy ();
-    m_indices.Destroy ();
-    m_textures.Clear ();
-    m_vao.Destroy ();
+void Mesh::Destroy(void)
+noexcept(noexcept(m_vertices.Destroy()) &&
+    noexcept(m_normals.Destroy()) &&
+    noexcept(m_texCoords.Destroy()) &&
+    noexcept(m_vertexColors.Destroy()) &&
+    noexcept(m_indices.Destroy()) &&
+    noexcept(m_textures.Clear()) &&
+    noexcept(m_vao.Destroy()))
+{
+    m_vertices.Destroy();
+    m_normals.Destroy();
+    m_texCoords.Destroy();
+    m_vertexColors.Destroy();
+    m_indices.Destroy();
+    m_textures.Clear();
+    m_vao.Destroy();
 }
 
 // =================================================================================================

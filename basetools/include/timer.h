@@ -23,24 +23,32 @@ public:
     }
 
 
-    inline void SetDuration(int duration) {
+    inline void SetDuration(int duration)
+        noexcept
+    {
         m_duration = duration;
     }
 
 
-    int Start(int offset = 0) {
+    int Start(int offset = 0)
+        noexcept
+    {
         m_startTime = SDL_GetTicks() + offset;
         m_endTime = m_startTime + offset + m_duration;
         return m_startTime;
     }
 
 
-    inline int GetLapTime(void) {
+    inline int GetLapTime(void)
+        noexcept
+    {
         return m_lapTime = SDL_GetTicks() - m_startTime;
     }
 
 
-    bool HasExpired(int time = 0, bool restart = false) {
+    bool HasExpired(int time = 0, bool restart = false)
+        noexcept
+    {
         GetLapTime();
         if (time == 0)
             time = m_duration;
@@ -52,37 +60,51 @@ public:
     }
 
 
-    inline int StartTime(void) {
+    inline int StartTime(void)
+        noexcept
+    {
         return m_startTime;
     }
 
 
-    inline int EndTime(void) {
+    inline int EndTime(void)
+        noexcept
+    {
         return m_endTime;
     }
 
 
-    inline int LapTime(void) {
+    inline int LapTime(void)
+        noexcept
+    {
         return m_lapTime;
     }
 
 
-    inline int RemainingTime(void) {
+    inline int RemainingTime(void)
+        noexcept
+    {
         return m_duration - GetLapTime();
     }
 
 
-    inline float Progress(void) {
+    inline float Progress(void)
+        noexcept
+    {
         return float(GetLapTime()) / float(m_duration);
     }
 
 
-    inline bool IsRemaining(int time) {
+    inline bool IsRemaining(int time)
+        noexcept
+    {
         return RemainingTime() >= time;
     }
 
 
-    void Delay(void) {
+    void Delay(void)
+        noexcept
+    {
         int t = m_duration - m_slack - GetLapTime();
         if (t > 0)
             Sleep(DWORD(t));

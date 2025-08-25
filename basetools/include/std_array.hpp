@@ -24,8 +24,9 @@ public:
     }
 
     inline ManagedArray(std::initializer_list<DATA_T> data)
-        : m_array(data) 
-    { }
+        : m_array(data)
+    {
+    }
 
     // Konstruktor für 2D-ManagedArray
     inline ManagedArray(int32_t width, int32_t height)
@@ -39,13 +40,25 @@ public:
     }
 
     ManagedArray(const ManagedArray& other)
-        : m_array(other.m_array) {
+        : m_array(other.m_array),
+        m_width(other.m_width),
+        m_height(other.m_height),
+        m_autoFit(other.m_autoFit),
+        m_isShrinkable(other.m_isShrinkable),
+        m_defaultValue(other.m_defaultValue)
+    {
     }
 
     // Move-Konstruktor
     ManagedArray(ManagedArray&& other) noexcept
-        : m_array(std::move(other.m_array)) 
-    { }
+        : m_array(std::move(other.m_array)),
+        m_width(std::exchange(other.m_width, 0)),
+        m_height(std::exchange(other.m_height, 0)),
+        m_autoFit(std::exchange(other.m_autoFit, false)),
+        m_isShrinkable(std::exchange(other.m_isShrinkable, true)),
+        m_defaultValue(std::move(other.m_defaultValue))
+    {
+    }
 
     // Copy-Zuweisungsoperator
     ManagedArray& operator=(const ManagedArray& other) {
@@ -68,7 +81,7 @@ public:
             m_height = std::exchange(other.m_height, 0);
             m_autoFit = std::exchange(other.m_autoFit, false);
             m_isShrinkable = std::exchange(other.m_isShrinkable, true);
-            m_defaultValue = other.m_defaultValue;
+            m_defaultValue = std::move(other.m_defaultValue);
         }
         return *this;
     }
@@ -78,15 +91,15 @@ public:
         return *this;
     }
 
-    inline int32_t Capacity(void) const { return static_cast<int32_t>(m_array.capacity()); }
+    inline int32_t Capacity(void) const noexcept { return static_cast<int32_t>(m_array.capacity()); }
 
     // Zugriff auf Länge
-    inline int32_t Length(void) const { return static_cast<int32_t>(m_array.size()); }
+    inline int32_t Length(void) const noexcept { return static_cast<int32_t>(m_array.size()); }
 
-    inline bool IsEmpty(void) const { return Length() == 0; }
+    inline bool IsEmpty(void) const noexcept { return Length() == 0; }
 
     // Gesamte Datenmenge in Bytes
-    inline int32_t DataSize() const { return Length() * static_cast<int32_t>(sizeof(DATA_T)); }
+    inline int32_t DataSize() const noexcept { return Length() * static_cast<int32_t>(sizeof(DATA_T)); }
 
     inline int32_t AutoFit(int32_t i) {
         if (m_autoFit and (i >= Length()))
@@ -124,13 +137,13 @@ public:
 #endif
     }
 
-    inline bool IsValidIndex(int32_t i) { return (i >= 0) and (m_autoFit or (i < Length())); }
+    inline bool IsValidIndex(int32_t i) const noexcept { return (i >= 0) and (m_autoFit or (i < Length())); }
 
-    inline bool IsValidIndex(int32_t x, int32_t y) { return (x >= 0) and (m_autoFit or (x < m_width)) and (y >= 0) and (m_autoFit or (y < m_height)); }
+    inline bool IsValidIndex(int32_t x, int32_t y) const noexcept { return (x >= 0) and (m_autoFit or (x < m_width)) and (y >= 0) and (m_autoFit or (y < m_height)); }
 
-    inline int GetCheckedIndex(int32_t x, int32_t y) { return IsValidIndex(x, y) ?int(y * m_width + x) : -1; }
+    inline int GetCheckedIndex(int32_t x, int32_t y) const noexcept { return IsValidIndex(x, y) ? int(y * m_width + x) : -1; }
 
-    inline DATA_T* operator()(int32_t x, int32_t y, bool rangeCheck) { // always checks range; parameter only to distinguish from other operator()
+    inline DATA_T* operator()(int32_t x, int32_t y, bool rangeCheck) {
         int i = GetCheckedIndex(x, y);
         return (i < 0) ? nullptr : Data(AutoFit(i));
     }
@@ -148,19 +161,19 @@ public:
 
     ManagedArray<DATA_T>& Append(ManagedArray<DATA_T>& other, bool copyData) {
         Reserve(Length() + other.Length());
-        if (copyData) 
+        if (copyData)
             m_array.insert(m_array.end(), other.begin(), other.end());
         else
             m_array.insert(m_array.end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
         return *this;
     }
 
-    void Fill(DATA_T value) {
+    void Fill(DATA_T value) noexcept {
         std::fill(m_array.begin(), m_array.end(), value);
     }
 
-    DATA_T* Append(void) { 
-        m_array.emplace_back(); 
+    DATA_T* Append(void) {
+        m_array.emplace_back();
         return &m_array.back();
     }
 
@@ -181,9 +194,9 @@ public:
     }
 
     // Zeiger auf Rohdaten (z.B. für OpenGL)
-    inline DATA_T* Data(int32_t i = 0) { return m_array.data() + i; }
+    inline DATA_T* Data(int32_t i = 0) noexcept { return m_array.data() + i; }
 
-    inline const DATA_T* Data(int32_t i = 0) const { return m_array.data() + i; }
+    inline const DATA_T* Data(int32_t i = 0) const noexcept { return m_array.data() + i; }
 
     DATA_T* DataRow(int32_t y) {
 #if defined(_DEBUG)
@@ -197,19 +210,17 @@ public:
         m_array.reserve(static_cast<size_t>(capacity));
     }
 
-    inline bool AllowResize(size_t newSize) {
-        return m_isShrinkable or (newSize > Length());
-    }
+    inline bool AllowResize(size_t newSize) const noexcept { return m_isShrinkable or (newSize > static_cast<size_t>(Length())); }
 
     // Resize-Methoden
     inline DATA_T* Resize(int32_t newSize) {
-        if (AllowResize(newSize))
+        if (AllowResize(static_cast<size_t>(newSize)))
             m_array.resize(static_cast<size_t>(newSize));
         return Data();
     }
 
     inline DATA_T* Resize(int32_t newSize, const DATA_T& value) {
-        if (AllowResize(newSize))
+        if (AllowResize(static_cast<size_t>(newSize)))
             m_array.resize(static_cast<size_t>(newSize), value);
         return Data();
     }
@@ -233,26 +244,26 @@ public:
         m_array.shrink_to_fit();
     }
 
-    inline auto begin() { return m_array.begin(); }
+    inline auto begin() noexcept { return m_array.begin(); }
 
-    inline auto end() { return m_array.end(); }
+    inline auto end() noexcept { return m_array.end(); }
 
-    inline auto begin() const { return m_array.begin(); }
+    inline auto begin() const noexcept { return m_array.begin(); }
 
-    inline auto end() const { return m_array.end(); }
+    inline auto end() const noexcept { return m_array.end(); }
 
-    inline auto rbegin() { return m_array.rbegin(); }
+    inline auto rbegin() noexcept { return m_array.rbegin(); }
 
-    inline auto rend() { return m_array.rend(); }
+    inline auto rend() noexcept { return m_array.rend(); }
 
-    inline auto rbegin() const { return m_array.rbegin(); }
+    inline auto rbegin() const noexcept { return m_array.rbegin(); }
 
-    inline auto rend() const { return m_array.rend(); }
+    inline auto rend() const noexcept { return m_array.rend(); }
 
     // Typecast-Operator zu std::vector<DATA_T>
-    inline operator std::vector<DATA_T>& () { return m_array; }
+    inline operator std::vector<DATA_T>& () noexcept { return m_array; }
 
-    inline operator const std::vector<DATA_T>& () const { return m_array; }
+    inline operator const std::vector<DATA_T>& () const noexcept { return m_array; }
 
     template <typename Predicate>
     auto Find(Predicate compare) {
@@ -286,21 +297,21 @@ public:
             return -1;
     }
 
-    inline bool GetAutoFit(void) {
+    inline bool GetAutoFit(void) const noexcept {
         return m_autoFit;
     }
-    
-    inline bool SetAutoFit(bool newSetting) {
+
+    inline bool SetAutoFit(bool newSetting) noexcept {
         bool currentSetting = m_autoFit;
         m_autoFit = newSetting;
         return currentSetting;
     }
 
-    inline bool GetShrinkable(void) {
-        return m_autoFit;
+    inline bool GetShrinkable(void) const noexcept {
+        return m_isShrinkable;
     }
 
-    inline bool SetShrinkable(bool newSetting) {
+    inline bool SetShrinkable(bool newSetting) noexcept {
         bool currentSetting = m_isShrinkable;
         m_isShrinkable = newSetting;
         return currentSetting;
@@ -341,7 +352,7 @@ public:
     }
 };
 
-class UIntArray : public ManagedArray<int32_t> {
+class UIntArray : public ManagedArray<uint32_t> {
 public:
     UIntArray(const int32_t nLength) {
         Resize(nLength);

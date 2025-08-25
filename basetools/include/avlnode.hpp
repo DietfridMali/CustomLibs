@@ -1,66 +1,60 @@
 #pragma once
 
-#include "avltreetraits.h"
-
 // =================================================================================================
-
-#define AVL_OVERFLOW   1
-#define AVL_BALANCED   0
-#define AVL_UNDERFLOW  -1
-
-//-----------------------------------------------------------------------------
-
-class AVLNode;
-
-using AVLNodePtr = AVLNode*;
-
-//-----------------------------------------------------------------------------
 
 class AVLNode
 {
 public:
-    KEY_T		    key;
-    DATA_T		    data;
-    AVLNodePtr      left;
-    AVLNodePtr      right;
-    char		    balance;
-    int             visited;
+    KEY_T       key;
+    DATA_T      data;
+    AVLNode*    left;
+    AVLNode*    right;
+    char        balance;
+    int         visited;
 #if DEBUG_MALLOC
-    int             poolIndex;
+    int         poolIndex;
 #endif
 
-        AVLNode()
-            : left(nullptr), right(nullptr), balance(0), visited(0)
+    AVLNode() noexcept
+        : left(nullptr), right(nullptr), balance(0), visited(0)
 #if DEBUG_MALLOC
-            , poolIndex(-1)
+        , poolIndex(-1)
 #endif
-        {
+    {
 #if !DEBUG_MALLOC
-            if constexpr (not std::is_trivially_constructible<DATA_T>::value)
-                memset(&data, 0, sizeof(DATA_T));
-            else
-                new(&data) DATA_T();
-            if constexpr (not std::is_trivially_constructible<KEY_T>::value)
-                memset(&key, 0, sizeof(KEY_T));
-            else
-                new(&key) DATA_T();
+        if constexpr (std::is_trivially_constructible<DATA_T>::value)
+            memset(&data, 0, sizeof(DATA_T));
+        else
+            new (&data) DATA_T();
+        if constexpr (std::is_trivially_constructible<KEY_T>::value)
+            memset(&key, 0, sizeof(KEY_T));
+        else
+            new (&key) KEY_T();
 #endif
-        }
+    }
 
-        AVLNode(KEY_T key, DATA_T data)
-            : key(key), data(data), balance(0), visited(0)
+    AVLNode(const KEY_T& k, const DATA_T& d) noexcept(std::is_nothrow_copy_constructible<KEY_T>::value&& std::is_nothrow_copy_constructible<DATA_T>::value)
+        : key(k), data(d), left(nullptr), right(nullptr), balance(0), visited(0)
 #if DEBUG_MALLOC
-            , poolIndex(-1)
+        , poolIndex(-1)
 #endif
-        {
- }
+    {
+    }
 
-    AVLNodePtr RotateSingleLL(bool isBalanced) {
-        AVLNodePtr child = left;
+    AVLNode(KEY_T&& k, DATA_T&& d) noexcept(std::is_nothrow_move_constructible<KEY_T>::value&& std::is_nothrow_move_constructible<DATA_T>::value)
+        : key(std::move(k)), data(std::move(d)), left(nullptr), right(nullptr), balance(0), visited(0)
+#if DEBUG_MALLOC
+        , poolIndex(-1)
+#endif
+    {
+    }
+
+    AVLNode* RotateSingleLL(bool isBalanced) noexcept {
+        AVLNode* child = left;
         left = child->right;
         child->right = this;
-        if (isBalanced) { // always true for insertions
-            balance =
+        if (isBalanced) {
+            balance = AVL_BALANCED;
             child->balance = AVL_BALANCED;
         }
         else {
@@ -70,26 +64,24 @@ public:
         return child;
     }
 
-
-    AVLNodePtr RotateSingleRR(bool isBalanced) {
-        AVLNodePtr child = right;
+    AVLNode* RotateSingleRR(bool isBalanced) noexcept {
+        AVLNode* child = right;
         right = child->left;
         child->left = this;
-        if (isBalanced) { // always true for insertions
-            balance =
+        if (isBalanced) {
+            balance = AVL_BALANCED;
             child->balance = AVL_BALANCED;
         }
         else {
             balance = AVL_OVERFLOW;
-            right->balance = AVL_UNDERFLOW;
+            child->balance = AVL_UNDERFLOW;
         }
         return child;
     }
 
-
-    AVLNodePtr RotateDoubleLR(void) {
-        AVLNodePtr child = left;
-        AVLNodePtr pivot = child->right;
+    AVLNode* RotateDoubleLR(void) noexcept {
+        AVLNode* child = left;
+        AVLNode* pivot = child->right;
         child->right = pivot->left;
         pivot->left = child;
         left = pivot->right;
@@ -101,10 +93,9 @@ public:
         return pivot;
     }
 
-
-    AVLNodePtr RotateDoubleRL(void) {
-        AVLNodePtr child = right;
-        AVLNodePtr pivot = child->left;
+    AVLNode* RotateDoubleRL(void) noexcept {
+        AVLNode* child = right;
+        AVLNode* pivot = child->left;
         child->left = pivot->right;
         pivot->right = child;
         right = pivot->left;
@@ -116,53 +107,44 @@ public:
         return pivot;
     }
 
-
-    inline AVLNodePtr RotateLeft(bool doSingleRotation, bool isBalanced = true) {
+    inline AVLNode* RotateLeft(bool doSingleRotation, bool isBalanced = true) noexcept {
         return doSingleRotation ? RotateSingleLL(isBalanced) : RotateDoubleLR();
     }
 
-
-    inline AVLNodePtr RotateRight(bool doSingleRotation, bool isBalanced = true) {
+    inline AVLNode* RotateRight(bool doSingleRotation, bool isBalanced = true) noexcept {
         return doSingleRotation ? RotateSingleRR(isBalanced) : RotateDoubleRL();
     }
 
-
-    inline AVLNodePtr BalanceLeftGrowth(void) {
-        return RotateLeft(left->balance == AVL_UNDERFLOW);
+    inline AVLNode* BalanceLeftGrowth(void) noexcept {
+        return RotateLeft(left && left->balance == AVL_UNDERFLOW);
     }
 
-
-    inline AVLNodePtr BalanceRightGrowth(void) {
-        return RotateRight(right->balance == AVL_OVERFLOW);
+    inline AVLNode* BalanceRightGrowth(void) noexcept {
+        return RotateRight(right && right->balance == AVL_OVERFLOW);
     }
 
-
-    inline AVLNodePtr BalanceLeftShrink(bool& heightHasChanged)
+    inline AVLNode* BalanceLeftShrink(bool& heightHasChanged) noexcept
     {
-        char b = right->balance;
+        char b = right ? right->balance : AVL_BALANCED;
         if (b != AVL_BALANCED)
             heightHasChanged = false;
         return RotateRight(b != AVL_UNDERFLOW, b != AVL_BALANCED);
     }
 
-
-    inline AVLNodePtr BalanceRightShrink(bool& heightHasChanged)
+    inline AVLNode* BalanceRightShrink(bool& heightHasChanged) noexcept
     {
-        char b = left->balance;
+        char b = left ? left->balance : AVL_BALANCED;
         if (b != AVL_BALANCED)
             heightHasChanged = false;
         return RotateLeft(b != AVL_OVERFLOW, b != AVL_BALANCED);
     }
 
-
-    inline void SetChild(AVLNodePtr oldChild, AVLNodePtr newChild) {
-        // it is assured that either left or right indeed point to the old child
+    inline void SetChild(AVLNode* oldChild, AVLNode* newChild) noexcept {
         if (oldChild == left)
             left = newChild;
-        else // if (oldChild == right) 
+        else
             right = newChild;
     }
 };
 
 // =================================================================================================
-

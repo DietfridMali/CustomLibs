@@ -108,8 +108,10 @@
     <ClInclude Include="..\include\fbo.h" />
     <ClInclude Include="..\include\framecounter.h" />
     <ClInclude Include="..\include\icosphere.h" />
+    <ClInclude Include="..\include\linesegment.h" />
     <ClInclude Include="..\include\mesh.h" />
     <ClInclude Include="..\include\outlinerenderer.h" />
+    <ClInclude Include="..\include\plane.h" />
     <ClInclude Include="..\include\prerenderedtexture.h" />
     <ClInclude Include="..\include\projection.h" />
     <ClInclude Include="..\include\base_quad.h" />
