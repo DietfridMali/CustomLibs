@@ -65,7 +65,7 @@ class Message {
         }
 
 
-        bool IsEmpty(void) {
+        bool IsEmpty(void) noexcept {
             return m_payload.IsEmpty();
         }
 

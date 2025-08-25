@@ -7,38 +7,37 @@
 
 // =================================================================================================
 
-class BaseShaderHandler 
+class BaseShaderHandler
     : public PolymorphSingleton<BaseShaderHandler>
 {
 public:
     typedef Shader* (__cdecl* tShaderLoader) (void);
 
     ManagedArray<FloatArray*>   m_kernels;
-    Shader*                     m_activeShader;
+    Shader* m_activeShader;
     String                      m_activeShaderId;
     Texture                     m_grayNoise;
-    BaseShaderCode*             m_shaderCode;
+    BaseShaderCode* m_shaderCode;
 
-
-    BaseShaderHandler() 
-        : m_kernels(16), m_shaderCode(nullptr), m_activeShader (nullptr), m_activeShaderId("")
+    BaseShaderHandler()
+        : m_kernels(16), m_shaderCode(nullptr), m_activeShader(nullptr), m_activeShaderId("")
     {
 #if 0
         List<String> filenames = { appData->textureFolder + "graynoise.png" };
         m_grayNoise.CreateFromFile(filenames, appData->flipImagesVertically);
 #endif
-        ComputeGaussKernels();
+        ComputeGaussKernels(); // kann allozieren -> nicht noexcept markieren
     }
 
-    virtual ~BaseShaderHandler() {
+    virtual ~BaseShaderHandler() noexcept {
         if (m_shaderCode)
-            delete m_shaderCode; // Speicherbereinigung nicht vergessen!
+            delete m_shaderCode;
     }
 
     static BaseShaderHandler& Instance(void) { return dynamic_cast<BaseShaderHandler&>(PolymorphSingleton::Instance()); }
 
 protected:
-    virtual void CreateShaderCode(void) {  m_shaderCode = new BaseShaderCode(); }
+    virtual void CreateShaderCode(void) { m_shaderCode = new BaseShaderCode(); } // allokiert -> nicht noexcept
 
 public:
     void CreateShaders(void) {
@@ -47,27 +46,24 @@ public:
     }
 
     Shader* SelectShader(Texture* texture);
-
     Shader* SetupShader(String shaderId);
-
     void StopShader(bool needLegacyMatrices = false);
 
-    inline bool ShaderIsActive(Shader* shader = nullptr) {
+    inline bool ShaderIsActive(Shader* shader = nullptr) const noexcept {
         return m_activeShader != shader;
     }
 
     inline Shader* GetShader(String shaderId) {
-        return m_shaderCode->GetShader (shaderId);
+        return m_shaderCode->GetShader(shaderId);
     }
 
-    inline FloatArray* GetKernel(int radius) {
+    inline FloatArray* GetKernel(int radius) noexcept {
         return ((radius < 1) or (radius > m_kernels.Length())) ? nullptr : m_kernels[radius - 1];
     }
 
 private:
-    FloatArray* ComputeGaussKernel1D(int radius);
-
-    void ComputeGaussKernels(void);
+    FloatArray* ComputeGaussKernel1D(int radius); // allokiert -> nicht noexcept
+    void ComputeGaussKernels(void);               // allokiert -> nicht noexcept
 };
 
 #define baseShaderHandler BaseShaderHandler::Instance()

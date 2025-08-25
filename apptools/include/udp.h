@@ -66,11 +66,11 @@ class UDP {
         }
 
 
-        inline uint16_t InPort(void) {
+        inline uint16_t InPort(void) noexcept {
             return m_sockets[0].m_localPort;
         }
 
-        inline uint16_t OutPort(void) {
+        inline uint16_t OutPort(void) noexcept {
             return m_sockets[1].m_localPort;
         }
 
