@@ -1,3 +1,4 @@
+
 #include <utility>
 #include <stdio.h>
 #include "texture.h"
@@ -22,7 +23,9 @@ TextureBuffer::TextureBuffer(TextureBuffer&& other) noexcept {
 }
 
 
-void TextureBuffer::Reset(void) {
+void TextureBuffer::Reset(void)
+noexcept
+{
     m_info.Reset();
 #if USE_SHARED_POINTERS
     m_data.Release();
@@ -33,12 +36,17 @@ void TextureBuffer::Reset(void) {
 
 
 void TextureBuffer::FlipSurface(SDL_Surface* source)
+noexcept
 {
     SDL_LockSurface(source);
     int pitch = source->pitch; // row size
     int h = source->h;
     char* pixels = (char*)source->pixels + h * pitch;
+#if USE_SHARED_POINTERS
+    char* dataPtr = (char*)m_data.get();
+#else
     char* dataPtr = (char*)m_data;
+#endif
 
     for (int i = 0; i < h; i++) {
         pixels -= pitch;
@@ -73,28 +81,40 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool flipVertically) {
         if (flipVertically)
             FlipSurface(source);
         else
+#if USE_SHARED_POINTERS
+            memcpy(m_data.get(), source->pixels, m_info.dataSize);
+#else
             memcpy(m_data, source->pixels, m_info.dataSize);
+#endif
         SDL_FreeSurface(source);
     }
     return *this;
 }
 
 
-TextureBuffer& TextureBuffer::operator= (const TextureBuffer& other) {
+TextureBuffer& TextureBuffer::operator= (const TextureBuffer& other)
+noexcept
+{
     return Copy(const_cast<TextureBuffer&>(other));
 }
 
-TextureBuffer& TextureBuffer::operator= (TextureBuffer&& other) {
+TextureBuffer& TextureBuffer::operator= (TextureBuffer&& other)
+noexcept
+{
     return Move(other);
 }
 
-TextureBuffer& TextureBuffer::Copy(TextureBuffer& other) {
+TextureBuffer& TextureBuffer::Copy(TextureBuffer& other)
+noexcept
+{
     m_info = other.m_info;
     m_data = other.m_data;
     return *this;
 }
 
-TextureBuffer& TextureBuffer::Move(TextureBuffer& other) {
+TextureBuffer& TextureBuffer::Move(TextureBuffer& other)
+noexcept
+{
     m_info = other.m_info;
     m_data = std::move(other.m_data);
     other.Reset();
@@ -115,7 +135,9 @@ bool Texture::Create(void) {
 }
 
 
-void Texture::Destroy(void) {
+void Texture::Destroy(void)
+noexcept
+{
 #if USE_SHARED_HANDLES
     m_handle.Release();
 #else
@@ -130,6 +152,7 @@ void Texture::Destroy(void) {
         }
     }
     m_buffers.Clear();
+    m_hasBuffer = false; // BUGFIX: Status zurücksetzen
 }
 
 
@@ -143,12 +166,16 @@ Texture& Texture::Copy(const Texture& other) {
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
+        m_hasBuffer = other.m_hasBuffer;   // BUGFIX: fehlende Felder kopieren
+        m_isValid = other.m_isValid;     // BUGFIX: fehlende Felder kopieren
     }
     return *this;
 }
 
 
-Texture& Texture::Move(Texture& other) {
+Texture& Texture::Move(Texture& other)
+noexcept
+{
     if (this != &other) {
         Destroy();
         m_handle = std::move(other.m_handle);
@@ -161,14 +188,18 @@ Texture& Texture::Move(Texture& other) {
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
+        m_hasBuffer = other.m_hasBuffer;   // BUGFIX: aufnehmen
+        m_isValid = other.m_isValid;     // BUGFIX: aufnehmen
     }
     return *this;
 }
 
-bool Texture::IsAvailable(void) {
-    return 
+bool Texture::IsAvailable(void)
+noexcept
+{
+    return
 #if USE_SHARED_HANDLES
-        m_handle.IsAvailable() 
+        m_handle.IsAvailable()
 #else
         (m_handle != 0)
 #endif
@@ -176,7 +207,9 @@ bool Texture::IsAvailable(void) {
 }
 
 
-void Texture::Bind(void) {
+void Texture::Bind(void)
+noexcept
+{
     if (IsAvailable()) {
         glEnable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE0);
@@ -189,13 +222,17 @@ void Texture::Bind(void) {
 }
 
 
-void Texture::Release(void) {
+void Texture::Release(void)
+noexcept
+{
     if (IsAvailable())
         glBindTexture(m_type, 0);
 }
 
 
-void Texture::SetParams(void) {
+void Texture::SetParams(void)
+noexcept
+{
     if (m_useMipMaps) {
         glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
         glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -206,17 +243,20 @@ void Texture::SetParams(void) {
         glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
-    glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
 }
 
 
-void Texture::Wrap(void) {
+void Texture::Wrap(void)
+noexcept
+{
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, m_wrapMode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, m_wrapMode);
 }
 
 
-void Texture::Enable(int tmu) {
+void Texture::Enable(int tmu)
+noexcept
+{
     glActiveTexture(GL_TEXTURE0 + tmu);
     glEnable(m_type);
     Bind();
@@ -225,18 +265,26 @@ void Texture::Enable(int tmu) {
 }
 
 
-void Texture::Disable(void) {
+void Texture::Disable(void)
+noexcept
+{
     Release();
     glDisable(m_type);
 }
 
 
-void Texture::Deploy(int bufferIndex) {
+void Texture::Deploy(int bufferIndex)
+noexcept
+{
     if (IsAvailable()) {
         Bind();
         SetParams();
         TextureBuffer* texBuf = m_buffers[bufferIndex];
-        glTexImage2D(m_type, 0, texBuf->m_info.internalFormat, texBuf->m_info.width, texBuf->m_info.height, 0, texBuf->m_info.format, GL_UNSIGNED_BYTE, texBuf->m_data);
+#if USE_SHARED_POINTERS
+        glTexImage2D(m_type, 0, texBuf->m_info.internalFormat, texBuf->m_info.width, texBuf->m_info.height, 0, texBuf->m_info.format, GL_UNSIGNED_BYTE, (const void*)texBuf->m_data.get());
+#else
+        glTexImage2D(m_type, 0, texBuf->m_info.internalFormat, texBuf->m_info.width, texBuf->m_info.height, 0, texBuf->m_info.format, GL_UNSIGNED_BYTE, (const void*)texBuf->m_data);
+#endif
         Release();
     }
 }
@@ -344,6 +392,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, bool flipVertically) {
 
 
 tRenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
+noexcept
 {
     if (renderAreaWidth == 0)
         renderAreaWidth = viewportWidth;
