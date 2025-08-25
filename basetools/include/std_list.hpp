@@ -84,6 +84,7 @@ public:
     // ----------------------------------------------------------
 
     template <typename T>
+        requires std::constructible_from<ItemType, T&&>
     inline ItemType* Append(T&& dataItem) {
         m_list.push_back(std::forward<T>(dataItem));
         return &m_list.back();
@@ -94,8 +95,12 @@ public:
         return &m_list.back();
     }
 
-    template<typename... Args>
-    ItemType* Append(Args&&... args) {
+
+    template<typename... Args,
+        typename = std::enable_if_t<(sizeof...(Args) > 0) &&
+        std::is_constructible<ItemType, Args...>::value>>
+        ItemType * Append(Args&&... args) noexcept(noexcept(m_list.emplace_back(std::forward<Args>(args)...)))
+    {
         m_list.emplace_back(std::forward<Args>(args)...);
         return &m_list.back();
     }
@@ -103,6 +108,7 @@ public:
     // ----------------------------------------------------------
  
     template<typename T>
+        requires std::constructible_from<ItemType, T&&>
     ItemType* Insert(int32_t i, T&& dataItem)
     {
         if (i >= m_list.size())

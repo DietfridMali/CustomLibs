@@ -163,27 +163,27 @@ public:
         return scaled ? m_height * m_scale : m_height;
     }
 
-    inline int GetScale(void) {
+    inline int GetScale(void) noexcept {
         return m_scale;
     }
 
-    inline bool IsAvailable(void) {
+    inline bool IsAvailable(void) noexcept {
         return m_isAvailable;
     }
 
-    inline bool IsEnabled(void) {
+    inline bool IsEnabled(void) noexcept {
         return (m_activeHandle != GL_NONE) and (m_activeHandle == m_handle.get());
     }
 
-    inline int GetLastDestination(void) {
+    inline int GetLastDestination(void) noexcept {
         return m_lastDestination;
     }
 
-    inline void SetLastDestination(int i) {
+    inline void SetLastDestination(int i) noexcept {
         m_lastDestination = i;
     }
 
-    inline int NextBuffer(int i) {
+    inline int NextBuffer(int i) noexcept {
         return (i + 1) % m_bufferCount;
     }
 
@@ -215,22 +215,22 @@ public:
 #endif
     }
 
-    inline int VertexBufferIndex(int i = 0) {
+    inline int VertexBufferIndex(int i = 0) noexcept {
         return m_vertexBufferIndex + i;
     }
 
 
-    inline int DepthBufferIndex(void) {
+    inline int DepthBufferIndex(void) noexcept {
         return m_depthBufferIndex;
     }
 
 
-    inline bool operator==(const FBO& other) const {
+    inline bool operator==(const FBO& other) const noexcept {
         return m_handle == other.m_handle;
     }
 
 
-    inline bool operator!=(const FBO& other) const {
+    inline bool operator!=(const FBO& other) const noexcept {
         return m_handle != other.m_handle;
     }
 

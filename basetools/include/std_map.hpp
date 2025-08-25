@@ -81,11 +81,13 @@ public:
 
     // Fügt nur ein, wenn der Key noch nicht existiert
     template<typename K = KEY_T, typename D = DATA_T>
+        requires std::constructible_from<KEY_T, K&&> && std::constructible_from<DATA_T, D&&>
     bool Insert(K&& key, D&& data) {
         return m_map.emplace(std::forward<K>(key), std::forward<D>(data)).second;
     }
 
     template<typename K = KEY_T>
+        requires std::constructible_from<KEY_T, K&&>
     bool Remove(K&& key) {
         return m_map.erase(std::forward<K>(key)) > 0;
     }
