@@ -37,21 +37,22 @@ public:
 
     static BaseDisplayHandler& Instance(void) { return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance()); }
 
-    virtual void ComputeDimensions(int width, int height, bool fullscreen);
+    virtual void ComputeDimensions(int width, int height, bool fullscreen)
+        noexcept;
 
     virtual void SetupDisplay(String windowTitle);
 
     virtual void Update(void);
 
-    inline int GetWidth(void) {
+    inline int GetWidth(void) noexcept {
         return m_width;
     }
 
-    inline int GetHeight(void) {
+    inline int GetHeight(void) noexcept {
         return m_height;
     }
 
-    inline float GetAspectRatio(void) {
+    inline float GetAspectRatio(void) noexcept {
         return m_aspectRatio;
     }
 };

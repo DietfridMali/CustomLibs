@@ -109,7 +109,8 @@ public:
 
     void Disable(void);
 
-    void SetViewport(void);
+    void SetViewport(void)
+        noexcept;
 
     void Fill(RGBAColor color);
 

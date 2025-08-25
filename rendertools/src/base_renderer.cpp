@@ -51,7 +51,7 @@ bool BaseRenderer::Create(int width, int height, float fov) {
 }
 
 
-bool BaseRenderer::InitOpenGL(void) {
+bool BaseRenderer::InitOpenGL(void) noexcept {
     GLint i = glewInit();
     if (i != GLEW_OK) {
         fprintf(stderr, "Cannot initialize OpenGL\n");
@@ -63,22 +63,22 @@ bool BaseRenderer::InitOpenGL(void) {
 }
 
 
-void BaseRenderer::SetupOpenGL (void) {
+void BaseRenderer::SetupOpenGL(void) noexcept {
     glClearColor(0, 0, 0, 0);
-    glColorMask (1, 1, 1, 1);
-    glDepthMask (1);
-    glEnable (GL_DEPTH_TEST);
-    glDepthFunc (GL_LESS);
-    glEnable (GL_BLEND);
-    glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable (GL_ALPHA_TEST);
+    glColorMask(1, 1, 1, 1);
+    glDepthMask(1);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_ALPHA_TEST);
     glFrontFace(GL_CW);
-    glEnable (GL_CULL_FACE);
-    glCullFace (GL_BACK);
-    glEnable (GL_MULTISAMPLE);
-    glDisable (GL_POLYGON_OFFSET_FILL);
-    glHint (GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-    SetViewport ();
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glEnable(GL_MULTISAMPLE);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+    SetViewport();
 }
 
 
@@ -107,7 +107,7 @@ bool BaseRenderer::Stop3DScene(void) {
 bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
 #if 0
-    if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) 
+    if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
         return false;
 #endif
     SetClearColor(m_backgroundColor);
@@ -149,7 +149,7 @@ void BaseRenderer::Draw3DScene(void) {
 }
 
 
-void BaseRenderer::DrawScreen (bool bRotate, bool bFlipVertically) {
+void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     if (m_screenIsAvailable) {
         m_frameCounter.Draw(true);
         Stop2DScene();
@@ -171,12 +171,12 @@ void BaseRenderer::DrawScreen (bool bRotate, bool bFlipVertically) {
 }
 
 
-void BaseRenderer::SetViewport(bool flipVertically) {
+void BaseRenderer::SetViewport(bool flipVertically) noexcept {
     SetViewport(m_viewport, flipVertically);
 }
 
 
-void BaseRenderer::SetViewport(::Viewport viewport, bool flipVertically) { //, bool isFBO) {
+void BaseRenderer::SetViewport(::Viewport viewport, bool flipVertically) noexcept { //, bool isFBO) {
     if (flipVertically)
         m_viewport = ::Viewport(viewport.m_left, m_windowHeight - viewport.m_top - viewport.m_height, viewport.m_width, viewport.m_height);
     else
@@ -193,7 +193,7 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     baseRenderer.PopMatrix();
 }
 
-void BaseRenderer::ClearGLError(void) {
+void BaseRenderer::ClearGLError(void) noexcept {
 #if 0
     while (glGetError() != GL_NO_ERROR)
         ;
@@ -201,13 +201,13 @@ void BaseRenderer::ClearGLError(void) {
 }
 
 
-bool BaseRenderer::CheckGLError (const char* operation) {
+bool BaseRenderer::CheckGLError(const char* operation) noexcept {
     return true;
-    GLenum glError = glGetError ();
-    if (not glError) 
+    GLenum glError = glGetError();
+    if (not glError)
         return true;
 #ifdef _DEBUG
-    fprintf (stderr, "OpenGL Error %d (%s)\n", glError, operation);
+    fprintf(stderr, "OpenGL Error %d (%s)\n", glError, operation);
 #endif
     return false;
 }

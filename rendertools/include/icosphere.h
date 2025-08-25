@@ -17,7 +17,8 @@
 
 using VertexIndices = ManagedArray<GLuint>;
 
-class IcoSphere : public Mesh 
+class IcoSphere 
+    : public Mesh 
 {
     public:
         GLuint          m_vertexCount;
@@ -28,10 +29,12 @@ class IcoSphere : public Mesh
         public:
             GLuint  i1, i2;
 #if (USE_STD || USE_STD_MAP)
-            bool operator<(const VertexKey& other) const {
+            bool operator<(const VertexKey& other) const noexcept {
                 // Lexikografischer Vergleich wie in KeyCmp:
-                if (i1 < other.i1) return true;
-                if (i1 > other.i1) return false;
+                if (i1 < other.i1) 
+                    return true;
+                if (i1 > other.i1)
+                    return false;
                 return i2 < other.i2;
             }
 #endif
@@ -39,7 +42,7 @@ class IcoSphere : public Mesh
 
     public:
 #if !(USE_STD || USE_STD_MAP)
-        static int KeyCmp(void* context, VertexKey const& ki, VertexKey const& kj) {
+        static int KeyCmp(void* context, VertexKey const& ki, VertexKey const& kj) noexcept {
             return (ki.i1 < kj.i1) ? -1 : (ki.i1 > kj.i1) ? 1 : (ki.i2 < kj.i2) ? -1 : (ki.i2 > kj.i2) ? 1 : 0;
         }
 #endif

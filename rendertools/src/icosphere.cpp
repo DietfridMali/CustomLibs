@@ -57,7 +57,6 @@ void TriangleIcoSphere::CreateBaseMesh(int quality) {
 }
 
 
-
 void TriangleIcoSphere::CreateOctahedron(void) {
     float X = 0.5f;
     float Y = float(sqrt(0.5));

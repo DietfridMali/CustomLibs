@@ -56,15 +56,15 @@ public:
 
     bool Create(String text, TextRenderer::eTextAlignments alignment = TextRenderer::taCenter, RGBAColor color = ColorData::White, const TextRenderer::TextDecoration& decoration = {});
 
-    inline void SetColor(RGBAColor color) {
+    inline void SetColor(RGBAColor color) noexcept {
         m_color = color;
     }
 
-    inline void SetAlpha(float alpha) {
+    inline void SetAlpha(float alpha) noexcept {
         m_color.A() = alpha;
     }
 
-    void SetScale(float scale = 1.0) {
+    void SetScale(float scale = 1.0) noexcept {
         m_scale = scale;
     }
 

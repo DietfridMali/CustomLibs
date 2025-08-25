@@ -28,45 +28,45 @@ public:
     static List<Matrix4f> matrixStack;
     static bool           m_legacyMode;
 
-    RenderMatrices() { }
+    RenderMatrices() noexcept {}
 
 
     void CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov);
 
 
-    inline float ZNear(void) {
+    inline float ZNear(void) noexcept {
         return m_projection.m_zNear;
     }
 
 
-    inline float ZFar(void) {
+    inline float ZFar(void) noexcept {
         return m_projection.m_zFar;
     }
 
 
-    inline Matrix4f& ModelView(void) {
+    inline Matrix4f& ModelView(void) noexcept {
         return m_renderMatrices[mtModelView];
     }
 
 
-    inline Matrix4f& Projection(void) {
+    inline Matrix4f& Projection(void) noexcept {
         return m_renderMatrices[mtProjection];
     }
 
 
-    inline GLfloat* ProjectionMatrix(void) {
+    inline GLfloat* ProjectionMatrix(void) noexcept {
         return (GLfloat*)m_renderMatrices[mtProjection].AsArray();
     }
 
     // setup 3D transformation and projection
-    void SetupTransformation(void);
+    void SetupTransformation(void) noexcept;
 
 
-    void ResetTransformation(void);
+    void ResetTransformation(void) noexcept;
 
 
     template<typename T>
-    void SetMatrix(T&& m, eMatrixType matrixType = mtModelView) {
+    void SetMatrix(T&& m, eMatrixType matrixType = mtModelView) noexcept {
         if (matrixType == mtModelView) {
             ModelView() = std::forward<T>(m);
             glMatrixMode(GL_MODELVIEW);
@@ -86,58 +86,53 @@ public:
     void PopMatrix(eMatrixType matrixType = mtModelView);
 
 
-    bool CheckModelView(void);
+    bool CheckModelView(void) noexcept;
 
 
-    bool CheckProjection(void);
+    bool CheckProjection(void) noexcept;
 
 
-    Matrix4f& Scale(float xScale, float yScale, float zScale, const char* caller = "");
+    Matrix4f& Scale(float xScale, float yScale, float zScale, const char* caller = "") noexcept;
 
 
-    Matrix4f& Translate(float xTranslate, float yTranslate, float zTranslate, const char* caller = "");
+    Matrix4f& Translate(float xTranslate, float yTranslate, float zTranslate, const char* caller = "") noexcept;
 
 
-    Matrix4f& Rotate(float angle, float xScale, float yScale, float zScale, const char* caller = "");
+    Matrix4f& Rotate(float angle, float xScale, float yScale, float zScale, const char* caller = "") noexcept;
 
 
-    Matrix4f& Rotate(Matrix4f& r);
+    Matrix4f& Rotate(Matrix4f& r) noexcept;
 
 
-    Matrix4f& Rotate(Vector3f angles);
+    Matrix4f& Rotate(Vector3f angles) noexcept;
 
 
-    inline void Translate(Vector3f v) {
+    inline void Translate(Vector3f v) noexcept {
         Translate(v.X(), v.Y(), v.Z());
     }
 
 
-    inline Matrix4f& Scale(float scale) {
+    inline Matrix4f& Scale(float scale) noexcept {
         return Scale(scale, scale, scale);
     }
 
 
-    inline Matrix4f& Scale(Vector3f scale) {
+    inline Matrix4f& Scale(Vector3f scale) noexcept {
         return Scale(scale.X(), scale.Y(), scale.Z());
     }
 
-    
-    inline Vector3f Project(Vector3f v) {
+
+    inline Vector3f Project(Vector3f v) noexcept {
         return static_cast<Vector3f>(Projection() * (ModelView() * static_cast<Vector4f>(v)));
     }
 
 
-    static void PushMatrix(Matrix4f& m) {
-        matrixStack.Append(m);
-    }
+    static void PushMatrix(Matrix4f& m);
 
 
-    static Matrix4f& PopMatrix(Matrix4f& m) {
-        matrixStack.Pop(m);
-        return m;
-    }
+    static Matrix4f& PopMatrix(Matrix4f& m);
 
-    void UpdateLegacyMatrices(void);
+    void UpdateLegacyMatrices(void) noexcept;
 };
 
 // =================================================================================================

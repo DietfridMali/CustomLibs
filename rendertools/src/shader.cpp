@@ -105,231 +105,171 @@ void Shader::UpdateMatrices(void) {
 }
 
 
-
-GLint Shader::SetMatrix4f(const char* name, GLint& location, const float* data, bool transpose) {
+GLint Shader::SetMatrix4f(const char* name, GLint& location, const float* data, bool transpose) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniformMatrix4fv(location, 1, GLboolean(transpose), data);
     return location;
 #else
-    UniformArray16f* uniform = GetUniform<UniformArray16f>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        uniform->Copy(data);
-        glUniformMatrix4fv(uniform->m_location, 1, GLboolean(transpose), data);
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const float*, UniformArray16f>(name, location, data))
+        UniformArray16f* uniform = GetUniform<UniformArray16f>(name, location);
+    glUniformMatrix4fv(location, 1, GLboolean(transpose), data);
+    return location;
 #endif
 }
 
 
-GLint Shader::SetMatrix3f(const char* name, GLint& location, float* data, bool transpose) {
+GLint Shader::SetMatrix3f(const char* name, GLint& location, float* data, bool transpose) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniformMatrix3fv(location, 1, GLboolean(transpose), data);
     return location;
 #else
-    UniformArray9f* uniform = GetUniform<UniformArray9f>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        uniform->Copy(data);
-        glUniformMatrix3fv(uniform->m_location, 1, GLboolean(transpose), data);
-    }
-    return uniform->m_location;
+    if (UpdateUniform<float*, UniformArray9f>(name, location, data))
+        glUniformMatrix3fv(location, 1, GLboolean(transpose), data);
+    return location;
 #endif
 }
 
 
-GLint Shader::SetVector4f(const char* name, GLint& location, const Vector4f& data) {
+GLint Shader::SetVector4f(const char* name, GLint& location, const Vector4f& data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform4fv(location, 1, data.Data());
     return location;
 #else
-    UniformVector4f* uniform = GetUniform<UniformVector4f>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform4fv(uniform->m_location, 1, data.Data());
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const Vector4f, UniformVector4f>(name, location, data))
+        glUniform4fv(location, 1, data.Data());
+    return location;
 #endif
 }
 
 
-GLint Shader::SetVector3f(const char* name, GLint& location, const Vector3f& data) {
+GLint Shader::SetVector3f(const char* name, GLint& location, const Vector3f& data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform3fv(location, 1, data.Data());
     return location;
 #else
-    UniformVector3f* uniform = GetUniform<UniformVector3f>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform3fv(uniform->m_location, 1, data.Data());
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const Vector3f, UniformVector3f>(name, location, data))
+        glUniform3fv(location, 1, data.Data());
+    return location;
 #endif
 }
 
 
-GLint Shader::SetVector2f(const char* name, GLint& location, const Vector2f& data) {
+GLint Shader::SetVector2f(const char* name, GLint& location, const Vector2f& data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform2fv(location, 1, data.Data());
     return location;
 #else
-    UniformVector2f* uniform = GetUniform<UniformVector2f>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform2fv(uniform->m_location, 1, data.Data());
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const Vector2f, UniformVector2f>(name, location, data))
+        glUniform2fv(location, 1, data.Data());
+    return location;
 #endif
 }
 
 
-GLint Shader::SetFloat(const char* name, GLint& location, float data) {
+GLint Shader::SetFloat(const char* name, GLint& location, float data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform1f(location, GLfloat(data));
     return location;
 #else
-    UniformFloat* uniform = GetUniform<UniformFloat>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform1f(uniform->m_location, GLfloat(data));
-    }
-    return uniform->m_location;
+    if (UpdateUniform<float, UniformFloat>(name, location, data))
+        glUniform1f(location, GLfloat(data));
+    return location;
 #endif
 }
 
 
-GLint Shader::SetVector2i(const char* name, GLint& location, const GLint* data) {
+GLint Shader::SetVector2i(const char* name, GLint& location, const GLint* data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform2iv(location, 1, data);
     return location;
 #else
-    UniformArray2i* uniform = GetUniform<UniformArray2i>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform2iv(uniform->m_location, 1, data);
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const GLint*, UniformArray2i>(name, location, data))
+        glUniform2iv(location, 1, data);
+    return location;
 #endif
 }
 
 
-GLint Shader::SetVector3i(const char* name, GLint& location, const GLint* data) {
+GLint Shader::SetVector3i(const char* name, GLint& location, const GLint* data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform3iv(location, 1, data);
     return location;
 #else
-    UniformArray3i* uniform = GetUniform<UniformArray3i>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform3iv(uniform->m_location, 1, data);
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const GLint*, UniformArray3i>(name, location, data))
+        glUniform3iv(location, 1, data);
+    return location;
 #endif
 }
 
 
-GLint Shader::SetVector4i(const char* name, GLint& location, const GLint* data) {
+GLint Shader::SetVector4i(const char* name, GLint& location, const GLint* data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform4iv(location, 1, data);
     return location;
 #else
-    UniformArray4i* uniform = GetUniform<UniformArray4i>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform4iv(uniform->m_location, 1, data);
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const GLint*, UniformArray4i>(name, location, data))
+        glUniform4iv(location, 1, data);
+    return location;
 #endif
 }
 
 
-GLint Shader::SetInt(const char* name, GLint& location, int data) {
+GLint Shader::SetInt(const char* name, GLint& location, int data) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform1i(location, GLint(data));
     return location;
 #else
-    UniformInt* uniform = GetUniform<UniformInt>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        *uniform = data;
-        glUniform1i(uniform->m_location, GLint(data));
-    }
-    return uniform->m_location;
+    if (UpdateUniform<int, UniformInt>(name, location, data))
+        glUniform1i(location, GLint(data));
+    return location;
 #endif
 }
 
 
-GLint Shader::SetFloatData(const char* name, GLint& location, const float* data, size_t length) {
+GLint Shader::SetFloatData(const char* name, GLint& location, const float* data, size_t length) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform1fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
     return location;
 #else
-    UniformArray<float>* uniform = GetUniform<UniformArray<float>>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        uniform->Copy(data, length);
-        glUniform1fv(uniform->m_location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const float*, UniformArray<float>>(name, location, data))
+        glUniform1fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
+    return location;
 #endif
 }
 
 
-GLint Shader::SetIntData(const char* name, GLint& location, const int* data, size_t length) {
+GLint Shader::SetIntData(const char* name, GLint& location, const int* data, size_t length) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
         glUniform1iv(location, GLsizei(length), reinterpret_cast<const GLint*>(data));
     return location;
 #else
-    UniformArray<int>* uniform = GetUniform<UniformArray<int>>(name, location);
-    if (not uniform or (uniform->m_location < 0))
-        return -1;
-    if (*uniform != data) {
-        uniform->Copy(data, length);
-        glUniform1iv(uniform->m_location, GLsizei(length), reinterpret_cast<const GLint*>(data));
-    }
-    return uniform->m_location;
+    if (UpdateUniform<const int*, UniformArray<int>>(name, location, data))
+        glUniform1iv(location, GLsizei(length), reinterpret_cast<const GLint*>(data));
+    return location;
 #endif
 }
 

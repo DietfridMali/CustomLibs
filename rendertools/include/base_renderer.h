@@ -1,4 +1,5 @@
 #pragma once
+
 #include <utility>
 
 #include <stdlib.h>
@@ -16,160 +17,161 @@
 // =================================================================================================
 // basic renderer class. Initializes display and OpenGL and sets up projections and view matrix
 
-class BaseRenderer 
+class BaseRenderer
     : public RenderMatrices
     , public DrawBufferHandler
     , public PolymorphSingleton<BaseRenderer>
 {
-    public:
-        struct GLVersion {
-            GLint major{ 0 };
-            GLint minor{ 0 };
-        };
-
-    protected:
-        FBO*                    m_screenBuffer;
-        FBO*                    m_sceneBuffer;
-        Texture                 m_renderTexture;
-        bool                    m_screenIsAvailable;
-
-        Viewport                m_viewport;
-        BaseQuad                m_viewportArea;
-
-        int                     m_windowWidth;
-        int                     m_windowHeight;
-        int                     m_sceneWidth;
-        int                     m_sceneHeight;
-        int                     m_sceneLeft;
-        int                     m_sceneTop;
-        float                   m_aspectRatio;
-
-        RGBAColor               m_backgroundColor;
-
-        GLVersion               m_glVersion;
-        MovingFrameCounter      m_frameCounter;
-
-        static List<::Viewport> viewportStack;
 public:
-        BaseRenderer()
-            : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
-            , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f), m_backgroundColor(ColorData::Black)
-            , m_screenIsAvailable(false)
-        { 
-            //_instance = this;
-        }
+    struct GLVersion {
+        GLint major{ 0 };
+        GLint minor{ 0 };
+    };
 
-        static BaseRenderer& Instance(void) { return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance()); }
+protected:
+    FBO* m_screenBuffer;
+    FBO* m_sceneBuffer;
+    Texture                 m_renderTexture;
+    bool                    m_screenIsAvailable;
 
-        bool InitOpenGL(void);
+    Viewport                m_viewport;
+    BaseQuad                m_viewportArea;
 
-        virtual void Init(int width, int height, float fov);
+    int                     m_windowWidth;
+    int                     m_windowHeight;
+    int                     m_sceneWidth;
+    int                     m_sceneHeight;
+    int                     m_sceneLeft;
+    int                     m_sceneTop;
+    float                   m_aspectRatio;
 
-        virtual bool Create(int width = 1920, int height = 1080, float fov = 45);
+    RGBAColor               m_backgroundColor;
 
-        bool CreateScreenBuffer(void);
-            
-        void SetupOpenGL (void);
+    GLVersion               m_glVersion;
+    MovingFrameCounter      m_frameCounter;
 
-        virtual bool Start3DScene(void);
+    static List<::Viewport> viewportStack;
+public:
+    BaseRenderer()
+        : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
+        , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f), m_backgroundColor(ColorData::Black)
+        , m_screenIsAvailable(false)
+    {
+        //_instance = this;
+    }
 
-        virtual bool Stop3DScene(void);
+    static BaseRenderer& Instance(void) { return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance()); }
 
-        virtual bool Start2DScene(void);
+    bool InitOpenGL(void) noexcept;
 
-        virtual bool Stop2DScene(void);
+    virtual void Init(int width, int height, float fov);
 
-        virtual void Draw3DScene(void);
-            
-        virtual void DrawScreen(bool bRotate, bool bFlipVertically);
+    virtual bool Create(int width = 1920, int height = 1080, float fov = 45);
 
-        virtual bool EnableCamera(void) { return false; }
+    bool CreateScreenBuffer(void);
 
-        virtual bool DisableCamera(void) { return false; }
+    void SetupOpenGL(void) noexcept;
 
-        inline FBO* SceneBuffer(void) { return m_sceneBuffer; }
+    virtual bool Start3DScene(void);
 
-        inline FBO* ScreenBuffer(void) { return m_screenBuffer; }
+    virtual bool Stop3DScene(void);
 
-        bool SetActiveBuffer(FBO* buffer, bool clearBuffer = false);
+    virtual bool Start2DScene(void);
 
-        inline int WindowWidth(void) { return m_windowWidth; }
+    virtual bool Stop2DScene(void);
 
-        inline int WindowHeight(void) { return m_windowHeight; }
+    virtual void Draw3DScene(void);
 
-        inline int SceneWidth(void) { return m_sceneWidth; }
+    virtual void DrawScreen(bool bRotate, bool bFlipVertically);
 
-        inline int SceneHeight(void) { return m_sceneHeight; }
+    virtual bool EnableCamera(void) { return false; }
 
-        inline int SceneLeft(void) { return m_sceneLeft; }
+    virtual bool DisableCamera(void) { return false; }
 
-        inline int SceneTop(void) { return m_sceneTop; }
+    inline FBO* SceneBuffer(void) noexcept { return m_sceneBuffer; }
 
-        inline float AspectRatio(void) { return m_aspectRatio; }
+    inline FBO* ScreenBuffer(void) noexcept { return m_screenBuffer; }
 
-        template <typename T>
-        inline void SetBackgroundColor(T&& backgroundColor) {
-            m_backgroundColor = std::forward<T>(backgroundColor);
-        }
+    bool SetActiveBuffer(FBO* buffer, bool clearBuffer = false);
 
-        inline void SetClearColor(const RGBAColor& color) const {
-            glClearColor(color.R(), color.G(), color.B(), color.A());
-        }
+    inline int WindowWidth(void) noexcept { return m_windowWidth; }
 
-        inline void SetClearColor(RGBAColor&& color) {
-            SetClearColor(static_cast<const RGBAColor&>(color));
-        }
+    inline int WindowHeight(void) noexcept { return m_windowHeight; }
 
-        inline void ResetClearColor(void) {
-            glClearColor(0, 0, 0, 0);
-        }
+    inline int SceneWidth(void) noexcept { return m_sceneWidth; }
+
+    inline int SceneHeight(void) noexcept { return m_sceneHeight; }
+
+    inline int SceneLeft(void) noexcept { return m_sceneLeft; }
+
+    inline int SceneTop(void) noexcept { return m_sceneTop; }
+
+    inline float AspectRatio(void) noexcept { return m_aspectRatio; }
+
+    template <typename T>
+    inline void SetBackgroundColor(T&& backgroundColor) {
+        m_backgroundColor = std::forward<T>(backgroundColor);
+    }
+
+    inline void SetClearColor(const RGBAColor& color) const noexcept {
+        glClearColor(color.R(), color.G(), color.B(), color.A());
+    }
+
+    inline void SetClearColor(RGBAColor&& color)  noexcept {
+        SetClearColor(static_cast<const RGBAColor&>(color));
+    }
+
+    inline void ResetClearColor(void) noexcept {
+        glClearColor(0, 0, 0, 0);
+    }
 #if 0
-        typedef struct {
-            int width, height;
-        } tViewport;
+    typedef struct {
+        int width, height;
+    } tViewport;
 #endif
-        Viewport& Viewport(void) { return m_viewport; }
+    Viewport& Viewport(void)  noexcept { return m_viewport; }
 
-        void SetViewport(bool flipVertically = false);
+    void SetViewport(bool flipVertically = false)
+        noexcept;
 
-        void SetViewport(::Viewport viewport, bool flipVertically = false); // , bool isFBO = false);
+    void SetViewport(::Viewport viewport, bool flipVertically = false) noexcept; // , bool isFBO = false);
 
-        void PushViewport(void) {
-            viewportStack.Append(m_viewport);
-        }
+    void PushViewport(void) {
+        viewportStack.Append(m_viewport);
+    }
 
-        void PopViewport(void) {
-            ::Viewport viewport;
-            viewportStack.Pop(viewport);
-            SetViewport(viewport);
-        }
+    void PopViewport(void) {
+        ::Viewport viewport;
+        viewportStack.Pop(viewport);
+        SetViewport(viewport);
+    }
 
-        void Fill(const RGBAColor& color, float scale = 1.0f);
+    void Fill(const RGBAColor& color, float scale = 1.0f);
 
-        void Fill(RGBAColor&& color, float scale = 1.0f) {
-            Fill(static_cast<const RGBAColor&>(color), scale);
-        }
+    void Fill(RGBAColor&& color, float scale = 1.0f) {
+        Fill(static_cast<const RGBAColor&>(color), scale);
+    }
 
-        template <typename T>
-        inline void Fill(T&& color, float alpha, float scale = 1.0f) {
-            Fill(RGBAColor(std::forward<T>(color), alpha), scale);
-        }
+    template <typename T>
+    inline void Fill(T&& color, float alpha, float scale = 1.0f) {
+        Fill(RGBAColor(std::forward<T>(color), alpha), scale);
+    }
 
-        inline GLVersion GetGLVersion(void) {
-            return m_glVersion;
-        }
+    inline GLVersion GetGLVersion(void) noexcept {
+        return m_glVersion;
+    }
 
-        inline void ShowFps(bool showFps) {
-            m_frameCounter.ShowFps(showFps);
-        }
+    inline void ShowFps(bool showFps) {
+        m_frameCounter.ShowFps(showFps);
+    }
 
-        inline void ToggleFps(void) {
-            m_frameCounter.Toggle();
-        }
+    inline void ToggleFps(void) {
+        m_frameCounter.Toggle();
+    }
 
-        static void ClearGLError(void);
+    static void ClearGLError(void) noexcept;
 
-        static bool CheckGLError (const char* operation = "");
+    static bool CheckGLError(const char* operation = "") noexcept;
 };
 
 #define baseRenderer BaseRenderer::Instance()

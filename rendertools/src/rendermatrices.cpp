@@ -1,3 +1,4 @@
+
 #include "rendermatrices.h"
 
 #define DEBUG_MATRICES 0
@@ -27,15 +28,15 @@ void RenderMatrices::CreateMatrices(int windowWidth, int windowHeight, float asp
 }
 
 
-void RenderMatrices::SetupTransformation(void) {
-    if (DEBUG_MATRICES or m_legacyMode)  {
+void RenderMatrices::SetupTransformation(void) noexcept {
+    if (DEBUG_MATRICES or m_legacyMode) {
         glMatrixMode(GL_PROJECTION);
         glLoadMatrixf(m_renderMatrices[mtProjection3D].AsArray()); // already column major
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
     }
 #if !DEBUG_MATRICES
-    else 
+    else
 #endif
     {
         m_renderMatrices[mtModelView] = Matrix4f::IDENTITY;
@@ -44,11 +45,11 @@ void RenderMatrices::SetupTransformation(void) {
 }
 
 
-void RenderMatrices::ResetTransformation(void) {
+void RenderMatrices::ResetTransformation(void) noexcept {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "resetting transformation\n");
 #endif
-    if (DEBUG_MATRICES or m_legacyMode)  {
+    if (DEBUG_MATRICES or m_legacyMode) {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
@@ -65,7 +66,7 @@ void RenderMatrices::ResetTransformation(void) {
 }
 
 
-bool RenderMatrices::CheckModelView(void) {
+bool RenderMatrices::CheckModelView(void) noexcept {
 #if DEBUG_MATRICES
     float glData[16], mData[16];
     Shader::GetFloatData(GL_MODELVIEW_MATRIX, 16, glData);
@@ -80,7 +81,7 @@ bool RenderMatrices::CheckModelView(void) {
 }
 
 
-bool RenderMatrices::CheckProjection(void) {
+bool RenderMatrices::CheckProjection(void) noexcept {
 #if DEBUG_MATRICES
     float glData[16], mData[16];
     Shader::GetFloatData(GL_PROJECTION_MATRIX, 16, glData);
@@ -95,7 +96,7 @@ bool RenderMatrices::CheckProjection(void) {
 }
 
 
-Matrix4f& RenderMatrices::Scale(float xScale, float yScale, float zScale, const char* caller) {
+Matrix4f& RenderMatrices::Scale(float xScale, float yScale, float zScale, const char* caller) noexcept {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "   Scale(%1.2f, %1.2f, %1.2f)\n", xScale, yScale, zScale);
 #endif
@@ -119,7 +120,7 @@ Matrix4f& RenderMatrices::Scale(float xScale, float yScale, float zScale, const 
 }
 
 
-Matrix4f& RenderMatrices::Translate(float xTranslate, float yTranslate, float zTranslate, const char* caller) {
+Matrix4f& RenderMatrices::Translate(float xTranslate, float yTranslate, float zTranslate, const char* caller) noexcept {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "   Translate(%1.2f, %1.2f, %1.2f)\n", xTranslate, yTranslate, zTranslate);
 #endif
@@ -154,14 +155,14 @@ Matrix4f& RenderMatrices::Translate(float xTranslate, float yTranslate, float zT
 }
 
 
-Matrix4f& RenderMatrices::Rotate(float angle, float xScale, float yScale, float zScale, const char* caller) {
+Matrix4f& RenderMatrices::Rotate(float angle, float xScale, float yScale, float zScale, const char* caller) noexcept {
 #if DEBUG_MATRICES
     float glData[16];
     Shader::GetFloatData(GL_MODELVIEW_MATRIX, 16, glData);
     Matrix4f m = ModelView();
     CheckModelView();
 #endif
-    if (DEBUG_MATRICES or m_legacyMode) 
+    if (DEBUG_MATRICES or m_legacyMode)
         glRotatef(angle, xScale, yScale, zScale);
 #if !DEBUG_MATRICES
     else
@@ -174,7 +175,7 @@ Matrix4f& RenderMatrices::Rotate(float angle, float xScale, float yScale, float 
 }
 
 
-Matrix4f& RenderMatrices::Rotate(Matrix4f& r) {
+Matrix4f& RenderMatrices::Rotate(Matrix4f& r) noexcept {
 #if LOG_MATRIX_OPERATIONS
     float mData[16];
     memcpy(mData, r.AsArray(), sizeof(mData));
@@ -199,7 +200,7 @@ Matrix4f& RenderMatrices::Rotate(Matrix4f& r) {
 }
 
 
-Matrix4f& RenderMatrices::Rotate(Vector3f angles) {
+Matrix4f& RenderMatrices::Rotate(Vector3f angles) noexcept {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "   Rotate(%1.2f, %1.2f, %1.2f)\n", angles.X(), angles.Y(), angles.Z());
 #endif
@@ -249,7 +250,7 @@ void RenderMatrices::PopMatrix(eMatrixType matrixType) {
 }
 
 
-void RenderMatrices::UpdateLegacyMatrices(void) {
+void RenderMatrices::UpdateLegacyMatrices(void) noexcept {
     glMatrixMode(GL_PROJECTION);
     glLoadMatrixf(Projection().AsArray());
     glMatrixMode(GL_MODELVIEW);

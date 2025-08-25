@@ -37,7 +37,6 @@ public:
         noexcept(noexcept(glm::make_mat4((const float*)nullptr)))
     {
         float data[16] = {};
-        // std::copy für Trivialtypen wirft praktisch nicht; wir koppeln die Garantie an make_mat4
         std::copy(list.begin(), list.end(), data);
         m = glm::make_mat4(data);
     }
@@ -57,7 +56,7 @@ public:
     operator const glm::mat4& () const noexcept { return m; }
 
     // ===== EulerComputeZYX =====
-    Matrix4f& EulerComputeZYX(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ); // (lassen ohne noexcept – hängt von deiner Implementierung ab)
+    Matrix4f& EulerComputeZYX(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ);
 
     // ===== Static builders =====
     static Matrix4f Identity() noexcept(noexcept(glm::mat4(1.0f))) {
@@ -73,7 +72,7 @@ public:
     }
 
     static Matrix4f Translation(const Vector3f& v)
-        noexcept(noexcept(Translation(v.X(), v.Y(), v.Z())))
+        noexcept(noexcept(Translation(std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         return Translation(v.X(), v.Y(), v.Z());
     }
@@ -87,7 +86,7 @@ public:
     }
 
     static Matrix4f Scaling(const Vector3f& s)
-        noexcept(noexcept(Scaling(s.X(), s.Y(), s.Z())))
+        noexcept(noexcept(Scaling(std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         return Scaling(s.X(), s.Y(), s.Z());
     }
@@ -106,35 +105,35 @@ public:
     }
 
     static Matrix4f Rotation(float angleDeg, const Vector3f& axis)
-        noexcept(noexcept(Rotation(angleDeg, axis.X(), axis.Y(), axis.Z())))
+        noexcept(noexcept(Rotation(std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         return Rotation(angleDeg, axis.X(), axis.Y(), axis.Z());
     }
 
     static Matrix4f& Rotation(Matrix4f& rotation, float x, float y, float z)
-        noexcept(noexcept(rotation.EulerComputeZYX(0, 0, 0, 0, 0, 0)))
+        noexcept(noexcept(rotation.EulerComputeZYX(std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         float radX = Conversions::DegToRad(x);
         float radY = Conversions::DegToRad(y);
         float radZ = Conversions::DegToRad(z);
-        return rotation.EulerComputeZYX(sin(radX), cos(radX), sin(radY), cos(radY), sin(radZ), cos(radZ));
+        return rotation.EulerComputeZYX(std::sin(radX), std::cos(radX), std::sin(radY), std::cos(radY), std::sin(radZ), std::cos(radZ));
     }
 
     static Matrix4f Rotation(float x, float y, float z)
-        noexcept(noexcept(Rotation(std::declval<Matrix4f&>(), x, y, z)))
+        noexcept(noexcept(Rotation(std::declval<Matrix4f&>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         Matrix4f rotation;
         return Rotation(rotation, x, y, z);
     }
 
     static Matrix4f Rotation(Matrix4f& rotation, Vector3f angles)
-        noexcept(noexcept(Rotation(rotation, angles.X(), angles.Y(), angles.Z())))
+        noexcept(noexcept(Rotation(std::declval<Matrix4f&>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         return Rotation(rotation, angles.X(), angles.Y(), angles.Z());
     }
 
     static Matrix4f Rotation(Vector3f angles)
-        noexcept(noexcept(Rotation(std::declval<Matrix4f&>(), angles.X(), angles.Y(), angles.Z())))
+        noexcept(noexcept(Rotation(std::declval<Matrix4f&>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         Matrix4f rotation;
         return Rotation(rotation, angles.X(), angles.Y(), angles.Z());
@@ -142,14 +141,14 @@ public:
 
     // ===== Member transforms =====
     Matrix4f& Translate(float x, float y, float z)
-        noexcept(noexcept(Translation(x, y, z)))
+        noexcept(noexcept(Translation(std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         m *= Translation(x, y, z).m;
         return *this;
     }
 
     Matrix4f& Translate(const Vector3f& v)
-        noexcept(noexcept(Translate(v.X(), v.Y(), v.Z())))
+        noexcept(noexcept(Translate(std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         return Translate(v.X(), v.Y(), v.Z());
     }
@@ -162,14 +161,14 @@ public:
     }
 
     Matrix4f& Scale(const glm::vec3& s)
-        noexcept(noexcept(glm::scale(std::declval<glm::mat4&>(), s)))
+        noexcept(noexcept(glm::scale(std::declval<glm::mat4&>(), std::declval<glm::vec3>())))
     {
         m = glm::scale(m, s);
         return *this;
     }
 
     Matrix4f& Rotate(float angleDeg, const glm::vec3& axis)
-        noexcept(noexcept(glm::rotate(std::declval<glm::mat4&>(), std::declval<float>(), axis)))
+        noexcept(noexcept(glm::rotate(std::declval<glm::mat4&>(), std::declval<float>(), std::declval<glm::vec3>())))
     {
         if ((angleDeg != 0.0f) and (glm::length(axis) != 0.0f))
             m = glm::rotate(m, glm::radians(angleDeg), axis);
@@ -177,12 +176,12 @@ public:
     }
 
     Matrix4f& Rotate(float angleDeg, float x, float y, float z)
-        noexcept(noexcept(Rotate(angleDeg, glm::vec3(x, y, z))))
+        noexcept(noexcept(Rotate(std::declval<float>(), std::declval<glm::vec3>())))
     {
         return Rotate(angleDeg, glm::vec3(x, y, z));
     }
 
-    template<typename T>  
+    template<typename T>
         requires std::same_as<std::decay_t<T>, Matrix4f>
     Matrix4f& Rotate(T&& r) noexcept {
         m *= std::forward<T>(r).m;
@@ -209,7 +208,7 @@ public:
         return Matrix4f(glm::inverse(m));
     }
 
-    Matrix4f AffineInverse(void); // (lass offen – je nach Implementierung)
+    Matrix4f AffineInverse(void); // bewusst ohne noexcept
 
     static Vector3f Rotate(const Matrix4f& mm, const Vector3f& v)
         noexcept(noexcept(mm* v))
@@ -219,13 +218,13 @@ public:
 
     template <typename T> requires std::same_as<std::decay_t<T>, Vector3f>
     Vector3f Rotate(T&& v) const
-        noexcept(noexcept((*this)* std::forward<T>(v)))
+        noexcept(noexcept((*this)* std::declval<Vector3f>()))
     {
         return *this * std::forward<T>(v);
     }
 
     Vector3f Unrotate(const Vector3f v)
-        noexcept(noexcept(Transpose()* v))
+        noexcept(noexcept(Transpose()* std::declval<Vector3f>()))
     {
         return Transpose() * v;
     }
@@ -252,14 +251,14 @@ public:
     Matrix4f& operator*=(const Matrix4f& other)
         noexcept(noexcept(std::declval<glm::mat4&>() *= other.m))
     {
-        m *= other.m; 
+        m *= other.m;
         return *this;
     }
 
     Matrix4f& operator*=(const glm::mat4& other)
         noexcept(noexcept(std::declval<glm::mat4&>() *= other))
     {
-        m *= other; 
+        m *= other;
         return *this;
     }
 
@@ -270,10 +269,10 @@ public:
     }
 
     Vector3f operator*(const Vector3f& v) const
-        noexcept(noexcept(std::declval<glm::mat4>()* Vector4f(v)))
+        noexcept(noexcept(std::declval<glm::mat4>()* std::declval<Vector4f>()))
     {
         Vector4f h = v;
-        return m * h;
+        return static_cast<Vector3f>(m * h);  // BUGFIX: Rückgabetyp korrekt zu Vector3f
     }
 
     operator const float* () const noexcept { return glm::value_ptr(m); }
