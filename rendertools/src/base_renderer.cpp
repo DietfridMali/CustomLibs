@@ -136,6 +136,10 @@ void BaseRenderer::Draw3DScene(void) {
 #if 0
         baseRenderer.Translate(0.5, 0.5, 0);
         baseRenderer.Scale(1, -1, 1);
+#else
+        m_viewportArea.RenderCentered(true);
+        m_viewportArea.FlipVertically(true);
+        m_viewportArea.SetRotation(0.0f);
 #endif
         glDepthFunc(GL_ALWAYS);
         glDisable(GL_CULL_FACE);
@@ -168,13 +172,9 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             if (bFlipVertically)
                 Scale(1, -1, 1);
 #else
-            static bool setOnce = true;
-            if (setOnce) {
-                setOnce = false;
-                m_viewportArea.RenderCentered(true);
-                m_viewportArea.FlipVertically(bFlipVertically);
-                m_viewportArea.SetRotation(bRotate ? 90.0f : 0.0f);
-            }
+            m_viewportArea.RenderCentered(true);
+            m_viewportArea.FlipVertically(bFlipVertically);
+            m_viewportArea.SetRotation(bRotate ? 90.0f : 0.0f);
 #endif
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             m_viewportArea.Render(&m_renderTexture); // bFlipVertically);

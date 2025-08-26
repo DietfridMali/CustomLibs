@@ -164,16 +164,18 @@ void BaseQuad::Render(RGBAColor color) {
 
 
 bool BaseQuad::UpdateTransformation(void) {
-    if (not m_isCentered or m_flipVertically or m_rotate)
-        return false;
-    baseRenderer.PushMatrix();
-    if (m_isCentered)
-        baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-    if (m_rotation != 0.0f)
-        baseRenderer.Rotate(m_rotation, 0, 0, 1);
-    if (m_flipVertically)
-        baseRenderer.Scale(1.0f, -1.0f, 1.0f);
-    return true;
+    if (m_isCentered or m_flipVertically or m_rotate) {
+        baseRenderer.PushMatrix();
+        if (m_isCentered)
+            baseRenderer.Translate(0.5f, 0.5f, 0.0f);
+        if (m_rotation != 0.0f)
+            baseRenderer.Rotate(m_rotation, 0, 0, 1);
+        if (m_flipVertically)
+            baseRenderer.Scale(1.0f, -1.0f, 1.0f);
+        return true;
+
+    }
+    return false;
 }
 
 
