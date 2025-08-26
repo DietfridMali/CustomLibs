@@ -20,18 +20,25 @@ public:
     VertexBuffer    m_vertexBuffer;
     TexCoordBuffer  m_texCoordBuffer;
     TexCoord        m_maxTexCoord;
-    Texture* m_texture;
+    Texture*        m_texture;
     RGBAColor       m_color;
     float           m_aspectRatio;
     float           m_offset;
     bool            m_isAvailable;
+    bool            m_isCentered;
+    bool            m_flipVertically;
+    bool            m_rotate;
+    float           m_rotation;
+
+    static std::initializer_list<Vector3f> defaultVertices;
+    static std::initializer_list<TexCoord> defaultTexCoords;
 
     BaseQuad()
-        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false)
+        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false), m_isCentered(false), m_flipVertically(false), m_rotate(false), m_rotation(0.0f)
     {
     }
 
-    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {}, Texture* texture = nullptr, RGBAColor color = ColorData::White)
+    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords, Texture* texture = nullptr, RGBAColor color = ColorData::White)
         : Plane(vertices), m_texture(texture), m_color(color), /*m_borderWidth(borderWidth),*/ m_isAvailable(true), m_offset(0)
     {
         Setup(vertices, texCoords, texture, color/*, borderWidth*/);
@@ -80,11 +87,15 @@ public:
 
     Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
 
+    bool UpdateTransformation(void);
+
     void Render(RGBAColor color = ColorData::White);
 
-    void Render(Shader* shader, Texture* texture, bool updateVAO = true);
+    bool Render(Shader* shader, Texture* texture, bool updateVAO = true);
 
-    void Render(Texture* texture);
+    inline void Render(Texture* texture) {
+        Render(LoadShader(texture != nullptr), texture, true);
+    }
 
     // fill 2D area defined by x and y components of vertices with color color
     void Fill(const RGBAColor& color);
@@ -95,6 +106,19 @@ public:
 
     inline void Fill(RGBColor color, float alpha = 1.0f) {
         return Fill(RGBAColor(color, alpha));
+    }
+
+    inline void FlipVertically(bool enable) noexcept {
+        m_flipVertically = enable;
+    }
+
+    inline void RenderCentered(bool isCentered) noexcept {
+        m_isCentered = isCentered;
+    }
+
+    inline void SetRotation(float angle) noexcept {
+        m_rotation = angle;
+        m_rotate = (angle != 0.0f);
     }
 
     ~BaseQuad() {

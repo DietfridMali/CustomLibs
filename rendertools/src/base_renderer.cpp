@@ -46,7 +46,7 @@ bool BaseRenderer::Create(int width, int height, float fov) {
     SetupOpenGL();
     m_drawBufferStack.Clear();
     m_renderTexture.HasBuffer() = true;
-    m_viewportArea.Setup({ Vector3f{ -0.5f, -0.5f, 0.0f }, Vector3f{ -0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, -0.5f, 0.0f } });
+    m_viewportArea.Setup(BaseQuad::defaultVertices);
     return true;
 }
 
@@ -133,8 +133,10 @@ bool BaseRenderer::Stop2DScene(void) {
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
         baseRenderer.PushMatrix();
+#if 0
         baseRenderer.Translate(0.5, 0.5, 0);
         baseRenderer.Scale(1, -1, 1);
+#endif
         glDepthFunc(GL_ALWAYS);
         glDisable(GL_CULL_FACE);
         SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), false);
@@ -159,11 +161,21 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             glDisable(GL_CULL_FACE); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight), false);
             glClear(GL_COLOR_BUFFER_BIT);
+#if 1
             Translate(0.5, 0.5, 0);
             if (bRotate)
                 Rotate(90, 0, 0, 1);
             if (bFlipVertically)
                 Scale(1, -1, 1);
+#else
+            static bool setOnce = true;
+            if (setOnce) {
+                setOnce = false;
+                m_viewportArea.RenderCentered(true);
+                m_viewportArea.FlipVertically(bFlipVertically);
+                m_viewportArea.SetRotation(bRotate ? 90.0f : 0.0f);
+            }
+#endif
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             m_viewportArea.Render(&m_renderTexture); // bFlipVertically);
         }

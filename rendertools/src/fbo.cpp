@@ -112,8 +112,7 @@ bool FBO::AttachBuffers(bool hasMRTs) {
 
 
 void FBO::CreateRenderArea(void) {
-    m_viewportArea.Setup({ Vector3f{ -0.5f, -0.5f, 0.0f }, Vector3f{ -0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, -0.5f, 0.0f }},
-                         { /*TexCoord{0, 0}, TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0} */});
+    m_viewportArea.Setup(BaseQuad::defaultVertices, BaseQuad::defaultTexCoords);
     m_viewport = Viewport(0, 0, m_width * m_scale, m_height * m_scale);
 }
 

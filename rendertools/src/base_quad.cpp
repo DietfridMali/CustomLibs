@@ -7,12 +7,18 @@
 #include "base_quad.h"
 #include "base_shaderhandler.h"
 #include "type_helper.hpp"
+#include "base_renderer.h"
 
 #define USE_VAO true
 
 // caution: the VAO shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this vao is initialized.
 // VAO::Init takes care of that by first assigning a handle-less shared gl handle 
 VAO* BaseQuad::m_vao = nullptr;
+
+std::initializer_list<Vector3f> BaseQuad::defaultVertices = { Vector3f{ -0.5f, -0.5f, 0.0f }, Vector3f{ -0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, -0.5f, 0.0f } };
+
+std::initializer_list<TexCoord> BaseQuad::defaultTexCoords = { TexCoord{ 0, 1 }, TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 } };
+
 
 // =================================================================================================
 
@@ -157,54 +163,61 @@ void BaseQuad::Render(RGBAColor color) {
 }
 
 
-void BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
-    if (not updateVAO or UpdateVAO()) {
-        m_vao->Render(shader, texture);
-    }
-    else {
-        glEnable(GL_TEXTURE_2D);
-        texture->Enable();
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glBegin(GL_QUADS);
-        for (auto& v : m_vertexBuffer.m_appData) {
-            glColor4f(1, 1, 1, 1);
-            glVertex3f(v.X(), v.Y(), v.Z());
-        }
-        glEnd();
-        texture->Disable();
-    }
+bool BaseQuad::UpdateTransformation(void) {
+    if (not m_isCentered or m_flipVertically or m_rotate)
+        return false;
+    baseRenderer.PushMatrix();
+    if (m_isCentered)
+        baseRenderer.Translate(0.5f, 0.5f, 0.0f);
+    if (m_rotation != 0.0f)
+        baseRenderer.Rotate(m_rotation, 0, 0, 1);
+    if (m_flipVertically)
+        baseRenderer.Scale(1.0f, -1.0f, 1.0f);
+    return true;
 }
 
 
-void BaseQuad::Render(Texture* texture) {
-    if (UpdateVAO()) {
-        m_vao->Render(LoadShader(texture != nullptr), texture);
+bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
+    if (not updateVAO or UpdateVAO()) {
+        bool restoreMatrix = UpdateTransformation();
+        m_vao->Render(shader, texture);
+        if (restoreMatrix)
+            baseRenderer.PopMatrix();
+        return true;
+        }
+
+    if (baseRenderer.m_legacyMode) {
+        if (texture) {
+            glEnable(GL_TEXTURE_2D);
+            texture->Enable();
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glBegin(GL_QUADS);
+            for (auto& v : m_vertexBuffer.m_appData) {
+                glColor4f(1, 1, 1, 1);
+                glVertex3f(v.X(), v.Y(), v.Z());
+            }
+            glEnd();
+            texture->Disable();
+        }
     }
+    return false;
 }
 
 
 // fill 2D area defined by x and y components of vertices with color color
 void BaseQuad::Fill(const RGBAColor& color) {
-    if (UpdateVAO()) {
-        Render(LoadShader(false, color), nullptr, false);
-        //baseShaderHandler.StopShader();
-    }
-    else {
-        glDisable(GL_TEXTURE_2D);
-        glBegin(GL_QUADS);
-        //for (auto& v : m_vertexBuffer.m_appData) 
-        {
+    if (not Render(LoadShader(false, color), nullptr, true)) {
+        if (baseRenderer.m_legacyMode) {
+            glDisable(GL_TEXTURE_2D);
+            glBegin(GL_QUADS);
             glColor4f(color.R(), color.G(), color.B(), color.A());
-            //glVertex2f(v.X(), v.Y());
-
             glVertex2f(0, 0);
             glVertex2f(0, 1);
             glVertex2f(1, 1);
             glVertex2f(1, 0);
-
+            glEnd();
         }
-        glEnd();
     }
 }
 
