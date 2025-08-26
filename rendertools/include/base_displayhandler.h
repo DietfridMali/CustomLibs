@@ -55,6 +55,15 @@ public:
     inline float GetAspectRatio(void) noexcept {
         return m_aspectRatio;
     }
+
+    inline SDL_Window* GetWindow(void) noexcept {
+        return m_window;
+    }
+
+    inline SDL_GLContext GetContext(void) noexcept {
+        return m_context;
+    }
+
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()
