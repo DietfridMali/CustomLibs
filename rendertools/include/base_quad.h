@@ -17,29 +17,36 @@ class BaseQuad
 public:
     static VAO* m_vao;
 
-    VertexBuffer    m_vertexBuffer;
-    TexCoordBuffer  m_texCoordBuffer;
-    TexCoord        m_maxTexCoord;
-    Texture*        m_texture;
-    RGBAColor       m_color;
-    float           m_aspectRatio;
-    float           m_offset;
-    bool            m_isAvailable;
-    bool            m_isCentered;
-    bool            m_flipVertically;
-    bool            m_rotate;
-    float           m_rotation;
+    struct TransformationParams {
+        bool            centerOrigin = false;
+        bool            flipVertically = false;
+        float           rotation = 0.0f;
+        bool            autoClear = true;
+
+        bool HaveTransformations(void) { return centerOrigin or flipVertically or (rotation != 0.0f); }
+        void Clear(void) {  *this = {}; }
+    };
+
+    VertexBuffer            m_vertexBuffer;
+    TexCoordBuffer          m_texCoordBuffer;
+    TexCoord                m_maxTexCoord;
+    Texture*                m_texture;
+    RGBAColor               m_color;
+    float                   m_aspectRatio;
+    float                   m_offset;
+    bool                    m_isAvailable;
+    TransformationParams    m_transformations;
 
     static std::initializer_list<Vector3f> defaultVertices;
     static std::initializer_list<TexCoord> defaultTexCoords;
 
     BaseQuad()
-        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false), m_isCentered(false), m_flipVertically(false), m_rotate(false), m_rotation(0.0f)
+        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false)
     {
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords, Texture* texture = nullptr, RGBAColor color = ColorData::White)
-        : Plane(vertices), m_texture(texture), m_color(color), /*m_borderWidth(borderWidth),*/ m_isAvailable(true), m_offset(0)
+        : Plane(vertices), m_texture(texture), m_color(color), m_isAvailable(true), m_offset(0)
     {
         Setup(vertices, texCoords, texture, color/*, borderWidth*/);
     }
@@ -87,8 +94,6 @@ public:
 
     Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
 
-    bool UpdateTransformation(void);
-
     void Render(RGBAColor color = ColorData::White);
 
     bool Render(Shader* shader, Texture* texture, bool updateVAO = true);
@@ -108,22 +113,26 @@ public:
         return Fill(RGBAColor(color, alpha));
     }
 
-    inline void FlipVertically(bool enable) noexcept {
-        m_flipVertically = enable;
+    inline void SetTransformations(const TransformationParams& params = {}) {
+        m_transformations = params;
     }
 
-    inline void RenderCentered(bool isCentered) noexcept {
-        m_isCentered = isCentered;
-    }
-
-    inline void SetRotation(float angle) noexcept {
-        m_rotation = angle;
-        m_rotate = (angle != 0.0f);
+    inline void ClearTransformations(void) {
+        m_transformations.Clear();
     }
 
     ~BaseQuad() {
         Destroy();
     }
+
+    protected:
+        void UpdateTransformation(void);
+
+        void ResetTransformation(void);
+
+        inline bool HaveTransformations(void) noexcept {
+            return m_transformations.HaveTransformations();
+        }
 };
 
 // =================================================================================================

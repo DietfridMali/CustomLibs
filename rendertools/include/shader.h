@@ -161,6 +161,7 @@ class Shader
                 return false;
             if (*uniform == data)
                 return false;
+            *uniform = data;
             return true;
         }
 

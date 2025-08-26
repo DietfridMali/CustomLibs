@@ -132,6 +132,7 @@ Shader* BaseQuad::LoadShader(bool useTexture, const RGBAColor& color) {
     static ShaderLocationTable shaderLocations[2];
     String shaderNames[] = { "plainTexture", "plainColor" };
     int shaderId = useTexture ? 0 : 1;
+    UpdateTransformation();
     Shader* shader = baseShaderHandler.SetupShader(shaderNames[shaderId]);
     if (shader) {
         ShaderLocationTable& locations = shaderLocations[shaderId];
@@ -163,28 +164,32 @@ void BaseQuad::Render(RGBAColor color) {
 }
 
 
-bool BaseQuad::UpdateTransformation(void) {
-    if (m_isCentered or m_flipVertically or m_rotate) {
+void BaseQuad::UpdateTransformation(void) {
+    if (HaveTransformations()) {
         baseRenderer.PushMatrix();
-        if (m_isCentered)
+        if (m_transformations.centerOrigin)
             baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-        if (m_rotation != 0.0f)
-            baseRenderer.Rotate(m_rotation, 0, 0, 1);
-        if (m_flipVertically)
+        if (m_transformations.rotation != 0.0f)
+            baseRenderer.Rotate(m_transformations.rotation, 0, 0, 1);
+        if (m_transformations.flipVertically)
             baseRenderer.Scale(1.0f, -1.0f, 1.0f);
-        return true;
-
     }
-    return false;
+}
+
+
+void BaseQuad::ResetTransformation(void) {
+    if (HaveTransformations()) {
+        baseRenderer.PopMatrix();
+        if (m_transformations.autoClear)
+            ClearTransformations();
+    }
 }
 
 
 bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
     if (not updateVAO or UpdateVAO()) {
-        bool restoreMatrix = UpdateTransformation();
         m_vao->Render(shader, texture);
-        if (restoreMatrix)
-            baseRenderer.PopMatrix();
+        ResetTransformation();
         return true;
         }
 
