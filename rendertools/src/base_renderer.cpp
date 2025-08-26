@@ -210,7 +210,6 @@ void BaseRenderer::ClearGLError(void) noexcept {
 
 
 bool BaseRenderer::CheckGLError(const char* operation) noexcept {
-    return true;
     GLenum glError = glGetError();
     if (not glError)
         return true;

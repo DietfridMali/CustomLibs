@@ -409,11 +409,7 @@ void TextRenderer::RenderToScreen(FBO* fbo, int flipVertically) {
 
 void TextRenderer::Render(String text, eTextAlignments alignment, int flipVertically, int renderAreaWidth, int renderAreaHeight, bool useFBO) {
     if (m_isAvailable) {
-#if 1 //TEST_ATLAS
-        if (true) {
-#else
         if (useFBO) {
-#endif
             RenderToBuffer(text, alignment, nullptr, baseRenderer.Viewport(), renderAreaWidth, renderAreaHeight, flipVertically);
         }
         else {

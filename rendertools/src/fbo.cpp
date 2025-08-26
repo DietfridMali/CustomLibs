@@ -94,6 +94,8 @@ bool FBO::AttachBuffers(bool hasMRTs) {
     glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
     BaseRenderer::CheckGLError();
     bool bindColorBuffers = true;
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
     for (int i = 0; i < m_bufferCount; i++) {
 #if 1
         if (m_bufferInfo[i].m_type == BufferInfo::btColor) { // always bind the first color buffer
@@ -106,6 +108,8 @@ bool FBO::AttachBuffers(bool hasMRTs) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, m_bufferInfo[i].m_attachment, GL_TEXTURE_2D, m_bufferInfo[i].m_handle, 0);
     }
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    if (not m_isAvailable)
+        baseRenderer.CheckGLError();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return m_isAvailable;
 }
