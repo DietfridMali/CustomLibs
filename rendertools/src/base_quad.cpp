@@ -15,9 +15,19 @@
 // VAO::Init takes care of that by first assigning a handle-less shared gl handle 
 VAO* BaseQuad::m_vao = nullptr;
 
-std::initializer_list<Vector3f> BaseQuad::defaultVertices = { Vector3f{ -0.5f, -0.5f, 0.0f }, Vector3f{ -0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, -0.5f, 0.0f } };
+std::initializer_list<Vector3f> BaseQuad::defaultVertices[2] = {
+    { Vector3f{0.0f, 0.0f, 0.0f}, Vector3f{0.0f, 1.0f, 0.0f}, Vector3f{1.0f, 1.0f, 0.0f}, Vector3f{1.0f, 0.0f, 0.0f} },
+    { Vector3f{-0.5f, -0.5f, 0.0f}, Vector3f{-0.5f, 0.5f, 0.0f}, Vector3f{0.5f, 0.5f, 0.0f}, Vector3f{0.5f, -0.5f, 0.0f} }
+};
 
-std::initializer_list<TexCoord> BaseQuad::defaultTexCoords = { TexCoord{ 0, 1 }, TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 } };
+std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[4] = {
+    { TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1} }, // regular
+    { TexCoord{0, 0}, TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0} }, // v flip
+    { TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0}, TexCoord{0, 1} }, // h flip
+    { TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0} }, // v + h flip
+    { TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0} }, // rotate ccw 90 deg
+    { TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0}, TexCoord{0, 1} }, // rotate cw 90 deg
+};
 
 
 // =================================================================================================

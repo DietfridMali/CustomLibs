@@ -37,15 +37,29 @@ public:
     bool                    m_isAvailable;
     TransformationParams    m_transformations;
 
-    static std::initializer_list<Vector3f> defaultVertices;
-    static std::initializer_list<TexCoord> defaultTexCoords;
+    typedef enum {
+        voCenter,
+        voZero
+    } eVertexOrigins;
+
+    typedef enum {
+        tcRegular,
+        tcFlipVert, // flip vertically
+        tcFlipHorz, // flip horizontally
+        tcFlipBoth, // flip in both directions
+        tcRotLeft90,
+        tcRotRight90
+    };
+
+    static std::initializer_list<Vector3f> defaultVertices[2];
+    static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()
         : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false)
     {
     }
 
-    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords, Texture* texture = nullptr, RGBAColor color = ColorData::White)
+    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], Texture* texture = nullptr, RGBAColor color = ColorData::White)
         : Plane(vertices), m_texture(texture), m_color(color), m_isAvailable(true), m_offset(0)
     {
         Setup(vertices, texCoords, texture, color/*, borderWidth*/);
