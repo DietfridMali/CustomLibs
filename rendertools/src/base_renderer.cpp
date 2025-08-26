@@ -46,7 +46,7 @@ bool BaseRenderer::Create(int width, int height, float fov) {
     SetupOpenGL();
     m_drawBufferStack.Clear();
     m_renderTexture.HasBuffer() = true;
-    m_viewportArea.Setup(BaseQuad::defaultVertices);
+    m_viewportArea.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
     return true;
 }
 

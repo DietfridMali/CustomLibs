@@ -49,7 +49,7 @@ public:
         tcFlipBoth, // flip in both directions
         tcRotLeft90,
         tcRotRight90
-    };
+    } eTexCoordTransforms;
 
     static std::initializer_list<Vector3f> defaultVertices[2];
     static std::initializer_list<TexCoord> defaultTexCoords[6];
