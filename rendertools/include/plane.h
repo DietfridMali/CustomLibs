@@ -10,16 +10,17 @@
 // =================================================================================================
 // Geometric computations in planes and rectangles in a plane
 
-class Plane : public Vector3f {
+class Plane 
+    : public Vector3f {
 
 public:
-    ManagedArray<Vector3f> m_vertices;
-    Vector3f        m_normal;
-    Vector3f        m_center;
-    Vector3f        m_refEdges[2];
-    float           m_refDots[2];
-    float           m_tolerance;
-    float           m_toleranceSquared;
+    ManagedArray<Vector3f>  m_vertices;
+    Vector3f                m_normal;
+    Vector3f                m_center;
+    Vector3f                m_refEdges[2];
+    float                   m_refDots[2];
+    float                   m_tolerance;
+    float                   m_toleranceSquared;
 
     Plane()
         noexcept;
@@ -34,15 +35,15 @@ public:
         noexcept;
 
         // distance to plane (v0, v1, v2)
-        inline float Distance(const Vector3f& p) {
-        return (p - m_vertices[0]).Dot(m_normal);
+        inline float Distance(const Vector3f& v) {
+        return (v - m_vertices[0]).Dot(m_normal);
     }
     /* noexcept is intentionally omitted here to keep your original single-line style for inlines;
        all other non-inline declarations below are marked with noexcept in the next line. */
 
        // flips the normal for collision handling with walls with thickness zero (i.e. where a wall is accessible from both of its sides)
-    inline void AdjustNormal(const Vector3f& p) {
-        if (Distance(p) < 0.0f)
+    inline void AdjustNormal(const Vector3f& v) {
+        if (Distance(v) < 0.0f)
             m_normal = -m_normal;
     }
 

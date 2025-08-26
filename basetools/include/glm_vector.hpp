@@ -144,17 +144,24 @@ public:
 
     Vector Cross(const Vector& other) const
         noexcept(
-            (std::is_same_v<VEC_TYPE, glm::vec3> && noexcept(glm::cross(*this, other))) ||
-            (std::is_same_v<VEC_TYPE, glm::vec4> && noexcept(glm::cross(glm::vec3(this->x, this->y, this->z),
-                glm::vec3(other.x, other.y, other.z))))
+            std::is_same_v<VEC_TYPE, glm::vec3> ?
+            noexcept(glm::cross(std::declval<glm::vec3>(), std::declval<glm::vec3>()))
+            : std::is_same_v<VEC_TYPE, glm::vec4> ?
+            noexcept(glm::cross(std::declval<glm::vec3>(), std::declval<glm::vec3>()))
+            : false
             )
     {
         if constexpr (std::is_same_v<VEC_TYPE, glm::vec3>) {
-            return Vector(glm::cross(*this, other));
+            // Falls dein Vector konvertierbar ist:
+            // return Vector( glm::cross(static_cast<glm::vec3>(*this), static_cast<glm::vec3>(other)) );
+            // oder einfach aus Komponenten bauen:
+            glm::vec3 a3{ this->x, this->y, this->z };
+            glm::vec3 b3{ other.x, other.y, other.z };
+            return Vector(glm::cross(a3, b3));
         }
         else if constexpr (std::is_same_v<VEC_TYPE, glm::vec4>) {
-            glm::vec3 a3(this->x, this->y, this->z);
-            glm::vec3 b3(other.x, other.y, other.z);
+            glm::vec3 a3{ this->x, this->y, this->z };
+            glm::vec3 b3{ other.x, other.y, other.z };
             glm::vec3 c = glm::cross(a3, b3);
             return Vector(glm::vec4(c, 0.0f));
         }

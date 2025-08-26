@@ -56,7 +56,8 @@ public:
     operator const glm::mat4& () const noexcept { return m; }
 
     // ===== EulerComputeZYX =====
-    Matrix4f& EulerComputeZYX(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ);
+    Matrix4f& EulerComputeZYX(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ)
+        noexcept;
 
     // ===== Static builders =====
     static Matrix4f Identity() noexcept(noexcept(glm::mat4(1.0f))) {
@@ -64,12 +65,7 @@ public:
     }
 
     static Matrix4f Translation(float dx, float dy, float dz)
-        noexcept(noexcept(glm::translate(std::declval<glm::mat4&>(), std::declval<glm::vec3>())))
-    {
-        glm::mat4 t(1.0f);
-        t = glm::translate(t, glm::vec3(dx, dy, dz));
-        return Matrix4f(t);
-    }
+        noexcept;
 
     static Matrix4f Translation(const Vector3f& v)
         noexcept(noexcept(Translation(std::declval<float>(), std::declval<float>(), std::declval<float>())))
@@ -78,12 +74,7 @@ public:
     }
 
     static Matrix4f Scaling(float sx, float sy, float sz)
-        noexcept(noexcept(glm::scale(std::declval<glm::mat4&>(), std::declval<glm::vec3>())))
-    {
-        glm::mat4 s(1.0f);
-        s = glm::scale(s, glm::vec3(sx, sy, sz));
-        return Matrix4f(s);
-    }
+        noexcept;
 
     static Matrix4f Scaling(const Vector3f& s)
         noexcept(noexcept(Scaling(std::declval<float>(), std::declval<float>(), std::declval<float>())))
@@ -195,11 +186,10 @@ public:
         return Matrix4f(glm::transpose(m));
     }
 
-    Matrix4f Transpose(Matrix4f& m, int /*dimensions*/ = 4) const
+    Matrix4f Transpose(Matrix4f& _m, int /*dimensions*/ = 4) const
         noexcept(noexcept(glm::transpose(std::declval<glm::mat4>())))
     {
-        return m = m.Transpose();
-        m;
+        return _m = _m.Transpose();
     }
 
     Matrix4f Inverse() const
@@ -208,7 +198,8 @@ public:
         return Matrix4f(glm::inverse(m));
     }
 
-    Matrix4f AffineInverse(void); // bewusst ohne noexcept
+    Matrix4f AffineInverse(void)
+        noexcept; // bewusst ohne noexcept
 
     static Vector3f Rotate(const Matrix4f& mm, const Vector3f& v)
         noexcept(noexcept(mm* v))

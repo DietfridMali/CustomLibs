@@ -127,10 +127,16 @@ public:
     }
 
 
-    static void PushMatrix(Matrix4f& m);
+    static void PushMatrix(Matrix4f& m) {
+        matrixStack.Append(m);
+    }
 
 
-    static Matrix4f& PopMatrix(Matrix4f& m);
+    static Matrix4f& PopMatrix(Matrix4f& m) {
+        matrixStack.Pop(m);
+        return m;
+    }
+
 
     void UpdateLegacyMatrices(void) noexcept;
 };

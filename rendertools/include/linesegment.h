@@ -34,11 +34,11 @@ public:
 		properties = p1 - p0;
 	}
 
-	void Init(Vector3f p0 = Vector3f::ZERO, Vector3f p1 = Vector3f::ZERO)
+	void Init(Vector3f _p0 = Vector3f::ZERO, Vector3f _p1 = Vector3f::ZERO)
 		noexcept
 	{
-		this->p0 = p0;
-		this->p1 = p1;
+		p0 = _p0;
+		p1 = _p1;
 		solutions = 0;
 		Refresh();
 	}

@@ -31,8 +31,8 @@ public:
         Refresh();
     }
 
-    inline void SetScale(Vector3f scale) {
-        this->scale = scale;
+    inline void SetScale(Vector3f _scale) {
+        scale = _scale;
     }
 
     Movement& Copy(const Movement& m) {
