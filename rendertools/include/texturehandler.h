@@ -27,27 +27,27 @@ public:
 
     void Destroy(void) noexcept;
 
-#if 0
-    Texture* GetTexture(void);
-#else
     template <typename T>
-    T* TextureHandler::GetTexture(void) {
+    T* GetTexture(void) {
         T* t = new T();
         if (t)
             m_textures.Append(t);
         return t;
     }
-#endif
 
     using TextureGetter = std::function<Texture*()>;
 
-    Using GetStandardTexture = GetTexture<Texture>;
+    inline Texture* GetStandardTexture(void) {
+        return GetTexture<Texture>();
+    }
 
-    Using GetTiledTexture = GetTexture<TiledTexture>;
+    inline TiledTexture* GetTiledTexture(void) {
+        return GetTexture<TiledTexture>();
+    } 
 
-    Using GetCubemap = GetTexture<Cubemap>;
-
-    Cubemap* GetCubemap(void);
+    inline Cubemap* GetCubemap(void) {
+        return GetTexture<Cubemap>();
+    }
 
     bool Remove(Texture* texture);
 
@@ -58,15 +58,15 @@ public:
     TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture);
 
     inline TextureList CreateStandardTextures(String textureFolder, List<String>& textureNames) {
-        return CreateTextures(textureFolder, textureNames, GetStandardTexture);
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetStandardTexture(); });
     }
 
     TextureList CreateTiledTextures(String textureFolder, List<String>& textureNames) {
-        return CreateTextures(textureFolder, textureNames, GetTiledTexture);
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetTiledTexture(); });
     }
 
-    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames, GetTexture<Cubemap>) {
-        return CreateTextures(textureFolder, textureNames, GetCubemap);
+    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames) {
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetCubemap(); });
     }
 
     TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType);
