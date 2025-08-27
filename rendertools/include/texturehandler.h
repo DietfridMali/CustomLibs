@@ -27,17 +27,47 @@ public:
 
     void Destroy(void) noexcept;
 
+#if 0
     Texture* GetTexture(void);
+#else
+    template <typename T>
+    T* TextureHandler::GetTexture(void) {
+        T* t = new T();
+        if (t)
+            m_textures.Append(t);
+        return t;
+    }
+#endif
+
+    using TextureGetter = std::function<Texture*()>;
+
+    Using GetStandardTexture = GetTexture<Texture>;
+
+    Using GetTiledTexture = GetTexture<TiledTexture>;
+
+    Using GetCubemap = GetTexture<Cubemap>;
 
     Cubemap* GetCubemap(void);
 
     bool Remove(Texture* texture);
 
+#if 0
     TextureList Create(String textureFolder, List<String>& textureNames, GLenum textureType);
+#endif
 
-    TextureList CreateTextures(String textureFolder, List<String>& textureNames);
+    TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture);
 
-    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames);
+    inline TextureList CreateStandardTextures(String textureFolder, List<String>& textureNames) {
+        return CreateTextures(textureFolder, textureNames, GetStandardTexture);
+    }
+
+    TextureList CreateTiledTextures(String textureFolder, List<String>& textureNames) {
+        return CreateTextures(textureFolder, textureNames, GetTiledTexture);
+    }
+
+    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames, GetTexture<Cubemap>) {
+        return CreateTextures(textureFolder, textureNames, GetCubemap);
+    }
 
     TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType);
 

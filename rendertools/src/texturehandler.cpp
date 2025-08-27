@@ -39,13 +39,29 @@ Cubemap* TextureHandler::GetCubemap(void) {
     return t;
 }
 
+#if 0
+TextureList TextureHandler::Create(String textureFolder, List<String>& textureNames, TextureGetter getTexture) {
+    return CreateTextures(textureFolder, textureNames, getTexture);
+}
+#endif
 
-TextureList TextureHandler::Create(String textureFolder, List<String>& textureNames, GLenum textureType) {
-    return (textureType == GL_TEXTURE_CUBE_MAP) ? CreateCubemaps(textureFolder, textureNames) : CreateTextures(textureFolder, textureNames);
+TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture) {
+    TextureList textures;
+    for (auto& n : textureNames) {
+        Texture* t = getTexture();
+        if (not t)
+            break;
+        textures.Append(t);
+        List<String> fileNames; // must be local here so it gets reset every loop iteration
+        fileNames.Append(textureFolder + n);
+        if (not t->CreateFromFile(fileNames))
+            break;
+    }
+    return textures;
 }
 
 
-TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames) {
+TextureList TextureHandler::CreateAnimatedTextures(String textureFolder, List<String>& textureNames) {
     TextureList textures;
     for (auto& n : textureNames) {
         Texture* t = GetTexture();
@@ -63,12 +79,12 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
 
 TextureList TextureHandler::CreateCubemaps(String textureFolder, List<String>& textureNames) {
     TextureList textures;
-    List<String> fileNames;
     for (auto& n : textureNames) {
         Cubemap* t = GetCubemap();
         if (not t)
             break;
         textures.Append(t);
+        List<String> fileNames;
         fileNames.Append(textureFolder + n);
         if (not t->CreateFromFile(fileNames))
             break;

@@ -281,7 +281,7 @@ void Texture::Deploy(int bufferIndex)
     }
 }
 
-// --------------------------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Load loads textures from file. The texture filenames are given in filenames
 // An empty filename ("") means that the previously loaded texture should be used here as well
 // This makes sense e.g. for cubemaps if several of its faces share the same texture, like e.g. spherical smileys,
@@ -400,6 +400,21 @@ noexcept
     else if (wRatio < hRatio)
         offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
     return offsets;
+}
+
+// =================================================================================================
+
+void TiledTexture::SetParams(void) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // (optional) Anisotropie
+    GLfloat aniso = 0.f;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
 }
 
 // =================================================================================================
