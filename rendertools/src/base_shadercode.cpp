@@ -7,6 +7,7 @@
 
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
+const ShaderSource& GrayScaleShader();
 const ShaderSource& OutlineShader();
 const ShaderSource& BoxBlurShader();
 const ShaderSource& FxaaShader();
@@ -18,6 +19,7 @@ BaseShaderCode::BaseShaderCode() {
     ManagedArray<const ShaderSource*> shaderSource = {
         &PlainColorShader(),
         &PlainTextureShader(),
+        &GrayScaleShader(),
         &OutlineShader(),
         &BoxBlurShader(),
         &FxaaShader(),

@@ -22,7 +22,33 @@ const ShaderSource& PlainColorShader() {
 }
 
 
-    // render a b/w mask with color applied.
+const ShaderSource& GrayScaleShader() {
+    static const ShaderSource grayScaleShader(
+        "grayScale",
+        StandardVS(),
+        R"(
+        #version 330 core
+        // Für OpenGL ES 3.0 statt dessen:
+        // #version 300 es
+        // precision mediump float;
+
+        uniform sampler2D source;
+        in vec2 fragTexCoord;
+        out vec4 fragColor;
+
+        void main() {
+            vec4 texColor = texture(source, fragTexCoord);
+            // Rec.601 Luminanzgewichte in Gamma-Space
+            float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+            fragColor = vec4(vec3(gray), texColor.a);
+        }
+        )" 
+        );
+    return grayScaleShader;
+}
+
+
+// render a b/w mask with color applied.
 const ShaderSource& PlainTextureShader() {
     static const ShaderSource plainTextureShader(
         "plainTexture",
