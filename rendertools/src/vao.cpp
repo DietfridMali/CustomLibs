@@ -172,9 +172,8 @@ void VAO::Render(Shader* shader, Texture* texture)
 noexcept
 {
 #if 1
-    if (baseShaderHandler.ShaderIsActive()) {
-        EnableTexture(texture);
-    }
+    if (baseShaderHandler.ShaderIsActive() and texture and not EnableTexture(texture))
+        return;
 #endif
     Enable();
     if (m_indexBuffer.m_data)

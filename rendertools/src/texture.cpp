@@ -205,17 +205,18 @@ bool Texture::IsAvailable(void)
 }
 
 
-void Texture::Bind(void)
+bool Texture::Bind(void)
 {
-    if (IsAvailable()) {
-        glEnable(GL_TEXTURE_2D);
-        glActiveTexture(GL_TEXTURE0);
+    if (not IsAvailable())
+        return false;
+    glEnable(GL_TEXTURE_2D);
+    glActiveTexture(GL_TEXTURE0);
 #if USE_SHARED_HANDLES
-        glBindTexture(m_type, m_handle.get());
+    glBindTexture(m_type, m_handle.get());
 #else
-        glBindTexture(m_type, m_handle);
+    glBindTexture(m_type, m_handle);
 #endif
-    }
+    return true;
 }
 
 
@@ -249,13 +250,15 @@ noexcept
 }
 
 
-void Texture::Enable(int tmu)
+bool Texture::Enable(int tmu)
 {
     glActiveTexture(GL_TEXTURE0 + tmu);
     glEnable(m_type);
-    Bind();
+    if (not Bind())
+        return false;
     SetParams();
     Wrap();
+    return true;
 }
 
 

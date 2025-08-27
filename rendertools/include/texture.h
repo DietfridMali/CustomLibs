@@ -42,7 +42,7 @@ public:
 
     virtual bool IsAvailable(void) = 0;
 
-    virtual void Bind(void) = 0;
+    virtual bool Bind(void) = 0;
 
     virtual void Release(void) = 0;
 
@@ -50,7 +50,7 @@ public:
 
     virtual void Deploy(int bufferIndex = 0) = 0;
 
-    virtual void Enable(int tmu = 0) = 0;
+    virtual bool Enable(int tmu = 0) = 0;
 
     virtual void Disable(void) = 0;
 
@@ -238,7 +238,7 @@ public:
 
     virtual bool IsAvailable(void);
 
-    virtual void Bind(void);
+    virtual bool Bind(void);
 
     virtual void Release(void);
 
@@ -247,7 +247,7 @@ public:
     void Wrap(void)
         noexcept;
 
-    virtual void Enable(int tmu = 0);
+    virtual bool Enable(int tmu = 0);
 
     virtual void Disable(void);
 
