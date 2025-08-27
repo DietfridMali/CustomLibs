@@ -126,9 +126,18 @@ public:
         for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] != other[i]) return false;
         return true;
     }
+
     bool operator!=(const Vector& other) const noexcept {
         for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] == other[i]) return false;
         return true;
+    }
+
+    inline static Vector Floor(Vector v) {
+        return Vector(glm::floor(v));
+    }
+
+    inline static Vector Ceil(Vector v) {
+        return Vector(glm::ceil(v));
     }
 
     float Dot(const Vector& other, int range = VEC_TYPE::length()) const noexcept {
