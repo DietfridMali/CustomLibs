@@ -20,5 +20,7 @@
 
 #endif //USE_STD_VECTOR
 
+#include <array>
+
 template <typename DATA_T, size_t size>
 using SimpleArray = std::array<DATA_T, size>;
