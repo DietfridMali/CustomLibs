@@ -16,6 +16,7 @@ public:
         mtActual,
         mtRemaining,
         mtTotal,
+        ntStep,
         mtCount
     } eMovementTypes;
 
