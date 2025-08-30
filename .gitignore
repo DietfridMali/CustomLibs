@@ -387,6 +387,11 @@ FodyWeavers.xsd
 
 # project-specific files
 /**
+
+!/*.sln
+!/*.vcxproj
+!/*.vcproj
+
 !/**/
 !/**/*.c
 !/**/*.h
