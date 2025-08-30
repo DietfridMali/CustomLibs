@@ -401,6 +401,7 @@ FodyWeavers.xsd
 !/**/*.sln
 !/**/*.vcproj
 !/**/*.vcxproj
+!/**/*.vcxproj.filters
 !/**/*.dll
 !/**/*.lib
 !/**/*.rc
