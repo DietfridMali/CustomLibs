@@ -66,6 +66,16 @@ public:
     bool operator!=(const Rectangle& other) const noexcept {
         return m_left != other.m_left or m_top != other.m_top or m_width != other.m_width or m_height != other.m_height;
     }
+
+    void Resize(int dx, int dy) {
+        m_left += dx;
+        m_top += dy;
+        m_right -= dx;
+        m_bottom -= dy;
+        m_width -= 2 * dx;
+        m_height -= 2 * dy;
+
+    }
 };
 
 // =================================================================================================
