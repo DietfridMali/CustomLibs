@@ -36,11 +36,17 @@ const ShaderSource& GrayScaleShader() {
         uniform float brightness;
         in vec2 fragTexCoord;
         out vec4 fragColor;
+        uniform float uContrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
+        uniform float uGamma;        // Gammawert (z.B. 2.2 für Standard-Monitor)
 
         void main() {
             vec4 texColor = texture(source, fragTexCoord);
             // Rec.601 Luminanzgewichte in Gamma-Space
-            float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114)) * brightness;
+            float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+            gray = (gray - 0.5) * uContrast + 0.5;
+            gray = clamp(gray, 0.0, 1.0);
+            gray = pow(gray, 1.0 / uGamma);
+            gray *= brightness;
             fragColor = vec4(vec3(gray), texColor.a);
         }
         )" 

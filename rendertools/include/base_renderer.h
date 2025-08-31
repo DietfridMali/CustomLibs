@@ -80,6 +80,8 @@ public:
 
     virtual bool Stop2DScene(void);
 
+    virtual Shader* LoadShader(void) { return nullptr; }
+
     virtual void Draw3DScene(void);
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);

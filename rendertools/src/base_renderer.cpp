@@ -144,7 +144,7 @@ void BaseRenderer::Draw3DScene(void) {
 #endif
 #if 1
         m_renderTexture.m_handle = m_sceneBuffer->BufferHandle(0);
-        m_viewportArea.Render(&m_renderTexture);
+        m_viewportArea.Render(LoadShader(), &m_renderTexture);
 #else
         m_viewportArea.Fill(ColorData::Orange);
 #endif
