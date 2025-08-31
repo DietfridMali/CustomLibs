@@ -33,21 +33,67 @@ const ShaderSource& GrayScaleShader() {
         // precision mediump float;
 
         uniform sampler2D source;
-        uniform float brightness;
         in vec2 fragTexCoord;
         out vec4 fragColor;
-        uniform float uContrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
-        uniform float uGamma;        // Gammawert (z.B. 2.2 für Standard-Monitor)
+        uniform float brightness;
+        uniform float contrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
+        uniform float gamma;        // Gammawert (z.B. 2.2 für Standard-Monitor)
+        uniform vec4 tint;
+        uniform int blurRadius;
+        uniform vec2 texelSize;
+
+        vec4 GaussBlur5x5() {
+            const int HALF = 2;
+            const int weight[5] = int[](1, 4, 6, 4, 1);
+
+            vec4 sum = vec4(0.0);
+            int  wSum = 0;
+
+            for (int j = -HALF; j <= HALF; ++j) {
+                int jy = j + HALF;
+                for (int i = -HALF; i <= HALF; ++i) {
+                    int ix = i + HALF;
+                    int w = weight[ix] * weight[jy]; // 2D-Gewicht per Outer-Product
+                    vec2 offset = vec2(float(i), float(j)) * uTexelSize;
+                    sum += texture(source, fragTexCoord + offset) * float(w);
+                    wSum += w;
+                }
+            }
+        return sum / float(wSum); // wSum = 256
+        }   
+
+
+        vec4 GaussBlur3x3() {
+            const int HALF = 1;
+            const int weight[3] = int[](1, 2, 1);
+
+            vec4 sum = vec4(0.0);
+            int  wSum = 0;
+
+            for (int j = -HALF; j <= HALF; ++j) {
+                int jy = j + HALF;
+                for (int i = -HALF; i <= HALF; ++i) {
+                    int ix = i + HALF;
+                    int w = weight[ix] * weight[jy];
+                    vec2 offset = vec2(float(i), float(j)) * uTexelSize;
+                    sum += texture(source, fragTexCoord + offset) * float(w);
+                    wSum += w;
+                }
+            }
+            return sum / float(wSum); // wSum = 16
+        }
+
 
         void main() {
-            vec4 texColor = texture(source, fragTexCoord);
+            vec4 texColor = (uBlurRadius > 1) ? GaussBlur5x5() : (uBlurRadius == 1) ? GaussBlur3x3() : texture(source, fragTexCoord);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
-            gray = (gray - 0.5) * uContrast + 0.5;
+            gray = (gray - 0.5) * contrast + 0.5;
             gray = clamp(gray, 0.0, 1.0);
-            gray = pow(gray, 1.0 / uGamma);
+            gray = pow(gray, 1.0 / gamma);
             gray *= brightness;
-            fragColor = vec4(vec3(gray), texColor.a);
+            vec3 finalRgb = mix(vec3(gray), tint.rgb * gray, tint.a);
+            fragColor = vec4(finalRgb, texColor.a);
         }
         )" 
         );
