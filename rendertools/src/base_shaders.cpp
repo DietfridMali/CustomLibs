@@ -42,50 +42,87 @@ const ShaderSource& GrayScaleShader() {
         uniform int blurRadius;
         uniform vec2 texelSize;
 
-        vec4 GaussBlur5x5() {
-            const int HALF = 2;
-            const int weight[5] = int[](1, 4, 6, 4, 1);
+        vec4 GaussBlur7x7(float spread)
+        {
+            const int HALF = 3;
+            const int weight[7] = int[](1, 6, 15, 20, 15, 6, 1);
 
-            vec4 sum = vec4(0.0);
-            int  wSum = 0;
-
-            for (int j = -HALF; j <= HALF; ++j) {
-                int jy = j + HALF;
-                for (int i = -HALF; i <= HALF; ++i) {
-                    int ix = i + HALF;
-                    int w = weight[ix] * weight[jy]; // 2D-Gewicht per Outer-Product
-                    vec2 offset = vec2(float(i), float(j)) * texelSize;
-                    sum += texture(source, fragTexCoord + offset) * float(w);
-                    wSum += w;
-                }
-            }
-        return sum / float(wSum); // wSum = 256
-        }   
-
-
-        vec4 GaussBlur3x3() {
-            const int HALF = 1;
-            const int weight[3] = int[](1, 2, 1);
-
-            vec4 sum = vec4(0.0);
-            int  wSum = 0;
+            vec3 sumRGB = vec3(0.0);
+            float sumA = 0.0;
+            float wSum = 0.0;
 
             for (int j = -HALF; j <= HALF; ++j) {
                 int jy = j + HALF;
                 for (int i = -HALF; i <= HALF; ++i) {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
-                    vec2 offset = vec2(float(i), float(j)) * texelSize;
-                    sum += texture(source, fragTexCoord + offset) * float(w);
-                    wSum += w;
+                    vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
+                    vec4 c = texture(source, fragTexCoord + offset);
+                    sumRGB += c.rgb * c.a * w; // premultiplied
+                    sumA   += c.a * w;
+                    wSum   += w;
                 }
             }
-            return sum / float(wSum); // wSum = 16
+            vec3 rgb = (sumA > 1e-6) ? (sumRGB / sumA) : vec3(0.0);
+            float a  = sumA / wSum;
+            return vec4(rgb, a);
+        }
+
+
+        vec4 GaussBlur5x5(float spread) {
+            const int HALF = 2;
+            const int weight[5] = int[](1, 4, 6, 4, 1);
+
+            vec3 sumRGB = vec3(0.0);
+            float sumA = 0.0;
+            float wSum = 0.0;
+
+            for (int j = -HALF; j <= HALF; ++j) {
+                int jy = j + HALF;
+                for (int i = -HALF; i <= HALF; ++i) {
+                    int ix = i + HALF;
+                    int w = weight[ix] * weight[jy];
+                    vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
+                    vec4 c = texture(source, fragTexCoord + offset);
+                    sumRGB += c.rgb * c.a * w; // premultiplied
+                    sumA   += c.a * w;
+                    wSum   += w;
+                }
+            }
+            vec3 rgb = (sumA > 1e-6) ? (sumRGB / sumA) : vec3(0.0);
+            float a  = sumA / wSum;
+            return vec4(rgb, a);
+        }   
+
+
+        vec4 GaussBlur3x3(float spread) {
+            const int HALF = 1;
+            const int weight[3] = int[](1, 2, 1);
+
+            vec3 sumRGB = vec3(0.0);
+            float sumA = 0.0;
+            float wSum = 0.0;
+
+            for (int j = -HALF; j <= HALF; ++j) {
+                int jy = j + HALF;
+                for (int i = -HALF; i <= HALF; ++i) {
+                    int ix = i + HALF;
+                    int w = weight[ix] * weight[jy];
+                    vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
+                    vec4 c = texture(source, fragTexCoord + offset);
+                    sumRGB += c.rgb * c.a * w; // premultiplied
+                    sumA   += c.a * w;
+                    wSum   += w;
+                }
+            }
+            vec3 rgb = (sumA > 1e-6) ? (sumRGB / sumA) : vec3(0.0);
+            float a  = sumA / wSum;
+            return vec4(rgb, a);
         }
 
 
         void main() {
-            vec4 texColor = (blurRadius > 1) ? GaussBlur5x5() : (blurRadius == 1) ? GaussBlur3x3() : texture(source, fragTexCoord);
+            vec4 texColor = (blurRadius > 2) ? GaussBlur7x7(3) : (blurRadius == 2) ? GaussBlur5x5(3) : (blurRadius == 1) ? GaussBlur3x3(3) : texture(source, fragTexCoord);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray = (gray - 0.5) * contrast + 0.5;
