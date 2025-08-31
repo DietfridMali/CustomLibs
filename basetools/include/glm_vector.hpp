@@ -123,13 +123,15 @@ public:
     }
 
     bool operator==(const Vector& other) const noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] != other[i]) return false;
+        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] != other[i]) 
+            return false;
         return true;
     }
 
     bool operator!=(const Vector& other) const noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] == other[i]) return false;
-        return true;
+        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] != other[i]) 
+            return true;
+        return false;
     }
 
     inline static Vector Floor(Vector v) {

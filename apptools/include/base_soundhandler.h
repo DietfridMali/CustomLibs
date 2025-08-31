@@ -37,11 +37,11 @@ class SoundObject
                 Stop ();
         }
 
-        void Play (int loops = 1);
+        bool Play (int loops = 0);
 
         void FadeOut(int fadeTime);
 
-        void Stop (void);
+        bool Stop (void);
 
         void SetPanning (float left, float right);
 
@@ -143,11 +143,9 @@ class BaseSoundHandler
             for (auto it = m_busyChannels.begin(); it != m_busyChannels.end(); )
             {
                 SoundObject& c = *it;
-                if (not condition(c)) {
+                if (not (condition(c) and c.Stop()))
                     ++it;
-                }
                 else {
-                    c.Stop();
                     m_idleChannels.Append(c);
                     // Achtung: erase mit reverse_iterator!
                     it = m_busyChannels.Discard(it);

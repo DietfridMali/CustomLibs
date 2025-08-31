@@ -4,15 +4,19 @@
 
 // =================================================================================================
 
-void SoundObject::Play (int loops) {
-    if (0 > Mix_PlayChannel (m_channel, m_sound, loops))
-        fprintf (stderr, "Couldn't play sound '%s' (%s)\n", m_name.Data(), Mix_GetError ());
+bool SoundObject::Play (int loops) {
+    if (0 > Mix_PlayChannel(m_channel, m_sound, loops)) {
+        fprintf(stderr, "Couldn't play sound '%s' (%s)\n", m_name.Data(), Mix_GetError());
+        return false;
+    }
+    m_startTime = SDL_GetTicks();
 #if 0
     else if (Busy ())
         fprintf (stderr, "playing '%s' on channel %d (%d loops)\n", m_name.Data(), m_channel, loops);
     else
         fprintf (stderr, "Couldn't play sound '%s' (%s)\n", m_name.Data(), Mix_GetError ());
 #endif
+    return true;
 }
 
 void SoundObject::FadeOut(int fadeTime) {
@@ -20,8 +24,9 @@ void SoundObject::FadeOut(int fadeTime) {
     Mix_FadeOutChannel(m_channel, fadeTime);
 }
 
-void SoundObject::Stop (void) {
+bool SoundObject::Stop (void) {
     Mix_HaltChannel (m_channel);
+    return true;
 }
 
 void SoundObject::SetPanning (float left, float right) {
@@ -58,7 +63,7 @@ bool BaseSoundHandler::Setup(String soundFolder) {
     m_maxAudibleDistance = 30.0f;
     Mix_Quit();
     Mix_Init(MIX_INIT_MP3 | MIX_INIT_OGG);
-    if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 4096))
+    if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512))
         fprintf(stderr, "Couldn't initialize sound system (%s)\n", Mix_GetError());
 #if 0
     int frequency, channels;
@@ -158,7 +163,8 @@ SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams&
     newSound.m_position = position;
     newSound.m_startTime = startTime;
     newSound.m_owner = const_cast<void*>(owner);
-    newSound.Play(params.loops);
+    if (not newSound.Play(params.loops))
+        return nullptr;
     UpdateSound(newSound);
     //fprintf(stderr, "playing '%s' (%d)\n", soundName.Data(), soundObject->m_id);
     return &newSound;
