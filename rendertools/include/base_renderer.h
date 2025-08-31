@@ -80,7 +80,9 @@ public:
 
     virtual bool Stop2DScene(void);
 
-    virtual Shader* LoadShader(void) { return nullptr; }
+    virtual bool UseCustomSceneShader(void) { return false; }
+
+    virtual Shader* LoadCustomSceneShader(void) { return nullptr; }
 
     virtual void Draw3DScene(void);
 

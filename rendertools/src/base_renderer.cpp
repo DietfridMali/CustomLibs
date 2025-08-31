@@ -132,23 +132,27 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
-        baseRenderer.PushMatrix();
         glDepthFunc(GL_ALWAYS);
         glDisable(GL_CULL_FACE);
         SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), false);
-#if 0
-        baseRenderer.Translate(0.5, 0.5, 0);
-        baseRenderer.Scale(1, -1, 1);
-#else
-        m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
-#endif
+        Shader* shader;
+        if (not UseCustomSceneShader())
+            shader = nullptr;
+        else {
+            PushMatrix();
+            Translate(0.5, 0.5, 0);
+            Scale(1, -1, 1);
+            if (not (shader = LoadCustomSceneShader()))
+                PopMatrix();
+            }
+        if (shader == nullptr) 
+            m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 #if 1
         m_renderTexture.m_handle = m_sceneBuffer->BufferHandle(0);
-        m_viewportArea.Render(LoadShader(), &m_renderTexture);
+        m_viewportArea.Render(shader, &m_renderTexture);
 #else
         m_viewportArea.Fill(ColorData::Orange);
 #endif
-        baseRenderer.PopMatrix();
     }
 }
 

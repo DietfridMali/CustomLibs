@@ -54,7 +54,7 @@ const ShaderSource& GrayScaleShader() {
                 for (int i = -HALF; i <= HALF; ++i) {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy]; // 2D-Gewicht per Outer-Product
-                    vec2 offset = vec2(float(i), float(j)) * uTexelSize;
+                    vec2 offset = vec2(float(i), float(j)) * texelSize;
                     sum += texture(source, fragTexCoord + offset) * float(w);
                     wSum += w;
                 }
@@ -75,7 +75,7 @@ const ShaderSource& GrayScaleShader() {
                 for (int i = -HALF; i <= HALF; ++i) {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
-                    vec2 offset = vec2(float(i), float(j)) * uTexelSize;
+                    vec2 offset = vec2(float(i), float(j)) * texelSize;
                     sum += texture(source, fragTexCoord + offset) * float(w);
                     wSum += w;
                 }
@@ -85,7 +85,7 @@ const ShaderSource& GrayScaleShader() {
 
 
         void main() {
-            vec4 texColor = (uBlurRadius > 1) ? GaussBlur5x5() : (uBlurRadius == 1) ? GaussBlur3x3() : texture(source, fragTexCoord);
+            vec4 texColor = (blurRadius > 1) ? GaussBlur5x5() : (blurRadius == 1) ? GaussBlur3x3() : texture(source, fragTexCoord);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray = (gray - 0.5) * contrast + 0.5;
