@@ -92,7 +92,7 @@ void Shader::UpdateMatrices(void) {
         // both matrices must be column major
         SetMatrix4f("mModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);
         SetMatrix4f("mProjection", m_locations.Current(), baseRenderer.Projection().AsArray(), false);
-        SetVector2f("mViewport", m_locations.Current(), baseRenderer.ViewportTransformation());
+        SetMatrix4f("mViewport", m_locations.Current(), baseRenderer.ViewportTransformation().AsArray(), false);
 #if 0
         SetMatrix4f("mBaseModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);
 #endif
@@ -114,8 +114,7 @@ GLint Shader::SetMatrix4f(const char* name, GLint& location, const float* data, 
     return location;
 #else
     if (UpdateUniform<const float*, UniformArray16f>(name, location, data))
-        UniformArray16f* uniform = GetUniform<UniformArray16f>(name, location);
-    glUniformMatrix4fv(location, 1, GLboolean(transpose), data);
+        glUniformMatrix4fv(location, 1, GLboolean(transpose), data);
     return location;
 #endif
 }

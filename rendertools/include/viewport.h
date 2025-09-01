@@ -2,6 +2,7 @@
 
 #include "rectangle.h"
 #include "vector.hpp"
+#include "matrix.hpp"
 #include "base_quad.h"
 #include "colordata.h"
 
@@ -10,12 +11,19 @@
 class Viewport : public Rectangle 
 {
 public:
+    Matrix4f    m_transformation;
+    int         m_windowWidth;
+    int         m_windowHeight;
+    bool        m_flipVertically;
+
     Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
-        : Rectangle(left, top, width, height) {
-    }
+        : Rectangle(left, top, width, height) 
+        , m_windowWidth(0), m_windowHeight(0), m_flipVertically(false)
+    { }
 
     Viewport(Rectangle& r) 
         : Rectangle (r.m_left, r.m_top, r.m_width, r.m_height) 
+        , m_windowWidth(0), m_windowHeight(0), m_flipVertically(false)
     { }
 
     void Fill(const RGBColor& color, float alpha = 1.0f, float scale = 1.0f);
@@ -36,11 +44,21 @@ public:
 
     inline float Heightf(void) noexcept { return float(m_height); }
 
+    inline int WindowWidth(void) noexcept { return m_windowWidth; }
+
+    inline int WindowHeight(void) noexcept { return m_windowHeight; }
+
+    inline int FlipVertically(void) noexcept { return m_flipVertically; }
+
+    inline Matrix4f& Transformation(void) noexcept { return m_transformation; }
+
     void SetViewport(void);
 
     Viewport Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight);
 
     void SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight);
+
+    void BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 
 };
 

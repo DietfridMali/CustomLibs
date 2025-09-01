@@ -135,7 +135,7 @@ void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
         glDepthFunc(GL_ALWAYS);
         glDisable(GL_CULL_FACE);
-        SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight));
+        SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, true);
         Shader* shader;
         if (not UseCustomSceneShader())
             shader = nullptr;
@@ -203,35 +203,6 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // x' = sx * x + cx,  y' = sy * y + cy
 // Column-major Initializer-Reihenfolge (GLM!):
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
-void BaseRenderer::BuildViewportTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept {
-#if 0
-    if (windowWidth * windowHeight == 0) {
-        if (m_drawBufferInfo.m_fbo) {
-            windowWidth = m_drawBufferInfo.m_fbo->GetWidth(true);
-            windowHeight = m_drawBufferInfo.m_fbo->GetHeight(true);
-        }
-        else {
-            windowWidth = m_windowWidth;
-            windowHeight = m_windowHeight;
-        }
-    }
-#endif        
-    const float sx = m_viewport.Widthf() / float(windowWidth);
-    const float sy = m_viewport.Heightf() / float(windowHeight);
-    const float cx = 2.0f * (m_viewport.Leftf() + 0.5f * m_viewport.Widthf()) / float(windowWidth) - 1.0f;
-    const float cy = 
-        flipVertically 
-        ? -1.0f + 2.0f * (m_viewport.Topf() + 0.5f * m_viewport.Heightf()) / float(windowHeight)
-        :  1.0f - 2.0f * (m_viewport.Topf() + 0.5f * m_viewport.Heightf()) / float(windowHeight);
-
-    m_viewportTransformation = Matrix4f({
-        sx, 0,  0,  0,   // col 0
-         0, sy, 0,  0,   // col 1
-         0, 0,  1,  0,   // col 2
-        cx, cy, 0,  1    // col 3 (Translation in W-Spalte!)
-        });
-}
-
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isFBO) {
 #if 1
@@ -246,28 +217,8 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
         }
     }
 
-    const float sx = 2.0f * float (viewport.m_width) / float(windowWidth);
-    const float sy = 2.0f * float (viewport.m_height) / float(windowHeight);
-
     m_viewport = viewport;
-    if (flipVertically) {
-        // viewport ist jetzt in Bottom-Left-Koordinaten
-        m_viewport.m_top = windowHeight - viewport.m_top - viewport.m_height;
-        m_ndcScale = Vector2f(sx, +sy);
-        m_ndcBias = Vector2f(
-            2.0f * float (m_viewport.m_left) / float (windowWidth) - 1.0f, 
-            -1.0f + 2.0f * float (m_viewport.m_top) / float(windowHeight)
-        );
-    }
-    else {
-        // viewport ist in Top-Left-Koordinaten
-        m_ndcScale = Vector2f(sx, -sy);
-        m_ndcBias = Vector2f(
-            2.0f * float(m_viewport.m_left) / float(windowWidth) - 1.0f, 
-            1.0f - 2.0f * float (m_viewport.m_top) / float(windowHeight)
-        );
-    }
-    BuildViewportTransformation(windowWidth, windowHeight, flipVertically);
+    m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
 #else
     glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
 #endif

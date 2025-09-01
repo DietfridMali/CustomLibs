@@ -35,7 +35,6 @@ protected:
     bool                    m_screenIsAvailable;
 
     Viewport                m_viewport;
-    Matrix4f                m_viewportTransformation;
     Vector2f                m_ndcScale;
     Vector2f                m_ndcBias;
     BaseQuad                m_viewportArea;
@@ -119,6 +118,8 @@ public:
 
     inline float AspectRatio(void) noexcept { return m_aspectRatio; }
 
+    inline Matrix4f& ViewportTransformation(void) noexcept { return m_viewport.Transformation(); }
+
     inline Vector2f& NDCScale(void) noexcept { return m_ndcScale; }
 
     inline Vector2f& NDCBias(void) noexcept { return m_ndcBias; }
@@ -158,7 +159,7 @@ public:
     void PopViewport(void) {
         ::Viewport viewport;
         viewportStack.Pop(viewport);
-        SetViewport(viewport);
+        SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
     }
 
     void Fill(const RGBAColor& color, float scale = 1.0f);
