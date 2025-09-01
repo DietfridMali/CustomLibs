@@ -35,6 +35,9 @@ protected:
     bool                    m_screenIsAvailable;
 
     Viewport                m_viewport;
+    Matrix4f                m_viewportTransformation;
+    Vector2f                m_ndcScale;
+    Vector2f                m_ndcBias;
     BaseQuad                m_viewportArea;
 
     int                     m_windowWidth;
@@ -54,7 +57,9 @@ protected:
 public:
     BaseRenderer()
         : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
-        , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f), m_backgroundColor(ColorData::Black)
+        , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f)
+        , m_ndcScale(Vector2f::ONE), m_ndcBias(Vector2f::ONE)
+        , m_backgroundColor(ColorData::Black)
         , m_screenIsAvailable(false)
     {
         //_instance = this;
@@ -86,7 +91,7 @@ public:
 
     virtual void Draw3DScene(void);
 
-    virtual void RenderToViewport(Texture* texture, bool bRotate, bool bFlipVertically);
+    virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically);
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);
 
@@ -114,6 +119,10 @@ public:
 
     inline float AspectRatio(void) noexcept { return m_aspectRatio; }
 
+    inline Vector2f& NDCScale(void) noexcept { return m_ndcScale; }
+
+    inline Vector2f& NDCBias(void) noexcept { return m_ndcBias; }
+
     template <typename T>
     inline void SetBackgroundColor(T&& backgroundColor) {
         m_backgroundColor = std::forward<T>(backgroundColor);
@@ -140,7 +149,7 @@ public:
     void SetViewport(bool flipVertically = false)
         noexcept;
 
-    void SetViewport(::Viewport viewport, bool flipVertically = false) noexcept; // , bool isFBO = false);
+    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept; // , bool isFBO = false);
 
     void PushViewport(void) {
         viewportStack.Append(m_viewport);
@@ -178,6 +187,9 @@ public:
     static void ClearGLError(void) noexcept;
 
     static bool CheckGLError(const char* operation = "") noexcept;
+
+protected:
+    void BuildViewportTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 };
 
 #define baseRenderer BaseRenderer::Instance()

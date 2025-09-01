@@ -15,6 +15,15 @@
 // rendered sideways. That's why DrawBufferHandler class has m_windowWidth, m_windowHeight and m_aspectRatio
 // separate from DisplayHandler.
 
+void DrawBufferHandler::SetActiveDrawBuffers(void) {
+    glDrawBuffers(ActiveDrawBuffers()->Length(), ActiveDrawBuffers()->Data());
+    if (m_drawBufferInfo.m_fbo)
+        glViewport(0, 0, m_drawBufferInfo.m_fbo->GetWidth(true), m_drawBufferInfo.m_fbo->GetHeight(true));
+    else
+        glViewport(0, 0, m_windowWidth, m_windowHeight);
+}
+
+
 bool DrawBufferHandler::SetActiveBuffer(FBO* buffer, bool clearBuffer) {
     if (m_activeBuffer != buffer) {
         if (m_activeBuffer)

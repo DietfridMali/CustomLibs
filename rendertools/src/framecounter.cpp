@@ -14,7 +14,7 @@ void BaseFrameCounter::Draw(bool update) {
     if (m_drawTimer.HasExpired(0, true))
         m_fps = GetFps();
     if (m_showFps) {
-        baseRenderer.SetViewport(m_viewport, false);
+        baseRenderer.SetViewport(m_viewport);
         std::string s = std::format("{:7.2f} fps", m_fps);
         textRenderer.SetColor(m_color);
         textRenderer.Render(s, TextRenderer::taLeft, 0);

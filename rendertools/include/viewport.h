@@ -28,6 +28,14 @@ public:
         Fill(static_cast<RGBColor>(ColorData::White));
     }
 
+    inline float Leftf(void) noexcept { return float(m_left); }
+
+    inline float Topf(void) noexcept { return float(m_top); }
+
+    inline float Widthf(void) noexcept { return float(m_width); }
+
+    inline float Heightf(void) noexcept { return float(m_height); }
+
     void SetViewport(void);
 
     Viewport Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight);

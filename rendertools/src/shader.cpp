@@ -92,6 +92,7 @@ void Shader::UpdateMatrices(void) {
         // both matrices must be column major
         SetMatrix4f("mModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);
         SetMatrix4f("mProjection", m_locations.Current(), baseRenderer.Projection().AsArray(), false);
+        SetVector2f("mViewport", m_locations.Current(), baseRenderer.ViewportTransformation());
 #if 0
         SetMatrix4f("mBaseModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);
 #endif

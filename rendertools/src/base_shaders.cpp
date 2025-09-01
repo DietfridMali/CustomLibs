@@ -6,9 +6,9 @@
 // =================================================================================================
 
 const ShaderSource& PlainColorShader() {
-    static const ShaderSource plainColorShader(
+    static const ShaderSource shader(
         "plainColor",
-        StandardVS(),
+        Standard2DVS(),
         R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
@@ -18,14 +18,14 @@ const ShaderSource& PlainColorShader() {
         void main() { fragColor = surfaceColor; }
         )"
         );
-    return plainColorShader;
+    return shader;
 }
 
 
 const ShaderSource& GrayScaleShader() {
-    static const ShaderSource grayScaleShader(
+    static const ShaderSource shader(
         "grayScale",
-        StandardVS(),
+        Standard2DVS(),
         R"(
         #version 330 core
         // Für OpenGL ES 3.0 statt dessen:
@@ -134,15 +134,15 @@ const ShaderSource& GrayScaleShader() {
         }
         )" 
         );
-    return grayScaleShader;
+    return shader;
 }
 
 
 // render a b/w mask with color applied.
 const ShaderSource& PlainTextureShader() {
-    static const ShaderSource plainTextureShader(
+    static const ShaderSource shader(
         "plainTexture",
-        StandardVS(),
+        Standard2DVS(),
         R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
@@ -162,7 +162,7 @@ const ShaderSource& PlainTextureShader() {
             }
     )"
     );
-    return plainTextureShader;
+    return shader;
 }
 
 // =================================================================================================

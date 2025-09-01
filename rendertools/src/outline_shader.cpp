@@ -8,7 +8,7 @@
 const ShaderSource& OutlineShader() {
     static const ShaderSource outlineShader(
         "outline",
-        OffsetVS(),
+        Offset2DVS(),
         R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable

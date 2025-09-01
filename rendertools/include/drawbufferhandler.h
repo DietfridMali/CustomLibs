@@ -12,7 +12,7 @@
 class DrawBufferInfo {
 public:
     FBO*                    m_fbo;
-    ManagedArray<GLuint>* m_drawBuffers;
+    ManagedArray<GLuint>*   m_drawBuffers;
 
 public:
     DrawBufferInfo(FBO* fbo = nullptr, ManagedArray<GLuint>* drawBuffers = nullptr) {
@@ -35,10 +35,16 @@ class DrawBufferHandler
         ManagedArray<GLuint>    m_defaultDrawBuffers;
         DrawBufferInfo          m_drawBufferInfo;
         List<DrawBufferInfo>    m_drawBufferStack;
+        int                     m_windowWidth;
+        int                     m_windowHeight;
     public:
         DrawBufferHandler()
-            : m_activeBuffer(nullptr)
-        { 
+            : m_activeBuffer(nullptr), m_windowWidth(0), m_windowHeight(0)
+        { }
+
+        void Setup(int windowWidth, int windowHeight) {
+            m_windowWidth = windowWidth;
+            m_windowHeight = windowHeight;
         }
 
         bool SetActiveBuffer(FBO* buffer, bool clearBuffer = false);
@@ -49,9 +55,7 @@ class DrawBufferHandler
 
         void SetupDrawBuffers(void);
             
-        inline void SetActiveDrawBuffers(void) {
-            glDrawBuffers(ActiveDrawBuffers()->Length(), ActiveDrawBuffers()->Data());
-        }
+        void SetActiveDrawBuffers(void);
 
         void SaveDrawBuffer();
 

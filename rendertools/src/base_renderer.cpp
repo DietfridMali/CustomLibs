@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <stdlib.h>
 #include <algorithm>
@@ -28,6 +28,7 @@ void BaseRenderer::Init(int width, int height, float fov) {
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov);
     ResetTransformation();
     int w = m_windowWidth / 15;
+    DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
 }
 
@@ -78,7 +79,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     glEnable(GL_MULTISAMPLE);
     glDisable(GL_POLYGON_OFFSET_FILL);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-    SetViewport();
+    glViewport(0, 0, m_windowWidth, m_windowHeight);
 }
 
 
@@ -89,7 +90,7 @@ bool BaseRenderer::Start3DScene(void) {
     ResetDrawBuffers(m_sceneBuffer);
     SetupTransformation();
     SetupOpenGL();
-    SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight), false);
+    SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight));
     EnableCamera();
     return true;
 }
@@ -114,7 +115,7 @@ bool BaseRenderer::Start2DScene(void) {
     ResetDrawBuffers(m_screenBuffer, not m_screenIsAvailable);
     m_screenIsAvailable = true;
     ResetTransformation();
-    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight), false);
+    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     ResetClearColor();
@@ -134,7 +135,7 @@ void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
         glDepthFunc(GL_ALWAYS);
         glDisable(GL_CULL_FACE);
-        SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), false);
+        SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight));
         Shader* shader;
         if (not UseCustomSceneShader())
             shader = nullptr;
@@ -157,7 +158,7 @@ void BaseRenderer::Draw3DScene(void) {
 }
 
 
-void BaseRenderer::RenderToViewport(Texture* texture, bool bRotate, bool bFlipVertically) {
+void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically) {
 #if 0
     Translate(0.5, 0.5, 0);
     if (bRotate)
@@ -167,8 +168,12 @@ void BaseRenderer::RenderToViewport(Texture* texture, bool bRotate, bool bFlipVe
 #else
     m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = (bRotate ? 90.0f : 0.0f) });
 #endif
-    m_viewportArea.Render(&m_renderTexture); // bFlipVertically);
-
+#if 1
+    m_viewportArea.SetTexture(texture);
+    m_viewportArea.Render(color); // bFlipVertically);
+#else
+    m_viewportArea.Fill(color); // bFlipVertically);
+#endif
 }
 
 
@@ -180,26 +185,92 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         if (m_screenBuffer) {
             glDepthFunc(GL_ALWAYS);
             glDisable(GL_CULL_FACE); // required for vertical flipping because that inverts the buffer's winding
-            SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight), false);
+            SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
             glClear(GL_COLOR_BUFFER_BIT);
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
-            RenderToViewport(&m_renderTexture, bRotate, bFlipVertically);
+            RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
         }
     }
 }
 
 
 void BaseRenderer::SetViewport(bool flipVertically) noexcept {
-    SetViewport(m_viewport, flipVertically);
+    SetViewport(m_viewport, 0, 0, flipVertically);
 }
 
 
-void BaseRenderer::SetViewport(::Viewport viewport, bool flipVertically) noexcept { //, bool isFBO) {
-    if (flipVertically)
-        m_viewport = ::Viewport(viewport.m_left, m_windowHeight - viewport.m_top - viewport.m_height, viewport.m_width, viewport.m_height);
-    else
-        m_viewport = viewport;
+// Mapped NDC_local ∈ [-1..1] auf das Ziel-Rect im Full-NDC:
+// x' = sx * x + cx,  y' = sy * y + cy
+// Column-major Initializer-Reihenfolge (GLM!):
+// [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
+void BaseRenderer::BuildViewportTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept {
+#if 0
+    if (windowWidth * windowHeight == 0) {
+        if (m_drawBufferInfo.m_fbo) {
+            windowWidth = m_drawBufferInfo.m_fbo->GetWidth(true);
+            windowHeight = m_drawBufferInfo.m_fbo->GetHeight(true);
+        }
+        else {
+            windowWidth = m_windowWidth;
+            windowHeight = m_windowHeight;
+        }
+    }
+#endif        
+    const float sx = m_viewport.Widthf() / float(windowWidth);
+    const float sy = m_viewport.Heightf() / float(windowHeight);
+    const float cx = 2.0f * (m_viewport.Leftf() + 0.5f * m_viewport.Widthf()) / float(windowWidth) - 1.0f;
+    const float cy = 
+        flipVertically 
+        ? -1.0f + 2.0f * (m_viewport.Topf() + 0.5f * m_viewport.Heightf()) / float(windowHeight)
+        :  1.0f - 2.0f * (m_viewport.Topf() + 0.5f * m_viewport.Heightf()) / float(windowHeight);
+
+    m_viewportTransformation = Matrix4f({
+        sx, 0,  0,  0,   // col 0
+         0, sy, 0,  0,   // col 1
+         0, 0,  1,  0,   // col 2
+        cx, cy, 0,  1    // col 3 (Translation in W-Spalte!)
+        });
+}
+
+
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isFBO) {
+#if 1
+    if (windowWidth * windowHeight == 0) {
+        if (m_drawBufferInfo.m_fbo) {
+            windowWidth = m_drawBufferInfo.m_fbo->GetWidth(true);
+            windowHeight = m_drawBufferInfo.m_fbo->GetHeight(true);
+        }
+        else {
+            windowWidth = m_windowWidth;
+            windowHeight = m_windowHeight;
+        }
+    }
+
+    const float sx = 2.0f * float (viewport.m_width) / float(windowWidth);
+    const float sy = 2.0f * float (viewport.m_height) / float(windowHeight);
+
+    m_viewport = viewport;
+    if (flipVertically) {
+        // viewport ist jetzt in Bottom-Left-Koordinaten
+        m_viewport.m_top = windowHeight - viewport.m_top - viewport.m_height;
+        m_ndcScale = Vector2f(sx, +sy);
+        m_ndcBias = Vector2f(
+            2.0f * float (m_viewport.m_left) / float (windowWidth) - 1.0f, 
+            -1.0f + 2.0f * float (m_viewport.m_top) / float(windowHeight)
+        );
+    }
+    else {
+        // viewport ist in Top-Left-Koordinaten
+        m_ndcScale = Vector2f(sx, -sy);
+        m_ndcBias = Vector2f(
+            2.0f * float(m_viewport.m_left) / float(windowWidth) - 1.0f, 
+            1.0f - 2.0f * float (m_viewport.m_top) / float(windowHeight)
+        );
+    }
+    BuildViewportTransformation(windowWidth, windowHeight, flipVertically);
+#else
     glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
+#endif
 }
 
 

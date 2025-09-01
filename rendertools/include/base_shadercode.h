@@ -65,8 +65,9 @@ public:
 
 // =================================================================================================
 
-const String& StandardVS();
-const String& OffsetVS();
+const String& Standard2DVS();
+const String& Standard3DVS();
+const String& Offset2DVS();
 
 // =================================================================================================
 

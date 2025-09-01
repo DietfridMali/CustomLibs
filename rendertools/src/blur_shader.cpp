@@ -8,7 +8,7 @@
 const ShaderSource& BoxBlurShader() {
     static const ShaderSource boxBlurShader(
         "boxblur",
-        OffsetVS(),
+        Offset2DVS(),
         R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
@@ -55,7 +55,7 @@ const ShaderSource& BoxBlurShader() {
 const ShaderSource& FxaaShader() {
     static const ShaderSource fxaaShader(
         "fxaa",
-        OffsetVS(),
+        Offset2DVS(),
         R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
@@ -102,7 +102,7 @@ const ShaderSource& FxaaShader() {
 const ShaderSource& GaussBlurShader() {
     static const ShaderSource gaussBlurShader(
         "gaussblur",
-        OffsetVS(),
+        Offset2DVS(),
         R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
