@@ -12,6 +12,7 @@
 #include "viewport.h"
 #include "fbo.h"
 #include "drawbufferhandler.h"
+#include "opengl_states.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -20,6 +21,7 @@
 class BaseRenderer
     : public RenderMatrices
     , public DrawBufferHandler
+    , public OpenGLStates
     , public PolymorphSingleton<BaseRenderer>
 {
 public:

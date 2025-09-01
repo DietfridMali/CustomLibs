@@ -231,7 +231,7 @@ void Texture::SetParams(void)
 {
     if (m_useMipMaps) {
         glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
-        glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR); //GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
     else {
