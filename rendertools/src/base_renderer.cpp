@@ -142,18 +142,20 @@ void BaseRenderer::Draw3DScene(void) {
         else {
             PushMatrix();
             Translate(0.5, 0.5, 0);
-            Scale(1, -1, 1);
+            //Scale(1, -1, 1);
             if (not (shader = LoadCustomSceneShader()))
                 PopMatrix();
             }
         if (shader == nullptr) 
-            m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
+            m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = false, .rotation = 0.0f });
 #if 1
         m_renderTexture.m_handle = m_sceneBuffer->BufferHandle(0);
         m_viewportArea.Render(shader, &m_renderTexture);
 #else
         m_viewportArea.Fill(ColorData::Orange);
 #endif
+        if (shader != nullptr)
+            PopMatrix();
     }
 }
 
