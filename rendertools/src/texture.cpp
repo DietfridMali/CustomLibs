@@ -209,12 +209,10 @@ bool Texture::Bind(void)
 {
     if (not IsAvailable())
         return false;
-    glEnable(GL_TEXTURE_2D);
-    glActiveTexture(GL_TEXTURE0);
 #if USE_SHARED_HANDLES
-    glBindTexture(m_type, m_handle.get());
+    baseRenderer.Bind(GL_TEXTURE0, m_handle.get());
 #else
-    glBindTexture(m_type, m_handle);
+    baseRenderer.Bind(GL_TEXTURE0, m_handle);
 #endif
     return true;
 }
@@ -223,7 +221,7 @@ bool Texture::Bind(void)
 void Texture::Release(void)
 {
     if (IsAvailable())
-        glBindTexture(m_type, 0);
+        baseRenderer.Bind(GL_NONE, 0);
 }
 
 
