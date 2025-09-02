@@ -158,11 +158,9 @@ void BaseQuad::Render(RGBAColor color) {
         Render(LoadShader(m_texture != nullptr, color), m_texture, false);
         //baseShaderHandler.StopShader();
     }
-    else {
-        glEnable(GL_TEXTURE_2D);
-        m_texture->Enable();
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    else if (m_texture->Enable()) {
+        baseRenderer.SetBlending(true);
+        baseRenderer.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glBegin(GL_QUADS);
         for (auto& v : m_vertexBuffer.m_appData) {
             glColor4f(color.R(), color.G(), color.B(), color.A());

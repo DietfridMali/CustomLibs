@@ -1,5 +1,8 @@
 
 #include "opengl_states.h"
+#include "array.hpp"
+#include <glm/glm.hpp>
+#include <glm/vector_relational.hpp>
 
 // =================================================================================================
 
@@ -13,10 +16,10 @@ RGBAColor OpenGLStates::ClearColor(RGBAColor color) {
 	return previous;
 }
 
-ivec4 OpenGLStates::ColorMask(ivec4 mask) {
-	static ivec4 current = ivec4(-1, -1, -1, -1);
-	ivec4 previous = current;
-	if (glm::any(current != mask)) {        // <-- wichtig: any()
+glm::ivec4 OpenGLStates::ColorMask(glm::ivec4 mask) {
+	static glm::ivec4 current = glm::ivec4(-1, -1, -1, -1);
+	glm::ivec4 previous = current;
+	if (glm::any(glm::notEqual(current, mask))) {        // <-- wichtig: any()
 		current = mask;
 		glColorMask(GLboolean(mask.x), GLboolean(mask.y), GLboolean(mask.z), GLboolean(mask.w));
 	}
@@ -40,9 +43,11 @@ GLenum OpenGLStates::DepthFunc(GLenum func) {
 		current = func;
 		glDepthFunc(current);
 	}
+	return current;
 }
 
-void OpenGLStates::BlendFunc(GLenum sfactor, GLenum dfactor) {
+void OpenGLStates::BlendFunc(GLenum sFactor, GLenum dFactor) {
+	SetBlending(true);
 	static GLenum sCurrent = GL_NONE;
 	static GLenum dCurrent = GL_NONE;
 	if ((sCurrent != sFactor) or (dCurrent != dFactor)) {
@@ -80,24 +85,6 @@ GLenum OpenGLStates::ActiveTexture(GLenum tmu) {
 		glActiveTexture(tmu);
 	}
 	return previous;
-}
-
-GLint OpenGLStates::BindTexture(GLenum tmu, GLint texture) {
-	static ManagedArray<GLint> binds;
-	static GLenum currentTMU = GL_TEXTURE0;
-	if (binds.Length() == 0) {
-		binds.SetAutoFit(true);
-		SetDefaultValue(0);
-	}
-	if (tmu == GL_NONE)
-		tmu = currentTMU;
-	int i = int(tmu) - int(GL_TEXTURE0);
-	if (binds[i] != texture) {
-		SetTexture2D(true);
-		binds[i] = texture;
-		currentTMU = ActiveTexture(tmu);
-		glBind(texture);
-	}
 }
 
 // =================================================================================================

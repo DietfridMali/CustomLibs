@@ -42,17 +42,17 @@ public:
 
     virtual bool IsAvailable(void) = 0;
 
-    virtual bool Bind(void) = 0;
+    virtual bool Bind(int tmuIndex) = 0;
 
-    virtual void Release(void) = 0;
+    virtual void Release(int tmuIndex) = 0;
 
     virtual void SetParams(void) = 0;
 
     virtual void Deploy(int bufferIndex = 0) = 0;
 
-    virtual bool Enable(int tmu = 0) = 0;
+    virtual bool Enable(int tmuIndex = 0) = 0;
 
-    virtual void Disable(void) = 0;
+    virtual void Disable(int tmuIndex = 0) = 0;
 
     virtual bool Load(List<String>& fileNames, bool flipVertically = false) = 0;
 };
@@ -232,28 +232,28 @@ public:
         return m_handle != other.m_handle;
     }
 
-    virtual bool Create(void);
+    virtual bool Create(void) override;
 
-    virtual void Destroy(void);
+    virtual void Destroy(void) override;
 
-    virtual bool IsAvailable(void);
+    virtual bool IsAvailable(void) override;
 
-    virtual bool Bind(void);
+    virtual bool Bind(int tmuIndex = 0) override;
 
-    virtual void Release(void);
+    virtual void Release(int tmuIndex = 0) override;
 
-    virtual void SetParams(void);
+    virtual void SetParams(void) override;
 
     void Wrap(void)
         noexcept;
 
-    virtual bool Enable(int tmu = 0);
+    virtual bool Enable(int tmuIndex = 0) override;
 
-    virtual void Disable(void);
+    virtual void Disable(int tmuIndex = 0) override;
 
-    virtual void Deploy(int bufferIndex = 0);
+    virtual void Deploy(int bufferIndex = 0) override;
 
-    virtual bool Load(List<String>& fileNames, bool flipVertically);
+    virtual bool Load(List<String>& fileNames, bool flipVertically) override;
 
     bool CreateFromFile(List<String>& fileNames, bool flipVertically = false);
 
@@ -306,9 +306,8 @@ public:
     inline static void Release(int tmuIndex)
         noexcept
     {
-        glActiveTexture(GL_TEXTURE0 + tmuIndex);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glActiveTexture(GL_TEXTURE0); // always reset!
+        renderer.BindTexture2D(GL_TEXTURE0 + tmuIndex, 0);
+        renderer.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 
     static tRenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)

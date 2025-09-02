@@ -205,23 +205,23 @@ bool Texture::IsAvailable(void)
 }
 
 
-bool Texture::Bind(void)
+bool Texture::Bind(int tmuIndex)
 {
     if (not IsAvailable())
         return false;
 #if USE_SHARED_HANDLES
-    baseRenderer.Bind(GL_TEXTURE0, m_handle.get());
+    baseRenderer.BindTexture<m_type>(GL_TEXTURE0 + tmuIndex, m_handle.get());
 #else
-    baseRenderer.Bind(GL_TEXTURE0, m_handle);
+    baseRenderer.BindTexture<m_type>(GL_TEXTURE0 + tmuIndex, m_handle);
 #endif
     return true;
 }
 
 
-void Texture::Release(void)
+void Texture::Release(int tmu)
 {
     if (IsAvailable())
-        baseRenderer.Bind(GL_NONE, 0);
+        baseRenderer.BindTexture<m_type>(GL_TEXTURE0 + tmuIndex, 0);
 }
 
 
@@ -248,11 +248,9 @@ noexcept
 }
 
 
-bool Texture::Enable(int tmu)
+bool Texture::Enable(int tmuIndex)
 {
-    glActiveTexture(GL_TEXTURE0 + tmu);
-    glEnable(m_type);
-    if (not Bind())
+    if (not Bind(GL_TEXTURE0 + tmuIndex))
         return false;
     SetParams();
     Wrap();
@@ -260,10 +258,10 @@ bool Texture::Enable(int tmu)
 }
 
 
-void Texture::Disable(void)
+void Texture::Disable(int tmuIndex)
 {
-    Release();
-    glDisable(m_type);
+    Release(tmuIndex);
+    baseRenderer.SetState<m_type>(false);
 }
 
 

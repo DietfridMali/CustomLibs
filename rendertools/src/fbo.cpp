@@ -35,7 +35,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
-    glBindTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
+    baseRenderer.BindTexture(GL_TEXTURE0, bufferInfo.m_handle);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -54,7 +54,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
             break;
     }
-    glBindTexture(GL_TEXTURE_2D, 0);
+    baseRenderer.BindTexture(GL_TEXTURE0, 0);
     ++m_bufferCount;
 }
 
@@ -210,7 +210,7 @@ void FBO::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
         return false;
-    glBindTexture(GL_TEXTURE_2D, 0);
+    baseRenderer.BindTexture(GL_TEXTURE0, 0);
     if (reenable)
         glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
     else
@@ -252,10 +252,7 @@ bool FBO::ReattachBuffers(void) {
 bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
-    if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
-        glEnable(GL_DEPTH_TEST);
-    else
-        glDisable(GL_DEPTH_TEST);
+    baseRenderer.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
     Clear(bufferIndex, drawBufferGroup, clear);
     return baseRenderer.CheckGLError();
 }
@@ -289,17 +286,15 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
     if (bufferIndex < 0)
         return false;
     BaseRenderer::ClearGLError();
-    glEnable(GL_TEXTURE_2D);
     if (tmuIndex < 0)
         tmuIndex = bufferIndex;
     for (int i = 0; i < m_bufferCount; ++i)
         if ((i != bufferIndex) and (m_bufferInfo[i].m_tmuIndex == tmuIndex))
             m_bufferInfo[i].m_tmuIndex = -1;
-    glActiveTexture(GL_TEXTURE0 + tmuIndex);
-    glBindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle);
+    baseRenderer.BindTexture(GL_TEXTURE0 + tmuIndex, m_bufferInfo[bufferIndex].m_handle);
     baseRenderer.CheckGLError("FBO::BindBuffer");
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
-    glActiveTexture(GL_TEXTURE0); // always reset!
+    baseRenderer.ActiveTexture(GL_TEXTURE0); // always reset!
     return true;
 }
 
@@ -324,11 +319,11 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         if (not Enable(params.destination, FBO::dbSingle, params.clearBuffer))
             return false;
         m_lastDestination = params.destination;
-        glDisable(GL_BLEND);
+        baseRenderer.SetBlending(false);
     }
     else { // rendering to the current render target
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        baseRenderer.SetBlending(true);
+        baseRenderer.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0);
@@ -340,8 +335,8 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         baseRenderer.Scale(params.scale, -params.scale, 1);
     else if (params.scale != 1.0f)
         baseRenderer.Scale(params.scale, params.scale, 1);
-    glDepthFunc(GL_ALWAYS);
-    glDisable(GL_CULL_FACE);
+    GLenum depthFunc = baseRenderer.DepthFunc(GL_ALWAYS);
+    bool faceCulling = baseRenderer.SetFaceCulling(false);
     m_viewportArea.SetTexture(source);
     if (params.shader)
         m_viewportArea.Render(params.shader, source);
@@ -361,8 +356,8 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
             m_viewportArea.Render(color); // texture has been assigned to m_viewportArea above
         //baseShaderHandler.StopShader();
     }
-    glEnable(GL_CULL_FACE);
-    glDepthFunc(GL_LESS);
+    baseRenderer.SetFaceCulling(faceCulling);
+    baseRenderer.DepthFunc(depthFunc);
     baseRenderer.PopMatrix();
     if (params.destination > -1)
         Disable();

@@ -5,6 +5,7 @@
 #include "glew.h"
 #include <glm/glm.hpp>
 #include "array.hpp"
+#include "colordata.h"
 
 // =================================================================================================
 
@@ -17,7 +18,7 @@ public:
 		if (not current.has_value()) {
 			current = (glIsEnabled(stateID) == GL_TRUE); // expensive and not essential
 #endif
-			std::optional<bool> bool previous = current;
+			std::optional<bool> previous = current;
 			if (current != state) {
 				current = state;
 				if (state)
@@ -46,103 +47,54 @@ public:
 
 		inline std::optional<bool> SetMultiSample(bool state) { return SetState<GL_MULTISAMPLE>(state); }
 
-		inline std::optional<bool> SetTexture2D(bool state) { return SetState<GL_TEXTURE_2D>(state); }
+		template <GLenum typeID>
+		inline std::optional<bool> SetTexture(bool state) { return SetState<typeID>(state); }
 
-		inline RGBAColor ClearColor(RGBAColor color) {
-			static RGBAColor current = ColorData::Invisible;
-			RGBAColor previous = current;
-			if (current != color) {
-				current = color;
-				glClearColor(color.R(), color.G(), color.B(), color.A());
-			}
-			return previous;
-		}
+		inline std::optional<bool> SetTexture2D(bool state) { return SetTexture<GL_TEXTURE_2D>(state); }
 
-		inline ivec4 ColorMask(ivec4 mask) {
-			static ivec4 current = ivec4(-1, -1, -1, -1);
-			ivec4 previous = current;
-			if (glm::any(current != mask)) {        // <-- wichtig: any()
-				current = mask;
-				glColorMask(GLboolean(mask.x), GLboolean(mask.y), GLboolean(mask.z), GLboolean(mask.w));
-			}
-			return previous;
-		}
+		inline std::optional<bool> SetTextureCubemap(bool state) { return SetTexture<GL_TEXTURE_CUBE_MAP>(state); }
 
-		inline int DepthMask(int mask) {
-			static int current = -1;
-			int previous = current;
-			if (current != mask) {        // <-- wichtig: any()
-				current = mask;
-				glDepthMask(GLboolean(mask));
-			}
-			return previous;
-		}
+		RGBAColor ClearColor(RGBAColor color);
 
-		inline GLenum DepthFunc(GLenum func) {
-			static GLenum current = GL_NONE;
-			GLenum previous = current;
-			if (current != func) {
-				current = func;
-				glDepthFunc(current);
-			}
-		}
+		glm::ivec4 ColorMask(glm::ivec4 mask);
 
-		inline void BlendFunc(GLenum sfactor, GLenum dfactor) {
-			static GLenum sCurrent = GL_NONE;
-			static GLenum dCurrent = GL_NONE;
-			if ((sCurrent != sFactor) or (dCurrent != dFactor)) {
-				sCurrent = sFactor;
-				dCurrent = dFactor;
-				glBlendFunc(sFactor, dFactor);
-			}
-		}
+		int DepthMask(int mask);
 
-		inline GLenum FrontFace(GLenum face) {
-			static GLenum current = GL_NONE;
-			GLenum previous = current;
-			if (current != face) {
-				current = face;
-				glFrontFace(face);
-			}
-			return previous;
-		}
+		GLenum DepthFunc(GLenum func);
 
-		inline GLenum CullFace(GLenum face) {
-			static GLenum current = GL_NONE;
-			GLenum previous = current;
-			if (current != face) {
-				current = face;
-				glCullFace(face);
-			}
-			return previous;
-		}
+		void BlendFunc(GLenum sfactor, GLenum dfactor);
 
-		inline GLenum ActiveTexture(GLenum tmu) {
-			static GLenum current = GL_NONE;
-			GLenum previous = tmu;
-			if (current != tmu) {
-				current = tmu;
-				glActiveTexture(tmu);
-			}
-			return previous;
-		}
+		GLenum FrontFace(GLenum face);
 
-		inline GLint BindTexture(GLenum tmu, GLint texture) {
+		GLenum CullFace(GLenum face);
+
+		GLenum ActiveTexture(GLenum tmu);
+
+		template <GLenum typeID>
+		void BindTexture(GLenum tmu, GLint texture) {
 			static ManagedArray<GLint> binds;
 			static GLenum currentTMU = GL_TEXTURE0;
 			if (binds.Length() == 0) {
 				binds.SetAutoFit(true);
-				SetDefaultValue(0);
+				binds.SetDefaultValue(0);
 			}
 			if (tmu == GL_NONE)
 				tmu = currentTMU;
-			int i = int (tmu) - int (GL_TEXTURE0);
+			int i = int(tmu) - int(GL_TEXTURE0);
 			if (binds[i] != texture) {
-				SetTexture2D(true);
+				SetTexture<typeID>(true);
 				binds[i] = texture;
 				currentTMU = ActiveTexture(tmu);
-				glBind(texture);
+				glBindTexture(GL_TEXTURE_2D, texture);
 			}
+		}
+
+		inline void BindTexture2D(GLenum tmu, GLint texture) {
+			BindTexture<GL_TEXTURE_2D>(tmu, texture);
+		}
+
+		inline void BindCubemap(GLenum tmu, GLint texture) {
+			BindTexture<GL_TEXTURE_CUBE_MAP>(tmu, texture);
 		}
 	};
 
