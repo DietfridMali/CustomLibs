@@ -29,9 +29,14 @@ public:
         GLint minor{ 0 };
     };
 
+    enum class RenderPasses {
+        rpDepth,
+        rpColor
+    };
+
 protected:
-    FBO* m_screenBuffer;
-    FBO* m_sceneBuffer;
+    FBO*                    m_screenBuffer;
+    FBO*                    m_sceneBuffer;
     Texture                 m_renderTexture;
     bool                    m_screenIsAvailable;
 
@@ -50,6 +55,8 @@ protected:
 
     RGBAColor               m_backgroundColor;
 
+    RenderPasses            m_renderPass;
+
     MovingFrameCounter      m_frameCounter;
 
     static List<::Viewport> viewportStack;
@@ -59,6 +66,7 @@ public:
     BaseRenderer()
         : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
         , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f)
+        , m_renderPass(RenderPasses::rpColor)
         , m_ndcScale(Vector2f::ONE), m_ndcBias(Vector2f::ONE)
         , m_backgroundColor(ColorData::Black)
         , m_screenIsAvailable(false)
@@ -77,6 +85,23 @@ public:
     bool CreateScreenBuffer(void);
 
     void SetupOpenGL(void) noexcept;
+
+    void StartDepthPass(void) noexcept;
+
+    void StartColorPass(void) noexcept;
+
+    inline bool DepthPass(void) noexcept { return RenderPass() == RenderPasses::rpDepth; }
+
+    inline bool ColorPass(void) noexcept { return RenderPass() == RenderPasses::rpColor; }
+
+    inline void StartRenderPass(RenderPasses pass) noexcept {
+        if (pass == RenderPasses::rpDepth)
+            StartDepthPass();
+        else
+            StartColorPass();
+    }
+
+    RenderPasses RenderPass(void) noexcept { return m_renderPass; }
 
     virtual bool Start3DScene(void);
 
@@ -194,6 +219,8 @@ public:
 protected:
     void BuildViewportTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 };
+
+using RenderPassType = BaseRenderer::RenderPasses;
 
 #define baseRenderer BaseRenderer::Instance()
 

@@ -5,6 +5,27 @@
 
 // =================================================================================================
 
+const ShaderSource& DepthShader() {
+    static const ShaderSource shader(
+        "depthShader",
+        R"(
+        #version 330 core
+        layout(location = 0) in vec3 position;
+        layout(location = 1) in vec2 texCoord;
+        uniform mat4 mModelView;
+        uniform mat4 mProjection;
+        void main() { 
+            gl_Position = mProjection * mModelView * vec4 (position, 1.0);
+        }
+        )",
+        R"(
+        void main() { }
+        )"
+        );
+    return shader;
+}
+
+
 const ShaderSource& PlainColorShader() {
     static const ShaderSource shader(
         "plainColor",

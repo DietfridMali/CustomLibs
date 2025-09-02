@@ -156,6 +156,9 @@
     <ClInclude Include="..\include\sharedglhandle.hpp">
       <Filter>Header Files\general</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\tristate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">

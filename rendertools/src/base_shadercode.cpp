@@ -5,6 +5,7 @@
 
 // =================================================================================================
 
+const ShaderSource& DepthShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
 const ShaderSource& GrayScaleShader();
@@ -17,6 +18,7 @@ const ShaderSource& GaussBlurShader();
 
 BaseShaderCode::BaseShaderCode() {
     ManagedArray<const ShaderSource*> shaderSource = {
+        &DepthShader(),
         &PlainColorShader(),
         &PlainTextureShader(),
         &GrayScaleShader(),

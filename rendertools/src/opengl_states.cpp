@@ -28,6 +28,8 @@ glm::ivec4 OpenGLStates::ColorMask(glm::ivec4 mask) {
 
 int OpenGLStates::DepthMask(int mask) {
 	static int current = -1;
+	if (mask < 0)
+		return current;
 	int previous = current;
 	if (current != mask) {        // <-- wichtig: any()
 		current = mask;
@@ -38,16 +40,19 @@ int OpenGLStates::DepthMask(int mask) {
 
 GLenum OpenGLStates::DepthFunc(GLenum func) {
 	static GLenum current = GL_NONE;
-	GLenum previous = current;
-	if (current != func) {
-		current = func;
-		glDepthFunc(current);
+	if (func == GL_NONE)
+		return current;
+		GLenum previous = current;
+		if (current != func) {
+			current = func;
+			glDepthFunc(current);
+		}
 	}
-	return current;
+	return previous;
 }
 
-std::optional<bool> OpenGLStates::BlendFunc(GLenum sFactor, GLenum dFactor) {
-	std::optional<bool> blending = SetBlending(true);
+int OpenGLStates::BlendFunc(GLenum sFactor, GLenum dFactor) {
+	int blending = SetBlending(true);
 	static GLenum sCurrent = GL_NONE;
 	static GLenum dCurrent = GL_NONE;
 	if ((sCurrent != sFactor) or (dCurrent != dFactor)) {

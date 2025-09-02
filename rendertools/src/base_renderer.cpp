@@ -69,7 +69,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
     openGLStates.DepthMask(1);
     openGLStates.SetDepthTest(true);
-    openGLStates.DepthFunc(GL_LESS);
+    openGLStates.DepthFunc(GL_LEQUAL);
     openGLStates.SetBlending(true);
     openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     openGLStates.SetAlphaTest(true);
@@ -80,6 +80,26 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.SetPolygonOffsetFill(false);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glViewport(0, 0, m_windowWidth, m_windowHeight);
+}
+
+
+void BaseRenderer::StartDepthPass(void) noexcept {
+    m_renderPass = RenderPasses::rpDepth;
+    openGLStates.SetDepthTest(true);
+    openGLStates.DepthMask(1);                        // Z schreiben
+    openGLStates.DepthFunc(GL_LESS);                        // normaler Z-Test
+    openGLStates.ColorMask(glm::ivec4(0, 0, 0, 0));
+    openGLStates.SetBlending(false);
+}
+
+
+void BaseRenderer::StartColorPass(void) noexcept {
+    m_renderPass = RenderPasses::rpColor;
+    openGLStates.SetDepthTest(true);
+    openGLStates.DepthMask(0);                        // Z schreiben
+    openGLStates.DepthFunc(GL_LEQUAL);                        // normaler Z-Test
+    openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
+    openGLStates.SetBlending(false);
 }
 
 
@@ -133,8 +153,8 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
-        glDepthFunc(GL_ALWAYS);
-        glDisable(GL_CULL_FACE);
+        openGLStates.DepthFunc(GL_ALWAYS);
+        openGLStates.SetFaceCulling(false);
         SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, true);
         Shader* shader;
         if (not UseCustomSceneShader())
@@ -185,8 +205,8 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            glDepthFunc(GL_ALWAYS);
-            glDisable(GL_CULL_FACE); // required for vertical flipping because that inverts the buffer's winding
+            openGLStates.DepthFunc(GL_ALWAYS);
+            openGLStates.SetFaceCulling(false); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
             glClear(GL_COLOR_BUFFER_BIT);
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);

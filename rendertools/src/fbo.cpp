@@ -337,8 +337,8 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         baseRenderer.Scale(params.scale, -params.scale, 1);
     else if (params.scale != 1.0f)
         baseRenderer.Scale(params.scale, params.scale, 1);
-    GLenum depthFunc = openGLStates.DepthFunc(GL_ALWAYS);
-    auto faceCulling = openGLStates.SetFaceCulling(false);
+    Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
+    Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(false));
     m_viewportArea.SetTexture(source);
     if (params.shader)
         m_viewportArea.Render(params.shader, source);
@@ -358,7 +358,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
             m_viewportArea.Render(color); // texture has been assigned to m_viewportArea above
         //baseShaderHandler.StopShader();
     }
-    openGLStates.SetFaceCulling(Conversions::OptionalValue<bool>(faceCulling, false));
+    openGLStates.SetFaceCulling(faceCulling);
     openGLStates.DepthFunc(depthFunc);
     baseRenderer.PopMatrix();
     if (params.destination > -1)

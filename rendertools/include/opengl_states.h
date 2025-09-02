@@ -30,13 +30,15 @@ public:
 
 
 	template<GLenum stateID>
-	inline std::optional<bool> SetState(bool state) {
-		static std::optional<bool> current;
+	inline int SetState(int state) {
+		static int current = -1;
+		if (state < 0)
+			return current;
 #if 0
 		if (not current.has_value()) {
 			current = (glIsEnabled(stateID) == GL_TRUE); // expensive and not essential
 #endif
-			std::optional<bool> previous = current;
+			int previous = current;
 			if (current != state) {
 				current = state;
 				if (state)
@@ -47,32 +49,32 @@ public:
 			return previous;
 		}
 
-		inline std::optional<bool> SetDepthTest(bool state) { return SetState<GL_DEPTH_TEST>(state); }
+		inline int SetDepthTest(int state) { return SetState<GL_DEPTH_TEST>(state); }
 
-		inline std::optional<bool> SetBlending(bool state) { return SetState<GL_BLEND>(state); }
+		inline int SetBlending(int state) { return SetState<GL_BLEND>(state); }
 
-		inline std::optional<bool> SetFaceCulling(bool state) { return SetState<GL_CULL_FACE>(state); }
+		inline int SetFaceCulling(int state) { return SetState<GL_CULL_FACE>(state); }
 
-		inline std::optional<bool> SetAlphaTest(bool state) { return SetState<GL_ALPHA_TEST>(state); }
+		inline int SetAlphaTest(int state) { return SetState<GL_ALPHA_TEST>(state); }
 
-		inline std::optional<bool> SetScissorTest(bool state) { return SetState<GL_SCISSOR_TEST>(state); }
+		inline int SetScissorTest(int state) { return SetState<GL_SCISSOR_TEST>(state); }
 
-		inline std::optional<bool> SetStencilTest(bool state) { return SetState<GL_STENCIL_TEST>(state); }
+		inline int SetStencilTest(int state) { return SetState<GL_STENCIL_TEST>(state); }
 
-		inline std::optional<bool> SetPolygonOffsetFill(bool state) { return SetState<GL_POLYGON_OFFSET_FILL>(state); }
+		inline int SetPolygonOffsetFill(int state) { return SetState<GL_POLYGON_OFFSET_FILL>(state); }
 
-		inline std::optional<bool> SetDither(bool state) { return SetState<GL_DITHER>(state); }
+		inline int SetDither(int state) { return SetState<GL_DITHER>(state); }
 
-		inline std::optional<bool> SetMultiSample(bool state) { return SetState<GL_MULTISAMPLE>(state); }
+		inline int SetMultiSample(int state) { return SetState<GL_MULTISAMPLE>(state); }
 #if 0 // obsolete
 		template <GLenum typeID>
-		inline std::optional<bool> SetTexture(bool state) { return SetState<typeID>(state); }
+		inline int SetTexture(int state) { return SetState<typeID>(state); }
 
-		inline std::optional<bool> SetTexture2D(bool state) { return SetTexture<GL_TEXTURE_2D>(state); }
+		inline int SetTexture2D(int state) { return SetTexture<GL_TEXTURE_2D>(state); }
 
-		inline std::optional<bool> SetTextureCubemap(bool state) { return SetTexture<GL_TEXTURE_CUBE_MAP>(state); }
+		inline int SetTextureCubemap(int state) { return SetTexture<GL_TEXTURE_CUBE_MAP>(state); }
 
-		inline std::optional<bool> SetTexture(GLenum typeID, bool state) {
+		inline int SetTexture(GLenum typeID, int state) {
 			switch (typeID) {
 			case GL_TEXTURE_2D:         
 				return SetTexture<GL_TEXTURE_2D>(state);
@@ -92,7 +94,7 @@ public:
 
 		GLenum DepthFunc(GLenum func);
 
-		std::optional<bool> BlendFunc(GLenum sfactor, GLenum dfactor);
+		int BlendFunc(GLenum sfactor, GLenum dfactor);
 
 		GLenum FrontFace(GLenum face);
 

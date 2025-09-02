@@ -53,7 +53,7 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod) {
 void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration) {
     if (decoration.HaveOutline()) {
         Shader* shader = baseShaderHandler.SetupShader("outline");
-        if (shader) {
+        if (shader and not renderer.DepthPass()) {
             static ShaderLocationTable locations;
             locations.Start();
             shader->SetFloat("outlineWidth", locations.Current(), decoration.outlineWidth);
