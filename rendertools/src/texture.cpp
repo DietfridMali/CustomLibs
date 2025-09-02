@@ -9,8 +9,8 @@
 
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
 
-TextureBuffer::TextureBuffer(SDL_Surface* source, bool flipVertically) {
-    Create(source, flipVertically);
+TextureBuffer::TextureBuffer(SDL_Surface* source, bool premultiply, bool flipVertically) {
+    Create(source, premultiply, flipVertically);
 }
 
 
@@ -58,7 +58,35 @@ noexcept
 }
 
 
-TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool flipVertically) {
+uint8_t TextureBuffer::Premultiply(uint16_t c, uint16_t a) noexcept {
+    uint8_t r = c % a > (a >> 1); // round up if c % a > a / 2
+    // c = max. alpha * c / a
+    c *= 255;
+    c /= a;
+    return c + r;
+}
+
+
+TextureBuffer& TextureBuffer::Premultiply(void) {
+    if (m_info.format == GL_RGBA) {
+        struct RGBA8 {
+            uint8_t r;
+            uint8_t g;
+            uint8_t b;
+            uint8_t a;
+        };
+        RGBA8* p = reinterpret_cast<RGBA8*>(m_data);
+        for (int i = m_info.dataSize / 4; i; --i, ++p) {
+            uint16_t a = uint16_t (p->a);
+            p->r = Premultiply(uint16_t(p->r), a);
+            p->g = Premultiply(uint16_t(p->g), a);
+            p->b = Premultiply(uint16_t(p->b), a);
+        }
+    }
+}
+
+
+TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool flipVertically) {
     m_info.width = source->w;
     m_info.height = source->h;
     m_info.componentCount = source->pitch / source->w;
@@ -88,6 +116,8 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool flipVertically) {
             memcpy(m_data, source->pixels, m_info.dataSize);
 #endif
         SDL_FreeSurface(source);
+        if (premultiply)
+            Premultiply();
     }
     return *this;
 }
@@ -321,7 +351,7 @@ static void CheckFileOpen(const std::string& path) {
 
 #endif
 
-bool Texture::Load(List<String>& fileNames, bool flipVertically) {
+bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVertically) {
     // load texture from file
     m_filenames = fileNames;
     m_name = fileNames.First();

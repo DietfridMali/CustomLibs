@@ -123,15 +123,19 @@ public:
 
     TextureBuffer(TextureBuffer&& other) noexcept;
 
-    TextureBuffer(SDL_Surface* source, bool flipVertically);
+    TextureBuffer(SDL_Surface* source, bool premultiply, bool flipVertically);
 
     void Reset(void)
         noexcept;
 
-    TextureBuffer& Create(SDL_Surface* source, bool flipVertically);
+    TextureBuffer& Create(SDL_Surface* source, bool premultiply, bool flipVertically);
 
     void FlipSurface(SDL_Surface* source)
         noexcept;
+
+    uint8_t Premultiply(uint16_t c, uint16_t a) noexcept;
+
+    TextureBuffer& Premultiply(void);
 
     TextureBuffer& operator= (const TextureBuffer& other)
         noexcept;
@@ -254,11 +258,11 @@ public:
 
     virtual void Deploy(int bufferIndex = 0) override;
 
-    virtual bool Load(List<String>& fileNames, bool flipVertically) override;
+    virtual bool Load(List<String>& fileNames, bool premultiply = false, bool flipVertically) override;
 
-    bool CreateFromFile(List<String>& fileNames, bool flipVertically = false);
+    bool CreateFromFile(List<String>& fileNames, bool premultiply = false, bool flipVertically = false);
 
-    bool CreateFromSurface(SDL_Surface* surface, bool flipVertically = false);
+    bool CreateFromSurface(SDL_Surface* surface, bool premultiply = false, bool flipVertically = false);
 
     inline size_t TextureCount(void)
         noexcept

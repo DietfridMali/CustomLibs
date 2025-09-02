@@ -107,6 +107,7 @@
     <ClInclude Include="..\include\drawbufferhandler.h" />
     <ClInclude Include="..\include\fbo.h" />
     <ClInclude Include="..\include\framecounter.h" />
+    <ClInclude Include="..\include\gputimer.h" />
     <ClInclude Include="..\include\icosphere.h" />
     <ClInclude Include="..\include\linesegment.h" />
     <ClInclude Include="..\include\mesh.h" />
