@@ -55,7 +55,7 @@ public:
 
     virtual void Disable(int tmuIndex = 0) = 0;
 
-    virtual bool Load(List<String>& fileNames, bool flipVertically = false) = 0;
+    virtual bool Load(List<String>& fileNames, bool premultiply = false, bool flipVertically = false) = 0;
 };
 
 // =================================================================================================
@@ -258,7 +258,7 @@ public:
 
     virtual void Deploy(int bufferIndex = 0) override;
 
-    virtual bool Load(List<String>& fileNames, bool premultiply = false, bool flipVertically) override;
+    virtual bool Load(List<String>& fileNames, bool premultiply = false, bool flipVertically = false) override;
 
     bool CreateFromFile(List<String>& fileNames, bool premultiply = false, bool flipVertically = false);
 

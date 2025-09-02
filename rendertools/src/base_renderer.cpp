@@ -66,14 +66,14 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 
 void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.ClearColor(ColorData::Invisible);
-    openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
+    openGLStates.ColorMask(1, 1, 1, 1);
     openGLStates.DepthMask(1);
     openGLStates.SetDepthTest(true);
     openGLStates.DepthFunc(GL_LEQUAL);
-    openGLStates.SetBlending(true);
+    openGLStates.SetBlending(false);
     //openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    glBlendEquation(GL_FUNC_ADD);
+    openGLStates.BlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    openGLStates.BlendEquation(GL_FUNC_ADD);
     openGLStates.SetAlphaTest(true);
     openGLStates.FrontFace(GL_CW);
     openGLStates.SetFaceCulling(true);
@@ -90,7 +90,7 @@ void BaseRenderer::StartDepthPass(void) noexcept {
     openGLStates.SetDepthTest(true);
     openGLStates.DepthMask(1);                 
     openGLStates.DepthFunc(GL_LESS);                  
-    openGLStates.ColorMask(glm::ivec4(0, 0, 0, 0));
+    openGLStates.ColorMask(0, 0, 0, 0);
     openGLStates.SetBlending(false);
 }
 
@@ -100,7 +100,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
     openGLStates.SetDepthTest(true);
     openGLStates.DepthMask(0);                        
     openGLStates.DepthFunc(GL_LEQUAL);                
-    openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
+    openGLStates.ColorMask(1, 1, 1, 1);
     openGLStates.SetBlending(false);
 }
 
@@ -110,7 +110,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
     openGLStates.SetDepthTest(true);
     openGLStates.DepthMask(1);                        
     openGLStates.DepthFunc(GL_LEQUAL);                
-    openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
+    openGLStates.ColorMask(1, 1, 1, 1);
     openGLStates.SetBlending(false);
 }
 
