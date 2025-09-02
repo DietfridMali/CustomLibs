@@ -46,8 +46,8 @@ GLenum OpenGLStates::DepthFunc(GLenum func) {
 	return current;
 }
 
-void OpenGLStates::BlendFunc(GLenum sFactor, GLenum dFactor) {
-	SetBlending(true);
+std::optional<bool> OpenGLStates::BlendFunc(GLenum sFactor, GLenum dFactor) {
+	std::optional<bool> blending = SetBlending(true);
 	static GLenum sCurrent = GL_NONE;
 	static GLenum dCurrent = GL_NONE;
 	if ((sCurrent != sFactor) or (dCurrent != dFactor)) {
@@ -55,6 +55,7 @@ void OpenGLStates::BlendFunc(GLenum sFactor, GLenum dFactor) {
 		dCurrent = dFactor;
 		glBlendFunc(sFactor, dFactor);
 	}
+	return blending;
 }
 
 GLenum OpenGLStates::OpenGLStates::FrontFace(GLenum face) {

@@ -224,7 +224,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
 void BaseQuad::Fill(const RGBAColor& color) {
     if (not Render(LoadShader(false, color), nullptr, true)) {
         if (baseRenderer.m_legacyMode) {
-            renderer.SetTexture2D(false);
+            openGLStates.SetTexture2D(false);
             glBegin(GL_QUADS);
             glColor4f(color.R(), color.G(), color.B(), color.A());
             glVertex2f(0, 0);

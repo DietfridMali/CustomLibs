@@ -65,19 +65,19 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 
 
 void BaseRenderer::SetupOpenGL(void) noexcept {
-    ClearColor(ColorData::ZERO);
-    glColorMask(ivec4(1, 1, 1, 1));
-    DepthMask(1);
-    SetDepthTest(true);
-    DepthFunc(GL_LESS);
-    SetBlending(true);
-    BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    SetAlphaTest(true);
-    FrontFace(GL_CW);
-    SetFaceCulling(true);
-    CullFace(GL_BACK);
-    SetMultiSample(true);
-    SetPolygonOffsetFill(false);
+    openGLStates.ClearColor(ColorData::Invisible);
+    openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
+    openGLStates.DepthMask(1);
+    openGLStates.SetDepthTest(true);
+    openGLStates.DepthFunc(GL_LESS);
+    openGLStates.SetBlending(true);
+    openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    openGLStates.SetAlphaTest(true);
+    openGLStates.FrontFace(GL_CW);
+    openGLStates.SetFaceCulling(true);
+    openGLStates.CullFace(GL_BACK);
+    openGLStates.openGLStates.SetMultiSample(true);
+    openGLStates.SetPolygonOffsetFill(false);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glViewport(0, 0, m_windowWidth, m_windowHeight);
 }

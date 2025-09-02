@@ -8,6 +8,7 @@
 #include <bit>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 #ifndef M_PI
 #   define M_PI 3.14159265358979323846
@@ -135,6 +136,11 @@ namespace Conversions
         }
 
         return { w, n / w };
+    }
+
+    template <typename T>
+    T OptionalValue(std::optional<T> var, T defVal) {
+        return var.has_value() ? var.value() : defVal;
     }
 };
 

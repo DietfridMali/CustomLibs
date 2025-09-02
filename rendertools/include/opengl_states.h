@@ -77,7 +77,7 @@ public:
 
 		GLenum DepthFunc(GLenum func);
 
-		void BlendFunc(GLenum sfactor, GLenum dfactor);
+		std::optional<bool> BlendFunc(GLenum sfactor, GLenum dfactor);
 
 		GLenum FrontFace(GLenum face);
 
@@ -87,18 +87,18 @@ public:
 
 		template <GLenum typeID>
 		void BindTexture(GLenum tmu, GLuint texture) {
-			static ManagedArray<GLint> binds;
+			static ManagedArray<GLuint> bindings;
 			static GLenum currentTMU = GL_TEXTURE0;
-			if (binds.Length() == 0) {
-				binds.SetAutoFit(true);
-				binds.SetDefaultValue(0);
+			if (bindings.Length() == 0) {
+				bindings.SetAutoFit(true);
+				bindings.SetDefaultValue(0);
 			}
 			if (tmu == GL_NONE)
 				tmu = currentTMU;
 			int i = int(tmu) - int(GL_TEXTURE0);
-			if (binds[i] != texture) {
+			if (bindings[i] != texture) {
 				SetTexture<typeID>(true);
-				binds[i] = texture;
+				bindings[i] = texture;
 				currentTMU = ActiveTexture(tmu);
 				glBindTexture(GL_TEXTURE_2D, texture);
 			}

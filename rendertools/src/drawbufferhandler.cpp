@@ -7,6 +7,7 @@
 #include "conversions.hpp"
 #include "glew.h"
 //#include "quad.h"
+#include "opengl_states.h"
 #include "drawbufferhandler.h"
 
 // =================================================================================================
@@ -72,7 +73,7 @@ void DrawBufferHandler::SetDrawBuffers(FBO* fbo, ManagedArray<GLuint>* drawBuffe
 
 void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
-    openGLStates.BindTexture(GL_TEXTURE0, 0);
+    openGLStates.BindTexture2D(GL_TEXTURE0, 0);
     if (m_drawBufferInfo.m_fbo != nullptr)
         m_drawBufferInfo.m_fbo->Reenable(false, true);
     else

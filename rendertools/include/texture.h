@@ -8,6 +8,7 @@
 #include "conversions.hpp"
 #include "sharedpointer.hpp"
 #include "sharedglhandle.hpp"
+#include "opengl_states.h"
 
 #include "SDL.h"
 #include "SDL_image.h"
@@ -295,6 +296,14 @@ public:
 
     inline String GetName(void) {
         return m_name;
+    }
+
+    template <GLenum typeID>
+    inline static void Release(int tmuIndex)
+        noexcept
+    {
+        openGLStates.BindTexture<typeID>(GL_TEXTURE0 + tmuIndex, 0);
+        openGLStates.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 
     inline bool& HasBuffer(void)
