@@ -36,6 +36,7 @@ public:
 #if defined(_DEBUG)
         if (width * height <= 0)
             throw std::invalid_argument("ManagedArray: invalid width or height arguments (must both be > 0)");
+        Resize(width * height);
 #endif    
     }
 
@@ -210,7 +211,9 @@ public:
         m_array.reserve(static_cast<size_t>(capacity));
     }
 
-    inline bool AllowResize(size_t newSize) const noexcept { return m_isShrinkable or (newSize > static_cast<size_t>(Length())); }
+    inline bool AllowResize(size_t newSize) const noexcept { 
+        return m_isShrinkable or (newSize > static_cast<size_t>(Length())); 
+    }
 
     // Resize-Methoden
     inline DATA_T* Resize(int32_t newSize) {
