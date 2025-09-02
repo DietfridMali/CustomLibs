@@ -36,7 +36,9 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
+    baseRenderer.ClearGLError();
     openGLStates.BindTexture2D(GL_TEXTURE0, bufferInfo.m_handle);
+    baseRenderer.CheckGLError("FBO::CreateBuffer->BindTexture2D");
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

@@ -13,7 +13,22 @@
 class OpenGLStates 
 	: public BaseSingleton<OpenGLStates>
 {
+private:
+	struct textureBindings {
+		GLuint	handles[2]; // texture2D, cubemap
+	};
+
+	ManagedArray<textureBindings> m_bindings;
+
 public:
+	OpenGLStates() {
+		GLint tmuCount = 0;
+		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &tmuCount);
+		m_bindings.Resize(tmuCount);
+		m_bindings.Fill({ 0,0 });
+	}
+
+
 	template<GLenum stateID>
 	inline std::optional<bool> SetState(bool state) {
 		static std::optional<bool> current;
@@ -49,7 +64,7 @@ public:
 		inline std::optional<bool> SetDither(bool state) { return SetState<GL_DITHER>(state); }
 
 		inline std::optional<bool> SetMultiSample(bool state) { return SetState<GL_MULTISAMPLE>(state); }
-
+#if 0 // obsolete
 		template <GLenum typeID>
 		inline std::optional<bool> SetTexture(bool state) { return SetState<typeID>(state); }
 
@@ -68,7 +83,7 @@ public:
 				return std::nullopt; // oder assert/throw
 			}
 		}
-
+#endif
 		RGBAColor ClearColor(RGBAColor color);
 
 		glm::ivec4 ColorMask(glm::ivec4 mask);
@@ -85,25 +100,13 @@ public:
 
 		GLenum ActiveTexture(GLenum tmu);
 
-		template <GLenum typeID>
-		void BindTexture(GLenum tmu, GLuint texture) {
-			static ManagedArray<GLuint> bindings;
-			static GLenum currentTMU = GL_TEXTURE0;
-			if (bindings.Length() == 0) {
-				bindings.SetAutoFit(true);
-				bindings.SetDefaultValue(0);
-			}
-			if (tmu == GL_NONE)
-				tmu = currentTMU;
-			int i = int(tmu) - int(GL_TEXTURE0);
-			if (bindings[i] != texture) {
-				SetTexture<typeID>(true);
-				bindings[i] = texture;
-				currentTMU = ActiveTexture(tmu);
-				glBindTexture(GL_TEXTURE_2D, texture);
-			}
-		}
+		void BindTexture(GLenum typeID, GLenum tmu, GLuint texture);
 
+		template <GLenum typeID>
+		inline void BindTexture(GLenum tmu, GLuint texture) {
+			BindTexture(typeID, tmu, texture);
+		}
+#if 0
 		inline void BindTexture(GLenum typeID, GLenum tmu, GLuint texture) {
 			switch (typeID) {
 			case GL_TEXTURE_2D:
@@ -116,7 +119,7 @@ public:
 				; // oder assert/throw
 			}
 		}
-
+#endif
 		inline void BindTexture2D(GLenum tmu, GLuint texture) {
 			BindTexture<GL_TEXTURE_2D>(tmu, texture);
 		}

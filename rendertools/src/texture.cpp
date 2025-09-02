@@ -232,7 +232,7 @@ void Texture::SetParams(void)
 {
     if (m_useMipMaps) {
         glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
-        glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR); //GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
     else {
@@ -253,7 +253,7 @@ noexcept
 
 bool Texture::Enable(int tmuIndex)
 {
-    if (not Bind(GL_TEXTURE0 + tmuIndex))
+    if (not Bind(tmuIndex))
         return false;
     SetParams();
     Wrap();
@@ -264,7 +264,7 @@ bool Texture::Enable(int tmuIndex)
 void Texture::Disable(int tmuIndex)
 {
     Release(tmuIndex);
-    openGLStates.SetTexture(m_type, false);
+    //openGLStates.SetTexture(m_type, false);
 }
 
 

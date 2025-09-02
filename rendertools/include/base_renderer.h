@@ -50,11 +50,12 @@ protected:
 
     RGBAColor               m_backgroundColor;
 
-    GLVersion               m_glVersion;
     MovingFrameCounter      m_frameCounter;
 
     static List<::Viewport> viewportStack;
 public:
+    GLVersion               m_glVersion;
+
     BaseRenderer()
         : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
         , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f)

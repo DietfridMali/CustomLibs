@@ -26,7 +26,7 @@ public:
     Matrix4f    m_glModelView[3];
 
     static List<Matrix4f> matrixStack;
-    static bool           m_legacyMode;
+    static bool           LegacyMode;
 
     RenderMatrices() noexcept {}
 

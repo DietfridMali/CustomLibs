@@ -4,9 +4,9 @@
 #define DEBUG_MATRICES 0
 
 #if DEBUG_MATRICES
-bool RenderMatrices::m_legacyMode = false;
+bool RenderMatrices::LegacyMode = false;
 #else
-bool RenderMatrices::m_legacyMode = false;
+bool RenderMatrices::LegacyMode = false;
 #endif
 
 List<Matrix4f> RenderMatrices::matrixStack;
@@ -29,7 +29,7 @@ void RenderMatrices::CreateMatrices(int windowWidth, int windowHeight, float asp
 
 
 void RenderMatrices::SetupTransformation(void) noexcept {
-    if (DEBUG_MATRICES or m_legacyMode) {
+    if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode(GL_PROJECTION);
         glLoadMatrixf(m_renderMatrices[mtProjection3D].AsArray()); // already column major
         glMatrixMode(GL_MODELVIEW);
@@ -49,7 +49,7 @@ void RenderMatrices::ResetTransformation(void) noexcept {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "resetting transformation\n");
 #endif
-    if (DEBUG_MATRICES or m_legacyMode) {
+    if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
@@ -107,7 +107,7 @@ Matrix4f& RenderMatrices::Scale(float xScale, float yScale, float zScale, const 
     m = ModelView().IsColMajor() ? ModelView() : ModelView().Transpose(m, 3);
     CheckModelView();
 #endif
-    if (DEBUG_MATRICES or m_legacyMode)
+    if (DEBUG_MATRICES or LegacyMode)
         glScalef(xScale, yScale, zScale);
 #if !DEBUG_MATRICES
     else
@@ -130,7 +130,7 @@ Matrix4f& RenderMatrices::Translate(float xTranslate, float yTranslate, float zT
     Matrix4f m;
     m = ModelView().IsColMajor() ? ModelView() : ModelView().Transpose(m, 3);
 #endif
-    if (DEBUG_MATRICES or m_legacyMode) {
+    if (DEBUG_MATRICES or LegacyMode) {
         glTranslatef(xTranslate, yTranslate, zTranslate);
     }
 #if !DEBUG_MATRICES
@@ -162,7 +162,7 @@ Matrix4f& RenderMatrices::Rotate(float angle, float xScale, float yScale, float 
     Matrix4f m = ModelView();
     CheckModelView();
 #endif
-    if (DEBUG_MATRICES or m_legacyMode)
+    if (DEBUG_MATRICES or LegacyMode)
         glRotatef(angle, xScale, yScale, zScale);
 #if !DEBUG_MATRICES
     else
@@ -187,7 +187,7 @@ Matrix4f& RenderMatrices::Rotate(Matrix4f& r) noexcept {
     Matrix4f m = ModelView();
     CheckModelView();
 #endif
-    if (DEBUG_MATRICES or m_legacyMode)
+    if (DEBUG_MATRICES or LegacyMode)
         glMultMatrixf(r.AsArray());
 #if !DEBUG_MATRICES
     else
@@ -217,7 +217,7 @@ void RenderMatrices::PushMatrix(eMatrixType matrixType) {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "PushMatrix\n");
 #endif
-    if (DEBUG_MATRICES or m_legacyMode) {
+    if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode((matrixType == mtModelView) ? GL_MODELVIEW : GL_PROJECTION);
         glPushMatrix();
     }
@@ -234,7 +234,7 @@ void RenderMatrices::PopMatrix(eMatrixType matrixType) {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "PopMatrix\n");
 #endif
-    if (DEBUG_MATRICES or m_legacyMode) {
+    if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode((matrixType == mtModelView) ? GL_MODELVIEW : GL_PROJECTION);
         glPopMatrix();
     }

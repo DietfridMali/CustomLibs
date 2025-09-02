@@ -203,7 +203,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
         return true;
         }
 
-    if (baseRenderer.m_legacyMode) {
+    if (baseRenderer.LegacyMode) {
         if (texture and texture->Enable()) {
             openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glBegin(GL_QUADS);
@@ -223,8 +223,8 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
 // fill 2D area defined by x and y components of vertices with color color
 void BaseQuad::Fill(const RGBAColor& color) {
     if (not Render(LoadShader(false, color), nullptr, true)) {
-        if (baseRenderer.m_legacyMode) {
-            openGLStates.SetTexture2D(false);
+        if (baseRenderer.LegacyMode) {
+            //openGLStates.SetTexture2D(false);
             glBegin(GL_QUADS);
             glColor4f(color.R(), color.G(), color.B(), color.A());
             glVertex2f(0, 0);

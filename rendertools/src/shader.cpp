@@ -84,7 +84,7 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
 void Shader::UpdateMatrices(void) {
     m_locations.Start();
     float glData[16];
-    if (RenderMatrices::m_legacyMode) {
+    if (RenderMatrices::LegacyMode) {
         SetMatrix4f("mModelView", m_locations.Current(), GetFloatData(GL_MODELVIEW_MATRIX, 16, glData));
         SetMatrix4f("mProjection", m_locations.Current(), GetFloatData(GL_PROJECTION_MATRIX, 16, glData));
     }
