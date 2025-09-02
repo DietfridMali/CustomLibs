@@ -109,7 +109,7 @@ public:
 
     void Disable(void);
 
-    void SetViewport(void)
+    void SetViewport(bool flipVertically = false)
         noexcept;
 
     void Fill(RGBAColor color);

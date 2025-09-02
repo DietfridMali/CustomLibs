@@ -313,8 +313,8 @@ void FBO::ReleaseBuffers(void) {
 }
 
 
-void FBO::SetViewport(void) noexcept {
-    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), false);
+void FBO::SetViewport(bool flipVertically) noexcept {
+    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
 }
 
 
