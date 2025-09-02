@@ -35,7 +35,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
-    baseRenderer.BindTexture(GL_TEXTURE0, bufferInfo.m_handle);
+    openGLStates.BindTexture(GL_TEXTURE0, bufferInfo.m_handle);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -54,7 +54,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
             break;
     }
-    baseRenderer.BindTexture(GL_TEXTURE0, 0);
+    openGLStates.BindTexture(GL_TEXTURE0, 0);
     ++m_bufferCount;
 }
 
@@ -210,7 +210,7 @@ void FBO::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
         return false;
-    baseRenderer.BindTexture(GL_TEXTURE0, 0);
+    openGLStates.BindTexture(GL_TEXTURE0, 0);
     if (reenable)
         glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
     else
@@ -252,7 +252,7 @@ bool FBO::ReattachBuffers(void) {
 bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
-    baseRenderer.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
+    openGLStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
     Clear(bufferIndex, drawBufferGroup, clear);
     return baseRenderer.CheckGLError();
 }
@@ -291,10 +291,10 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
     for (int i = 0; i < m_bufferCount; ++i)
         if ((i != bufferIndex) and (m_bufferInfo[i].m_tmuIndex == tmuIndex))
             m_bufferInfo[i].m_tmuIndex = -1;
-    baseRenderer.BindTexture(GL_TEXTURE0 + tmuIndex, m_bufferInfo[bufferIndex].m_handle);
-    baseRenderer.CheckGLError("FBO::BindBuffer");
+    openGLStates.BindTexture(GL_TEXTURE0 + tmuIndex, m_bufferInfo[bufferIndex].m_handle);
+    openGLStates.CheckGLError("FBO::BindBuffer");
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
-    baseRenderer.ActiveTexture(GL_TEXTURE0); // always reset!
+    openGLStates.ActiveTexture(GL_TEXTURE0); // always reset!
     return true;
 }
 
@@ -319,11 +319,10 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         if (not Enable(params.destination, FBO::dbSingle, params.clearBuffer))
             return false;
         m_lastDestination = params.destination;
-        baseRenderer.SetBlending(false);
+        openGLStates.SetBlending(false);
     }
     else { // rendering to the current render target
-        baseRenderer.SetBlending(true);
-        baseRenderer.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     }
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0);
@@ -335,8 +334,8 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         baseRenderer.Scale(params.scale, -params.scale, 1);
     else if (params.scale != 1.0f)
         baseRenderer.Scale(params.scale, params.scale, 1);
-    GLenum depthFunc = baseRenderer.DepthFunc(GL_ALWAYS);
-    bool faceCulling = baseRenderer.SetFaceCulling(false);
+    GLenum depthFunc = openGLStates.DepthFunc(GL_ALWAYS);
+    bool faceCulling = openGLStates.SetFaceCulling(false);
     m_viewportArea.SetTexture(source);
     if (params.shader)
         m_viewportArea.Render(params.shader, source);
@@ -356,8 +355,8 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
             m_viewportArea.Render(color); // texture has been assigned to m_viewportArea above
         //baseShaderHandler.StopShader();
     }
-    baseRenderer.SetFaceCulling(faceCulling);
-    baseRenderer.DepthFunc(depthFunc);
+    openGLStates.SetFaceCulling(faceCulling);
+    openGLStates.DepthFunc(depthFunc);
     baseRenderer.PopMatrix();
     if (params.destination > -1)
         Disable();

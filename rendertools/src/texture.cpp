@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "texture.h"
 #include "SDL_image.h"
+#include "opengl_states.h"
 
 // =================================================================================================
 
@@ -210,18 +211,20 @@ bool Texture::Bind(int tmuIndex)
     if (not IsAvailable())
         return false;
 #if USE_SHARED_HANDLES
-    baseRenderer.BindTexture<m_type>(GL_TEXTURE0 + tmuIndex, m_handle.get());
+    openGLStates.BindTexture(m_type, GL_TEXTURE0 + tmuIndex, m_handle.get());
 #else
-    baseRenderer.BindTexture<m_type>(GL_TEXTURE0 + tmuIndex, m_handle);
+    openGLStates.BindTexture(m_type, GL_TEXTURE0 + tmuIndex, m_handle);
 #endif
     return true;
 }
 
 
-void Texture::Release(int tmu)
+void Texture::Release(int tmuIndex)
 {
-    if (IsAvailable())
-        baseRenderer.BindTexture<m_type>(GL_TEXTURE0 + tmuIndex, 0);
+    if (IsAvailable()) {
+        openGLStates.BindTexture(m_type, GL_TEXTURE0 + tmuIndex, 0);
+        openGLStates.ActiveTexture(GL_TEXTURE0);
+    }
 }
 
 
@@ -261,7 +264,7 @@ bool Texture::Enable(int tmuIndex)
 void Texture::Disable(int tmuIndex)
 {
     Release(tmuIndex);
-    baseRenderer.SetState<m_type>(false);
+    openGLStates.SetTexture(m_type, false);
 }
 
 

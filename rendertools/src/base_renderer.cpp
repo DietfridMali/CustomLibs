@@ -257,6 +257,4 @@ bool BaseRenderer::CheckGLError(const char* operation) noexcept {
 #endif
 }
 
-BaseRenderer* baseRendererInstance = nullptr;
-
 // =================================================================================================

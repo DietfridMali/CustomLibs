@@ -171,7 +171,7 @@ public:
     String                  m_name;
     List<TextureBuffer*>    m_buffers;
     List<String>            m_filenames;
-    int                     m_type;
+    GLenum                  m_type;
     int                     m_wrapMode;
     int                     m_useMipMaps;
     bool                    m_hasBuffer;
@@ -301,13 +301,6 @@ public:
         noexcept
     {
         return m_hasBuffer;
-    }
-
-    inline static void Release(int tmuIndex)
-        noexcept
-    {
-        renderer.BindTexture2D(GL_TEXTURE0 + tmuIndex, 0);
-        renderer.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 
     static tRenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)

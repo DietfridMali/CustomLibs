@@ -21,7 +21,6 @@
 class BaseRenderer
     : public RenderMatrices
     , public DrawBufferHandler
-    , public OpenGLStates
     , public PolymorphSingleton<BaseRenderer>
 {
 public:

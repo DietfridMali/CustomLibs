@@ -5,11 +5,14 @@
 #include "glew.h"
 #include <glm/glm.hpp>
 #include "array.hpp"
+#include "singletonbase.hpp"
 #include "colordata.h"
 
 // =================================================================================================
 
-class OpenGLStates {
+class OpenGLStates 
+	: public BaseSingleton<OpenGLStates>
+{
 public:
 	template<GLenum stateID>
 	inline std::optional<bool> SetState(bool state) {
@@ -54,6 +57,18 @@ public:
 
 		inline std::optional<bool> SetTextureCubemap(bool state) { return SetTexture<GL_TEXTURE_CUBE_MAP>(state); }
 
+		inline std::optional<bool> SetTexture(GLenum typeID, bool state) {
+			switch (typeID) {
+			case GL_TEXTURE_2D:         
+				return SetTexture<GL_TEXTURE_2D>(state);
+			case GL_TEXTURE_CUBE_MAP:   
+				return SetTexture<GL_TEXTURE_CUBE_MAP>(state);
+				// weitere Targets nach Bedarf ...
+			default:                    
+				return std::nullopt; // oder assert/throw
+			}
+		}
+
 		RGBAColor ClearColor(RGBAColor color);
 
 		glm::ivec4 ColorMask(glm::ivec4 mask);
@@ -71,7 +86,7 @@ public:
 		GLenum ActiveTexture(GLenum tmu);
 
 		template <GLenum typeID>
-		void BindTexture(GLenum tmu, GLint texture) {
+		void BindTexture(GLenum tmu, GLuint texture) {
 			static ManagedArray<GLint> binds;
 			static GLenum currentTMU = GL_TEXTURE0;
 			if (binds.Length() == 0) {
@@ -89,13 +104,28 @@ public:
 			}
 		}
 
-		inline void BindTexture2D(GLenum tmu, GLint texture) {
+		inline void BindTexture(GLenum typeID, GLenum tmu, GLuint texture) {
+			switch (typeID) {
+			case GL_TEXTURE_2D:
+				BindTexture<GL_TEXTURE_2D>(tmu, texture);
+				break;
+			case GL_TEXTURE_CUBE_MAP:
+				BindTexture<GL_TEXTURE_CUBE_MAP>(tmu, texture);
+				break;
+			default:
+				; // oder assert/throw
+			}
+		}
+
+		inline void BindTexture2D(GLenum tmu, GLuint texture) {
 			BindTexture<GL_TEXTURE_2D>(tmu, texture);
 		}
 
-		inline void BindCubemap(GLenum tmu, GLint texture) {
+		inline void BindCubemap(GLenum tmu, GLuint texture) {
 			BindTexture<GL_TEXTURE_CUBE_MAP>(tmu, texture);
 		}
 	};
+
+#define openGLStates OpenGLStates::Instance()
 
 	// =================================================================================================
