@@ -9,6 +9,7 @@ const ShaderSource& DepthShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
 const ShaderSource& GrayScaleShader();
+const ShaderSource& TintAndBlurShader();
 const ShaderSource& OutlineShader();
 const ShaderSource& BoxBlurShader();
 const ShaderSource& FxaaShader();
@@ -22,6 +23,7 @@ BaseShaderCode::BaseShaderCode() {
         &PlainColorShader(),
         &PlainTextureShader(),
         &GrayScaleShader(),
+        &TintAndBlurShader(),
         &OutlineShader(),
         &BoxBlurShader(),
         &FxaaShader(),

@@ -57,6 +57,18 @@ public:
     inline bool IsVisible(void) {
         return A() > 0.0f;
     }
+
+    RGBAColor Premultiplied(void) const {
+        return (A() < 1.0f) ? RGBAColor (R() * A(), G() * A(), B() * A(), A()) : *this;
+    }
+
+    static RGBAColor& Premultiply(RGBAColor& color) {
+        if (color.A() < 1.0f) {
+            color.R() *= color.A();
+            color.G() *= color.A();
+            color.B() *= color.A();
+        }
+    }
 };
 
 

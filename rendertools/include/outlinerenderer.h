@@ -21,9 +21,9 @@ public:
         inline bool ApplyAA() const { return aaMethod.ApplyAA(); };
     };
 
-    void AntiAlias(FBO* fbo, const AAMethod& aaMethod);
+    void AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premultiply = false);
 
-    void RenderOutline(FBO* fbo, const Decoration& decoration);
+    void RenderOutline(FBO* fbo, const Decoration& decoration, bool premultiply = false);
 };
 
 // =================================================================================================

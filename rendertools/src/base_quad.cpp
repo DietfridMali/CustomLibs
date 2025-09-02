@@ -147,7 +147,13 @@ Shader* BaseQuad::LoadShader(bool useTexture, const RGBAColor& color) {
     if (shader and not baseRenderer.DepthPass()) {
         ShaderLocationTable& locations = shaderLocations[shaderId];
         locations.Start();
-        shader->SetVector4f("surfaceColor", locations.Current(), color);
+        if (shaderId == 1) 
+            shader->SetVector4f("surfaceColor", locations.Current(), m_premultiply ? color.Premultiplied() : color);
+        else {
+            shader->SetVector4f("surfaceColor", locations.Current(), color);
+            shader->SetFloat("premultiply", locations.Current(), m_premultiply ? 1.0f : 0.0f);
+        }
+        m_premultiply = false; // has to be set explicitly every time BaseQuad::Render() is called and premult. is required
     }
     return shader;
 }
@@ -159,7 +165,7 @@ void BaseQuad::Render(RGBAColor color) {
         //baseShaderHandler.StopShader();
     }
     else if (m_texture->Enable()) {
-        openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        openGLStates.SetBlending(true);
         glBegin(GL_QUADS);
         for (auto& v : m_vertexBuffer.m_appData) {
             glColor4f(color.R(), color.G(), color.B(), color.A());
@@ -205,7 +211,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
 
     if (baseRenderer.LegacyMode) {
         if (texture and texture->Enable()) {
-            openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            openGLStates.SetBlending(true);
             glBegin(GL_QUADS);
             for (auto& v : m_vertexBuffer.m_appData) {
                 glColor4f(1, 1, 1, 1);

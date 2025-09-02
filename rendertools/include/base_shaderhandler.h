@@ -24,7 +24,7 @@ public:
     {
 #if 0
         List<String> filenames = { appData->textureFolder + "graynoise.png" };
-        m_grayNoise.CreateFromFile(filenames, appData->flipImagesVertically);
+        m_grayNoise.CreateFromFile(filenames, false, appData->flipImagesVertically);
 #endif
         ComputeGaussKernels(); // kann allozieren -> nicht noexcept markieren
     }

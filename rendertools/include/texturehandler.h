@@ -55,21 +55,21 @@ public:
     TextureList Create(String textureFolder, List<String>& textureNames, GLenum textureType);
 #endif
 
-    TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture);
+    TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, bool premultiply = false);
 
-    inline TextureList CreateStandardTextures(String textureFolder, List<String>& textureNames) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetStandardTexture(); });
+    inline TextureList CreateStandardTextures(String textureFolder, List<String>& textureNames, bool premultiply = false) {
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetStandardTexture(); }, premultiply);
     }
 
-    TextureList CreateTiledTextures(String textureFolder, List<String>& textureNames) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetTiledTexture(); });
+    TextureList CreateTiledTextures(String textureFolder, List<String>& textureNames, bool premultiply = false) {
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetTiledTexture(); }, premultiply);
     }
 
-    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetCubemap(); });
+    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames, bool premultiply = false) {
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetCubemap(); }, premultiply);
     }
 
-    TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType);
+    TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, bool premultiply = false);
 
 };
 

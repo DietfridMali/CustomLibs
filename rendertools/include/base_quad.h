@@ -35,6 +35,7 @@ public:
     float                   m_aspectRatio;
     float                   m_offset;
     bool                    m_isAvailable;
+    bool                    m_premultiply;
     TransformationParams    m_transformations;
 
     typedef enum {
@@ -55,12 +56,12 @@ public:
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()
-        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false)
+        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false), m_premultiply(false)
     {
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], Texture* texture = nullptr, RGBAColor color = ColorData::White)
-        : Plane(vertices), m_texture(texture), m_color(color), m_isAvailable(true), m_offset(0)
+        : Plane(vertices), m_texture(texture), m_color(color), m_offset(0), m_isAvailable(true), m_premultiply(false)
     {
         Setup(vertices, texCoords, texture, color/*, borderWidth*/);
     }
@@ -133,6 +134,10 @@ public:
 
     inline void ClearTransformations(void) {
         m_transformations.Clear();
+    }
+
+    inline bool Premultiply(void) {
+        m_premultiply = true;
     }
 
     ~BaseQuad() {

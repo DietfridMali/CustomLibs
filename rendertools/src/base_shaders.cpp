@@ -36,7 +36,9 @@ const ShaderSource& PlainColorShader() {
         #version 330
         uniform vec4 surfaceColor;
         out vec4 fragColor;
-        void main() { fragColor = surfaceColor; }
+        void main() { 
+            fragColor = surfaceColor; 
+        }
         )"
         );
     return shader;
@@ -46,6 +48,33 @@ const ShaderSource& PlainColorShader() {
 const ShaderSource& GrayScaleShader() {
     static const ShaderSource shader(
         "grayScale",
+        Standard2DVS(),
+        R"(
+        #version 330 core
+        // Für OpenGL ES 3.0 statt dessen:
+        // #version 300 es
+        // precision mediump float;
+
+        uniform sampler2D source;
+        in vec2 fragTexCoord;
+        out vec4 fragColor;
+        uniform float brightness;
+        void main() {
+            vec4 texColor = texture(source, fragTexCoord);
+            // Rec.601 Luminanzgewichte in Gamma-Space
+            float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+            gray *= brightness;
+            fragColor = vec4(gray.rgb, texColor.a);
+        }
+        )" 
+        );
+    return shader;
+}
+
+
+const ShaderSource& TintAndBlurShader() {
+    static const ShaderSource shader(
+        "tintAndBlur",
         Standard2DVS(),
         R"(
         #version 330 core
@@ -150,11 +179,11 @@ const ShaderSource& GrayScaleShader() {
             gray = clamp(gray, 0.0, 1.0);
             gray = pow(gray, 1.0 / gamma);
             gray *= brightness;
-            vec3 finalRgb = mix(vec3(gray), tint.rgb * gray, tint.a);
-            fragColor = vec4(finalRgb, texColor.a);
+            vec3 finalRGB = mix(vec3(gray), tint.rgb * gray, tint.a);
+            fragColor = vec4(finalRGB, texColor.a);
         }
-        )" 
-        );
+        )"
+    );
     return shader;
 }
 
@@ -170,6 +199,7 @@ const ShaderSource& PlainTextureShader() {
         #version 330
         uniform sampler2D source;
         uniform vec4 surfaceColor;
+        uniform float premultiply;
         in vec3 fragPos;
         in vec2 fragTexCoord;
 
@@ -179,7 +209,7 @@ const ShaderSource& PlainTextureShader() {
             vec4 texColor = texture (source, fragTexCoord);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
-            fragColor = vec4 (texColor.rgb * surfaceColor.rgb, a);
+            fragColor = vec4 (texColor.rgb * surfaceColor.rgb * mix (1.0, a, premultiply), a);
             }
     )"
     );

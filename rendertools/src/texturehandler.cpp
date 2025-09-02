@@ -30,7 +30,7 @@ TextureList TextureHandler::Create(String textureFolder, List<String>& textureNa
 }
 #endif
 
-TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture) {
+TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, bool premultiply) {
     TextureList textures;
     for (auto& n : textureNames) {
         Texture* t = getTexture();
@@ -39,15 +39,15 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
         textures.Append(t);
         List<String> fileNames; // must be local here so it gets reset every loop iteration
         fileNames.Append(textureFolder + n);
-        if (not t->CreateFromFile(fileNames))
+        if (not t->CreateFromFile(fileNames, premultiply))
             break;
     }
     return textures;
 }
 
 
-TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType) {
-    return CreateTextures(textureFolder, textureNames, [&]() { return (textureType == GL_TEXTURE_CUBE_MAP) ? GetCubemap() : GetStandardTexture(); });
+TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, bool premultiply) {
+    return CreateTextures(textureFolder, textureNames, [&]() { return (textureType == GL_TEXTURE_CUBE_MAP) ? GetCubemap() : GetStandardTexture(); }, premultiply);
 }
 
 // =================================================================================================

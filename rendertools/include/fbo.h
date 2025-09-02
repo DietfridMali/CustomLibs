@@ -83,6 +83,7 @@ public:
         int source = 0;
         int destination = -1;
         bool clearBuffer = true;
+        bool premultiply = false;
         int flipVertically = 0; // -1: flip, 1: don't flip, 0: renderer decides
         float rotation = 0.0f; 
         float scale = 1.0f;

@@ -326,7 +326,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         openGLStates.SetBlending(false);
     }
     else { // rendering to the current render target
-        openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        openGLStates.SetBlending(true);
     }
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0);
@@ -356,7 +356,11 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         }
         else
 #endif
+        {
+            if (params.premultiply)
+                m_viewportArea.Premultiply();
             m_viewportArea.Render(color); // texture has been assigned to m_viewportArea above
+        }
         //baseShaderHandler.StopShader();
     }
     openGLStates.SetFaceCulling(faceCulling);

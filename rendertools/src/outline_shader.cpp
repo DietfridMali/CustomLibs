@@ -18,6 +18,7 @@ const ShaderSource& OutlineShader() {
             uniform sampler2D source;
             uniform vec4 outlineColor;
             uniform float outlineWidth;
+            uniform float premultiply;
             void main() {
                 vec4 color = texture(source, fragTexCoord);
                 if (color.a > 0.0) {
@@ -31,14 +32,13 @@ const ShaderSource& OutlineShader() {
                 for (int x = r; x >= 0; x--, dx -= texelSize.x) {
                     float dy = outlineWidth * texelSize.y;
                     for (int y = r; y >= 0; y--, dy -= texelSize.y) {
-                        float a;
-                        a = texture(source, fragTexCoord + vec2(-dx, -dy)).a; if (a > alpha) alpha = a;
-                        a = texture(source, fragTexCoord + vec2(-dx,  dy)).a; if (a > alpha) alpha = a;
-                        a = texture(source, fragTexCoord + vec2( dx,  dy)).a; if (a > alpha) alpha = a;
-                        a = texture(source, fragTexCoord + vec2( dx, -dy)).a; if (a > alpha) alpha = a;
+                        alpha = max(alpha, texture(source, fragTexCoord + vec2(-dx, -dy)).a);
+                        alpha = max(alpha, texture(source, fragTexCoord + vec2(-dx,  dy)).a);
+                        alpha = max(alpha, texture(source, fragTexCoord + vec2( dx,  dy)).a);
+                        alpha = max(alpha, texture(source, fragTexCoord + vec2( dx, -dy)).a);
                         }
                     }
-                fragColor = (alpha > 0.0) ? vec4(outlineColor.rgb, alpha) : vec4(0.0);
+                fragColor = (alpha > 0.0) ? vec4(outlineColor.rgb * mix(1.0, alpha, premultiply), alpha) : vec4(0.0);
                 }
             )"
     );

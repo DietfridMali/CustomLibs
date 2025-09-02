@@ -18,7 +18,7 @@
 
 #define AUTORENDER 0
 
-void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod) {
+void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premultiply) {
     static ShaderLocationTable locations;
     if (aaMethod.ApplyAA()) {
         FBO::FBORenderParams params = { .clearBuffer = true, .scale = 1.0f };
@@ -28,6 +28,7 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod) {
         BaseRenderer::ClearGLError();
         locations.Start();
         params.shader->SetFloat("offset", locations.Current(), 0.5f);
+        params.shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
         if (aaMethod.method != "gaussblur")
             fbo->AutoRender(params);
         else {
@@ -51,7 +52,7 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod) {
 }
 
 
-void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration) {
+void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool premultiply) {
     if (decoration.HaveOutline()) {
         Shader* shader = baseShaderHandler.SetupShader("outline");
         if (shader and not baseRenderer.DepthPass()) {
@@ -60,6 +61,7 @@ void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration) {
             shader->SetFloat("outlineWidth", locations.Current(), decoration.outlineWidth);
             shader->SetVector4f("outlineColor", locations.Current(), decoration.outlineColor);
             shader->SetFloat("offset", locations.Current(), 0.5f);
+            shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
             fbo->AutoRender({ .clearBuffer = true, .shader = shader });
         }
         //baseShaderHandler.StopShader();
