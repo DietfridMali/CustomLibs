@@ -1,6 +1,8 @@
 #pragma once
 
 #include <optional>
+#include <tuple>
+#include <utility>
 
 #include "glew.h"
 #include <glm/glm.hpp>
@@ -86,21 +88,79 @@ public:
 			}
 		}
 #endif
-		RGBAColor ClearColor(RGBAColor color);
+		template <typename STATE_T, STATE_T None, class FUNC_T>
+		STATE_T FuncState(STATE_T state, FUNC_T&& glFunc) {
+			static STATE_T current = None;
+			if (state == None) 
+				return current; 
+			STATE_T previous = current;
+			if (current != state) { 
+				current = state; 
+				std::forward<FUNC_T>(glFunc) (state);
+			} 
+			return previous; 
+		}
 
-		glm::ivec4 ColorMask(glm::ivec4 mask);
+		template<class F, class... Args>
+		auto FuncState(const std::tuple<Args...>& state, F&& glFunc)
+			-> std::tuple<Args...>
+		{
+			static bool initialized = false;
+			static std::tuple<Args...> current;
 
-		int DepthMask(int mask);
+			auto previous = current;
+			if (not initialized or (current != state)) {
+				initialized = true;
+				current = state;
+				std::apply(std::forward<F>(glFunc), state); // ruft GL-Funktion mit Args...
+			}
+			return previous;
+		}
 
-		GLenum DepthFunc(GLenum func);
+		inline GLenum DepthFunc(GLenum state) {
+			return FuncState<GLenum, GL_NONE>(state, glDepthFunc);
+		}
 
-		int BlendFunc(GLenum sfactor, GLenum dfactor);
+		inline GLenum BlendEquation(GLenum state) {
+			return FuncState<GLenum, GL_NONE>(state, glBlendEquation);
+		}
 
-		GLenum FrontFace(GLenum face);
+		inline GLenum FrontFace(GLenum state) {
+			return FuncState<GLenum, GL_NONE>(state, glFrontFace);
+		}
 
-		GLenum CullFace(GLenum face);
+		inline GLenum CullFace(GLenum state) {
+			return FuncState<GLenum, GL_NONE>(state, glCullFace);
+		}
 
-		GLenum ActiveTexture(GLenum tmu);
+		inline GLenum ActiveTexture(GLenum state) {
+			return FuncState<GLenum, GL_NONE>(state, glActiveTexture);
+		}
+
+		inline int DepthMask(int state) {
+			return FuncState<int, -1>(state, glDepthMask);
+		}
+
+		inline std::tuple<int, int, int, int>ColorMask(int r, int g, int b, int a) {
+			return FuncState(std::make_tuple(r, g, b, a), glColorMask);
+		}
+
+		inline std::tuple<float, float, float, float>ClearColor(float r, float g, float b, float a) {
+			return FuncState(std::make_tuple(r, g, b, a), glClearColor);
+		}
+
+		inline RGBAColor ClearColor(RGBAColor color) {
+			auto t = ClearColor(color.R(), color.G(), color.B(), color.A());
+			return RGBAColor{ std::get<0>(t), std::get<1>(t), std::get<2>(t), std::get<3>(t) };
+		}
+
+		inline std::tuple<GLenum, GLenum> BlendFunc(GLenum sFactor, GLenum dFactor) {
+			return FuncState(std::make_tuple(sFactor, dFactor), glBlendFunc);
+		}
+
+		inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA) {
+			return FuncState(std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
+		}
 
 		void BindTexture(GLenum typeID, GLenum tmu, GLuint texture);
 

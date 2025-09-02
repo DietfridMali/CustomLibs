@@ -61,14 +61,14 @@ noexcept
 uint8_t TextureBuffer::Premultiply(uint16_t c, uint16_t a) noexcept {
     uint8_t r = c % a > (a >> 1); // round up if c % a > a / 2
     // c = max. alpha * c / a
-    c *= 255;
-    c /= a;
-    return c + r;
+    c *= a;
+    c += 128;
+    return (uint8_t)((c + (c >> 8)) >> 8);
 }
 
 
-TextureBuffer& TextureBuffer::Premultiply(void) {
-    if (m_info.format == GL_RGBA) {
+void TextureBuffer::Premultiply(void) {
+    if (m_info.format == GL_RGBA8) {
         struct RGBA8 {
             uint8_t r;
             uint8_t g;

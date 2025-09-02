@@ -135,7 +135,7 @@ public:
 
     uint8_t Premultiply(uint16_t c, uint16_t a) noexcept;
 
-    TextureBuffer& Premultiply(void);
+    void Premultiply(void);
 
     TextureBuffer& operator= (const TextureBuffer& other)
         noexcept;

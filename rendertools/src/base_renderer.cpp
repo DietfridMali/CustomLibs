@@ -71,7 +71,9 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.SetDepthTest(true);
     openGLStates.DepthFunc(GL_LEQUAL);
     openGLStates.SetBlending(true);
-    openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    //openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendEquation(GL_FUNC_ADD);
     openGLStates.SetAlphaTest(true);
     openGLStates.FrontFace(GL_CW);
     openGLStates.SetFaceCulling(true);
