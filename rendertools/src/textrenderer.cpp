@@ -223,7 +223,7 @@ Shader* TextRenderer::LoadShader(void) {
     if (shader) {
         locations.Start();
         shader->SetVector4f("surfaceColor", locations.Current(), m_color);
-        shader->SetFloat("premultiply", locations.Current(), 0.0f);
+        //shader->SetFloat("premultiply", locations.Current(), 0.0f);
     }
     return shader;
 }

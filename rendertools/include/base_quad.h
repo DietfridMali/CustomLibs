@@ -136,7 +136,7 @@ public:
         m_transformations.Clear();
     }
 
-    inline bool Premultiply(void) {
+    inline void Premultiply(void) {
         m_premultiply = true;
     }
 

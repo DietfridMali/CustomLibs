@@ -64,7 +64,7 @@ const ShaderSource& GrayScaleShader() {
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray *= brightness;
-            fragColor = vec4(gray.rgb, texColor.a);
+            fragColor = vec4(vec3(gray), texColor.a);
         }
         )" 
         );
@@ -199,7 +199,7 @@ const ShaderSource& PlainTextureShader() {
         #version 330
         uniform sampler2D source;
         uniform vec4 surfaceColor;
-        uniform float premultiply;
+        //uniform float premultiply;
         in vec3 fragPos;
         in vec2 fragTexCoord;
 
@@ -209,7 +209,7 @@ const ShaderSource& PlainTextureShader() {
             vec4 texColor = texture (source, fragTexCoord);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
-            fragColor = vec4 (texColor.rgb * surfaceColor.rgb * mix (1.0, a, premultiply), a);
+            fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
             }
     )"
     );

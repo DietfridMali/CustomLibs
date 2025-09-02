@@ -17,7 +17,7 @@ const ShaderSource& BoxBlurShader() {
             float FXAA_SPAN_MAX = 16.0;
             float FXAA_REDUCE_MIN = 1.0 / 128.0;
             float FXAA_REDUCE_MUL = 1.0 / 8.0;
-            uniform float premultiply;
+            //uniform float premultiply;
             in vec2 fragTexCoord;
             out vec4 fragColor;
             vec3 FxaaPixelShader(vec2 pos, sampler2D tex, vec2 texelSize) {
@@ -47,7 +47,7 @@ const ShaderSource& BoxBlurShader() {
                 vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
                 vec3 color = FxaaPixelShader(fragTexCoord, source, texelSize);
                 float a = texture(source, fragTexCoord).a;
-                fragColor = vec4(color * mix(1.0, a, premultiply), a);
+                fragColor = vec4(color /** mix(1.0, a, premultiply)*/, a);
                 }
             )"
     );
@@ -66,7 +66,7 @@ const ShaderSource& FxaaShader() {
         float FXAA_SPAN_MAX = 16.0;
         float FXAA_REDUCE_MIN = 1.0 / 128.0;
         float FXAA_REDUCE_MUL = 1.0 / 8.0;
-        uniform float premultiply;
+        //uniform float premultiply;
         in vec2 fragTexCoord;
         out vec4 fragColor;
         vec3 FxaaPixelShader(vec2 pos, sampler2D tex, vec2 texelSize) {
@@ -96,7 +96,7 @@ const ShaderSource& FxaaShader() {
             vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
             vec3 color = FxaaPixelShader(fragTexCoord, source, texelSize);
             float a = texture(source, fragTexCoord).a;
-            fragColor = vec4(color * mix(1.0, a, premultiply), a);
+            fragColor = vec4(color /** mix(1.0, a, premultiply)*/, a);
         }
         )"
     );
@@ -117,7 +117,7 @@ const ShaderSource& GaussBlurShader() {
         out vec4 fragColor;
         uniform int radius; 
         uniform float coeffs[33];
-        uniform float premultiply;
+        //uniform float premultiply;
         void main() {
             vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
             vec2 offset = vec2 (1.0 - direction, direction);
@@ -127,7 +127,7 @@ const ShaderSource& GaussBlurShader() {
     		    vec2 coord = fragTexCoord + offset * float(i - radius) * texelSize;
     		    sum += vec4 (coeffs[i] * texture(source, coord));
     	    }
-    	    fragColor = vec4(sum.rgb * mix(1.0, sum.a, premultiply), sum.a);
+    	    fragColor = vec4(sum.rgb /** mix(1.0, sum.a, premultiply)*/, sum.a);
         }
         )"
     );

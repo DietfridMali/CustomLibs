@@ -151,7 +151,7 @@ Shader* BaseQuad::LoadShader(bool useTexture, const RGBAColor& color) {
             shader->SetVector4f("surfaceColor", locations.Current(), m_premultiply ? color.Premultiplied() : color);
         else {
             shader->SetVector4f("surfaceColor", locations.Current(), color);
-            shader->SetFloat("premultiply", locations.Current(), m_premultiply ? 1.0f : 0.0f);
+            //shader->SetFloat("premultiply", locations.Current(), m_premultiply ? 1.0f : 0.0f);
         }
         m_premultiply = false; // has to be set explicitly every time BaseQuad::Render() is called and premult. is required
     }

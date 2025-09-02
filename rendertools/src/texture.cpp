@@ -75,7 +75,7 @@ void TextureBuffer::Premultiply(void) {
             uint8_t b;
             uint8_t a;
         };
-        RGBA8* p = reinterpret_cast<RGBA8*>(m_data);
+        RGBA8* p = reinterpret_cast<RGBA8*>(m_data.get());
         for (int i = m_info.dataSize / 4; i; --i, ++p) {
             uint16_t a = uint16_t (p->a);
             p->r = Premultiply(uint16_t(p->r), a);
@@ -383,7 +383,7 @@ bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVerticall
             }
             texBuf = new TextureBuffer();
             if (texBuf) {
-                texBuf->Create(image, flipVertically);
+                texBuf->Create(image, premultiply, flipVertically);
                 m_buffers.Append(texBuf);
 #ifdef _DEBUG
                 texBuf->m_name = bufferName;
@@ -395,7 +395,7 @@ bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVerticall
 }
 
 
-bool Texture::CreateFromFile(List<String>& fileNames, bool flipVertically) {
+bool Texture::CreateFromFile(List<String>& fileNames, bool premultiply, bool flipVertically) {
     if (not Create())
         return false;
     if (fileNames.IsEmpty())
@@ -407,10 +407,10 @@ bool Texture::CreateFromFile(List<String>& fileNames, bool flipVertically) {
 }
 
 
-bool Texture::CreateFromSurface(SDL_Surface* surface, bool flipVertically) {
+bool Texture::CreateFromSurface(SDL_Surface* surface, bool premultiply, bool flipVertically) {
     if (not Create())
         return false;
-    m_buffers.Append(new TextureBuffer(surface, flipVertically));
+    m_buffers.Append(new TextureBuffer(surface, premultiply, flipVertically));
     return true;
 }
 

@@ -28,7 +28,7 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premult
         BaseRenderer::ClearGLError();
         locations.Start();
         params.shader->SetFloat("offset", locations.Current(), 0.5f);
-        params.shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+        //params.shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
         if (aaMethod.method != "gaussblur")
             fbo->AutoRender(params);
         else {
@@ -61,7 +61,7 @@ void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool
             shader->SetFloat("outlineWidth", locations.Current(), decoration.outlineWidth);
             shader->SetVector4f("outlineColor", locations.Current(), decoration.outlineColor);
             shader->SetFloat("offset", locations.Current(), 0.5f);
-            shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+            //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
             fbo->AutoRender({ .clearBuffer = true, .shader = shader });
         }
         //baseShaderHandler.StopShader();
