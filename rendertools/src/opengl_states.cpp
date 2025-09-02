@@ -42,11 +42,10 @@ GLenum OpenGLStates::DepthFunc(GLenum func) {
 	static GLenum current = GL_NONE;
 	if (func == GL_NONE)
 		return current;
-		GLenum previous = current;
-		if (current != func) {
-			current = func;
-			glDepthFunc(current);
-		}
+	GLenum previous = current;
+	if (current != func) {
+		current = func;
+		glDepthFunc(current);
 	}
 	return previous;
 }

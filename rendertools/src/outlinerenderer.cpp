@@ -1,6 +1,7 @@
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 #include "outlinerenderer.h"
+#include "base_renderer.h"
 
 // =================================================================================================
 // the(text) outline renderer works as follows :
@@ -53,7 +54,7 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod) {
 void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration) {
     if (decoration.HaveOutline()) {
         Shader* shader = baseShaderHandler.SetupShader("outline");
-        if (shader and not renderer.DepthPass()) {
+        if (shader and not baseRenderer.DepthPass()) {
             static ShaderLocationTable locations;
             locations.Start();
             shader->SetFloat("outlineWidth", locations.Current(), decoration.outlineWidth);

@@ -92,7 +92,7 @@ void Shader::UpdateMatrices(void) {
         // both matrices must be column major
         SetMatrix4f("mModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);
         SetMatrix4f("mProjection", m_locations.Current(), baseRenderer.Projection().AsArray(), false);
-        if (baseRenderer.DepthPass()) // depth shader doesn't have and doesn't use viewports
+        if (not baseRenderer.DepthPass()) // depth shader doesn't have and doesn't use viewports
             SetMatrix4f("mViewport", m_locations.Current(), baseRenderer.ViewportTransformation().AsArray(), false);
 #if 0
         SetMatrix4f("mBaseModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);

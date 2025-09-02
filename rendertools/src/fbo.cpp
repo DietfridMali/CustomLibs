@@ -1,6 +1,7 @@
 #include "glew.h"
 #include "conversions.hpp"
 #include "fbo.h"
+#include "tristate.h"
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 

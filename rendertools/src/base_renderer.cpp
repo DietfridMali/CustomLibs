@@ -86,8 +86,8 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
 void BaseRenderer::StartDepthPass(void) noexcept {
     m_renderPass = RenderPasses::rpDepth;
     openGLStates.SetDepthTest(true);
-    openGLStates.DepthMask(1);                        // Z schreiben
-    openGLStates.DepthFunc(GL_LESS);                        // normaler Z-Test
+    openGLStates.DepthMask(1);                 
+    openGLStates.DepthFunc(GL_LESS);                  
     openGLStates.ColorMask(glm::ivec4(0, 0, 0, 0));
     openGLStates.SetBlending(false);
 }
@@ -96,8 +96,18 @@ void BaseRenderer::StartDepthPass(void) noexcept {
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPasses::rpColor;
     openGLStates.SetDepthTest(true);
-    openGLStates.DepthMask(0);                        // Z schreiben
-    openGLStates.DepthFunc(GL_LEQUAL);                        // normaler Z-Test
+    openGLStates.DepthMask(0);                        
+    openGLStates.DepthFunc(GL_LEQUAL);                
+    openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
+    openGLStates.SetBlending(false);
+}
+
+
+void BaseRenderer::StartFullPass(void) noexcept {
+    m_renderPass = RenderPasses::rpColor;
+    openGLStates.SetDepthTest(true);
+    openGLStates.DepthMask(1);                        
+    openGLStates.DepthFunc(GL_LEQUAL);                
     openGLStates.ColorMask(glm::ivec4(1, 1, 1, 1));
     openGLStates.SetBlending(false);
 }
@@ -194,7 +204,7 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
     m_viewportArea.SetTexture(texture);
     m_viewportArea.Render(color); // bFlipVertically);
 #else
-    m_viewportArea.Fill(color); // bFlipVertically);
+    m_viewportArea.Fill(ColorData::Gold); // bFlipVertically);
 #endif
 }
 

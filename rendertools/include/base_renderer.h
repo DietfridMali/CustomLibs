@@ -31,7 +31,8 @@ public:
 
     enum class RenderPasses {
         rpDepth,
-        rpColor
+        rpColor,
+        rpFull
     };
 
 protected:
@@ -86,19 +87,27 @@ public:
 
     void SetupOpenGL(void) noexcept;
 
+    inline void SetRenderPass(RenderPasses renderPass) noexcept { m_renderPass = renderPass; }
+
     void StartDepthPass(void) noexcept;
 
     void StartColorPass(void) noexcept;
+
+    void StartFullPass(void) noexcept;
 
     inline bool DepthPass(void) noexcept { return RenderPass() == RenderPasses::rpDepth; }
 
     inline bool ColorPass(void) noexcept { return RenderPass() == RenderPasses::rpColor; }
 
+    inline bool FullPass(void) noexcept { return RenderPass() == RenderPasses::rpFull; }
+
     inline void StartRenderPass(RenderPasses pass) noexcept {
         if (pass == RenderPasses::rpDepth)
             StartDepthPass();
-        else
+        else if (pass == RenderPasses::rpColor)
             StartColorPass();
+        else
+            StartFullPass();
     }
 
     RenderPasses RenderPass(void) noexcept { return m_renderPass; }
