@@ -56,11 +56,13 @@ const ShaderSource& GrayScaleShader() {
         // precision mediump float;
 
         uniform sampler2D source;
+        uniform vec2 tcOffset;
+        uniform vec2 tcScale;
         uniform float brightness;
         in vec2 fragTexCoord;
         out vec4 fragColor;
         void main() {
-            vec4 texColor = texture(source, fragTexCoord);
+            vec4 texColor = texture(source, tcOffset + fragTexCoord * tcScale);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray *= brightness;

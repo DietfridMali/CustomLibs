@@ -140,7 +140,7 @@ Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, int rad
 }
 
 
-Shader* BaseShaderHandler::LoadGrayScaleShader(float brightness) {
+Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f& tcOffset, const Vector2f& tcScale) {
     Shader* shader = SetupShader("grayScale");
     if (shader and not baseRenderer.DepthPass()) {
         ShaderLocationTable locations;
