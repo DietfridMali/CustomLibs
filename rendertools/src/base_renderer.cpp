@@ -214,7 +214,7 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
     m_viewportArea.SetTexture(texture);
     m_viewportArea.Render(color); // bFlipVertically);
 #else
-    m_viewportArea.Fill(ColorData::Gold); // bFlipVertically);
+    m_viewportArea.Fill(color); // bFlipVertically);
 #endif
 }
 

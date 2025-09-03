@@ -139,7 +139,8 @@ noexcept
 
 
 Shader* BaseQuad::LoadShader(bool useTexture, const RGBAColor& color) {
-    return 
+    UpdateTransformation();
+    return
         useTexture 
         ? baseShaderHandler.LoadPlainTextureShader(color, Vector2f::ZERO, Vector2f::ONE, m_premultiply) 
         : baseShaderHandler.LoadPlainColorShader(color, m_premultiply);

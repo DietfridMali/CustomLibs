@@ -17,7 +17,6 @@
 #define USE_TEXT_FBOS 1
 #define USE_ATLAS 1
 #define TEST_ATLAS 0
-#define EXTERNAL_ATLAS 1
 
 // =================================================================================================
 
@@ -83,15 +82,19 @@ int TextRenderer::BuildAtlas(void) {
 #if EXTERNAL_ATLAS
     if (not m_atlas.Enable())
         return -1;
+    baseRenderer.PushViewport();
+    m_atlas.SetViewport();
 #else
     if (not m_atlas->Enable())
         return -1;
-    m_atlas.SetViewport();
+    baseRenderer.PushViewport();
+    m_atlas->SetViewport();
 #endif
     baseRenderer.ResetTransformation();
 #if 1
     m_glyphDict.Walk(&TextRenderer::RenderGlyphToAtlas, this);
 #endif
+    baseRenderer.PopViewport();
 #if EXTERNAL_ATLAS
     m_atlas.Disable();
 #else
@@ -186,7 +189,7 @@ bool TextRenderer::CreateAtlas(void) {
     int i = CreateTextures();
     m_maxGlyphSize.Update();
 #if EXTERNAL_ATLAS
-    int glyphCount = float(m_glyphs.Length() + 1);
+    int glyphCount = m_glyphs.Length() + 1;
     m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2);
 #else
     float glyphCount = float(m_glyphs.Length() + 1);

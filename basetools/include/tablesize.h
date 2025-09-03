@@ -70,11 +70,11 @@ public:
     }
 
     inline int Row(int i) noexcept {
-        return GetSize() / i;
+        return i / m_cols;
     }
 
     inline int Col(int i) noexcept {
-        return GetSize() % i;
+        return i % m_cols;
     }
 
     inline float Rowf(int i) noexcept {

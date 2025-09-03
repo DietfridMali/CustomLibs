@@ -79,7 +79,9 @@ public:
 		template <typename STATE_T, STATE_T unknown, class FUNC_T>
 		STATE_T FuncState(STATE_T state, int32_t& stateID, FUNC_T&& glFunc) {
 			auto& currentList = StateRegistry<STATE_T>::list;
-			if (stateID < 0) {
+
+			bool initialized = stateID >= 0;
+			if (not initialized) {
 				stateID = currentList.Length();
 				currentList.Append(state);
 			}
@@ -87,7 +89,7 @@ public:
 			if (state == unknown)
 				return current; 
 			STATE_T previous = current;
-			if (ENFORCE_STATE or (current != state)) { 
+			if (ENFORCE_STATE or not initialized or (current != state)) { 
 				current = state;
 				std::forward<FUNC_T>(glFunc) (state);
 			}
