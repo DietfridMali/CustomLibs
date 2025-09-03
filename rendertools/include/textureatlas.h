@@ -60,9 +60,9 @@ public:
 
 	bool Render(Shader* shader);
 
-	bool RenderColor(int glyphIndex, RGBAColor color);
+	bool RenderColored(int glyphIndex, RGBAColor color = ColorData::White);
 
-	bool RenderGrayscale(int glyphIndex, float brightness);
+	bool RenderGrayscale(int glyphIndex, float brightness = 1.0f);
 
 	bool Add(Texture* glyph, int glyphIndex);
 

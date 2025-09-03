@@ -39,7 +39,7 @@ bool TextureAtlas::Render(Shader* shader) {
 }
 
 
-bool TextureAtlas::RenderColor(int glyphIndex, RGBAColor color) {
+bool TextureAtlas::RenderColored(int glyphIndex, RGBAColor color) {
 	return Render(baseShaderHandler.LoadPlainTextureShader(color, m_scale, GlyphOffset(glyphIndex)));
 }
 
