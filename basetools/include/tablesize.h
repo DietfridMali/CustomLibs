@@ -61,6 +61,22 @@ public:
         m_size = m_rows * m_cols;
     }
 
+    inline int Row(int i) noexcept {
+        return GetSize() / i;
+    }
+
+    inline int Col(int i) noexcept {
+        return GetSize() % i;
+    }
+
+    inline float Rowf(int i) noexcept {
+        return float(Row(i));
+    }
+
+    inline float Colf(int i) noexcept {
+        return float(Col(i));
+    }
+
     inline bool IsEmpty(void) const noexcept {
         return m_size == 0;
     }
