@@ -7,7 +7,7 @@
 #include "fbo.h"
 #include "avltree.hpp" // faster lookup than std::map
 #include "colordata.h"
-#include "tabledimensions.h"
+#include "tablesize.h"
 #include "outlinerenderer.h"
 #include "mesh.h"
 #include "singletonbase.hpp"
@@ -75,7 +75,7 @@ private:
     FBO*                        m_atlas; // texture containing all letters
     Texture                     m_atlasTexture;
     Mesh                        m_mesh;
-    TableDimensions             m_atlasSize;
+    TableSize             m_atlasSize;
     Dictionary<int, FBO*>       m_fbos;
 
 public:

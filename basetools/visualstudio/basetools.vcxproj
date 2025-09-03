@@ -58,7 +58,7 @@
     <ClInclude Include="..\include\std_string.hpp" />
     <ClInclude Include="..\include\string.hpp" />
     <ClInclude Include="..\include\stringutils.hpp" />
-    <ClInclude Include="..\include\tabledimensions.h" />
+    <ClInclude Include="..\include\tablesize.h" />
     <ClInclude Include="..\include\timer.h" />
     <ClInclude Include="..\include\tristate.h" />
     <ClInclude Include="..\include\type_helper.hpp" />

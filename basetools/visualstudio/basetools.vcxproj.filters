@@ -69,9 +69,6 @@
     <ClInclude Include="..\include\singletonbase.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\tabledimensions.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\custom_array.hpp">
       <Filter>Header Files\custom</Filter>
     </ClInclude>
@@ -157,6 +154,9 @@
       <Filter>Header Files\general</Filter>
     </ClInclude>
     <ClInclude Include="..\include\tristate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\tablesize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

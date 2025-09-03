@@ -160,7 +160,7 @@ int ArgHandler::LoadArgs(const char* fileName) {
     List<String>    fileLines;
 
     auto lineFilterWrapper = [this](String& line) { return this->LineFilter(line); };
-    TableDimensions argC = f.ReadLines (fileName, fileLines, lineFilterWrapper);
+    TableSize argC = f.ReadLines (fileName, fileLines, lineFilterWrapper);
     if (argC.GetRows() > 0)
         for (auto& line : fileLines)
             Add(line);

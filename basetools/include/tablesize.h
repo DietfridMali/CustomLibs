@@ -2,12 +2,12 @@
 
 // =================================================================================================
 
-class TableDimensions {
+class TableSize {
 protected:
     int m_cols, m_rows, m_size;
 
 public:
-    TableDimensions(int cols = 0, int rows = 0, float scale = 1) {
+    TableSize(int cols = 0, int rows = 0, float scale = 1) {
         Init (cols, rows, scale);
     }
 
@@ -17,25 +17,25 @@ public:
         m_size = m_cols * m_rows;
     }
 
-    TableDimensions(TableDimensions const& other) 
+    TableSize(TableSize const& other) 
         : m_cols(other.m_cols), m_rows(other.m_rows), m_size(other.m_size) 
     { }
 
-    TableDimensions& operator=(const TableDimensions& other) noexcept {
+    TableSize& operator=(const TableSize& other) noexcept {
         m_cols = other.m_cols;
         m_rows = other.m_rows;
         m_size = other.m_size;
         return *this;
     }
 
-    TableDimensions& operator=(const TableDimensions&& other) noexcept {
+    TableSize& operator=(const TableSize&& other) noexcept {
         m_cols = other.m_cols;
         m_rows = other.m_rows;
         m_size = other.m_size;
         return *this;
     }
 
-    bool operator== (TableDimensions& other) noexcept {
+    bool operator== (TableSize& other) noexcept {
         return (m_cols == other.m_cols) and (m_rows == other.m_rows);
     }
 
