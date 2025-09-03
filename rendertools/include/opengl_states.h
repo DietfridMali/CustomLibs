@@ -70,29 +70,15 @@ public:
 		inline int SetDither(int state) { return SetState<GL_DITHER>(state); }
 
 		inline int SetMultiSample(int state) { return SetState<GL_MULTISAMPLE>(state); }
-#if 0 // obsolete
-		template <GLenum typeID>
-		inline int SetTexture(int state) { return SetState<typeID>(state); }
 
-		inline int SetTexture2D(int state) { return SetTexture<GL_TEXTURE_2D>(state); }
+		template <class T>
+		struct StateRegistry {
+			static inline ManagedArray<T> list{};
+		};
 
-		inline int SetTextureCubemap(int state) { return SetTexture<GL_TEXTURE_CUBE_MAP>(state); }
-
-		inline int SetTexture(GLenum typeID, int state) {
-			switch (typeID) {
-			case GL_TEXTURE_2D:         
-				return SetTexture<GL_TEXTURE_2D>(state);
-			case GL_TEXTURE_CUBE_MAP:   
-				return SetTexture<GL_TEXTURE_CUBE_MAP>(state);
-				// weitere Targets nach Bedarf ...
-			default:                    
-				return std::nullopt; // oder assert/throw
-			}
-		}
-#endif
 		template <typename STATE_T, STATE_T unknown, class FUNC_T>
 		STATE_T FuncState(STATE_T state, int32_t& stateID, FUNC_T&& glFunc) {
-			static ManagedArray<STATE_T> currentList;
+			auto& currentList = StateRegistry<STATE_T>::list;
 			if (stateID < 0) {
 				stateID = currentList.Length();
 				currentList.Append(state);
@@ -108,12 +94,17 @@ public:
 			return previous; 
 		}
 
+		template <class... Args>
+		struct MultiStateRegistry {
+			static inline ManagedArray<std::tuple<Args...>> list{};
+		};
+
 		template<class F, class... Args>
 		auto FuncState(int32_t& stateID, const std::tuple<Args...>& state, F&& glFunc)
 			-> std::tuple<Args...>
 		{
 			bool initialized = stateID >= 0;
-			static ManagedArray<std::tuple<Args...>> currentList;
+			auto& currentList = MultiStateRegistry<Args...>::list;
 			if (not initialized) {
 				stateID = currentList.Length();
 				currentList.Append(state);
