@@ -82,6 +82,7 @@ const String& GaussBlurFuncs() {
     static const String source(
         R"(
         uniform int blurRadius;
+        uniform vec2 texelSize;
 
         vec4 GaussBlur7x7(float spread) {
             const int HALF = 3;

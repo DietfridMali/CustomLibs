@@ -132,6 +132,8 @@ Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, int rad
         locations.Start();
         shader->SetVector4f("surfaceColor", locations.Current(), color);
         shader->SetInt("blurRadius", locations.Current(), radius);
+        shader->SetVector2f("texelSize", locations.Current(), Vector2f{ 1.0f / float (baseRenderer.Viewport().Width()), 1.0f / float(baseRenderer.Viewport().Height())});
+
         //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
     }
     return shader;
