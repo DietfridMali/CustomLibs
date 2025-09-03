@@ -61,6 +61,12 @@ public:
         return ((radius < 1) or (radius > m_kernels.Length())) ? nullptr : m_kernels[radius - 1];
     }
 
+    Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
+
+    Shader* LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);
+
+    Shader* LoadGrayScaleShader(float brightness);
+
 private:
     FloatArray* ComputeGaussKernel1D(int radius); // allokiert -> nicht noexcept
     void ComputeGaussKernels(void);               // allokiert -> nicht noexcept

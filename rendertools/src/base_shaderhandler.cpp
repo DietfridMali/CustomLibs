@@ -100,4 +100,39 @@ void BaseShaderHandler::StopShader(bool needLegacyMatrices) {
     }
 }
 
+Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool premultiply) {
+    Shader* shader = SetupShader("plainColor");
+    if (shader and not baseRenderer.DepthPass()) {
+        static ShaderLocationTable locations;
+        locations.Start();
+        shader->SetVector4f("surfaceColor", locations.Current(), premultiply ? color.Premultiplied() : color);
+    }
+    return shader;
+}
+
+
+Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
+    Shader* shader = SetupShader("plainTexture");
+    if (shader and not baseRenderer.DepthPass()) {
+        static ShaderLocationTable locations;
+        locations.Start();
+        shader->SetVector4f("surfaceColor", locations.Current(), color);
+        shader->SetVector2f("tcOffset", locations.Current(), tcOffset);
+        shader->SetVector2f("tcScale", locations.Current(), tcOffset);
+        //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+    }
+    return shader;
+}
+
+
+Shader* BaseShaderHandler::LoadGrayScaleShader(float brightness) {
+    Shader* shader = SetupShader("grayScale");
+    if (shader and not baseRenderer.DepthPass()) {
+        ShaderLocationTable locations;
+        locations.Start();
+        shader->SetFloat("brightness", locations.Current(), brightness);
+    }
+    return shader;
+}
+
 // =================================================================================================

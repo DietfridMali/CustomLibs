@@ -56,9 +56,9 @@ const ShaderSource& GrayScaleShader() {
         // precision mediump float;
 
         uniform sampler2D source;
+        uniform float brightness;
         in vec2 fragTexCoord;
         out vec4 fragColor;
-        uniform float brightness;
         void main() {
             vec4 texColor = texture(source, fragTexCoord);
             // Rec.601 Luminanzgewichte in Gamma-Space
@@ -68,6 +68,37 @@ const ShaderSource& GrayScaleShader() {
         }
         )" 
         );
+    return shader;
+}
+
+
+// render a b/w mask with color applied.
+const ShaderSource& PlainTextureShader() {
+    static const ShaderSource shader(
+        "plainTexture",
+        Standard2DVS(),
+        R"(
+        //#version 140
+        //#extension GL_ARB_explicit_attrib_location : enable
+        #version 330
+        uniform sampler2D source;
+        uniform vec4 surfaceColor;
+        uniform vec2 tcOffset;
+        uniform vec2 tcScale;
+        //uniform float premultiply;
+        in vec3 fragPos;
+        in vec2 fragTexCoord;
+
+        layout(location = 0) out vec4 fragColor;
+        
+        void main() {
+            vec4 texColor = texture (source, tcOffset + fragTexCoord * tcScale);
+            float a = texColor.a * surfaceColor.a;
+            if (a == 0) discard;
+            fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
+            }
+    )"
+    );
     return shader;
 }
 
@@ -183,35 +214,6 @@ const ShaderSource& TintAndBlurShader() {
             fragColor = vec4(finalRGB, texColor.a);
         }
         )"
-    );
-    return shader;
-}
-
-
-// render a b/w mask with color applied.
-const ShaderSource& PlainTextureShader() {
-    static const ShaderSource shader(
-        "plainTexture",
-        Standard2DVS(),
-        R"(
-        //#version 140
-        //#extension GL_ARB_explicit_attrib_location : enable
-        #version 330
-        uniform sampler2D source;
-        uniform vec4 surfaceColor;
-        //uniform float premultiply;
-        in vec3 fragPos;
-        in vec2 fragTexCoord;
-
-        layout(location = 0) out vec4 fragColor;
-        
-        void main() {
-            vec4 texColor = texture (source, fragTexCoord);
-            float a = texColor.a * surfaceColor.a;
-            if (a == 0) discard;
-            fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
-            }
-    )"
     );
     return shader;
 }
