@@ -12,14 +12,13 @@ class TextureAtlas {
 protected:
 	FBO			m_atlas;
 	TableSize	m_size;
+	TableSize	m_glyphSize;
 	Vector2f	m_scale;
 
 	static BaseQuad	renderQuad;
 
 public:
-	TextureAtlas()
-		: m_size(0), m_scale(Vector2f::ONE)
-	{ }
+	TextureAtlas();
 
 	~TextureAtlas() = default;
 
@@ -30,9 +29,13 @@ public:
 			: Vector2f::ZERO;
 	}
 
-	bool Create(String name, int glyphWidth, int glyphHeight, int glyphCount, float aspectRatio = 1.0f, float scale = 1);
+	bool Create(String name, int glyphWidth, int glyphHeight, int glyphCount, float aspectRatio = 1.0f, int scale = 1);
 
-	bool Render(int glyphIndex, RGBAColor color, bool grayscale = false);
+	bool Render(Shader* shader);
+
+	bool RenderColor(int glyphIndex, RGBAColor color);
+
+	bool RenderGrayscale(int glyphIndex, float brightness);
 
 	bool Add(Texture* glyph, int glyphIndex);
 };

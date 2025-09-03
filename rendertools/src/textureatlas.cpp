@@ -1,48 +1,65 @@
 
 #include "textureatlas.h"
 #include "base_shaderhandler.h"
+#include "base_renderer.h"
 
 // =================================================================================================
 
 BaseQuad TextureAtlas::renderQuad;
 
 TextureAtlas::TextureAtlas()
+	: m_size(0), m_glyphSize(0), m_scale(Vector2f::ONE)
 {
 	renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voZero], BaseQuad::defaultTexCoords[BaseQuad::tcRegular]);
 	renderQuad.SetTransformations({ .centerOrigin = false, .autoClear = false });
 }
 
 
-bool TextureAtlas::Create(String name, int glyphWidth, int glyphHeight, int glyphCount, float aspectRatio, float scale) {
-	m_size.SetCols(int(ceil(sqrtf(float(glyphCount) / m_maxGlyphSize.aspectRatio))));
-	m_size.SetRows(int(ceil(float(glyphCount) / float(m_atlasSize.GetCols()))));
-	if (not m_atlas.Create(name, m_size.GetCols() * glyphWidth, m_size.GetRows() * glyphHeight, scale, { .name = name })) {
+bool TextureAtlas::Create(String name, int glyphWidth, int glyphHeight, int glyphCount, float aspectRatio, int scale) {
+	m_glyphSize = TableSize(glyphWidth, glyphHeight);
+	m_size.SetCols(int(ceil(sqrtf(float(glyphCount) / aspectRatio))));
+	m_size.SetRows(int(ceil(float(glyphCount) / float(m_size.GetCols()))));
+	if (not m_atlas.Create(m_size.GetCols() * glyphWidth, m_size.GetRows() * glyphHeight, scale, { .name = name })) {
 		m_atlas.Destroy();
 		return false;
 	}
-	m_tcScale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
+	m_scale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
+	return true;
 }
 
 
-bool TextureAtlas::Render(int glyphIndex, RGBAColor color, bool grayscale) {
-	Vector2f offset = Vector2f(m_size.Colf(glyphIndex) * m_tcScale.X(), m_size.Rowf(glyphIndex) * m_tcScale.Y());
-	Shader* shader = 
-		grayscale
-		? baseShaderHandler.LoadGrayScaleShader(color, m_scale, offset)
-		: baseShaderHandler.LoadPlainTextureShader(color, m_scale, offset);
-	if (shader)
-		m_atlas.Render({ .clearBuffer = false, .shader = shader });
-	return false;
+bool TextureAtlas::Render(Shader* shader) {
+	if (not shader)
+		return false;
+	m_atlas.Render({ .clearBuffer = false, .shader = shader });
+	return true;
+}
+
+
+bool TextureAtlas::RenderColor(int glyphIndex, RGBAColor color) {
+	return Render(baseShaderHandler.LoadPlainTextureShader(color, m_scale, GlyphOffset(glyphIndex)));
+}
+
+
+bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
+	return Render(baseShaderHandler.LoadGrayScaleShader(brightness, m_scale, GlyphOffset(glyphIndex)));
 }
 
 
 bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
-	m_atlas.Enable();
-	m_atlas.SetViewport();
-	Shader* shader = LoadPlainTextureShader(color, m_scale, offset);
-	bool added = renderQuad.Render(shader, glyph, true);
-	m_atlas.Disable();
-	return added;
+	bool enableLocally = not m_atlas.IsEnabled();
+	if (enableLocally)
+		m_atlas.Enable();
+	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White, m_scale, GlyphOffset(glyphIndex));
+	if (shader) {
+		baseRenderer.PushViewport();
+		baseRenderer.SetViewport(m_size.Col(glyphIndex) * m_glyphSize.Width(), m_size.Row(glyphIndex) * m_glyphSize.Height(), m_glyphSize.Width(), m_glyphSize.Height());
+		renderQuad.Render(shader, glyph, true);
+		baseRenderer.PopViewport();
+	}
+	if (enableLocally)
+		m_atlas.Disable();
+	return shader != nullptr;
 }
 
 // =================================================================================================

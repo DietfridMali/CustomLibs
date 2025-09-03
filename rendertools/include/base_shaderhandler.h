@@ -67,7 +67,7 @@ public:
 
     Shader* LoadBlurTextureShader(const RGBAColor& color, int radius, bool premultiply);
 
-    Shader* LoadGrayScaleShader(float brightness);
+    Shader* LoadGrayScaleShader(float brightness, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE);
 
 private:
     FloatArray* ComputeGaussKernel1D(int radius); // allokiert -> nicht noexcept

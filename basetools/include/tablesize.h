@@ -47,12 +47,20 @@ public:
         return m_cols;
     }
 
+    inline int Width(void) noexcept {
+        return m_cols;
+    }
+
     inline void SetCols(int cols, float scale = 1) noexcept {
         m_cols = int(cols * scale);
         m_size = m_cols * m_rows;
     }
 
     inline int GetRows(void) const noexcept {
+        return m_rows;
+    }
+
+    inline int Height(void) noexcept {
         return m_rows;
     }
 
