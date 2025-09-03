@@ -10,7 +10,7 @@
 #include "singletonbase.hpp"
 #include "colordata.h"
 
-#define PASS_STATE_THROUGH true
+#define ENFORCE_STATE false
 
 // =================================================================================================
 
@@ -43,7 +43,7 @@ public:
 			current = (glIsEnabled(stateID) == GL_TRUE); // expensive and not essential
 #endif
 			int previous = current;
-			if (PASS_STATE_THROUGH or (current != state)) {
+			if (ENFORCE_STATE or (current != state)) {
 				current = state;
 				if (state)
 					glEnable(stateID);
@@ -96,7 +96,7 @@ public:
 			if (state == None) 
 				return current; 
 			STATE_T previous = current;
-			if (PASS_STATE_THROUGH or (current != state)) { 
+			if (ENFORCE_STATE or (current != state)) { 
 				current = state; 
 				std::forward<FUNC_T>(glFunc) (state);
 			} 
@@ -111,7 +111,7 @@ public:
 			static std::tuple<Args...> current;
 
 			auto previous = current;
-			if (PASS_STATE_THROUGH or not initialized or (current != state)) {
+			if (ENFORCE_STATE or not initialized or (current != state)) {
 				initialized = true;
 				current = state;
 				std::apply(std::forward<F>(glFunc), state); // ruft GL-Funktion mit Args...
