@@ -65,6 +65,8 @@ public:
 
     Shader* LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);
 
+    Shader* LoadBlurTextureShader(const RGBAColor& color, int radius, bool premultiply);
+
     Shader* LoadGrayScaleShader(float brightness);
 
 private:

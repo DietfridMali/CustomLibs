@@ -125,6 +125,19 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
 }
 
 
+Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, int radius, bool premultiply) {
+    Shader* shader = SetupShader("blurTexture");
+    if (shader and not baseRenderer.DepthPass()) {
+        static ShaderLocationTable locations;
+        locations.Start();
+        shader->SetVector4f("surfaceColor", locations.Current(), color);
+        shader->SetInt("blurRadius", locations.Current(), radius);
+        //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+    }
+    return shader;
+}
+
+
 Shader* BaseShaderHandler::LoadGrayScaleShader(float brightness) {
     Shader* shader = SetupShader("grayScale");
     if (shader and not baseRenderer.DepthPass()) {

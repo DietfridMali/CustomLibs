@@ -78,7 +78,7 @@ const String& Offset2DVS() {
 }
 
 
-const String& GaussBlur() {
+const String& GaussBlurFuncs() {
     static const String source(
         R"(
         uniform int blurRadius;

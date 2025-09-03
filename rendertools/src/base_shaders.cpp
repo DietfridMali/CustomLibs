@@ -6,7 +6,7 @@
 // =================================================================================================
 
 const ShaderSource& DepthShader() {
-    static const ShaderSource shader(
+    static const ShaderSource source(
         "depthShader",
         R"(
         #version 330 core
@@ -22,12 +22,12 @@ const ShaderSource& DepthShader() {
         void main() { }
         )"
         );
-    return shader;
+    return source;
 }
 
 
 const ShaderSource& PlainColorShader() {
-    static const ShaderSource shader(
+    static const ShaderSource source(
         "plainColor",
         Standard2DVS(),
         R"(
@@ -41,12 +41,12 @@ const ShaderSource& PlainColorShader() {
         }
         )"
         );
-    return shader;
+    return source;
 }
 
 
 const ShaderSource& GrayScaleShader() {
-    static const ShaderSource shader(
+    static const ShaderSource source(
         "grayScale",
         Standard2DVS(),
         R"(
@@ -68,13 +68,13 @@ const ShaderSource& GrayScaleShader() {
         }
         )" 
         );
-    return shader;
+    return source;
 }
 
 
 // render a b/w mask with color applied.
 const ShaderSource& PlainTextureShader() {
-    static const ShaderSource shader(
+    static const ShaderSource source(
         "plainTexture",
         Standard2DVS(),
         R"(
@@ -99,44 +99,43 @@ const ShaderSource& PlainTextureShader() {
             }
     )"
     );
-    return shader;
+    return source;
 }
 
 
 // render a b/w mask with color applied.
 const ShaderSource& BlurTextureShader() {
-    static const ShaderSource shader(
+    static const ShaderSource source(
         "plainTexture",
         Standard2DVS(),
-        R"(
+        String(R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
         uniform sampler2D source;
         uniform vec4 surfaceColor;
-        uniform vec2 tcOffset;
-        uniform vec2 tcScale;
-        uniform int blurRadius;
         //uniform float premultiply;
         in vec3 fragPos;
         in vec2 fragTexCoord;
-
+        )")
+        + GaussBlurFuncs() +
+        String(R"(
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture (source, tcOffset + fragTexCoord * tcScale);
+            vec4 texColor = texture (source, fragTexCoord);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
             }
-    )"
+        )")
     );
-    return shader;
+    return source;
 }
 
 
 const ShaderSource& TintAndBlurShader() {
-    static const ShaderSource shader(
+    static const ShaderSource source(
         "tintAndBlur",
         Standard2DVS(),
         String(R"(
@@ -170,7 +169,7 @@ const ShaderSource& TintAndBlurShader() {
         }
         )")
     );
-    return shader;
+    return source;
 }
 
 // =================================================================================================
