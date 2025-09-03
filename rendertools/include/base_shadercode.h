@@ -68,6 +68,7 @@ public:
 const String& Standard2DVS();
 const String& Standard3DVS();
 const String& Offset2DVS();
+const String& GaussBlur();
 
 // =================================================================================================
 
