@@ -9,10 +9,37 @@
 // =================================================================================================
 
 class TextureAtlas {
+public:
+	struct GlyphSize {
+		int width = 0;
+		int height = 0;
+		float aspectRatio = 0.0f;
+
+		GlyphSize(int w = 0, int h = 0)
+			: width(w), height(h)
+		{
+			Update();
+		}
+
+		GlyphSize& Update(void) {
+			aspectRatio = (width * height) ? float(width) / float(height) : 1.0f;
+			return *this;
+		}
+#if 0
+		GlyphSize& operator=(const GlyphSize& other) {
+			width = other.width;
+			height = other.height;
+			aspectRatio = other.aspectRatio;
+			return *this;
+		}
+#endif
+	};
+
 protected:
 	FBO			m_atlas;
+	Texture		m_texture;
 	TableSize	m_size;
-	TableSize	m_glyphSize;
+	GlyphSize	m_glyphSize;
 	Vector2f	m_scale;
 
 	static BaseQuad	renderQuad;
@@ -23,13 +50,13 @@ public:
 	~TextureAtlas() = default;
 
 	inline Vector2f GlyphOffset(int glyphIndex) {
-		return 
+		return
 			(m_scale.X() * m_scale.Y()) // both != 0?
 			? Vector2f(m_size.Colf(glyphIndex) * m_scale.X(), m_size.Rowf(glyphIndex) * m_scale.Y())
 			: Vector2f::ZERO;
 	}
 
-	bool Create(String name, int glyphWidth, int glyphHeight, int glyphCount, float aspectRatio = 1.0f, int scale = 1);
+	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1);
 
 	bool Render(Shader* shader);
 
@@ -38,6 +65,22 @@ public:
 	bool RenderGrayscale(int glyphIndex, float brightness);
 
 	bool Add(Texture* glyph, int glyphIndex);
+
+	Texture& GetTexture(void) noexcept {
+		return m_texture;
+	}
+
+	inline bool Enable(void) {
+		return m_atlas.Enable();
+	}
+
+	inline void Disable(void) {
+		m_atlas.Disable();
+	}
+
+	inline void SetViewport(void) {
+		m_atlas.SetViewport();
+	}
 };
 
 // =================================================================================================

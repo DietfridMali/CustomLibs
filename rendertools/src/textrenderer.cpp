@@ -17,6 +17,7 @@
 #define USE_TEXT_FBOS 1
 #define USE_ATLAS 1
 #define TEST_ATLAS 0
+#define EXTERNAL_ATLAS 1
 
 // =================================================================================================
 
@@ -42,6 +43,10 @@ bool TextRenderer::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
     if (not shader)
         return false;
     if (info) {
+#if EXTERNAL_ATLAS
+        m_atlas.Add(info->texture, info->index);
+        info->atlasPosition = m_atlas.GlyphOffset(info->index);
+#else
         // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
         info->glyphSize.width = info->texture->GetWidth();
         info->glyphSize.height = info->texture->GetHeight();
@@ -62,13 +67,7 @@ bool TextRenderer::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
                 info->texture,
                 ColorData::White);
         //info->atlasPosition.Y() = 1.0f - info->atlasPosition.Y();
-#if 1
         q.Render(shader, info->texture, ColorData::White);
-#else
-        if (info->index & 1)
-            q.Fill(RGBAColor(p.X(), p.Y(), 0.0f, 1.0f));
-        else
-            q.Fill(RGBAColor(p.Y(), p.X(), 0.0f, 1.0f));
 #endif
 #if USE_ATLAS
         delete info->texture;
@@ -81,18 +80,31 @@ bool TextRenderer::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
 
 
 int TextRenderer::BuildAtlas(void) {
+#if EXTERNAL_ATLAS
+    if (not m_atlas.Enable())
+        return -1;
+#else
     if (not m_atlas->Enable())
         return -1;
-    m_atlas->SetViewport();
+    m_atlas.SetViewport();
+#endif
     baseRenderer.ResetTransformation();
 #if 1
     m_glyphDict.Walk(&TextRenderer::RenderGlyphToAtlas, this);
 #endif
+#if EXTERNAL_ATLAS
+    m_atlas.Disable();
+#else
     m_atlas->Disable();
+#endif
+    m_mesh.SetDynamic(true);
+#if EXTERNAL_ATLAS
+    m_mesh.Init(GL_QUADS, 0, &m_atlas.GetTexture());
+#else
     m_atlasTexture.m_handle = m_atlas->BufferHandle(0);
     m_atlasTexture.HasBuffer() = true;
-    m_mesh.SetDynamic(true);
     m_mesh.Init(GL_QUADS, 0, &m_atlasTexture);
+#endif
 
     return m_glyphDict.Size(); // glyphCount;
 }
@@ -173,9 +185,13 @@ int TextRenderer::CreateTextures(void) {
 bool TextRenderer::CreateAtlas(void) {
     int i = CreateTextures();
     m_maxGlyphSize.Update();
-    float l = float(m_glyphs.Length() + 1);
-    m_atlasSize.SetCols(int(ceil(sqrtf(l / m_maxGlyphSize.aspectRatio))));
-    m_atlasSize.SetRows(int(ceil(l / float(m_atlasSize.GetCols()))));
+#if EXTERNAL_ATLAS
+    int glyphCount = float(m_glyphs.Length() + 1);
+    m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2);
+#else
+    float glyphCount = float(m_glyphs.Length() + 1);
+    m_atlasSize.SetCols(int(ceil(sqrtf(glyphCount / m_maxGlyphSize.aspectRatio))));
+    m_atlasSize.SetRows(int(ceil(glyphCount / float(m_atlasSize.GetCols()))));
     int w = m_atlasSize.GetCols() * m_maxGlyphSize.width;
     int h = m_atlasSize.GetRows() * m_maxGlyphSize.height;
     m_atlas = new FBO();
@@ -183,7 +199,8 @@ bool TextRenderer::CreateAtlas(void) {
         return false;
     if (not m_atlas->Create(w, h, 2, { .name = "GlyphAtlas" }))
         return false;
-    return BuildAtlas() == int(l);
+#endif
+    return BuildAtlas() == int(glyphCount);
 }
 
 
@@ -280,7 +297,11 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateVAO(true);
+#if EXTERNAL_ATLAS
+    m_mesh.Render(shader, &m_atlas.GetTexture());
+#else
     m_mesh.Render(shader, &m_atlasTexture);
+#endif
 }
 
 

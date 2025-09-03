@@ -10,6 +10,7 @@
 #include "tablesize.h"
 #include "outlinerenderer.h"
 #include "mesh.h"
+#include "textureatlas.h"
 #include "singletonbase.hpp"
 
 // =================================================================================================
@@ -27,32 +28,16 @@ public:
         taRight
     } eTextAlignments;
 
-    struct TextDimensions {
-        int width = 0;
-        int height = 0;
-        float aspectRatio = 0.0f;
-
-        TextDimensions(int w = 0, int h = 0)
-            : width(w), height(h)
-        { 
-            Update();
-        }
-
-        TextDimensions& Update(void) { 
-            aspectRatio = (width * height) ? float(width) / float(height) : 0.0f; 
-            return *this;
-        }
-    };
-
-    using GlyphSize = TextDimensions;
+    using GlyphSize = TextureAtlas::GlyphSize;
+    using TextDimensions = TextureAtlas::GlyphSize;
 
     struct GlyphInfo {
-        Texture*                    texture;
-        String                      name;
-        int32_t                     index;
-        GlyphSize                   glyphSize;
-        Vector2f                    atlasPosition;
-        Vector2f                    atlasSize;
+        Texture*                texture;
+        String                  name;
+        int32_t                 index;
+        TextureAtlas::GlyphSize glyphSize;
+        Vector2f                atlasPosition;
+        Vector2f                atlasSize;
 
         GlyphInfo(Texture* _texture = nullptr, String _name = "", int32_t _index = -1, Vector2f _position = Vector2f::ZERO, Vector2f _size = Vector2f::ZERO)
             : texture(_texture), name(_name), index(_index), atlasPosition(_position), atlasSize(_size)
@@ -72,10 +57,9 @@ private:
     VAO                         m_vao;
 
     AVLTree<String, GlyphInfo>  m_glyphDict;
-    FBO*                        m_atlas; // texture containing all letters
-    Texture                     m_atlasTexture;
+    TextureAtlas                m_atlas;
+    //Texture                     m_atlasTexture;
     Mesh                        m_mesh;
-    TableSize             m_atlasSize;
     Dictionary<int, FBO*>       m_fbos;
 
 public:

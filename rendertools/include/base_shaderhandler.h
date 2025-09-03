@@ -1,5 +1,6 @@
 #pragma once
 
+#include "texture.h"
 #include "shader.h"
 #include "base_shadercode.h"
 #include "matrix.hpp"
@@ -14,10 +15,10 @@ public:
     typedef Shader* (__cdecl* tShaderLoader) (void);
 
     ManagedArray<FloatArray*>   m_kernels;
-    Shader* m_activeShader;
+    Shader*                     m_activeShader;
     String                      m_activeShaderId;
     Texture                     m_grayNoise;
-    BaseShaderCode* m_shaderCode;
+    BaseShaderCode*             m_shaderCode;
 
     BaseShaderHandler()
         : m_kernels(16), m_shaderCode(nullptr), m_activeShader(nullptr), m_activeShaderId("")
