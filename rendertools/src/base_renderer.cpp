@@ -123,12 +123,12 @@ void BaseRenderer::StartFullPass(void) noexcept {
 
 
 bool BaseRenderer::Start3DScene(void) {
+    SetupOpenGL();
     m_frameCounter.Start();
     if (not (m_sceneBuffer and m_sceneBuffer->IsAvailable()))
         return false;
     ResetDrawBuffers(m_sceneBuffer);
     SetupTransformation();
-    SetupOpenGL();
     SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight));
     EnableCamera();
     return true;
@@ -261,7 +261,11 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
     m_viewport = viewport;
     m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
 #else
+    m_viewport = viewport;
+    if (flipVertically)
+        m_viewport.m_top = m_windowHeight - m_viewport.m_top - m_viewport.m_height;
     glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
+    m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
 #endif
 }
 
@@ -292,6 +296,7 @@ bool BaseRenderer::CheckGLError(const char* operation) noexcept {
 #   ifdef _DEBUG
     fprintf(stderr, "OpenGL Error %d (%s)\n", glError, operation);
 #   endif
+    ClearGLError();
     return false;
 #endif
 }
