@@ -6,10 +6,10 @@
 
 // =================================================================================================
 
-void OpenGLStates::BindTexture(GLenum typeID, GLenum tmu, GLuint texture) {
+void OpenGLStates::BindTexture(GLenum typeID, GLuint texture, GLenum tmu) {
 	static GLenum currentTMU = GL_TEXTURE0;
 	if (tmu == GL_NONE)
-		tmu = currentTMU;
+		tmu = GL_TEXTURE0;
 #if 0
 	ActiveTexture(tmu);
 	glBindTexture(typeID, texture);

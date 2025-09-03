@@ -90,16 +90,21 @@ public:
 			}
 		}
 #endif
-		template <typename STATE_T, STATE_T None, class FUNC_T>
-		STATE_T FuncState(STATE_T state, FUNC_T&& glFunc) {
-			static STATE_T current = None;
-			if (state == None) 
+		template <typename STATE_T, STATE_T unknown, class FUNC_T>
+		STATE_T FuncState(STATE_T state, int32_t& stateID, FUNC_T&& glFunc) {
+			static ManagedArray<STATE_T> currentList;
+			if (stateID < 0) {
+				stateID = currentList.Length();
+				currentList.Append(state);
+			}
+			STATE_T& current = currentList[stateID];
+			if (state == unknown)
 				return current; 
 			STATE_T previous = current;
 			if (ENFORCE_STATE or (current != state)) { 
-				current = state; 
+				current = state;
 				std::forward<FUNC_T>(glFunc) (state);
-			} 
+			}
 			return previous; 
 		}
 
@@ -120,27 +125,33 @@ public:
 		}
 
 		inline GLenum DepthFunc(GLenum state) {
-			return FuncState<GLenum, GL_NONE>(state, glDepthFunc);
+			static int32_t stateID = -1;
+			return FuncState<GLenum, GL_NONE>(state, stateID, glDepthFunc);
 		}
 
 		inline GLenum BlendEquation(GLenum state) {
-			return FuncState<GLenum, GL_NONE>(state, glBlendEquation);
+			static int32_t stateID = -1;
+			return FuncState<GLenum, GL_NONE>(state, stateID, glBlendEquation);
 		}
 
 		inline GLenum FrontFace(GLenum state) {
-			return FuncState<GLenum, GL_NONE>(state, glFrontFace);
+			static int32_t stateID = -1;
+			return FuncState<GLenum, GL_NONE>(state, stateID, glFrontFace);
 		}
 
 		inline GLenum CullFace(GLenum state) {
-			return FuncState<GLenum, GL_NONE>(state, glCullFace);
+			static int32_t stateID = -1;
+			return FuncState<GLenum, GL_NONE>(state, stateID, glCullFace);
 		}
 
 		inline GLenum ActiveTexture(GLenum state) {
-			return FuncState<GLenum, GL_NONE>(state, glActiveTexture);
+			static int32_t stateID = -1;
+			return FuncState<GLenum, GL_NONE>(state, stateID, glActiveTexture);
 		}
 
 		inline int DepthMask(int state) {
-			return FuncState<int, -1>(state, glDepthMask);
+			static int32_t stateID = -1;
+			return FuncState<int, -1>(state, stateID, glDepthMask);
 		}
 
 		inline std::tuple<int, int, int, int>ColorMask(int r, int g, int b, int a) {
@@ -164,32 +175,19 @@ public:
 			return FuncState(std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
 		}
 
-		void BindTexture(GLenum typeID, GLenum tmu, GLuint texture);
+		void BindTexture(GLenum typeID, GLuint texture, GLenum tmu = GL_NONE);
 
 		template <GLenum typeID>
-		inline void BindTexture(GLenum tmu, GLuint texture) {
-			BindTexture(typeID, tmu, texture);
-		}
-#if 0
-		inline void BindTexture(GLenum typeID, GLenum tmu, GLuint texture) {
-			switch (typeID) {
-			case GL_TEXTURE_2D:
-				BindTexture<GL_TEXTURE_2D>(tmu, texture);
-				break;
-			case GL_TEXTURE_CUBE_MAP:
-				BindTexture<GL_TEXTURE_CUBE_MAP>(tmu, texture);
-				break;
-			default:
-				; // oder assert/throw
-			}
-		}
-#endif
-		inline void BindTexture2D(GLenum tmu, GLuint texture) {
-			BindTexture<GL_TEXTURE_2D>(tmu, texture);
+		inline void BindTexture(GLuint texture, GLenum tmu = GL_NONE) {
+			BindTexture(typeID, texture, tmu);
 		}
 
-		inline void BindCubemap(GLenum tmu, GLuint texture) {
-			BindTexture<GL_TEXTURE_CUBE_MAP>(tmu, texture);
+		inline void BindTexture2D(GLuint texture, GLenum tmu = GL_NONE) {
+			BindTexture<GL_TEXTURE_2D>(texture, tmu);
+		}
+
+		inline void BindCubemap(GLuint texture, GLenum tmu = GL_NONE) {
+			BindTexture<GL_TEXTURE_CUBE_MAP>(texture, tmu);
 		}
 	};
 

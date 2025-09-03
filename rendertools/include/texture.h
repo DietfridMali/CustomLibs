@@ -306,7 +306,7 @@ public:
     inline static void Release(int tmuIndex)
         noexcept
     {
-        openGLStates.BindTexture<typeID>(GL_TEXTURE0 + tmuIndex, 0);
+        openGLStates.BindTexture<typeID>(0, GL_TEXTURE0 + tmuIndex);
         openGLStates.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 

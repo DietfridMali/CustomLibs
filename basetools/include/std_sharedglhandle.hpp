@@ -36,7 +36,17 @@ public:
             handle
             ? std::shared_ptr<HandleInfo>(
                 new HandleInfo(handle, m_releaser),
-                [](HandleInfo* p) { if (p) { if (p->releaser) p->releaser(p->handle); delete p; } }
+                [](HandleInfo* p) noexcept { 
+                    if (p) { 
+                        try {
+                            if (p->releaser)
+                                p->releaser(p->handle);
+                        }
+                        catch (...) {
+                        }
+                        delete p;
+                    }
+                }
             )
             : std::shared_ptr<HandleInfo>()
         )
@@ -108,7 +118,8 @@ public:
     inline void Release()
         noexcept
     {
-        m_info.reset(); // custom deleter ruft releaser automatisch
+        if (m_info and m_info->handle and m_releaser)
+            m_info.reset(); // custom deleter ruft releaser automatisch
     }
 
     // Claim: gibt alten frei, legt neuen an (wenn allocator gesetzt)

@@ -95,7 +95,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.1\include;$(ProjectDir)..\..\..\external\SDL2_net-2.0.1\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>d:\projects\libraries\custom\rendertools\include;d:\projects\smiley-battle\include;$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.1\include;$(ProjectDir)..\..\..\external\SDL2_net-2.0.1\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;;$(ProjectDir)..\..\..\external\SDL2_ttf-2.0.15\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_image-2.0.5\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>

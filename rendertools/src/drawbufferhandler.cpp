@@ -73,7 +73,7 @@ void DrawBufferHandler::SetDrawBuffers(FBO* fbo, ManagedArray<GLuint>* drawBuffe
 
 void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
-    openGLStates.BindTexture2D(GL_TEXTURE0, 0);
+    openGLStates.BindTexture2D(0, GL_TEXTURE0);
     if (m_drawBufferInfo.m_fbo != nullptr)
         m_drawBufferInfo.m_fbo->Reenable(false, true);
     else

@@ -30,6 +30,14 @@ public:
     BufferInfo(GLuint handle = 0, int attachment = 0)
         : m_handle(handle), m_attachment(attachment), m_tmuIndex(-1), m_type(btColor), m_isAttached(false)
     { }
+
+    void Init(void) {
+        m_handle = 0;
+        m_attachment = 0;
+        m_tmuIndex = -1; 
+        m_type = btColor;
+        m_isAttached = false;
+    }
 };
 
 // =================================================================================================
@@ -93,8 +101,10 @@ public:
     FBO();
 
     ~FBO() {
-        //Destroy();
+        Destroy();
     }
+
+    void Init(void);
 
     bool Create(int width, int height, int scale, const FBOBufferParams& params = {});
 

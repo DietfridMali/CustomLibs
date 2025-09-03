@@ -241,9 +241,9 @@ bool Texture::Bind(int tmuIndex)
     if (not IsAvailable())
         return false;
 #if USE_SHARED_HANDLES
-    openGLStates.BindTexture(m_type, GL_TEXTURE0 + tmuIndex, m_handle.get());
+    openGLStates.BindTexture(m_type, m_handle.get(), GL_TEXTURE0 + tmuIndex);
 #else
-    openGLStates.BindTexture(m_type, GL_TEXTURE0 + tmuIndex, m_handle);
+    openGLStates.BindTexture(m_type, m_handle, GL_TEXTURE0 + tmuIndex);
 #endif
     return true;
 }
@@ -252,7 +252,7 @@ bool Texture::Bind(int tmuIndex)
 void Texture::Release(int tmuIndex)
 {
     if (IsAvailable()) {
-        openGLStates.BindTexture(m_type, GL_TEXTURE0 + tmuIndex, 0);
+        openGLStates.BindTexture(m_type, 0, GL_TEXTURE0 + tmuIndex);
         openGLStates.ActiveTexture(GL_TEXTURE0);
     }
 }

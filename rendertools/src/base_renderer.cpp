@@ -7,6 +7,7 @@
 #include "conversions.hpp"
 #include "glew.h"
 //#include "quad.h"
+#include "tristate.h"
 #include "base_renderer.h"
 
 List<::Viewport> BaseRenderer::viewportStack;
@@ -224,12 +225,13 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            openGLStates.DepthFunc(GL_ALWAYS);
+            Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
             openGLStates.SetFaceCulling(false); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
             glClear(GL_COLOR_BUFFER_BIT);
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
+            openGLStates.DepthFunc(depthFunc);
         }
     }
 }
