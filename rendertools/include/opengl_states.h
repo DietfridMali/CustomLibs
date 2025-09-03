@@ -109,15 +109,18 @@ public:
 		}
 
 		template<class F, class... Args>
-		auto FuncState(const std::tuple<Args...>& state, F&& glFunc)
+		auto FuncState(int32_t& stateID, const std::tuple<Args...>& state, F&& glFunc)
 			-> std::tuple<Args...>
 		{
-			static bool initialized = false;
-			static std::tuple<Args...> current;
-
+			bool initialized = stateID >= 0;
+			static ManagedArray<std::tuple<Args...>> currentList;
+			if (not initialized) {
+				stateID = currentList.Length();
+				currentList.Append(state);
+			}
+			auto& current = currentList[stateID];
 			auto previous = current;
 			if (ENFORCE_STATE or not initialized or (current != state)) {
-				initialized = true;
 				current = state;
 				std::apply(std::forward<F>(glFunc), state); // ruft GL-Funktion mit Args...
 			}
@@ -154,12 +157,14 @@ public:
 			return FuncState<int, -1>(state, stateID, glDepthMask);
 		}
 
-		inline std::tuple<int, int, int, int>ColorMask(int r, int g, int b, int a) {
-			return FuncState(std::make_tuple(r, g, b, a), glColorMask);
+		inline std::tuple<GLboolean, GLboolean, GLboolean, GLboolean>ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a) {
+			static int32_t stateID = -1;
+			return FuncState(stateID, std::make_tuple(r, g, b, a), glColorMask);
 		}
 
 		inline std::tuple<float, float, float, float>ClearColor(float r, float g, float b, float a) {
-			return FuncState(std::make_tuple(r, g, b, a), glClearColor);
+			static int32_t stateID = -1;
+			return FuncState(stateID, std::make_tuple(r, g, b, a), glClearColor);
 		}
 
 		inline RGBAColor ClearColor(RGBAColor color) {
@@ -168,11 +173,13 @@ public:
 		}
 
 		inline std::tuple<GLenum, GLenum> BlendFunc(GLenum sFactor, GLenum dFactor) {
-			return FuncState(std::make_tuple(sFactor, dFactor), glBlendFunc);
+			static int32_t stateID = -1;
+			return FuncState(stateID, std::make_tuple(sFactor, dFactor), glBlendFunc);
 		}
 
 		inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA) {
-			return FuncState(std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
+			static int32_t stateID = -1;
+			return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
 		}
 
 		void BindTexture(GLenum typeID, GLuint texture, GLenum tmu = GL_NONE);
