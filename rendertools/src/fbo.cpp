@@ -333,34 +333,63 @@ void FBO::SetViewport(bool flipVertically) noexcept {
 }
 
 
+bool FBO::UpdateTransformation(const FBORenderParams& params) {
+    bool haveTransformation = false;
+    if (params.centerOrigin) {
+        haveTransformation = true;
+        baseRenderer.Translate(0.5, 0.5, 0);
+    }
+    if (params.rotation) {
+        haveTransformation = true;
+        baseRenderer.Rotate(params.rotation, 0, 0, 1);
+    }
+    if (params.flipVertically) {
+        haveTransformation = true;
+        baseRenderer.Scale(params.scale, params.scale * params.flipVertically, 1);
+    }
+    else if (params.source & 1) {
+        haveTransformation = true;
+        baseRenderer.Scale(params.scale, -params.scale, 1);
+    }
+    else if (params.scale != 1.0f) {
+        haveTransformation = true;
+        baseRenderer.Scale(params.scale, params.scale, 1);
+    }
+    return haveTransformation;
+}
+
+
 bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RGBAColor& color) {
+    Tristate<int> blending(-1, 0, 0);
     if (params.destination > -1) { // rendering to another FBO (than the main buffer)
         if (not Enable(params.destination, FBO::dbSingle, params.clearBuffer))
             return false;
         m_lastDestination = params.destination;
-        openGLStates.SetBlending(false);
+        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(false));
     }
     else { // rendering to the current render target
-        openGLStates.SetBlending(true);
+        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(true));
     }
     baseRenderer.PushMatrix();
-    baseRenderer.Translate(0.5, 0.5, 0);
-    if (params.rotation)
-        baseRenderer.Rotate(params.rotation, 0, 0, 1);
-    if (params.flipVertically)
-        baseRenderer.Scale(params.scale, params.scale * params.flipVertically, 1);
-    else if (params.source & 1)
-        baseRenderer.Scale(params.scale, -params.scale, 1);
-    else if (params.scale != 1.0f)
-        baseRenderer.Scale(params.scale, params.scale, 1);
+    bool applyTransformation = UpdateTransformation(params);
     Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
     Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(false));
     m_viewportArea.SetTexture(source);
-    if (params.shader)
+    if (params.shader) {
+        if (applyTransformation)
+            params.shader->UpdateMatrices();
+#if 1
         m_viewportArea.Render(params.shader, source);
+#else
+        if (params.centerOrigin)
+            m_viewportArea.Render(params.shader, source);
+        else
+            m_viewportArea.Fill(ColorData::LightGreen);
+#endif
+    }
     else {
 #ifdef _DEBUG
-        static bool fillArea = false;
+        static bool fillArea = not params.centerOrigin;
         static bool oscillate = false;
         static int i = 0;
         if (fillArea) {
@@ -378,6 +407,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         }
         //baseShaderHandler.StopShader();
     }
+    openGLStates.SetBlending(blending > 0);
     openGLStates.SetFaceCulling(faceCulling > 0);
     openGLStates.DepthFunc(depthFunc);
     baseRenderer.PopMatrix();
@@ -394,20 +424,24 @@ void FBO::Fill(RGBAColor color) {
 }
 
 
+Texture* FBO::GetRenderTexture(const FBORenderParams& params) {
+    if (params.source == params.destination)
+        return nullptr;
+    if (params.source < 0)
+        m_renderTexture.m_handle = SharedTextureHandle(GLuint(-params.source));
+    else
+        m_renderTexture.m_handle = BufferHandle(params.source);
+    m_renderTexture.HasBuffer() = true;
+    return &m_renderTexture;
+}
+
+
  // source < 0 means source contains a texture handle from some texture external to the FBO
 bool FBO::Render(const FBORenderParams& params, const RGBAColor& color) {
-    Texture texture;
-    if (params.source != params.destination) {
-        if (params.source < 0)
-            texture.m_handle = SharedTextureHandle(GLuint(-params.source));
-        else
-            texture.m_handle = BufferHandle(params.source);
-        texture.HasBuffer() = true;
-    }
     if (params.destination >= 0)
         m_lastDestination = params.destination;
-    return RenderTexture((params.source == params.destination) ? nullptr : &texture, params, color);
-    }
+    return RenderTexture((params.source == params.destination) ? nullptr : GetRenderTexture(params), params, color);
+}
 
 
 bool FBO::AutoRender(const FBORenderParams& params, const RGBAColor& color) {

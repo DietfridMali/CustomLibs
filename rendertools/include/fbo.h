@@ -71,6 +71,7 @@ public:
     DrawBufferList              m_drawBuffers; 
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
+    Texture                     m_renderTexture;
     bool                        m_pingPong;
     bool                        m_isAvailable;
     int                         m_lastDestination;
@@ -93,6 +94,7 @@ public:
         bool clearBuffer = true;
         bool premultiply = false;
         int flipVertically = 0; // -1: flip, 1: don't flip, 0: renderer decides
+        bool centerOrigin = true;
         float rotation = 0.0f; 
         float scale = 1.0f;
         Shader* shader = nullptr;
@@ -126,6 +128,10 @@ public:
     void Fill(RGBAColor color);
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
+
+    Texture* GetRenderTexture(const FBORenderParams& params = {});
+
+    bool UpdateTransformation(const FBORenderParams& params);
 
     bool RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color);
 

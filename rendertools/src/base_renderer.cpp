@@ -247,7 +247,7 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // Column-major Initializer-Reihenfolge (GLM!):
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isFBO) {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept { //, bool isFBO) {
 #if 1
     if (windowWidth * windowHeight == 0) {
         if (m_drawBufferInfo.m_fbo) {
@@ -262,10 +262,10 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 
     m_viewport = viewport;
 #if 1
-    if (flipVertically)
+    if (flipWindowVertically)
         m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
 #endif
-    m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
+    m_viewport.BuildTransformation(windowWidth, windowHeight, flipViewportVertically);
 #else
     m_viewport = viewport;
     if (flipVertically)

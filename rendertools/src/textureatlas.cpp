@@ -34,7 +34,7 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 bool TextureAtlas::Render(Shader* shader) {
 	if (not shader)
 		return false;
-	m_atlas.Render({ .clearBuffer = false, .shader = shader });
+	m_atlas.Render({ .clearBuffer = false, .centerOrigin = true, .shader = shader });
 	return true;
 }
 
@@ -72,7 +72,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
 	l = x * w;
 	t = y * h;
 #endif
-	baseRenderer.SetViewport(Viewport(l, t, w, h), 0, 0, true);
+	baseRenderer.SetViewport(Viewport(l, t, w, h), 0, 0, true, true);
 	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White); // , GlyphOffset(glyphIndex), m_scale);
 	if (shader) {
 		float c = float(glyphIndex) / float(m_size.GetSize());

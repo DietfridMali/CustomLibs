@@ -35,7 +35,7 @@ void Viewport::BuildTransformation(int windowWidth, int windowHeight, bool flipV
 
     float tx = 2.0f * (Leftf() + 0.5f * Widthf()) / float(windowWidth) - 1.0f;
     float ty = 1.0f - 2.0f * (Topf() + 0.5f * Heightf()) / float(windowHeight);
-#if 0
+#if 1
     glm::mat4 M(1.0f);
 #   if 1
     M[0][0] = sx;           // scale x
