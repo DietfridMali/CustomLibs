@@ -151,8 +151,9 @@ const ShaderSource& TintAndBlurShader() {
             uniform float contrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
             uniform float gamma;        // Gammawert (z.B. 2.2 für Standard-Monitor)
             uniform vec4 tint;
-        )")
-        + GaussBlurFuncs() +
+        )") +
+        GaussBlurFuncs() +
+        TintFuncs() +
         String(R"(
         void main() {
             vec4 texColor = (blurRadius > 2) ? GaussBlur7x7(3) : (blurRadius == 2) ? GaussBlur5x5(3) : (blurRadius == 1) ? GaussBlur3x3(3) : texture(source, fragTexCoord);

@@ -165,5 +165,37 @@ const String& GaussBlurFuncs() {
     return source;
 };
 
+const String& TintFuncs() {
+    static const String source(R"(
+        vec3 ApplyClampedTint(vec3 color, vec3 tintScale) {
+            vec3 scale = tintScale - vec3(1.0);
+            float maxScale = max(max(scale.r, scale.g), scale.b);
+            float maxColor = max(max(color.r, color.g), color.b);
+            float minHeadroom = 1.0 - maxColor;
+            scale *= min(1.0, minHeadroom / max(maxScale, 1e-6));
+            scale += vec3(1.0);
+            return clamp(color * scale, 0.0, 1.0);
+        }
+
+        // downscale color just so much inf need be that tint can be fully applied
+        vec3 ApplyTint(vec3 color, vec3 tintScale) {
+            vec3 denom = max(color * tintScale, vec3(1e-6));
+            vec3 inv   = 1.0 / denom;
+            // t = min(1, min(inv.r, inv.g, inv.b))
+            float t = min(1.0, min(inv.r, min(inv.g, inv.b)));
+            // erst runterregeln, dann Tint anwenden
+            return (color * t) * tintScale;
+        }
+
+        vec3 ApplyExponentialTint(vec3 color, vec3 tintScale, float e, float tMin) {
+            vec3 s = pow(max(tintScale, vec3(1e-6)), vec3(max(e, 0.0)));
+            vec3 denom = max(color * s, vec3(1e-6));
+            float t = min(1.0, min(1.0/denom.r, min(1.0/denom.g, 1.0/denom.b)));
+            t = max(t, tMin);
+            return (color * t) * s;
+        }
+        )");
+    return source;
+}
 
 // =================================================================================================

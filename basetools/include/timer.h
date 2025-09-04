@@ -74,6 +74,13 @@ public:
     }
 
 
+    inline int Duration(void)
+        noexcept
+    {
+        return m_duration;
+    }
+
+
     inline int LapTime(void)
         noexcept
     {

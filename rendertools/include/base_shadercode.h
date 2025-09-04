@@ -69,6 +69,7 @@ const String& Standard2DVS();
 const String& Standard3DVS();
 const String& Offset2DVS();
 const String& GaussBlurFuncs();
+const String& TintFuncs();
 
 // =================================================================================================
 
