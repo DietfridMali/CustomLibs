@@ -77,7 +77,7 @@ public:
     }
 
     float GrayValue(bool perceptive = true) const noexcept {
-        static Vector3f luminance[2]{ { 0.299, 0.587, 0.114 }, { 0.2126,0.7152,0.0722 } };
+        static Vector3f luminance[2]{ { 0.299f, 0.587f, 0.114f }, { 0.2126f,0.7152f,0.0722f } };
         return Vector3f(*this).Dot(luminance[perceptive]);
     }
 
@@ -89,25 +89,14 @@ public:
     // Liefert die MULTIPLIKATIVE Skalen-"Farbe" (RGB um 1.0 herum),
 // die aus der Tint-Grundfarbe (*this) berechnet wird.
 // strength ∈ [0,1], keepLuminance = L(scale) auf 1 normieren.
-    RGBAColor Tint(float strength = 1.0f, bool keepLuminance = true, bool perceptive = true) const noexcept  {
+    RGBAColor Tint(float strength = 1.0f, bool perceptive = true) const noexcept  {
         float pivot = GrayValue(perceptive);
+        if (pivot < Conversions::NumericTolerance)
+            return *this;
         RGBColor scale = RGBColor(*this);
         scale -= RGBColor(pivot, pivot, pivot);
         scale *= std::clamp(strength, 0.0f, 1.0f);
         scale += Vector3f::ONE;                              // um 1.0 herum -> reine Multiplikation
-
-        // Optional: Helligkeit stabil halten → L(scale) = 1
-        if (keepLuminance) {
-            // L(scale) = dot(scale, w)
-            // per Grayscale/Average ausgedrückt (lesbar): dot == 3 * Average(Grayscale(scale))
-            RGBAColor scaleRGBA(scale.R(), scale.G(), scale.B(), 1.0f);
-            float g = scaleRGBA.GrayValue(perceptive);
-            float lum = RGBAColor(g, g, g, scaleRGBA.A()).Average() * 3.0f;
-            if (lum > Conversions::NumericTolerance) {
-                scale *= (1.0f / lum);
-            }
-        }
-
         return RGBAColor(scale.R(), scale.G(), scale.B(), 1.0f);
     }
 
