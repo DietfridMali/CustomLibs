@@ -78,4 +78,3 @@ private:
 #define baseShaderHandler BaseShaderHandler::Instance()
 
 // =================================================================================================
-
