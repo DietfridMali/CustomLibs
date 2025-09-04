@@ -239,6 +239,8 @@ class Shader
             return data;
         }
 
+        GLint SetVector2fData(const char* name, GLint& location, const Vector2f* data, size_t length) noexcept;
+
         static inline ManagedArray<float>& GetFloatData(GLenum id, int32_t size, ManagedArray<float>& glData) noexcept {
             if (glData.Length() < size)
                 try {

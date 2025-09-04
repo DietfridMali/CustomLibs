@@ -274,4 +274,17 @@ GLint Shader::SetIntData(const char* name, GLint& location, const int* data, siz
 #endif
 }
 
+GLint Shader::SetVector2fData(const char* name, GLint& location, const Vector2f* data, size_t length) noexcept {
+#if PASSTHROUGH_MODE
+    GetLocation(name, location);
+    if (location >= 0)
+        glUniform2fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
+    return location;
+#else
+    if (UpdateUniform<const float*, UniformArray<float>>(name, location, data))
+        glUniform2fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
+    return location;
+#endif
+}
+
 // =================================================================================================
