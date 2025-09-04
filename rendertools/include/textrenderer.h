@@ -13,7 +13,7 @@
 #include "textureatlas.h"
 #include "singletonbase.hpp"
 
-#define EXTERNAL_ATLAS 0
+#define EXTERNAL_ATLAS 1
 
 // =================================================================================================
 
@@ -60,13 +60,7 @@ private:
 
     AVLTree<String, GlyphInfo>  m_glyphDict;
 
-#if EXTERNAL_ATLAS
     TextureAtlas                m_atlas;
-#else
-    FBO*                        m_atlas;
-    Texture                     m_atlasTexture;
-    TableSize                   m_atlasSize;
-#endif
     Mesh                        m_mesh;
     Dictionary<int, FBO*>       m_fbos;
 

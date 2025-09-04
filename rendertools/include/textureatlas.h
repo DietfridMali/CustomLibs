@@ -56,6 +56,10 @@ public:
 			: Vector2f::ZERO;
 	}
 
+	inline Vector2f GlyphScale(void) noexcept {
+		return m_scale;
+	}
+
 	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1);
 
 	bool Render(Shader* shader);
@@ -80,6 +84,22 @@ public:
 
 	inline void SetViewport(void) {
 		m_atlas.SetViewport();
+	}
+
+	inline TableSize& Size(void) {
+		return m_size;
+	}
+	 
+	inline int GetWidth(bool scaled = false) noexcept {
+		return m_atlas.GetWidth(scaled);
+	}
+
+	inline int GetHeight(bool scaled = false) noexcept {
+		return m_atlas.GetHeight(scaled);
+	}
+
+	inline FBO& GetFBO(void) noexcept {
+		return m_atlas;
 	}
 };
 

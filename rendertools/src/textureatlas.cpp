@@ -40,12 +40,12 @@ bool TextureAtlas::Render(Shader* shader) {
 
 
 bool TextureAtlas::RenderColored(int glyphIndex, RGBAColor color) {
-	return Render(baseShaderHandler.LoadPlainTextureShader(color, m_scale, GlyphOffset(glyphIndex)));
+	return Render(baseShaderHandler.LoadPlainTextureShader(color, GlyphOffset(glyphIndex), m_scale));
 }
 
 
 bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
-	return Render(baseShaderHandler.LoadGrayscaleShader(brightness, m_scale, GlyphOffset(glyphIndex)));
+	return Render(baseShaderHandler.LoadGrayscaleShader(brightness, GlyphOffset(glyphIndex), m_scale));
 }
 
 
@@ -53,13 +53,37 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
 	bool enableLocally = not m_atlas.IsEnabled();
 	if (enableLocally)
 		m_atlas.Enable();
-	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White, m_scale, GlyphOffset(glyphIndex));
+	baseRenderer.PushViewport();
+	int x = m_size.Col(glyphIndex);
+	int y = m_size.Row(glyphIndex);
+	int l, t, w, h;
+#if 1
+	Vector2f offset{ GlyphOffset(glyphIndex) };
+	Vector2f size{ float(m_atlas.GetWidth(true)), float(m_atlas.GetHeight(true)) };
+	l = int(roundf(offset.X() * size.X()));
+	t = int(roundf(offset.Y() * size.Y()));
+	w = int(roundf(m_scale.X() * size.X()));
+	h = int(roundf(m_scale.Y() * size.Y()));
+//#else
+	int s = m_atlas.GetScale();
+	w = m_glyphSize.width * s;
+	h = m_glyphSize.height * s;
+	l = x * w;
+	t = y * h;
+#endif
+	baseRenderer.SetViewport(Viewport(l, t, w, h), 0, 0, true);
+	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White); // , GlyphOffset(glyphIndex), m_scale);
 	if (shader) {
-		baseRenderer.PushViewport();
-		baseRenderer.SetViewport(m_size.Col(glyphIndex) * m_glyphSize.width, m_size.Row(glyphIndex) * m_glyphSize.height, m_glyphSize.width, m_glyphSize.height);
+		float c = float(glyphIndex) / float(m_size.GetSize());
+#if 1
 		renderQuad.Render(shader, glyph, true);
-		baseRenderer.PopViewport();
+#else
+		renderQuad.Fill(RGBAColor(c, c, c, 1)); 
+#endif
+		renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 	}
+	baseRenderer.PopViewport();
+
 	if (enableLocally)
 		m_atlas.Disable();
 	return shader != nullptr;

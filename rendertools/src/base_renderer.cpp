@@ -175,7 +175,7 @@ void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
         openGLStates.DepthFunc(GL_ALWAYS);
         openGLStates.SetFaceCulling(false);
-        SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, true);
+        SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, false);
         Shader* shader;
         if (not UseCustomSceneShader())
             shader = nullptr;
@@ -187,7 +187,7 @@ void BaseRenderer::Draw3DScene(void) {
                 PopMatrix();
             }
         if (shader == nullptr) 
-            m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = false, .rotation = 0.0f });
+            m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 #if 1
         m_renderTexture.m_handle = m_sceneBuffer->BufferHandle(0);
         m_viewportArea.Render(shader, &m_renderTexture);
@@ -261,11 +261,15 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
     }
 
     m_viewport = viewport;
+#if 1
+    if (flipVertically)
+        m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
+#endif
     m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
 #else
     m_viewport = viewport;
     if (flipVertically)
-        m_viewport.m_top = m_windowHeight - m_viewport.m_top - m_viewport.m_height;
+        m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
     glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
     m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
 #endif
