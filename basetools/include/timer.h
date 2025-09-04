@@ -61,28 +61,28 @@ public:
 
 
     inline int StartTime(void)
-        noexcept
+        const noexcept
     {
         return m_startTime;
     }
 
 
     inline int EndTime(void)
-        noexcept
+        const noexcept
     {
         return m_endTime;
     }
 
 
     inline int Duration(void)
-        noexcept
+        const noexcept
     {
         return m_duration;
     }
 
 
     inline int LapTime(void)
-        noexcept
+        const noexcept
     {
         return m_lapTime;
     }
