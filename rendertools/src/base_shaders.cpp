@@ -68,8 +68,7 @@ const ShaderSource& GrayScaleShader() {
             gray *= brightness;
             fragColor = vec4(vec3(gray), texColor.a);
         }
-        )" 
-        );
+        )");
     return source;
 }
 
@@ -99,8 +98,7 @@ const ShaderSource& PlainTextureShader() {
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
             }
-    )"
-    );
+        )");
     return source;
 }
 
@@ -108,7 +106,7 @@ const ShaderSource& PlainTextureShader() {
 // render a b/w mask with color applied.
 const ShaderSource& BlurTextureShader() {
     static const ShaderSource source(
-        "plainTexture",
+        "blurTexture",
         Standard2DVS(),
         String(R"(
         //#version 140

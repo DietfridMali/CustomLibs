@@ -184,16 +184,7 @@ FBO* TextRenderer::GetFBO(float scale) {
 
 
 Shader* TextRenderer::LoadShader(void) {
-    static ShaderLocationTable locations;
-    Shader* shader = baseShaderHandler.SetupShader("plainTexture");
-    if (shader) {
-        locations.Start();
-        shader->SetVector4f("surfaceColor", locations.Current(), m_color);
-        shader->SetVector2f("tcOffset", locations.Current(), Vector2f::ZERO);
-        shader->SetVector2f("tcScale", locations.Current(), Vector2f::ONE);
-        //shader->SetFloat("premultiply", locations.Current(), 0.0f);
-    }
-    return shader;
+    return baseShaderHandler.LoadPlainTextureShader(m_color);
 }
 
 

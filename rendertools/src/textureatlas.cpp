@@ -51,20 +51,21 @@ bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
 
 bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
 	bool enableLocally = not m_atlas.IsEnabled();
-	if (enableLocally)
+	if (enableLocally) {
+		baseRenderer.PushViewport();
 		m_atlas.Enable();
-	baseRenderer.PushViewport();
+	}
 	int x = m_size.Col(glyphIndex);
 	int y = m_size.Row(glyphIndex);
 	int l, t, w, h;
-#if 1
+#if 0
 	Vector2f offset{ GlyphOffset(glyphIndex) };
 	Vector2f size{ float(m_atlas.GetWidth(true)), float(m_atlas.GetHeight(true)) };
 	l = int(roundf(offset.X() * size.X()));
 	t = int(roundf(offset.Y() * size.Y()));
 	w = int(roundf(m_scale.X() * size.X()));
 	h = int(roundf(m_scale.Y() * size.Y()));
-//#else
+#else
 	int s = m_atlas.GetScale();
 	w = m_glyphSize.width * s;
 	h = m_glyphSize.height * s;
@@ -76,16 +77,17 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
 	if (shader) {
 		float c = float(glyphIndex) / float(m_size.GetSize());
 #if 1
+		//renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 		renderQuad.Render(shader, glyph, true);
 #else
 		renderQuad.Fill(RGBAColor(c, c, c, 1)); 
 #endif
-		renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 	}
-	baseRenderer.PopViewport();
 
-	if (enableLocally)
+	if (enableLocally) {
 		m_atlas.Disable();
+		baseRenderer.PopViewport();
+	}
 	return shader != nullptr;
 }
 
