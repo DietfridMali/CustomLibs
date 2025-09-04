@@ -1,6 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include "vector.hpp"
+#include "conversions.hpp"
 
 class RGBAColor;
 
@@ -58,6 +59,11 @@ public:
         return A() > 0.0f;
     }
 
+    RGBAColor Mix(const RGBAColor& other, float t) const noexcept {
+        t = std::clamp(t, 0.0f, 1.0f);
+        return RGBAColor(std::lerp(R(), other.R(), t), std::lerp(G(), other.G(), t), std::lerp(B(), other.B(), t), std::lerp(A(), other.A(), t));
+    }
+
     RGBAColor Premultiplied(void) const {
         return (A() < 1.0f) ? RGBAColor (R() * A(), G() * A(), B() * A(), A()) : *this;
     }
@@ -69,6 +75,42 @@ public:
             color.B() *= color.A();
         }
     }
+
+    float GrayValue(bool perceptive = true) const noexcept {
+        static Vector3f luminance[2]{ { 0.299, 0.587, 0.114 }, { 0.2126,0.7152,0.0722 } };
+        return Vector3f(*this).Dot(luminance[perceptive]);
+    }
+
+    inline float Average(void) noexcept {
+        return (R() + B() + G()) / 3.0f;
+    }
+
+
+    // Liefert die MULTIPLIKATIVE Skalen-"Farbe" (RGB um 1.0 herum),
+// die aus der Tint-Grundfarbe (*this) berechnet wird.
+// strength ∈ [0,1], keepLuminance = L(scale) auf 1 normieren.
+    RGBAColor Tint(float strength = 1.0f, bool keepLuminance = true, bool perceptive = true) const noexcept  {
+        float pivot = GrayValue(perceptive);
+        RGBColor scale = RGBColor(*this);
+        scale -= RGBColor(pivot, pivot, pivot);
+        scale *= std::clamp(strength, 0.0f, 1.0f);
+        scale += Vector3f::ONE;                              // um 1.0 herum -> reine Multiplikation
+
+        // Optional: Helligkeit stabil halten → L(scale) = 1
+        if (keepLuminance) {
+            // L(scale) = dot(scale, w)
+            // per Grayscale/Average ausgedrückt (lesbar): dot == 3 * Average(Grayscale(scale))
+            RGBAColor scaleRGBA(scale.R(), scale.G(), scale.B(), 1.0f);
+            float g = scaleRGBA.GrayValue(perceptive);
+            float lum = RGBAColor(g, g, g, scaleRGBA.A()).Average() * 3.0f;
+            if (lum > Conversions::NumericTolerance) {
+                scale *= (1.0f / lum);
+            }
+        }
+
+        return RGBAColor(scale.R(), scale.G(), scale.B(), 1.0f);
+    }
+
 };
 
 

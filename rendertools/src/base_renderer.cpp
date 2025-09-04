@@ -182,7 +182,7 @@ void BaseRenderer::Draw3DScene(void) {
         else {
             PushMatrix();
             Translate(0.5, 0.5, 0);
-            //Scale(1, -1, 1);
+            Scale(1, -1, 1);
             if (not (shader = LoadCustomSceneShader()))
                 PopMatrix();
             }
