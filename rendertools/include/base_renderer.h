@@ -48,10 +48,10 @@ protected:
 
     int                     m_windowWidth;
     int                     m_windowHeight;
-    int                     m_sceneWidth;
-    int                     m_sceneHeight;
     int                     m_sceneLeft;
     int                     m_sceneTop;
+    int                     m_sceneWidth;
+    int                     m_sceneHeight;
     float                   m_aspectRatio;
 
     RGBAColor               m_backgroundColor;
