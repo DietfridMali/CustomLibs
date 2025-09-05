@@ -122,7 +122,7 @@ public:
 
     virtual bool UseCustomSceneShader(void) { return false; }
 
-    virtual Shader* LoadCustomSceneShader(void) { return nullptr; }
+    virtual Shader* LoadPostEffectShader(void) { return nullptr; }
 
     virtual void Draw3DScene(void);
 

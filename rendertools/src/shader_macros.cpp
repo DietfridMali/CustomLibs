@@ -227,6 +227,27 @@ const String& NoiseFuncs() {
 }
 
 
+
+const String& EdgeFadeFunc() {
+    static const String source(R"(
+        vec2 EdgeFade(vec2 baseUV, vec2 dispUV) {
+            float ef = clamp(edgeFade, 0.0, 0.5);
+            if (ef > 1e-6) {
+                vec2 edgeXY = min(baseUV, 1.0 - baseUV);
+                float edgeMin = min(edgeXY.x, edgeXY.y);
+                float w = smoothstep(0.0, ef, edgeMin);
+                dispUV *= w;
+                // Bounds cap to keep finalUV safely inside [0,1]
+                vec2 limit = max(edgeXY - vec2(1e-4), vec2(0.0));
+                dispUV = clamp(dispUV, -limit, limit);
+            }
+            return dispUV;
+        }
+    )");
+    return source;
+}
+
+
 const String& ChromAbFunc() {
     static const String source(R"(
         // === Chromatic Aberration (UV-space) ===
