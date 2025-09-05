@@ -66,9 +66,18 @@ public:
 
     Shader* LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);
 
-    Shader* LoadBlurTextureShader(const RGBAColor& color, int radius, bool premultiply);
+    Shader* LoadBlurTextureShader(const RGBAColor& color, int strength = 3, float spread = 3.0f, bool premultiply = false);
 
     Shader* LoadGrayscaleShader(float brightness, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE);
+
+    Shader* SetGaussBlurParams(Shader* shader, Vector2f viewportSize, int strength, float spread);
+
+    Shader* SetChromAbParams(Shader* shader, int offsetType, float aberration);
+
+    Shader* SetWarpParams(Shader* shader, float intensity, float speed);
+
+    Shader* SetWarpJitterParams(Shader* shader, float jitter, float jitterScale, float jitterSpeed);
+
 
 private:
     FloatArray* ComputeGaussKernel1D(int radius); // allokiert -> nicht noexcept

@@ -168,9 +168,9 @@ const String& GaussBlurFuncs() {
                 case 2:
                     return GaussBlur5x5(baseUV);
                 case 1:
-                    return GaussBlur3x3(ubaseUV);
+                    return GaussBlur3x3(baseUV);
                 default:
-                    return color;
+                    return texture(source, baseUV);
             }
         }
       )"
@@ -248,7 +248,7 @@ const String& EdgeFadeFunc() {
 }
 
 
-const String& ChromAbFunc() {
+const String& ChromAbFuncs() {
     static const String source(R"(
         // === Chromatic Aberration (UV-space) ===
         // Uses existing uniforms: sampler2D source, vec2 viewportSize

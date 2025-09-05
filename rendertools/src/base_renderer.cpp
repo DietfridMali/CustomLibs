@@ -177,7 +177,7 @@ void BaseRenderer::Draw3DScene(void) {
         openGLStates.SetFaceCulling(false);
         SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, false);
         Shader* shader;
-        if (not UseCustomSceneShader())
+        if (not UsePostEffectShader())
             shader = nullptr;
         else {
             PushMatrix();

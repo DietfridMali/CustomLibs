@@ -70,6 +70,9 @@ const String& Standard3DVS();
 const String& Offset2DVS();
 const String& GaussBlurFuncs();
 const String& TintFuncs();
+const String& NoiseFuncs();
+const String& ChromAbFuncs();
+const String& EdgeFadeFunc();
 
 // =================================================================================================
 

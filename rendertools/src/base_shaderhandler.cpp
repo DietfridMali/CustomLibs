@@ -125,13 +125,13 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
 }
 
 
-Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, int radius, bool premultiply) {
+Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, int strength, float spread, bool premultiply) {
     Shader* shader = SetupShader("blurTexture");
     if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
         shader->SetVector4f("surfaceColor", locations.Current(), color);
-        shader->SetInt("blurRadius", locations.Current(), radius);
+        shader->SetInt("blurStrength", locations.Current(), radius);
         shader->SetVector2f("texelSize", locations.Current(), Vector2f{ 1.0f / float (baseRenderer.Viewport().Width()), 1.0f / float(baseRenderer.Viewport().Height())});
 
         //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
@@ -150,6 +150,56 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f&
         shader->SetFloat("brightness", locations.Current(), brightness);
     }
     return shader;
+}
+
+
+Shader* ShaderHandler::SetGaussBlurParams(Shader* shader, Vector2f viewportSize, int strength, float spread) {
+    if (shader and not renderer.DepthPass()) {
+        static ShaderLocationTable locations;
+        locations.Start();
+        shader->SetVector2f("texelSize", locations.Current(), Vector2f(1.0f / viewportSize.X(), 1.0f / viewportSize.Y()));
+        shader->SetInt("blurStrength", locations.Current(), strength);
+        shader->SetFloat("blurSpread", locations.Current(), spread);
+        return shader;
+    }
+    return nullptr;
+}
+
+
+Shader* ShaderHandler::SetChromAbParams(Shader* shader, int offsetType, float aberration) { // offsetType: 0 - linear, 1 - radial
+    if (shader and not renderer.DepthPass()) {
+        static ShaderLocationTable locations;
+        locations.Start();
+        shader->SetInt("offsetType", locations.Current(), offsetType);
+        shader->SetFloat("aberration", locations.Current(), aberration);
+        return shader;
+    }
+    return nullptr;
+}
+
+
+Shader* ShaderHandler::SetWarpParams(Shader* shader, float intensity, float speed) { // offsetType: 0 - linear, 1 - radial
+    if (shader and not renderer.DepthPass()) {
+        static ShaderLocationTable locations;
+        locations.Start();
+        shader->SetFloat("warpIntensity", locations.Current(), intensity);
+        shader->SetFloat("warpSpeed", locations.Current(), 0.01f);
+        return shader;
+    }
+    return nullptr;
+}
+
+
+Shader* ShaderHandler::SetWarpJitterParams(Shader* shader, float jitter, float jitterScale, float jitterSpeed) { // offsetType: 0 - linear, 1 - radial
+    if (shader and not renderer.DepthPass()) {
+        static ShaderLocationTable locations;
+        locations.Start();
+        shader->SetFloat("warpJitter", locations.Current(), 0.5f);       // 0..1   (Stärke), z.B. 0.6
+        shader->SetFloat("warpJitterScale", locations.Current(), 2.0f);  // 4..64  (Zellengröße), z.B. 14.0
+        shader->SetFloat("warpJitterSpeed", locations.Current(), 0.125f);  // 0..2   (Anim-Geschw.), z.B. 0.25
+        return shader;
+    }
+    return nullptr;
 }
 
 // =================================================================================================

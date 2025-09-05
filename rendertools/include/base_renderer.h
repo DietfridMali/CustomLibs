@@ -120,7 +120,7 @@ public:
 
     virtual bool Stop2DScene(void);
 
-    virtual bool UseCustomSceneShader(void) { return false; }
+    virtual bool UsePostEffectShader(void) { return false; }
 
     virtual Shader* LoadPostEffectShader(void) { return nullptr; }
 
@@ -224,9 +224,6 @@ public:
     static void ClearGLError(void) noexcept;
 
     static bool CheckGLError(const char* operation = "") noexcept;
-
-protected:
-    void BuildViewportTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 };
 
 using RenderPassType = BaseRenderer::RenderPasses;
