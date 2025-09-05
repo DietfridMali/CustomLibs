@@ -281,7 +281,7 @@ GLint Shader::SetVector2fData(const char* name, GLint& location, const Vector2f*
         glUniform2fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
     return location;
 #else
-    if (UpdateUniform<const float*, UniformArray<float>>(name, location, data))
+    if (UpdateUniform<const Vector2f*, UniformArray<Vector2f>>(name, location, data))
         glUniform2fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
     return location;
 #endif
