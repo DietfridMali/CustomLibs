@@ -131,7 +131,7 @@ Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, int str
         static ShaderLocationTable locations;
         locations.Start();
         shader->SetVector4f("surfaceColor", locations.Current(), color);
-        shader->SetInt("blurStrength", locations.Current(), radius);
+        shader->SetInt("blurStrength", locations.Current(), strength);
         shader->SetVector2f("texelSize", locations.Current(), Vector2f{ 1.0f / float (baseRenderer.Viewport().Width()), 1.0f / float(baseRenderer.Viewport().Height())});
 
         //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
@@ -153,8 +153,8 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f&
 }
 
 
-Shader* ShaderHandler::SetGaussBlurParams(Shader* shader, Vector2f viewportSize, int strength, float spread) {
-    if (shader and not renderer.DepthPass()) {
+Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, Vector2f viewportSize, int strength, float spread) {
+    if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
         shader->SetVector2f("texelSize", locations.Current(), Vector2f(1.0f / viewportSize.X(), 1.0f / viewportSize.Y()));
@@ -166,8 +166,8 @@ Shader* ShaderHandler::SetGaussBlurParams(Shader* shader, Vector2f viewportSize,
 }
 
 
-Shader* ShaderHandler::SetChromAbParams(Shader* shader, int offsetType, float aberration) { // offsetType: 0 - linear, 1 - radial
-    if (shader and not renderer.DepthPass()) {
+Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, int offsetType, float aberration) { // offsetType: 0 - linear, 1 - radial
+    if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
         shader->SetInt("offsetType", locations.Current(), offsetType);
@@ -178,8 +178,8 @@ Shader* ShaderHandler::SetChromAbParams(Shader* shader, int offsetType, float ab
 }
 
 
-Shader* ShaderHandler::SetWarpParams(Shader* shader, float intensity, float speed) { // offsetType: 0 - linear, 1 - radial
-    if (shader and not renderer.DepthPass()) {
+Shader* BaseShaderHandler::SetWarpParams(Shader* shader, float intensity, float speed) { // offsetType: 0 - linear, 1 - radial
+    if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
         shader->SetFloat("warpIntensity", locations.Current(), intensity);
@@ -190,8 +190,8 @@ Shader* ShaderHandler::SetWarpParams(Shader* shader, float intensity, float spee
 }
 
 
-Shader* ShaderHandler::SetWarpJitterParams(Shader* shader, float jitter, float jitterScale, float jitterSpeed) { // offsetType: 0 - linear, 1 - radial
-    if (shader and not renderer.DepthPass()) {
+Shader* BaseShaderHandler::SetWarpJitterParams(Shader* shader, float jitter, float jitterScale, float jitterSpeed) { // offsetType: 0 - linear, 1 - radial
+    if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
         shader->SetFloat("warpJitter", locations.Current(), 0.5f);       // 0..1   (Stärke), z.B. 0.6

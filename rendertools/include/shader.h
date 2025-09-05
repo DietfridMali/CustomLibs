@@ -75,7 +75,11 @@ class Shader
         }
 
         String GetInfoLog (GLuint handle, bool isProgram = false);
+
+        void PrintLog(String infoLog, String title);
             
+        void PrintShaderSource(GLuint handle, String title);
+
         GLuint Compile(const char* code, GLuint type);
 
         GLuint Link(GLuint vsHandle, GLuint fsHandle);

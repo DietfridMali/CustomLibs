@@ -1,5 +1,8 @@
 
 #include <utility>
+#include <string_view>
+#include <ranges>
+
 #include "shader.h"
 #include "base_renderer.h"
 
@@ -7,6 +10,34 @@
 
 // =================================================================================================
 // Some basic shader handling: Compiling, enabling, setting shader variables
+
+void Shader::PrintLog(String infoLog, String title) {
+    // Gesamtzahl der Zeilen zählen
+    const size_t lineCount = std::ranges::count(infoLog, '\n') + 1;
+    const int width = static_cast<int>(std::to_string(lineCount).size());
+
+    fprintf(stderr, "\n%s\n", (char*) title);
+
+    int lineNo = 0;
+    for (auto&& chunk : infoLog | std::views::split('\n')) {
+        std::string_view line(chunk.begin(), chunk.end());
+        if (!line.empty() && line.back() == '\r')
+            line.remove_suffix(1);
+        fprintf(stderr, "%3d: %.*s\n", ++lineNo, static_cast<int>(line.size()), line.data());
+    }
+    fprintf(stderr, "\n\n");
+}
+
+
+void Shader::PrintShaderSource(GLuint handle, String title) {
+    String buffer;
+    GLsizei bufLen = 0;
+    glGetShaderiv(handle, GL_SHADER_SOURCE_LENGTH, &bufLen);
+    buffer.Resize(bufLen);
+    glGetShaderSource(handle, sizeof(buffer), &bufLen, buffer.Data());
+    PrintLog(buffer, title);
+}
+
 
 String Shader::GetInfoLog (GLuint handle, bool isProgram)
 {
@@ -26,7 +57,7 @@ String Shader::GetInfoLog (GLuint handle, bool isProgram)
         glGetProgramInfoLog (handle, logLength, &charsWritten,infoLog.Data());
     else
         glGetShaderInfoLog (handle, logLength, &charsWritten, infoLog.Data());
-    fprintf (stderr, "Shader info: %s\n\n", static_cast<char*>(infoLog));
+    PrintLog(infoLog, isProgram ? String("Shader program") : String("Shader"));
     return infoLog;
     }
 
@@ -40,11 +71,8 @@ GLuint Shader::Compile(const char* code, GLuint type) {
     if (isCompiled == GL_TRUE)
         return handle;
     String shaderLog = GetInfoLog (handle);
-    char buffer [10000];
-    GLsizei bufLen;
-    glGetShaderSource (handle, sizeof (buffer), &bufLen, buffer);
-    fprintf(stderr, "\n***** compiler error in %s shader: *****\n\n", (char*)m_name);
-    fprintf (stderr, "\nshader source:\n%s\n\n", buffer);
+     fprintf(stderr, "\n***** compiler error in %s shader: *****\n\n", (char*)m_name);
+    PrintShaderSource(handle, String("Shader source:"));
     glDeleteShader(handle);
     return 0;
 }
@@ -67,13 +95,9 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
         return handle;
     }
     String shaderLog = GetInfoLog (handle, true);
-    char buffer [10000];
-    GLsizei bufLen;
     fprintf(stderr, "\n***** linker error in %s shader: *****\n\n", (char*)m_name);
-    glGetShaderSource (vsHandle, sizeof (buffer), &bufLen, buffer);
-    fprintf (stderr, "\nVertex shader:\n%s\n\n", buffer);
-    glGetShaderSource (fsHandle, sizeof (buffer), &bufLen, buffer);
-    fprintf (stderr, "\nFragment shader:\n%s\n\n", buffer);
+    PrintShaderSource(vsHandle, String("Vertex shader:"));
+    PrintShaderSource(fsHandle, String("Fragment shader:"));
     glDeleteShader(vsHandle);
     glDeleteShader(fsHandle);
     glDeleteProgram(handle);
