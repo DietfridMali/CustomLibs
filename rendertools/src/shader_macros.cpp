@@ -232,7 +232,7 @@ const String& ChromAbFunc() {
         // === Chromatic Aberration (UV-space) ===
         // Uses existing uniforms: sampler2D source, vec2 viewportSize
         uniform float aberration;
-        uniform int  offsetType;       // 0 = linear, 1 = radial
+        uniform int   offsetType;       // 0 = linear, 1 = radial
 
         // Build linear CA offset in UV units
         vec2 LinearOffset(vec2 uv) {
