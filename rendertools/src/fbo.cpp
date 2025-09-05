@@ -407,8 +407,8 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         }
         //baseShaderHandler.StopShader();
     }
-    openGLStates.SetBlending(blending > 0);
-    openGLStates.SetFaceCulling(faceCulling > 0);
+    openGLStates.SetBlending(blending);
+    openGLStates.SetFaceCulling(faceCulling);
     openGLStates.DepthFunc(depthFunc);
     baseRenderer.PopMatrix();
     if (params.destination > -1)

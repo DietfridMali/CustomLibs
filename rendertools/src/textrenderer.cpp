@@ -66,8 +66,8 @@ int TextRenderer::BuildAtlas(void) {
     m_atlas.Disable();
     m_mesh.SetDynamic(true);
     m_mesh.Init(GL_QUADS, 0, &m_atlas.GetTexture());
-    openGLStates.SetBlending(blending > 0);
-    openGLStates.SetFaceCulling(faceCulling > 0);
+    openGLStates.SetBlending(blending);
+    openGLStates.SetFaceCulling(faceCulling);
     return m_glyphDict.Size(); // glyphCount;
 }
 
