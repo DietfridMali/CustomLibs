@@ -230,6 +230,7 @@ const String& NoiseFuncs() {
 
 const String& EdgeFadeFunc() {
     static const String source(R"(
+        uniform float edgeFade;
         vec2 EdgeFade(vec2 baseUV, vec2 dispUV) {
             float ef = clamp(edgeFade, 0.0, 0.5);
             if (ef > 1e-6) {

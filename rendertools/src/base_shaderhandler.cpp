@@ -166,7 +166,7 @@ Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, Vector2f viewportS
 }
 
 
-Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, int offsetType, float aberration) { // offsetType: 0 - linear, 1 - radial
+Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, float aberration, int offsetType) { // offsetType: 0 - linear, 1 - radial
     if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
@@ -178,10 +178,11 @@ Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, int offsetType, floa
 }
 
 
-Shader* BaseShaderHandler::SetWarpParams(Shader* shader, float intensity, float speed) { // offsetType: 0 - linear, 1 - radial
+Shader* BaseShaderHandler::SetWarpParams(Shader* shader, float time, float intensity, float speed) { // offsetType: 0 - linear, 1 - radial
     if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
+        shader->SetFloat("warpTime", locations.Current(), time);
         shader->SetFloat("warpIntensity", locations.Current(), intensity);
         shader->SetFloat("warpSpeed", locations.Current(), 0.01f);
         return shader;

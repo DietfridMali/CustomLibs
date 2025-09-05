@@ -34,7 +34,7 @@ void Shader::PrintShaderSource(GLuint handle, String title) {
     GLsizei bufLen = 0;
     glGetShaderiv(handle, GL_SHADER_SOURCE_LENGTH, &bufLen);
     buffer.Resize(bufLen);
-    glGetShaderSource(handle, sizeof(buffer), &bufLen, buffer.Data());
+    glGetShaderSource(handle, bufLen, &bufLen, buffer.Data());
     PrintLog(buffer, title);
 }
 

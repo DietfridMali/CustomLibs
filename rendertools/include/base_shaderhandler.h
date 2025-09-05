@@ -72,9 +72,9 @@ public:
 
     Shader* SetGaussBlurParams(Shader* shader, Vector2f viewportSize, int strength, float spread);
 
-    Shader* SetChromAbParams(Shader* shader, int offsetType, float aberration);
+    Shader* SetChromAbParams(Shader* shader, float aberration = 0.1f, int offsetType = 1);
 
-    Shader* SetWarpParams(Shader* shader, float intensity, float speed);
+    Shader* SetWarpParams(Shader* shader, float time, float intensity, float speed);
 
     Shader* SetWarpJitterParams(Shader* shader, float jitter, float jitterScale, float jitterSpeed);
 
