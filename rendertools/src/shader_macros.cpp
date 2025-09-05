@@ -81,9 +81,9 @@ const String& Offset2DVS() {
 const String& GaussBlurFuncs() {
     static const String source(
         R"(
-        uniform int blurStrengh;
-        uniform blurSpread;
         uniform vec2 texelSize;
+        uniform int blurStrengh;
+        uniform float blurSpread;
 
         vec4 GaussBlur7x7(vec2 baseUV) {
             const int HALF = 3;
@@ -232,56 +232,43 @@ const String& ChromAbFunc() {
         // === Chromatic Aberration (UV-space) ===
         // Uses existing uniforms: sampler2D source, vec2 viewportSize
         uniform float aberration;
-        uniform int  caType;       // 0 = linear, 1 = radial
-        uniform vec2 caLinearDir;  // arbitrary direction for linear CA (need not be normalized)
-
-        // Branchless, safe normalization (returns zero for zero-length input)
-        vec2 SafeNorm(vec2 v) {
-            float invLen = inversesqrt(max(dot(v, v), 1e-12));
-            return v * invLen;
-        }
+        uniform int  offsetType;       // 0 = linear, 1 = radial
 
         // Build linear CA offset in UV units
-        vec2 LinearUVOffset(vec2 uv) {
-            vec2 dir = safeNorm(caLinearDir);
-            return dir * aberration; // aberration already in UV units
+        vec2 LinearOffset(vec2 uv) {
+            return uv * (0.6 * aberration + 1e-4);
         }
 
         // Build radial CA offset in UV units (aspect-correct, circular around center)
-        vec2 RadialUVOffset(vec2 uv) {
+        vec2 RadialOffset(vec2 uv) {
             float aspect = viewportSize.x / max(viewportSize.y, 1.0);
-            vec2 d   = uv - 0.5;                // UV delta from center
-            vec2 m   = vec2(d.x * aspect, d.y); // metric space (x scaled by aspect)
+            vec2 d = uv - 0.5;                // UV delta from center
+            vec2 m = vec2(d.x * aspect, d.y); // metric space (x scaled by aspect)
             float rM = length(m);               // radial distance in metric space
             vec2 dirM = (rM > 0.0) ? (m / rM) : vec2(0.0); // direction (metric)
-            float L   = aberration * rM;        // fringe grows with radius
+            float L = aberration * rM;        // fringe grows with radius
             // Map metric direction back to UV
             return vec2((L * dirM.x) / max(aspect, 1e-6), L * dirM.y);
         }
 
-        // Dispatcher for offset
-        vec2 CAOffset(vec2 uv) {
-            return (caType == 1) ? RadialOffsetUV(uv) : LinearOffsetUV(uv);
-        }
-
         // Pure CA: compose RGB from source only (useful in a dedicated CA pass)
-        vec3 ChromaticAberration(vec2 uv) {
-            vec2 off = CAOffset(uv);
-            float rC = texture(source, uv + off).r;
-            float gC = texture(source, uv      ).g;
-            float bC = texture(source, uv - off).b;
+        vec3 ChromaticAberration(vec2 baseUV, vec2 dispUV) {
+            vec2 offset = (offsetType == 1) ? RadialOffset(baseUV) : LinearOffset(dispUV);
+            float rC = texture(source, baseUV + offset).r;
+            float gC = texture(source, baseUV).g;
+            float bC = texture(source, baseUV - offset).b;
             return vec3(rC, gC, bC);
         }
 
         // Hybrid CA (Delta-Fringe): add only the RB fringe to the already-processed baseColor
         // Keeps your blur/tint/gray intact and costs only 2 extra fetches.
-        vec3 ChromaticAberration(vec2 uv, vec3 baseColor) {
+        vec3 ChromaticAberration(vec2 baseUV, vec2 dispUV, vec3 baseColor) {
             if (aberration < 1e-6)
                 return baseColor;
-            vec2 off = BuildCAOffset(uv);
-            vec3 c0  = texture(source, uv).rgb;
-            float rS = texture(source, uv + off).r;
-            float bS = texture(source, uv - off).b;
+            vec2 offset = (offsetType == 1) ? RadialOffset(baseUV) : LinearOffset(dispUV);
+            vec3 c0 = texture(source, baseUV).rgb;
+            float rS = texture(source, baseUV + offset).r;
+            float bS = texture(source, baseUV - offset).b;
             vec3 fringe = vec3(rS - c0.r, 0.0, bS - c0.b);
             return baseColor + fringe;
         }
