@@ -156,7 +156,8 @@ const ShaderSource& TintAndBlurShader() {
         TintFuncs() +
         String(R"(
         void main() {
-            vec4 texColor = (blurRadius > 2) ? GaussBlur7x7(3) : (blurRadius == 2) ? GaussBlur5x5(3) : (blurRadius == 1) ? GaussBlur3x3(3) : texture(source, fragTexCoord);
+            vec2 baseUV = fragTexCoord;
+            vec4 texColor = (blurRadius > 2) ? GaussBlur7x7(3, baseUV) : (blurRadius == 2) ? GaussBlur5x5(3, baseUV) : (blurRadius == 1) ? GaussBlur3x3(3, baseUV) : texture(source, baseUV);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray = (gray - 0.5) * contrast + 0.5;
