@@ -161,8 +161,8 @@ const String& GaussBlurFuncs() {
             return vec4(rgb, a);
         }
 
-        vec4 GaussBlur(vec2 baseUV) {
-            switch(blurStrengh) {
+        vec4 GaussBlur(vec2 baseUV, int strength) {
+            switch((strength < 0) ? blurStrengh : strength) {
                 case 3:
                     return GaussBlur7x7(baseUV);
                 case 2:
