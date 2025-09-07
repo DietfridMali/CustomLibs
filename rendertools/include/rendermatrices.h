@@ -17,6 +17,7 @@ public:
         mtProjection,
         mtProjection2D,
         mtProjection3D,
+        mtProjectionFx,
         mtCount
     } eMatrixType;
 
@@ -35,12 +36,22 @@ public:
 
 
     inline float ZNear(void) noexcept {
-        return m_projection.m_zNear;
+        return m_projection.ZNear();
     }
 
 
     inline float ZFar(void) noexcept {
-        return m_projection.m_zFar;
+        return m_projection.ZFar();
+    }
+
+
+    inline float FoV(void) noexcept {
+        return m_projection.FoV();
+    }
+
+
+    inline float AspectRatio(void) noexcept {
+        return m_projection.AspectRatio();
     }
 
 
@@ -51,6 +62,11 @@ public:
 
     inline Matrix4f& Projection(void) noexcept {
         return m_renderMatrices[mtProjection];
+    }
+
+
+    inline Matrix4f& FxProjection(void) noexcept {
+        return m_renderMatrices[mtProjectionFx];
     }
 
 

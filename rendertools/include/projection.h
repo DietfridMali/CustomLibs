@@ -28,6 +28,22 @@ public:
 
     Matrix4f ComputeFrustum(float left, float right, float bottom, float top, bool rowMajor = false)
         noexcept;
+
+    inline float ZNear(void) noexcept {
+        return m_zNear;
+    }
+
+    inline float ZFar(void) noexcept {
+        return m_zFar;
+    } 
+
+    inline float FoV(void) noexcept {
+        return m_fov;
+    }
+
+    inline float AspectRatio(void) noexcept {
+        return m_aspectRatio;
+    }
 };
 
 // =================================================================================================

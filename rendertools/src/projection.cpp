@@ -18,42 +18,28 @@ noexcept
 Matrix4f Projection::ComputeProjection(bool rowMajor)
 noexcept
 {
-    //m_projection.Create (16);
+#if USE_GLM
+    float radFov = glm::radians(m_fov);
+    return Matrix4f(glm::perspective(glm::radians(m_fov), m_aspectRatio, m_zNear, m_zFar));
+#else
     float yMax = m_zNear * tanf(Conversions::DegToRad(m_fov / 2));
-    //ymin = -ymax;
-    //xmin = -ymax * aspectRatio;
     float xMax = yMax * m_aspectRatio;
     return ComputeFrustum(-xMax, xMax, -yMax, yMax, rowMajor);
+#endif
 }
 
 
 Matrix4f Projection::ComputeFrustum(float left, float right, float bottom, float top, bool rowMajor)
 noexcept
 {
+#if USE_GLM
+    return Matrix4f();
+#else
     float nearPlane = 2.0f * m_zNear;
     float depth = m_zFar - m_zNear;
 
-#if 0
-    // symmetric frustum, i.e. left == -right and bottom == -top
-    m_projection =
-        Matrix4f(
-            Vector4f{ m_zNear / right, 0.0f, 0.0f, 0.0f },
-            Vector4f{ 0.0f, m_zNear / top, 0.0f, 0.0f },
-            Vector4f{ 0.0f, 0.0f, -{m_zFar + m_zNear} / depth, -1.0f },
-            Vector4f{ 0.0f, 0.0f, {-nearPlane * m_zFar} / depth, 0.0f }
-        );
-#else
     float width = right - left;
     float height = top - bottom;
-#if USE_GLM
-    Matrix4f m({
-        Vector4f{ nearPlane / width,               0.0f,        (left + right) / width,  0.0f },
-        Vector4f{              0.0f, nearPlane / height,       (top + bottom) / height,  0.0f },
-        Vector4f{              0.0f,               0.0f,   -(m_zFar + m_zNear) / depth, -1.0f },
-        Vector4f{              0.0f,               0.0f, (-nearPlane * m_zFar) / depth,  0.0f }
-        });
-    return m;
-#else
     Matrix4f m({
         Vector4f{ nearPlane / width,               0.0f,        (left + right) / width,  0.0f },
         Vector4f{              0.0f, nearPlane / height,       (top + bottom) / height,  0.0f },
@@ -61,7 +47,6 @@ noexcept
         Vector4f{              0.0f,               0.0f, (-nearPlane * m_zFar) / depth,  0.0f }
         }, false);
     return rowMajor ? m.Transpose() : m;
-#endif
 #endif
 }
 
