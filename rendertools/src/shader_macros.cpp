@@ -227,6 +227,33 @@ const String& NoiseFuncs() {
 }
 
 
+const String& RandFuncs() {
+    static const String source(R"(
+        uint _rngState;
+
+        void seedRand(float s) {
+            // simple float->uint hash for seeding; scale s to avoid tiny deltas
+            uint u = uint(s * 4096.0);
+            u ^= 0x9E3779B9u;               // mix in a constant
+            _rngState = (u == 0u) ? 1u : u; // avoid zero state
+        }
+
+        uint _lcg() {
+            _rngState *= 1664525u + 1013904223u; // LCG
+            return _rngState;
+        }
+
+        float rand() {
+            return float(_lcg()) * (1.0 / 4294967296.0); // [0..1)
+        }
+
+        int randn(int n) {
+            return int(_lcg() % uint(max(n, 1)));        // 0..n-1
+        }
+    )");
+    return source;
+}
+
 
 const String& EdgeFadeFunc() {
     static const String source(R"(

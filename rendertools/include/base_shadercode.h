@@ -71,6 +71,7 @@ const String& Offset2DVS();
 const String& GaussBlurFuncs();
 const String& TintFuncs();
 const String& NoiseFuncs();
+const String& RandFuncs();
 const String& ChromAbFuncs();
 const String& EdgeFadeFunc();
 

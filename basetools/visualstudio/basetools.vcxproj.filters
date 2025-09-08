@@ -159,6 +159,9 @@
     <ClInclude Include="..\include\tablesize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\random.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">

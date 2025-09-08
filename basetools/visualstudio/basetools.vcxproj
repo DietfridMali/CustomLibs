@@ -42,6 +42,7 @@
     <ClInclude Include="..\include\list_helpers.h" />
     <ClInclude Include="..\include\matrix.hpp" />
     <ClInclude Include="..\include\quicksort.hpp" />
+    <ClInclude Include="..\include\random.hpp" />
     <ClInclude Include="..\include\segmentedlist.hpp" />
     <ClInclude Include="..\include\sharedglhandle.hpp" />
     <ClInclude Include="..\include\sharedpointer.hpp" />
