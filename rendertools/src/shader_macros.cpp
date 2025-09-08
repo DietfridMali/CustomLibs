@@ -85,7 +85,7 @@ const String& GaussBlurFuncs() {
         uniform int blurStrengh;
         uniform float blurSpread;
 
-        vec4 GaussBlur7x7(vec2 baseUV) {
+        vec4 GaussBlur7x7(vec2 baseUV, float spread) {
             const int HALF = 3;
             const int weight[7] = int[](1, 6, 15, 20, 15, 6, 1);
 
@@ -98,7 +98,7 @@ const String& GaussBlurFuncs() {
                 for (int i = -HALF; i <= HALF; ++i) {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
-                    vec2 offset = vec2(float(i), float(j)) * texelSize * blurSpread;
+                    vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
                     vec4 c = texture(source, baseUV + offset);
                     sumRGB += c.rgb * c.a * w; // premultiplied
                     sumA   += c.a * w;
@@ -111,7 +111,7 @@ const String& GaussBlurFuncs() {
         }
 
 
-        vec4 GaussBlur5x5(vec2 baseUV) {
+        vec4 GaussBlur5x5(vec2 baseUV, float spread) {
             const int HALF = 2;
             const int weight[5] = int[](1, 4, 6, 4, 1);
 
@@ -124,7 +124,7 @@ const String& GaussBlurFuncs() {
                 for (int i = -HALF; i <= HALF; ++i) {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
-                    vec2 offset = vec2(float(i), float(j)) * texelSize * blurSpread;
+                    vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
                     vec4 c = texture(source, baseUV + offset);
                     sumRGB += c.rgb * c.a * w; // premultiplied
                     sumA   += c.a * w;
@@ -136,7 +136,7 @@ const String& GaussBlurFuncs() {
             return vec4(rgb, a);
         }   
 
-        vec4 GaussBlur3x3(vec2 baseUV) {
+        vec4 GaussBlur3x3(vec2 baseUV, float spread) {
             const int HALF = 1;
             const int weight[3] = int[](1, 2, 1);
 
@@ -149,7 +149,7 @@ const String& GaussBlurFuncs() {
                 for (int i = -HALF; i <= HALF; ++i) {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
-                    vec2 offset = vec2(float(i), float(j)) * texelSize * blurSpread;
+                    vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
                     vec4 c = texture(source, baseUV + offset);
                     sumRGB += c.rgb * c.a * w; // premultiplied
                     sumA   += c.a * w;
@@ -161,14 +161,14 @@ const String& GaussBlurFuncs() {
             return vec4(rgb, a);
         }
 
-        vec4 GaussBlur(vec2 baseUV, int strength) {
+        vec4 GaussBlur(vec2 baseUV, int strength, float spread) {
             switch((strength < 0) ? blurStrengh : strength) {
                 case 3:
-                    return GaussBlur7x7(baseUV);
+                    return GaussBlur7x7(baseUV, (spread < 0) ? blurSpread : spread);
                 case 2:
-                    return GaussBlur5x5(baseUV);
+                    return GaussBlur5x5(baseUV, (spread < 0) ? blurSpread : spread);
                 case 1:
-                    return GaussBlur3x3(baseUV);
+                    return GaussBlur3x3(baseUV, (spread < 0) ? blurSpread : spread);
                 default:
                     return texture(source, baseUV);
             }
