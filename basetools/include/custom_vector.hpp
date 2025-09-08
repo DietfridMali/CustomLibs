@@ -62,6 +62,7 @@ public:
 
     static const Vector<DATA_T, dimensions> NONE;
     static const Vector<DATA_T, dimensions> ZERO;
+    static const Vector<DATA_T, dimensions> HALF;
     static const Vector<DATA_T, dimensions> ONE;
 
     inline DATA_T* Data(void) {

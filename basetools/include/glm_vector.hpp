@@ -317,6 +317,7 @@ public:
 
     static const Vector<VEC_TYPE> NONE;
     static const Vector<VEC_TYPE> ZERO;
+    static const Vector<VEC_TYPE> HALF;
     static const Vector<VEC_TYPE> ONE;
 
 private:

@@ -13,9 +13,9 @@ private:
     inline static thread_local std::uniform_real_distribution<float> floatDist{ 0.0f, 1.0f };
 
 public:
-    static float Float()
+    static float Float(float scale = 1.0f)
     {
-        return floatDist(rng); // [0,1)
+        return floatDist(rng) * scale; // [0,1)
     }
 
     static int Int(int maxValue) // [0, maxValue-1]
