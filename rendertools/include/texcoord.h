@@ -1,5 +1,7 @@
 #pragma once
 
+#include "conversions.hpp"
+
 // =================================================================================================
 // Texture coordinate representation
 
@@ -7,7 +9,16 @@
 
 #include "vector.hpp"
 
-using TexCoord = Vector2f;
+class TexCoord
+    : public Vector2f
+{
+public:
+    using Vector2f::Vector2f;
+
+    const float Aspect(void) const noexcept {
+        return (Y() > Conversions::NumericTolerance) ? X() / Y() : 1.0f;
+    }
+};
 
 #else
 
@@ -55,6 +66,9 @@ class TexCoord {
             return *this;
         }
 		
+        const float Aspect(void) const noexcept {
+            return (Y() > Conversions::NumericTolerance) ? X() / Y() : 1.0f;
+        }
 };
 
 #endif

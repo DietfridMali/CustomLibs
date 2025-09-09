@@ -2,6 +2,7 @@
 
 #include "texture.h"
 #include "shader.h"
+#include "texcoord.h"
 #include "base_shadercode.h"
 #include "matrix.hpp"
 #include "singletonbase.hpp"
@@ -71,11 +72,11 @@ public:
 
     Shader* LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);
 
-    Shader* LoadBlurTextureShader(Vector2f viewportSize, const RGBAColor& color, const GaussBlurParams& params = {}, bool premultiply = false);
+    Shader* LoadBlurTextureShader(TexCoord viewportSize, const RGBAColor& color, const GaussBlurParams& params = {}, bool premultiply = false);
 
     Shader* LoadGrayscaleShader(float brightness, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE);
 
-    Shader* SetGaussBlurParams(Shader* shader, Vector2f viewportSize, const GaussBlurParams& params = {});
+    Shader* SetGaussBlurParams(Shader* shader, TexCoord viewportSize, const GaussBlurParams& params = {});
 
     Shader* SetChromAbParams(Shader* shader, float aberration = 0.1f, int offsetType = 1);
 
