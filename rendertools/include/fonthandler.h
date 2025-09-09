@@ -4,6 +4,7 @@
 
 #include "vector.hpp"
 #include "base_quad.h"
+#include "texture.h"
 #include "fbo.h"
 #include "mesh.h"
 #include "avltree.hpp" // faster lookup than std::map
@@ -58,6 +59,10 @@ public:
 
     inline GlyphInfo* FindGlyph(String key) {
         return m_glyphDict.Find(key);
+    }
+
+    inline Texture* GetAtlas(void) noexcept {
+        return m_atlas.GetTexture();
     }
 
     struct TextDimensions TextSize(String text);

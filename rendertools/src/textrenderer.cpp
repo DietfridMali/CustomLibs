@@ -18,14 +18,12 @@
 #define USE_ATLAS 1
 #define TEST_ATLAS 0
 
+using GlyphSize = TextureAtlas::GlyphSize;
+using TextDimensions = TextureAtlas::GlyphSize;
+
 // =================================================================================================
 
 int TextRenderer::CompareFBOs(void* context, const int& key1, const int& key2) {
-    return (key1 < key2) ? -1 : (key1 > key2) ? 1 : 0;
-}
-
-
-int TextRenderer::CompareTextures(void* context, const char& key1, const char& key2) {
     return (key1 < key2) ? -1 : (key1 > key2) ? 1 : 0;
 }
 
@@ -34,141 +32,6 @@ TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, fl
     : m_color(color), m_scale(scale), m_font(nullptr), m_textAlignment(taCenter), m_decoration(decoration), m_isAvailable(false)
 {
     Setup();
-}
-
-
-bool TextRenderer::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
-    Shader* shader = LoadShader();
-    if (not shader)
-        return false;
-    if (info) {
-        info->glyphSize.width = info->texture->GetWidth();
-        info->glyphSize.height = info->texture->GetHeight();
-        m_atlas.Add(info->texture, info->index);
-        info->atlasPosition = m_atlas.GlyphOffset(info->index);
-        Vector2f scale = m_atlas.GlyphScale();
-        // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
-        info->atlasSize = { float(info->glyphSize.width) / float(m_maxGlyphSize.width) * scale.X(), float(info->glyphSize.height) / float(m_maxGlyphSize.height) * scale.Y() };
-        delete info->texture;
-        info->texture = nullptr;
-    }
-    return true;
-}
-
-
-int TextRenderer::BuildAtlas(void) {
-    if (not m_atlas.Enable())
-        return -1;
-    Tristate<int> blending(-1, 0, openGLStates.SetBlending(true));
-    Tristate<int> faceCulling(-1, 0, openGLStates.SetFaceCulling(false));
-    baseRenderer.ResetTransformation();
-    m_glyphDict.Walk(&TextRenderer::RenderGlyphToAtlas, this);
-    m_atlas.Disable();
-    m_mesh.SetDynamic(true);
-    m_mesh.Init(GL_QUADS, 0, &m_atlas.GetTexture());
-    openGLStates.SetBlending(blending);
-    openGLStates.SetFaceCulling(faceCulling);
-    return m_glyphDict.Size(); // glyphCount;
-}
-
-
-void TextRenderer::Setup(void) {
-#ifdef _WIN32
-    m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
-#else
-    //std::locale::global(std::locale("de_DE.UTF-8"));
-    m_euroChar = "\u20AC";
-#endif
-    m_glyphs = String("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-=.,*/: _?!%"); // +m_euroChar;
-#if 1 //!(USE_STD || USE_STD_MAP)
-    //m_fbos.SetComparator(TextRenderer::CompareFBOs);
-    m_glyphDict.SetComparator(String::Compare); //TextRenderer::CompareTextures);
-#endif
-}
-
-
-bool TextRenderer::InitFont(String fontFolder, String fontName) {
-    if (0 > TTF_Init()) {
-        fprintf(stderr, "Cannot initialize font system\n");
-        return false;
-    }
-    String fontFile = fontFolder + fontName;
-    if (not (m_font = TTF_OpenFont(fontFile.Data(), 120))) {
-        fprintf(stderr, "Cannot load font '%s'\n", (char*) fontName);
-        return false;
-    }
-    return true;
-}
-
-
-bool TextRenderer::Create(String fontFolder, String fontName) {
-    if (m_isAvailable = InitFont(fontFolder, fontName))
-        CreateAtlas();
-    return m_isAvailable;
-}
-
-
-bool TextRenderer::CreateTexture(const char* szChar, char key, int index)
-{
-    GlyphInfo info{ new Texture(), String (key), index };
-    if (info.texture == nullptr)
-        return false;
-    info.texture = new Texture();
-    SDL_Surface* surface = (strlen(szChar) == 1)
-        ? TTF_RenderText_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255))
-        : TTF_RenderUTF8_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255));
-    if (not info.texture->CreateFromSurface(surface)) {
-        delete info.texture;
-        info = GlyphInfo();
-        return false;
-        }
-    info.texture->Deploy();
-    m_glyphDict.Insert(String(key), info);
-    m_maxGlyphSize.width = std::max(m_maxGlyphSize.width, info.texture->GetWidth());
-    m_maxGlyphSize.height = std::max(m_maxGlyphSize.height, info.texture->GetHeight());
-    return true;
-}
-
-
-int TextRenderer::CreateTextures(void) {
-    char szChar[4] = " ";
-    int32_t i = 0;
-    for (char* info = m_glyphs.Data(); *info; info++) {
-        szChar[0] = *info;
-        if (CreateTexture(szChar, *info, i))
-            ++i;
-    }
-    if (CreateTexture((const char*)m_euroChar, '€', i))
-        ++i;
-    return i;
-}
-
-
-bool TextRenderer::CreateAtlas(void) {
-    int i = CreateTextures();
-    m_maxGlyphSize.Update();
-    int glyphCount = m_glyphs.Length() + 1;
-    m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2);
-    return BuildAtlas() == int(glyphCount);
-}
-
-
-struct TextRenderer::TextDimensions TextRenderer::TextSize(String text) {
-    TextDimensions d;
-    for (auto glyph : text) {
-        GlyphInfo* info = FindGlyph(String(glyph));
-        if (info->index < 0) {
-            fprintf(stderr, "texture '%c' not found\r\n", glyph);
-            return TextDimensions();
-        }
-        int tw = info->glyphSize.width;
-        d.width += tw;
-        //auto Max = [=](auto& a, auto b) { return (a > b) ? a : b; };
-        int th = info->glyphSize.height;
-        if (d.height < th)
-            d.height = th;
-        }
-    return d.Update();
 }
 
 
@@ -189,6 +52,8 @@ Shader* TextRenderer::LoadShader(void) {
 
 
 void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, bool flipVertically) {
+    if (not m_font)
+        return;
     Shader* shader = LoadShader();
     if (not shader)
         return;
@@ -211,7 +76,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
 
     m_mesh.ResetVAO();
     for (auto glyph : text) {
-        GlyphInfo* info = FindGlyph(String(glyph));
+        FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
 
         if (info) {
             // create output quad coordinates
@@ -238,7 +103,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateVAO(true);
-    m_mesh.Render(shader, &m_atlas.GetTexture());
+    m_mesh.Render(shader, m_font->GetAtlas());
 }
 
 
@@ -256,10 +121,14 @@ BaseQuad& TextRenderer::CreateQuad(BaseQuad& q, float x, float y, float w, Textu
 
 
 void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, bool flipVertically) {
+    if (not m_font)
+        return;
     Shader* shader = LoadShader();
+    if (not shader)
+        return;
     BaseQuad q;
     for (auto glyph : text) {
-        GlyphInfo* info = FindGlyph(String(glyph));
+        FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
         if (info->index < 0)
             fprintf(stderr, "texture '%c' not found\r\n", glyph);
         else {
@@ -278,6 +147,8 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
 
 
 void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment, int flipVertically) {
+    if (not m_font)
+        return;
     baseRenderer.PushMatrix();
 #if !TEST_ATLAS
     baseRenderer.ResetTransformation();
@@ -319,10 +190,10 @@ void TextRenderer::Fill(Vector4f color) {
 
 
 void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* fbo, Viewport& viewport, int renderAreaWidth, int renderAreaHeight, int flipVertically) {
-    if (m_isAvailable) {
+    if (m_font and m_isAvailable) {
         if (fbo)
             fbo->m_name = String::Concat ("[", text, "]");
-        auto [textWidth, textHeight, aspectRatio] = TextSize(text);
+        auto [textWidth, textHeight, aspectRatio] = m_font->TextSize(text);
         float outlineWidth = m_decoration.outlineWidth * 2;
         textWidth += int(2 * outlineWidth + 0.5f);
         textHeight += int(2 * outlineWidth + 0.5f);

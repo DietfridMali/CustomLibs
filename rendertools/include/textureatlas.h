@@ -70,8 +70,8 @@ public:
 
 	bool Add(Texture* glyph, int glyphIndex);
 
-	Texture& GetTexture(void) noexcept {
-		return m_texture;
+	Texture* GetTexture(void) noexcept {
+		return &m_texture;
 	}
 
 	inline bool Enable(void) {

@@ -10,7 +10,7 @@
 #include "tablesize.h"
 #include "outlinerenderer.h"
 #include "mesh.h"
-#include "textureatlas.h"
+#include "fonthandler.h"
 #include "singletonbase.hpp"
 
 #define EXTERNAL_ATLAS 1
@@ -30,50 +30,26 @@ public:
         taRight
     } eTextAlignments;
 
-    using GlyphSize = TextureAtlas::GlyphSize;
-    using TextDimensions = TextureAtlas::GlyphSize;
-
-    struct GlyphInfo {
-        Texture*                texture;
-        String                  name;
-        int32_t                 index;
-        TextureAtlas::GlyphSize glyphSize;
-        Vector2f                atlasPosition;
-        Vector2f                atlasSize;
-
-        GlyphInfo(Texture* _texture = nullptr, String _name = "", int32_t _index = -1, Vector2f _position = Vector2f::ZERO, Vector2f _size = Vector2f::ZERO)
-            : texture(_texture), name(_name), index(_index), atlasPosition(_position), atlasSize(_size)
-        { }
-    };
-
 private:
-    TTF_Font*                   m_font;
-    String                      m_euroChar;
-    String                      m_glyphs;
     bool                        m_isAvailable;
     RGBAColor                   m_color;
     float                       m_scale;
     eTextAlignments             m_textAlignment;
     struct TextDecoration       m_decoration;
-    struct GlyphSize            m_maxGlyphSize;
     VAO                         m_vao;
-
-    AVLTree<String, GlyphInfo>  m_glyphDict;
 
     TextureAtlas                m_atlas;
     Mesh                        m_mesh;
     Dictionary<int, FBO*>       m_fbos;
 
+    FontHandler*                m_font;
+
 public:
     static int CompareFBOs(void* context, const int& key1, const int& key2);
-
-    static int CompareTextures(void* context, const char& key1, const char& key2);
 
     TextRenderer(RGBAColor color = ColorData::White, const TextDecoration& decoration = {}, float scale = 1.0f);
 
     void Setup(void);
-
-    bool Create(String fontFolder, String fontName);
 
     void Fill(Vector4f color);
 
@@ -83,72 +59,58 @@ public:
 
     void Render(String text, eTextAlignments alignment = taLeft, int flipVertically = 0, int renderAreaWidth = 0, int renderAreaHeight = 0, bool useFBO = true);
 
-    inline bool SetColor(RGBAColor color = ColorData::White) {
+    inline void SetFont(FontHandler* font) noexcept {
+        m_font = font;
+    }
+
+    inline bool SetColor(RGBAColor color = ColorData::White) noexcept {
         if (color.A() < 0.0f)
             return false;
         m_color = color;
         return true;
     }
 
-    inline bool SetAlpha(float alpha = 1.0) {
+    inline bool SetAlpha(float alpha = 1.0) noexcept {
         if (alpha < 0.0f)
             return false;
         m_color.A() = alpha;
         return true;
     }
 
-    inline bool SetScale(float scale = 1.0) {
+    inline bool SetScale(float scale = 1.0) noexcept {
         if (scale < 0.0f)
             return false;
         m_scale = scale;
         return true;
     }
 
-    void SetAAMethod(const OutlineRenderer::AAMethod& aaMethod) {
+    void SetAAMethod(const OutlineRenderer::AAMethod& aaMethod) noexcept {
         m_decoration.aaMethod = aaMethod;
     }
 
-    inline void SetTextAlignment(eTextAlignments alignment) {
+    inline void SetTextAlignment(eTextAlignments alignment) noexcept {
         m_textAlignment = alignment;
     }
 
-    inline void SetOutline(float outlineWidth = 0.0f, RGBAColor outlineColor = ColorData::Invisible) {
+    inline void SetOutline(float outlineWidth = 0.0f, RGBAColor outlineColor = ColorData::Invisible) noexcept {
         m_decoration.outlineWidth = outlineWidth;
         m_decoration.outlineColor = outlineColor;
     }
 
 
-    inline void SetDecoration(const TextDecoration& decoration = {}) {
+    inline void SetDecoration(const TextDecoration& decoration = {}) noexcept {
         m_decoration = decoration;
     }
 
-    inline bool HaveOutline(void) {
+    inline bool HaveOutline(void) noexcept {
         return m_decoration.HaveOutline();
     }
 
-    inline bool ApplyAA(void) {
+    inline bool ApplyAA(void) noexcept {
         return m_decoration.ApplyAA();
     }
 
-    inline GlyphInfo* FindGlyph(String key) {
-        return m_glyphDict.Find(key);
-    }
-
-    struct TextDimensions TextSize(String text);
-
 private:
-    bool InitFont(String fontFolder, String fontName);
-
-    bool CreateTexture(const char* szChar, char key, int index);
-
-    int CreateTextures(void);
-
-    int BuildAtlas(void);
-        
-    bool CreateAtlas(void);
-
-    bool RenderGlyphToAtlas(const String& key, GlyphInfo* info);
-        
     BaseQuad& CreateQuad(BaseQuad& q, float x, float y, float w, Texture* t, bool flipVertically);
 
     FBO* GetFBO(float scale);
@@ -163,11 +125,11 @@ private:
 
     int SourceBuffer(bool hasOutline, bool antiAliased);
 
-    static inline int FBOID(const int width, const int height) {
+    static inline int FBOID(const int width, const int height) noexcept {
         return width << 16 | height;
     }
 
-    static inline int FBOID(const FBO* fbo) {
+    static inline int FBOID(const FBO* fbo) noexcept {
         return FBOID (fbo->m_width, fbo->m_height);
     }
 };
