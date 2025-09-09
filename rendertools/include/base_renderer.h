@@ -181,7 +181,7 @@ public:
         int width, height;
     } tViewport;
 #endif
-    Viewport& Viewport(void)  noexcept { return m_viewport; }
+    inline Viewport& Viewport(void)  noexcept { return m_viewport; }
 
     void SetViewport(bool flipVertically = false)
         noexcept;
@@ -196,6 +196,14 @@ public:
         ::Viewport viewport;
         viewportStack.Pop(viewport);
         SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
+    }
+
+    inline TexCoord ViewportSize(void) noexcept {
+        return TexCoord(float(m_viewport.Width()), float(m_viewport.Height()));
+    }
+
+    inline TexCoord TexelSize(void) noexcept {
+        return TexCoord(1.0f / float(m_viewport.Width()), 1.0f / (m_viewport.Height()));
     }
 
     void Fill(const RGBAColor& color, float scale = 1.0f);

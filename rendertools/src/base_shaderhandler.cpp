@@ -125,13 +125,13 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
 }
 
 
-Shader* BaseShaderHandler::LoadBlurTextureShader(TexCoord viewportSize, const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
+Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
     Shader* shader = SetupShader("blurTexture");
     if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
         shader->SetVector4f("surfaceColor", locations.Current(), color);
-        SetGaussBlurParams(shader, viewportSize, blur);
+        SetGaussBlurParams(shader, blur);
         //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
     }
     return shader;
@@ -151,11 +151,11 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f&
 }
 
 
-Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, TexCoord viewportSize, const GaussBlurParams& blur) {
+Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, const GaussBlurParams& blur) {
     if (shader and not baseRenderer.DepthPass()) {
         static ShaderLocationTable locations;
         locations.Start();
-        shader->SetVector2f("texelSize", locations.Current(), Vector2f(1.0f / viewportSize.X(), 1.0f / viewportSize.Y()));
+        shader->SetVector2f("texelSize", locations.Current(), baseRenderer.TexelSize());
         shader->SetInt("blurStrength", locations.Current(), blur.strength);
         shader->SetFloat("blurSpread", locations.Current(), blur.spread);
         return shader;

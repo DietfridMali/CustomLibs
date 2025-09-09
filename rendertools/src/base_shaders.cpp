@@ -1,4 +1,4 @@
-
+ï»¿
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
@@ -51,7 +51,7 @@ const ShaderSource& GrayScaleShader() {
         Standard2DVS(),
         R"(
         #version 330 core
-        // Für OpenGL ES 3.0 statt dessen:
+        // FÃ¼r OpenGL ES 3.0 statt dessen:
         // #version 300 es
         // precision mediump float;
 
@@ -121,7 +121,6 @@ const ShaderSource& BlurTextureShader() {
         + GaussBlurFuncs() +
         String(R"(
         layout(location = 0) out vec4 fragColor;
-        
         void main() {
             vec4 texColor = GaussBlur(fragTexCoord, -1, -1);
             float a = texColor.a * surfaceColor.a;
@@ -140,7 +139,7 @@ const ShaderSource& TintAndBlurShader() {
         Standard2DVS(),
         String(R"(
             #version 330 core
-            // Für OpenGL ES 3.0 statt dessen:
+            // FÃ¼r OpenGL ES 3.0 statt dessen:
             // #version 300 es
             // precision mediump float;
 
@@ -149,7 +148,7 @@ const ShaderSource& TintAndBlurShader() {
             out vec4 fragColor;
             uniform float brightness;
             uniform float contrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
-            uniform float gamma;        // Gammawert (z.B. 2.2 für Standard-Monitor)
+            uniform float gamma;        // Gammawert (z.B. 2.2 fÃ¼r Standard-Monitor)
             uniform vec4 tint;
         )") +
         GaussBlurFuncs() +
