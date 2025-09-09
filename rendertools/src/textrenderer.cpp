@@ -29,9 +29,10 @@ int TextRenderer::CompareFBOs(void* context, const int& key1, const int& key2) {
 
 
 TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, float scale)
-    : m_color(color), m_scale(scale), m_font(nullptr), m_textAlignment(taCenter), m_decoration(decoration), m_isAvailable(false)
-{
-    Setup();
+    : m_color(color), m_scale(scale), m_font(nullptr), m_textAlignment(taCenter), m_decoration(decoration)
+{ 
+    m_mesh.SetDynamic(true);
+    m_mesh.Init(GL_QUADS, 100);
 }
 
 
@@ -61,12 +62,12 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     // test code: display entire atlas on screen
 #if TEST_ATLAS
     baseRenderer.ResetTransformation();
-    baseRenderer.SetViewport(::Viewport (0, 0, m_atlas.GetWidth(), m_atlas.GetHeight()));
+    baseRenderer.SetViewport(::Viewport (0, 0, m_font->GetAtlas().GetWidth(), m_font->GetAtlas().GetHeight()));
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     baseRenderer.ClearGLError();
-    m_atlas.GetFBO().Render({}, ColorData::Yellow);
+    m_font->GetFBO().Render({}, ColorData::Yellow);
     baseRenderer.CheckGLError("render glyph atlas");
     return;
 #endif
@@ -103,7 +104,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateVAO(true);
-    m_mesh.Render(shader, m_font->GetAtlas());
+    m_mesh.Render(shader, m_font->GetTexture());
 }
 
 
@@ -121,8 +122,6 @@ BaseQuad& TextRenderer::CreateQuad(BaseQuad& q, float x, float y, float w, Textu
 
 
 void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, bool flipVertically) {
-    if (not m_font)
-        return;
     Shader* shader = LoadShader();
     if (not shader)
         return;
@@ -147,8 +146,6 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
 
 
 void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment, int flipVertically) {
-    if (not m_font)
-        return;
     baseRenderer.PushMatrix();
 #if !TEST_ATLAS
     baseRenderer.ResetTransformation();
@@ -190,7 +187,7 @@ void TextRenderer::Fill(Vector4f color) {
 
 
 void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* fbo, Viewport& viewport, int renderAreaWidth, int renderAreaHeight, int flipVertically) {
-    if (m_font and m_isAvailable) {
+    if (m_font) {
         if (fbo)
             fbo->m_name = String::Concat ("[", text, "]");
         auto [textWidth, textHeight, aspectRatio] = m_font->TextSize(text);
@@ -234,14 +231,14 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
 
 void TextRenderer::RenderToScreen(FBO* fbo, int flipVertically) {
 #if USE_TEXT_FBOS
-    if (m_isAvailable)
+    if (m_font)
         fbo->RenderToScreen({ .source = fbo ? fbo->GetLastDestination() : -1, .clearBuffer = false, .flipVertically = flipVertically, .scale = m_scale }, m_color); // render outline to viewport
 #endif
 }
 
 
 void TextRenderer::Render(String text, eTextAlignments alignment, int flipVertically, int renderAreaWidth, int renderAreaHeight, bool useFBO) {
-    if (m_isAvailable) {
+    if (m_font) {
         if (useFBO) {
             RenderToBuffer(text, alignment, nullptr, baseRenderer.Viewport(), renderAreaWidth, renderAreaHeight, flipVertically);
         }

@@ -73,8 +73,6 @@ int FontHandler::BuildAtlas(void) {
     baseRenderer.ResetTransformation();
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
     m_atlas.Disable();
-    m_mesh.SetDynamic(true);
-    m_mesh.Init(GL_QUADS, 0, &m_atlas.GetTexture());
     openGLStates.SetBlending(blending);
     openGLStates.SetFaceCulling(faceCulling);
     return m_glyphDict.Size(); // glyphCount;
@@ -82,9 +80,13 @@ int FontHandler::BuildAtlas(void) {
 
 
 bool FontHandler::InitFont(String fontFolder, String fontName) {
-    if (0 > TTF_Init()) {
-        fprintf(stderr, "Cannot initialize font system\n");
-        return false;
+    static bool initTTF = true;
+    if (initTTF) {
+        if (0 > TTF_Init()) {
+            fprintf(stderr, "Cannot initialize font system\n");
+            return false;
+        }
+        initTTF = false;
     }
     String fontFile = fontFolder + fontName;
     if (not (m_font = TTF_OpenFont(fontFile.Data(), 120))) {
@@ -97,8 +99,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName) {
 
 bool FontHandler::Create(String fontFolder, String fontName, String glyphs) {
     m_glyphs = glyphs;
-    if (m_isAvailable = InitFont(fontFolder, fontName))
-        CreateAtlas();
+    m_isAvailable = InitFont(fontFolder, fontName) and CreateAtlas();
     return m_isAvailable;
 }
 

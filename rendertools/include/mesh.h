@@ -136,7 +136,7 @@ public:
         return m_vao;
     }
 
-    void SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType);
+    void SetupTexture(Texture* texture, String textureFolder = "", List<String> textureNames = List<String>(), GLenum textureType = GL_TEXTURE_2D);
 
     virtual void PushTexture(Texture* texture);
 

@@ -85,9 +85,8 @@ void Mesh::PushTexture(Texture* texture) {
 }
 
 void Mesh::PopTexture(void) {
-    if (not m_textures.IsEmpty()) {
+    if (not m_textures.IsEmpty()) 
         m_textures.DiscardLast();
-    }
 }
 
 Texture* Mesh::GetTexture(void)

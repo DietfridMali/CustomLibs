@@ -45,7 +45,6 @@ private:
     VAO                         m_vao;
 
     AVLTree<String, GlyphInfo>  m_glyphDict;
-    Mesh                        m_mesh;
     TextureAtlas                m_atlas;
 
 public:
@@ -61,7 +60,15 @@ public:
         return m_glyphDict.Find(key);
     }
 
-    inline Texture* GetAtlas(void) noexcept {
+    inline TextureAtlas& GetAtlas(void) noexcept {
+        return m_atlas;
+    }
+
+    inline FBO& GetFBO(void) noexcept {
+        return m_atlas.GetFBO();
+    }
+
+    inline Texture* GetTexture(void) noexcept {
         return m_atlas.GetTexture();
     }
 
