@@ -73,6 +73,10 @@ public:
         return true;
     }
 
+    inline RGBAColor GetColor(void) noexcept {
+        return m_color;
+    }
+
     inline bool SetAlpha(float alpha = 1.0) noexcept {
         if (alpha < 0.0f)
             return false;

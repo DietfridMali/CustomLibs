@@ -27,6 +27,11 @@ public:
         : m_bufferCount(0), m_viewport(viewport)
     { }
 
+
+    void SetViewport(Viewport& viewport) noexcept {
+        m_viewport = viewport;
+    }
+
     bool Create(int bufferCount = 1);
 
     void Destroy() {
