@@ -71,7 +71,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.DepthMask(1);
     openGLStates.SetDepthTest(true);
     openGLStates.DepthFunc(GL_LEQUAL);
-    openGLStates.SetBlending(false);
+    openGLStates.SetBlending(0);
 #if 1
 #   if 1
     openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -99,7 +99,7 @@ void BaseRenderer::StartDepthPass(void) noexcept {
     openGLStates.DepthMask(1);                 
     openGLStates.DepthFunc(GL_LESS);                  
     openGLStates.ColorMask(0, 0, 0, 0);
-    openGLStates.SetBlending(false);
+    openGLStates.SetBlending(0);
 }
 
 
@@ -109,7 +109,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
     openGLStates.DepthMask(0);                        
     openGLStates.DepthFunc(GL_LEQUAL);                
     openGLStates.ColorMask(1, 1, 1, 1);
-    openGLStates.SetBlending(false);
+    openGLStates.SetBlending(0);
 }
 
 
@@ -119,7 +119,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
     openGLStates.DepthMask(1);                        
     openGLStates.DepthFunc(GL_LEQUAL);                
     openGLStates.ColorMask(1, 1, 1, 1);
-    openGLStates.SetBlending(false);
+    openGLStates.SetBlending(0);
 }
 
 

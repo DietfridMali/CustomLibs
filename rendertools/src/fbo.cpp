@@ -373,14 +373,13 @@ bool FBO::UpdateTransformation(const FBORenderParams& params) {
 
 bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RGBAColor& color) {
     Tristate<int> blending(-1, 0, 0);
-    if (params.destination > -1) { // rendering to another FBO (than the main buffer)
+    if (params.destination < 0) // rendering to the current render target
+        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(1));
+    else { // rendering to another FBO (than the main buffer)
         if (not Enable(params.destination, FBO::dbSingle, params.clearBuffer))
             return false;
         m_lastDestination = params.destination;
-        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(1));
-    }
-    else { // rendering to the current render target
-        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(1));
+        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(0));
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);

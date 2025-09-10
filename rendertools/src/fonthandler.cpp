@@ -68,7 +68,7 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
 int FontHandler::BuildAtlas(void) {
     if (not m_atlas.Enable())
         return -1;
-    Tristate<int> blending(-1, 0, openGLStates.SetBlending(true));
+    Tristate<int> blending(-1, 0, openGLStates.SetBlending(1));
     Tristate<int> faceCulling(-1, 0, openGLStates.SetFaceCulling(false));
     baseRenderer.ResetTransformation();
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);

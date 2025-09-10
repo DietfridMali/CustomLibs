@@ -13,7 +13,7 @@
 #include "texture.h"
 #include "shaderdata.h"
 
-#define USE_LOCATION_CACHE 1
+#define CACHE_SHADER_DATA 1
 
 // =================================================================================================
 
@@ -203,7 +203,6 @@ class Shader
             GLint* location = m_locations[name]; // call only once per SetUniform call because it switches the internal index of m_locations to the next entry!
             if (not location)
                 return -1;
-            // Cache: speichere genau den externen Typ DATA_T
             if (UpdateUniform<DATA_T, UniformData<DATA_T>>(name, location, data))
                 FuncType::fn(*location, data);
             return *location;
@@ -306,7 +305,7 @@ class Shader
         inline GLint SetMatrix3f(const char* name, ManagedArray<GLfloat>& data, bool transpose) noexcept {
             SetMatrix3f(name, data.Data(), transpose);
         }
-#if 1
+
         inline GLint SetInt(const char* name, int data) noexcept {
             return SetUniform<int>(name, data);
         }
@@ -374,7 +373,6 @@ class Shader
         inline GLint SetFloatArray(const char* name, const FloatArray& data) noexcept {
             return SetUniformArray<float>(name, data.Data(), data.Length());
         }
-#endif
 
         // -----------------------------------------------------------------------------------------
 

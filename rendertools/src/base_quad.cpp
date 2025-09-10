@@ -153,7 +153,7 @@ void BaseQuad::Render(RGBAColor color) {
         //baseShaderHandler.StopShader();
     }
     else if (m_texture->Enable()) {
-        openGLStates.SetBlending(true);
+        openGLStates.SetBlending(1);
         glBegin(GL_QUADS);
         for (auto& v : m_vertexBuffer.m_appData) {
             glColor4f(color.R(), color.G(), color.B(), color.A());
@@ -161,7 +161,7 @@ void BaseQuad::Render(RGBAColor color) {
         }
         glEnd();
         m_texture->Disable();
-        openGLStates.SetBlending(false);
+        openGLStates.SetBlending(0);
     }
 }
 
@@ -199,7 +199,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
 
     if (baseRenderer.LegacyMode) {
         if (texture and texture->Enable()) {
-            openGLStates.SetBlending(true);
+            openGLStates.SetBlending(1);
             glBegin(GL_QUADS);
             for (auto& v : m_vertexBuffer.m_appData) {
                 glColor4f(1, 1, 1, 1);
@@ -207,7 +207,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
             }
             glEnd();
             texture->Disable();
-            openGLStates.SetBlending(false);
+            openGLStates.SetBlending(0);
         }
     }
     return false;
