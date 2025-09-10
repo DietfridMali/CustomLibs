@@ -248,19 +248,24 @@ public:
 class ShaderLocationTable {
 public:
     struct ShaderLocation {
-        const char* m_name{ "" };
-        GLint       m_location{ std::numeric_limits<GLint>::min() };
+        String  m_name{ "" };
+        int     m_nameLength;
+        GLint   m_location{ std::numeric_limits<GLint>::min() };
 
-        ShaderLocation(const char* name = "") 
-            : m_name(name), m_location(std::numeric_limits<GLint>::min())
+        ShaderLocation(String name = "") 
+            : m_name(name), m_nameLength(name.Length()), m_location(std::numeric_limits<GLint>::min())
         { }
 
-        inline String Name(void) noexcept {
+        inline String& Name(void) noexcept {
             return m_name;
         }
 
         inline GLint* Location(void) noexcept {
             return &m_location;
+        }
+
+        inline bool operator==(const String& name) const {
+            return (m_nameLength == name.Length()) and (m_name == name);
         }
     };
 
@@ -275,7 +280,7 @@ public:
 
     GLint* operator[](const String name) noexcept {
         for (auto& location : m_locations)
-            if (location.Name() == name)
+            if (location == name)
                 return location.Location();
         ShaderLocation* location;
         try {

@@ -245,9 +245,6 @@ bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, boo
         glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
     else {
         baseRenderer.SetDrawBuffers(this, &m_drawBuffers);
-        GLint cur; 
-        glGetIntegerv(GL_DRAW_BUFFER0, &cur);
-        cur = cur;
     }
     return true;
 }
