@@ -384,7 +384,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
     Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
-    Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(ß));
+    Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(0));
     m_viewportArea.SetTexture(source);
     if (params.shader) {
         if (applyTransformation)
