@@ -103,9 +103,7 @@ void BaseShaderHandler::StopShader(bool needLegacyMatrices) {
 Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool premultiply) {
     Shader* shader = SetupShader("plainColor");
     if (shader and not baseRenderer.DepthPass()) {
-        static ShaderLocationTable locations;
-        locations.Start();
-        shader->SetVector4f("surfaceColor", locations.Current(), premultiply ? color.Premultiplied() : color);
+        shader->SetVector4f("surfaceColor", premultiply ? color.Premultiplied() : color);
     }
     return shader;
 }
@@ -114,12 +112,10 @@ Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool pre
 Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
     Shader* shader = SetupShader("plainTexture");
     if (shader and not baseRenderer.DepthPass()) {
-        static ShaderLocationTable locations;
-        locations.Start();
-        shader->SetVector4f("surfaceColor", locations.Current(), color);
-        shader->SetVector2f("tcOffset", locations.Current(), tcOffset);
-        shader->SetVector2f("tcScale", locations.Current(), tcScale);
-        //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+        shader->SetVector4f("surfaceColor", color);
+        shader->SetVector2f("tcOffset", tcOffset);
+        shader->SetVector2f("tcScale", tcScale);
+        //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
     }
     return shader;
 }
@@ -128,11 +124,9 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
 Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
     Shader* shader = SetupShader("blurTexture");
     if (shader and not baseRenderer.DepthPass()) {
-        static ShaderLocationTable locations;
-        locations.Start();
-        shader->SetVector4f("surfaceColor", locations.Current(), color);
+        shader->SetVector4f("surfaceColor", color);
         SetGaussBlurParams(shader, blur);
-        //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+        //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
     }
     return shader;
 }
@@ -143,9 +137,9 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f&
     if (shader and not baseRenderer.DepthPass()) {
         ShaderLocationTable locations;
         locations.Start();
-        shader->SetVector2f("tcOffset", locations.Current(), tcOffset);
-        shader->SetVector2f("tcScale", locations.Current(), tcScale);
-        shader->SetFloat("brightness", locations.Current(), brightness);
+        shader->SetVector2f("tcOffset", tcOffset);
+        shader->SetVector2f("tcScale", tcScale);
+        shader->SetFloat("brightness", brightness);
     }
     return shader;
 }
@@ -153,11 +147,9 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f&
 
 Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, const GaussBlurParams& blur) {
     if (shader and not baseRenderer.DepthPass()) {
-        static ShaderLocationTable locations;
-        locations.Start();
-        shader->SetVector2f("texelSize", locations.Current(), baseRenderer.TexelSize());
-        shader->SetInt("blurStrength", locations.Current(), blur.strength);
-        shader->SetFloat("blurSpread", locations.Current(), blur.spread);
+        shader->SetVector2f("texelSize", baseRenderer.TexelSize());
+        shader->SetInt("blurStrength", blur.strength);
+        shader->SetFloat("blurSpread", blur.spread);
         return shader;
     }
     return nullptr;
@@ -166,10 +158,8 @@ Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, const GaussBlurPar
 
 Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, float aberration, int offsetType) { // offsetType: 0 - linear, 1 - radial
     if (shader and not baseRenderer.DepthPass()) {
-        static ShaderLocationTable locations;
-        locations.Start();
-        shader->SetInt("offsetType", locations.Current(), offsetType);
-        shader->SetFloat("aberration", locations.Current(), aberration);
+        shader->SetInt("offsetType", offsetType);
+        shader->SetFloat("aberration", aberration);
         return shader;
     }
     return nullptr;

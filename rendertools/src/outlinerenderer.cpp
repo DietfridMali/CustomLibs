@@ -19,30 +19,28 @@
 #define AUTORENDER 0
 
 void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premultiply) {
-    static ShaderLocationTable locations;
     if (aaMethod.ApplyAA()) {
         FBO::FBORenderParams params = { .clearBuffer = true, .scale = 1.0f };
         params.shader = baseShaderHandler.SetupShader(aaMethod.method);
         if (params.shader == nullptr)
             return;
         BaseRenderer::ClearGLError();
-        locations.Start();
-        params.shader->SetFloat("offset", locations.Current(), 0.0f);
-        //params.shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+        params.shader->SetFloat("offset", 0.0f);
+        //params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
         if (aaMethod.method != "gaussblur") {
-            params.shader->SetVector2f("texelSize", locations.Current(), baseRenderer.TexelSize());
+            params.shader->SetVector2f("texelSize", baseRenderer.TexelSize());
             fbo->AutoRender(params);
         }
         else {
             FloatArray* kernel = baseShaderHandler.GetKernel(aaMethod.strength);
             if (kernel != nullptr) {
-                params.shader->SetFloatArray("coeffs", locations.Current(), *kernel);
-                params.shader->SetInt("radius", locations.Current(), aaMethod.strength);
+                params.shader->SetFloatArray("coeffs", *kernel);
+                params.shader->SetInt("radius", aaMethod.strength);
                 params.destination = fbo->GetLastDestination();
                 
                 for (int i = 0; i < 2; ++i) {
                     // the following code only works if not called multiple times in a loop!
-                    params.shader->SetFloat("direction", locations.Current(), float (i));
+                    params.shader->SetFloat("direction", float (i));
                     params.source = params.destination;
                     params.destination = fbo->NextBuffer(params.source);
                     fbo->Render(params);
@@ -58,12 +56,10 @@ void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool
     if (decoration.HaveOutline()) {
         Shader* shader = baseShaderHandler.SetupShader("outline");
         if (shader and not baseRenderer.DepthPass()) {
-            static ShaderLocationTable locations;
-            locations.Start();
-            shader->SetFloat("outlineWidth", locations.Current(), decoration.outlineWidth);
-            shader->SetVector4f("outlineColor", locations.Current(), decoration.outlineColor);
-            shader->SetFloat("offset", locations.Current(), 0.5f);
-            //shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
+            shader->SetFloat("outlineWidth", decoration.outlineWidth);
+            shader->SetVector4f("outlineColor", decoration.outlineColor);
+            shader->SetFloat("offset", 0.5f);
+            //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
             fbo->AutoRender({ .clearBuffer = true, .shader = shader });
         }
         //baseShaderHandler.StopShader();

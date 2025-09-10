@@ -201,16 +201,9 @@ struct FixedUniformArray
 
 // -------------------------------------------------------------------------------------------------
 // ShaderLocationTable's use is intended as follows: For each shader instance, a ShaderLocationTable
-// must be provided. ShaderLocationTable entries are sequentially passed to uniform setter calls as
-// follows:
-// void LoadShader(String shaderName) {
-// Shader* shader = shaderHandler.Setup(shaderName);
-// if (shader) {
-//     static ShaderLocationTable locations;
-//     locations.Start();
-//     shader->SetFloat("someFloatUniform", locations.Current(), 1.0f);
-//     shader->SetVector4f("someVectorUniform", locations.Current(), Vector4f(1,1,1,1));
-//     etc.
+// is provided internally. The shader resets its location table index on every load call (even if it is
+// already loaded), and then uses the location table to store the locations of all uniform variables
+// set through it by its uniform setter functions.
 // 
 // The way this works is that the first time a locations entry is referenced it is initialized with 
 // a value OpenGL will not use or return. To the shader's uniform management this means that the 
@@ -219,14 +212,6 @@ struct FixedUniformArray
 // If the uniform location is valid (>= 0), a new uniform variable cache instance will be created
 // and be used for further writing to that location, only updating it when its contents changes.
 // The entire optimization brings a speedup of almost 50% just in debug mode.
-// 
-// You need to regard that location's entries are tied to uniform variables strictly by the
-// call sequence here. You can ofc. use defines or constexprs to define aptly named index values.
-// You also need to be aware that making locations static means there is only a single table instance
-// for all instances of the method it has been declared in. This is not an issue as it will always
-// be used the same way, but you need to be cautious if a method is called on different shaders
-// which share uniform variable names. In that case, that method needs a ShaderLocationTable for each
-// shader it writes to.
 
 #if 1 // simple version
 
