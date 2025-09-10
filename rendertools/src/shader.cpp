@@ -111,17 +111,17 @@ void Shader::UpdateMatrices(void) {
     m_locations.Start();
     if (RenderMatrices::LegacyMode) {
         float glData[16];
-        SetMatrix4f("mModelView", m_locations.Current(), GetFloatData(GL_MODELVIEW_MATRIX, 16, glData));
-        SetMatrix4f("mProjection", m_locations.Current(), GetFloatData(GL_PROJECTION_MATRIX, 16, glData));
+        SetMatrix4f("mModelView", GetFloatData(GL_MODELVIEW_MATRIX, 16, glData));
+        SetMatrix4f("mProjection", GetFloatData(GL_PROJECTION_MATRIX, 16, glData));
     }
     else {
         // both matrices must be column major
-        SetMatrix4f("mModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);
-        SetMatrix4f("mProjection", m_locations.Current(), baseRenderer.Projection().AsArray(), false);
+        SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
+        SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
         if (not baseRenderer.DepthPass()) // depth shader doesn't have and doesn't use viewports
-            SetMatrix4f("mViewport", m_locations.Current(), baseRenderer.ViewportTransformation().AsArray(), false);
+            SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
 #if 0
-        SetMatrix4f("mBaseModelView", m_locations.Current(), baseRenderer.ModelView().AsArray(), false);
+        SetMatrix4f("mBaseModelView", baseRenderer.ModelView().AsArray(), false);
 #endif
     }
 #if 0
@@ -133,7 +133,8 @@ void Shader::UpdateMatrices(void) {
 }
 
 
-GLint Shader::SetMatrix4f(const char* name, GLint& location, const float* data, bool transpose) noexcept {
+GLint Shader::SetMatrix4f(const char* name, const float* data, bool transpose) noexcept {
+    GLint& location = m_locations.Current();
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
@@ -147,7 +148,8 @@ GLint Shader::SetMatrix4f(const char* name, GLint& location, const float* data, 
 }
 
 
-GLint Shader::SetMatrix3f(const char* name, GLint& location, float* data, bool transpose) noexcept {
+GLint Shader::SetMatrix3f(const char* name, float* data, bool transpose) noexcept {
+    GLint& location = m_locations.Current();
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)

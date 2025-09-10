@@ -121,7 +121,7 @@ class Shader
             return m_handle;
         }
 
-        inline GLint GetLocation(const char* name) const {
+        inline GLint GetLocation(const char* name, GLint& location) const {
          // location is returned back to caller of SetUniform method who stores is for future use
          // initially, that caller sets location to a value < -1 to signal that it has to be initialized here
          // so if location < -1, return glGetUnifomLocation result, otherwise location has been initialized; just return it
@@ -211,7 +211,7 @@ class Shader
                 std::is_same_v<std::remove_cv_t<DATA_T>, float>
                 );
 
-            location = m_locations.Current(); // call only once per SetUniform call because it switches the internal index of m_locations to the next entry!
+            GLint& location = m_locations.Current(); // call only once per SetUniform call because it switches the internal index of m_locations to the next entry!
             GetLocation(name, location);
             if (location < 0) 
                 return location;
@@ -288,7 +288,7 @@ class Shader
             static_assert((std::is_same_v<BaseType, float> or std::is_same_v<BaseType, int>), "only float and int base types possible");
             static_assert(Components >= 1 and Components <= 4, "only 1 to 4 components possible");
 
-            location = m_locations.Current(); // call only once per SetUniformArray call because it switches the internal index of m_locations to the next entry!
+            GLint& location = m_locations.Current(); // call only once per SetUniformArray call because it switches the internal index of m_locations to the next entry!
             GetLocation(name, location);
             if (location < 0) 
                 return location;
@@ -311,66 +311,66 @@ class Shader
             noexcept;
 
         inline GLint SetMatrix4f(const char* name, ManagedArray<GLfloat>& data, bool transpose = false) noexcept {
-            return SetMatrix4f(name, location, data.Data(), transpose);
+            return SetMatrix4f(name, data.Data(), transpose);
         }
 
         GLint SetMatrix3f(const char* name, float* data, bool transpose = false)
             noexcept;
 
         inline GLint SetMatrix3f(const char* name, ManagedArray<GLfloat>& data, bool transpose) noexcept {
-            SetMatrix3f(name, location, data.Data(), transpose);
+            SetMatrix3f(name, data.Data(), transpose);
         }
 #if 1
         GLint SetInt(const char* name, int data) noexcept {
-            return SetUniform<int>(name, location, data);
+            return SetUniform<int>(name, data);
         }
 
         GLint SetFloat(const char* name, float data) noexcept {
-            return SetUniform<float>(name, location, data);
+            return SetUniform<float>(name, data);
         }
 
         GLint SetVector4f(const char* name, const Vector4f& data) noexcept {
-            return SetUniformArray<Vector4f>(name, location, &data, 1);
+            return SetUniformArray<Vector4f>(name, &data, 1);
         }
 
         inline GLint SetVector4f(const char* name, Vector4f&& data) noexcept {
-            return SetVector4f(name, location, static_cast<const Vector4f&>(data));
+            return SetVector4f(name, static_cast<const Vector4f&>(data));
         }
 
         GLint SetVector3f(const char* name, const Vector3f& data) noexcept {
-            return SetUniformArray<Vector3f>(name, location, &data, 1);
+            return SetUniformArray<Vector3f>(name, &data, 1);
         }
 
         inline GLint SetVector3f(const char* name, Vector3f&& data) noexcept {
-            return SetVector3f(name, location, static_cast<const Vector3f&>(data));
+            return SetVector3f(name, static_cast<const Vector3f&>(data));
         }
 
         GLint SetVector2f(const char* name, const Vector2f& data) noexcept {
-            return SetUniformArray<Vector2f>(name, location, &data, 1);
+            return SetUniformArray<Vector2f>(name, &data, 1);
         }
 
         inline GLint SetVector2f(const char* name, Vector2f&& data) noexcept {
-            return SetVector2f(name, location, static_cast<const Vector2f&>(data));
+            return SetVector2f(name, static_cast<const Vector2f&>(data));
         }
 
         inline GLint SetVector2f(const char* name, float x, float y) noexcept {
-            return SetVector2f(name, location, Vector2f(x, y));
+            return SetVector2f(name, Vector2f(x, y));
         }
 
         GLint SetVector2i(const char* name, const GLint* data) noexcept {
-            return SetUniformArray<int>(name, location, data, 2);
+            return SetUniformArray<int>(name, data, 2);
         }
 
         GLint SetVector3i(const char* name, const GLint* data) noexcept {
-            return SetUniformArray<int>(name, location, data, 3);
+            return SetUniformArray<int>(name, data, 3);
         }
 
         GLint SetVector4i(const char* name, const GLint* data) noexcept {
-            return SetUniformArray<int>(name, location, data, 4);
+            return SetUniformArray<int>(name, data, 4);
         }
 
         GLint SetFloatArray(const char* name, const float* data, size_t length) noexcept {
-            return SetUniformArray<float>(name, location, data, length);
+            return SetUniformArray<float>(name, data, length);
         }
 #endif
 
