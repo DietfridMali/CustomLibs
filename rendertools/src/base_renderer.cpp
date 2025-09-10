@@ -69,7 +69,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.ClearColor(ColorData::Invisible);
     openGLStates.ColorMask(1, 1, 1, 1);
     openGLStates.DepthMask(1);
-    openGLStates.SetDepthTest(true);
+    openGLStates.SetDepthTest(1);
     openGLStates.DepthFunc(GL_LEQUAL);
     openGLStates.SetBlending(0);
 #if 1
@@ -84,10 +84,10 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.BlendEquation(GL_FUNC_ADD);
     openGLStates.SetAlphaTest(true);
     openGLStates.FrontFace(GL_CW);
-    openGLStates.SetFaceCulling(true);
+    openGLStates.SetFaceCulling(1);
     openGLStates.CullFace(GL_BACK);
-    openGLStates.openGLStates.SetMultiSample(true);
-    openGLStates.SetPolygonOffsetFill(false);
+    openGLStates.openGLStates.SetMultiSample(1);
+    openGLStates.SetPolygonOffsetFill(0);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glViewport(0, 0, m_windowWidth, m_windowHeight);
 }
@@ -95,7 +95,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
 
 void BaseRenderer::StartDepthPass(void) noexcept {
     m_renderPass = RenderPasses::rpDepth;
-    openGLStates.SetDepthTest(true);
+    openGLStates.SetDepthTest(1);
     openGLStates.DepthMask(1);                 
     openGLStates.DepthFunc(GL_LESS);                  
     openGLStates.ColorMask(0, 0, 0, 0);
@@ -105,7 +105,7 @@ void BaseRenderer::StartDepthPass(void) noexcept {
 
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPasses::rpColor;
-    openGLStates.SetDepthTest(true);
+    openGLStates.SetDepthTest(1);
     openGLStates.DepthMask(0);                        
     openGLStates.DepthFunc(GL_LEQUAL);                
     openGLStates.ColorMask(1, 1, 1, 1);
@@ -115,7 +115,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
 
 void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPasses::rpColor;
-    openGLStates.SetDepthTest(true);
+    openGLStates.SetDepthTest(1);
     openGLStates.DepthMask(1);                        
     openGLStates.DepthFunc(GL_LEQUAL);                
     openGLStates.ColorMask(1, 1, 1, 1);
@@ -174,7 +174,7 @@ bool BaseRenderer::Stop2DScene(void) {
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
         openGLStates.DepthFunc(GL_ALWAYS);
-        openGLStates.SetFaceCulling(false);
+        openGLStates.SetFaceCulling(0);
         SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, false);
         Shader* shader;
         if (not UsePostEffectShader())
@@ -226,7 +226,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
             Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
-            openGLStates.SetFaceCulling(false); // required for vertical flipping because that inverts the buffer's winding
+            openGLStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
             glClear(GL_COLOR_BUFFER_BIT);
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
