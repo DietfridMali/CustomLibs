@@ -36,10 +36,10 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     bufferInfo.Init();
     if (bufferType == BufferInfo::btDepth)
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
-    else if (isMRT)
+    else //if (isMRT)
         bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
-    else
-        bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0; // color buffer for ping pong rendering; these will be bound alternatingly when needed as render target
+    //else
+    //    bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0; // color buffer for ping pong rendering; these will be bound alternatingly when needed as render target
     baseRenderer.ClearGLError();
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
@@ -177,36 +177,47 @@ void FBO::Destroy(void) {
 
 bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
     int l = m_drawBuffers.Length();
-    if ((m_activeBufferIndex != bufferIndex) and (bufferIndex >= 0) and (bufferIndex < l)) {
-        m_activeBufferIndex = bufferIndex;
+    if (drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
-        m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
-        for (int i = 1; i < l; i++)
-            m_drawBuffers[i] = GL_NONE;
+        if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
+            return false;
+        if (m_activeBufferIndex != bufferIndex) {
+            m_activeBufferIndex = bufferIndex;
+            m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
+            AttachBuffer(bufferIndex);
+            for (int i = 1; i < l; ++i)
+                m_drawBuffers[i] = GL_NONE;
+        }
     }
     else if ((drawBufferGroup != dbCustom) and ((drawBufferGroup == dbNone) or (m_drawBufferGroup != drawBufferGroup))) {
         m_activeBufferIndex = -1;
         m_drawBufferGroup = (drawBufferGroup == dbNone) ? dbAll : drawBufferGroup;
         if (m_drawBufferGroup == dbAll) {
-            for (int i = 0; i < l; ++i)
+            for (int i = 0; i < l; ++i) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
+                AttachBuffer(i);
+            }
         }
         else if (m_drawBufferGroup == dbColor) {
             int i = 0;
-            for ( ; i < m_colorBufferCount; ++i) 
+            for ( ; i < m_colorBufferCount; ++i) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
+                AttachBuffer(i);
+            }
             for ( ; i < l; ++i)
-                m_drawBuffers[i] = GL_NONE;
+                    m_drawBuffers[i] = GL_NONE;
         }
         else if (m_drawBufferGroup == dbExtra) {
             int i = 0;
             for (; i < m_colorBufferCount; ++i) 
                 m_drawBuffers[i] = GL_NONE;
-            for (; i < l; ++i)
+            for (; i < l; ++i) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
+                AttachBuffer(i);
+            }
         }
     }
-    return ReattachBuffers();
+    return true;
 }
 
 
@@ -389,7 +400,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
     }
     else {
 #ifdef _DEBUG
-        static bool fillArea = not params.centerOrigin;
+        bool fillArea = false; // params.source > 0;
         static bool oscillate = false;
         static int i = 0;
         if (fillArea) {

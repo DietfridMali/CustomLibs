@@ -9,7 +9,7 @@ const ShaderSource& BoxBlurShader() {
     static const ShaderSource boxBlurShader(
         "boxblur",
         Offset2DVS(),
-        R"(
+        String(R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -20,6 +20,10 @@ const ShaderSource& BoxBlurShader() {
             //uniform float premultiply;
             in vec2 fragTexCoord;
             out vec4 fragColor;
+            )") +
+            GaussBlurFuncs() +
+            String(R"(
+#if 0
             vec3 FxaaPixelShader(vec2 pos, sampler2D tex, vec2 texelSize) {
                 vec3 rgbNW = textureOffset(tex, pos, ivec2(-1, -1)).xyz;
                 vec3 rgbNE = textureOffset(tex, pos, ivec2(1, -1)).xyz;
@@ -43,13 +47,18 @@ const ShaderSource& BoxBlurShader() {
                 float lumaB = dot(rgbB, luma);
                 return (lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB;
                 }
+#endif
             void main() {
-                vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
-                vec3 color = FxaaPixelShader(fragTexCoord, source, texelSize);
+#if 1
+                fragColor = GaussBlur(fragTexCoord, 3, 1);
+#else
+                //vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
+                //vec3 color = FxaaPixelShader(fragTexCoord, source, texelSize);
                 float a = texture(source, fragTexCoord).a;
                 fragColor = vec4(color /** mix(1.0, a, premultiply)*/, a);
+#endif
                 }
-            )"
+            )")
     );
     return boxBlurShader;
 }

@@ -27,10 +27,12 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premult
             return;
         BaseRenderer::ClearGLError();
         locations.Start();
-        params.shader->SetFloat("offset", locations.Current(), 0.5f);
+        params.shader->SetFloat("offset", locations.Current(), 0.0f);
         //params.shader->SetFloat("premultiply", locations.Current(), premultiply ? 1.0f : 0.0f);
-        if (aaMethod.method != "gaussblur")
+        if (aaMethod.method != "gaussblur") {
+            params.shader->SetVector2f("texelSize", locations.Current(), baseRenderer.TexelSize());
             fbo->AutoRender(params);
+        }
         else {
             FloatArray* kernel = baseShaderHandler.GetKernel(aaMethod.strength);
             if (kernel != nullptr) {
