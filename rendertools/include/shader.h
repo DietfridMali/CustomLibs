@@ -13,7 +13,7 @@
 #include "texture.h"
 #include "shaderdata.h"
 
-#define LOCATION_LOOKUP_MODE 0
+#define USE_LOCATION_CACHE 1
 
 // =================================================================================================
 
@@ -121,21 +121,6 @@ class Shader
             return m_handle;
         }
 
-        inline GLint GetLocation(const char* name, GLint& location) const {
-         // location is returned back to caller of SetUniform method who stores is for future use
-         // initially, that caller sets location to a value < -1 to signal that it has to be initialized here
-         // so if location < -1, return glGetUnifomLocation result, otherwise location has been initialized; just return it
-#if LOCATION_LOOKUP_MODE == 0
-            bool initialize = location < -1;
-            location = glGetUniformLocation(m_handle, name);
-            if (initialize and (location == -1))
-                fprintf(stderr, "location %s::%s not found\n", (const char*)m_name, (const char*)name);
-            return location;
-#else
-            return (location < -1) ? glGetUniformLocation(m_handle, name) : location;
-#endif
-        }
-
 
         inline bool HaveBuffer(GLint location) noexcept {
             if (static_cast<int32_t>(location) >= m_uniforms.Length()) {
@@ -213,21 +198,21 @@ class Shader
                 std::is_same_v<std::remove_cv_t<DATA_T>, float>
                 );
 
+            using FuncType = glUniform1<DATA_T>;
+#if CACHE_SHADER_DATA
             GLint* location = m_locations[name]; // call only once per SetUniform call because it switches the internal index of m_locations to the next entry!
             if (not location)
                 return -1;
-
-            using FuncType = glUniform1<DATA_T>;
-#if PASSTHROUGH_MODE
-            GetLocation(name, location);
-            if (*location >= 0)
-                FuncType::fn(*location, data);
-#else
             // Cache: speichere genau den externen Typ DATA_T
             if (UpdateUniform<DATA_T, UniformData<DATA_T>>(name, location, data))
                 FuncType::fn(*location, data);
-#endif
             return *location;
+#else
+            GLint location = glGetUniformLocation(m_handle, name);
+            if (location >= 0)
+                FuncType::fn(location, data);
+            return location;
+#endif
         }
 
         // -----------------------------------------------------------------------------------------
@@ -289,21 +274,21 @@ class Shader
             static_assert((std::is_same_v<BaseType, float> or std::is_same_v<BaseType, int>), "only float and int base types possible");
             static_assert(Components >= 1 and Components <= 4, "only 1 to 4 components possible");
 
+            using FuncType = glUniform<BaseType, Components>;
+#if CACHE_SHADER_DATA
             GLint* location = m_locations[name]; // call only once per SetUniformArray call because it switches the internal index of m_locations to the next entry!
             if (not location)
                 return -1;
-
-            using FuncType = glUniform<BaseType, Components>;
-#if PASSTHROUGH_MODE
-            GetLocation(name, location);
-            if (location >= 0)
-                FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
-#else
             // Cache: speichere genau den externen Typ DATA_T
             if (UpdateUniform<const DATA_T*, UniformArray<DATA_T>>(name, location, data))
                 FuncType::fn(*location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
-#endif
             return *location;
+#else
+            GLint location = glGetUniformLocation(m_handle, name);
+            if (location >= 0)
+                FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
+            return location;
+#endif
         }
 
         // -----------------------------------------------------------------------------------------
