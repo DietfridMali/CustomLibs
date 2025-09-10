@@ -104,11 +104,13 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
     return 0;
 }
 
-
+// set modelview, projection and viewport matrices in shader. 
+// Every shader program should have at least modelview and projection matrices.
+// Also starts location indexing by calling m_locations.Start().
 void Shader::UpdateMatrices(void) {
     m_locations.Start();
-    float glData[16];
     if (RenderMatrices::LegacyMode) {
+        float glData[16];
         SetMatrix4f("mModelView", m_locations.Current(), GetFloatData(GL_MODELVIEW_MATRIX, 16, glData));
         SetMatrix4f("mProjection", m_locations.Current(), GetFloatData(GL_PROJECTION_MATRIX, 16, glData));
     }
@@ -158,6 +160,7 @@ GLint Shader::SetMatrix3f(const char* name, GLint& location, float* data, bool t
 #endif
 }
 
+#if 0
 
 GLint Shader::SetVector4f(const char* name, GLint& location, const Vector4f& data) noexcept {
 #if PASSTHROUGH_MODE
@@ -298,7 +301,7 @@ GLint Shader::SetIntData(const char* name, GLint& location, const int* data, siz
 #endif
 }
 
-GLint Shader::SetVector2fData(const char* name, GLint& location, const Vector2f* data, size_t length) noexcept {
+GLint Shader::SetVector2fArray(const char* name, GLint& location, const Vector2f* data, size_t length) noexcept {
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
     if (location >= 0)
@@ -310,5 +313,33 @@ GLint Shader::SetVector2fData(const char* name, GLint& location, const Vector2f*
     return location;
 #endif
 }
+
+GLint Shader::SetVector3fArray(const char* name, GLint& location, const Vector3f* data, size_t length) noexcept {
+#if PASSTHROUGH_MODE
+    GetLocation(name, location);
+    if (location >= 0)
+        glUniform2fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
+    return location;
+#else
+    if (UpdateUniform<const Vector3f*, UniformArray<Vector3f>>(name, location, data))
+        glUniform3fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
+    return location;
+#endif
+}
+
+GLint Shader::SetVector4fArray(const char* name, GLint& location, const Vector4f* data, size_t length) noexcept {
+#if PASSTHROUGH_MODE
+    GetLocation(name, location);
+    if (location >= 0)
+        glUniform2fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
+    return location;
+#else
+    if (UpdateUniform<const Vector4f*, UniformArray<Vector4f>>(name, location, data))
+        glUniform4fv(location, GLsizei(length), reinterpret_cast<const GLfloat*>(data));
+    return location;
+#endif
+}
+
+#endif
 
 // =================================================================================================

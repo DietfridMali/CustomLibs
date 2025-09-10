@@ -152,9 +152,9 @@ struct UniformArray : public UniformHandle {
     inline const DATA_T* Data() const noexcept { return m_data.get(); }
 
     // Größen-API
-    static constexpr size_t Length() noexcept { return m_length; }
+    constexpr size_t Length() noexcept { return m_length; }
 
-    static constexpr size_t Size()    noexcept { return m_size; }
+    constexpr size_t Size()    noexcept { return m_size; }
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -293,11 +293,11 @@ public:
 
 // -------------------------------------------------------------------------------------------------
 
-using UniformVector4f = UniformData<Vector4f>;
+using UniformVector2f = UniformData<Vector2f>;
 
 using UniformVector3f = UniformData<Vector3f>;
 
-using UniformVector2f = UniformData<Vector2f>;
+using UniformVector4f = UniformData<Vector4f>;
 
 using UniformFloat = UniformData<float>;
 

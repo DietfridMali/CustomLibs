@@ -36,7 +36,7 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premult
         else {
             FloatArray* kernel = baseShaderHandler.GetKernel(aaMethod.strength);
             if (kernel != nullptr) {
-                params.shader->SetFloatData("coeffs", locations.Current(), *kernel);
+                params.shader->SetFloatArray("coeffs", locations.Current(), *kernel);
                 params.shader->SetInt("radius", locations.Current(), aaMethod.strength);
                 params.destination = fbo->GetLastDestination();
                 

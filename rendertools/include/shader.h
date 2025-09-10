@@ -1,6 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include <type_traits>
+#include <functional>
 #include <cstring>
 #include <memory>
 
@@ -13,6 +14,24 @@
 #include "shaderdata.h"
 
 #define LOCATION_LOOKUP_MODE 0
+
+// =================================================================================================
+
+template <typename T, typename = void>
+struct ScalarTraits {
+    using scalar = std::remove_cv_t<T>;
+    static constexpr int k = 1;
+};
+template <typename T>
+struct ScalarTraits<T, std::void_t<typename T::value_type>> {
+    using scalar = std::remove_cv_t<typename T::value_type>;
+    static constexpr int k = int(sizeof(T) / sizeof(typename T::value_type));
+};
+template <typename T>
+using ScalarBaseType = typename ScalarTraits<std::remove_cv_t<T>>::scalar;
+
+template <typename T>
+inline constexpr int ComponentCount = ScalarTraits<std::remove_cv_t<T>>::components;
 
 // =================================================================================================
 // Some basic shader handling: Compiling, enabling, setting shader variables
@@ -183,7 +202,7 @@ class Shader
         inline GLint SetMatrix3f(const char* name, GLint& location, ManagedArray<GLfloat>& data, bool transpose) noexcept {
             SetMatrix3f(name, location, data.Data(), transpose);
         }
-
+#if 0
         GLint SetVector4f(const char* name, GLint& location, const Vector4f& data)
             noexcept;
 
@@ -224,26 +243,124 @@ class Shader
         GLint SetInt(const char* name, GLint& location, int data)
             noexcept;
 
-        GLint SetFloatData(const char* name, GLint& location, const float* data, size_t length)
+        GLint SetFloatArray(const char* name, GLint& location, const float* data, size_t length)
             noexcept;
+#endif
+        // -----------------------------------------------------------------------------------------
+        // Automatically deduce proper glUniform function for passing uniform (array) data from data type passed
 
-        inline GLint SetFloatData(const char* name, GLint& location, const FloatArray& data) noexcept {
-            return SetFloatData(name, location, data.Data(), size_t(data.Length()));
+        template <typename S> struct glUniform1;
+
+        template <> struct glUniform1<float> {
+            using fn_t = PFNGLUNIFORM1FPROC;
+            static inline fn_t& fn = glUniform1f; // referenziert den echten Loader-Zeiger
+        };
+
+        template <> struct glUniform1<int> {
+            using fn_t = PFNGLUNIFORM1IPROC;
+            static inline fn_t& fn = glUniform1i;
+        };
+
+        template <typename DATA_T>
+        GLint SetData(const char* name, GLint& location, DATA_T data) noexcept {
+            static_assert(std::is_same_v<std::remove_cv_t<DATA_T>, float> || std::is_same_v<std::remove_cv_t<DATA_T>, int>);
+            GetLocation(name, location);
+            if (location < 0) return location;
+
+            using FuncType = glUniform1<DATA_T>;
+
+#if PASSTHROUGH_MODE
+            FuncType::fn(location, data);
+#else
+            // Cache: speichere genau den externen Typ DATA_T
+            if (UpdateUniform<const DATA_T, UniformData<DATA_T>>(name, location, data)) {
+                FuncType::fn(location, data);
+            }
+#endif
+            return location;
         }
 
-        GLint SetIntData(const char* name, GLint& location, const int* data, size_t length)
-            noexcept;
+        // -----------------------------------------------------------------------------------------
 
-        inline GLint SetIntData(const char* name, GLint& location, const IntArray& data) noexcept {
-            return SetIntData(name, location, data.Data(), size_t(data.Length()));
+        // 2) Dispatcher: S∈{float,int}, K∈{1..4} → passender glUniform-Zeiger
+        template <typename S, int C> struct glUniform;
+
+        // Variante A: Referenzen auf Loader-Symbole (GLAD/GLEW)
+        template <typename, int> struct glUniform;
+
+        // float-Kanal
+        template <> struct glUniform<float, 1> {
+            using GlFuncType = PFNGLUNIFORM1FVPROC;
+            static inline GlFuncType& fn = glUniform1fv;
+        };
+
+        template <> struct glUniform<float, 2> {
+            using GlFuncType = PFNGLUNIFORM2FVPROC;
+            static inline GlFuncType& fn = glUniform2fv;
+        };
+
+        template <> struct glUniform<float, 3> {
+            using GlFuncType = PFNGLUNIFORM3FVPROC;
+            static inline GlFuncType& fn = glUniform3fv;
+        };
+
+        template <> struct glUniform<float, 4> {
+            using GlFuncType = PFNGLUNIFORM4FVPROC;
+            static inline GlFuncType& fn = glUniform4fv;
+        };
+
+        // int-Kanal
+        template <> struct glUniform<int, 1> {
+            using GlFuncType = PFNGLUNIFORM1IVPROC;
+            static inline GlFuncType& fn = glUniform1iv;
+        };
+
+        template <> struct glUniform<int, 2> {
+            using GlFuncType = PFNGLUNIFORM2IVPROC;
+            static inline GlFuncType& fn = glUniform2iv;
+        };
+
+        template <> struct glUniform<int, 3> {
+            using GlFuncType = PFNGLUNIFORM3IVPROC;
+            static inline GlFuncType& fn = glUniform3iv;
+        };
+
+        template <> struct glUniform<int, 4> {
+            using GlFuncType = PFNGLUNIFORM4IVPROC;
+            static inline GlFuncType& fn = glUniform4iv;
+        };
+
+        template <typename DATA_T>
+        GLint SetArrayData(const char* name, GLint& location, const DATA_T* data, size_t length) noexcept
+        {
+            using BaseType = ScalarBaseType<DATA_T>;
+            constexpr int Components = ComponentCount<DATA_T>;
+
+            static_assert((std::is_same_v<BaseType, float> or std::is_same_v<BaseType, int>), "only float and int base types possible");
+            static_assert(Components >= 1 and Components <= 4, "only 1 to 4 components possible");
+
+            GetLocation(name, location);
+            if (location < 0) 
+                return location;
+
+            using FuncType = glUniform<BaseType, Components>;
+#if PASSTHROUGH_MODE
+            FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
+#else
+            // Cache: speichere genau den externen Typ DATA_T
+            if (UpdateUniform<const DATA_T*, UniformArray<DATA_T>>(name, location, data)) {
+                FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
+            }
+#endif
+            return location;
         }
+
+        // -----------------------------------------------------------------------------------------
 
         static inline float* GetFloatData(GLenum id, int32_t size, float* data) noexcept {
             glGetFloatv(id, (GLfloat*)data);
             return data;
         }
-
-        GLint SetVector2fData(const char* name, GLint& location, const Vector2f* data, size_t length) noexcept;
 
         static inline ManagedArray<float>& GetFloatData(GLenum id, int32_t size, ManagedArray<float>& glData) noexcept {
             if (glData.Length() < size)
