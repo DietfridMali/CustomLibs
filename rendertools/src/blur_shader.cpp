@@ -128,6 +128,9 @@ const ShaderSource& GaussBlurShader() {
         uniform float coeffs[33];
         //uniform float premultiply;
         void main() {
+#if 1
+            fragColor = vec4(1,1,1,1);
+#else
             vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
             vec2 offset = vec2 (1.0 - direction, direction);
     	    vec4 sum = vec4(0.0);
@@ -137,6 +140,7 @@ const ShaderSource& GaussBlurShader() {
     		    sum += vec4 (coeffs[i] * texture(source, coord));
     	    }
     	    fragColor = vec4(sum.rgb /** mix(1.0, sum.a, premultiply)*/, sum.a);
+#endif
         }
         )"
     );

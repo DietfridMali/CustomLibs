@@ -134,31 +134,31 @@ void Shader::UpdateMatrices(void) {
 
 
 GLint Shader::SetMatrix4f(const char* name, const float* data, bool transpose) noexcept {
-    GLint& location = m_locations.Current();
+    GLint* location = m_locations[name]; // .Current();
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
-    if (location >= 0)
-        glUniformMatrix4fv(location, 1, GLboolean(transpose), data);
+    if (*location >= 0)
+        glUniformMatrix4fv(*location, 1, GLboolean(transpose), data);
     return location;
 #else
     if (UpdateUniform<const float*, UniformArray16f>(name, location, data))
-        glUniformMatrix4fv(location, 1, GLboolean(transpose), data);
-    return location;
+        glUniformMatrix4fv(*location, 1, GLboolean(transpose), data);
+    return *location;
 #endif
 }
 
 
 GLint Shader::SetMatrix3f(const char* name, float* data, bool transpose) noexcept {
-    GLint& location = m_locations.Current();
+    GLint* location = m_locations[name]; // .Current();
 #if PASSTHROUGH_MODE
     GetLocation(name, location);
-    if (location >= 0)
-        glUniformMatrix3fv(location, 1, GLboolean(transpose), data);
+    if (*location >= 0)
+        glUniformMatrix3fv(*location, 1, GLboolean(transpose), data);
     return location;
 #else
     if (UpdateUniform<float*, UniformArray9f>(name, location, data))
-        glUniformMatrix3fv(location, 1, GLboolean(transpose), data);
-    return location;
+        glUniformMatrix3fv(*location, 1, GLboolean(transpose), data);
+    return *location;
 #endif
 }
 

@@ -205,7 +205,7 @@ bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) 
                 AttachBuffer(i);
             }
             for ( ; i < l; ++i)
-                    m_drawBuffers[i] = GL_NONE;
+                m_drawBuffers[i] = GL_NONE;
         }
         else if (m_drawBufferGroup == dbExtra) {
             int i = 0;
@@ -243,8 +243,12 @@ bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, boo
     openGLStates.BindTexture2D(0, GL_TEXTURE0);
     if (reenable)
         glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
-    else
+    else {
         baseRenderer.SetDrawBuffers(this, &m_drawBuffers);
+        GLint cur; 
+        glGetIntegerv(GL_DRAW_BUFFER0, &cur);
+        cur = cur;
+    }
     return true;
 }
 
@@ -376,10 +380,10 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         if (not Enable(params.destination, FBO::dbSingle, params.clearBuffer))
             return false;
         m_lastDestination = params.destination;
-        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(false));
+        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(1));
     }
     else { // rendering to the current render target
-        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(true));
+        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(1));
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);

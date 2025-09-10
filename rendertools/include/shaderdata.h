@@ -12,11 +12,12 @@
 
 struct UniformHandle
 {
-    GLint   m_location{};
+    GLint   m_location{ std::numeric_limits<GLint>::min() };
     String  m_name{ "" };
 
     UniformHandle() = default;
-    UniformHandle(String name, GLint location)
+
+    UniformHandle(String name, GLint location = std::numeric_limits<GLint>::min())
         : m_location{ location }, m_name{ std::move(name) }
     {
     }
@@ -213,13 +214,13 @@ struct FixedUniformArray
 // and be used for further writing to that location, only updating it when its contents changes.
 // The entire optimization brings a speedup of almost 50% just in debug mode.
 
-#if 1 // simple version
+#if 0 // simple version
 
 class ShaderLocationTable {
 public:
 private:
-    ManagedArray<GLint> m_locations;
-    int                 m_index{ -1 };
+    ManagedArray<UniformHandle> m_locations;
+    int                         m_index{ -1 };
 
 public:
     ShaderLocationTable()
@@ -232,15 +233,17 @@ public:
 
     ~ShaderLocationTable() = default;
 
-    GLint& operator[](int32_t i) { return m_locations[i]; }
+    GLint* operator[](int32_t i) { return &m_locations[i]; }
 
     void Start(void) { m_index = -1; }
 
-    GLint& Current(void) { return m_locations[++m_index]; }
+    GLint* Current(void) { return &m_locations[++m_index]; }
 
 };
 
 #else
+
+// call order-independent version
 
 class ShaderLocationTable {
 public:
@@ -251,11 +254,14 @@ public:
         ShaderLocation(const char* name = "") 
             : m_name(name), m_location(std::numeric_limits<GLint>::min())
         { }
-    };
 
-    struct LocationIndex {
-        int32_t     i;
-        const char* name;
+        inline String Name(void) noexcept {
+            return m_name;
+        }
+
+        inline GLint* Location(void) noexcept {
+            return &m_location;
+        }
     };
 
 private:
@@ -265,12 +271,23 @@ public:
     ShaderLocationTable() = default;
     ~ShaderLocationTable() = default;
 
-    ShaderLocation& operator[](LocationIndex i) {
-        if (i.i >= m_locations.Length()) {
-            m_locations.Resize(i.i + 1);
-            m_locations [i.i] = ShaderLocation(i.name);
+    void Start(void) { /*nothing*/ }
+
+    GLint* operator[](const String name) noexcept {
+        for (auto& location : m_locations)
+            if (location.Name() == name)
+                return location.Location();
+        ShaderLocation* location;
+        try {
+            location = m_locations.Append();
         }
-        return m_locations[i.i];
+        catch (...) {
+            return nullptr;
+        }
+        if (not location)
+            return nullptr;
+        *location = ShaderLocation(name);
+        return location->Location();
     }
 };
 
@@ -299,4 +316,3 @@ using UniformArray3i = FixedUniformArray<int, 3>;
 using UniformArray4i = FixedUniformArray<int, 4>;
 
 // =================================================================================================
-

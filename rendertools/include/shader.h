@@ -126,8 +126,9 @@ class Shader
          // initially, that caller sets location to a value < -1 to signal that it has to be initialized here
          // so if location < -1, return glGetUnifomLocation result, otherwise location has been initialized; just return it
 #if LOCATION_LOOKUP_MODE == 0
+            bool initialize = location < -1;
             location = glGetUniformLocation(m_handle, name);
-            if (location == -1)
+            if (initialize and (location == -1))
                 fprintf(stderr, "location %s::%s not found\n", (const char*)m_name, (const char*)name);
             return location;
 #else
@@ -150,40 +151,41 @@ class Shader
 
 
         template <typename UNIFORM_T>
-        inline UNIFORM_T* GetUniform(const char* name, GLint& location) noexcept {
-            if (location >= 0) { // location has been successfully retrieved from this shader
-                if (HaveBuffer(location))
-                    return dynamic_cast<UNIFORM_T*>(m_uniforms[location]); // return uniform variable cache
+        inline UNIFORM_T* GetUniform(const char* name, GLint* location) noexcept {
+            if (*location >= 0) { // location has been successfully retrieved from this shader
+                if (HaveBuffer(*location))
+                    return dynamic_cast<UNIFORM_T*>(m_uniforms[*location]); // return uniform variable cache
             }
             else {
-                if (location < -1) // no location has yet been retrieved for this uniform
-                    location = glGetUniformLocation(m_handle, name); // retrieve it
-                if (location < 0)  // not present in current shader
+                if (*location < -1) // no location has yet been retrieved for this uniform
+                    *location = glGetUniformLocation(m_handle, name); // retrieve it
+                if (*location < 0)  // not present in current shader
                     return nullptr;
             }
-            if (not HaveBuffer(location)) // at this point, we at least have a location (>= 0) or know that it doesn't exist (-1)
+            if (not HaveBuffer(*location)) // at this point, we at least have a location (>= 0) or know that it doesn't exist (-1)
                 return nullptr; // this may allow caller to use regular gl call without buffering
-            if (m_uniforms[location] == nullptr) {// location has never been accessed before
+            if (m_uniforms[*location] == nullptr) {// location has never been accessed before
                 try {
-                    m_uniforms[location] = new UNIFORM_T(name, location); // auto fit must be on for m_uniforms
+                    m_uniforms[*location] = new UNIFORM_T(name, *location); // auto fit must be on for m_uniforms
                 }
                 catch (...) {
                     return nullptr;
                 }
             }
-            return static_cast<UNIFORM_T*>(m_uniforms[location]);
+            return static_cast<UNIFORM_T*>(m_uniforms[*location]);
         }
 
 
         template <typename DATA_T, typename UNIFORM_T>
-        bool UpdateUniform(const char* name, GLint& location, DATA_T data) noexcept {
+        bool UpdateUniform(const char* name, GLint* location, DATA_T data) noexcept {
+            bool initialize = *location < -1;
             UNIFORM_T* uniform = GetUniform<UNIFORM_T>(name, location);
-            if (location < 0)
+            if (*location < 0)
                 return false;
             if (not uniform)
                 return false;
             if (*uniform == data)
-                return false;
+                return initialize;
             *uniform = data;
             return true;
         }
@@ -211,22 +213,21 @@ class Shader
                 std::is_same_v<std::remove_cv_t<DATA_T>, float>
                 );
 
-            GLint& location = m_locations.Current(); // call only once per SetUniform call because it switches the internal index of m_locations to the next entry!
-            GetLocation(name, location);
-            if (location < 0) 
-                return location;
+            GLint* location = m_locations[name]; // call only once per SetUniform call because it switches the internal index of m_locations to the next entry!
+            if (not location)
+                return -1;
 
             using FuncType = glUniform1<DATA_T>;
-
 #if PASSTHROUGH_MODE
-            FuncType::fn(location, data);
+            GetLocation(name, location);
+            if (*location >= 0)
+                FuncType::fn(*location, data);
 #else
             // Cache: speichere genau den externen Typ DATA_T
-            if (UpdateUniform<DATA_T, UniformData<DATA_T>>(name, location, data)) {
-                FuncType::fn(location, data);
-            }
+            if (UpdateUniform<DATA_T, UniformData<DATA_T>>(name, location, data))
+                FuncType::fn(*location, data);
 #endif
-            return location;
+            return *location;
         }
 
         // -----------------------------------------------------------------------------------------
@@ -288,21 +289,21 @@ class Shader
             static_assert((std::is_same_v<BaseType, float> or std::is_same_v<BaseType, int>), "only float and int base types possible");
             static_assert(Components >= 1 and Components <= 4, "only 1 to 4 components possible");
 
-            GLint& location = m_locations.Current(); // call only once per SetUniformArray call because it switches the internal index of m_locations to the next entry!
-            GetLocation(name, location);
-            if (location < 0) 
-                return location;
+            GLint* location = m_locations[name]; // call only once per SetUniformArray call because it switches the internal index of m_locations to the next entry!
+            if (not location)
+                return -1;
 
             using FuncType = glUniform<BaseType, Components>;
 #if PASSTHROUGH_MODE
-            FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
+            GetLocation(name, location);
+            if (location >= 0)
+                FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
 #else
             // Cache: speichere genau den externen Typ DATA_T
-            if (UpdateUniform<const DATA_T*, UniformArray<DATA_T>>(name, location, data)) {
-                FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
-            }
+            if (UpdateUniform<const DATA_T*, UniformArray<DATA_T>>(name, location, data))
+                FuncType::fn(*location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
 #endif
-            return location;
+            return *location;
         }
 
         // -----------------------------------------------------------------------------------------
@@ -321,31 +322,19 @@ class Shader
             SetMatrix3f(name, data.Data(), transpose);
         }
 #if 1
-        GLint SetInt(const char* name, int data) noexcept {
+        inline GLint SetInt(const char* name, int data) noexcept {
             return SetUniform<int>(name, data);
         }
 
-        GLint SetFloat(const char* name, float data) noexcept {
+        inline GLint SetFloat(const char* name, float data) noexcept {
             return SetUniform<float>(name, data);
         }
 
-        GLint SetVector4f(const char* name, const Vector4f& data) noexcept {
-            return SetUniformArray<Vector4f>(name, &data, 1);
+        inline GLint SetVector2fArray(const char* name, const Vector2f* data, GLsizei length) noexcept {
+            return SetUniformArray<Vector2f>(name, data, length);
         }
 
-        inline GLint SetVector4f(const char* name, Vector4f&& data) noexcept {
-            return SetVector4f(name, static_cast<const Vector4f&>(data));
-        }
-
-        GLint SetVector3f(const char* name, const Vector3f& data) noexcept {
-            return SetUniformArray<Vector3f>(name, &data, 1);
-        }
-
-        inline GLint SetVector3f(const char* name, Vector3f&& data) noexcept {
-            return SetVector3f(name, static_cast<const Vector3f&>(data));
-        }
-
-        GLint SetVector2f(const char* name, const Vector2f& data) noexcept {
+        inline GLint SetVector2f(const char* name, const Vector2f& data) noexcept {
             return SetUniformArray<Vector2f>(name, &data, 1);
         }
 
@@ -357,20 +346,48 @@ class Shader
             return SetVector2f(name, Vector2f(x, y));
         }
 
-        GLint SetVector2i(const char* name, const GLint* data) noexcept {
+        inline GLint SetVector3fArray(const char* name, const Vector3f* data, GLsizei length) noexcept {
+            return SetUniformArray<Vector3f>(name, data, length);
+        }
+
+        inline GLint SetVector3f(const char* name, const Vector3f& data) noexcept {
+            return SetUniformArray<Vector3f>(name, &data, 1);
+        }
+
+        inline GLint SetVector3f(const char* name, Vector3f&& data) noexcept {
+            return SetVector3f(name, static_cast<const Vector3f&>(data));
+        }
+
+        inline GLint SetVector4fArray(const char* name, const Vector4f* data, GLsizei length) noexcept {
+            return SetUniformArray<Vector4f>(name, data, length);
+        }
+
+        inline GLint SetVector4f(const char* name, const Vector4f& data) noexcept {
+            return SetUniformArray<Vector4f>(name, &data, 1);
+        }
+
+        inline GLint SetVector4f(const char* name, Vector4f&& data) noexcept {
+            return SetVector4f(name, static_cast<const Vector4f&>(data));
+        }
+
+        inline GLint SetVector2i(const char* name, const GLint* data) noexcept {
             return SetUniformArray<int>(name, data, 2);
         }
 
-        GLint SetVector3i(const char* name, const GLint* data) noexcept {
+        inline GLint SetVector3i(const char* name, const GLint* data) noexcept {
             return SetUniformArray<int>(name, data, 3);
         }
 
-        GLint SetVector4i(const char* name, const GLint* data) noexcept {
+        inline GLint SetVector4i(const char* name, const GLint* data) noexcept {
             return SetUniformArray<int>(name, data, 4);
         }
 
-        GLint SetFloatArray(const char* name, const float* data, size_t length) noexcept {
+        inline GLint SetFloatArray(const char* name, const float* data, size_t length) noexcept {
             return SetUniformArray<float>(name, data, length);
+        }
+
+        inline GLint SetFloatArray(const char* name, const FloatArray& data) noexcept {
+            return SetUniformArray<float>(name, data.Data(), data.Length());
         }
 #endif
 
