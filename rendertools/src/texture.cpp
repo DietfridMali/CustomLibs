@@ -86,7 +86,7 @@ void TextureBuffer::Premultiply(void) {
 }
 
 
-bool TextureBuffer::Allocate(int width, int height, int componentCount) noexcept {
+bool TextureBuffer::Allocate(int width, int height, int componentCount, void* data) noexcept {
     m_info.m_width = width;
     m_info.m_height = height;
     m_info.m_componentCount = componentCount;
@@ -103,7 +103,15 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount) noexcept
     catch(...) {
         return false;
     }
-    return m_data.get() != nullptr;
+    if (m_data.get() == nullptr)
+        return false;
+    if (data)
+#if USE_SHARED_POINTERS
+        memcpy(m_data.get(), data, m_info.m_dataSize);
+#else
+        memcpy(m_data, data, m_info.m_dataSize);
+#endif
+    return true;
 }
 
 
@@ -451,6 +459,17 @@ void LinearTexture::SetParams(void)
 }
 
 
+bool LinearTexture::Create(ManagedArray<Vector4f>& data) {
+    if (not Allocate(data.Length()))
+        return false;
+    TextureBuffer* texBuf = m_buffers[0];
+    if (not texBuf->Allocate(data.Length(), 1, 4, data.Data()))
+        return false;
+    Deploy();
+    return true;
+}
+
+
 bool LinearTexture::Allocate(int length) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf)
@@ -460,6 +479,7 @@ bool LinearTexture::Allocate(int length) {
         return false;
     }
     texBuf->m_info = TextureBuffer::BufferInfo(length, 1, 4, GL_RGBA, GL_RGBA);
+    Deploy();
     return true;
 }
 
@@ -471,9 +491,9 @@ void LinearTexture::Deploy(int bufferIndex)
         SetParams();
         TextureBuffer* texBuf = m_buffers[0];
 #if USE_SHARED_POINTERS
-        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_FLOAT, (const void*)texBuf->m_data.get());
 #else
-        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, nullptr);
+        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_FLOAT, (const void*)texBuf->m_data);
 #endif
         Release();
     }

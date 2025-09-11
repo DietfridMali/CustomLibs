@@ -128,7 +128,7 @@ public:
     void Reset(void)
         noexcept;
 
-    bool Allocate(int width, int height, int componentCount) noexcept;
+    bool Allocate(int width, int height, int componentCount, void* data = nullptr) noexcept;
 
     TextureBuffer& Create(SDL_Surface* source, bool premultiply, bool flipVertically);
 
@@ -340,6 +340,8 @@ public:
     virtual void SetParams(void) override;
 
     bool Allocate(int length);
+
+    bool Create(ManagedArray<Vector4f>& data);
 
     virtual void Deploy(int bufferIndex = 0) override;
 
