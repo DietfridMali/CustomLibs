@@ -24,18 +24,8 @@ int FontHandler::CompareTextures(void* context, const char& key1, const char& ke
 }
 
 
-FontHandler::FontHandler()
+FontHandler::FontHandler(int fontSize)
 {
-    Setup();
-}
-
-
-Shader* FontHandler::LoadShader(void) {
-    return baseShaderHandler.LoadPlainTextureShader(ColorData::White);
-}
-
-
-void FontHandler::Setup(void) {
 #ifdef _WIN32
     m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
 #else
@@ -43,6 +33,12 @@ void FontHandler::Setup(void) {
     m_euroChar = "\u20AC";
 #endif
     m_glyphDict.SetComparator(String::Compare); //FontHandler::CompareTextures);
+    m_fontSize = fontSize;
+}
+
+
+Shader* FontHandler::LoadShader(void) {
+    return baseShaderHandler.LoadPlainTextureShader(ColorData::White);
 }
 
 
@@ -89,7 +85,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName) {
         initTTF = false;
     }
     String fontFile = fontFolder + fontName;
-    if (not (m_font = TTF_OpenFont(fontFile.Data(), 120))) {
+    if (not (m_font = TTF_OpenFont(fontFile.Data(), m_fontSize))) {
         fprintf(stderr, "Cannot load font '%s'\n", (char*) fontName);
         return false;
     }

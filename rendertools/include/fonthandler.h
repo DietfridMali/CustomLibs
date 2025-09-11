@@ -37,6 +37,7 @@ public:
 
 private:
     TTF_Font*                   m_font;
+    int                         m_fontSize;
     String                      m_euroChar;
     String                      m_glyphs;
     bool                        m_isAvailable;
@@ -50,9 +51,11 @@ private:
 public:
     static int CompareTextures(void* context, const char& key1, const char& key2);
 
-    FontHandler();
+    FontHandler(int fontSize = 128);
 
-    void Setup(void);
+    void SetFontSize(int fontSize) noexcept {
+        m_fontSize = fontSize;
+    }
 
     bool Create(String fontFolder, String fontName, String glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-=.,*/: _?!%");
 
