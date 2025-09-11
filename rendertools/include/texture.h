@@ -65,37 +65,37 @@ class TextureBuffer
 {
 public:
 
-    class TextureBufferInfo {
+    class BufferInfo {
     public:
-        int                 width;
-        int                 height;
-        int                 componentCount;
-        GLenum              internalFormat;
-        GLenum              format;
-        int                 dataSize;
+        int     m_width;
+        int     m_height;
+        int     m_componentCount;
+        GLenum  m_internalFormat;
+        GLenum  m_format;
+        int     m_dataSize;
 
-        TextureBufferInfo()
-            : width(0), height(0), componentCount(0), internalFormat(0), format(0), dataSize(0)
+        BufferInfo(int width = 0, int height = 0, int componentCount = 0, int internalFormat = 0, int format = 0)
+            : m_width(width), m_height(height), m_componentCount(height), m_internalFormat(internalFormat), m_format(format), m_dataSize(width * height * componentCount)
         {
         }
 
         void Reset(void)
             noexcept
         {
-            width = 0;
-            height = 0;
-            componentCount = 0;
-            internalFormat = 0;
-            format = 0;
-            dataSize = 0;
+            m_width = 0;
+            m_height = 0;
+            m_componentCount = 0;
+            m_internalFormat = 0;
+            m_format = 0;
+            m_dataSize = 0;
         }
     };
 
-    TextureBufferInfo   m_info;
+    BufferInfo   m_info;
 #if USE_SHARED_POINTERS
     SharedPointer<char> m_data;
 #else
-    char* m_data;
+    char*               m_data;
 #endif
 #ifdef _DEBUG
     String              m_name;
@@ -127,6 +127,8 @@ public:
 
     void Reset(void)
         noexcept;
+
+    bool Allocate(int width, int height, int componentCount) noexcept;
 
     TextureBuffer& Create(SDL_Surface* source, bool premultiply, bool flipVertically);
 
@@ -273,13 +275,17 @@ public:
     inline int GetWidth(int i = 0)
         noexcept
     {
-        return m_buffers[i]->m_info.width;
+        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width : 0;
     }
 
     inline int GetHeight(int i = 0)
         noexcept
     {
-        return m_buffers[i]->m_info.height;
+        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0;
+    }
+
+    inline char* GetData(int i = 0) {
+        return (i < m_buffers.Length()) ? static_cast<char*>(m_buffers[i]->m_data) : nullptr;
     }
 
     inline int Type(void)
@@ -318,6 +324,26 @@ public:
 
     static tRenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
         noexcept;
+};
+
+// =================================================================================================
+
+class LinearTexture
+    : public Texture
+{
+public:
+    ManagedArray<Vector4f>  m_data;
+
+    LinearTexture() = default;
+    ~LinearTexture() = default;
+
+    virtual void SetParams(void) override;
+
+    bool Allocate(int length);
+
+    virtual void Deploy(int bufferIndex = 0) override;
+
+    int Upload(ManagedArray<Vector4f>& data);
 };
 
 // =================================================================================================

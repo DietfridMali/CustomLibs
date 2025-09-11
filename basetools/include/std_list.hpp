@@ -85,13 +85,23 @@ public:
 
     template <typename T>
         requires std::constructible_from<ItemType, T&&>
-    inline ItemType* Append(T&& dataItem) {
-        m_list.push_back(std::forward<T>(dataItem));
+    inline ItemType* Append(T&& dataItem) noexcept {
+        try {
+            m_list.push_back(std::forward<T>(dataItem));
+        }
+        catch (...) {
+            return nullptr;
+        }
         return &m_list.back();
     }
 
-    ItemType* Append(void) {
-        m_list.emplace_back();         // Default-Konstruktor von ItemType
+    ItemType* Append(void) noexcept {
+        try {
+            m_list.emplace_back();         // Default-Konstruktor von ItemType
+        }
+        catch (...) {
+            return nullptr;
+        }
         return &m_list.back();
     }
 
@@ -101,7 +111,12 @@ public:
         std::is_constructible<ItemType, Args...>::value>>
         ItemType * Append(Args&&... args) noexcept(noexcept(m_list.emplace_back(std::forward<Args>(args)...)))
     {
-        m_list.emplace_back(std::forward<Args>(args)...);
+        try {
+            m_list.emplace_back(std::forward<Args>(args)...);
+        }
+        catch (...) {
+            return nullptr;
+        }
         return &m_list.back();
     }
 

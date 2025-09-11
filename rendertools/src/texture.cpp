@@ -68,7 +68,7 @@ uint8_t TextureBuffer::Premultiply(uint16_t c, uint16_t a) noexcept {
 
 
 void TextureBuffer::Premultiply(void) {
-    if (m_info.format == GL_RGBA8) {
+    if (m_info.m_format == GL_RGBA8) {
         struct RGBA8 {
             uint8_t r;
             uint8_t g;
@@ -76,7 +76,7 @@ void TextureBuffer::Premultiply(void) {
             uint8_t a;
         };
         RGBA8* p = reinterpret_cast<RGBA8*>(m_data.get());
-        for (int i = m_info.dataSize / 4; i; --i, ++p) {
+        for (int i = m_info.m_dataSize / 4; i; --i, ++p) {
             uint16_t a = uint16_t (p->a);
             p->r = Premultiply(uint16_t(p->r), a);
             p->g = Premultiply(uint16_t(p->g), a);
@@ -86,34 +86,38 @@ void TextureBuffer::Premultiply(void) {
 }
 
 
-TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool flipVertically) {
-    m_info.width = source->w;
-    m_info.height = source->h;
-    m_info.componentCount = source->pitch / source->w;
-    if (m_info.componentCount < 3) {
-        SDL_Surface* h = source;
-        source = SDL_ConvertSurfaceFormat(source, SDL_PIXELFORMAT_RGBA32, 0);
-        SDL_FreeSurface(h);
-        m_info.componentCount = source->pitch / source->w;
-    }
-    m_info.internalFormat = (m_info.componentCount == 4) ? GL_RGBA : GL_RGB;
-    m_info.format = (m_info.componentCount == 4) ? GL_RGBA : GL_RGB;
-    m_info.dataSize = m_info.width * m_info.height * m_info.componentCount;
+bool TextureBuffer::Allocate(int width, int height, int componentCount) noexcept {
+    m_info.m_width = width;
+    m_info.m_height = height;
+    m_info.m_componentCount = componentCount;
+    m_info.m_format =
+    m_info.m_internalFormat = (componentCount == 3) ? GL_RGB : GL_RGBA;
+    m_info.m_dataSize = width * height * componentCount;
+    try {
 #if USE_SHARED_POINTERS
-    m_data = SharedPointer<char>(m_info.dataSize);
+        m_data = SharedPointer<char>(m_info.m_dataSize);
 #else
-    m_data = new char[m_info.dataSize];
+        m_data = new char[m_info.m_dataSize];
 #endif
-    if (not m_data) // malloc(m_dataSize);
+    }
+    catch(...) {
+        return false;
+    }
+    return m_data.get() != nullptr;
+}
+
+
+TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool flipVertically) {
+    if (not Allocate(source->w, source->h, source->pitch / source->w))
         fprintf(stderr, "%s (%d): memory allocation for texture clone failed\n", __FILE__, __LINE__);
     else {
         if (flipVertically)
             FlipSurface(source);
         else
 #if USE_SHARED_POINTERS
-            memcpy(m_data.get(), source->pixels, m_info.dataSize);
+            memcpy(m_data.get(), source->pixels, m_info.m_dataSize);
 #else
-            memcpy(m_data, source->pixels, m_info.dataSize);
+            memcpy(m_data, source->pixels, m_info.m_dataSize);
 #endif
         SDL_FreeSurface(source);
         if (premultiply)
@@ -307,9 +311,9 @@ void Texture::Deploy(int bufferIndex)
         SetParams();
         TextureBuffer* texBuf = m_buffers[bufferIndex];
 #if USE_SHARED_POINTERS
-        glTexImage2D(m_type, 0, texBuf->m_info.internalFormat, texBuf->m_info.width, texBuf->m_info.height, 0, texBuf->m_info.format, GL_UNSIGNED_BYTE, (const void*)texBuf->m_data.get());
+        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, (const void*)texBuf->m_data.get());
 #else
-        glTexImage2D(m_type, 0, texBuf->m_info.internalFormat, texBuf->m_info.width, texBuf->m_info.height, 0, texBuf->m_info.format, GL_UNSIGNED_BYTE, (const void*)texBuf->m_data);
+        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, (const void*)texBuf->m_data);
 #endif
         Release();
     }
@@ -434,6 +438,59 @@ noexcept
     else if (wRatio < hRatio)
         offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
     return offsets;
+}
+
+// =================================================================================================
+
+void LinearTexture::SetParams(void)
+{
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+
+bool LinearTexture::Allocate(int length) {
+    TextureBuffer* texBuf = new TextureBuffer();
+    if (not texBuf)
+        return false;
+    if (not m_buffers.Append(texBuf)) {
+        delete texBuf;
+        return false;
+    }
+    texBuf->m_info = TextureBuffer::BufferInfo(length, 1, 4, GL_RGBA, GL_RGBA);
+    return true;
+}
+
+
+void LinearTexture::Deploy(int bufferIndex)
+{
+    if (IsAvailable()) {
+        Bind();
+        SetParams();
+        TextureBuffer* texBuf = m_buffers[0];
+#if USE_SHARED_POINTERS
+        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, nullptr);
+#else
+        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, nullptr);
+#endif
+        Release();
+    }
+}
+
+int LinearTexture::Upload(ManagedArray<Vector4f>& data)
+{
+    if (m_buffers.Length() == 0)
+        return 0;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    int l = std::min(GetWidth(), int(data.Length()));
+    if (l > 0) {
+        memcpy(GetData(0), data.Data(), l);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, l, 1, GL_RGBA, GL_FLOAT, data.Data());
+    }
+    return l;
+
 }
 
 // =================================================================================================

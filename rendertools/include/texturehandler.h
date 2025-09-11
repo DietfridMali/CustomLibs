@@ -41,6 +41,10 @@ public:
         return GetTexture<Texture>();
     }
 
+    inline Texture* GetLinearTexture(void) {
+        return GetTexture<LinearTexture>();
+    }
+
     inline TiledTexture* GetTiledTexture(void) {
         return GetTexture<TiledTexture>();
     } 
