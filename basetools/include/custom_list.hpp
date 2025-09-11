@@ -297,20 +297,20 @@ public:
 		ListNodePtr 	m_first;
 		ListNodePtr 	m_last;
 		ListNodePtr 	m_current;
-		int32_t			m_index;
+		int32_t			m_normalIndex;
 		int32_t			m_length;
 
 	public:
 		explicit Iterator() {}
 
 		Iterator(List<ItemType>& l)
-			: m_first(l.First()), m_last(l.Last()), m_index(0), m_length(l.Length())
+			: m_first(l.First()), m_last(l.Last()), m_normalIndex(-1), m_length(l.Length())
 		{
 			m_current = m_first;
 		}
 
 		Iterator(const List<ItemType>& l)
-			: m_first(l.First()), m_last(l.Last()), m_index(0), m_length(0)
+			: m_first(l.First()), m_last(l.Last()), m_normalIndex(1), m_length(0)
 		{
 			m_current = m_first;
 		}

@@ -75,7 +75,7 @@ class VertexDataBuffer {
             return (GLvoid*)m_glData.data();
         }
 
-        inline uint32_t AppDataLength(void) {
+        inline uint32_t AppDataLength(void) const {
             return m_appData.Length();
         }
 
@@ -83,7 +83,7 @@ class VertexDataBuffer {
             return m_glData.Data();
         }
 
-        inline uint32_t GLDataLength(void) {
+        inline uint32_t GLDataLength(void) const {
             return m_glData.Length();
         }
 

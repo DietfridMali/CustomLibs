@@ -65,7 +65,7 @@ public:
         m_isArray = false;
     }
 
-    DATA_T* get() noexcept {
+    DATA_T* Data() noexcept {
         if (m_isArray) {
             if (auto p = std::get_if<std::shared_ptr<DATA_T[]>>(&m_ptr)) return p->get();
             return nullptr;
@@ -76,7 +76,7 @@ public:
         }
     }
 
-    const DATA_T* get() const noexcept {
+    const DATA_T* Data() const noexcept {
         if (m_isArray) {
             if (auto p = std::get_if<std::shared_ptr<DATA_T[]>>(&m_ptr)) return p->get();
             return nullptr;
@@ -88,40 +88,44 @@ public:
     }
 
     DATA_T& operator[](std::size_t i) {
-        if (!m_isArray) throw std::logic_error("Kein Array verwaltet!");
+        if (!m_isArray) 
+            throw std::logic_error("not an array!");
         return std::get<std::shared_ptr<DATA_T[]>>(m_ptr).get()[i];
     }
 
     const DATA_T& operator[](std::size_t i) const {
-        if (!m_isArray) throw std::logic_error("Kein Array verwaltet!");
+        if (!m_isArray) 
+            throw std::logic_error("not an array!");
         return std::get<std::shared_ptr<DATA_T[]>>(m_ptr).get()[i];
     }
 
     DATA_T& operator*() {
-        if (m_isArray) throw std::logic_error("Array-Modus: Kein Einzelobjekt dereferenzierbar!");
-        DATA_T* ptr = get();
+        if (m_isArray) 
+            throw std::logic_error("Array mode: cannot dereference singuar object!");
+        DATA_T* ptr = Data();
         if (!ptr) throw std::runtime_error("Nullpointer!");
         return *ptr;
     }
 
     DATA_T* operator->() {
-        if (m_isArray) throw std::logic_error("Array-Modus: Kein Einzelobjekt dereferenzierbar!");
-        return get();
+        if (m_isArray) 
+            throw std::logic_error("Array mode: cannot dereference singuar object!");
+        return Data();
     }
 
-    inline bool IsValid(void) const noexcept { return get() != nullptr; }
+    inline bool IsValid(void) const noexcept { return Data() != nullptr; }
 
     operator bool() const noexcept { return IsValid(); }
 
     bool operator!() const noexcept { return not IsValid(); }
 
-    operator DATA_T* () noexcept { return static_cast<DATA_T*>(get()); }
+    operator DATA_T* () noexcept { return static_cast<DATA_T*>(Data()); }
 
-    operator const DATA_T* () const noexcept { return static_cast<const DATA_T*>(get()); }
+    operator const DATA_T* () const noexcept { return static_cast<const DATA_T*>(Data()); }
 
-    operator void* () noexcept { return static_cast<void*>(get()); }
+    operator void* () noexcept { return static_cast<void*>(Data()); }
 
-    operator const void* () const noexcept { return static_cast<const void*>(get()); }
+    operator const void* () const noexcept { return static_cast<const void*>(Data()); }
 
     bool isArray() const noexcept { return m_isArray; }
 
@@ -131,10 +135,10 @@ public:
         noexcept
     {
         if (!m_isArray && !other.m_isArray)
-            return get() == other.get();
+            return Data() == other.Data();
         if (m_isArray != other.m_isArray)
             return false;
-        return get() == other.get();
+        return Data() == other.Data();
     }
 
     inline bool operator!=(const SharedPointer& other) const

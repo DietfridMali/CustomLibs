@@ -85,7 +85,7 @@ public:
         return m_info ? m_info->handle == handle : false;
     }
 
-    inline HANDLE_T get() const
+    inline HANDLE_T Data() const
         noexcept
     {
         return m_info ? m_info->handle : HANDLE_T{};
@@ -94,13 +94,13 @@ public:
     inline operator HANDLE_T() const
         noexcept
     {
-        return get();
+        return Data();
     }
 
     inline bool IsAvailable(void) const
         noexcept
     {
-        return get() != HANDLE_T{};
+        return Data() != HANDLE_T{};
     }
 
     inline operator bool() const

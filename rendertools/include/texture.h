@@ -30,7 +30,7 @@ using TextureList = List<Texture*>;
 #   undef USE_SHARED_POINTERS
 #endif
 
-#define USE_SHARED_POINTERS 1
+#define USE_SHARED_POINTERS 0
 
 // =================================================================================================
 // texture handling classes
@@ -93,9 +93,9 @@ public:
 
     BufferInfo   m_info;
 #if USE_SHARED_POINTERS
-    SharedPointer<char> m_data;
+    SharedPointer<uint8_t>  m_data;
 #else
-    char*               m_data;
+    ManagedArray<uint8_t>   m_data;
 #endif
 #ifdef _DEBUG
     String              m_name;
@@ -112,10 +112,7 @@ public:
         if (m_data.IsValid())
             m_data.Release();
 #else
-        if (m_data) {
-            delete[](m_data);
-            m_data = nullptr;
-        }
+        m_data.Reset();
 #endif
     }
 
@@ -284,8 +281,8 @@ public:
         return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0;
     }
 
-    inline char* GetData(int i = 0) {
-        return (i < m_buffers.Length()) ? static_cast<char*>(m_buffers[i]->m_data) : nullptr;
+    inline uint8_t* GetData(int i = 0) {
+        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->m_data.Data()) : nullptr;
     }
 
     inline int Type(void)

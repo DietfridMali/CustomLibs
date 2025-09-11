@@ -103,6 +103,16 @@ public:
         return 1;
     }
 
+    inline const VertexBuffer& Vertices(void) const noexcept { return m_vertices; }
+
+    inline const VertexBuffer& Normals(void) const noexcept { return m_normals; }
+
+    inline const TexCoordBuffer& TexCoords(void) const noexcept { return m_texCoords; }
+
+    inline const ColorBuffer& VertexColors(void) const noexcept { return m_vertexColors; }
+
+    inline const IndexBuffer& Indices(void) const noexcept { return m_indices; }
+
     inline void UpdateVertexBuffer(void) {
         m_vao.UpdateVertexBuffer("Vertex", m_vertices.GLData(), m_vertices.GLDataSize(), GL_FLOAT, 3);
     }

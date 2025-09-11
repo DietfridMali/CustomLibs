@@ -190,7 +190,7 @@ public:
     }
 
     inline bool IsEnabled(void) noexcept {
-        return (m_activeHandle != GL_NONE) and (m_activeHandle == m_handle.get());
+        return (m_activeHandle != GL_NONE) and (m_activeHandle == m_handle.Data());
     }
 
     inline int GetLastDestination(void) noexcept {

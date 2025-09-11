@@ -297,7 +297,7 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
         if (not baseRenderer.CheckGLError())
             return false;
-        m_activeHandle = m_handle.get();
+        m_activeHandle = m_handle.Data();
     }
     return EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable);
 }
