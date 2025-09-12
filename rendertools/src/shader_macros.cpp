@@ -17,11 +17,11 @@ const String& Standard2DVS() {
             uniform mat4 mProjection;
             uniform mat4 mViewport;
             out vec3 fragPos;
-            out vec2 fragTexCoord;
+            out vec2 fragCood;
             void main() {
                 vec4 viewPos = mModelView * vec4 (position, 1.0);
                 gl_Position = mViewport * mProjection * viewPos;
-                fragTexCoord = texCoord;
+                fragCood = texCoord;
                 fragPos = viewPos.xyz;
                 }
         )"
@@ -40,11 +40,11 @@ const String& Standard3DVS() {
             uniform mat4 mModelView;
             uniform mat4 mProjection;
             out vec3 fragPos;
-            out vec2 fragTexCoord;
+            out vec2 fragCood;
             void main() {
                 vec4 viewPos = mModelView * vec4 (position, 1.0);
                 gl_Position = mProjection * viewPos;
-                fragTexCoord = texCoord;
+                fragCood = texCoord;
                 fragPos = viewPos.xyz;
                 }
         )"
@@ -65,11 +65,11 @@ const String& Offset2DVS() {
             uniform mat4 mViewport;
             uniform float offset;
             out vec3 fragPos;
-            out vec2 fragTexCoord;
+            out vec2 fragCood;
             void main() {
                 vec4 viewPos = mModelView * vec4 (position, 1.0);
                 gl_Position = mViewport * mProjection * vec4(viewPos.x + offset, viewPos.y + offset, viewPos.z, 1.0);
-                fragTexCoord = texCoord;
+                fragCood = texCoord;
                 fragPos = viewPos.xyz;
                 }
         )"

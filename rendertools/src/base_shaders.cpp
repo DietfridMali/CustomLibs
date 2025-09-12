@@ -59,10 +59,10 @@ const ShaderSource& GrayScaleShader() {
         uniform vec2 tcOffset;
         uniform vec2 tcScale;
         uniform float brightness;
-        in vec2 fragTexCoord;
+        in vec2 fragCood;
         out vec4 fragColor;
         void main() {
-            vec4 texColor = texture(source, tcOffset + fragTexCoord * tcScale);
+            vec4 texColor = texture(source, tcOffset + fragCood * tcScale);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray *= brightness;
@@ -88,12 +88,12 @@ const ShaderSource& PlainTextureShader() {
         uniform vec2 tcScale;
         //uniform float premultiply;
         in vec3 fragPos;
-        in vec2 fragTexCoord;
+        in vec2 fragCood;
 
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture (source, tcOffset + fragTexCoord * tcScale);
+            vec4 texColor = texture (source, tcOffset + fragCood * tcScale);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
@@ -116,13 +116,13 @@ const ShaderSource& BlurTextureShader() {
         uniform vec4 surfaceColor;
         //uniform float premultiply;
         in vec3 fragPos;
-        in vec2 fragTexCoord;
+        in vec2 fragCood;
         )")
         + GaussBlurFuncs() +
         String(R"(
         layout(location = 0) out vec4 fragColor;
         void main() {
-            vec4 texColor = GaussBlur(fragTexCoord, -1, -1);
+            vec4 texColor = GaussBlur(fragCood, -1, -1);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
@@ -144,7 +144,7 @@ const ShaderSource& TintAndBlurShader() {
             // precision mediump float;
 
             uniform sampler2D source;
-            in vec2 fragTexCoord;
+            in vec2 fragCood;
             out vec4 fragColor;
             uniform float brightness;
             uniform float contrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
@@ -155,7 +155,7 @@ const ShaderSource& TintAndBlurShader() {
         TintFuncs() +
         String(R"(
         void main() {
-            vec2 baseUV = fragTexCoord;
+            vec2 baseUV = fragCood;
             vec4 texColor = GaussBlur(baseUV, -1, -1);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
