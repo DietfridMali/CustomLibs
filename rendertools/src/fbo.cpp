@@ -52,8 +52,10 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#if 0
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+#endif
     switch (bufferType) {
         case BufferInfo::btColor:
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
@@ -97,6 +99,9 @@ bool FBO::AttachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
         return true;
+    GLenum tmu = openGLStates.TextureIsBound(GL_TEXTURE_2D, bufferInfo.m_handle);
+    if (tmu != GL_NONE)
+        openGLStates.BindTexture2D(0, tmu);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
     return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
 }
@@ -445,11 +450,15 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params) {
         (params.source < 0)
         ? SharedTextureHandle(GLuint(-params.source))
         : BufferHandle(params.source);
+    m_renderTexture.HasBuffer() = true;
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
-        m_renderTexture.SetParams(true);
     }
-    m_renderTexture.HasBuffer() = true;
+#if 1
+    m_renderTexture.Bind(0);
+    m_renderTexture.SetParams(true);
+    //m_renderTexture.Release();
+#endif
     return &m_renderTexture;
 }
 

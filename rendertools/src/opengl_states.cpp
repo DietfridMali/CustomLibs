@@ -29,8 +29,18 @@ void OpenGLStates::BindTexture(GLenum typeID, GLuint texture, GLenum tmu) {
 		currentTMU = ActiveTexture(tmu);
 		glBindTexture(typeID, texture);
 	}
+	if (m_maxTMU < i + 1)
+		m_maxTMU = i + 1;
 #endif
 }
 
+
+GLenum OpenGLStates::TextureIsBound(GLenum typeID, GLuint texture) {
+	int j = (typeID == GL_TEXTURE_2D) ? 0 : 1;
+	for (int i = 0; j < m_maxTMU; ++i)
+		if (m_bindings[i].handles[j] == texture)
+			return i;
+	return GL_NONE;
+}
 
 // =================================================================================================

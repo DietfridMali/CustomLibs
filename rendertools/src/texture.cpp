@@ -206,8 +206,9 @@ Texture& Texture::Copy(const Texture& other) {
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer = other.m_hasBuffer;   // BUGFIX: fehlende Felder kopieren
-        m_isValid = other.m_isValid;     // BUGFIX: fehlende Felder kopieren
+        m_hasBuffer = other.m_hasBuffer; 
+        m_hasParams = other.m_hasParams;
+        m_isValid = other.m_isValid;     
     }
     return *this;
 }
@@ -228,8 +229,9 @@ noexcept
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer = other.m_hasBuffer;   // BUGFIX: aufnehmen
-        m_isValid = other.m_isValid;     // BUGFIX: aufnehmen
+        m_hasBuffer = other.m_hasBuffer; 
+        m_hasParams = other.m_hasParams;
+        m_isValid = other.m_isValid;     
     }
     return *this;
 }
@@ -271,7 +273,6 @@ void Texture::Release(int tmuIndex)
 void Texture::SetParams(bool enforce)
 {
     if (enforce or not m_hasParams) {
-        Bind();
         m_hasParams = true;
         if (m_useMipMaps) {
             glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
@@ -453,7 +454,6 @@ void LinearTexture::SetParams(bool enforce)
 {
     if (enforce or not m_hasParams) {
         m_hasParams = true;
-        Bind();
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -491,9 +491,9 @@ void LinearTexture::Deploy(int bufferIndex)
 {
     if (IsAvailable()) {
         Bind();
-        SetParams();
         TextureBuffer* texBuf = m_buffers[0];
         glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_FLOAT, reinterpret_cast<const void*>(texBuf->m_data.Data()));
+        SetParams();
         Release();
     }
 }
@@ -516,7 +516,6 @@ int LinearTexture::Upload(ManagedArray<Vector4f>& data)
 
 void TiledTexture::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
-        m_hasParams = true;
         Texture::SetParams();
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -534,13 +533,14 @@ void TiledTexture::SetParams(bool enforce) {
 void FBOTexture::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
         m_hasParams = true;
-        Bind();
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#if 0
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+#endif
     }
 }
 

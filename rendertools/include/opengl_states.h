@@ -18,6 +18,8 @@ class OpenGLStates
 	: public BaseSingleton<OpenGLStates>
 {
 private:
+	int	m_maxTMU;
+
 	struct textureBindings {
 		GLuint	handles[2]; // texture2D, cubemap
 	};
@@ -25,7 +27,9 @@ private:
 	ManagedArray<textureBindings> m_bindings;
 
 public:
-	OpenGLStates() {
+	OpenGLStates() 
+		: m_maxTMU(0)
+	{
 		GLint tmuCount = 0;
 		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &tmuCount);
 		m_bindings.Resize(tmuCount);
@@ -189,6 +193,8 @@ public:
 		inline void BindCubemap(GLuint texture, GLenum tmu = GL_NONE) {
 			BindTexture<GL_TEXTURE_CUBE_MAP>(texture, tmu);
 		}
+
+		GLenum TextureIsBound(GLenum typeID, GLuint texture);
 	};
 
 #define openGLStates OpenGLStates::Instance()
