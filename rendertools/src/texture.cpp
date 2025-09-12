@@ -268,20 +268,24 @@ void Texture::Release(int tmuIndex)
 }
 
 
-void Texture::SetParams(void)
+void Texture::SetParams(bool enforce)
 {
-    if (m_useMipMaps) {
-        glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
-        glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    if (enforce or not m_hasParams) {
+        Bind();
+        m_hasParams = true;
+        if (m_useMipMaps) {
+            glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
+            glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
+        else {
+            glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_FALSE);
+            glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
-    else {
-        glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_FALSE);
-        glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
-    glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 
@@ -297,7 +301,11 @@ noexcept
 
 bool Texture::Enable(int tmuIndex)
 {
-    return Bind(tmuIndex);
+    if (not Bind(tmuIndex))
+        return false;
+    //SetParams();
+    //SetWrapping();
+    return true;
 }
 
 
@@ -441,12 +449,16 @@ noexcept
 
 // =================================================================================================
 
-void LinearTexture::SetParams(void)
+void LinearTexture::SetParams(bool enforce)
 {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (enforce or not m_hasParams) {
+        m_hasParams = true;
+        Bind();
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
 }
 
 
@@ -502,17 +514,34 @@ int LinearTexture::Upload(ManagedArray<Vector4f>& data)
 
 // =================================================================================================
 
-void TiledTexture::SetParams(void) {
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glGenerateMipmap(GL_TEXTURE_2D);
+void TiledTexture::SetParams(bool enforce) {
+    if (enforce or not m_hasParams) {
+        m_hasParams = true;
+        Texture::SetParams();
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glGenerateMipmap(GL_TEXTURE_2D);
 
-    // (optional) Anisotropie
-    GLfloat aniso = 0.f;
-    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+        // (optional) Anisotropie
+        GLfloat aniso = 0.f;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+    }
+}
+
+// =================================================================================================
+
+void FBOTexture::SetParams(bool enforce) {
+    if (enforce or not m_hasParams) {
+        m_hasParams = true;
+        Bind();
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    }
 }
 
 // =================================================================================================

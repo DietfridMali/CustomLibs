@@ -115,6 +115,7 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
         shader->SetVector4f("surfaceColor", color);
         shader->SetVector2f("tcOffset", tcOffset);
         shader->SetVector2f("tcScale", tcScale);
+        shader->SetInt("source", 0);
         //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
     }
     return shader;
@@ -135,8 +136,6 @@ Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const G
 Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f& tcOffset, const Vector2f& tcScale) {
     Shader* shader = SetupShader("grayScale");
     if (shader and not baseRenderer.DepthPass()) {
-        ShaderLocationTable locations;
-        locations.Start();
         shader->SetVector2f("tcOffset", tcOffset);
         shader->SetVector2f("tcScale", tcScale);
         shader->SetFloat("brightness", brightness);

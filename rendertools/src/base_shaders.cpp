@@ -59,10 +59,10 @@ const ShaderSource& GrayScaleShader() {
         uniform vec2 tcOffset;
         uniform vec2 tcScale;
         uniform float brightness;
-        in vec2 fragCood;
+        in vec2 fragCoord;
         out vec4 fragColor;
         void main() {
-            vec4 texColor = texture(source, tcOffset + fragCood * tcScale);
+            vec4 texColor = texture(source, tcOffset + fragCoord * tcScale);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray *= brightness;
@@ -88,12 +88,12 @@ const ShaderSource& PlainTextureShader() {
         uniform vec2 tcScale;
         //uniform float premultiply;
         in vec3 fragPos;
-        in vec2 fragCood;
+        in vec2 fragCoord;
 
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture (source, tcOffset + fragCood * tcScale);
+            vec4 texColor = texture (source, tcOffset + fragCoord * tcScale);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
@@ -118,7 +118,7 @@ const ShaderSource& MovingTextureShader() {
         uniform float time;
         //uniform float premultiply;
         in vec3 fragPos;
-        in vec2 fragCood;
+        in vec2 fragCoord;
 
         layout(location = 0) out vec4 fragColor;
         
@@ -126,7 +126,7 @@ const ShaderSource& MovingTextureShader() {
 #if 0
             fragColor = vec4(1,0,1,1);
 #else            
-            vec4 texColor = texture (source, fragCood + direction * (time * speed));
+            vec4 texColor = texture (source, fragCoord + direction * (time * speed));
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
@@ -150,13 +150,13 @@ const ShaderSource& BlurTextureShader() {
         uniform vec4 surfaceColor;
         //uniform float premultiply;
         in vec3 fragPos;
-        in vec2 fragCood;
+        in vec2 fragCoord;
         )")
         + GaussBlurFuncs() +
         String(R"(
         layout(location = 0) out vec4 fragColor;
         void main() {
-            vec4 texColor = GaussBlur(fragCood, -1, -1);
+            vec4 texColor = GaussBlur(fragCoord, -1, -1);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
@@ -178,7 +178,7 @@ const ShaderSource& TintAndBlurShader() {
             // precision mediump float;
 
             uniform sampler2D source;
-            in vec2 fragCood;
+            in vec2 fragCoord;
             out vec4 fragColor;
             uniform float brightness;
             uniform float contrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
@@ -189,7 +189,7 @@ const ShaderSource& TintAndBlurShader() {
         TintFuncs() +
         String(R"(
         void main() {
-            vec2 baseUV = fragCood;
+            vec2 baseUV = fragCoord;
             vec4 texColor = GaussBlur(baseUV, -1, -1);
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));

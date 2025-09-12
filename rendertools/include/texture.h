@@ -47,7 +47,7 @@ public:
 
     virtual void Release(int tmuIndex) = 0;
 
-    virtual void SetParams(void) = 0;
+    virtual void SetParams(bool enforce = false) = 0;
 
     virtual void Deploy(int bufferIndex = 0) = 0;
 
@@ -179,12 +179,13 @@ public:
     int                     m_wrapMode;
     int                     m_useMipMaps;
     bool                    m_hasBuffer;
+    bool                    m_hasParams;
     bool                    m_isValid;
 
     static SharedTextureHandle nullHandle;
 
     Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_CLAMP_TO_EDGE)
-        : m_handle(handle), m_type(type), m_wrapMode(wrapMode), m_useMipMaps(false), m_isValid(true), m_hasBuffer(false)
+        : m_handle(handle), m_type(type), m_wrapMode(wrapMode), m_useMipMaps(false), m_isValid(true), m_hasBuffer(false), m_hasParams(false)
     {
     }
 
@@ -246,7 +247,7 @@ public:
 
     virtual void Release(int tmuIndex = 0) override;
 
-    virtual void SetParams(void) override;
+    virtual void SetParams(bool enforce = false) override;
 
     void SetWrapping(int wrapMode = -1)
         noexcept;
@@ -334,7 +335,7 @@ public:
     LinearTexture() = default;
     ~LinearTexture() = default;
 
-    virtual void SetParams(void) override;
+    virtual void SetParams(bool enforce = false) override;
 
     bool Allocate(int length);
 
@@ -357,7 +358,20 @@ public:
 
     ~TiledTexture() = default;
 
-    void SetParams(void);
+    virtual void SetParams(bool enforce = false) override;
+};
+
+// =================================================================================================
+
+class FBOTexture
+    : public Texture
+{
+public:
+    FBOTexture() = default;
+
+    ~FBOTexture() = default;
+
+    virtual void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================

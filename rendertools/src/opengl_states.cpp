@@ -3,6 +3,7 @@
 #include "array.hpp"
 #include <glm/glm.hpp>
 #include <glm/vector_relational.hpp>
+#include "base_renderer.h"
 
 // =================================================================================================
 
@@ -10,6 +11,12 @@ void OpenGLStates::BindTexture(GLenum typeID, GLuint texture, GLenum tmu) {
 	static GLenum currentTMU = GL_TEXTURE0;
 	if (tmu == GL_NONE)
 		tmu = GL_TEXTURE0;
+#if 1
+	baseRenderer.ClearGLError();
+	GLint tex = 0;
+	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
+	baseRenderer.CheckGLError("BindTexture");
+#endif
 #if 0
 	ActiveTexture(tmu);
 	glBindTexture(typeID, texture);

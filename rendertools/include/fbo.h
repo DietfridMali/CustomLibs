@@ -71,7 +71,7 @@ public:
     DrawBufferList              m_drawBuffers; 
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
-    Texture                     m_renderTexture;
+    FBOTexture                  m_renderTexture;
     bool                        m_pingPong;
     bool                        m_isAvailable;
     int                         m_lastDestination;

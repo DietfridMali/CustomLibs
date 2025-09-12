@@ -52,6 +52,8 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     switch (bufferType) {
         case BufferInfo::btColor:
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
@@ -439,10 +441,14 @@ void FBO::Fill(RGBAColor color) {
 Texture* FBO::GetRenderTexture(const FBORenderParams& params) {
     if (params.source == params.destination)
         return nullptr;
-    if (params.source < 0)
-        m_renderTexture.m_handle = SharedTextureHandle(GLuint(-params.source));
-    else
-        m_renderTexture.m_handle = BufferHandle(params.source);
+    SharedTextureHandle handle = 
+        (params.source < 0)
+        ? SharedTextureHandle(GLuint(-params.source))
+        : BufferHandle(params.source);
+    if (m_renderTexture.m_handle != handle) {
+        m_renderTexture.m_handle = handle;
+        m_renderTexture.SetParams(true);
+    }
     m_renderTexture.HasBuffer() = true;
     return &m_renderTexture;
 }
