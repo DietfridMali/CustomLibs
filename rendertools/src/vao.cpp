@@ -168,7 +168,7 @@ noexcept
 }
 
 
-void VAO::Render(Shader* shader, Texture* texture)
+void VAO::Render(Texture* texture)
 noexcept
 {
 #if 1
@@ -181,11 +181,7 @@ noexcept
     else
         glDrawArrays(m_shape, 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
     Disable();
-#if 0
-    if (shader != nullptr)
-        //baseShaderHandler.StopShader();
-#endif
-        DisableTexture(texture);
+    //DisableTexture(texture);
 }
 
 // =================================================================================================

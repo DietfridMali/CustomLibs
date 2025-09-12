@@ -105,7 +105,7 @@ const ShaderSource& PlainTextureShader() {
 
 const ShaderSource& MovingTextureShader() {
     static const ShaderSource source(
-        "plainTexture",
+        "movingTexture",
         Standard2DVS(),
         R"(
         //#version 140
@@ -123,10 +123,14 @@ const ShaderSource& MovingTextureShader() {
         layout(location = 0) out vec4 fragColor;
         
         void main() {
+#if 0
+            fragColor = vec4(1,0,1,1);
+#else            
             vec4 texColor = texture (source, fragCood + direction * (time * speed));
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
+#endif
             }
         )");
     return source;

@@ -104,7 +104,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateVAO(true);
-    m_mesh.Render(shader, m_font->GetTexture());
+    m_mesh.Render(m_font->GetTexture());
 }
 
 

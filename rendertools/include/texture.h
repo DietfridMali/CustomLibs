@@ -248,7 +248,7 @@ public:
 
     virtual void SetParams(void) override;
 
-    void Wrap(void)
+    void SetWrapping(int wrapMode = -1)
         noexcept;
 
     virtual bool Enable(int tmuIndex = 0) override;
@@ -351,7 +351,10 @@ class TiledTexture
     : public Texture
 {
 public:
-    TiledTexture() = default;
+    TiledTexture()
+        : Texture(0, GL_TEXTURE_2D, GL_REPEAT) 
+    { }
+
     ~TiledTexture() = default;
 
     void SetParams(void);

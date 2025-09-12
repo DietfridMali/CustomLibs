@@ -115,7 +115,7 @@ noexcept
         texture->Disable();
 }
 
-void Mesh::Render(Shader* shader, Texture* texture) {
+void Mesh::Render(Texture* texture) {
     if (m_vao.IsValid()) {
 #if 0
         SetTexture();
@@ -123,7 +123,7 @@ void Mesh::Render(Shader* shader, Texture* texture) {
         SetOutlineColor();
         SetMaxDistance(maxDistance);
 #endif
-        m_vao.Render(shader, texture);
+        m_vao.Render(texture);
     }
 }
 

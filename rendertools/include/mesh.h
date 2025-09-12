@@ -21,7 +21,7 @@ public:
 
     virtual void Destroy(void) = 0;
 
-    virtual void Render(Shader* shader, Texture* texture) = 0;
+    virtual void Render(Texture* texture) = 0;
 
     virtual ~AbstractMesh() = default;
 };
@@ -213,7 +213,7 @@ public:
         return m_vertices.IsEmpty();
     }
 
-    virtual void Render(Shader* shader, Texture* texture);
+    virtual void Render(Texture* texture);
 };
 
 // =================================================================================================

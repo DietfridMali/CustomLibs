@@ -193,7 +193,7 @@ public:
     void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
         noexcept;
 
-    void Render(Shader* shader, Texture* texture = nullptr)
+    void Render(Texture* texture = nullptr)
         noexcept;
 };
 

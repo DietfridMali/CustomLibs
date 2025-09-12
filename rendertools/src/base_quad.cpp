@@ -192,7 +192,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
     if (not (shader or (shader = LoadShader(texture != nullptr))))
         return false;
     if (not updateVAO or UpdateVAO()) {
-        m_vao->Render(shader, texture);
+        m_vao->Render(texture);
         ResetTransformation();
         return true;
         }

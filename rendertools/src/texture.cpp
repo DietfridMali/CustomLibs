@@ -285,9 +285,11 @@ void Texture::SetParams(void)
 }
 
 
-void Texture::Wrap(void)
+void Texture::SetWrapping(int wrapMode)
 noexcept
 {
+    if (wrapMode >= 0)
+        m_wrapMode = wrapMode;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, m_wrapMode);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, m_wrapMode);
 }
@@ -295,18 +297,13 @@ noexcept
 
 bool Texture::Enable(int tmuIndex)
 {
-    if (not Bind(tmuIndex))
-        return false;
-    SetParams();
-    Wrap();
-    return true;
+    return Bind(tmuIndex);
 }
 
 
 void Texture::Disable(int tmuIndex)
 {
     Release(tmuIndex);
-    //openGLStates.SetTexture(m_type, false);
 }
 
 
