@@ -103,6 +103,36 @@ const ShaderSource& PlainTextureShader() {
 }
 
 
+const ShaderSource& MovingTextureShader() {
+    static const ShaderSource source(
+        "plainTexture",
+        Standard2DVS(),
+        R"(
+        //#version 140
+        //#extension GL_ARB_explicit_attrib_location : enable
+        #version 330
+        uniform sampler2D source;
+        uniform vec4 surfaceColor;
+        uniform vec2 direction;
+        uniform float speed;
+        uniform float time;
+        //uniform float premultiply;
+        in vec3 fragPos;
+        in vec2 fragCood;
+
+        layout(location = 0) out vec4 fragColor;
+        
+        void main() {
+            vec4 texColor = texture (source, fragCood + direction * (time * speed));
+            float a = texColor.a * surfaceColor.a;
+            if (a == 0) discard;
+            fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
+            }
+        )");
+    return source;
+}
+
+
 // render a b/w mask with color applied.
 const ShaderSource& BlurTextureShader() {
     static const ShaderSource source(
