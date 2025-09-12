@@ -75,19 +75,24 @@ class VertexDataBuffer {
             return (GLvoid*)m_glData.data();
         }
 
-        inline uint32_t AppDataLength(void) const {
+
+        inline SegmentedList<APP_DATA_T>& AppData(void) noexcept {
+            return m_appData;
+        }
+
+        inline uint32_t AppDataLength(void) const noexcept {
             return m_appData.Length();
         }
 
-        inline GL_DATA_T* GLData(void) {
+        inline GL_DATA_T* GLData(void) noexcept {
             return m_glData.Data();
         }
 
-        inline uint32_t GLDataLength(void) const {
+        inline uint32_t GLDataLength(void) const noexcept {
             return m_glData.Length();
         }
 
-        inline uint32_t GLDataSize(void) {
+        inline uint32_t GLDataSize(void) noexcept {
             return m_glData.Length() * sizeof(GL_DATA_T);
         }
 
