@@ -50,7 +50,8 @@ public:
     }
 
     virtual void Deploy(int bufferIndex) override {
-        if (!IsAvailable()) return;
+         if (!IsAvailable()) 
+            return;
         Bind();
         glPixelStorei(GL_UNPACK_ALIGNMENT, GLTexTraits<DATA_T>::align);
         TextureBuffer* texBuf = m_buffers[0];
@@ -66,6 +67,8 @@ public:
     }
 
     inline bool Create(ManagedArray<DATA_T>& data) {
+        if (not Texture::Create())
+            return false;
         if (!Allocate(static_cast<int>(data.Length())))
             return false;
         TextureBuffer* texBuf = m_buffers[0];
@@ -77,23 +80,29 @@ public:
 
     bool Allocate(int length) {
         auto* texBuf = new TextureBuffer();
-        if (!texBuf) return false;
-        if (!m_buffers.Append(texBuf)) { delete texBuf; return false; }
-        texBuf->m_info = TextureBuffer::BufferInfo(length, 1, 4,
-            GLTexTraits<DATA_T>::format, GLTexTraits<DATA_T>::format);
+        if (!texBuf) 
+            return false;
+        if (!m_buffers.Append(texBuf)) { 
+            delete texBuf; 
+            return false; 
+        }
+        texBuf->m_info = TextureBuffer::BufferInfo(length, 1, 4, GLTexTraits<DATA_T>::format, GLTexTraits<DATA_T>::format);
         Deploy(0);
         return true;
     }
 
     inline int Upload(ManagedArray<DATA_T>& data) {
-        if (m_buffers.Length() == 0) return 0;
+        if (m_buffers.Length() == 0) 
+            return 0;
         const int l = std::min(GetWidth(), int(data.Length()));
-        if (l <= 0) return 0;
+        if (l <= 0) 
+            return 0;
 
         Bind();
         glPixelStorei(GL_UNPACK_ALIGNMENT, GLTexTraits<DATA_T>::align);
         std::memcpy(GetData(0), data.Data(), size_t(l) * sizeof(DATA_T));
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, l, 1,
+        glTexSubImage2D(
+            GL_TEXTURE_2D, 0, 0, 0, l, 1,
             GLTexTraits<DATA_T>::format,
             GLTexTraits<DATA_T>::type,
             data.Data());
