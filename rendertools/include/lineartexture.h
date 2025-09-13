@@ -34,20 +34,26 @@ class LinearTexture
     : public Texture
 {
 public:
-    ManagedArray<DATA_T>  m_data;
+    ManagedArray<DATA_T>    m_data;
+    bool                    m_isRepeating;
 
-    LinearTexture() = default;
+    LinearTexture()
+        : m_isRepeating(false)
+    { }
+
     ~LinearTexture() = default;
+
 
     void SetParams(bool enforce) override {
         if (enforce || !m_hasParams) {
             m_hasParams = true;
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, m_isRepeating ? GL_REPEAT : GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         }
     }
+
 
     virtual void Deploy(int bufferIndex) override {
          if (!IsAvailable()) 
@@ -66,17 +72,20 @@ public:
         Release();
     }
 
-    inline bool Create(ManagedArray<DATA_T>& data) {
+
+    inline bool Create(ManagedArray<DATA_T>& data, bool isRepeating) {
         if (not Texture::Create())
             return false;
         if (!Allocate(static_cast<int>(data.Length())))
             return false;
         TextureBuffer* texBuf = m_buffers[0];
-        if (!texBuf->Allocate(static_cast<int>(data.Length()), 1, 4, data.Data()))
+        if (!texBuf->Allocate(static_cast<int>(data.Length()), 1, GLTexTraits<DATA_T>::align, data.Data()))
             return false;
+        m_isRepeating = isRepeating;
         Deploy(0);
         return true;
     }
+
 
     bool Allocate(int length) {
         auto* texBuf = new TextureBuffer();
@@ -86,10 +95,11 @@ public:
             delete texBuf; 
             return false; 
         }
-        texBuf->m_info = TextureBuffer::BufferInfo(length, 1, 4, GLTexTraits<DATA_T>::format, GLTexTraits<DATA_T>::format);
+        texBuf->m_info = TextureBuffer::BufferInfo(length, 1, GLTexTraits<DATA_T>::align, GLTexTraits<DATA_T>::internalFormat, GLTexTraits<DATA_T>::format);
         Deploy(0);
         return true;
     }
+
 
     inline int Upload(ManagedArray<DATA_T>& data) {
         if (m_buffers.Length() == 0) 

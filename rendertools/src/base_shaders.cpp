@@ -127,6 +127,8 @@ const ShaderSource& MovingTextureShader() {
         const float THRESHOLD     = 0.6;   // 0..1 (linear space)
         const float GAMMA_BRIGHT  = 2.2;   // >1 → stärkeres Aufhellen über Threshold
         const float GAMMA_DARK    = 1.5;   // >1 → stärkeres Abdunkeln unter Threshold
+
+        float Boost(float x) { return (x < 0.5) ? pow(x,0.333) : pow(x,3.0); }
         
         void main() {
 #if 0
@@ -134,15 +136,12 @@ const ShaderSource& MovingTextureShader() {
 #else            
             vec4 texColor = texture (source, fragCoord + direction * (time * speed));
             float a = texColor.a * surfaceColor.a;
-            if (a == 0) discard;
+            //if (a == 0) discard;
 
             vec3 rgbColor = texColor.rgb * surfaceColor.rgb;
-            rgbColor += vec3(0.5);
-            rgbColor = vec3(pow(rgbColor.r, 4.0), pow(rgbColor.g, 4.0), pow(rgbColor.b, 4.0));
-            rgbColor -= 0.5;
-            fragColor = vec4(rgbColor, a); 
-            return;
-
+#   if 1
+            fragColor = vec4(vec3(Boost(rgbColor.r), Boost(rgbColor.g), Boost(rgbColor.b)), 1.0); 
+#   else
             float L = dot(rgbColor, LUMA);
             float r = L / max(THRESHOLD, 1e-6);
 
@@ -153,6 +152,7 @@ const ShaderSource& MovingTextureShader() {
             float s = (L > 0.0) ? (L2 / L) : 0.0;
             fragColor = vec4(rgbColor * s, a); 
             //fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
+#   endif
 #endif
             }
         )");

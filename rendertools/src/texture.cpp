@@ -86,8 +86,8 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount, void* da
     m_info.m_width = width;
     m_info.m_height = height;
     m_info.m_componentCount = componentCount;
-    m_info.m_format =
-    m_info.m_internalFormat = (componentCount == 3) ? GL_RGB : GL_RGBA;
+    m_info.m_format = (componentCount == 1) ? GL_RED : (componentCount == 3) ? GL_RGB : GL_RGBA;
+    m_info.m_internalFormat = (componentCount == 1) ? GL_R8 : (componentCount == 3) ? GL_RGB : GL_RGBA;
     m_info.m_dataSize = width * height * componentCount;
     try {
 #if USE_SHARED_POINTERS
