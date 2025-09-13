@@ -454,6 +454,8 @@ noexcept
 
 // =================================================================================================
 
+#if 0
+
 void LinearTexture::SetParams(bool enforce)
 {
     if (enforce or not m_hasParams) {
@@ -526,6 +528,8 @@ int LinearTexture::Upload(ManagedArray<DATA_T>& data)
     return l;
 
 }
+
+#endif
 
 // =================================================================================================
 

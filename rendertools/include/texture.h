@@ -1,4 +1,7 @@
 #pragma once
+
+#define _TEXTURE_H
+
 #include "std_defines.h"
 
 #include "glew.h"
@@ -328,47 +331,6 @@ public:
 
 // =================================================================================================
 
-template<typename T> struct GLTexTraits;
-
-template<> struct GLTexTraits<uint8_t> {
-    static constexpr GLint  internal = GL_R8;
-    static constexpr GLenum format = GL_RED;
-    static constexpr GLenum type = GL_UNSIGNED_BYTE;
-    static constexpr GLint  align = 1;
-};
-
-
-template<> struct GLTexTraits<Vector4f> {
-    static constexpr GLint  internal = GL_RGBA32F;  // oder GL_RGBA16F / GL_RGBA8
-    static constexpr GLenum format = GL_RGBA;
-    static constexpr GLenum type = GL_FLOAT;
-    static constexpr GLint  align = 4;
-};
-
-
-template <typename DATA_T>
-class LinearTexture
-    : public Texture
-{
-public:
-    ManagedArray<DATA_T>  m_data;
-
-    LinearTexture() = default;
-    ~LinearTexture() = default;
-
-    virtual void SetParams(bool enforce = false) override;
-
-    bool Allocate(int length);
-
-    bool Create(ManagedArray<DATA_T>& data);
-
-    virtual void Deploy(int bufferIndex = 0) override;
-
-    int Upload(ManagedArray<DATA_T>& data);
-};
-
-// =================================================================================================
-
 class TiledTexture
     : public Texture
 {
@@ -394,5 +356,9 @@ public:
 
     virtual void SetParams(bool enforce = false) override;
 };
+
+// =================================================================================================
+
+#include "lineartexture.h"
 
 // =================================================================================================

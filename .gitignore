@@ -398,6 +398,7 @@ FodyWeavers.xsd
 !/**/*.h
 !/**/*.cpp
 !/**/*.hpp
+!/**/*.inl
 !/**/*.sln
 !/**/*.vcproj
 !/**/*.vcxproj
