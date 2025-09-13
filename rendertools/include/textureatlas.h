@@ -37,7 +37,6 @@ public:
 
 protected:
 	FBO			m_atlas;
-	Texture		m_texture;
 	TableSize	m_size;
 	GlyphSize	m_glyphSize;
 	Vector2f	m_scale;
@@ -71,7 +70,7 @@ public:
 	bool Add(Texture* glyph, int glyphIndex);
 
 	Texture* GetTexture(void) noexcept {
-		return &m_texture;
+		return m_atlas.GetTexture();
 	}
 
 	inline bool Enable(void) {

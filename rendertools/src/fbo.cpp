@@ -46,13 +46,13 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     baseRenderer.CheckGLError("FBO::CreateBuffer->Claim");
     bufferInfo.m_type = bufferType;
     baseRenderer.ClearGLError();
-    openGLStates.BindTexture2D(bufferInfo.m_handle, GL_TEXTURE0);
+    openGLStates.BindTexture2D(bufferInfo.m_handle, 0);
     baseRenderer.CheckGLError("FBO::CreateBuffer->BindTexture2D");
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-#if 0
+#if 1
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 #endif
@@ -70,7 +70,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
             break;
     }
-    openGLStates.BindTexture2D(0, GL_TEXTURE0);
+    openGLStates.BindTexture2D(0, 0);
     ++m_bufferCount;
 }
 
@@ -247,7 +247,7 @@ void FBO::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
         return false;
-    openGLStates.BindTexture2D(0, GL_TEXTURE0);
+    openGLStates.BindTexture2D(0, 0);
     if (reenable)
         glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
     else {
@@ -329,10 +329,9 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
     for (int i = 0; i < m_bufferCount; ++i)
         if ((i != bufferIndex) and (m_bufferInfo[i].m_tmuIndex == tmuIndex))
             m_bufferInfo[i].m_tmuIndex = -1;
-    openGLStates.BindTexture2D(m_bufferInfo[bufferIndex].m_handle, GL_TEXTURE0 + tmuIndex);
+    openGLStates.BindTexture2D(m_bufferInfo[bufferIndex].m_handle, tmuIndex);
     baseRenderer.CheckGLError("FBO::BindBuffer");
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
-    openGLStates.ActiveTexture(GL_TEXTURE0); // always reset!
     return true;
 }
 
@@ -453,12 +452,12 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params) {
     m_renderTexture.HasBuffer() = true;
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
-    }
 #if 1
-    m_renderTexture.Bind(0);
-    m_renderTexture.SetParams(true);
-    //m_renderTexture.Release();
+        m_renderTexture.Bind(0);
+        m_renderTexture.SetParams(true);
+        //m_renderTexture.Release();
 #endif
+    }
     return &m_renderTexture;
 }
 

@@ -176,6 +176,7 @@ public:
     List<TextureBuffer*>    m_buffers;
     List<String>            m_filenames;
     GLenum                  m_type;
+    int                     m_tmuIndex;
     int                     m_wrapMode;
     int                     m_useMipMaps;
     bool                    m_hasBuffer;
@@ -185,7 +186,7 @@ public:
     static SharedTextureHandle nullHandle;
 
     Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_CLAMP_TO_EDGE)
-        : m_handle(handle), m_type(type), m_wrapMode(wrapMode), m_useMipMaps(false), m_isValid(true), m_hasBuffer(false), m_hasParams(false)
+        : m_handle(handle), m_type(type), m_tmuIndex(-1), m_wrapMode(wrapMode), m_useMipMaps(false), m_isValid(true), m_hasBuffer(false), m_hasParams(false)
     {
     }
 
@@ -310,7 +311,8 @@ public:
     inline static void Release(int tmuIndex)
         noexcept
     {
-        openGLStates.BindTexture<typeID>(0, GL_TEXTURE0 + tmuIndex);
+        if (tmuIndex >= 0)
+            openGLStates.BindTexture<typeID>(0, tmuIndex);
         openGLStates.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 
@@ -326,11 +328,30 @@ public:
 
 // =================================================================================================
 
+template<typename T> struct GLTexTraits;
+
+template<> struct GLTexTraits<uint8_t> {
+    static constexpr GLint  internal = GL_R8;
+    static constexpr GLenum format = GL_RED;
+    static constexpr GLenum type = GL_UNSIGNED_BYTE;
+    static constexpr GLint  align = 1;
+};
+
+
+template<> struct GLTexTraits<Vector4f> {
+    static constexpr GLint  internal = GL_RGBA32F;  // oder GL_RGBA16F / GL_RGBA8
+    static constexpr GLenum format = GL_RGBA;
+    static constexpr GLenum type = GL_FLOAT;
+    static constexpr GLint  align = 4;
+};
+
+
+template <typename DATA_T>
 class LinearTexture
     : public Texture
 {
 public:
-    ManagedArray<Vector4f>  m_data;
+    ManagedArray<DATA_T>  m_data;
 
     LinearTexture() = default;
     ~LinearTexture() = default;
@@ -339,11 +360,11 @@ public:
 
     bool Allocate(int length);
 
-    bool Create(ManagedArray<Vector4f>& data);
+    bool Create(ManagedArray<DATA_T>& data);
 
     virtual void Deploy(int bufferIndex = 0) override;
 
-    int Upload(ManagedArray<Vector4f>& data);
+    int Upload(ManagedArray<DATA_T>& data);
 };
 
 // =================================================================================================

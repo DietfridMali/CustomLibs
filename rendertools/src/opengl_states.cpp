@@ -7,40 +7,41 @@
 
 // =================================================================================================
 
-void OpenGLStates::BindTexture(GLenum typeID, GLuint texture, GLenum tmu) {
-	static GLenum currentTMU = GL_TEXTURE0;
-	if (tmu == GL_NONE)
-		tmu = GL_TEXTURE0;
-#if 1
+bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
+	static int currentTMU = -1;
+	if (tmuIndex < 0)
+		return false;
+#if 0
 	baseRenderer.ClearGLError();
 	GLint tex = 0;
 	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
 	baseRenderer.CheckGLError("BindTexture");
 #endif
 #if 0
-	ActiveTexture(tmu);
+	ActiveTexture(GL_TEXTURE0 + tmuIndex);
 	glBindTexture(typeID, texture);
 #else
-	int i = int(tmu) - int(GL_TEXTURE0);
-	int j = (typeID == GL_TEXTURE_2D) ? 0 : 1;
-	if (m_bindings[i].handles[j] != texture) {
+	int typeIndex = (typeID == GL_TEXTURE_2D) ? 0 : 1;
+	if (m_bindings[tmuIndex].handles[typeIndex] != texture) {
 		//SetTexture(typeID, true);
-		m_bindings[i].handles[j] = texture;
-		currentTMU = ActiveTexture(tmu);
+		m_bindings[tmuIndex].handles[typeIndex] = texture;
+		currentTMU = ActiveTexture(GL_TEXTURE0 + tmuIndex);
 		glBindTexture(typeID, texture);
+		if (GL_TEXTURE0 + tmuIndex != currentTMU)
+			ActiveTexture(currentTMU);
 	}
-	if (m_maxTMU < i + 1)
-		m_maxTMU = i + 1;
+	if (m_maxTMU < tmuIndex + 1)
+		m_maxTMU = tmuIndex + 1;
 #endif
 }
 
 
-GLenum OpenGLStates::TextureIsBound(GLenum typeID, GLuint texture) {
+int OpenGLStates::TextureIsBound(GLenum typeID, GLuint texture) {
 	int j = (typeID == GL_TEXTURE_2D) ? 0 : 1;
-	for (int i = 0; j < m_maxTMU; ++i)
+	for (int i = 0; i < m_maxTMU; ++i)
 		if (m_bindings[i].handles[j] == texture)
 			return i;
-	return GL_NONE;
+	return -1;
 }
 
 // =================================================================================================

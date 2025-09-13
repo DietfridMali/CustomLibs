@@ -209,6 +209,10 @@ public:
         return m_bufferInfo[bufferIndex].m_handle;
     }
 
+    FBOTexture* GetTexture(void) noexcept {
+        return &m_renderTexture;
+    }
+
     bool AttachBuffer(int bufferIndex);
 
     bool DetachBuffer(int bufferIndex);

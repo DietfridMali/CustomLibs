@@ -179,22 +179,22 @@ public:
 			return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
 		}
 
-		void BindTexture(GLenum typeID, GLuint texture, GLenum tmu = GL_NONE);
+		bool BindTexture(GLenum typeID, GLuint texture, int tmuIndex);
 
 		template <GLenum typeID>
-		inline void BindTexture(GLuint texture, GLenum tmu = GL_NONE) {
-			BindTexture(typeID, texture, tmu);
+		inline bool BindTexture(GLuint texture, int tmuIndex) {
+			return BindTexture(typeID, texture, tmuIndex);
 		}
 
-		inline void BindTexture2D(GLuint texture, GLenum tmu = GL_NONE) {
-			BindTexture<GL_TEXTURE_2D>(texture, tmu);
+		inline bool BindTexture2D(GLuint texture, int tmuIndex) {
+			return BindTexture<GL_TEXTURE_2D>(texture, tmuIndex);
 		}
 
-		inline void BindCubemap(GLuint texture, GLenum tmu = GL_NONE) {
-			BindTexture<GL_TEXTURE_CUBE_MAP>(texture, tmu);
+		inline bool BindCubemap(GLuint texture, int tmuIndex) {
+			return BindTexture<GL_TEXTURE_CUBE_MAP>(texture, tmuIndex);
 		}
 
-		GLenum TextureIsBound(GLenum typeID, GLuint texture);
+		int TextureIsBound(GLenum typeID, GLuint texture);
 	};
 
 #define openGLStates OpenGLStates::Instance()

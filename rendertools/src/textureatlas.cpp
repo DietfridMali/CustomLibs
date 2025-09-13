@@ -24,9 +24,9 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 		return false;
 	}
 	m_scale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
-	m_texture.m_handle = m_atlas.BufferHandle(0);
-	m_texture.HasBuffer() = true;
-
+	GetTexture()->m_handle = m_atlas.BufferHandle(0);
+	GetTexture()->HasBuffer() = true;
+	GetTexture()->SetParams(true);
 	return true;
 }
 

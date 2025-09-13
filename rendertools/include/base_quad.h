@@ -23,7 +23,9 @@ public:
         float           rotation = 0.0f;
         bool            autoClear = true;
 
-        bool HaveTransformations(void) { return centerOrigin or flipVertically or (rotation != 0.0f); }
+        bool HaveTransformations(void) { 
+            return centerOrigin or flipVertically or (rotation != 0.0f); 
+        }
         void Clear(void) {  *this = {}; }
     };
 

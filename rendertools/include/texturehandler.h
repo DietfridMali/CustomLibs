@@ -41,8 +41,9 @@ public:
         return GetTexture<Texture>();
     }
 
+    template <typename DATA_T>
     inline Texture* GetLinearTexture(void) {
-        return GetTexture<LinearTexture>();
+        return GetTexture<LinearTexture<DATA_T>>();
     }
 
     inline TiledTexture* GetTiledTexture(void) {
