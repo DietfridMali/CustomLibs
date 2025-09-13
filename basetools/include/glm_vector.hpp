@@ -327,10 +327,16 @@ private:
         this->y = other.y;
 
         if constexpr (VEC_TYPE::length() > 2) {
-            if constexpr (OTHER_VEC::length() > 2) this->z = other.z; else this->z = 0.0f;
+            if constexpr (OTHER_VEC::length() > 2) 
+                this->z = other.z; 
+            else 
+                this->z = 0.0f;
         }
         if constexpr (VEC_TYPE::length() > 3) {
-            if constexpr (OTHER_VEC::length() > 3) this->w = other.w; else this->w = 0.0f;
+            if constexpr (OTHER_VEC::length() > 3) 
+                this->w = other.w; 
+            else 
+                this->w = 0.0f;
         }
     }
 };
