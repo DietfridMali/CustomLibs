@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "SDL.h"
+#include "conversions.hpp"
 
 // =================================================================================================
 // Timer functions: Measuring time, delaying program execution, etc.
@@ -116,6 +117,11 @@ public:
         if (t > 0)
             Sleep(DWORD(t));
         m_slack = GetLapTime() - m_duration;
+    }
+
+    // compute ramp value derived from current time and timer's start and end times and a threshold value
+    inline float Ramp(int threshold, int t = -1) noexcept {
+        return Conversions::Ramp(float((t < 0) ? SDL_GetTicks() : t), float(m_startTime), float(m_endTime), float(threshold));
     }
 };
 

@@ -142,6 +142,15 @@ namespace Conversions
     T OptionalValue(std::optional<T> var, T defVal) {
         return var.has_value() ? var.value() : defVal;
     }
+
+    inline float Ramp(float value, float minValue, float maxValue, float threshold) noexcept {
+        if (threshold < NumericTolerance)
+            return 0.0f;
+        if ((value < minValue) or (value > maxValue)) 
+            return 0.0f;
+        float d = std::min(value - minValue, maxValue - value);
+        return (d >= threshold) ? 1.0f : d / threshold;
+    }
 };
 
 // =================================================================================================
