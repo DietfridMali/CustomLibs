@@ -1,4 +1,4 @@
-
+﻿
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
@@ -184,7 +184,7 @@ const String& TintFuncs() {
     static const String source(R"(
         // downscale color just so much inf need be that tint can be fully applied
         vec3 ApplyExponentialTint(vec3 color, vec3 tintScale, float e) {
-            // exponentiell verst�rkter Tint
+            // exponentiell verstärkter Tint
             vec3 s = pow(max(tintScale, vec3(1e-6)), vec3(max(e, 0.0)));
             // determine downscale factor to avoid color overrun when applying tint
             vec3 denom = max(color * s, vec3(1e-6));
@@ -325,5 +325,23 @@ const String& ChromAbFuncs() {
     return source;
 }
 
+
+const String& VignetteFunc() {
+    static const String source(R"(
+        uniform float vignetteRadius = 0.25f;
+        const float vignetteBlur = 0.25; // konstant, kann auch Uniform werden
+
+        float Vignette() {
+            // Mittelpunkt in NDC
+            vec2 uv = fragCoord;
+            vec2 center = vec2(0.5, 0.5);
+            float dist = distance(uv, center) / 0.7071; // max Abstand Ecke ≈ √0.5 ≈ 0.7071
+            float edge0 = vignetteRadius;
+            float edge1 = min(1.0, vignetteRadius + vignetteBlur);
+            return smoothstep(edge1, edge0, dist);
+        }
+    )");
+    return source;
+}
 
 // =================================================================================================

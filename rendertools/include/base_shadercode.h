@@ -74,6 +74,7 @@ const String& NoiseFuncs();
 const String& RandFuncs();
 const String& ChromAbFuncs();
 const String& EdgeFadeFunc();
+const String& VignetteFunc();
 
 // =================================================================================================
 
