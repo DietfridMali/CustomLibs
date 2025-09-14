@@ -88,7 +88,7 @@ public:
 
 
     bool Allocate(int length) {
-        auto* texBuf = new TextureBuffer();
+        TextureBuffer* texBuf = new TextureBuffer();
         if (!texBuf) 
             return false;
         if (!m_buffers.Append(texBuf)) { 

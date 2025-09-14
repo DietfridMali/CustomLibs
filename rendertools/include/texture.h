@@ -152,6 +152,18 @@ public:
     TextureBuffer& Move(TextureBuffer& other)
         noexcept;
 
+    inline uint8_t* DataBuffer(void) noexcept {
+        return m_data.Data();
+    }
+
+    inline int Width(void) noexcept {
+        return m_info.m_width;
+    }
+
+    inline int Height(void) noexcept {
+        return m_info.m_height;
+    }
+
     // CTextureBuffer(CTextureBuffer&& other) = default;            // move construct
 
     // CTextureBuffer& operator=(CTextureBuffer and other) = default; // move assignment
@@ -287,7 +299,7 @@ public:
     }
 
     inline uint8_t* GetData(int i = 0) {
-        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->m_data.Data()) : nullptr;
+        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr;
     }
 
     inline int Type(void)
