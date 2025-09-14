@@ -47,7 +47,6 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premult
                 }
             }
         }
-        //baseShaderHandler.StopShader();
     }
 }
 
@@ -62,7 +61,6 @@ void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool
             //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
             fbo->AutoRender({ .clearBuffer = true, .shader = shader });
         }
-        //baseShaderHandler.StopShader();
         AntiAlias(fbo, decoration.aaMethod);
     }
 }

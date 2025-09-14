@@ -150,7 +150,6 @@ Shader* BaseQuad::LoadShader(bool useTexture, const RGBAColor& color) {
 void BaseQuad::Render(RGBAColor color) {
     if (UpdateVAO()) {
         Render(LoadShader(m_texture != nullptr, color), m_texture, false);
-        //baseShaderHandler.StopShader();
     }
     else if (m_texture->Enable()) {
         openGLStates.SetBlending(1);
