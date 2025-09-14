@@ -56,20 +56,19 @@ public:
 
 
     virtual void Deploy(int bufferIndex) override {
-         if (!IsAvailable()) 
-            return;
-        Bind();
-        glPixelStorei(GL_UNPACK_ALIGNMENT, GLTexTraits<DATA_T>::align);
-        TextureBuffer* texBuf = m_buffers[0];
-        glTexImage2D(
-            GL_TEXTURE_2D, 0,
-            GLTexTraits<DATA_T>::internalFormat,
-            texBuf->m_info.m_width, 1, 0,
-            GLTexTraits<DATA_T>::format,
-            GLTexTraits<DATA_T>::type,
-            nullptr);
-        SetParams(false);
-        Release();
+        if (Bind()) {
+            glPixelStorei(GL_UNPACK_ALIGNMENT, GLTexTraits<DATA_T>::align);
+            TextureBuffer* texBuf = m_buffers[0];
+            glTexImage2D(
+                GL_TEXTURE_2D, 0,
+                GLTexTraits<DATA_T>::internalFormat,
+                texBuf->m_info.m_width, 1, 0,
+                GLTexTraits<DATA_T>::format,
+                GLTexTraits<DATA_T>::type,
+                nullptr);
+            SetParams(false);
+            Release();
+        }
     }
 
 

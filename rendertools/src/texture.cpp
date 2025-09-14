@@ -322,8 +322,7 @@ void Texture::Disable(int tmuIndex)
 
 void Texture::Deploy(int bufferIndex)
 {
-    if (IsAvailable()) {
-        Bind();
+    if (Bind()) {
         SetParams();
         TextureBuffer* texBuf = m_buffers[bufferIndex];
         glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
@@ -451,85 +450,6 @@ noexcept
         offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
     return offsets;
 }
-
-// =================================================================================================
-
-#if 0
-
-void LinearTexture::SetParams(bool enforce)
-{
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-}
-
-
-bool LinearTexture::Create(ManagedArray<DATA_T>& data) {
-    if (not Allocate(data.Length()))
-        return false;
-    TextureBuffer* texBuf = m_buffers[0];
-    if (not texBuf->Allocate(data.Length(), 1, 4, data.Data()))
-        return false;
-    Deploy();
-    return true;
-}
-
-
-bool LinearTexture::Allocate(int length) {
-    TextureBuffer* texBuf = new TextureBuffer();
-    if (not texBuf)
-        return false;
-    if (not m_buffers.Append(texBuf)) {
-        delete texBuf;
-        return false;
-    }
-    texBuf->m_info = TextureBuffer::BufferInfo(length, 1, 4, GL_RGBA, GL_RGBA);
-    Deploy();
-    return true;
-}
-
-
-void LinearTexture::Deploy(int bufferIndex)
-{
-    if (IsAvailable()) {
-        Bind();
-        TextureBuffer* texBuf = m_buffers[0];
-        glTexImage2D(
-            GL_TEXTURE_2D, 0,
-            GLTexTraits<DATA_T>::internal,
-            m_width, 1, 0,
-            GLTexTraits<DATA_T>::format,
-            GLTexTraits<DATA_T>::type,
-            reinterpret_cast<const void*>(texBuf->m_data.Data()));
-        SetParams();
-        Release();
-    }
-}
-
-int LinearTexture::Upload(ManagedArray<DATA_T>& data)
-{
-    if (m_buffers.Length() == 0)
-        return 0;
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    int l = std::min(GetWidth(), int(data.Length()));
-    if (l > 0) {
-        memcpy(GetData(0), data.Data(), l);
-        glTexSubImage2D(
-            GL_TEXTURE_2D, 0, 0, 0,
-            m_width, 1,
-            GLTexTraits<DATA_T>::format,
-            GLTexTraits<DATA_T>::type,
-            data.Data());
-    }
-    return l;
-
-}
-
-#endif
 
 // =================================================================================================
 

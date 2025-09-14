@@ -36,10 +36,8 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     bufferInfo.Init();
     if (bufferType == BufferInfo::btDepth)
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
-    else //if (isMRT)
+    else
         bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
-    //else
-    //    bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0; // color buffer for ping pong rendering; these will be bound alternatingly when needed as render target
     baseRenderer.ClearGLError();
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
