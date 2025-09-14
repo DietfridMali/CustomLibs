@@ -125,8 +125,8 @@ const ShaderSource& MovingTextureShader() {
         // Konstanten
         const vec3  LUMA          = vec3(0.2126, 0.7152, 0.0722);
         const float THRESHOLD     = 0.6;   // 0..1 (linear space)
-        const float GAMMA_BRIGHT  = 2.2;   // >1 → stärkeres Aufhellen über Threshold
-        const float GAMMA_DARK    = 1.5;   // >1 → stärkeres Abdunkeln unter Threshold
+        const float GAMMA_BRIGHT  = 2.2;   // >1 => stärkeres Aufhellen über Threshold
+        const float GAMMA_DARK    = 1.5;   // >1 => stärkeres Abdunkeln unter Threshold
 
         float Boost(float x) { return (x < 0.5) ? pow(x,0.333) : pow(x,3.0); }
         

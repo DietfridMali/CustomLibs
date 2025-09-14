@@ -67,21 +67,20 @@ static float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, 
 
 
 void NoiseTexture::ComputeNoise(int edgeSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
-    TextureBuffer* texBuf = m_buffers[0];
-    uint8_t* data = texBuf->DataBuffer();
+    float* data = m_data.Data();
     for (int y = 0; y < edgeSize; ++y) {
         for (int x = 0; x < edgeSize; ++x) {
             // sample-Koords in Periodenraum
             float sx = (x + 0.5f) / edgeSize * yPeriod;
             float sy = (y + 0.5f) / edgeSize * xPeriod;
             float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octaves, 2.0f, 0.5f, seed);
-            data[y * edgeSize + x] = (uint8_t)std::lround(std::clamp(n, 0.0f, 1.0f) * 255.0f);
+            data[y * edgeSize + x] = std::clamp(n, 0.0f, 1.0f);
         }
     }
 }
 
     
-bool NoiseTexture::Allocate(int size) {
+bool NoiseTexture::Allocate(int edgeSize) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (!texBuf)
         return false;
@@ -89,9 +88,8 @@ bool NoiseTexture::Allocate(int size) {
         delete texBuf;
         return false;
     }
-    if (!texBuf->Allocate(size, 1, 1))
-        return false;
-    texBuf->m_info = TextureBuffer::BufferInfo(size, 1, 1, GL_R8, GL_RED);
+    m_data.Resize(edgeSize * edgeSize);
+    texBuf->m_info = TextureBuffer::BufferInfo(edgeSize, edgeSize, 1, GL_R32F, GL_RED);
     return true;
 }
 
@@ -100,7 +98,7 @@ bool NoiseTexture::Allocate(int size) {
 bool NoiseTexture::Create(int edgeSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
     if (not Texture::Create())
         return false;
-    if (not Allocate(edgeSize * edgeSize))
+    if (not Allocate(edgeSize))
         return false;
     ComputeNoise(edgeSize, yPeriod, xPeriod, octaves, seed);
     Deploy();
@@ -124,9 +122,9 @@ void NoiseTexture::Deploy(int bufferIndex) {
     if (!IsAvailable())
         return;
     Bind();
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     TextureBuffer* texBuf = m_buffers[0];
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, texBuf->Width(), texBuf->Height(), 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->DataBuffer()));
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, texBuf->Width(), texBuf->Height(), 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(m_data.Data()));
     SetParams(false);
     Release();
 }

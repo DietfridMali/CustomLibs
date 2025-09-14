@@ -33,6 +33,7 @@ bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
 	if (m_maxTMU < tmuIndex + 1)
 		m_maxTMU = tmuIndex + 1;
 #endif
+	return true;
 }
 
 

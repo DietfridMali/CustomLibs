@@ -67,7 +67,7 @@ public:
             texBuf->m_info.m_width, 1, 0,
             GLTexTraits<DATA_T>::format,
             GLTexTraits<DATA_T>::type,
-            reinterpret_cast<const void*>(texBuf->m_data.Data()));
+            nullptr);
         SetParams(false);
         Release();
     }
@@ -76,13 +76,10 @@ public:
     inline bool Create(ManagedArray<DATA_T>& data, bool isRepeating) {
         if (not Texture::Create())
             return false;
+        m_isRepeating = isRepeating;
         if (!Allocate(static_cast<int>(data.Length())))
             return false;
-        TextureBuffer* texBuf = m_buffers[0];
-        if (!texBuf->Allocate(static_cast<int>(data.Length()), 1, GLTexTraits<DATA_T>::align, data.Data()))
-            return false;
-        m_isRepeating = isRepeating;
-        Deploy(0);
+        Upload(data);
         return true;
     }
 

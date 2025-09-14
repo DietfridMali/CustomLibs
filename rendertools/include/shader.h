@@ -354,16 +354,28 @@ class Shader
             return SetVector4f(name, static_cast<const Vector4f&>(data));
         }
 
-        inline GLint SetVector2i(const char* name, const GLint* data) noexcept {
-            return SetUniformArray<int>(name, data, 2);
+        inline GLint SetVector2i(const char* name, const Vector2i& data) noexcept {
+            return SetUniformArray<Vector2i>(name, &data, 1);
         }
 
-        inline GLint SetVector3i(const char* name, const GLint* data) noexcept {
-            return SetUniformArray<int>(name, data, 3);
+        inline GLint SetVector2i(const char* name, Vector2i&& data) noexcept {
+            return SetVector2i(name, static_cast<const Vector2i&>(data));
         }
 
-        inline GLint SetVector4i(const char* name, const GLint* data) noexcept {
-            return SetUniformArray<int>(name, data, 4);
+        inline GLint SetVector3i(const char* name, const Vector3i& data) noexcept {
+            return SetUniformArray<Vector3i>(name, &data, 1);
+        }
+
+        inline GLint SetVector2i(const char* name, Vector3i&& data) noexcept {
+            return SetVector3i(name, static_cast<const Vector3i&>(data));
+        }
+
+        inline GLint SetVector4i(const char* name, const Vector4i& data) noexcept {
+            return SetUniformArray<Vector4i>(name, &data, 1);
+        }
+
+        inline GLint SetVector4i(const char* name, Vector4i&& data) noexcept {
+            return SetVector4i(name, static_cast<const Vector4i&>(data));
         }
 
         inline GLint SetFloatArray(const char* name, const float* data, size_t length) noexcept {

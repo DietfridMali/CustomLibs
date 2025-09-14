@@ -347,4 +347,8 @@ using Vector2f = Vector<glm::vec2>;
 using Vector3f = Vector<glm::vec3>;
 using Vector4f = Vector<glm::vec4>;
 
+using Vector2i = glm::ivec2;
+using Vector3i = glm::ivec3;
+using Vector4i = glm::ivec4;
+
 // =================================================================================================

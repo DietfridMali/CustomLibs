@@ -15,7 +15,9 @@ public:
 	bool Create(int edgeSize, int periodX, int periodY, int octaves = 3, uint32_t seed = 1);
 
 private:
-	bool Allocate(int size);
+	ManagedArray<float>	m_data;
+
+	bool Allocate(int edgeSize);
 
 	void ComputeNoise(int edgeSize, int yPeriod, int xPeriod, int octaves, uint32_t seed);
 
