@@ -78,7 +78,7 @@ public:
         int     m_dataSize;
 
         BufferInfo(int width = 0, int height = 0, int componentCount = 0, int internalFormat = 0, int format = 0)
-            : m_width(width), m_height(height), m_componentCount(height), m_internalFormat(internalFormat), m_format(format), m_dataSize(width * height * componentCount)
+            : m_width(width), m_height(height), m_componentCount(componentCount), m_internalFormat(internalFormat), m_format(format), m_dataSize(width * height * componentCount)
         {
         }
 

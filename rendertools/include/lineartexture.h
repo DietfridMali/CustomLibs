@@ -93,6 +93,7 @@ public:
             return false; 
         }
         texBuf->m_info = TextureBuffer::BufferInfo(length, 1, GLTexTraits<DATA_T>::align, GLTexTraits<DATA_T>::internalFormat, GLTexTraits<DATA_T>::format);
+        HasBuffer() = true;
         Deploy(0);
         return true;
     }
@@ -107,7 +108,6 @@ public:
 
         Bind();
         glPixelStorei(GL_UNPACK_ALIGNMENT, GLTexTraits<DATA_T>::align);
-        std::memcpy(GetData(0), data.Data(), size_t(l) * sizeof(DATA_T));
         glTexSubImage2D(
             GL_TEXTURE_2D, 0, 0, 0, l, 1,
             GLTexTraits<DATA_T>::format,
