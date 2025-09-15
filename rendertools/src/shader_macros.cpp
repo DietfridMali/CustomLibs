@@ -335,7 +335,7 @@ const String& VignetteFunc() {
             // Mittelpunkt in NDC
             vec2 uv = fragCoord;
             vec2 center = vec2(0.5, 0.5);
-            float dist = distance(uv, center) / 0.7071; // max Abstand Ecke ≈ √0.5 ≈ 0.7071
+            float dist = distance(uv, center) / 0.7071; // max Abstand Ecke ~ sqrt(0.5) ~ 0.7071
             float edge0 = vignetteRadius;
             float edge1 = min(1.0, vignetteRadius + vignetteBlur);
             return smoothstep(edge1, edge0, dist);
