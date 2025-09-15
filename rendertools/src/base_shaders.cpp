@@ -107,7 +107,7 @@ const ShaderSource& MovingTextureShader() {
     static const ShaderSource source(
         "movingTexture",
         Standard2DVS(),
-        R"(
+        String(R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -127,9 +127,9 @@ const ShaderSource& MovingTextureShader() {
         const float THRESHOLD     = 0.6;   // 0..1 (linear space)
         const float GAMMA_BRIGHT  = 2.2;   // >1 => stärkeres Aufhellen über Threshold
         const float GAMMA_DARK    = 1.5;   // >1 => stärkeres Abdunkeln unter Threshold
-
-        float Boost(float x) { return (x < 0.5) ? pow(x,0.333) : pow(x,3.0); }
-        
+        )") +
+        BoostFuncs() +
+        String(R"(
         void main() {
 #if 0
             fragColor = vec4(1,0,1,1);
@@ -140,7 +140,7 @@ const ShaderSource& MovingTextureShader() {
 
             vec3 rgbColor = texColor.rgb * surfaceColor.rgb;
 #   if 1
-            fragColor = vec4(vec3(Boost(rgbColor.r), Boost(rgbColor.g), Boost(rgbColor.b)), 1.0); 
+            fragColor = vec4(SmoothBoost(rgbColor, 2.0), 1.0); 
 #   else
             float L = dot(rgbColor, LUMA);
             float r = L / max(THRESHOLD, 1e-6);
@@ -155,7 +155,8 @@ const ShaderSource& MovingTextureShader() {
 #   endif
 #endif
             }
-        )");
+        )")
+    );
     return source;
 }
 

@@ -179,6 +179,49 @@ const String& GaussBlurFuncs() {
 };
 
 
+const String& BoostFuncs() {
+    static const String source(R"(
+        float Boost(float v, float strength) { 
+            return (v < 0.5) ? pow(v, 1.0 / strength) : pow(v, strength); 
+        }
+        
+        vec3 Boost(vec3 v, float strength) { 
+            return vec3(Boost(v.x, strength), Boost(v.y, strength), Boost(v.z, strength)); 
+        }
+
+        float SmoothBoost(float v, float strength) {
+            float dark = pow(v, strength);                 // < 0.5 dunkler (strength>1)
+            float light = pow(v, 1.0/strength);            // >= 0.5 heller
+            float blend = smoothstep(0.45, 0.55, v);
+            return mix(dark, light, blend);
+        }
+
+        vec3 SmoothBoost(vec3 v, float strength) { 
+            return vec3(SmoothBoost(v.r,strength), SmoothBoost(v.g,strength), SmoothBoost(v.b,strength)); 
+        }
+
+        float SinBoost(float v, float strength) {
+    	    const float PI = 3.14159265358979323846f;
+            return sin(Boost(v, strength) * 0.5 * PI);
+        }
+
+        vec3 SinBoost(vec3 v, float strength) { 
+            return vec3(SinBoost(v.r,strength), SinBoost(v.g,strength), SinBoost(v.b,strength)); 
+        }
+    )");
+    return source;
+}
+
+
+const String& SRGBFuncs() {
+    static const String source(R"(
+        vec3 ToLinear(vec3 c) { return pow(c, vec3(2.2)); }
+
+        vec3 ToSRGB(vec3 c) { return pow(max(c, 0.0), vec3(1.0 / 2.2)); }
+    )");
+    return source;
+}
+
 
 const String& TintFuncs() {
     static const String source(R"(
@@ -197,8 +240,7 @@ const String& TintFuncs() {
         vec3 ApplyTint(vec3 color, vec3 tintScale) {
             return ApplyExponentialTint(color, tintScale, 1.0);
         }
-
-        )");
+    )");
     return source;
 }
 
