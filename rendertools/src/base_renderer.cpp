@@ -276,6 +276,15 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 }
 
 
+void BaseRenderer::Render(Texture* texture, const RGBAColor& color) {
+    baseRenderer.PushMatrix();
+    baseRenderer.Translate(0.5, 0.5, 0.0);
+    m_viewportArea.SetTexture(texture);
+    m_viewportArea.Render(color);
+    baseRenderer.PopMatrix();
+}
+
+
 void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0.0);
@@ -283,6 +292,7 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     m_viewportArea.Fill(color);
     baseRenderer.PopMatrix();
 }
+
 
 void BaseRenderer::ClearGLError(void) noexcept {
 #if 0
