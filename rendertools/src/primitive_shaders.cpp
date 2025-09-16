@@ -35,10 +35,10 @@ const ShaderSource& LineShader() {
 
             uniform vec2 start;
             uniform vec2 end;
-            uniform float strength;      // Pixel
+            uniform float strength;      // [0..1] in UV
             uniform vec4 surfaceColor;
-            // optional, billigstes AA
             uniform bool antialias;      // false = harte Kante
+            uniform vec2 viewportSize;   // Pixel
 
             in vec2 fragCoord;           // [0..viewportSize]
             out vec4 fragColor;
@@ -47,31 +47,28 @@ const ShaderSource& LineShader() {
                 vec2 p = fragCoord;
                 vec2 v = end - start;
                 float len2 = dot(v, v);
-                float r = 0.5 * max(strength, 0.0);
 
+                float pxStrength = strength * min(viewportSize.x, viewportSize.y);
+                float r = 0.5 * max(pxStrength, 0.0);
                 float d; // signed distance: <0 innen
                 if (len2 < 1e-6) {
                     d = length(p - start) - r;                  // runder Punkt
-                } 
-                else {
+                } else {
                     vec2 w = p - start;
                     float t = clamp(dot(w, v) / len2, 0.0, 1.0);
                     vec2 proj = start + t * v;
                     d = length(p - proj) - r;                   // Linie mit runden Kappen
                 }
-
                 float alpha;
                 if (antialias) {
                     float w = 0.5 * fwidth(d);                  // ~1 Pixel weich
                     alpha = 1.0 - smoothstep(0.0, w, d);
-                }
-                else {
+                } else {
                     alpha = step(d, 0.0);
                 }
-
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-        )"
+
         );
     return source;
 }
@@ -85,36 +82,40 @@ const ShaderSource& RingShader() {
             #version 330 core
 
             uniform vec2 center;
-            uniform float radius;     // äußerer Kreisradius in Pixeln
-            uniform float strength;   // Ringdicke in Pixeln
+            uniform float radius;        // äußerer Kreisradius in Pixeln
+            uniform float strength;      // [0..1] in UV (Dicke)
             uniform vec4 surfaceColor;
-            uniform bool antialias;   // billigstes AA optional
+            uniform bool antialias;      // billigstes AA optional
+            uniform vec2 viewportSize;   // Pixel
 
-            in vec2 fragCoord;        // [0..viewportSize]
+            in vec2 fragCoord;           // [0..viewportSize]
             out vec4 fragColor;
 
             void main() {
                 vec2 p = fragCoord;
                 float dist = length(p - center);
+
+                float pxStrength = strength * min(viewportSize.x, viewportSize.y);
+
                 float innerR, outerR;
-                if (radius >= strength) {
+                if (radius >= pxStrength) {
                     outerR = radius;
-                    innerR = radius - strength;
-                } 
-                else {
-                    outerR = 0.5 * strength;
+                    innerR = radius - pxStrength;
+                } else {
+                    outerR = 0.5 * pxStrength; // kleiner Kreis als Punkt
                     innerR = 0.0;
                 }
+
                 float dOuter = dist - outerR;   // <0 innen vom Außenrand
                 float dInner = innerR - dist;   // <0 außen vom Innenrand
+
                 float alpha;
                 if (antialias) {
                     float w = 0.5 * fwidth(dist);
                     float aOuter = 1.0 - smoothstep(0.0, w, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, w, dInner);
                     alpha = aOuter * aInner;
-                } 
-                else {
+                } else {
                     alpha = step(dOuter, 0.0) * step(dInner, 0.0);
                 }
 

@@ -151,7 +151,7 @@
     <ClCompile Include="..\src\framecounter.cpp" />
     <ClCompile Include="..\src\icosphere.cpp" />
     <ClCompile Include="..\src\linesegment.cpp" />
-    <ClCompile Include="..\src\line_shaders.cpp" />
+    <ClCompile Include="..\src\primitive_shaders.cpp" />
     <ClCompile Include="..\src\mesh.cpp" />
     <ClCompile Include="..\src\noisetexture.cpp" />
     <ClCompile Include="..\src\opengl_states.cpp" />
@@ -170,7 +170,7 @@
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\src\textureatlas.cpp" />
     <ClCompile Include="..\src\texturehandler.cpp" />
-    <ClCompile Include="..\src\base_shaders.cpp" />
+    <ClCompile Include="..\src\base_texture_shaders.cpp" />
     <ClCompile Include="..\src\vao.cpp" />
     <ClCompile Include="..\src\vbo.cpp" />
     <ClCompile Include="..\src\viewport.cpp" />

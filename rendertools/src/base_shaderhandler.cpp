@@ -104,6 +104,7 @@ void BaseShaderHandler::StopShader(bool needLegacyMatrices) {
 Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f& start, const Vector2f& end, float strength, bool antialias) {
     Shader* shader = SetupShader("lineShader");
     if (shader and not baseRenderer.DepthPass()) {
+        shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
         shader->SetVector4f("surfaceColor", color);
         shader->SetVector2f("start", start);
         shader->SetVector2f("end", end);
@@ -117,6 +118,7 @@ Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f
 Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, bool antialias) {
     Shader* shader = SetupShader("ringShader");
     if (shader and not baseRenderer.DepthPass()) {
+        shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
         shader->SetVector4f("surfaceColor", color);
         shader->SetVector2f("center", center);
         shader->SetFloat("radius", radius);

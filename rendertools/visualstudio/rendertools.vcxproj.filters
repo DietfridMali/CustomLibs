@@ -212,7 +212,7 @@
     <ClCompile Include="..\src\outline_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\base_shaders.cpp">
+    <ClCompile Include="..\src\base_texture_shaders.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_shadercode.cpp">
@@ -239,7 +239,7 @@
     <ClCompile Include="..\src\noisetexture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\line_shaders.cpp">
+    <ClCompile Include="..\src\primitive_shaders.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
   </ItemGroup>
