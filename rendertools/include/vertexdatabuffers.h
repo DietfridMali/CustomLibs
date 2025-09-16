@@ -25,7 +25,7 @@ public:
 
     ~BaseVertexDataBuffer() = default;
 
-    virtual void* GLData(void) noexcept { return nullptr; }
+    virtual void* GLDataBuffer(void) noexcept { return nullptr; }
 
     virtual uint32_t GLDataLength(void) const noexcept { return 0; }
 
@@ -39,7 +39,7 @@ public:
         return m_isDirty;
     }
 
-    inline bool SetDirty(bool isDirty) noexcept {
+    inline void SetDirty(bool isDirty) noexcept {
         m_isDirty = false;
     }
 };
@@ -50,7 +50,7 @@ template < typename APP_DATA_T, typename GL_DATA_T>
 class VertexDataBuffer 
     : public BaseVertexDataBuffer
 {
-    public:
+    protected:
         SegmentedList<APP_DATA_T>   m_appData;
         ManagedArray<GL_DATA_T>     m_glData;
 
@@ -93,8 +93,10 @@ class VertexDataBuffer
             return *this;
         }
 
+public:
         inline void SetGLData(ManagedArray<GL_DATA_T>& glData) { // directly set m_glData without going over m_appData
             m_glData = glData;
+            m_isDirty = true;
         }
 
         virtual ManagedArray<GL_DATA_T>& Setup(void) = 0;
@@ -102,6 +104,7 @@ class VertexDataBuffer
         void Reset(void) {
             m_appData.Clear();
             m_glData.Reset();
+            m_isDirty = false;
         }
 
         operator GLvoid* () {
@@ -113,19 +116,23 @@ class VertexDataBuffer
             return m_appData;
         }
 
-        inline uint32_t AppDataLength(void) const noexcept {
+        inline ManagedArray<GL_DATA_T>& GLData(void) noexcept {
+            return m_glData;
+        }
+
+        inline uint32_t AppDataLength(void) const noexcept override {
             return m_appData.Length();
         }
 
-        virtual void* GLData(void) noexcept {
-            return reinterpret_cast<void*>(m_glData.Data());
+        virtual uint32_t GLDataBuffer(void) const noexcept override {
+            return m_glData.Data();
         }
 
-        virtual uint32_t GLDataLength(void) const noexcept {
+        virtual uint32_t GLDataLength(void) const noexcept override {
             return m_glData.Length();
         }
 
-        virtual uint32_t GLDataSize(void) noexcept {
+        virtual uint32_t GLDataSize(void) noexcept override {
             return m_glData.Length() * sizeof(GL_DATA_T);
         }
 
@@ -139,6 +146,7 @@ class VertexDataBuffer
         inline bool Append(SegmentedList<APP_DATA_T>& data) {
             m_isDirty = true;
             m_appData += data;
+            return true;
         }
 
         inline APP_DATA_T& operator[] (const int32_t i) {

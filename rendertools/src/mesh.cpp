@@ -22,12 +22,13 @@ void Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String 
 
 void Mesh::CreateVertexIndices(void) {
     uint32_t l = m_vertices.AppDataLength(); // number of vertices
-    uint32_t* pi = m_indices.m_glData.Resize((l / 2) * 3); // 6 indices for 4 vertices
+    uint32_t* pi = m_indices.GLData().Resize((l / 2) * 3); // 6 indices for 4 vertices
     l /= 4; // quad count
     for (uint32_t i = 0, j = 0; i < l; i++, j += 4) {
         for (uint32_t k = 0; k < 6; k++)
             *pi++ = quadTriangleIndices[k] + j;
     }
+    m_indices.SetDirty(true);
 }
 
 void Mesh::UpdateVAO(bool createVertexIndex) {
@@ -35,7 +36,7 @@ void Mesh::UpdateVAO(bool createVertexIndex) {
         createVertexIndex = false;
     m_vao.Init(createVertexIndex ? GL_TRIANGLES : m_shape);
     m_vao.Enable();
-    if (m_indices.HaveData()) {
+    if (m_indices.IsDirty()) {
         m_indices.Setup();
         UpdateIndexBuffer();
     }
@@ -44,19 +45,19 @@ void Mesh::UpdateVAO(bool createVertexIndex) {
         m_vao.m_indexBuffer.SetDynamic(true);
         UpdateIndexBuffer();
     }
-    if (m_vertices.HaveData()) {
+    if (m_vertices.IsDirty()) {
         m_vertices.Setup();
         UpdateVertexBuffer();
     }
-    if (m_texCoords.HaveData()) {
+    if (m_texCoords.IsDirty()) {
         m_texCoords.Setup();
         UpdateTexCoordBuffer();
     }
-    if (m_vertexColors.HaveData()) {
+    if (m_vertexColors.IsDirty()) {
         m_vertexColors.Setup();
         UpdateColorBuffer();
     }
-    if (m_normals.HaveData()) {
+    if (m_normals.IsDirty()) {
         m_normals.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateNormalBuffer();

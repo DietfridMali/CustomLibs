@@ -186,7 +186,7 @@ public:
 
     bool UpdateVertexBuffer(const char* type, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
         if (buffer.IsDirty()) {
-            if (not UpdateVertexBuffer(type, buffer.GLData(), buffer.GLDataLength(), componentType, size_t(buffer.ComponentCount())))
+            if (not UpdateVertexBuffer(type, buffer.GLDataBuffer(), buffer.GLDataLength(), componentType, size_t(buffer.ComponentCount())))
                 return false;
             buffer.SetDirty(false);
         }
@@ -196,7 +196,7 @@ public:
 
     void UpdateIndexBuffer(IndexBuffer& buffer, size_t componentType) noexcept {
         if (buffer.IsDirty()) {
-            UpdateIndexBuffer(buffer.GLData(), buffer.GLDataSize(), componentType);
+            UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), componentType);
             buffer.SetDirty(false);
         }
     }

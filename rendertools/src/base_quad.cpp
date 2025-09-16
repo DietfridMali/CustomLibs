@@ -58,14 +58,14 @@ noexcept
 
 void BaseQuad::CreateTexCoords(void) {
     if (m_texCoordBuffer.AppDataLength() > 0) {
-        for (auto& tc : m_texCoordBuffer.m_appData)
+        for (auto& tc : m_texCoordBuffer.AppData())
             m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
     }
     else {
 #if 0
         if (m_texture and (m_texture->WrapMode() == GL_REPEAT)) {
             m_maxTexCoord = TexCoord{ 0, 0 };
-            for (auto& v : m_vertexBuffer.m_appData) {
+            for (auto& v : m_vertexBuffer.AppData()) {
                 m_texCoordBuffer.Append(TexCoord({ v.X(), v.Z() }));
                 // BUGFIX: zweiter Max-Vergleich muss Z-Komponente verwenden (nicht Y), da oben Z in die Texcoords geschrieben wird.
                 m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), v.X()), std::max(m_maxTexCoord.V(), v.Z()) });
@@ -86,8 +86,8 @@ void BaseQuad::CreateTexCoords(void) {
 
 bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords) {
     Plane::Init(vertices);
-    m_vertexBuffer.m_appData = vertices;
-    m_texCoordBuffer.m_appData = texCoords;
+    m_vertexBuffer.AppData() = vertices;
+    m_texCoordBuffer.AppData() = texCoords;
     CreateTexCoords();
     m_vertexBuffer.Setup();
     m_texCoordBuffer.Setup();
@@ -115,13 +115,15 @@ bool BaseQuad::UpdateVAO(void) {
     if (not CreateVAO())
         return false;
 #endif
-    if (m_vao->IsValid() and not m_vertexBuffer.m_glData.IsEmpty()) {
+    if (not m_vao->IsValid())
+        return false;
+    if (m_vertexBuffer.IsDirty() or m_texCoordBuffer.IsDirty()) {
         m_vao->Enable();
         m_vao->UpdateVertexBuffer("Vertex", m_vertexBuffer, GL_FLOAT);
         m_vao->UpdateVertexBuffer("TexCoord", m_texCoordBuffer, GL_FLOAT);
         m_vao->Disable();
     }
-    return m_vao->IsValid();
+    return true;
 }
 
 
@@ -130,7 +132,7 @@ noexcept
 {
     Vector3f vMin = Vector3f{ 1e6, 1e6, 1e6 };
     Vector3f vMax = Vector3f{ -1e6, -1e6, -1e6 };
-    for (auto& v : m_vertexBuffer.m_appData) {
+    for (auto& v : m_vertexBuffer.AppData()) {
         vMin.Minimize(v);
         vMax.Maximize(v);
     }
@@ -183,7 +185,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) 
         if (texture and texture->Enable()) {
             openGLStates.SetBlending(1);
             glBegin(GL_QUADS);
-            for (auto& v : m_vertexBuffer.m_appData) {
+            for (auto& v : m_vertexBuffer.AppData()) {
                 glColor4f(1, 1, 1, 1);
                 glVertex3f(v.X(), v.Y(), v.Z());
             }
