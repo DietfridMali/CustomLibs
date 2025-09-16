@@ -100,6 +100,45 @@ void BaseShaderHandler::StopShader(bool needLegacyMatrices) {
     }
 }
 
+
+Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f& start, const Vector2f& end, float strength, bool antialias) {
+    Shader* shader = SetupShader("lineShader");
+    if (shader and not baseRenderer.DepthPass()) {
+        shader->SetVector4f("surfaceColor", color);
+        shader->SetVector2f("start", start);
+        shader->SetVector2f("end", end);
+        shader->SetFloat("strength", strength);
+        shader->SetInt("antialias", antialias ? 1 : 0);
+    }
+    return shader;
+}
+
+
+Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, bool antialias) {
+    Shader* shader = SetupShader("ringShader");
+    if (shader and not baseRenderer.DepthPass()) {
+        shader->SetVector4f("surfaceColor", color);
+        shader->SetVector2f("center", center);
+        shader->SetFloat("radius", radius);
+        shader->SetFloat("strength", strength);
+        shader->SetInt("antialias", antialias ? 1 : 0);
+    }
+    return shader;
+}
+
+
+Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector2f& center, float radius, bool antialias) {
+    Shader* shader = SetupShader("circleShader");
+    if (shader and not baseRenderer.DepthPass()) {
+        shader->SetVector4f("surfaceColor", color);
+        shader->SetVector2f("center", center);
+        shader->SetFloat("radius", radius);
+        shader->SetInt("antialias", antialias ? 1 : 0);
+    }
+    return shader;
+}
+
+
 Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool premultiply) {
     Shader* shader = SetupShader("plainColor");
     if (shader and not baseRenderer.DepthPass()) {

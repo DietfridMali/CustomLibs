@@ -239,5 +239,8 @@
     <ClCompile Include="..\src\noisetexture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\line_shaders.cpp">
+      <Filter>Source Files\Shader</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

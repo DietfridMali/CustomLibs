@@ -8,7 +8,12 @@
 
 // =================================================================================================
 
-class Viewport : public Rectangle 
+struct ScreenCoord {
+    int x;
+    int y;
+};
+
+class Viewport : public Rectangle
 {
 public:
     Matrix4f    m_transformation;
@@ -24,7 +29,7 @@ public:
 
     Viewport(Rectangle& r) 
         : Rectangle (r.m_left, r.m_top, r.m_width, r.m_height) 
-        , m_windowWidth(0), m_windowHeight(0), m_center({ left + width / 2, top + height / 2 }), m_flipVertically(false)
+        , m_windowWidth(0), m_windowHeight(0), m_center({ r.m_left + r.m_width / 2, r.m_top + r.m_height / 2 }), m_flipVertically(false)
     { }
 
     void Fill(const RGBColor& color, float alpha = 1.0f, float scale = 1.0f);

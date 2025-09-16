@@ -19,11 +19,6 @@
 // =================================================================================================
 // basic renderer class. Initializes display and OpenGL and sets up projections and view matrix
 
-struct ScreenCoord {
-    int x;
-    int y;
-};
-
 class BaseRenderer
     : public RenderMatrices
     , public DrawBufferHandler

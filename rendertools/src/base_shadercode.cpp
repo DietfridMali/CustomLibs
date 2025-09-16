@@ -6,6 +6,9 @@
 // =================================================================================================
 
 const ShaderSource& DepthShader();
+const ShaderSource& LineShader();
+const ShaderSource& RingShader();
+const ShaderSource& CircleShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
 const ShaderSource& MovingTextureShader();

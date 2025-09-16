@@ -68,6 +68,24 @@ public:
         return ((radius < 1) or (radius > m_kernels.Length())) ? nullptr : m_kernels[radius - 1];
     }
 
+    Shader* LoadLineShader(const RGBAColor& color, const Vector2f& start, const Vector2f& end, float strength, bool antialias);
+
+    inline Shader* LoadLineShader(RGBAColor&& color, Vector2f&& start, Vector2f&& end, float strength, bool antialias) {
+        return LoadLineShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(start), static_cast<const Vector2f&>(end), strength, antialias);
+    }
+
+    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, bool antialias);
+
+    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, float radius, float strength, bool antialias) {
+        return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, antialias);
+    }
+
+    Shader* LoadCircleShader(const RGBAColor& color, const Vector2f& center, float radius, bool antialias);
+
+    Shader* LoadCircleShader(RGBAColor&& color, Vector2f&& center, float radius, bool antialias) {
+        return LoadCircleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, antialias);
+    }
+
     Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
 
     Shader* LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);
