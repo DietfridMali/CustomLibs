@@ -52,7 +52,8 @@ public:
 };
 
 
-class Mesh : public AbstractMesh
+class Mesh 
+    : public AbstractMesh
 {
 public:
     String              m_name;

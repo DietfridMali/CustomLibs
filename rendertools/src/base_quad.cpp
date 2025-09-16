@@ -36,10 +36,6 @@ BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
         m_vertexBuffer = other.m_vertexBuffer;
         m_texCoordBuffer = other.m_texCoordBuffer;
-#if 0
-        m_texture = other.m_texture;
-#endif
-        m_color = other.m_color;
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }
@@ -53,10 +49,6 @@ noexcept
     if (this != &other) {
         m_vertexBuffer = std::move(other.m_vertexBuffer);
         m_texCoordBuffer = std::move(other.m_texCoordBuffer);
-#if 0
-        m_texture = std::move(other.m_texture);
-#endif
-        m_color = other.m_color;
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }
@@ -92,7 +84,7 @@ void BaseQuad::CreateTexCoords(void) {
 }
 
 
-bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords, Texture* texture, RGBAColor color/*, float borderWidth*/) {
+bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords) {
     Plane::Init(vertices);
     m_vertexBuffer.m_appData = vertices;
     m_texCoordBuffer.m_appData = texCoords;
@@ -102,10 +94,6 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     if (not CreateVAO())
         return false;
     m_vao->Init(GL_QUADS);
-#if 0
-    m_texture = texture;
-#endif
-    m_color = color;
     m_aspectRatio = ComputeAspectRatio();
     return true;
 }
@@ -205,19 +193,20 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) 
 
 
 // fill 2D area defined by x and y components of vertices with color color
-void BaseQuad::Fill(const RGBAColor& color) {
-    if (not Render(LoadShader(false, color), nullptr, true)) {
-        if (baseRenderer.LegacyMode) {
-            //openGLStates.SetTexture2D(false);
-            glBegin(GL_QUADS);
-            glColor4f(color.R(), color.G(), color.B(), color.A());
-            glVertex2f(0, 0);
-            glVertex2f(0, 1);
-            glVertex2f(1, 1);
-            glVertex2f(1, 0);
-            glEnd();
-        }
-    }
+bool BaseQuad::Fill(const RGBAColor& color) {
+    if (Render(nullptr, nullptr, color))
+        return true;
+    if (not baseRenderer.LegacyMode)
+        return false;
+    //openGLStates.SetTexture2D(false);
+    glBegin(GL_QUADS);
+    glColor4f(color.R(), color.G(), color.B(), color.A());
+    glVertex2f(0, 0);
+    glVertex2f(0, 1);
+    glVertex2f(1, 1);
+    glVertex2f(1, 0);
+    glEnd();
+    return true;
 }
 
 

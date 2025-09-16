@@ -32,10 +32,6 @@ public:
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
     TexCoord                m_maxTexCoord;
-#if 0
-    Texture*                m_texture;
-#endif
-    RGBAColor               m_color;
     float                   m_aspectRatio;
     float                   m_offset;
     bool                    m_isAvailable;
@@ -60,35 +56,26 @@ public:
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()
-        : m_color(ColorData::White)
-        , m_aspectRatio(1)
-        , m_offset(0)
+        : m_aspectRatio(1.0f)
+        , m_offset(0.0f)
         , m_isAvailable(false)
         , m_premultiply(false)
-#if 0
-        , m_texture(nullptr)
-#endif
     {
     }
 
-    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], Texture* texture = nullptr, RGBAColor color = ColorData::White)
+    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular])
         : Plane(vertices)
-        , m_color(color)
-        , m_offset(0)
         , m_isAvailable(true)
         , m_premultiply(false)
-#if 0
-        , m_texture(texture)
-#endif
     {
-        Setup(vertices, texCoords, texture, color/*, borderWidth*/);
+        Setup(vertices, texCoords);
     }
 
     BaseQuad(const BaseQuad& other) {
         Copy(other);
     }
 
-    bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {}, Texture* texture = nullptr, RGBAColor color = ColorData::White);
+    bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {});
 
     bool CreateVAO(void);
 
@@ -114,16 +101,6 @@ public:
 
     float ComputeAspectRatio(void)
         noexcept;
-#if 0
-    inline void SetTexture(Texture* texture) {
-        m_texture = texture;
-    }
-#endif
-    inline void SetColor(RGBAColor color)
-        noexcept
-    {
-        m_color = color;
-    }
 
     Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
 
@@ -142,13 +119,13 @@ public:
     }
 
     // fill 2D area defined by x and y components of vertices with color color
-    void Fill(const RGBAColor& color);
+    bool Fill(const RGBAColor& color);
 
-    void Fill(RGBAColor&& color) {
-        Fill(static_cast<const RGBAColor&>(color));
+    bool Fill(RGBAColor&& color) {
+        return Fill(static_cast<const RGBAColor&>(color));
     }
 
-    inline void Fill(RGBColor color, float alpha = 1.0f) {
+    inline bool Fill(RGBColor color, float alpha = 1.0f) {
         return Fill(RGBAColor(color, alpha));
     }
 

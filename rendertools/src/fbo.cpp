@@ -389,7 +389,6 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
     bool applyTransformation = UpdateTransformation(params);
     Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
     Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(0));
-    m_viewportArea.SetTexture(source);
     if (params.shader) {
         if (applyTransformation)
             params.shader->UpdateMatrices();
@@ -419,7 +418,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
             if (params.premultiply)
                 m_viewportArea.Premultiply();
             m_viewportArea.SetTransformations({ .flipVertically = params.flipVertically == 1 });
-            m_viewportArea.Render(color); // texture has been assigned to m_viewportArea above
+            m_viewportArea.Render(nullptr, source, color); // texture has been assigned to m_viewportArea above
         }
     }
     openGLStates.SetBlending(blending);

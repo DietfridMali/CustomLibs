@@ -111,12 +111,10 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
 BaseQuad& TextRenderer::CreateQuad(BaseQuad& q, float x, float y, float w, Texture* t, bool flipVertically) {
     if (flipVertically)
         q.Setup({ Vector3f{x, y, 0.0}, Vector3f{x + w, y, 0.0}, Vector3f{x + w, -y, 0.0}, Vector3f{x, -y, 0.0} },
-            { TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0} },
-            t, m_color);
+                { TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0} });
     else
         q.Setup({ Vector3f{x, y, 0.0}, Vector3f{x + w, y, 0.0}, Vector3f{x + w, -y, 0.0}, Vector3f{x, -y, 0.0} },
-            { TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } },
-            t, m_color);
+                { TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } });
     return q;
 }
 
@@ -134,11 +132,10 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
             float width = float(info->glyphSize.width) * scale;
             CreateQuad(q, x, y, width, info->texture, flipVertically);
 #if 1
-            q.Render(shader, info->texture, true);
+            q.Render(shader, info->texture, m_color);
 #else
             q.Fill((i & 1) ? ColorData::Orange : ColorData::MediumBlue);
 #endif
-            //q.Render(m_color, m_color.A());
             x += width;
         }
     }
