@@ -94,6 +94,7 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     if (not CreateVAO())
         return false;
     m_vao->Init(GL_QUADS);
+    UpdateVAO();
     m_aspectRatio = ComputeAspectRatio();
     return true;
 }
@@ -110,12 +111,14 @@ bool BaseQuad::CreateVAO(void) {
 
 
 bool BaseQuad::UpdateVAO(void) {
+#if 0
     if (not CreateVAO())
         return false;
+#endif
     if (m_vao->IsValid() and not m_vertexBuffer.m_glData.IsEmpty()) {
         m_vao->Enable();
-        m_vao->UpdateVertexBuffer("Vertex", m_vertexBuffer.GLData(), m_vertexBuffer.GLDataSize(), GL_FLOAT, 3);
-        m_vao->UpdateVertexBuffer("TexCoord", m_texCoordBuffer.GLData(), m_texCoordBuffer.GLDataSize(), GL_FLOAT, 2);
+        m_vao->UpdateVertexBuffer("Vertex", m_vertexBuffer, GL_FLOAT);
+        m_vao->UpdateVertexBuffer("TexCoord", m_texCoordBuffer, GL_FLOAT);
         m_vao->Disable();
     }
     return m_vao->IsValid();
@@ -169,7 +172,8 @@ void BaseQuad::ResetTransformation(void) {
 bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
     if (not (shader or (shader = LoadShader(texture != nullptr, color))))
         return false;
-    if (UpdateVAO()) {
+    if (UpdateVAO()) 
+    {
         m_vao->Render(texture);
         ResetTransformation();
         return true;

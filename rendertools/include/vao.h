@@ -3,6 +3,7 @@
 #include "glew.h"
 #include "list.hpp"
 #include "sharedglhandle.hpp"
+#include "vertexdatabuffers.h"
 #include "vbo.h"
 #include "vector.hpp"
 #include "texture.h"
@@ -183,18 +184,36 @@ public:
     VBO* FindBuffer(const char* type, int& index)
         noexcept;
 
-    // add a vertex or index data buffer
-    bool UpdateBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0)
-        noexcept;
+    bool UpdateVertexBuffer(const char* type, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
+        if (buffer.IsDirty()) {
+            if (not UpdateVertexBuffer(type, buffer.GLData(), buffer.GLDataLength(), componentType, size_t(buffer.ComponentCount())))
+                return false;
+            buffer.SetDirty(false);
+        }
+        return true;
+    }
+        
 
-    bool UpdateVertexBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
-        noexcept;
-
-    void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
-        noexcept;
+    void UpdateIndexBuffer(IndexBuffer& buffer, size_t componentType) noexcept {
+        if (buffer.IsDirty()) {
+            UpdateIndexBuffer(buffer.GLData(), buffer.GLDataSize(), componentType);
+            buffer.SetDirty(false);
+        }
+    }
 
     void Render(Texture* texture = nullptr)
         noexcept;
+
+    protected:
+        // add a vertex or index data buffer
+        bool UpdateBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0)
+            noexcept;
+
+        bool UpdateVertexBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+            noexcept;
+
+        void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
+            noexcept;
 };
 
 // =================================================================================================

@@ -12,6 +12,10 @@
 
 List<::Viewport> BaseRenderer::viewportStack;
 
+#ifdef _DEBUG
+static Texture* testTexture = nullptr;
+#endif
+
 // =================================================================================================
 // basic renderer class. Initializes display and OpenGL and sets up projections and view transformation
 // the renderer enforces window width >= window height, so for portrait screen mode, the window contents
@@ -31,6 +35,15 @@ void BaseRenderer::Init(int width, int height, float fov) {
     int w = m_windowWidth / 15;
     DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
+#ifdef _DEBUG
+    testTexture = textureHandler.GetStandardTexture();
+    List<String> fileName = { "resources\\textures\\ring-512x512.png" };
+    if (not testTexture->CreateFromFile(fileName, true)) {
+        delete testTexture;
+        testTexture = nullptr;
+#endif
+    }
+
 }
 
 
@@ -176,6 +189,12 @@ void BaseRenderer::Draw3DScene(void) {
         openGLStates.DepthFunc(GL_ALWAYS);
         openGLStates.SetFaceCulling(0);
         SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, false);
+#if 0
+        if (m_sceneBuffer->Enable(true)) {
+            RenderToViewport(testTexture, ColorData::White, false, false);
+            m_sceneBuffer->Disable();
+        }
+#endif
         Shader* shader;
         if (not UsePostEffectShader())
             shader = nullptr;

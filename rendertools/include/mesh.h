@@ -115,24 +115,24 @@ public:
     inline const IndexBuffer& Indices(void) const noexcept { return m_indices; }
 
     inline void UpdateVertexBuffer(void) {
-        m_vao.UpdateVertexBuffer("Vertex", m_vertices.GLData(), m_vertices.GLDataSize(), GL_FLOAT, 3);
+        m_vao.UpdateVertexBuffer("Vertex", m_vertices, GL_FLOAT);
     }
 
     inline void UpdateTexCoordBuffer(void) {
-        m_vao.UpdateVertexBuffer("TexCoord", m_texCoords.GLData(), m_texCoords.GLDataSize(), GL_FLOAT, 2);
+        m_vao.UpdateVertexBuffer("TexCoord", m_texCoords, GL_FLOAT);
     }
 
     inline void UpdateColorBuffer(void) {
-        m_vao.UpdateVertexBuffer("Color", m_vertexColors.GLData(), m_vertexColors.GLDataSize(), GL_FLOAT, 4);
+        m_vao.UpdateVertexBuffer("Color", m_vertexColors, GL_FLOAT);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(void) {
-        m_vao.UpdateVertexBuffer("Normal", m_normals.GLData(), m_normals.GLDataSize(), GL_FLOAT, 3);
+        m_vao.UpdateVertexBuffer("Normal", m_normals, GL_FLOAT);
     }
 
     inline void UpdateIndexBuffer(void) {
-        m_vao.UpdateIndexBuffer(m_indices.GLData(), m_indices.GLDataSize(), GL_UNSIGNED_INT);
+        m_vao.UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT);
     }
 
     void UpdateVAO(bool createVertexIndex = false);
@@ -173,15 +173,15 @@ public:
     }
 
     inline void AddTexCoord(const TexCoord& tc) {
-        m_texCoords.m_appData.Append(tc);
+        m_texCoords.Append(tc);
     }
 
     inline void AddTexCoord(TexCoord&& tc) {
-        m_texCoords.m_appData.Append(const_cast<const TexCoord&>(tc));
+        m_texCoords.Append(const_cast<const TexCoord&>(tc));
     }
 
     inline void AddTexCoord(SegmentedList<TexCoord>& tc) {
-        m_texCoords.m_appData += tc;
+        m_texCoords.Append(tc);
     }
 
     inline void AddColor(const RGBAColor& c) {

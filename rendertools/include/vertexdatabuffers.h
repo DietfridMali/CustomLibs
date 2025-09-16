@@ -14,15 +14,48 @@
 // Supplies iterators, assignment and indexing operatores and transparent data conversion to OpenGL
 // ready format (Setup() method)
 
+class BaseVertexDataBuffer {
+public:
+    uint32_t    m_componentCount;
+    bool        m_isDirty;
+
+    BaseVertexDataBuffer(uint32_t componentCount = 1)
+        : m_componentCount(componentCount), m_isDirty(false)
+    { }
+
+    ~BaseVertexDataBuffer() = default;
+
+    virtual void* GLData(void) noexcept { return nullptr; }
+
+    virtual uint32_t GLDataLength(void) const noexcept { return 0; }
+
+    virtual uint32_t GLDataSize(void) noexcept { return 0; }
+
+    inline uint32_t ComponentCount(void) noexcept {
+        return m_componentCount;
+    }
+
+    inline const bool IsDirty(void) const noexcept {
+        return m_isDirty;
+    }
+
+    inline bool SetDirty(bool isDirty) noexcept {
+        m_isDirty = false;
+    }
+};
+
+// =================================================================================================
+
 template < typename APP_DATA_T, typename GL_DATA_T>
-class VertexDataBuffer {
+class VertexDataBuffer 
+    : public BaseVertexDataBuffer
+{
     public:
         SegmentedList<APP_DATA_T>   m_appData;
         ManagedArray<GL_DATA_T>     m_glData;
-        uint32_t                    m_componentCount;
 
         VertexDataBuffer(uint32_t componentCount = 1, size_t listSegmentSize = 1)
-            : m_componentCount (componentCount)
+            : BaseVertexDataBuffer(componentCount)
         {
 #if USE_SEGMENTED_LISTS
             m_appData = SegmentedList<APP_DATA_T>(listSegmentSize);
@@ -84,20 +117,28 @@ class VertexDataBuffer {
             return m_appData.Length();
         }
 
-        inline GL_DATA_T* GLData(void) noexcept {
-            return m_glData.Data();
+        virtual void* GLData(void) noexcept {
+            return reinterpret_cast<void*>(m_glData.Data());
         }
 
-        inline uint32_t GLDataLength(void) const noexcept {
+        virtual uint32_t GLDataLength(void) const noexcept {
             return m_glData.Length();
         }
 
-        inline uint32_t GLDataSize(void) noexcept {
+        virtual uint32_t GLDataSize(void) noexcept {
             return m_glData.Length() * sizeof(GL_DATA_T);
         }
 
         inline bool Append(APP_DATA_T data) {
-            return m_appData.Append(data);
+            if (not m_appData.Append(data))
+                return false;
+            m_isDirty = true;
+            return true;
+        }
+
+        inline bool Append(SegmentedList<APP_DATA_T>& data) {
+            m_isDirty = true;
+            m_appData += data;
         }
 
         inline APP_DATA_T& operator[] (const int32_t i) {
