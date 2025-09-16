@@ -29,7 +29,6 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
     { TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0} }, // rotate right (cw) 90 deg
 };
 
-
 // =================================================================================================
 
 BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
