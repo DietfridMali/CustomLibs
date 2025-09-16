@@ -13,7 +13,7 @@
 
 // caution: the VAO shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this vao is initialized.
 // VAO::Init takes care of that by first assigning a handle-less shared gl handle 
-VAO* BaseQuad::m_vao = nullptr;
+//VAO* BaseQuad::m_vao = nullptr;
 
 std::initializer_list<Vector3f> BaseQuad::defaultVertices[2] = {
     { Vector3f{-0.5f, -0.5f, 0.0f}, Vector3f{-0.5f, 0.5f, 0.0f}, Vector3f{0.5f, 0.5f, 0.0f}, Vector3f{0.5f, -0.5f, 0.0f} },
@@ -34,6 +34,7 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
 
 BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
+        m_vao = other.m_vao;
         m_vertexBuffer = other.m_vertexBuffer;
         m_texCoordBuffer = other.m_texCoordBuffer;
         m_aspectRatio = other.m_aspectRatio;
@@ -47,6 +48,7 @@ BaseQuad& BaseQuad::Move(BaseQuad& other)
 noexcept
 {
     if (this != &other) {
+        m_vao = std::move(other.m_vao);
         m_vertexBuffer = std::move(other.m_vertexBuffer);
         m_texCoordBuffer = std::move(other.m_texCoordBuffer);
         m_aspectRatio = other.m_aspectRatio;
@@ -89,11 +91,12 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     m_vertexBuffer.AppData() = vertices;
     m_texCoordBuffer.AppData() = texCoords;
     CreateTexCoords();
+    m_vertexBuffer.SetDirty(true);
+    m_texCoordBuffer.SetDirty(true);
     m_vertexBuffer.Setup();
     m_texCoordBuffer.Setup();
     if (not CreateVAO())
         return false;
-    m_vao->Init(GL_QUADS);
     UpdateVAO();
     m_aspectRatio = ComputeAspectRatio();
     return true;
@@ -111,10 +114,6 @@ bool BaseQuad::CreateVAO(void) {
 
 
 bool BaseQuad::UpdateVAO(void) {
-#if 0
-    if (not CreateVAO())
-        return false;
-#endif
     if (not m_vao->IsValid())
         return false;
     if (m_vertexBuffer.IsDirty() or m_texCoordBuffer.IsDirty()) {

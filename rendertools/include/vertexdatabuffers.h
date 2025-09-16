@@ -29,9 +29,9 @@ public:
 
     virtual uint32_t GLDataLength(void) const noexcept { return 0; }
 
-    virtual uint32_t GLDataSize(void) noexcept { return 0; }
+    virtual uint32_t GLDataSize(void) const noexcept { return 0; }
 
-    inline uint32_t ComponentCount(void) noexcept {
+    inline uint32_t ComponentCount(void) const noexcept {
         return m_componentCount;
     }
 
@@ -40,7 +40,7 @@ public:
     }
 
     inline void SetDirty(bool isDirty) noexcept {
-        m_isDirty = false;
+        m_isDirty = isDirty;
     }
 };
 
@@ -120,20 +120,20 @@ public:
             return m_glData;
         }
 
-        inline uint32_t AppDataLength(void) const noexcept override {
-            return m_appData.Length();
-        }
-
-        virtual uint32_t GLDataBuffer(void) const noexcept override {
-            return m_glData.Data();
+        virtual void* GLDataBuffer(void) noexcept override {
+            return reinterpret_cast<void*>(m_glData.Data());
         }
 
         virtual uint32_t GLDataLength(void) const noexcept override {
             return m_glData.Length();
         }
 
-        virtual uint32_t GLDataSize(void) noexcept override {
+        virtual uint32_t GLDataSize(void) const noexcept override {
             return m_glData.Length() * sizeof(GL_DATA_T);
+        }
+
+        inline uint32_t AppDataLength(void) const noexcept {
+            return m_appData.Length();
         }
 
         inline bool Append(APP_DATA_T data) {

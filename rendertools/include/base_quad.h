@@ -15,7 +15,7 @@ class BaseQuad
     : public Plane
 {
 public:
-    static VAO* m_vao;
+    //static VAO* m_vao;
 
     struct TransformationParams {
         bool            centerOrigin = false;
@@ -29,6 +29,7 @@ public:
         void Clear(void) {  *this = {}; }
     };
 
+    VAO*                    m_vao;
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
     TexCoord                m_maxTexCoord;
@@ -56,7 +57,8 @@ public:
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()
-        : m_aspectRatio(1.0f)
+        : m_vao(nullptr)
+        , m_aspectRatio(1.0f)
         , m_offset(0.0f)
         , m_isAvailable(false)
         , m_premultiply(false)
@@ -64,7 +66,8 @@ public:
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular])
-        : Plane(vertices)
+        : m_vao(nullptr)
+        , Plane(vertices)
         , m_isAvailable(true)
         , m_premultiply(false)
     {
@@ -75,7 +78,7 @@ public:
         Copy(other);
     }
 
-    bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {});
+    virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {});
 
     bool CreateVAO(void);
 

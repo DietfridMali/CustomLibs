@@ -186,7 +186,7 @@ public:
 
     bool UpdateVertexBuffer(const char* type, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
         if (buffer.IsDirty()) {
-            if (not UpdateVertexBuffer(type, buffer.GLDataBuffer(), buffer.GLDataLength(), componentType, size_t(buffer.ComponentCount())))
+            if (not UpdateVertexBuffer(type, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount())))
                 return false;
             buffer.SetDirty(false);
         }

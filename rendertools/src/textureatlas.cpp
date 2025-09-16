@@ -9,7 +9,10 @@ BaseQuad TextureAtlas::renderQuad;
 
 TextureAtlas::TextureAtlas()
 	: m_size(0), m_glyphSize(0), m_scale(Vector2f::ONE)
-{
+{ }
+
+
+void TextureAtlas::Initialize(void) {
 	renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voZero], BaseQuad::defaultTexCoords[BaseQuad::tcRegular]);
 	renderQuad.SetTransformations({ .centerOrigin = false, .autoClear = false });
 }

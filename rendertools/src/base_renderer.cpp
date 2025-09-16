@@ -246,6 +246,12 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
             openGLStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+#if 0
+            if (m_screenBuffer->Enable(true)) {
+                RenderToViewport(testTexture, ColorData::White, false, false);
+                m_screenBuffer->Disable();
+            }
+#endif
             glClear(GL_COLOR_BUFFER_BIT);
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);

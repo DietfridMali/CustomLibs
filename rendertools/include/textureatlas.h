@@ -48,6 +48,8 @@ public:
 
 	~TextureAtlas() = default;
 
+	void Initialize(void);
+
 	inline Vector2f GlyphOffset(int glyphIndex) {
 		return
 			(m_scale.X() * m_scale.Y()) // both != 0?
