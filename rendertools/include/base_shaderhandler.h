@@ -86,6 +86,12 @@ public:
         return LoadCircleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, antialias);
     }
 
+    Shader* LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, float radius, float maskScale = 1.0f, bool antialias = true);
+
+    Shader* LoadCircleMaskShader(RGBAColor&& color, RGBAColor&& maskColor, Vector2f&& center, float radius, float maskScale = 1.0f, bool antialias = true) {
+        return LoadCircleMaskShader(static_cast<const RGBAColor&>(color), static_cast<const RGBAColor&>(maskColor), static_cast<const Vector2f&>(center), radius, maskScale, antialias);
+    }
+
     Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
 
     Shader* LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);

@@ -9,6 +9,7 @@ const ShaderSource& DepthShader();
 const ShaderSource& LineShader();
 const ShaderSource& RingShader();
 const ShaderSource& CircleShader();
+const ShaderSource& CircleMaskShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
 const ShaderSource& MovingTextureShader();
@@ -25,6 +26,10 @@ const ShaderSource& GaussBlurShader();
 BaseShaderCode::BaseShaderCode() {
     ManagedArray<const ShaderSource*> shaderSource = {
         &DepthShader(),
+        &LineShader(),
+        &RingShader(),
+        &CircleShader(),
+        &CircleMaskShader(),
         &PlainColorShader(),
         &PlainTextureShader(),
         &MovingTextureShader(),

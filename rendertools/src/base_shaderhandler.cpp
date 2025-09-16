@@ -142,6 +142,21 @@ Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector
 }
 
 
+Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, float radius, float maskScale, bool antialias) {
+    Shader* shader = SetupShader("circleMaskShader");
+    if (shader and not baseRenderer.DepthPass()) {
+        shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+        shader->SetVector4f("surfaceColor", color);
+        shader->SetVector4f("maskColor", maskColor);
+        shader->SetVector2f("center", center);
+        shader->SetFloat("radius", radius);
+        shader->SetFloat("maskScale", maskScale);
+        shader->SetInt("antialias", antialias ? 1 : 0);
+    }
+    return shader;
+}
+
+
 Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool premultiply) {
     Shader* shader = SetupShader("plainColor");
     if (shader and not baseRenderer.DepthPass()) {

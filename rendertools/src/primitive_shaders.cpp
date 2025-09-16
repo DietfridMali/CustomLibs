@@ -127,7 +127,7 @@ const ShaderSource& CircleShader() {
         Standard2DVS(),
         R"(
             #version 330 core
-
+            
             uniform vec2 viewportSize;   // Pixel
             uniform vec4 surfaceColor;
             uniform vec2 center;
@@ -138,11 +138,11 @@ const ShaderSource& CircleShader() {
             out vec4 fragColor;
 
             void main() {
-#if 1
+#if 0
                 fragColor = vec4(1,0,1,1);
 #else
-                vec2 pxDelta   = (fragCoord - center) * viewportSize;
-                float pxDist   = length(pxDelta);
+                vec2 pxDelta = (fragCoord - center) * viewportSize;
+                float pxDist = length(pxDelta);
                 float pxRadius = radius * min(viewportSize.x, viewportSize.y);
                 float d = pxDist - pxRadius;   // <0 = innen
 
@@ -157,6 +157,60 @@ const ShaderSource& CircleShader() {
                 }
 
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+#endif
+            }
+        )");
+    return source;
+}
+
+// render a b/w mask with color applied.
+const ShaderSource& CircleMaskShader() {
+    static const ShaderSource source(
+        "circleMaskShader",
+        Standard2DVS(),
+        R"(
+            #version 330 core
+
+            uniform sampler2D source;
+            uniform vec2 viewportSize;   // Pixel
+            uniform vec4 surfaceColor;
+            uniform vec4 maskColor;
+            uniform vec2 center;
+            uniform float radius;      // [0..1] in UV
+            uniform float maskScale;
+            uniform bool antialias;    // billigstes AA
+
+            in vec2 fragCoord;         // [0..viewportSize]
+            out vec4 fragColor;
+
+            void main() {
+#if 0
+                fragColor = vec4(1,0,1,1);
+#else
+                vec2 fcDelta = fragCoord - center;
+                vec4 mask = texture(source, clamp(center + fcDelta * maskScale, 0.0, 1.0));
+                if (mask.a > 0)
+                    fragColor = maskColor;
+                else {
+                    vec2 pxDelta = (fragCoord - center) * viewportSize;
+                    float pxDist = length(pxDelta);
+                    float pxRadius = radius * min(viewportSize.x, viewportSize.y);
+                    float d = pxDist - pxRadius;   // <0 = innen
+
+                    float alpha;
+                    if (antialias) {
+                        float pxWidth = 0.5 * fwidth(pxDist);  // ~1 Pixel Übergang
+                        if (d > pxWidth) 
+                            discard;
+                        alpha = 1.0 - smoothstep(0.0, pxWidth, d);
+                    } 
+                    else {
+                        if (d > 0.0) 
+                            discard;
+                        alpha = 1.0;
+                    }
+                    fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+                }
 #endif
             }
         )");
