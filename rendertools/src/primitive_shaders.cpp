@@ -69,46 +69,39 @@ const ShaderSource& RingShader() {
             #version 330 core
 
             uniform vec2 center;          // [0..1] UV
-            uniform float radius;         // äußerer Kreisradius in Pixeln
-            uniform float strength;       // [0..1] UV (Dicke, bezogen auf min(viewportSize))
+            uniform float radius;         // [0..1] UV (außen, bezogen auf min(viewportSize))
+            uniform float strength;       // [0..1] UV (Dicke)
             uniform vec4 surfaceColor;
-            uniform bool antialias;       // billigstes AA optional
+            uniform bool antialias;
             uniform vec2 viewportSize;    // Pixel
 
             in vec2 fragCoord;            // [0..1] UV
             out vec4 fragColor;
 
             void main() {
-                vec2 pxFragCoord = fragCoord * viewportSize;
-                vec2 pxCenter = center * viewportSize;
-                float pxDist = length(pxFragCoord - pxCenter);
+                float pxScale     = min(viewportSize.x, viewportSize.y);
+                vec2  pxDelta     = (fragCoord - center) * viewportSize;
+                float pxDist      = length(pxDelta);
+                float pxRadius    = radius   * pxScale;
+                float pxStrength  = strength * pxScale;
 
-                float pxStrength = strength * min(viewportSize.x, viewportSize.y);
+                float outerR = pxRadius;
+                float innerR = max(pxRadius - pxStrength, 0.0);
 
-                float innerR, outerR;
-                if (radius >= pxStrength) {
-                    outerR = radius;
-                    innerR = radius - pxStrength;
-                }
-                else {
-                    outerR = 0.5 * pxStrength; // kleiner Kreis als Punkt
-                    innerR = 0.0;
-                }
-
-                float dOuter = pxDist - outerR;   // <0 innen vom Außenrand
-                float dInner = innerR - pxDist;   // <0 außen vom Innenrand
+                float dOuter = pxDist - outerR;   // <0: innen vom Außenrand
+                float dInner = innerR - pxDist;   // <0: außen vom Innenrand
 
                 float alpha;
                 if (antialias) {
                     float pxWidth = 0.5 * fwidth(pxDist);
-                    if (dOuter > pxWidth || dInner > pxWidth) 
+                    if (dOuter > pxWidth || dInner > pxWidth)
                         discard;
                     float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
                     alpha = aOuter * aInner;
                 }
                 else {
-                    if (dOuter > 0.0 || dInner > 0.0) 
+                    if (dOuter > 0.0 || dInner > 0.0)
                         discard;
                     alpha = 1.0;
                 }
