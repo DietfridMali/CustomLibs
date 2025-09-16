@@ -32,7 +32,9 @@ public:
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
     TexCoord                m_maxTexCoord;
+#if 0
     Texture*                m_texture;
+#endif
     RGBAColor               m_color;
     float                   m_aspectRatio;
     float                   m_offset;
@@ -58,12 +60,26 @@ public:
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()
-        : m_texture(nullptr), m_color(ColorData::White), m_aspectRatio(1), m_offset(0), m_isAvailable(false), m_premultiply(false)
+        : m_color(ColorData::White)
+        , m_aspectRatio(1)
+        , m_offset(0)
+        , m_isAvailable(false)
+        , m_premultiply(false)
+#if 0
+        , m_texture(nullptr)
+#endif
     {
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], Texture* texture = nullptr, RGBAColor color = ColorData::White)
-        : Plane(vertices), m_texture(texture), m_color(color), m_offset(0), m_isAvailable(true), m_premultiply(false)
+        : Plane(vertices)
+        , m_color(color)
+        , m_offset(0)
+        , m_isAvailable(true)
+        , m_premultiply(false)
+#if 0
+        , m_texture(texture)
+#endif
     {
         Setup(vertices, texCoords, texture, color/*, borderWidth*/);
     }
@@ -98,11 +114,11 @@ public:
 
     float ComputeAspectRatio(void)
         noexcept;
-
+#if 0
     inline void SetTexture(Texture* texture) {
         m_texture = texture;
     }
-
+#endif
     inline void SetColor(RGBAColor color)
         noexcept
     {
@@ -111,12 +127,18 @@ public:
 
     Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
 
-    void Render(RGBAColor color = ColorData::White);
+    bool Render(Shader* shader, Texture* texture, const RGBAColor& color = ColorData::White);
 
-    bool Render(Shader* shader, Texture* texture, bool updateVAO = true);
+    inline bool Render(Shader* shader, Texture* texture, RGBAColor&& color) {
+        return Render(shader, texture, static_cast<const RGBAColor&>(color));
+    }
 
-    inline void Render(Texture* texture) {
-        Render(LoadShader(texture != nullptr), texture, true);
+    inline bool Render(Texture* texture) {
+        return Render(nullptr, texture);
+    }
+
+    inline bool Render(RGBAColor color = ColorData::White) {
+        return Render(nullptr, nullptr, color);
     }
 
     // fill 2D area defined by x and y components of vertices with color color

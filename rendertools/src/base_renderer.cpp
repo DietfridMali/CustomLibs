@@ -211,8 +211,7 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
     m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = (bRotate ? 90.0f : 0.0f) });
 #endif
 #if 1
-    m_viewportArea.SetTexture(texture);
-    m_viewportArea.Render(color); // bFlipVertically);
+    m_viewportArea.Render(nullptr, texture, color); // bFlipVertically);
 #else
     m_viewportArea.Fill(color); // bFlipVertically);
 #endif
@@ -276,11 +275,10 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 }
 
 
-void BaseRenderer::Render(Texture* texture, const RGBAColor& color) {
+void BaseRenderer::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0.0);
-    m_viewportArea.SetTexture(texture);
-    m_viewportArea.Render(color);
+    m_viewportArea.Render(nullptr, texture, color);
     baseRenderer.PopMatrix();
 }
 

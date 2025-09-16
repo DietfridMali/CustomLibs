@@ -36,7 +36,9 @@ BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
         m_vertexBuffer = other.m_vertexBuffer;
         m_texCoordBuffer = other.m_texCoordBuffer;
+#if 0
         m_texture = other.m_texture;
+#endif
         m_color = other.m_color;
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
@@ -51,7 +53,9 @@ noexcept
     if (this != &other) {
         m_vertexBuffer = std::move(other.m_vertexBuffer);
         m_texCoordBuffer = std::move(other.m_texCoordBuffer);
+#if 0
         m_texture = std::move(other.m_texture);
+#endif
         m_color = other.m_color;
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
@@ -66,6 +70,7 @@ void BaseQuad::CreateTexCoords(void) {
             m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
     }
     else {
+#if 0
         if (m_texture and (m_texture->WrapMode() == GL_REPEAT)) {
             m_maxTexCoord = TexCoord{ 0, 0 };
             for (auto& v : m_vertexBuffer.m_appData) {
@@ -74,7 +79,9 @@ void BaseQuad::CreateTexCoords(void) {
                 m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), v.X()), std::max(m_maxTexCoord.V(), v.Z()) });
             }
         }
-        else {
+        else 
+#endif
+        {
             m_texCoordBuffer.Append(TexCoord{ 0, 1 });
             m_texCoordBuffer.Append(TexCoord{ 0, 0 });
             m_texCoordBuffer.Append(TexCoord{ 1, 0 });
@@ -95,7 +102,9 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     if (not CreateVAO())
         return false;
     m_vao->Init(GL_QUADS);
+#if 0
     m_texture = texture;
+#endif
     m_color = color;
     m_aspectRatio = ComputeAspectRatio();
     return true;
@@ -147,24 +156,6 @@ Shader* BaseQuad::LoadShader(bool useTexture, const RGBAColor& color) {
 }
 
 
-void BaseQuad::Render(RGBAColor color) {
-    if (UpdateVAO()) {
-        Render(LoadShader(m_texture != nullptr, color), m_texture, false);
-    }
-    else if (m_texture->Enable()) {
-        openGLStates.SetBlending(1);
-        glBegin(GL_QUADS);
-        for (auto& v : m_vertexBuffer.m_appData) {
-            glColor4f(color.R(), color.G(), color.B(), color.A());
-            glVertex3f(v.X(), v.Y(), v.Z());
-        }
-        glEnd();
-        m_texture->Disable();
-        openGLStates.SetBlending(0);
-    }
-}
-
-
 void BaseQuad::UpdateTransformation(void) {
     if (HaveTransformations()) {
         baseRenderer.PushMatrix();
@@ -187,10 +178,10 @@ void BaseQuad::ResetTransformation(void) {
 }
 
 
-bool BaseQuad::Render(Shader* shader, Texture* texture, bool updateVAO) {
-    if (not (shader or (shader = LoadShader(texture != nullptr))))
+bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
+    if (not (shader or (shader = LoadShader(texture != nullptr, color))))
         return false;
-    if (not updateVAO or UpdateVAO()) {
+    if (UpdateVAO()) {
         m_vao->Render(texture);
         ResetTransformation();
         return true;

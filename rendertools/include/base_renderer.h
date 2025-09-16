@@ -207,10 +207,10 @@ public:
         return TexCoord(1.0f / float(m_viewport.Width()), 1.0f / (m_viewport.Height()));
     }
 
-    void Render(Texture* texture, const RGBAColor& color);
+    void Render(Shader* shader, Texture* texture, const RGBAColor& color);
 
-    void Render(Texture* texture, RGBAColor&& color) {
-        Render(texture, static_cast<const RGBAColor&>(color));
+    void Render(Shader* shader, Texture* texture, RGBAColor&& color) {
+        Render(shader, texture, static_cast<const RGBAColor&>(color));
     }
 
     void Fill(const RGBAColor& color, float scale = 1.0f);
