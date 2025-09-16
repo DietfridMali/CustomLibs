@@ -132,6 +132,7 @@ Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f
 Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector2f& center, float radius, bool antialias) {
     Shader* shader = SetupShader("circleShader");
     if (shader and not baseRenderer.DepthPass()) {
+        shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
         shader->SetVector4f("surfaceColor", color);
         shader->SetVector2f("center", center);
         shader->SetFloat("radius", radius);

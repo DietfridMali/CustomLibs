@@ -5,27 +5,6 @@
 
 // =================================================================================================
 
-const ShaderSource& DepthShader() {
-    static const ShaderSource source(
-        "depthShader",
-        R"(
-        #version 330 core
-        layout(location = 0) in vec3 position;
-        layout(location = 1) in vec2 texCoord;
-        uniform mat4 mModelView;
-        uniform mat4 mProjection;
-        void main() { 
-            gl_Position = mProjection * mModelView * vec4 (position, 1.0);
-        }
-        )",
-        R"(
-        void main() { }
-        )"
-        );
-    return source;
-}
-
-
 const ShaderSource& LineShader() {
     static const ShaderSource source(
         "lineShader",
@@ -33,43 +12,51 @@ const ShaderSource& LineShader() {
         R"(
             #version 330 core
 
-            uniform vec2 start;
-            uniform vec2 end;
-            uniform float strength;      // [0..1] in UV
-            uniform vec4 surfaceColor;
-            uniform bool antialias;      // false = harte Kante
             uniform vec2 viewportSize;   // Pixel
+            uniform vec4 surfaceColor;
+            uniform vec2 start;          // [0..1] UV
+            uniform vec2 end;            // [0..1] UV
+            uniform float strength;      // [0..1] UV, bezogen auf min(viewportSize)
+            uniform bool antialias;
 
-            in vec2 fragCoord;           // [0..viewportSize]
+            in vec2 fragCoord;           // [0..1] UV
             out vec4 fragColor;
 
             void main() {
-                vec2 p = fragCoord;
-                vec2 v = end - start;
+                // Umrechnung in Pixel
+                vec2 pxFragCoord = fragCoord * viewportSize;
+                vec2 pxStart = start * viewportSize;
+                vec2 pxEnd = end * viewportSize;
+
+                vec2 v = pxEnd - pxStart;
                 float len2 = dot(v, v);
 
                 float pxStrength = strength * min(viewportSize.x, viewportSize.y);
                 float r = 0.5 * max(pxStrength, 0.0);
+
                 float d; // signed distance: <0 innen
                 if (len2 < 1e-6) {
-                    d = length(p - start) - r;                  // runder Punkt
-                } else {
-                    vec2 w = p - start;
+                    d = length(pxFragCoord - pxStart) - r;                  // Punkt
+                } 
+                else {
+                    vec2 w = pxFragCoord - pxStart;
                     float t = clamp(dot(w, v) / len2, 0.0, 1.0);
-                    vec2 proj = start + t * v;
-                    d = length(p - proj) - r;                   // Linie mit runden Kappen
+                    vec2 proj = pxStart + t * v;
+                    d = length(pxFragCoord - proj) - r;                     // Linie mit runden Kappen
                 }
+
                 float alpha;
                 if (antialias) {
-                    float w = 0.5 * fwidth(d);                  // ~1 Pixel weich
-                    alpha = 1.0 - smoothstep(0.0, w, d);
-                } else {
+                    float pxWidth = 0.5 * fwidth(d);  // ~1 Pixel weich
+                    alpha = 1.0 - smoothstep(0.0, pxWidth, d);
+                } 
+                else {
                     alpha = step(d, 0.0);
                 }
+
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-
-        );
+            )");
     return source;
 }
 
@@ -81,19 +68,20 @@ const ShaderSource& RingShader() {
         R"(
             #version 330 core
 
-            uniform vec2 center;
-            uniform float radius;        // äußerer Kreisradius in Pixeln
-            uniform float strength;      // [0..1] in UV (Dicke)
+            uniform vec2 center;          // [0..1] UV
+            uniform float radius;         // äußerer Kreisradius in Pixeln
+            uniform float strength;       // [0..1] UV (Dicke, bezogen auf min(viewportSize))
             uniform vec4 surfaceColor;
-            uniform bool antialias;      // billigstes AA optional
-            uniform vec2 viewportSize;   // Pixel
+            uniform bool antialias;       // billigstes AA optional
+            uniform vec2 viewportSize;    // Pixel
 
-            in vec2 fragCoord;           // [0..viewportSize]
+            in vec2 fragCoord;            // [0..1] UV
             out vec4 fragColor;
 
             void main() {
-                vec2 p = fragCoord;
-                float dist = length(p - center);
+                vec2 pxFragCoord = fragCoord * viewportSize;
+                vec2 pxCenter = center * viewportSize;
+                float pxDist = length(pxFragCoord - pxCenter);
 
                 float pxStrength = strength * min(viewportSize.x, viewportSize.y);
 
@@ -101,27 +89,32 @@ const ShaderSource& RingShader() {
                 if (radius >= pxStrength) {
                     outerR = radius;
                     innerR = radius - pxStrength;
-                } else {
+                }
+                else {
                     outerR = 0.5 * pxStrength; // kleiner Kreis als Punkt
                     innerR = 0.0;
                 }
 
-                float dOuter = dist - outerR;   // <0 innen vom Außenrand
-                float dInner = innerR - dist;   // <0 außen vom Innenrand
+                float dOuter = pxDist - outerR;   // <0 innen vom Außenrand
+                float dInner = innerR - pxDist;   // <0 außen vom Innenrand
 
                 float alpha;
                 if (antialias) {
-                    float w = 0.5 * fwidth(dist);
-                    float aOuter = 1.0 - smoothstep(0.0, w, dOuter);
-                    float aInner = 1.0 - smoothstep(0.0, w, dInner);
+                    float pxWidth = 0.5 * fwidth(pxDist);
+                    if (dOuter > pxWidth || dInner > pxWidth) 
+                        discard;
+                    float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
+                    float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
                     alpha = aOuter * aInner;
-                } else {
-                    alpha = step(dOuter, 0.0) * step(dInner, 0.0);
+                }
+                else {
+                    if (dOuter > 0.0 || dInner > 0.0) 
+                        discard;
+                    alpha = 1.0;
                 }
 
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-
         )");
     return source;
 }
@@ -135,27 +128,36 @@ const ShaderSource& CircleShader() {
         R"(
             #version 330 core
 
-            uniform vec2 center;
-            uniform float radius;      // Kreisradius in Pixeln
+            uniform vec2 viewportSize;   // Pixel
             uniform vec4 surfaceColor;
-            uniform bool antialias;    // optional, billigstes AA
+            uniform vec2 center;
+            uniform float radius;      // [0..1] in UV
+            uniform bool antialias;    // billigstes AA
 
             in vec2 fragCoord;         // [0..viewportSize]
             out vec4 fragColor;
 
             void main() {
-                vec2 p = fragCoord;
-                float dist = length(p - center);
-                float d = dist - radius;   // <0 = innen
+#if 1
+                fragColor = vec4(1,0,1,1);
+#else
+                vec2 pxDelta   = (fragCoord - center) * viewportSize;
+                float pxDist   = length(pxDelta);
+                float pxRadius = radius * min(viewportSize.x, viewportSize.y);
+                float d = pxDist - pxRadius;   // <0 = innen
+
                 float alpha;
                 if (antialias) {
-                    float w = 0.5 * fwidth(dist);          // ~1 Pixel Übergang
-                    alpha = 1.0 - smoothstep(0.0, w, d);
-                } 
-                else {
-                    alpha = step(d, 0.0);
+                    float pxWidth = 0.5 * fwidth(pxDist);  // ~1 Pixel Übergang
+                    if (d > pxWidth) discard;
+                    alpha = 1.0 - smoothstep(0.0, pxWidth, d);
+                } else {
+                    if (d > 0.0) discard;
+                    alpha = 1.0;
                 }
+
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+#endif
             }
         )");
     return source;
