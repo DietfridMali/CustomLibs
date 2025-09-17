@@ -46,11 +46,11 @@ public:
     bool                m_isDynamic;
     bool                m_isBound;
 
-    static VAO* activeVAO;
+    static VAO*         activeVAO;
     static List<VAO*>   vaoStack;
 
     VAO()
-        : m_isDynamic(false), m_isBound(false), m_shape(0)
+        : m_isDynamic(false), m_isBound(false), m_shape(GL_QUADS)
     { }
 
     static inline void PushVAO(VAO* vao)
@@ -78,7 +78,7 @@ public:
         m_indexBuffer.SetDynamic(m_isDynamic);
     }
 
-    bool Create(GLuint shape, bool isDynamic)
+    bool Create(GLuint shape = GL_QUADS, bool isDynamic = false)
         noexcept;
 
     ~VAO() {
@@ -153,7 +153,7 @@ public:
         }
     }
 
-    void Enable(void)
+    bool Enable(void)
         noexcept;
 
     void Disable(void)

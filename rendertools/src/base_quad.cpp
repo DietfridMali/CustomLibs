@@ -48,7 +48,7 @@ BaseQuad& BaseQuad::Move(BaseQuad& other)
 noexcept
 {
     if (this != &other) {
-        m_vao = std::move(other.m_vao);
+        m_vao.Move(other.m_vao);
         m_vertexBuffer = std::move(other.m_vertexBuffer);
         m_texCoordBuffer = std::move(other.m_texCoordBuffer);
         m_aspectRatio = other.m_aspectRatio;

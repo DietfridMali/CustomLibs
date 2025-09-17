@@ -1,4 +1,5 @@
 #include "vbo.h"
+#include "base_renderer.h"
 
 // =================================================================================================
 // OpenGL vertex buffer handling: Creation, sending attributes to OpenGL, binding for rendering
@@ -93,6 +94,7 @@ noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
 noexcept(noexcept(Bind()) && noexcept(Describe()))
 #endif
 {
+    baseRenderer.ClearGLError();
     bool update;
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable()) {
@@ -135,6 +137,7 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
     else
         glBufferData(m_bufferType, dataSize, data, m_isDynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
     Describe();
+    baseRenderer.CheckGLError();
     return true;
     }
 

@@ -219,17 +219,21 @@ public:
     }
 
     List& Move(List& other) noexcept {
-        m_list.splice(m_list.end(), other.m_list);
+        if (other.Length())
+            m_list.splice(m_list.end(), other.m_list);
         return *this;
     }
+    
     List& Move(List&& other) noexcept {
-        m_list.splice(m_list.end(), other.m_list); // 'other' ist L-Wert hier, splice erwartet lvalue-ref -> ok
+        if (other.Length())
+            m_list.splice(m_list.end(), other.m_list); // 'other' ist L-Wert hier, splice erwartet lvalue-ref -> ok
         return *this;
     }
 
     // copy-append
     List& Copy(const List& other) {
-        m_list.insert(m_list.end(), other.m_list.begin(), other.m_list.end());
+        if (other.Length())
+            m_list.insert(m_list.end(), other.m_list.begin(), other.m_list.end());
         return *this;
     }
 
@@ -237,9 +241,27 @@ public:
     List& operator+=(List& other) {            // move von lvalue-Quelle
         return Move(other);
     }
+
+    List& operator=(List&& other) {           // move von rvalue-Quelle
+        return Move(std::move(other));
+    }
+
+    List& operator=(const List& other) {      // optional: copy-append bei const
+        return Copy(other);
+    }
+
+    List(const List& other) {
+        Copy(other);
+    }
+
+    List(List&& other) noexcept {
+        Move(other);
+    }
+
     List& operator+=(List&& other) {           // move von rvalue-Quelle
         return Move(std::move(other));
     }
+
     List& operator+=(const List& other) {      // optional: copy-append bei const
         return Copy(other);
     }

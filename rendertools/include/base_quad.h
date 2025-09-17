@@ -145,7 +145,7 @@ public:
     }
 
     ~BaseQuad() {
-        Destroy();
+        //Destroy();
     }
 
     protected:

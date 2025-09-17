@@ -78,7 +78,7 @@ public:
         Destroy();
     }
 
-    void Init(GLenum shape, int32_t listSegmentSize, Texture* texture = nullptr, String textureFolder = "", List<String> textureNames = List<String>(), GLenum textureType = GL_TEXTURE_2D);
+    bool Init(GLenum shape, int32_t listSegmentSize, Texture* texture = nullptr, String textureFolder = "", List<String> textureNames = List<String>(), GLenum textureType = GL_TEXTURE_2D);
 
     void SetName(String name) { m_name = name; }
 
@@ -104,15 +104,15 @@ public:
         return 1;
     }
 
-    inline const VertexBuffer& Vertices(void) const noexcept { return m_vertices; }
+    inline VertexBuffer& Vertices(void) noexcept { return m_vertices; }
 
-    inline const VertexBuffer& Normals(void) const noexcept { return m_normals; }
+    inline VertexBuffer& Normals(void) noexcept { return m_normals; }
 
-    inline const TexCoordBuffer& TexCoords(void) const noexcept { return m_texCoords; }
+    inline TexCoordBuffer& TexCoords(void) noexcept { return m_texCoords; }
 
-    inline const ColorBuffer& VertexColors(void) const noexcept { return m_vertexColors; }
+    inline ColorBuffer& VertexColors(void) noexcept { return m_vertexColors; }
 
-    inline const IndexBuffer& Indices(void) const noexcept { return m_indices; }
+    inline IndexBuffer& Indices(void) noexcept { return m_indices; }
 
     inline void UpdateVertexBuffer(void) {
         m_vao.UpdateVertexBuffer("Vertex", m_vertices, GL_FLOAT);
@@ -180,7 +180,7 @@ public:
         m_texCoords.Append(const_cast<const TexCoord&>(tc));
     }
 
-    inline void AddTexCoord(SegmentedList<TexCoord>& tc) {
+    inline void AddTexCoord(const SegmentedList<TexCoord>& tc) {
         m_texCoords.Append(tc);
     }
 

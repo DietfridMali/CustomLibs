@@ -5,7 +5,7 @@
 
 uint32_t Mesh::quadTriangleIndices[6] = { 0, 1, 2, 0, 2, 3 };
 
-void Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {
+bool Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {
     m_shape = shape;
     m_indices.m_componentCount = ShapeSize();
     //float f = std::numeric_limits<float>::lowest();
@@ -18,6 +18,7 @@ void Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String 
     m_vertexColors = ColorBuffer(listSegmentSize);
     m_indices = IndexBuffer(ShapeSize(), listSegmentSize);
     SetupTexture(texture, textureFolder, textureNames, textureType);
+    return m_vao.Create(GL_QUADS, false);
 }
 
 void Mesh::CreateVertexIndices(void) {
@@ -34,7 +35,7 @@ void Mesh::CreateVertexIndices(void) {
 void Mesh::UpdateVAO(bool createVertexIndex) {
     if (m_shape != GL_QUADS)
         createVertexIndex = false;
-    m_vao.Init(createVertexIndex ? GL_TRIANGLES : m_shape);
+    m_vao.Create(createVertexIndex ? GL_TRIANGLES : m_shape);
     m_vao.Enable();
     if (m_indices.IsDirty()) {
         m_indices.Setup();
@@ -129,7 +130,8 @@ void Mesh::Render(Texture* texture) {
 }
 
 void Mesh::Destroy(void)
-noexcept(noexcept(m_vertices.Destroy()) &&
+noexcept(
+    noexcept(m_vertices.Destroy()) &&
     noexcept(m_normals.Destroy()) &&
     noexcept(m_texCoords.Destroy()) &&
     noexcept(m_vertexColors.Destroy()) &&

@@ -28,24 +28,32 @@ bool VAO::Create(GLuint shape, bool isDynamic)
 noexcept
 {
     m_shape = shape;
+    SetDynamic(isDynamic);
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable())
         return true;
     m_handle = SharedGLHandle(0, glGenVertexArrays, glDeleteVertexArrays); // need to set allocate and release functions
-    return (m_handle.Claim() != 0);
+    if (m_handle.Claim() == 0)
+        return false;
+    fprintf(stderr, "create vao: %d\n", m_handle.Data());
+    return true;
 #else
     if (m_handle)
         return true;
     glGenVertexArrays(1, &m_handle);
     return m_handle != 0;
 #endif
-    SetDynamic(isDynamic);
 }
 
 
 void VAO::Destroy(void)
 noexcept
 {
+    GLuint h = m_handle.Data();
+    if (h == 0)
+        fprintf(stderr, "delete NULL vao: %d\n", h);
+    else
+        fprintf(stderr, "delete vao: %d\n", h);
     Disable();
     for (auto& vbo : m_dataBuffers)
         vbo->Destroy();
@@ -64,6 +72,7 @@ noexcept
 
 VAO& VAO::Copy(VAO const& other) {
     if (this != &other) {
+        Destroy();
         m_dataBuffers = other.m_dataBuffers;
         m_indexBuffer = other.m_indexBuffer;
         m_handle = other.m_handle;
@@ -77,9 +86,15 @@ VAO& VAO::Move(VAO& other)
 noexcept
 {
     if (this != &other) {
+        Destroy();
         m_dataBuffers = std::move(other.m_dataBuffers);
         m_indexBuffer = std::move(other.m_indexBuffer);
+#if USE_SHARED_HANDLES
         m_handle = std::move(other.m_handle);
+#else
+        m_handle = other.m_handle;
+        other.m_handle = 0;
+#endif
         m_shape = other.m_shape;
     }
     return *this;
@@ -142,9 +157,11 @@ noexcept
 }
 
 
-void VAO::Enable(void)
+bool VAO::Enable(void)
 noexcept
 {
+    if (not m_handle.IsAvailable())
+        return false;
     Activate();
     if (not IsBound()) {
 #if USE_SHARED_HANDLES
@@ -155,6 +172,7 @@ noexcept
         m_isBound = true; // BUGFIX: m_isBound wurde im !USE_SHARED_HANDLES-Zweig nicht gesetzt
 #endif
     }
+    return true;
 }
 
 
@@ -172,15 +190,18 @@ noexcept
 void VAO::Render(Texture* texture)
 noexcept
 {
+    if (not Enable())
+        return;
 #if 1
     if (baseShaderHandler.ShaderIsActive() and texture and not EnableTexture(texture))
         return;
 #endif
-    Enable();
+#if 1
     if (m_indexBuffer.m_data)
         glDrawElements(m_shape, m_indexBuffer.m_itemCount, m_indexBuffer.m_componentType, nullptr); // draw using an index buffer
     else
         glDrawArrays(m_shape, 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
+#endif
     Disable();
     DisableTexture(texture);
 }

@@ -74,25 +74,6 @@ class VertexDataBuffer
             return Move(other);
         }
 
-        VertexDataBuffer& Copy (VertexDataBuffer const& other) {
-            if (this != &other) {
-                m_appData = other.m_appData;
-                m_glData = other.m_glData;
-                m_componentCount = other.m_componentCount;
-            }
-            return *this;
-        }
-
-        VertexDataBuffer& Move(VertexDataBuffer& other) {
-            if (this != &other) {
-                m_appData = std::move(other.m_appData);
-                m_glData = std::move(other.m_glData);
-                m_componentCount = other.m_componentCount;
-                other.m_componentCount = 0;
-            }
-            return *this;
-        }
-
 public:
         inline void SetGLData(ManagedArray<GL_DATA_T>& glData) { // directly set m_glData without going over m_appData
             m_glData = glData;
@@ -101,16 +82,15 @@ public:
 
         virtual ManagedArray<GL_DATA_T>& Setup(void) = 0;
 
-        void Reset(void) {
+        inline void Reset(void) {
             m_appData.Clear();
             m_glData.Reset();
             m_isDirty = false;
         }
 
-        operator GLvoid* () {
+        inline operator GLvoid*() {
             return (GLvoid*)m_glData.data();
         }
-
 
         inline SegmentedList<APP_DATA_T>& AppData(void) noexcept {
             return m_appData;
@@ -143,7 +123,7 @@ public:
             return true;
         }
 
-        inline bool Append(SegmentedList<APP_DATA_T>& data) {
+        inline bool Append(const SegmentedList<APP_DATA_T>& data) {
             m_isDirty = true;
             m_appData += data;
             return true;
@@ -153,20 +133,19 @@ public:
             return m_appData[i];
         }
 
-        void Destroy (void) {
-            m_appData.Clear();
-            m_glData.Reset();
+        inline void Destroy (void) {
+           Reset();
         }
         
-        inline bool HaveAppData(void) {
+        inline bool HaveAppData(void) const {
             return !m_appData.IsEmpty();
         }
 
-        inline bool HaveGLData(void) {
+        inline bool HaveGLData(void) const {
             return m_glData.Length() > 0;
         }
 
-        inline bool HaveData(void) {
+        inline bool HaveData(void) const {
             return HaveAppData() or HaveGLData();
         }
 
@@ -178,6 +157,31 @@ public:
             Destroy ();
         }
 
+protected:
+    VertexDataBuffer& Copy(VertexDataBuffer const& other) {
+        if (this != &other) {
+            Reset();
+            if (other.HaveData()) {
+                m_appData = other.m_appData;
+                m_glData = other.m_glData;
+            }
+            m_componentCount = other.m_componentCount;
+        }
+        return *this;
+    }
+
+    VertexDataBuffer& Move(VertexDataBuffer& other) {
+        if (this != &other) {
+            Reset();
+            if (other.HaveData()) {
+                m_appData = std::move(other.m_appData);
+                m_glData = std::move(other.m_glData);
+            }
+            m_componentCount = other.m_componentCount;
+            other.m_componentCount = 0;
+        }
+        return *this;
+    }
 };
 
 // =================================================================================================
