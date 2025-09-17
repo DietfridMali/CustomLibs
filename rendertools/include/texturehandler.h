@@ -18,14 +18,21 @@ class TextureHandler
 {
 public:
     TextureList m_textures;
+    String      m_textureFolder;
 
     typedef Texture* (*tGetter) (void);
 
-    TextureHandler() = default;
+    TextureHandler()
+        : m_textureFolder("")
+    { }
 
     ~TextureHandler() noexcept { Destroy(); }
 
     void Destroy(void) noexcept;
+
+    void SetTextureFolder(String textureFolder) {
+        m_textureFolder = textureFolder;
+    }
 
     template <typename T>
     T* GetTexture(void) {
