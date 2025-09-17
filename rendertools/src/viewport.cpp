@@ -16,12 +16,23 @@ void Viewport::SetViewport(void) {
 }
 
 
-Viewport Viewport::Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) {
+Viewport Viewport::Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const {
     return Viewport (m_left + deltaLeft, m_top + deltaTop, m_width + deltaWidth, m_height + deltaHeight);
 }
 
 
-void Viewport::SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) {
+Viewport Viewport::Resize(float scale) const {
+    int w = int(roundf((float(m_width) * scale)));
+    int h = int(roundf((float(m_height) * scale)));
+    if (w * h == 0)
+        return *this;
+    int dw = m_width - w / 2;
+    int dh = m_height - h / 2;
+    return Viewport(m_left + dw, m_top + dh, w, h);
+}
+
+
+void Viewport::SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const {
     baseRenderer.SetViewport (Resize (deltaLeft, deltaTop, deltaWidth, deltaHeight));
 }
 

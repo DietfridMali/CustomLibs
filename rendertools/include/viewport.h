@@ -60,9 +60,11 @@ public:
 
     void SetViewport(void);
 
-    Viewport Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight);
+    Viewport Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
 
-    void SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight);
+    Viewport Resize(float scale) const;
+
+    void SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
 
     void BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 
