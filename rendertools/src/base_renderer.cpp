@@ -303,6 +303,8 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 void BaseRenderer::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0.0);
+    if (shader)
+        shader->UpdateMatrices();
     m_renderQuad.Render(shader, texture, color);
     baseRenderer.PopMatrix();
 }
