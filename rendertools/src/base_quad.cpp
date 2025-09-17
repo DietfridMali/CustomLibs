@@ -10,11 +10,15 @@
 #include "base_renderer.h"
 #include "conversions.hpp"
 
-#define USE_VAO true
-
 // caution: the VAO shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this vao is initialized.
 // VAO::Init takes care of that by first assigning a handle-less shared gl handle 
-//VAO* BaseQuad::m_vao = nullptr;
+// VAO* BaseQuad::m_vao = nullptr;
+
+#if USE_STATIC_VAO 
+VAO BaseQuad::m_vao;
+#endif
+
+// =================================================================================================
 
 std::initializer_list<Vector3f> BaseQuad::defaultVertices[2] = {
     { Vector3f{-0.5f, -0.5f, 0.0f}, Vector3f{-0.5f, 0.5f, 0.0f}, Vector3f{0.5f, 0.5f, 0.0f}, Vector3f{0.5f, -0.5f, 0.0f} },

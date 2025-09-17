@@ -9,6 +9,8 @@
 #include "colordata.h"
 #include "plane.h"
 
+#define USE_STATIC_VAO 0
+
 // =================================================================================================
 
 class BaseQuad
@@ -29,6 +31,9 @@ public:
         void Clear(void) {  *this = {}; }
     };
 
+#if USE_STATIC_VAO 
+    static
+#endif
     VAO                     m_vao;
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
@@ -57,19 +62,19 @@ public:
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()
-        : m_vao()
-        , m_aspectRatio(1.0f)
+        : m_aspectRatio(1.0f)
         , m_offset(0.0f)
         , m_isAvailable(false)
         , m_premultiply(false)
+        //, m_vao()
     {
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular])
-        : m_vao()
-        , Plane(vertices)
+        : Plane(vertices)
         , m_isAvailable(true)
         , m_premultiply(false)
+        //, m_vao()
     {
         Setup(vertices, texCoords);
     }
