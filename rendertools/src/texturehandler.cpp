@@ -24,23 +24,22 @@ bool TextureHandler::Remove(Texture* texture) {
 }
 
 
-#if 0
-TextureList TextureHandler::Create(String textureFolder, List<String>& textureNames, TextureGetter getTexture) {
-    return CreateTextures(textureFolder, textureNames, getTexture);
-}
-#endif
-
 TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, bool premultiply) {
+    if (textureFolder == "")
+        textureFolder = appData.m_textureFolder;
     TextureList textures;
     for (auto& n : textureNames) {
         Texture* t = getTexture();
         if (not t)
-            break;
-        textures.Append(t);
         List<String> fileNames; // must be local here so it gets reset every loop iteration
         fileNames.Append(textureFolder + n);
-        if (not t->CreateFromFile(fileNames, premultiply))
+        if (not (t = getTexture() and t->CreateFromFile(fileNames, premultiply))) {
+            for (auto& h : textures)
+                delete h;
+            textures.Clear();
             break;
+        }
+        textures.Append(t);
     }
     return textures;
 }
