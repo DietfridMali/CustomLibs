@@ -31,8 +31,8 @@ int TextRenderer::CompareFBOs(void* context, const int& key1, const int& key2) {
 TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, float scale)
     : m_color(color), m_scale(scale), m_font(nullptr), m_textAlignment(taCenter), m_decoration(decoration)
 { 
-    m_mesh.SetDynamic(true);
     m_mesh.Init(GL_QUADS, 100);
+    m_mesh.SetDynamic(true);
 }
 
 
@@ -115,6 +115,7 @@ BaseQuad& TextRenderer::CreateQuad(BaseQuad& q, float x, float y, float w, Textu
     else
         q.Setup({ Vector3f{x, y, 0.0}, Vector3f{x + w, y, 0.0}, Vector3f{x + w, -y, 0.0}, Vector3f{x, -y, 0.0} },
                 { TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } });
+    q.GetVAO().SetDynamic(true);
     return q;
 }
 
@@ -236,9 +237,8 @@ void TextRenderer::RenderToScreen(FBO* fbo, int flipVertically) {
 
 void TextRenderer::Render(String text, eTextAlignments alignment, int flipVertically, int renderAreaWidth, int renderAreaHeight, bool useFBO) {
     if (m_font) {
-        if (useFBO) {
+        if (not useFBO)
             RenderToBuffer(text, alignment, nullptr, baseRenderer.Viewport(), renderAreaWidth, renderAreaHeight, flipVertically);
-        }
         else {
             FBO* fbo = GetFBO(2.0f);
             if (fbo != nullptr) {

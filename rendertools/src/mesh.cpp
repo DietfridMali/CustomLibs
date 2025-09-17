@@ -72,6 +72,7 @@ void Mesh::ResetVAO(void) {
     m_texCoords.Reset();
     m_vertexColors.Reset();
     m_normals.Reset();
+    m_vao.Destroy();
 }
 
 void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {

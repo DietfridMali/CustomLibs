@@ -35,7 +35,7 @@ noexcept
     m_handle = SharedGLHandle(0, glGenVertexArrays, glDeleteVertexArrays); // need to set allocate and release functions
     if (m_handle.Claim() == 0)
         return false;
-    fprintf(stderr, "create vao: %d\n", m_handle.Data());
+    //fprintf(stderr, "create vao: %d\n", m_handle.Data());
     return true;
 #else
     if (m_handle)
@@ -49,18 +49,14 @@ noexcept
 void VAO::Destroy(void)
 noexcept
 {
-    GLuint h = m_handle.Data();
-    if (h == 0)
-        fprintf(stderr, "delete NULL vao: %d\n", h);
-    else
-        fprintf(stderr, "delete vao: %d\n", h);
     Disable();
     for (auto& vbo : m_dataBuffers)
         vbo->Destroy();
     m_indexBuffer.Destroy();
     m_dataBuffers.Clear();
 #if USE_SHARED_HANDLES
-    m_handle.Release();
+    if (m_handle.IsAvailable())
+        m_handle.Release();
 #else
     if (m_handle) {
         glDeleteVertexArrays(1, &m_handle);

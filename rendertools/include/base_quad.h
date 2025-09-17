@@ -100,6 +100,10 @@ public:
 
     void CreateTexCoords(void);
 
+    inline VAO& GetVAO(void) {
+        return m_vao;
+    }
+
     bool UpdateVAO(void);
 
     float ComputeAspectRatio(void)

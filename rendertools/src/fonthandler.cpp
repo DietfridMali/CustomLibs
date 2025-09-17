@@ -54,8 +54,10 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
         Vector2f scale = m_atlas.GlyphScale();
         // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
         info->atlasSize = { float(info->glyphSize.width) / float(m_maxGlyphSize.width) * scale.X(), float(info->glyphSize.height) / float(m_maxGlyphSize.height) * scale.Y() };
+#ifdef NDEBUG
         delete info->texture;
         info->texture = nullptr;
+#endif
     }
     return true;
 }
