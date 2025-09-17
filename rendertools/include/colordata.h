@@ -120,7 +120,8 @@ public:
     inline static const RGBAColor   Yellow = RGBAColor{ 1.0f, 1.0f, 0.0f, 1 };
     inline static const RGBAColor   Orange = RGBAColor{1.0f, 0.5f, 0.0f, 1 };
     inline static const RGBAColor   Red = RGBAColor{ 0.8f, 0.0f, 0.0f, 1 };
-    inline static const RGBAColor   Green = RGBAColor{ 0.0f, 0.8f, 0.0f, 1 };
+    inline static const RGBAColor   Green = RGBAColor{ 0.0f, 0.8f, 0.2f, 1 };
+    inline static const RGBAColor   DarkGreen = RGBAColor{ 0.0f, 0.4f, 0.1f, 1 };
     inline static const RGBAColor   Blue = RGBAColor{ 0.0f, 0.2f, 0.8f, 1 };
     inline static const RGBAColor   LightBlue = RGBAColor{ 0.0f, 0.8f, 1.0f, 1 };
     inline static const RGBAColor   MediumBlue = RGBAColor{ 0.0f, 0.5f, 1.0f, 1 };
