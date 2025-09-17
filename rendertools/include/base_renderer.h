@@ -45,7 +45,7 @@ protected:
     Viewport                m_viewport;
     Vector2f                m_ndcScale;
     Vector2f                m_ndcBias;
-    BaseQuad                m_viewportArea;
+    BaseQuad                m_renderQuad;
 
     int                     m_windowWidth;
     int                     m_windowHeight;
@@ -182,6 +182,8 @@ public:
         int width, height;
     } tViewport;
 #endif
+    inline BaseQuad& RenderQuad(void)  noexcept { return m_renderQuad; }
+
     inline Viewport& Viewport(void)  noexcept { return m_viewport; }
 
     void SetViewport(bool flipVertically = false)
@@ -207,7 +209,7 @@ public:
         return TexCoord(1.0f / float(m_viewport.Width()), 1.0f / (m_viewport.Height()));
     }
 
-    void Render(Shader* shader, Texture* texture, const RGBAColor& color);
+    void Render(Shader* shader, Texture* texture = nullptr, const RGBAColor& color = ColorData::White);
 
     void Render(Shader* shader, Texture* texture, RGBAColor&& color) {
         Render(shader, texture, static_cast<const RGBAColor&>(color));

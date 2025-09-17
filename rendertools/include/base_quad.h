@@ -107,7 +107,7 @@ public:
 
     Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
 
-    bool Render(Shader* shader, Texture* texture, const RGBAColor& color = ColorData::White);
+    bool Render(Shader* shader, Texture* texture = nullptr, const RGBAColor& color = ColorData::White);
 
     inline bool Render(Shader* shader, Texture* texture, RGBAColor&& color) {
         return Render(shader, texture, static_cast<const RGBAColor&>(color));

@@ -61,7 +61,7 @@ bool BaseRenderer::Create(int width, int height, float fov) {
     SetupOpenGL();
     m_drawBufferStack.Clear();
     m_renderTexture.HasBuffer() = true;
-    m_viewportArea.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
+    m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
     return true;
 }
 
@@ -206,12 +206,12 @@ void BaseRenderer::Draw3DScene(void) {
                 PopMatrix();
             }
         if (shader == nullptr) 
-            m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
+            m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 #if 1
         m_renderTexture.m_handle = m_sceneBuffer->BufferHandle(0);
-        m_viewportArea.Render(shader, &m_renderTexture);
+        m_renderQuad.Render(shader, &m_renderTexture);
 #else
-        m_viewportArea.Fill(ColorData::Orange);
+        m_renderQuad.Fill(ColorData::Orange);
 #endif
         if (shader != nullptr)
             PopMatrix();
@@ -227,12 +227,12 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
     if (bFlipVertically)
         Scale(1, -1, 1);
 #else
-    m_viewportArea.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = (bRotate ? 90.0f : 0.0f) });
+    m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = (bRotate ? 90.0f : 0.0f) });
 #endif
 #if 1
-    m_viewportArea.Render(nullptr, texture, color); // bFlipVertically);
+    m_renderQuad.Render(nullptr, texture, color); // bFlipVertically);
 #else
-    m_viewportArea.Fill(color); // bFlipVertically);
+    m_renderQuad.Fill(color); // bFlipVertically);
 #endif
 }
 
@@ -303,7 +303,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 void BaseRenderer::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0.0);
-    m_viewportArea.Render(nullptr, texture, color);
+    m_renderQuad.Render(shader, texture, color);
     baseRenderer.PopMatrix();
 }
 
@@ -312,7 +312,7 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5, 0.5, 0.0);
     baseRenderer.Scale(scale, scale, 1);
-    m_viewportArea.Fill(color);
+    m_renderQuad.Fill(color);
     baseRenderer.PopMatrix();
 }
 

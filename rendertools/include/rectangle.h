@@ -59,6 +59,10 @@ public:
         return m_height;
     }
 
+    inline float AspectRatio(void) const noexcept {
+        return m_aspectRatio;
+    }
+
     bool operator==(const Rectangle& other) const noexcept {
         return m_left == other.m_left and m_top == other.m_top and m_width == other.m_width and m_height == other.m_height;
     }
