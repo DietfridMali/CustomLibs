@@ -13,7 +13,7 @@ TextureAtlas::TextureAtlas()
 
 
 void TextureAtlas::Initialize(void) {
-	renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voZero], BaseQuad::defaultTexCoords[BaseQuad::tcRegular]);
+	renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voZero], BaseQuad::defaultTexCoords[BaseQuad::tcRegular], true);
 	renderQuad.SetTransformations({ .centerOrigin = false, .autoClear = false });
 }
 

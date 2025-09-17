@@ -32,15 +32,16 @@ public:
     };
 
 #if USE_STATIC_VAO 
-    static
+    static VAO              staticVAO;
 #endif
-    VAO                     m_vao;
+    VAO*                    m_vao;
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
     TexCoord                m_maxTexCoord;
     float                   m_aspectRatio;
     float                   m_offset;
     bool                    m_isAvailable;
+    bool                    m_privateVAO;
     bool                    m_premultiply;
     TransformationParams    m_transformations;
 
@@ -65,16 +66,17 @@ public:
         : m_aspectRatio(1.0f)
         , m_offset(0.0f)
         , m_isAvailable(false)
+        , m_privateVAO(false)
         , m_premultiply(false)
-        //, m_vao()
+        , m_vao(nullptr)
     {
     }
 
-    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular])
+    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false)
         : Plane(vertices)
         , m_isAvailable(true)
         , m_premultiply(false)
-        //, m_vao()
+        , m_vao(nullptr)
     {
         Setup(vertices, texCoords);
     }
@@ -83,9 +85,9 @@ public:
         Copy(other);
     }
 
-    virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = {});
+    virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false);
 
-    bool CreateVAO(void);
+    bool CreateVAO(bool privateVAO);
 
     BaseQuad& Copy(const BaseQuad& other);
 
@@ -106,7 +108,7 @@ public:
     void CreateTexCoords(void);
 
     inline VAO& GetVAO(void) {
-        return m_vao;
+        return *m_vao;
     }
 
     bool UpdateVAO(void);
@@ -154,6 +156,8 @@ public:
     }
 
     ~BaseQuad() {
+        if (not m_privateVAO)
+            m_vao = nullptr;
         //Destroy();
     }
 

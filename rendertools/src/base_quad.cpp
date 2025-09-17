@@ -15,7 +15,7 @@
 // VAO* BaseQuad::m_vao = nullptr;
 
 #if USE_STATIC_VAO 
-VAO BaseQuad::m_vao;
+VAO BaseQuad::staticVAO;
 #endif
 
 // =================================================================================================
@@ -38,7 +38,8 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
 
 BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
-        m_vao.Copy(other.m_vao);
+        if (m_privateVAO)
+            m_vao->Copy(*other.m_vao);
         m_vertexBuffer = other.m_vertexBuffer;
         m_texCoordBuffer = other.m_texCoordBuffer;
         m_aspectRatio = other.m_aspectRatio;
@@ -52,7 +53,9 @@ BaseQuad& BaseQuad::Move(BaseQuad& other)
 noexcept
 {
     if (this != &other) {
-        m_vao.Move(other.m_vao);
+        m_vao = other.m_vao;
+        if ((m_privateVAO = other.m_privateVAO))
+            other.m_vao = nullptr;
         m_vertexBuffer = std::move(other.m_vertexBuffer);
         m_texCoordBuffer = std::move(other.m_texCoordBuffer);
         m_aspectRatio = other.m_aspectRatio;
@@ -67,39 +70,32 @@ void BaseQuad::CreateTexCoords(void) {
         for (auto& tc : m_texCoordBuffer.AppData())
             m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
     }
-    else {
-#if 0
-        if (m_texture and (m_texture->WrapMode() == GL_REPEAT)) {
-            m_maxTexCoord = TexCoord{ 0, 0 };
-            for (auto& v : m_vertexBuffer.AppData()) {
-                m_texCoordBuffer.Append(TexCoord({ v.X(), v.Z() }));
-                // BUGFIX: zweiter Max-Vergleich muss Z-Komponente verwenden (nicht Y), da oben Z in die Texcoords geschrieben wird.
-                m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), v.X()), std::max(m_maxTexCoord.V(), v.Z()) });
-            }
-        }
-        else 
-#endif
-        {
-            m_texCoordBuffer.Append(TexCoord{ 0, 1 });
-            m_texCoordBuffer.Append(TexCoord{ 0, 0 });
-            m_texCoordBuffer.Append(TexCoord{ 1, 0 });
-            m_texCoordBuffer.Append(TexCoord{ 1, 1 });
-            m_maxTexCoord = TexCoord{ 1, 1 };
-        }
-    }
 }
 
 
-bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords) {
-    Plane::Init(vertices);
-    m_vertexBuffer.AppData() = vertices;
-    m_texCoordBuffer.AppData() = texCoords;
+bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords, bool privateVAO) {
+
+    auto equals = [](auto const& c, std::initializer_list<typename std::decay_t<decltype(*c.begin())>> il) {
+        return c.size() == il.size() && std::equal(c.begin(), c.end(), il.begin());
+        };
+
+    if (vertices.size() and not equals(m_vertexBuffer.AppData().StdList(), vertices)) {
+        Plane::Init(vertices);
+        m_vertexBuffer.AppData() = vertices;
+        m_vertexBuffer.Setup();
+        m_vertexBuffer.SetDirty(true);
+    }
+
+    if (texCoords.size() == 0)
+        texCoords = defaultTexCoords[tcRegular];
+    if (not equals(m_texCoordBuffer.AppData().StdList(), texCoords)) {
+        m_texCoordBuffer.AppData() = texCoords;
+        m_texCoordBuffer.Setup();
+        m_texCoordBuffer.SetDirty(true);
+    }
     CreateTexCoords();
-    m_vertexBuffer.SetDirty(true);
-    m_texCoordBuffer.SetDirty(true);
-    m_vertexBuffer.Setup();
-    m_texCoordBuffer.Setup();
-    if (not CreateVAO())
+
+    if (not CreateVAO(privateVAO))
         return false;
     UpdateVAO();
     m_aspectRatio = ComputeAspectRatio();
@@ -107,19 +103,34 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
 }
 
 
-bool BaseQuad::CreateVAO(void) {
-    return m_vao.Create(GL_QUADS, true);
+bool BaseQuad::CreateVAO(bool privateVAO) {
+#if USE_STATIC_VAO 
+    if (privateVAO and not m_vao) {
+        m_vao = new VAO();
+        m_privateVAO = m_vao != nullptr;
+    }
+    if (not m_privateVAO) // fallback
+        m_vao = &staticVAO;
+    return m_vao->Create(GL_QUADS, true);
+#else
+    if (m_vao)
+        return true;
+    m_vao = new VAO();
+    if (not m_vao)
+        return false;
+    return m_vao->Create(GL_QUADS, true);
+#endif
 }
 
 
 bool BaseQuad::UpdateVAO(void) {
-    if (not m_vao.IsValid())
+    if (not m_vao->IsValid())
         return false;
     if (m_vertexBuffer.IsDirty() or m_texCoordBuffer.IsDirty()) {
-        m_vao.Enable();
-        m_vao.UpdateVertexBuffer("Vertex", m_vertexBuffer, GL_FLOAT);
-        m_vao.UpdateVertexBuffer("TexCoord", m_texCoordBuffer, GL_FLOAT);
-        m_vao.Disable();
+        m_vao->Enable();
+        m_vao->UpdateVertexBuffer("Vertex", m_vertexBuffer, GL_FLOAT);
+        m_vao->UpdateVertexBuffer("TexCoord", m_texCoordBuffer, GL_FLOAT);
+        m_vao->Disable();
     }
     return true;
 }
@@ -174,7 +185,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) 
         return false;
     if (UpdateVAO()) 
     {
-        m_vao.Render(texture);
+        m_vao->Render(texture);
         ResetTransformation();
         return true;
         }
@@ -218,7 +229,10 @@ void BaseQuad::Destroy(void)
 noexcept
 {
     if constexpr (not is_static_member_v<&BaseQuad::m_vao>) {
-        m_vao.Destroy();
+        if (m_privateVAO) {
+            delete m_vao;
+            m_vao = nullptr;
+        }
     }
 }
 

@@ -60,6 +60,10 @@ public:
             m_list.push_back(elem);
     }
 
+    inline std::list<ItemType>& StdList(void) noexcept {
+        return m_list;
+    }
+
     inline operator std::list<ItemType>& () { return m_list; }
 
     inline operator const std::list<ItemType>& () const { return m_list; }
