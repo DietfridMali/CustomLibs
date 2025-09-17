@@ -8,6 +8,7 @@
 #include "base_shaderhandler.h"
 #include "type_helper.hpp"
 #include "base_renderer.h"
+#include "conversions.hpp"
 
 #define USE_VAO true
 
@@ -33,7 +34,7 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
 
 BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
-        m_vao = other.m_vao;
+        m_vao.Copy(other.m_vao);
         m_vertexBuffer = other.m_vertexBuffer;
         m_texCoordBuffer = other.m_texCoordBuffer;
         m_aspectRatio = other.m_aspectRatio;
@@ -103,23 +104,18 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
 
 
 bool BaseQuad::CreateVAO(void) {
-    if (m_vao)
-        return true;
-    if (not (m_vao = new VAO(true)))
-        return false;
-    m_vao->Init(GL_QUADS);
-    return true;
+    return m_vao.Create(GL_QUADS, true);
 }
 
 
 bool BaseQuad::UpdateVAO(void) {
-    if (not m_vao->IsValid())
+    if (not m_vao.IsValid())
         return false;
     if (m_vertexBuffer.IsDirty() or m_texCoordBuffer.IsDirty()) {
-        m_vao->Enable();
-        m_vao->UpdateVertexBuffer("Vertex", m_vertexBuffer, GL_FLOAT);
-        m_vao->UpdateVertexBuffer("TexCoord", m_texCoordBuffer, GL_FLOAT);
-        m_vao->Disable();
+        m_vao.Enable();
+        m_vao.UpdateVertexBuffer("Vertex", m_vertexBuffer, GL_FLOAT);
+        m_vao.UpdateVertexBuffer("TexCoord", m_texCoordBuffer, GL_FLOAT);
+        m_vao.Disable();
     }
     return true;
 }
@@ -174,7 +170,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) 
         return false;
     if (UpdateVAO()) 
     {
-        m_vao->Render(texture);
+        m_vao.Render(texture);
         ResetTransformation();
         return true;
         }
@@ -218,9 +214,8 @@ void BaseQuad::Destroy(void)
 noexcept
 {
     if constexpr (not is_static_member_v<&BaseQuad::m_vao>) {
-        m_vao->Destroy(); // don't destroy static members as they may be reused by other resources any time during program execution. Will be automatically destroyed at program termination
+        m_vao.Destroy();
     }
-    //textureHandler.Remove (m_texture); // BaseQuad textures are shared with quads and maybe reused after such a quad has been destroyed; so don't remove it globally
 }
 
 // =================================================================================================

@@ -49,16 +49,9 @@ public:
     static VAO* activeVAO;
     static List<VAO*>   vaoStack;
 
-    VAO(bool isDynamic = true)
-        : m_isDynamic(isDynamic), m_isBound(false), m_shape(0)
-#if USE_SHARED_HANDLES
-        , m_handle(SharedGLHandle(0, glGenVertexArrays, glDeleteVertexArrays))
-#else
-        , m_handle(0)
-#endif
-    {
-        SetDynamic(isDynamic);
-    }
+    VAO()
+        : m_isDynamic(false), m_isBound(false), m_shape(0)
+    { }
 
     static inline void PushVAO(VAO* vao)
         noexcept
@@ -85,7 +78,7 @@ public:
         m_indexBuffer.SetDynamic(m_isDynamic);
     }
 
-    bool Init(GLuint shape)
+    bool Create(GLuint shape, bool isDynamic)
         noexcept;
 
     ~VAO() {

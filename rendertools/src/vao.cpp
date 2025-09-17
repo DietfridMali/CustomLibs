@@ -24,7 +24,7 @@ List<VAO*> VAO::vaoStack;
 // TODO: Expand shader for all kinds of inputs (texture coordinates, normals)
 // See also https://qastack.com.de/programming/8704801/glvertexattribpointer-clarification
 
-bool VAO::Init(GLuint shape)
+bool VAO::Create(GLuint shape, bool isDynamic)
 noexcept
 {
     m_shape = shape;
@@ -39,6 +39,7 @@ noexcept
     glGenVertexArrays(1, &m_handle);
     return m_handle != 0;
 #endif
+    SetDynamic(isDynamic);
 }
 
 

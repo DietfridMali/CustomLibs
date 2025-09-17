@@ -9,6 +9,8 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <memory>
+#include <new>    // std::nothrow
 
 #ifndef M_PI
 #   define M_PI 3.14159265358979323846
@@ -150,6 +152,12 @@ namespace Conversions
             return 0.0f;
         float d = std::min(value - minValue, maxValue - value);
         return (d >= threshold) ? 1.0f : d / threshold;
+    }
+
+
+    template <typename T, typename... Args>
+    std::unique_ptr<T> MakeUnique(Args&&... args) {
+        return std::unique_ptr<T>{ new(std::nothrow) T(std::forward<Args>(args)...) };
     }
 };
 

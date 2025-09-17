@@ -218,15 +218,35 @@ public:
         return static_cast<int32_t>(oldSize - m_list.size());
     }
 
-
-    List<ItemType>& operator+= (List<ItemType> other) { // move other to end of *this
-        m_list.splice(m_list.end(), other);
+    List& Move(List& other) noexcept {
+        m_list.splice(m_list.end(), other.m_list);
         return *this;
     }
-        
-    List<ItemType>& AppendList (const List<ItemType>& other) { // move other to end of *this
-        m_list.insert(m_list.end(), other.begin(), other.end());
+    List& Move(List&& other) noexcept {
+        m_list.splice(m_list.end(), other.m_list); // 'other' ist L-Wert hier, splice erwartet lvalue-ref -> ok
         return *this;
+    }
+
+    // copy-append
+    List& Copy(const List& other) {
+        m_list.insert(m_list.end(), other.m_list.begin(), other.m_list.end());
+        return *this;
+    }
+
+    // operator+= Varianten
+    List& operator+=(List& other) {            // move von lvalue-Quelle
+        return Move(other);
+    }
+    List& operator+=(List&& other) {           // move von rvalue-Quelle
+        return Move(std::move(other));
+    }
+    List& operator+=(const List& other) {      // optional: copy-append bei const
+        return Copy(other);
+    }
+
+    // Alias
+    List& AppendList(const List& other) {
+        return Copy(other);
     }
 
     // ----------------------------------------------------------

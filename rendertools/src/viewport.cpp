@@ -26,8 +26,8 @@ Viewport Viewport::Resize(float scale) const {
     int h = int(roundf((float(m_height) * scale)));
     if (w * h == 0)
         return *this;
-    int dw = m_width - w / 2;
-    int dh = m_height - h / 2;
+    int dw = (m_width - w) / 2;
+    int dh = (m_height - h) / 2;
     return Viewport(m_left + dw, m_top + dh, w, h);
 }
 

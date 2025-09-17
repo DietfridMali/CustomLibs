@@ -29,7 +29,7 @@ public:
         void Clear(void) {  *this = {}; }
     };
 
-    VAO*                    m_vao;
+    VAO                     m_vao;
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
     TexCoord                m_maxTexCoord;
@@ -57,7 +57,7 @@ public:
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()
-        : m_vao(nullptr)
+        : m_vao()
         , m_aspectRatio(1.0f)
         , m_offset(0.0f)
         , m_isAvailable(false)
@@ -66,7 +66,7 @@ public:
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular])
-        : m_vao(nullptr)
+        : m_vao()
         , Plane(vertices)
         , m_isAvailable(true)
         , m_premultiply(false)

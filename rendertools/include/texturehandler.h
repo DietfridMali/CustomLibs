@@ -30,8 +30,14 @@ public:
 
     void Destroy(void) noexcept;
 
-    void SetTextureFolder(String textureFolder) {
+    void SetTextureFolder(String textureFolder) noexcept {
         m_textureFolder = textureFolder;
+    }
+
+    String& GetTextureFolder(String& textureFolder) noexcept {
+        if (textureFolder.Length() == 0) 
+            textureFolder = m_textureFolder;
+        return textureFolder;
     }
 
     template <typename T>

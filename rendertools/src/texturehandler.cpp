@@ -26,8 +26,7 @@ bool TextureHandler::Remove(Texture* texture) {
 
 
 TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, bool premultiply) {
-    if (textureFolder == "")
-        textureFolder = m_textureFolder;
+    GetTextureFolder(textureFolder);
     TextureList textures;
     for (auto& n : textureNames) {
         Texture* t = getTexture();
