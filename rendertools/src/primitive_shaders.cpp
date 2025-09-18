@@ -230,8 +230,6 @@ const ShaderSource& RectangleShader() {
             uniform float radius;      // corner radius in pixels (0.0 = sharp)
             uniform bool  antialias;
 
-            out vec4 fragColor;
-
             float sdRoundRect(vec2 p, vec2 c, vec2 halfSize, float r) {
                 vec2 q = abs(p - c) - (halfSize - vec2(r));
                 return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
