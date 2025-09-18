@@ -210,4 +210,45 @@ const ShaderSource& CircleMaskShader() {
     return source;
 }
 
+
+// render a b/w mask with color applied.
+const ShaderSource& RectangleShader() {
+    static const ShaderSource source(
+        "rectangleShader",
+        Standard2DVS(),
+        R"(
+            #version 330 core
+            
+            in vec2 fragCoord;         // [0..viewportSize]
+            out vec4 fragColor;
+
+            uniform vec2 viewportSize;
+            uniform vec4 surfaceColor;
+            uniform vec2 center;      // pixel center (x,y)
+            uniform vec2 size;       // uv width and height
+            uniform float strength;    // line thickness in pixels
+            uniform float radius;      // corner radius in pixels (0.0 = sharp)
+            uniform bool  antialias;
+
+            out vec4 fragColor;
+
+            float sdRoundRect(vec2 p, vec2 c, vec2 halfSize, float r) {
+                vec2 q = abs(p - c) - (halfSize - vec2(r));
+                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
+            }
+
+            void main() {
+                vec2 uv = fragCoord.xy / viewportSize;
+                vec2 halfSize = size * 0.5;
+                float r = clamp(radius, 0.0, min(halfSize.x, halfSize.y));
+                float sd = sdRoundRect(uv, center.xy, halfSize, r);
+                float band = 0.5 * strength;
+                float aaw = antialias ? fwidth(sd) : 0.0;
+                float alpha = 1.0 - smoothstep(band, band + aaw, abs(sd));
+                fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+            }
+        )");
+    return source;
+}
+
 // =================================================================================================

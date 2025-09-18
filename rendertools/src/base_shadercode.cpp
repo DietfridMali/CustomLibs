@@ -10,6 +10,7 @@ const ShaderSource& LineShader();
 const ShaderSource& RingShader();
 const ShaderSource& CircleShader();
 const ShaderSource& CircleMaskShader();
+const ShaderSource& RectangleShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
 const ShaderSource& MovingTextureShader();
@@ -30,6 +31,7 @@ BaseShaderCode::BaseShaderCode() {
         &RingShader(),
         &CircleShader(),
         &CircleMaskShader(),
+        &RectangleShader(),
         &PlainColorShader(),
         &PlainTextureShader(),
         &MovingTextureShader(),
