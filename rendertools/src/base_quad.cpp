@@ -65,7 +65,7 @@ noexcept
 }
 
 
-void BaseQuad::CreateTexCoords(void) {
+void BaseQuad::UpdateTexCoords(void) {
     if (m_texCoordBuffer.AppDataLength() > 0) {
         for (auto& tc : m_texCoordBuffer.AppData())
             m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
@@ -93,7 +93,7 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
         m_texCoordBuffer.Setup();
         m_texCoordBuffer.SetDirty(true);
     }
-    CreateTexCoords();
+    UpdateTexCoords();
 
     if (not CreateVAO(privateVAO))
         return false;

@@ -87,8 +87,6 @@ public:
 
     virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false);
 
-    bool CreateVAO(bool privateVAO);
-
     BaseQuad& Copy(const BaseQuad& other);
 
     BaseQuad& Move(BaseQuad& other)
@@ -104,8 +102,6 @@ public:
 
     void Destroy(void)
         noexcept;
-
-    void CreateTexCoords(void);
 
     inline VAO& GetVAO(void) {
         return *m_vao;
@@ -162,6 +158,10 @@ public:
     }
 
     protected:
+        bool CreateVAO(bool privateVAO);
+
+        void UpdateTexCoords(void);
+
         void UpdateTransformation(void);
 
         void ResetTransformation(void);
