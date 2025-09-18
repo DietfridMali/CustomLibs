@@ -57,9 +57,11 @@ public:
 
     void Render(String text, eTextAlignments alignment = taLeft, int flipVertically = 0, int renderAreaWidth = 0, int renderAreaHeight = 0, bool useFBO = true);
 
-    inline void SetFont(FontHandler* font) noexcept {
-        if (m_font = font)
+    inline FontHandler* SetFont(FontHandler * font) noexcept {
+        FontHandler* currentFont = m_font;
+        if ((m_font = font))
             m_mesh.SetupTexture(m_font->GetTexture());
+        return currentFont;
     }
 
     inline FontHandler* GetFont(void) noexcept {

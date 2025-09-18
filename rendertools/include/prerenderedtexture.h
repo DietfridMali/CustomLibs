@@ -28,6 +28,10 @@ public:
     { }
 
 
+    FBO& GetFBO(void) noexcept {
+        return m_fbo;
+    }
+
     void SetViewport(Viewport& viewport) noexcept {
         m_viewport = viewport;
     }
