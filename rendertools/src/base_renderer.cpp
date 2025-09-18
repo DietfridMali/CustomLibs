@@ -41,9 +41,8 @@ void BaseRenderer::Init(int width, int height, float fov) {
     if (not testTexture->CreateFromFile(fileName, true)) {
         delete testTexture;
         testTexture = nullptr;
-#endif
     }
-
+#endif
 }
 
 
