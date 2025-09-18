@@ -301,7 +301,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 
 void BaseRenderer::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
     baseRenderer.PushMatrix();
-    baseRenderer.Translate(0.5, 0.5, 0.0);
+    baseRenderer.Translate(0.5f, 0.5f, 0.0f);
     if (shader)
         shader->UpdateMatrices();
     m_renderQuad.Render(shader, texture, color);
@@ -311,7 +311,7 @@ void BaseRenderer::Render(Shader* shader, Texture* texture, const RGBAColor& col
 
 void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     baseRenderer.PushMatrix();
-    baseRenderer.Translate(0.5, 0.5, 0.0);
+    baseRenderer.Translate(0.5f, 0.5f, 0.0f);
     baseRenderer.Scale(scale, scale, 1);
     m_renderQuad.Fill(color);
     baseRenderer.PopMatrix();
