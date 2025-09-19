@@ -170,7 +170,7 @@ struct FontHandler::TextDimensions FontHandler::TextSize(String text) {
     TextDimensions d;
     for (auto glyph : text) {
         GlyphInfo* info = FindGlyph(String(glyph));
-        if (info->index < 0) {
+        if ((info == nullptr) or (info->index < 0)) {
             fprintf(stderr, "texture '%c' not found\r\n", glyph);
             return TextDimensions();
         }

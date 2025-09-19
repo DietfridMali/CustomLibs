@@ -156,7 +156,7 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
         xOffset = -0.5f;
         break;
     case taRight:
-        xOffset = 1.0f - xOffset * 2;
+        xOffset = -0.5f + xOffset * 0.5f;
         break;
     case taCenter:
     default:
