@@ -41,10 +41,10 @@ private:
     int                         m_fontSize;
     String                      m_euroChar;
     String                      m_glyphs;
-    bool                        m_isAvailable;
     RGBAColor                   m_color;
     struct GlyphSize            m_maxGlyphSize;
     VAO                         m_vao;
+    bool                        m_isAvailable;
 
     AVLTree<String, GlyphInfo>  m_glyphDict;
     TextureAtlas                m_atlas;
@@ -80,12 +80,20 @@ public:
         return m_atlas.GetTexture();
     }
 
+    inline const String& GetGlyphs(void) const noexcept {
+        return m_glyphs;
+    }
+
+    inline bool IsAvailable(void) noexcept {
+        return m_isAvailable;
+    }
+
     struct TextDimensions TextSize(String text);
 
 private:
     Shader* LoadShader(void);
 
-    bool InitFont(String fontFolder, String fontName, int fontSize);
+    bool InitFont(String fontFolder, String fontName, int fontSize, String glyphs);
 
     bool CreateTexture(const char* szChar, char key, int index);
 

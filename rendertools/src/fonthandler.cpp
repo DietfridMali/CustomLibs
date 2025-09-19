@@ -25,7 +25,7 @@ int FontHandler::CompareTextures(void* context, const char& key1, const char& ke
 
 
 FontHandler::FontHandler()
-    : m_font(nullptr), m_fontName(""), m_fontSize(0)
+    : m_font(nullptr), m_fontName(""), m_fontSize(0), m_glyphs(""), m_isAvailable(false)
 {
 #ifdef _WIN32
     m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
@@ -49,11 +49,11 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
     if (info) {
         info->glyphSize.width = info->texture->GetWidth();
         info->glyphSize.height = info->texture->GetHeight();
-        m_atlas.Add(info->texture, info->index);
         info->atlasPosition = m_atlas.GlyphOffset(info->index);
-        Vector2f scale = m_atlas.GlyphScale();
+        Vector2f scale = Vector2f(float(info->glyphSize.width) / float(m_maxGlyphSize.width), float(info->glyphSize.height) / float(m_maxGlyphSize.height));
         // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
-        info->atlasSize = { float(info->glyphSize.width) / float(m_maxGlyphSize.width) * scale.X(), float(info->glyphSize.height) / float(m_maxGlyphSize.height) * scale.Y() };
+        info->atlasSize = scale * m_atlas.GlyphScale();
+        m_atlas.Add(info->texture, info->index, scale);
 #if 1 //def NDEBUG
         delete info->texture;
         info->texture = nullptr;
@@ -89,7 +89,7 @@ bool FontHandler::InitTTF(void) {
 }
 
 
-bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize) {
+bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, String glyphs) {
     if (not InitTTF())
         return false;
 
@@ -101,10 +101,13 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize) {
     }
 
     String fontFile = fontFolder + fontName;
-    if (not (m_font = TTF_OpenFont(fontFile.Data(), m_fontSize))) {
+    if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
         fprintf(stderr, "Cannot load font '%s'\n", (char*) fontName);
         return false;
     }
+    SDL_Log("family=%s style=%s",
+        TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
+    m_glyphs = glyphs;
     m_fontName = fontName;
     m_fontSize = fontSize;
     return true;
@@ -112,8 +115,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize) {
 
 
 bool FontHandler::Create(String fontFolder, String fontName, int fontSize, String glyphs) {
-    m_glyphs = glyphs;
-    m_isAvailable = InitFont(fontFolder, fontName, fontSize) and CreateAtlas();
+    m_isAvailable = InitFont(fontFolder, fontName, fontSize, glyphs) and CreateAtlas();
     return m_isAvailable;
 }
 
@@ -134,6 +136,7 @@ bool FontHandler::CreateTexture(const char* szChar, char key, int index)
         }
     info.texture->Deploy();
     m_glyphDict.Insert(String(key), info);
+    info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());
     m_maxGlyphSize.width = std::max(m_maxGlyphSize.width, info.texture->GetWidth());
     m_maxGlyphSize.height = std::max(m_maxGlyphSize.height, info.texture->GetHeight());
     return true;

@@ -56,7 +56,7 @@ bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
 }
 
 
-bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
+bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	if (not m_atlas)
 		return false;
 	bool enableLocally = not m_atlas->IsEnabled();
@@ -81,7 +81,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
 	l = x * w;
 	t = y * h;
 #endif
-	baseRenderer.SetViewport(Viewport(l, t, w, h), 0, 0, true, true);
+	baseRenderer.SetViewport(Viewport(l, t, int(roundf(scale.X() * w)), int(roundf(scale.Y() * h))), 0, 0, true, true);
 	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White); // , GlyphOffset(glyphIndex), m_scale);
 	if (shader) {
 		float c = float(glyphIndex) / float(m_size.GetSize());

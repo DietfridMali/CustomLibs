@@ -74,7 +74,7 @@ public:
 
 	bool RenderGrayscale(int glyphIndex, float brightness = 1.0f);
 
-	bool Add(Texture* glyph, int glyphIndex);
+	bool Add(Texture* glyph, int glyphIndex, Vector2f& scale);
 
 	Texture* GetTexture(void) noexcept {
 		return m_atlas ? m_atlas->GetTexture() : nullptr;
@@ -108,6 +108,10 @@ public:
 
 	inline FBO* GetFBO(void) noexcept {
 		return m_atlas;
+	}
+
+	inline bool IsAvailable(void) noexcept {
+		return m_atlas != nullptr;
 	}
 };
 
