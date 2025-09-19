@@ -24,7 +24,8 @@ int FontHandler::CompareTextures(void* context, const char& key1, const char& ke
 }
 
 
-FontHandler::FontHandler(int fontSize)
+FontHandler::FontHandler()
+    : m_font(nullptr), m_fontName(""), m_fontSize(0)
 {
 #ifdef _WIN32
     m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
@@ -33,7 +34,6 @@ FontHandler::FontHandler(int fontSize)
     m_euroChar = "\u20AC";
 #endif
     m_glyphDict.SetComparator(String::Compare); //FontHandler::CompareTextures);
-    m_fontSize = fontSize;
 }
 
 
@@ -78,27 +78,42 @@ int FontHandler::BuildAtlas(void) {
 }
 
 
-bool FontHandler::InitFont(String fontFolder, String fontName) {
-    static bool initTTF = true;
-    if (initTTF) {
-        if (0 > TTF_Init()) {
+bool FontHandler::InitTTF(void) {
+    static int haveTTF = 0;
+    if (not haveTTF) {
+        haveTTF = (0 > TTF_Init()) ? -1 : 1;
+        if (haveTTF < 0) 
             fprintf(stderr, "Cannot initialize font system\n");
-            return false;
-        }
-        initTTF = false;
     }
+    return haveTTF > 0;
+}
+
+
+bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize) {
+    if (not InitTTF())
+        return false;
+
+    if (m_font) {
+        if ((fontName == fontName) and (fontSize == m_fontSize))
+            return true;
+        TTF_CloseFont(m_font);
+        m_font = nullptr;
+    }
+
     String fontFile = fontFolder + fontName;
     if (not (m_font = TTF_OpenFont(fontFile.Data(), m_fontSize))) {
         fprintf(stderr, "Cannot load font '%s'\n", (char*) fontName);
         return false;
     }
+    m_fontName = fontName;
+    m_fontSize = fontSize;
     return true;
 }
 
 
-bool FontHandler::Create(String fontFolder, String fontName, String glyphs) {
+bool FontHandler::Create(String fontFolder, String fontName, int fontSize, String glyphs) {
     m_glyphs = glyphs;
-    m_isAvailable = InitFont(fontFolder, fontName) and CreateAtlas();
+    m_isAvailable = InitFont(fontFolder, fontName, fontSize) and CreateAtlas();
     return m_isAvailable;
 }
 
@@ -164,6 +179,17 @@ struct FontHandler::TextDimensions FontHandler::TextSize(String text) {
             d.height = th;
         }
     return d.Update();
+}
+
+
+void FontHandler::Destroy(void) {
+    m_atlas.Destroy();
+    if (m_font) {
+        TTF_CloseFont(m_font);
+        m_font = nullptr;
+        m_fontName = "";
+        m_fontSize = 0;
+    }
 }
 
 

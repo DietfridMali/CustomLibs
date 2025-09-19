@@ -37,6 +37,7 @@ public:
 
 private:
     TTF_Font*                   m_font;
+    String                      m_fontName;
     int                         m_fontSize;
     String                      m_euroChar;
     String                      m_glyphs;
@@ -51,13 +52,17 @@ private:
 public:
     static int CompareTextures(void* context, const char& key1, const char& key2);
 
-    FontHandler(int fontSize = 128);
+    FontHandler();
 
-    void SetFontSize(int fontSize) noexcept {
-        m_fontSize = fontSize;
+    ~FontHandler() {
+        Destroy();
     }
 
-    bool Create(String fontFolder, String fontName, String glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-=.,*/: _?!%");
+    void Destroy(void);
+
+    bool InitTTF(void);
+
+    bool Create(String fontFolder, String fontName, int fontSize = 127, String glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-=.,*/: _?!%");
 
     inline GlyphInfo* FindGlyph(String key) {
         return m_glyphDict.Find(key);
@@ -67,7 +72,7 @@ public:
         return m_atlas;
     }
 
-    inline FBO& GetFBO(void) noexcept {
+    inline FBO* GetFBO(void) noexcept {
         return m_atlas.GetFBO();
     }
 
@@ -80,7 +85,7 @@ public:
 private:
     Shader* LoadShader(void);
 
-    bool InitFont(String fontFolder, String fontName);
+    bool InitFont(String fontFolder, String fontName, int fontSize);
 
     bool CreateTexture(const char* szChar, char key, int index);
 

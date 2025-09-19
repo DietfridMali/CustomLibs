@@ -9,7 +9,9 @@ BaseQuad TextureAtlas::renderQuad;
 
 TextureAtlas::TextureAtlas()
 	: m_size(0), m_glyphSize(0), m_scale(Vector2f::ONE)
-{ }
+{
+	m_atlas = new FBO();
+}
 
 
 void TextureAtlas::Initialize(void) {
@@ -19,15 +21,17 @@ void TextureAtlas::Initialize(void) {
 
 // condition: all glyphs must fit into glyphWidth, glyphHeight - that's the grid they will be rendered into
 bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale) {
+	if (not m_atlas)
+		return false;
 	m_glyphSize = glyphSize;
 	m_size.SetCols(int(ceil(sqrtf(float(glyphCount) / glyphSize.aspectRatio))));
 	m_size.SetRows(int(ceil(float(glyphCount) / float(m_size.GetCols()))));
-	if (not m_atlas.Create(m_size.GetCols() * glyphSize.width, m_size.GetRows() * glyphSize.height, scale, { .name = name })) {
-		m_atlas.Destroy();
+	if (not m_atlas->Create(m_size.GetCols() * glyphSize.width, m_size.GetRows() * glyphSize.height, scale, { .name = name })) {
+		m_atlas->Destroy();
 		return false;
 	}
 	m_scale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
-	GetTexture()->m_handle = m_atlas.BufferHandle(0);
+	GetTexture()->m_handle = m_atlas->BufferHandle(0);
 	GetTexture()->HasBuffer() = true;
 	GetTexture()->SetParams(true);
 	return true;
@@ -35,9 +39,9 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 
 
 bool TextureAtlas::Render(Shader* shader) {
-	if (not shader)
+	if (not (m_atlas and shader))
 		return false;
-	m_atlas.Render({ .clearBuffer = false, .centerOrigin = true, .shader = shader });
+	m_atlas->Render({ .clearBuffer = false, .centerOrigin = true, .shader = shader });
 	return true;
 }
 
@@ -53,23 +57,25 @@ bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
 
 
 bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
-	bool enableLocally = not m_atlas.IsEnabled();
+	if (not m_atlas)
+		return false;
+	bool enableLocally = not m_atlas->IsEnabled();
 	if (enableLocally) {
 		baseRenderer.PushViewport();
-		m_atlas.Enable();
+		m_atlas->Enable();
 	}
 	int x = m_size.Col(glyphIndex);
 	int y = m_size.Row(glyphIndex);
 	int l, t, w, h;
 #if 0
 	Vector2f offset{ GlyphOffset(glyphIndex) };
-	Vector2f size{ float(m_atlas.GetWidth(true)), float(m_atlas.GetHeight(true)) };
+	Vector2f size{ float(m_atlas->GetWidth(true)), float(m_atlas->GetHeight(true)) };
 	l = int(roundf(offset.X() * size.X()));
 	t = int(roundf(offset.Y() * size.Y()));
 	w = int(roundf(m_scale.X() * size.X()));
 	h = int(roundf(m_scale.Y() * size.Y()));
 #else
-	int s = m_atlas.GetScale();
+	int s = m_atlas->GetScale();
 	w = m_glyphSize.width * s;
 	h = m_glyphSize.height * s;
 	l = x * w;
@@ -88,7 +94,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex) {
 	}
 
 	if (enableLocally) {
-		m_atlas.Disable();
+		m_atlas->Disable();
 		baseRenderer.PopViewport();
 	}
 	return shader != nullptr;

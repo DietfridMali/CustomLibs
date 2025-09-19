@@ -36,7 +36,7 @@ public:
 	};
 
 protected:
-	FBO			m_atlas;
+	FBO*		m_atlas;
 	TableSize	m_size;
 	GlyphSize	m_glyphSize;
 	Vector2f	m_scale;
@@ -47,6 +47,11 @@ public:
 	TextureAtlas();
 
 	~TextureAtlas() = default;
+
+	void Destroy(void) {
+		delete m_atlas;
+		m_atlas = nullptr;
+	}
 
 	void Initialize(void);
 
@@ -72,19 +77,21 @@ public:
 	bool Add(Texture* glyph, int glyphIndex);
 
 	Texture* GetTexture(void) noexcept {
-		return m_atlas.GetTexture();
+		return m_atlas ? m_atlas->GetTexture() : nullptr;
 	}
 
 	inline bool Enable(void) {
-		return m_atlas.Enable();
+		return m_atlas ? m_atlas->Enable() : false;
 	}
 
 	inline void Disable(void) {
-		m_atlas.Disable();
+		if (m_atlas)
+			m_atlas->Disable();
 	}
 
 	inline void SetViewport(void) {
-		m_atlas.SetViewport();
+		if (m_atlas)
+			m_atlas->SetViewport();
 	}
 
 	inline TableSize& Size(void) {
@@ -92,14 +99,14 @@ public:
 	}
 	 
 	inline int GetWidth(bool scaled = false) noexcept {
-		return m_atlas.GetWidth(scaled);
+		return m_atlas ? m_atlas->GetWidth(scaled) : 0;
 	}
 
 	inline int GetHeight(bool scaled = false) noexcept {
-		return m_atlas.GetHeight(scaled);
+		return m_atlas ? m_atlas->GetHeight(scaled) : 0;
 	}
 
-	inline FBO& GetFBO(void) noexcept {
+	inline FBO* GetFBO(void) noexcept {
 		return m_atlas;
 	}
 };
