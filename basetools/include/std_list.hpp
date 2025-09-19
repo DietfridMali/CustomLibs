@@ -277,11 +277,13 @@ public:
 
     // ----------------------------------------------------------
 
-    inline int32_t Length() const { return static_cast<int32_t>(m_list.size()); }
+    inline int32_t Length(void) const { return static_cast<int32_t>(m_list.size()); }
 
-    inline bool IsEmpty() const { return m_list.empty(); }
+    inline bool IsEmpty(void) const { return m_list.empty(); }
 
-    inline void Clear() { m_list.clear(); }
+    inline void Clear(void) { m_list.clear(); }
+
+    inline void Reset(void) { Clear(); }
 
     inline ItemType& First(void) {  return m_list.front(); }
 
