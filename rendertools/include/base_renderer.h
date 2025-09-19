@@ -20,8 +20,8 @@
 // basic renderer class. Initializes display and OpenGL and sets up projections and view matrix
 
 class BaseRenderer
-    : public RenderMatrices
-    , public DrawBufferHandler
+    : public DrawBufferHandler
+    , public RenderMatrices
     , public PolymorphSingleton<BaseRenderer>
 {
 public:
@@ -67,10 +67,18 @@ public:
     GLVersion               m_glVersion;
 
     BaseRenderer()
-        : m_screenBuffer(nullptr), m_sceneBuffer(nullptr)
-        , m_windowWidth(0), m_windowHeight(0), m_sceneWidth(0), m_sceneHeight(0), m_sceneLeft(0), m_sceneTop(0), m_aspectRatio(1.0f)
+        : m_screenBuffer(nullptr)
+        , m_sceneBuffer(nullptr)
+        , m_windowWidth(0)
+        , m_windowHeight(0)
+        , m_sceneWidth(0)
+        , m_sceneHeight(0)
+        , m_sceneLeft(0)
+        , m_sceneTop(0)
+        , m_aspectRatio(1.0f)
         , m_renderPass(RenderPasses::rpColor)
-        , m_ndcScale(Vector2f::ONE), m_ndcBias(Vector2f::ONE)
+        , m_ndcScale(Vector2f::ONE)
+        , m_ndcBias(Vector2f::ONE)
         , m_backgroundColor(ColorData::Black)
         , m_screenIsAvailable(false)
     {

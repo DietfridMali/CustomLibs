@@ -8,32 +8,25 @@
 
 // =================================================================================================
 
-#define FIXED_RENDER_PIPELINE 1
-
-class RenderMatrices {
+class MatrixStack {
 public:
-    typedef enum {
+    enum class MatrixType {
         mtModelView,
         mtProjection,
         mtProjection2D,
         mtProjection3D,
         mtProjectionFx,
         mtCount
-    } eMatrixType;
+    };
 
-    Projection  m_projection;
-    Matrix4f    m_renderMatrices[mtCount]; // matrices are row major - let OpenGL transpose them when passing them with glUniformMatrix4fv
-    Matrix4f    m_glProjection[3];
-    Matrix4f    m_glModelView[3];
+    using enum MatrixType;
 
-    static List<Matrix4f> matrixStack;
-    static bool           LegacyMode;
+    Projection      m_projection;
+    Matrix4f        m_transformations[int(mtCount)]; // matrices are row major - let OpenGL transpose them when passing them with glUniformMatrix4fv
+    Matrix4f        m_glProjection[3];
+    Matrix4f        m_glModelView[3];
 
-    RenderMatrices() noexcept {}
-
-
-    void CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov);
-
+    List<Matrix4f>  m_stack;
 
     inline float ZNear(void) noexcept {
         return m_projection.ZNear();
@@ -56,22 +49,142 @@ public:
 
 
     inline Matrix4f& ModelView(void) noexcept {
-        return m_renderMatrices[mtModelView];
+        return m_transformations[int(mtModelView)];
     }
 
 
     inline Matrix4f& Projection(void) noexcept {
-        return m_renderMatrices[mtProjection];
+        return m_transformations[int(mtProjection)];
+    }
+
+
+    inline Matrix4f& Projection2D(void) noexcept {
+        return m_transformations[int(mtProjection2D)];
+    }
+
+
+    inline Matrix4f& Projection3D(void) noexcept {
+        return m_transformations[int(mtProjection3D)];
     }
 
 
     inline Matrix4f& FxProjection(void) noexcept {
-        return m_renderMatrices[mtProjectionFx];
+        return m_transformations[int(mtProjectionFx)];
     }
 
 
     inline GLfloat* ProjectionMatrix(void) noexcept {
-        return (GLfloat*)m_renderMatrices[mtProjection].AsArray();
+        return (GLfloat*)m_transformations[int(mtProjection)].AsArray();
+    }
+
+
+    Matrix4f* Transformations(void) noexcept {
+        return m_transformations;
+    }
+
+    Matrix4f& Transformation(MatrixType matrixType) noexcept {
+        return m_transformations [int(matrixType)];
+    }
+
+    ::Projection& GetProjection(void) noexcept {
+        return m_projection;
+    }
+
+
+    void Push(Matrix4f& m) {
+        m_stack.Append(m);
+    }
+
+
+    Matrix4f& Pop(Matrix4f& m) {
+        m_stack.Pop(m);
+        return m;
+    }
+
+
+    void Push(MatrixType matrixType) {
+        Push(m_transformations[int(matrixType)]);
+    }
+
+
+    Matrix4f Pop(MatrixType matrixType) {
+        return Pop(m_transformations[int(matrixType)]);
+    }
+};
+
+// =================================================================================================
+
+class RenderMatrices {
+public:
+    ManagedArray<MatrixStack>   m_matrices;
+    int                         m_activeStack;
+
+    static bool                 LegacyMode;
+
+    using MatrixType = MatrixStack::MatrixType;
+    using enum MatrixStack::MatrixType;
+
+    RenderMatrices()
+        : m_activeStack(0)
+    {
+        m_matrices.Resize(1);
+    }
+
+
+    void CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov);
+
+    MatrixStack& Matrices(void) {
+        return m_matrices[m_activeStack];
+    }
+
+
+    inline float ZNear(void) noexcept {
+        return Matrices().ZNear();
+    }
+
+
+    inline float ZFar(void) noexcept {
+        return Matrices().ZFar();
+    }
+
+
+    inline float FoV(void) noexcept {
+        return Matrices().FoV();
+    }
+
+
+    inline float AspectRatio(void) noexcept {
+        return Matrices().AspectRatio();
+    }
+
+
+    inline Matrix4f& ModelView(void) noexcept {
+        return Matrices().ModelView();
+    }
+
+
+    inline Matrix4f& Projection(void) noexcept {
+        return Matrices().Projection();
+    }
+
+
+    inline Matrix4f& Projection2D(void) noexcept {
+        return Matrices().Projection2D();
+    }
+
+
+    inline Matrix4f& Projection3D(void) noexcept {
+        return Matrices().Projection3D();
+    }
+
+
+    inline Matrix4f& FxProjection(void) noexcept {
+        return Matrices().FxProjection();
+    }
+
+
+    inline GLfloat* ProjectionMatrix(void) noexcept {
+        return (GLfloat*)Matrices().Projection().AsArray();
     }
 
     // setup 3D transformation and projection
@@ -82,8 +195,8 @@ public:
 
 
     template<typename T>
-    void SetMatrix(T&& m, eMatrixType matrixType = mtModelView) noexcept {
-        if (matrixType == mtModelView) {
+    void SetMatrix(T&& m, MatrixStack::MatrixType matrixType = mtModelView) noexcept {
+        if (matrixType == MatrixStack::mtModelView) {
             ModelView() = std::forward<T>(m);
             glMatrixMode(GL_MODELVIEW);
             glLoadMatrixf(std::forward<T>(m).Transpose().AsArray());
@@ -96,10 +209,10 @@ public:
     }
 
 
-    void PushMatrix(eMatrixType matrixType = mtModelView);
+    void PushMatrix(MatrixType matrixType = mtModelView);
 
 
-    void PopMatrix(eMatrixType matrixType = mtModelView);
+    void PopMatrix(MatrixType matrixType = mtModelView);
 
 
     bool CheckModelView(void) noexcept;
@@ -142,17 +255,15 @@ public:
         return static_cast<Vector3f>(Projection() * (ModelView() * static_cast<Vector4f>(v)));
     }
 
-
-    static void PushMatrix(Matrix4f& m) {
-        matrixStack.Append(m);
+    void PushMatrix(Matrix4f& m) {
+        Matrices().Push(m);
     }
 
 
-    static Matrix4f& PopMatrix(Matrix4f& m) {
-        matrixStack.Pop(m);
+    Matrix4f& PopMatrix(Matrix4f& m) {
+        Matrices().Pop(m);
         return m;
     }
-
 
     void UpdateLegacyMatrices(void) noexcept;
 };

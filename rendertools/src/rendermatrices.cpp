@@ -9,29 +9,29 @@ bool RenderMatrices::LegacyMode = false;
 bool RenderMatrices::LegacyMode = false;
 #endif
 
-List<Matrix4f> RenderMatrices::matrixStack;
-
 #ifdef _DEBUG
 #   define  LOG_MATRIX_OPERATIONS 0
 #else
 #   define  LOG_MATRIX_OPERATIONS 0
 #endif
 
+using enum MatrixStack::MatrixType;
+
 // =================================================================================================
 
 void RenderMatrices::CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov) {
-    m_renderMatrices[mtModelView] = Matrix4f::IDENTITY;
-    m_renderMatrices[mtProjection2D] = m_projection.ComputeOrthoProjection(0.0f, float(windowWidth), 0.0f, float(windowHeight), -1.0f, 1.0f);
-    m_renderMatrices[mtProjection2D].AsArray();
-    m_renderMatrices[mtProjection3D] = m_projection.Create(aspectRatio, fov, true);
-    m_renderMatrices[mtProjection3D].AsArray();
+    ModelView() = Matrix4f::IDENTITY;
+    Projection2D() = Matrices().GetProjection().ComputeOrthoProjection(0.0f, float(windowWidth), 0.0f, float(windowHeight), -1.0f, 1.0f);
+    Projection2D().AsArray();
+    Projection3D() = Matrices().GetProjection().Create(aspectRatio, fov, true);
+    Projection3D().AsArray();
 }
 
 
 void RenderMatrices::SetupTransformation(void) noexcept {
     if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode(GL_PROJECTION);
-        glLoadMatrixf(m_renderMatrices[mtProjection3D].AsArray()); // already column major
+        glLoadMatrixf(Projection3D().AsArray()); // already column major
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
     }
@@ -39,8 +39,8 @@ void RenderMatrices::SetupTransformation(void) noexcept {
     else
 #endif
     {
-        m_renderMatrices[mtModelView] = Matrix4f::IDENTITY;
-        m_renderMatrices[mtProjection] = m_renderMatrices[mtProjection3D];
+        ModelView() = Matrix4f::IDENTITY;
+        Projection() = Projection3D();
     }
 }
 
@@ -60,8 +60,8 @@ void RenderMatrices::ResetTransformation(void) noexcept {
     else
 #endif
     {
-        m_renderMatrices[mtModelView] = Matrix4f::IDENTITY;
-        m_renderMatrices[mtProjection] = m_renderMatrices[mtProjection2D];
+        ModelView() = Matrix4f::IDENTITY;
+        Projection() = Projection2D();
     }
 }
 
@@ -213,7 +213,7 @@ Matrix4f& RenderMatrices::Rotate(Vector3f angles) noexcept {
 }
 
 
-void RenderMatrices::PushMatrix(eMatrixType matrixType) {
+void RenderMatrices::PushMatrix(MatrixType matrixType) {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "PushMatrix\n");
 #endif
@@ -225,12 +225,12 @@ void RenderMatrices::PushMatrix(eMatrixType matrixType) {
     else
 #endif
     {
-        PushMatrix(m_renderMatrices[matrixType]);
+        Matrices().Push(matrixType);
     }
 }
 
 
-void RenderMatrices::PopMatrix(eMatrixType matrixType) {
+void RenderMatrices::PopMatrix(MatrixType matrixType) {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "PopMatrix\n");
 #endif
@@ -242,9 +242,9 @@ void RenderMatrices::PopMatrix(eMatrixType matrixType) {
     else
 #endif
     {
-        PopMatrix(m_renderMatrices[matrixType]);
+        Matrices().Pop(matrixType);
 #ifdef _DEBUG
-        m_renderMatrices[matrixType].AsArray();
+        Matrices().Transformation(matrixType).AsArray();
 #endif
     }
 }
