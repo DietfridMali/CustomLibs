@@ -27,7 +27,7 @@ void BaseRenderer::Init(int width, int height, float fov) {
     m_windowWidth = width; // (width > height) ? width : height;
     m_sceneHeight =
     m_windowHeight = height; // (height > width) ? width : height;
-    m_sceneViewport = Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
+    m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight); // just for code clarity
     SetupDrawBuffers();
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov);
