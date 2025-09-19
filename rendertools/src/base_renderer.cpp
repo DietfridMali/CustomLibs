@@ -24,10 +24,10 @@ static Texture* testTexture = nullptr;
 
 void BaseRenderer::Init(int width, int height, float fov) {
     m_sceneWidth =
-        m_windowWidth = width; // (width > height) ? width : height;
+    m_windowWidth = width; // (width > height) ? width : height;
     m_sceneHeight =
-        m_windowHeight = height; // (height > width) ? width : height;
-
+    m_windowHeight = height; // (height > width) ? width : height;
+    m_sceneViewport = Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight); // just for code clarity
     SetupDrawBuffers();
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov);
@@ -187,7 +187,7 @@ void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
         openGLStates.DepthFunc(GL_ALWAYS);
         openGLStates.SetFaceCulling(0);
-        SetViewport(::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight), 0, 0, false);
+        SetViewport(m_sceneViewport, 0, 0, false);
 #if 0
         if (m_sceneBuffer->Enable(true)) {
             RenderToViewport(testTexture, ColorData::White, false, false);

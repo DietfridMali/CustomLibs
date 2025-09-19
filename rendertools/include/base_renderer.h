@@ -43,6 +43,7 @@ protected:
     bool                    m_screenIsAvailable;
 
     Viewport                m_viewport;
+    Viewport                m_sceneViewport;
     Vector2f                m_ndcScale;
     Vector2f                m_ndcBias;
     BaseQuad                m_renderQuad;
@@ -124,6 +125,14 @@ public:
     virtual bool UsePostEffectShader(void) { return false; }
 
     virtual Shader* LoadPostEffectShader(void) { return nullptr; }
+
+    inline void SetSceneViewport(Viewport viewport) noexcept {
+        m_sceneViewport = viewport;
+    }
+
+    inline Viewport GetSceneViewport(void) noexcept {
+        return m_sceneViewport;
+    }
 
     virtual void Draw3DScene(void);
 
