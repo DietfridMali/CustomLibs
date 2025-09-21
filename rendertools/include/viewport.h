@@ -78,6 +78,14 @@ public:
 
     void BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 
+    Viewport Move(int dx, int dy) {
+        m_left += dx;
+        m_right += dx;
+        m_top += dy;
+        m_bottom += dy;
+        return *this;
+    }
+
 };
 
 // =================================================================================================
