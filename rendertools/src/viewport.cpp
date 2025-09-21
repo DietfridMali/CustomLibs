@@ -22,6 +22,8 @@ Viewport Viewport::Resize(int deltaLeft, int deltaTop, int deltaWidth, int delta
 
 
 Viewport Viewport::Resize(float scale) const {
+    if (scale == 1.0f)
+        return *this;
     int w = int(roundf((float(m_width) * scale)));
     int h = int(roundf((float(m_height) * scale)));
     if (w * h == 0)
