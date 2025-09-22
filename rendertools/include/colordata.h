@@ -86,6 +86,10 @@ public:
     }
 
 
+    inline const bool IsInvisible(void) const noexcept {
+        return R() + B() + G() + A() == 0.0f;
+    }
+
     // Liefert die MULTIPLIKATIVE Skalen-"Farbe" (RGB um 1.0 herum),
 // die aus der Tint-Grundfarbe (*this) berechnet wird.
 // strength ∈ [0,1], keepLuminance = L(scale) auf 1 normieren.
@@ -126,7 +130,7 @@ public:
     inline static const RGBAColor   LightBlue = RGBAColor{ 0.0f, 0.8f, 1.0f, 1 };
     inline static const RGBAColor   MediumBlue = RGBAColor{ 0.0f, 0.5f, 1.0f, 1 };
     inline static const RGBAColor   MediumGreen = RGBAColor{ 0.0f, 1.0f, 0.5f, 1 };
-    inline static const RGBAColor   LightGreen = RGBAColor{ 0.0f, 1.0f, 0.8f, 1 };
+    inline static const RGBAColor   LightGreen = RGBAColor{ 0.0f, 0.8f, 0.1f, 1 };
     inline static const RGBAColor   Magenta = RGBAColor{ 1.0f, 0.0f, 1.0f, 1 };
     inline static const RGBAColor   Purple = RGBAColor{ 0.5f, 0.0f, 0.5f, 1 };
     inline static const RGBAColor   Brown = RGBAColor{ 0.45f, 0.25f, 0.1f, 1 };

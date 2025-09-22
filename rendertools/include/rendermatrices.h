@@ -133,8 +133,21 @@ public:
 
     void CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov);
 
+    inline int SelectMatrixStack(int i) {
+        int current = m_activeStack;
+        if (i < m_matrices.Length())
+            m_activeStack = i;
+        return current;
+    }
+
+
     MatrixStack& Matrices(void) {
         return m_matrices[m_activeStack];
+    }
+
+
+    MatrixStack& AddMatrices(void) {
+        return *m_matrices.Append();
     }
 
 

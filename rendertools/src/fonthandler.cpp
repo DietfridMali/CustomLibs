@@ -105,8 +105,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
         fprintf(stderr, "Cannot load font '%s'\n", (char*) fontName);
         return false;
     }
-    SDL_Log("family=%s style=%s",
-        TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
+    //SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
     m_glyphs = glyphs;
     m_fontName = fontName;
     m_fontSize = fontSize;

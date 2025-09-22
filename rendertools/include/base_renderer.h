@@ -95,6 +95,14 @@ public:
 
     bool CreateScreenBuffer(void);
 
+    virtual FBO* GetSceneBuffer(void) noexcept {
+        return m_sceneBuffer;
+    }
+
+    virtual void ActivateSceneViewport(void) noexcept {
+        SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight));
+    }
+
     void SetupOpenGL(void) noexcept;
 
     inline void SetRenderPass(RenderPasses renderPass) noexcept { m_renderPass = renderPass; }

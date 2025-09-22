@@ -138,18 +138,19 @@ void BaseRenderer::StartFullPass(void) noexcept {
 bool BaseRenderer::Start3DScene(void) {
     SetupOpenGL();
     m_frameCounter.Start();
-    if (not (m_sceneBuffer and m_sceneBuffer->IsAvailable()))
+    FBO* sceneBuffer = GetSceneBuffer();
+    if (not (sceneBuffer and sceneBuffer->IsAvailable()))
         return false;
-    ResetDrawBuffers(m_sceneBuffer);
+    ResetDrawBuffers(sceneBuffer);
     SetupTransformation();
-    SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight));
+    SetViewport(m_sceneViewport);
     EnableCamera();
     return true;
 }
 
 
 bool BaseRenderer::Stop3DScene(void) {
-    if (not m_sceneBuffer->IsAvailable())
+    if (not GetSceneBuffer()->IsAvailable())
         return false;
     DisableCamera();
     ResetTransformation();
@@ -189,9 +190,9 @@ void BaseRenderer::Draw3DScene(void) {
         openGLStates.SetFaceCulling(0);
         SetViewport(m_sceneViewport, 0, 0, false);
 #if 0
-        if (m_sceneBuffer->Enable(true)) {
+        if (GetSceneBuffer()->Enable(true)) {
             RenderToViewport(testTexture, ColorData::White, false, false);
-            m_sceneBuffer->Disable();
+            GetSceneBuffer()->Disable();
         }
 #endif
         Shader* shader;
@@ -207,7 +208,7 @@ void BaseRenderer::Draw3DScene(void) {
         if (shader == nullptr) 
             m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 #if 1
-        m_renderTexture.m_handle = m_sceneBuffer->BufferHandle(0);
+        m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
         m_renderQuad.Render(shader, &m_renderTexture);
 #else
         m_renderQuad.Fill(ColorData::Orange);
