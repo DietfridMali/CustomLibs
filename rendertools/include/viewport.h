@@ -83,6 +83,8 @@ public:
         m_right += dx;
         m_top += dy;
         m_bottom += dy;
+        m_center.X() += dx;
+        m_center.Y() += dy;
         return *this;
     }
 
