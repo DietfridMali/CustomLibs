@@ -2,6 +2,7 @@
 #include "glew.h"
 #include "viewport.h"
 #include "base_renderer.h"
+#include "conversions.hpp"
 
 // =================================================================================================
 
@@ -24,13 +25,11 @@ Viewport Viewport::Resize(int deltaLeft, int deltaTop, int deltaWidth, int delta
 Viewport Viewport::Resize(float scale) const {
     if (scale == 1.0f)
         return *this;
-    int w = int(roundf((float(m_width) * scale)));
-    int h = int(roundf((float(m_height) * scale)));
-    if (w * h == 0)
+    float w = float(m_width) * scale;
+    float h = float(m_height) * scale;
+    if (w * h <= Conversions::NumericTolerance)
         return *this;
-    int dw = (m_width - w) / 2;
-    int dh = (m_height - h) / 2;
-    return Viewport(m_left + dw, m_top + dh, w, h);
+    return Viewport(int (round(m_center.X() - w * 0.5f)), int (round(m_center.Y() - h * 0.5f)), int(round(w)), int(round(h)));
 }
 
 
