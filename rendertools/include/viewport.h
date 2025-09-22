@@ -30,7 +30,15 @@ public:
         , m_flipVertically(false)
     { }
 
-    Viewport(Rectangle& r) 
+    Viewport(Vector2i center, int width = 0, int height = 0)
+        : Rectangle(center.x - width / 2, center.y - height / 2, width, height)
+        , m_windowWidth(0)
+        , m_windowHeight(0)
+        , m_center({ float(center.x), float(center.y) })
+        , m_flipVertically(false)
+    { }
+
+    Viewport(Rectangle& r)
         : Rectangle (r.m_left, r.m_top, r.m_width, r.m_height) 
         , m_windowWidth(0)
         , m_windowHeight(0)
