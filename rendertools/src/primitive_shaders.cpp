@@ -217,39 +217,66 @@ const ShaderSource& RectangleShader() {
         "rectangleShader",
         Standard2DVS(),
         R"(
-            #version 330 core
+#version 330 core
 
-            in vec2 fragCoord;         // [0..viewportSize]
-            out vec4 fragColor;
+in vec2 fragCoord;         // UV [0..1]
+out vec4 fragColor;
 
-            uniform vec2 viewportSize;
-            uniform vec4 surfaceColor;
-            uniform vec2 center;      // pixel center (x,y)
-            uniform vec2 size;        // uv width and height
-            uniform float strength;   // line thickness in pixels
-            uniform float radius;     // corner radius in pixels (0.0 = sharp)
-            uniform bool  antialias;
+uniform vec2 viewportSize; // Pixel
+uniform vec4 surfaceColor;
+uniform vec2 center;       // UV
+uniform vec2 size;         // UV, Außenmaß im Sinne von: Rect liegt innerhalb center +/- size  (=> size = Halbgröße)
+uniform float strength;    // relativ zu min(viewportSize)
+uniform float radius;      // relativ zu min(viewportSize)
+uniform bool  antialias;
 
-            float sdRoundRect(vec2 p, vec2 c, vec2 halfSize, float r) {
-                vec2 q = abs(p - c) - (halfSize - vec2(r));
-                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
-            }
+vec2 pxFragCoord;
+vec2 pxCenter;
+vec2 pxSize;
+float pxRadius;
 
-            void main() {
-                vec2 p = fragCoord;                         // Pixelraum
-                vec2 halfSize = size * 0.5 * viewportSize;  // uv -> Pixel
-                float r = clamp(radius, 0.0, min(halfSize.x, halfSize.y));
-                float sd = sdRoundRect(p, center.xy, halfSize, r);
-                float aaw = antialias ? fwidth(sd) : 0.0;
-                float alpha;
-                if (strength <= 0.0)
-                    alpha = 1.0 - smoothstep(0.0, aaw, sd);
-                else {
-                    float band = 0.5 * strength;
-                    alpha = 1.0 - smoothstep(band, band + aaw, abs(sd));
-                }
-                fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
-            }
+// SDF im PIXELRAUM, damit Dicken/Radius pixelgenau und isotrop sind
+float sdRoundRect() {
+    vec2 q = abs(pxFragCoord - pxCenter) - (pxSize - vec2(pxRadius));
+    return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - pxRadius; // <0 innen
+}
+
+void main() {
+    // UV -> Pixel (Zuweisung an die globalen px*-Variablen, nicht neu deklarieren)
+    pxFragCoord = fragCoord * viewportSize;
+    pxCenter    = center    * viewportSize;
+    pxSize      = size      * viewportSize;   // size = Halbgröße, Rect innerhalb center +/- size
+    pxRadius    = clamp(radius * min(viewportSize.x, viewportSize.y), 0.0, min(pxSize.x, pxSize.y));
+
+    // Distanz zur Außenkante in PIXELN
+    float sd  = sdRoundRect();
+    float aaw = antialias ? fwidth(sd) : 0.0;            // ~1 Pixel
+
+    if (strength <= 0.0) {
+        if (sd > aaw) 
+            discard;
+        float alpha = 1.0 - smoothstep(0.0, aaw, sd);
+        fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+    }
+    else {
+        // Strichdicke in PIXELN, bezogen auf min(viewport)
+        float pxStrength = strength * min(viewportSize.x, viewportSize.y);
+        float inner = -pxStrength; // Stroke von sd=0 (Außenkante) bis sd=-pxStrength (nach innen)
+
+        if (sd > aaw)         
+            discard;
+        if (sd < inner - aaw) 
+            discard;
+
+        float alphaOuter = 1.0 - smoothstep(0.0,      aaw, sd);
+        float alphaInner =        smoothstep(inner - aaw, inner, sd);
+        float alpha = min(alphaOuter, alphaInner);
+
+        if (alpha <= 0.0) 
+            discard;
+        fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+    }
+}
         )");
 
     return source;
