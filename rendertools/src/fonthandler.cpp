@@ -76,7 +76,7 @@ int FontHandler::BuildAtlas(void) {
     m_atlas.Disable();
     openGLStates.SetBlending(blending);
     openGLStates.SetFaceCulling(faceCulling);
-    return m_glyphDict.Size(); // glyphCount;
+    return m_glyphDict.Size(); 
 }
 
 
