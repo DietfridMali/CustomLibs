@@ -70,7 +70,9 @@ int FontHandler::BuildAtlas(void) {
     Tristate<int> faceCulling(-1, 0, openGLStates.SetFaceCulling(0));
     baseRenderer.ResetTransformation();
     m_atlas.Initialize();
+    baseRenderer.PushViewport();
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
+    baseRenderer.PopViewport();
     m_atlas.Disable();
     openGLStates.SetBlending(blending);
     openGLStates.SetFaceCulling(faceCulling);
