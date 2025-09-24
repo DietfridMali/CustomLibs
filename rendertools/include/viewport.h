@@ -91,6 +91,11 @@ public:
     }
 
 
+    Viewport Movef(float dx, float dy) {
+        return Viewport(m_left + int(m_width * dx), int (m_top + m_height * dy), m_width, m_height);
+    }
+
+
     Viewport& operator+=(Vector2i offset) {
         m_left += offset.x;
         m_right += offset.x;
@@ -98,6 +103,12 @@ public:
         m_bottom += offset.y;
         m_center.X() += offset.x;
         m_center.Y() += offset.y;
+        return *this;
+    }
+
+
+    Viewport& operator+=(Vector2f offset) {
+        *this += Vector2i(int(m_width * offset.x), int(m_height * offset.y));
         return *this;
     }
 
