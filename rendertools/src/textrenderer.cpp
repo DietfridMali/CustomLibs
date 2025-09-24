@@ -236,7 +236,7 @@ void TextRenderer::RenderToScreen(FBO* fbo, int flipVertically) {
 
 
 void TextRenderer::Render(String text, eTextAlignments alignment, int flipVertically, int renderAreaWidth, int renderAreaHeight, bool useFBO) {
-    if (m_font) {
+    if (m_font and (text.Length() > 0)) {
         if (not useFBO)
             RenderToBuffer(text, alignment, nullptr, baseRenderer.Viewport(), renderAreaWidth, renderAreaHeight, flipVertically);
         else {

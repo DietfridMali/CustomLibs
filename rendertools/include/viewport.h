@@ -87,12 +87,34 @@ public:
     void BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 
     Viewport Move(int dx, int dy) {
-        m_left += dx;
-        m_right += dx;
-        m_top += dy;
-        m_bottom += dy;
-        m_center.X() += dx;
-        m_center.Y() += dy;
+        return Viewport(m_left + dx, m_top + dy, m_width, m_height);
+    }
+
+
+    Viewport& operator+=(Vector2i offset) {
+        m_left += offset.x;
+        m_right += offset.x;
+        m_top += offset.y;
+        m_bottom += offset.y;
+        m_center.X() += offset.x;
+        m_center.Y() += offset.y;
+        return *this;
+    }
+
+
+    Viewport& operator*=(float scale) {
+        if (fabs(scale) > Conversions::NumericTolerance) {
+            float w = float(m_width) * scale;
+            float h = float(m_height) * scale;
+            if (w * h <= Conversions::NumericTolerance)
+                return *this;
+            m_left = int(round(m_center.X() - w * 0.5f));
+            m_top = int(round(m_center.Y() - h * 0.5f));
+            m_right = int(round(m_center.X() + w * 0.5f));
+            m_bottom = int(round(m_center.Y() + h * 0.5f));
+            m_width = int(round(w));
+            m_height = int(round(h));
+        }
         return *this;
     }
 
