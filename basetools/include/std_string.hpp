@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <format>
 #include <list>
 #include <initializer_list>
 #include <sstream>
@@ -166,6 +167,11 @@ public:
 
     static int Compare(void* context, const String& s1, const String& s2) noexcept {
         return (s1.Length() or s2.Length()) ? std::strcmp(static_cast<const char*>(s1), static_cast<const char*>(s2)) : 0;
+    }
+
+    template <typename... Args>
+    void Format(std::string_view fmt, Args&&... args) {
+        m_str = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
     }
 };
 
