@@ -173,6 +173,15 @@ public:
     void Format(std::string_view fmt, Args&&... args) {
         m_str = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
     }
+
+    String& LTrim(String filter) {
+        size_t start = m_str.find_first_not_of(filter.m_str);
+        if (start == std::string::npos)
+            m_str.clear();
+        else
+            m_str.erase(0, start);
+        return *this;
+    }
 };
 
 // ---------- Inline-Funktionen (kurze Operatoren & Zuweisungen) ----------
