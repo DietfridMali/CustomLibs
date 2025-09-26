@@ -90,6 +90,12 @@ public:
         return R() + B() + G() + A() == 0.0f;
     }
 
+
+    inline RGBAColor& SetAlpha(float alpha) {
+        A() = alpha;
+        return *this;
+    }
+
     // Liefert die MULTIPLIKATIVE Skalen-"Farbe" (RGB um 1.0 herum),
 // die aus der Tint-Grundfarbe (*this) berechnet wird.
 // strength ∈ [0,1], keepLuminance = L(scale) auf 1 normieren.
