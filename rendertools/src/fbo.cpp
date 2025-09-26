@@ -475,6 +475,4 @@ bool FBO::RenderToScreen(const FBORenderParams& params, const RGBAColor& color) 
     return Render(params, color);
 }
 
-
 // =================================================================================================
-
