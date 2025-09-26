@@ -141,4 +141,15 @@ public:
     inline static const RGBAColor   Magenta = RGBAColor{ 1.0f, 0.0f, 1.0f, 1 };
     inline static const RGBAColor   Purple = RGBAColor{ 0.5f, 0.0f, 0.5f, 1 };
     inline static const RGBAColor   Brown = RGBAColor{ 0.45f, 0.25f, 0.1f, 1 };
+
+    static inline const RGBAColor& Get(const RGBAColor& color, float alpha) {
+        if (alpha == 1.0f)
+            return color;
+        else {
+            thread_local RGBAColor m_color;
+            m_color = color;
+            m_color.A() = alpha;
+            return m_color;
+        }
+    }
 };
