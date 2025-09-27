@@ -5,79 +5,49 @@
 // =================================================================================================
 // UDP based networking
 
-bool UDPSocket::Open(String localAddress, uint16_t localPort) {
-    m_localAddress = localAddress;
-    m_localPort = localPort;
+bool UDPSocket::Open(String& localAddress, uint16_t port) {
     if (localAddress == "127.0.0.1") {
         fprintf(stderr, "UDP OpenSocket: Please specify a valid local network or internet address in the command line or ini file\n");
         return false;
     }
-    if (not (m_socket = SDLNet_UDP_Open(localPort)))
+    Set(localAddress, port);
+    if (not (m_socket = SDLNet_UDP_Open(Port())))
         return false;
-    m_packet = SDLNet_AllocPacket(1500);
-    return m_isValid = true;
+    m_packet = SDLNet_AllocPacket(MaxPacketSize);
+    return m_packet != nullptr;
 }
 
 
 void UDPSocket::Close(void) {
-    if (m_isValid) {
-        m_isValid = false;
-        // Unbind ();
+    if (m_socket) {
         SDLNet_UDP_Close(m_socket);
+        m_socket = nullptr;
     }
 }
 
 
-int UDPSocket::Bind (NetworkEndpoint receiver) {
-#if 0
-    if (0 > (m_channel = SDLNet_ResolveHost (&m_address, (char*) address, port)))
-        fprintf (stderr, "Failed to resolve host '%s:%d'\n", (char*) address, port);
-    else
-#endif
-    if (0 > (m_channel = SDLNet_UDP_Bind (m_socket, -1, &receiver.Address())))
-        fprintf (stderr, "Failed to bind '%s:%d' to UDP socket\n", (char*) address.IpAddress(), address.Port());
-    else 
-        return 0;
-    return m_channel;
-}
-
-
-
-bool UDPSocket::Send(NetworkEndpoint& receiver, String message) {
-    if (not m_isValid)
+bool UDPSocket::Send(String& message, NetworkEndpoint& receiver) {
+    if (not m_socket)
         return false;
-    UDPpacket packet = { Bind(receiver), (Uint8*)message.Data(), int(message.Length()), int(message.Length()), 0, m_address};
-    if (m_channel < 0)
-        return false;
-    int n = SDLNet_UDP_Send(m_socket, m_channel, &packet);
-    Unbind ();
+    int l = int(message.Length());
+    UDPpacket packet = { -1, (Uint8*)message.Data(), l, l, 0, receiver.SocketAddress() };
+    int n = SDLNet_UDP_Send(m_socket, -1, &packet);
     return (n > 0);
 }
 
 
-String UDPSocket::Receive(NetworkEndpoint& sender) {
-    if (not m_isValid)
-        return String ("");
-    if (0 > (m_packet->channel = Bind(m_localAddress)))
-        return String("");
+bool UDPSocket::Receive(NetworkMessage& message) { // return sender address in message.Address()
+    if (not (m_socket and m_packet))
+        false;
     int n = SDLNet_UDP_Recv(m_socket, m_packet);
-    Unbind();
-    if (n <= 0)
-        return String("");
-    uint8_t* p = (uint8_t*)&m_packet->address.host;
-    char s[16];
-    sprintf_s(s, sizeof (s), "%hu.%hu.%hu.%hu", p[0], p[1], p[2], p[3]);
-    sender.Set(s, uint16_t(m_packet->address.port));
-    return String((const char*)m_packet->data, m_packet->len);
+    if ((n <= 0) or (n > MaxPacketSize))
+        false;
+    uint8_t* p = reinterpret_cast<uint8_t*>(&m_packet->address.host);
+    String s;
+    s.Format("{}.{}.{}.{}", p[0], p[1], p[2], p[3]);
+    message.Address().Set(s, uint16_t(m_packet->address.port - 1)); // the port is the sender's out port; we need the in port which by convention of this app is out port - 1
+    message.Payload() = String((const char*)m_packet->data, m_packet->len);
+    return true;
 }
-
-
-Message& UDP::Receive(Message& message) {
-    message.m_payload = m_sockets[0].Receive(message.address);
-    if (message.m_payload.Find("SMIBAT") == 0)
-        message.m_payload = message.m_payload.Replace("SMIBAT", "", 1);
-    return message;
-}
-
 
 // =================================================================================================

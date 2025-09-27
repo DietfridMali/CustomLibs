@@ -3,7 +3,7 @@
 // =================================================================================================
 // network data and address
 
-bool Message::IsValid(int valueCount) {
+bool NetworkMessage::IsValid(int valueCount) {
     /*
         check a message for a match with the requested keyword
         deconstruct message (Split payload it into separate values)

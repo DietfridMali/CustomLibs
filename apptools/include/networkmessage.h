@@ -10,7 +10,7 @@
 // =================================================================================================
 // network data and address
 
-class Message {
+class NetworkMessage {
     /*
     Network message container class
 
@@ -42,11 +42,11 @@ class Message {
         int                     m_result;
         ManagedArray<String>    m_values;
 
-        Message() 
+        NetworkMessage() 
             : m_numValues (0), m_address ("", 0), m_result (0) 
         { }
 
-        Message(String message, String ipAddress, uint16_t port) {
+        NetworkMessage(String message, NetworkEndpoint address) {
             /*
             Setup meaningful default values during class instance construction
 
@@ -60,11 +60,15 @@ class Message {
                     sender udp port
             */
             m_payload = message;
-            m_address.Set(ipAddress, port);
+            m_address = address;
             m_numValues = 0;
             m_result = 0;
         }
 
+
+        inline NetworkEndpoint& Address(void) noexcept {
+            return m_address;
+        }
 
         inline String& IpAddress(void) noexcept {
             return m_address.IpAddress();
@@ -74,7 +78,23 @@ class Message {
             return m_address.Port() + i;
         }
 
-        bool IsEmpty(void) noexcept {
+        inline String& Payload(void) noexcept {
+            return m_payload;
+        }
+
+        inline int NumValues(void) noexcept {
+            return m_numValues;
+        }
+
+        inline bool HasValues(int minValues) noexcept {
+            return m_numValues >= minValues;
+        }
+
+        inline int Result(void) noexcept {
+            return m_result;
+        }
+
+        inline bool IsEmpty(void) noexcept {
             return m_payload.IsEmpty();
         }
 

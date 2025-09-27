@@ -5,7 +5,8 @@
 
 // =================================================================================================
 
-class NetworkEndpoint {
+class NetworkEndpoint 
+{
 public:
     String      m_ipAddress;
     uint16_t    m_port;
@@ -53,7 +54,7 @@ public:
         return m_port + 1;
     }
 
-    inline const IPaddress& SocketAdress(void) const noexcept {
+    inline const IPaddress& SocketAddress(void) const noexcept {
         return m_socketAddress;
     }
 
