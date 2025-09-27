@@ -27,7 +27,7 @@ public:
             fieldValues[i] = uint16_t(fields[i]);
         for (; i < 4; ++i)
             fieldValues[i] = 0;
-        m_socketAddress.host = (fieldValues[0] << 24) | (fieldValues[1] << 16) | (fieldValues[2] << 8) | fieldValues[3];
+        m_socketAddress.host = (fieldValues[3] << 24) | (fieldValues[2] << 16) | (fieldValues[1] << 8) | fieldValues[0];
         m_socketAddress.port = SDL_SwapBE16(m_port);
     }
 
