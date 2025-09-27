@@ -34,7 +34,7 @@ class UDPSocket
             }
         }
 
-        bool Open(String& localAddress, uint16_t port);
+        bool Open(const String& localAddress, uint16_t port);
 
         void Close(void);
 

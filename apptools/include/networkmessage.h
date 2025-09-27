@@ -70,12 +70,12 @@ class NetworkMessage {
             return m_address;
         }
 
-        inline String& IpAddress(void) noexcept {
+        inline const String& IpAddress(void) const noexcept {
             return m_address.IpAddress();
         }
 
-        inline uint16_t Port(uint16_t i = 0) noexcept {
-            return m_address.Port() + i;
+        inline uint16_t Port(void) noexcept {
+            return m_address.GetPort();
         }
 
         inline String& Payload(void) noexcept {

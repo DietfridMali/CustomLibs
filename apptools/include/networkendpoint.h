@@ -37,7 +37,7 @@ public:
 
     ~NetworkEndpoint() = default;
 
-    inline String& IpAddress(void) noexcept {
+    inline String GetIpAddress(void) noexcept {
         return m_ipAddress;
     }
 
@@ -45,20 +45,13 @@ public:
         return m_ipAddress;
     }
 
-    inline uint16_t Port(void) const noexcept {
+    inline uint16_t GetPort(void) const noexcept {
         return m_port;
     }
 
     inline void SetPort(uint16_t port) noexcept {
         m_port = port;
-    }
-
-    inline uint16_t InPort(void) const noexcept {
-        return m_port;
-    }
-
-    inline uint16_t OutPort(void) const noexcept {
-        return m_port + 1;
+        UpdateSocketAddress();
     }
 
     inline const IPaddress& SocketAddress(void) const noexcept {
@@ -81,9 +74,19 @@ public:
         return not (*this == other);
     }
 
-    NetworkEndpoint& operator=(const NetworkEndpoint& other) = default;
+    NetworkEndpoint& operator=(const NetworkEndpoint& other) {
+        m_ipAddress = other.m_ipAddress;
+        m_port = other.m_port;
+        UpdateSocketAddress();
+        return *this;
+    }
 
-    NetworkEndpoint& operator=(NetworkEndpoint&& other) = default;
+    NetworkEndpoint& operator=(NetworkEndpoint&& other) {
+        m_ipAddress = other.m_ipAddress;
+        m_port = other.m_port;
+        UpdateSocketAddress();
+        return *this;
+    }
 };
 
 // =================================================================================================
