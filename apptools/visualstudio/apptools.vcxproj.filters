@@ -30,6 +30,9 @@
     <ClInclude Include="..\include\networkmessage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\networkendpoint.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\arghandler.cpp">

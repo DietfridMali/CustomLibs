@@ -5,29 +5,34 @@
 #include "SDL_net.h"
 #include "string.hpp"
 #include "networkmessage.h"
+#include "networkendpoint.h"
 
 // =================================================================================================
 // UDP based networking
 
 class UDPSocket {
     public:
-        String      m_localAddress;
-        uint16_t    m_localPort;
-        UDPsocket   m_socket;
-        UDPpacket*  m_packet;
-        IPaddress   m_address;
-        int         m_channel;
-        bool        m_isValid;
+        NetworkEndPoint     m_localAddress;
+        UDPsocket           m_socket;
+        UDPpacket*          m_packet;
+        //IPaddress           m_address;
+        int                 m_channel;
+        bool                m_isValid;
 
     private:
-        int Bind (String& address, uint16_t port);
+        int Bind (NetworkEndPoint receiver);
 
         inline void Unbind(void) {
             SDLNet_UDP_Unbind(m_socket, m_channel);
         }
 
     public:
-        UDPSocket() : m_localAddress(String("127.0.0.1")), m_localPort(0), m_packet(nullptr), m_channel(0), m_isValid(false) {
+        UDPSocket() 
+            : m_localAddress(String("127.0.0.1", 0))
+            , m_packet(nullptr)
+            , m_channel(0)
+            , m_isValid(false)
+        {
             memset(&m_address, 0, sizeof(m_address));
             memset(&m_socket, 0, sizeof(m_socket));
         }
@@ -39,14 +44,14 @@ class UDPSocket {
             }
         }
 
-        bool Open(String localAddress, uint16_t localPort);
+        bool Open(NetworkEndPoint& localAddress);
 
         void Close(void);
 
-        bool Send(String message, String address, uint16_t port);
+        bool Send(NetworkEndPoint& receiver, String message);
 
 
-        String Receive(String& address, uint16_t& port);
+        String Receive(NetworkEndPoint& sender);
 
 };
 
@@ -55,31 +60,33 @@ class UDPSocket {
 class UDP {
     public:
 
-        String     m_localAddress;
-        UDPSocket  m_sockets[2];
+        NetworkEndPoint m_localAddress;
+        UDPSocket       m_sockets[2];
 
-        UDP() : m_localAddress(String("127.0.0.1")) {}
+        UDP() 
+            : m_localAddress("127.0.0.1", 0) 
+        { }
 
 
-        bool OpenSocket(uint16_t port, int type) {     // 0: read, 1: write
-            return m_sockets[type].Open(m_localAddress, port);
+        bool OpenSocket(int type) {     // 0: read, 1: write
+            return m_sockets[type].Open(m_localAddress.IpAddress(), m_localAddress.Port() + type); // 0: in port, 1: out port
         }
 
 
         inline uint16_t InPort(void) noexcept {
-            return m_sockets[0].m_localPort;
+            return m_localAddress.InPort();
         }
 
         inline uint16_t OutPort(void) noexcept {
-            return m_sockets[1].m_localPort;
+            return m_localAddress.OutPort();
         }
 
-        bool Transmit(String message, String address, uint16_t port) {
-            return m_sockets[1].Send(String("SMIBAT") + message, address, port);
+        bool Transmit(String message, NetworkEndPoint& address) {
+            return m_sockets[1].Send(address, String("SMIBAT") + message);
         }
 
 
-        Message Receive(void);
+        Message& Receive(Message& message);
 
 };
 

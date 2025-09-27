@@ -35,16 +35,17 @@ class Message {
     */
 
     public:
-        String         m_payload;
-        String         m_address;
-        uint16_t       m_port;
-        size_t         m_numValues;
-        int            m_result;
+        String                  m_payload;
+        NetworkEndPoint         m_address;
+        size_t                  m_numValues;
+        int                     m_result;
         ManagedArray<String>    m_values;
 
-        Message() : m_numValues (0), m_port (0), m_result (0) {}
+        Message() 
+            : m_numValues (0), m_address ("", 0), m_result (0) 
+        { }
 
-        Message(String message, String address, uint16_t port) {
+        Message(String message, String ipAddress, uint16_t port) {
             /*
             Setup meaningful default values during class instance construction
 
@@ -58,12 +59,19 @@ class Message {
                     sender udp port
             */
             m_payload = message;
-            m_address = address;
-            m_port = port;
+            m_address.Set(ipAddress, port);
             m_numValues = 0;
             m_result = 0;
         }
 
+
+        inline String& IpAddress(void) noexcept {
+            return m_address.IpAddress();
+        }
+
+        inline uint16_t Port(uint16_t i = 0) noexcept {
+            return m_address.Port() + i;
+        }
 
         bool IsEmpty(void) noexcept {
             return m_payload.IsEmpty();

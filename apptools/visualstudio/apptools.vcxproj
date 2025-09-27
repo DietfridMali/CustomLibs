@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\arghandler.h" />
+    <ClInclude Include="..\include\networkendpoint.h" />
     <ClInclude Include="..\include\networkmessage.h" />
     <ClInclude Include="..\include\base_soundhandler.h" />
     <ClInclude Include="..\include\textfileloader.h" />
