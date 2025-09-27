@@ -1,6 +1,7 @@
 #pragma once
 
 #include "string.hpp"
+#include "array.hpp"
 #include "SDL_net.h"
 
 // =================================================================================================
@@ -15,12 +16,18 @@ public:
     NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 9100)
         : m_ipAddress(ipAddress), m_port(port)
     {
-        UpdateAddress();
+        UpdateSocketAddress();
     }
 
-    void UpdateAddress(void) {
-        unsigned a, b, c, d; std::sscanf(m_ipAddress, "%u.%u.%u.%u", &a, &b, &c, &d);
-        m_socketAddress.host = (a << 24) | (b << 16) | (c << 8) | d; // Big-Endian zusammensetzen
+    void UpdateSocketAddress(void) {
+        ManagedArray<String> fields = m_ipAddress.Split('.');
+        unsigned fieldValues[4];
+        int i = 0, l = fields.Length();
+        for (; i < l; ++i)
+            fieldValues[i] = uint16_t(fields[i]);
+        for (; i < 4; ++i)
+            fieldValues[i] = 0;
+        m_socketAddress.host = (fieldValues[0] << 24) | (fieldValues[1] << 16) | (fieldValues[2] << 8) | fieldValues[3];
         m_socketAddress.port = SDL_SwapBE16(m_port);
     }
 
@@ -63,7 +70,7 @@ public:
             m_ipAddress = ipAddress;
         if (port > 0)
             m_port = port;
-        UpdateAddress();
+        UpdateSocketAddress();
     }
 
     bool operator==(const NetworkEndpoint& other) const {

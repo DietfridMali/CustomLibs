@@ -26,7 +26,7 @@ void UDPSocket::Close(void) {
 }
 
 
-bool UDPSocket::Send(String& message, NetworkEndpoint& receiver) {
+bool UDPSocket::Send(const String& message, NetworkEndpoint& receiver) {
     if (not m_socket)
         return false;
     int l = int(message.Length());

@@ -38,7 +38,7 @@ class UDPSocket
 
         void Close(void);
 
-        bool Send(String& message, NetworkEndpoint& receiver);
+        bool Send(const String& message, NetworkEndpoint& receiver);
 
 
         bool Receive(NetworkMessage& message);
