@@ -5,29 +5,29 @@
 
 // =================================================================================================
 
-class NetworkEndPoint {
+class NetworkEndpoint {
 public:
     String      m_ipAddress;
     uint16_t    m_port;
-    IPAddress   m_address;
+    IPaddress   m_socketAddress;
 
-    NetworkEndPoint(String ipAddress = "127.0.0.1", uint16_t port = 9100)
+    NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 9100)
         : m_ipAddress(ipAddress), m_port(port)
     {
         UpdateAddress();
     }
 
     void UpdateAddress(void) {
-        unsigned a, b, c, d; std::sscanf(ipAddress, "%u.%u.%u.%u", &a, &b, &c, &d);
-        uint32_t m_address.host = (a << 24) | (b << 16) | (c << 8) | d; // Big-Endian zusammensetzen
-        m_address.port = SDL_SwapBE16(m_port);
+        unsigned a, b, c, d; std::sscanf(m_ipAddress, "%u.%u.%u.%u", &a, &b, &c, &d);
+        m_socketAddress.host = (a << 24) | (b << 16) | (c << 8) | d; // Big-Endian zusammensetzen
+        m_socketAddress.port = SDL_SwapBE16(m_port);
     }
 
-    NetworkEndPoint(const NetworkEndPoint& other) = default;
+    NetworkEndpoint(const NetworkEndpoint& other) = default;
 
-    NetworkEndPoint(NetworkEndPoint&& other) = default;
+    NetworkEndpoint(NetworkEndpoint&& other) = default;
 
-    ~NetworkEndPoint() = default;
+    ~NetworkEndpoint() = default;
 
     inline String& IpAddress(void) noexcept {
         return m_ipAddress;
@@ -53,8 +53,8 @@ public:
         return m_port + 1;
     }
 
-    inline IPAddress& Adress(void) const noexcept {
-        return m_address;
+    inline const IPaddress& SocketAdress(void) const noexcept {
+        return m_socketAddress;
     }
 
     inline void Set(String ipAddress, uint16_t port = 0) noexcept {
@@ -65,17 +65,17 @@ public:
         UpdateAddress();
     }
 
-    bool operator==(const NetworkEndPoint& other) const {
+    bool operator==(const NetworkEndpoint& other) const {
         return (m_ipAddress == other.m_ipAddress) and (m_port == other.m_port);
     }
 
-    bool operator!=(const NetworkEndPoint& other) const {
+    bool operator!=(const NetworkEndpoint& other) const {
         return not (*this == other);
     }
 
-    NetworkEndPoint& operator=(const NetworkEndPoint& other) = default;
+    NetworkEndpoint& operator=(const NetworkEndpoint& other) = default;
 
-    NetworkEndPoint& operator=(NetworkEndPoint&& other) = default;
+    NetworkEndpoint& operator=(NetworkEndpoint&& other) = default;
 };
 
 // =================================================================================================

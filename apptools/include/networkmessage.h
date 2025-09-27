@@ -5,6 +5,7 @@
 #include "string.hpp"
 #include "list.hpp"
 #include "vector.hpp"
+#include "networkendpoint.h"
 
 // =================================================================================================
 // network data and address
@@ -36,7 +37,7 @@ class Message {
 
     public:
         String                  m_payload;
-        NetworkEndPoint         m_address;
+        NetworkEndpoint         m_address;
         size_t                  m_numValues;
         int                     m_result;
         ManagedArray<String>    m_values;

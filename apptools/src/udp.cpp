@@ -28,7 +28,7 @@ void UDPSocket::Close(void) {
 }
 
 
-int UDPSocket::Bind (NetworkEndPoint receiver) {
+int UDPSocket::Bind (NetworkEndpoint receiver) {
 #if 0
     if (0 > (m_channel = SDLNet_ResolveHost (&m_address, (char*) address, port)))
         fprintf (stderr, "Failed to resolve host '%s:%d'\n", (char*) address, port);
@@ -43,7 +43,7 @@ int UDPSocket::Bind (NetworkEndPoint receiver) {
 
 
 
-bool UDPSocket::Send(NetworkEndPoint& receiver, String message) {
+bool UDPSocket::Send(NetworkEndpoint& receiver, String message) {
     if (not m_isValid)
         return false;
     UDPpacket packet = { Bind(receiver), (Uint8*)message.Data(), int(message.Length()), int(message.Length()), 0, m_address};
@@ -55,7 +55,7 @@ bool UDPSocket::Send(NetworkEndPoint& receiver, String message) {
 }
 
 
-String UDPSocket::Receive(NetworkEndPoint& sender) {
+String UDPSocket::Receive(NetworkEndpoint& sender) {
     if (not m_isValid)
         return String ("");
     if (0 > (m_packet->channel = Bind(m_localAddress)))

@@ -12,7 +12,7 @@
 
 class UDPSocket {
     public:
-        NetworkEndPoint     m_localAddress;
+        NetworkEndpoint     m_localAddress;
         UDPsocket           m_socket;
         UDPpacket*          m_packet;
         //IPaddress           m_address;
@@ -20,7 +20,7 @@ class UDPSocket {
         bool                m_isValid;
 
     private:
-        int Bind (NetworkEndPoint receiver);
+        int Bind (NetworkEndpoint receiver);
 
         inline void Unbind(void) {
             SDLNet_UDP_Unbind(m_socket, m_channel);
@@ -33,7 +33,6 @@ class UDPSocket {
             , m_channel(0)
             , m_isValid(false)
         {
-            memset(&m_address, 0, sizeof(m_address));
             memset(&m_socket, 0, sizeof(m_socket));
         }
 
@@ -44,14 +43,14 @@ class UDPSocket {
             }
         }
 
-        bool Open(NetworkEndPoint& localAddress);
+        bool Open(NetworkEndpoint& localAddress);
 
         void Close(void);
 
-        bool Send(NetworkEndPoint& receiver, String message);
+        bool Send(NetworkEndpoint& receiver, String message);
 
 
-        String Receive(NetworkEndPoint& sender);
+        String Receive(NetworkEndpoint& sender);
 
 };
 
@@ -60,7 +59,7 @@ class UDPSocket {
 class UDP {
     public:
 
-        NetworkEndPoint m_localAddress;
+        NetworkEndpoint m_localAddress;
         UDPSocket       m_sockets[2];
 
         UDP() 
@@ -81,7 +80,7 @@ class UDP {
             return m_localAddress.OutPort();
         }
 
-        bool Transmit(String message, NetworkEndPoint& address) {
+        bool Transmit(String message, NetworkEndpoint& address) {
             return m_sockets[1].Send(address, String("SMIBAT") + message);
         }
 
