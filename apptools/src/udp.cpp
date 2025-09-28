@@ -45,33 +45,42 @@ void UDPSocket::Unbind(void) {
 }
 
 
-bool UDPSocket::Send(const String& message, NetworkEndpoint& receiver) {
+bool UDPSocket::Send(const uint8_t* data, int dataLen, NetworkEndpoint& receiver) {
     if (not m_socket)
         return false;
 #if 1
     m_packet->channel = -1;
-    m_packet->len = int (message.Length());
+    m_packet->len = dataLen;
     m_packet->maxlen = MaxPacketSize;
-    std::memcpy(m_packet->data, message.Data(), m_packet->len);
+    std::memcpy(m_packet->data, data, dataLen);
     m_packet->address = receiver.SocketAddress();
-    int n = SDLNet_UDP_Send(m_socket, -1, m_packet);
+    return SDLNet_UDP_Send(m_socket, -1, m_packet) > 0;
 #else
     int l = int(message.Length());
     UDPpacket packet = { -1, reinterpret_cast<Uint8*>(message.Data()), l, MaxPacketSize, 0, receiver.SocketAddress() };
-    int n = SDLNet_UDP_Send(m_socket, -1, &packet);
+    return SDLNet_UDP_Send(m_socket, -1, &packet) > 0;
 #endif
-    return (n > 0);
+}
+
+
+UDPData UDPSocket::Receive(int minLength) { // return sender address in message.Address()
+    if (not (m_socket and m_packet))
+        return { nullptr, 0 };
+    int n = SDLNet_UDP_Recv(m_socket, m_packet);
+    if ((n <= 0) or (n > MaxPacketSize) or (m_packet->len > MaxPacketSize))
+        return { nullptr, 0 };
+    if ((minLength > 0) and (m_packet->len < minLength))
+        return { nullptr, 0 };
+    return { m_packet->data, m_packet->len };
 }
 
 
 bool UDPSocket::Receive(NetworkMessage& message, int portOffset) { // return sender address in message.Address()
-    if (not (m_socket and m_packet))
-        false;
-    int n = SDLNet_UDP_Recv(m_socket, m_packet);
-    if ((n <= 0) or (n > MaxPacketSize) or (m_packet->len > MaxPacketSize))
+    UDPData data = Receive();
+    if (not data.length)
         return false;
     message.Address() = m_packet->address;
-    message.SetPort(uint16_t(int (message.GetPort()) + portOffset));
+    message.SetPort(uint16_t(int(message.GetPort()) + portOffset));
     message.Payload() = String((const char*)m_packet->data, m_packet->len);
     return true;
 }

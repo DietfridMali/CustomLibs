@@ -10,14 +10,19 @@
 // =================================================================================================
 // UDP based networking
 
+struct UDPData {
+    uint8_t*    buffer;
+    int         length;
+};
+
 class UDPSocket
     : public NetworkEndpoint
 {
 public:
-    UDPsocket           m_socket; // is a pointer type!
-    UDPpacket* m_packet;
-    IPaddress           m_address;
-    int                 m_channel;
+    UDPsocket   m_socket; // is a pointer type!
+    UDPpacket*  m_packet;
+    IPaddress   m_address;
+    int         m_channel;
 
     static constexpr int MaxPacketSize = 1500;
 
@@ -45,7 +50,13 @@ public:
 
     void Close(void);
 
-    bool Send(const String& message, NetworkEndpoint& receiver);
+    bool Send(const uint8_t* data, int dataLen, NetworkEndpoint& receiver);
+
+    inline bool Send(const String& message, NetworkEndpoint& receiver) {
+        return Send(reinterpret_cast<const uint8_t*>(message.Data()), int(message.Length()), receiver);
+    }
+
+    UDPData Receive(int minLength = 0);
 
     bool Receive(NetworkMessage& message, int portOffset = -1);
 };
