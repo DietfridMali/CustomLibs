@@ -38,7 +38,7 @@ class NetworkMessage {
     public:
         String                  m_payload;
         NetworkEndpoint         m_address;
-        size_t                  m_numValues;
+        int                     m_numValues;
         int                     m_result;
         ManagedArray<String>    m_values;
 
@@ -74,8 +74,12 @@ class NetworkMessage {
             return m_address.IpAddress();
         }
 
-        inline uint16_t Port(void) noexcept {
+        inline uint16_t GetPort(void) noexcept {
             return m_address.GetPort();
+        }
+
+        inline void SetPort(uint16_t port) noexcept {
+            m_address.SetPort(port);
         }
 
         inline String& Payload(void) noexcept {

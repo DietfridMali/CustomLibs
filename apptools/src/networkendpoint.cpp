@@ -1,0 +1,48 @@
+
+#include "networkendpoint.h"
+
+// =================================================================================================
+
+void NetworkEndpoint::UpdateFromSocketAddress(void) {
+    uint32_t host = SDL_SwapBE32(m_socketAddress.host);
+    m_port = SDL_SwapBE16(m_socketAddress.port);
+    uint8_t* p = reinterpret_cast<uint8_t*>(&host);
+    m_ipAddress.Format("{}.{}.{}.{}", p[0], p[1], p[2], p[3]);
+}
+
+
+NetworkEndpoint::NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrder) {
+    if (byteOrder == ByteOrder::Host) {
+        m_socketAddress.host = SDL_SwapBE32(host);
+        m_socketAddress.port = SDL_SwapBE16(port);
+    }
+    else {
+        m_socketAddress.host = host;
+        m_socketAddress.port = port;
+    }
+    UpdateFromSocketAddress();
+}
+
+
+void NetworkEndpoint::UpdateSocketAddress(void) {
+    ManagedArray<String> fields = m_ipAddress.Split('.');
+    unsigned fieldValues[4] = { 0,0,0,0 };
+    int i = 0, l = fields.Length();
+    for (; i < l; ++i)
+        fieldValues[i] = fields[i].IsEmpty() ? 0 : uint16_t(fields[i]);
+    uint32_t host = (fieldValues[0] << 24) | (fieldValues[1] << 16) | (fieldValues[2] << 8) | fieldValues[3];
+    m_socketAddress.host = SDL_SwapBE32(host);
+    m_socketAddress.port = SDL_SwapBE16(m_port);
+}
+
+
+void NetworkEndpoint::Set(String ipAddress, uint16_t port) noexcept {
+    if (not ipAddress.IsEmpty())
+        m_ipAddress = ipAddress;
+    if (port > 0)
+        m_port = port;
+    UpdateSocketAddress();
+}
+
+// =================================================================================================
+

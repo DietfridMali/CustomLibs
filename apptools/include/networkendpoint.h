@@ -11,9 +11,9 @@ enum class ByteOrder { Host, Network };
 class NetworkEndpoint 
 {
 public:
-    String      m_ipAddress;
-    uint16_t    m_port;
-    IPaddress   m_socketAddress;
+    String      m_ipAddress{ "" };
+    uint16_t    m_port{ 0 };
+    IPaddress   m_socketAddress{};
 
     NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 9100)
         : m_ipAddress(ipAddress), m_port(port)
@@ -21,39 +21,11 @@ public:
         UpdateSocketAddress();
     }
 
-    NetworkEndpoint(const IPaddress& socketAddress) { 
+    NetworkEndpoint(const IPaddress& socketAddress) noexcept { 
         *this = socketAddress; 
     }
 
-    void UpdateFromSocketAddress(void) {
-        uint32_t host = SDL_SwapBE32(m_socketAddress.host);
-        m_port = SDL_SwapBE16(m_socketAddress.port);
-        uint8_t* p = reinterpret_cast<uint8_t*>(&host);
-        m_ipAddress.Format("{}.{}.{}.{}", p[0], p[1], p[2], p[3]);
-    }
-
-    NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrder = ByteOrder::Host) {
-        if (byteOrder == ByteOrder::Host) {
-            m_socketAddress.host = SDL_SwapBE32(host);
-            m_socketAddress.port = SDL_SwapBE16(port);
-        }
-        else {
-            m_socketAddress.host = host;
-            m_socketAddress.port = port;
-        }
-        UpdateFromSocketAddress();
-    }
-
-    void UpdateSocketAddress(void) {
-        ManagedArray<String> fields = m_ipAddress.Split('.');
-        unsigned fieldValues[4] = { 0,0,0,0 };
-        int i = 0, l = fields.Length();
-        for (; i < l; ++i)
-            fieldValues[i] = fields[i].IsEmpty() ? 0 : uint16_t(fields[i]);
-        uint32_t host = (fieldValues[0] << 24) | (fieldValues[1] << 16) | (fieldValues[2] << 8) | fieldValues[3];
-        m_socketAddress.host = SDL_SwapBE32(host);
-        m_socketAddress.port = SDL_SwapBE16(m_port);
-    }
+    NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrder = ByteOrder::Host);
 
     NetworkEndpoint(const NetworkEndpoint& other) = default;
 
@@ -86,13 +58,7 @@ public:
         return m_socketAddress;
     }
 
-    inline void Set(String ipAddress, uint16_t port = 0) noexcept {
-        if (not ipAddress.IsEmpty())
-            m_ipAddress = ipAddress;
-        if (port > 0)
-            m_port = port;
-        UpdateSocketAddress();
-    }
+    inline void Set(String ipAddress, uint16_t port = 0) noexcept;
 
     bool operator==(const NetworkEndpoint& other) const {
         return (m_ipAddress == other.m_ipAddress) and (m_port == other.m_port);
@@ -116,10 +82,16 @@ public:
         return *this;
     }
 
-    NetworkEndpoint& operator=(const IPaddress& const socketAddress) {
+    NetworkEndpoint& operator=(const IPaddress& socketAddress) {
         m_socketAddress = socketAddress;
+        UpdateFromSocketAddress();
         return *this;
     }
+
+private:
+    void UpdateFromSocketAddress(void);
+
+    void UpdateSocketAddress(void);
 };
 
 // =================================================================================================

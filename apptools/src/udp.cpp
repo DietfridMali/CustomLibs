@@ -20,6 +20,7 @@ bool UDPSocket::Open(const String& localAddress, uint16_t port) {
 
 void UDPSocket::Close(void) {
     if (m_socket) {
+        SDLNet_FreePacket(m_packet);
         SDLNet_UDP_Close(m_socket);
         m_socket = nullptr;
     }
@@ -27,11 +28,10 @@ void UDPSocket::Close(void) {
 
 
 bool UDPSocket::Bind(void) {
-    m_channel = SDLNet_ResolveHost(&a, (char*)m_ipAddress, m_port);
-    if (0 > m_channel)
+    if (SDLNet_ResolveHost(&m_socketAddress, (char*)m_ipAddress, m_port))
         return false;
-    m_channel = SDLNet_UDP_Bind(m_socket, -1, &m_address);
-    if (0 > channel)
+    m_channel = SDLNet_UDP_Bind(m_socket, -1, &m_socketAddress);
+    if (0 > m_channel)
         return false;
     return true;
 }
@@ -48,17 +48,23 @@ void UDPSocket::Unbind(void) {
 bool UDPSocket::Send(const String& message, NetworkEndpoint& receiver) {
     if (not m_socket)
         return false;
-#if 0 // test code
-    IPaddress a;
-#endif
+#if 1
+    m_packet->channel = -1;
+    m_packet->len = int (message.Length());
+    m_packet->maxlen = MaxPacketSize;
+    std::memcpy(m_packet->data, message.Data(), m_packet->len);
+    m_packet->address = receiver.SocketAddress();
+    int n = SDLNet_UDP_Send(m_socket, -1, m_packet);
+#else
     int l = int(message.Length());
-    UDPpacket packet = { -1, (Uint8*)message.Data(), l, l, 0, receiver.SocketAddress() };
+    UDPpacket packet = { -1, reinterpret_cast<Uint8*>(message.Data()), l, MaxPacketSize, 0, receiver.SocketAddress() };
     int n = SDLNet_UDP_Send(m_socket, -1, &packet);
+#endif
     return (n > 0);
 }
 
 
-bool UDPSocket::Receive(NetworkMessage& message, uint16_t portOffset) { // return sender address in message.Address()
+bool UDPSocket::Receive(NetworkMessage& message, int portOffset) { // return sender address in message.Address()
     if (not (m_socket and m_packet))
         false;
     int n = SDLNet_UDP_Recv(m_socket, m_packet);

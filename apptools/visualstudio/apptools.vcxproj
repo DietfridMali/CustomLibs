@@ -28,6 +28,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\arghandler.cpp" />
+    <ClCompile Include="..\src\networkendpoint.cpp" />
     <ClCompile Include="..\src\networkmessage.cpp" />
     <ClCompile Include="..\src\base_soundhandler.cpp" />
     <ClCompile Include="..\src\textfileloader.cpp" />
