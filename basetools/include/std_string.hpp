@@ -264,19 +264,21 @@ inline String::operator const char* () const noexcept {
     return m_str.c_str();
 }
 
-inline String::operator char* () noexcept {
+inline String::operator char*() noexcept {
     return m_str.data();
 }
 
 inline String::operator int() const {
-    return std::stoi(m_str);
+    return IsEmpty() ? 0 : std::stoi(m_str);
 }
 
 inline String::operator size_t() const {
-    return static_cast<size_t>(std::stoll(m_str));
+    return IsEmpty() ? 0 : static_cast<size_t>(std::stoll(m_str));
 }
 
 inline String::operator uint16_t() const {
+    if (IsEmpty())
+        return 0;
     auto val = static_cast<size_t>(*this);
     if (val > std::numeric_limits<uint16_t>::max())
         throw std::out_of_range("Wert zu groß für uint16_t");
@@ -284,11 +286,11 @@ inline String::operator uint16_t() const {
 }
 
 inline String::operator float() const {
-    return std::stof(m_str);
+    return IsEmpty() ? 0.0f : std::stof(m_str);
 }
 
 inline String::operator bool() const noexcept {
-    return !m_str.empty() and m_str != "0";
+    return not IsEmpty() and (m_str != "0");
 }
 
 // ---------- Template-Funktionen ----------

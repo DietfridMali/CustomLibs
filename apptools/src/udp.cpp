@@ -26,17 +26,30 @@ void UDPSocket::Close(void) {
 }
 
 
+bool UDPSocket::Bind(void) {
+    m_channel = SDLNet_ResolveHost(&a, (char*)m_ipAddress, m_port);
+    if (0 > m_channel)
+        return false;
+    m_channel = SDLNet_UDP_Bind(m_socket, -1, &m_address);
+    if (0 > channel)
+        return false;
+    return true;
+}
+
+
+void UDPSocket::Unbind(void) {
+    if (m_socket and (m_channel >= 0)) {
+        SDLNet_UDP_Unbind(m_socket, m_channel);
+        m_channel = -1;
+    }
+}
+
+
 bool UDPSocket::Send(const String& message, NetworkEndpoint& receiver) {
     if (not m_socket)
         return false;
 #if 0 // test code
     IPaddress a;
-    int channel = SDLNet_ResolveHost(&a, (char*)m_ipAddress, m_port);
-    if (0 > channel)
-        return false;
-    channel = SDLNet_UDP_Bind(m_socket, -1, &a);
-    if (0 > channel)
-        return false;
 #endif
     int l = int(message.Length());
     UDPpacket packet = { -1, (Uint8*)message.Data(), l, l, 0, receiver.SocketAddress() };
@@ -45,27 +58,14 @@ bool UDPSocket::Send(const String& message, NetworkEndpoint& receiver) {
 }
 
 
-bool UDPSocket::Receive(NetworkMessage& message) { // return sender address in message.Address()
+bool UDPSocket::Receive(NetworkMessage& message, uint16_t portOffset) { // return sender address in message.Address()
     if (not (m_socket and m_packet))
         false;
-#if 0 // test code
-    IPaddress a;
-    int channel = SDLNet_ResolveHost(&a, (char*)m_ipAddress, m_port);
-    if (0 > channel)
-        return false;
-    channel = SDLNet_UDP_Bind(m_socket, -1, &a);
-    if (0 > channel)
-        return false;
-#endif
     int n = SDLNet_UDP_Recv(m_socket, m_packet);
-    if ((n <= 0) or (n > MaxPacketSize))
-        false;
-    uint8_t* p = reinterpret_cast<uint8_t*>(&m_packet->address.host);
-    String s;
-    s.Format("{}.{}.{}.{}", p[0], p[1], p[2], p[3]);
-    message.Address().Set(s, uint16_t(m_packet->address.port - 1)); // the port is the sender's out port; we need the in port which by convention of this app is out port - 1
-    if (m_packet->len > MaxPacketSize)
+    if ((n <= 0) or (n > MaxPacketSize) or (m_packet->len > MaxPacketSize))
         return false;
+    message.Address() = m_packet->address;
+    message.SetPort(uint16_t(int (message.GetPort()) + portOffset));
     message.Payload() = String((const char*)m_packet->data, m_packet->len);
     return true;
 }

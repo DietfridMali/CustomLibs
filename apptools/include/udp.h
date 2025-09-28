@@ -10,39 +10,44 @@
 // =================================================================================================
 // UDP based networking
 
-class UDPSocket 
+class UDPSocket
     : public NetworkEndpoint
 {
-    public:
-        UDPsocket           m_socket; // is a pointer type!
-        UDPpacket*          m_packet;
+public:
+    UDPsocket           m_socket; // is a pointer type!
+    UDPpacket* m_packet;
+    IPaddress           m_address;
+    int                 m_channel;
 
-        static constexpr int MaxPacketSize = 1500;
+    static constexpr int MaxPacketSize = 1500;
 
-    public:
-        UDPSocket() 
-            : NetworkEndpoint()
-            , m_packet(nullptr)
-        {
-            memset(&m_socket, 0, sizeof(m_socket));
+public:
+    UDPSocket()
+        : NetworkEndpoint()
+        , m_packet(nullptr)
+        , m_channel(-1)
+    {
+        memset(&m_socket, 0, sizeof(m_socket));
+    }
+
+    ~UDPSocket() {
+        if (m_packet) {
+            SDLNet_FreePacket(m_packet);
+            m_packet = nullptr;
         }
+    }
 
-        ~UDPSocket() {
-            if (m_packet) {
-                SDLNet_FreePacket(m_packet);
-                m_packet = nullptr;
-            }
-        }
+    bool Open(const String& localAddress, uint16_t port);
 
-        bool Open(const String& localAddress, uint16_t port);
+    bool Bind(void);
 
-        void Close(void);
+    void Unbind(void);
 
-        bool Send(const String& message, NetworkEndpoint& receiver);
+    void Close(void);
 
+    bool Send(const String& message, NetworkEndpoint& receiver);
 
-        bool Receive(NetworkMessage& message);
-
+    bool Receive(NetworkMessage& message, int portOffset = -1);
 };
 
 // =================================================================================================
