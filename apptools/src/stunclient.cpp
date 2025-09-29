@@ -87,7 +87,7 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
 
 #pragma comment(lib, "ws2_32.lib")
 
-String GetLocalAddress(void) {
+String StunClient::GetLocalAddress(void) {
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
         return String("");
@@ -132,7 +132,7 @@ String GetLocalAddress(void) {
 #include <sys/socket.h>
 #include <unistd.h>
 
-String GetLocalAddress() {
+String StunClient::GetLocalAddress(void) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
         return String("");
