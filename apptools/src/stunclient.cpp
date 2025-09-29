@@ -77,3 +77,90 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
 }
 
 // =================================================================================================
+
+#ifdef _WIN32
+
+#include <string>
+#include <stdexcept>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#pragma comment(lib, "ws2_32.lib")
+
+String GetLocalAddress(void) {
+    WSADATA wsa;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
+        return String("");
+
+    SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock == INVALID_SOCKET)
+        return String("");
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(80);
+    inet_pton(AF_INET, "8.8.8.8", &addr.sin_addr);
+
+    if (connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR) {
+        closesocket(sock);
+        WSACleanup();
+        return String("");
+    }
+
+    sockaddr_in local{};
+    int len = sizeof(local);
+    if (getsockname(sock, reinterpret_cast<sockaddr*>(&local), &len) == SOCKET_ERROR) {
+        closesocket(sock);
+        WSACleanup();
+        return String("");
+    }
+
+    char buf[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf));
+
+    closesocket(sock);
+    WSACleanup();
+    return String(buf);
+}
+
+#else
+
+#include <string>
+#include <stdexcept>
+#include <cstring>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+String GetLocalAddress() {
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0)
+        return String("");
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(80);
+    inet_pton(AF_INET, "8.8.8.8", &addr.sin_addr);
+
+    if (connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        close(sock);
+        return String("");
+    }
+
+    sockaddr_in local{};
+    socklen_t len = sizeof(local);
+    if (getsockname(sock, reinterpret_cast<sockaddr*>(&local), &len) < 0) {
+        close(sock);
+        return String("");
+    }
+    close(sock);
+
+    char buf[INET_ADDRSTRLEN];
+    if (!inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf)))
+        return String("");
+    return String(buf);
+}
+
+#endif
+
+// =================================================================================================
