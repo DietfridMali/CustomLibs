@@ -417,7 +417,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         {
             if (params.premultiply)
                 m_viewportArea.Premultiply();
-            m_viewportArea.SetTransformations({ .flipVertically = params.flipVertically == 1 });
+            //m_viewportArea.SetTransformations({ .flipVertically = params.flipVertically == 1 });
             m_viewportArea.Render(nullptr, source, color); // texture has been assigned to m_viewportArea above
         }
     }

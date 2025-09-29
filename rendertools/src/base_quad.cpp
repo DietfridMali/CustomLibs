@@ -9,6 +9,7 @@
 #include "type_helper.hpp"
 #include "base_renderer.h"
 #include "conversions.hpp"
+#include "tristate.h"
 
 // caution: the VAO shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this vao is initialized.
 // VAO::Init takes care of that by first assigning a handle-less shared gl handle 
@@ -192,7 +193,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) 
 
     if (baseRenderer.LegacyMode) {
         if (texture and texture->Enable()) {
-            openGLStates.SetBlending(1);
+            Tristate<int> blending (-1, 0, openGLStates.SetBlending(1));
             glBegin(GL_QUADS);
             for (auto& v : m_vertexBuffer.AppData()) {
                 glColor4f(1, 1, 1, 1);
@@ -200,7 +201,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) 
             }
             glEnd();
             texture->Disable();
-            openGLStates.SetBlending(0);
+            openGLStates.SetBlending(blending);
         }
     }
     return false;

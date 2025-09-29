@@ -125,7 +125,7 @@ public:
     }
 
     inline bool Render(RGBAColor color = ColorData::White) {
-        return Render(nullptr, nullptr, color);
+        return Render(nullptr, nullptr, static_cast<const RGBAColor&>(color));
     }
 
     // fill 2D area defined by x and y components of vertices with color color

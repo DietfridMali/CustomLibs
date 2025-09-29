@@ -36,7 +36,7 @@ void BaseRenderer::Init(int width, int height, float fov) {
     int w = m_windowWidth / 15;
     DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
-#ifdef _DEBUG
+#if 0//def _DEBUG
     testTexture = textureHandler.GetStandardTexture();
     List<String> fileName = { "resources\\textures\\ring-512x512.png" };
     if (not testTexture->CreateFromFile(fileName, true)) {

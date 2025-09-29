@@ -167,7 +167,7 @@ bool FontHandler::CreateAtlas(void) {
 }
 
 
-struct FontHandler::TextDimensions FontHandler::TextSize(String text) {
+FontHandler::TextDimensions FontHandler::TextSize(String text) {
     TextDimensions d;
     for (auto glyph : text) {
         GlyphInfo* info = FindGlyph(String(glyph));

@@ -23,6 +23,7 @@ class TextRenderer
 {
 public:
     using TextDecoration = OutlineRenderer::Decoration;
+    using TextDimensions = FontHandler::TextDimensions;
 
     typedef enum {
         taLeft,
@@ -66,6 +67,10 @@ public:
 
     inline FontHandler* GetFont(void) noexcept {
         return m_font;
+    }
+
+    inline TextDimensions TextSize(String text) {
+        return m_font ? m_font->TextSize(text) : TextDimensions(0, 0);
     }
 
     inline bool SetColor(RGBAColor color = ColorData::White) noexcept {

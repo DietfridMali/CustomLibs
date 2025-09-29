@@ -88,7 +88,7 @@ public:
         return m_isAvailable;
     }
 
-    struct TextDimensions TextSize(String text);
+    TextDimensions TextSize(String text);
 
 private:
     Shader* LoadShader(void);

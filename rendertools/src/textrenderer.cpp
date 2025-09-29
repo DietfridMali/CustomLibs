@@ -188,23 +188,23 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
     if (m_font) {
         if (fbo)
             fbo->m_name = String::Concat ("[", text, "]");
-        auto [textWidth, textHeight, aspectRatio] = m_font->TextSize(text);
+        TextDimensions td = m_font->TextSize(text);
         float outlineWidth = m_decoration.outlineWidth * 2;
-        textWidth += int(2 * outlineWidth + 0.5f);
-        textHeight += int(2 * outlineWidth + 0.5f);
+        td.width += int(2 * outlineWidth + 0.5f);
+        td.height += int(2 * outlineWidth + 0.5f);
         tRenderOffsets offset =
 #if 1
-            Texture::ComputeOffsets(int(textHeight * aspectRatio), textHeight, viewport.m_width, viewport.m_height, renderAreaWidth, renderAreaHeight);
+            Texture::ComputeOffsets(int(td.height * td.aspectRatio), td.height, viewport.m_width, viewport.m_height, renderAreaWidth, renderAreaHeight);
 #else
             m_centerText
-            ? Texture::ComputeOffsets(int(textHeight * aspectRatio), textHeight, viewport.m_width, viewport.m_height, renderAreaWidth, renderAreaHeight)
-            : Texture::ComputeOffsets(int(textHeight * aspectRatio), textHeight, int(textHeight * aspectRatio), textHeight, int(textHeight * aspectRatio), textHeight);
+            ? Texture::ComputeOffsets(int(td.height * td.aspectRatio), td.height, viewport.m_width, viewport.m_height, renderAreaWidth, renderAreaHeight)
+            : Texture::ComputeOffsets(int(td.height * td.aspectRatio), td.height, int(textHeight * aspectRatio), textHeight, int(textHeight * aspectRatio), textHeight);
 #endif
-        textWidth -= int(2 * outlineWidth + 0.5f);
-        textHeight -= int(2 * outlineWidth + 0.5f);
+        td.width -= int(2 * outlineWidth + 0.5f);
+        td.height -= int(2 * outlineWidth + 0.5f);
 
         if (not fbo)
-            RenderText(text, textWidth, offset.x, offset.y, alignment, flipVertically);
+            RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
         else if (fbo->Enable(-1, FBO::dbAll, true)) {
             baseRenderer.PushViewport();
             fbo->SetViewport();
@@ -213,7 +213,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
                 offset.y -= outlineWidth / float(fbo->m_height);
             }
             fbo->m_lastDestination = 0;
-            RenderText(text, textWidth, offset.x, offset.y, alignment);
+            RenderText(text, td.width, offset.x, offset.y, alignment);
             fbo->Disable();
             if (fbo->IsAvailable()) {
                 if (HaveOutline())

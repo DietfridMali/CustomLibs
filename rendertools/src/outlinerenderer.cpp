@@ -57,7 +57,7 @@ void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool
         if (shader and not baseRenderer.DepthPass()) {
             shader->SetFloat("outlineWidth", decoration.outlineWidth);
             shader->SetVector4f("outlineColor", decoration.outlineColor);
-            shader->SetFloat("offset", 0.5f);
+            shader->SetFloat("offset", 0.0f); // 0.5f);
             //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
             fbo->AutoRender({ .clearBuffer = true, .shader = shader });
         }
