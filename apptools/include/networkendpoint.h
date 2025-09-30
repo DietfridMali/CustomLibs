@@ -88,6 +88,10 @@ public:
         return *this;
     }
 
+    inline uint32_t SubNet(void) noexcept {
+        return m_socketAddress.host & SDL_SwapBE32(0xFFFFFF00u);
+    }
+
 private:
     void UpdateFromSocketAddress(void);
 
@@ -95,4 +99,3 @@ private:
 };
 
 // =================================================================================================
-

@@ -21,12 +21,16 @@ bool NetworkMessage::IsValid(int valueCount) {
     */
     m_values = m_payload.Split('#');
     String keyword = m_values[0];
-    m_values = m_values[1].Split(';');
-    if (not m_values[0].IsEmpty())
-        m_numValues = m_values.Length();
-    else {
-        m_values.Clear();
+    if (m_values.Length() < 2)
         m_numValues = 0;
+    else {
+        m_values = m_values[1].Split(';');
+        if (not m_values[0].IsEmpty())
+            m_numValues = m_values.Length();
+        else {
+            m_values.Clear();
+            m_numValues = 0;
+        }
     }
     if (valueCount == 0) {
         m_result = 1;

@@ -11,7 +11,7 @@ bool UDPSocket::Open(const String& localAddress, uint16_t port) {
         return false;
     }
     Set(localAddress, port);
-    if (not (m_socket = SDLNet_UDP_Open(GetPort())))
+    if (not (m_socket = SDLNet_UDP_Open(port)))
         return false;
     m_packet = SDLNet_AllocPacket(MaxPacketSize);
     return m_packet != nullptr;
@@ -67,7 +67,10 @@ UDPData UDPSocket::Receive(int minLength) { // return sender address in message.
     if (not (m_socket and m_packet))
         return { nullptr, 0 };
     int n = SDLNet_UDP_Recv(m_socket, m_packet);
-    if ((n <= 0) or (n > MaxPacketSize) or (m_packet->len > MaxPacketSize))
+    NetworkEndpoint ep = m_packet->address;
+    if (ep.GetIpAddress() == "192.168.178.34")
+        n = n;
+    if ((n <= 0) or (m_packet->len > MaxPacketSize))
         return { nullptr, 0 };
     if ((minLength > 0) and (m_packet->len < minLength))
         return { nullptr, 0 };
