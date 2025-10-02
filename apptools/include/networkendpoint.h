@@ -92,6 +92,19 @@ public:
         return m_socketAddress.host & SDL_SwapBE32(0xFFFFFF00u);
     }
 
+    // Limited Broadcast 255.255.255.255:port
+    static NetworkEndpoint LimitedBroadcast(uint16_t port) noexcept {
+        return NetworkEndpoint("255.255.255.255", port);
+    }
+
+    // Subnet-Directed Broadcast x.y.z.255:port (angenommen /24)
+    NetworkEndpoint DirectedBroadcast(uint16_t port) const noexcept {
+        // nutzt vorhandene IP-String-Repräsentation
+        ManagedArray<String> f = m_ipAddress.Split('.');
+        if (f.Length() != 4) return LimitedBroadcast(port);
+        return NetworkEndpoint(String::Format("{}.{}.{}.255", f[0], f[1], f[2]), port);
+    }
+
 private:
     void UpdateFromSocketAddress(void);
 
