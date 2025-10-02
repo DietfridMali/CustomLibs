@@ -201,7 +201,14 @@ public:
     static SharedTextureHandle nullHandle;
 
     Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_CLAMP_TO_EDGE)
-        : m_handle(handle), m_type(type), m_tmuIndex(-1), m_wrapMode(wrapMode), m_useMipMaps(false), m_isValid(true), m_hasBuffer(false), m_hasParams(false)
+        : m_handle(handle)
+        , m_type(type)
+        , m_tmuIndex(-1)
+        , m_wrapMode(wrapMode)
+        , m_useMipMaps(false)
+        , m_isValid(true)
+        , m_hasBuffer(false)
+        , m_hasParams(false)
     {
     }
 

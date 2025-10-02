@@ -59,6 +59,13 @@ public:
     UDPData Receive(int minLength = 0);
 
     bool Receive(NetworkMessage& message, int portOffset = -1);
+
+    bool SendBroadcast(const uint8_t* data, int len, bool subnetOnly = true);
+
+    inline bool SendBroadcast(const String& msg, bool subnetOnly = true) {
+        return SendBroadcast(reinterpret_cast<const uint8_t*>(msg.Data()), int(msg.Length()), subnetOnly);
+    }
+
 };
 
 // =================================================================================================

@@ -92,6 +92,14 @@ public:
         return m_socketAddress.host & SDL_SwapBE32(0xFFFFFF00u);
     }
 
+    // Limited Broadcast 255.255.255.255:port
+    static NetworkEndpoint LimitedBroadcast(uint16_t port) noexcept {
+        return NetworkEndpoint("255.255.255.255", port);
+    }
+
+    // Subnet-Directed Broadcast x.y.z.255:port (angenommen /24)
+    NetworkEndpoint DirectedBroadcast(uint16_t port) noexcept;
+
 private:
     void UpdateFromSocketAddress(void);
 
