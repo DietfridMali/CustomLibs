@@ -53,12 +53,4 @@ bool NetworkMessage::IsValid(int valueCount) {
     return false;
 }
 
-
-NetworkEndpoint NetworkEndpoint::DirectedBroadcast(uint16_t port) const noexcept {
-    // nutzt vorhandene IP-String-Repräsentation
-    ManagedArray<String> f = m_ipAddress.Split('.');
-    if (f.Length() != 4) return LimitedBroadcast(port);
-    return NetworkEndpoint(String::Format("{}.{}.{}.255", f[0], f[1], f[2]), port);
-}
-
 // =================================================================================================

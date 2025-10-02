@@ -44,5 +44,16 @@ void NetworkEndpoint::Set(String ipAddress, uint16_t port) noexcept {
     UpdateSocketAddress();
 }
 
+
+NetworkEndpoint NetworkEndpoint::DirectedBroadcast(uint16_t port) noexcept {
+    // nutzt vorhandene IP-String-Repräsentation
+    ManagedArray<String> f = m_ipAddress.Split('.');
+    if (f.Length() != 4) 
+        return LimitedBroadcast(port);
+    //String ipAddress;
+    //ipAddress.Format("{}.{}.{}.255", (char*)(f[0]), (char*)(f[1]), (char*)(f[2]));
+    return NetworkEndpoint(String::Concat(f[0], ".", f[1], ".", f[2], ".255"), port);
+}
+
 // =================================================================================================
 
