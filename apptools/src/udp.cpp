@@ -89,7 +89,7 @@ bool UDPSocket::Receive(NetworkMessage& message, int portOffset) { // return sen
 }
 
 
-bool UDPSocket::SendBroadcast(const uint8_t* data, int dataLen, uint8_t destPort, bool subnetOnly) {
+bool UDPSocket::SendBroadcast(const uint8_t* data, int dataLen, uint16_t destPort, bool subnetOnly) {
     // Empfänger bestimmen
     NetworkEndpoint destination = subnetOnly ? DirectedBroadcast(destPort) : NetworkEndpoint::LimitedBroadcast(destPort);
     // Hinweis: SDL_net setzt i.d.R. SO_BROADCAST beim UDP-Open. Falls eine Plattform das nicht tut,

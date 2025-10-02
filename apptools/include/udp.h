@@ -60,9 +60,9 @@ public:
 
     bool Receive(NetworkMessage& message, int portOffset = -1);
 
-    bool SendBroadcast(const uint8_t* data, int dataLen, uint8_t destPort, bool subnetOnly);
+    bool SendBroadcast(const uint8_t* data, int dataLen, uint16_t destPort, bool subnetOnly);
 
-    inline bool SendBroadcast(const String& msg, uint8_t destPort, bool subnetOnly = true) {
+    inline bool SendBroadcast(const String& msg, uint16_t destPort, bool subnetOnly = true) {
         return SendBroadcast(reinterpret_cast<const uint8_t*>(msg.Data()), int(msg.Length()), destPort, subnetOnly);
     }
 
