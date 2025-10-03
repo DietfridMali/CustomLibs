@@ -248,8 +248,5 @@
     <ClCompile Include="..\src\noisetexture.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\noisetexture3d.cpp">
-      <Filter>Source Files\Texture</Filter>
-    </ClCompile>
   </ItemGroup>
 </Project>
