@@ -39,6 +39,7 @@ public:
 protected:
     FBO*                    m_screenBuffer;
     FBO*                    m_sceneBuffer;
+    FBO*                    m_skyBuffer;
     Texture                 m_renderTexture;
     bool                    m_screenIsAvailable;
 
@@ -97,6 +98,10 @@ public:
 
     virtual FBO* GetSceneBuffer(void) noexcept {
         return m_sceneBuffer;
+    }
+
+    FBO* GetSkyBuffer(void) noexcept {
+        return m_skyBuffer;
     }
 
     virtual void ActivateSceneViewport(void) noexcept {

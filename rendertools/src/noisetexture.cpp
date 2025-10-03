@@ -65,6 +65,7 @@ static float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, 
     return std::clamp(s, 0.0f, 1.0f);
 }
 
+
 void NoiseTexture::ComputeNoise(int edgeSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
     float* data = m_data.Data();
     for (int y = 0; y < edgeSize; ++y) {
@@ -126,9 +127,7 @@ void NoiseTexture::Deploy(int bufferIndex) {
     if (Bind()) {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         TextureBuffer* texBuf = m_buffers[0];
-        baseRenderer.ClearGLError();
         glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, texBuf->Width(), texBuf->Height(), 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
-        baseRenderer.CheckGLError();
         SetParams(false);
         Release();
     }
