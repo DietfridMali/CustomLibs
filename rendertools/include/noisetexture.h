@@ -33,12 +33,12 @@ public:
 
 	virtual void SetParams(bool enforce = false) override;
 
-	bool Create(int edgeSize, int periodX, int periodY, int octaves = 3, uint32_t seed = 1);
+	bool Create(int edgeSize);
 
 private:
 	int m_edgeSize;
 
-	ManagedArray<float>	m_data;
+	ManagedArray<uint8_t>	m_data;
 
 	bool Allocate(int edgeSize);
 

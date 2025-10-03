@@ -101,7 +101,7 @@ bool NoiseTexture3D::Create(int edgeSize) {
         return false;
     if (not Allocate(edgeSize))
         return false;
-    ComputeNoise(edgeSize, yPeriod, xPeriod, octaves, seed);
+    ComputeNoise();
     Deploy();
     return true;
 }
