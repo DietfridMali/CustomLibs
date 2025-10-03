@@ -86,7 +86,7 @@ Shader* BaseShaderHandler::SetupShader(String shaderId) {
     }
     shader->UpdateMatrices();
     baseRenderer.CheckGLError();
-    return baseRenderer.DepthPass() ? nullptr : shader; // pretend no shader was loaded during depth pass so the app doesn't try to set uniforms
+    return /*baseRenderer.DepthPass() ? nullptr : */ shader; // pretend no shader was loaded during depth pass so the app doesn't try to set uniforms
 }
 
 
