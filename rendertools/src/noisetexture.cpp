@@ -181,15 +181,14 @@ static float valueNoise(float x, float y, float z) {
 
 
 void NoiseTexture3D::ComputeNoise(void) {
-    uint8_t* data = m_data.Data();
+    float* data = reinterpret_cast<float*>(m_data.Data());
 
     float freq = 2.0f;
     int   oct = 4;
     float amp = 0.5f, gain = 0.5f, lac = 2.0f;
 
-    // kleine, konstante Domänenrotation (vermeidet Achsen-Banding)
-    const float r = 0.70710678f; // ~1/sqrt(2)
-    const float warp = 0.15f;    // sehr klein halten
+    const float r = 0.70710678f;
+    const float warp = 0.15f;
 
     for (int z = 0; z < m_edgeSize; ++z)
         for (int y = 0; y < m_edgeSize; ++y)
@@ -199,31 +198,24 @@ void NoiseTexture3D::ComputeNoise(void) {
                 float Y = (y / (float)m_edgeSize) * freq;
                 float Z = (z / (float)m_edgeSize) * freq;
 
-                // feste 45°-Mischung der Achsen
                 float Xr = (X + Y) * r;
                 float Yr = (Y + Z) * r;
                 float Zr = (Z + X) * r;
 
-                // sehr leichte Domain-Warping-Perturbation aus derselben Value-Noise
                 float wx = valueNoise(Xr * 2.0f, Yr * 2.0f, Zr * 2.0f) - 0.5f;
                 float wy = valueNoise(Xr * 2.0f + 31.0f, Yr * 2.0f, Zr * 2.0f) - 0.5f;
                 float wz = valueNoise(Xr * 2.0f, Yr * 2.0f + 19.0f, Zr * 2.0f) - 0.5f;
-                Xr += warp * wx;
-                Yr += warp * wy;
-                Zr += warp * wz;
+                Xr += warp * wx; Yr += warp * wy; Zr += warp * wz;
 
                 float s = 0.0f, a = amp, fx = 1.0f;
-                for (int o = 0; o < oct; ++o) {
-                    s += a * valueNoise(Xr * fx, Yr * fx, Zr * fx);
-                    a *= gain; fx *= lac;
-                }
+                for (int o = 0; o < oct; ++o) { s += a * valueNoise(Xr * fx, Yr * fx, Zr * fx); a *= gain; fx *= lac; }
 
-                // Normalisieren grob auf [0..1]
                 float norm = 1.0f - powf(gain, (float)oct);
                 s = (norm > 0.0f) ? s / norm : s;
+                // clamp auf [0..1], direkt als float ablegen
                 s = fminf(fmaxf(s, 0.0f), 1.0f);
 
-                data[(z * m_edgeSize + y) * m_edgeSize + x] = (uint8_t)lrintf(s * 255.0f);
+                data[(z * m_edgeSize + y) * m_edgeSize + x] = s;
             }
 }
 
@@ -232,9 +224,12 @@ bool NoiseTexture3D::Allocate(int edgeSize) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (!texBuf) return false;
     if (!m_buffers.Append(texBuf)) { delete texBuf; return false; }
-    m_data.Resize(edgeSize * edgeSize * edgeSize);
+
+    m_edgeSize = edgeSize; // falls nicht schon gesetzt
+    m_data.Resize(edgeSize * edgeSize * edgeSize * sizeof(float)); // floats
+
     texBuf->m_info = TextureBuffer::BufferInfo(edgeSize * edgeSize * edgeSize,
-        1, 1, GL_R8, GL_RED); // war GL_R32F
+        1, 1, GL_R16F, GL_RED); // internes Format = R16F
     HasBuffer() = true;
     return true;
 }
@@ -258,7 +253,7 @@ void NoiseTexture3D::SetParams(bool enforce) {
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // war: GL_LINEAR
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 }
@@ -266,11 +261,12 @@ void NoiseTexture3D::SetParams(bool enforce) {
 
 void NoiseTexture3D::Deploy(int bufferIndex) {
     if (Bind()) {
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4); // float-Alignment
         TextureBuffer* texBuf = m_buffers[0];
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, m_edgeSize, m_edgeSize, m_edgeSize, 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(m_data.Data()));
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F,
+            m_edgeSize, m_edgeSize, m_edgeSize, 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
         SetParams(false);
-        glGenerateMipmap(GL_TEXTURE_3D); // <-- hinzufügen
+        glGenerateMipmap(GL_TEXTURE_3D);
         Release();
     }
 }

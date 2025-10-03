@@ -38,7 +38,7 @@ public:
 private:
 	int m_edgeSize;
 
-	ManagedArray<uint8_t>	m_data;
+	ManagedArray<float>	m_data;
 
 	bool Allocate(int edgeSize);
 
