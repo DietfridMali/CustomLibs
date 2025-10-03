@@ -84,11 +84,11 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
         glGenerateMipmap(target);
     }
 
-    static void Compute(ManagedArray<float>& data, int edge, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
-        data.Resize(edge * edge);
-        uint8_t* dataPtr = data.Data();
-        for (int y = 0; y < edge; ++y)
-            for (int x = 0; x < edge; ++x)
+    static void Compute(ManagedArray<float>& data, int edgeSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
+        data.Resize(edgeSize * edgeSize);
+        float* dataPtr = data.Data();
+        for (int y = 0; y < edgeSize; ++y)
+            for (int x = 0; x < edgeSize; ++x)
                 *dataPtr++ = Hash2i(x % xPeriod, y % yPeriod);
     }
 };
@@ -110,13 +110,13 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
         glGenerateMipmap(target);
     }
 
-    static void Compute(ManagedArray<float>& data, int edge, int yPeriod, int xPeriod, int octave, uint32_t /*seed*/) {
-        data.Resize(edge * edge);
-        uint8_t* dataPtr = data.Data();
-        for (int y = 0; y < edge; ++y) {
-            for (int x = 0; x < edge; ++x) {
-                float sx = (x + 0.5f) / edge * float(yPeriod);
-                float sy = (y + 0.5f) / edge * float(xPeriod);
+    static void Compute(ManagedArray<float>& data, int edgeSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
+        data.Resize(edgeSize * edgeSize);
+        float* dataPtr = data.Data();
+        for (int y = 0; y < edgeSize; ++y) {
+            for (int x = 0; x < edgeSize; ++x) {
+                float sx = (x + 0.5f) / edgeSize * float(yPeriod);
+                float sy = (y + 0.5f) / edgeSize * float(xPeriod);
                 float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
                 *dataPtr++ = std::clamp(n, 0.0f, 1.0f);
             }
@@ -142,14 +142,14 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
         glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
     }
 
-    static void Compute(ManagedArray<uint8_t>& data, int edge, int /*yPeriod*/, int /*xPeriod*/, int /*octave*/, uint32_t seed) {
-        data.Resize(edge * edge * 4);
+    static void Compute(ManagedArray<uint8_t>& data, int edgeSize, int /*yPeriod*/, int /*xPeriod*/, int /*octave*/, uint32_t seed) {
+        data.Resize(edgeSize * edgeSize * 4);
         uint8_t* dataPtr = data.Data();
-        for (int y = 0; y < edge; ++y) {
-            int py = (y % edge + edge) % edge;
-            for (int x = 0; x < edge; ++x) {
-                int px = (x % edge + edge) % edge;
-                size_t i = size_t(y) * edge * 4 + size_t(x) * 4;
+        for (int y = 0; y < edgeSize; ++y) {
+            int py = (y % edgeSize + edgeSize) % edgeSize;
+            for (int x = 0; x < edgeSize; ++x) {
+                int px = (x % edgeSize + edgeSize) % edgeSize;
+                size_t i = size_t(y) * edgeSize * 4 + size_t(x) * 4;
                 *dataPtr++ = Hash2iByte(px, py, seed, 0);
                 *dataPtr++ = Hash2iByte(px + 73, py, seed, 1);
                 *dataPtr++ = Hash2iByte(px, py + 91, seed, 2);
@@ -165,19 +165,23 @@ template<class Tag>
 class NoiseTexture 
     : public Texture {
 public:
-    bool Create(int edgeSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
-        if (not Texture::Create()) return false;
-        if (not Allocate(edgeSize)) return false;
+    bool Create(int edgeSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
+        if (not Texture::Create()) 
+            return false;
+        if (not Allocate(edgeSize)) 
+            return false;
         Compute(edgeSize, yPeriod, xPeriod, octaves, seed);
         Deploy();
         return true;
     }
+
     void SetParams(bool enforce) {
         if (enforce || not m_hasParams) {
             m_hasParams = true;
             NoiseTraits<Tag>::SetParams(GL_TEXTURE_2D);
         }
     }
+
     const std::vector<typename NoiseTraits<Tag>::PixelT>& Data() const { 
         return m_data; 
     }
@@ -213,16 +217,16 @@ private:
                 texBuf->Width(), texBuf->Height(), 0,
                 NoiseTraits<Tag>::EFmt,
                 NoiseTraits<Tag>::Type,
-                reinterpret_cast<const void*>(m_data.data()));
+                reinterpret_cast<const void*>(m_data.Data()));
             SetParams(false);
             Release();
         }
     }
 };
 
-using ValueNoiseR32FTexture = NoiseTexture<ValueNoiseR32F>;
-using FbmNoiseR32FTexture = NoiseTexture<FbmNoiseR32F>;
-using HashNoiseRGBA8Texture = NoiseTexture<HashNoiseRGBA8>;
+using ValueNoiseTextureR32F = NoiseTexture<ValueNoiseR32F>;
+using FbmNoiseTextureR32F = NoiseTexture<FbmNoiseR32F>;
+using HashNoiseTextureRGBA8 = NoiseTexture<HashNoiseRGBA8>;
 
 // =================================================================================================
 
