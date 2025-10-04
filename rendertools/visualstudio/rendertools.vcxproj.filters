@@ -227,9 +227,6 @@
     <ClCompile Include="..\src\fonthandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\noisetexture.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\primitive_shaders.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
@@ -246,6 +243,9 @@
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texturehandler.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\noisetexture.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
   </ItemGroup>
