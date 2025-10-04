@@ -1,15 +1,13 @@
-#pragma once
+ï»¿#pragma once
 
 #include "texture.h"
 
 // =================================================================================================
-
-// -------------------------------------------------------------
 // Tags
-// -------------------------------------------------------------
+
 struct ValueNoiseR32F {};     // dein aktueller #if 1 Pfad (Hash2i, 1 Kanal)
 struct FbmNoiseR32F {};   // dein #else Pfad (fbmPeriodic, 1 Kanal)
-struct HashNoiseRGBA8 {};         // neu: 4 Kanäle uint8, weißes Tile-Noise
+struct HashNoiseRGBA8 {};         // neu: 4 KanÃ¤le uint8, weiÃŸes Tile-Noise
 
 // -------------------------------------------------------------
 // Utilities 
@@ -63,6 +61,18 @@ static inline uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch) {
     float f = s - std::floor(s);
     int   v = int(f * 255.0f + 0.5f);
     return (uint8_t)std::min(v, 255);
+}
+
+// starker 32-bit Hash (avalanche), unabhÃ¤ngig pro (x,y,seed,channel)
+static inline uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch) {
+    uint32_t v = (uint32_t)x;
+    v ^= (uint32_t)y * 0x27d4eb2dU;
+    v ^= seed * 0x9e3779b9U;
+    v ^= (ch + 1U) * 0x85ebca6bU;
+    v ^= v >> 16; v *= 0x7feb352dU;
+    v ^= v >> 15; v *= 0x846ca68bU;
+    v ^= v >> 16;
+    return v;
 }
 
 // -------------------------------------------------------------
@@ -127,7 +137,7 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
 // -------------------------------------------------------------
 
 template<> struct NoiseTraits<HashNoiseRGBA8> {
-    using PixelT = uint8_t; // 4 Kanäle hintereinander
+    using PixelT = uint8_t;
     static constexpr GLenum IFmt = GL_RGBA8;
     static constexpr GLenum EFmt = GL_RGBA;
     static constexpr GLenum Type = GL_UNSIGNED_BYTE;
@@ -145,15 +155,19 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
     static void Compute(ManagedArray<uint8_t>& data, int edgeSize, int /*yPeriod*/, int /*xPeriod*/, int /*octave*/, uint32_t seed) {
         data.Resize(edgeSize * edgeSize * 4);
         uint8_t* dataPtr = data.Data();
+
         for (int y = 0; y < edgeSize; ++y) {
-            int py = (y % edgeSize + edgeSize) % edgeSize;
             for (int x = 0; x < edgeSize; ++x) {
-                int px = (x % edgeSize + edgeSize) % edgeSize;
-                size_t i = size_t(y) * edgeSize * 4 + size_t(x) * 4;
-                *dataPtr++ = Hash2iByte(px, py, seed, 0);
-                *dataPtr++ = Hash2iByte(px + 73, py, seed, 1);
-                *dataPtr++ = Hash2iByte(px, py + 91, seed, 2);
-                *dataPtr++ = Hash2iByte(px + 157, py + 37, seed, 3);
+                uint32_t h0 = HashXYC32(x, y, seed, 0);
+                uint32_t h1 = HashXYC32(x, y, seed, 1);
+                uint32_t h2 = HashXYC32(x, y, seed, 2);
+                uint32_t h3 = HashXYC32(x, y, seed, 3);
+
+                // oberes Byte je Hash â†’ U(0..255)
+                *dataPtr++ = (uint8_t)(h0 >> 24);
+                *dataPtr++ = (uint8_t)(h1 >> 24);
+                *dataPtr++ = (uint8_t)(h2 >> 24);
+                *dataPtr++ = (uint8_t)(h3 >> 24);
             }
         }
     }
