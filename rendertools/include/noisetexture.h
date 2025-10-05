@@ -34,9 +34,10 @@ static inline void Grad3(uint32_t h, float& gx, float& gy, float& gz) {
     case 4: gx = 1; gy = 0; gz = 1; break; case 5: gx = -1; gy = 0; gz = 1; break;
     case 6: gx = 1; gy = 0; gz = -1; break; case 7: gx = -1; gy = 0; gz = -1; break;
     case 8: gx = 0; gy = 1; gz = 1; break; case 9: gx = 0; gy = -1; gz = 1; break;
-    case10: gx = 0; gy = 1; gz = -1; break; default: gx = 0; gy = -1; gz = -1; break;
+    case 10: gx = 0; gy = 1; gz = -1; break; default: gx = 0; gy = -1; gz = -1; break;
     }
 }
+
 static float Perlin3_Periodic(float x, float y, float z, int P, uint32_t seed) {
     int xi0 = (int)std::floor(x), yi0 = (int)std::floor(y), zi0 = (int)std::floor(z);
     float xf = x - xi0, yf = y - yi0, zf = z - zi0;
@@ -67,6 +68,7 @@ static float Perlin3_Periodic(float x, float y, float z, int P, uint32_t seed) {
     float nxy1 = nx01 + (nx11 - nx01) * v;
     return nxy0 + (nxy1 - nxy0) * w; // ~[-1,1]
 }
+
 static float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, float lac, float gain, uint32_t seed) {
     float a = 1.f, sum = 0.f, norm = 0.f;
     for (int i = 0; i < oct; ++i) {
@@ -98,9 +100,11 @@ static float WorleyF1_Periodic(float x, float y, float z, int C, uint32_t seed) 
     const float invMax = 1.0f / 1.7320508075688772f; // 1/sqrt(3)
     return std::clamp(dmin * invMax, 0.0f, 1.0f);
 }
+
 static inline float WorleyInv_Periodic(float x, float y, float z, int C, uint32_t seed) {
     return 1.0f - WorleyF1_Periodic(x, y, z, C, seed);
 }
+
 static float WorleyFBM_Periodic(float xP, float yP, float zP, int P, int C0, int oct, float lac, float gain, uint32_t seed) {
     float a = 1.f, sum = 0.f, norm = 0.f;
     float sx = xP * (float)C0 / float(P);
@@ -122,7 +126,11 @@ static inline float Hash2i(int ix, int iy) {
     float s = std::sinf(t) * 43758.5453f;
     return s - std::floor(s);
 }
-static inline float Smoothe(float t) { return t * t * (3.0f - 2.0f * t); }
+
+static inline float Smoothe(float t) { 
+    return t * t * (3.0f - 2.0f * t); 
+}
+
 static float ValueNoisePeriodic(float x, float y, int perX, int /*perY*/) {
     int ix0 = (int)std::floor(x), iy0 = (int)std::floor(y);
     float fx = x - ix0, fy = y - iy0;
@@ -137,6 +145,7 @@ static float ValueNoisePeriodic(float x, float y, int perX, int /*perY*/) {
     float cd = c + (d - c) * ux;
     return ab + (cd - ab) * uy; // 0..1
 }
+
 static float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, float lac = 2.0f, float gain = 0.5f) {
     float s = 0.0f, amp = 1.0f, norm = 0.0f;
     float px = x, py = y; int pX = perX; (void)perY;
@@ -150,6 +159,7 @@ static float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, 
     s = 0.5f + (s - 0.5f) * 2.2f;
     return std::clamp(s, 0.0f, 1.0f);
 }
+
 static inline uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch) {
     float phase = float((seed ^ (ch * 0x9E3779B9u)) & 0xFFFFu) * (1.0f / 65536.0f);
     float t = float(ix) * 127.1f + float(iy) * 311.7f + phase;
@@ -158,6 +168,7 @@ static inline uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch) {
     int   v = int(f * 255.0f + 0.5f);
     return (uint8_t)std::min(v, 255);
 }
+
 static inline uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch) {
     uint32_t v = (uint32_t)x;
     v ^= (uint32_t)y * 0x27d4eb2dU;
@@ -245,7 +256,7 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
     // 'octave' ist hier der z-Slice-Index [0..edgeSize-1]
     static void Compute(ManagedArray<uint8_t>& data, int edgeSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed) {
         data.Resize(edgeSize * edgeSize * 4);
-        uint8_t* out = data.Data();
+        uint8_t* dataPtr = data.Data();
 
         const int   P = edgeSize;                 // Periode in allen Achsen
         const float fx = 1.0f / float(edgeSize);
@@ -277,10 +288,10 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
                 float B = WorleyFBM_Periodic(xP, yP, zP, P, C_B, 4, 2.0f, 0.5f, seed ^ 0xBEEFu);
                 float A = WorleyFBM_Periodic(xP, yP, zP, P, C_A, 4, 2.0f, 0.5f, seed ^ 0xCAFEu);
 
-                *out++ = ToByte01(R);
-                *out++ = ToByte01(G);
-                *out++ = ToByte01(B);
-                *out++ = ToByte01(A);
+                *dataPtr++ = ToByte01(R);
+                *dataPtr++ = ToByte01(G);
+                *dataPtr++ = ToByte01(B);
+                *dataPtr++ = ToByte01(A);
             }
         }
     }
@@ -289,7 +300,8 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
 // -------------------------------------------------------------
 // Texture-Wrapper wie im Original
 template<class Tag>
-class NoiseTexture : public Texture {
+class NoiseTexture 
+    : public Texture {
 public:
     bool Create(int edgeSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
         if (not Texture::Create()) return false;
@@ -305,6 +317,10 @@ public:
         }
     }
     const std::vector<typename NoiseTraits<Tag>::PixelT>& Data() const { return m_data; }
+
+    inline bool IsAvailable(void) noexcept {
+        return HasBuffer() and (m_data.Length() != 0);
+    }
 
 private:
     ManagedArray<typename NoiseTraits<Tag>::PixelT> m_data;
