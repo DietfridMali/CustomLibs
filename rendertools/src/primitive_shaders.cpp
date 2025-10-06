@@ -68,14 +68,17 @@ const ShaderSource& RingShader() {
         R"(
             #version 330 core
 
-            uniform vec2 center;          // [0..1] UV
-            uniform float radius;         // [0..1] UV (außen, bezogen auf min(viewportSize))
-            uniform float strength;       // [0..1] UV (Dicke)
-            uniform vec4 surfaceColor;
-            uniform bool antialias;
-            uniform vec2 viewportSize;    // Pixel
+            uniform vec2  center;          // [0..1] UV
+            uniform float radius;          // [0..1] UV (außen, bezogen auf min(viewportSize))
+            uniform float strength;        // [0..1] UV (Dicke)
+            uniform vec4  surfaceColor;
+            uniform bool  antialias;
+            uniform vec2  viewportSize;    // Pixel
 
-            in vec2 fragCoord;            // [0..1] UV
+            uniform float startAngle;      // [0..360)
+            uniform float endAngle;        // [0..360)
+
+            in vec2 fragCoord;             // [0..1] UV
             out vec4 fragColor;
 
             void main() {
@@ -84,6 +87,15 @@ const ShaderSource& RingShader() {
                 float pxDist      = length(pxDelta);
                 float pxRadius    = radius   * pxScale;
                 float pxStrength  = strength * pxScale;
+
+                // Winkel 0..360
+                float a = degrees(atan(pxDelta.y, pxDelta.x));
+                if (a < 0.0) a += 360.0;
+
+                // optional Segment (Start..Ende, Ende inkl.)
+                bool renderSegment = startAngle != endAngle;
+                if (renderSegment && (a < startAngle || a > endAngle))
+                    discard;
 
                 float outerR = pxRadius;
                 float innerR = max(pxRadius - pxStrength, 0.0);
@@ -94,14 +106,13 @@ const ShaderSource& RingShader() {
                 float alpha;
                 if (antialias) {
                     float pxWidth = 0.5 * fwidth(pxDist);
-                    if (dOuter > pxWidth || dInner > pxWidth)
-                        discard;
+                    if (dOuter > pxWidth || dInner > pxWidth) discard;
                     float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
                     alpha = aOuter * aInner;
-                }
+                } 
                 else {
-                    if (dOuter > 0.0 || dInner > 0.0)
+                    if (dOuter > 0.0 || dInner > 0.0) 
                         discard;
                     alpha = 1.0;
                 }

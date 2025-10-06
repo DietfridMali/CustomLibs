@@ -74,10 +74,10 @@ public:
         return LoadLineShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(start), static_cast<const Vector2f&>(end), strength, antialias);
     }
 
-    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, bool antialias);
+    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true);
 
-    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, float radius, float strength, bool antialias) {
-        return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, antialias);
+    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true) {
+        return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, antialias);
     }
 
     Shader* LoadCircleShader(const RGBAColor& color, const Vector2f& center, float radius, bool antialias);

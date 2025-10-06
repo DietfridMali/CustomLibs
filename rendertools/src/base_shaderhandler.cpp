@@ -117,7 +117,7 @@ Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f
 }
 
 
-Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, bool antialias) {
+Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, float startAngle, float endAngle, bool antialias) {
     Shader* shader = SetupShader("ringShader");
     if (shader and not baseRenderer.DepthPass()) {
         shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
@@ -125,6 +125,8 @@ Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f
         shader->SetVector2f("center", center);
         shader->SetFloat("radius", radius);
         shader->SetFloat("strength", strength);
+        shader->SetFloat("startAngle", startAngle);
+        shader->SetFloat("endAngle", endAngle);
         shader->SetInt("antialias", antialias ? 1 : 0);
     }
     return shader;
