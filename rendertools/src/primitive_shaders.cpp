@@ -233,9 +233,9 @@ const ShaderSource& RectangleShader() {
             in vec2 fragCoord;         // UV [0..1]
             out vec4 fragColor;
 
-            uniform vec2 viewportSize; // Pixel
+            uniform vec2 viewportSize; // [px]
             uniform vec4 surfaceColor;
-            uniform vec2 center;       // UV
+            uniform vec2 center;       // [uv]
             uniform vec2 size;         // UV, Rect liegt innerhalb center +/- size  (=> size = Halbgröße)
             uniform float strength;    // relativ zu min(viewportSize)
             uniform float radius;      // relativ zu min(viewportSize)
@@ -246,7 +246,7 @@ const ShaderSource& RectangleShader() {
             vec2  pxSize;     // Halbgröße in Pixeln
             float pxRadius;
 
-            // SDF im PIXELRAUM, damit Dicken/Radius pixelgenau und isotrop sind
+            // SDF in pixel space to keep thickness and radius pixel perfect and isotropic
             float sdRoundRect() {
                 vec2 q = abs(pxFragCoord - pxCenter) - (pxSize - vec2(pxRadius));
                 return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - pxRadius; // <0 innen
@@ -256,31 +256,32 @@ const ShaderSource& RectangleShader() {
                 // UV -> Pixel (Zuweisung an die globalen px*-Variablen)
                 pxFragCoord = fragCoord * viewportSize;
                 pxCenter    = center    * viewportSize;
-                pxSize      = size      * viewportSize;   // size = Halbgröße
-                pxRadius    = clamp(radius * min(viewportSize.x, viewportSize.y),
-                                    0.0, min(pxSize.x, pxSize.y));
+                pxSize      = size      * viewportSize;   // size = half size here
+                pxRadius    = clamp(radius * min(viewportSize.x, viewportSize.y),0.0, min(pxSize.x, pxSize.y));
 
-                float sd  = sdRoundRect();                    // Distanz zur Außenkante (px)
+                float sd  = sdRoundRect();                    // distance to outer border [px]
                 float aaw = antialias ? fwidth(sd) : 0.0;     // ~1 px
 
                 if (strength <= 0.0) {
                     if (sd > aaw) discard;
                     float alpha = 1.0 - smoothstep(0.0, aaw, sd);
                     fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
-                } else {
-                    // einseitiger Stroke: von sd ∈ [-pxStrength, 0]
+                } 
+                else {
                     float pxStrength = strength * min(viewportSize.x, viewportSize.y);
                     float sdi = sd + pxStrength;              // Distanz zur Innenkante
 
-                    // harte Verwerfungen außerhalb des AA-Korridors
-                    if (sd > aaw || sdi < -aaw) discard;
+                    // hard discard outside of the aa corridor
+                    if (sd > aaw || sdi < -aaw) 
+                        discard;
 
                     // konstante Dicke: Coverages MULTIPLIZIEREN statt min()
                     float covOuter = 1.0 - smoothstep(0.0, aaw, sd);   // Außenkante
                     float covInner =        smoothstep(0.0, aaw, sdi); // Innenkante
                     float alpha    = covOuter * covInner;
 
-                    if (alpha <= 0.0) discard;
+                    if (alpha <= 0.0) 
+                        discard;
                     fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
                 }
             }
