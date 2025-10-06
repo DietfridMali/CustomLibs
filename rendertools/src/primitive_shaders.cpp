@@ -89,7 +89,7 @@ const ShaderSource& RingShader() {
                 float pxStrength  = strength * pxScale;
 
                 // Winkel 0..360
-                float a = degrees(atan(pxDelta.y, pxDelta.x));
+                float a = degrees(atan(pxDelta.y, pxDelta.x)) + 90.0;
                 if (a < 0.0) a += 360.0;
 
                 // optional Segment (Start..Ende, Ende inkl.)
