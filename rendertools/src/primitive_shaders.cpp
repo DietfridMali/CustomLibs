@@ -85,12 +85,10 @@ const ShaderSource& RingShader() {
 
             float Rad2Deg(float r) { return r * (180.0 / PI); }
 
-            float Norm360(float d) { return d - floor(d / 360.0) * 360.0; }
-
             // Winkel mit 0°=12 Uhr, CW steigend
             float Degrees(vec2 d) {
-                float r = 0.5 * PI - atan(d.y, d.x);     
-                r = r - floor(r / (2.0 * PI)) * (2.0 * PI);
+                float r = 0.5 * PI - atan(-d.y, d.x);     
+                r -= floor(r / (2.0 * PI)) * (2.0 * PI);
                 return Rad2Deg(r);
             }
 
@@ -103,7 +101,7 @@ const ShaderSource& RingShader() {
                 float pxStrength  = strength * pxScale;
 
                 // Winkel 0..360
-                float a = Degrees(atan(pxDelta.y, pxDelta.x)) + 90.0;
+                float a = Degrees(pxDelta);
                 if (a < 0.0) 
                     a += 360.0;
 
