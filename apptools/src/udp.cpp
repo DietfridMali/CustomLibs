@@ -67,10 +67,9 @@ UDPData UDPSocket::Receive(int minLength) { // return sender address in message.
     if (not (m_socket and m_packet))
         return { nullptr, 0 };
     int n = SDLNet_UDP_Recv(m_socket, m_packet);
-    NetworkEndpoint ep = m_packet->address;
-    if (ep.GetIpAddress() == "192.168.178.34")
-        n = n;
     if ((n <= 0) or (m_packet->len > MaxPacketSize))
+        return { nullptr, 0 };
+    if (SocketAddress().host == m_packet->address.host)
         return { nullptr, 0 };
     if ((minLength > 0) and (m_packet->len < minLength))
         return { nullptr, 0 };
