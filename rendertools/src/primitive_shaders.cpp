@@ -81,6 +81,20 @@ const ShaderSource& RingShader() {
             in vec2 fragCoord;             // [0..1] UV
             out vec4 fragColor;
 
+            const float PI = 3.14159265358979323846;
+
+            float Rad2Deg(float r) { return r * (180.0 / PI); }
+
+            float Norm360(float d) { return d - floor(d / 360.0) * 360.0; }
+
+            // Winkel mit 0°=12 Uhr, CW steigend
+            float Degrees(vec2 d) {
+                float r = 0.5 * PI - atan(d.y, d.x);     
+                r = r - floor(r / (2.0 * PI)) * (2.0 * PI);
+                return Rad2Deg(r);
+            }
+
+
             void main() {
                 float pxScale     = min(viewportSize.x, viewportSize.y);
                 vec2  pxDelta     = (fragCoord - center) * viewportSize;
@@ -89,8 +103,9 @@ const ShaderSource& RingShader() {
                 float pxStrength  = strength * pxScale;
 
                 // Winkel 0..360
-                float a = degrees(atan(pxDelta.y, pxDelta.x));
-                if (a < 0.0) a += 360.0;
+                float a = Degrees(atan(pxDelta.y, pxDelta.x)) + 90.0;
+                if (a < 0.0) 
+                    a += 360.0;
 
                 // optional Segment (Start..Ende, Ende inkl.)
                 bool renderSegment = startAngle != endAngle;
@@ -106,7 +121,8 @@ const ShaderSource& RingShader() {
                 float alpha;
                 if (antialias) {
                     float pxWidth = 0.5 * fwidth(pxDist);
-                    if (dOuter > pxWidth || dInner > pxWidth) discard;
+                    if (dOuter > pxWidth || dInner > pxWidth) 
+                        discard;
                     float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
                     alpha = aOuter * aInner;
