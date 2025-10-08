@@ -75,6 +75,10 @@ public:
     }
 
 
+    inline void SetStartTime(int startTime) noexcept {
+        m_startTime = startTime;
+    }
+
     inline int Duration(void)
         const noexcept
     {
