@@ -130,6 +130,30 @@ class NetworkMessage {
         }
 
 
+        inline int ToUInt16(int i) {
+            /*
+            return i-th parameter value as int
+
+            Parameters:
+            -----------
+                i: Index of the requested parameter
+            */
+            return uint16_t(m_values[i]);
+        }
+
+
+        inline int ToUInt32(int i) {
+            /*
+            return i-th parameter value as int
+
+            Parameters:
+            -----------
+                i: Index of the requested parameter
+            */
+            return uint32_t(m_values[i]);
+        }
+
+
         inline float ToFloat(int i) {
             /*
             return i-th parameter value as float

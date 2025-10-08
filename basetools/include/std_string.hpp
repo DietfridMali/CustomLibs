@@ -32,6 +32,10 @@ public:
 
     explicit String(int n) : m_str(std::to_string(n)) {}
 
+    explicit String(uint16_t n) : m_str(std::to_string(n)) {}
+
+    explicit String(uint32_t n) : m_str(std::to_string(n)) {}
+
     explicit String(size_t n) : m_str(std::to_string(n)) {}
 
     explicit String(float f) : m_str(std::to_string(f)) {}
@@ -77,6 +81,7 @@ public:
     explicit operator int() const;
     explicit operator size_t() const;
     explicit operator uint16_t() const;
+    explicit operator uint32_t() const;
     explicit operator float() const;
     explicit operator bool() const noexcept;
 
@@ -283,6 +288,15 @@ inline String::operator uint16_t() const {
     if (val > std::numeric_limits<uint16_t>::max())
         throw std::out_of_range("Wert zu groß für uint16_t");
     return static_cast<uint16_t>(val);
+}
+
+inline String::operator uint32_t() const {
+    if (IsEmpty())
+        return 0;
+    auto val = static_cast<size_t>(*this);
+    if (val > std::numeric_limits<uint32_t>::max())
+        throw std::out_of_range("Wert zu groß für uint16_t");
+    return static_cast<uint32_t>(val);
 }
 
 inline String::operator float() const {
