@@ -147,6 +147,8 @@ noexcept(
     m_indices.Destroy();
     m_textures.Clear();
     m_vao.Destroy();
+    m_vMax = Vector3f{ -1e6, -1e6, -1e6 }; 
+    m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; 
 }
 
 // =================================================================================================
