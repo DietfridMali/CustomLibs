@@ -100,7 +100,6 @@ public:
     // Subnet-Directed Broadcast x.y.z.255:port (angenommen /24)
     NetworkEndpoint DirectedBroadcast(uint16_t port) noexcept;
 
-private:
     void UpdateFromSocketAddress(void);
 
     void UpdateSocketAddress(void);
