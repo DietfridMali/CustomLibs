@@ -173,25 +173,41 @@ Argument* ArgHandler::GetArg(const char* key) {
 }
 
 
-const String ArgHandler::StrVal(const char* key, int i, String defVal) {
+const String ArgHandler::StrVal(const char* key, int i, String defVal, bool onlyDebug) {
+#ifdef RELEASE
+    if (onlyDebug)
+    return defVal;
+#endif
     Argument* a = GetArg(key);
     return a ? a->GetVal(i) : defVal;
 }
 
 
-int ArgHandler::IntVal(const char* key, int i, int defVal) {
+int ArgHandler::IntVal(const char* key, int i, int defVal, bool onlyDebug) {
+#ifdef RELEASE
+    if (onlyDebug)
+        return defVal;
+#endif
     Argument* a = GetArg(key);
     return a ? int (a->GetVal(i)) : defVal;
 }
 
 
-float ArgHandler::FloatVal(const char* key, int i, float defVal) {
+float ArgHandler::FloatVal(const char* key, int i, float defVal, bool onlyDebug) {
+#ifdef RELEASE
+    if (onlyDebug)
+        return defVal;
+#endif
     Argument* a = GetArg(key);
     return a ? float (a->GetVal(i)) : defVal;
 }
 
 
-bool ArgHandler::BoolVal(const char* key, int i, bool defVal) {
+bool ArgHandler::BoolVal(const char* key, int i, bool defVal, bool onlyDebug) {
+#ifdef RELEASE
+    if (onlyDebug)
+        return defVal;
+#endif
     return bool(IntVal(key, i, int(defVal)));
 }
 
