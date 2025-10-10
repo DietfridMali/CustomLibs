@@ -113,7 +113,12 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
-            return m_values[i];
+            try {
+                return m_values[i];
+            }
+            catch (...) {
+                return String("");
+            }
         }
 
 
@@ -126,7 +131,12 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
-            return int(m_values[i]);
+            try {
+                return int(m_values[i]);
+            }
+            catch (...) {
+                return 0;
+            }
         }
 
 
@@ -138,7 +148,12 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
-            return uint16_t(m_values[i]);
+            try {
+                return uint16_t(m_values[i]);
+            }
+            catch (...) {
+                return 0;
+            }
         }
 
 
@@ -150,7 +165,12 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
-            return uint32_t(m_values[i]);
+            try {
+                return uint32_t(m_values[i]);
+            }
+            catch (...) {
+                return 0;
+            }
         }
 
 
@@ -162,7 +182,12 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
-            return float(m_values[i]);
+            try {
+                return float(m_values[i]);
+            }
+            catch (...) {
+                return 0;
+            }
         }
 
 
@@ -175,8 +200,13 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
-            ManagedArray<String> coords = m_values[i].Split(',');
-            return Vector3f{ float(coords[0]), float(coords[1]), float(coords[2]) };
+            try {
+                ManagedArray<String> coords = m_values[i].Split(',');
+                return Vector3f{ float(coords[0]), float(coords[1]), float(coords[2]) };
+            }
+            catch (...) {
+                return Vector3f::ZERO;
+            }
         }
 
 
@@ -191,9 +221,15 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
-            ManagedArray<String> values = m_values[i].Split(':');
-            port = uint16_t(values[1]);
-            return values[0];
+            try {
+                ManagedArray<String> values = m_values[i].Split(':');
+                port = uint16_t(values[1]);
+                return values[0];
+            }
+            catch (...) {
+                port = 0;
+                return String("127.0.0.1");
+            }
         }
 };
 

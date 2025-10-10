@@ -19,36 +19,42 @@ bool NetworkMessage::IsValid(int valueCount) {
             < 0: specifies the required minimum number of parameters
             == 0: don't check parameter count
     */
-    m_values = m_payload.Split('#');
-    String keyword = m_values[0];
-    if (m_values.Length() < 2)
-        m_numValues = 0;
-    else {
-        m_values = m_values[1].Split(';');
-        if (not m_values[0].IsEmpty())
-            m_numValues = m_values.Length();
-        else {
-            m_values.Clear();
+    try {
+        m_values = m_payload.Split('#');
+        String keyword = m_values[0];
+        if (m_values.Length() < 2)
             m_numValues = 0;
+        else {
+            m_values = m_values[1].Split(';');
+            if (not m_values[0].IsEmpty())
+                m_numValues = m_values.Length();
+            else {
+                m_values.Clear();
+                m_numValues = 0;
+            }
         }
-    }
-    if (valueCount == 0) {
-        m_result = 1;
-        return true;
-    }
-    if (valueCount > 0) {
-        if (m_numValues == valueCount) {
+        if (valueCount == 0) {
             m_result = 1;
             return true;
         }
-    }
-    else if (valueCount < 0) {
-        if (m_numValues >= -valueCount) {
-            m_result = 1;
-            return true;
+        if (valueCount > 0) {
+            if (m_numValues == valueCount) {
+                m_result = 1;
+                return true;
+            }
         }
+        else if (valueCount < 0) {
+            if (m_numValues >= -valueCount) {
+                m_result = 1;
+                return true;
+            }
+        }
+        fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)\n", static_cast<char*>(keyword), valueCount, m_numValues);
     }
-    fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)\n", static_cast<char*>(keyword), valueCount, m_numValues);
+    catch (...) {
+        m_result = -1;
+        return false;
+    }
     m_result = -1;
     return false;
 }
