@@ -48,7 +48,7 @@ bool NetworkMessage::IsValid(int valueCount) {
             return true;
         }
     }
-    fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)", static_cast<char*>(keyword), valueCount, m_numValues);
+    fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)\n", static_cast<char*>(keyword), valueCount, m_numValues);
     m_result = -1;
     return false;
 }
