@@ -78,20 +78,24 @@ public:
 
     void SetViewport(void);
 
-    Viewport Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
+    Viewport& Resize(float scale);
 
-    Viewport Resize(float scale) const;
+    Viewport Resized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
+
+    Viewport Resized(float scale) const;
 
     void SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
 
     void BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
 
-    Viewport Move(int dx, int dy) {
+    Viewport& Move(int dx, int dy);
+
+    Viewport Moved(int dx, int dy) {
         return Viewport(m_left + dx, m_top + dy, m_width, m_height);
     }
 
 
-    Viewport Movef(float dx, float dy) {
+    Viewport Movedf(float dx, float dy) {
         return Viewport(m_left + int(m_width * dx), int (m_top + m_height * dy), m_width, m_height);
     }
 

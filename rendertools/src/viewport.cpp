@@ -17,12 +17,42 @@ void Viewport::SetViewport(void) {
 }
 
 
-Viewport Viewport::Resize(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const {
+Viewport& Viewport::Move(int dx, int dy) {
+    if (dx) {
+        m_left += dx;
+        m_right += dx;
+        m_center.X() += dx;
+    }
+    if (dy) {
+        m_top += dy;
+        m_bottom += dy;
+        m_center.Y() += dy;
+    }
+    return *this;
+}
+
+
+Viewport& Viewport::Resize(float scale) {
+    if (scale == 1.0f)
+        return *this;
+    m_width = int(round(float(m_width) * scale));
+    m_height = int(round(float(m_height) * scale));
+    m_left = int(m_center.X()) - m_width / 2;
+    m_top = int(m_center.Y()) - m_height / 2;
+    m_right = m_left + m_width;
+    m_bottom = m_top + m_height;
+    m_center.X() = float(m_left) + float(m_width) * 0.5f;
+    m_center.Y() = float(m_top) + float(m_height) * 0.5f;
+    return *this;
+}
+
+
+Viewport Viewport::Resized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const {
     return Viewport (m_left + deltaLeft, m_top + deltaTop, m_width + deltaWidth, m_height + deltaHeight);
 }
 
 
-Viewport Viewport::Resize(float scale) const {
+Viewport Viewport::Resized(float scale) const {
     if (scale == 1.0f)
         return *this;
     float w = float(m_width) * scale;
@@ -34,7 +64,7 @@ Viewport Viewport::Resize(float scale) const {
 
 
 void Viewport::SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const {
-    baseRenderer.SetViewport (Resize (deltaLeft, deltaTop, deltaWidth, deltaHeight));
+    baseRenderer.SetViewport (Resized (deltaLeft, deltaTop, deltaWidth, deltaHeight));
 }
 
 
