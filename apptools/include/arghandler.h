@@ -115,13 +115,13 @@ class ArgHandler
 
         Argument* GetArg(const char* key);
 
-        const String StrVal(const char* key, int i = 0, String defVal = String (""));
+        const String StrVal(const char* key, int i = 0, String defVal = String (""), bool onlyDebug = true);
 
-        int IntVal(const char* key, int i = 0, int defVal = 0);
+        int IntVal(const char* key, int i = 0, int defVal = 0, bool onlyDebug = true);
 
-        float FloatVal(const char* key, int i = 0, float defVal = 0.0f);
+        float FloatVal(const char* key, int i = 0, float defVal = 0.0f, bool onlyDebug = true);
 
-        bool BoolVal(const char* key, int i = 0, bool defVal = false);
+        bool BoolVal(const char* key, int i = 0, bool defVal = false, bool onlyDebug = true);
  };
 
 #define argHandler ArgHandler::Instance()
