@@ -103,6 +103,16 @@ public:
     void UpdateFromSocketAddress(void);
 
     void UpdateSocketAddress(void);
+
+    inline void Clear(void) noexcept {
+        m_socketAddress.host = 0;
+        m_socketAddress.port = 0;
+        UpdateFromSocketAddress();
+    }
+
+    inline bool IsEmpty(void) noexcept {
+        return (m_socketAddress.host == 0) and (m_socketAddress.port == 0);
+    }
 };
 
 // =================================================================================================
