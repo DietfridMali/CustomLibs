@@ -50,15 +50,19 @@ public:
 
     void Close(void);
 
-    bool Send(const uint8_t* data, int dataLen, NetworkEndpoint& receiver);
+    bool Send(const uint8_t* data, int dataLen, const NetworkEndpoint& receiver);
 
     inline bool Send(const String& message, NetworkEndpoint& receiver) {
         return Send(reinterpret_cast<const uint8_t*>(message.Data()), int(message.Length()), receiver);
     }
 
+    inline bool Send(NetworkMessage& const message) {
+        return Send(message.Payload(), message.Address());
+    }
+
     UDPData Receive(int minLength = 0);
 
-    bool Receive(NetworkMessage& message, int portOffset = -1);
+    bool Receive(NetworkMessage& message);
 
     bool SendBroadcast(const uint8_t* data, int dataLen, uint16_t destPort, bool subnetOnly);
 

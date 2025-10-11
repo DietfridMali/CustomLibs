@@ -45,7 +45,7 @@ void UDPSocket::Unbind(void) {
 }
 
 
-bool UDPSocket::Send(const uint8_t* data, int dataLen, NetworkEndpoint& receiver) {
+bool UDPSocket::Send(const uint8_t* data, int dataLen, const NetworkEndpoint& receiver) {
     if (not m_socket)
         return false;
 #if 1
@@ -77,12 +77,11 @@ UDPData UDPSocket::Receive(int minLength) { // return sender address in message.
 }
 
 
-bool UDPSocket::Receive(NetworkMessage& message, int portOffset) { // return sender address in message.Address()
+bool UDPSocket::Receive(NetworkMessage& message) { // return sender address in message.Address()
     UDPData data = Receive();
     if (not data.length)
         return false;
     message.Address() = m_packet->address;
-    message.SetPort(uint16_t(int(message.GetPort()) + portOffset));
     message.Payload() = String((const char*)m_packet->data, m_packet->len);
     return true;
 }
