@@ -319,7 +319,7 @@ public:
     bool Pop(ItemType& value) {
         if (Length() == 0)
             return false;
-        value = m_list.back();
+        value = std::move(m_list.back());
         m_list.pop_back();
         return true;
     }
