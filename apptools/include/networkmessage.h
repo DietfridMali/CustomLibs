@@ -224,24 +224,7 @@ class NetworkMessage {
 
         // format: <ip v4 address>":"<port>
         // <ip address> = "//.//.//.//" (// = one to three digit subnet id)
-        inline NetworkEndpoint& ToIpAddress(int i, NetworkEndpoint& address) {
-            /*
-            return i-th parameter value as ip address:port pair
-
-            Parameters:
-            -----------
-                i: Index of the requested parameter
-            */
-            try {
-                address.SocketAddress().host = uint32_t(m_values[i]);
-                address.SocketAddress().port = uint16_t(m_values[i + 1]);
-                address.UpdateFromSocketAddress();
-            }
-            catch (...) {
-                address.Set("127.0.0.1", 1);
-            }
-            return address;
-        }
+        NetworkEndpoint& ToIpAddress(int i, NetworkEndpoint& address);
 };
 
 // =================================================================================================

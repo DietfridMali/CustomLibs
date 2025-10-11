@@ -59,4 +59,30 @@ bool NetworkMessage::IsValid(int valueCount) {
     return false;
 }
 
+
+
+NetworkEndpoint& NetworkMessage::ToIpAddress(int i, NetworkEndpoint& address) {
+    /*
+    return i-th parameter value as ip address:port pair
+
+    Parameters:
+    -----------
+        i: Index of the requested parameter
+    */
+    try {
+        ManagedArray<String> ipParts = m_values[i].Split(':');
+        if (ipParts.Length() < 2)
+            address.Set("127.0.0.1", 1);
+        else {
+            address.SocketAddress().host = uint32_t(ipParts[0]);
+            address.SocketAddress().port = uint16_t(ipParts[1]);
+            address.UpdateFromSocketAddress();
+        }
+    }
+    catch (...) {
+        address.Set("127.0.0.1", 1);
+    }
+    return address;
+}
+
 // =================================================================================================
