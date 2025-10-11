@@ -52,11 +52,11 @@ public:
 
     bool Send(const uint8_t* data, int dataLen, const NetworkEndpoint& receiver);
 
-    inline bool Send(const String& message, NetworkEndpoint& receiver) {
+    inline bool Send(String& message, NetworkEndpoint& receiver) {
         return Send(reinterpret_cast<const uint8_t*>(message.Data()), int(message.Length()), receiver);
     }
 
-    inline bool Send(NetworkMessage& const message) {
+    inline bool Send(NetworkMessage& message) {
         return Send(message.Payload(), message.Address());
     }
 
