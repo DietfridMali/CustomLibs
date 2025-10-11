@@ -213,7 +213,7 @@ class NetworkMessage {
 
         // format: <ip v4 address>":"<port>
         // <ip address> = "//.//.//.//" (// = one to three digit subnet id)
-        inline String ToAddress(int i, uint16_t& port) {
+        inline NetworkEndpoint& ToIpAddress(int i, NetworkEndpoint& address) {
             /*
             return i-th parameter value as ip address:port pair
 
@@ -223,13 +223,12 @@ class NetworkMessage {
             */
             try {
                 ManagedArray<String> values = m_values[i].Split(':');
-                port = uint16_t(values[1]);
-                return values[0];
+                address.Set(values[0], uint16_t(values[1]));
             }
             catch (...) {
-                port = 0;
-                return String("127.0.0.1");
+                address.Set("127.0.0.1", 1);
             }
+            return address;
         }
 };
 
