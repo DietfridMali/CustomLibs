@@ -40,10 +40,14 @@ class NetworkMessage {
         NetworkEndpoint         m_address;
         int                     m_numValues;
         int                     m_result;
+        bool                    m_isBroadcast; // used for sending this message as a broadcast in a LAN
         ManagedArray<String>    m_values;
 
         NetworkMessage() 
-            : m_numValues (0), m_address ("", 0), m_result (0) 
+            : m_numValues (0)
+            , m_address ("", 0)
+            , m_isBroadcast(false)
+            , m_result (0) 
         { }
 
         NetworkMessage(String message, NetworkEndpoint address) {
@@ -104,6 +108,13 @@ class NetworkMessage {
 
         bool IsValid(int valueCount = 0);
 
+        inline bool IsBroadcast(void) {
+            return m_isBroadcast;
+        }
+
+        inline void Broadcast(bool isBroadcast) {
+            m_isBroadcast = isBroadcast;
+        }
 
         inline String ToStr(int i) {
             /*
