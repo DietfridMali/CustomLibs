@@ -48,7 +48,7 @@
     <ClInclude Include="..\include\sharedpointer.hpp" />
     <ClInclude Include="..\include\sharedresource.hpp" />
     <ClInclude Include="..\include\simpledatapool.hpp" />
-    <ClInclude Include="..\include\singletonbase.hpp" />
+    <ClInclude Include="..\include\basesingleton.hpp" />
     <ClInclude Include="..\include\smartpointer.hpp" />
     <ClInclude Include="..\include\std_array.hpp" />
     <ClInclude Include="..\include\std_defines.h" />

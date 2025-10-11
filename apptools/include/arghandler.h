@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 #include "string.hpp"
 #include "sharedpointer.hpp"
 #include "list.hpp"

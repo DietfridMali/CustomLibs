@@ -5,7 +5,7 @@
 #include "texcoord.h"
 #include "base_shadercode.h"
 #include "matrix.hpp"
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 
 // =================================================================================================
 

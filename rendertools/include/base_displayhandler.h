@@ -5,7 +5,7 @@
 #include <math.h>
 #include <functional>
 #include "string.hpp"
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 
 // =================================================================================================
 // basic renderer class. Initializes display and OpenGL and sets up projections and view matrix

@@ -2,7 +2,7 @@
 
 #include "glew.h"
 #include "vector.hpp"
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 
 class Cube 
     : public BaseSingleton<Cube>

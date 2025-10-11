@@ -7,7 +7,7 @@
 #include "glew.h"
 #include <glm/glm.hpp>
 #include "array.hpp"
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 #include "colordata.h"
 
 #define ENFORCE_STATE false

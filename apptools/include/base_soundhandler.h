@@ -9,7 +9,7 @@
 #include "array.hpp"
 #include "list.hpp"
 #include "dictionary.hpp"
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 
 #include <math.h>
 

@@ -5,7 +5,7 @@
 
 #include <stdlib.h>
 #include <math.h>
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 #include "array.hpp"
 #include "matrix.hpp"
 #include "projection.h"

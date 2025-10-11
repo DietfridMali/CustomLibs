@@ -11,7 +11,7 @@
 #include "outlinerenderer.h"
 #include "mesh.h"
 #include "fonthandler.h"
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 
 #define EXTERNAL_ATLAS 1
 

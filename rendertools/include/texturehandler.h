@@ -5,7 +5,7 @@
 #include "cubemap.h"
 #include "list.hpp"
 #include "sharedpointer.hpp"
-#include "singletonbase.hpp"
+#include "basesingleton.hpp"
 
 // =================================================================================================
 // Very simply class for texture tracking
