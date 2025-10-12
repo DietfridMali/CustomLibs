@@ -87,7 +87,7 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount, void* da
     m_info.m_height = height;
     m_info.m_componentCount = componentCount;
     m_info.m_format = (componentCount == 1) ? GL_RED : (componentCount == 3) ? GL_RGB : GL_RGBA;
-    m_info.m_internalFormat = (componentCount == 1) ? GL_R8 : (componentCount == 3) ? GL_RGB : GL_RGBA;
+    m_info.m_internalFormat = (componentCount == 1) ? GL_R8 : (componentCount == 3) ? GL_RGB8 : GL_RGBA8;
     m_info.m_dataSize = width * height * componentCount;
     try {
 #if USE_SHARED_POINTERS
@@ -328,6 +328,7 @@ void Texture::Deploy(int bufferIndex)
     if (Bind()) {
         SetParams();
         TextureBuffer* texBuf = m_buffers[bufferIndex];
+        uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.Data());
         glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
         Release();
     }

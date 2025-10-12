@@ -29,10 +29,10 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
     GetTextureFolder(textureFolder);
     TextureList textures;
     for (auto& n : textureNames) {
-        Texture* t = getTexture();
         List<String> fileNames; // must be local here so it gets reset every loop iteration
         fileNames.Append(textureFolder + n);
-        if (not ((t = getTexture()) and t->CreateFromFile(fileNames, premultiply))) {
+        Texture* t = getTexture();
+        if (not (t and t->CreateFromFile(fileNames, premultiply))) {
             for (auto& h : textures)
                 delete h;
             textures.Clear();
