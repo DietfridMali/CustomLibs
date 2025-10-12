@@ -85,7 +85,7 @@ const ShaderSource& PlainTextureShader() {
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture (source, tcOffset + fragCoord * tcScale);
+            vec4 texColor = texture (source, tcOffset + (fragCoord - floor(fragCoord)) * tcScale);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);

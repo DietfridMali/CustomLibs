@@ -297,10 +297,13 @@ void Texture::SetParams(bool enforce)
 void Texture::SetWrapping(int wrapMode)
 noexcept
 {
-    if (wrapMode >= 0)
-        m_wrapMode = wrapMode;
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, m_wrapMode);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, m_wrapMode);
+    if (Bind()) {
+        if (wrapMode >= 0)
+            m_wrapMode = wrapMode;
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, m_wrapMode);
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, m_wrapMode);
+        Release();
+    }
 }
 
 
