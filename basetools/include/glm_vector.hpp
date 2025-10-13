@@ -4,6 +4,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 // =================================================================================================
 
@@ -340,6 +341,20 @@ private:
         }
     }
 };
+
+// =================================================================================================
+
+template<typename VEC_TYPE>
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::ZERO{ 0.0f };
+
+template<typename VEC_TYPE>
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::HALF{ 0.5f };
+
+template<typename VEC_TYPE>
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::ONE{ 1.0f };
+
+template<typename VEC_TYPE>
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::NONE{ std::numeric_limits<float>::quiet_NaN() };
 
 // =================================================================================================
 
