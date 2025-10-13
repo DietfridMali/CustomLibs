@@ -21,9 +21,9 @@ using enum MatrixStack::MatrixType;
 
 void RenderMatrices::CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov) {
     ModelView() = Matrix4f::IDENTITY;
-    Projection2D() = Matrices().GetProjection().ComputeOrthoProjection(0.0f, float(windowWidth), 0.0f, float(windowHeight), -1.0f, 1.0f);
+    Projection2D() = Matrices().GetProjector().ComputeOrthoProjection(0.0f, float(windowWidth), 0.0f, float(windowHeight), -1.0f, 1.0f);
     Projection2D().AsArray();
-    Projection3D() = Matrices().GetProjection().Create(aspectRatio, fov, true);
+    Projection3D() = Matrices().GetProjector().Create(aspectRatio, fov, true);
     Projection3D().AsArray();
 }
 

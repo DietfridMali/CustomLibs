@@ -21,7 +21,7 @@ public:
 
     using enum MatrixType;
 
-    Projection      m_projection;
+    Projection      m_projector;
     Matrix4f        m_transformations[int(mtCount)]; // matrices are row major - let OpenGL transpose them when passing them with glUniformMatrix4fv
     Matrix4f        m_glProjection[3];
     Matrix4f        m_glModelView[3];
@@ -29,22 +29,22 @@ public:
     List<Matrix4f>  m_stack;
 
     inline float ZNear(void) noexcept {
-        return m_projection.ZNear();
+        return m_projector.ZNear();
     }
 
 
     inline float ZFar(void) noexcept {
-        return m_projection.ZFar();
+        return m_projector.ZFar();
     }
 
 
     inline float FoV(void) noexcept {
-        return m_projection.FoV();
+        return m_projector.FoV();
     }
 
 
     inline float AspectRatio(void) noexcept {
-        return m_projection.AspectRatio();
+        return m_projector.AspectRatio();
     }
 
 
@@ -53,7 +53,7 @@ public:
     }
 
 
-    inline Matrix4f& Projection(void) noexcept {
+    inline Matrix4f& GetProjection(void) noexcept {
         return m_transformations[int(mtProjection)];
     }
 
@@ -86,8 +86,8 @@ public:
         return m_transformations [int(matrixType)];
     }
 
-    ::Projection& GetProjection(void) noexcept {
-        return m_projection;
+    ::Projection& GetProjector(void) noexcept {
+        return m_projector;
     }
 
 
@@ -177,7 +177,7 @@ public:
 
 
     inline Matrix4f& Projection(void) noexcept {
-        return Matrices().Projection();
+        return Matrices().GetProjection();
     }
 
 
@@ -197,7 +197,7 @@ public:
 
 
     inline GLfloat* ProjectionMatrix(void) noexcept {
-        return (GLfloat*)Matrices().Projection().AsArray();
+        return (GLfloat*)Matrices().GetProjection().AsArray();
     }
 
     // setup 3D transformation and projection
