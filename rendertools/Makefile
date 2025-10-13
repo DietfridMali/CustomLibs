@@ -42,7 +42,7 @@ SRCDIR := src
 INCDIRS := ./include ../basetools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2
 INCLUDES := $(addprefix -I,$(INCDIRS))
 OBJDIR := obj
-DEFINES := -DNDEBUG -DUSE_STD=1 -DUSE_GLM=1 -DCOMPILE_STRING
+DEFINES := -DNDEBUG -DUSE_STD=1 -DUSE_GLM=1
 LIB := librendertools.a
 
 CXXFLAGS := -std=c++20 -O3 $(DEFINES) $(INCLUDES)
@@ -64,4 +64,4 @@ rendertools.lib: $(LIB)
 > cp $(LIB) $@
 
 clean:
-> rm -rf $(OBJDIR) $(LIB) rendertools.lib
+> rm -rf $(OBJDIR) $(LIB) librendertools.a

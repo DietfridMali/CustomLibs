@@ -27,4 +27,4 @@ basetools.lib: $(LIB)
 > cp $(LIB) $@
 
 clean:
-> rm -rf $(OBJDIR) $(LIB) basetools.lib
+> rm -rf $(OBJDIR) $(LIB) libbasetools.a
