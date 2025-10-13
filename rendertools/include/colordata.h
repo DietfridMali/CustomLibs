@@ -74,6 +74,7 @@ public:
             color.G() *= color.A();
             color.B() *= color.A();
         }
+        return color;
     }
 
     float GrayValue(bool perceptive = true) const noexcept {

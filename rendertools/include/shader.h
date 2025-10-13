@@ -262,7 +262,7 @@ class Shader
             noexcept;
 
         inline GLint SetMatrix3f(const char* name, ManagedArray<GLfloat>& data, bool transpose) noexcept {
-            SetMatrix3f(name, data.Data(), transpose);
+            return SetMatrix3f(name, data.Data(), transpose);
         }
 
         inline GLint SetInt(const char* name, int data) noexcept {

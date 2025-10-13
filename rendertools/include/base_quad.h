@@ -20,10 +20,10 @@ public:
     //static VAO* m_vao;
 
     struct TransformationParams {
-        bool            centerOrigin = false;
-        bool            flipVertically = false;
-        float           rotation = 0.0f;
-        bool            autoClear = true;
+        bool            centerOrigin{ false };
+        bool            flipVertically{ false };
+        float           rotation{ 0.0f };
+        bool            autoClear{ true };
 
         bool HaveTransformations(void) { 
             return centerOrigin or flipVertically or (rotation != 0.0f); 
