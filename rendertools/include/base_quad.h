@@ -31,6 +31,8 @@ public:
         void Clear(void) {  *this = {}; }
     };
 
+    static inline constexpr defaultTransformationParams = TransformationParams{};
+
 #if USE_STATIC_VAO 
     static VAO              staticVAO;
 #endif
@@ -139,7 +141,7 @@ public:
         return Fill(RGBAColor(color, alpha));
     }
 
-    inline void SetTransformations(const TransformationParams& params = TransformationParams{}) {
+    inline void SetTransformations(const TransformationParams& params = defaultTransformationParams) {
         m_transformations = params;
     }
 
