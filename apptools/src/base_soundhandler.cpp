@@ -62,7 +62,9 @@ bool BaseSoundHandler::Setup(String soundFolder) {
     m_masterVolume = argHandler.FloatVal("masterVolume", 0, 1);
     m_maxAudibleDistance = 30.0f;
     Mix_Quit();
+#if 0
     Mix_Init(MIX_INIT_MP3 | MIX_INIT_OGG);
+#endif
     if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512))
         fprintf(stderr, "Couldn't initialize sound system (%s)\n", Mix_GetError());
 #if 0
