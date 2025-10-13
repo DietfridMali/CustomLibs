@@ -141,8 +141,7 @@ public:
 
     void CreateVertexIndices(void);
 
-    inline VAO& VAO(void)
-        noexcept
+    inline VAO& GetVAO(void) noexcept
     {
         return m_vao;
     }

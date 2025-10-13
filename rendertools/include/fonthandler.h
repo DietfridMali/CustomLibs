@@ -26,7 +26,7 @@ public:
         Texture*                texture;
         String                  name;
         int32_t                 index;
-        TextureAtlas::GlyphSize glyphSize;
+        GlyphSize               glyphSize;
         Vector2f                atlasPosition;
         Vector2f                atlasSize;
 
@@ -42,7 +42,7 @@ private:
     String                      m_euroChar;
     String                      m_glyphs;
     RGBAColor                   m_color;
-    struct GlyphSize            m_maxGlyphSize;
+    GlyphSize                   m_maxGlyphSize;
     VAO                         m_vao;
     bool                        m_isAvailable;
 
