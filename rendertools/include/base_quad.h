@@ -31,7 +31,7 @@ public:
         void Clear(void) {  *this = {}; }
     };
 
-    static inline constexpr TransformationParams defaultTransformationParams = TransformationParams{};
+    //static inline constexpr TransformationParams defaultTransformationParams = TransformationParams{};
 
 #if USE_STATIC_VAO 
     static VAO              staticVAO;

@@ -88,7 +88,7 @@ public:
         bool hasMRTs{ false };
     };
 
-    static inline constexpr FBOBufferParams defaultBufferParams = FBOBufferParams{};
+    //static inline constexpr FBOBufferParams defaultBufferParams = FBOBufferParams{};
 
     struct FBORenderParams {
         int source{ 0 };
@@ -102,7 +102,7 @@ public:
         Shader* shader{ nullptr };
     };
 
-    static inline constexpr FBORenderParams defaultBufferParams = FBORenderParams{};
+    //static inline constexpr FBORenderParams defaultBufferParams = FBORenderParams{};
 
     FBO();
 
