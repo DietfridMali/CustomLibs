@@ -88,8 +88,6 @@ public:
         bool hasMRTs{ false };
     };
 
-    //static inline constexpr FBOBufferParams defaultBufferParams = FBOBufferParams{};
-
     struct FBORenderParams {
         int source{ 0 };
         int destination{ -1 };
@@ -102,8 +100,6 @@ public:
         Shader* shader{ nullptr };
     };
 
-    //static inline constexpr FBORenderParams defaultBufferParams = FBORenderParams{};
-
     FBO();
 
     ~FBO() {
@@ -112,7 +108,7 @@ public:
 
     void Init(void);
 
-    bool Create(int width, int height, int scale, FBOBufferParams params = FBOBufferParams{});
+    bool Create(int width, int height, int scale, const FBOBufferParams& params);
 
     void Destroy(void);
 
@@ -133,7 +129,7 @@ public:
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
-    Texture* GetRenderTexture(FBORenderParams params = FBORenderParams{});
+    Texture* GetRenderTexture(const FBORenderParams& params);
 
     bool UpdateTransformation(const FBORenderParams& params);
 
