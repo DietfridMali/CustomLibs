@@ -409,4 +409,5 @@ FodyWeavers.xsd
 !/**/*.def
 !/**/*.props
 !.gitignore
+!Makefile
 /rendertools/include/shader-new.h
