@@ -32,16 +32,16 @@ public:
     } eTextAlignments;
 
 private:
-    RGBAColor                   m_color;
-    float                       m_scale;
-    eTextAlignments             m_textAlignment;
-    struct TextDecoration       m_decoration;
-    VAO                         m_vao;
+    RGBAColor               m_color;
+    float                   m_scale;
+    eTextAlignments         m_textAlignment;
+    TextDecoration          m_decoration;
+    VAO                     m_vao;
 
-    Mesh                        m_mesh;
-    Dictionary<int, FBO*>       m_fbos;
+    Mesh                    m_mesh;
+    Dictionary<int, FBO*>   m_fbos;
 
-    FontHandler*                m_font;
+    FontHandler*            m_font;
 
 public:
     static int CompareFBOs(void* context, const int& key1, const int& key2);
