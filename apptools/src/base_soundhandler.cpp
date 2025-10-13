@@ -65,8 +65,10 @@ bool BaseSoundHandler::Setup(String soundFolder) {
 #if 0
     Mix_Init(MIX_INIT_MP3 | MIX_INIT_OGG);
 #endif
-    if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512))
+    if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512)) {
         fprintf(stderr, "Couldn't initialize sound system (%s)\n", Mix_GetError());
+        return false;
+    }
 #if 0
     int frequency, channels;
     Uint16 format;
