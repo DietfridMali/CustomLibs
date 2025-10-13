@@ -16,7 +16,7 @@ static inline float Hash2i(int ix, int iy) {
     // GLSL-kompatibel: fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453)
     // seed wirkt nur als kleine Phasenverschiebung
     float t = float(ix) * 127.1f + float(iy) * 311.7f;
-    float s = std::sinf(t) * 43758.5453f;
+    float s = std::sin(t) * 43758.5453f;
     return s - std::floor(s); // fract
 }
 

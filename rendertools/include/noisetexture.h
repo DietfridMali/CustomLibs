@@ -123,7 +123,7 @@ static float WorleyFBM_Periodic(float xP, float yP, float zP, int P, int C0, int
 // Optionale 2D-ValueNoise (wie im Original)
 static inline float Hash2i(int ix, int iy) {
     float t = float(ix) * 127.1f + float(iy) * 311.7f;
-    float s = std::sinf(t) * 43758.5453f;
+    float s = std::sin(t) * 43758.5453f;
     return s - std::floor(s);
 }
 
@@ -163,7 +163,7 @@ static float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, 
 static inline uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch) {
     float phase = float((seed ^ (ch * 0x9E3779B9u)) & 0xFFFFu) * (1.0f / 65536.0f);
     float t = float(ix) * 127.1f + float(iy) * 311.7f + phase;
-    float s = std::sinf(t) * 43758.5453f;
+    float s = std::sin(t) * 43758.5453f;
     float f = s - std::floor(s);
     int   v = int(f * 255.0f + 0.5f);
     return (uint8_t)std::min(v, 255);

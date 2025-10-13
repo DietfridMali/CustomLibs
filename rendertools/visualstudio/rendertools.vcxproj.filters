@@ -126,9 +126,6 @@
     <ClInclude Include="..\include\lineartexture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\noisetexture.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\prerenderedtexture.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
@@ -142,6 +139,9 @@
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
     <ClInclude Include="..\include\texturehandler.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\noisetexture.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
   </ItemGroup>
