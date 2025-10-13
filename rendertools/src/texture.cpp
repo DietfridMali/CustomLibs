@@ -1,6 +1,7 @@
 
 #include <utility>
 #include <stdio.h>
+#include <stdexcept>
 #include "texture.h"
 #include "SDL_image.h"
 #include "opengl_states.h"
