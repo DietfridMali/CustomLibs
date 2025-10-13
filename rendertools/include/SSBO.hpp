@@ -96,7 +96,7 @@ public:
 
 
 	inline GLuint GetHandle(void) {
-		return m_handle.GetHandle();
+		return GLuint(m_handle);
 	}
 
 	void Clear(DATA_T value) {
