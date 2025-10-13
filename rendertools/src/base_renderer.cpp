@@ -38,7 +38,7 @@ void BaseRenderer::Init(int width, int height, float fov) {
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
 #if 0//def _DEBUG
     testTexture = textureHandler.GetStandardTexture();
-    List<String> fileName = { "resources\\textures\\ring-512x512.png" };
+    List<String> fileName = { "resources/textures/ring-512x512.png" };
     if (not testTexture->CreateFromFile(fileName, true)) {
         delete testTexture;
         testTexture = nullptr;
