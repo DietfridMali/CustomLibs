@@ -1,8 +1,10 @@
 #pragma once
 
 #include "std_defines.h"
-#include <windows.h>
-#include <stdio.h>
+#if 0
+#   include <windows.h>
+#   include <stdio.h>
+#endif
 
 #include "SDL.h"
 #include "conversions.hpp"
@@ -119,7 +121,7 @@ public:
     {
         int t = m_duration - m_slack - GetLapTime();
         if (t > 0)
-            Sleep(DWORD(t));
+            SDL_Delay(uint32_t(t));
         m_slack = GetLapTime() - m_duration;
     }
 
