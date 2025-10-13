@@ -1,4 +1,4 @@
-#if 0 //USE_GLM
+#if USE_GLM
 
 #include "glm_vector.hpp"
 

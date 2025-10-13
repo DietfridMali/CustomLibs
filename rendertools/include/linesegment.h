@@ -16,8 +16,8 @@ public:
 		struct {
 			Vector3f	p0;
 			Vector3f	p1;
-		};
-		std::array<Vector3f, 2> endPoints;
+		} pts;
+		std::array<Vector3f, 2> vec;
 	};
 	int						solutions;
 	std::array<float, 2>	offsets;
@@ -31,14 +31,14 @@ public:
 	inline void Refresh(void)
 		noexcept
 	{
-		properties = p1 - p0;
+		properties = pts.p1 - pts.p0;
 	}
 
 	void Init(Vector3f _p0 = Vector3f::ZERO, Vector3f _p1 = Vector3f::ZERO)
 		noexcept
 	{
-		p0 = _p0;
-		p1 = _p1;
+		pts.p0 = _p0;
+		pts.p1 = _p1;
 		solutions = 0;
 		Refresh();
 	}
@@ -85,7 +85,7 @@ public:
 	inline Vector3f NearestPointAt(int i)
 		noexcept
 	{
-		return (i < solutions) ? p0 + Velocity() * offsets[i] : Vector3f::NONE;
+		return (i < solutions) ? pts.p0 + Velocity() * offsets[i] : Vector3f::NONE;
 	}
 
 	float ComputeNearestPoints(LineSegment& other, LineSegment& nearestPoints)

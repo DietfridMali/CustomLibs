@@ -13,35 +13,60 @@ class Vector : public VEC_TYPE {
 public:
     using VEC_TYPE::VEC_TYPE; // übernimmt alle ctors
 
-    Vector() noexcept(noexcept(VEC_TYPE(0))) : VEC_TYPE(0) {}
-    Vector(const VEC_TYPE& v) noexcept : VEC_TYPE(v) {}
+    Vector() noexcept(noexcept(VEC_TYPE(0))) 
+        : VEC_TYPE(0) 
+    { }
+
+    Vector(const VEC_TYPE& v) noexcept : VEC_TYPE(v) 
+    { }
 
     // Copy-Konstruktor aus anderem Vector
     template <typename OTHER_VEC>
-    Vector(const Vector<OTHER_VEC>& other) noexcept { Assign(other); }
+    Vector(const Vector<OTHER_VEC>& other) noexcept { 
+        Assign(other); 
+    }
 
-    Vector(std::initializer_list<float> list) noexcept { *this = list; }
+    Vector(std::initializer_list<float> list) noexcept { 
+        *this = list; 
+    }
 
     template <typename OTHER_VEC>
-    Vector& operator=(const Vector<OTHER_VEC>& other) noexcept { Assign(other); return *this; }
+    Vector& operator=(const Vector<OTHER_VEC>& other) noexcept { 
+        Assign(other); 
+        return *this; 
+    }
 
     template <typename OTHER_VEC>
-    Vector& operator=(const OTHER_VEC& other) noexcept { Assign(other); return *this; }
+    Vector& operator=(const OTHER_VEC& other) noexcept { 
+        Assign(other); 
+        return *this; 
+    }
 
-    inline float* Data() noexcept { return &((*this)[0]); }
-    inline const float* Data() const noexcept { return glm::value_ptr(static_cast<VEC_TYPE const&>(*this)); }
-    inline int DataSize() const noexcept { return int(sizeof(float) * VEC_TYPE::length()); }
+    inline float* Data() noexcept { 
+        return &((*this)[0]); 
+    }
+
+    inline const float* Data() const noexcept { 
+        return glm::value_ptr(static_cast<VEC_TYPE const&>(*this)); 
+    }
+    
+    inline int DataSize() const noexcept { 
+        return int(sizeof(float) * VEC_TYPE::length()); 
+    }
 
     inline Vector& operator+=(const Vector& other)
         noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other)))
     {
-        *this = static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other); return *this;
+        *this = static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other); 
+        return *this;
     }
 
     Vector& operator=(std::initializer_list<float> list) noexcept {
         int i = 0;
-        for (auto it = list.begin(); it != list.end() && i < VEC_TYPE::length(); ++it) (*this)[i++] = *it;
-        for (; i < VEC_TYPE::length(); ++i) (*this)[i] = 0.0f;
+        for (auto it = list.begin(); it != list.end() && i < VEC_TYPE::length(); ++it) 
+            (*this)[i++] = *it;
+        for (; i < VEC_TYPE::length(); ++i) 
+            (*this)[i] = 0.0f;
         return *this;
     }
 
@@ -124,14 +149,16 @@ public:
     }
 
     bool operator==(const Vector& other) const noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] != other[i]) 
-            return false;
+        for (int i = 0; i < VEC_TYPE::length(); ++i) 
+            if ((*this)[i] != other[i]) 
+                return false;
         return true;
     }
 
     bool operator!=(const Vector& other) const noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] != other[i]) 
-            return true;
+        for (int i = 0; i < VEC_TYPE::length(); ++i) 
+            if ((*this)[i] != other[i]) 
+                return true;
         return false;
     }
 
@@ -345,16 +372,16 @@ private:
 // =================================================================================================
 
 template<typename VEC_TYPE>
-inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::ZERO{ 0.0f };
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::ZERO(0.0f);
 
 template<typename VEC_TYPE>
-inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::HALF{ 0.5f };
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::HALF(0.5f);
 
 template<typename VEC_TYPE>
-inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::ONE{ 1.0f };
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::ONE(1.0f);
 
 template<typename VEC_TYPE>
-inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::NONE{ std::numeric_limits<float>::quiet_NaN() };
+inline const Vector<VEC_TYPE> Vector<VEC_TYPE>::NONE(std::numeric_limits<float>::quiet_NaN());
 
 // =================================================================================================
 

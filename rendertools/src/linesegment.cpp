@@ -9,11 +9,11 @@ noexcept
     float l2 = properties.length * properties.length;
 
     if (l2 < m_tolerance) {// line too short, projection may fail due to numerical limitations
-        f = p0;
+        f = pts.p0;
         return 0.0f;
     }
-    float t = (p - p0).Dot(properties.velocity) / l2; // project (p - p0) on (p0,p1)
-    f = p0 + Velocity() * t; // determine foot point on line
+    float t = (p - pts.p0).Dot(properties.velocity) / l2; // project (p - p0) on (p0,p1)
+    f = pts.p0 + Velocity() * t; // determine foot point on line
     return (p - f).Length();
 }
 
@@ -25,7 +25,7 @@ noexcept
     if (l2 < m_tolerance) // line too short, projection may fail due to numerical limitations
         return 0.0f;
     Vector3f u = p;
-    u -= p0;
+    u -= pts.p0;
     float t = u.Dot(properties.velocity) / l2; // project (p - p0) on (p0,p1)
     return Length() * t;
 }
@@ -38,7 +38,7 @@ int LineSegment::ComputeNearestPointsAt(const Vector3f& p, float radius, const C
 noexcept
 {
     // Unterschiedsvektor zum Referenzpunkt
-    Vector3f delta = p0 - p;
+    Vector3f delta = pts.p0 - p;
 
     float A = Velocity().Dot(Velocity());
     float B = 2.0f * Velocity().Dot(delta);
@@ -73,7 +73,7 @@ noexcept
 
     const Vector3f d1 = this->Velocity();          // *this: p0 -> p1 (Gerade)
     const Vector3f d2 = other.Velocity();          // other: q0 -> q1 (Gerade)
-    const Vector3f r = this->p0 - other.p0;
+    const Vector3f r = pts.p0 - other.pts.p0;
 
     const float a = d1.Dot(d1);                    // d1·d1
     const float e = d2.Dot(d2);                    // d2·d2
@@ -81,34 +81,34 @@ noexcept
     // Degenerationen
     if (a <= m_tolerance and e <= m_tolerance) {
         // Punkt–Punkt: nur ein nächster Punkt auf *this* (p0 selbst)
-        nearestPoints.endPoints[0] = this->p0;
+        nearestPoints.vec[0] = pts.p0;
         nearestPoints.offsets[0] = 0.0f;
         nearestPoints.solutions = 1;
-        return (this->p0 - other.p0).Length();
+        return (pts.p0 - other.pts.p0).Length();
     }
 
     if (a <= m_tolerance) {
         // *this ist Punkt -> einziger nächster Punkt auf *this* ist p0
-        nearestPoints.endPoints[0] = this->p0;
+        nearestPoints.vec[0] = pts.p0;
         nearestPoints.offsets[0] = 0.0f;
         nearestPoints.solutions = 1;
 
         // Distanz Punkt–Gerade(other)
-        if (e <= m_tolerance) return (this->p0 - other.p0).Length();
-        Vector3f cx = (this->p0 - other.p0).Cross(d2);
+        if (e <= m_tolerance) return (pts.p0 - other.pts.p0).Length();
+        Vector3f cx = (pts.p0 - other.pts.p0).Cross(d2);
         return cx.Length() / std::sqrt(e);
     }
 
     if (e <= m_tolerance) {
         // other ist Punkt -> projiziere other.p0 auf *this*-Gerade
-        float s = ScalarProjection(this->p0, other.p0, d1);
-        Vector3f p = this->p0 + d1 * s;
+        float s = ScalarProjection(pts.p0, other.pts.p0, d1);
+        Vector3f p = pts.p0 + d1 * s;
 
-        nearestPoints.endPoints[0] = p;
+        nearestPoints.vec[0] = p;
         nearestPoints.offsets[0] = s;
         nearestPoints.solutions = 1;
 
-        return (p - other.p0).Length();
+        return (p - other.pts.p0).Length();
     }
 
     // Allgemeiner Fall
@@ -119,27 +119,27 @@ noexcept
 
     if (std::fabs(denom) <= m_tolerance) {
         // Quasi-parallel: unendlich viele nächste Punkte -> nimm Projektionen der Endpunkte von 'other' auf *this*
-        float s0 = ScalarProjection(this->p0, other.p0, d1);
-        float s1 = ScalarProjection(this->p0, other.p1, d1);
+        float s0 = ScalarProjection(pts.p0, other.pts.p0, d1);
+        float s1 = ScalarProjection(pts.p0, other.pts.p1, d1);
 
-        nearestPoints.endPoints[0] = this->p0 + d1 * s0;
-        nearestPoints.endPoints[1] = this->p0 + d1 * s1;
+        nearestPoints.vec[0] = pts.p0 + d1 * s0;
+        nearestPoints.vec[1] = pts.p0 + d1 * s1;
         nearestPoints.offsets[0] = s0;
         nearestPoints.offsets[1] = s1;
         nearestPoints.solutions = 2;
 
         // konstante Linien-Distanz (zu other.p0)
-        Vector3f cx = (other.p0 - this->p0).Cross(d1);
+        Vector3f cx = (other.pts.p0 - pts.p0).Cross(d1);
         return cx.Length() / std::sqrt(a);
     }
 
     // Schiefe Geraden: genau ein nächster Punkt auf *this*
     float s = (b * f - c * e) / denom;            // Parameter auf *this*
     float t = (a * f - b * c) / denom;            // Parameter auf other (nur für Distanz)
-    Vector3f pClosest = this->p0 + d1 * s;
-    Vector3f qClosest = other.p0 + d2 * t;
+    Vector3f pClosest = pts.p0 + d1 * s;
+    Vector3f qClosest = other.pts.p0 + d2 * t;
 
-    nearestPoints.endPoints[0] = pClosest;
+    nearestPoints.vec[0] = pClosest;
     nearestPoints.offsets[0] = s;
     nearestPoints.solutions = 1;
 
@@ -154,14 +154,14 @@ noexcept
     const float r2 = radius * radius;
 
     // δ_c^2 = ||(p0 - c) × d||^2 / ||d||^2
-    Vector3f w = this->p0; w -= c;
+    Vector3f w = pts.p0; w -= c;
     Vector3f wxd = w.Cross(d);
     float delta2 = wxd.Dot(wxd) / dd;
     if (delta2 > r2 + Conversions::NumericTolerance)
         return false;
 
     // Fußpunkt + Pythagoras entlang P
-    float tFoot = ScalarProjection(this->p0, c, d);
+    float tFoot = ScalarProjection(pts.p0, c, d);
     float inside = r2 - delta2;
     float dt = (inside > 0.0f) ? std::sqrt(inside / dd) : 0.0f;
 
@@ -202,9 +202,9 @@ noexcept
         };
     auto keepBestT = [&](float t) {
         if (not acceptT(t)) return;
-        Vector3f w = this->p0 + d * t;
+        Vector3f w = pts.p0 + d * t;
         if (collisionPoints.solutions == 0 or t > collisionPoints.offsets[0]) {
-            collisionPoints.endPoints[0] = w;   // Punkt auf *this*
+            collisionPoints.vec[0] = w;   // Punkt auf *this*
             collisionPoints.offsets[0] = t;   // Parameter t
             collisionPoints.solutions = 1;
         }
@@ -218,9 +218,9 @@ noexcept
         if (ee > tol) {
             if (nearest.solutions == 1) {
                 const float    tStar = nearest.offsets[0];
-                const Vector3f pStar = nearest.endPoints[0];
+                const Vector3f pStar = nearest.vec[0];
 
-                float sStar = ScalarProjection(other.p0, pStar, e); // Projektion auf G
+                float sStar = ScalarProjection(other.pts.p0, pStar, e); // Projektion auf G
                 if (acceptS01(sStar) and delta <= radius + tol) {
                     Vector3f cx = d.Cross(e);
                     float   c2 = cx.Dot(cx);          // |d×e|^2
@@ -261,14 +261,14 @@ noexcept
     // ---------- 2) Kappen (Endpunkte g0, g1) ----------
     if (ee > tol) {
         float tSel;
-        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel))
+        if (CapCheckOnP(other.pts.p0, d, dd, radius, limits, tSel))
             keepBestT(tSel);
-        if (CapCheckOnP(other.p1, d, dd, radius, limits, tSel))
+        if (CapCheckOnP(other.pts.p1, d, dd, radius, limits, tSel))
             keepBestT(tSel);
     }
     else {
         float tSel;
-        if (CapCheckOnP(other.p0, d, dd, radius, limits, tSel))
+        if (CapCheckOnP(other.pts.p0, d, dd, radius, limits, tSel))
             keepBestT(tSel);
     }
 

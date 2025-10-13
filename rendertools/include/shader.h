@@ -15,6 +15,22 @@
 
 #define CACHE_SHADER_DATA 1
 
+namespace UniformFuncs {
+    template<typename S, int C> struct gl_uniform;               // Primary
+
+    // float
+    template<> struct gl_uniform<float, 1> { using fn_t = PFNGLUNIFORM1FVPROC; static inline fn_t& fn = glUniform1fv; };
+    template<> struct gl_uniform<float, 2> { using fn_t = PFNGLUNIFORM2FVPROC; static inline fn_t& fn = glUniform2fv; };
+    template<> struct gl_uniform<float, 3> { using fn_t = PFNGLUNIFORM3FVPROC; static inline fn_t& fn = glUniform3fv; };
+    template<> struct gl_uniform<float, 4> { using fn_t = PFNGLUNIFORM4FVPROC; static inline fn_t& fn = glUniform4fv; };
+
+    // int
+    template<> struct gl_uniform<int, 1> { using fn_t = PFNGLUNIFORM1IVPROC; static inline fn_t& fn = glUniform1iv; };
+    template<> struct gl_uniform<int, 2> { using fn_t = PFNGLUNIFORM2IVPROC; static inline fn_t& fn = glUniform2iv; };
+    template<> struct gl_uniform<int, 3> { using fn_t = PFNGLUNIFORM3IVPROC; static inline fn_t& fn = glUniform3iv; };
+    template<> struct gl_uniform<int, 4> { using fn_t = PFNGLUNIFORM4IVPROC; static inline fn_t& fn = glUniform4iv; };
+} 
+
 // =================================================================================================
 
 template <typename T, typename = void>
@@ -179,113 +195,56 @@ class Shader
         // -----------------------------------------------------------------------------------------
         // Automatically deduce proper glUniform function for passing uniform (array) data from data type passed
 
-        template <typename S> struct glUniform1;
-
-        template <> struct glUniform1<int> {
-            using fn_t = PFNGLUNIFORM1IPROC;
-            static inline fn_t& fn = glUniform1i;
-        };
-
-        template <> struct glUniform1<float> {
-            using fn_t = PFNGLUNIFORM1FPROC;
-            static inline fn_t& fn = glUniform1f; // referenziert den echten Loader-Zeiger
-        };
-
-        template <typename DATA_T>
+        template<typename DATA_T>
         GLint SetUniform(const char* name, DATA_T data) noexcept {
-            static_assert(
-                std::is_same_v<std::remove_cv_t<DATA_T>, int> or 
-                std::is_same_v<std::remove_cv_t<DATA_T>, float>
-                );
+            using T = std::remove_cvref_t<DATA_T>;
+            static_assert(std::is_same_v<T, int> || std::is_same_v<T, float>);
 
-            using FuncType = glUniform1<DATA_T>;
 #if CACHE_SHADER_DATA
-            GLint* location = m_locations[name]; // call only once per SetUniform call because it switches the internal index of m_locations to the next entry!
-            if (not location)
+            GLint* location = m_locations[name];           // einmal ziehen, siehe Kommentar
+            if (location == 0) 
                 return -1;
-            if (UpdateUniform<DATA_T, UniformData<DATA_T>>(name, location, data))
-                FuncType::fn(*location, data);
+
+            if (UpdateUniform<T, UniformData<T>>(name, location, static_cast<T>(data))) {
+                if constexpr (std::is_same_v<T, int>)
+                    glUniform1i(*location, static_cast<GLint>(data));
+                else
+                    glUniform1f(*location, static_cast<GLfloat>(data));
+            }
             return *location;
 #else
             GLint location = glGetUniformLocation(m_handle, name);
-            if (location >= 0)
-                FuncType::fn(location, data);
+            if (location >= 0) {
+                if constexpr (std::is_same_v<T, int>)
+                    glUniform1i(location, static_cast<GLint>(data));
+                else
+                    glUniform1f(location, static_cast<GLfloat>(data));
+            }
             return location;
 #endif
         }
 
         // -----------------------------------------------------------------------------------------
 
-        // 2) Dispatcher: S∈{float,int}, K∈{1..4} → passender glUniform-Zeiger
-        template <typename S, int C> struct glUniform;
-
-        // Variante A: Referenzen auf Loader-Symbole (GLAD/GLEW)
-        template <typename, int> struct glUniform;
-
-        // float-Kanal
-        template <> struct glUniform<float, 1> {
-            using GlFuncType = PFNGLUNIFORM1FVPROC;
-            static inline GlFuncType& fn = glUniform1fv;
-        };
-
-        template <> struct glUniform<float, 2> {
-            using GlFuncType = PFNGLUNIFORM2FVPROC;
-            static inline GlFuncType& fn = glUniform2fv;
-        };
-
-        template <> struct glUniform<float, 3> {
-            using GlFuncType = PFNGLUNIFORM3FVPROC;
-            static inline GlFuncType& fn = glUniform3fv;
-        };
-
-        template <> struct glUniform<float, 4> {
-            using GlFuncType = PFNGLUNIFORM4FVPROC;
-            static inline GlFuncType& fn = glUniform4fv;
-        };
-
-        // int-Kanal
-        template <> struct glUniform<int, 1> {
-            using GlFuncType = PFNGLUNIFORM1IVPROC;
-            static inline GlFuncType& fn = glUniform1iv;
-        };
-
-        template <> struct glUniform<int, 2> {
-            using GlFuncType = PFNGLUNIFORM2IVPROC;
-            static inline GlFuncType& fn = glUniform2iv;
-        };
-
-        template <> struct glUniform<int, 3> {
-            using GlFuncType = PFNGLUNIFORM3IVPROC;
-            static inline GlFuncType& fn = glUniform3iv;
-        };
-
-        template <> struct glUniform<int, 4> {
-            using GlFuncType = PFNGLUNIFORM4IVPROC;
-            static inline GlFuncType& fn = glUniform4iv;
-        };
-
         template <typename DATA_T>
-        GLint SetUniformArray(const char* name, const DATA_T* data, size_t length) noexcept
-        {
-            using BaseType = ScalarBaseType<DATA_T>;
-            constexpr int Components = ComponentCount<DATA_T>;
+        GLint SetUniformArray(const char* name, const DATA_T* data, size_t length) noexcept {
+            using Base = ScalarBaseType<DATA_T>;          // statt: std::remove_cv_t<typename ScalarBaseType<DATA_T>>
+            constexpr int C = ComponentCount<DATA_T>;
 
-            static_assert((std::is_same_v<BaseType, float> or std::is_same_v<BaseType, int>), "only float and int base types possible");
-            static_assert(Components >= 1 and Components <= 4, "only 1 to 4 components possible");
+            static_assert(std::is_same_v<Base, float> || std::is_same_v<Base, int>, "only float or int");
+            static_assert(C >= 1 && C <= 4, "components 1..4");
 
-            using FuncType = glUniform<BaseType, Components>;
 #if CACHE_SHADER_DATA
-            GLint* location = m_locations[name]; // call only once per SetUniformArray call because it switches the internal index of m_locations to the next entry!
-            if (not location)
+            GLint* location = m_locations[name];
+            if (not location) 
                 return -1;
-            // Cache: speichere genau den externen Typ DATA_T
-            if (UpdateUniform<const DATA_T*, UniformArray<DATA_T>>(name, location, data))
-                FuncType::fn(*location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
+            if (UpdateUniform<const DATA_T*, UniformArray<DATA_T>>(name, location, data)) 
+                UniformFuncs::gl_uniform<Base, C>::fn(*location, GLsizei(length), reinterpret_cast<const Base*>(data));
             return *location;
 #else
             GLint location = glGetUniformLocation(m_handle, name);
-            if (location >= 0)
-                FuncType::fn(location, GLsizei(length), reinterpret_cast<const BaseType*>(data));
+            if (location >= 0) 
+                UniformFuncs::gl_uniform<Base, C>::fn(location, GLsizei(length), reinterpret_cast<const Base*>(data));
             return location;
 #endif
         }

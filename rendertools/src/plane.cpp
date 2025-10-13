@@ -172,7 +172,7 @@ int Plane::PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
 noexcept
 {
     float denom = line.Normal().Dot(line.Velocity());
-    float dist = m_normal.Dot(line.p0 - m_vertices[0]);
+    float dist = m_normal.Dot(line.pts.p0 - m_vertices[0]);
 
     if (fabs(denom) < m_tolerance)  // Linie parallel zur Ebene
         return (fabs(dist - d) < m_tolerance) ? 0 : -1;
@@ -182,7 +182,7 @@ noexcept
     if (t < 0.0f or t > 1.0f)
         return -1;
 #endif
-    vLinePoint = line.p0 + line.Normal() * t;
+    vLinePoint = line.pts.p0 + line.Normal() * t;
     return 1;
 }
 
@@ -237,7 +237,7 @@ noexcept
 {
     // Projektion von p0 in die Ebene und Innen-Test
     Vector3f p;
-    float d = Project(line.p0, p);
+    float d = Project(line.pts.p0, p);
     if (std::fabs(d) > radius + m_tolerance)
         return false;
     if (Contains(p))
@@ -247,7 +247,7 @@ noexcept
     radius *= radius;
     radius += m_toleranceSquared;
     for (int i = 0; i < 4; ++i) {
-        if (PointToSegmentDistanceSquared(m_vertices[i], m_vertices[(i + 1) % 4], line.p0) <= radius)
+        if (PointToSegmentDistanceSquared(m_vertices[i], m_vertices[(i + 1) % 4], line.pts.p0) <= radius)
             return true;
     }
     return false;
@@ -258,13 +258,13 @@ noexcept
 int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
 noexcept
 {
-    float d0 = Distance(line.p0);
-    float d1 = Distance(line.p1);
+    float d0 = Distance(line.pts.p0);
+    float d1 = Distance(line.pts.p1);
     if ((d0 * d1 > 0) and (std::min(fabs(d0), fabs(d1)) > radius))
         return -1; // start and end on same side of plane and both too far away
 
     if (line.Length() < m_tolerance) {
-        line.p1 = line.p0 + m_normal;
+        line.pts.p1 = line.pts.p0 + m_normal;
         line.Refresh();
     }
 
@@ -284,7 +284,7 @@ noexcept
         float r = (d0 >= 0) ? radius : -radius;
         float t = (r - d0) / denom;
         if (AllowMovement(t) and limits.Contains(t)) {
-            Vector3f candidate = line.p0 + line.Velocity() * t;
+            Vector3f candidate = line.pts.p0 + line.Velocity() * t;
             float d = Distance(candidate);
             Vector3f vPlane = candidate - m_normal * d;
             if (Contains(vPlane)) {
@@ -305,7 +305,7 @@ noexcept
         for (int j = 0; j < collisionPoints.solutions; ++j) {
             if (collisionPoints.offsets[j] > bestOffset) {
                 bestOffset = collisionPoints.offsets[j];
-                bestPoint = collisionPoints.endPoints[j];
+                bestPoint = collisionPoints.vec[j];
             }
         }
     }
@@ -315,7 +315,7 @@ noexcept
     if (not AllowMovement(bestOffset))
         return -1;
     collisionPoint = bestPoint;
-    endPoint = line.p0 + line.Velocity() * bestOffset;
+    endPoint = line.pts.p0 + line.Velocity() * bestOffset;
     if (line.Normal().Dot(m_normal) >= 0) // just touching quad and moving away
         return 0;
     return 1;

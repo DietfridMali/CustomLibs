@@ -1,9 +1,9 @@
 #pragma once
 
 #include "glew.h"
-//#include <string.h>
 #include "sharedpointer.hpp"
 #include "sharedglhandle.hpp"
+#include <cstring>
 
 #ifdef USE_SHARED_HANDLES
 #   undef USE_SHARED_HANDLES
