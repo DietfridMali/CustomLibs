@@ -51,7 +51,7 @@ public:
 
 
 	void Destroy(void) {
-		if (m_handle.Handle()) {
+		if (m_handle) {
 			Release();
 			m_handle.Release();
 			m_data.Destroy();
@@ -74,7 +74,7 @@ public:
 
 
 	bool Upload(void) {
-		if (not m_handle.Handle())
+		if (not m_handle)
 			return false;
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle.Handle());
 		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, this->DataSize(), this->Data());
@@ -83,7 +83,7 @@ public:
 
 
 	bool Download(void) const {
-		if (not m_handle.Handle())
+		if (not m_handle)
 			return false;
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle.Handle());
 		void* ptr = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);

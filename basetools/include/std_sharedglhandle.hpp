@@ -151,7 +151,9 @@ public:
 using glBufferAllocator = void (*)(GLsizei, GLuint*);
 using glBufferReleaser = void (*)(GLsizei, const GLuint*);
 
-class SharedGLHandle : public SharedHandle<GLuint> {
+class SharedGLHandle 
+    : public SharedHandle<GLuint> 
+{
 public:
     SharedGLHandle() = default;
 
@@ -165,6 +167,7 @@ public:
     }
 };
 
+
 class SharedTextureHandle : public SharedGLHandle {
 public:
     SharedTextureHandle(GLuint handle = 0)
@@ -173,6 +176,7 @@ public:
     }
 };
 
+
 class SharedBufferHandle : public SharedGLHandle {
 public:
     SharedBufferHandle(GLuint handle = 0)
@@ -180,6 +184,7 @@ public:
     {
     }
 };
+
 
 class SharedFramebufferHandle : public SharedGLHandle {
 public:
