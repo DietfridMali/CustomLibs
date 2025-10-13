@@ -124,7 +124,7 @@ noexcept
         u -= v;
     }
     float l = u.Dot(u);
-    return squared ? l : std::sqrtf(l);
+    return squared ? l : std::sqrt(l);
 }
 
 // -------------------------------------------------------------------------------------------------
