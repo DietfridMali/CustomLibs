@@ -18,8 +18,6 @@ class BaseShaderHandler
     : public PolymorphSingleton<BaseShaderHandler>
 {
 public:
-    typedef Shader* (__cdecl* tShaderLoader) (void);
-
     ManagedArray<FloatArray*>   m_kernels;
     Shader*                     m_activeShader;
     String                      m_activeShaderId;

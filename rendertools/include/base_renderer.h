@@ -214,7 +214,7 @@ public:
 #endif
     inline BaseQuad& RenderQuad(void)  noexcept { return m_renderQuad; }
 
-    inline Viewport& Viewport(void)  noexcept { return m_viewport; }
+    inline ::Viewport& Viewport(void)  noexcept { return m_viewport; }
 
     void SetViewport(bool flipVertically = false)
         noexcept;
