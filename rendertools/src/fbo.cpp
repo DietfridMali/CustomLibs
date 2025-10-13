@@ -407,7 +407,7 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
         static bool oscillate = false;
         static int i = 0;
         if (fillArea) {
-            Viewport viewport = baseRenderer.Viewport();
+            Viewport viewport = baseRenderer.GetViewport();
             m_viewportArea.Fill(oscillate ? i ? ColorData::MediumBlue : ColorData::Orange : color);
             if (oscillate)
                 i ^= 1;

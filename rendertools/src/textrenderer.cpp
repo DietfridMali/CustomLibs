@@ -37,11 +37,11 @@ TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, fl
 
 
 FBO* TextRenderer::GetFBO(float scale) {
-    FBO** fboRef = m_fbos.Find(FBOID(baseRenderer.Viewport().m_width, baseRenderer.Viewport().m_height));
+    FBO** fboRef = m_fbos.Find(FBOID(baseRenderer.GetViewport().m_width, baseRenderer.GetViewport().m_height));
     if (fboRef != nullptr)
         return *fboRef;
     FBO* fbo = new FBO();
-    fbo->Create(baseRenderer.Viewport().m_width, baseRenderer.Viewport().m_height, 2, {.name = "text", .colorBufferCount = 2});
+    fbo->Create(baseRenderer.GetViewport().m_width, baseRenderer.GetViewport().m_height, 2, {.name = "text", .colorBufferCount = 2});
     m_fbos.Insert(FBOID(fbo), fbo);
     return fbo;
 }
@@ -238,11 +238,11 @@ void TextRenderer::RenderToScreen(FBO* fbo, int flipVertically) {
 void TextRenderer::Render(String text, eTextAlignments alignment, int flipVertically, int renderAreaWidth, int renderAreaHeight, bool useFBO) {
     if (m_font and (text.Length() > 0)) {
         if (not useFBO)
-            RenderToBuffer(text, alignment, nullptr, baseRenderer.Viewport(), renderAreaWidth, renderAreaHeight, flipVertically);
+            RenderToBuffer(text, alignment, nullptr, baseRenderer.GetViewport(), renderAreaWidth, renderAreaHeight, flipVertically);
         else {
             FBO* fbo = GetFBO(2.0f);
             if (fbo != nullptr) {
-                RenderToBuffer(text, alignment, fbo, baseRenderer.Viewport(), renderAreaWidth, renderAreaHeight);
+                RenderToBuffer(text, alignment, fbo, baseRenderer.GetViewport(), renderAreaWidth, renderAreaHeight);
                 RenderToScreen(fbo, flipVertically); // render outline to viewport
             }
         }
