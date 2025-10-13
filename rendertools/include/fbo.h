@@ -112,7 +112,7 @@ public:
 
     void Init(void);
 
-    bool Create(int width, int height, int scale, FBOBufferParams params = {});
+    bool Create(int width, int height, int scale, FBOBufferParams params = FBOBufferParams{});
 
     void Destroy(void);
 
@@ -133,7 +133,7 @@ public:
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
-    Texture* GetRenderTexture(FBORenderParams params = {});
+    Texture* GetRenderTexture(FBORenderParams params = FBORenderParams{});
 
     bool UpdateTransformation(const FBORenderParams& params);
 

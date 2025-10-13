@@ -141,7 +141,7 @@ public:
         return Fill(RGBAColor(color, alpha));
     }
 
-    inline void SetTransformations(TransformationParams params = {}) {
+    inline void SetTransformations(TransformationParams params = TransformationParams{}) {
         m_transformations = params;
     }
 
