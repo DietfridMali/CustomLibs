@@ -1,6 +1,6 @@
 #if defined(COMPILE_STRING)
 
-#include "String.hpp"
+#include "string.hpp"
 #include <string>
 #include <algorithm>
 
