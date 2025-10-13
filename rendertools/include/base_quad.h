@@ -139,7 +139,7 @@ public:
         return Fill(RGBAColor(color, alpha));
     }
 
-    inline void SetTransformations(const TransformationParams& params = TransformationParams{}) {
+    inline void SetTransformations(const TransformationParams& params = {}) {
         m_transformations = params;
     }
 
