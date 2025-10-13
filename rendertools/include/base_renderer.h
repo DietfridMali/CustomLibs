@@ -151,7 +151,7 @@ public:
         m_sceneViewport = viewport;
     }
 
-    inline Viewport GetSceneViewport(void) noexcept {
+    inline ::Viewport GetSceneViewport(void) noexcept {
         return m_sceneViewport;
     }
 

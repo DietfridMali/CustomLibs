@@ -81,23 +81,23 @@ public:
     static GLuint               m_activeHandle;
 
     struct FBOBufferParams {
-        String name = "";
-        int colorBufferCount = 1;
-        int depthBufferCount = 0;
-        int vertexBufferCount = 0;
-        bool hasMRTs = false;
+        String name{ "" };
+        int colorBufferCount{ 1 };
+        int depthBufferCount{ 0 };
+        int vertexBufferCount{ 0 };
+        bool hasMRTs{ false };
     };
 
     struct FBORenderParams {
-        int source = 0;
-        int destination = -1;
-        bool clearBuffer = true;
-        bool premultiply = false;
-        int flipVertically = 0; // -1: flip, 1: don't flip, 0: renderer decides
-        bool centerOrigin = true;
-        float rotation = 0.0f; 
-        float scale = 1.0f;
-        Shader* shader = nullptr;
+        int source{ 0 };
+        int destination{ -1 };
+        bool clearBuffer{ true };
+        bool premultiply{ false };
+        int flipVertically{ 0 }; // -1: flip, 1: don't flip, 0: renderer decides
+        bool centerOrigin{ true };
+        float rotation{ 0.0f };
+        float scale{ 1.0f };
+        Shader* shader{ nullptr };
     };
 
     FBO();
