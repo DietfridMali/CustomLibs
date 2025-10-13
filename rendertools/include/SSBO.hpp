@@ -76,7 +76,7 @@ public:
 	bool Upload(void) {
 		if (not m_handle)
 			return false;
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle.Handle());
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
 		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, this->DataSize(), this->Data());
 		return true;
 	}
@@ -85,7 +85,7 @@ public:
 	bool Download(void) const {
 		if (not m_handle)
 			return false;
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle.Handle());
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
 		void* ptr = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
 		if (not ptr)
 			return false;
