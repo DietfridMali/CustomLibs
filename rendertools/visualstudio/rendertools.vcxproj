@@ -127,7 +127,7 @@
     <ClInclude Include="..\include\shader.h" />
     <ClInclude Include="..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
-    <ClInclude Include="..\include\SSBO.hpp" />
+    <ClInclude Include="..\include\ssbo.hpp" />
     <ClInclude Include="..\include\texcoord.h" />
     <ClInclude Include="..\include\textrenderer.h" />
     <ClInclude Include="..\include\texture.h" />
