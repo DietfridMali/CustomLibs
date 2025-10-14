@@ -26,6 +26,19 @@ protected:
     std::function<void(HANDLE_T)>          m_releaser;
     std::function<HANDLE_T()>              m_allocator;
 
+private:
+    static void Dispose(HandleInfo* p) noexcept {
+        if (p) {
+            try {
+                if (p->releaser && p->handle)
+                    p->releaser(p->handle);
+            }
+            catch (...) { }
+            delete p;
+        }
+    }
+
+
 public:
     SharedHandle() = default;
 
@@ -34,20 +47,7 @@ public:
         , m_allocator(std::move(allocator))
         , m_info(
             handle
-            ? std::shared_ptr<HandleInfo>(
-                new HandleInfo(handle, m_releaser),
-                [](HandleInfo* p) noexcept { 
-                    if (p) { 
-                        try {
-                            if (p->releaser)
-                                p->releaser(p->handle);
-                        }
-                        catch (...) {
-                        }
-                        delete p;
-                    }
-                }
-            )
+            ? std::shared_ptr<HandleInfo>(new HandleInfo(handle, m_releaser), &Dispose)
             : std::shared_ptr<HandleInfo>()
         )
     {
@@ -61,6 +61,22 @@ public:
     SharedHandle& operator=(const SharedHandle&) = default;
 
     SharedHandle& operator=(SharedHandle&&) noexcept = default;
+
+    SharedHandle& operator=(HANDLE_T h) noexcept {
+        if (h == HANDLE_T{}) { 
+            Release(); 
+            return *this; 
+        }
+        m_info = std::shared_ptr<HandleInfo>(new HandleInfo(h, m_releaser), &Dispose);
+        return *this;
+    }
+
+
+    SharedHandle& operator=(std::nullptr_t) noexcept { 
+        Release(); 
+        return *this; 
+    }
+
 
     // Gleichheitsoperator
     inline bool operator==(const SharedHandle& other) const
@@ -131,10 +147,7 @@ public:
             return HANDLE_T{};
         HANDLE_T newHandle = m_allocator();
         if (newHandle) {
-            m_info = std::shared_ptr<HandleInfo>(
-                new HandleInfo(newHandle, m_releaser),
-                [](HandleInfo* p) { if (p) { if (p->releaser) p->releaser(p->handle); delete p; } }
-            );
+            m_info = std::shared_ptr<HandleInfo>(new HandleInfo(newHandle, m_releaser), &Dispose);
         }
         return newHandle;
     }
