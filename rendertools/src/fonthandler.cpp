@@ -135,7 +135,7 @@ bool FontHandler::CreateTexture(const char* szChar, char key, int index)
         return false;
         }
     info.texture->Deploy();
-    m_glyphDict.Insert(String(key), info);
+    m_glyphDict.Insert(info.name, info);
     info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());
     m_maxGlyphSize.width = std::max(m_maxGlyphSize.width, info.texture->GetWidth());
     m_maxGlyphSize.height = std::max(m_maxGlyphSize.height, info.texture->GetHeight());

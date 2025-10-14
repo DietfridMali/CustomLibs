@@ -11,9 +11,9 @@
 class TextureAtlas {
 public:
 	struct GlyphSize {
-		int width = 0;
-		int height = 0;
-		float aspectRatio = 0.0f;
+		int width{ 0 };
+		int height{ 0 };
+		float aspectRatio{ 1.0f };
 
 		GlyphSize(int w = 0, int h = 0)
 			: width(w), height(h)
