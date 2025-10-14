@@ -27,9 +27,17 @@ public:
 
     NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrder = ByteOrder::Host);
 
-    NetworkEndpoint(const NetworkEndpoint& other) = default;
+    NetworkEndpoint(const NetworkEndpoint& other) {
+        m_ipAddress = other.m_ipAddress;
+        m_port = other.m_port;
+        m_socketAddress = other.m_socketAddress;
+    }
 
-    NetworkEndpoint(NetworkEndpoint&& other) = default;
+    NetworkEndpoint(NetworkEndpoint&& other) {
+        m_ipAddress = std::move(other.m_ipAddress);
+        m_port = other.m_port;
+        m_socketAddress = other.m_socketAddress;
+    }
 
     ~NetworkEndpoint() = default;
 

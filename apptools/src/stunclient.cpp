@@ -62,9 +62,8 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
                         port ^= uint16_t(MAGIC >> 16);
                         uint32_t addr = SDLNet_Read32(data.buffer + pos + 4);
                         addr ^= MAGIC;
-                        NetworkEndpoint result(addr, port, ByteOrder::Host);
                         sock.Close();
-                        return result;
+                        return NetworkEndpoint(addr, port, ByteOrder::Host);
                     }
                 }
                 pos += al + ((4 - (al % 4)) % 4); // 32-bit Padding
