@@ -17,7 +17,7 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
     NetworkEndpoint serverAddress = socketAddress;
 
     UDPSocket sock;
-    if (!sock.Open("0.0.0.0", 0))
+    if (not sock.Open("0.0.0.0", 0))
         return std::nullopt;
 
     // 20-Byte Binding Request
@@ -41,7 +41,7 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
             const uint16_t msgType = SDLNet_Read16(data.buffer + 0);   // host-order
             const uint16_t msgLen = SDLNet_Read16(data.buffer + 2);
             const uint32_t cookie = SDLNet_Read32(data.buffer + 4);
-            if (msgType != 0x0101 || cookie != MAGIC) // Binding Success
+            if (msgType != 0x0101 or cookie != MAGIC) // Binding Success
                 continue;
             if (20 + msgLen > data.length)
                 continue;
@@ -57,7 +57,7 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
                     break;
 
                 if (at == 0x0020) { // XOR-MAPPED-ADDRESS
-                    if (al >= 8 && data.buffer[pos + 1] == 0x01) { // IPv4
+                    if ((al >= 8) and (data.buffer[pos + 1] == 0x01)) { // IPv4
                         uint16_t port = SDLNet_Read16(data.buffer + pos + 2);
                         port ^= uint16_t(MAGIC >> 16);
                         uint32_t addr = SDLNet_Read32(data.buffer + pos + 4);

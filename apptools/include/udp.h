@@ -29,11 +29,10 @@ public:
 public:
     UDPSocket()
         : NetworkEndpoint()
+        , m_socket(nullptr)
         , m_packet(nullptr)
         , m_channel(-1)
-    {
-        memset(&m_socket, 0, sizeof(m_socket));
-    }
+    { }
 
     ~UDPSocket() {
         if (m_packet) {
