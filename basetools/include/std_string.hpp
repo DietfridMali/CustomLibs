@@ -176,8 +176,10 @@ public:
 
     template <typename... Args>
     void Format(std::string_view fmt, Args&&... args) {
-        m_str = std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
+        auto hold = std::tuple<std::decay_t<Args>...>(std::forward<Args>(args)...);
+        m_str = std::apply([&](auto&... largs) { return std::vformat(fmt, std::make_format_args(largs...)); }, hold);
     }
+
 
     String& LTrim(String filter) {
         size_t start = m_str.find_first_not_of(filter.m_str);
