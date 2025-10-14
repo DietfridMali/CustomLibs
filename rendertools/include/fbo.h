@@ -32,9 +32,9 @@ public:
     { }
 
     void Init(void) {
-        m_handle = 0;
+        m_handle = SharedTextureHandle(0);
         m_attachment = 0;
-        m_tmuIndex = -1; 
+        m_tmuIndex = -1;
         m_type = btColor;
         m_isAttached = false;
     }

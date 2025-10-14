@@ -5,7 +5,7 @@
 #include <cstddef> // für std::size_t
 
 // Für OpenGL-Typen und Funktionen
-#include <GL/gl.h> // oder <GL/glew.h> oder <GL/glcorearb.h> je nach System/Projekt
+#include "glew.h" // oder <GL/glew.h> oder <GL/glcorearb.h> je nach System/Projekt
 
 // =================================================================================================
 
@@ -161,8 +161,9 @@ public:
 
 // =================================================================================================
 
-using glBufferAllocator = void (*)(GLsizei, GLuint*);
-using glBufferReleaser = void (*)(GLsizei, const GLuint*);
+using glBufferAllocator = std::remove_pointer_t<decltype(&glGenTextures)>;
+using glBufferReleaser = std::remove_pointer_t<decltype(&glDeleteTextures)>;
+
 
 class SharedGLHandle 
     : public SharedHandle<GLuint> 
@@ -170,14 +171,28 @@ class SharedGLHandle
 public:
     SharedGLHandle() = default;
 
+    using SharedHandle<GLuint>::operator=;
+    using SharedHandle<GLuint>::SharedHandle;
+
     SharedGLHandle(GLuint handle, glBufferAllocator allocator, glBufferReleaser releaser)
-        : SharedHandle(
+        : SharedHandle<GLuint>(
             handle,
             [allocator]() { GLuint h; if (allocator == nullptr) h = 0; else allocator(1, &h); return h; },
             [releaser](GLuint h) { if (h and (releaser != nullptr)) releaser(1, &h); }
         )
     {
     }
+
+    SharedGLHandle& operator=(GLuint h) noexcept {
+        SharedHandle<GLuint>::operator=(h);
+        return *this;
+    }
+
+    SharedGLHandle& operator=(std::nullptr_t) noexcept {
+        SharedHandle<GLuint>::operator=(nullptr);
+        return *this;
+    }
+
 };
 
 
