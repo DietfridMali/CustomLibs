@@ -10,7 +10,6 @@ BaseQuad TextureAtlas::renderQuad;
 TextureAtlas::TextureAtlas()
 	: m_size(0), m_glyphSize(0), m_scale(Vector2f::ONE)
 {
-	m_atlas = new FBO();
 }
 
 
@@ -21,6 +20,9 @@ void TextureAtlas::Initialize(void) {
 
 // condition: all glyphs must fit into glyphWidth, glyphHeight - that's the grid they will be rendered into
 bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale) {
+	if (m_atlas)
+		delete m_atlas;
+	m_atlas = new FBO();
 	if (not m_atlas)
 		return false;
 	m_glyphSize = glyphSize;
