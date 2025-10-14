@@ -45,30 +45,47 @@ public:
 
 private:
     struct tAVLTreeInfo {
-        AVLNode* root;
-        AVLNode* workingNode;
-        AVLNode* workingParent;
+        AVLNode*    root;
+        AVLNode*    workingNode;
+        AVLNode*    workingParent;
         int         nodeCount;
         KEY_T       workingKey;
         DATA_T      workingData;
         Comparator  compareNodes;
         std::function<bool(const KEY_T&, DATA_T*)>  processNode;
-        void* context;
+        void*       context;
         int         visited;
         bool        isDuplicate;
         bool        heightHasChanged;
         bool        result;
 #ifdef _DEBUG
-        AVLNode* testNode;
+        AVLNode*    testNode;
         KEY_T       nullKey;
         KEY_T       testKey;
 #endif
 
         tAVLTreeInfo() noexcept
-            : root(nullptr), workingNode(nullptr), workingParent(nullptr), nodeCount(0), compareNodes(nullptr), processNode(nullptr), context(nullptr), visited(0), isDuplicate(false), heightHasChanged(false), result(false)
+            : root(nullptr)
+            , workingNode(nullptr)
+            , workingParent(nullptr)
+            , nodeCount(0)
+            , compareNodes(nullptr)
+            , processNode(nullptr)
+            , context(nullptr)
+            , visited(0)
+            , isDuplicate(false)
+            , heightHasChanged(false)
+            , result(false)
+#ifdef _DEBUG
+            testNode(nullptr)
+#endif
         {
             InitializeAnyType(workingData);
             InitializeAnyType(workingKey);
+#ifdef _DEBUG
+            InitializeAnyType(nullKey);
+            InitializeAnyType(testKey);
+#endif
         }
     };
 
@@ -88,7 +105,6 @@ public:
         : m_nodePool(), m_useNodePool(capacity > 0)
 #endif
     {
-        memset(&m_info, 0, sizeof(m_info));
 #if DEBUG_MALLOC
         m_nodePool.Create(capacity);
 #endif
