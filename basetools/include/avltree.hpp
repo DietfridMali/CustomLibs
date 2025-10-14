@@ -77,7 +77,7 @@ private:
             , heightHasChanged(false)
             , result(false)
 #ifdef _DEBUG
-            testNode(nullptr)
+            , testNode(nullptr)
 #endif
         {
             InitializeAnyType(workingData);
@@ -91,23 +91,13 @@ private:
 
 private:
     tAVLTreeInfo            m_info;
-#if DEBUG_MALLOC
-    BasicDataPool<AVLNode>  m_nodePool;
-    bool                    m_useNodePool;
-#endif
 
     //-----------------------------------------------------------------------------
 
 public:
 
     AVLTree(int capacity = 0) noexcept
-#if DEBUG_MALLOC
-        : m_nodePool(), m_useNodePool(capacity > 0)
-#endif
     {
-#if DEBUG_MALLOC
-        m_nodePool.Create(capacity);
-#endif
     }
 
     ~AVLTree() {
@@ -197,21 +187,7 @@ public:
 private:
     AVLNode* AllocNode(void)
     {
-#if DEBUG_MALLOC
-        int poolIndex = -1;
-        m_info.workingNode = m_useNodePool ? m_nodePool.Claim(poolIndex) : new AVLNode();
-        if (not m_info.workingNode)
-            return nullptr;
-        new (m_info.workingNode) AVLNode();
-        if constexpr (std::is_same<DATA_T, int>::value)
-            m_info.workingNode->data = -1;
-        m_info.workingNode->poolIndex = poolIndex;
-        m_info.workingNode->left =
-            m_info.workingNode->right = nullptr;
-        m_info.workingNode->balance = AVL_BALANCED;
-#else
         m_info.workingNode = new AVLNode();
-#endif
         m_info.workingNode->key = std::move(m_info.workingKey);
         m_info.heightHasChanged = true;
         ++m_info.nodeCount;
@@ -221,12 +197,7 @@ private:
     //-----------------------------------------------------------------------------
 
     void DeleteNode(AVLNode*& node) noexcept {
-#if DBG_MALLOC
-        if (m_useNodePool)
-            m_nodePool.Release(node->poolIndex);
-        else
-#endif
-            delete node;
+        delete node;
         node = nullptr;
         --m_info.nodeCount;
     }
@@ -761,10 +732,6 @@ public:
 
     inline AVLTree& Copy(AVLTree& other)
     {
-#if DEBUG_MALLOC
-        m_nodePool = other.m_nodePool;
-        m_useNodePool = other.m_useNodePool;
-#endif
         Walk(CopyData, this);
         return *this;
     }
