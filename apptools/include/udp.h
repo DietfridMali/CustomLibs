@@ -35,10 +35,7 @@ public:
     { }
 
     ~UDPSocket() {
-        if (m_packet) {
-            SDLNet_FreePacket(m_packet);
-            m_packet = nullptr;
-        }
+        Close(true);
     }
 
     bool Open(const String& localAddress, uint16_t port);
@@ -47,7 +44,7 @@ public:
 
     void Unbind(void);
 
-    void Close(void);
+    void Close(bool destroy = false);
 
     bool Send(const uint8_t* data, int dataLen, const NetworkEndpoint& receiver);
 

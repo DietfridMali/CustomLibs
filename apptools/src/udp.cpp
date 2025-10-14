@@ -18,9 +18,12 @@ bool UDPSocket::Open(const String& localAddress, uint16_t port) {
 }
 
 
-void UDPSocket::Close(void) {
-    if (m_socket) {
+void UDPSocket::Close(bool destroy) {
+    if (destroy and m_packet) {
         SDLNet_FreePacket(m_packet);
+        m_packet = nullptr;
+    }
+    if (m_socket) {
         SDLNet_UDP_Close(m_socket);
         m_socket = nullptr;
     }
