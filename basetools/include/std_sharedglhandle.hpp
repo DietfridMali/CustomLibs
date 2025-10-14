@@ -183,7 +183,7 @@ public:
 
 class SharedTextureHandle : public SharedGLHandle {
 public:
-    SharedTextureHandle(GLuint handle = 0)
+    explicit SharedTextureHandle(GLuint handle = 0)
         : SharedGLHandle(handle, glGenTextures, glDeleteTextures)
     {
     }
@@ -192,7 +192,7 @@ public:
 
 class SharedBufferHandle : public SharedGLHandle {
 public:
-    SharedBufferHandle(GLuint handle = 0)
+    explicit SharedBufferHandle(GLuint handle = 0)
         : SharedGLHandle(handle, glGenBuffers, glDeleteBuffers)
     {
     }
@@ -201,7 +201,7 @@ public:
 
 class SharedFramebufferHandle : public SharedGLHandle {
 public:
-    SharedFramebufferHandle(GLuint handle = 0)
+    explicit SharedFramebufferHandle(GLuint handle = 0)
         : SharedGLHandle(handle, glGenFramebuffers, glDeleteFramebuffers)
     {
     }
