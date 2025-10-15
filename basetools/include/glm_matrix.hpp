@@ -205,7 +205,7 @@ public:
 
     template <typename T> 
         requires std::same_as<std::decay_t<T>, Vector3f>
-    Vector3f Matrix4f::Rotate(T&& v) const
+    Vector3f Rotate(T&& v) const
     {
         return *this * std::forward<T>(v);
     }
