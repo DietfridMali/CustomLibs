@@ -13,8 +13,8 @@ template <typename HANDLE_T>
 class SharedHandle {
 protected:
     struct HandleInfo {
-        HANDLE_T                           handle{};
-        std::function<void(HANDLE_T)>      releaser{};
+        HANDLE_T                        handle{};
+        std::function<void(HANDLE_T)>   releaser{};
 
         HandleInfo(HANDLE_T h, std::function<void(HANDLE_T)> r)
             : handle(h), releaser(std::move(r))
@@ -22,9 +22,9 @@ protected:
         }
     };
 
-    std::shared_ptr<HandleInfo>            m_info;
-    std::function<void(HANDLE_T)>          m_releaser;
-    std::function<HANDLE_T()>              m_allocator;
+    std::function<void(HANDLE_T)>       m_releaser;
+    std::function<HANDLE_T()>           m_allocator;
+    std::shared_ptr<HandleInfo>         m_info;
 
 private:
     static void Dispose(HandleInfo* p) noexcept {
@@ -47,7 +47,7 @@ public:
         , m_allocator(std::move(allocator))
         , m_info(
             handle
-            ? std::shared_ptr<HandleInfo>(new HandleInfo(handle, releaser), &Dispose)
+            ? std::shared_ptr<HandleInfo>(new HandleInfo(handle, m_releaser), &Dispose)
             : std::shared_ptr<HandleInfo>()
         )
     {

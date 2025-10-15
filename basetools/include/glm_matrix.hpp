@@ -201,15 +201,11 @@ public:
     Matrix4f AffineInverse(void)
         noexcept; // bewusst ohne noexcept
 
-    static Vector3f Rotate(const Matrix4f& mm, const Vector3f& v)
-        noexcept(noexcept(mm* v))
-    {
-        return mm * v;
-    }
+    static inline Vector3f Rotate(const Matrix4f& mm, const Vector3f& v);
 
-    template <typename T> requires std::same_as<std::decay_t<T>, Vector3f>
-    Vector3f Rotate(T&& v) const
-        noexcept(noexcept((*this) * std::declval<Vector3f>()))
+    template <typename T> 
+        requires std::same_as<std::decay_t<T>, Vector3f>
+    Vector3f Matrix4f::Rotate(T&& v) const
     {
         return *this * std::forward<T>(v);
     }
@@ -292,6 +288,12 @@ inline Vector3f Matrix4f::Unrotate(const Vector3f v)
 noexcept(noexcept(Transpose()* std::declval<Vector3f>()))
 {
     return Transpose() * v;
+}
+
+inline Vector3f Matrix4f::Rotate(const Matrix4f& mm, const Vector3f& v)
+noexcept(noexcept(mm* v))
+{
+    return mm * v;
 }
 
 // =================================================================================================
