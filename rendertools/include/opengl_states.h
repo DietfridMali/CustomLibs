@@ -63,8 +63,6 @@ public:
 
 		inline int SetFaceCulling(int state) { return SetState<GL_CULL_FACE>(state); }
 
-		inline int SetAlphaTest(int state) { return SetState<GL_ALPHA_TEST>(state); }
-
 		inline int SetScissorTest(int state) { return SetState<GL_SCISSOR_TEST>(state); }
 
 		inline int SetStencilTest(int state) { return SetState<GL_STENCIL_TEST>(state); }

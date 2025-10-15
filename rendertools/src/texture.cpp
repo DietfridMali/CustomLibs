@@ -280,14 +280,14 @@ void Texture::SetParams(bool enforce)
     if (enforce or not m_hasParams) {
         m_hasParams = true;
         if (m_useMipMaps) {
-            glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_TRUE);
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glGenerateMipmap(m_type);
         }
         else {
-            glTexParameteri(m_type, GL_GENERATE_MIPMAP, GL_FALSE);
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
+            glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
         }
         glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);

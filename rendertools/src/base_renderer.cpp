@@ -95,13 +95,11 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.BlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
     openGLStates.BlendEquation(GL_FUNC_ADD);
-    openGLStates.SetAlphaTest(true);
     openGLStates.FrontFace(GL_CW);
     openGLStates.SetFaceCulling(1);
     openGLStates.CullFace(GL_BACK);
     openGLStates.openGLStates.SetMultiSample(1);
     openGLStates.SetPolygonOffsetFill(0);
-    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glViewport(0, 0, m_windowWidth, m_windowHeight);
 }
 
