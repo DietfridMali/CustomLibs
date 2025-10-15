@@ -47,8 +47,6 @@ endif
 
 LIB := libapptools.a
 
-.PHONY: all clean
-
 all: $(LIB)
 
 $(LIB): $(OBJECTS)

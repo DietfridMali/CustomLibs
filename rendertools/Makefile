@@ -39,6 +39,8 @@ FILES := \
  vbo \
  viewport
 
+INCDIRS := ./include ../basetools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2
+
 .PHONY: all clean DEBUG RELEASE
 
 MODE ?= release
@@ -70,6 +72,10 @@ else
   CXXFLAGS := -std=c++20 $(OPTFLAGS) $(DEFINES) -DNDEBUG $(INCLUDES) -MMD -MP
   LDFLAGS  :=
 endif
+
+LIB := librendertools.a
+
+all: $(LIB)
 
 $(LIB): $(OBJECTS)
 > $(AR) rcs $@ $^
