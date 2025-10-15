@@ -8,7 +8,7 @@
 BaseQuad TextureAtlas::renderQuad;
 
 TextureAtlas::TextureAtlas()
-	: _m_atlas(nullptr)
+	: m_atlas(nullptr)
 	, m_size(0)
 	, m_glyphSize(0)
 	, m_scale(Vector2f::ONE)
