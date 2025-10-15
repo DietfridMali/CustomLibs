@@ -206,7 +206,7 @@ public:
         }
         else {
             static_assert(std::is_same_v<VEC_TYPE, glm::vec3> || std::is_same_v<VEC_TYPE, glm::vec4>,
-                "Cross nur für vec3 und vec4 definiert");
+                "Cross only defined for vec3 and vec4");
         }
     }
 
@@ -327,11 +327,11 @@ public:
     inline float& Y() noexcept { return (*this)[1]; }
 
     inline float& Z() noexcept {
-        static_assert(VEC_TYPE::length() >= 3, "Z() nur für Vektoren mit >=3 Komponenten.");
+        static_assert(VEC_TYPE::length() >= 3, "Z() only for vektors with >= 3 components.");
         return (*this)[2];
     }
     inline float& W() noexcept {
-        static_assert(VEC_TYPE::length() >= 4, "W() nur für Vektoren mit >=4 Komponenten.");
+        static_assert(VEC_TYPE::length() >= 4, "W() only for vektors with >= 4 components.");
         return (*this)[3];
     }
 

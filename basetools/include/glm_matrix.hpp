@@ -209,16 +209,12 @@ public:
 
     template <typename T> requires std::same_as<std::decay_t<T>, Vector3f>
     Vector3f Rotate(T&& v) const
-        noexcept(noexcept((*this)* std::declval<Vector3f>()))
+        noexcept(noexcept((*this) * std::declval<Vector3f>()))
     {
         return *this * std::forward<T>(v);
     }
 
-    Vector3f Unrotate(const Vector3f v)
-        noexcept(noexcept(Transpose()* std::declval<Vector3f>()))
-    {
-        return Transpose() * v;
-    }
+    Vector3f Unrotate(const Vector3f v);
 
     float Det() const
         noexcept(noexcept(glm::determinant(std::declval<glm::mat4>())))
@@ -289,5 +285,13 @@ public:
         return true;
     }
 };
+
+// =================================================================================================
+
+inline Vector3f Matrix4f::Unrotate(const Vector3f v)
+noexcept(noexcept(Transpose()* std::declval<Vector3f>()))
+{
+    return Transpose() * v;
+}
 
 // =================================================================================================

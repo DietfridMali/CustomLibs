@@ -135,7 +135,7 @@ noexcept
 
     // Schiefe Geraden: genau ein nächster Punkt auf *this*
     float s = (b * f - c * e) / denom;            // Parameter auf *this*
-    float t = (a * f - b * c) / denom;            // Parameter auf other (nur für Distanz)
+    float t = (a * f - b * c) / denom;            
     Vector3f pClosest = pts.p0 + d1 * s;
     Vector3f qClosest = other.pts.p0 + d2 * t;
 

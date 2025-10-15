@@ -288,7 +288,7 @@ inline String::operator uint16_t() const {
         return 0;
     auto val = static_cast<size_t>(*this);
     if (val > std::numeric_limits<uint16_t>::max())
-        throw std::out_of_range("Wert zu groß für uint16_t");
+        throw std::out_of_range("value too large for uint16_t");
     return static_cast<uint16_t>(val);
 }
 
@@ -297,7 +297,7 @@ inline String::operator uint32_t() const {
         return 0;
     auto val = static_cast<size_t>(*this);
     if (val > std::numeric_limits<uint32_t>::max())
-        throw std::out_of_range("Wert zu groß für uint16_t");
+        throw std::out_of_range("value too large for uint32_t");
     return static_cast<uint32_t>(val);
 }
 
