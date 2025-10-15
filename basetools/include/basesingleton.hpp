@@ -43,9 +43,7 @@ public:
 
 protected:
     // every class using PolymorphSingleton needs a (default) c'tor to initialize _instance
-    PolymorphSingleton() { 
-        _instance = static_cast<CLASS_T*>(this); 
-    }
+    PolymorphSingleton() = default;
 
     static inline CLASS_T* _instance = nullptr;
 };

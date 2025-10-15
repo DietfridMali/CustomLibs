@@ -81,7 +81,9 @@ class BaseSoundHandler
 
         BaseSoundHandler()
             : m_soundLevel(0), m_masterVolume(0.0f), m_maxAudibleDistance(0.0f), m_channelCount(0)
-        { }
+        { 
+            _instance = this;
+        }
 
         virtual ~BaseSoundHandler() = default;
 

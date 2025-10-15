@@ -83,7 +83,7 @@ public:
         , m_backgroundColor(ColorData::Black)
         , m_screenIsAvailable(false)
     {
-        //_instance = this;
+        _instance = this;
     }
 
     static BaseRenderer& Instance(void) { return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance()); }

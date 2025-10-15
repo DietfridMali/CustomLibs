@@ -26,9 +26,18 @@ public:
     SDL_GLContext   m_context;
 
     BaseDisplayHandler()
-        : m_width(0), m_height(0), m_maxWidth(0), m_maxHeight(0), m_fullscreen(false), m_vSync(true), m_isLandscape(false), m_aspectRatio(1.0f), m_window(nullptr), m_context(SDL_GLContext(0))
+        : m_width(0)
+        , m_height(0)
+        , m_maxWidth(0)
+        , m_maxHeight(0)
+        , m_fullscreen(false)
+        , m_vSync(true)
+        , m_isLandscape(false)
+        , m_aspectRatio(1.0f)
+        , m_window(nullptr)
+        , m_context(SDL_GLContext(0))
     { 
-        // _instance = this;
+        _instance = this;
     }
 
     virtual ~BaseDisplayHandler();
