@@ -1,46 +1,19 @@
 .RECIPEPREFIX := >
 CXX := g++
 AR  := ar
+
 FILES := \
- base_displayhandler \
- base_quad \
- base_renderer \
- base_shadercode \
- base_shaderhandler \
- base_texture_shaders \
- blur_shader \
- cube \
- cubemap \
- drawbufferhandler \
- fbo \
- fonthandler \
- framecounter \
- icosphere \
- linesegment \
- mesh \
- noisetexture \
- opengl_states \
- outlinerenderer \
- outline_shader \
- plane \
- prerenderedtexture \
- primitive_shaders \
- projection \
- rendermatrices \
- shader \
- shader_macros \
- SSBO \
- textrenderer \
- textureatlas \
- texture \
- texturehandler \
- vao \
- vbo \
- viewport
+ arghandler \
+ base_soundhandler \
+ networkendpoint \
+ networkmessage \
+ stunclient \
+ textfileloader \
+ udp
 
 SRCDIR := src
 OBJDIR := obj
-INCDIRS := ./include ../basetools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2
+INCDIRS := ./include ../basetools/include ../rendertools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
 SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
@@ -51,7 +24,7 @@ SANITIZE := -fsanitize=address,undefined
 DBGFLAGS := -g3 -Og -fno-omit-frame-pointer $(SANITIZE) -D_GLIBCXX_ASSERTIONS
 CXXFLAGS := -std=c++20 -O0 $(DEFINES) $(INCLUDES) -MMD -MP
 
-LIB := librendertools.a
+LIB := libapptools.a
 
 .PHONY: all clean
 
@@ -68,4 +41,4 @@ rendertools.lib: $(LIB)
 > cp $(LIB) $@
 
 clean:
-> rm -rf $(OBJDIR) $(LIB) librendertools.a
+> rm -rf $(OBJDIR) $(LIB) libapptools.a
