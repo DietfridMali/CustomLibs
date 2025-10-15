@@ -47,7 +47,7 @@ public:
         , m_allocator(std::move(allocator))
         , m_info(
             handle
-            ? std::shared_ptr<HandleInfo>(new HandleInfo(handle, m_releaser), &Dispose)
+            ? std::shared_ptr<HandleInfo>(new HandleInfo(handle, releaser), &Dispose)
             : std::shared_ptr<HandleInfo>()
         )
     {
