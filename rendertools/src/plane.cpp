@@ -35,8 +35,8 @@ Plane& Plane::operator= (std::initializer_list<Vector3f> vertices) {
 int Plane::Winding(void)
 noexcept
 {
-    Vector3f e0 = m_vertices[1] - m_vertices[0];
-    Vector3f e1 = m_vertices[2] - m_vertices[0];
+    Vector3f e0 = m_coordinates[1] - m_coordinates[0];
+    Vector3f e1 = m_coordinates[2] - m_coordinates[0];
     Vector3f n = e0.Cross(e1);
     return (n.Z() > 0) ? 1 : -1;
 }
@@ -45,18 +45,18 @@ noexcept
 
 void Plane::Init(std::initializer_list<Vector3f> vertices) {
     m_tolerance = Conversions::NumericTolerance;
-    m_vertices = vertices;
+    m_coordinates = vertices;
 #if 0
     if (Winding() < 0) {
-        std::swap(m_vertices[1], m_vertices[3]);
+        std::swap(m_coordinates[1], m_coordinates[3]);
     }
 #endif
-    m_center = (m_vertices[0] + m_vertices[1] + m_vertices[2] + m_vertices[3]) * 0.25f;
-    m_normal = Vector3f::Normal(m_vertices[0], m_vertices[1], m_vertices[2]);
+    m_center = (m_coordinates[0] + m_coordinates[1] + m_coordinates[2] + m_coordinates[3]) * 0.25f;
+    m_normal = Vector3f::Normal(m_coordinates[0], m_coordinates[1], m_coordinates[2]);
     m_normal.Negate();
     // refEdges and refDots are precomputed for faster "point inside rectangle" tests
-    m_refEdges[0] = m_vertices[1] - m_vertices[0];
-    m_refEdges[1] = m_vertices[3] - m_vertices[0];
+    m_refEdges[0] = m_coordinates[1] - m_coordinates[0];
+    m_refEdges[1] = m_coordinates[3] - m_coordinates[0];
     m_refDots[0] = m_refEdges[0].Dot(m_refEdges[0]) + m_tolerance;
     m_refDots[1] = m_refEdges[1].Dot(m_refEdges[1]) + m_tolerance;
 }
@@ -69,7 +69,7 @@ noexcept
     m_center += t;
     // m_refEdges [0] += t;
     // m_refEdges [1] += t;
-    for (auto& v : m_vertices)
+    for (auto& v : m_coordinates)
         v += t;
 }
 
@@ -93,11 +93,11 @@ noexcept
     float denom = m_normal.Dot(vLine);
 
     if (std::abs(denom) < m_tolerance) {
-        float d = m_normal.Dot(m_vertices[0] - p0);
+        float d = m_normal.Dot(m_coordinates[0] - p0);
         vLinePoint = p0 + m_normal * (d / m_normal.Dot(m_normal));
     }
     else {
-        float t = m_normal.Dot(m_vertices[0] - p0) / denom;
+        float t = m_normal.Dot(m_coordinates[0] - p0) / denom;
         vLinePoint = p0 + vLine * t;
     }
     return Distance(vLinePoint);
@@ -145,7 +145,7 @@ noexcept
     }
 #endif
     float denom = m_normal.Dot(vLine);
-    float dist = m_normal.Dot(p0 - m_vertices[0]);
+    float dist = m_normal.Dot(p0 - m_coordinates[0]);
 
     if (fabs(denom) < m_tolerance) {
         if (fabs(dist) <= m_tolerance) {
@@ -172,7 +172,7 @@ int Plane::PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
 noexcept
 {
     float denom = line.Normal().Dot(line.Velocity());
-    float dist = m_normal.Dot(line.pts.p0 - m_vertices[0]);
+    float dist = m_normal.Dot(line.pts.p0 - m_coordinates[0]);
 
     if (fabs(denom) < m_tolerance)  // Linie parallel zur Ebene
         return (fabs(dist - d) < m_tolerance) ? 0 : -1;
@@ -217,10 +217,10 @@ noexcept
     // barycentric method is rather computation heavy and not needed for rectangles in a plane
     if (barycentric)
         return
-        TriangleContains(p, m_vertices[0], m_vertices[1], m_vertices[2]) or
-        TriangleContains(p, m_vertices[0], m_vertices[2], m_vertices[3]);
+        TriangleContains(p, m_coordinates[0], m_coordinates[1], m_coordinates[2]) or
+        TriangleContains(p, m_coordinates[0], m_coordinates[2], m_coordinates[3]);
     // (0 < AM ⋅ AB < AB ⋅ AB) ∧ (0 < AM ⋅ AD < AD ⋅ AD)
-    Vector3f m = p - m_vertices[0];
+    Vector3f m = p - m_coordinates[0];
     float d = m.Dot(m_refEdges[0]);
     if ((-m_tolerance > d) or (d >= m_refDots[0]))
         return false;
@@ -247,7 +247,7 @@ noexcept
     radius *= radius;
     radius += m_toleranceSquared;
     for (int i = 0; i < 4; ++i) {
-        if (PointToSegmentDistanceSquared(m_vertices[i], m_vertices[(i + 1) % 4], line.pts.p0) <= radius)
+        if (PointToSegmentDistanceSquared(m_coordinates[i], m_coordinates[(i + 1) % 4], line.pts.p0) <= radius)
             return true;
     }
     return false;
@@ -300,7 +300,7 @@ noexcept
     Vector3f bestPoint;
 
     for (int i = 0; i < 4; ++i) {
-        LineSegment edge(m_vertices[i], m_vertices[(i + 1) % 4]), collisionPoints;
+        LineSegment edge(m_coordinates[i], m_coordinates[(i + 1) % 4]), collisionPoints;
         line.ComputeCapsuleIntersection(edge, collisionPoints, radius, limits);
         for (int j = 0; j < collisionPoints.solutions; ++j) {
             if (collisionPoints.offsets[j] > bestOffset) {

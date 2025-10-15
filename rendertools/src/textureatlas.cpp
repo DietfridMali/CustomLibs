@@ -88,11 +88,13 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 #endif
 	baseRenderer.SetViewport(Viewport(l, t, int(roundf(scale.X() * w)), int(roundf(scale.Y() * h))), 0, 0, true, true);
 	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White); // , GlyphOffset(glyphIndex), m_scale);
+	BaseRenderer::CheckGLError();
 	if (shader) {
 		float c = float(glyphIndex) / float(m_size.GetSize());
 #if 1
 		//renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 		renderQuad.Render(shader, glyph, true);
+		BaseRenderer::CheckGLError();
 #else
 		renderQuad.Fill(RGBAColor(c, c, c, 1)); 
 #endif

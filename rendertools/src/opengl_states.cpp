@@ -45,4 +45,16 @@ int OpenGLStates::TextureIsBound(GLenum typeID, GLuint texture) {
 	return -1;
 }
 
+
+void OpenGLStates::DetermineExtensions(void) {
+	GLint extCount = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
+	m_extensions.reserve(extCount);
+	for (GLint i = 0; i < extCount; ++i) {
+		const char* s = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
+		if (s) 
+			m_extensions.emplace(s);
+	}
+}
+
 // =================================================================================================

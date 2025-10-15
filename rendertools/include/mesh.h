@@ -21,7 +21,7 @@ public:
 
     virtual void Destroy(void) = 0;
 
-    virtual void Render(Texture* texture) = 0;
+    virtual bool Render(Texture* texture) = 0;
 
     virtual ~AbstractMesh() = default;
 };
@@ -56,17 +56,17 @@ class Mesh
     : public AbstractMesh
 {
 public:
-    String              m_name;
+    String              m_name{ "" };
     TextureList         m_textures;
     VertexBuffer        m_vertices;
     VertexBuffer        m_normals;
     TexCoordBuffer      m_texCoords;
     ColorBuffer         m_vertexColors;
     IndexBuffer         m_indices;
-    VAO                 m_vao;
-    GLenum              m_shape;
-    Vector3f            m_vMin;
-    Vector3f            m_vMax;
+    VAO*                m_vao{ nullptr };
+    GLenum              m_shape{ 0 };
+    Vector3f            m_vMin{ Vector3f::ZERO };
+    Vector3f            m_vMax{ Vector3f::ZERO };
 
     static uint32_t quadTriangleIndices[6];
 
@@ -89,7 +89,8 @@ public:
     virtual void Destroy(void);
 
     inline void SetDynamic(bool isDynamic) {
-        m_vao.SetDynamic(isDynamic);
+        if (m_vao)
+            m_vao->SetDynamic(isDynamic);
     }
 
     inline uint32_t ShapeSize(void)
@@ -115,33 +116,38 @@ public:
     inline IndexBuffer& Indices(void) noexcept { return m_indices; }
 
     inline void UpdateVertexBuffer(void) {
-        m_vao.UpdateVertexBuffer("Vertex", m_vertices, GL_FLOAT);
+        if (m_vao)
+            m_vao->UpdateVertexBuffer("Vertex", m_vertices, GL_FLOAT);
     }
 
     inline void UpdateTexCoordBuffer(void) {
-        m_vao.UpdateVertexBuffer("TexCoord", m_texCoords, GL_FLOAT);
+        if (m_vao)
+            m_vao->UpdateVertexBuffer("TexCoord", m_texCoords, GL_FLOAT);
     }
 
     inline void UpdateColorBuffer(void) {
-        m_vao.UpdateVertexBuffer("Color", m_vertexColors, GL_FLOAT);
+        if (m_vao)
+            m_vao->UpdateVertexBuffer("Color", m_vertexColors, GL_FLOAT);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(void) {
-        m_vao.UpdateVertexBuffer("Normal", m_normals, GL_FLOAT);
+        if (m_vao)
+            m_vao->UpdateVertexBuffer("Normal", m_normals, GL_FLOAT);
     }
 
     inline void UpdateIndexBuffer(void) {
-        m_vao.UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT);
+        if (m_vao)
+            m_vao->UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT);
     }
 
-    void UpdateVAO(bool createVertexIndex = false);
+    bool UpdateVAO(void);
 
     void ResetVAO(void);
 
     void CreateVertexIndices(void);
 
-    inline VAO& GetVAO(void) noexcept
+    inline VAO* GetVAO(void) noexcept
     {
         return m_vao;
     }
@@ -213,7 +219,7 @@ public:
         return m_vertices.IsEmpty();
     }
 
-    virtual void Render(Texture* texture);
+    virtual bool Render(Texture* texture);
 };
 
 // =================================================================================================

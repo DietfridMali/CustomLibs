@@ -8,6 +8,7 @@
 #include "texturehandler.h"
 #include "colordata.h"
 #include "plane.h"
+#include "mesh.h"
 
 #define USE_STATIC_VAO 0
 
@@ -15,6 +16,7 @@
 
 class BaseQuad
     : public Plane
+    , public Mesh
 {
 public:
     //static VAO* m_vao;
@@ -36,9 +38,11 @@ public:
 #if USE_STATIC_VAO 
     static VAO              staticVAO;
 #endif
+#if 0
     VAO*                    m_vao;
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
+#endif
     TexCoord                m_maxTexCoord;
     float                   m_aspectRatio;
     float                   m_offset;
@@ -70,16 +74,16 @@ public:
         , m_isAvailable(false)
         , m_privateVAO(false)
         , m_premultiply(false)
-        , m_vao(nullptr)
     {
+        Mesh::Init(GL_QUADS, 100);
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false)
         : Plane(vertices)
         , m_isAvailable(true)
         , m_premultiply(false)
-        , m_vao(nullptr)
     {
+        Mesh::Init(GL_QUADS, 100);
         Setup(vertices, texCoords);
     }
 
@@ -108,8 +112,6 @@ public:
     inline VAO& GetVAO(void) {
         return *m_vao;
     }
-
-    bool UpdateVAO(void);
 
     float ComputeAspectRatio(void)
         noexcept;

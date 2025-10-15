@@ -57,6 +57,7 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
 #if 1 //def NDEBUG
         delete info->texture;
         info->texture = nullptr;
+        BaseRenderer::CheckGLError();
 #endif
     }
     return true;

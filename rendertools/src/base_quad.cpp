@@ -41,8 +41,8 @@ BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
         if (m_privateVAO)
             m_vao->Copy(*other.m_vao);
-        m_vertexBuffer = other.m_vertexBuffer;
-        m_texCoordBuffer = other.m_texCoordBuffer;
+        m_vertices = other.m_vertices;
+        m_texCoords = other.m_texCoords;
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }
@@ -57,8 +57,8 @@ noexcept
         m_vao = other.m_vao;
         if ((m_privateVAO = other.m_privateVAO))
             other.m_vao = nullptr;
-        m_vertexBuffer = std::move(other.m_vertexBuffer);
-        m_texCoordBuffer = std::move(other.m_texCoordBuffer);
+        m_vertices = std::move(other.m_vertices);
+        m_texCoords = std::move(other.m_texCoords);
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }
@@ -67,8 +67,8 @@ noexcept
 
 
 void BaseQuad::UpdateTexCoords(void) {
-    if (m_texCoordBuffer.AppDataLength() > 0) {
-        for (auto& tc : m_texCoordBuffer.AppData())
+    if (m_texCoords.AppDataLength() > 0) {
+        for (auto& tc : m_texCoords.AppData())
             m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
     }
 }
@@ -80,19 +80,19 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
         return c.size() == il.size() && std::equal(c.begin(), c.end(), il.begin());
         };
 
-    if (vertices.size() and not equals(m_vertexBuffer.AppData().StdList(), vertices)) {
+    if (vertices.size() and not equals(m_vertices.AppData().StdList(), vertices)) {
         Plane::Init(vertices);
-        m_vertexBuffer.AppData() = vertices;
-        m_vertexBuffer.Setup();
-        m_vertexBuffer.SetDirty(true);
+        m_vertices.AppData() = vertices;
+        m_vertices.Setup();
+        m_vertices.SetDirty(true);
     }
 
     if (texCoords.size() == 0)
         texCoords = defaultTexCoords[tcRegular];
-    if (not equals(m_texCoordBuffer.AppData().StdList(), texCoords)) {
-        m_texCoordBuffer.AppData() = texCoords;
-        m_texCoordBuffer.Setup();
-        m_texCoordBuffer.SetDirty(true);
+    if (not equals(m_texCoords.AppData().StdList(), texCoords)) {
+        m_texCoords.AppData() = texCoords;
+        m_texCoords.Setup();
+        m_texCoords.SetDirty(true);
     }
     UpdateTexCoords();
 
@@ -124,25 +124,12 @@ bool BaseQuad::CreateVAO(bool privateVAO) {
 }
 
 
-bool BaseQuad::UpdateVAO(void) {
-    if (not m_vao->IsValid())
-        return false;
-    if (m_vertexBuffer.IsDirty() or m_texCoordBuffer.IsDirty()) {
-        m_vao->Enable();
-        m_vao->UpdateVertexBuffer("Vertex", m_vertexBuffer, GL_FLOAT);
-        m_vao->UpdateVertexBuffer("TexCoord", m_texCoordBuffer, GL_FLOAT);
-        m_vao->Disable();
-    }
-    return true;
-}
-
-
 float BaseQuad::ComputeAspectRatio(void)
 noexcept
 {
     Vector3f vMin = Vector3f{ 1e6, 1e6, 1e6 };
     Vector3f vMax = Vector3f{ -1e6, -1e6, -1e6 };
-    for (auto& v : m_vertexBuffer.AppData()) {
+    for (auto& v : m_vertices.AppData()) {
         vMin.Minimize(v);
         vMax.Maximize(v);
     }
@@ -184,8 +171,7 @@ void BaseQuad::ResetTransformation(void) {
 bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
     if (not (shader or (shader = LoadShader(texture != nullptr, color))))
         return false;
-    if (UpdateVAO()) 
-    {
+    if (UpdateVAO()) {
         m_vao->Render(texture);
         ResetTransformation();
         return true;
@@ -195,7 +181,7 @@ bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) 
         if (texture and texture->Enable()) {
             Tristate<int> blending (-1, 0, openGLStates.SetBlending(1));
             glBegin(GL_QUADS);
-            for (auto& v : m_vertexBuffer.AppData()) {
+            for (auto& v : m_vertices.AppData()) {
                 glColor4f(1, 1, 1, 1);
                 glVertex3f(v.X(), v.Y(), v.Z());
             }

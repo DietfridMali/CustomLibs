@@ -3,6 +3,7 @@
 #include <optional>
 #include <tuple>
 #include <utility>
+#include <unordered_set>
 
 #include "glew.h"
 #include <glm/glm.hpp>
@@ -18,7 +19,9 @@ class OpenGLStates
 	: public BaseSingleton<OpenGLStates>
 {
 private:
-	int	m_maxTMU;
+	int	m_maxTMU{ 0 };
+	std::unordered_set<std::string> m_extensions;
+	bool m_haveExtensions{ false };
 
 	struct textureBindings {
 		GLuint	handles[2]; // texture2D, cubemap
@@ -27,15 +30,19 @@ private:
 	ManagedArray<textureBindings> m_bindings;
 
 public:
-	OpenGLStates() 
-		: m_maxTMU(0)
-	{
+	OpenGLStates() {
 		GLint tmuCount = 0;
 		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &tmuCount);
 		m_bindings.Resize(tmuCount);
 		m_bindings.Fill({ 0,0 });
+		DetermineExtensions();
 	}
 
+	void DetermineExtensions(void);
+
+	inline bool HasExtension(const char* extension) {
+		return m_extensions.find(extension) != m_extensions.end();
+	}
 
 	template<GLenum stateID>
 	inline int SetState(int state) {

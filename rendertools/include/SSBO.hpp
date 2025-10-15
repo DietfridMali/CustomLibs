@@ -10,7 +10,7 @@ public:
 	static inline bool IsAvailable;
 	
 	BaseSSBO() {
-		IsAvailable = (strstr((const char*)glGetString(GL_EXTENSIONS), "GL_ARB_shader_storage_buffer_object"));
+		IsAvailable = openGLStates.HasExtension("GL_ARB_shader_storage_buffer_object");
 	}
 };
 

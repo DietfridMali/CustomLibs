@@ -18,7 +18,9 @@ bool Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String 
     m_vertexColors = ColorBuffer(listSegmentSize);
     m_indices = IndexBuffer(ShapeSize(), listSegmentSize);
     SetupTexture(texture, textureFolder, textureNames, textureType);
-    return m_vao.Create(GL_QUADS, false);
+    if (not (m_vao = new VAO()))
+        return false;
+    return m_vao->Create(GL_QUADS, false);
 }
 
 void Mesh::CreateVertexIndices(void) {
@@ -32,18 +34,21 @@ void Mesh::CreateVertexIndices(void) {
     m_indices.SetDirty(true);
 }
 
-void Mesh::UpdateVAO(bool createVertexIndex) {
-    if (m_shape != GL_QUADS)
-        createVertexIndex = false;
-    m_vao.Create(createVertexIndex ? GL_TRIANGLES : m_shape);
-    m_vao.Enable();
-    if (m_indices.IsDirty()) {
-        m_indices.Setup();
+bool Mesh::UpdateVAO(void) {
+    if (not (m_vao and m_vao->IsValid()))
+        return false;
+    bool createVertexIndex = (m_shape == GL_QUADS);
+    m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape);
+    m_vao->Enable();
+    if (createVertexIndex) {
+        CreateVertexIndices();
+        m_shape = GL_TRIANGLES;
+        m_vao->m_indexBuffer.SetDynamic(true);
+        m_indices.SetDirty(true);
         UpdateIndexBuffer();
     }
-    else if (createVertexIndex) {
-        CreateVertexIndices();
-        m_vao.m_indexBuffer.SetDynamic(true);
+    if (m_indices.IsDirty()) {
+        m_indices.Setup();
         UpdateIndexBuffer();
     }
     if (m_vertices.IsDirty()) {
@@ -63,7 +68,8 @@ void Mesh::UpdateVAO(bool createVertexIndex) {
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateNormalBuffer();
     }
-    m_vao.Disable();
+    m_vao->Disable();
+    return true;
 }
 
 void Mesh::ResetVAO(void) {
@@ -72,7 +78,7 @@ void Mesh::ResetVAO(void) {
     m_texCoords.Reset();
     m_vertexColors.Reset();
     m_normals.Reset();
-    m_vao.Destroy();
+    m_vao->Destroy();
 }
 
 void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {
@@ -118,16 +124,11 @@ noexcept
         texture->Disable();
 }
 
-void Mesh::Render(Texture* texture) {
-    if (m_vao.IsValid()) {
-#if 0
-        SetTexture();
-        SetColor();
-        SetOutlineColor();
-        SetMaxDistance(maxDistance);
-#endif
-        m_vao.Render(texture);
-    }
+bool Mesh::Render(Texture* texture) {
+    if (not m_vao->IsValid())
+        return false;
+    m_vao->Render(texture);
+    return true;
 }
 
 void Mesh::Destroy(void)
@@ -138,7 +139,7 @@ noexcept(
     noexcept(m_vertexColors.Destroy()) &&
     noexcept(m_indices.Destroy()) &&
     noexcept(m_textures.Clear()) &&
-    noexcept(m_vao.Destroy()))
+    noexcept(m_vao->Destroy()))
 {
     m_vertices.Destroy();
     m_normals.Destroy();
@@ -146,7 +147,7 @@ noexcept(
     m_vertexColors.Destroy();
     m_indices.Destroy();
     m_textures.Clear();
-    m_vao.Destroy();
+    m_vao->Destroy();
     m_vMax = Vector3f{ -1e6, -1e6, -1e6 }; 
     m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; 
 }

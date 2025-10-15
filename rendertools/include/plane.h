@@ -14,7 +14,7 @@ class Plane
     : public Vector3f {
 
 public:
-    ManagedArray<Vector3f>  m_vertices;
+    ManagedArray<Vector3f>  m_coordinates;
     Vector3f                m_normal;
     Vector3f                m_center;
     Vector3f                m_refEdges[2];
@@ -36,7 +36,7 @@ public:
 
         // distance to plane (v0, v1, v2)
         inline float Distance(const Vector3f& v) {
-        return (v - m_vertices[0]).Dot(m_normal);
+        return (v - m_coordinates[0]).Dot(m_normal);
     }
     /* noexcept is intentionally omitted here to keep your original single-line style for inlines;
        all other non-inline declarations below are marked with noexcept in the next line. */
