@@ -13,8 +13,8 @@ template <typename HANDLE_T>
 class SharedHandle {
 protected:
     struct HandleInfo {
-        HANDLE_T                           handle;
-        std::function<void(HANDLE_T)>      releaser;
+        HANDLE_T                           handle{};
+        std::function<void(HANDLE_T)>      releaser{};
 
         HandleInfo(HANDLE_T h, std::function<void(HANDLE_T)> r)
             : handle(h), releaser(std::move(r))
