@@ -202,16 +202,4 @@ bool BaseQuad::Fill(const RGBAColor& color) {
     return true;
 }
 
-
-void BaseQuad::Destroy(void)
-noexcept
-{
-    if constexpr (not is_static_member_v<&BaseQuad::m_vao>) {
-        if (m_privateVAO) {
-            delete m_vao;
-            m_vao = nullptr;
-        }
-    }
-}
-
 // =================================================================================================

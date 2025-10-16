@@ -91,6 +91,8 @@ public:
         Copy(other);
     }
 
+    ~BaseQuad() = default;
+
     virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false);
 
     BaseQuad& Copy(const BaseQuad& other);
@@ -153,12 +155,6 @@ public:
 
     inline void Premultiply(void) {
         m_premultiply = true;
-    }
-
-    ~BaseQuad() {
-        if (not m_privateVAO)
-            m_vao = nullptr;
-        //Destroy();
     }
 
     protected:
