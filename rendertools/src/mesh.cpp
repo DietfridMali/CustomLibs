@@ -155,6 +155,8 @@ noexcept(
     m_textures.Clear();
     if (m_vao)
         m_vao->Destroy();
+    delete m_vao;
+    m_vao = nullptr;
     m_vMax = Vector3f{ -1e6, -1e6, -1e6 }; 
     m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; 
 }
