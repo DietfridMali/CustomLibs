@@ -42,16 +42,14 @@ public:
 #else
     GLuint              m_handle;
 #endif
-    GLuint              m_shape;
-    bool                m_isDynamic;
-    bool                m_isBound;
+    GLenum              m_shape{ GL_QUADS };
+    bool                m_isDynamic{ false };
+    bool                m_isBound{ false };
 
     static VAO*         activeVAO;
     static List<VAO*>   vaoStack;
 
-    VAO()
-        : m_isDynamic(false), m_isBound(false), m_shape(GL_QUADS)
-    { }
+    VAO() = default;
 
     static inline void PushVAO(VAO* vao)
         noexcept
@@ -76,6 +74,10 @@ public:
         for (auto vbo : m_dataBuffers)
             vbo->SetDynamic(isDynamic);
         m_indexBuffer.SetDynamic(m_isDynamic);
+    }
+
+    inline void SetShape(GLenum shape) noexcept {
+        m_shape = shape;
     }
 
     bool Create(GLuint shape = GL_QUADS, bool isDynamic = false)

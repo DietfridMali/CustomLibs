@@ -95,6 +95,12 @@ public:
             m_vao->SetDynamic(isDynamic);
     }
 
+    inline void SetShape(GLenum shape) noexcept {
+        m_shape = shape;
+        if (m_vao)
+            m_vao->SetShape(shape);
+    }
+
     inline uint32_t ShapeSize(void)
         noexcept
     {
