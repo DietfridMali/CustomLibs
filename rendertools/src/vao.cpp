@@ -50,8 +50,10 @@ void VAO::Destroy(void)
 noexcept
 {
     Disable();
-    for (auto& vbo : m_dataBuffers)
+    for (auto& vbo : m_dataBuffers) {
         vbo->Destroy();
+        delete vbo;
+    }
     m_indexBuffer.Destroy();
     m_dataBuffers.Clear();
 #if USE_SHARED_HANDLES
