@@ -68,10 +68,11 @@ class BaseSoundHandler
         Dictionary<String, Mix_Chunk*>  m_sounds;
         List<SoundObject>               m_idleChannels;
         List<SoundObject>               m_busyChannels;
-        int                             m_soundLevel;
-        float                           m_masterVolume;
-        float                           m_maxAudibleDistance;
-        int                             m_channelCount;
+        int                             m_soundLevel{ 0 };
+        float                           m_masterVolume{ 0.0f };
+        float                           m_maxAudibleDistance{ 0.0f };
+        int                             m_channelCount{ 0 };
+        bool                            m_haveAudio{ false };
 
         struct SoundParams {
             float volume = 1.0f;
@@ -79,13 +80,16 @@ class BaseSoundHandler
             int level = 1;
         };
 
-        BaseSoundHandler()
-            : m_soundLevel(0), m_masterVolume(0.0f), m_maxAudibleDistance(0.0f), m_channelCount(0)
+        BaseSoundHandler() 
         { 
             _instance = this;
         }
 
-        virtual ~BaseSoundHandler() = default;
+        virtual ~BaseSoundHandler() {
+            Destroy();
+        }
+
+        void Destroy();
 
         virtual bool Setup(String soundFolder);
 

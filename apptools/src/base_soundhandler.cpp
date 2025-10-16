@@ -61,7 +61,7 @@ bool BaseSoundHandler::Setup(String soundFolder) {
     m_soundLevel = argHandler.IntVal("soundlevel", 0, 1);
     m_masterVolume = argHandler.FloatVal("masterVolume", 0, 1);
     m_maxAudibleDistance = 30.0f;
-    Mix_Quit();
+    Destroy();
 #if 0
     Mix_Init(MIX_INIT_MP3 | MIX_INIT_OGG);
 #endif
@@ -69,6 +69,7 @@ bool BaseSoundHandler::Setup(String soundFolder) {
         fprintf(stderr, "Couldn't initialize sound system (%s)\n", Mix_GetError());
         return false;
     }
+    m_haveAudio = true;
 #if 0
     int frequency, channels;
     Uint16 format;
@@ -206,6 +207,15 @@ void BaseSoundHandler::Update(void) {
     Cleanup();
     for (auto& so : m_busyChannels)
         UpdateSound(so);
+}
+
+
+void BaseSoundHandler::Destroy(void) {
+    if (m_haveAudio) {
+        m_haveAudio = false;
+        Mix_CloseAudio();
+    }
+    Mix_Quit();
 }
 
 BaseSoundHandler* baseSoundHandler = nullptr;
