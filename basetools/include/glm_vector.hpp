@@ -236,26 +236,34 @@ public:
 
     float Min() const noexcept {
         float v = (*this)[0];
-        for (int i = 1; i < VEC_TYPE::length(); ++i) v = std::min(v, (*this)[i]);
+        for (int i = 1; i < VEC_TYPE::length(); ++i) 
+            v = std::min(v, (*this)[i]);
         return v;
     }
     float Max() const noexcept {
         float v = (*this)[0];
-        for (int i = 1; i < VEC_TYPE::length(); ++i) v = std::max(v, (*this)[i]);
+        for (int i = 1; i < VEC_TYPE::length(); ++i) 
+            v = std::max(v, (*this)[i]);
         return v;
     }
 
     const Vector& Minimize(const Vector& other) noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] > other[i]) (*this)[i] = other[i];
+        for (int i = 0; i < VEC_TYPE::length(); ++i) 
+            if ((*this)[i] > other[i]) 
+                (*this)[i] = other[i];
         return *this;
     }
     const Vector& Maximize(const Vector& other) noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) if ((*this)[i] < other[i]) (*this)[i] = other[i];
+        for (int i = 0; i < VEC_TYPE::length(); ++i) 
+            if ((*this)[i] < other[i]) 
+                (*this)[i] = other[i];
         return *this;
     }
 
     bool IsValid() const noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) if (!std::isfinite((*this)[i])) return false;
+        for (int i = 0; i < VEC_TYPE::length(); ++i) 
+            if (!std::isfinite((*this)[i])) 
+                return false;
         return true;
     }
 
