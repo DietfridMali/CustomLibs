@@ -92,7 +92,7 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     if (vertices.size() and not equals(m_vertices.AppData().StdList(), vertices)) {
         Plane::Init(vertices);
         m_vertices.AppData() = vertices;
-        m_vertices.Setup();
+        //m_vertices.Setup();
         m_vertices.SetDirty(true);
     }
 
@@ -100,14 +100,16 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
         texCoords = defaultTexCoords[tcRegular];
     if (not equals(m_texCoords.AppData().StdList(), texCoords)) {
         m_texCoords.AppData() = texCoords;
-        m_texCoords.Setup();
+        //m_texCoords.Setup();
         m_texCoords.SetDirty(true);
     }
     UpdateTexCoords();
 
     if (not CreateVAO())
         return false;
+    //SetShape(GL_TRIANGLES); // trigger building of triangle index everytime new vertices are loaded
     UpdateVAO();
+    //SetShape(GL_QUADS); // trigger building of triangle index everytime new vertices are loaded
     m_aspectRatio = ComputeAspectRatio();
     return true;
 }

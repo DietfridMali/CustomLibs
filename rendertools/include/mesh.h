@@ -67,6 +67,7 @@ public:
     GLenum              m_shape{ 0 };
     Vector3f            m_vMin{ Vector3f::ZERO };
     Vector3f            m_vMax{ Vector3f::ZERO };
+    bool                m_isDynamic{ false };
 
     static uint32_t quadTriangleIndices[6];
 
@@ -91,6 +92,7 @@ public:
     virtual void Destroy(void);
 
     inline void SetDynamic(bool isDynamic) {
+        m_isDynamic = isDynamic;
         if (m_vao)
             m_vao->SetDynamic(isDynamic);
     }

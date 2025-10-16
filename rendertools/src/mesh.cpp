@@ -24,7 +24,7 @@ bool Mesh::CreateVAO(void) {
         return true;
     if (not (m_vao = new VAO()))
         return false;
-    return m_vao->Create(GL_QUADS, false);
+    return m_vao->Create(GL_QUADS, m_isDynamic);
 }
 
 // This only works for linearly increasing quad vertex indices starting at 0!
@@ -44,7 +44,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
         return false;
     if (not createVertexIndex)
         createVertexIndex = (m_shape == GL_QUADS);
-    m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape);
+    m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape, m_isDynamic);
     m_vao->Enable();
     if (createVertexIndex) {
         CreateVertexIndices();
