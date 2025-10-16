@@ -130,12 +130,15 @@ void TriangleIcoSphere::Refine(SegmentedList<VertexIndices>& faces, int quality)
 void RectangleIcoSphere::Create(int quality) {
     CreateBaseMesh(0);
     m_vertexCount = m_vertices.AppDataLength ();
+#if 1
     Refine(m_indices.AppData(), quality);
+#endif
     m_faceCount = m_indices.AppDataLength();
     m_normals = m_vertices;
     m_vertices.SetDirty(true);
-    m_indices.SetDirty(true);
     m_normals.SetDirty(true);
+    m_indices.SetDirty(true);
+    CreateTriangleVertexIndices();
     UpdateVAO();
 }
 
@@ -156,6 +159,7 @@ void RectangleIcoSphere::CreateCube(void) {
     float X = 0.5f;
     float Y = 0.5f;
     float Z = 0.5f;
+#if 0
     m_vertices.AppData() = { 
         Vector3f{-X,-Y,-Z}, Vector3f{+X,-Y,-Z}, Vector3f{+X,+Y,-Z}, Vector3f{-X,+Y,-Z},
         Vector3f{-X,-Y,+Z}, Vector3f{+X,-Y,+Z}, Vector3f{+X,+Y,+Z}, Vector3f{-X,+Y,+Z} 
@@ -164,6 +168,20 @@ void RectangleIcoSphere::CreateCube(void) {
         VertexIndices({0,1,2,3}), VertexIndices({0,4,5,1}), VertexIndices({0,3,7,4}),
         VertexIndices({6,2,1,5}), VertexIndices({6,7,3,2}), VertexIndices({6,5,4,7})
     };
+#else
+    m_vertices.AppData() = {
+        Vector3f{-X,-Y,-Z}, Vector3f{-X,+Y,-Z}, Vector3f{+X,+Y,-Z}, Vector3f{+X,-Y,-Z},
+        Vector3f{-X,-Y,+Z}, Vector3f{-X,+Y,+Z}, Vector3f{+X,+Y,+Z}, Vector3f{+X,-Y,+Z}
+    };
+    m_indices.AppData() = {
+        VertexIndices({3,2,1,0}), // front
+        VertexIndices({6,7,4,5}), // back
+        VertexIndices({0,1,5,4}), // left
+        VertexIndices({7,6,2,3}), // right
+        VertexIndices({7,3,0,4}), // bottom
+        VertexIndices({2,6,5,1})  // top
+    };
+#endif
 }
 
 
@@ -242,6 +260,24 @@ void RectangleIcoSphere::SubDivide(SegmentedList<VertexIndices>& faces) {
 void RectangleIcoSphere::Refine(SegmentedList<VertexIndices>& faces, int quality) {
     while (quality--)
         SubDivide(faces);
+}
+
+
+void RectangleIcoSphere::CreateTriangleVertexIndices(void) {
+    m_indices.Setup();
+    uint32_t l = m_indices.GLDataLength(); // number of vertices
+    ManagedArray<GLuint> triIndices((l / 2) * 3);
+    uint32_t* p4 = m_indices.GLData().Data(); // p4 points at the 4 vertex indices of the current quad
+    uint32_t* p3 = triIndices.Data(); // 6 indices for 4 vertices
+    l /= 4; // quad count
+    for (uint32_t i = 0; i < l; i++, p4 += 4) {
+        for (uint32_t k = 0; k < 6; k++)
+            *p3++ = p4[quadTriangleIndices[k]]; // put out the 4 quad indices into 2 x 3 triangle indices
+    }
+    m_indices.Reset();
+    m_indices.SetGLData(triIndices);
+    m_indices.SetDirty(true);
+    m_shape = GL_TRIANGLES;
 }
 
 // =================================================================================================

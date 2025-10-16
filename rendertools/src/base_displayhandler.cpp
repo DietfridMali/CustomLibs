@@ -53,7 +53,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         m_fullscreen = true;
     }
     m_aspectRatio = float(m_width) / float(m_height);
-#if 1
+#if 0
     SDL_GL_ResetAttributes();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -63,7 +63,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-
+#endif
     try {
         m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, screenType);
     }
@@ -85,7 +85,6 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         exit(1);
     }
     SDL_GL_SetSwapInterval(m_vSync ? 1 : 0);
-#endif
 }
 
 void BaseDisplayHandler::Update(void) {

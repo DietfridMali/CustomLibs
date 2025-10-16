@@ -27,6 +27,7 @@ bool Mesh::CreateVAO(void) {
     return m_vao->Create(GL_QUADS, false);
 }
 
+// This only works for linearly increasing quad vertex indices starting at 0!
 void Mesh::CreateVertexIndices(void) {
     uint32_t l = m_vertices.AppDataLength(); // number of vertices
     uint32_t* pi = m_indices.GLData().Resize((l / 2) * 3); // 6 indices for 4 vertices

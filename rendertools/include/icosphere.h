@@ -74,7 +74,8 @@ class IcoSphere
 // =================================================================================================
 // Create an ico sphere based on a shape with triangular faces
 
-class TriangleIcoSphere : public IcoSphere {
+class TriangleIcoSphere 
+    : public IcoSphere {
     public:
         TriangleIcoSphere(Texture* texture, String textureFolder, List<String> textureNames)
             : IcoSphere(GL_TRIANGLES, texture, textureFolder, textureNames)
@@ -100,7 +101,8 @@ class TriangleIcoSphere : public IcoSphere {
 // =================================================================================================
 // Create an ico sphere based on a shape with rectangular faces
 
-class RectangleIcoSphere : public IcoSphere {
+class RectangleIcoSphere 
+    : public IcoSphere {
     public:
         RectangleIcoSphere(Texture * texture, String textureFolder, List<String> textureNames)
             : IcoSphere(GL_TRIANGLES, texture, textureFolder, textureNames)
@@ -112,6 +114,8 @@ class RectangleIcoSphere : public IcoSphere {
 
     protected:
         void CreateBaseMesh(int quality);
+
+        void CreateTriangleVertexIndices(void);
 
         void CreateCube(void);
 
