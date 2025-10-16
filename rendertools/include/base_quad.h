@@ -108,9 +108,6 @@ public:
         return Move(other);
     }
 
-    void Destroy(void)
-        noexcept;
-
     inline VAO& GetVAO(void) {
         return *m_vao;
     }
