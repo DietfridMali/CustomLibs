@@ -213,6 +213,8 @@ void BaseSoundHandler::Update(void) {
 void BaseSoundHandler::Destroy(void) {
     if (m_haveAudio) {
         m_haveAudio = false;
+        for (auto& so : m_busyChannels)
+            so.Stop();
         Mix_CloseAudio();
     }
     Mix_Quit();
