@@ -11,6 +11,32 @@
 
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
 
+
+Texture::Texture(GLuint handle, int type, int wrapMode)
+    : m_handle(handle)
+    , m_type(type)
+    , m_tmuIndex(-1)
+    , m_wrapMode(wrapMode)
+    , m_id (GetID())
+{
+    textureLUT.Insert(m_id, this);
+}
+
+
+Texture::~Texture()
+noexcept
+{
+    if (m_id) {
+        if (UpdateLUT())
+            textureLUT.Remove(m_id);
+        m_id = 0;
+        Destroy();
+    }
+    else
+        fprintf(stderr, "repeatedly destroying texture '%s'\n", (char*)m_filenames[0]);
+}
+
+
 TextureBuffer::TextureBuffer(SDL_Surface* source, bool premultiply, bool flipVertically) {
     Create(source, premultiply, flipVertically);
 }
@@ -170,31 +196,31 @@ bool Texture::Create(void) {
     Destroy();
 #if USE_SHARED_HANDLES
     m_handle = SharedTextureHandle();
-    return m_handle.Claim() != 0;
+    m_isValid = m_handle.Claim() != 0;
 #else
     glGenTextures(1, &m_handle);
-    return m_handle != 0;
+    m_isValid = m_handle != 0;
 #endif
+    return m_isValid;
 }
 
 
 void Texture::Destroy(void)
 {
+    if (m_isValid) {
+        m_isValid = false;
 #if USE_SHARED_HANDLES
-    m_handle.Release();
+        m_handle.Release();
 #else
-    glDeleteTextures(1, &m_handle);
-    m_handle = 0;
+        glDeleteTextures(1, &m_handle);
+        m_handle = 0;
 #endif
-    TextureBuffer* texBuf = nullptr;
-    for (const auto& p : m_buffers) {
-        if (p != texBuf) {
-            texBuf = p;
-            delete p;
-        }
+        for (const auto& p : m_buffers)
+            if (not p->IsAlias())
+                delete p;
+        m_buffers.Clear();
+        m_hasBuffer = false; // BUGFIX: Status zurücksetzen
     }
-    m_buffers.Clear();
-    m_hasBuffer = false; // BUGFIX: Status zurücksetzen
 }
 
 
@@ -374,6 +400,11 @@ static void CheckFileOpen(const std::string& path) {
 
 #endif
 
+// Load does a "trick" for loading cubemaps
+// If a cubemap uses the same texture for subsequent sides, it can specify "" as filename for these sides
+// Load will load the texture, and for each subsequent side with texture name "", that texture's data buffer
+// will be used. This is saving memory for smileys, where 5 sides bear the same texture, while only the front
+// face bears the face.
 bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVertically) {
     // load texture from file
     m_filenames = fileNames;
@@ -383,10 +414,11 @@ bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVerticall
     String bufferName = "";
 #endif
     for (auto& fileName : fileNames) {
-        if (fileName.IsEmpty()) { // must never be true for first filename
+        if (fileName.IsEmpty()) { // This means that the last previously loaded texture should be used here as well; must never be true for first filename
             if (not texBuf) // must always be true here -> fileNames[0] must always contain a valid filename of an existing texture file
                 throw std::runtime_error("Texture::Load: missing texture names");
             else {
+                texBuf->m_isAlias = true;
                 m_buffers.Append(texBuf);
 #ifdef _DEBUG
                 texBuf->m_name = bufferName;

@@ -11,6 +11,7 @@
 #include "conversions.hpp"
 #include "sharedpointer.hpp"
 #include "sharedglhandle.hpp"
+#include "avltree.hpp"
 #include "opengl_states.h"
 
 #include "SDL.h"
@@ -78,7 +79,12 @@ public:
         int     m_dataSize;
 
         BufferInfo(int width = 0, int height = 0, int componentCount = 0, int internalFormat = 0, int format = 0)
-            : m_width(width), m_height(height), m_componentCount(componentCount), m_internalFormat(internalFormat), m_format(format), m_dataSize(width * height * componentCount)
+            : m_width(width)
+            , m_height(height)
+            , m_componentCount(componentCount)
+            , m_internalFormat(internalFormat)
+            , m_format(format)
+            , m_dataSize(width * height * componentCount)
         {
         }
 
@@ -101,14 +107,13 @@ public:
     ManagedArray<uint8_t>   m_data;
 #endif
 #ifdef _DEBUG
-    String              m_name;
+    String              m_name{ "" };
 #endif
-    //int     m_isAlias;
+    bool                m_isAlias{ false };
 
     TextureBuffer()
-        : m_data()//, m_isAlias (false)
-    {
-    }
+        : m_data()
+    {  }
 
     ~TextureBuffer() {
 #if USE_SHARED_POINTERS
@@ -164,6 +169,10 @@ public:
         return m_info.m_height;
     }
 
+    inline bool IsAlias(void) noexcept {
+        return m_isAlias;
+    }
+
     // CTextureBuffer(CTextureBuffer&& other) = default;            // move construct
 
     // CTextureBuffer& operator=(CTextureBuffer and other) = default; // move assignment
@@ -179,49 +188,46 @@ typedef struct {
 } tRenderOffsets;
 
 
-class Texture : public AbstractTexture
+class Texture 
+    : public AbstractTexture
 {
 public:
 #if USE_SHARED_HANDLES
-    SharedTextureHandle     m_handle;
+    SharedTextureHandle         m_handle;
 #else
-    GLuint                  m_handle;
+    GLuint                      m_handle;
 #endif
-    String                  m_name;
-    List<TextureBuffer*>    m_buffers;
-    List<String>            m_filenames;
-    GLenum                  m_type;
-    int                     m_tmuIndex;
-    int                     m_wrapMode;
-    int                     m_useMipMaps;
-    bool                    m_hasBuffer;
-    bool                    m_hasParams;
-    bool                    m_isValid;
+    size_t                      m_id{ 0 };
+    String                      m_name{ "" };
+    List<TextureBuffer*>        m_buffers;
+    List<String>                m_filenames;
+    GLenum                      m_type{ GL_TEXTURE_2D };
+    int                         m_tmuIndex{ -1 };
+    int                         m_wrapMode{ GL_REPEAT };
+    int                         m_useMipMaps{ false };
+    bool                        m_hasBuffer{ false };
+    bool                        m_hasParams{ false };
+    bool                        m_isValid{ false };
 
-    static SharedTextureHandle nullHandle;
+    static SharedTextureHandle  nullHandle;
 
-    Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_CLAMP_TO_EDGE)
-        : m_handle(handle)
-        , m_type(type)
-        , m_tmuIndex(-1)
-        , m_wrapMode(wrapMode)
-        , m_useMipMaps(false)
-        , m_isValid(true)
-        , m_hasBuffer(false)
-        , m_hasParams(false)
-    {
+    static inline AVLTree<uint32_t, Texture*>    textureLUT;
+
+    static inline size_t GetID(void) noexcept {
+        static size_t textureID = 0;
+        return ++textureID;
     }
 
-    ~Texture()
-        noexcept
-    {
-        if (m_isValid) {
-            Destroy();
-            m_isValid = false;
-        }
-        else
-            fprintf(stderr, "repeatedly destroying texture '%s'\n", (char*)m_filenames[0]);
+    static inline bool UpdateLUT(int update = -1) { // -1: just query; 0: false; 1: true
+        static bool updateLUT = true;
+        if (update != -1)
+            updateLUT = update == 1;
+        return updateLUT;
     }
+
+    Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_CLAMP_TO_EDGE);
+
+    ~Texture();
 
     Texture(const Texture& other) {
         Copy(other);
@@ -286,6 +292,10 @@ public:
     bool CreateFromFile(List<String>& fileNames, bool premultiply = false, bool flipVertically = false);
 
     bool CreateFromSurface(SDL_Surface* surface, bool premultiply = false, bool flipVertically = false);
+
+    inline void SetID(uint32_t id) noexcept {
+        m_id = id;
+    }
 
     inline size_t TextureCount(void)
         noexcept

@@ -17,16 +17,16 @@ class TextureHandler
     : public BaseSingleton<TextureHandler>
 {
 public:
-    TextureList m_textures;
-    String      m_textureFolder;
+    String      m_textureFolder{ "" };
+    uint32_t    m_textureID{ 0 };
 
     typedef Texture* (*tGetter) (void);
 
-    TextureHandler()
-        : m_textureFolder("")
-    { }
+    TextureHandler() = default;
 
     ~TextureHandler() noexcept { Destroy(); }
+
+    bool DeleteTextures(const size_t& key, Texture** texture);
 
     void Destroy(void) noexcept;
 
@@ -42,10 +42,7 @@ public:
 
     template <typename T>
     T* GetTexture(void) {
-        T* t = new T();
-        if (t)
-            m_textures.Append(t);
-        return t;
+        return new T();
     }
 
     using TextureGetter = std::function<Texture*()>;
@@ -66,12 +63,6 @@ public:
     inline Cubemap* GetCubemap(void) {
         return GetTexture<Cubemap>();
     }
-
-    bool Remove(Texture* texture);
-
-#if 0
-    TextureList Create(String textureFolder, List<String>& textureNames, GLenum textureType);
-#endif
 
     TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, bool premultiply = false);
 

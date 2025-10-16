@@ -87,6 +87,7 @@ bool FBO::DetachBuffer(int bufferIndex) {
     BaseRenderer::ClearGLError();
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
+    return true;
 }
 
 

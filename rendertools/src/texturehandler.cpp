@@ -8,20 +8,17 @@
 // a well defined and controlled way at program termination without having to bother about releasing
 // textures at a dozen places in the game
 
-void TextureHandler::Destroy(void) noexcept {
-    for (auto& t : m_textures)
-        delete t;
-    m_textures.Clear(); // verhindert Double-Delete bei wiederholtem Destroy
+
+bool TextureHandler::DeleteTextures(const size_t& key, Texture** texture) {
+    delete *texture;
+    *texture = nullptr;
+    return true;
 }
 
 
-bool TextureHandler::Remove(Texture* texture) {
-    if (not texture)
-        return false;
-    m_textures.Remove(texture);
-    texture->Destroy();
-    delete texture; // BUGFIX: Speicherleck beseitigt (Objekt selbst freigeben)
-    return true;
+void TextureHandler::Destroy(void) noexcept {
+    Texture::UpdateLUT(false);
+    Texture::textureLUT.Walk(&TextureHandler::DeleteTextures, this);
 }
 
 
@@ -38,7 +35,6 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
             textures.Clear();
             break;
         }
-        textures.Append(t);
     }
     return textures;
 }
