@@ -53,7 +53,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         m_fullscreen = true;
     }
     m_aspectRatio = float(m_width) / float(m_height);
-#if 0
+#if 1
     SDL_GL_ResetAttributes();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
