@@ -60,7 +60,8 @@ class IcoSphere
             m_vertexCount = 0;
             m_faceCount = 0;
             Mesh::SetDynamic(false);
-            Mesh::Init (shape, 100, texture, textureFolder, textureNames, GL_TEXTURE_CUBE_MAP);
+            Mesh::Init(shape, 100);
+            Mesh::SetupTexture(texture, textureFolder, textureNames, GL_TEXTURE_CUBE_MAP);
         }
 
     protected:

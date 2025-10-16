@@ -78,7 +78,9 @@ public:
         Destroy();
     }
 
-    bool Init(GLenum shape, int32_t listSegmentSize, Texture* texture = nullptr, String textureFolder = "", List<String> textureNames = List<String>(), GLenum textureType = GL_TEXTURE_2D);
+    void Init(GLenum shape, int32_t listSegmentSize);
+
+    bool CreateVAO(void);
 
     void SetName(String name) { m_name = name; }
 
@@ -141,7 +143,7 @@ public:
             m_vao->UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT);
     }
 
-    bool UpdateVAO(void);
+    bool UpdateVAO(bool createVertexIndex = false);
 
     void ResetVAO(void);
 

@@ -27,12 +27,21 @@ std::initializer_list<Vector3f> BaseQuad::defaultVertices[2] = {
 };
 
 std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
+#if 1
     { TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1} }, // regular
     { TexCoord{0, 0}, TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0} }, // v flip
     { TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0}, TexCoord{0, 1} }, // h flip
     { TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0} }, // v + h flip
     { TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1} }, // rotate left (ccw) 90 deg
     { TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0} }, // rotate right (cw) 90 deg
+#else
+    { TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1} }, // regular
+    { TexCoord{0, 0}, TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0} }, // v flip
+    { TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0}, TexCoord{0, 1} }, // h flip
+    { TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0} }, // v + h flip
+    { TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1} }, // rotate left (ccw) 90 deg
+    { TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0} }, // rotate right (cw) 90 deg
+#endif
 };
 
 // =================================================================================================
@@ -96,31 +105,11 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     }
     UpdateTexCoords();
 
-    if (not CreateVAO(privateVAO))
+    if (not CreateVAO())
         return false;
     UpdateVAO();
     m_aspectRatio = ComputeAspectRatio();
     return true;
-}
-
-
-bool BaseQuad::CreateVAO(bool privateVAO) {
-#if USE_STATIC_VAO 
-    if (privateVAO and not m_vao) {
-        m_vao = new VAO();
-        m_privateVAO = m_vao != nullptr;
-    }
-    if (not m_privateVAO) // fallback
-        m_vao = &staticVAO;
-    return m_vao->Create(GL_QUADS, true);
-#else
-    if (m_vao)
-        return true;
-    m_vao = new VAO();
-    if (not m_vao)
-        return false;
-    return m_vao->Create(GL_QUADS, true);
-#endif
 }
 
 

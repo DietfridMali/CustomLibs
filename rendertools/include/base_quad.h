@@ -162,8 +162,6 @@ public:
     }
 
     protected:
-        bool CreateVAO(bool privateVAO);
-
         void UpdateTexCoords(void);
 
         void UpdateTransformation(void);

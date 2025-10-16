@@ -5,7 +5,7 @@
 
 uint32_t Mesh::quadTriangleIndices[6] = { 0, 1, 2, 0, 2, 3 };
 
-bool Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {
+void Mesh::Init(GLenum shape, int32_t listSegmentSize) {
     m_shape = shape;
     m_indices.m_componentCount = ShapeSize();
     //float f = std::numeric_limits<float>::lowest();
@@ -17,7 +17,11 @@ bool Mesh::Init(GLenum shape, int32_t listSegmentSize, Texture* texture, String 
     m_texCoords = TexCoordBuffer(listSegmentSize);
     m_vertexColors = ColorBuffer(listSegmentSize);
     m_indices = IndexBuffer(ShapeSize(), listSegmentSize);
-    SetupTexture(texture, textureFolder, textureNames, textureType);
+}
+
+bool Mesh::CreateVAO(void) {
+    if (m_vao)
+        return true;
     if (not (m_vao = new VAO()))
         return false;
     return m_vao->Create(GL_QUADS, false);
@@ -34,20 +38,20 @@ void Mesh::CreateVertexIndices(void) {
     m_indices.SetDirty(true);
 }
 
-bool Mesh::UpdateVAO(void) {
-    if (not (m_vao and m_vao->IsValid()))
+bool Mesh::UpdateVAO(bool createVertexIndex) {
+    if (not CreateVAO())
         return false;
-    bool createVertexIndex = (m_shape == GL_QUADS);
+    if (not createVertexIndex)
+        createVertexIndex = (m_shape == GL_QUADS);
     m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape);
     m_vao->Enable();
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = GL_TRIANGLES;
         m_vao->m_indexBuffer.SetDynamic(true);
-        m_indices.SetDirty(true);
         UpdateIndexBuffer();
     }
-    if (m_indices.IsDirty()) {
+    else if (m_indices.IsDirty()) {
         m_indices.Setup();
         UpdateIndexBuffer();
     }
@@ -78,7 +82,8 @@ void Mesh::ResetVAO(void) {
     m_texCoords.Reset();
     m_vertexColors.Reset();
     m_normals.Reset();
-    m_vao->Destroy();
+    if (m_vao)
+        m_vao->Destroy();
 }
 
 void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {
@@ -147,7 +152,8 @@ noexcept(
     m_vertexColors.Destroy();
     m_indices.Destroy();
     m_textures.Clear();
-    m_vao->Destroy();
+    if (m_vao)
+        m_vao->Destroy();
     m_vMax = Vector3f{ -1e6, -1e6, -1e6 }; 
     m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; 
 }
