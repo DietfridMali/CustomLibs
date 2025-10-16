@@ -180,14 +180,12 @@ bool Texture::Create(void) {
 
 void Texture::Destroy(void)
 {
-    BaseRenderer::CheckGLError();
 #if USE_SHARED_HANDLES
     m_handle.Release();
 #else
     glDeleteTextures(1, &m_handle);
     m_handle = 0;
 #endif
-    BaseRenderer::CheckGLError();
     TextureBuffer* texBuf = nullptr;
     for (const auto& p : m_buffers) {
         if (p != texBuf) {
@@ -286,17 +284,14 @@ void Texture::SetParams(bool enforce)
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glGenerateMipmap(m_type);
-            BaseRenderer::CheckGLError();
         }
         else {
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
-            BaseRenderer::CheckGLError();
         }
         glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        BaseRenderer::CheckGLError();
     }
 }
 
@@ -333,14 +328,11 @@ void Texture::Disable(int tmuIndex)
 void Texture::Deploy(int bufferIndex)
 {
     if (Bind()) {
-        BaseRenderer::CheckGLError();
         SetParams();
         TextureBuffer* texBuf = m_buffers[bufferIndex];
         uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.Data());
         glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
-        BaseRenderer::CheckGLError();
         Release();
-        BaseRenderer::CheckGLError();
     }
 }
 

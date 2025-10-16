@@ -61,7 +61,6 @@ Shader* BaseShaderHandler::SelectShader(Texture* texture) {
 
 
 Shader* BaseShaderHandler::SetupShader(String shaderId) {
-    baseRenderer.CheckGLError();
     Shader* shader;
     if (baseRenderer.DepthPass())
         shaderId = "depthShader"; // override all shaders with simplest possible shader during depth pass
@@ -85,7 +84,6 @@ Shader* BaseShaderHandler::SetupShader(String shaderId) {
         shader->Enable();
     }
     shader->UpdateMatrices();
-    baseRenderer.CheckGLError();
     return /*baseRenderer.DepthPass() ? nullptr : */ shader; // pretend no shader was loaded during depth pass so the app doesn't try to set uniforms
 }
 

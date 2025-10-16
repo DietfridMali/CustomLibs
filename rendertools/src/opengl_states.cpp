@@ -15,7 +15,6 @@ bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
 	baseRenderer.ClearGLError();
 	GLint tex = 0;
 	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
-	baseRenderer.CheckGLError("BindTexture");
 #endif
 #if 0
 	ActiveTexture(GL_TEXTURE0 + tmuIndex);

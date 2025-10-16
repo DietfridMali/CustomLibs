@@ -41,11 +41,9 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     baseRenderer.ClearGLError();
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
-    baseRenderer.CheckGLError("FBO::CreateBuffer->Claim");
     bufferInfo.m_type = bufferType;
     baseRenderer.ClearGLError();
     openGLStates.BindTexture2D(bufferInfo.m_handle, 0);
-    baseRenderer.CheckGLError("FBO::CreateBuffer->BindTexture2D");
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -89,7 +87,6 @@ bool FBO::DetachBuffer(int bufferIndex) {
     BaseRenderer::ClearGLError();
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
-    return BaseRenderer::CheckGLError("FBO::DetachBuffer");
 }
 
 
@@ -101,7 +98,11 @@ bool FBO::AttachBuffer(int bufferIndex) {
     if (tmu != GL_NONE)
         openGLStates.BindTexture2D(0, tmu);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
+#ifdef _DEBUG
     return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
+#else
+    return bufferInfo.m_isAttached = true;
+#endif
 }
 
 
@@ -110,7 +111,6 @@ bool FBO::AttachBuffers(bool hasMRTs) {
         return false;
     BaseRenderer::ClearGLError();
     glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
-    BaseRenderer::CheckGLError();
     bool bindColorBuffers = true;
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
@@ -129,8 +129,10 @@ bool FBO::AttachBuffers(bool hasMRTs) {
 #endif
     }
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+#ifdef _DEBUG
     if (not m_isAvailable)
         baseRenderer.CheckGLError();
+#endif
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return m_isAvailable;
 }
@@ -290,7 +292,11 @@ bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool
         return false;
     openGLStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
     Clear(bufferIndex, drawBufferGroup, clear);
+#ifdef _DEBUG
     return baseRenderer.CheckGLError();
+#else
+    return true;
+#endif
 }
 
 
@@ -300,8 +306,10 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
     //BaseRenderer::ClearGLError();
     if (not IsEnabled()) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
+#ifdef _DEBUG
         if (not baseRenderer.CheckGLError())
             return false;
+#endif
         m_activeHandle = m_handle.Data();
     }
     return EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable);
@@ -328,7 +336,6 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
         if ((i != bufferIndex) and (m_bufferInfo[i].m_tmuIndex == tmuIndex))
             m_bufferInfo[i].m_tmuIndex = -1;
     openGLStates.BindTexture2D(m_bufferInfo[bufferIndex].m_handle, tmuIndex);
-    baseRenderer.CheckGLError("FBO::BindBuffer");
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
     return true;
 }

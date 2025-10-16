@@ -68,7 +68,6 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     glDisable(GL_CULL_FACE);
     baseRenderer.ClearGLError();
     m_font->GetFBO()->Render({}, ColorData::Yellow);
-    baseRenderer.CheckGLError("render glyph atlas");
     return;
 #endif
 

@@ -137,7 +137,6 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
     else
         glBufferData(m_bufferType, dataSize, data, m_isDynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
     Describe();
-    baseRenderer.CheckGLError();
     return true;
     }
 
