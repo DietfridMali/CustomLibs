@@ -260,6 +260,10 @@ noexcept
         m_hasBuffer = other.m_hasBuffer; 
         m_hasParams = other.m_hasParams;
         m_isValid = other.m_isValid;     
+        textureLUT.Remove(m_id);
+        textureLUT.Insert(other.m_id, this, true); // overwrite the data entry for key m_id with this texture
+        m_id = other.m_id;
+        other.m_id = 0;
     }
     return *this;
 }

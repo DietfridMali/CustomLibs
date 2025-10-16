@@ -211,7 +211,7 @@ public:
 
     static SharedTextureHandle  nullHandle;
 
-    static inline AVLTree<uint32_t, Texture*>    textureLUT;
+    static inline AVLTree<size_t, Texture*>    textureLUT;
 
     static inline size_t GetID(void) noexcept {
         static size_t textureID = 0;
