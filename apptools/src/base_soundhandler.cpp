@@ -149,7 +149,7 @@ SoundObject* BaseSoundHandler::FindSoundByOwner(const void* owner, const String&
 // depending on the distance of the viewer to the sound position
 SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams& params, size_t startTime, const Vector3f position, const void* owner) {
     //return -1;
-    if ((m_soundLevel == 0) or (params.level > m_soundLevel))
+    if (not m_playSound or (m_soundLevel == 0) or (params.level > m_soundLevel))
         return nullptr;
     if (not position.IsValid())
         return nullptr;
@@ -226,9 +226,19 @@ void BaseSoundHandler::Destroy(void) {
 }
 
 
-bool BaseSoundHandler::PlaySong(String songName) {
-    if (m_song)
+void BaseSoundHandler::StopMusic(void) {
+    if (m_song) {
+        Mix_HaltMusic();
         Mix_FreeMusic(m_song);
+        m_song = nullptr;
+    }
+}
+
+bool BaseSoundHandler::PlayMusic(String songName) {
+    StopMusic();
+    if (not m_playMusic or songName.IsEmpty())
+        return false;
+    m_lastSong = songName;
     if (not (m_song = Mix_LoadMUS((const char*)songName)))
         return false;
     if (Mix_PlayMusic(m_song, -1) == 0)
@@ -236,6 +246,19 @@ bool BaseSoundHandler::PlaySong(String songName) {
     Mix_FreeMusic(m_song);
     m_song = nullptr;
     return false;
+}
+
+
+void BaseSoundHandler::SetMusicPlayback(bool play) {
+    if (m_playMusic != play) {
+        if ((m_playMusic = play)) {
+            if (not m_lastSong.IsEmpty())
+                PlayMusic(m_lastSong);
+        }
+        else {
+            StopMusic();
+        }
+    }
 }
 
 

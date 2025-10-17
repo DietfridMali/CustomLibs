@@ -75,6 +75,9 @@ class BaseSoundHandler
         float                           m_maxAudibleDistance{ 0.0f };
         int                             m_channelCount{ 0 };
         bool                            m_haveAudio{ false };
+        bool                            m_playSound{ true };
+        bool                            m_playMusic{ true };
+        String                          m_lastSong{ "" };
 
         struct SoundParams {
             float volume = 1.0f;
@@ -134,7 +137,23 @@ class BaseSoundHandler
         // cleanup expired channels and update sound volumes
         void Update(void);
 
-        bool PlaySong(String songName);
+        bool PlayMusic(String songName);
+
+        void StopMusic(void);
+
+        void SetSoundPlayback(bool play) {
+            m_playSound = play;
+        }
+
+        bool GetSoundPlayback(void) {
+            return m_playSound;
+        }
+
+        void SetMusicPlayback(bool play);
+
+        bool GetMusicPlayback(void) {
+            return m_playMusic;
+        }
 
         inline float GetMasterVolume(void) noexcept {
             return m_masterVolume;
