@@ -203,8 +203,6 @@ noexcept
 #endif
         Destroy();
     }
-    else
-        fprintf(stderr, "repeatedly destroying texture '%s'\n", (char*)m_filenames[0]);
 }
 
 
