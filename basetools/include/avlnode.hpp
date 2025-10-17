@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // =================================================================================================
 
@@ -49,94 +49,136 @@ public:
     {
     }
 
-    AVLNode* RotateSingleLL(bool isBalanced) noexcept {
+    //-----------------------------------------------------------------------------
+
+    inline AVLNode* BalanceLeftGrowth() noexcept
+    {
+        // balance == AVL_UNDERFLOW
         AVLNode* child = left;
-        left = child->right;
-        child->right = this;
-        if (isBalanced) {
+        char b = child->balance;
+
+        if (b == AVL_UNDERFLOW) {                // single LL
+            left = child->right;
+            child->right = this;
             balance = AVL_BALANCED;
             child->balance = AVL_BALANCED;
+            return child;
         }
-        else {
-            balance = AVL_UNDERFLOW;
-            child->balance = AVL_OVERFLOW;
-        }
-        return child;
-    }
 
-    AVLNode* RotateSingleRR(bool isBalanced) noexcept {
-        AVLNode* child = right;
-        right = child->left;
-        child->left = this;
-        if (isBalanced) {
-            balance = AVL_BALANCED;
-            child->balance = AVL_BALANCED;
-        }
-        else {
-            balance = AVL_OVERFLOW;
-            child->balance = AVL_UNDERFLOW;
-        }
-        return child;
-    }
-
-    AVLNode* RotateDoubleLR(void) noexcept {
-        AVLNode* child = left;
+        // double LR (lb == AVL_OVERFLOW)
         AVLNode* pivot = child->right;
         child->right = pivot->left;
         pivot->left = child;
         left = pivot->right;
         pivot->right = this;
-        char b = pivot->balance;
+
+         b = pivot->balance;
         balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
         child->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
         pivot->balance = AVL_BALANCED;
         return pivot;
     }
 
-    AVLNode* RotateDoubleRL(void) noexcept {
+    //-----------------------------------------------------------------------------
+
+    inline AVLNode* BalanceRightGrowth() noexcept
+    {
+        // balance == AVL_OVERFLOW
         AVLNode* child = right;
+        char b = child->balance;
+
+        if (b == AVL_OVERFLOW) {                 // single RR
+            right = child->left;
+            child->left = this;
+            balance = AVL_BALANCED;
+            child->balance = AVL_BALANCED;
+            return child;
+        }
+
+        // double RL (rb == AVL_UNDERFLOW)
         AVLNode* pivot = child->left;
         child->left = pivot->right;
         pivot->right = child;
         right = pivot->left;
         pivot->left = this;
-        char b = pivot->balance;
+
+        b = pivot->balance;
         balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
         child->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
         pivot->balance = AVL_BALANCED;
         return pivot;
     }
 
-    inline AVLNode* RotateLeft(bool doSingleRotation, bool isBalanced = true) noexcept {
-        return doSingleRotation ? RotateSingleLL(isBalanced) : RotateDoubleLR();
-    }
-
-    inline AVLNode* RotateRight(bool doSingleRotation, bool isBalanced = true) noexcept {
-        return doSingleRotation ? RotateSingleRR(isBalanced) : RotateDoubleRL();
-    }
-
-    inline AVLNode* BalanceLeftGrowth(void) noexcept {
-        return RotateLeft(left && left->balance == AVL_UNDERFLOW);
-    }
-
-    inline AVLNode* BalanceRightGrowth(void) noexcept {
-        return RotateRight(right && right->balance == AVL_OVERFLOW);
-    }
+    //-----------------------------------------------------------------------------
 
     inline AVLNode* BalanceLeftShrink(bool& heightHasChanged) noexcept
     {
-        char b = right ? right->balance : AVL_BALANCED;
-        if (b != AVL_BALANCED)
-            heightHasChanged = false;
-        return RotateRight(b != AVL_UNDERFLOW, b != AVL_BALANCED);
+        AVLNode* child = right;
+        char b = child->balance;
+
+        if (b != AVL_UNDERFLOW) { // single RR
+            right = child->left;
+            child->left = this;
+            if (b == AVL_BALANCED) {
+                balance = AVL_OVERFLOW;
+                child->balance = AVL_UNDERFLOW;
+                heightHasChanged = false;
+            }
+            else {
+                balance = AVL_BALANCED;
+                child->balance = AVL_BALANCED;
+            }
+            return child;
+        }
+
+        // double RL
+        AVLNode* pivot = child->left;
+        child->left = pivot->right;
+        pivot->right = child;
+        right = pivot->left;
+        pivot->left = this;
+
+        b = pivot->balance;
+        balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
+        child->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
+        pivot->balance = AVL_BALANCED;
+        return pivot;
     }
+
+    //-----------------------------------------------------------------------------
 
     inline AVLNode* BalanceRightShrink(bool& heightHasChanged) noexcept
     {
-        char b = left ? left->balance : AVL_BALANCED;
-        if (b != AVL_BALANCED)
-            heightHasChanged = false;
-        return RotateLeft(b != AVL_OVERFLOW, b != AVL_BALANCED);
+        AVLNode* child = left;
+        char b = child->balance;
+
+        if (b != AVL_OVERFLOW) { // single LL
+            left = child->right;
+            child->right = this;
+            if (b == AVL_BALANCED) {
+                balance = AVL_UNDERFLOW;
+                child->balance = AVL_OVERFLOW;
+                heightHasChanged = false;
+            }
+            else {
+                balance = AVL_BALANCED;
+                child->balance = AVL_BALANCED;
+            }
+            return child;
+        }
+
+        // double LR
+        AVLNode* pivot = child->right;        // <- war: child->left (falsch)
+        child->right = pivot->left;
+        pivot->left = child;
+        left = pivot->right;        // <- war: right = ... (falsch)
+        pivot->right = this;
+
+        b = pivot->balance;
+        balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
+        child->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
+        pivot->balance = AVL_BALANCED;
+        return pivot;
     }
 
     inline void SetChild(AVLNode* oldChild, AVLNode* newChild) noexcept {

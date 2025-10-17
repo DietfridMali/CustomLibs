@@ -7,6 +7,8 @@
 #include "opengl_states.h"
 #include "base_renderer.h"
 
+#define USE_TEXTURE_LUT 1
+
 // =================================================================================================
 
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
@@ -19,7 +21,10 @@ Texture::Texture(GLuint handle, int type, int wrapMode)
     , m_wrapMode(wrapMode)
     , m_id (GetID())
 {
+#if USE_TEXTURE_LUT
+    SetupLUT();
     textureLUT.Insert(m_id, this);
+#endif
 }
 
 
@@ -27,13 +32,23 @@ Texture::~Texture()
 noexcept
 {
     if (m_id) {
+#if USE_TEXTURE_LUT
         if (UpdateLUT())
             textureLUT.Remove(m_id);
+        m_id = 0;
+        Texture** h = textureLUT.Find(0);
+        assert(h == nullptr);
+#endif
         m_id = 0;
         Destroy();
     }
     else
         fprintf(stderr, "repeatedly destroying texture '%s'\n", (char*)m_filenames[0]);
+}
+
+
+int Texture::CompareTextures(void* context, const size_t& key1, const size_t& key2) {
+    return (key1 > key2) - (key1 < key2);
 }
 
 

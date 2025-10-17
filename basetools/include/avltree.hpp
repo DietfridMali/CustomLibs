@@ -28,6 +28,8 @@
 #define AVL_BALANCED   0
 #define AVL_UNDERFLOW  -1
 
+#define RELINK_DELETED_NODE 0
+
 // =================================================================================================
 
 template <typename KEY_T, typename DATA_T>
@@ -189,7 +191,6 @@ private:
     {
         m_info.workingNode = new AVLNode();
         m_info.workingNode->key = std::move(m_info.workingKey);
-        m_info.heightHasChanged = true;
         ++m_info.nodeCount;
         return m_info.workingNode;
     }
@@ -256,8 +257,18 @@ public:
 private:
     inline AVLNode* BalanceLeftGrowth(AVLNode* node) noexcept
     {
-        m_info.heightHasChanged = false;
-        return node->BalanceLeftGrowth();
+        switch (node->balance) {
+        case AVL_UNDERFLOW:
+            m_info.heightHasChanged = false;
+            return node->BalanceLeftGrowth();
+        case AVL_BALANCED:
+            node->balance = AVL_UNDERFLOW;
+            return node;
+        case AVL_OVERFLOW:
+            m_info.heightHasChanged = false;
+            node->balance = AVL_BALANCED;
+            return node;
+        }
     }
 
     //-----------------------------------------------------------------------------
@@ -265,8 +276,18 @@ private:
 private:
     inline AVLNode* BalanceRightGrowth(AVLNode* node) noexcept
     {
-        m_info.heightHasChanged = false;
-        return node->BalanceRightGrowth();
+        switch (node->balance) {
+        case AVL_OVERFLOW:
+            m_info.heightHasChanged = false;
+            return node->BalanceRightGrowth();
+        case AVL_BALANCED:
+            node->balance = AVL_OVERFLOW;
+            return node;
+        case AVL_UNDERFLOW:
+            m_info.heightHasChanged = false;
+            node->balance = AVL_BALANCED;
+            return node;
+        }
     }
 
     //-----------------------------------------------------------------------------
@@ -277,6 +298,7 @@ private:
         if (not node) {
             if (not (m_info.workingNode = AllocNode()))
                 return nullptr;
+            m_info.heightHasChanged = true;
             return m_info.workingNode;
         }
 
@@ -288,7 +310,7 @@ private:
                 switch (node->balance) {
                 case AVL_UNDERFLOW:
                     m_info.heightHasChanged = false;
-                    return BalanceLeftGrowth(node);
+                    return node->BalanceLeftGrowth();
                 case AVL_BALANCED:
                     node->balance = AVL_UNDERFLOW;
                     return node;
@@ -306,7 +328,7 @@ private:
                 switch (node->balance) {
                 case AVL_OVERFLOW:
                     m_info.heightHasChanged = false;
-                    return BalanceRightGrowth(node);
+                    return node->BalanceRightGrowth();
                 case AVL_BALANCED:
                     node->balance = AVL_OVERFLOW;
                     return node;
@@ -404,14 +426,20 @@ private:
 
 #if RELINK_DELETED_NODE
     void SwapNodes(AVLNode* delParent, AVLNode* delNode, AVLNode* replParent, AVLNode* replNode) noexcept {
-        delParent->SetChild(delNode, replNode);
+        // delNode im Eltern verankern (Root-Fall)
+        if (delParent) 
+            delParent->SetChild(delNode, replNode);
+        else           
+            m_info.root = replNode;
+
         if (replParent == delNode) {
             replNode->right = delNode->right;
+            // replNode->left bleibt wie vorher (kein Zyklus erzeugen)
         }
         else {
-            replNode->right = delNode->right;
-            replParent->right = replNode->left;
+            replParent->right = replNode->left; // replNode war rechter Ast des replParent
             replNode->left = delNode->left;
+            replNode->right = delNode->right;
         }
         replNode->balance = delNode->balance;
     }
@@ -458,50 +486,76 @@ private:
     //-----------------------------------------------------------------------------
 
 private:
-    AVLNode* RemoveNode(AVLNode* node, AVLNode* parent = nullptr)
+    AVLNode* RemoveNode(AVLNode* node, AVLNode* parent = nullptr) noexcept
     {
-        if (not node)
-            m_info.heightHasChanged = false;
-        else {
-            int rel = m_info.compareNodes(m_info.context, m_info.workingKey, node->key);
-            if (rel < 0) {
-                if (not (node->left = RemoveNode(node->left, node)))
-                    return node;
-                if (m_info.heightHasChanged)
-                    node = BalanceLeftShrink(node);
-            }
-            else if (rel > 0) {
-                if (not (node->right = RemoveNode(node->right, node)))
-                    return node;
-                if (m_info.heightHasChanged)
-                    node = BalanceRightShrink(node);
-            }
-            else {
-                m_info.workingParent = parent;
-                m_info.workingNode = node;
-                m_info.workingData = std::move(node->data);
-                m_info.result = true;
-                if (not node->right) {
-                    m_info.heightHasChanged = true;
-                    node = node->left;
-                }
-                else if (not node->left) {
-                    m_info.heightHasChanged = true;
-                    node = node->right;
-                }
-                else {
-#if RELINK_DELETED_NODE
-                    node->left = UnlinkNode(node->left, node);
-#else
-                    node->left = UnlinkNode(node->left);
-#endif
-                    if (m_info.heightHasChanged)
-                        node = BalanceLeftShrink(node);
-                }
-                DeleteNode(m_info.workingNode);
-            }
+        if (not node) { 
+            m_info.heightHasChanged = false; 
+            return nullptr; 
         }
+
+        const int rel = m_info.compareNodes(m_info.context, m_info.workingKey, node->key);
+
+        if (rel < 0) {
+            node->left = RemoveNode(node->left, node);
+            if (m_info.heightHasChanged) node = BalanceLeftShrink(node);
+            return node;
+        }
+
+        if (rel > 0) {
+            node->right = RemoveNode(node->right, node);
+            if (m_info.heightHasChanged) node = BalanceRightShrink(node);
+            return node;
+        }
+
+        // Treffer
+        m_info.result = true;
+        m_info.workingParent = parent;
+        m_info.workingNode = node;
+        m_info.workingData = std::move(node->data);
+
+#if RELINK_DELETED_NODE
+        if (not node->right) {
+            m_info.heightHasChanged = true;
+            AVLNode* next = node->left;
+            DeleteNode(node);
+            return next;
+        }
+
+        if (not node->left) {
+            m_info.heightHasChanged = true;
+            AVLNode* next = node->right;
+            DeleteNode(node);
+            return next;
+        }
+
+        // zwei Kinder: Vorgänger aus linkem Teilbaum herauslösen und relinken
+        node = UnlinkNode(node->left, node);          // liefert neue Wurzel an dieser Stelle
+        if (m_info.heightHasChanged) 
+            node = BalanceLeftShrink(node);
+        DeleteNode(m_info.workingNode);               // ursprünglichen Knoten entfernen
         return node;
+#else
+        if (not node->right) {
+            m_info.heightHasChanged = true;
+            AVLNode* next = node->left;
+            DeleteNode(node);
+            return next;
+        }
+
+        if (not node->left) {
+            m_info.heightHasChanged = true;
+            AVLNode* next = node->right;
+            DeleteNode(node);
+            return next;
+        }
+
+        // zwei Kinder: Schlüssel/Daten mit Vorgänger tauschen, dann Vorgänger löschen
+        node->left = UnlinkNode(node->left);
+        if (m_info.heightHasChanged) 
+            node = BalanceLeftShrink(node);
+        DeleteNode(m_info.workingNode);               // der im Unlink gelöste Vorgänger
+        return node;
+#endif
     }
 
     //-----------------------------------------------------------------------------

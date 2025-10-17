@@ -218,6 +218,16 @@ public:
         return ++textureID;
     }
 
+    static int CompareTextures(void* context, const size_t& key1, const size_t& key2);
+
+    static void SetupLUT(void) noexcept {
+        static bool needSetup = true;
+        if (needSetup) {
+            textureLUT.SetComparator(&Texture::CompareTextures);
+            needSetup = false;
+        }
+    }
+
     static inline bool UpdateLUT(int update = -1) { // -1: just query; 0: false; 1: true
         static bool updateLUT = true;
         if (update != -1)

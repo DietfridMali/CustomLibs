@@ -10,6 +10,7 @@
 
 
 bool TextureHandler::DeleteTextures(const size_t& key, Texture** texture) {
+    assert(texture->m_id != 0);
     delete *texture;
     *texture = nullptr;
     return true;
@@ -35,6 +36,7 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
             textures.Clear();
             break;
         }
+        textures.Append(t);
     }
     return textures;
 }
