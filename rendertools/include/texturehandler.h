@@ -22,7 +22,9 @@ public:
 
     typedef Texture* (*tGetter) (void);
 
-    TextureHandler() = default;
+    TextureHandler() {
+        Texture::textureLUT.SetComparator(&Texture::CompareTextures);
+    }
 
     ~TextureHandler() noexcept { Destroy(); }
 
@@ -42,7 +44,10 @@ public:
 
     template <typename T>
     T* GetTexture(void) {
-        return new T();
+        T* t = new T();
+        if (t)
+            t->Register();
+        return t;
     }
 
     using TextureGetter = std::function<Texture*()>;

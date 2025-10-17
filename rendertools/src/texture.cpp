@@ -19,7 +19,7 @@ Texture::Texture(GLuint handle, int type, int wrapMode)
     , m_type(type)
     , m_tmuIndex(-1)
     , m_wrapMode(wrapMode)
-    , m_id (GetID())
+    , m_id (0)
 {
 #if USE_TEXTURE_LUT
     SetupLUT();
@@ -31,15 +31,13 @@ Texture::Texture(GLuint handle, int type, int wrapMode)
 Texture::~Texture()
 noexcept
 {
-    if (m_id) {
+    if (m_isValid) {
 #if USE_TEXTURE_LUT
-        if (UpdateLUT())
+        if (m_id and UpdateLUT()) {
             textureLUT.Remove(m_id);
-        m_id = 0;
-        Texture** h = textureLUT.Find(0);
-        assert(h == nullptr);
+            m_id = 0;
+        }
 #endif
-        m_id = 0;
         Destroy();
     }
     else

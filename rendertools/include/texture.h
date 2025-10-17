@@ -239,6 +239,12 @@ public:
 
     ~Texture();
 
+    inline void Register(void) {
+        m_id = GetID();
+        textureLUT.Insert(m_id, this);
+    }
+
+
     Texture(const Texture& other) {
         Copy(other);
     }
