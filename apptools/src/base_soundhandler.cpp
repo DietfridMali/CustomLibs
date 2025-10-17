@@ -234,14 +234,14 @@ void BaseSoundHandler::StopMusic(void) {
     }
 }
 
-bool BaseSoundHandler::PlayMusic(String songName) {
+bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
     StopMusic();
     if (not m_playMusic or songName.IsEmpty())
         return false;
     m_lastSong = songName;
     if (not (m_song = Mix_LoadMUS((const char*)songName)))
         return false;
-    if (Mix_PlayMusic(m_song, -1) == 0)
+    if (0 == ((fadeTime > 0) ? Mix_FadeInMusic(m_song, loops, fadeTime) : Mix_PlayMusic(m_song, loops)))
         return true;
     Mix_FreeMusic(m_song);
     m_song = nullptr;

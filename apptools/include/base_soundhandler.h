@@ -137,7 +137,7 @@ class BaseSoundHandler
         // cleanup expired channels and update sound volumes
         void Update(void);
 
-        bool PlayMusic(String songName);
+        bool PlayMusic(String songName, int loops = -1, int fadeTime = 0);
 
         void StopMusic(void);
 
@@ -172,6 +172,10 @@ class BaseSoundHandler
         void SetMusicVolume(float volume) {
             m_musicVolume = volume;
             Mix_VolumeMusic((int(round(MIX_MAX_VOLUME * volume))));
+        }
+
+        void FadeOutMusic(int duration) {
+             Mix_FadeOutMusic(duration);
         }
 
 private:
