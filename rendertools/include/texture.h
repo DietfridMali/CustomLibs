@@ -109,7 +109,7 @@ public:
 #ifdef _DEBUG
     String              m_name{ "" };
 #endif
-    bool                m_isAlias{ false };
+    uint32_t            m_refCount{ 0 };
 
     TextureBuffer()
         : m_data()
@@ -169,8 +169,8 @@ public:
         return m_info.m_height;
     }
 
-    inline bool IsAlias(void) noexcept {
-        return m_isAlias;
+    inline uint32_t RefCount(void) noexcept {
+        return m_refCount > 0;
     }
 
     // CTextureBuffer(CTextureBuffer&& other) = default;            // move construct

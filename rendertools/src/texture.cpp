@@ -11,45 +11,6 @@
 
 // =================================================================================================
 
-SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
-
-
-Texture::Texture(GLuint handle, int type, int wrapMode)
-    : m_handle(handle)
-    , m_type(type)
-    , m_tmuIndex(-1)
-    , m_wrapMode(wrapMode)
-    , m_id (0)
-{
-#if USE_TEXTURE_LUT
-    SetupLUT();
-    textureLUT.Insert(m_id, this);
-#endif
-}
-
-
-Texture::~Texture()
-noexcept
-{
-    if (m_isValid) {
-#if USE_TEXTURE_LUT
-        if (m_id and UpdateLUT()) {
-            textureLUT.Remove(m_id);
-            m_id = 0;
-        }
-#endif
-        Destroy();
-    }
-    else
-        fprintf(stderr, "repeatedly destroying texture '%s'\n", (char*)m_filenames[0]);
-}
-
-
-int Texture::CompareTextures(void* context, const size_t& key1, const size_t& key2) {
-    return (key1 > key2) - (key1 < key2);
-}
-
-
 TextureBuffer::TextureBuffer(SDL_Surface* source, bool premultiply, bool flipVertically) {
     Create(source, premultiply, flipVertically);
 }
@@ -189,21 +150,63 @@ noexcept
 TextureBuffer& TextureBuffer::Copy(TextureBuffer& other)
 noexcept
 {
-    m_info = other.m_info;
-    m_data = other.m_data;
+    if (this != &other) {
+        m_info = other.m_info;
+        m_data = other.m_data;
+    }
     return *this;
 }
 
 TextureBuffer& TextureBuffer::Move(TextureBuffer& other)
 noexcept
 {
-    m_info = other.m_info;
-    m_data = std::move(other.m_data);
-    other.Reset();
+    if (this != &other) {
+        m_info = other.m_info;
+        m_data = std::move(other.m_data);
+        other.Reset();
+    }
     return *this;
 }
 
 // =================================================================================================
+
+SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
+
+int Texture::CompareTextures(void* context, const size_t& key1, const size_t& key2) {
+    return (key1 > key2) - (key1 < key2);
+}
+
+
+Texture::Texture(GLuint handle, int type, int wrapMode)
+    : m_handle(handle)
+    , m_type(type)
+    , m_tmuIndex(-1)
+    , m_wrapMode(wrapMode)
+    , m_id(0)
+{
+#if USE_TEXTURE_LUT
+    SetupLUT();
+    textureLUT.Insert(m_id, this);
+#endif
+}
+
+
+Texture::~Texture()
+noexcept
+{
+    if (m_isValid) {
+#if USE_TEXTURE_LUT
+        if (m_id and UpdateLUT()) {
+            textureLUT.Remove(m_id);
+            m_id = 0;
+        }
+#endif
+        Destroy();
+    }
+    else
+        fprintf(stderr, "repeatedly destroying texture '%s'\n", (char*)m_filenames[0]);
+}
+
 
 bool Texture::Create(void) {
     Destroy();
@@ -228,9 +231,12 @@ void Texture::Destroy(void)
         glDeleteTextures(1, &m_handle);
         m_handle = 0;
 #endif
-        for (const auto& p : m_buffers)
-            if (not p->IsAlias())
+        for (const auto& p : m_buffers) {
+            if (p->m_refCount)
+                --(p->m_refCount);
+            else
                 delete p;
+        }
         m_buffers.Clear();
         m_hasBuffer = false; // BUGFIX: Status zurücksetzen
     }
@@ -435,7 +441,7 @@ bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVerticall
             if (not texBuf) // must always be true here -> fileNames[0] must always contain a valid filename of an existing texture file
                 throw std::runtime_error("Texture::Load: missing texture names");
             else {
-                texBuf->m_isAlias = true;
+                ++(texBuf->m_refCount);
                 m_buffers.Append(texBuf);
 #ifdef _DEBUG
                 texBuf->m_name = bufferName;
