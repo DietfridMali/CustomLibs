@@ -171,6 +171,7 @@ SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams&
     if (not newSound.Play(params.loops))
         return nullptr;
     UpdateSound(newSound);
+    SetMusicVolume(m_musicVolume);
     //fprintf(stderr, "playing '%s' (%d)\n", soundName.Data(), soundObject->m_id);
     return &newSound;
 }
@@ -216,9 +217,27 @@ void BaseSoundHandler::Destroy(void) {
         for (auto& so : m_busyChannels)
             so.Stop();
         Mix_CloseAudio();
+        if (m_song) {
+            Mix_FreeMusic(m_song);
+            m_song = nullptr;
+        }
     }
     Mix_Quit();
 }
+
+
+bool BaseSoundHandler::PlaySong(String songName) {
+    if (m_song)
+        Mix_FreeMusic(m_song);
+    if (not (m_song = Mix_LoadMUS((const char*)songName)))
+        return false;
+    if (Mix_PlayMusic(m_song, -1) == 0)
+        return true;
+    Mix_FreeMusic(m_song);
+    m_song = nullptr;
+    return false;
+}
+
 
 BaseSoundHandler* baseSoundHandler = nullptr;
 

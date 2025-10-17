@@ -68,6 +68,7 @@ class BaseSoundHandler
         Dictionary<String, Mix_Chunk*>  m_sounds;
         List<SoundObject>               m_idleChannels;
         List<SoundObject>               m_busyChannels;
+        Mix_Music*                      m_song{ nullptr };
         int                             m_soundLevel{ 0 };
         float                           m_masterVolume{ 1.0f };
         float                           m_musicVolume{ 1.0f };
@@ -133,16 +134,28 @@ class BaseSoundHandler
         // cleanup expired channels and update sound volumes
         void Update(void);
 
-        inline float* MasterVolume(void) noexcept {
-            return &m_masterVolume;
+        bool PlaySong(String songName);
+
+        inline float GetMasterVolume(void) noexcept {
+            return m_masterVolume;
         }
 
-        inline float* MusicVolume(void) noexcept {
-            return &m_musicVolume;
+        inline float GetMusicVolume(void) noexcept {
+            return m_musicVolume;
+        }
+
+        void SetMasterVolume(float volume) {
+            m_masterVolume = volume;
+            for (auto& so : m_busyChannels)
+                UpdateSound(so);
+        }
+
+        void SetMusicVolume(float volume) {
+            m_musicVolume = volume;
+            Mix_VolumeMusic((int(round(MIX_MAX_VOLUME * volume))));
         }
 
 private:
-
         // compute stereo panning from the angle between the viewer direction and the vector from the viewer to the sound source
         virtual float Pan(Vector3f& position) { return 0.0f; }
 
