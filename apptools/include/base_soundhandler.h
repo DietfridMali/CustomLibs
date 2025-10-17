@@ -69,7 +69,8 @@ class BaseSoundHandler
         List<SoundObject>               m_idleChannels;
         List<SoundObject>               m_busyChannels;
         int                             m_soundLevel{ 0 };
-        float                           m_masterVolume{ 0.0f };
+        float                           m_masterVolume{ 1.0f };
+        float                           m_musicVolume{ 1.0f };
         float                           m_maxAudibleDistance{ 0.0f };
         int                             m_channelCount{ 0 };
         bool                            m_haveAudio{ false };
@@ -132,7 +133,15 @@ class BaseSoundHandler
         // cleanup expired channels and update sound volumes
         void Update(void);
 
-    private:
+        inline float* MasterVolume(void) noexcept {
+            return &m_masterVolume;
+        }
+
+        inline float* MusicVolume(void) noexcept {
+            return &m_musicVolume;
+        }
+
+private:
 
         // compute stereo panning from the angle between the viewer direction and the vector from the viewer to the sound source
         virtual float Pan(Vector3f& position) { return 0.0f; }
