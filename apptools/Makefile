@@ -6,6 +6,7 @@ AR  := ar
 FILES := \
  arghandler \
  base_soundhandler \
+ filelist \
  networkendpoint \
  networkmessage \
  stunclient \
