@@ -62,7 +62,7 @@ public:
     {
         if (not vaoStack.Length())
             return nullptr;
-        VAO* vao;
+        VAO* vao = nullptr;
         vaoStack.Pop(vao);
         return vao;
     }
