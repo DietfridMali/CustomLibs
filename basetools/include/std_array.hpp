@@ -165,10 +165,26 @@ public:
         Reserve(Length() + other.Length());
         if (copyData)
             m_array.insert(m_array.end(), other.begin(), other.end());
-        else
+        else {
             m_array.insert(m_array.end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
+            other.Clear();
+        }
         return *this;
     }
+
+    ManagedArray& operator+=(const ManagedArray& other) {
+        if (std::addressof(other) == this) 
+            return *this;
+        return Append(const_cast<ManagedArray&>(other), true);
+    }
+
+    ManagedArray& operator+=(ManagedArray&& other) {
+        if (std::addressof(other) == this) 
+            return *this;
+        return Append(other, false);
+        return *this;
+    }
+
 
     void Fill(DATA_T value) noexcept {
         std::fill(m_array.begin(), m_array.end(), value);
