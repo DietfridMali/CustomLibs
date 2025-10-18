@@ -70,6 +70,7 @@ public:
     BaseRenderer()
         : m_screenBuffer(nullptr)
         , m_sceneBuffer(nullptr)
+        , m_skyBuffer(nullptr)
         , m_windowWidth(0)
         , m_windowHeight(0)
         , m_sceneWidth(0)
