@@ -63,7 +63,7 @@ DEFINES := -DUSE_STD=1 -DUSE_GLM=1
 SANITIZEFLAGS := -fsanitize=address,undefined
 OPTFLAGS := -O3
 DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIONS
-LDFLAGS := -fsanitize=address,undefined
+LDFLAGS := 
 
 ifeq ($(MODE),debug)
   CXXFLAGS := -std=c++20 $(DBGFLAGS) $(DEFINES) -D_DEBUG $(INCLUDES) -MMD -MP
