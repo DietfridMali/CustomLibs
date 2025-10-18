@@ -47,7 +47,7 @@ $(LIB): $(OBJECTS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 > @mkdir -p $(OBJDIR)
-> $(CXX) $(CXXFLAGS) $(DBGFLAGS) -c $< -o $@
+> $(CXX) $(CXXFLAGS) -c $< -o $@
 
 basetools.lib: $(LIB)
 > cp $(LIB) $@

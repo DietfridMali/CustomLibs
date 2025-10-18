@@ -54,7 +54,7 @@ $(LIB): $(OBJECTS)
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 > @mkdir -p $(OBJDIR)
-> $(CXX) $(CXXFLAGS) $(DBGFLAGS) -c $< -o $@
+> $(CXX) $(CXXFLAGS) -c $< -o $@
 
 rendertools.lib: $(LIB)
 > cp $(LIB) $@
