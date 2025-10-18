@@ -62,8 +62,9 @@ bool BaseSoundHandler::Setup(String soundFolder) {
     m_masterVolume = argHandler.FloatVal("masterVolume", 0, 1);
     m_maxAudibleDistance = 30.0f;
     Destroy();
-#if 0
-    Mix_Init(MIX_INIT_MP3 | MIX_INIT_OGG);
+#if 1
+    m_supportsMP3 = Mix_Init(MIX_INIT_MP3) == MIX_INIT_MP3;
+    m_supportsOGG = Mix_Init(MIX_INIT_OGG) == MIX_INIT_OGG;
 #endif
     if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512)) {
         fprintf(stderr, "Couldn't initialize sound system (%s)\n", Mix_GetError());
@@ -235,6 +236,11 @@ void BaseSoundHandler::StopMusic(void) {
 }
 
 bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
+    String s = songName.ToLowercase();
+    if ((s.Find(".mp3") != -1) and not m_supportsMP3)
+        return false;
+    if ((s.Find(".ogg") != -1) and not m_supportsOGG)
+        return false;
     StopMusic();
     if (not m_playMusic or songName.IsEmpty())
         return false;

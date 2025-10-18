@@ -77,6 +77,8 @@ class BaseSoundHandler
         bool                            m_haveAudio{ false };
         bool                            m_playSound{ true };
         bool                            m_playMusic{ true };
+        bool                            m_supportsMP3 { false };
+        bool                            m_supportsOGG { false };
         String                          m_lastSong{ "" };
 
         struct SoundParams {
@@ -176,6 +178,14 @@ class BaseSoundHandler
 
         void FadeOutMusic(int duration) {
              Mix_FadeOutMusic(duration);
+        }
+
+        inline bool SupportsMP3(void) noexcept {
+            return m_supportsMP3;
+        }
+
+        inline bool SupportsOGG(void) noexcept {
+            return m_supportsOGG;
         }
 
 private:

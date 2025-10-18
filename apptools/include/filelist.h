@@ -14,7 +14,7 @@ using FileList = ManagedArray<String>;
 
 class FileLister {
 public:
-    FileList Get(const String& pattern);
+    static FileList Get(const String& pattern);
 };
 
 // =================================================================================================
