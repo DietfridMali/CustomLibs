@@ -1,5 +1,3 @@
-#pragma once
-
 #include "filelist.h"
 
 #include <regex>
