@@ -74,6 +74,7 @@ public:
     bool operator>=(const String& other) const noexcept;
     bool operator==(const char* s) const noexcept;
     bool operator!=(const char* s) const noexcept;
+    // --- In class String (public) ergänzen ---
 
     // Typecasts
     operator const char* () const noexcept;
@@ -84,6 +85,9 @@ public:
     explicit operator uint32_t() const;
     explicit operator float() const;
     explicit operator bool() const noexcept;
+
+    char& operator[](int idx) noexcept;
+    const char& operator[](int idx) const noexcept;
 
     // Eigenschaften
     inline int Length(void) const noexcept { return static_cast<int>(m_str.length()); }
@@ -323,6 +327,15 @@ inline String String::Concat(std::initializer_list<String> values) {
     for (const auto& v : values)
         oss << static_cast<const char*>(v);
     return String(oss.str());   // BUGFIX: eine überflüssige Klammer entfernt
+}
+
+// --- Inline-Implementierungen ---
+inline char& String::operator[](int idx) noexcept {
+    return m_str[static_cast<size_t>(idx)];
+}
+
+inline const char& String::operator[](int idx) const noexcept {
+    return m_str[static_cast<size_t>(idx)];
 }
 
 // =================================================================================================
