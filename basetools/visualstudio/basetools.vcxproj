@@ -38,6 +38,7 @@
     <ClInclude Include="..\include\dictionary.hpp" />
     <ClInclude Include="..\include\glm_matrix.hpp" />
     <ClInclude Include="..\include\glm_vector.hpp" />
+    <ClInclude Include="..\include\hiressleep.h" />
     <ClInclude Include="..\include\list.hpp" />
     <ClInclude Include="..\include\list_helpers.h" />
     <ClInclude Include="..\include\matrix.hpp" />

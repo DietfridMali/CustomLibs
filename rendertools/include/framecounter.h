@@ -11,7 +11,7 @@ class BaseFrameCounter {
 protected:
     RGBAColor               m_color;
     Viewport                m_viewport;
-    size_t                  m_renderStartTime{ 0 };
+    uint64_t                m_renderStartTime{ 0 };
     Timer                   m_drawTimer{ 1000 };
     float                   m_fps{ 0.0f };
     bool                    m_showFps{ true };
@@ -35,7 +35,7 @@ public:
     virtual bool Start(void) {
         if (m_renderStartTime != 0)
             return false;
-        m_renderStartTime = SDL_GetTicks();
+        m_renderStartTime = SDL_GetPerformanceCounter();
         m_drawTimer.Start();
         return true;
     }

@@ -162,6 +162,9 @@
     <ClInclude Include="..\include\sharedresource.hpp">
       <Filter>Header Files\general</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\hiressleep.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">

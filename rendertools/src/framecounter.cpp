@@ -52,7 +52,7 @@ void MovingFrameCounter::Update(void) {
     uint64_t t = SDL_GetPerformanceCounter();
     if (m_renderStartTime > 0) {
         uint64_t dt = t - m_renderStartTime;
-        if ((dt <= 1000000) and (dt > 0)) {
+        if (dt <= m_frequency) {
             m_movingTotalTicks -= m_movingFrameTimes[m_movingFrameIndex]; // remove oldest frame time from total
             m_movingTotalTicks += dt; // add in current frame time
             m_movingFrameTimes[m_movingFrameIndex] = dt;
