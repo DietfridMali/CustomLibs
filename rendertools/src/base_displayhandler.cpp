@@ -49,7 +49,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         if ((m_width != m_maxWidth) or (m_height != m_maxHeight))
             screenType |= SDL_WINDOW_BORDERLESS;
         else
-            screenType |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+            screenType |= SDL_WINDOW_FULLSCREEN;
         m_fullscreen = true;
     }
     m_aspectRatio = float(m_width) / float(m_height);
