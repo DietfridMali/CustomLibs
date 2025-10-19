@@ -45,7 +45,7 @@ public:
 
 
     static inline int64_t GetHiresTime() noexcept { // micro seconds
-        const int64_t t = int64_t(SDL_GetPerformanceCounter());
+        const int64_t t = int64_t(SDL_GetPerformanceCounter()) - BaseTime();
         const int64_t f = Frequency();
         const int64_t q = t / f;      // Sekunden
         const int64_t r = t % f;      // Rest-Ticks
