@@ -155,7 +155,6 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
         xOffset = -0.5f;
         break;
     case taRight:
-        //xOffset = -0.5f + xOffset * 0.5f;
         xOffset = -(1.0f - float(textWidth) / float(baseRenderer.GetViewport().Width()));
         break;
     case taCenter:
