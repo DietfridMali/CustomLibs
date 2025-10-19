@@ -142,6 +142,17 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
 }
 
 
+float TextRenderer::XOffset(float xOffset, int textWidth, eTextAlignments alignment) {
+#if 1
+    if (alignment == taLeft)
+        return -0.5;
+    if (alignment == taCenter)
+        return -xOffset;
+#endif
+    return 0.5f - 2 * xOffset;
+}
+
+
 void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment, int flipVertically) {
     baseRenderer.PushMatrix();
 #if !TEST_ATLAS
@@ -150,17 +161,13 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
 #endif
     Tristate<GLenum> depthFunc (GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
     float letterScale = 2 * xOffset / float(textWidth);
-    switch (alignment) {
-    case taLeft:
-        xOffset = -0.5f;
-        break;
-    case taRight:
-        xOffset = -(1.0f - float(textWidth) / float(baseRenderer.GetViewport().Width()));
-        break;
-    case taCenter:
-    default:
+    // reusing xOffset here
+    if (alignment == taLeft)
+        xOffset = -0.5;
+    else if (alignment == taCenter)
         xOffset = -xOffset;
-    }
+    else
+        xOffset = 0.5f - 2 * xOffset;
 #if USE_ATLAS
     RenderTextMesh(text, xOffset, yOffset, letterScale, flipVertically < 0);
 #else

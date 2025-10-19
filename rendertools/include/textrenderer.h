@@ -135,6 +135,8 @@ private:
 
     void RenderGlyphs(String& text, float x, float y, float scale, bool flipVertically);
 
+    float XOffset(float xOffset, int textWidth, eTextAlignments alignment);
+
     void RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment = taLeft, int flipVertically = 0);
 
     int SourceBuffer(bool hasOutline, bool antiAliased);
