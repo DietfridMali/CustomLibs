@@ -145,7 +145,17 @@ namespace Conversions
         return var.has_value() ? var.value() : defVal;
     }
 
-    inline float Ramp(float value, float minValue, float maxValue, float threshold) noexcept {
+    inline float Rampi(int64_t value, int64_t minValue, int64_t maxValue, int64_t threshold) noexcept {
+        if (threshold < 1)
+            return 0.0f;
+        if ((value < minValue) or (value > maxValue))
+            return 0.0f;
+        float d = std::min(value - minValue, maxValue - value);
+        return (d >= threshold) ? 1.0f : float (d) / float(threshold);
+    }
+
+
+    inline float Rampf(float value, float minValue, float maxValue, float threshold) noexcept {
         if (threshold < NumericTolerance)
             return 0.0f;
         if ((value < minValue) or (value > maxValue)) 
@@ -153,6 +163,16 @@ namespace Conversions
         float d = std::min(value - minValue, maxValue - value);
         return (d >= threshold) ? 1.0f : d / threshold;
     }
+
+    inline double Ramp(double value, double minValue, double maxValue, double threshold) noexcept {
+        if (threshold < NumericTolerance)
+            return 0.0f;
+        if ((value < minValue) or (value > maxValue))
+            return 0.0f;
+        double d = std::min(value - minValue, maxValue - value);
+        return (d >= threshold) ? 1.0f : d / threshold;
+    }
+
 
 
     template <typename T, typename... Args>

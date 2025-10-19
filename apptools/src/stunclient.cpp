@@ -1,4 +1,5 @@
 
+#include "timer.h"
 #include "stunclient.h"
 
 // =================================================================================================
@@ -23,7 +24,7 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
     // 20-Byte Binding Request
     uint8_t request[20] = { 0x00, 0x01, 0x00, 0x00, 0x21, 0x12, 0xA4, 0x42 };
 
-    const uint32_t ticks = SDL_GetTicks();
+    const uint32_t ticks = Timer::GetTime();
     for (int i = 0; i < 12; ++i)
         request[8 + i] = uint8_t(ticks >> ((i % 4) * 8));
 
@@ -32,10 +33,10 @@ std::optional<NetworkEndpoint> StunClient::StunQueryIPv4(const char* serverHost,
         return std::nullopt;
     }
 
-    const uint32_t start = SDL_GetTicks();
+    const uint32_t start = Timer::GetTime();
     UDPData data;
 
-    while ((SDL_GetTicks() - start) < timeoutMs) {
+    while ((Timer::GetTime() - start) < timeoutMs) {
         data = sock.Receive(20);
         if (data.length) {
             const uint16_t msgType = SDLNet_Read16(data.buffer + 0);   // host-order

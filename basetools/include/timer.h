@@ -11,7 +11,7 @@
 #include "conversions.hpp"
 
 // ================================================================================================ =
-// High-Resolution Timer (intern/extern: Millisekunden, int64_t)
+// High-Resolution Timer (intern/extern: micro seconds, int64_t)
 
 class HiresTimer {
 public:
@@ -32,18 +32,24 @@ public:
     }
 
 
+    static inline int64_t BaseTime() {
+        static int64_t baseTime = int64_t(SDL_GetPerformanceCounter());
+        return baseTime;
+    }
+
+
     static inline int64_t Frequency() {
         static int64_t frequency = int64_t(SDL_GetPerformanceFrequency());
         return frequency;
     }
 
 
-    static inline int64_t GetMS(void) {
-        int64_t t = int64_t(SDL_GetPerformanceCounter());
-        int64_t f = Frequency();
-        int64_t q = t / f;
-        int64_t r = t % f;
-        return q * 1000 + (r * 1000 + f / 2) / f;
+    static inline int64_t GetHiresTime() noexcept { // micro seconds
+        const int64_t t = int64_t(SDL_GetPerformanceCounter());
+        const int64_t f = Frequency();
+        const int64_t q = t / f;      // Sekunden
+        const int64_t r = t % f;      // Rest-Ticks
+        return q * 1000000 + (r * 1000000 + f / 2) / f; // rundet
     }
 
 
@@ -67,8 +73,8 @@ public:
     int64_t Start(int64_t offset = 0)
         noexcept
     {
-        m_startTime = GetMS() + offset;
-        m_endTime = m_startTime + offset + m_duration;
+        m_startTime = GetHiresTime() + offset;
+        m_endTime = m_startTime + m_duration;
         return m_startTime;
     }
 
@@ -76,7 +82,7 @@ public:
     inline int64_t GetLapTime(void)
         noexcept
     {
-        return m_lapTime = GetMS() - m_startTime;
+        return m_lapTime = GetHiresTime() - m_startTime;
     }
 
 
@@ -156,7 +162,7 @@ public:
 
     // compute ramp value derived from current time and timer's start and end times and a threshold value
     inline float Ramp(int64_t threshold, int64_t t = -1) noexcept {
-        return Conversions::Ramp(float((t < 0) ? GetMS() : t), float(m_startTime), float(m_endTime), float(threshold));
+        return Conversions::Rampi(float((t < 0) ? GetHiresTime() : t), m_startTime, m_endTime, threshold);
     }
 };
 
@@ -167,6 +173,10 @@ class Timer
     : public HiresTimer
 {
 public:
+    static inline int GetTime(void) noexcept {
+        return Downscale(GetHiresTime());
+    }
+
     Timer(int duration = 0)
         : HiresTimer(Upscale(duration))
     {
@@ -250,7 +260,7 @@ public:
     inline bool IsRemaining(int time)
         noexcept
     {
-        return Downscale(HiresTimer::IsRemaining(Upscale(time)));
+        return HiresTimer::IsRemaining(Upscale(time));
     }
 
 

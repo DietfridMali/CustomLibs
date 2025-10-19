@@ -69,7 +69,7 @@ void MovingFrameCounter::Update(void) {
 void LinearFrameCounter::Update(void) {
     ++m_frameCount[0];
     if (m_fpsTimer.HasExpired(0, true)) {
-        m_fps[0] = float(m_frameCount[0]) / float((SDL_GetTicks() - m_renderStartTime) * 0.001f);
+        m_fps[0] = float(m_frameCount[0]) / float((Timer::GetTime() - m_renderStartTime) * 0.001f);
         m_fps[1] = float(m_frameCount[1]) / float(m_fpsTimer.LapTime() * 0.001f);
     }
     else

@@ -1,4 +1,5 @@
 
+#include "timer.h"
 #include "arghandler.h"
 #include "base_soundhandler.h"
 
@@ -9,7 +10,7 @@ bool SoundObject::Play (int loops) {
         fprintf(stderr, "Couldn't play sound '%s' (%s)\n", m_name.Data(), Mix_GetError());
         return false;
     }
-    m_startTime = SDL_GetTicks();
+    m_startTime = Timer::GetTime();
 #if 0
     else if (Busy ())
         fprintf (stderr, "playing '%s' on channel %d (%d loops)\n", m_name.Data(), m_channel, loops);
@@ -20,7 +21,7 @@ bool SoundObject::Play (int loops) {
 }
 
 void SoundObject::FadeOut(int fadeTime) {
-    m_endTime = SDL_GetTicks() + fadeTime;
+    m_endTime = Timer::GetTime() + fadeTime;
     Mix_FadeOutChannel(m_channel, fadeTime);
 }
 
@@ -42,7 +43,7 @@ bool SoundObject::Busy (void) const {
 }
 
 bool SoundObject::IsSilent(void) const {
-    return (m_endTime > 0) and (m_endTime < SDL_GetTicks());
+    return (m_endTime > 0) and (m_endTime < Timer::GetTime());
 }
 
 // =================================================================================================
