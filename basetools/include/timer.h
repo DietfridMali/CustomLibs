@@ -10,7 +10,7 @@
 #include "hiressleep.h"
 #include "conversions.hpp"
 
-/ ================================================================================================ =
+// ================================================================================================ =
 // High-Resolution Timer (intern/extern: Millisekunden, int64_t)
 
 class HiresTimer {
@@ -22,13 +22,13 @@ public:
     int64_t m_slack;
 
 
-    static inline int64_t UpScale(int t) noexcept {
-        return _int64_t(t) * 1000;
+    static inline int64_t Upscale(int t) noexcept {
+        return int64_t(t) * 1000;
     }
 
 
-    static inline int64_t Downscale(int t) noexcept {
-        return _int64_t(t + 500) / 1000;
+    static inline int Downscale(int64_t t) noexcept {
+        return int((t + 500) / 1000);
     }
 
 
@@ -155,7 +155,7 @@ public:
     }
 
     // compute ramp value derived from current time and timer's start and end times and a threshold value
-    inline float Ramp(int threshold, int64_t t = -1) noexcept {
+    inline float Ramp(int64_t threshold, int64_t t = -1) noexcept {
         return Conversions::Ramp(float((t < 0) ? GetMS() : t), float(m_startTime), float(m_endTime), float(threshold));
     }
 };
@@ -168,7 +168,7 @@ class Timer
 {
 public:
     Timer(int duration = 0)
-        : HiresTimer(UpScale(duration))
+        : HiresTimer(Upscale(duration))
     {
     }
 
@@ -190,7 +190,7 @@ public:
     inline int GetLapTime(void)
         noexcept
     {
-        return DownScale(HiresTimer::GetLapTime());
+        return Downscale(HiresTimer::GetLapTime());
     }
 
 
