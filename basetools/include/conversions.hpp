@@ -150,7 +150,7 @@ namespace Conversions
             return 0.0f;
         if ((value < minValue) or (value > maxValue))
             return 0.0f;
-        float d = std::min(value - minValue, maxValue - value);
+        int64_t d = std::min(value - minValue, maxValue - value);
         return (d >= threshold) ? 1.0f : float (d) / float(threshold);
     }
 

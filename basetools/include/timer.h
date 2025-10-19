@@ -162,7 +162,7 @@ public:
 
     // compute ramp value derived from current time and timer's start and end times and a threshold value
     inline float Ramp(int64_t threshold, int64_t t = -1) noexcept {
-        return Conversions::Rampi(float((t < 0) ? GetHiresTime() : t), m_startTime, m_endTime, threshold);
+        return Conversions::Rampi((t < 0) ? GetHiresTime() : t, m_startTime, m_endTime, threshold);
     }
 };
 
