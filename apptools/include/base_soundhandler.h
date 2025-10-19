@@ -29,7 +29,14 @@ class SoundObject
         size_t      m_endTime;
 
         SoundObject(int id = -1, String name = String(""), int channel = -1, Mix_Chunk * sound = nullptr, Vector4f position = {0, 0, 0}, float volume = 1.0f)
-            : m_id(id), m_channel(channel), m_sound(sound), m_position(position), m_owner (nullptr), m_volume(volume), m_startTime (0), m_endTime(0)
+            : m_id(id)
+            , m_channel(channel)
+            , m_sound(sound)
+            , m_position(position)
+            , m_owner (nullptr)
+            , m_volume(volume)
+            , m_startTime (0)
+            , m_endTime(0)
         {}
 
         ~SoundObject () {
@@ -69,7 +76,7 @@ class BaseSoundHandler
         List<SoundObject>               m_idleChannels;
         List<SoundObject>               m_busyChannels;
         Mix_Music*                      m_song{ nullptr };
-        int                             m_soundLevel{ 0 };
+        int                             m_soundLevel{ 0 }; // maximum
         float                           m_masterVolume{ 1.0f };
         float                           m_musicVolume{ 1.0f };
         float                           m_maxAudibleDistance{ 0.0f };

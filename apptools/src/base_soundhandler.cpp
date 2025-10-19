@@ -59,8 +59,13 @@ bool BaseSoundHandler::Setup(String soundFolder) {
 #if !(USE_STD || USE_STD_MAP)
     m_sounds.SetComparator(String::Compare);
 #endif
-    m_soundLevel = argHandler.IntVal("soundlevel", 0, 1);
-    m_masterVolume = argHandler.FloatVal("masterVolume", 0, 1);
+#ifdef _DEBUG
+    m_soundLevel = argHandler.IntVal("soundlevel", 0, 0);
+#endif
+    SetMasterVolume(float(argHandler.IntVal("soundvolume", 0, 100, false)) * 0.01f);
+    SetMusicVolume(float(argHandler.IntVal("musicvolume", 0, 100, false)) * 0.01f);
+    SetSoundPlayback(argHandler.IntVal("playsound", 0, 1, false) == 1);
+    SetMusicPlayback(argHandler.IntVal("playmusic", 0, 1, false) == 1);
     m_maxAudibleDistance = 30.0f;
     Destroy();
 #if 1
@@ -151,8 +156,12 @@ SoundObject* BaseSoundHandler::FindSoundByOwner(const void* owner, const String&
 // depending on the distance of the viewer to the sound position
 SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams& params, size_t startTime, const Vector3f position, const void* owner) {
     //return -1;
-    if (not m_playSound or (m_soundLevel == 0) or (params.level > m_soundLevel))
+    if (not m_playSound)
         return nullptr;
+#ifdef _DEBUG // filter out sounds depending on their level
+    if ((m_soundLevel == 0) or (params.level > m_soundLevel))
+        return nullptr;
+#endif
     if (not position.IsValid())
         return nullptr;
 
