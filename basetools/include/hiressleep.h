@@ -12,7 +12,7 @@
 
 // =================================================================================================
 
-class HiresSleep 
+class HiresSleep
     : public BaseSingleton<HiresSleep>
 {
 public:
@@ -29,57 +29,55 @@ public:
 #endif
     }
 
-    // Monotone Zeit in Nanosekunden
+    // Monotone Zeit in Mikrosekunden
     static int64_t GetTime(void) {
 #ifdef _WIN32
         LARGE_INTEGER c, f;
         QueryPerformanceCounter(&c);
         QueryPerformanceFrequency(&f);
-        return (int64_t)((c.QuadPart * 1000000000LL + f.QuadPart / 2) / f.QuadPart); // rundend
+        return (int64_t)((c.QuadPart * 1000000LL + f.QuadPart / 2) / f.QuadPart); // rundend
 #else
         timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
-        return (int64_t)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+        return (int64_t)ts.tv_sec * 1000000LL + (ts.tv_nsec + 500) / 1000LL;       // rundend
 #endif
     }
 
-
-
-    // Schlafe bis absolute Deadline (ns, CLOCK_MONOTONIC-Basis)
+    // Schlafe bis absolute Deadline (µs, CLOCK_MONOTONIC-Basis)
     void SleepTo(int64_t deadline) const {
 #ifdef _WIN32
         int64_t diff = deadline - GetTime();
         if (diff <= 0) return;
         LARGE_INTEGER due;
-        due.QuadPart = -((diff + 99) / 100);            // 100-ns Ticks, rundend, relativ
+        due.QuadPart = -(diff * 10);                         // 100-ns Ticks, relativ
         if (h_) {
             if (SetWaitableTimer(h_, &due, 0, nullptr, nullptr, FALSE)) {
                 WaitForSingleObject(h_, INFINITE);
                 return;
             }
         }
-        Sleep((DWORD)((diff + 999999) / 1000000));      // Fallback
+        Sleep((DWORD)((diff + 999) / 1000));                 // Fallback
 #else
 #ifdef TIMER_ABSTIME
         timespec ts;
-        ts.tv_sec = deadline / 1000000000LL;
-        ts.tv_nsec = deadline % 1000000000LL;
+        ts.tv_sec = deadline / 1000000LL;
+        ts.tv_nsec = (deadline % 1000000LL) * 1000LL;
         while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, nullptr) == EINTR) {}
 #else
         int64_t diff = deadline - GetTime();
         if (diff <= 0) return;
-        timespec rq{ diff / 1000000000LL, diff % 1000000000LL };
+        timespec rq{ diff / 1000000LL, (diff % 1000000LL) * 1000LL };
         while (nanosleep(&rq, &rq) == -1 and errno == EINTR) {}
 #endif
 #endif
     }
 
     // Relativ schlafen
-    void Sleep(int64_t duration) const { 
-        SleepTo(GetTime() + duration); 
+    void Sleep(int64_t duration) const {
+        SleepTo(GetTime() + duration);
     }
-    
-    void SleepMS(int64_t duration) const { 
-        Sleep(duration * 1000000LL); 
+
+    void SleepMS(int64_t duration) const {
+        Sleep(duration * 1000LL);
     }
 
 private:

@@ -150,7 +150,7 @@ public:
     {
         int64_t t = m_duration - m_slack - GetLapTime();
         if (t > 0)
-            hiresSleep.SleepMS(t);
+            hiresSleep.Sleep(t);
         m_slack = GetLapTime() - m_duration;
     }
 
