@@ -153,6 +153,10 @@ public:
 			return m_appData.IsEmpty();
 		}
 
+        inline void SetComponentCount(uint32_t componentCount) noexcept {
+            m_componentCount = componentCount;
+        }
+
         ~VertexDataBuffer () {
             Destroy ();
         }
