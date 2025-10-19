@@ -25,7 +25,7 @@ public:
 
     virtual ~BaseFrameCounter() = default;
 
-    void Setup(Viewport viewport, RGBAColor color = ColorData::White) noexcept {
+    inline void Setup(Viewport viewport, RGBAColor color = ColorData::White) noexcept {
         m_viewport = viewport;
         m_color = color;
     }
@@ -40,8 +40,12 @@ public:
         return true;
     }
 
-    void ShowFps(bool showFps) noexcept { 
+    inline void ShowFps(bool showFps) noexcept {
         m_showFps = showFps; 
+    }
+
+    inline bool IsActive(void) noexcept {
+        return m_showFps;
     }
 
     void Toggle(void) noexcept {

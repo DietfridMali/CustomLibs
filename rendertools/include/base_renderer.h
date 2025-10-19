@@ -192,6 +192,10 @@ public:
 
     inline Vector2f& NDCBias(void) noexcept { return m_ndcBias; }
 
+    inline MovingFrameCounter& FrameCounter(void) noexcept {
+        return m_frameCounter;
+    }
+
     template <typename T>
     inline void SetBackgroundColor(T&& backgroundColor) {
         m_backgroundColor = std::forward<T>(backgroundColor);
