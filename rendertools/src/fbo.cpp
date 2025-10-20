@@ -100,7 +100,7 @@ bool FBO::AttachBuffer(int bufferIndex) {
         openGLStates.BindTexture2D(0, tmu);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
-    return bufferInfo.m_isAttached = BaseRenderer::CheckGLError ca();
+    return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
 #else
     return bufferInfo.m_isAttached = true;
 #endif
