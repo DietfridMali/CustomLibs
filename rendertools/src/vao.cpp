@@ -118,13 +118,13 @@ bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, si
 noexcept
 {
     if (strcmp(type, "Index"))
-        return UpdateFloatBuffer(type, id, data, dataSize, componentType, componentCount);
+        return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount);
     UpdateIndexBuffer(data, dataSize, componentType);
     return true;
 }
 
 
-bool VAO::UpdateFloatBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
 noexcept
 {
     int index;

@@ -179,9 +179,9 @@ public:
     VBO* FindBuffer(const char* type, int id, int& index)
         noexcept;
 
-    bool UpdateFloatBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
+    bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
         if (buffer.IsDirty()) {
-            if (not UpdateFloatBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount())))
+            if (not UpdateDataBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount())))
                 return false;
             buffer.SetDirty(false);
         }
@@ -204,7 +204,7 @@ public:
         bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0)
             noexcept;
 
-        bool UpdateFloatBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+        bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
             noexcept;
 
         void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)

@@ -130,28 +130,28 @@ public:
 
     inline void UpdateVertexBuffer(void) {
         if (m_vao)
-            m_vao->UpdateFloatBuffer("Vertex", 0, m_vertices, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Vertex", 0, m_vertices, GL_FLOAT);
     }
 
     inline void UpdateTexCoordBuffer(int i) {
         if (m_vao)
-            m_vao->UpdateFloatBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT);
+            m_vao->UpdateDataBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT);
     }
 
     inline void UpdateColorBuffer(void) {
         if (m_vao)
-            m_vao->UpdateFloatBuffer("Color", 0, m_vertexColors, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Color", 0, m_vertexColors, GL_FLOAT);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(void) {
         if (m_vao)
-            m_vao->UpdateFloatBuffer("Normal", 0, m_normals, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Normal", 0, m_normals, GL_FLOAT);
     }
 
-    inline void UpdateFloatBuffer(void) {
+    inline void UpdateFloatDataBuffer(void) {
         if (m_vao)
-            m_vao->UpdateFloatBuffer("Float", 0, m_floatBuffer, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Float", 0, m_floatBuffer, GL_FLOAT);
     }
 
     inline void UpdateIndexBuffer(void) {

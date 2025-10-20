@@ -79,7 +79,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
     if (m_floatBuffer.IsDirty()) {
         m_floatBuffer.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
-        UpdateFloatBuffer();
+        UpdateFloatDataBuffer();
     }
     m_vao->Disable();
     return true;
