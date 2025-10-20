@@ -100,7 +100,7 @@ bool FBO::AttachBuffer(int bufferIndex) {
         openGLStates.BindTexture2D(0, tmu);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
-    return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
+    return bufferInfo.m_isAttached = BaseRenderer::CheckGLError ca();
 #else
     return bufferInfo.m_isAttached = true;
 #endif
@@ -154,7 +154,6 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
     m_scale = scale;
     m_bufferCount = 0;
     m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount);
-    BaseRenderer::ClearGLError();
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));

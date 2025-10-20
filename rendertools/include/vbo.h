@@ -128,7 +128,7 @@ public:
 
     inline bool HasID(int id)
         noexcept {
-        return m_id = id;
+        return m_id == id;
     }
 
     inline void SetDynamic(bool isDynamic)

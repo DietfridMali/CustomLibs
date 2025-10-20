@@ -8,11 +8,23 @@
 
 // =================================================================================================
 
+struct RGB8 {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    inline bool IsVisible(void) noexcept {
+        return true;
+    }
+};
+
 struct RGBA8 {
     uint8_t r;
     uint8_t g;
     uint8_t b;
     uint8_t a;
+    inline bool IsVisible(void) noexcept {
+        return a > 0;
+    }
 };
 
 TextureBuffer::TextureBuffer(SDL_Surface* source, bool premultiply, bool flipVertically) {
@@ -174,10 +186,11 @@ static inline uint8_t Posterize(uint16_t c, uint16_t g = 15) noexcept {
 }
 
 
-static void Posterize(RGBA8* colorBuffer, int bufSize, uint16_t gradients)
+template <typename T>
+static void Posterize(T* colorBuffer, int bufSize, uint16_t gradients)
 {
     for (; bufSize; --bufSize, ++colorBuffer) {
-        if (colorBuffer->a) {
+        if (colorBuffer->IsVisible()) {
             colorBuffer->r = Posterize((uint16_t)colorBuffer->r, gradients);
             colorBuffer->g = Posterize((uint16_t)colorBuffer->g, gradients);
             colorBuffer->b = Posterize((uint16_t)colorBuffer->b, gradients);
@@ -200,14 +213,14 @@ static void ComputeOutline(RGBA8* colorBuffer, uint8_t* maskBuffer, int w, int h
 
     int nTag = 254, n = 0, a = 255;
 
-    for (int nPass = 0; nPass < nPasses; --nPass, --nTag) {
+    for (int nPass = 0; nPass < nPasses; ++nPass, --nTag) {
         for (int y = 0; y < h; ++y) {
             int i = y * w;
             for (int x = 0; x < w; ++x, ++i) {
                 if (maskBuffer[i])
                     continue;
                 for (int o = 0; o < 8; ++o) {
-                    int j = std::clamp(y + offsets[o][1], 0, h) * w + std::clamp(x + offsets[o][0], 0, w);
+                    int j = std::clamp(y + offsets[o][1], 0, h - 1) * w + std::clamp(x + offsets[o][0], 0, w - 1);
                     if (maskBuffer[j] > nTag) {
                         maskBuffer[i] = nTag;
                         colorBuffer[i].r = 
@@ -231,7 +244,8 @@ static void Outline(RGBA8* colorBuffer, int w, int h, int nPasses) {
 }
 
 
-static void BoxBlurH(RGBA8* dest, RGBA8* src, int w, int h, int r)
+template <typename T>
+static void BoxBlurH(T* dest, T* src, int w, int h, int r)
 {
     int i = 0;
     for (int y = 0; y < h; ++y) {
@@ -241,8 +255,8 @@ static void BoxBlurH(RGBA8* dest, RGBA8* src, int w, int h, int r)
         for (int x = -r; x < w; ++x) {
             int j = x - r - 1;
             if (j >= 0) {
-                RGBA8& color = src[i + j];
-                if (color.a) {
+                T& color = src[i + j];
+                if (color.IsVisible()) {
                     a[0] -= (int)color.r;
                     a[1] -= (int)color.g;
                     a[2] -= (int)color.b;
@@ -252,8 +266,8 @@ static void BoxBlurH(RGBA8* dest, RGBA8* src, int w, int h, int r)
 
             j = x + r;
             if (j < w) {
-                RGBA8& color = src[i + j];
-                if (color.a) {
+                T& color = src[i + j];
+                if (color.IsVisible()) {
                     a[0] += (int)color.r;
                     a[1] += (int)color.g;
                     a[2] += (int)color.b;
@@ -262,10 +276,12 @@ static void BoxBlurH(RGBA8* dest, RGBA8* src, int w, int h, int r)
             }
 
             if (x >= 0) {
-                RGBA8& srcColor = src[i + x];
-                RGBA8& destColor = dest[i + x];
-                if (n and srcColor.a) {
-                    destColor.a = srcColor.a;
+                T& srcColor = src[i + x];
+                T& destColor = dest[i + x];
+                if (n and srcColor.IsVisible()) {
+                    if constexpr (std::is_same_v<T, RGBA8>) {
+                        destColor.a = srcColor.a;
+                    }
                     destColor.r = uint8_t(a[0] / n);
                     destColor.g = uint8_t(a[1] / n);
                     destColor.b = uint8_t(a[2] / n);
@@ -279,7 +295,8 @@ static void BoxBlurH(RGBA8* dest, RGBA8* src, int w, int h, int r)
 }
 
 
-static void BoxBlurV(RGBA8* dest, RGBA8* src, int w, int h, int r)
+template <typename T>
+static void BoxBlurV(T* dest, T* src, int w, int h, int r)
 {
     int o[2] = { -(r + 1), r };
 
@@ -291,8 +308,8 @@ static void BoxBlurV(RGBA8* dest, RGBA8* src, int w, int h, int r)
         for (int y = -r; y < h; ++y) {
             int j = y - r - 1;
             if (j >= 0) {
-                RGBA8& color = src[i + o[0]];
-                if (color.a) {
+                T& color = src[i + o[0]];
+                if (color.IsVisible()) {
                     a[0] -= (int)color.r;
                     a[1] -= (int)color.g;
                     a[2] -= (int)color.b;
@@ -302,8 +319,9 @@ static void BoxBlurV(RGBA8* dest, RGBA8* src, int w, int h, int r)
 
             j = y + r;
             if (j < h) {
-                RGBA8& color = src[i + o[1]];
-                if (color.a) {
+                T& color = src[i + o[1]];
+                if (color.IsVisible()) 
+                {
                     a[0] += (int)color.r;
                     a[1] += (int)color.g;
                     a[2] += (int)color.b;
@@ -312,10 +330,12 @@ static void BoxBlurV(RGBA8* dest, RGBA8* src, int w, int h, int r)
             }
 
             if (y >= 0) {
-                RGBA8& srcColor = dest[y * w + x];
-                RGBA8& destColor = dest[y * w + x];
-                if (n and srcColor.a) {
-                    destColor.a = srcColor.a;
+                T& srcColor = src[y * w + x];
+                T& destColor = dest[y * w + x];
+                if (n and srcColor.IsVisible()) {
+                    if constexpr (std::is_same_v<T, RGBA8>) {
+                        destColor.a = srcColor.a;
+                    }
                     destColor.r = uint8_t(a[0] / n);
                     destColor.g = uint8_t(a[1] / n);
                     destColor.b = uint8_t(a[2] / n);
@@ -328,18 +348,29 @@ static void BoxBlurV(RGBA8* dest, RGBA8* src, int w, int h, int r)
     }
 }
 
+
 void TextureBuffer::BoxBlur(uint16_t strength) {
-    ManagedArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height * 4);
-    BoxBlurH(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
-    BoxBlurV(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+    if (m_info.m_componentCount == 3) {
+        ManagedArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
+        BoxBlurH<RGB8>(blurBuffer.Data(), reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
+        BoxBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+    }
+    else if (m_info.m_componentCount == 4) {
+        ManagedArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
+        BoxBlurH<RGBA8>(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
+        BoxBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+    }
 }
 
 
 void TextureBuffer::Posterize(uint16_t gradients) {
     if (not m_isPosterized) {
         m_isPosterized = true;
-        ::Posterize(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width * m_info.m_height, gradients);
-    }
+        if (m_info.m_componentCount == 3)
+            ::Posterize<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width * m_info.m_height, gradients);
+        else if (m_info.m_componentCount == 4)
+            ::Posterize<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width * m_info.m_height, gradients);
+        }
 }
 
 
@@ -348,7 +379,8 @@ void TextureBuffer::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16
         m_isCartoonized = true;
         BoxBlur(blurStrength);
         Posterize(gradients);
-        ::Outline(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(outlinePasses));
+        if (m_info.m_componentCount == 4) 
+            ::Outline(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(outlinePasses));
     }
 }
 
