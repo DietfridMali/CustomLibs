@@ -246,6 +246,8 @@ void BaseSoundHandler::StopMusic(void) {
 }
 
 bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
+    if (m_musicVolume == 0.0f)
+        return false;
     String s = songName.ToLowercase();
     if ((s.Find(".mp3") != -1) and not m_supportsMP3)
         return false;
@@ -257,8 +259,10 @@ bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
     m_lastSong = songName;
     if (not (m_song = Mix_LoadMUS((const char*)songName)))
         return false;
-    if (0 == ((fadeTime > 0) ? Mix_FadeInMusic(m_song, loops, fadeTime) : Mix_PlayMusic(m_song, loops)))
+    if (0 == ((fadeTime > 0) ? Mix_FadeInMusic(m_song, loops, fadeTime) : Mix_PlayMusic(m_song, loops))) {
+        Mix_VolumeMusic((int(round(MIX_MAX_VOLUME * m_musicVolume))));
         return true;
+    }
     Mix_FreeMusic(m_song);
     m_song = nullptr;
     return false;
