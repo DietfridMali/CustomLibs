@@ -11,165 +11,6 @@
 
 // =================================================================================================
 
-TextureBuffer::TextureBuffer(SDL_Surface* source, bool premultiply, bool flipVertically) {
-    Create(source, premultiply, flipVertically);
-}
-
-
-TextureBuffer::TextureBuffer(TextureBuffer const& other) {
-    Copy(const_cast<TextureBuffer&> (other));
-}
-
-
-TextureBuffer::TextureBuffer(TextureBuffer&& other) noexcept {
-    Move(other);
-}
-
-
-void TextureBuffer::Reset(void)
-noexcept
-{
-    m_info.Reset();
-#if USE_SHARED_POINTERS
-    m_data.Release();
-#else
-    m_data.Reset();
-#endif
-}
-
-
-void TextureBuffer::FlipSurface(SDL_Surface* source)
-noexcept
-{
-    SDL_LockSurface(source);
-    int pitch = source->pitch; // row size
-    int h = source->h;
-    char* pixels = (char*)source->pixels + h * pitch;
-    uint8_t* dataPtr = reinterpret_cast<uint8_t*>(m_data.Data());
-
-    for (int i = 0; i < h; i++) {
-        pixels -= pitch;
-        memcpy(dataPtr, pixels, pitch);
-        dataPtr += pitch;
-    }
-    SDL_UnlockSurface(source);
-}
-
-
-uint8_t TextureBuffer::Premultiply(uint16_t c, uint16_t a) noexcept {
-    uint8_t r = c % a > (a >> 1); // round up if c % a > a / 2
-    // c = max. alpha * c / a
-    c *= a;
-    c += 128;
-    return (uint8_t)((c + (c >> 8)) >> 8);
-}
-
-
-void TextureBuffer::Premultiply(void) {
-    if (m_info.m_format == GL_RGBA8) {
-        struct RGBA8 {
-            uint8_t r;
-            uint8_t g;
-            uint8_t b;
-            uint8_t a;
-        };
-        RGBA8* p = reinterpret_cast<RGBA8*>(m_data.Data());
-        for (int i = m_info.m_dataSize / 4; i; --i, ++p) {
-            uint16_t a = uint16_t (p->a);
-            p->r = Premultiply(uint16_t(p->r), a);
-            p->g = Premultiply(uint16_t(p->g), a);
-            p->b = Premultiply(uint16_t(p->b), a);
-        }
-    }
-}
-
-
-bool TextureBuffer::Allocate(int width, int height, int componentCount, void* data) noexcept {
-    m_info.m_width = width;
-    m_info.m_height = height;
-    m_info.m_componentCount = componentCount;
-    m_info.m_format = (componentCount == 1) ? GL_RED : (componentCount == 3) ? GL_RGB : GL_RGBA;
-    m_info.m_internalFormat = (componentCount == 1) ? GL_R8 : (componentCount == 3) ? GL_RGB8 : GL_RGBA8;
-    m_info.m_dataSize = width * height * componentCount;
-    try {
-#if USE_SHARED_POINTERS
-        m_data = SharedPointer<char>(m_info.m_dataSize);
-#else
-        m_data.Resize(m_info.m_dataSize);
-#endif
-    }
-    catch(...) {
-        return false;
-    }
-    if (data) {
-#if USE_SHARED_POINTERS
-        if (m_data.Data() == nullptr)
-#else
-        if (m_data.Length() < m_info.m_dataSize)
-#endif
-            return false;
-        memcpy(m_data.Data(), data, m_info.m_dataSize);
-    }
-    return true;
-}
-
-
-TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool flipVertically) {
-    if (source->pitch / source->w < 3) {
-        SDL_Surface* h = source;
-        source = SDL_ConvertSurfaceFormat(source, SDL_PIXELFORMAT_RGBA32, 0);
-        SDL_FreeSurface(h);
-    }
-    if (not Allocate(source->w, source->h, source->pitch / source->w))
-        fprintf(stderr, "%s (%d): memory allocation for texture clone failed\n", __FILE__, __LINE__);
-    else {
-        if (flipVertically)
-            FlipSurface(source);
-        else
-            memcpy(m_data.Data(), source->pixels, m_info.m_dataSize);
-        SDL_FreeSurface(source);
-        if (premultiply)
-            Premultiply();
-    }
-    return *this;
-}
-
-
-TextureBuffer& TextureBuffer::operator= (const TextureBuffer& other)
-noexcept
-{
-    return Copy(const_cast<TextureBuffer&>(other));
-}
-
-TextureBuffer& TextureBuffer::operator= (TextureBuffer&& other)
-noexcept
-{
-    return Move(other);
-}
-
-TextureBuffer& TextureBuffer::Copy(TextureBuffer& other)
-noexcept
-{
-    if (this != &other) {
-        m_info = other.m_info;
-        m_data = other.m_data;
-    }
-    return *this;
-}
-
-TextureBuffer& TextureBuffer::Move(TextureBuffer& other)
-noexcept
-{
-    if (this != &other) {
-        m_info = other.m_info;
-        m_data = std::move(other.m_data);
-        other.Reset();
-    }
-    return *this;
-}
-
-// =================================================================================================
-
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
 
 int Texture::CompareTextures(void* context, const size_t& key1, const size_t& key2) {
@@ -369,6 +210,12 @@ bool Texture::Enable(int tmuIndex)
 void Texture::Disable(int tmuIndex)
 {
     Release(tmuIndex);
+}
+
+
+void Texture::Posterize(uint32_t gradients = 15) {
+    for (auto& b : m_buffers)
+        b.Posterize(gradients);
 }
 
 

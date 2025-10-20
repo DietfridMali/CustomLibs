@@ -8,25 +8,23 @@
 // dataSize: buffer size in bytes
 // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
 // componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
-VBO::VBO(const char* type, GLint bufferType, bool isDynamic)
-noexcept
-{
-    m_index = -1;
-    m_type = type;
-    m_bufferType = bufferType;
-    m_data = nullptr;
+VBO::VBO(const char* type, GLint bufferType, bool isDynamic) noexcept
+    , m_index(-1)
+    , m_type(type)
+    , m_bufferType(bufferType)
+    , m_data(nullptr)
 #if USE_SHARED_HANDLES
-    m_handle = SharedBufferHandle();
+    , m_handle(SharedBufferHandle())
 #else
-    m_handle = 0;
+    , m_handle(0)
 #endif
-    m_size = 0;
-    m_itemSize = 0;
-    m_itemCount = 0;
-    m_componentCount = 0;
-    m_componentType = 0;
-    m_isDynamic = isDynamic;
-}
+    , m_size(0)
+    , m_itemSize(0)
+    , m_itemCount(0)
+    , m_componentCount(0)
+    , m_componentType(0)
+    , m_isDynamic(isDynamic)
+{ }
 
 
 size_t VBO::ComponentSize(size_t componentType)
@@ -49,6 +47,7 @@ VBO& VBO::Copy(VBO const& other) {
     if (this != &other) {
         m_index = other.m_index;
         m_type = other.m_type;
+        m_id = other.m_id;
         m_bufferType = other.m_bufferType;
         m_data = other.m_data;
         m_handle = other.m_handle;
@@ -69,6 +68,7 @@ noexcept
     if (this != &other) {
         m_index = other.m_index;
         m_type = other.m_type;
+        m_id = other.m_id;
         m_bufferType = other.m_bufferType;
         m_data = other.m_data;
         m_handle = std::move(other.m_handle);

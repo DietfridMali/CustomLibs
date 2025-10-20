@@ -176,12 +176,12 @@ public:
             texture->Disable();
     }
 
-    VBO* FindBuffer(const char* type, int& index)
+    VBO* FindBuffer(const char* type, int id, int& index)
         noexcept;
 
-    bool UpdateVertexBuffer(const char* type, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
+    bool UpdateVertexBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
         if (buffer.IsDirty()) {
-            if (not UpdateVertexBuffer(type, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount())))
+            if (not UpdateVertexBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount())))
                 return false;
             buffer.SetDirty(false);
         }
@@ -201,10 +201,10 @@ public:
 
     protected:
         // add a vertex or index data buffer
-        bool UpdateBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0)
+        bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0)
             noexcept;
 
-        bool UpdateVertexBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+        bool UpdateVertexBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
             noexcept;
 
         void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)

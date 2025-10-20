@@ -19,7 +19,8 @@ class VBO
 public:
 
     int                 m_index;
-    const char* m_type;
+    const char*         m_type;
+    int                 m_id;
     GLenum              m_bufferType;
     char* m_data;
 #if USE_SHARED_HANDLES
@@ -34,7 +35,7 @@ public:
     GLenum              m_componentType;
     bool                m_isDynamic;
 
-    VBO(const char* type = "", GLint bufferType = GL_ARRAY_BUFFER, bool isDynamic = true)
+    VBO(const char* type = "", int id = 0, GLint bufferType = GL_ARRAY_BUFFER, bool isDynamic = true)
         noexcept;
 
     void Reset(void) {
@@ -43,6 +44,7 @@ public:
 #else
         m_handle = 0;
 #endif
+        m_id = 0;
         m_isDynamic = true;
     }
 
@@ -122,6 +124,11 @@ public:
         noexcept
     {
         return !strcmp(m_type, type);
+    }
+
+    inline bool HasID(int id)
+        noexcept {
+        return m_id = id;
     }
 
     inline void SetDynamic(bool isDynamic)

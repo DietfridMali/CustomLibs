@@ -99,12 +99,12 @@ noexcept
 }
 
 
-VBO* VAO::FindBuffer(const char* type, int& index)
+VBO* VAO::FindBuffer(const char* type, int id, int& index)
 noexcept
 {
     int i = 0;
     for (auto vbo : m_dataBuffers) {
-        if (vbo->IsType(type)) {
+        if (vbo->IsType(type) and vbo->HasID(id)) {
             index = i;
             return vbo;
         }
@@ -114,21 +114,21 @@ noexcept
 }
 
 // add a vertex or index data buffer
-bool VAO::UpdateBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
 noexcept
 {
     if (strcmp(type, "Index"))
-        return UpdateVertexBuffer(type, data, dataSize, componentType, componentCount);
+        return UpdateVertexBuffer(type, id, data, dataSize, componentType, componentCount);
     UpdateIndexBuffer(data, dataSize, componentType);
     return true;
 }
 
 
-bool VAO::UpdateVertexBuffer(const char* type, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+bool VAO::UpdateVertexBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
 noexcept
 {
     int index;
-    VBO* vbo = FindBuffer(type, index);
+    VBO* vbo = FindBuffer(type, id, index);
     if (not vbo) { // otherwise index has been initialized by FindBuffer()
         vbo = new VBO();
         if (not vbo)

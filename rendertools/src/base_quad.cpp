@@ -51,7 +51,8 @@ BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
         if (m_privateVAO)
             m_vao->Copy(*other.m_vao);
         m_vertices = other.m_vertices;
-        m_texCoords = other.m_texCoords;
+        m_texCoords[0] = other.m_texCoords[0];
+        m_texCoords[1] = other.m_texCoords[1];
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }
@@ -67,7 +68,8 @@ noexcept
         if ((m_privateVAO = other.m_privateVAO))
             other.m_vao = nullptr;
         m_vertices = std::move(other.m_vertices);
-        m_texCoords = std::move(other.m_texCoords);
+        m_texCoords[0] = std::move(other.m_texCoords[0]);
+        m_texCoords[1] = std::move(other.m_texCoords[1]);
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }
@@ -76,8 +78,8 @@ noexcept
 
 
 void BaseQuad::UpdateTexCoords(void) {
-    if (m_texCoords.AppDataLength() > 0) {
-        for (auto& tc : m_texCoords.AppData())
+    if (m_texCoords[0].AppDataLength() > 0) {
+        for (auto& tc : m_texCoords[0].AppData())
             m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
     }
 }
@@ -98,10 +100,10 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
 
     if (texCoords.size() == 0)
         texCoords = defaultTexCoords[tcRegular];
-    if (not equals(m_texCoords.AppData().StdList(), texCoords)) {
-        m_texCoords.AppData() = texCoords;
+    if (not equals(m_texCoords[0].AppData().StdList(), texCoords)) {
+        m_texCoords[0].AppData() = texCoords;
         //m_texCoords.Setup();
-        m_texCoords.SetDirty(true);
+        m_texCoords[0].SetDirty(true);
     }
     UpdateTexCoords();
 

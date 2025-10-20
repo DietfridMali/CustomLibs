@@ -111,6 +111,24 @@ public:
         return RGBAColor(scale.R(), scale.G(), scale.B(), 1.0f);
     }
 
+    inline float PosterizeComponent(float c, uint16_t g = 15) noexcept {
+        uint16_t i = uint16_t(round(c * 255.0f));
+        return float(std::max<uint32_t>(0, ((i / g + g / 2) * g - g))) / 255.0f;
+    }
+
+    inline RGBAColor& Posterize(uint8_t gradients = 15) noexcept {
+        if (gradients > 0) {
+            R() = PosterizeComponent(R(), gradients);
+            G() = PosterizeComponent(G(), gradients);
+            B() = PosterizeComponent(B(), gradients);
+        }
+        return *this;
+    }
+
+    inline RGBAColor Posterized(uint8_t gradients = 15) noexcept {
+        RGBAColor color = *this;
+        return color.Posterized(gradients);
+    }
 };
 
 

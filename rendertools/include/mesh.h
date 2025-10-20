@@ -60,7 +60,7 @@ public:
     TextureList         m_textures;
     VertexBuffer        m_vertices;
     VertexBuffer        m_normals;
-    TexCoordBuffer      m_texCoords;
+    TexCoordBuffer      m_texCoords[2];
     ColorBuffer         m_vertexColors;
     IndexBuffer         m_indices;
     VAO*                m_vao{ nullptr };
@@ -119,7 +119,7 @@ public:
 
     inline VertexBuffer& Normals(void) noexcept { return m_normals; }
 
-    inline TexCoordBuffer& TexCoords(void) noexcept { return m_texCoords; }
+    inline TexCoordBuffer& TexCoords(int i) noexcept { return m_texCoords [i]; }
 
     inline ColorBuffer& VertexColors(void) noexcept { return m_vertexColors; }
 
@@ -127,23 +127,23 @@ public:
 
     inline void UpdateVertexBuffer(void) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("Vertex", m_vertices, GL_FLOAT);
+            m_vao->UpdateVertexBuffer("Vertex", 0, m_vertices, GL_FLOAT);
     }
 
-    inline void UpdateTexCoordBuffer(void) {
+    inline void UpdateTexCoordBuffer(int i) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("TexCoord", m_texCoords, GL_FLOAT);
+            m_vao->UpdateVertexBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT);
     }
 
     inline void UpdateColorBuffer(void) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("Color", m_vertexColors, GL_FLOAT);
+            m_vao->UpdateVertexBuffer("Color", 0, m_vertexColors, GL_FLOAT);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(void) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("Normal", m_normals, GL_FLOAT);
+            m_vao->UpdateVertexBuffer("Normal", 0, m_normals, GL_FLOAT);
     }
 
     inline void UpdateIndexBuffer(void) {
@@ -187,16 +187,16 @@ public:
         AddVertex(static_cast<const Vector3f&>(v));
     }
 
-    inline void AddTexCoord(const TexCoord& tc) {
-        m_texCoords.Append(tc);
+    inline void AddTexCoord(const TexCoord& tc, int i = 0) {
+        m_texCoords[i].Append(tc);
     }
 
-    inline void AddTexCoord(TexCoord&& tc) {
-        m_texCoords.Append(const_cast<const TexCoord&>(tc));
+    inline void AddTexCoord(TexCoord&& tc, int i = 0) {
+        m_texCoords[i].Append(const_cast<const TexCoord&>(tc));
     }
 
-    inline void AddTexCoord(const SegmentedList<TexCoord>& tc) {
-        m_texCoords.Append(tc);
+    inline void AddTexCoord(const SegmentedList<TexCoord>& tc, int i = 0) {
+        m_texCoords[i].Append(tc);
     }
 
     inline void AddColor(const RGBAColor& c) {

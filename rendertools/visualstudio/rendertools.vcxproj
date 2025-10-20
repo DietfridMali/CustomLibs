@@ -134,6 +134,7 @@
     <ClInclude Include="..\include\textrenderer.h" />
     <ClInclude Include="..\include\texture.h" />
     <ClInclude Include="..\include\textureatlas.h" />
+    <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\include\texturehandler.h" />
     <ClInclude Include="..\include\vao.h" />
     <ClInclude Include="..\include\vbo.h" />
@@ -171,8 +172,10 @@
     <ClCompile Include="..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\src\textureatlas.cpp" />
+    <ClCompile Include="..\src\texturebuffer.cpp" />
     <ClCompile Include="..\src\texturehandler.cpp" />
     <ClCompile Include="..\src\base_texture_shaders.cpp" />
+    <ClCompile Include="..\src\textureprocessing.cpp" />
     <ClCompile Include="..\src\vao.cpp" />
     <ClCompile Include="..\src\vbo.cpp" />
     <ClCompile Include="..\src\viewport.cpp" />
