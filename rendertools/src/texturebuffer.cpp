@@ -247,50 +247,60 @@ static void Outline(RGBA8* colorBuffer, int w, int h, int nPasses) {
 template <typename T>
 static void BoxBlurH(T* dest, T* src, int w, int h, int r)
 {
-    int i = 0;
     for (int y = 0; y < h; ++y) {
+        const int row = y * w;
         int a[3] = { 0, 0, 0 };
         int n = 0;
 
-        for (int x = -r; x < w; ++x) {
-            int j = x - r - 1;
-            if (j >= 0) {
-                T& color = src[i + j];
-                if (color.IsVisible()) {
-                    a[0] -= (int)color.r;
-                    a[1] -= (int)color.g;
-                    a[2] -= (int)color.b;
+        const int xr = std::min(r, w - 1);
+        for (int x = 0; x <= xr; ++x) {
+            T& c = src[row + x];
+            if (c.IsVisible()) {
+                a[0] += (int)c.r;
+                a[1] += (int)c.g;
+                a[2] += (int)c.b;
+                ++n;
+            }
+        }
+
+        for (int x = 0; x < w; ++x) {
+            T& srcColor = src[row + x];
+            T& destColor = dest[row + x];
+
+            if (n and srcColor.IsVisible()) {
+                if constexpr (std::is_same_v<T, RGBA8>) {
+                    destColor.a = srcColor.a;
+                }
+                destColor.r = (uint8_t)(a[0] / n);
+                destColor.g = (uint8_t)(a[1] / n);
+                destColor.b = (uint8_t)(a[2] / n);
+            }
+            else {
+                destColor = srcColor;
+            }
+
+            int removeIdx = x - r;
+            int addIdx = x + r + 1;
+
+            if (removeIdx >= 0) {
+                T& c = src[row + removeIdx];
+                if (c.IsVisible()) {
+                    a[0] -= (int)c.r;
+                    a[1] -= (int)c.g;
+                    a[2] -= (int)c.b;
                     --n;
                 }
             }
-
-            j = x + r;
-            if (j < w) {
-                T& color = src[i + j];
-                if (color.IsVisible()) {
-                    a[0] += (int)color.r;
-                    a[1] += (int)color.g;
-                    a[2] += (int)color.b;
+            if (addIdx < w) {
+                T& c = src[row + addIdx];
+                if (c.IsVisible()) {
+                    a[0] += (int)c.r;
+                    a[1] += (int)c.g;
+                    a[2] += (int)c.b;
                     ++n;
                 }
             }
-
-            if (x >= 0) {
-                T& srcColor = src[i + x];
-                T& destColor = dest[i + x];
-                if (n and srcColor.IsVisible()) {
-                    if constexpr (std::is_same_v<T, RGBA8>) {
-                        destColor.a = srcColor.a;
-                    }
-                    destColor.r = uint8_t(a[0] / n);
-                    destColor.g = uint8_t(a[1] / n);
-                    destColor.b = uint8_t(a[2] / n);
-                }
-                else
-                    destColor = srcColor;
-            }
         }
-        ++i;
     }
 }
 

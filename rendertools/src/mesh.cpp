@@ -60,7 +60,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
     if (m_vertices.IsDirty()) {
         m_vertices.Setup();
         UpdateVertexBuffer();
-    }
+        }
     for (int i = 0; i < 2; ++i) {
         if (m_texCoords[i].HaveData() and m_texCoords[i].IsDirty()) {
             m_texCoords[i].Setup();
@@ -75,6 +75,11 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
         m_normals.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateNormalBuffer();
+    }
+    if (m_floatBuffer.IsDirty()) {
+        m_floatBuffer.Setup();
+        // in the case of an icosphere, the vertices also are the vertex normals
+        UpdateFloatBuffer();
     }
     m_vao->Disable();
     return true;

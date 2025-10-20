@@ -18,7 +18,7 @@ GLuint IcoSphere::AddVertexIndices(Dictionary<VertexKey, GLuint>& indexLookup, G
     if (keyPtr)
         return *keyPtr;
     indexLookup.Insert(key, m_vertexCount);
-    Vector3f v = m_vertices [int(i1)] + m_vertices [int(i2)];
+    Vector3f v = m_vertices[int(i1)] + m_vertices[int(i2)];
     v.Normalize();
     v *= 0.5f;
     m_vertices.Append(v);
@@ -38,7 +38,7 @@ List<Vector3f> IcoSphere::CreateFaceNormals(VertexBuffer& vertices, SegmentedLis
 
 void TriangleIcoSphere::Create(int quality) {
     CreateBaseMesh(0);
-    m_vertexCount = m_vertices.AppDataLength ();
+    m_vertexCount = m_vertices.AppDataLength();
     Refine(m_indices.AppData(), quality);
     m_faceCount = m_indices.AppDataLength();
     m_vertices.SetDirty(true);
@@ -63,7 +63,7 @@ void TriangleIcoSphere::CreateOctahedron(void) {
     float X = 0.5f;
     float Y = float(sqrt(0.5));
     float Z = 0.5;
-    m_vertices.AppData() = { 
+    m_vertices.AppData() = {
         Vector3f{-X,0,-Z}, Vector3f{X,0,-Z}, Vector3f{X,0,Z}, Vector3f{-X,0,Z}, Vector3f{0,-Y,0}, Vector3f{0,Y,0} 
     };
     m_indices.AppData() = {
@@ -78,7 +78,7 @@ void TriangleIcoSphere::CreateIcosahedron(void) {
     float Z = 0.850650808352039932f;
     float N = 0.0f;
     m_vertices.AppData().Clear();
-    m_vertices.AppData() = { 
+    m_vertices.AppData() = {
         Vector3f{-X,+N,+Z}, Vector3f{+X,+N,+Z}, Vector3f{-X,+N,-Z}, Vector3f{+X,+N,-Z},
         Vector3f{+N,+Z,+X}, Vector3f{+N,+Z,-X}, Vector3f{+N,-Z,+X}, Vector3f{+N,-Z,-X},
         Vector3f{+Z, +X, +N}, Vector3f{-Z, +X, +N}, Vector3f{+Z, -X, +N}, Vector3f{-Z, -X, +N} 
@@ -160,7 +160,7 @@ void RectangleIcoSphere::CreateCube(void) {
     float Y = 0.5f;
     float Z = 0.5f;
 #if 0
-    m_vertices.AppData() = { 
+    m_vertices.AppData() = {
         Vector3f{-X,-Y,-Z}, Vector3f{+X,-Y,-Z}, Vector3f{+X,+Y,-Z}, Vector3f{-X,+Y,-Z},
         Vector3f{-X,-Y,+Z}, Vector3f{+X,-Y,+Z}, Vector3f{+X,+Y,+Z}, Vector3f{-X,+Y,+Z} 
     };
@@ -238,7 +238,7 @@ void RectangleIcoSphere::SubDivide(SegmentedList<VertexIndices>& faces) {
         GLuint i2 = AddVertexIndices(indexLookup, f2, f3);
         GLuint i3 = AddVertexIndices(indexLookup, f3, f0);
         GLuint i4 = m_vertexCount++;
-        Vector3f v = m_vertices [int(i0)] + m_vertices [int(i1)] + m_vertices [int(i2)] + m_vertices [int(i3)];
+        Vector3f v = m_vertices[int(i0)] + m_vertices[int(i1)] + m_vertices[int(i2)] + m_vertices[int(i3)];
         v.Normalize();
         v *= 0.5f;
         m_vertices.AppData().Append(v);

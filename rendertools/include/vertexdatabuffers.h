@@ -285,7 +285,35 @@ class IndexBuffer : public VertexDataBuffer <ManagedArray<GLuint>, GLuint> {
         Copy (other);
         return *this;
     }
+};
 
+// =================================================================================================
+// Buffer for index data (n-tuples of integer values). 
+// Requires an additional componentCount parameter, as index count depends on the vertex count of the 
+// primitive being rendered (quad: 4, triangle: 3, line: 2, point: 1)
+
+class FloatDataBuffer : public VertexDataBuffer <GLfloat, GLfloat> {
+public:
+    FloatDataBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1)
+        : VertexDataBuffer(componentCount, listSegmentSize)
+    {
+    }
+
+    // Create a densely packed numpy array from the vertex data
+    virtual ManagedArray<GLfloat>& Setup(void) {
+        if (HaveAppData()) {
+            float* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
+            for (auto& v : m_appData) {
+                *glData++ = v;
+            }
+        }
+        return m_glData;
+    }
+
+    FloatDataBuffer& operator= (FloatDataBuffer const& other) {
+        Copy(other);
+        return *this;
+    }
 };
 
 // =================================================================================================

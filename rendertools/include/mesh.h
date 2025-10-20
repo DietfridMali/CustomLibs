@@ -63,6 +63,7 @@ public:
     TexCoordBuffer      m_texCoords[2];
     ColorBuffer         m_vertexColors;
     IndexBuffer         m_indices;
+    FloatDataBuffer     m_floatBuffer;
     VAO*                m_vao{ nullptr };
     GLenum              m_shape{ 0 };
     Vector3f            m_vMin{ Vector3f::ZERO };
@@ -125,25 +126,32 @@ public:
 
     inline IndexBuffer& Indices(void) noexcept { return m_indices; }
 
+    inline FloatDataBuffer& FloatBuffer(void) noexcept { return m_floatBuffer; }
+
     inline void UpdateVertexBuffer(void) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("Vertex", 0, m_vertices, GL_FLOAT);
+            m_vao->UpdateFloatBuffer("Vertex", 0, m_vertices, GL_FLOAT);
     }
 
     inline void UpdateTexCoordBuffer(int i) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT);
+            m_vao->UpdateFloatBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT);
     }
 
     inline void UpdateColorBuffer(void) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("Color", 0, m_vertexColors, GL_FLOAT);
+            m_vao->UpdateFloatBuffer("Color", 0, m_vertexColors, GL_FLOAT);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(void) {
         if (m_vao)
-            m_vao->UpdateVertexBuffer("Normal", 0, m_normals, GL_FLOAT);
+            m_vao->UpdateFloatBuffer("Normal", 0, m_normals, GL_FLOAT);
+    }
+
+    inline void UpdateFloatBuffer(void) {
+        if (m_vao)
+            m_vao->UpdateFloatBuffer("Float", 0, m_floatBuffer, GL_FLOAT);
     }
 
     inline void UpdateIndexBuffer(void) {
@@ -221,6 +229,10 @@ public:
 
     inline void SetIndices(ManagedArray<GLuint>& i) {
         m_indices.SetGLData(i);
+    }
+
+    inline void AddFloat(const float n) {
+        m_floatBuffer.Append(n);
     }
 
     inline bool IsEmpty(void)
