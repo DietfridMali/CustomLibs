@@ -80,6 +80,7 @@ public:
 #endif
     uint32_t            m_refCount{ 0 };
     bool                m_isPosterized{ false };
+    bool                m_isCartoonized{ false };
 
     TextureBuffer()
         : m_data()
@@ -143,11 +144,11 @@ public:
         return m_refCount > 0;
     }
 
-    void BoxBlur(int r);
+    void BoxBlur(uint16_t strength = 4);
 
-    void Posterize(uint32_t gradients = 15);
+    void Posterize(uint16_t gradients = 15);
 
-    void Cartoonize(void);
+    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 4, uint16_t outlinePasses = 4);
 };
 
 // =================================================================================================

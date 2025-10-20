@@ -39,6 +39,8 @@ noexcept
 #else
     m_data.Reset();
 #endif
+    m_isPosterized = false;
+    m_isCartoonized = false;
 }
 
 
@@ -326,14 +328,14 @@ static void BoxBlurV(RGBA8* dest, RGBA8* src, int w, int h, int r)
     }
 }
 
-void TextureBuffer::BoxBlur(int r) {
+void TextureBuffer::BoxBlur(uint16_t strength) {
     ManagedArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height * 4);
-    BoxBlurH(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, r);
-    BoxBlurV(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, r);
+    BoxBlurH(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
+    BoxBlurV(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
 }
 
 
-void TextureBuffer::Posterize(uint32_t gradients) {
+void TextureBuffer::Posterize(uint16_t gradients) {
     if (not m_isPosterized) {
         m_isPosterized = true;
         ::Posterize(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width * m_info.m_height, gradients);
@@ -341,10 +343,13 @@ void TextureBuffer::Posterize(uint32_t gradients) {
 }
 
 
-void TextureBuffer::Cartoonize(void) {
-    BoxBlur(4);
-    Posterize();
-    ::Outline(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, 4);
+void TextureBuffer::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses) {
+    if (not m_isCartoonized) {
+        m_isCartoonized = true;
+        BoxBlur(blurStrength);
+        Posterize(gradients);
+        ::Outline(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(outlinePasses));
+    }
 }
 
 // =================================================================================================

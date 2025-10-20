@@ -191,6 +191,9 @@ public:
 
     bool CreateFromSurface(SDL_Surface* surface, bool premultiply = false, bool flipVertically = false);
 
+    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 15, uint16_t outlinePasses = 4);
+
+
     inline void SetID(uint32_t id) noexcept {
         m_id = id;
     }

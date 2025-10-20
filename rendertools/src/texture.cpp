@@ -213,9 +213,10 @@ void Texture::Disable(int tmuIndex)
 }
 
 
-void Texture::Posterize(uint32_t gradients = 15) {
+
+void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses) {
     for (auto& b : m_buffers)
-        b.Posterize(gradients);
+        b->Cartoonize(blurStrength, gradients, outlinePasses);
 }
 
 

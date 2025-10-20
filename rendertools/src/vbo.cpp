@@ -8,8 +8,9 @@
 // dataSize: buffer size in bytes
 // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
 // componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
-VBO::VBO(const char* type, GLint bufferType, bool isDynamic) noexcept
-    , m_index(-1)
+VBO::VBO(const char* type, int id, GLint bufferType, bool isDynamic) noexcept
+    : m_index(-1)
+    , m_id(id)
     , m_type(type)
     , m_bufferType(bufferType)
     , m_data(nullptr)
