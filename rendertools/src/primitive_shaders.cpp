@@ -208,7 +208,7 @@ const ShaderSource& CircleMaskShader() {
                 vec2 fcDelta = fragCoord - center;
                 vec4 mask = texture(source, clamp(center + fcDelta * maskScale, 0.0, 1.0));
                 if (mask.a > 0)
-                    fragColor = maskColor;
+                    fragColor = mask; //Color;
                 else {
                     vec2 pxDelta = (fragCoord - center) * viewportSize;
                     float pxDist = length(pxDelta);
