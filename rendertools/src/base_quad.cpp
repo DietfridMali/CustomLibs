@@ -52,7 +52,6 @@ BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
             m_vao->Copy(*other.m_vao);
         m_vertices = other.m_vertices;
         m_texCoords[0] = other.m_texCoords[0];
-        m_texCoords[1] = other.m_texCoords[1];
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }
@@ -69,7 +68,6 @@ noexcept
             other.m_vao = nullptr;
         m_vertices = std::move(other.m_vertices);
         m_texCoords[0] = std::move(other.m_texCoords[0]);
-        m_texCoords[1] = std::move(other.m_texCoords[1]);
         m_aspectRatio = other.m_aspectRatio;
         m_isAvailable = other.m_isAvailable;
     }

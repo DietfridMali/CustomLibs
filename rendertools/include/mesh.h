@@ -60,7 +60,7 @@ public:
     TextureList         m_textures;
     VertexBuffer        m_vertices;
     VertexBuffer        m_normals;
-    TexCoordBuffer      m_texCoords[2];
+    SimpleArray<TexCoordBuffer, 3>  m_texCoords;
     ColorBuffer         m_vertexColors;
     IndexBuffer         m_indices;
     FloatDataBuffer     m_floatBuffer;

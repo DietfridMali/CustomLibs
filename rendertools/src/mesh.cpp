@@ -14,8 +14,8 @@ void Mesh::Init(GLenum shape, int32_t listSegmentSize) {
     m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; // f, f, f);
     m_vertices = VertexBuffer(listSegmentSize);
     m_normals = VertexBuffer(listSegmentSize);
-    m_texCoords[0] = TexCoordBuffer(listSegmentSize);
-    m_texCoords[1] = TexCoordBuffer(listSegmentSize);
+    for (auto& tc : m_texCoords)
+        tc = TexCoordBuffer(listSegmentSize);
     m_vertexColors = ColorBuffer(listSegmentSize);
     m_indices = IndexBuffer(ShapeSize(), listSegmentSize);
 }
@@ -61,10 +61,11 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
         m_vertices.Setup();
         UpdateVertexBuffer();
         }
-    for (int i = 0; i < 2; ++i) {
-        if (m_texCoords[i].HaveData() and m_texCoords[i].IsDirty()) {
-            m_texCoords[i].Setup();
-            UpdateTexCoordBuffer(i);
+    int i = -1;
+    for (auto& tc : m_texCoords) {
+        if (tc.HaveData() and tc.IsDirty()) {
+            tc.Setup();
+            UpdateTexCoordBuffer(++i);
         }
     }
     if (m_vertexColors.IsDirty()) {
@@ -88,8 +89,8 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
 void Mesh::ResetVAO(void) {
     m_indices.Reset();
     m_vertices.Reset();
-    m_texCoords[0].Reset();
-    m_texCoords[1].Reset();
+    for (auto& tc : m_texCoords)
+        tc.Reset();
     m_vertexColors.Reset();
     m_normals.Reset();
     if (m_vao)
@@ -152,6 +153,7 @@ noexcept(
     noexcept(m_normals.Destroy()) &&
     noexcept(m_texCoords[0].Destroy()) &&
     noexcept(m_texCoords[1].Destroy()) &&
+    noexcept(m_texCoords[2].Destroy()) &&
     noexcept(m_vertexColors.Destroy()) &&
     noexcept(m_indices.Destroy()) &&
     noexcept(m_textures.Clear()) &&
@@ -159,8 +161,8 @@ noexcept(
 {
     m_vertices.Destroy();
     m_normals.Destroy();
-    m_texCoords[0].Destroy();
-    m_texCoords[1].Destroy();
+    for (auto& tc : m_texCoords)
+        tc.Destroy();
     m_vertexColors.Destroy();
     m_indices.Destroy();
     m_textures.Clear();
