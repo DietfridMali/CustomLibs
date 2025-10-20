@@ -63,7 +63,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
     }
     for (int i = 0; i < 2; ++i) {
         if (m_texCoords[i].HaveData() and m_texCoords[i].IsDirty()) {
-            m_texCoords[0].Setup();
+            m_texCoords[i].Setup();
             UpdateTexCoordBuffer(i);
         }
     }
