@@ -146,9 +146,11 @@ public:
 
     void BoxBlur(uint16_t strength = 4);
 
-    void Posterize(uint16_t gradients = 15);
+    void GaussBlur(uint16_t strength = 4);
 
-    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 4, uint16_t outlinePasses = 4);
+    void Posterize(uint16_t gradients = 7);
+
+    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
 };
 
 // =================================================================================================

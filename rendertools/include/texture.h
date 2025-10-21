@@ -202,7 +202,7 @@ public:
 
     bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
 
-    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 15, uint16_t outlinePasses = 4);
+    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
 
 
     inline void SetID(uint32_t id) noexcept {
