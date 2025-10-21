@@ -520,8 +520,8 @@ void TextureBuffer::Posterize(uint16_t gradients) {
 void TextureBuffer::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses) {
     if (not m_isCartoonized) {
         m_isCartoonized = true;
-        GaussBlur(blurStrength);
         Posterize(gradients);
+        GaussBlur(blurStrength);
         if (m_info.m_componentCount == 4) 
             ::Outline(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(outlinePasses));
     }
