@@ -34,6 +34,7 @@ FILES := \
  textrenderer \
  textureatlas \
  texture \
+ texturebuffer \
  texturehandler \
  vao \
  vbo \
