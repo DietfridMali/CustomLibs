@@ -129,7 +129,7 @@ bool FontHandler::CreateTexture(const char* szChar, char key, int index)
     SDL_Surface* surface = (strlen(szChar) == 1)
         ? TTF_RenderText_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255))
         : TTF_RenderUTF8_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255));
-    if (not info.texture->CreateFromSurface(surface)) {
+    if (not info.texture->CreateFromSurface(surface), {}) {
         delete info.texture;
         info = GlyphInfo();
         return false;

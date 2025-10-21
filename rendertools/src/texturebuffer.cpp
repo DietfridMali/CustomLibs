@@ -308,52 +308,172 @@ static void BoxBlurH(T* dest, T* src, int w, int h, int r)
 template <typename T>
 static void BoxBlurV(T* dest, T* src, int w, int h, int r)
 {
-    int o[2] = { -(r + 1), r };
-
     for (int x = 0; x < w; ++x) {
         int a[3] = { 0, 0, 0 };
         int n = 0;
 
-        int i = -r + x;
-        for (int y = -r; y < h; ++y) {
-            int j = y - r - 1;
-            if (j >= 0) {
-                T& color = src[i + o[0]];
-                if (color.IsVisible()) {
-                    a[0] -= (int)color.r;
-                    a[1] -= (int)color.g;
-                    a[2] -= (int)color.b;
+        int yr = std::min(r, h - 1);
+        for (int y = 0; y <= yr; ++y) {
+            T& c = src[y * w + x];
+            if (c.IsVisible()) {
+                a[0] += (int)c.r;
+                a[1] += (int)c.g;
+                a[2] += (int)c.b;
+                ++n;
+            }
+        }
+
+        for (int y = 0; y < h; ++y) {
+            T& srcColor = src[y * w + x];
+            T& destColor = dest[y * w + x];
+
+            if (n and srcColor.IsVisible()) {
+                if constexpr (std::is_same_v<T, RGBA8>) {
+                    destColor.a = srcColor.a;
+                }
+                destColor.r = (uint8_t)(a[0] / n);
+                destColor.g = (uint8_t)(a[1] / n);
+                destColor.b = (uint8_t)(a[2] / n);
+            }
+            else {
+                destColor = srcColor;
+            }
+
+            int removeIdx = y - r;
+            int addIdx = y + r + 1;
+
+            if (removeIdx >= 0) {
+                T& c = src[removeIdx * w + x];
+                if (c.IsVisible()) {
+                    a[0] -= (int)c.r;
+                    a[1] -= (int)c.g;
+                    a[2] -= (int)c.b;
                     --n;
                 }
             }
-
-            j = y + r;
-            if (j < h) {
-                T& color = src[i + o[1]];
-                if (color.IsVisible()) 
-                {
-                    a[0] += (int)color.r;
-                    a[1] += (int)color.g;
-                    a[2] += (int)color.b;
+            if (addIdx < h) {
+                T& c = src[addIdx * w + x];
+                if (c.IsVisible()) {
+                    a[0] += (int)c.r;
+                    a[1] += (int)c.g;
+                    a[2] += (int)c.b;
                     ++n;
                 }
             }
+        }
+    }
+}
 
-            if (y >= 0) {
-                T& srcColor = src[y * w + x];
-                T& destColor = dest[y * w + x];
-                if (n and srcColor.IsVisible()) {
-                    if constexpr (std::is_same_v<T, RGBA8>) {
-                        destColor.a = srcColor.a;
+using GaussKernel = SimpleArray<double, 31>;
+
+static  ComputeKernel(GaussKernel& kernel, int r) {
+        kernel.fill(0.0);
+        double sigma = r > 0 ? r * 0.5 : 1.0;
+        double s2 = 2.0 * sigma * sigma;
+        double norm = 0.0;
+
+        for (int k = -r; k <= r; ++k) {
+            double v = r == 0 ? 1.0 : std::exp(-(double)(k * k) / s2);
+            kernel[15 + k] = v;
+            norm += v;
+        }
+        double inv = 1.0 / norm;
+        for (int k = -r; k <= r; ++k) 
+            kernels[15 + k] *= inv;
+    }
+}
+
+
+// Kernel-Caching: ein Eintrag pro Radius 0..15, Länge 31 (Mitte = Index 15)
+static GaussKernel& GetKernel(int r)
+{
+    static SimpleArray<GaussKernel, 16> kernels;
+    static bool haveKernel[16] = { false };
+
+    if (not haveKernel[r]) {
+        haveKernel[r] = true;
+        ComputeKernel(kernels[r], r);
+    }
+    return kernels[r];
+}
+
+template <typename T>
+static void GaussBlurH(T* dest, T* src, int w, int h, int r)
+{
+    GaussKernel& kernel = GaussKernel(r);
+
+    for (int y = 0; y < h; ++y) {
+        int row = y * w;
+        for (int x = 0; x < w; ++x) {
+            T& srcColor = src[row + x];
+            T& destColor = dest[row + x];
+
+            double a[3] = { 0.0, 0.0, 0.0 };
+            double wsum = 0.0;
+
+            for (int k = -r; k <= r; ++k) {
+                int sx = x + k;
+                if (sx >= 0 and sx < w) {
+                    T& c = src[row + sx];
+                    if (c.IsVisible()) {
+                        double wv = kernel[15 + k];
+                        a[0] += wv * (int)c.r;
+                        a[1] += wv * (int)c.g;
+                        a[2] += wv * (int)c.b;
+                        wsum += wv;
                     }
-                    destColor.r = uint8_t(a[0] / n);
-                    destColor.g = uint8_t(a[1] / n);
-                    destColor.b = uint8_t(a[2] / n);
                 }
-                else
-                    destColor = srcColor;
             }
-            ++i;
+
+            if (wsum > 0.0 and srcColor.IsVisible()) {
+                if constexpr (std::is_same_v<T, RGBA8>) destColor.a = srcColor.a;
+                destColor.r = (uint8_t)(a[0] / wsum + 0.5);
+                destColor.g = (uint8_t)(a[1] / wsum + 0.5);
+                destColor.b = (uint8_t)(a[2] / wsum + 0.5);
+            }
+            else {
+                destColor = srcColor;
+            }
+        }
+    }
+}
+
+template <typename T>
+static void GaussBlurV(T* dest, T* src, int w, int h, int r)
+{
+    GaussKernel& kernel = GaussKernel(r);
+
+    for (int x = 0; x < w; ++x) {
+        for (int y = 0; y < h; ++y) {
+            T& srcColor = src[y * w + x];
+            T& destColor = dest[y * w + x];
+
+            double a[3] = { 0.0, 0.0, 0.0 };
+            double wsum = 0.0;
+
+            for (int k = -r; k <= r; ++k) {
+                int sy = y + k;
+                if (sy >= 0 and sy < h) {
+                    T& c = src[sy * w + x];
+                    if (c.IsVisible()) {
+                        double wv = kernel[15 + k];
+                        a[0] += wv * (int)c.r;
+                        a[1] += wv * (int)c.g;
+                        a[2] += wv * (int)c.b;
+                        wsum += wv;
+                    }
+                }
+            }
+
+            if (wsum > 0.0 and srcColor.IsVisible()) {
+                if constexpr (std::is_same_v<T, RGBA8>) destColor.a = srcColor.a;
+                destColor.r = (uint8_t)(a[0] / wsum + 0.5);
+                destColor.g = (uint8_t)(a[1] / wsum + 0.5);
+                destColor.b = (uint8_t)(a[2] / wsum + 0.5);
+            }
+            else {
+                destColor = srcColor;
+            }
         }
     }
 }

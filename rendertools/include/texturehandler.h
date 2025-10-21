@@ -69,21 +69,21 @@ public:
         return GetTexture<Cubemap>();
     }
 
-    TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, bool premultiply = false);
+    TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, const TextureCreationParams& params);
 
-    inline TextureList CreateStandardTextures(String textureFolder, List<String>& textureNames, bool premultiply = false) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetStandardTexture(); }, premultiply);
+    inline TextureList CreateStandardTextures(String textureFolder, List<String>& textureNames, const TextureCreationParams& params) {
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetStandardTexture(); }, params);
     }
 
-    TextureList CreateTiledTextures(String textureFolder, List<String>& textureNames, bool premultiply = false) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetTiledTexture(); }, premultiply);
+    TextureList CreateTiledTextures(String textureFolder, List<String>& textureNames, const TextureCreationParams& params) {
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetTiledTexture(); }, params);
     }
 
-    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames, bool premultiply = false) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetCubemap(); }, premultiply);
+    TextureList CreateCubemaps(String textureFolder, List<String>& textureNames, const TextureCreationParams& params) {
+        return CreateTextures(textureFolder, textureNames, [&]() { return GetCubemap(); }, params);
     }
 
-    TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, bool premultiply = false);
+    TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, const TextureCreationParams& params);
 
 };
 

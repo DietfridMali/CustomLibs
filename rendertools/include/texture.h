@@ -35,6 +35,17 @@ using TextureList = List<Texture*>;
 #define USE_SHARED_POINTERS 0
 
 // =================================================================================================
+
+struct TextureCreationParams {
+    bool        premultiply{ false };
+    bool        flipVertically{ false };
+    bool        cartoonize{ false };
+    uint16_t    blur{ 4 };
+    uint16_t    gradients{ 7 };
+    uint16_t    outline{ 4 };
+};
+
+// =================================================================================================
 // texture handling classes
 
 class AbstractTexture {
@@ -57,7 +68,7 @@ public:
 
     virtual void Disable(int tmuIndex = 0) = 0;
 
-    virtual bool Load(List<String>& fileNames, bool premultiply = false, bool flipVertically = false) = 0;
+    virtual bool Load(List<String>& fileNames, const TextureCreationParams& params) = 0;
 };
 
 // =================================================================================================
@@ -185,11 +196,11 @@ public:
 
     virtual void Deploy(int bufferIndex = 0) override;
 
-    virtual bool Load(List<String>& fileNames, bool premultiply = false, bool flipVertically = false) override;
+    virtual bool Load(List<String>& fileNames, const TextureCreationParams& params) override;
 
-    bool CreateFromFile(List<String>& fileNames, bool premultiply = false, bool flipVertically = false);
+    bool CreateFromFile(List<String>& fileNames, const TextureCreationParams& params);
 
-    bool CreateFromSurface(SDL_Surface* surface, bool premultiply = false, bool flipVertically = false);
+    bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
 
     void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 15, uint16_t outlinePasses = 4);
 

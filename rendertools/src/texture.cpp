@@ -213,7 +213,6 @@ void Texture::Disable(int tmuIndex)
 }
 
 
-
 void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses) {
     for (auto& b : m_buffers)
         b->Cartoonize(blurStrength, gradients, outlinePasses);
@@ -274,7 +273,7 @@ static void CheckFileOpen(const std::string& path) {
 // Load will load the texture, and for each subsequent side with texture name "", that texture's data buffer
 // will be used. This is saving memory for smileys, where 5 sides bear the same texture, while only the front
 // face bears the face.
-bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVertically) {
+bool Texture::Load(List<String>& fileNames, const TextureCreationParams& params) {
     // load texture from file
     m_filenames = fileNames;
     m_name = fileNames.First();
@@ -307,7 +306,7 @@ bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVerticall
             }
             texBuf = new TextureBuffer();
             if (texBuf) {
-                texBuf->Create(image, premultiply, flipVertically);
+                texBuf->Create(image, params.premultiply, params.flipVertically);
                 m_buffers.Append(texBuf);
 #ifdef _DEBUG
                 texBuf->m_name = bufferName;
@@ -319,22 +318,24 @@ bool Texture::Load(List<String>& fileNames, bool premultiply, bool flipVerticall
 }
 
 
-bool Texture::CreateFromFile(List<String>& fileNames, bool premultiply, bool flipVertically) {
+bool Texture::CreateFromFile(List<String>& fileNames, const TextureCreationParams& params) {
     if (not Create())
         return false;
     if (fileNames.IsEmpty())
         return true;
-    if (not Load(fileNames, flipVertically))
+    if (not Load(fileNames, params))
         return false;
+    if (params.cartoonize)
+        Cartoonize(params.blur, params.gradients, params.outline);
     Deploy();
     return true;
 }
 
 
-bool Texture::CreateFromSurface(SDL_Surface* surface, bool premultiply, bool flipVertically) {
+bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params) {
     if (not Create())
         return false;
-    m_buffers.Append(new TextureBuffer(surface, premultiply, flipVertically));
+    m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
     return true;
 }
 
