@@ -128,6 +128,11 @@ public:
         return pos != std::string::npos ? static_cast<int>(pos) : -1;
     }
 
+    inline int Find(const char c) const noexcept {
+        auto pos = m_str.find(c);
+        return pos != std::string::npos ? static_cast<int>(pos) : -1;
+    }
+
     String Replace(const char* oldPattern, const char* newPattern = "", int repetitions = 0) const;
 
     static ManagedArray<String> Split(const String& str, char delim);
