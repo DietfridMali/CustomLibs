@@ -93,6 +93,9 @@ public:
             glDisableVertexAttribArray(m_index);
     }
 
+#ifdef _DEBUG
+    void Describe(void);
+#else
     inline void Describe(void)
         noexcept
     {
@@ -102,6 +105,7 @@ public:
         }
     }
 
+#endif
     // data: buffer with OpenGL data (float or unsigned int)
     // dataSize: buffer size in bytes
     // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)

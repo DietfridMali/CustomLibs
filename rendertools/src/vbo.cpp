@@ -141,6 +141,15 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
     return true;
     }
 
+#ifdef _DEBUG
+void VBO::Describe(void)
+{
+    if (m_index > -1) {
+        glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
+        EnableAttribs();
+    }
+}
+#endif
 
 void VBO::Destroy(void)
 noexcept

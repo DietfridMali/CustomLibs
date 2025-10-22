@@ -127,30 +127,34 @@ noexcept
 bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
 noexcept
 {
+    bool disabled = not IsActive() or not IsBound();
+    if (disabled)
+        Enable();
+
     int index;
     VBO* vbo = FindBuffer(type, id, index);
-    if (not vbo) { // otherwise index has been initialized by FindBuffer()
-        vbo = new VBO();
-        if (not vbo)
-            return false;
+    if (not vbo and (vbo = new VBO())) { // otherwise index has been initialized by FindBuffer()
         m_dataBuffers.Append(vbo);
         vbo->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
     }
-    vbo->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount);
-    return true;
+    if (vbo)
+        vbo->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount);
+
+    if (disabled)
+        Disable();
+    return vbo != nullptr;
 }
 
 
 void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
 noexcept
 {
-    bool inactive = not IsActive();
-    bool unbound = not IsBound();
-    if (inactive or unbound)
+    bool disabled = not IsActive() or not IsBound();
+    if (disabled)
         Enable();
     m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize, componentType);
-    if (inactive or unbound)
+    if (disabled)
         Disable();
 }
 

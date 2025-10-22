@@ -16,7 +16,7 @@ bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
 	GLint tex = 0;
 	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
 #endif
-#if 0
+#if 1
 	ActiveTexture(GL_TEXTURE0 + tmuIndex);
 	glBindTexture(typeID, texture);
 #else
