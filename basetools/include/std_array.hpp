@@ -12,11 +12,11 @@ template<typename DATA_T>
 class ManagedArray {
 private:
     std::vector<DATA_T> m_array;
-    int32_t m_width{ 0 };
-    int32_t m_height{ 0 };
-    bool m_autoFit{ false };
-    bool m_isShrinkable{ true };
-    DATA_T m_defaultValue;
+    int32_t             m_width{ 0 };
+    int32_t             m_height{ 0 };
+    bool                m_autoFit{ false };
+    bool                m_isShrinkable{ true };
+    DATA_T              m_defaultValue{};
 
 public:
     // Konstruktor für 1D-ManagedArray
@@ -110,7 +110,7 @@ public:
     }
 
     // 1D-Indexzugriff
-    inline DATA_T& operator[](int32_t i) {
+    inline decltype(auto) operator[](int32_t i) {
         AutoFit(i);
 #if defined(_DEBUG)
         return m_array.at(static_cast<size_t>(i));
@@ -119,7 +119,7 @@ public:
 #endif
     }
 
-    inline const DATA_T& operator[](int32_t i) const {
+    inline decltype(auto) operator[](int32_t i) const {
 #if defined(_DEBUG)
         return m_array.at(static_cast<size_t>(i));
 #else
@@ -210,12 +210,16 @@ public:
         m_array.emplace_back(std::forward<Args>(args)...);
         return &m_array.back();
     }
-
+#if 0
     // Zeiger auf Rohdaten (z.B. für OpenGL)
     inline DATA_T* Data(int32_t i = 0) noexcept { return m_array.data() + i; }
 
     inline const DATA_T* Data(int32_t i = 0) const noexcept { return m_array.data() + i; }
+#else
+    inline auto Data(int32_t i = 0) noexcept { return m_array.data() + i; }
 
+    inline auto Data(int32_t i = 0) const noexcept { return m_array.data() + i; }
+#endif
     DATA_T* DataRow(int32_t y) {
 #if defined(_DEBUG)
         if (m_width * m_height <= 0)
