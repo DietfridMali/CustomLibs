@@ -127,7 +127,7 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
     for (auto glyph : text) {
         FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
         if (info->index < 0)
-            fprintf(stderr, "texture '%c' not found\r\n", glyph);
+            fprintf(stderr, "TextRenderer: Texture for glyph '%c' not found.\r\n", glyph);
         else {
             float width = float(info->glyphSize.width) * scale;
             CreateQuad(q, x, y, width, info->texture, flipVertically);

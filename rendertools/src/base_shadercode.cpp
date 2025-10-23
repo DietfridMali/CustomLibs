@@ -52,8 +52,10 @@ void BaseShaderCode::AddShaders(ManagedArray<const ShaderSource*>& shaderSource)
         Shader* shader = new Shader(source->m_name);
         if (shader->Create(source->m_vs, source->m_fs))
             m_shaders[source->m_name] = shader;
+#ifdef _DEBUG
         else
             fprintf(stderr, "creating shader '%s' failed\n", (const char*) source->m_name);
+#endif
     }
 }
 

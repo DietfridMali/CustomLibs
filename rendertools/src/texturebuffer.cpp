@@ -133,7 +133,7 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool
         SDL_FreeSurface(h);
     }
     if (not Allocate(source->w, source->h, source->pitch / source->w))
-        fprintf(stderr, "%s (%d): memory allocation for texture clone failed\n", __FILE__, __LINE__);
+        fprintf(stderr, "%s (%d): Memory allocation for texture clone failed\n", __FILE__, __LINE__);
     else {
         if (flipVertically)
             FlipSurface(source);

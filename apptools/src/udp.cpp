@@ -6,10 +6,12 @@
 // UDP based networking
 
 bool UDPSocket::Open(const String& localAddress, uint16_t port) {
+#ifdef _DEBUG
     if (localAddress == "127.0.0.1") {
         fprintf(stderr, "UDP OpenSocket: Please specify a valid local network or internet address in the command line or ini file\n");
         return false;
     }
+#endif
     Set(localAddress, port);
     if (not (m_socket = SDLNet_UDP_Open(port)))
         return false;

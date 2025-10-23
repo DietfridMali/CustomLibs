@@ -35,7 +35,6 @@ noexcept
     m_handle = SharedGLHandle(0, glGenVertexArrays, glDeleteVertexArrays); // need to set allocate and release functions
     if (m_handle.Claim() == 0)
         return false;
-    //fprintf(stderr, "create vao: %d\n", m_handle.Data());
     return true;
 #else
     if (m_handle)

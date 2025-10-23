@@ -85,7 +85,7 @@ bool FontHandler::InitTTF(void) {
     if (not haveTTF) {
         haveTTF = (0 > TTF_Init()) ? -1 : 1;
         if (haveTTF < 0) 
-            fprintf(stderr, "Cannot initialize font system\n");
+            fprintf(stderr, "Smiley-Battle: Cannot initialize font system.\n");
     }
     return haveTTF > 0;
 }
@@ -104,7 +104,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
 
     String fontFile = fontFolder + fontName;
     if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
-        fprintf(stderr, "Cannot load font '%s'\n", (char*) fontName);
+        fprintf(stderr, "Smiley-Battle: Cannot load font '%s'.\n", (char*) fontName);
         return false;
     }
     //SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
@@ -171,7 +171,9 @@ FontHandler::TextDimensions FontHandler::TextSize(String text) {
     for (auto glyph : text) {
         GlyphInfo* info = FindGlyph(String(glyph));
         if ((info == nullptr) or (info->index < 0)) {
-            fprintf(stderr, "texture '%c' not found\r\n", glyph);
+#ifdef _DEBUG
+            fprintf(stderr, "Couldn't load texture for glyph '%c'\r\n", glyph);
+#endif
             return TextDimensions();
         }
         int tw = info->glyphSize.width;

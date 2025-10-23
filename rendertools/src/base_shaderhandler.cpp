@@ -68,17 +68,14 @@ Shader* BaseShaderHandler::SetupShader(String shaderId) {
         shader = m_activeShader;
     else {
         shader = GetShader(shaderId);
-        //Shader** shaderPtr = m_shaders.Find(shaderId); // m_shaders[shaderId];
-        if (shader == nullptr) {
-            //fprintf(stderr, "*** couldn't find shader'%s'\r\n", (char*)shaderId);
+        if (shader == nullptr)
             return nullptr;
-        }
-        //Shader* shader = *shaderPtr;
         if (shader->m_handle == 0) {
+#ifdef _DEBUG
             fprintf(stderr, "*** shader'%s' is not available\r\n", (char*)shaderId);
+#endif
             return nullptr;
         }
-        //fprintf(stderr, "loading shader '%s'\r\n", (char*) shaderId);
         m_activeShader = shader;
         m_activeShaderId = shaderId;
         shader->Enable();

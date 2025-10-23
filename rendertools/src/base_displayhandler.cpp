@@ -71,7 +71,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         m_window = nullptr;
     }
     if (not m_window) {
-        fprintf(stderr, "Couldn't set screen mode (%d x %d) (error '%s')\n", m_width, m_height, SDL_GetError());
+        fprintf(stderr, "Smiley-Battle: Couldn't set screen mode (%d x %d) (error '%s')\n", m_width, m_height, SDL_GetError());
         exit(1);
     }
     try {
@@ -81,7 +81,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         m_context = nullptr;
     }
     if (not m_context) {
-        fprintf(stderr, "Could not get OpenGL context (error '%s')\n", SDL_GetError());
+        fprintf(stderr, "Smiley-Battle: Couldn't get OpenGL context (error '%s')\n", SDL_GetError());
         exit(1);
     }
     SDL_GL_SetSwapInterval(m_vSync ? 1 : 0);

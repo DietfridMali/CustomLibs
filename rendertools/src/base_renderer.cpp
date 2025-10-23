@@ -69,7 +69,7 @@ bool BaseRenderer::Create(int width, int height, float fov) {
 bool BaseRenderer::InitOpenGL(void) noexcept {
     GLint i = glewInit();
     if (i != GLEW_OK) {
-        fprintf(stderr, "Cannot initialize OpenGL\n");
+        fprintf(stderr, "Smiley-Battle: Cannot initialize GLEW.\n");
         return false;
     }
     glGetIntegerv(GL_MAJOR_VERSION, &m_glVersion.major);
@@ -319,7 +319,7 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
 
 
 void BaseRenderer::ClearGLError(void) noexcept {
-#if 0
+#ifdef _DEBUG
     while (glGetError() != GL_NO_ERROR)
         ;
 #endif
@@ -327,15 +327,13 @@ void BaseRenderer::ClearGLError(void) noexcept {
 
 
 bool BaseRenderer::CheckGLError(const char* operation) noexcept {
-#if 0
+#ifdef NDEBUG
     return true;
 #else
     GLenum glError = glGetError();
     if (not glError)
         return true;
-#   ifdef _DEBUG
-    fprintf(stderr, "OpenGL Error %d (%s)\n", glError, operation);
-#   endif
+    fprintf(stderr, "Smiley-Battle: OpenGL Error %d (%s)\n", glError, operation);
     ClearGLError();
     return false;
 #endif

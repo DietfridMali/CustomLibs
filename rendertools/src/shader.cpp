@@ -12,6 +12,7 @@
 // Some basic shader handling: Compiling, enabling, setting shader variables
 
 void Shader::PrintLog(String infoLog, String title) {
+#ifdef _DEBUG
     // Gesamtzahl der Zeilen zählen
     const size_t lineCount = std::ranges::count(infoLog, '\n') + 1;
     const int width = static_cast<int>(std::to_string(lineCount).size());
@@ -26,6 +27,7 @@ void Shader::PrintLog(String infoLog, String title) {
         fprintf(stderr, "%3d: %.*s\n", ++lineNo, static_cast<int>(line.size()), line.data());
     }
     fprintf(stderr, "\n\n");
+#endif
 }
 
 
@@ -70,9 +72,11 @@ GLuint Shader::Compile(const char* code, GLuint type) {
     glGetShaderiv (handle, GL_COMPILE_STATUS, &isCompiled);
     if (isCompiled == GL_TRUE)
         return handle;
-    String shaderLog = GetInfoLog (handle);
-     fprintf(stderr, "\n***** compiler error in %s shader: *****\n\n", (char*)m_name);
+#ifdef _DEBUG
+    String shaderLog = GetInfoLog(handle);
+    fprintf(stderr, "\n***** GLSL compiler error in %s shader: *****\n\n", (char*)m_name);
     PrintShaderSource(handle, String("Shader source:"));
+#endif
     glDeleteShader(handle);
     return 0;
 }
@@ -94,10 +98,12 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
         glDetachShader(handle, fsHandle);
         return handle;
     }
-    String shaderLog = GetInfoLog (handle, true);
-    fprintf(stderr, "\n***** linker error in %s shader: *****\n\n", (char*)m_name);
+#ifdef _DEBUG
+    String shaderLog = GetInfoLog(handle, true);
+    fprintf(stderr, "\n***** GLSL linker error in %s shader: *****\n\n", (char*)m_name);
     PrintShaderSource(vsHandle, String("Vertex shader:"));
     PrintShaderSource(fsHandle, String("Fragment shader:"));
+#endif
     glDeleteShader(vsHandle);
     glDeleteShader(fsHandle);
     glDeleteProgram(handle);

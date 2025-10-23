@@ -7,16 +7,12 @@
 
 bool SoundObject::Play (int loops) {
     if (0 > Mix_PlayChannel(m_channel, m_sound, loops)) {
+#ifdef _DEBUG
         fprintf(stderr, "Couldn't play sound '%s' (%s)\n", m_name.Data(), Mix_GetError());
+#endif
         return false;
     }
     m_startTime = Timer::GetTime();
-#if 0
-    else if (Busy ())
-        fprintf (stderr, "playing '%s' on channel %d (%d loops)\n", m_name.Data(), m_channel, loops);
-    else
-        fprintf (stderr, "Couldn't play sound '%s' (%s)\n", m_name.Data(), Mix_GetError ());
-#endif
     return true;
 }
 
@@ -73,7 +69,9 @@ bool BaseSoundHandler::Setup(String soundFolder) {
     m_supportsOGG = Mix_Init(MIX_INIT_OGG) == MIX_INIT_OGG;
 #endif
     if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512)) {
+#ifdef _DEBUG
         fprintf(stderr, "Couldn't initialize sound system (%s)\n", Mix_GetError());
+#endif
         return false;
     }
     m_haveAudio = true;
@@ -104,7 +102,9 @@ bool BaseSoundHandler::LoadSounds(String soundFolder) {
             m_sounds.Insert(name, sound);
         else {
             isComplete = false;
+#ifdef _DEBUG
             fprintf(stderr, "Couldn't load sound '%s' (%s)\n", name.Data(), Mix_GetError());
+#endif
         }
     }
     return isComplete;
@@ -183,7 +183,6 @@ SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams&
         return nullptr;
     UpdateSound(newSound);
     SetMusicVolume(m_musicVolume);
-    //fprintf(stderr, "playing '%s' (%d)\n", soundName.Data(), soundObject->m_id);
     return &newSound;
 }
 

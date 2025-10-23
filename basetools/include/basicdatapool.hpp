@@ -92,7 +92,6 @@ public:
 #ifdef _DEBUG
 		m_freeItems[m_freeItemCount] = -1;
 #endif
-		//fprintf(stderr, "claiming data pool item #%d\n", i);
 		ITEM_T* item = m_itemPool + itemIndex;
 		if constexpr (not std::is_trivially_constructible<ITEM_T>::value) {
 			new(item) ITEM_T();

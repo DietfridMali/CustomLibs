@@ -33,7 +33,7 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
         Texture* t = getTexture();
         if (not (t and t->CreateFromFile(fileNames, params))) {
 #ifdef _DEBUG
-            fprintf(stderr, "Couldn't load texture '%s'\n", (char*)n);
+            fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)n);
 #endif
             for (auto& h : textures)
                 delete h;
