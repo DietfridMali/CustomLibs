@@ -56,7 +56,7 @@ public:
     void StopShader(bool needLegacyMatrices = false);
 
     inline bool ShaderIsActive(Shader* shader = nullptr) const noexcept {
-        return m_activeShader != shader;
+        return (shader == nullptr) ? m_activeShader != nullptr : m_activeShader == shader;
     }
 
     inline Shader* GetShader(String shaderId) {

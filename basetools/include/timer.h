@@ -151,12 +151,16 @@ public:
     }
 
 
+    inline void Sleep(int64_t t) {
+        if (t > 0)
+            hiresSleep.Sleep(t);
+    }
+
+
     void Delay(void)
         noexcept
     {
-        int64_t t = m_duration - m_slack - GetLapTime();
-        if (t > 0)
-            hiresSleep.Sleep(t);
+        Sleep(m_duration - m_slack - GetLapTime());
         m_slack = GetLapTime() - m_duration;
     }
 
@@ -261,6 +265,12 @@ public:
         noexcept
     {
         return HiresTimer::IsRemaining(Upscale(time));
+    }
+
+
+    inline void Sleep(int t) {
+        if (t > 0)
+            hiresSleep.Sleep(Upscale(t));
     }
 
 

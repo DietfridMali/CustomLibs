@@ -189,6 +189,10 @@ public:
         return m_isAvailable;
     }
 
+    inline Viewport& GetViewport(void) noexcept {
+        return m_viewport;
+    }
+
     inline bool IsEnabled(void) noexcept {
         return (m_activeHandle != GL_NONE) and (m_activeHandle == m_handle.Data());
     }
