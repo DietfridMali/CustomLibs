@@ -183,7 +183,7 @@ class BaseSoundHandler
             Mix_VolumeMusic((int(round(MIX_MAX_VOLUME * volume))));
         }
 
-        void FadeOutMusic(int duration) {
+        void FadeOutMusic(int duration = 1000) {
              Mix_FadeOutMusic(duration);
         }
 
