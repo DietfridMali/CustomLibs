@@ -9,8 +9,8 @@
 // textures at a dozen places in the game
 
 
-bool TextureHandler::DeleteTextures(const size_t& key, Texture** texture) {
-    if (texture and ((*texture)->m_id != 0)) {
+bool TextureHandler::DeleteTextures(const TextureID& key, Texture** texture) {
+    if (texture and ((*texture)->m_id.ID != 0)) {
         delete* texture;
         *texture = nullptr;
     }
@@ -24,22 +24,32 @@ void TextureHandler::Destroy(void) noexcept {
 }
 
 
+Texture* TextureHandler::FindTexture(String name) {
+    TextureID id{ -1, name };
+    Texture** t = Texture::textureLUT.Find(id);
+    return t ? *t : nullptr;
+}
+
+
 TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, const TextureCreationParams& params) {
     GetTextureFolder(textureFolder);
     TextureList textures;
     for (auto& n : textureNames) {
         List<String> fileNames; // must be local here so it gets reset every loop iteration
-        fileNames.Append(textureFolder + n);
-        Texture* t = getTexture();
-        if (not (t and t->CreateFromFile(fileNames, params))) {
+        Texture* t = FindTexture(n);
+        if (not t) {
+            fileNames.Append(textureFolder + n);
+            if (not ((t = getTexture()) and t->CreateFromFile(fileNames, params))) {
 #ifdef _DEBUG
-            fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)n);
+                fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)n);
 #endif
-            for (auto& h : textures)
-                delete h;
-            textures.Clear();
-            break;
+                for (auto& h : textures)
+                    delete h;
+                textures.Clear();
+                break;
+            }
         }
+        //t->m_id.name = n.Split('.')[0];
         textures.Append(t);
     }
     return textures;

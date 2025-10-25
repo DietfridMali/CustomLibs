@@ -162,9 +162,10 @@ SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams&
     if ((m_soundLevel == 0) or (params.level > m_soundLevel))
         return nullptr;
 #endif
+#if 0
     if (not position.IsValid())
         return nullptr;
-
+#endif
     SoundObject* activeSound = FindSoundByOwner(owner, soundName);
     if (activeSound != nullptr)
         return activeSound;

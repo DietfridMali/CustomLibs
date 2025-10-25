@@ -13,8 +13,8 @@
 
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
 
-int Texture::CompareTextures(void* context, const size_t& key1, const size_t& key2) {
-    return (key1 > key2) - (key1 < key2);
+int Texture::CompareTextures(void* context, const TextureID& key1, const TextureID& key2) {
+    return (key1.ID >= 0) ? (key1.ID > key2.ID) - (key1.ID < key2.ID) : (key1.name > key2.name) - (key1.name < key2.name);
 }
 
 
@@ -37,9 +37,10 @@ noexcept
 {
     if (m_isValid) {
 #if USE_TEXTURE_LUT
-        if (m_id and UpdateLUT()) {
+        if (m_id.ID and UpdateLUT()) {
             textureLUT.Remove(m_id);
-            m_id = 0;
+            m_id.ID = 0;
+            m_id.name = "";
         }
 #endif
         Destroy();
@@ -86,7 +87,7 @@ Texture& Texture::Copy(const Texture& other) {
     if (this != &other) {
         Destroy();
         m_handle = other.m_handle;
-        m_name = other.m_name;
+        m_id.name = other.m_id.name;
         m_buffers = other.m_buffers;
         m_filenames = other.m_filenames;
         m_type = other.m_type;
@@ -109,7 +110,8 @@ noexcept
 #if !USE_SHARED_HANDLES
         other.m_handle = 0;
 #endif
-        m_name = std::move(other.m_name);
+        m_id.ID = other.m_id.ID;
+        m_id.name = std::move(other.m_id.name);
         m_buffers = std::move(other.m_buffers);
         m_filenames = std::move(other.m_filenames);
         m_type = other.m_type;
@@ -121,10 +123,11 @@ noexcept
         textureLUT.Remove(m_id);
         textureLUT.Insert(other.m_id, this, true); // overwrite the data entry for key m_id with this texture
         m_id = other.m_id;
-        other.m_id = 0;
+        other.m_id.ID = 0;
     }
     return *this;
 }
+
 
 bool Texture::IsAvailable(void)
 {
@@ -276,7 +279,7 @@ static void CheckFileOpen(const std::string& path) {
 bool Texture::Load(List<String>& fileNames, const TextureCreationParams& params) {
     // load texture from file
     m_filenames = fileNames;
-    m_name = fileNames.First();
+    m_id.name = fileNames.First();
     TextureBuffer* texBuf = nullptr;
 #ifdef _DEBUG
     String bufferName = "";
@@ -340,7 +343,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
 }
 
 
-tRenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
+RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
 noexcept
 {
     if (renderAreaWidth == 0)
@@ -351,7 +354,7 @@ noexcept
     float yScale = float(renderAreaHeight) / float(viewportHeight);
     float wRatio = float(renderAreaWidth) / float(w);
     float hRatio = float(renderAreaHeight) / float(h);
-    tRenderOffsets offsets = { 0.5f * xScale, 0.5f * yScale };
+    RenderOffsets offsets = { 0.5f * xScale, 0.5f * yScale };
     if (wRatio > hRatio)
         offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
     else if (wRatio < hRatio)

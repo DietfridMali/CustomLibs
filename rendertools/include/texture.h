@@ -76,9 +76,15 @@ public:
 // enabling for rendering
 // Base class for higher level textures (e.g. cubemaps)
 
-typedef struct {
+struct RenderOffsets {
     float x, y;
-} tRenderOffsets;
+};
+
+
+struct TextureID {
+    int64_t     ID;
+    String      name;
+};
 
 
 class Texture 
@@ -90,8 +96,7 @@ public:
 #else
     GLuint                      m_handle;
 #endif
-    size_t                      m_id{ 0 };
-    String                      m_name{ "" };
+    TextureID                   m_id{ 0, "" };
     List<TextureBuffer*>        m_buffers;
     List<String>                m_filenames;
     GLenum                      m_type{ GL_TEXTURE_2D };
@@ -104,14 +109,14 @@ public:
 
     static SharedTextureHandle  nullHandle;
 
-    static inline AVLTree<size_t, Texture*>    textureLUT;
+    static inline AVLTree<TextureID, Texture*>  textureLUT;
 
-    static inline size_t GetID(void) noexcept {
+    static inline size_t CreateID(void) noexcept {
         static size_t textureID = 0;
         return ++textureID;
     }
 
-    static int CompareTextures(void* context, const size_t& key1, const size_t& key2);
+    static int CompareTextures(void* context, const TextureID& key1, const TextureID& key2);
 
     static void SetupLUT(void) noexcept {
         static bool needSetup = true;
@@ -133,7 +138,7 @@ public:
     ~Texture();
 
     inline void Register(void) {
-        m_id = GetID();
+        m_id.ID = CreateID();
         textureLUT.Insert(m_id, this);
     }
 
@@ -206,7 +211,7 @@ public:
 
 
     inline void SetID(uint32_t id) noexcept {
-        m_id = id;
+        m_id.ID = id;
     }
 
     inline size_t TextureCount(void)
@@ -244,11 +249,11 @@ public:
     }
 
     inline void SetName(String name) {
-        m_name = name;
+        m_id.name = name;
     }
 
     inline String GetName(void) {
-        return m_name;
+        return m_id.name;
     }
 
     template <GLenum typeID>
@@ -266,7 +271,7 @@ public:
         return m_hasBuffer;
     }
 
-    static tRenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
+    static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
         noexcept;
 };
 

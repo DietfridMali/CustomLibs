@@ -28,7 +28,7 @@ public:
 
     ~TextureHandler() noexcept { Destroy(); }
 
-    bool DeleteTextures(const size_t& key, Texture** texture);
+    bool DeleteTextures(const TextureID& key, Texture** texture);
 
     void Destroy(void) noexcept;
 
@@ -49,6 +49,9 @@ public:
             t->Register();
         return t;
     }
+
+    Texture* FindTexture(String name);
+
 
     using TextureGetter = std::function<Texture*()>;
 

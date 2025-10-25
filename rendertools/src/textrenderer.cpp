@@ -198,7 +198,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
         float outlineWidth = m_decoration.outlineWidth * 2;
         td.width += int(2 * outlineWidth + 0.5f);
         td.height += int(2 * outlineWidth + 0.5f);
-        tRenderOffsets offset =
+        RenderOffsets offset =
 #if 1
             Texture::ComputeOffsets(int(td.height * td.aspectRatio), td.height, viewport.m_width, viewport.m_height, renderAreaWidth, renderAreaHeight);
 #else
