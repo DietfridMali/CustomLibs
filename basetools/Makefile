@@ -18,7 +18,12 @@ RELEASE:
 > $(MAKE) MODE=release --no-print-directory all
 
 SRCDIR := src
-OBJDIR := obj
+
+ifeq ($(MODE),debug)
+  OBJDIR := obj/debug
+else
+  OBJDIR := obj/release
+endif
 
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
@@ -38,7 +43,11 @@ else
   LDFLAGS  :=
 endif
 
-LIB := libbasetools.a
+ifeq ($(MODE),debug)
+  LIB := libbasetoolsd.a
+else
+  LIB := libbasetools.a
+endif
 
 all: $(LIB)
 
