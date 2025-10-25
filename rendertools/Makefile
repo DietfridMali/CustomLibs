@@ -58,9 +58,6 @@ SRCDIR := src
 
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
-SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
-OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(FILES)))
-
 DEFINES := -DUSE_STD=1 -DUSE_GLM=1
 SANITIZEFLAGS := -fsanitize=address,undefined
 OPTFLAGS := -O3
@@ -77,6 +74,9 @@ else ifeq ($(TARGET),RELEASE)
 else
   $(error TARGET must be DEBUG or RELEASE)
 endif
+
+SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
+OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(FILES)))
 
 LIB := librendertools$(LIB_SUFFIX).a
 
