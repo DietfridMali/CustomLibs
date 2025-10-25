@@ -48,10 +48,13 @@ INCDIRS := ./include ../basetools/include ../../ExternalLibs/glew/include/GL /us
 # Steuerung ohne Rekursion
 TARGET ?= RELEASE
 
-DEBUG: TARGET=DEBUG
-DEBUG: all
+ifneq (,$(filter DEBUG,$(MAKECMDGOALS)))
+  TARGET := DEBUG
+else ifneq (,$(filter RELEASE,$(MAKECMDGOALS)))
+  TARGET := RELEASE
+endif
 
-RELEASE: TARGET=RELEASE
+DEBUG: all
 RELEASE: all
 
 SRCDIR := src
