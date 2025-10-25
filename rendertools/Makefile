@@ -2,6 +2,7 @@
 # CXX := g++
 CXX := clang++
 AR  := ar
+
 FILES := \
  base_displayhandler \
  base_quad \
@@ -44,60 +45,51 @@ INCDIRS := ./include ../basetools/include ../../ExternalLibs/glew/include/GL /us
 
 .PHONY: all clean DEBUG RELEASE
 
-MODE ?= release
+# Steuerung ohne Rekursion
+TARGET ?= RELEASE
 
-DEBUG:
-> $(MAKE) MODE=debug --no-print-directory all
+DEBUG: TARGET=DEBUG
+DEBUG: all
 
-RELEASE:
-> $(MAKE) MODE=release --no-print-directory all
+RELEASE: TARGET=RELEASE
+RELEASE: all
 
 SRCDIR := src
-ifeq ($(MODE),debug)
-  OBJDIR := obj/debug
-else
-  OBJDIR := obj/release
-endif
 
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
-SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(Files)))
+SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
 OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(FILES)))
 
 DEFINES := -DUSE_STD=1 -DUSE_GLM=1
 SANITIZEFLAGS := -fsanitize=address,undefined
 OPTFLAGS := -O3
 DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIONS
-LDFLAGS := 
 
-ifeq ($(MODE),debug)
+ifeq ($(TARGET),DEBUG)
   CXXFLAGS := -std=c++20 $(DBGFLAGS) $(DEFINES) -D_DEBUG $(INCLUDES) -MMD -MP
-  LDFLAGS  := $(SANITIZEFLAGS)
-else
+  OBJDIR := obj/debug
+  LIB_SUFFIX := d
+else ifeq ($(TARGET),RELEASE)
   CXXFLAGS := -std=c++20 $(OPTFLAGS) $(DEFINES) -DNDEBUG $(INCLUDES) -MMD -MP
-  LDFLAGS  :=
+  OBJDIR := obj/release
+  LIB_SUFFIX :=
+else
+  $(error TARGET must be DEBUG or RELEASE)
 endif
 
-ifeq ($(MODE),debug)
-  LIB := librendertoolsd.a
-else
-  LIB := librendertools.a
-endif
+LIB := librendertools$(LIB_SUFFIX).a
 
 all: $(LIB)
 
 $(LIB): $(OBJECTS)
-> $(AR) rcs $@ $^
+>$(AR) rcs $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
-> @mkdir -p $(OBJDIR)
-> $(CXX) $(CXXFLAGS) -c $< -o $@
-
-rendertools.lib: $(LIB)
-> cp $(LIB) $@
+>@mkdir -p $(OBJDIR)
+>$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-> rm -rf $(OBJDIR) $(LIB) librendertools.a
+>rm -rf $(OBJDIR) $(LIB)
 
 -include $(OBJECTS:.o=.d)
-

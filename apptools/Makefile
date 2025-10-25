@@ -17,24 +17,20 @@ INCDIRS := ./include ../basetools/include ../rendertools/include ../../ExternalL
 
 .PHONY: all clean DEBUG RELEASE
 
-MODE ?= release
+# Steuerung ohne Rekursion
+TARGET ?= RELEASE
 
-DEBUG:
-> $(MAKE) MODE=debug --no-print-directory all
+DEBUG: TARGET=DEBUG
+DEBUG: all
 
-RELEASE:
-> $(MAKE) MODE=release --no-print-directory all
+RELEASE: TARGET=RELEASE
+RELEASE: all
 
 SRCDIR := src
-ifeq ($(MODE),debug)
-  OBJDIR := obj/debug
-else
-  OBJDIR := obj/release
-endif
 
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
-SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(Files)))
+SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
 OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(FILES)))
 
 DEFINES := -DUSE_STD=1 -DUSE_GLM=1 -DCOMPILE_STRING -DCOMPILE_MATRIX
@@ -42,34 +38,30 @@ SANITIZEFLAGS := -fsanitize=address,undefined
 OPTFLAGS := -O3
 DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIONS
 
-ifeq ($(MODE),debug)
+ifeq ($(TARGET),DEBUG)
   CXXFLAGS := -std=c++20 $(DBGFLAGS) $(DEFINES) -D_DEBUG $(INCLUDES) -MMD -MP
-  LDFLAGS  := $(SANITIZEFLAGS)
-else
+  OBJDIR := obj/debug
+  LIB_SUFFIX := d
+else ifeq ($(TARGET),RELEASE)
   CXXFLAGS := -std=c++20 $(OPTFLAGS) $(DEFINES) -DNDEBUG $(INCLUDES) -MMD -MP
-  LDFLAGS  :=
-endif
-
-ifeq ($(MODE),debug)
-  LIB := libapptoolsd.a
+  OBJDIR := obj/release
+  LIB_SUFFIX :=
 else
-  LIB := libapptools.a
+  $(error TARGET must be DEBUG or RELEASE)
 endif
 
+LIB := libapptools$(LIB_SUFFIX).a
 
 all: $(LIB)
 
 $(LIB): $(OBJECTS)
-> $(AR) rcs $@ $^
+>$(AR) rcs $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
-> @mkdir -p $(OBJDIR)
-> $(CXX) $(CXXFLAGS) -c $< -o $@
-
-rendertools.lib: $(LIB)
-> cp $(LIB) $@
+>@mkdir -p $(OBJDIR)
+>$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-> rm -rf $(OBJDIR) $(LIB) libapptools.a
+>rm -rf $(OBJDIR) $(LIB)
 
 -include $(OBJECTS:.o=.d)
