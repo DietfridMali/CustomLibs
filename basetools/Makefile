@@ -18,9 +18,6 @@ else ifneq (,$(filter RELEASE,$(MAKECMDGOALS)))
   TARGET := RELEASE
 endif
 
-DEBUG: all
-RELEASE: all
-
 SRCDIR := src
 
 INCLUDES := $(addprefix -I,$(INCDIRS))
@@ -46,6 +43,9 @@ SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
 OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(FILES)))
 
 LIB := libbasetools$(LIB_SUFFIX).a
+
+DEBUG: all
+RELEASE: all
 
 all: $(LIB)
 
