@@ -62,29 +62,32 @@ bool NetworkMessage::IsValid(int valueCount) {
 }
 
 
+/*
+return i-th parameter value as ip address:port pair
 
-NetworkEndpoint& NetworkMessage::ToIpAddress(int i, NetworkEndpoint& address) {
-    /*
-    return i-th parameter value as ip address:port pair
-
-    Parameters:
-    -----------
-        i: Index of the requested parameter
-    */
+Parameters:
+-----------
+    i: Index of the requested parameter
+*/
+bool NetworkMessage::ToIpAddress(String caller, String valueName, int valueIndex, NetworkEndpoint& address) {
+    if (not IsValidIndex(valueIndex))
+        return false;
     try {
         ManagedArray<String> ipParts = m_values[i].Split(':');
-        if (ipParts.Length() < 2)
-            address.Set("127.0.0.1", 1);
-        else {
-            address.SocketAddress().host = uint32_t(ipParts[0]);
-            address.SocketAddress().port = uint16_t(ipParts[1]);
-            address.UpdateFromSocketAddress();
-        }
+        if (ipParts.Length() != 2)
+            return false;
+        address.SocketAddress().host = StringToNumber<uint32_t>(caller, valueName, ipParts[0]);
+        if (m_valueError)
+            return false;
+        address.SocketAddress().port = StringToNumber<uint16_t>(caller, valueName, ipParts[1]);
+        if (m_valueError)
+            return false;
+        address.UpdateFromSocketAddress();
+        return true;
     }
     catch (...) {
-        address.Set("127.0.0.1", 1);
     }
-    return address;
+    return InvalidDataError(caller, valueName, m_values[i]);
 }
 
 // =================================================================================================

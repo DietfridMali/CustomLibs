@@ -41,12 +41,14 @@ class NetworkMessage {
         int                     m_numValues;
         int                     m_result;
         bool                    m_isBroadcast; // used for sending this message as a broadcast in a LAN
+        bool                    m_valueError;
         ManagedArray<String>    m_values;
 
         NetworkMessage() 
             : m_numValues (0)
             , m_address ("", 0)
             , m_isBroadcast(false)
+            , m_valueError(false)
             , m_result (0) 
         { }
 
@@ -133,8 +135,15 @@ class NetworkMessage {
         }
 
 
+        inline bool InvalidDataError(String caller, String valueName, String value) {
+            m_valueError = true;
+            sprintf(stderr, "%s (%s): value '%s' out of range\n", caller, valueName, value);
+            return false;
+        }
 
-        inline int ToInt(int i) {
+
+        typename <template T>
+        inline bool StringToNumber(T& v, String caller, String valueName, String value, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
             /*
             return i-th parameter value as int
 
@@ -142,89 +151,95 @@ class NetworkMessage {
             -----------
                 i: Index of the requested parameter
             */
+            m_valueError = false;
             try {
-                return int(m_values[i]);
+                v = static_cast<T>(value);
             }
             catch (...) {
-                return 0;
+                return InvalidDataError(caller, valueName, value);
             }
+            T i = std::clamp<T>(v, minVal, maxVal);
+            return (v == i) ? true : InvalidDataError(caller, valueName, value);
         }
 
-
-        inline int ToUInt16(int i) {
-            /*
-            return i-th parameter value as int
-
-            Parameters:
-            -----------
-                i: Index of the requested parameter
-            */
-            try {
-                return uint16_t(m_values[i]);
-            }
-            catch (...) {
-                return 0;
-            }
+        inline bool IsValidIndex(int valueIndex) {
+            if (valueIndex < m_values.Length())
+                return true;
+            m_valueError = true;
+            sprintf(stderr, "%s (%s): invalid field index '%d'\n", caller, valueName, valueIndex);
+            return false;
         }
 
-
-        inline int ToUInt32(int i) {
-            /*
-            return i-th parameter value as int
-
-            Parameters:
-            -----------
-                i: Index of the requested parameter
-            */
-            try {
-                return uint32_t(m_values[i]);
-            }
-            catch (...) {
-                return 0;
-            }
+        typename <template T>
+        inline bool FieldToNumber(T& v, String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
+            return IsValidIndex(valueIndex) ? StringToNumber<T>(v, caller, valueName, m_values[valueIndex], minVal, maxVal) : minVal;
         }
 
-
-        inline float ToFloat(int i) {
-            /*
-            return i-th parameter value as float
-
-            Parameters:
-            -----------
-                i: Index of the requested parameter
-            */
-            try {
-                return float(m_values[i]);
-            }
-            catch (...) {
-                return 0;
-            }
+        inline bool ToInt(int& v, String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<int>::lowest(), T maxVal = std::numeric_limits<int>::max()) {
+            return FieldToNumber<int>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
+        inline bool ToUInt16(uint16_t& v, String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), int uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
+            return FieldToNumber<uint16_t>(v, caller, valueName, valueIndex, minVal, maxVal);
+        }
 
+        inline bool ToUInt32(uint32_t& v, String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), int uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
+            return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal);
+        }
+
+        inline bool ToFloat(float& v, String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), int float maxVal = std::numeric_limits<float>::max()) {
+            return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal);
+        }
+
+        inline int ToInt(String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<int>::lowest(), T maxVal = std::numeric_limits<int>::max()) {
+            int v;
+            return FieldToNumber<int>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
+        }
+
+        inline uint16_t ToUInt16(uint16_t& v, String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), int uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
+            uint16_t v;
+            return FieldToNumber<uint16_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
+        }
+
+        inline uint32_t ToUInt32(uint32_t& v, String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), int uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
+            uint32_t v;
+            return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
+        }
+
+        inline float ToFloat(String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), int float maxVal = std::numeric_limits<float>::max()) {
+            float v;
+            return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
+        }
+
+        /*
+        return i-th parameter value as 3D float vector
+
+        Parameters:
+        -----------
+            i: Index of the requested parameter
+        */
         // format: <x>,<y>,<z> (3 x float)
-        inline Vector3f ToVector3f(int i) {
-            /*
-            return i-th parameter value as 3D float vector
-
-            Parameters:
-            -----------
-                i: Index of the requested parameter
-            */
+        inline bool ToVector3f(Vector3f& v, String caller, String valueName, int valueIndex) {
+            v = Vector3f::ZERO;
+            if (not IsValidIndex(valueIndex))
+                return false;
             try {
                 ManagedArray<String> coords = m_values[i].Split(',');
-                return Vector3f{ float(coords[0]), float(coords[1]), float(coords[2]) };
+                if (coords.Length() == 3)
+                    return Vector3f{ StringToNumber(caller, valueName, coords[0]), StringToNumber(caller, valueName, coords[1]), StringToNumber(caller, valueName, coords[2]) };
+                return false;
             }
             catch (...) {
-                return Vector3f::ZERO;
             }
+            InvalidDataMessage(caller, valueName, m_values[i]);
+            return return false;
         }
 
 
 
         // format: <ip v4 address>":"<port>
         // <ip address> = "//.//.//.//" (// = one to three digit subnet id)
-        NetworkEndpoint& ToIpAddress(int i, NetworkEndpoint& address);
+        bool ToNetworkEndpoint(String caller, String valueName, int valueIndex, NetworkEndpoint& address);
 };
 
 // =================================================================================================
