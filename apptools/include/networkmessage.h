@@ -178,7 +178,7 @@ class NetworkMessage {
 
         template <typename T>
         inline bool FieldToNumber(T& v, String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
-            return IsValidIndex(caller, valueName, valueIndex) ? StringToNumber<T>(v, caller, valueName, m_values[valueIndex], minVal, maxVal) : minVal;
+            return IsValidIndex(caller, valueName, valueIndex) ? StringToNumber<T>(v, caller, valueName, m_values[valueIndex], minVal, maxVal) : false;
         }
 
         inline bool ToInt(int& v, String caller, String valueName, int valueIndex, int minVal = std::numeric_limits<int>::lowest(), int maxVal = std::numeric_limits<int>::max()) {
