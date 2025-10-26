@@ -185,12 +185,12 @@ class NetworkMessage {
             return FieldToNumber<int>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
-        inline bool ToUInt16(uint16_t& v, String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
-            return FieldToNumber<uint16_t>(v, caller, valueName, valueIndex, minVal, maxVal);
-        }
-
         inline bool ToUInt8(uint8_t& v, String caller, String valueName, int valueIndex, uint8_t minVal = std::numeric_limits<uint8_t>::lowest(), uint8_t maxVal = std::numeric_limits<uint8_t>::max()) {
             return FieldToNumber<uint8_t>(v, caller, valueName, valueIndex, minVal, maxVal);
+        }
+
+        inline bool ToUInt16(uint16_t& v, String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
+            return FieldToNumber<uint16_t>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
         inline bool ToUInt32(uint32_t& v, String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
