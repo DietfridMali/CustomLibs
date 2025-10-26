@@ -234,20 +234,7 @@ class NetworkMessage {
             i: Index of the requested parameter
         */
         // format: <x>,<y>,<z> (3 x float)
-        inline bool ToVector3f(Vector3f& v, String caller, String valueName, int valueIndex) {
-            v = Vector3f::ZERO;
-            if (not IsValidIndex(caller, valueName, valueIndex))
-                return false;
-            try {
-                ManagedArray<String> coords = m_values[valueIndex].Split(',');
-                if (coords.Length() == 3)
-                    return Vector3f{ StringToNumber<float>(caller, valueName, coords[0]), StringToNumber<float>(caller, valueName, coords[1]), StringToNumber<float>(caller, valueName, coords[2]) };
-                return false;
-            }
-            catch (...) {
-            }
-            return InvalidDataError(caller, valueName, m_values[valueIndex]);
-        }
+        bool ToVector3f(Vector3f& v, String caller, String valueName, int valueIndex) noexcept;
 
 
         // format: <ip v4 address>":"<port>
