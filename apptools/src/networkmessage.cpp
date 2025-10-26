@@ -91,7 +91,7 @@ bool NetworkMessage::ToNetworkEndpoint(String caller, String valueName, int valu
 }
 
 
-inline bool NetworkMessage::ToVector3f(Vector3f& v, String caller, String valueName, int valueIndex) noexcept {
+bool NetworkMessage::ToVector3f(Vector3f& v, String caller, String valueName, int valueIndex) noexcept {
     v = Vector3f::ZERO;
     if (not IsValidIndex(caller, valueName, valueIndex))
         return false;
