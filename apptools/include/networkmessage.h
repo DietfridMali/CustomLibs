@@ -135,14 +135,14 @@ class NetworkMessage {
         }
 
 
-        inline bool InvalidDataError(String caller, String valueName, String value) {
+        inline bool InvalidDataError(const String caller, const String valueName, const String value) {
             m_valueError = true;
-            sprintf(stderr, "%s (%s): value '%s' out of range\n", caller, valueName, value);
+            fprintf(stderr, "%s (%s): value '%s' out of range\n", (const char*) caller, (const char*) valueName, (const char*)value);
             return false;
         }
 
 
-        typename <template T>
+        template <typename T>
         inline bool StringToNumber(T& v, String caller, String valueName, String value, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
             /*
             return i-th parameter value as int
@@ -162,53 +162,59 @@ class NetworkMessage {
             return (v == i) ? true : InvalidDataError(caller, valueName, value);
         }
 
-        inline bool IsValidIndex(int valueIndex) {
+        inline bool IsValidIndex(const String& caller, const String& valueName, int valueIndex) {
             if (valueIndex < m_values.Length())
                 return true;
             m_valueError = true;
-            sprintf(stderr, "%s (%s): invalid field index '%d'\n", caller, valueName, valueIndex);
+            fprintf(stderr, "%s (%s): invalid field index '%d'\n", (const char*)caller, (const char*)valueName, valueIndex);
             return false;
         }
 
-        typename <template T>
-        inline bool FieldToNumber(T& v, String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
-            return IsValidIndex(valueIndex) ? StringToNumber<T>(v, caller, valueName, m_values[valueIndex], minVal, maxVal) : minVal;
+        template <typename T>
+        inline T StringToNumber(String caller, String valueName, String value, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
+            T v;
+            return StringToNumber(v, caller, valueName, value, minVal, maxVal) ? v : minVal;
         }
 
-        inline bool ToInt(int& v, String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<int>::lowest(), T maxVal = std::numeric_limits<int>::max()) {
+        template <typename T>
+        inline bool FieldToNumber(T& v, String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
+            return IsValidIndex(caller, valueName, valueIndex) ? StringToNumber<T>(v, caller, valueName, m_values[valueIndex], minVal, maxVal) : minVal;
+        }
+
+        inline bool ToInt(int& v, String caller, String valueName, int valueIndex, int minVal = std::numeric_limits<int>::lowest(), int maxVal = std::numeric_limits<int>::max()) {
             return FieldToNumber<int>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
-        inline bool ToUInt16(uint16_t& v, String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), int uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
+        inline bool ToUInt16(uint16_t& v, String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
             return FieldToNumber<uint16_t>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
-        inline bool ToUInt32(uint32_t& v, String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), int uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
+        inline bool ToUInt32(uint32_t& v, String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
             return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
-        inline bool ToFloat(float& v, String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), int float maxVal = std::numeric_limits<float>::max()) {
-            return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal);
+        inline bool ToFloat(float& v, String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), float maxVal = std::numeric_limits<float>::max()) {
+            return FieldToNumber<float>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
-        inline int ToInt(String caller, String valueName, int valueIndex, T minVal = std::numeric_limits<int>::lowest(), T maxVal = std::numeric_limits<int>::max()) {
+        inline int ToInt(String caller, String valueName, int valueIndex, int minVal = std::numeric_limits<int>::lowest(), int maxVal = std::numeric_limits<int>::max()) {
             int v;
             return FieldToNumber<int>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
-        inline uint16_t ToUInt16(uint16_t& v, String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), int uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
+        inline uint16_t ToUInt16(String caller, String valueName, int valueIndex, uint16_t minVal = std::numeric_limits<uint16_t>::lowest(), uint16_t maxVal = std::numeric_limits<uint16_t>::max()) {
             uint16_t v;
             return FieldToNumber<uint16_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
-        inline uint32_t ToUInt32(uint32_t& v, String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), int uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
+        inline uint32_t ToUInt32(String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
             uint32_t v;
             return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
-        inline float ToFloat(String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), int float maxVal = std::numeric_limits<float>::max()) {
+        inline float ToFloat(String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), float maxVal = std::numeric_limits<float>::max()) {
             float v;
-            return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
+            return FieldToNumber<float>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
         /*
@@ -221,18 +227,17 @@ class NetworkMessage {
         // format: <x>,<y>,<z> (3 x float)
         inline bool ToVector3f(Vector3f& v, String caller, String valueName, int valueIndex) {
             v = Vector3f::ZERO;
-            if (not IsValidIndex(valueIndex))
+            if (not IsValidIndex(caller, valueName, valueIndex))
                 return false;
             try {
-                ManagedArray<String> coords = m_values[i].Split(',');
+                ManagedArray<String> coords = m_values[valueIndex].Split(',');
                 if (coords.Length() == 3)
-                    return Vector3f{ StringToNumber(caller, valueName, coords[0]), StringToNumber(caller, valueName, coords[1]), StringToNumber(caller, valueName, coords[2]) };
+                    return Vector3f{ StringToNumber<float>(caller, valueName, coords[0]), StringToNumber<float>(caller, valueName, coords[1]), StringToNumber<float>(caller, valueName, coords[2]) };
                 return false;
             }
             catch (...) {
             }
-            InvalidDataMessage(caller, valueName, m_values[i]);
-            return return false;
+            return InvalidDataError(caller, valueName, m_values[valueIndex]);
         }
 
 

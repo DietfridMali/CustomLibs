@@ -69,11 +69,11 @@ Parameters:
 -----------
     i: Index of the requested parameter
 */
-bool NetworkMessage::ToIpAddress(String caller, String valueName, int valueIndex, NetworkEndpoint& address) {
-    if (not IsValidIndex(valueIndex))
+bool NetworkMessage::ToNetworkEndpoint(String caller, String valueName, int valueIndex, NetworkEndpoint& address) {
+    if (not IsValidIndex(caller, valueName, valueIndex))
         return false;
     try {
-        ManagedArray<String> ipParts = m_values[i].Split(':');
+        ManagedArray<String> ipParts = m_values[valueIndex].Split(':');
         if (ipParts.Length() != 2)
             return false;
         address.SocketAddress().host = StringToNumber<uint32_t>(caller, valueName, ipParts[0]);
@@ -87,7 +87,7 @@ bool NetworkMessage::ToIpAddress(String caller, String valueName, int valueIndex
     }
     catch (...) {
     }
-    return InvalidDataError(caller, valueName, m_values[i]);
+    return InvalidDataError(caller, valueName, m_values[valueIndex]);
 }
 
 // =================================================================================================
