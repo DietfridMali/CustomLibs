@@ -32,6 +32,8 @@ public:
 
     explicit String(int n) : m_str(std::to_string(n)) {}
 
+    explicit String(uint8_t n) : m_str(std::to_string(n)) {}
+
     explicit String(uint16_t n) : m_str(std::to_string(n)) {}
 
     explicit String(uint32_t n) : m_str(std::to_string(n)) {}
@@ -81,6 +83,7 @@ public:
     operator char* () noexcept;
     explicit operator int() const;
     explicit operator size_t() const;
+    explicit operator uint8_t() const;
     explicit operator uint16_t() const;
     explicit operator uint32_t() const;
     explicit operator float() const;
@@ -290,6 +293,15 @@ inline String::operator int() const {
 
 inline String::operator size_t() const {
     return IsEmpty() ? 0 : static_cast<size_t>(std::stoll(m_str));
+}
+
+inline String::operator uint8_t() const {
+    if (IsEmpty())
+        return 0;
+    auto val = static_cast<size_t>(*this);
+    if (val > std::numeric_limits<uint8_t>::max())
+        throw std::out_of_range("value too large for uint16_t");
+    return static_cast<uint8_t>(val);
 }
 
 inline String::operator uint16_t() const {
