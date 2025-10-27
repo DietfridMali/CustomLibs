@@ -10,6 +10,43 @@
 
 // =================================================================================================
 
+bool BaseDisplayHandler::Init(void) {
+    if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
+        return false;
+    return GetDisplayModes() > 0;
+}
+
+
+int BaseDisplayHandler::GetDisplayModes(void) {
+    int n = SDL_GetNumDisplayModes(0);
+    ManagedArray<SDL_DisplayMode> m(n);
+    for (int i = 0; i < n; ++n)
+        SDL_GetDisplayMode(0, i, &m[i]);
+
+    std::sort(m_displayModes.begin(), m_displayModes.end(),
+        [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
+            int64_t areaA = int64_t(a.w) * int64_t(a.h);
+            int64_t areaB = int64_t(b.w) * int64_t(b.h);
+            if (areaA != areaB)
+                return areaA > areaB;
+            if (a.w != b.w)
+                return a.w > b.w;
+            if (a.refresh_rate != b.refresh_rate)
+                return a.refresh_rate > b.refresh_rate;
+            return a.format > b.format;
+        });
+
+    int64_t ai = 0, aj = 0;
+    for (int i = 0; i < n; ++i) {
+        aj = ai;
+        ai = int64_t(m[i].h) * int64_t(m[i].w);
+        if (ai != aj)
+            m_displayModes.Append(m[i]);
+    }
+    return m_displayModes.Length();
+}
+
+
 void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool fullscreen, bool vSync) {
     SDL_Rect rect;
     SDL_GetDisplayBounds(0, &rect);

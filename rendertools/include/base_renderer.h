@@ -57,13 +57,6 @@ protected:
     int                     m_sceneHeight;
     float                   m_aspectRatio;
 
-    ManagedArray<SDL_DisplayMode>   m_displayModes;
-    int                             m_activeDisplayMode { 0 };
-#ifdef _DEBUG
-    bool                            m_fullScreen{ false };
-#else
-    bool                            m_fullScreen{ true };
-#endif
     RGBAColor               m_backgroundColor;
 
     RenderPasses            m_renderPass;
@@ -201,22 +194,6 @@ public:
 
     inline MovingFrameCounter& FrameCounter(void) noexcept {
         return m_frameCounter;
-    }
-
-    inline const ManagedArray<SDL_DisplaMode>& DisplayModes(void) const noexcept {
-        return m_displayModes;
-    }
-
-    inline const SDL_DisplayMode& ActiveDisplayMode(void) const noexcept {
-        return m_displayModes[m_activeDisplayModes];
-    }
-
-    inline bool IsFullScreen(void) noexcept {
-        return m_fullScreen;
-    }
-
-    inline bool ToggleFullScreen(void) noexcept {
-        return m_fullScreen = not m_fullScreen;
     }
 
     template <typename T>

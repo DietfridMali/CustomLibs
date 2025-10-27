@@ -38,15 +38,6 @@ public:
         , m_flipVertically(false)
     { }
 
-    Viewport(Vector2r center, int width = 0, int height = 0)
-        : Rectangle(int(round(center.x)) - width / 2, int(round(center.y)) - height / 2, width, height)
-        , m_windowWidth(0)
-        , m_windowHeight(0)
-        , m_center(center)
-        , m_flipVertically(false)
-    {
-    }
-
     Viewport(Rectangle& r)
         : Rectangle (r.m_left, r.m_top, r.m_width, r.m_height) 
         , m_windowWidth(0)
@@ -81,6 +72,10 @@ public:
 
     inline Vector2f Center(void) const noexcept {
         return m_center;
+    }
+
+    inline Vector2i Centeri(void) const noexcept {
+        return Vector2i(int(round(m_center.X())), int(round(m_center.Y())));
     }
 
     inline Matrix4f& Transformation(void) noexcept { return m_transformation; }

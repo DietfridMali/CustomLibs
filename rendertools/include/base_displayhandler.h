@@ -6,6 +6,7 @@
 #include <functional>
 #include "string.hpp"
 #include "basesingleton.hpp"
+#include "sdlhandler.h"
 
 // =================================================================================================
 // basic renderer class. Initializes display and OpenGL and sets up projections and view matrix
@@ -25,6 +26,14 @@ public:
     SDL_Window*     m_window;
     SDL_GLContext   m_context;
 
+    ManagedArray<SDL_DisplayMode>   m_displayModes;
+    int                             m_activeDisplayMode{ 0 };
+#ifdef _DEBUG
+    bool                            m_fullScreen{ false };
+#else
+    bool                            m_fullScreen{ true };
+#endif
+
     BaseDisplayHandler()
         : m_width(0)
         , m_height(0)
@@ -41,6 +50,10 @@ public:
     }
 
     virtual ~BaseDisplayHandler();
+
+    bool Init(void);
+
+    int GetDisplayModes(void);
 
     void Create (String windowTitle = "", int width = 1920, int height = 1080, bool fullscreen = true, bool vSync = false);
 
@@ -73,6 +86,33 @@ public:
         return m_context;
     }
 
+    inline const ManagedArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
+        return m_displayModes;
+    }
+
+    inline const SDL_DisplayMode& GetDisplayMode(int i) const noexcept {
+        return m_displayModes[((i < 0) or (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
+    }
+
+    inline int SelectedDisplayMode(void) noexcept {
+        return m_activeDisplayMode;
+    }
+
+    inline void SelectDisplayMode(int displayMode) noexcept {
+        m_activeDisplayMode = displayMode;
+    }
+
+    inline bool IsFullScreen(void) noexcept {
+        return m_fullScreen;
+    }
+
+    inline bool ToggleFullScreen(void) noexcept {
+        return m_fullScreen = not m_fullScreen;
+    }
+
+    inline void SetFullScreen(bool fullScreen) noexcept {
+        m_fullScreen = fullScreen;
+    }
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()

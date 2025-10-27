@@ -127,6 +127,7 @@
     <ClInclude Include="..\include\rectangle.h" />
     <ClInclude Include="..\include\base_renderer.h" />
     <ClInclude Include="..\include\rendermatrices.h" />
+    <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
     <ClInclude Include="..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
