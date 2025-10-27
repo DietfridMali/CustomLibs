@@ -20,6 +20,7 @@ bool NetworkMessage::IsValid(int valueCount) {
             == 0: don't check parameter count
     */
     try {
+        m_values.Clear();
         m_values = m_payload.Split('#');
         String keyword = m_values[0];
         if (m_values.Length() < 2)
