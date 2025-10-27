@@ -57,6 +57,9 @@ protected:
     int                     m_sceneHeight;
     float                   m_aspectRatio;
 
+    ManagedArray<SDL_DisplayMode>   m_displayModes;
+    int                             m_currentDisplayMode{ 0 };
+
     RGBAColor               m_backgroundColor;
 
     RenderPasses            m_renderPass;
@@ -194,6 +197,10 @@ public:
 
     inline MovingFrameCounter& FrameCounter(void) noexcept {
         return m_frameCounter;
+    }
+
+    inline const ManagedArray<SDL_DisplaMode>& DisplayModes(void) const noexcept {
+        return m_displayModes;
     }
 
     template <typename T>
