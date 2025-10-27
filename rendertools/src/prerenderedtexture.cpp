@@ -13,8 +13,11 @@
 
 bool PrerenderedItem::Create(int bufferCount) {
     if (m_fbo.IsAvailable() and (m_bufferCount == bufferCount)) {
-        m_fbo.SetLastDestination(0);
-        return false;
+        if (m_fbo.GetViewport() == m_viewport) {
+            m_fbo.SetLastDestination(0);
+            return false;
+        }
+        m_fbo.Destroy();
     }
     m_bufferCount = bufferCount;
     m_fbo.Create(m_viewport.m_width, m_viewport.m_height, 2, { .colorBufferCount = bufferCount } );

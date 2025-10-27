@@ -115,6 +115,14 @@ public:
     inline void SetFullScreen(bool fullScreen) noexcept {
         m_fullScreen = fullScreen;
     }
+
+
+    inline bool DisplayModeHasChanged(int& lastDisplayMode) noexcept {
+        if (lastDisplayMode == m_activeDisplayMode)
+            return false;
+        lastDisplayMode = m_activeDisplayMode;
+        return true;
+    }
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()
