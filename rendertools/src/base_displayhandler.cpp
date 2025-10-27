@@ -20,7 +20,7 @@ bool BaseDisplayHandler::Init(void) {
 int BaseDisplayHandler::GetDisplayModes(void) {
     int n = SDL_GetNumDisplayModes(0);
     ManagedArray<SDL_DisplayMode> m(n);
-    for (int i = 0; i < n; ++n)
+    for (int i = 0; i < n; ++i)
         SDL_GetDisplayMode(0, i, &m[i]);
 
     std::sort(m_displayModes.begin(), m_displayModes.end(),
