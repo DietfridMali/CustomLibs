@@ -132,19 +132,26 @@ void BaseDisplayHandler::Update(void) {
 bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
     if ((displayMode < 0) and (displayMode >= m_displayModes.Length()))
         return false;
-    if (m_fullScreen != fullscreen) {
-        m_fullScreen = fullscreen;
-        SDL_SetWindowFullscreen(m_window, m_fullScreen ? SDL_WINDOW_FULLSCREEN : 0);
-    }
     if (m_activeDisplayMode != displayMode) {
         m_activeDisplayMode = displayMode;
+        m_fullScreen = fullscreen;
         SDL_DisplayMode mode = GetDisplayMode();
-        if (m_fullScreen)
+        if (m_fullScreen) {
             SDL_SetWindowDisplayMode(m_window, &mode);
-        else
+            SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
+        }
+        else {
+            SDL_SetWindowFullscreen(m_window, 0);
             SDL_SetWindowSize(m_window, mode.w, mode.h);
+            SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        }
         m_width = mode.w;
         m_height = mode.h;
+        m_aspectRatio = float(m_width) / float(m_height);
+    }
+    else if (m_fullScreen != fullscreen) {
+        m_fullScreen = fullscreen;
+        SDL_SetWindowFullscreen(m_window, m_fullScreen ? SDL_WINDOW_FULLSCREEN : 0);
     }
     return true;
 }
