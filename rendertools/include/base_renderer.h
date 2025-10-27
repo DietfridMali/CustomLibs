@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 
 #include <utility>
 
@@ -64,6 +63,7 @@ protected:
     MovingFrameCounter      m_frameCounter;
 
     static List<::Viewport> viewportStack;
+
 public:
     GLVersion               m_glVersion;
 
@@ -212,11 +212,7 @@ public:
     inline void ResetClearColor(void) noexcept {
         glClearColor(0, 0, 0, 0);
     }
-#if 0
-    typedef struct {
-        int width, height;
-    } tViewport;
-#endif
+
     inline BaseQuad& RenderQuad(void)  noexcept { return m_renderQuad; }
 
     inline ::Viewport& GetViewport(void)  noexcept { return m_viewport; }
