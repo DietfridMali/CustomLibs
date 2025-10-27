@@ -90,7 +90,7 @@ public:
         return m_displayModes;
     }
 
-    inline const SDL_DisplayMode& GetDisplayMode(int i) const noexcept {
+    inline const SDL_DisplayMode& GetDisplayMode(int i = -1) const noexcept {
         return m_displayModes[((i < 0) or (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
     }
 
