@@ -129,6 +129,21 @@ void BaseDisplayHandler::Update(void) {
 }
 
 
+bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
+    if ((displayMode < 0) and (displayMode >= m_displayModes.Length()))
+        return false;
+    if (m_activeDisplayMode != displayMode) {
+        m_activeDisplayMode = displayMode;
+        SDL_SetWindowDisplayMode(0, &GetDisplayMode());
+    }
+    if (m_fullScreen != fullscreen) {
+        m_fullScreen = fullscreen;
+        SDL_SetWindowFullscreen(0, m_fullScreen ? SDL_WINDOW_FULLSCREEN : 0);
+    }
+    return true;
+}
+
+
 BaseDisplayHandler* baseDisplayHandlerInstance = nullptr;
 
 // =================================================================================================

@@ -29,6 +29,7 @@ void BaseRenderer::Init(int width, int height, float fov) {
     m_windowHeight = height; // (height > width) ? width : height;
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
     m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
+    m_fov = fov;
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight); // just for code clarity
     SetupDrawBuffers();
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov);
@@ -48,6 +49,8 @@ void BaseRenderer::Init(int width, int height, float fov) {
 
 
 bool BaseRenderer::CreateScreenBuffer(void) {
+    if (m_screenBuffer)
+        delete m_screenBuffer;
     if (not (m_screenBuffer = new FBO()))
         return false;
     m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 }); // FBO for entire screen incl. 2D elements (e.g. UI)

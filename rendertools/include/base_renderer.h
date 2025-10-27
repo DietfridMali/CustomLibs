@@ -54,6 +54,7 @@ protected:
     int                     m_sceneTop;
     int                     m_sceneWidth;
     int                     m_sceneHeight;
+    float                   m_fov;
     float                   m_aspectRatio;
 
     RGBAColor               m_backgroundColor;
@@ -77,6 +78,7 @@ public:
         , m_sceneHeight(0)
         , m_sceneLeft(0)
         , m_sceneTop(0)
+        , m_fov(0.0f)
         , m_aspectRatio(1.0f)
         , m_renderPass(RenderPasses::rpColor)
         , m_ndcScale(Vector2f::ONE)
@@ -183,6 +185,8 @@ public:
     inline int SceneLeft(void) noexcept { return m_sceneLeft; }
 
     inline int SceneTop(void) noexcept { return m_sceneTop; }
+
+    inline float FOV(void) noexcept { return m_fov; }
 
     inline float AspectRatio(void) noexcept { return m_aspectRatio; }
 

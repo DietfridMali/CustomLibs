@@ -102,6 +102,8 @@ public:
         m_activeDisplayMode = displayMode;
     }
 
+    bool ChangeDisplayMode(int displayMode, bool fullscreen);
+
     inline bool IsFullScreen(void) noexcept {
         return m_fullScreen;
     }
