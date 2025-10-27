@@ -81,6 +81,7 @@ public:
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false)
         : Plane(vertices)
         , m_isAvailable(true)
+        , m_privateVAO(false)
         , m_premultiply(false)
     {
         Mesh::Init(GL_QUADS, 100);
