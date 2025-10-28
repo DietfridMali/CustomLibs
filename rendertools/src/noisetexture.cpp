@@ -208,7 +208,8 @@ bool NoiseTexture3D::Allocate(int edgeSize) {
 
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
-    std::vector<int> perm; buildPermutation(perm, m_edgeSize, 0x1234567u);
+    std::vector<int> perm; 
+    buildPermutation(perm, m_edgeSize, 0x1234567u);
 
     // fBm-Parameter identisch zum Shader
     const float base = 2.032f;
