@@ -14,14 +14,14 @@
 // High-Resolution Timer (intern/extern: micro seconds, int64_t)
 
 class HiresTimer {
-public:
+protected:
     int64_t m_startTime;
     int64_t m_endTime;
     int64_t m_lapTime;
     int64_t m_duration;
     int64_t m_slack;
 
-
+public:
     static inline int64_t Upscale(int t) noexcept {
         return int64_t(t) * 1000;
     }
@@ -79,7 +79,7 @@ public:
     }
 
 
-    inline int64_t GetLapTime(void)
+    inline int64_t TakeLapTime(void)
         noexcept
     {
         return m_lapTime = GetHiresTime() - m_startTime;
@@ -89,7 +89,7 @@ public:
     bool HasExpired(int64_t time = 0, bool restart = false)
         noexcept
     {
-        GetLapTime();
+        TakeLapTime();
         if ((m_startTime > 0) and (m_lapTime < (time ? time : m_duration)))
             return false;
         if (restart)
@@ -133,14 +133,14 @@ public:
     inline int64_t RemainingTime(void)
         noexcept
     {
-        return m_duration - GetLapTime();
+        return m_duration - TakeLapTime();
     }
 
 
     inline float Progress(void)
         noexcept
     {
-        return float(GetLapTime()) / float(m_duration);
+        return float(TakeLapTime()) / float(m_duration);
     }
 
 
@@ -160,8 +160,8 @@ public:
     void Delay(void)
         noexcept
     {
-        Sleep(m_duration - m_slack - GetLapTime());
-        m_slack = GetLapTime() - m_duration;
+        Sleep(m_duration - m_slack - TakeLapTime());
+        m_slack = TakeLapTime() - m_duration;
     }
 
     // compute ramp value derived from current time and timer's start and end times and a threshold value
@@ -201,10 +201,10 @@ public:
     }
 
 
-    inline int GetLapTime(void)
+    inline int TakeLapTime(void)
         noexcept
     {
-        return Downscale(HiresTimer::GetLapTime());
+        return Downscale(HiresTimer::TakeLapTime());
     }
 
 
