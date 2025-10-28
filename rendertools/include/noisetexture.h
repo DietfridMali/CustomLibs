@@ -360,6 +360,17 @@ using HashNoiseTextureRGBA8 = NoiseTexture<HashNoiseRGBA8>;
 
 // =================================================================================================
 
+struct Noise3DParams {
+    uint32_t seed{ 0x1234567u };
+    float base{ 2.032f };      // Grundskala
+    float lac{ 2.6434f };      // Lacunarity
+    int oct{ 5 };            // Oktaven
+    float init_gain{ 0.5f };   // erste Amplitude
+    float gain{ 0.5f };        // Amplitudenabfall
+    float warp{ 0.10f };       // Domain warp
+    float rot_deg{ 11.25f };   // Rotation um Y
+};
+
 class NoiseTexture3D
 	: public Texture
 {
@@ -368,10 +379,11 @@ public:
 
 	virtual void SetParams(bool enforce = false) override;
 
-	bool Create(int edgeSize);
+	bool Create(int edgeSize, const Noise3DParams& params);
 
 private:
-	int m_edgeSize;
+	int             m_edgeSize;
+    Noise3DParams   m_params;
 
 	ManagedArray<float>	m_data;
 
