@@ -12,12 +12,20 @@ public:
     BaseSingleton(const BaseSingleton&) = delete;
     BaseSingleton& operator=(const BaseSingleton&) = delete;
 
-    static T& Instance()
-    {
-        static std::once_flag flag;
-        static T* instance = nullptr;
-        std::call_once(flag, []() { instance = new T(); });
-        return *instance;
+    static T& Instance() {
+#ifdef _DEBUG
+        static thread_local bool constructing = false;
+        if (constructing) {
+            std::fputs("BaseSingleton: reentrant construction detected\n", stderr);
+            std::abort();
+        }
+        constructing = true;
+        static T instance;
+        constructing = false;
+#else
+        static T instance;
+#endif
+        return instance;
     }
 
 protected:

@@ -46,6 +46,12 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
 
 // =================================================================================================
 
+void BaseQuad::Init(void) {
+    // just create the vao and its vbos
+    Setup(defaultVertices[0], defaultTexCoords[0]);
+}
+
+
 BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
         if (m_privateVAO)

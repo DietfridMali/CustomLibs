@@ -94,6 +94,8 @@ public:
 
     ~BaseQuad() = default;
 
+    void Init(void);
+
     virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false);
 
     BaseQuad& Copy(const BaseQuad& other);
