@@ -308,7 +308,7 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
     if (not IsEnabled()) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
 #ifdef _DEBUG
-        if (not baseRenderer.CheckGLError())
+        if (not BaseRenderer::CheckGLError())
             return false;
 #endif
         m_activeHandle = m_handle.Data();
