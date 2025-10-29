@@ -176,6 +176,7 @@ void FBO::Destroy(void) {
     for (int i = 0; i < m_bufferCount; i++) {
         m_bufferInfo[i].m_handle.Release();
     }
+    m_bufferCount = 0;
     m_bufferInfo.Reset();
     m_handle.Release();
     //glDeleteFramebuffers(1, &m_handle);

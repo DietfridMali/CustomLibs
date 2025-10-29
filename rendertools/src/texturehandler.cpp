@@ -10,7 +10,7 @@
 
 
 bool TextureHandler::DeleteTextures(const TextureID& key, Texture** texture) {
-    if (texture and ((*texture)->m_id.ID != 0)) {
+    if (texture and *texture and ((*texture)->m_id.ID != 0)) {
         delete* texture;
         *texture = nullptr;
     }
