@@ -15,7 +15,8 @@ bool UDPSocket::Open(const String& localAddress, uint16_t port) {
     Set(localAddress, port);
     if (not (m_socket = SDLNet_UDP_Open(port)))
         return false;
-    m_packet = SDLNet_AllocPacket(MaxPacketSize);
+    if (not m_packet)
+        m_packet = SDLNet_AllocPacket(MaxPacketSize);
     return m_packet != nullptr;
 }
 
