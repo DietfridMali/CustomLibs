@@ -10,6 +10,8 @@
 #include "hiressleep.h"
 #include "conversions.hpp"
 
+#include <algorithm>
+
 // ================================================================================================ =
 // High-Resolution Timer (intern/extern: micro seconds, int64_t)
 
@@ -137,10 +139,11 @@ public:
     }
 
 
-    inline float Progress(void)
+    inline float Progress(bool clamped = false)
         noexcept
     {
-        return float(TakeLapTime()) / float(m_duration);
+        float progress = float(TakeLapTime()) / float(m_duration);
+        return clamped ? std::clamp(progress, 0.0f, 1.0f) : progress;
     }
 
 
@@ -254,10 +257,10 @@ public:
     }
 
 
-    inline float Progress(void)
+    inline float Progress(bool clamped = false)
         noexcept
     {
-        return HiresTimer::Progress();
+        return HiresTimer::Progress(clamped);
     }
 
 
