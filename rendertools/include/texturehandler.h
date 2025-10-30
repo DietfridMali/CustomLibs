@@ -43,47 +43,47 @@ public:
     }
 
     template <typename T>
-    T* GetTexture(void) {
+    T* GetTexture(String& name) {
         T* t = new T();
         if (t)
-            t->Register();
+            t->Register(name);
         return t;
     }
 
     Texture* FindTexture(String name);
 
 
-    using TextureGetter = std::function<Texture*()>;
+    using TextureGetter = std::function<Texture*(String& name)>;
 
-    inline Texture* GetStandardTexture(void) {
-        return GetTexture<Texture>();
+    inline Texture* GetStandardTexture(String& name) {
+        return GetTexture<Texture>(name);
     }
 
     template <typename DATA_T>
-    inline Texture* GetLinearTexture(void) {
-        return GetTexture<LinearTexture<DATA_T>>();
+    inline Texture* GetLinearTexture(String& name) {
+        return GetTexture<LinearTexture<DATA_T>>(name);
     }
 
-    inline TiledTexture* GetTiledTexture(void) {
-        return GetTexture<TiledTexture>();
+    inline TiledTexture* GetTiledTexture(String& name) {
+        return GetTexture<TiledTexture>(name);
     } 
 
-    inline Cubemap* GetCubemap(void) {
-        return GetTexture<Cubemap>();
+    inline Cubemap* GetCubemap(String& name) {
+        return GetTexture<Cubemap>(name);
     }
 
     TextureList CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, const TextureCreationParams& params);
 
     inline TextureList CreateStandardTextures(String textureFolder, List<String>& textureNames, const TextureCreationParams& params) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetStandardTexture(); }, params);
+        return CreateTextures(textureFolder, textureNames, [&](String& name) { return GetStandardTexture(name); }, params);
     }
 
     TextureList CreateTiledTextures(String textureFolder, List<String>& textureNames, const TextureCreationParams& params) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetTiledTexture(); }, params);
+        return CreateTextures(textureFolder, textureNames, [&](String& name) { return GetTiledTexture(name); }, params);
     }
 
     TextureList CreateCubemaps(String textureFolder, List<String>& textureNames, const TextureCreationParams& params) {
-        return CreateTextures(textureFolder, textureNames, [&]() { return GetCubemap(); }, params);
+        return CreateTextures(textureFolder, textureNames, [&](String& name) { return GetCubemap(name); }, params);
     }
 
     TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, const TextureCreationParams& params);

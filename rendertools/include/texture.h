@@ -68,7 +68,7 @@ public:
 
     virtual void Disable(int tmuIndex = 0) = 0;
 
-    virtual bool Load(List<String>& fileNames, const TextureCreationParams& params) = 0;
+    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
 };
 
 // =================================================================================================
@@ -137,8 +137,9 @@ public:
 
     ~Texture();
 
-    inline void Register(void) {
+    inline void Register(String& name) {
         m_id.ID = CreateID();
+        m_id.name = name;
         textureLUT.Insert(m_id, this);
     }
 
@@ -201,9 +202,9 @@ public:
 
     virtual void Deploy(int bufferIndex = 0) override;
 
-    virtual bool Load(List<String>& fileNames, const TextureCreationParams& params) override;
+    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
 
-    bool CreateFromFile(List<String>& fileNames, const TextureCreationParams& params);
+    bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
 
     bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
 

@@ -34,14 +34,14 @@ Texture* TextureHandler::FindTexture(String name) {
 TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, const TextureCreationParams& params) {
     GetTextureFolder(textureFolder);
     TextureList textures;
-    for (auto& n : textureNames) {
+    for (auto& name : textureNames) {
         List<String> fileNames; // must be local here so it gets reset every loop iteration
-        Texture* t = FindTexture(n);
+        Texture* t = FindTexture(name);
         if (not t) {
-            fileNames.Append(textureFolder + n);
-            if (not ((t = getTexture()) and t->CreateFromFile(fileNames, params))) {
+            fileNames.Append(name);
+            if (not ((t = getTexture(name)) and t->CreateFromFile(textureFolder, fileNames, params))) {
 #ifdef _DEBUG
-                fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)n);
+                fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)(textureFolder + name));
 #endif
                 for (auto& h : textures)
                     delete h;
@@ -57,7 +57,7 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
 
 
 TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, const TextureCreationParams& params) {
-    return CreateTextures(textureFolder, textureNames, [&]() { return (textureType == GL_TEXTURE_CUBE_MAP) ? GetCubemap() : GetStandardTexture(); }, params);
+    return CreateTextures(textureFolder, textureNames, [&](String& name) { return (textureType == GL_TEXTURE_CUBE_MAP) ? GetCubemap(name) : GetStandardTexture(name); }, params);
 }
 
 // =================================================================================================

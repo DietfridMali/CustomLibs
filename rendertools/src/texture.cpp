@@ -276,7 +276,7 @@ static void CheckFileOpen(const std::string& path) {
 // Load will load the texture, and for each subsequent side with texture name "", that texture's data buffer
 // will be used. This is saving memory for smileys, where 5 sides bear the same texture, while only the front
 // face bears the face.
-bool Texture::Load(List<String>& fileNames, const TextureCreationParams& params) {
+bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) {
     // load texture from file
     m_filenames = fileNames;
     m_id.name = fileNames.First();
@@ -297,14 +297,15 @@ bool Texture::Load(List<String>& fileNames, const TextureCreationParams& params)
             }
         }
         else {
+            String fullName = folder + fileName;
 #if 0 // def _DEBUG
             bufferName = fileName;
-            CheckFileOpen(fileName);
+            CheckFileOpen(fullName);
 #endif
-            SDL_Surface* image = IMG_Load(fileName.Data());
+            SDL_Surface* image = IMG_Load(fullName.Data());
             if (not image) {
                 const char* imgError = IMG_GetError();
-                fprintf(stderr, "Couldn't load '%s (%s)'\n", (char*)(fileName), imgError);
+                fprintf(stderr, "Couldn't load '%s (%s)'\n", (char*)(fullName), imgError);
                 return false;
             }
             texBuf = new TextureBuffer();
@@ -321,12 +322,12 @@ bool Texture::Load(List<String>& fileNames, const TextureCreationParams& params)
 }
 
 
-bool Texture::CreateFromFile(List<String>& fileNames, const TextureCreationParams& params) {
+bool Texture::CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params) {
     if (not Create())
         return false;
     if (fileNames.IsEmpty())
         return true;
-    if (not Load(fileNames, params))
+    if (not Load(folder, fileNames, params))
         return false;
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
