@@ -14,7 +14,7 @@
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
 
 int Texture::CompareTextures(void* context, const TextureID& key1, const TextureID& key2) {
-    return (key1.ID >= 0) ? (key1.ID > key2.ID) - (key1.ID < key2.ID) : (key1.name > key2.name) - (key1.name < key2.name);
+    return /*(key1.ID >= 0) ? (key1.ID > key2.ID) - (key1.ID < key2.ID) :*/ (key1.name > key2.name) - (key1.name < key2.name);
 }
 
 

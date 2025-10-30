@@ -50,7 +50,7 @@ public:
         return t;
     }
 
-    Texture* FindTexture(String name);
+    Texture* FindTexture(String& name);
 
 
     using TextureGetter = std::function<Texture*(String& name)>;

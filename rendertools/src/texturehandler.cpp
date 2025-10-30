@@ -24,7 +24,7 @@ void TextureHandler::Destroy(void) noexcept {
 }
 
 
-Texture* TextureHandler::FindTexture(String name) {
+Texture* TextureHandler::FindTexture(String& name) {
     TextureID id{ -1, name };
     Texture** t = Texture::textureLUT.Find(id);
     return t ? *t : nullptr;
