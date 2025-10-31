@@ -28,7 +28,7 @@ public:
 
     ~TextureHandler() noexcept { Destroy(); }
 
-    bool DeleteTextures(const TextureID& key, Texture** texture);
+    bool DeleteTextures(const String& key, Texture** texture);
 
     void Destroy(void) noexcept;
 
@@ -45,8 +45,9 @@ public:
     template <typename T>
     T* GetTexture(String& name) {
         T* t = new T();
-        if (t)
+        if (t) {
             t->Register(name);
+        }
         return t;
     }
 

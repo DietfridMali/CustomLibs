@@ -9,9 +9,9 @@
 // textures at a dozen places in the game
 
 
-bool TextureHandler::DeleteTextures(const TextureID& key, Texture** texture) {
-    if (texture and *texture and ((*texture)->m_id.ID != 0)) {
-        delete* texture;
+bool TextureHandler::DeleteTextures(const String& key, Texture** texture) {
+    if (texture and *texture) {
+        delete *texture;
         *texture = nullptr;
     }
     return true;
@@ -25,8 +25,7 @@ void TextureHandler::Destroy(void) noexcept {
 
 
 Texture* TextureHandler::FindTexture(String& name) {
-    TextureID id{ -1, name };
-    Texture** t = Texture::textureLUT.Find(id);
+    Texture** t = Texture::textureLUT.Find(name);
     return t ? *t : nullptr;
 }
 

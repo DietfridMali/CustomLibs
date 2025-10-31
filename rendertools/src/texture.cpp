@@ -13,8 +13,9 @@
 
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
 
-int Texture::CompareTextures(void* context, const TextureID& key1, const TextureID& key2) {
-    return /*(key1.ID >= 0) ? (key1.ID > key2.ID) - (key1.ID < key2.ID) :*/ (key1.name > key2.name) - (key1.name < key2.name);
+int Texture::CompareTextures(void* context, const String& key1, const String& key2) {
+    int i = String::Compare(nullptr, key1, key2);
+    return (i < 0) ? -1 : (i > 0) ? 1 : 0;
 }
 
 
@@ -23,11 +24,10 @@ Texture::Texture(GLuint handle, int type, int wrapMode)
     , m_type(type)
     , m_tmuIndex(-1)
     , m_wrapMode(wrapMode)
-    , m_id(0)
+    , m_name("")
 {
 #if USE_TEXTURE_LUT
     SetupLUT();
-    textureLUT.Insert(m_id, this);
 #endif
 }
 
@@ -37,10 +37,9 @@ noexcept
 {
     if (m_isValid) {
 #if USE_TEXTURE_LUT
-        if (m_id.ID and UpdateLUT()) {
-            textureLUT.Remove(m_id);
-            m_id.ID = 0;
-            m_id.name = "";
+        if (UpdateLUT()) {
+            textureLUT.Remove(m_name);
+            m_name = "";
         }
 #endif
         Destroy();
@@ -87,7 +86,7 @@ Texture& Texture::Copy(const Texture& other) {
     if (this != &other) {
         Destroy();
         m_handle = other.m_handle;
-        m_id.name = other.m_id.name;
+        m_name = other.m_name;
         m_buffers = other.m_buffers;
         m_filenames = other.m_filenames;
         m_type = other.m_type;
@@ -110,8 +109,7 @@ noexcept
 #if !USE_SHARED_HANDLES
         other.m_handle = 0;
 #endif
-        m_id.ID = other.m_id.ID;
-        m_id.name = std::move(other.m_id.name);
+        m_name = std::move(other.m_name);
         m_buffers = std::move(other.m_buffers);
         m_filenames = std::move(other.m_filenames);
         m_type = other.m_type;
@@ -120,10 +118,8 @@ noexcept
         m_hasBuffer = other.m_hasBuffer; 
         m_hasParams = other.m_hasParams;
         m_isValid = other.m_isValid;     
-        textureLUT.Remove(m_id);
-        textureLUT.Insert(other.m_id, this, true); // overwrite the data entry for key m_id with this texture
-        m_id = other.m_id;
-        other.m_id.ID = 0;
+        textureLUT.Remove(m_name);
+        textureLUT.Insert(m_name, this, true); // overwrite the data entry for key m_id with this texture
     }
     return *this;
 }
@@ -279,7 +275,7 @@ static void CheckFileOpen(const std::string& path) {
 bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) {
     // load texture from file
     m_filenames = fileNames;
-    m_id.name = fileNames.First();
+    m_name = fileNames.First();
     TextureBuffer* texBuf = nullptr;
 #ifdef _DEBUG
     String bufferName = "";

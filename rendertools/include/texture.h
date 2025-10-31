@@ -81,12 +81,6 @@ struct RenderOffsets {
 };
 
 
-struct TextureID {
-    int64_t     ID;
-    String      name;
-};
-
-
 class Texture 
     : public AbstractTexture
 {
@@ -96,7 +90,7 @@ public:
 #else
     GLuint                      m_handle;
 #endif
-    TextureID                   m_id{ 0, "" };
+    String                      m_name;
     List<TextureBuffer*>        m_buffers;
     List<String>                m_filenames;
     GLenum                      m_type{ GL_TEXTURE_2D };
@@ -109,14 +103,14 @@ public:
 
     static SharedTextureHandle  nullHandle;
 
-    static inline AVLTree<TextureID, Texture*>  textureLUT;
+    static inline AVLTree<String, Texture*>  textureLUT;
 
     static inline size_t CreateID(void) noexcept {
         static size_t textureID = 0;
         return ++textureID;
     }
 
-    static int CompareTextures(void* context, const TextureID& key1, const TextureID& key2);
+    static int CompareTextures(void* context, const String& key1, const String& key2);
 
     static void SetupLUT(void) noexcept {
         static bool needSetup = true;
@@ -138,9 +132,8 @@ public:
     ~Texture();
 
     inline void Register(String& name) {
-        m_id.ID = CreateID();
-        m_id.name = name;
-        textureLUT.Insert(m_id, this);
+       m_name = name;
+        textureLUT.Insert(m_name, this);
     }
 
 
@@ -211,10 +204,6 @@ public:
     void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
 
 
-    inline void SetID(uint32_t id) noexcept {
-        m_id.ID = id;
-    }
-
     inline size_t TextureCount(void)
         noexcept
     {
@@ -249,12 +238,8 @@ public:
         return m_wrapMode;
     }
 
-    inline void SetName(String name) {
-        m_id.name = name;
-    }
-
     inline String GetName(void) {
-        return m_id.name;
+        return m_name;
     }
 
     template <GLenum typeID>
