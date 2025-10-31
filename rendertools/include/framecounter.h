@@ -14,7 +14,7 @@ protected:
     uint64_t                m_renderStartTime{ 0 };
     Timer                   m_drawTimer{ 1000 };
     float                   m_fps{ 0.0f };
-    bool                    m_showFps{ true };
+    bool                    m_showFps{ false };
 
 public:
     BaseFrameCounter()
