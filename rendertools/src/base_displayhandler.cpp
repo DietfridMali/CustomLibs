@@ -82,6 +82,7 @@ BaseDisplayHandler::~BaseDisplayHandler() {
 
 void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     int screenType = SDL_WINDOW_OPENGL;
+#if 0
     if (m_fullscreen) {
         if ((m_width != m_maxWidth) or (m_height != m_maxHeight))
             screenType |= SDL_WINDOW_BORDERLESS;
@@ -89,7 +90,10 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
             screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
         m_fullscreen = true;
     }
-    m_aspectRatio = float(m_width) / float(m_height);
+#else
+    if (m_fullscreen)
+        screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
+#endif
 #if 1
     SDL_GL_ResetAttributes();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
