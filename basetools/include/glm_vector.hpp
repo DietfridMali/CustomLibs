@@ -225,7 +225,10 @@ public:
     inline Vector& Normalize()
         noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = glm::normalize(static_cast<VEC_TYPE>(*this))))
     {
-        *this = glm::normalize(static_cast<VEC_TYPE>(*this)); return *this;
+        float l = LengthSquared();
+        if ((l != 0.0f) and (l != 1.0f))
+            *this /= std::sqrtf(l); // glm::normalize(static_cast<VEC_TYPE>(*this));
+        return *this;
     }
 
     inline Vector Normal() const
