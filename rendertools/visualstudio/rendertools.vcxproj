@@ -73,6 +73,7 @@
       <AdditionalIncludeDirectories>..\include;$(ProjectDir)..\..\..\external\SDL2_ttf-2.0.15\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_image-2.0.5\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;$(ProjectDir)..\..\basetools\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>
