@@ -227,7 +227,7 @@ public:
     {
         float l = LengthSquared();
         if ((l != 0.0f) and (l != 1.0f))
-            *this /= std::sqrtf(l); // glm::normalize(static_cast<VEC_TYPE>(*this));
+            *this /= sqrtf(l); // glm::normalize(static_cast<VEC_TYPE>(*this));
         return *this;
     }
 
