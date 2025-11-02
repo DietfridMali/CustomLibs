@@ -32,9 +32,11 @@ void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float
 
 void  Billboard::Render(void) {
 	Tristate<int> faceCulling(-1, 0, openGLStates.SetFaceCulling(0));
+	Tristate<int> blending(-1, 0, openGLStates.SetBlending(1));
 	//SetTransformations({ .centerOrigin = true });
 	BaseQuad::Render(nullptr, m_icon);
 	openGLStates.SetFaceCulling(faceCulling);
+	openGLStates.SetBlending(blending);
 }
 
 // =================================================================================================
