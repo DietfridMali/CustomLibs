@@ -104,6 +104,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\include\base_shadercode.h" />
+    <ClInclude Include="..\include\billboard.h" />
     <ClInclude Include="..\include\colordata.h" />
     <ClInclude Include="..\include\cube.h" />
     <ClInclude Include="..\include\cubemap.h" />
@@ -147,6 +148,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\base_shadercode.cpp" />
+    <ClCompile Include="..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />
     <ClCompile Include="..\src\cube.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />

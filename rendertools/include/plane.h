@@ -25,7 +25,7 @@ public:
     Plane()
         noexcept;
 
-        Plane(std::initializer_list<Vector3f> vertices);
+    Plane(std::initializer_list<Vector3f> vertices);
 
     Plane& operator= (std::initializer_list<Vector3f> vertices);
 
