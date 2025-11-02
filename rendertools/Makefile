@@ -10,7 +10,7 @@ FILES := \
  base_shadercode \
  base_shaderhandler \
  base_texture_shaders \
- billboards \
+ billboard \
  blur_shader \
  cube \
  cubemap \
