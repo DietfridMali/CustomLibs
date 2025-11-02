@@ -15,7 +15,7 @@ bool Billboard::Setup(String iconName) {
 }
 
 
-void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float height) {
+void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float height, float offset) {
 	Vector3f u = p1 - p2;
 	u.Normalize();
 	Vector3f f = p1 - p0;
@@ -26,6 +26,8 @@ void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float
 	v.Normalize();
 	v *= height;
 	h *= width;
+	if (offset)
+		p1 += f * offset;
 	BaseQuad::Setup({ p1 - h - v, p1 - h + v, p1 + h + v, p1 + h - v });
 }
 
