@@ -231,7 +231,7 @@ uint32_t InternetServices::QueryDate(int timeout) {
     uint32_t month = uint32_t(tm_utc.tm_mon + 1);
     uint32_t year = uint32_t(tm_utc.tm_year + 1900);
     sock.Close(true);
-    return day * 100000u + month * 1000u + year;
+    return year * 100000u + month * 1000u + day;
 }
 
 // =================================================================================================
