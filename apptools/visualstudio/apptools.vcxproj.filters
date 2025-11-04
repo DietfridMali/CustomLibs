@@ -33,7 +33,7 @@
     <ClInclude Include="..\include\networkendpoint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\stunclient.h">
+    <ClInclude Include="..\include\internetservices.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\filelist.h">
@@ -59,10 +59,13 @@
     <ClCompile Include="..\src\networkendpoint.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\stunclient.cpp">
+    <ClCompile Include="..\src\internetservices.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\filelist.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ntpclient.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

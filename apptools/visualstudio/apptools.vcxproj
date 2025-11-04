@@ -24,7 +24,7 @@
     <ClInclude Include="..\include\networkendpoint.h" />
     <ClInclude Include="..\include\networkmessage.h" />
     <ClInclude Include="..\include\base_soundhandler.h" />
-    <ClInclude Include="..\include\stunclient.h" />
+    <ClInclude Include="..\include\internetservices.h" />
     <ClInclude Include="..\include\textfileloader.h" />
     <ClInclude Include="..\include\udp.h" />
   </ItemGroup>
@@ -34,9 +34,10 @@
     <ClCompile Include="..\src\networkendpoint.cpp" />
     <ClCompile Include="..\src\networkmessage.cpp" />
     <ClCompile Include="..\src\base_soundhandler.cpp" />
-    <ClCompile Include="..\src\stunclient.cpp" />
+    <ClCompile Include="..\src\internetservices.cpp" />
     <ClCompile Include="..\src\textfileloader.cpp" />
     <ClCompile Include="..\src\udp.cpp" />
+    <ClCompile Include="ntpclient.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
