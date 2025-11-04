@@ -173,8 +173,9 @@ String InternetServices::GetLocalAddress(void) {
 #define NTP_UNIX_EPOCH_DIFF 2208988800u
 
 uint32_t InternetServices::QueryDate(int timeout) {
-    if (timeout <= 0) 
+    if (timeout <= 0)
         timeout = 1;
+    timeout *= 1000;
 
     UDPSocket sock;
     if (not sock.Open("0.0.0.0", 0)) 
@@ -200,7 +201,8 @@ uint32_t InternetServices::QueryDate(int timeout) {
     UDPData resp{};
     do {
         resp = sock.Receive(48);
-        if (resp.length >= 48) break;
+        if (resp.length >= 48) 
+            break;
         SDL_Delay(1);
     } while (not t.HasExpired(timeout, false));
     if (resp.length < 48) {
