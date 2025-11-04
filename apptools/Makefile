@@ -7,9 +7,9 @@ FILES := \
  arghandler \
  base_soundhandler \
  filelist \
+ internetservices \
  networkendpoint \
  networkmessage \
- stunclient \
  textfileloader \
  udp
 
