@@ -9,6 +9,7 @@
 #include "noisetexture.h"
 #include "base_renderer.h"
 
+#define NORMALIZE_NOISE 0
 
 // =================================================================================================
 // Helpers
@@ -236,7 +237,9 @@ static const float g3[12][3] = { {1,1,0},{-1,1,0},{1,-1,0},{-1,-1,0},{1,0,1},{-1
 
 
 static void BuildPermutation(std::vector<int>& perm, int period, uint32_t seed) {
-    perm.resize(period); for (int i = 0; i < period; ++i) perm[i] = i;
+    perm.resize(period); 
+    for (int i = 0; i < period; ++i) 
+        perm[i] = i;
     uint32_t s = seed ? seed : 0x9E3779B9u;
     for (int i = period - 1; i > 0; --i) {
         s = s * 1664525u + 1013904223u;
@@ -312,6 +315,157 @@ static float SNoise3Periodic(float x, float y, float z, const std::vector<int>& 
 
 // -------------------------------------------------------------------------------------------------
 
+static float fastFloor(float x) { return x >= 0.0f ? (float)(int)x : (float)((int)x - 1); }
+
+static float SNoise3Ashima(const float x, const float y, const float z)
+{
+    const float F3 = 1.0f / 3.0f;
+    const float G3 = 1.0f / 6.0f;
+
+    const float s = (x + y + z) * F3;
+    const float xs = x + s;
+    const float ys = y + s;
+    const float zs = z + s;
+
+    const int i = (int)fastFloor(xs);
+    const int j = (int)fastFloor(ys);
+    const int k = (int)fastFloor(zs);
+
+    const float t = (float)(i + j + k) * G3;
+    const float X0 = (float)i - t;
+    const float Y0 = (float)j - t;
+    const float Z0 = (float)k - t;
+
+    const float x0 = x - X0;
+    const float y0 = y - Y0;
+    const float z0 = z - Z0;
+
+    int i1 = (x0 >= y0) ? 1 : 0;
+    int j1 = (x0 < y0) ? 1 : 0;
+    int i2 = (x0 >= z0) ? 1 : 0;
+    int k1 = (x0 < z0) ? 1 : 0;
+    int j2 = (y0 >= z0) ? 1 : 0;
+    int k2 = (y0 < z0) ? 1 : 0;
+    i2 &= i1; j2 |= j1;
+
+    const float x1 = x0 - (float)i1 + G3;
+    const float y1 = y0 - (float)j1 + G3;
+    const float z1 = z0 - (float)k1 + G3;
+    const float x2 = x0 - (float)i2 + 2.0f * G3;
+    const float y2 = y0 - (float)j2 + 2.0f * G3;
+    const float z2 = z0 - (float)(k1 | k2) + 2.0f * G3;
+    const float x3 = x0 - 1.0f + 3.0f * G3;
+    const float y3 = y0 - 1.0f + 3.0f * G3;
+    const float z3 = z0 - 1.0f + 3.0f * G3;
+
+    auto mod289 = [](float x) { return x - floorf(x * (1.0f / 289.0f)) * 289.0f; };
+    auto mod289v4 = [&](const float v[4], float out[4]) {
+        for (int n = 0; n < 4; ++n)
+            out[n] = mod289(v[n]);
+        };
+    auto permute = [&](float x) { return mod289((x * 34.0f + 1.0f) * x); };
+
+    float ii = (float)i;
+    float jj = (float)j;
+    float kk = (float)k;
+
+    float iVec[4] = { 0.0f, (float)i1, (float)i2, 1.0f };
+    float jVec[4] = { 0.0f, (float)j1, (float)j2, 1.0f };
+    float kVec[4] = { 0.0f, (float)k1, (float)(k1 | k2), 1.0f };
+
+    float p[4];
+    for (int n = 0; n < 4; ++n)
+        p[n] = kk + kVec[n];
+    for (int n = 0; n < 4; ++n)
+        p[n] = permute(p[n] + jj + jVec[n]);
+    for (int n = 0; n < 4; ++n)
+        p[n] = permute(p[n] + ii + iVec[n]);
+
+    const float n_ = 0.142857142857f;
+    const float D1 = 0.0f, D2 = 0.5f, D3 = 1.0f, D4 = 2.0f;
+    const float nsx = n_ * D4 - D1;      // wie im Shader (kompakt)
+    const float nsy = n_ * D3 - D1;
+    const float nsz = n_ * D2 - D1;
+
+    float x_[4], y_[4];
+    for (int n = 0; n < 4; ++n) {
+        float jn = p[n] - 49.0f * floorf(p[n] * nsz * nsz);
+        x_[n] = floorf(jn * nsz);
+        y_[n] = floorf(jn - 7.0f * x_[n]);
+    }
+
+    float xw[4], yw[4], h[4];
+    for (int n = 0; n < 4; ++n) {
+        xw[n] = x_[n] * nsx + nsy;
+        yw[n] = y_[n] * nsx + nsy;
+        h[n] = 1.0f - fabsf(xw[n]) - fabsf(yw[n]);
+    }
+
+    float b0x = xw[0], b0y = xw[1];
+    float b0z = yw[0], b0w = yw[1];
+    float b1x = xw[2], b1y = xw[3];
+    float b1z = yw[2], b1w = yw[3];
+
+    float s0x = floorf(b0x) * 2.0f + 1.0f;
+    float s0y = floorf(b0y) * 2.0f + 1.0f;
+    float s0z = floorf(b0z) * 2.0f + 1.0f;
+    float s0w = floorf(b0w) * 2.0f + 1.0f;
+    float s1x = floorf(b1x) * 2.0f + 1.0f;
+    float s1y = floorf(b1y) * 2.0f + 1.0f;
+    float s1z = floorf(b1z) * 2.0f + 1.0f;
+    float s1w = floorf(b1w) * 2.0f + 1.0f;
+
+    float sh[4] = {
+        -(h[0] < 0.0f ? 1.0f : 0.0f),
+        -(h[1] < 0.0f ? 1.0f : 0.0f),
+        -(h[2] < 0.0f ? 1.0f : 0.0f),
+        -(h[3] < 0.0f ? 1.0f : 0.0f)
+    };
+
+    float a0x = b0x + s0x * sh[0];
+    float a0y = b0z + s0z * sh[0];
+    float a0z = h[0];
+    float a1x = b0y + s0y * sh[1];
+    float a1y = b0w + s0w * sh[1];
+    float a1z = h[1];
+    float a2x = b1x + s1x * sh[2];
+    float a2y = b1z + s1z * sh[2];
+    float a2z = h[2];
+    float a3x = b1y + s1y * sh[3];
+    float a3y = b1w + s1w * sh[3];
+    float a3z = h[3];
+
+    auto invSqrt = [](float r) { return 1.79284291400159f - 0.85373472095314f * r; };
+
+    float norm0 = invSqrt(a0x * a0x + a0y * a0y + a0z * a0z);
+    float norm1 = invSqrt(a1x * a1x + a1y * a1y + a1z * a1z);
+    float norm2 = invSqrt(a2x * a2x + a2y * a2y + a2z * a2z);
+    float norm3 = invSqrt(a3x * a3x + a3y * a3y + a3z * a3z);
+
+    a0x *= norm0; a0y *= norm0; a0z *= norm0;
+    a1x *= norm1; a1y *= norm1; a1z *= norm1;
+    a2x *= norm2; a2y *= norm2; a2z *= norm2;
+    a3x *= norm3; a3y *= norm3; a3z *= norm3;
+
+    float m0 = 0.6f - x0 * x0 - y0 * y0 - z0 * z0;
+    float m1 = 0.6f - x1 * x1 - y1 * y1 - z1 * z1;
+    float m2 = 0.6f - x2 * x2 - y2 * y2 - z2 * z2;
+    float m3 = 0.6f - x3 * x3 - y3 * y3 - z3 * z3;
+    if (m0 < 0) m0 = 0; m0 *= m0;
+    if (m1 < 0) m1 = 0; m1 *= m1;
+    if (m2 < 0) m2 = 0; m2 *= m2;
+    if (m3 < 0) m3 = 0; m3 *= m3;
+
+    float n0 = m0 * m0 * (a0x * x0 + a0y * y0 + a0z * z0);
+    float n1 = m1 * m1 * (a1x * x1 + a1y * y1 + a1z * z1);
+    float n2 = m2 * m2 * (a2x * x2 + a2y * y2 + a2z * z2);
+    float n3 = m3 * m3 * (a3x * x3 + a3y * y3 + a3z * z3);
+
+    return 42.0f * (n0 + n1 + n2 + n3);
+}
+
+// -------------------------------------------------------------------------------------------------
+
 // Allocate bleibt wie bei dir, aber BufferInfo sauber als 3D Platzhalter:
 bool NoiseTexture3D::Allocate(int edgeSize) {
     TextureBuffer* texBuf = new TextureBuffer();
@@ -322,7 +476,7 @@ bool NoiseTexture3D::Allocate(int edgeSize) {
         return false; 
     }
     m_edgeSize = edgeSize;
-    m_data.Resize(size_t(edgeSize) * edgeSize * edgeSize);
+    m_data.Resize(size_t(edgeSize) * size_t(edgeSize) * size_t(edgeSize) * 4u);
     // Werte sind hier irrelevant, dienen nur dem internen Status
     texBuf->m_info = TextureBuffer::BufferInfo(edgeSize, edgeSize, 1, GL_R16F, GL_RED);
     HasBuffer() = true;
@@ -349,104 +503,62 @@ bool NoiseTexture3D::Create(int edgeSize, const Noise3DParams& params, String no
 // ComputeNoise parametrisierbar gemacht (deine Simplex-FBM + Warp)
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
-    uint32_t seed = m_params.seed;
 
-    float rot = m_params.rot_deg * (3.14159265f / 180.0f);
-    float cr = cosf(rot);
-    float sr = sinf(rot);
+    const int C0 = m_edgeSize / 8;
+    const int C_G = C0;
+    const int C_B = C0 * 2;
+    const int C_A = C0 * 4;
+    const int C_R = C0 * 2;
 
-    // Periodenwahl: Volumen soll bei s,t,r in [0,1] nahtlos sein -> interne Periode P
-    int P = m_edgeSize;
-
-    int oct = (m_params.oct > 0) ? m_params.oct : 1;
-    float gain = m_params.gain;
-    float a0 = (m_params.initialGain > 0.0f) ? m_params.initialGain : 1.0f;
-
-    float norm;
-    if (fabsf(gain - 1.0f) < 1e-6f)
-        norm = a0 * (float)oct;
-    else
-        norm = a0 * (1.0f - powf(gain, (float)oct)) / (1.0f - gain);
-    if (norm <= 0.0f)
-        norm = 1.0f;
-
-    // Heuristik: base < 1 → Detail-Volume, sonst Shape-Volume
-    bool isDetail = (m_params.base < 1.0f);
-
-    // Worley base cells (Masterarbeit: verschiedene Frequenzen; hier fix, aber periodisch)
-    int cellShape = 16;
-    int cellDetail = 32;
-
-    float baseFreq = (m_params.base > 0.0f) ? m_params.base : 1.0f;
-    float lac = (m_params.lac > 1.0f) ? m_params.lac : 2.0f;
+    float perlinNorm = 0.0f;
+    {
+        float a = m_params.initialGain;
+        for (int o = 0; o < m_params.octaves; ++o) {
+            perlinNorm += a;
+            a *= m_params.gain;
+        }
+        if (perlinNorm <= 0.0f)
+            perlinNorm = 1.0f;
+    }
 
     size_t idx = 0;
 
     for (int z = 0; z < m_edgeSize; ++z)
         for (int y = 0; y < m_edgeSize; ++y)
             for (int x = 0; x < m_edgeSize; ++x) {
-                // Normalisierte Texturkoordinate in [0,1)
-                float u = (x + 0.5f) / (float)m_edgeSize;
-                float v = (y + 0.5f) / (float)m_edgeSize;
-                float w = (z + 0.5f) / (float)m_edgeSize;
+                float X = float(x) + 0.5f;
+                float Y = float(y) + 0.5f;
+                float Z = float(z) + 0.5f;
 
-                // In periodischen Raum [0,P)
-                float X = u * (float)P;
-                float Y = v * (float)P;
-                float Z = w * (float)P;
+                // Perlin-fBm für Basis
+                float ps = 0.0f;
+                float a = m_params.initialGain;
+                float f = m_params.baseFrequency;
 
-                // Rotation um Y (nur für Variation, bleibt periodisch)
-                float Xr = cr * X - sr * Z;
-                float Yr = Y;
-                float Zr = sr * X + cr * Z;
-
-                // Periodischer Domain-Warp (Perlin3_Periodic mit gleicher Periode)
-                float wf = 3.0f;
-                float wx = Perlin3_Periodic(Xr * wf + 17.0f, Yr * wf, Zr * wf, P, seed ^ 0x1111u);
-                float wy = Perlin3_Periodic(Xr * wf, Yr * wf + 11.0f, Zr * wf, P, seed ^ 0x2222u);
-                float wz = Perlin3_Periodic(Xr * wf, Yr * wf, Zr * wf + 29.0f, P, seed ^ 0x3333u);
-
-                Xr += m_params.warp * wx;
-                Yr += m_params.warp * wy;
-                Zr += m_params.warp * wz;
-
-                // ----------------------------
-                // Periodische Perlin-fBm (Basis)
-                // ----------------------------
-                float sPerlin = 0.0f;
-                float a = a0;
-                float freq = baseFreq;
-
-                for (int o = 0; o < oct; ++o) {
-                    int fi = (int)(freq + 0.5f);
-                    if (fi < 1) {
-                        fi = 1;
-                    }
-                    float n = Perlin3_Periodic(Xr * (float)fi, Yr * (float)fi, Zr * (float)fi, P, seed + (uint32_t)(131 * o));
-                    sPerlin += a * n;
-                    a *= gain;
-                    freq *= lac;
+                for (int o = 0; o < m_params.octaves; ++o) {
+                    float n = Perlin3_Periodic(X * f, Y * f, Z * f, m_edgeSize, m_params.seed ^ 0xA5A5A5u); // ~[-1,1]
+                    ps += a * n;
+                    a *= m_params.gain;
+                    f *= m_params.lacunarity;
                 }
 
-                sPerlin /= norm;
-                float perlin01 = 0.5f + 0.5f * sPerlin;
-                perlin01 = std::clamp(perlin01, 0.0f, 1.0f);
+                float perlin01 = 0.5f + 0.5f * (ps / perlinNorm);
+                if (perlin01 < 0.0f) perlin01 = 0.0f;
+                if (perlin01 > 1.0f) perlin01 = 1.0f;
 
-                // ----------------------------
-                // Worley-fBm (periodisch)
-                // ----------------------------
-                float val;
-                if (not isDetail) {
-                    // Shape: Perlin-Worley (Masterarbeit: R-Kanal)
-                    // WorleyFBM_Periodic nutzt WorleyInv_Periodic → liefert bereits "invertiert"
-                    val = perlin01 * WorleyFBM_Periodic(Xr, Yr, Zr, P, cellShape, 3, 2.0f, 0.5f, seed ^ 0x51u);
-                    // Kombination wie üblich: Perlin (weich) * Worley-invert (Zellen)
-                }
-                else {
-                    // Detail: reines Worley-fBm mit höherer Frequenz
-                    val = WorleyFBM_Periodic(Xr, Yr, Zr, P, cellDetail, 4, 2.0f, 0.5f, seed ^ 0x1337u);
-                }
-                data[idx++] = std::clamp(val, 0.0f, 1.0f);
+                // Worley-fBm für Kanäle
+                float wR = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_R, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0x51u);
+                float G = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_G, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0x1337u);
+                float B = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_B, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xBEEFu);
+                float A = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_A, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xCAFEu);
+
+                // R = Perlin-Worley
+                float R = perlin01 * wR;
+
+                data[idx++] = std::clamp(R, 0.0f, 1.0f);
+                data[idx++] = std::clamp(G, 0.0f, 1.0f);
+                data[idx++] = std::clamp(B, 0.0f, 1.0f);
+                data[idx++] = std::clamp(A, 0.0f, 1.0f);
             }
 }
 
@@ -466,6 +578,165 @@ void NoiseTexture3D::SetParams(bool enforce) {
 void NoiseTexture3D::Deploy(int) {
     if (Bind()) {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_edgeSize, m_edgeSize, m_edgeSize, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data())
+        );
+        SetParams(false);
+        glGenerateMipmap(GL_TEXTURE_3D);
+        Release();
+    }
+}
+
+bool NoiseTexture3D::LoadFromFile(const String& filename) {
+    if (filename.IsEmpty())
+        return false;
+    std::ifstream f((const char*)filename, std::ios::binary);
+    if (not f)
+        return false;
+
+    size_t voxelCount = size_t(m_edgeSize) * size_t(m_edgeSize) * size_t(m_edgeSize) * 4u;
+    size_t expectedBytes = voxelCount * sizeof(float);
+
+    f.seekg(0, std::ios::end);
+    std::streamoff fileSize = f.tellg();
+    f.seekg(0, std::ios::beg);
+
+    if (fileSize != std::streamoff(expectedBytes))
+        return false;
+
+    if (m_data.Length() != voxelCount)
+        m_data.Resize(voxelCount);
+
+    f.read(reinterpret_cast<char*>(m_data.Data()), expectedBytes);
+    return f.good();
+}
+
+
+bool NoiseTexture3D::SaveToFile(const String& filename) const {
+    if (filename.IsEmpty())
+        return false;
+    std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
+    if (not f)
+        return false;
+
+    size_t voxelCount = size_t(m_edgeSize) * size_t(m_edgeSize) * size_t(m_edgeSize) * 4u;
+    size_t bytes = voxelCount * sizeof(float);
+
+    if (m_data.Length() != voxelCount)
+        return false;
+
+    f.write(reinterpret_cast<const char*>(m_data.Data()), bytes);
+    return f.good();
+}
+
+// =================================================================================================
+
+bool CloudVolume3D::Allocate(int edgeSize) {
+    TextureBuffer* texBuf = new TextureBuffer();
+    if (not texBuf)
+        return false;
+    if (not m_buffers.Append(texBuf)) {
+        delete texBuf;
+        return false;
+    }
+    m_edgeSize = edgeSize;
+    m_data.Resize(size_t(edgeSize) * edgeSize * edgeSize);
+    texBuf->m_info = TextureBuffer::BufferInfo(edgeSize, edgeSize, 1, GL_R16F, GL_RED);
+    HasBuffer() = true;
+    return true;
+}
+
+
+bool CloudVolume3D::Create(int edgeSize, const CloudVolumeParams& params, String noiseFilename) {
+    if (not Texture::Create())
+        return false;
+    m_type = GL_TEXTURE_3D;
+    if (not Allocate(edgeSize))
+        return false;
+    m_params = params;
+    if (not LoadFromFile(noiseFilename)) {
+        Compute();
+        SaveToFile(noiseFilename);
+    }
+    Deploy();
+    return true;
+}
+
+
+void CloudVolume3D::Compute(void) {
+    float* data = m_data.Data();
+
+    std::vector<int> perm;
+    BuildPermutation(perm, m_edgeSize, m_params.seed ? m_params.seed : 0x9E3779B9u);
+
+    float norm = 0.0f;
+    {
+        float a = m_params.initialGain;
+        for (int o = 0; o < m_params.octaves; ++o) {
+            norm += a;
+            a *= m_params.gain;
+        }
+        if (norm <= 0.0f)
+            norm = 1.0f;
+    }
+
+    size_t idx = 0;
+#if NORMALIZE_NOISE
+    float maxVal = 0.0f;
+#endif
+    for (int z = 0; z < m_edgeSize; ++z)
+        for (int y = 0; y < m_edgeSize; ++y)
+            for (int x = 0; x < m_edgeSize; ++x) {
+                float u = (x + 0.5f) / float(m_edgeSize);
+                float v = (y + 0.5f) / float(m_edgeSize);
+                float w = (z + 0.5f) / float(m_edgeSize);
+                // in periodischen Raum [0,m_edgeSize)
+                float px = u * m_params.baseFreq;
+                float py = v *  m_params.baseFreq;
+                float pz = w *  m_params.baseFreq;
+
+                float t = 0.0f;
+                float a = m_params.initialGain;
+                float f = 1.0f;
+
+                for (int o = 0; o < m_params.octaves; ++o) {
+                    float n = SNoise3Ashima(px * f, py * f, pz * f); // SNoise3Periodic(px * f, py * f, pz * f, perm, m_edgeSize); // ~[-1,1], m_edgeSize-periodisch
+                    t += std::fabs(n) * a;
+                    a *= m_params.gain;
+                    f *= m_params.lacunarity;
+                }
+
+                float d = t / norm;              // ~0..1
+                d = std::clamp(d, 0.0f, 1.0f);
+                data[idx++] = d * 1.3f;
+#if NORMALIZE_NOISE
+                if (maxVal < d)
+                    maxVal = d;
+#endif
+            }
+#if NORMALIZE_NOISE
+    if ((maxVal > 0.0f) and (maxVal < 0.999f)) {
+        for (; idx; --idx, data++)
+            *data /= maxVal;
+    }
+#endif
+}
+
+
+void CloudVolume3D::SetParams(bool enforce) {
+    if (enforce or not m_hasParams) {
+        m_hasParams = true;
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+}
+
+
+void CloudVolume3D::Deploy(int) {
+    if (Bind()) {
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F, m_edgeSize, m_edgeSize, m_edgeSize, 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
         SetParams(false);
         glGenerateMipmap(GL_TEXTURE_3D);
@@ -474,7 +745,7 @@ void NoiseTexture3D::Deploy(int) {
 }
 
 
-bool NoiseTexture3D::LoadFromFile(const String& filename) {
+bool CloudVolume3D::LoadFromFile(const String& filename) {
     if (filename.IsEmpty())
         return false;
     std::ifstream f((const char*)filename, std::ios::binary);
@@ -499,7 +770,7 @@ bool NoiseTexture3D::LoadFromFile(const String& filename) {
 }
 
 
-bool NoiseTexture3D::SaveToFile(const String& filename) const {
+bool CloudVolume3D::SaveToFile(const String& filename) const {
     if (filename.IsEmpty())
         return false;
     std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);

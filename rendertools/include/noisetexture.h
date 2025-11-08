@@ -28,17 +28,17 @@ static inline uint32_t Hash3D(uint32_t x, uint32_t y, uint32_t z, uint32_t seed)
 
 // -------------------------------------------------------------
 // Periodischer Perlin 3D + fBm
-static float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, float lac, float gain, uint32_t seed);
+float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, float lac, float gain, uint32_t seed);
 
-static float WorleyF1_Periodic(float x, float y, float z, int C, uint32_t seed);
+float WorleyF1_Periodic(float x, float y, float z, int C, uint32_t seed);
 
-static float WorleyFBM_Periodic(float xP, float yP, float zP, int P, int C0, int oct, float lac, float gain, uint32_t seed);
+float WorleyFBM_Periodic(float xP, float yP, float zP, int P, int C0, int oct, float lac, float gain, uint32_t seed);
 
-static float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, float lac = 2.0f, float gain = 0.5f);
+float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, float lac = 2.0f, float gain = 0.5f);
 
-static inline uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
+inline uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
 
-static inline uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch);
+uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch);
 
 static inline float WorleyInv_Periodic(float x, float y, float z, int C, uint32_t seed) {
     return 1.0f - WorleyF1_Periodic(x, y, z, C, seed);
@@ -269,15 +269,15 @@ private:
 using ValueNoiseTextureR32F = NoiseTexture<ValueNoiseR32F>;
 using FbmNoiseTextureR32F = NoiseTexture<FbmNoiseR32F>;
 using HashNoiseTextureRGBA8 = NoiseTexture<HashNoiseRGBA8>;
-using WeatherNoiseTextureRG8 = NoiseTexture<WeatherNoiseRG8>;
+using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 // =================================================================================================
 
 struct Noise3DParams {
     uint32_t seed{ 0x1234567u };
-    float base{ 2.032f };       // Basisfrequenz (wird intern auf ganze Frequenzen gemappt)
-    float lac{ 2.0f };          // Lacunarity (>= 1), nur Richtwert
-    int   oct{ 5 };             // Oktaven
+    float baseFrequency{ 2.032f };       // Basisfrequenz (wird intern auf ganze Frequenzen gemappt)
+    float lacunarity{ 2.0f };          // Lacunarity (>= 1), nur Richtwert
+    int   octaves{ 5 };             // Oktaven
     float initialGain{ 0.5f };  // Start-Amplitude
     float gain{ 0.5f };         // Amplitudenfall
     float warp{ 0.10f };        // Domain-Warp Stärke
@@ -303,6 +303,41 @@ private:
 	bool Allocate(int edgeSize);
 
 	void ComputeNoise(void);
+
+    bool LoadFromFile(const String& filename);
+
+    bool SaveToFile(const String& filename) const;
+};
+
+// =================================================================================================
+
+struct CloudVolumeParams {
+    uint32_t seed{ 0xC0FFEEu };
+    int      octaves{ 5 };        // wie fbm_clouds
+    float    baseFreq{ 2.032f };  // Startfrequenz
+    float    lacunarity{ 2.6434f };
+    float    initialGain{ 0.5f };        // Amplitudenabfall
+    float    gain{ 0.5f };        // Amplitudenabfall
+};
+
+class CloudVolume3D
+    : public Texture
+{
+public:
+    virtual void Deploy(int bufferIndex = 0) override;
+
+    virtual void SetParams(bool enforce = false) override;
+
+    bool Create(int edgeSize, const CloudVolumeParams& params, String noiseFilename = "");
+
+private:
+    int                 m_edgeSize{ 0 };
+    CloudVolumeParams   m_params;
+    ManagedArray<float> m_data;
+
+    bool Allocate(int edgeSize);
+
+    void Compute();
 
     bool LoadFromFile(const String& filename);
 
