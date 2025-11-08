@@ -203,7 +203,6 @@ public:
 
     void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
 
-
     inline size_t TextureCount(void)
         noexcept
     {

@@ -65,7 +65,7 @@ public:
         tcRotRight90
     } eTexCoordTransforms;
 
-    static std::initializer_list<Vector3f> defaultVertices[2];
+    static std::initializer_list<Vector3f> defaultVertices[3];
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
     BaseQuad()

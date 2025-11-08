@@ -21,9 +21,10 @@ VAO BaseQuad::staticVAO;
 
 // =================================================================================================
 
-std::initializer_list<Vector3f> BaseQuad::defaultVertices[2] = {
+std::initializer_list<Vector3f> BaseQuad::defaultVertices[3] = {
     { Vector3f{-0.5f, -0.5f, 0.0f}, Vector3f{-0.5f, 0.5f, 0.0f}, Vector3f{0.5f, 0.5f, 0.0f}, Vector3f{0.5f, -0.5f, 0.0f} },
-    { Vector3f{0.0f, 0.0f, 0.0f}, Vector3f{0.0f, 1.0f, 0.0f}, Vector3f{1.0f, 1.0f, 0.0f}, Vector3f{1.0f, 0.0f, 0.0f} }
+    { Vector3f{0.0f, 0.0f, 0.0f}, Vector3f{0.0f, 1.0f, 0.0f}, Vector3f{1.0f, 1.0f, 0.0f}, Vector3f{1.0f, 0.0f, 0.0f} },
+    { Vector3f{-0.5f, -0.5f, -1.0f}, Vector3f{-0.5f, 0.5f, -1.0f}, Vector3f{0.5f, 0.5f, -1.0f}, Vector3f{0.5f, -0.5f, -1.0f} }
 };
 
 std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
