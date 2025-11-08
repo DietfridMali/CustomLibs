@@ -362,13 +362,13 @@ using HashNoiseTextureRGBA8 = NoiseTexture<HashNoiseRGBA8>;
 
 struct Noise3DParams {
     uint32_t seed{ 0x1234567u };
-    float base{ 2.032f };      // Grundskala
-    float lac{ 2.6434f };      // Lacunarity
-    int oct{ 5 };            // Oktaven
-    float init_gain{ 0.5f };   // erste Amplitude
-    float gain{ 0.5f };        // Amplitudenabfall
-    float warp{ 0.10f };       // Domain warp
-    float rot_deg{ 11.25f };   // Rotation um Y
+    float base{ 2.032f };       // Basisfrequenz (wird intern auf ganze Frequenzen gemappt)
+    float lac{ 2.0f };          // Lacunarity (>= 1), nur Richtwert
+    int   oct{ 5 };             // Oktaven
+    float initialGain{ 0.5f };  // Start-Amplitude
+    float gain{ 0.5f };         // Amplitudenfall
+    float warp{ 0.10f };        // Domain-Warp Stärke
+    float rot_deg{ 11.25f };    // Rotation um Y-Achse
 };
 
 class NoiseTexture3D

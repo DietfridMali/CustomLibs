@@ -1,4 +1,4 @@
-
+﻿
 // --- tileable fBM noise (periodisch in X/Y) ---------------------------------
 #include <vector>
 #include <cstdint>
@@ -9,7 +9,7 @@
 #include "base_renderer.h"
 
 // =================================================================================================
-/* f�r volumetrische Wolken:
+/* für volumetrische Wolken:
     NoiseTexture3D shapeTex3D, detailTex3D;
 
     Noise3DParams pShape;
@@ -21,7 +21,7 @@
 
     Noise3DParams pDetail = pShape;
     pDetail.seed = 0x9e3779b9u;
-    pDetail.base = 0.6f;    // h�here Frequenz
+    pDetail.base = 0.6f;    // höhere Frequenz
     pDetail.lac = 2.8f;
     pDetail.oct = 4;
     pDetail.warp = 0.05f;
@@ -148,41 +148,104 @@ bool NoiseTexture3D::Create(int edgeSize, const Noise3DParams& params) {
 // ComputeNoise parametrisierbar gemacht (deine Simplex-FBM + Warp)
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
-    std::vector<int> perm;
-    BuildPermutation(perm, m_edgeSize, m_params.seed);
+    uint32_t seed = m_params.seed;
 
-    float rotc = cosf(m_params.rot_deg * 3.14159265f / 180.f);
-    float rots = sinf(m_params.rot_deg * 3.14159265f / 180.f);
-    float scaleBase = float(m_edgeSize) / m_params.base;
+    float rot = m_params.rot_deg * (3.14159265f / 180.0f);
+    float cr = cosf(rot);
+    float sr = sinf(rot);
 
-    float norm = m_params.init_gain * (1.f - powf(m_params.gain, float(m_params.oct))) / (1.f - m_params.gain);
-    if (norm <= 0.f) norm = 1.f;
+    // Periodenwahl: Volumen soll bei s,t,r in [0,1] nahtlos sein -> interne Periode P
+    int P = m_edgeSize;
+
+    int oct = (m_params.oct > 0) ? m_params.oct : 1;
+    float gain = m_params.gain;
+    float a0 = (m_params.initialGain > 0.0f) ? m_params.initialGain : 1.0f;
+
+    float norm;
+    if (fabsf(gain - 1.0f) < 1e-6f)
+        norm = a0 * (float)oct;
+    else
+        norm = a0 * (1.0f - powf(gain, (float)oct)) / (1.0f - gain);
+    if (norm <= 0.0f)
+        norm = 1.0f;
+
+    // Heuristik: base < 1 → Detail-Volume, sonst Shape-Volume
+    bool isDetail = (m_params.base < 1.0f);
+
+    // Worley base cells (Masterarbeit: verschiedene Frequenzen; hier fix, aber periodisch)
+    int cellShape = 16;
+    int cellDetail = 32;
+
+    float baseFreq = (m_params.base > 0.0f) ? m_params.base : 1.0f;
+    float lac = (m_params.lac > 1.0f) ? m_params.lac : 2.0f;
 
     size_t idx = 0;
+
     for (int z = 0; z < m_edgeSize; ++z)
         for (int y = 0; y < m_edgeSize; ++y)
             for (int x = 0; x < m_edgeSize; ++x) {
-                float X = x / scaleBase, Y = y / scaleBase, Z = z / scaleBase;
+                // Normalisierte Texturkoordinate in [0,1)
+                float u = (x + 0.5f) / (float)m_edgeSize;
+                float v = (y + 0.5f) / (float)m_edgeSize;
+                float w = (z + 0.5f) / (float)m_edgeSize;
 
-                float Xr = rotc * X - rots * Z;
+                // In periodischen Raum [0,P)
+                float X = u * (float)P;
+                float Y = v * (float)P;
+                float Z = w * (float)P;
+
+                // Rotation um Y (nur für Variation, bleibt periodisch)
+                float Xr = cr * X - sr * Z;
                 float Yr = Y;
-                float Zr = rots * X + rotc * Z;
+                float Zr = sr * X + cr * Z;
 
-                float wx = SNoise3Periodic(Xr * 2.31f, Yr * 2.31f, Zr * 2.31f, perm, m_edgeSize);
-                float wy = SNoise3Periodic(Xr * 2.31f + 17.f, Yr * 2.31f, Zr * 2.31f, perm, m_edgeSize);
-                float wz = SNoise3Periodic(Xr * 2.31f, Yr * 2.31f + 11.f, Zr * 2.31f, perm, m_edgeSize);
-                Xr += m_params.warp * wx; 
-                Yr += m_params.warp * wy; 
+                // Periodischer Domain-Warp (Perlin3_Periodic mit gleicher Periode)
+                float wf = 3.0f;
+                float wx = Perlin3_Periodic(Xr * wf + 17.0f, Yr * wf, Zr * wf, P, seed ^ 0x1111u);
+                float wy = Perlin3_Periodic(Xr * wf, Yr * wf + 11.0f, Zr * wf, P, seed ^ 0x2222u);
+                float wz = Perlin3_Periodic(Xr * wf, Yr * wf, Zr * wf + 29.0f, P, seed ^ 0x3333u);
+
+                Xr += m_params.warp * wx;
+                Yr += m_params.warp * wy;
                 Zr += m_params.warp * wz;
 
-                float s = 0.f, a = m_params.init_gain, f = 1.f;
-                for (int o = 0; o < m_params.oct; ++o) {
-                    s += a * fabsf(SNoise3Periodic(Xr * f, Yr * f, Zr * f, perm, m_edgeSize));
-                    a *= m_params.gain; 
-                    f *= m_params.lac;
+                // ----------------------------
+                // Periodische Perlin-fBm (Basis)
+                // ----------------------------
+                float sPerlin = 0.0f;
+                float a = a0;
+                float freq = baseFreq;
+
+                for (int o = 0; o < oct; ++o) {
+                    int fi = (int)(freq + 0.5f);
+                    if (fi < 1) {
+                        fi = 1;
+                    }
+                    float n = Perlin3_Periodic(Xr * (float)fi, Yr * (float)fi, Zr * (float)fi, P, seed + (uint32_t)(131 * o));
+                    sPerlin += a * n;
+                    a *= gain;
+                    freq *= lac;
                 }
-                s /= norm;
-                data[idx++] = std::clamp((s - 0.28f) * 1.9f, 0.0f, 1.0f);
+
+                sPerlin /= norm;
+                float perlin01 = 0.5f + 0.5f * sPerlin;
+                perlin01 = std::clamp(perlin01, 0.0f, 1.0f);
+
+                // ----------------------------
+                // Worley-fBm (periodisch)
+                // ----------------------------
+                float val;
+                if (not isDetail) {
+                    // Shape: Perlin-Worley (Masterarbeit: R-Kanal)
+                    // WorleyFBM_Periodic nutzt WorleyInv_Periodic → liefert bereits "invertiert"
+                    val = perlin01 * WorleyFBM_Periodic(Xr, Yr, Zr, P, cellShape, 3, 2.0f, 0.5f, seed ^ 0x51u);
+                    // Kombination wie üblich: Perlin (weich) * Worley-invert (Zellen)
+                }
+                else {
+                    // Detail: reines Worley-fBm mit höherer Frequenz
+                    val = WorleyFBM_Periodic(Xr, Yr, Zr, P, cellDetail, 4, 2.0f, 0.5f, seed ^ 0x1337u);
+                }
+                data[idx++] = std::clamp(val, 0.0f, 1.0f);
             }
 }
 
