@@ -10,7 +10,7 @@ struct ValueNoiseR32F {};     // dein aktueller #if 1 Pfad (Hash2i, 1 Kanal)
 struct FbmNoiseR32F {};   // dein #else Pfad (fbmPeriodic, 1 Kanal)
 struct HashNoiseRGBA8 {};         // neu: 4 Kanäle uint8, weißes Tile-Noise
 
-// -------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Helpers
 
 static inline uint8_t ToByte01(float v) {
@@ -26,7 +26,7 @@ static inline float Hash2i(int ix, int iy) {
 
 static inline uint32_t Hash3D(uint32_t x, uint32_t y, uint32_t z, uint32_t seed);
 
-// -------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Periodischer Perlin 3D + fBm
 float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, float lac, float gain, uint32_t seed);
 
@@ -44,7 +44,7 @@ static inline float WorleyInv_Periodic(float x, float y, float z, int C, uint32_
     return 1.0f - WorleyF1_Periodic(x, y, z, C, seed);
 }
 
-// -------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
 // Traits
 template<class Tag> struct NoiseTraits;
 
@@ -72,6 +72,7 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
     }
 };
 
+// -------------------------------------------------------------------------------------------------
 // 2D fbm (unverändert)
 template<> struct NoiseTraits<FbmNoiseR32F> {
     using PixelT = float;
@@ -101,6 +102,7 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
     }
 };
 
+// -------------------------------------------------------------------------------------------------
 // RGBA8: R = Perlin × (1−Worley), G/B/A = Worley-fBm, je Kanal doppelte Grundfrequenz
 template<> struct NoiseTraits<HashNoiseRGBA8> {
     using PixelT = uint8_t;
@@ -162,6 +164,8 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
     }
 };
 
+// -------------------------------------------------------------------------------------------------
+
 struct WeatherNoiseRG8 {};
 
 template<>
@@ -203,7 +207,60 @@ struct NoiseTraits<WeatherNoiseRG8> {
     }
 };
 
-// -------------------------------------------------------------
+// -------------------------------------------------------------------------------------------------
+
+template<> struct NoiseTraits<BlueNoiseR8> {
+    using PixelT = uint8_t;
+    static constexpr GLenum IFmt = GL_R8;
+    static constexpr GLenum EFmt = GL_RED;
+    static constexpr GLenum Type = GL_UNSIGNED_BYTE;
+    static constexpr int    Components = 1;
+
+    static void SetParams(GLenum target) {
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    }
+
+    static void Compute(ManagedArray<uint8_t>& data, int edgeSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/) {
+        const int N = edgeSize;
+        data.Resize(N * N);
+        // Zwischenspeicher für White Noise
+        std::vector<float> white(N * N);
+
+        // White Noise (periodisch durch Wrap in Hash)
+        for (int y = 0; y < N; ++y) {
+            for (int x = 0; x < N; ++x) {
+                // Pseudozufall über vorhandenen Hash
+                uint32_t h = HashXYC32(x, y, 0x1234567u, 0u);
+                float v = (h & 0x00FFFFFFu) * (1.0f / 16777216.0f); // [0,1)
+                white[y * N + x] = v;
+            }
+        }
+
+        // Lokaler Highpass: Wert - lokaler Mittelwert (3x3) + 0.5
+        uint8_t* dst = data.Data();
+        for (int y = 0; y < N; ++y) {
+            for (int x = 0; x < N; ++x) {
+                float sum = 0.0f;
+                for (int dy = -1; dy <= 1; ++dy) {
+                    int yy = Wrap(y + dy, N);
+                    for (int dx = -1; dx <= 1; ++dx) {
+                        int xx = Wrap(x + dx, N);
+                        sum += white[yy * N + xx];
+                    }
+                }
+                float m = sum * (1.0f / 9.0f);
+                float v = white[y * N + x] - m + 0.5f; // Highpass + Rezentrierung
+                v = std::clamp(v, 0.0f, 1.0f);
+                *dst++ = ToByte01(v);
+            }
+        }
+    }
+};
+
+// -------------------------------------------------------------------------------------------------
 // Texture-Wrapper wie im Original
 template<class Tag>
 class NoiseTexture 
@@ -266,9 +323,12 @@ private:
     }
 };
 
-using ValueNoiseTextureR32F = NoiseTexture<ValueNoiseR32F>;
-using FbmNoiseTextureR32F = NoiseTexture<FbmNoiseR32F>;
-using HashNoiseTextureRGBA8 = NoiseTexture<HashNoiseRGBA8>;
+// -------------------------------------------------------------------------------------------------
+
+using ValueNoiseTexture = NoiseTexture<ValueNoiseR32F>;
+using FbmNoiseTexture = NoiseTexture<FbmNoiseR32F>;
+using HashNoiseTexture = NoiseTexture<HashNoiseRGBA8>;
+using BlueNoiseTexture = NoiseTexture<BlueNoiseR8>;
 using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 // =================================================================================================
