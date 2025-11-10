@@ -245,8 +245,10 @@ namespace Noise {
         GridPosf GradDecode(float p, const GridPosf& ns) {
             float h = p - 49.f * floorf(p * ns.z * ns.z);
             GridPosf g;
-            g.x = floorf(h * ns.z) * ns.x + ns.y;
-            g.y = floorf(h - 7.f * g.x) * ns.x + ns.y;
+            g.x = floorf(h * ns.z);
+            g.y = floorf(h - 7.f * g.x);
+            g.x = g.x * ns.x + ns.y;
+            g.y = g.y * ns.x + ns.y;
             g.z = 1.f - fabsf(g.x) - fabsf(g.y);
             float sx = (g.x < 0.f) ? -1.f : 1.f;
             float sy = (g.y < 0.f) ? -1.f : 1.f;
@@ -280,12 +282,14 @@ namespace Noise {
         };
 
         float t = (i.x + i.y + i.z) * G;
-        GridPosf x0 = (v - i) + t;
+
+        Simplexf offsets;
+        offsets.p[0] = (v - i) + t;
 
         GridPosf g{
-            (x0.x >= x0.y) ? 1.f : 0.f,
-            (x0.y >= x0.z) ? 1.f : 0.f,
-            (x0.z >= x0.x) ? 1.f : 0.f
+            (offsets.p[0].x >= offsets.p[0].y) ? 1.f : 0.f,
+            (offsets.p[0].y >= offsets.p[0].z) ? 1.f : 0.f,
+            (offsets.p[0].z >= offsets.p[0].x) ? 1.f : 0.f
         };
 
         GridPosf l = 1.f - g;
@@ -301,50 +305,51 @@ namespace Noise {
             fmaxf(g.z, l.y)
         };
 
-        GridPosf x1 = (x0 - i1) + G;
-        GridPosf x2 = (x0 - i2) + F;
-        GridPosf x3 = x0 - 0.5f;
+        offsets.p[1] = (offsets.p[0] - i1) + G;
+        offsets.p[2] = (offsets.p[0] - i2) + F;
+        offsets.p[3] = offsets.p[0] - 0.5f;
 
         // mod289(i)
         i.Mod289();
 
         // vec4 p
-        float p0 = Permute(Permute(Permute(i.z + 0.f) + i.y + 0.f) + i.x + 0.f);
-        float p1 = Permute(Permute(Permute(i.z + i1.z) + i.y + i1.y) + i.x + i1.x);
-        float p2 = Permute(Permute(Permute(i.z + i2.z) + i.y + i2.y) + i.x + i2.x);
-        float p3 = Permute(Permute(Permute(i.z + 1.f) + i.y + 1.f) + i.x + 1.f);
+        float perm[4]{
+            Permute(Permute(Permute(i.z + 0.f) + i.y + 0.f) + i.x + 0.f),
+            Permute(Permute(Permute(i.z + i1.z) + i.y + i1.y) + i.x + i1.x),
+            Permute(Permute(Permute(i.z + i2.z) + i.y + i2.y) + i.x + i2.x),
+            Permute(Permute(Permute(i.z + 1.f) + i.y + 1.f) + i.x + 1.f)
+        };
 
-        const float n = 1.f / 7.f;
-        GridPosf ns{ 2.f * n, 0.5f * n - 1.f, n };
+        const float m = 1.f / 7.f;
+        GridPosf ns{ 2.f * m, 0.5f * m - 1.f, m };
 
-        GridPosf g0 = GradDecode(p0, ns);
-        GridPosf g1 = GradDecode(p1, ns);
-        GridPosf g2 = GradDecode(p2, ns);
-        GridPosf g3 = GradDecode(p3, ns);
+        Simplexf gradients{
+            GradDecode(perm[0], ns),
+            GradDecode(perm[1], ns),
+            GradDecode(perm[2], ns),
+            GradDecode(perm[3], ns)
+        };
 
         auto Normalize = [&](GridPosf& g) {
             g *= TaylorInvSqrt(g.Dot(g));
             };
 
-        Normalize(g0);
-        Normalize(g1);
-        Normalize(g2);
-        Normalize(g3);
+        for (int i = 0; i < 4; i++)
+            Normalize(gradients.p[i]);
 
-        auto contrib = [&](const GridPosf& p, const GridPosf& g) {
-            float tt = 0.6f - p.x * p.x - p.y * p.y - p.z * p.z;
-            if (tt <= 0.f)
+        auto contrib = [&](const GridPosf& o, const GridPosf& g) {
+            float falloff = 0.6f - o.x * o.x - o.y * o.y - o.z * o.z;
+            if (falloff <= 0.f)
                 return 0.f;
-            tt *= tt;
-            return tt * tt * g.Dot(p);
+            falloff *= falloff;
+            return falloff * falloff * g.Dot(o);
             };
 
-        float n0 = contrib(x0, g0);
-        float n1 = contrib(x1, g1);
-        float n2 = contrib(x2, g2);
-        float n3 = contrib(x3, g3);
+        float n = 0;
+        for (int i = 0; i < 4; ++i)
+            n += contrib(offsets.p[i], gradients.p[i]);
 
-        return 42.f * (n0 + n1 + n2 + n3);
+        return 42.f * n;
     }
 
     // -------------------------------------------------------------------------------------------------

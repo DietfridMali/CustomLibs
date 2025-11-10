@@ -352,8 +352,7 @@ void NoiseTexture3D::SetParams(bool enforce) {
 void NoiseTexture3D::Deploy(int) {
     if (Bind()) {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data())
-        );
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
         SetParams(false);
         glGenerateMipmap(GL_TEXTURE_3D);
         Release();
@@ -453,14 +452,13 @@ void CloudVolume3D::Compute() {
 #else
 
 void CloudVolume3D::Compute(void) {
-    float* data = m_data.Data();
-
     SimplexAshimaFunctor noiseFn{};
     FBM<SimplexAshimaFunctor> fbm(noiseFn, m_params.fbmParams);
 
-
+    float* data = m_data.Data();
     size_t i = 0;
     float minVal = 1e6f, maxVal = 0.0f;
+    int belowCoverage = 0;
     for (int z = 0; z < m_gridSize; ++z) {
         float w = (float(z) + 0.5f) / float(m_gridSize);
         for (int y = 0; y < m_gridSize; ++y) {
@@ -473,11 +471,13 @@ void CloudVolume3D::Compute(void) {
                     minVal = n;
                 if (maxVal < n)
                     maxVal = n;
+                if (n < 0.3125)
+                    ++belowCoverage;
             }
         }
     }
 
-    if (m_params.normalize and (maxVal > 0.0f) and (maxVal < 0.999f)) {
+    if (m_params.normalize and (maxVal - minVal < 0.999f)) {
         for (; i; --i, ++data)
             Conversions::Normalize(*data, minVal, maxVal);
     }
