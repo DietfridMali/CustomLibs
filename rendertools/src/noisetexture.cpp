@@ -483,19 +483,17 @@ void NoiseTexture3D::ComputeNoise(void) {
     const int cellsPerAxis = 4;
     const float cellSize = float(m_gridSize) / float(cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
 
-    std::vector<int> perm;
-    BuildPermutation(perm, cellsPerAxis, m_params.seed);
 
     struct PerlinFunctor {
         const std::vector<int>& perm;
         int period;
         float operator()(float x, float y, float z) const {
-            return ImprovedPerlinNoise(x, y, z, perm, period); // ~[-1,1]
+            return Perlin::ImprovedNoise(x, y, z, perm, cellsPerAxis); // ~[-1,1]
         }
     };
 
     std::vector<int> perm;
-    BuildPermutation(perm, period, seed);
+    Perlin::BuildPermutation(perm, cellsPerAxis, m_params.seed);
     PerlinFunctor perlinFn{ perm, cellsPerAxis };
     FBM<PerlinFunctor> fbm(perlinFn, m_params.fbmParams);
 
@@ -503,21 +501,22 @@ void NoiseTexture3D::ComputeNoise(void) {
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
 
-    for (int z = 0; z < gridSize; ++z) {
-        float w = float(z) / float(gridSize) * cellsPerAxis;
-        for (int y = 0; y < gridSize; ++y) {
-            float v = float(y) / float(gridSize) * cellsPerAxis;
-            for (int x = 0; x < gridSize; ++x) {
-                float u = float(x) / float(gridSize) * cellsPerAxis;
+    int i = 0;
+    for (int z = 0; z < m_gridSize; ++z) {
+        float w = float(z) / float(m_gridSize) * cellsPerAxis;
+        for (int y = 0; y < m_gridSize; ++y) {
+            float v = float(y) / float(m_gridSize) * cellsPerAxis;
+            for (int x = 0; x < m_gridSize; ++x) {
+                float u = float(x) / float(m_gridSize) * cellsPerAxis;
 
-                noise.x = fbm.Value(x, y, z); // [0,1]
+                noise.x = fbm.Value(u, v, w); // [0,1]
                 minVals.Minimize(noise);
                 maxVals.Maximize(noise);
 
-                data[idx++] = std::clamp(noise.x, 0.0f, 1.0f);
-                data[idx++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
-                data[idx++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
-                data[idx++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
+                data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
+                data[i++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
+                data[i++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
+                data[i++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
             }
         }
     }

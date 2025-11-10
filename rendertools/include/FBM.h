@@ -22,7 +22,7 @@ private:
         float a = m_params.initialGain;
         float f = m_params.frequency;
         for (int i = 0; i < m_params.octaves; i++) {
-            v += a * m_noise(x * f, y * f, z * f);
+            v += a * m_noiseFn(x * f, y * f, z * f);
             a *= m_params.gain;
             f *= m_params.lacunarity;
         }
@@ -31,7 +31,7 @@ private:
 
 public:
     FBM(const NoiseFn& f, const FBMParams& p) 
-        : m_noise(f), m_params(p) 
+        : m_noiseFn(f), m_params(p) 
     {
         float a = p.initialGain;
         m_normal = 0.f;
