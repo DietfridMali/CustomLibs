@@ -1,10 +1,23 @@
 #pragma once
 
+#include "FBM.h"
+
 // =================================================================================================
+
+struct NoiseParams {
+    uint32_t    seed{ 0x1234567u };
+    int         cellsPerAxis{ 8 };
+    int         normalize{ 1 };
+    FBMParams   fbmParams;
+};
+
+// -------------------------------------------------------------------------------------------------
 
 namespace Noise
 {
     inline int WrapInt(int v, int p) {
+        if (p < 2)
+            return v;
         int r = v % p;
         return (r < 0) ? r + p : r;
     }
@@ -168,17 +181,58 @@ namespace Noise
 
     // -------------------------------------------------------------------------------------------------
     
+    void BuildPermutation(std::vector<int>& perm, int period, uint32_t seed);
+
     float Perlin(float x, float y, float z); // 3D perlin noise
 
-	float ImprovedNoise(float x, float y, float z, const std::vector<int>& perm, int period);
+	float ImprovedPerlin(float x, float y, float z, const std::vector<int>& perm, int period);
 
-	void BuildPermutation(std::vector<int>& perm, int period, uint32_t seed);
-
-	float SimplexPerlin(float x, float y, float z);
+	float SimplexPerlin(float x, float y, float z, int period);
 
 	float SimplexAshima(float x, float y, float z);
 
-    float Worley(const GridPosf& p, int period);
+    float Worley(float x, float y, float z, int period);
+
+    uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
+
+    uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch);
+
+    // -------------------------------------------------------------------------------------------------
+
+    struct PerlinFunctor {
+        float operator()(float x, float y, float z) const {
+            return Noise::Perlin(x, y, z); // ~[-1,1]
+        }
+    };
+
+    struct ImprovedPerlinFunctor {
+        const std::vector<int>& perm;
+        int period;
+        float operator()(float x, float y, float z) const {
+            return Noise::ImprovedPerlin(x, y, z, perm, period); // ~[-1,1]
+        }
+    };
+
+    struct SimplexPerlinFunctor {
+        int period;
+        float operator()(float x, float y, float z) const {
+            return Noise::SimplexPerlin(x, y, z, period);
+        }
+    };
+
+    struct SimplexAshimaFunctor {
+        float operator()(float x, float y, float z) const {
+            return Noise::SimplexAshima(x, y, z);
+        }
+    };
+
+    struct WorleyFunctor {
+        int period;
+        float operator()(float x, float y, float z) const {
+            return Noise::Worley(x, y, z, period);
+        }
+    };
+
 };
 
 // =================================================================================================

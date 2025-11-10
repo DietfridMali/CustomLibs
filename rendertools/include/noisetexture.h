@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "texture.h"
-#include "perlin.h"
+#include "noise.h"
 #include "FBM.h"
 
 // =================================================================================================
@@ -32,24 +32,6 @@ static inline float Hash2i(int ix, int iy) {
 }
 
 static inline uint32_t Hash3D(uint32_t x, uint32_t y, uint32_t z, uint32_t seed);
-
-// -------------------------------------------------------------------------------------------------
-// Periodischer Perlin 3D + fBm
-float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, float lac, float gain, uint32_t seed);
-
-float WorleyF1_Periodic(float x, float y, float z, int C, uint32_t seed);
-
-float WorleyFBM_Periodic(float xP, float yP, float zP, int P, int C0, int oct, float lac, float gain, uint32_t seed);
-
-float fbmPeriodic(float x, float y, int perX, int perY, int octaves = 3, float lac = 2.0f, float gain = 0.5f);
-
-inline uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
-
-uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch);
-
-static inline float WorleyInv_Periodic(float x, float y, float z, int C, uint32_t seed) {
-    return 1.0f - WorleyF1_Periodic(x, y, z, C, seed);
-}
 
 // -------------------------------------------------------------------------------------------------
 // Traits
@@ -102,8 +84,8 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
             for (int x = 0; x < gridSize; ++x) {
                 float sx = (x + 0.5f) / gridSize * float(yPeriod);
                 float sy = (y + 0.5f) / gridSize * float(xPeriod);
-                float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
-                *dataPtr++ = std::clamp(n, 0.0f, 1.0f);
+                //float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
+                //*dataPtr++ = std::clamp(n, 0.0f, 1.0f);
             }
         }
     }
@@ -144,12 +126,11 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
         const int C_B = C0 * 2;
         const int C_A = C0 * 4;
         const int C_R = 32;            // für (1−Worley) im R-Kanal
-
+#if 0
         for (int y = 0; y < gridSize; ++y) {
             float yP = ((y + 0.5f) * fy) * float(P);
             for (int x = 0; x < gridSize; ++x) {
                 float xP = ((x + 0.5f) * fx) * float(P);
-
                 // R: Perlin × (1 − Worley)
                 float per = PerlinFBM3_Periodic(xP, yP, zP, P, 1, 2.0f, 0.5f, seed ^ 0xA5A5A5u);
                 float wR = WorleyInv_Periodic(xP * (float)C_R / float(P),
@@ -168,6 +149,7 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
                 *dataPtr++ = ToByte01(A);
             }
         }
+#endif
     }
 };
 
@@ -198,7 +180,7 @@ struct NoiseTraits<WeatherNoiseRG8> {
             for (int x = 0; x < gridSize; ++x) {
                 float u = (x + 0.5f) / gridSize * xPeriod;
                 float v = (y + 0.5f) / gridSize * yPeriod;
-
+#if 0
                 // Coverage: großskaliges fbm
                 float cov = fbmPeriodic(u, v, xPeriod, yPeriod, octaves, 2.0f, 0.5f);
                 cov = std::clamp((cov - 0.35f) * 1.6f, 0.0f, 1.0f);
@@ -209,6 +191,7 @@ struct NoiseTraits<WeatherNoiseRG8> {
 
                 *dst++ = ToByte01(cov);
                 *dst++ = ToByte01(hb);
+#endif
             }
         }
     }
@@ -242,7 +225,7 @@ template<> struct NoiseTraits<BlueNoiseR8> {
         for (int y = 0; y < N; ++y) {
             for (int x = 0; x < N; ++x) {
                 // Pseudozufall über vorhandenen Hash
-                uint32_t h = HashXYC32(x, y, 0x1234567u, 0u);
+                uint32_t h = Noise::HashXYC32(x, y, 0x1234567u, 0u);
                 float v = (h & 0x00FFFFFFu) * (1.0f / 16777216.0f); // [0,1)
                 white[y * N + x] = v;
             }
@@ -342,13 +325,6 @@ using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 // =================================================================================================
 
-struct Noise3DParams {
-    uint32_t    seed{ 0x1234567u };
-    int         cellsPerAxis{ 8 };
-    int         normalize{ 1 };
-    FBMParams   fbmParams;
-};
-
 class NoiseTexture3D
 	: public Texture
 {
@@ -357,11 +333,11 @@ public:
 
 	virtual void SetParams(bool enforce = false) override;
 
-	bool Create(int gridSize, const Noise3DParams& params, String noiseFilename = "");
+	bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "");
 
 private:
-	int             m_gridSize;
-    Noise3DParams   m_params;
+	int         m_gridSize;
+    NoiseParams m_params;
 
 	ManagedArray<float>	m_data;
 
@@ -376,15 +352,6 @@ private:
 
 // =================================================================================================
 
-struct CloudVolumeParams {
-    uint32_t seed{ 0xC0FFEEu };
-    int      octaves{ 5 };        // wie fbm_clouds
-    float    baseFreq{ 1.0f };  // Startfrequenz
-    float    lacunarity{ 3.0f };
-    float    initialGain{ 0.5f };        // Amplitudenabfall
-    float    gain{ 0.5f };        // Amplitudenabfall
-};
-
 class CloudVolume3D
     : public Texture
 {
@@ -393,11 +360,11 @@ public:
 
     virtual void SetParams(bool enforce = false) override;
 
-    bool Create(int gridSize, const CloudVolumeParams& params, String noiseFilename = "");
+    bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "");
 
 private:
     int                 m_gridSize{ 0 };
-    CloudVolumeParams   m_params;
+    NoiseParams         m_params;
     ManagedArray<float> m_data;
 
     bool Allocate(int gridSize);

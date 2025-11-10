@@ -354,42 +354,56 @@ namespace Noise {
     }
 
     // F1 (nächster Featurepunkt)
-    float Worley(const GridPosf& p, int period) {
-        GridPosf pf = p;
-        if (period > 1)
-            pf.Wrap(period);
+    float Worley(float x, float y, float z, int period) {
+        GridPosf p(x, y, z);
+        p.Wrap(period);
 
-        GridPosi base(
-            (int)floorf(pf.x),
-            (int)floorf(pf.y),
-            (int)floorf(pf.z)
-        );
+        GridPosi base((int)floorf(p.x), (int)floorf(p.y), (int)floorf(p.z));
+        GridPosi c;
 
-        float d2min = FLT_MAX;
-
-        for (int dz = -1; dz <= 1; ++dz)
-            for (int dy = -1; dy <= 1; ++dy)
+        float dMin = FLT_MAX;
+        for (int dz = -1; dz <= 1; ++dz) {
+            c.z = WrapInt(base.z + dz, period);
+            for (int dy = -1; dy <= 1; ++dy) {
+                c.y = WrapInt(base.y + dy, period);
                 for (int dx = -1; dx <= 1; ++dx) {
-                    GridPosi c(base.x + dx, base.y + dy, base.z + dz);
-                    if (period > 1)
-                        c.Wrap(period);
-
-                    uint32_t h = Hash(c.x, c.y, c.z);
-                    float jx = HashToUnit01(h);
-                    float jy = HashToUnit01(h * 0x9E3779B1u);
-                    float jz = HashToUnit01(h * 0xBB67AE85u);
-
-                    GridPosf fp((float)c.x + jx, (float)c.y + jy, (float)c.z + jz);
-                    GridPosf d(fp.x - pf.x, fp.y - pf.y, fp.z - pf.z);
-
-                    float d2 = d.x * d.x + d.y * d.y + d.z * d.z;
-                    if (d2 < d2min) d2min = d2;
+                    c.x = WrapInt(base.x + dx, period);
+                    uint32_t h = Hash(c);
+                    GridPosf j(HashToUnit01(h), HashToUnit01(h * 0x9E3779B1u), HashToUnit01(h * 0xBB67AE85u));
+                    GridPosf o = j + c; // ((float)c.x + jx, (float)c.y + jy, (float)c.z + jz);
+                    GridPosf d = o - p;
+                    float d = d.Dot(d);
+                    if (d < dMin) 
+                        dMin = d;
                 }
 
-        float d = sqrtf(d2min) * (1.0f / 1.7320508075688772f);
-        if (d < 0.f) d = 0.f;
-        if (d > 1.f) d = 1.f;
-        return d;
+        float d = sqrtf(dMin) * (1.0f / 1.7320508075688772f);
+        return std::clamp(d, 0.0f, 1.0f);
+    }
+
+    // -------------------------------------------------------------------------------------------------
+
+    uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch) {
+        float phase = float((seed ^ (ch * 0x9E3779B9u)) & 0xFFFFu) * (1.0f / 65536.0f);
+        float t = float(ix) * 127.1f + float(iy) * 311.7f + phase;
+        float s = std::sin(t) * 43758.5453f;
+        float f = s - std::floor(s);
+        int   v = int(f * 255.0f + 0.5f);
+        return (uint8_t)std::min(v, 255);
+    }
+
+
+    uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch) {
+        uint32_t v = (uint32_t)x;
+        v ^= (uint32_t)y * 0x27d4eb2dU;
+        v ^= seed * 0x9e3779b9U;
+        v ^= (ch + 1U) * 0x85ebca6bU;
+        v ^= v >> 16;
+        v *= 0x7feb352dU;
+        v ^= v >> 15;
+        v *= 0x846ca68bU;
+        v ^= v >> 16;
+        return v;
     }
 
 };
