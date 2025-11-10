@@ -65,10 +65,6 @@ namespace Noise
         }
     };
 
-    inline float Dot(const GridPosf& a, const GridPosf& b) {
-        return a.x * b.x + a.y * b.y + a.z * b.z;
-    }
-
     // -------------------------------------------------------------------------------------------------
     
     float Perlin(float x, float y, float z); // 3D perlin noise

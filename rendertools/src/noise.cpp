@@ -39,6 +39,14 @@ namespace Noise {
             return h;
         }
 
+        inline float Dot(const GridPosf& a, const GridPosf& b) {
+            return a.x * b.x + a.y * b.y + a.z * b.z;
+        }
+    };
+
+    // -------------------------------------------------------------------------------------------------
+    // 3D Perlin, nicht periodisch, ~[-1,1]
+    namespace {
         inline grad3 RandomGradient(int ix, int iy, int iz) {
             uint32_t h = Hash(ix, iy, iz);
             return gradLUT[h % 12];
@@ -51,75 +59,7 @@ namespace Noise {
             float dz = z - (float)iz;
             return dx * g.x + dy * g.y + dz * g.z;
         }
-
-        inline grad3 PermGradient(int x, int y, int z, const std::vector<int>& perm, int period) {
-            int a = perm[WrapInt(x, period)];
-            int b = perm[(a + WrapInt(y, period)) % period];
-            int c = perm[(b + WrapInt(z, period)) % period];
-            return gradLUT[c % 12];
-        }
-
-        inline float DotPermGradient(int ix, int iy, int iz, float x, float y, float z, const std::vector<int>& perm, int period) {
-            grad3 g = PermGradient(ix, iy, iz, perm, period);
-            float dx = x - (float)ix;
-            float dy = y - (float)iy;
-            float dz = z - (float)iz;
-            return dx * g.x + dy * g.y + dz * g.z;
-        }
-
-        inline float Dot(const GridPosf& a, const GridPosf& b) {
-            return a.x * b.x + a.y * b.y + a.z * b.z;
-        }
-
-        struct SimplexOffset {
-            int i, j, k; 
-        };
-
-        struct Simplex {
-            GridPosi o[4];
-        };
-
-        inline const Simplex& SelectSimplex(const GridPosf& p) {
-            static const Simplex lut[6] = {
-                {{{0,0,0},{1,0,0},{1,1,0},{1,1,1}}}, // X>=Y>=Z
-                {{{0,0,0},{1,0,0},{1,0,1},{1,1,1}}}, // X>=Z>Y
-                {{{0,0,0},{0,0,1},{1,0,1},{1,1,1}}}, // Z>X>=Y
-                {{{0,0,0},{0,0,1},{0,1,1},{1,1,1}}}, // Z>Y>X
-                {{{0,0,0},{0,1,0},{0,1,1},{1,1,1}}}, // Y>=Z>X
-                {{{0,0,0},{0,1,0},{1,1,0},{1,1,1}}}  // Y>=X>=Z
-            };
-            if (p.x >= p.y) {
-                if (p.y >= p.z) return lut[0];
-                if (p.x >= p.z) return lut[1];
-                return lut[2];
-            }
-            else {
-                if (p.y < p.z)  return lut[3];
-                if (p.x < p.z)  return lut[4];
-                return lut[5];
-            }
-        }
-
-        GridPosf GradDecode(float p, GridPosf& ns) {
-            float h = p - 49.f * floorf(p * ns.z * ns.z);
-            float x = floorf(h * ns.z);
-            float y = floorf(h - 7.f * x);
-            GridPosf g;
-            g.x = x * ns.x + ns.y;
-            g.y = y * ns.x + ns.y;
-            g.z = 1.f - fabsf(g.x) - fabsf(g.y);
-            float sx = (g.x < 0.f) ? -1.f : 1.f;
-            float sy = (g.y < 0.f) ? -1.f : 1.f;
-            if (g.z < 0.f) {
-                g.x += sx;
-                g.y += sy;
-            }
-            return g;
-        }
     };
-
-    // -------------------------------------------------------------------------------------------------
-    // 3D Perlin, nicht periodisch, ~[-1,1]
 
     float Perlin(float x, float y, float z) {
         int x0 = (int)floorf(x);
@@ -166,6 +106,23 @@ namespace Noise {
 
     // -------------------------------------------------------------------------------------------------
 
+    namespace {
+        inline grad3 PermGradient(int x, int y, int z, const std::vector<int>& perm, int period) {
+            int a = perm[WrapInt(x, period)];
+            int b = perm[(a + WrapInt(y, period)) % period];
+            int c = perm[(b + WrapInt(z, period)) % period];
+            return gradLUT[c % 12];
+        }
+
+        inline float DotPermGradient(int ix, int iy, int iz, float x, float y, float z, const std::vector<int>& perm, int period) {
+            grad3 g = PermGradient(ix, iy, iz, perm, period);
+            float dx = x - (float)ix;
+            float dy = y - (float)iy;
+            float dz = z - (float)iz;
+            return dx * g.x + dy * g.y + dz * g.z;
+        }
+    };
+
     float ImprovedPerlin(float x, float y, float z, const std::vector<int>& perm, int period) {
         int x0 = (int)floorf(x), x1 = x0 + 1;
         int y0 = (int)floorf(y), y1 = y0 + 1;
@@ -196,6 +153,38 @@ namespace Noise {
     }
 
     // -------------------------------------------------------------------------------------------------
+
+    namespace {
+
+        struct SimplexOffset {
+            int i, j, k;
+        };
+
+        struct Simplex {
+            GridPosi o[4];
+        };
+
+        inline const Simplex& SelectSimplex(const GridPosf& p) {
+            static const Simplex lut[6] = {
+                {{{0,0,0},{1,0,0},{1,1,0},{1,1,1}}}, // X>=Y>=Z
+                {{{0,0,0},{1,0,0},{1,0,1},{1,1,1}}}, // X>=Z>Y
+                {{{0,0,0},{0,0,1},{1,0,1},{1,1,1}}}, // Z>X>=Y
+                {{{0,0,0},{0,0,1},{0,1,1},{1,1,1}}}, // Z>Y>X
+                {{{0,0,0},{0,1,0},{0,1,1},{1,1,1}}}, // Y>=Z>X
+                {{{0,0,0},{0,1,0},{1,1,0},{1,1,1}}}  // Y>=X>=Z
+            };
+            if (p.x >= p.y) {
+                if (p.y >= p.z) return lut[0];
+                if (p.x >= p.z) return lut[1];
+                return lut[2];
+            }
+            else {
+                if (p.y < p.z)  return lut[3];
+                if (p.x < p.z)  return lut[4];
+                return lut[5];
+            }
+        }
+    };
 
     float SimplexPerlin(float x, float y, float z, int period) {
         const float F = 1.f / 3.f;
@@ -251,6 +240,25 @@ namespace Noise {
     }
 
     // -------------------------------------------------------------------------------------------------
+
+    namespace {
+        GridPosf GradDecode(float p, GridPosf& ns) {
+            float h = p - 49.f * floorf(p * ns.z * ns.z);
+            float x = floorf(h * ns.z);
+            float y = floorf(h - 7.f * x);
+            GridPosf g;
+            g.x = x * ns.x + ns.y;
+            g.y = y * ns.x + ns.y;
+            g.z = 1.f - fabsf(g.x) - fabsf(g.y);
+            float sx = (g.x < 0.f) ? -1.f : 1.f;
+            float sy = (g.y < 0.f) ? -1.f : 1.f;
+            if (g.z < 0.f) {
+                g.x += sx;
+                g.y += sy;
+            }
+            return g;
+        }
+    };
 
     float SimplexAshima(float x, float y, float z) {
         const float Cx = 1.f / 6.f;
