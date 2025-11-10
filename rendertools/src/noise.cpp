@@ -52,15 +52,10 @@ namespace Noise {
             return dx * g.x + dy * g.y + dz * g.z;
         }
 
-        inline int Wrap(int x, int period) {
-            int r = x % period;
-            return r < 0 ? r + period : r;
-        }
-
         inline grad3 PermGradient(int x, int y, int z, const std::vector<int>& perm, int period) {
-            int a = perm[Wrap(x, period)];
-            int b = perm[(a + Wrap(y, period)) % period];
-            int c = perm[(b + Wrap(z, period)) % period];
+            int a = perm[WrapInt(x, period)];
+            int b = perm[(a + WrapInt(y, period)) % period];
+            int c = perm[(b + WrapInt(z, period)) % period];
             return gradLUT[c % 12];
         }
 
@@ -72,19 +67,19 @@ namespace Noise {
             return dx * g.x + dy * g.y + dz * g.z;
         }
 
-        struct gridPos {
-            float x, y, z;
-        };
+        inline float Dot(const GridPosf& a, const GridPosf& b) {
+            return a.x * b.x + a.y * b.y + a.z * b.z;
+        }
 
-        struct SimplexOffset { 
+        struct SimplexOffset {
             int i, j, k; 
         };
 
-        struct Simplex { 
-            SimplexOffset o[4]; 
+        struct Simplex {
+            GridPosi o[4];
         };
 
-        inline const Simplex& SelectSimplex(const gridPos& p) {
+        inline const Simplex& SelectSimplex(const GridPosf& p) {
             static const Simplex lut[6] = {
                 {{{0,0,0},{1,0,0},{1,1,0},{1,1,1}}}, // X>=Y>=Z
                 {{{0,0,0},{1,0,0},{1,0,1},{1,1,1}}}, // X>=Z>Y
@@ -105,11 +100,11 @@ namespace Noise {
             }
         }
 
-        gridPos GradDecode(float p, gridPos& ns) {
+        GridPosf GradDecode(float p, GridPosf& ns) {
             float h = p - 49.f * floorf(p * ns.z * ns.z);
             float x = floorf(h * ns.z);
             float y = floorf(h - 7.f * x);
-            gridPos g;
+            GridPosf g;
             g.x = x * ns.x + ns.y;
             g.y = y * ns.x + ns.y;
             g.z = 1.f - fabsf(g.x) - fabsf(g.y);
@@ -202,7 +197,7 @@ namespace Noise {
 
     // -------------------------------------------------------------------------------------------------
 
-    inline float SimplexPerlin(float x, float y, float z, int period) {
+    float SimplexPerlin(float x, float y, float z, int period) {
         const float F = 1.f / 3.f;
         const float G = 1.f / 6.f;
 
@@ -212,47 +207,34 @@ namespace Noise {
         int k = (int)floorf(z + s);
 
         float t = (i + j + k) * G;
-        gridPos p0{ x - i + t, y - j + t, z - k + t };
+        GridPosf p0(x - i + t, y - j + t, z - k + t);
 
         const Simplex& sp = SelectSimplex(p0);
+        const GridPosi& o1 = sp.o[1];
+        const GridPosi& o2 = sp.o[2];
 
-        gridPos p1{
-            p0.x - sp.o[1].i + G,
-            p0.y - sp.o[1].j + G,
-            p0.z - sp.o[1].k + G
-        };
-        gridPos p2{
-            p0.x - sp.o[2].i + 2.f * G,
-            p0.y - sp.o[2].j + 2.f * G,
-            p0.z - sp.o[2].k + 2.f * G
-        };
-        gridPos p3{
-            p0.x - 1.f + 3.f * G,
-            p0.y - 1.f + 3.f * G,
-            p0.z - 1.f + 3.f * G
-        };
+        GridPosf p1(p0.x - o1.x + G, p0.y - o1.y + G, p0.z - o1.z + G);
+        GridPosf p2(p0.x - o2.x + 2.f * G, p0.y - o2.y + 2.f * G, p0.z - o2.z + 2.f * G);
+        GridPosf p3(p0.x - 1.f + 3.f * G, p0.y - 1.f + 3.f * G, p0.z - 1.f + 3.f * G);
 
-        SimplexOffset lp[4] = {
-            { i + sp.o[0].i, j + sp.o[0].j, k + sp.o[0].k },
-            { i + sp.o[1].i, j + sp.o[1].j, k + sp.o[1].k },
-            { i + sp.o[2].i, j + sp.o[2].j, k + sp.o[2].k },
-            { i + sp.o[3].i, j + sp.o[3].j, k + sp.o[3].k }
+        GridPosi lp[4] = {
+            GridPosi(i + sp.o[0].x, j + sp.o[0].y, k + sp.o[0].z),
+            GridPosi(i + sp.o[1].x, j + sp.o[1].y, k + sp.o[1].z),
+            GridPosi(i + sp.o[2].x, j + sp.o[2].y, k + sp.o[2].z),
+            GridPosi(i + sp.o[3].x, j + sp.o[3].y, k + sp.o[3].z)
         };
 
         if (period > 1) {
-            for (int c = 0; c < 4; ++c) {
-                lp[c].i = Wrap(lp[c].i, period);
-                lp[c].j = Wrap(lp[c].j, period);
-                lp[c].k = Wrap(lp[c].k, period);
-            }
+            for (int c = 0; c < 4; ++c)
+                lp[c].Wrap(period);
         }
 
-        uint32_t h0 = Hash(lp[0].i, lp[0].j, lp[0].k);
-        uint32_t h1 = Hash(lp[1].i, lp[1].j, lp[1].k);
-        uint32_t h2 = Hash(lp[2].i, lp[2].j, lp[2].k);
-        uint32_t h3 = Hash(lp[3].i, lp[3].j, lp[3].k);
+        uint32_t h0 = Hash(lp[0].x, lp[0].y, lp[0].z);
+        uint32_t h1 = Hash(lp[1].x, lp[1].y, lp[1].z);
+        uint32_t h2 = Hash(lp[2].x, lp[2].y, lp[2].z);
+        uint32_t h3 = Hash(lp[3].x, lp[3].y, lp[3].z);
 
-        auto contrib = [&](const gridPos& p, uint32_t h) {
+        auto contrib = [&](const GridPosf& p, uint32_t h) {
             float tt = 0.6f - (p.x * p.x + p.y * p.y + p.z * p.z);
             if (tt <= 0.f) return 0.f;
             tt *= tt;
@@ -286,21 +268,21 @@ namespace Noise {
             return 1.79284291400159f - 0.85373472095314f * r;
             };
 
-        auto Dot = [](const gridPos& a, const gridPos& b) {
+        auto Dot = [](const GridPosf& a, const GridPosf& b) {
             return a.x * b.x + a.y * b.y + a.z * b.z;
             };
 
-        gridPos v{ x, y, z };
+        GridPosf v{ x, y, z };
 
         float s = (v.x + v.y + v.z) * Cy;
-        gridPos i{
+        GridPosf i{
             floorf(v.x + s),
             floorf(v.y + s),
             floorf(v.z + s)
         };
 
         float t = (i.x + i.y + i.z) * Cx;
-        gridPos x0{
+        GridPosf x0{
             v.x - i.x + t,
             v.y - i.y + t,
             v.z - i.z + t
@@ -314,28 +296,28 @@ namespace Noise {
         float ly = 1.f - gy;
         float lz = 1.f - gz;
 
-        gridPos i1{
+        GridPosf i1{
             fminf(gx, lz),
             fminf(gy, lx),
             fminf(gz, ly)
         };
-        gridPos i2{
+        GridPosf i2{
             fmaxf(gx, lz),
             fmaxf(gy, lx),
             fmaxf(gz, ly)
         };
 
-        gridPos x1{
+        GridPosf x1{
             x0.x - i1.x + Cx,
             x0.y - i1.y + Cx,
             x0.z - i1.z + Cx
         };
-        gridPos x2{
+        GridPosf x2{
             x0.x - i2.x + Cy,
             x0.y - i2.y + Cy,
             x0.z - i2.z + Cy
         };
-        gridPos x3{
+        GridPosf x3{
             x0.x - 0.5f,
             x0.y - 0.5f,
             x0.z - 0.5f
@@ -353,14 +335,14 @@ namespace Noise {
         float p3 = Permute(Permute(Permute(i.z + 1.f) + i.y + 1.f) + i.x + 1.f);
 
         const float n = 1.f / 7.f;
-        gridPos ns{ 2.f * n, 0.5f * n - 1.f, n };
+        GridPosf ns{ 2.f * n, 0.5f * n - 1.f, n };
 
-        gridPos g0 = GradDecode(p0, ns);
-        gridPos g1 = GradDecode(p1, ns);
-        gridPos g2 = GradDecode(p2, ns);
-        gridPos g3 = GradDecode(p3, ns);
+        GridPosf g0 = GradDecode(p0, ns);
+        GridPosf g1 = GradDecode(p1, ns);
+        GridPosf g2 = GradDecode(p2, ns);
+        GridPosf g3 = GradDecode(p3, ns);
 
-        auto Normalize = [&](gridPos& g) {
+        auto Normalize = [&](GridPosf& g) {
             float i = TaylorInvSqrt(g.x * g.x + g.y * g.y + g.z * g.z);
             g.x *= i;
             g.y *= i;
@@ -372,7 +354,7 @@ namespace Noise {
         Normalize(g2);
         Normalize(g3);
 
-        auto contrib = [&](const gridPos& p, const gridPos& g) {
+        auto contrib = [&](const GridPosf& p, const GridPosf& g) {
             float tt = 0.6f - p.x * p.x - p.y * p.y - p.z * p.z;
             if (tt <= 0.f)
                 return 0.f;
@@ -387,6 +369,52 @@ namespace Noise {
 
         return 42.f * (n0 + n1 + n2 + n3);
     }
+
+    // -------------------------------------------------------------------------------------------------
+
+    inline float HashToUnit01(uint32_t h) {
+        return (h & 0x00FFFFFFu) * (1.0f / 16777216.0f);
+    }
+
+    // F1 (nächster Featurepunkt)
+    float Worley(const GridPosf& p, int period) {
+        GridPosf pf = p;
+        if (period > 1)
+            pf.Wrap(period);
+
+        GridPosi base(
+            (int)floorf(pf.x),
+            (int)floorf(pf.y),
+            (int)floorf(pf.z)
+        );
+
+        float d2min = FLT_MAX;
+
+        for (int dz = -1; dz <= 1; ++dz)
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx) {
+                    GridPosi c(base.x + dx, base.y + dy, base.z + dz);
+                    if (period > 1)
+                        c.Wrap(period);
+
+                    uint32_t h = Hash(c.x, c.y, c.z);
+                    float jx = HashToUnit01(h);
+                    float jy = HashToUnit01(h * 0x9E3779B1u);
+                    float jz = HashToUnit01(h * 0xBB67AE85u);
+
+                    GridPosf fp((float)c.x + jx, (float)c.y + jy, (float)c.z + jz);
+                    GridPosf d(fp.x - pf.x, fp.y - pf.y, fp.z - pf.z);
+
+                    float d2 = d.x * d.x + d.y * d.y + d.z * d.z;
+                    if (d2 < d2min) d2min = d2;
+                }
+
+        float d = sqrtf(d2min) * (1.0f / 1.7320508075688772f);
+        if (d < 0.f) d = 0.f;
+        if (d > 1.f) d = 1.f;
+        return d;
+    }
+
 };
 
 // =================================================================================================
