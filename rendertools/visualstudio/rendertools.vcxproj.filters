@@ -272,7 +272,7 @@
     <ClCompile Include="..\src\billboard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\cpp\perrlin.cpp">
+    <ClCompile Include="..\cpp\perlin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -35,6 +35,8 @@ static inline float R01(uint32_t h) { return (h >> 8) * (1.0f / 16777216.0f); } 
 
 
 static float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, float lac, float gain, uint32_t seed) {
+    return 0;
+#if 0
     float a = 1.f;
     float sum = 0.f;
     float norm = 0.f;
@@ -53,6 +55,7 @@ static float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, floa
     float v = sum / norm;        // grob [-1,1]
     v = 0.5f + 0.5f * v;         // -> [0,1]
     return std::clamp(v, 0.0f, 1.0f);
+#endif
 }
 
 // -------------------------------------------------------------
@@ -477,38 +480,53 @@ bool NoiseTexture3D::Create(int gridSize, const Noise3DParams& params, String no
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
 
-    const float cellSize = float (m_gridSize) / 4.0f; // Anzahl Perlin-Zellen pro Kachel
+    const int cellsPerAxis = 4;
+    const float cellSize = float(m_gridSize) / float(cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
+
     std::vector<int> perm;
-    BuildPermutation(perm, perlinPeriod, m_params.seed);
+    BuildPermutation(perm, cellsPerAxis, m_params.seed);
 
-    const int C0 = m_gridSize / 8;
-    int C_R = C0;
-    int C_G = C0 * 2;
-    int C_B = C0 * 4;
-    int C_A = C0 * 8;
-
-    float perlinNorm = 0.0f;
-    {
-        float a = m_params.initialGain;
-        for (int o = 0; o < m_params.octaves; ++o) {
-            perlinNorm += a;
-            a *= m_params.gain;
+    struct PerlinFunctor {
+        const std::vector<int>& perm;
+        int period;
+        float operator()(float x, float y, float z) const {
+            return ImprovedPerlinNoise(x, y, z, perm, period); // ~[-1,1]
         }
-        if (perlinNorm <= 0.0f)
-            perlinNorm = 1.0f;
-    }
+    };
 
-    size_t idx = 0;
+    std::vector<int> perm;
+    BuildPermutation(perm, period, seed);
+    PerlinFunctor perlinFn{ perm, cellsPerAxis };
+    FBM<PerlinFunctor> fbm(perlinFn, m_params.fbmParams);
 
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
 
+    for (int z = 0; z < gridSize; ++z) {
+        float w = float(z) / float(gridSize) * cellsPerAxis;
+        for (int y = 0; y < gridSize; ++y) {
+            float v = float(y) / float(gridSize) * cellsPerAxis;
+            for (int x = 0; x < gridSize; ++x) {
+                float u = float(x) / float(gridSize) * cellsPerAxis;
+
+                noise.x = fbm.Value(x, y, z); // [0,1]
+                minVals.Minimize(noise);
+                maxVals.Maximize(noise);
+
+                data[idx++] = std::clamp(noise.x, 0.0f, 1.0f);
+                data[idx++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
+                data[idx++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
+                data[idx++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
+            }
+        }
+    }
+
+#   if 0
     for (int z = 0; z < m_gridSize; ++z) {
         for (int y = 0; y < m_gridSize; ++y) {
             for (int x = 0; x < m_gridSize; ++x) {
                 noise.x = PerlinNoise(float(x) / cellSize, float(y) / cellSize, float(z) / cellSize);
-#   if 0
                 // Perlin-fBm für Basis
                 float perlin = 0.0f;
                 float a = m_params.initialGain;
@@ -543,7 +561,6 @@ void NoiseTexture3D::ComputeNoise(void) {
                 noise.w = WorleyFBM_Tiled(X, Y, Z, m_gridSize, C_A, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xCAFEu);
 #       endif
 #   endif
-#endif
                 minVals.Minimize(noise);
                 maxVals.Maximize(noise);
 
@@ -554,6 +571,7 @@ void NoiseTexture3D::ComputeNoise(void) {
             }
         }
     }
+#endif
 
 #if 0
     for (int i = 0; i < idx; i += 4) {

@@ -149,7 +149,7 @@
     <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\cpp\perrlin.cpp" />
+    <ClCompile Include="..\cpp\perlin.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />

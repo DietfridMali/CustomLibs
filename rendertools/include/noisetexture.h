@@ -1,6 +1,8 @@
 ﻿#pragma once
 
 #include "texture.h"
+#include "perlin.h"
+#include "FBM.h"
 
 // =================================================================================================
 // 4 layers of periodic noise: R - Perlin-Worley, GBA: Worley-FBM with doubled frequency for each successive channel
@@ -342,13 +344,8 @@ using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 struct Noise3DParams {
     uint32_t seed{ 0x1234567u };
-    float    baseFrequency{ 2.0f };   // integer
-    float    lacunarity{ 2.0f };   // integer
-    int      octaves{ 5 };
-    float    initialGain{ 0.5f };
-    float    gain{ 0.5f };
-    float    warp{ 0.0f };   // siehe unten
-    float    rot_deg{ 0.0f };   // siehe unten
+    int     cellsPerAxis{ 4 };
+    FBMParams   fbmParams;
 };
 
 class NoiseTexture3D
