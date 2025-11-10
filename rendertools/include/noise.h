@@ -31,11 +31,15 @@ namespace Noise
             return GridPos(x - other.x, y - other.y, z - other.z);
         }
         GridPos& operator+=(const GridPos& other) {
-            x += other.x; y += other.y; z += other.z; 
+            x += other.x; 
+            y += other.y; 
+            z += other.z; 
             return *this;
         }
         GridPos& operator-=(const GridPos& other) {
-            x -= other.x; y -= other.y; z -= other.z; 
+            x -= other.x; 
+            y -= other.y; 
+            z -= other.z; 
             return *this;
         }
 
@@ -73,6 +77,10 @@ namespace Noise
         friend GridPos operator-(T n, const GridPos& p) {
             return GridPos(n - p.x, n - p.y, n - p.z);
         }
+
+        T Sum(void) {
+            return x + y + z;
+        }
     };
 
     class GridPosi 
@@ -96,6 +104,16 @@ namespace Noise
         : public GridPos<float> {
     public:
         using GridPos<float>::GridPos;
+        using GridPos<float>::operator+;   // wichtig
+        using GridPos<float>::operator-;
+        using GridPos<float>::operator+=;
+        using GridPos<float>::operator-=;
+        using GridPos<float>::operator*=;
+        using GridPos<float>::operator*;
+
+        GridPosf(float x, float y, float z)
+            : GridPos<float>(x, y, z) 
+        { }
 
         GridPosf(const GridPos<float>& p)
             : GridPos<float>(p) {}
@@ -112,6 +130,28 @@ namespace Noise
                 y = wrap(y);
                 z = wrap(z);
             }
+        }
+
+        GridPosf& operator+=(const GridPosi& other) {
+            x += float(other.x);
+            y += float(other.y);
+            z += float(other.z);
+            return *this;
+        }
+
+        GridPosf operator+(const GridPosi& other) const {
+            return GridPosf(x + float(other.x), y + float(other.y), z + float(other.z));
+        }
+
+        GridPosf& operator-=(const GridPosi& other) {
+            x -= float(other.x);
+            y -= float(other.y);
+            z -= float(other.z);
+            return *this;
+        }
+
+        GridPosf operator-(const GridPosi& other) const {
+            return GridPosf(x - float(other.x), y - float(other.y), z - float(other.z));
         }
 
         float Dot(const GridPosf& other) const {

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <vector>
 
+#include "array.hpp"
 #include "noise.h"
 
 // =================================================================================================
@@ -160,12 +161,16 @@ namespace Noise {
             int i, j, k;
         };
 
-        struct Simplex {
-            GridPosi o[4];
+        struct Simplexi {
+            GridPosi p[4];
         };
 
-        inline const Simplex& SelectSimplex(const GridPosf& p) {
-            static const Simplex lut[6] = {
+        struct Simplexf {
+            GridPosf p[4];
+        };
+
+        inline const Simplexi& SelectSimplex(const GridPosf& p) {
+            static const Simplexi lut[6] = {
                 {{{0,0,0},{1,0,0},{1,1,0},{1,1,1}}}, // X>=Y>=Z
                 {{{0,0,0},{1,0,0},{1,0,1},{1,1,1}}}, // X>=Z>Y
                 {{{0,0,0},{0,0,1},{1,0,1},{1,1,1}}}, // Z>X>=Y
@@ -184,6 +189,10 @@ namespace Noise {
                 return lut[5];
             }
         }
+
+        inline uint32_t Hash(const GridPosi& p) {
+            return Hash(p.x, p.y, p.z);
+        }
     };
 
     float SimplexPerlin(float x, float y, float z, int period) {
@@ -191,53 +200,43 @@ namespace Noise {
         const float G = 1.f / 6.f;
 
         float s = (x + y + z) * F;
-        int i = (int)floorf(x + s);
-        int j = (int)floorf(y + s);
-        int k = (int)floorf(z + s);
 
-        float t = (i + j + k) * G;
-        GridPosf p0(x - i + t, y - j + t, z - k + t);
+        GridPosi base((int)floorf(x + s), (int)floorf(y + s), (int)floorf(z + s));
+        float t = base.Sum() * G;
 
-        const Simplex& sp = SelectSimplex(p0);
-        const GridPosi& o1 = sp.o[1];
-        const GridPosi& o2 = sp.o[2];
+        Simplexf pos;
+        pos.p[0] = (GridPosf(x, y, z) - base) + t;
 
-        GridPosf p1(p0.x - o1.x + G, p0.y - o1.y + G, p0.z - o1.z + G);
-        GridPosf p2(p0.x - o2.x + 2.f * G, p0.y - o2.y + 2.f * G, p0.z - o2.z + 2.f * G);
-        GridPosf p3(p0.x - 1.f + 3.f * G, p0.y - 1.f + 3.f * G, p0.z - 1.f + 3.f * G);
+        const Simplexi& offsets = SelectSimplex(pos.p[0]);
+        pos.p[1] = (pos.p[0] - offsets.p[1]) + G;
+        pos.p[2] = (pos.p[0] - offsets.p[2]) + G * 2.f;
+        pos.p[3] = (pos.p[0] - GridPosi(1, 1, 1)) + G * 3.f;
 
-        GridPosi lp[4] = {
-            GridPosi(i + sp.o[0].x, j + sp.o[0].y, k + sp.o[0].z),
-            GridPosi(i + sp.o[1].x, j + sp.o[1].y, k + sp.o[1].z),
-            GridPosi(i + sp.o[2].x, j + sp.o[2].y, k + sp.o[2].z),
-            GridPosi(i + sp.o[3].x, j + sp.o[3].y, k + sp.o[3].z)
-        };
+        Simplexi corners;
+        for (int i = 0; i < 4; ++i)
+            corners.p[i] = base + offsets.p[i];
+
 
         if (period > 1) {
-            for (int c = 0; c < 4; ++c)
-                lp[c].Wrap(period);
+            for (int i = 0; i < 4; ++i)
+                corners.p[i].Wrap(period);
         }
 
-        uint32_t h0 = Hash(lp[0].x, lp[0].y, lp[0].z);
-        uint32_t h1 = Hash(lp[1].x, lp[1].y, lp[1].z);
-        uint32_t h2 = Hash(lp[2].x, lp[2].y, lp[2].z);
-        uint32_t h3 = Hash(lp[3].x, lp[3].y, lp[3].z);
-
-        auto contrib = [&](const GridPosf& p, uint32_t h) {
-            float falloff = 0.6f - (p.x * p.x + p.y * p.y + p.z * p.z);
+        auto contrib = [&](const GridPosf& p, uint32_t hash) {
+            float falloff = 0.6f - p.Dot(p);
             if (falloff <= 0.f) 
                 return 0.f;
-            const grad3& g = gradLUT[h % 12];
+            const grad3& g = gradLUT[hash % 12];
+            float dot = g.x * p.x + g.y * p.y + g.z * p.z;
             falloff *= falloff;
-            return falloff * falloff * (g.x * p.x + g.y * p.y + g.z * p.z);
+            return falloff * falloff * dot;
             };
 
-        float n0 = contrib(p0, h0);
-        float n1 = contrib(p1, h1);
-        float n2 = contrib(p2, h2);
-        float n3 = contrib(p3, h3);
+        float n = 0;
+        for (int i = 0; i < 4; i++)
+            n += contrib(pos.p[i], Hash(corners.p[i]));
 
-        return 32.f * (n0 + n1 + n2 + n3);
+        return 32.f * n;
     }
 
     // -------------------------------------------------------------------------------------------------
