@@ -224,11 +224,12 @@ namespace Noise {
         uint32_t h3 = Hash(lp[3].x, lp[3].y, lp[3].z);
 
         auto contrib = [&](const GridPosf& p, uint32_t h) {
-            float tt = 0.6f - (p.x * p.x + p.y * p.y + p.z * p.z);
-            if (tt <= 0.f) return 0.f;
-            tt *= tt;
+            float falloff = 0.6f - (p.x * p.x + p.y * p.y + p.z * p.z);
+            if (falloff <= 0.f) 
+                return 0.f;
             const grad3& g = gradLUT[h % 12];
-            return tt * tt * (g.x * p.x + g.y * p.y + g.z * p.z);
+            falloff *= falloff;
+            return falloff * falloff * (g.x * p.x + g.y * p.y + g.z * p.z);
             };
 
         float n0 = contrib(p0, h0);
