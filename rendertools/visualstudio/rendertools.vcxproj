@@ -103,6 +103,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\h\perlin.h" />
     <ClInclude Include="..\include\base_shadercode.h" />
     <ClInclude Include="..\include\billboard.h" />
     <ClInclude Include="..\include\colordata.h" />
@@ -147,6 +148,7 @@
     <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\cpp\perrlin.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />

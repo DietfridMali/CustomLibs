@@ -153,6 +153,9 @@
     <ClInclude Include="..\include\billboard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\h\perlin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\cube.cpp">
@@ -264,6 +267,9 @@
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\billboard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\cpp\perrlin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
