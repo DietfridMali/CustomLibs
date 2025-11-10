@@ -13,6 +13,11 @@ struct HashNoiseRGBA8 {};         // neu: 4 Kanäle uint8, weißes Tile-Noise
 // -------------------------------------------------------------------------------------------------
 // Helpers
 
+static inline int  Wrap(int a, int p) { 
+    int r = a % p; 
+    return r < 0 ? r + p : r; 
+}
+
 static inline uint8_t ToByte01(float v) {
     int iv = (int)std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f);
     return (uint8_t)std::clamp(iv, 0, 255);
@@ -209,6 +214,8 @@ struct NoiseTraits<WeatherNoiseRG8> {
 
 // -------------------------------------------------------------------------------------------------
 
+struct BlueNoiseR8 {};
+
 template<> struct NoiseTraits<BlueNoiseR8> {
     using PixelT = uint8_t;
     static constexpr GLenum IFmt = GL_R8;
@@ -335,13 +342,13 @@ using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 struct Noise3DParams {
     uint32_t seed{ 0x1234567u };
-    float baseFrequency{ 2.032f };       // Basisfrequenz (wird intern auf ganze Frequenzen gemappt)
-    float lacunarity{ 2.0f };          // Lacunarity (>= 1), nur Richtwert
-    int   octaves{ 5 };             // Oktaven
-    float initialGain{ 0.5f };  // Start-Amplitude
-    float gain{ 0.5f };         // Amplitudenfall
-    float warp{ 0.10f };        // Domain-Warp Stärke
-    float rot_deg{ 11.25f };    // Rotation um Y-Achse
+    float    baseFrequency{ 2.0f };   // integer
+    float    lacunarity{ 2.0f };   // integer
+    int      octaves{ 5 };
+    float    initialGain{ 0.5f };
+    float    gain{ 0.5f };
+    float    warp{ 0.0f };   // siehe unten
+    float    rot_deg{ 0.0f };   // siehe unten
 };
 
 class NoiseTexture3D
@@ -374,8 +381,8 @@ private:
 struct CloudVolumeParams {
     uint32_t seed{ 0xC0FFEEu };
     int      octaves{ 5 };        // wie fbm_clouds
-    float    baseFreq{ 2.032f };  // Startfrequenz
-    float    lacunarity{ 2.6434f };
+    float    baseFreq{ 1.0f };  // Startfrequenz
+    float    lacunarity{ 3.0f };
     float    initialGain{ 0.5f };        // Amplitudenabfall
     float    gain{ 0.5f };        // Amplitudenabfall
 };

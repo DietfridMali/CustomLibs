@@ -8,6 +8,7 @@
 
 #include "noisetexture.h"
 #include "base_renderer.h"
+#include "conversions.hpp"
 
 #define NORMALIZE_NOISE 0
 
@@ -15,8 +16,6 @@
 // Helpers
 
 static inline float Fade(float t) { return t * t * t * (t * (t * 6.f - 15.f) + 10.f); }
-
-static inline int  Wrap(int a, int p) { int r = a % p; return r < 0 ? r + p : r; }
 
 uint32_t Hash3D(uint32_t x, uint32_t y, uint32_t z, uint32_t seed) {
     uint32_t v = x * 0x27d4eb2du ^ (y + 0x9e3779b9u); v ^= z * 0x85ebca6bu ^ seed;
@@ -28,7 +27,25 @@ static inline float R01(uint32_t h) { return (h >> 8) * (1.0f / 16777216.0f); } 
 
 // -------------------------------------------------------------
 // Periodischer Perlin 3D + fBm
-static inline void Grad3(uint32_t h, float& gx, float& gy, float& gz) {
+static SimpleArray<Vector3f, 12> grad3Table{
+    Vector3f(1,1,0),
+    Vector3f(-1,1,0),
+    Vector3f(1,-1,0),
+    Vector3f(-1,-1,0),
+    Vector3f(1,0,1),
+    Vector3f(-1,0,1),
+    Vector3f(1,0,-1),
+    Vector3f(-1,0,-1),
+    Vector3f(0,1,1),
+    Vector3f(0,-1,1),
+    Vector3f(0,1,-1),
+    Vector3f(0,-1,-1)
+};
+
+static inline Vector3f& Grad3(uint32_t h) {
+#if 1
+    return grad3Table[h % 12];
+#else
     switch (h % 12u) {
     case 0: 
         gx = 1; gy = 1; gz = 0; 
@@ -67,84 +84,133 @@ static inline void Grad3(uint32_t h, float& gx, float& gy, float& gz) {
         gx = 0; gy = -1; gz = -1; 
         break;
     }
+#endif
 }
 
 static float Perlin3_Periodic(float x, float y, float z, int P, uint32_t seed) {
-    int xi0 = (int)std::floor(x), yi0 = (int)std::floor(y), zi0 = (int)std::floor(z);
-    float xf = x - xi0, yf = y - yi0, zf = z - zi0;
-    int xi1 = xi0 + 1, yi1 = yi0 + 1, zi1 = zi0 + 1;
-    int X0 = Wrap(xi0, P), X1 = Wrap(xi1, P);
-    int Y0 = Wrap(yi0, P), Y1 = Wrap(yi1, P);
-    int Z0 = Wrap(zi0, P), Z1 = Wrap(zi1, P);
+    int xi0 = (int)floorf(x);
+    int yi0 = (int)floorf(y);
+    int zi0 = (int)floorf(z);
+
+    float xf = x - xi0;
+    float yf = y - yi0;
+    float zf = z - zi0;
+
+    int xi1 = xi0 + 1;
+    int yi1 = yi0 + 1;
+    int zi1 = zi0 + 1;
+
+    int X0 = Wrap(xi0, P);
+    int X1 = Wrap(xi1, P);
+    int Y0 = Wrap(yi0, P);
+    int Y1 = Wrap(yi1, P);
+    int Z0 = Wrap(zi0, P);
+    int Z1 = Wrap(zi1, P);
 
     auto dotg = [&](int ix, int iy, int iz, float dx, float dy, float dz) {
-        float gx, gy, gz; Grad3(Hash3D(ix, iy, iz, seed), gx, gy, gz);
-        return gx * dx + gy * dy + gz * dz;
+        Vector3f g = Grad3(Hash3D((uint32_t)ix, (uint32_t)iy, (uint32_t)iz, seed));
+        return g.x * dx + g.y * dy + g.z * dz;
         };
-    float n000 = dotg(X0, Y0, Z0, xf, yf, zf);
-    float n100 = dotg(X1, Y0, Z0, xf - 1, yf, zf);
-    float n010 = dotg(X0, Y1, Z0, xf, yf - 1, zf);
-    float n110 = dotg(X1, Y1, Z0, xf - 1, yf - 1, zf);
-    float n001 = dotg(X0, Y0, Z1, xf, yf, zf - 1);
-    float n101 = dotg(X1, Y0, Z1, xf - 1, yf, zf - 1);
-    float n011 = dotg(X0, Y1, Z1, xf, yf - 1, zf - 1);
-    float n111 = dotg(X1, Y1, Z1, xf - 1, yf - 1, zf - 1);
 
-    float u = Fade(xf), v = Fade(yf), w = Fade(zf);
+    float n000 = dotg(X0, Y0, Z0, xf, yf, zf);
+    float n100 = dotg(X1, Y0, Z0, xf - 1.f, yf, zf);
+    float n010 = dotg(X0, Y1, Z0, xf, yf - 1.f, zf);
+    float n110 = dotg(X1, Y1, Z0, xf - 1.f, yf - 1.f, zf);
+    float n001 = dotg(X0, Y0, Z1, xf, yf, zf - 1.f);
+    float n101 = dotg(X1, Y0, Z1, xf - 1.f, yf, zf - 1.f);
+    float n011 = dotg(X0, Y1, Z1, xf, yf - 1.f, zf - 1.f);
+    float n111 = dotg(X1, Y1, Z1, xf - 1.f, yf - 1.f, zf - 1.f);
+
+    float u = Fade(xf);
+    float v = Fade(yf);
+    float w = Fade(zf);
+
     float nx00 = n000 + (n100 - n000) * u;
     float nx10 = n010 + (n110 - n010) * u;
     float nx01 = n001 + (n101 - n001) * u;
     float nx11 = n011 + (n111 - n011) * u;
+
     float nxy0 = nx00 + (nx10 - nx00) * v;
     float nxy1 = nx01 + (nx11 - nx01) * v;
-    return nxy0 + (nxy1 - nxy0) * w; // ~[-1,1]
+
+    float nxyz = nxy0 + (nxy1 - nxy0) * w; // ~[-1,1]
+    return nxyz;
 }
 
+
 static float PerlinFBM3_Periodic(float x, float y, float z, int P, int oct, float lac, float gain, uint32_t seed) {
-    float a = 1.f, sum = 0.f, norm = 0.f;
+    float a = 1.f;
+    float sum = 0.f;
+    float norm = 0.f;
+
     for (int i = 0; i < oct; ++i) {
-        sum += a * Perlin3_Periodic(x, y, z, P, seed + uint32_t(i * 131));
-        norm += a; a *= gain; x *= lac; y *= lac; z *= lac; P = int(P * lac);
+        sum += a * Perlin3_Periodic(x, y, z, P, seed + (uint32_t)(i * 131));
+        norm += a;
+        a *= gain;
+        x *= lac;
+        y *= lac;
+        z *= lac;
     }
-    return 0.5f + 0.5f * (sum / std::max(norm, 1e-6f)); // [0,1]
+
+    if (norm <= 0.f) 
+        return 0.5f;
+    float v = sum / norm;        // grob [-1,1]
+    v = 0.5f + 0.5f * v;         // -> [0,1]
+    return std::clamp(v, 0.0f, 1.0f);
 }
 
 // -------------------------------------------------------------
 // Periodischer Worley 3D (F1) + invertiert + fBm
-float WorleyF1_Periodic(float x, float y, float z, int C, uint32_t seed) {
-    int cx = (int)std::floor(x), cy = (int)std::floor(y), cz = (int)std::floor(z);
+float WorleyF1_Periodic(float X, float Y, float Z, int period, int cells, uint32_t seed) {
+    float scale = float(cells) / float(period);
+    float x = X * scale;
+    float y = Y * scale;
+    float z = Z * scale;
+    int cx = int(floorf(x));
+    int cy = int(floorf(y));
+    int cz = int(floorf(z));
     float dmin = 1e9f;
-    for (int dz = -1; dz <= 1; ++dz) for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) {
-        int ix = Wrap(cx + dx, C), iy = Wrap(cy + dy, C), iz = Wrap(cz + dz, C);
-        uint32_t h = Hash3D((uint32_t)ix, (uint32_t)iy, (uint32_t)iz, seed);
-        float jx = R01(h);
-        float jy = R01(h * 0x9e3779b9u + 0x7f4a7c15u);
-        float jz = R01(h * 0x85ebca6bu + 0xc2b2ae35u);
-        float fx = (ix + jx), fy = (iy + jy), fz = (iz + jz);
-
-        float dxw = std::fabs(x - fx); dxw = std::min(dxw, float(C) - dxw);
-        float dyw = std::fabs(y - fy); dyw = std::min(dyw, float(C) - dyw);
-        float dzw = std::fabs(z - fz); dzw = std::min(dzw, float(C) - dzw);
-        float d = std::sqrt(dxw * dxw + dyw * dyw + dzw * dzw);
-        dmin = std::min(dmin, d);
-    }
-    const float invMax = 1.0f / 1.7320508075688772f; // 1/sqrt(3)
+    for (int dz = -1; dz <= 1; dz++)
+        for (int dy = -1; dy <= 1; dy++)
+            for (int dx = -1; dx <= 1; dx++) {
+                int ix = Wrap(cx + dx, cells);
+                int iy = Wrap(cy + dy, cells);
+                int iz = Wrap(cz + dz, cells);
+                uint32_t h = Hash3D((uint32_t)ix, (uint32_t)iy, (uint32_t)iz, seed);
+                float jx = R01(h);
+                float jy = R01(h * 0x9e3779b9u + 0x7f4a7c15u);
+                float jz = R01(h * 0x85ebca6bu + 0xc2b2ae35u);
+                float fx = float(ix) + jx;
+                float fy = float(iy) + jy;
+                float fz = float(iz) + jz;
+                float dxw = x - fx;
+                float dyw = y - fy;
+                float dzw = z - fz;
+                dxw -= floorf(dxw / float(cells) + 0.5f) * float(cells);
+                dyw -= floorf(dyw / float(cells) + 0.5f) * float(cells);
+                dzw -= floorf(dzw / float(cells) + 0.5f) * float(cells);
+                float d = sqrtf(dxw * dxw + dyw * dyw + dzw * dzw);
+                if (d < dmin) dmin = d;
+            }
+    float invMax = 1.0f / 1.7320508075688772f;
     return std::clamp(dmin * invMax, 0.0f, 1.0f);
 }
 
 
-static float WorleyFBM_Periodic(float xP, float yP, float zP, int P, int C0, int oct, float lac, float gain, uint32_t seed) {
-    float a = 1.f, sum = 0.f, norm = 0.f;
-    float sx = xP * (float)C0 / float(P);
-    float sy = yP * (float)C0 / float(P);
-    float sz = zP * (float)C0 / float(P);
-    int C = C0;
-    for (int i = 0; i < oct; ++i) {
-        sum += a * WorleyInv_Periodic(sx, sy, sz, C, seed + uint32_t(i * 733));
+float WorleyFBM_Periodic(float X, float Y, float Z, int period, int cells0, int oct, float lac, float gain, uint32_t seed) {
+    float a = 1.f;
+    float sum = 0.f;
+    float norm = 0.f;
+    int cells = cells0;
+    for (int i = 0; i < oct and cells <= period; i++) {
+        float v = WorleyF1_Periodic(X, Y, Z, period, cells, seed + uint32_t(i * 733));
+        sum += a * v;
         norm += a;
-        a *= gain; sx *= lac; sy *= lac; sz *= lac; C = int(C * lac);
+        a *= gain;
+        cells = int(cells * lac);
     }
-    return std::clamp(sum / std::max(norm, 1e-6f), 0.0f, 1.0f);
+    if (norm <= 0.f) return 0.5f;
+    return std::clamp(sum / norm, 0.0f, 1.0f);
 }
 
 // -------------------------------------------------------------
@@ -315,158 +381,122 @@ static float SNoise3Periodic(float x, float y, float z, const std::vector<int>& 
 
 // -------------------------------------------------------------------------------------------------
 
-static float fastFloor(float x) { return x >= 0.0f ? (float)(int)x : (float)((int)x - 1); }
+// 3D Simplex Noise (Ashima/Gustavson), Output ca. [-1,1]
 
-static float SNoise3Ashima(const float x, const float y, const float z)
-{
+static const int grad3[12][3] = {
+    { 1, 1, 0},{-1, 1, 0},{ 1,-1, 0},{-1,-1, 0},
+    { 1, 0, 1},{-1, 0, 1},{ 1, 0,-1},{-1, 0,-1},
+    { 0, 1, 1},{ 0,-1, 1},{ 0, 1,-1},{ 0,-1,-1}
+};
+
+static inline float dotGrad3(int g, float x, float y, float z) {
+    return grad3[g][0] * x + grad3[g][1] * y + grad3[g][2] * z;
+}
+
+static float SNoise3Ashima(float x, float y, float z) {
     const float F3 = 1.0f / 3.0f;
     const float G3 = 1.0f / 6.0f;
 
-    const float s = (x + y + z) * F3;
-    const float xs = x + s;
-    const float ys = y + s;
-    const float zs = z + s;
+    float s = (x + y + z) * F3;
+    int i = (int)floorf(x + s);
+    int j = (int)floorf(y + s);
+    int k = (int)floorf(z + s);
 
-    const int i = (int)fastFloor(xs);
-    const int j = (int)fastFloor(ys);
-    const int k = (int)fastFloor(zs);
+    float t = (i + j + k) * G3;
+    float X0 = (float)i - t;
+    float Y0 = (float)j - t;
+    float Z0 = (float)k - t;
 
-    const float t = (float)(i + j + k) * G3;
-    const float X0 = (float)i - t;
-    const float Y0 = (float)j - t;
-    const float Z0 = (float)k - t;
+    float x0 = x - X0;
+    float y0 = y - Y0;
+    float z0 = z - Z0;
 
-    const float x0 = x - X0;
-    const float y0 = y - Y0;
-    const float z0 = z - Z0;
+    int i1, j1, k1;
+    int i2, j2, k2;
 
-    int i1 = (x0 >= y0) ? 1 : 0;
-    int j1 = (x0 < y0) ? 1 : 0;
-    int i2 = (x0 >= z0) ? 1 : 0;
-    int k1 = (x0 < z0) ? 1 : 0;
-    int j2 = (y0 >= z0) ? 1 : 0;
-    int k2 = (y0 < z0) ? 1 : 0;
-    i2 &= i1; j2 |= j1;
-
-    const float x1 = x0 - (float)i1 + G3;
-    const float y1 = y0 - (float)j1 + G3;
-    const float z1 = z0 - (float)k1 + G3;
-    const float x2 = x0 - (float)i2 + 2.0f * G3;
-    const float y2 = y0 - (float)j2 + 2.0f * G3;
-    const float z2 = z0 - (float)(k1 | k2) + 2.0f * G3;
-    const float x3 = x0 - 1.0f + 3.0f * G3;
-    const float y3 = y0 - 1.0f + 3.0f * G3;
-    const float z3 = z0 - 1.0f + 3.0f * G3;
-
-    auto mod289 = [](float x) { return x - floorf(x * (1.0f / 289.0f)) * 289.0f; };
-    auto mod289v4 = [&](const float v[4], float out[4]) {
-        for (int n = 0; n < 4; ++n)
-            out[n] = mod289(v[n]);
-        };
-    auto permute = [&](float x) { return mod289((x * 34.0f + 1.0f) * x); };
-
-    float ii = (float)i;
-    float jj = (float)j;
-    float kk = (float)k;
-
-    float iVec[4] = { 0.0f, (float)i1, (float)i2, 1.0f };
-    float jVec[4] = { 0.0f, (float)j1, (float)j2, 1.0f };
-    float kVec[4] = { 0.0f, (float)k1, (float)(k1 | k2), 1.0f };
-
-    float p[4];
-    for (int n = 0; n < 4; ++n)
-        p[n] = kk + kVec[n];
-    for (int n = 0; n < 4; ++n)
-        p[n] = permute(p[n] + jj + jVec[n]);
-    for (int n = 0; n < 4; ++n)
-        p[n] = permute(p[n] + ii + iVec[n]);
-
-    const float n_ = 0.142857142857f;
-    const float D1 = 0.0f, D2 = 0.5f, D3 = 1.0f, D4 = 2.0f;
-    const float nsx = n_ * D4 - D1;      // wie im Shader (kompakt)
-    const float nsy = n_ * D3 - D1;
-    const float nsz = n_ * D2 - D1;
-
-    float x_[4], y_[4];
-    for (int n = 0; n < 4; ++n) {
-        float jn = p[n] - 49.0f * floorf(p[n] * nsz * nsz);
-        x_[n] = floorf(jn * nsz);
-        y_[n] = floorf(jn - 7.0f * x_[n]);
+    if (x0 >= y0) {
+        if (y0 >= z0) { i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 1; k2 = 0; }
+        else if (x0 >= z0) { i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 0; k2 = 1; }
+        else { i1 = 0; j1 = 0; k1 = 1; i2 = 1; j2 = 0; k2 = 1; }
+    }
+    else {
+        if (y0 < z0) { i1 = 0; j1 = 0; k1 = 1; i2 = 0; j2 = 1; k2 = 1; }
+        else if (x0 < z0) { i1 = 0; j1 = 1; k1 = 0; i2 = 0; j2 = 1; k2 = 1; }
+        else { i1 = 0; j1 = 1; k1 = 0; i2 = 1; j2 = 1; k2 = 0; }
     }
 
-    float xw[4], yw[4], h[4];
-    for (int n = 0; n < 4; ++n) {
-        xw[n] = x_[n] * nsx + nsy;
-        yw[n] = y_[n] * nsx + nsy;
-        h[n] = 1.0f - fabsf(xw[n]) - fabsf(yw[n]);
-    }
+    float x1 = x0 - (float)i1 + G3;
+    float y1 = y0 - (float)j1 + G3;
+    float z1 = z0 - (float)k1 + G3;
+    float x2 = x0 - (float)i2 + 2.0f * G3;
+    float y2 = y0 - (float)j2 + 2.0f * G3;
+    float z2 = z0 - (float)k2 + 2.0f * G3;
+    float x3 = x0 - 1.0f + 3.0f * G3;
+    float y3 = y0 - 1.0f + 3.0f * G3;
+    float z3 = z0 - 1.0f + 3.0f * G3;
 
-    float b0x = xw[0], b0y = xw[1];
-    float b0z = yw[0], b0w = yw[1];
-    float b1x = xw[2], b1y = xw[3];
-    float b1z = yw[2], b1w = yw[3];
-
-    float s0x = floorf(b0x) * 2.0f + 1.0f;
-    float s0y = floorf(b0y) * 2.0f + 1.0f;
-    float s0z = floorf(b0z) * 2.0f + 1.0f;
-    float s0w = floorf(b0w) * 2.0f + 1.0f;
-    float s1x = floorf(b1x) * 2.0f + 1.0f;
-    float s1y = floorf(b1y) * 2.0f + 1.0f;
-    float s1z = floorf(b1z) * 2.0f + 1.0f;
-    float s1w = floorf(b1w) * 2.0f + 1.0f;
-
-    float sh[4] = {
-        -(h[0] < 0.0f ? 1.0f : 0.0f),
-        -(h[1] < 0.0f ? 1.0f : 0.0f),
-        -(h[2] < 0.0f ? 1.0f : 0.0f),
-        -(h[3] < 0.0f ? 1.0f : 0.0f)
+    static const int p[256] = {
+        151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,
+        140,36,103,30,69,142,8,99,37,240,21,10,23,190,6,148,
+        247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,
+        57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,
+        74,165,71,134,139,48,27,166,77,146,158,231,83,111,229,122,
+        60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54,
+        65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,
+        200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,
+        52,217,226,250,124,123,5,202,38,147,118,126,255,82,85,212,
+        207,206,59,227,47,16,58,17,182,189,28,42,223,183,170,213,
+        119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,
+        129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,
+        218,246,97,228,251,34,242,193,238,210,144,12,191,179,162,241,
+        81,51,145,235,249,14,239,107,49,192,214,31,181,199,106,157,
+        184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,
+        222,114,67,29,24,72,243,141,128,195,78,66,215
     };
 
-    float a0x = b0x + s0x * sh[0];
-    float a0y = b0z + s0z * sh[0];
-    float a0z = h[0];
-    float a1x = b0y + s0y * sh[1];
-    float a1y = b0w + s0w * sh[1];
-    float a1z = h[1];
-    float a2x = b1x + s1x * sh[2];
-    float a2y = b1z + s1z * sh[2];
-    float a2z = h[2];
-    float a3x = b1y + s1y * sh[3];
-    float a3y = b1w + s1w * sh[3];
-    float a3z = h[3];
+    static int perm[512];
+    static int permMod12[512];
+    static bool init = false;
+    if (!init) {
+        for (int n = 0; n < 512; ++n) {
+            perm[n] = p[n & 255];
+            permMod12[n] = perm[n] % 12;
+        }
+        init = true;
+    }
 
-    auto invSqrt = [](float r) { return 1.79284291400159f - 0.85373472095314f * r; };
+    int ii = i & 255;
+    int jj = j & 255;
+    int kk = k & 255;
 
-    float norm0 = invSqrt(a0x * a0x + a0y * a0y + a0z * a0z);
-    float norm1 = invSqrt(a1x * a1x + a1y * a1y + a1z * a1z);
-    float norm2 = invSqrt(a2x * a2x + a2y * a2y + a2z * a2z);
-    float norm3 = invSqrt(a3x * a3x + a3y * a3y + a3z * a3z);
+    int gi0 = permMod12[ii + perm[jj + perm[kk]]];
+    int gi1 = permMod12[ii + i1 + perm[jj + j1 + perm[kk + k1]]];
+    int gi2 = permMod12[ii + i2 + perm[jj + j2 + perm[kk + k2]]];
+    int gi3 = permMod12[ii + 1 + perm[jj + 1 + perm[kk + 1]]];
 
-    a0x *= norm0; a0y *= norm0; a0z *= norm0;
-    a1x *= norm1; a1y *= norm1; a1z *= norm1;
-    a2x *= norm2; a2y *= norm2; a2z *= norm2;
-    a3x *= norm3; a3y *= norm3; a3z *= norm3;
+    float n0, n1, n2, n3;
 
-    float m0 = 0.6f - x0 * x0 - y0 * y0 - z0 * z0;
-    float m1 = 0.6f - x1 * x1 - y1 * y1 - z1 * z1;
-    float m2 = 0.6f - x2 * x2 - y2 * y2 - z2 * z2;
-    float m3 = 0.6f - x3 * x3 - y3 * y3 - z3 * z3;
-    if (m0 < 0) m0 = 0; m0 *= m0;
-    if (m1 < 0) m1 = 0; m1 *= m1;
-    if (m2 < 0) m2 = 0; m2 *= m2;
-    if (m3 < 0) m3 = 0; m3 *= m3;
+    float t0 = 0.6f - x0 * x0 - y0 * y0 - z0 * z0;
+    if (t0 < 0.0f) n0 = 0.0f;
+    else { t0 *= t0; n0 = t0 * t0 * dotGrad3(gi0, x0, y0, z0); }
 
-    float n0 = m0 * m0 * (a0x * x0 + a0y * y0 + a0z * z0);
-    float n1 = m1 * m1 * (a1x * x1 + a1y * y1 + a1z * z1);
-    float n2 = m2 * m2 * (a2x * x2 + a2y * y2 + a2z * z2);
-    float n3 = m3 * m3 * (a3x * x3 + a3y * y3 + a3z * z3);
+    float t1 = 0.6f - x1 * x1 - y1 * y1 - z1 * z1;
+    if (t1 < 0.0f) n1 = 0.0f;
+    else { t1 *= t1; n1 = t1 * t1 * dotGrad3(gi1, x1, y1, z1); }
 
-    return 42.0f * (n0 + n1 + n2 + n3);
+    float t2 = 0.6f - x2 * x2 - y2 * y2 - z2 * z2;
+    if (t2 < 0.0f) n2 = 0.0f;
+    else { t2 *= t2; n2 = t2 * t2 * dotGrad3(gi2, x2, y2, z2); }
+
+    float t3 = 0.6f - x3 * x3 - y3 * y3 - z3 * z3;
+    if (t3 < 0.0f) n3 = 0.0f;
+    else { t3 *= t3; n3 = t3 * t3 * dotGrad3(gi3, x3, y3, z3); }
+
+    return 32.0f * (n0 + n1 + n2 + n3);
 }
 
 // -------------------------------------------------------------------------------------------------
 
-// Allocate bleibt wie bei dir, aber BufferInfo sauber als 3D Platzhalter:
 bool NoiseTexture3D::Allocate(int edgeSize) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf) 
@@ -477,7 +507,6 @@ bool NoiseTexture3D::Allocate(int edgeSize) {
     }
     m_edgeSize = edgeSize;
     m_data.Resize(size_t(edgeSize) * size_t(edgeSize) * size_t(edgeSize) * 4u);
-    // Werte sind hier irrelevant, dienen nur dem internen Status
     texBuf->m_info = TextureBuffer::BufferInfo(edgeSize, edgeSize, 1, GL_R16F, GL_RED);
     HasBuffer() = true;
     return true;
@@ -500,15 +529,14 @@ bool NoiseTexture3D::Create(int edgeSize, const Noise3DParams& params, String no
 }
 
 
-// ComputeNoise parametrisierbar gemacht (deine Simplex-FBM + Warp)
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
 
     const int C0 = m_edgeSize / 8;
-    const int C_G = C0;
-    const int C_B = C0 * 2;
-    const int C_A = C0 * 4;
-    const int C_R = C0 * 2;
+    int C_R = C0;
+    int C_G = C0 * 2;
+    int C_B = C0 * 4;
+    int C_A = C0 * 8;
 
     float perlinNorm = 0.0f;
     {
@@ -523,12 +551,15 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     size_t idx = 0;
 
-    for (int z = 0; z < m_edgeSize; ++z)
-        for (int y = 0; y < m_edgeSize; ++y)
+    Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
+    Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
+
+    for (int z = 0; z < m_edgeSize; ++z) {
+        float Z = float(z) + 0.5f;
+        for (int y = 0; y < m_edgeSize; ++y) {
+            float Y = float(y) + 0.5f;
             for (int x = 0; x < m_edgeSize; ++x) {
                 float X = float(x) + 0.5f;
-                float Y = float(y) + 0.5f;
-                float Z = float(z) + 0.5f;
 
                 // Perlin-fBm für Basis
                 float ps = 0.0f;
@@ -542,24 +573,36 @@ void NoiseTexture3D::ComputeNoise(void) {
                     f *= m_params.lacunarity;
                 }
 
-                float perlin01 = 0.5f + 0.5f * (ps / perlinNorm);
-                if (perlin01 < 0.0f) perlin01 = 0.0f;
-                if (perlin01 > 1.0f) perlin01 = 1.0f;
+                float perlin = 0.5f + 0.5f * (ps / perlinNorm);
+                perlin = std::clamp(perlin, 0.0f, 1.0f);
 
+                Vector4f noise;
                 // Worley-fBm für Kanäle
-                float wR = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_R, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0x51u);
-                float G = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_G, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0x1337u);
-                float B = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_B, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xBEEFu);
-                float A = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_A, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xCAFEu);
+                noise.x = WorleyF1_Periodic(X, Y, Z, m_edgeSize, C_R, m_params.seed ^ 0x51u);
+                noise.x = perlin * (1.0f - noise.x);
+                noise.y = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_G, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0x1337u);
+                noise.z = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_B, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xBEEFu);
+                noise.w = WorleyFBM_Periodic(X, Y, Z, m_edgeSize, C_A, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xCAFEu);
 
-                // R = Perlin-Worley
-                float R = perlin01 * wR;
+                minVals.Minimize(noise);
+                maxVals.Maximize(noise);
 
-                data[idx++] = std::clamp(R, 0.0f, 1.0f);
-                data[idx++] = std::clamp(G, 0.0f, 1.0f);
-                data[idx++] = std::clamp(B, 0.0f, 1.0f);
-                data[idx++] = std::clamp(A, 0.0f, 1.0f);
+                data[idx++] = std::clamp(noise.x, 0.0f, 1.0f);
+                data[idx++] = std::clamp(noise.y, 0.0f, 1.0f);
+                data[idx++] = std::clamp(noise.z, 0.0f, 1.0f);
+                data[idx++] = std::clamp(noise.w, 0.0f, 1.0f);
             }
+        }
+    }
+
+#if 0
+    for (int i = 0; i < idx; i += 4) {
+        Conversions::Normalize(data[i], minVals.x, maxVals.x);
+        //Conversions::Normalize(data[i++], minVals.y, maxVals.y);
+        //Conversions::Normalize(data[i++], minVals.z, maxVals.z);
+        //Conversions::Normalize(data[i++], minVals.w, maxVals.w);
+    }
+#endif
 }
 
 
@@ -593,8 +636,8 @@ bool NoiseTexture3D::LoadFromFile(const String& filename) {
     if (not f)
         return false;
 
-    size_t voxelCount = size_t(m_edgeSize) * size_t(m_edgeSize) * size_t(m_edgeSize) * 4u;
-    size_t expectedBytes = voxelCount * sizeof(float);
+    int voxelCount = size_t(m_edgeSize) * size_t(m_edgeSize) * size_t(m_edgeSize) * 4u;
+    int expectedBytes = voxelCount * sizeof(float);
 
     f.seekg(0, std::ios::end);
     std::streamoff fileSize = f.tellg();
@@ -661,6 +704,22 @@ bool CloudVolume3D::Create(int edgeSize, const CloudVolumeParams& params, String
     return true;
 }
 
+#if 0
+
+void CloudVolume3D::Compute() {
+    float* data = m_data.Data();
+    size_t idx = 0;
+
+    for (int z = 0; z < m_edgeSize; ++z) {
+        for (int y = 0; y < m_edgeSize; ++y) {
+            for (int x = 0; x < m_edgeSize; ++x) {
+                data[idx++] = PerlinFBM3_Periodic(float(x) + 0.5f, float(y) + 0.5f, float(z) + 0.5f, m_edgeSize, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed);
+            }
+        }
+    }
+}
+
+#else
 
 void CloudVolume3D::Compute(void) {
     float* data = m_data.Data();
@@ -669,50 +728,49 @@ void CloudVolume3D::Compute(void) {
     BuildPermutation(perm, m_edgeSize, m_params.seed ? m_params.seed : 0x9E3779B9u);
 
     float norm = 0.0f;
-    {
-        float a = m_params.initialGain;
-        for (int o = 0; o < m_params.octaves; ++o) {
-            norm += a;
-            a *= m_params.gain;
-        }
-        if (norm <= 0.0f)
-            norm = 1.0f;
+    float a = m_params.initialGain;
+    for (int o = 0; o < m_params.octaves; ++o) {
+        norm += a;
+        a *= m_params.gain;
     }
+    if (norm <= 0.0f)
+        norm = 1.0f;
 
     size_t idx = 0;
 #if NORMALIZE_NOISE
     float maxVal = 0.0f;
 #endif
-    for (int z = 0; z < m_edgeSize; ++z)
-        for (int y = 0; y < m_edgeSize; ++y)
+    for (int z = 0; z < m_edgeSize; ++z) {
+        float w = (float(z) + 0.5f) / float(m_edgeSize);
+        for (int y = 0; y < m_edgeSize; ++y) {
+            float v = (float(y) + 0.5f) / float(m_edgeSize);
             for (int x = 0; x < m_edgeSize; ++x) {
-                float u = (x + 0.5f) / float(m_edgeSize);
-                float v = (y + 0.5f) / float(m_edgeSize);
-                float w = (z + 0.5f) / float(m_edgeSize);
+                float u = (float(x) + 0.5f) / float(m_edgeSize);
                 // in periodischen Raum [0,m_edgeSize)
-                float px = u * m_params.baseFreq;
-                float py = v *  m_params.baseFreq;
-                float pz = w *  m_params.baseFreq;
 
                 float t = 0.0f;
                 float a = m_params.initialGain;
-                float f = 1.0f;
+                float f = float(m_edgeSize);
 
                 for (int o = 0; o < m_params.octaves; ++o) {
-                    float n = SNoise3Ashima(px * f, py * f, pz * f); // SNoise3Periodic(px * f, py * f, pz * f, perm, m_edgeSize); // ~[-1,1], m_edgeSize-periodisch
-                    t += std::fabs(n) * a;
+                    float n = SNoise3Periodic(u * f, v * f, w * f, perm, m_edgeSize); // ~[-1,1], m_edgeSize-periodisch
+                    t += fabs(n) * a;
                     a *= m_params.gain;
                     f *= m_params.lacunarity;
                 }
 
+                //t = (1.0f + t) * 0.5f;
                 float d = t / norm;              // ~0..1
                 d = std::clamp(d, 0.0f, 1.0f);
-                data[idx++] = d * 1.3f;
+                data[idx++] = d;
 #if NORMALIZE_NOISE
                 if (maxVal < d)
                     maxVal = d;
 #endif
             }
+        }
+    }
+
 #if NORMALIZE_NOISE
     if ((maxVal > 0.0f) and (maxVal < 0.999f)) {
         for (; idx; --idx, data++)
@@ -721,6 +779,7 @@ void CloudVolume3D::Compute(void) {
 #endif
 }
 
+#endif
 
 void CloudVolume3D::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
@@ -752,8 +811,8 @@ bool CloudVolume3D::LoadFromFile(const String& filename) {
     if (not f)
         return false;
 
-    size_t voxelCount = size_t(m_edgeSize) * size_t(m_edgeSize) * size_t(m_edgeSize);
-    size_t expectedBytes = voxelCount * sizeof(float);
+    int voxelCount = size_t(m_edgeSize) * size_t(m_edgeSize) * size_t(m_edgeSize);
+    int expectedBytes = voxelCount * sizeof(float);
 
     f.seekg(0, std::ios::end);
     std::streamoff fileSize = f.tellg();

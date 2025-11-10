@@ -44,6 +44,10 @@ namespace Conversions
         return RadToDeg(DotToRad(dot));
     }
 
+    static float Normalize(float v, float vMin, float vMax) {
+        return (v - vMin) / (vMax - vMin);
+    }
+
     template <typename T, size_t N>
     constexpr size_t ArrayLength(const T(&)[N]) noexcept { return N; }
 
@@ -112,6 +116,7 @@ namespace Conversions
         Int     height{ 0 };
     };
 
+
     // compute biggest integer a <= sqrt(n) so that n / d is also an integer value
     // in other words: 2D dimension {a, b} of a number, so that a and b are as close together as possible
     template <std::integral Int>
@@ -140,10 +145,12 @@ namespace Conversions
         return { w, n / w };
     }
 
+
     template <typename T>
     T OptionalValue(std::optional<T> var, T defVal) {
         return var.has_value() ? var.value() : defVal;
     }
+
 
     inline float Rampi(int64_t value, int64_t minValue, int64_t maxValue, int64_t threshold) noexcept {
         if (threshold < 1)
@@ -164,6 +171,7 @@ namespace Conversions
         return (d >= threshold) ? 1.0f : d / threshold;
     }
 
+
     inline double Ramp(double value, double minValue, double maxValue, double threshold) noexcept {
         if (threshold < NumericTolerance)
             return 0.0f;
@@ -172,7 +180,6 @@ namespace Conversions
         double d = std::min(value - minValue, maxValue - value);
         return (d >= threshold) ? 1.0f : d / threshold;
     }
-
 
 
     template <typename T, typename... Args>
