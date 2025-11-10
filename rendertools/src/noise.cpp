@@ -242,13 +242,11 @@ namespace Noise {
     // -------------------------------------------------------------------------------------------------
 
     namespace {
-        GridPosf GradDecode(float p, GridPosf& ns) {
+        GridPosf GradDecode(float p, const GridPosf& ns) {
             float h = p - 49.f * floorf(p * ns.z * ns.z);
-            float x = floorf(h * ns.z);
-            float y = floorf(h - 7.f * x);
             GridPosf g;
-            g.x = x * ns.x + ns.y;
-            g.y = y * ns.x + ns.y;
+            g.x = floorf(h * ns.z) * ns.x + ns.y;
+            g.y = floorf(h - 7.f * g.x) * ns.x + ns.y;
             g.z = 1.f - fabsf(g.x) - fabsf(g.y);
             float sx = (g.x < 0.f) ? -1.f : 1.f;
             float sy = (g.y < 0.f) ? -1.f : 1.f;
@@ -261,12 +259,8 @@ namespace Noise {
     };
 
     float SimplexAshima(float x, float y, float z) {
-        const float Cx = 1.f / 6.f;
-        const float Cy = 1.f / 3.f;
-
-        auto Mod289 = [](float v) {
-            return v - floorf(v * (1.f / 289.f)) * 289.f;
-            };
+        const float F = 1.f / 3.f;
+        const float G = 1.f / 6.f;
 
         auto Permute = [&](float v) {
             return Mod289(((v * 34.f) + 1.f) * v);
@@ -276,65 +270,43 @@ namespace Noise {
             return 1.79284291400159f - 0.85373472095314f * r;
             };
 
-        auto Dot = [](const GridPosf& a, const GridPosf& b) {
-            return a.x * b.x + a.y * b.y + a.z * b.z;
-            };
-
         GridPosf v{ x, y, z };
 
-        float s = (v.x + v.y + v.z) * Cy;
+        float s = (v.x + v.y + v.z) * F;
         GridPosf i{
             floorf(v.x + s),
             floorf(v.y + s),
             floorf(v.z + s)
         };
 
-        float t = (i.x + i.y + i.z) * Cx;
-        GridPosf x0{
-            v.x - i.x + t,
-            v.y - i.y + t,
-            v.z - i.z + t
+        float t = (i.x + i.y + i.z) * G;
+        GridPosf x0 = (v - i) + t;
+
+        GridPosf g{
+            (x0.x >= x0.y) ? 1.f : 0.f,
+            (x0.y >= x0.z) ? 1.f : 0.f,
+            (x0.z >= x0.x) ? 1.f : 0.f
         };
 
-        float gx = (x0.x >= x0.y) ? 1.f : 0.f;
-        float gy = (x0.y >= x0.z) ? 1.f : 0.f;
-        float gz = (x0.z >= x0.x) ? 1.f : 0.f;
-
-        float lx = 1.f - gx;
-        float ly = 1.f - gy;
-        float lz = 1.f - gz;
+        GridPosf l = 1.f - g;
 
         GridPosf i1{
-            fminf(gx, lz),
-            fminf(gy, lx),
-            fminf(gz, ly)
+            fminf(g.x, l.z),
+            fminf(g.y, l.x),
+            fminf(g.z, l.y)
         };
         GridPosf i2{
-            fmaxf(gx, lz),
-            fmaxf(gy, lx),
-            fmaxf(gz, ly)
+            fmaxf(g.x, l.z),
+            fmaxf(g.y, l.x),
+            fmaxf(g.z, l.y)
         };
 
-        GridPosf x1{
-            x0.x - i1.x + Cx,
-            x0.y - i1.y + Cx,
-            x0.z - i1.z + Cx
-        };
-        GridPosf x2{
-            x0.x - i2.x + Cy,
-            x0.y - i2.y + Cy,
-            x0.z - i2.z + Cy
-        };
-        GridPosf x3{
-            x0.x - 0.5f,
-            x0.y - 0.5f,
-            x0.z - 0.5f
-        };
+        GridPosf x1 = (x0 - i1) + G;
+        GridPosf x2 = (x0 - i2) + F;
+        GridPosf x3 = x0 - 0.5f;
 
         // mod289(i)
-        i.x = Mod289(i.x);
-        i.y = Mod289(i.y);
-        i.z = Mod289(i.z);
+        i.Mod289();
 
         // vec4 p
         float p0 = Permute(Permute(Permute(i.z + 0.f) + i.y + 0.f) + i.x + 0.f);
@@ -351,10 +323,7 @@ namespace Noise {
         GridPosf g3 = GradDecode(p3, ns);
 
         auto Normalize = [&](GridPosf& g) {
-            float i = TaylorInvSqrt(g.x * g.x + g.y * g.y + g.z * g.z);
-            g.x *= i;
-            g.y *= i;
-            g.z *= i;
+            g *= TaylorInvSqrt(g.Dot(g));
             };
 
         Normalize(g0);
@@ -367,7 +336,7 @@ namespace Noise {
             if (tt <= 0.f)
                 return 0.f;
             tt *= tt;
-            return tt * tt * (g.x * p.x + g.y * p.y + g.z * p.z);
+            return tt * tt * g.Dot(p);
             };
 
         float n0 = contrib(x0, g0);

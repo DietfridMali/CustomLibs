@@ -9,25 +9,69 @@ namespace Noise
         return (r < 0) ? r + p : r;
     }
 
+    inline float Mod289 (float v) {
+        return v - floorf(v * (1.f / 289.f)) * 289.f;
+        };
+
     template<typename T>
     class GridPos {
     public:
         T x, y, z;
 
-        GridPos() : x(0), y(0), z(0) {}
-        GridPos(T X, T Y, T Z) : x(X), y(Y), z(Z) {}
+        GridPos() 
+            : x(0), y(0), z(0) {}
 
-        GridPos operator+(const GridPos& o) const {
-            return GridPos(x + o.x, y + o.y, z + o.z);
+        GridPos(T X, T Y, T Z) 
+            : x(X), y(Y), z(Z) {}
+
+        GridPos operator+(const GridPos& other) const {
+            return GridPos(x + other.x, y + other.y, z + other.z);
         }
-        GridPos operator-(const GridPos& o) const {
-            return GridPos(x - o.x, y - o.y, z - o.z);
+        GridPos operator-(const GridPos& other) const {
+            return GridPos(x - other.x, y - other.y, z - other.z);
         }
-        GridPos& operator+=(const GridPos& o) {
-            x += o.x; y += o.y; z += o.z; return *this;
+        GridPos& operator+=(const GridPos& other) {
+            x += other.x; y += other.y; z += other.z; 
+            return *this;
         }
-        GridPos& operator-=(const GridPos& o) {
-            x -= o.x; y -= o.y; z -= o.z; return *this;
+        GridPos& operator-=(const GridPos& other) {
+            x -= other.x; y -= other.y; z -= other.z; 
+            return *this;
+        }
+
+        GridPos& operator+=(T n) {
+            x += n; y += n; z += n;
+            return *this;
+        }
+
+        GridPos& operator-=(T n) {
+            x -= n; y -= n; z -= n;
+            return *this;
+        }
+
+        GridPos operator+(T n) const {
+            return GridPos(x + n, y + n, z + n);
+        }
+
+        GridPos operator-(T n) const {
+            return GridPos(x - n, y - n, z - n);
+        }
+
+        GridPos& operator*=(T n) {
+            x *= n; y *= n; z *= n; 
+            return *this; 
+        }
+
+        GridPos operator*(T n) const {
+            return GridPos(x * n, y * n, z * n);
+        }
+
+        friend GridPos operator+(T n, const GridPos& p) {
+            return GridPos(n + p.x, n + p.y, n + p.z);
+        }
+
+        friend GridPos operator-(T n, const GridPos& p) {
+            return GridPos(n - p.x, n - p.y, n - p.z);
         }
     };
 
@@ -35,6 +79,9 @@ namespace Noise
         : public GridPos<int> {
     public:
         using GridPos<int>::GridPos;
+
+        GridPosi(const GridPos<int>& p)
+            : GridPos<int>(p) {}
 
         void Wrap(int period) {
             if (period > 1) {
@@ -50,6 +97,9 @@ namespace Noise
     public:
         using GridPos<float>::GridPos;
 
+        GridPosf(const GridPos<float>& p)
+            : GridPos<float>(p) {}
+
         void Wrap(int period) {
             if (period > 1) {
                 auto wrap = [period](float v) {
@@ -62,6 +112,17 @@ namespace Noise
                 y = wrap(y);
                 z = wrap(z);
             }
+        }
+
+        float Dot(const GridPosf& other) const {
+            return x * other.x + y * other.y + z * other.z;
+        }
+
+        GridPosf& Mod289(void){
+            x = Noise::Mod289(x);
+            y = Noise::Mod289(y);
+            z = Noise::Mod289(z);
+            return *this;
         }
     };
 
