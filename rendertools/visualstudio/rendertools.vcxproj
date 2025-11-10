@@ -103,7 +103,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\h\perlin.h" />
     <ClInclude Include="..\include\base_shadercode.h" />
     <ClInclude Include="..\include\billboard.h" />
     <ClInclude Include="..\include\colordata.h" />
@@ -124,6 +123,7 @@
     <ClInclude Include="..\include\noisetexture.h" />
     <ClInclude Include="..\include\opengl_states.h" />
     <ClInclude Include="..\include\outlinerenderer.h" />
+    <ClInclude Include="..\include\noise.h" />
     <ClInclude Include="..\include\plane.h" />
     <ClInclude Include="..\include\prerenderedtexture.h" />
     <ClInclude Include="..\include\projection.h" />
@@ -149,7 +149,6 @@
     <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\cpp\perlin.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />
@@ -177,6 +176,7 @@
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\shader_macros.cpp" />
+    <ClCompile Include="..\src\noise.cpp" />
     <ClCompile Include="..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\src\textureatlas.cpp" />

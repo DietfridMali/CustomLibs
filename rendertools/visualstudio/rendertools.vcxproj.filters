@@ -153,10 +153,10 @@
     <ClInclude Include="..\include\billboard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\h\perlin.h">
+    <ClInclude Include="..\include\FBM.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\FBM.h">
+    <ClInclude Include="..\include\noise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -272,7 +272,7 @@
     <ClCompile Include="..\src\billboard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\cpp\perlin.cpp">
+    <ClCompile Include="..\src\noise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

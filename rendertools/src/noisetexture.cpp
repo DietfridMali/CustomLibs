@@ -482,7 +482,7 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     const float cellSize = float(m_gridSize) / float(m_params.cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
 
-#if 1
+#if 0 // simple perlin
 
     struct PerlinFunctor {
         float operator()(float x, float y, float z) const {
@@ -529,7 +529,7 @@ void NoiseTexture3D::ComputeNoise(void) {
         const std::vector<int>& perm;
         int period;
         float operator()(float x, float y, float z) const {
-            return Perlin::ImprovedNoise(x, y, z, perm, m_params.cellsPerAxis); // ~[-1,1]
+            return Perlin::ImprovedNoise(x, y, z, perm, period); // ~[-1,1]
         }
     };
 
