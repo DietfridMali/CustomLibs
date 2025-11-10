@@ -372,10 +372,12 @@ namespace Noise {
                     GridPosf j(HashToUnit01(h), HashToUnit01(h * 0x9E3779B1u), HashToUnit01(h * 0xBB67AE85u));
                     GridPosf o = j + c; // ((float)c.x + jx, (float)c.y + jy, (float)c.z + jz);
                     GridPosf d = o - p;
-                    float d = d.Dot(d);
-                    if (d < dMin) 
-                        dMin = d;
+                    float n = d.Dot(d);
+                    if (n < dMin)
+                        dMin = n;
                 }
+            }
+        }
 
         float d = sqrtf(dMin) * (1.0f / 1.7320508075688772f);
         return std::clamp(d, 0.0f, 1.0f);
@@ -386,8 +388,8 @@ namespace Noise {
     uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch) {
         float phase = float((seed ^ (ch * 0x9E3779B9u)) & 0xFFFFu) * (1.0f / 65536.0f);
         float t = float(ix) * 127.1f + float(iy) * 311.7f + phase;
-        float s = std::sin(t) * 43758.5453f;
-        float f = s - std::floor(s);
+        float s = sinf(t) * 43758.5453f;
+        float f = s - floorf(s);
         int   v = int(f * 255.0f + 0.5f);
         return (uint8_t)std::min(v, 255);
     }
