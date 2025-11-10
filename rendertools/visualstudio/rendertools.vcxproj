@@ -111,6 +111,7 @@
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
     <ClInclude Include="..\include\drawbufferhandler.h" />
+    <ClInclude Include="..\include\FBM.h" />
     <ClInclude Include="..\include\fbo.h" />
     <ClInclude Include="..\include\fonthandler.h" />
     <ClInclude Include="..\include\framecounter.h" />

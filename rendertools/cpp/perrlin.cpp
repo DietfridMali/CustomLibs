@@ -19,7 +19,8 @@ static inline float lerp(float a, float b, float t) {
 }
 
 static inline uint32_t Hash(int x, int y, int z) {
-    uint32_t h = (uint32_t)x * 374761393u
+    uint32_t h = 
+          (uint32_t)x * 374761393u
         + (uint32_t)y * 668265263u
         + (uint32_t)z * 2147483647u;
     h ^= h >> 13;

@@ -68,11 +68,11 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glGenerateMipmap(target);
     }
-    static void Compute(ManagedArray<float>& data, int edgeSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
-        data.Resize(edgeSize * edgeSize);
+    static void Compute(ManagedArray<float>& data, int gridSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
+        data.Resize(gridSize * gridSize);
         float* dataPtr = data.Data();
-        for (int y = 0; y < edgeSize; ++y)
-            for (int x = 0; x < edgeSize; ++x)
+        for (int y = 0; y < gridSize; ++y)
+            for (int x = 0; x < gridSize; ++x)
                 *dataPtr++ = Hash2i(x % xPeriod, y % yPeriod);
     }
 };
@@ -93,13 +93,13 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glGenerateMipmap(target);
     }
-    static void Compute(ManagedArray<float>& data, int edgeSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
-        data.Resize(edgeSize * edgeSize);
+    static void Compute(ManagedArray<float>& data, int gridSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
+        data.Resize(gridSize * gridSize);
         float* dataPtr = data.Data();
-        for (int y = 0; y < edgeSize; ++y) {
-            for (int x = 0; x < edgeSize; ++x) {
-                float sx = (x + 0.5f) / edgeSize * float(yPeriod);
-                float sy = (y + 0.5f) / edgeSize * float(xPeriod);
+        for (int y = 0; y < gridSize; ++y) {
+            for (int x = 0; x < gridSize; ++x) {
+                float sx = (x + 0.5f) / gridSize * float(yPeriod);
+                float sy = (y + 0.5f) / gridSize * float(xPeriod);
                 float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
                 *dataPtr++ = std::clamp(n, 0.0f, 1.0f);
             }
@@ -125,15 +125,15 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
         glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
     }
 
-    // 'octave' ist hier der z-Slice-Index [0..edgeSize-1]
-    static void Compute(ManagedArray<uint8_t>& data, int edgeSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed) {
-        data.Resize(edgeSize * edgeSize * 4);
+    // 'octave' ist hier der z-Slice-Index [0..gridSize-1]
+    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed) {
+        data.Resize(gridSize * gridSize * 4);
         uint8_t* dataPtr = data.Data();
 
-        const int   P = edgeSize;                 // Periode in allen Achsen
-        const float fx = 1.0f / float(edgeSize);
-        const float fy = 1.0f / float(edgeSize);
-        const float fz = 1.0f / float(edgeSize);
+        const int   P = gridSize;                 // Periode in allen Achsen
+        const float fx = 1.0f / float(gridSize);
+        const float fy = 1.0f / float(gridSize);
+        const float fz = 1.0f / float(gridSize);
         const float zP = ((octave + 0.5f) * fz) * float(P);
 
         // Worley-Basiszellen: G, B=2×G, A=2×B
@@ -143,9 +143,9 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
         const int C_A = C0 * 4;
         const int C_R = 32;            // für (1−Worley) im R-Kanal
 
-        for (int y = 0; y < edgeSize; ++y) {
+        for (int y = 0; y < gridSize; ++y) {
             float yP = ((y + 0.5f) * fy) * float(P);
-            for (int x = 0; x < edgeSize; ++x) {
+            for (int x = 0; x < gridSize; ++x) {
                 float xP = ((x + 0.5f) * fx) * float(P);
 
                 // R: Perlin × (1 − Worley)
@@ -188,14 +188,14 @@ struct NoiseTraits<WeatherNoiseRG8> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
     }
 
-    static void Compute(ManagedArray<uint8_t>& data, int edgeSize, int yPeriod, int xPeriod, int octaves) {
-        data.Resize(edgeSize * edgeSize * 2);
+    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves) {
+        data.Resize(gridSize * gridSize * 2);
         uint8_t* dst = data.Data();
 
-        for (int y = 0; y < edgeSize; ++y) {
-            for (int x = 0; x < edgeSize; ++x) {
-                float u = (x + 0.5f) / edgeSize * xPeriod;
-                float v = (y + 0.5f) / edgeSize * yPeriod;
+        for (int y = 0; y < gridSize; ++y) {
+            for (int x = 0; x < gridSize; ++x) {
+                float u = (x + 0.5f) / gridSize * xPeriod;
+                float v = (y + 0.5f) / gridSize * yPeriod;
 
                 // Coverage: großskaliges fbm
                 float cov = fbmPeriodic(u, v, xPeriod, yPeriod, octaves, 2.0f, 0.5f);
@@ -230,8 +230,8 @@ template<> struct NoiseTraits<BlueNoiseR8> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
     }
 
-    static void Compute(ManagedArray<uint8_t>& data, int edgeSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/) {
-        const int N = edgeSize;
+    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/) {
+        const int N = gridSize;
         data.Resize(N * N);
         // Zwischenspeicher für White Noise
         std::vector<float> white(N * N);
@@ -273,12 +273,12 @@ template<class Tag>
 class NoiseTexture 
     : public Texture {
 public:
-    bool Create(int edgeSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
+    bool Create(int gridSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
         if (not Texture::Create()) 
             return false;
-        if (not Allocate(edgeSize)) 
+        if (not Allocate(gridSize)) 
             return false;
-        Compute(edgeSize, yPeriod, xPeriod, octaves, seed);
+        Compute(gridSize, yPeriod, xPeriod, octaves, seed);
         Deploy();
         return true;
     }
@@ -299,19 +299,19 @@ public:
 private:
     ManagedArray<typename NoiseTraits<Tag>::PixelT> m_data;
 
-    bool Allocate(int edgeSize) {
+    bool Allocate(int gridSize) {
         auto* texBuf = new TextureBuffer();
         if (not texBuf) return false;
         if (not m_buffers.Append(texBuf)) { delete texBuf; return false; }
         const GLenum IF = NoiseTraits<Tag>::IFmt;
         const GLenum EF = NoiseTraits<Tag>::EFmt;
-        texBuf->m_info = TextureBuffer::BufferInfo(edgeSize, edgeSize, 1, IF, EF);
+        texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, IF, EF);
         HasBuffer() = true;
         return true;
     }
 
-    void Compute(int edgeSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
-        NoiseTraits<Tag>::Compute(m_data, edgeSize, yPeriod, xPeriod, octaves);
+    void Compute(int gridSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
+        NoiseTraits<Tag>::Compute(m_data, gridSize, yPeriod, xPeriod, octaves);
     }
 
     void Deploy(int bufferIndex = 0) {
@@ -359,15 +359,15 @@ public:
 
 	virtual void SetParams(bool enforce = false) override;
 
-	bool Create(int edgeSize, const Noise3DParams& params, String noiseFilename = "");
+	bool Create(int gridSize, const Noise3DParams& params, String noiseFilename = "");
 
 private:
-	int             m_edgeSize;
+	int             m_gridSize;
     Noise3DParams   m_params;
 
 	ManagedArray<float>	m_data;
 
-	bool Allocate(int edgeSize);
+	bool Allocate(int gridSize);
 
 	void ComputeNoise(void);
 
@@ -395,14 +395,14 @@ public:
 
     virtual void SetParams(bool enforce = false) override;
 
-    bool Create(int edgeSize, const CloudVolumeParams& params, String noiseFilename = "");
+    bool Create(int gridSize, const CloudVolumeParams& params, String noiseFilename = "");
 
 private:
-    int                 m_edgeSize{ 0 };
+    int                 m_gridSize{ 0 };
     CloudVolumeParams   m_params;
     ManagedArray<float> m_data;
 
-    bool Allocate(int edgeSize);
+    bool Allocate(int gridSize);
 
     void Compute();
 
