@@ -480,21 +480,62 @@ bool NoiseTexture3D::Create(int gridSize, const Noise3DParams& params, String no
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
 
-    const int cellsPerAxis = 4;
-    const float cellSize = float(m_gridSize) / float(cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
+    const float cellSize = float(m_gridSize) / float(m_params.cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
 
+#if 1
+
+    struct PerlinFunctor {
+        float operator()(float x, float y, float z) const {
+            return Perlin::Noise(x, y, z); // ~[-1,1]
+        }
+    };
+
+    PerlinFunctor perlinFn{};
+    FBM<PerlinFunctor> fbm(perlinFn, m_params.fbmParams);
+
+    Vector4f noise;
+    Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
+    Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
+    int belowThreshold = 0;
+
+    int i = 0;
+    for (int z = 0; z < m_gridSize; ++z) {
+        float w = float(z) / cellSize;
+        for (int y = 0; y < m_gridSize; ++y) {
+            float v = float(y) / cellSize;
+            for (int x = 0; x < m_gridSize; ++x) {
+                float u = float(x) / cellSize;
+#if 0
+                noise.x = (1.0f + Perlin::Noise(u, v, w)) * 0.5f; // fbm.Value(u, v, w); // [0,1]
+#else
+                noise.x = fbm.Value(u, v, w);
+#endif
+                minVals.Minimize(noise);
+                maxVals.Maximize(noise);
+
+                data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
+                if (noise.x < 0.3125)
+                    ++belowThreshold;
+                data[i++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
+                data[i++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
+                data[i++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
+            }
+        }
+    }
+
+#else
 
     struct PerlinFunctor {
         const std::vector<int>& perm;
         int period;
         float operator()(float x, float y, float z) const {
-            return Perlin::ImprovedNoise(x, y, z, perm, cellsPerAxis); // ~[-1,1]
+            return Perlin::ImprovedNoise(x, y, z, perm, m_params.cellsPerAxis); // ~[-1,1]
         }
     };
 
     std::vector<int> perm;
-    Perlin::BuildPermutation(perm, cellsPerAxis, m_params.seed);
-    PerlinFunctor perlinFn{ perm, cellsPerAxis };
+    Perlin::BuildPermutation(perm, m_params.cellsPerAxis, m_params.seed);
+    PerlinFunctor perlinFn{ perm, m_params.cellsPerAxis };
     FBM<PerlinFunctor> fbm(perlinFn, m_params.fbmParams);
 
     Vector4f noise;
@@ -503,11 +544,11 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     int i = 0;
     for (int z = 0; z < m_gridSize; ++z) {
-        float w = float(z) / float(m_gridSize) * cellsPerAxis;
+        float w = float(z) / float(m_gridSize) * m_params.cellsPerAxis;
         for (int y = 0; y < m_gridSize; ++y) {
-            float v = float(y) / float(m_gridSize) * cellsPerAxis;
+            float v = float(y) / float(m_gridSize) * m_params.cellsPerAxis;
             for (int x = 0; x < m_gridSize; ++x) {
-                float u = float(x) / float(m_gridSize) * cellsPerAxis;
+                float u = float(x) / float(m_gridSize) * m_params.cellsPerAxis;
 
                 noise.x = fbm.Value(u, v, w); // [0,1]
                 minVals.Minimize(noise);
@@ -520,6 +561,8 @@ void NoiseTexture3D::ComputeNoise(void) {
             }
         }
     }
+
+#endif
 
 #   if 0
     for (int z = 0; z < m_gridSize; ++z) {
@@ -572,12 +615,23 @@ void NoiseTexture3D::ComputeNoise(void) {
     }
 #endif
 
-#if 0
-    for (int i = 0; i < idx; i += 4) {
-        Conversions::Normalize(data[i], minVals.x, maxVals.x);
-        //Conversions::Normalize(data[i++], minVals.y, maxVals.y);
-        //Conversions::Normalize(data[i++], minVals.z, maxVals.z);
-        //Conversions::Normalize(data[i++], minVals.w, maxVals.w);
+#if 1
+    if (m_params.normalize) {
+        int h = i;
+        for (int i = 0; i < h; ) {
+            if (m_params.normalize & 1)
+                Conversions::Normalize(data[i], minVals.x, maxVals.x);
+            ++i;
+            if (m_params.normalize & 2)
+                Conversions::Normalize(data[i++], minVals.y, maxVals.y);
+            ++i;
+            if (m_params.normalize & 4)
+                Conversions::Normalize(data[i++], minVals.z, maxVals.z);
+            ++i;
+            if (m_params.normalize & 8)
+                Conversions::Normalize(data[i++], minVals.w, maxVals.w);
+            ++i;
+        }
     }
 #endif
 }

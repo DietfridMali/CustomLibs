@@ -8,6 +8,7 @@ struct FBMParams {
     float initialGain{ .6f };
     float gain{ .5f };
     int octaves{ 5 };
+    bool perturb{ true };
 };
 
 template<typename NoiseFn>
@@ -22,7 +23,8 @@ private:
         float a = m_params.initialGain;
         float f = m_params.frequency;
         for (int i = 0; i < m_params.octaves; i++) {
-            v += a * m_noiseFn(x * f, y * f, z * f);
+            float n = m_noiseFn(x * f, y * f, z * f);
+            v += a * (m_params.perturb ? fabs(n) : n);
             a *= m_params.gain;
             f *= m_params.lacunarity;
         }
@@ -44,7 +46,9 @@ public:
     }
 
     float Value(float x, float y, float z) const {
-        float n = 0.5f + 0.5f * Compute(x, y, z) / m_normal;
+        float n = Compute(x, y, z) / m_normal;
+        if (not m_params.perturb)
+            n = 0.5f + 0.5f * n;
         return std::clamp(n, 0.0f, 1.0f);
     }
 };
