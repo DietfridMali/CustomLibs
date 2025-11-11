@@ -84,14 +84,8 @@ void NoiseTexture3D::ComputeNoise(void) {
             p.y = (float(y) + 0.5f) * cellScale;
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = (float(x) + 0.5f) * cellScale;
-                float shape = shapeFbm.Value(p);      // [0,1]
-                float detail = detailFbm.Value(p);      // [0,1], Peaks = Knubbel
-                const float sharpness = 0.6f;                    // Detailstärke 0..1
-                const float fuzziness = 0.3f;
-                float lumps = powf(detail, 1.5f);
-                float erosion = powf(1.0f - detail, 1.5f);
-                noise.x = shape - fuzziness * erosion;
-                noise.x *= (1.0f - sharpness) + sharpness * lumps;
+                noise.x = shapeFbm.Value(p);      // [0,1]
+                noise.y = detailFbm.Value(p);      // [0,1], Peaks = Knubbel
                 minVals.Minimize(noise);
                 maxVals.Maximize(noise);
                 data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
@@ -109,10 +103,10 @@ void NoiseTexture3D::ComputeNoise(void) {
     float minVal = 1e6f;
     float maxVal = 0.0f;
 #endif
+    int dataSize = i;
     if (m_params.normalize) {
-        int h = i;
         belowCoverage = 0;
-        for (int i = 0; i < h; ) {
+        for (int i = 0; i < dataSize; ) {
             if (m_params.normalize & 1) {
                 data[i] = Conversions::Normalize(data[i], minVals.x, maxVals.x);
 #ifdef _DEBUG
@@ -135,6 +129,19 @@ void NoiseTexture3D::ComputeNoise(void) {
                 data[i] = Conversions::Normalize(data[i], minVals.w, maxVals.w);
             ++i;
         }
+    }
+
+    // modulate base noise with detail noise
+    for (int i = 0; i < dataSize; i += 4) {
+        float shape = data[i];      // [0,1]
+        float detail = data[i + 1];      // [0,1], Peaks = Knubbel
+        const float sharpness = 0.6f;                    // Detailstärke 0..1
+        const float fuzziness = 0.3f;
+        float lumps = powf(detail, 1.5f);
+        float erosion = powf(1.0f - detail, 1.5f);
+        float density = shape - fuzziness * erosion;
+        density *= (1.0f - sharpness) + sharpness * lumps;
+        data[i] = density;
     }
 }
 
