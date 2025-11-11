@@ -11,6 +11,7 @@ struct FBMParams {
     float gain{ .5f };
     int octaves{ 5 };
     int perturb{ 0 };
+    bool normalize{ true };
 };
 
 template<typename NoiseFn>
@@ -49,7 +50,9 @@ public:
     }
 
     float Value(Vector3f& p) const {
-        float n = Compute(p) / m_normal;
+        float n = Compute(p);
+        if (m_params.normalize)
+            n /= m_normal;
         if (not m_params.perturb)
             n = 0.5f + 0.5f * n;
         else if (m_params.perturb < 0)

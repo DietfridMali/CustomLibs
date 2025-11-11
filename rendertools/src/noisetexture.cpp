@@ -50,22 +50,41 @@ bool NoiseTexture3D::Create(int gridSize, const NoiseParams& params, String nois
 }
 
 
+static float Modulate(float shape, float detail) {
+    const float sharpness = 0.6f;                    // Detailstärke 0..1
+    const float fuzziness = 0.3f;
+    float lumps = powf(detail, 1.5f);
+    float erosion = powf(1.0f - detail, 1.5f);
+    float density = shape - fuzziness * erosion;
+    density *= (1.0f - sharpness) + sharpness * lumps;
+    return 1.0f - density;
+}
+
+
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
 
     const float cellSize = float(m_gridSize) / float(m_params.cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
-
-    NoiseParams shapeParams, detailParams;
+    m_params.normalize = 1 + 2 + 4;
+    
+    NoiseParams shapeParams;
     shapeParams.fbmParams.perturb = 1;
     shapeParams.normalize = 1;
-    detailParams.fbmParams.octaves = 3;
-    detailParams.fbmParams.perturb = 0;
+
+    NoiseParams detailParams;
+    detailParams.fbmParams.octaves = 1;
+    detailParams.fbmParams.initialGain = 1.0f;
+    detailParams.fbmParams.gain = 1.0f;
+    detailParams.fbmParams.frequency = 4.0f;   // oder 3, 5 etc, ganzzahlig
+    detailParams.fbmParams.lacunarity = 2.0f;   // egal bei 1 Oktave
+    detailParams.fbmParams.perturb = 1;
+    detailParams.fbmParams.normalize = false;
 
     PerlinNoise::Setup(m_params.cellsPerAxis);
     PerlinFunctor shapeNoise{ };
     FBM<PerlinFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
 
-    WorleyFunctor detailNoise{ m_params.cellsPerAxis * 2 };
+    WorleyFunctor detailNoise{ m_params.cellsPerAxis };
     FBM<WorleyFunctor> detailFbm(detailNoise, detailParams.fbmParams);
 
     Vector4f noise;
@@ -86,12 +105,16 @@ void NoiseTexture3D::ComputeNoise(void) {
                 p.x = (float(x) + 0.5f) * cellScale;
                 noise.x = shapeFbm.Value(p);      // [0,1]
                 noise.y = detailFbm.Value(p);      // [0,1], Peaks = Knubbel
-                minVals.Minimize(noise);
-                maxVals.Maximize(noise);
+                noise.z = noise.x;
+                noise.a = 1.0f - noise.y;
                 data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
-                data[i++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
-                data[i++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
-                data[i++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
+                data[i++] = std::clamp(noise.y, 0.0f, 1.0f);
+                data[i++] = std::clamp(noise.z, 0.0f, 1.0f);
+                data[i++] = std::clamp(noise.a, 0.0f, 1.0f);
+                if (m_params.normalize) {
+                    minVals.Minimize(noise);
+                    maxVals.Maximize(noise);
+                }
 #ifdef _DEBUG
                 if (noise.x < 0.3125)
                     ++belowCoverage;
@@ -133,15 +156,7 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     // modulate base noise with detail noise
     for (int i = 0; i < dataSize; i += 4) {
-        float shape = data[i];      // [0,1]
-        float detail = data[i + 1];      // [0,1], Peaks = Knubbel
-        const float sharpness = 0.6f;                    // Detailstärke 0..1
-        const float fuzziness = 0.3f;
-        float lumps = powf(detail, 1.5f);
-        float erosion = powf(1.0f - detail, 1.5f);
-        float density = shape - fuzziness * erosion;
-        density *= (1.0f - sharpness) + sharpness * lumps;
-        data[i] = density;
+        data[i] = Modulate(data[i], 1.0f - data[i+1]);
     }
 }
 
