@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "vector.hpp"
+#include "conversions.hpp"
 
 #include "noise.h"
 
@@ -65,7 +66,7 @@ namespace Noise {
         inline grad3 RandomGradient(int ix, int iy, int iz) {
 #if 1
             Vector2f u = Hash23(ix, iy, iz);      // u.x, u.y in [0,1)
-            float z = 2.0 * u.x - 1.0;
+            float z = 2.0f * u.x - 1.0f;
             float a = float(TWO_PI * u.y);
             float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
             return grad3(r * cos(a), r * sin(a), z);

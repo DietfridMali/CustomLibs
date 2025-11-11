@@ -49,6 +49,20 @@ bool NoiseTexture3D::Create(int gridSize, const NoiseParams& params, String nois
     return true;
 }
 
+static float StretchTest(float v, float vMin, float vMax) {
+    float m = vMin + (vMax - vMin) * 0.5f;
+    if (v < m)
+        v = m - m * (m - v) / (m - vMin);
+    else
+        v = m + (1.0f - m) * (v - m) / (vMax - m);
+    if (v < 0.0f)
+        return 0.0f;
+    if (v > 1.0f)
+        return 1.0f;
+    return v;
+}
+
+
 
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
@@ -151,7 +165,7 @@ void NoiseTexture3D::ComputeNoise(void) {
         belowCoverage = 0;
         for (int i = 0; i < h; ) {
             if (m_params.normalize & 1) {
-                data[i] = Conversions::Stretch(data[i], minVals.x, maxVals.x);
+                data[i] = StretchTest(data[i], minVals.x, maxVals.x);
                 if (minVal > data[i])
                     minVal = data[i];
                 if (maxVal < data[i])
