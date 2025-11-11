@@ -50,14 +50,41 @@ bool NoiseTexture3D::Create(int gridSize, const NoiseParams& params, String nois
 }
 
 
-static float Modulate(float shape, float detail) {
-    const float sharpness = 0.6f;                    // Detailstärke 0..1
-    const float fuzziness = 0.3f;
-    float lumps = powf(detail, 1.5f);
-    float erosion = powf(1.0f - detail, 1.5f);
-    float density = shape - fuzziness * erosion;
-    density *= (1.0f - sharpness) + sharpness * lumps;
-    return 1.0f - density;
+static inline float Saturate(float v) {
+    return std::clamp(v, 0.0f, 1.0f);
+}
+
+
+static float Modulate(float shape, float coarseDetail, float fineDetail) {
+    // Coarse Puffs
+    const float puff1Exp = 2.5f;
+    float puff1 = std::pow(Saturate(coarseDetail), puff1Exp);
+
+    // Fine Puffs
+    const float puff2Exp = 3.0f;
+    float puff2 = std::pow(Saturate(fineDetail), puff2Exp);
+
+    // Mischung: coarse dominiert, fine legt Struktur oben drauf
+    float puff = Saturate(0.7f * puff1 + 0.3f * puff2);
+
+    // Erosion dazwischen: wo kaum Puff, schneiden wir die Basis stärker ein
+    const float erosionExp = 2.0f;
+    float erosion = std::pow(1.0f - puff, erosionExp); // hoch in „Löchern“
+
+    // Gewichte für sichtbaren Effekt
+    const float bumpAmp = 0.85f; // Verstärkung an Knubbeln
+    const float erosionAmp = 0.45f; // Tiefe der Einschnitte
+
+    float d = shape;
+
+    // 1) Erosion: Basis dort schwächen, wo keine Puffs sind
+    d *= (1.0f - erosionAmp * erosion);
+
+    // 2) Knubbel: Basis dort verstärken, wo Puffs sind
+    float bump = 1.0f + bumpAmp * (puff - 0.5f); // neutral bei ~0.5
+    d *= bump;
+
+    return Saturate(d);
 }
 
 
@@ -65,13 +92,13 @@ void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
 
     const float cellSize = float(m_gridSize) / float(m_params.cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
-    m_params.normalize = 1 + 2 + 4;
+    m_params.normalize = 1 + 2 + 4 + 8;
     
     NoiseParams shapeParams;
     shapeParams.fbmParams.perturb = 1;
     shapeParams.normalize = 1;
 
-    PerlinNoise::Setup(m_params.cellsPerAxis);
+    PerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
     PerlinFunctor shapeNoise{ };
     FBM<PerlinFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
 
@@ -84,13 +111,12 @@ void NoiseTexture3D::ComputeNoise(void) {
     detailParams.fbmParams.perturb = 1;
     detailParams.fbmParams.normalize = false;
 
-    WorleyFunctor detailNoise{ m_params.cellsPerAxis };
+    WorleyFunctor detailNoise{ m_params.cellsPerAxis, m_params.seed ^ 0x9E3779B9u };
     FBM<WorleyFunctor> detailFbm(detailNoise, detailParams.fbmParams);
 
     detailParams.fbmParams.frequency = 8.0f;
-    detailParams.fbmParams.lacunarity = 4.0f;
 
-    WorleyFunctor fineDetailNoise{ m_params.cellsPerAxis };
+    WorleyFunctor fineDetailNoise{ m_params.cellsPerAxis, m_params.seed ^ 0xBB67AE85u };
     FBM<WorleyFunctor> fineDetailFbm(fineDetailNoise, detailParams.fbmParams);
 
     Vector4f noise;
@@ -162,7 +188,7 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     // modulate base noise with detail noise
     for (int i = 0; i < dataSize; i += 4) {
-        data[i] = Modulate(data[i], 1.0f - data[i+1]);
+        data[i] = Modulate(data[i], 1.0f - data[i+1], 1.0f - data[i + 2]);
     }
 }
 

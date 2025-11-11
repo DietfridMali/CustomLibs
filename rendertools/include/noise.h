@@ -183,13 +183,13 @@ namespace Noise
 
     // -------------------------------------------------------------------------------------------------
     
-	float SimplexPerlin(Vector3f& p, int period);
+	float SimplexPerlin(Vector3f& p, int period, uint32_t seed);
 
 	float SimplexAshima(Vector3f& p);
 
     float SimplexAshimaGLSL(Vector3f& p);
 
-    float Worley(Vector3f& p, int period);
+    float Worley(Vector3f& p, int period, uint32_t seed);
 
     uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
 
@@ -197,15 +197,16 @@ namespace Noise
 
     class PerlinNoise {
     private:
-        static Vector3f    m_p;
-        static int         m_period;
+        static Vector3f m_p;
+        static int      m_period;
+        static uint32_t m_seed;
 
         static grad3 Gradient(int ix, int iy, int iz);
 
         static float GradientDot(int ix, int iy, int iz);
 
     public:
-        static void Setup(int period);
+        static void Setup(int period, uint32_t seed);
 
         static float Compute(Vector3f& p);
     };
@@ -215,16 +216,17 @@ namespace Noise
     private:
         static Vector3f         m_p;
         static int              m_period;
+        static uint32_t         m_seed;
         static std::vector<int> m_perm;
 
-        static void BuildPermutation(uint32_t seed);
+        static void BuildPermutation(void);
 
         static grad3 Gradient(int x, int y, int z);
 
         static float GradientDot(int ix, int iy, int iz);
 
     public:
-        static void Setup(int period, uint32_t seed);
+        static void Setup(int period, uint32_t seed = 0x9E3779B9u);
 
         static float Compute(Vector3f& p);
     };
@@ -246,8 +248,9 @@ namespace Noise
 
     struct SimplexPerlinFunctor {
         int period;
+        uint32_t seed;
         float operator()(Vector3f& p) const {
-            return Noise::SimplexPerlin(p, period);
+            return Noise::SimplexPerlin(p, period, seed);
         }
     };
 
@@ -265,18 +268,11 @@ namespace Noise
 
     struct WorleyFunctor {
         int period;
+        uint32_t seed;
         float operator()(Vector3f& p) const {
-            return Noise::Worley(p, period);
+            return Noise::Worley(p, period, seed);
         }
     };
-
-    struct InverseWorleyFunctor {
-        int period;
-        float operator()(Vector3f& p) const {
-            return 1.0f - Noise::Worley(p, period);
-        }
-    };
-
 };
 
 // =================================================================================================

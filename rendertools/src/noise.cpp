@@ -12,6 +12,13 @@
 
 namespace Noise {
 
+    static uint32_t hashSeed = 0x1234567u;
+
+    inline void SetHashSeed(uint32_t seed = 0xA341316Cu) {
+        hashSeed = seed;
+    }
+
+
     namespace {
         const grad3 gradLUT[12] = {
             { 1, 1, 0},{-1, 1, 0},{ 1,-1, 0},{-1,-1, 0},
@@ -29,11 +36,12 @@ namespace Noise {
             return a + t * (b - a);
         }
 
-        inline uint32_t Hash(int x, int y, int z) {
+        inline uint32_t Hash(int x, int y, int z, uint32_t seed = 0xA341316Cu) {
             uint32_t h =
-                (uint32_t)x * 374761393u
-                + (uint32_t)y * 668265263u
-                + (uint32_t)z * 2147483647u;
+                x * 374761393u ^
+                y * 668265263u ^
+                z * 2147483647u ^
+                (seed * 0x9E3779B9u);
             h ^= h >> 13;
             h *= 1274126177u;
             h ^= h >> 16;
@@ -63,9 +71,11 @@ namespace Noise {
 
     Vector3f    PerlinNoise::m_p;
     int         PerlinNoise::m_period;
+    uint32_t    PerlinNoise::m_seed;
 
-    void PerlinNoise::Setup(int period) {
+    void PerlinNoise::Setup(int period, uint32_t seed) {
         m_period = period;
+        m_seed = seed;
     }
 
     Noise::grad3 PerlinNoise::Gradient(int ix, int iy, int iz) {
@@ -76,7 +86,7 @@ namespace Noise {
         float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
         return grad3(r * cos(a), r * sin(a), z);
 #else
-        uint32_t h = Hash(ix, iy, iz);
+        uint32_t h = Hash(ix, iy, iz, m_seed);
         return gradLUT[h % 12];
 #endif
     }
@@ -123,21 +133,22 @@ namespace Noise {
 
     // -------------------------------------------------------------------------------------------------
 
-
     Vector3f            ImprovedPerlinNoise::m_p;
     int                 ImprovedPerlinNoise::m_period;
+    uint32_t            ImprovedPerlinNoise::m_seed;
     std::vector<int>    ImprovedPerlinNoise::m_perm;
 
     void ImprovedPerlinNoise::Setup(int period, uint32_t seed) {
         m_period = period;
-        BuildPermutation(seed);
+        m_seed = seed ? seed : 0x9E3779B9u;
+        BuildPermutation();
     }
 
-    void ImprovedPerlinNoise::BuildPermutation(uint32_t seed) {
+    void ImprovedPerlinNoise::BuildPermutation(void) {
         m_perm.resize(m_period);
         for (int i = 0; i < m_period; ++i) 
             m_perm[i] = i;
-        uint32_t s = seed ? seed : 0x9E3779B9u;
+        uint32_t s = m_seed;
         for (int i = m_period - 1; i > 0; --i) {
             s = s * 1664525u + 1013904223u;
             int j = int(s % uint32_t(i + 1));
@@ -229,12 +240,12 @@ namespace Noise {
             }
         }
 
-        inline uint32_t Hash(const GridPosi& p) {
-            return Hash(p.x, p.y, p.z);
+        inline uint32_t Hash(const GridPosi& p, uint32_t seed) {
+            return Hash(p.x, p.y, p.z, seed);
         }
     };
 
-    float SimplexPerlin(Vector3f& p, int period) {
+    float SimplexPerlin(Vector3f& p, int period, uint32_t seed) {
         const float F = 1.f / 3.f;
         const float G = 1.f / 6.f;
 
@@ -273,7 +284,7 @@ namespace Noise {
 
         float n = 0;
         for (int i = 0; i < 4; i++)
-            n += contrib(pos.p[i], Hash(corners.p[i]));
+            n += contrib(pos.p[i], Hash(corners.p[i], seed));
 
         return 32.f * n;
     }
@@ -398,7 +409,7 @@ namespace Noise {
     }
 
     // F1 (nächster Featurepunkt)
-    float Worley(Vector3f& p, int period) {
+    float Worley(Vector3f& p, int period, uint32_t seed) {
         GridPosf pos(p.x, p.y, p.z);
         pos.Wrap(period);
 
@@ -413,7 +424,7 @@ namespace Noise {
                 for (int dx = -1; dx <= 1; ++dx) {
                     c.x = WrapInt(base.x + dx, period);
 
-                    uint32_t h = Hash(c);
+                    uint32_t h = Hash(c, seed);
                     GridPosf j(
                         HashToUnit01(h),
                         HashToUnit01(h * 0x9E3779B1u),
