@@ -12,9 +12,8 @@
 #include <memory>
 #include <new>    // std::nothrow
 
-#ifndef M_PI
-#   define M_PI 3.14159265358979323846
-#endif
+constexpr float PI = 3.14159265358979323846f;
+constexpr float TWO_PI = 6.28318530717958647692f; 
 
 // =================================================================================================
 
@@ -23,13 +22,13 @@ namespace Conversions
     static float DegToRad(float deg)
         noexcept
     {
-        return static_cast<float>((static_cast<double>(deg) / 180.0 * M_PI));
+        return static_cast<float>((static_cast<double>(deg) / 180.0 * PI));
     }
 
     static float RadToDeg(float rad)
         noexcept
     {
-        return static_cast<float>((static_cast<double>(rad) * 180.0 / M_PI));
+        return static_cast<float>((static_cast<double>(rad) * 180.0 / PI));
     }
 
     static float DotToRad(float dot)

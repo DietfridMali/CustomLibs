@@ -2,6 +2,7 @@
 #include "matrix.hpp"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
+#include "conversions.hpp"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -13,7 +14,7 @@ FloatArray* BaseShaderHandler::ComputeGaussKernel1D(int radius) {
 
     const float sigma = float(radius) / 1.6f; // 2.0f; // Standardabweichung
     const float sigma2 = 2.0f * sigma * sigma;
-    const float sqrtSigmaPi2 = float (std::sqrt(M_PI * sigma2));
+    const float sqrtSigmaPi2 = float (std::sqrt(PI * sigma2));
     float sum = 0.0f;
 #ifdef _DEBUG
     float k[33];

@@ -41,6 +41,19 @@ namespace Noise {
             return h;
         }
 
+
+        inline float fractf(float x) {
+            return x - std::floor(x);
+        }
+
+        inline Vector2f Hash23(int ix, int iy, int iz) {
+            float n1 = ix * 127.1f + iy * 311.7f + iz * 74.7f;
+            float n2 = ix * 269.5f + iy * 183.3f + iz * 246.1f;
+            float s1 = sinf(n1) * 43758.5453123f;
+            float s2 = sinf(n2) * 43758.5453123f;
+            return Vector2f(fractf(s1), fractf(s2));
+        }
+
         inline float Dot(const GridPosf& a, const GridPosf& b) {
             return a.x * b.x + a.y * b.y + a.z * b.z;
         }
@@ -50,8 +63,16 @@ namespace Noise {
     // 3D Perlin, nicht periodisch, ~[-1,1]
     namespace {
         inline grad3 RandomGradient(int ix, int iy, int iz) {
+#if 1
+            Vector2f u = Hash23(ix, iy, iz);      // u.x, u.y in [0,1)
+            float z = 2.0 * u.x - 1.0;
+            float a = float(TWO_PI * u.y);
+            float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
+            return grad3(r * cos(a), r * sin(a), z);
+#else
             uint32_t h = Hash(ix, iy, iz);
             return gradLUT[h % 12];
+#endif
         }
 
         inline float DotGridGradient(int ix, int iy, int iz, float x, float y, float z) {
