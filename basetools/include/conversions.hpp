@@ -48,13 +48,11 @@ namespace Conversions
         return (v - vMin) / (vMax - vMin);
     }
 
+    // pulls everything below the middle towards the min value, everything above the middle towards the max value
     static float Stretch(float v, float vMin, float vMax) {
         float m = (vMax - vMin) * 0.5f;
         float h = vMin + m;
-        if (v < m)
-            return m * (m - v) / h;
-        else
-            return (1.0f - m) * (v - m) / h;
+        return (v < m) ? m * (m - v) / h : (1.0f - m) * (v - m) / h;
     }
 
     template <typename T, size_t N>
