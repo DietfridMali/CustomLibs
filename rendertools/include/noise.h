@@ -270,6 +270,13 @@ namespace Noise
         }
     };
 
+    struct InverseWorleyFunctor {
+        int period;
+        float operator()(Vector3f& p) const {
+            return 1.0f - Noise::Worley(p, period);
+        }
+    };
+
 };
 
 // =================================================================================================

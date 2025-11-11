@@ -412,13 +412,33 @@ namespace Noise {
                 c.y = WrapInt(base.y + dy, period);
                 for (int dx = -1; dx <= 1; ++dx) {
                     c.x = WrapInt(base.x + dx, period);
+
                     uint32_t h = Hash(c);
-                    GridPosf j(HashToUnit01(h), HashToUnit01(h * 0x9E3779B1u), HashToUnit01(h * 0xBB67AE85u));
-                    GridPosf o = j + c; // ((float)c.x + jx, (float)c.y + jy, (float)c.z + jz);
+                    GridPosf j(
+                        HashToUnit01(h),
+                        HashToUnit01(h * 0x9E3779B1u),
+                        HashToUnit01(h * 0xBB67AE85u)
+                    );
+
+                    GridPosf o = j + GridPosf((float)c.x, (float)c.y, (float)c.z);
                     GridPosf d = o - pos;
+
+                    // Periodische Distanz (Minimal-Image-Konvention)
+                    if (d.x > 0.5f * period) 
+                        d.x -= period;
+                    if (d.x < -0.5f * period) 
+                        d.x += period;
+                    if (d.y > 0.5f * period) 
+                        d.y -= period;
+                    if (d.y < -0.5f * period) 
+                        d.y += period;
+                    if (d.z > 0.5f * period) 
+                        d.z -= period;
+                    if (d.z < -0.5f * period) 
+                        d.z += period;
+
                     float n = d.Dot(d);
-                    if (n < dMin)
-                        dMin = n;
+                    if (n < dMin) dMin = n;
                 }
             }
         }
@@ -507,12 +527,13 @@ namespace Noise {
         const vec4 D = vec4(0.0f, 0.5, 1.0f, 2.0f);
         vec3 i = floor(v + dot(v, yyy(C)));
         vec3 x0 = v - i + dot(i, xxx(C));
-        vec3 g = step(yzx(x0), xyz(x0)), l = sub(1.0f, g);
+        vec3 g = step(yzx(x0), xyz(x0)), 
+             l = sub(1.0f, g);
         vec3 i1 = min(xyz(g), zxy(l)),
-            i2 = max(xyz(g), zxy(l));
+             i2 = max(xyz(g), zxy(l));
         vec3 x1 = x0 - i1 + xxx(C),
-            x2 = x0 - i2 + yyy(C),
-            x3 = x0 - yyy(D);
+             x2 = x0 - i2 + yyy(C),
+             x3 = x0 - yyy(D);
         i = mod289(i);
         vec4 p = permute(
             permute(
@@ -523,14 +544,14 @@ namespace Noise {
         vec3  ns = n_ * wyz(D) - xzx(D);
         vec4 j = p - mul(floorv(mul(p,ns.z * ns.z)), 49.0f);
         vec4 x_ = floorv(mul(j, ns.z)),
-            y_ = floorv(j - mul(x_, 7.0f));
+             y_ = floorv(j - mul(x_, 7.0f));
         vec4 x = mul(x_, ns.x) + yyyy(ns),
-            y = mul(y_, ns.x) + yyyy(ns);
+             y = mul(y_, ns.x) + yyyy(ns);
         vec4 h = 1.0f - absv(x) - absv(y);
         vec4 b0 = vec4(x.x, x.y, y.x, y.y),
-            b1 = vec4(x.z, x.w, y.z, y.w);
+             b1 = vec4(x.z, x.w, y.z, y.w);
         vec4 s0 = add(mul(floorv(b0), 2.0f), 1.0f),
-            s1 = add(mul(floorv(b1), 2.0f), 1.0f);
+             s1 = add(mul(floorv(b1), 2.0f), 1.0f);
         vec4 sh = -step(h, vec4(0.0f));
         vec4 a0 = xzyw(b0) + xzyw(s0) * xxyy(sh);
         vec4 a1 = xzyw(b1) + xzyw(s1) * zzww(sh);

@@ -55,120 +55,74 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     const float cellSize = float(m_gridSize) / float(m_params.cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
 
-#if 1 // simple perlin
-
-    m_params.fbmParams.perturb = 1;
-    m_params.normalize = 1;
-
-    SimplexAshimaFunctor ashimaFn{};
-    FBM<SimplexAshimaFunctor> ashimaFbm(ashimaFn, m_params.fbmParams);
+    NoiseParams shapeParams, detailParams;
+    shapeParams.fbmParams.perturb = 1;
+    shapeParams.normalize = 1;
+    detailParams.fbmParams.octaves = 3;
+    detailParams.fbmParams.perturb = 0;
 
     PerlinNoise::Setup(m_params.cellsPerAxis);
-    PerlinFunctor perlinFn{ };
-    FBM<PerlinFunctor> perlinFbm(perlinFn, m_params.fbmParams);
+    PerlinFunctor shapeNoise{ };
+    FBM<PerlinFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
+
+    WorleyFunctor detailNoise{ m_params.cellsPerAxis * 2 };
+    FBM<WorleyFunctor> detailFbm(detailNoise, detailParams.fbmParams);
 
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
+#ifdef _DEBUG
     int belowCoverage = 0;
+#endif
 
     int i = 0;
     Vector3f p;
     float cellScale = float(m_params.cellsPerAxis) / float(m_gridSize - 1);
     for (int z = 0; z < m_gridSize; ++z) {
-        p.z = float(z) * cellScale;
+        p.z = (float(z) + 0.5f) * cellScale;
         for (int y = 0; y < m_gridSize; ++y) {
-            p.y = float(y) * cellScale;
+            p.y = (float(y) + 0.5f) * cellScale;
             for (int x = 0; x < m_gridSize; ++x) {
-                p.x = float(x) * cellScale;
-#if 0
-                fabs(PerlinNoise::Compute(p); // fbm.Value(u, p, w); // [0,1]
-                noise.x = 0.5f + PerlinNoise::Compute(p) * 0.5f; // fbm.Value(u, p, w); // [0,1]
-#elif 1
-                noise.x = perlinFbm.Value(p);
-#else
-                noise.x = ashimaFbm.Value(p);
-#endif
+                p.x = (float(x) + 0.5f) * cellScale;
+                float shape = shapeFbm.Value(p);      // [0,1]
+                float detail = detailFbm.Value(p);      // [0,1], Peaks = Knubbel
+                const float sharpness = 0.6f;                    // Detailstärke 0..1
+                const float fuzziness = 0.3f;
+                float lumps = powf(detail, 1.5f);
+                float erosion = powf(1.0f - detail, 1.5f);
+                noise.x = shape - fuzziness * erosion;
+                noise.x *= (1.0f - sharpness) + sharpness * lumps;
                 minVals.Minimize(noise);
                 maxVals.Maximize(noise);
-
-                data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
-                if (noise.x < 0.3125)
-                    ++belowCoverage;
-                data[i++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
-                data[i++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
-                data[i++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
-            }
-        }
-    }
-
-#else
-
-    ImprovedPerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
-    
-    ImprovedPerlinFunctor baseNoiseFn{ perm, m_params.cellsPerAxis };
-    FBM<ImprovedPerlinFunctor> baseFbm(baseNoiseFn, m_params.fbmParams);
-    
-    WorleyFunctor detailNoiseFnG{ m_params.cellsPerAxis / 2};
-    FBM<WorleyFunctor> detailFbmG(detailNoiseFnG, m_params.fbmParams);
-    
-    WorleyFunctor detailNoiseFnB{ m_params.cellsPerAxis / 4 };
-    FBM<WorleyFunctor> detailFbmB(detailNoiseFnG, m_params.fbmParams);
-    
-    WorleyFunctor detailNoiseFnA{ m_params.cellsPerAxis / 8 };
-    FBM<WorleyFunctor> detailFbmA(detailNoiseFnG, m_params.fbmParams);
-
-    Vector4f noise;
-    Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
-    Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
-    int belowCoverage = 0;
-
-    int i = 0;
-    Vector3f p;
-    float cellScale = float(m_params.cellsPerAxis) / float(m_gridSize - 1);
-    for (int z = 0; z < m_gridSize; ++z) {
-        p.z = float(z) * cellScale;
-        for (int y = 0; y < m_gridSize; ++y) {
-            p.y = float(y) * cellScale;
-            for (int x = 0; x < m_gridSize; ++x) {
-                p.x = float(x) * cellScale;
-
-                noise.x = baseFbm.Value(p); // [0,1]
-                minVals.Minimize(noise);
-                maxVals.Maximize(noise);
-                if (noise.x < 0.3125)
-                    ++belowCoverage;
-
                 data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
-#   if 0
-                noise.y = detailFbmG.Value(u, v, w);
-                noise.z = detailFbmB.Value(u, v, w);
-                noise.w = detailFbmA.Value(u, v, w);
-#   endif
+#ifdef _DEBUG
+                if (noise.x < 0.3125)
+                    ++belowCoverage;
+#endif
             }
         }
     }
-
-#endif
-
-#if 1
+#ifdef _DEBUG
     float minVal = 1e6f;
     float maxVal = 0.0f;
+#endif
     if (m_params.normalize) {
         int h = i;
         belowCoverage = 0;
         for (int i = 0; i < h; ) {
             if (m_params.normalize & 1) {
                 data[i] = Conversions::Normalize(data[i], minVals.x, maxVals.x);
+#ifdef _DEBUG
                 if (minVal > data[i])
                     minVal = data[i];
                 if (maxVal < data[i])
                     maxVal = data[i];
                 if (data[i] < 0.3125)
                     ++belowCoverage;
+#endif
             }
             ++i;
             if (m_params.normalize & 2)
@@ -182,7 +136,6 @@ void NoiseTexture3D::ComputeNoise(void) {
             ++i;
         }
     }
-#endif
 }
 
 
