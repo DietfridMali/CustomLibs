@@ -7,10 +7,10 @@
 struct FBMParams {
     float frequency{ 1.f };
     float lacunarity{ 2.f };
-    float initialGain{ .6f };
+    float initialGain{ .5f };
     float gain{ .5f };
     int octaves{ 5 };
-    bool perturb{ true };
+    int perturb{ 0 };
 };
 
 template<typename NoiseFn>
@@ -20,37 +20,40 @@ private:
     FBMParams   m_params;
     float       m_normal;
 
-    float Compute(float x, float y, float z) const {
-        float v = 0.f;
+    float Compute(Vector3f p) const {
+        float n = 0.f;
         float a = m_params.initialGain;
         float f = m_params.frequency;
-        for (int i = 0; i < m_params.octaves; i++) {
-            float n = m_noiseFn(x * f, y * f, z * f);
-            v += a * (m_params.perturb ? fabs(n) : n);
+        p *= f;
+        for (int i = 0; i < m_params.octaves; ++i) {
+            float v = m_noiseFn(p);
+            n += a * (m_params.perturb ? (v < 0) ? -v : v : v);
             a *= m_params.gain;
-            f *= m_params.lacunarity;
+            p *= m_params.lacunarity;
         }
-        return v;
+        return n;
     }
 
 public:
-    FBM(const NoiseFn& f, const FBMParams& p) 
-        : m_noiseFn(f), m_params(p) 
+    FBM(const NoiseFn& noiseFn, const FBMParams& params) 
+        : m_noiseFn(noiseFn), m_params(params) 
     {
-        float a = p.initialGain;
+        float a = params.initialGain;
         m_normal = 0.f;
-        for (int i = 0; i < p.octaves; i++) {
+        for (int i = 0; i < params.octaves; ++i) {
             m_normal += a;
-            a *= p.gain;
+            a *= params.gain;
         }
         if (m_normal <= 0.f)
             m_normal = 1.f;
     }
 
-    float Value(float x, float y, float z) const {
-        float n = Compute(x, y, z) / m_normal;
+    float Value(Vector3f& p) const {
+        float n = Compute(p) / m_normal;
         if (not m_params.perturb)
             n = 0.5f + 0.5f * n;
+        else if (m_params.perturb < 0)
+            n = 1.0f - n;
         return std::clamp(n, 0.0f, 1.0f);
     }
 };

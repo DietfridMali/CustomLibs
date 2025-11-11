@@ -15,6 +15,8 @@ struct NoiseParams {
 
 namespace Noise
 {
+    struct grad3 { float x, y, z; };
+
     inline int WrapInt(int v, int p) {
         if (p < 2)
             return v;
@@ -181,63 +183,90 @@ namespace Noise
 
     // -------------------------------------------------------------------------------------------------
     
-    void BuildPermutation(std::vector<int>& perm, int period, uint32_t seed);
+	float SimplexPerlin(Vector3f& p, int period);
 
-    float Perlin(float x, float y, float z); // 3D perlin noise
+	float SimplexAshima(Vector3f& p);
 
-	float ImprovedPerlin(float x, float y, float z, const std::vector<int>& perm, int period);
+    float SimplexAshimaGLSL(Vector3f& p);
 
-	float SimplexPerlin(float x, float y, float z, int period);
-
-	float SimplexAshima(float x, float y, float z);
-
-    float SimplexAshimaGLSL(float xCoord, float yCoord, float zCoord);
-
-    float Worley(float x, float y, float z, int period);
+    float Worley(Vector3f& p, int period);
 
     uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
 
     uint32_t HashXYC32(int x, int y, uint32_t seed, uint32_t ch);
 
+    class PerlinNoise {
+    private:
+        static Vector3f    m_p;
+        static int         m_period;
+
+        static grad3 Gradient(int ix, int iy, int iz);
+
+        static float GradientDot(int ix, int iy, int iz);
+
+    public:
+        static void Setup(int period);
+
+        static float Compute(Vector3f& p);
+    };
+
+
+    class ImprovedPerlinNoise {
+    private:
+        static Vector3f         m_p;
+        static int              m_period;
+        static std::vector<int> m_perm;
+
+        static void BuildPermutation(uint32_t seed);
+
+        static grad3 Gradient(int x, int y, int z);
+
+        static float GradientDot(int ix, int iy, int iz);
+
+    public:
+        static void Setup(int period, uint32_t seed);
+
+        static float Compute(Vector3f& p);
+    };
+
+
     // -------------------------------------------------------------------------------------------------
 
     struct PerlinFunctor {
-        float operator()(float x, float y, float z) const {
-            return Noise::Perlin(x, y, z); // ~[-1,1]
+        float operator()(Vector3f& p) const {
+            return Noise::PerlinNoise::Compute(p); // ~[-1,1]
         }
     };
 
     struct ImprovedPerlinFunctor {
-        const std::vector<int>& perm;
-        int period;
-        float operator()(float x, float y, float z) const {
-            return Noise::ImprovedPerlin(x, y, z, perm, period); // ~[-1,1]
+        float operator()(Vector3f& p) const {
+            return Noise::ImprovedPerlinNoise::Compute(p); // ~[-1,1]
         }
     };
 
     struct SimplexPerlinFunctor {
         int period;
-        float operator()(float x, float y, float z) const {
-            return Noise::SimplexPerlin(x, y, z, period);
+        float operator()(Vector3f& p) const {
+            return Noise::SimplexPerlin(p, period);
         }
     };
 
     struct SimplexAshimaFunctor {
-        float operator()(float x, float y, float z) const {
-            return Noise::SimplexAshima(x, y, z);
+        float operator()(Vector3f& p) const {
+            return Noise::SimplexAshima(p);
         }
     };
 
     struct SimplexAshimaGLSLFunctor {
-        float operator()(float x, float y, float z) const {
-            return Noise::SimplexAshimaGLSL(x, y, z);
+        float operator()(Vector3f& p) const {
+            return Noise::SimplexAshimaGLSL(p);
         }
     };
 
     struct WorleyFunctor {
         int period;
-        float operator()(float x, float y, float z) const {
-            return Noise::Worley(x, y, z, period);
+        float operator()(Vector3f& p) const {
+            return Noise::Worley(p, period);
         }
     };
 

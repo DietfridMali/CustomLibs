@@ -13,8 +13,6 @@
 namespace Noise {
 
     namespace {
-        struct grad3 { float x, y, z; };
-
         const grad3 gradLUT[12] = {
             { 1, 1, 0},{-1, 1, 0},{ 1,-1, 0},{-1,-1, 0},
             { 1, 0, 1},{-1, 0, 1},{ 1, 0,-1},{-1, 0,-1},
@@ -62,108 +60,126 @@ namespace Noise {
 
     // -------------------------------------------------------------------------------------------------
     // 3D Perlin, nicht periodisch, ~[-1,1]
-    namespace {
-        inline grad3 RandomGradient(int ix, int iy, int iz) {
-#if 1
-            Vector2f u = Hash23(ix, iy, iz);      // u.x, u.y in [0,1)
-            float z = 2.0f * u.x - 1.0f;
-            float a = float(TWO_PI * u.y);
-            float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
-            return grad3(r * cos(a), r * sin(a), z);
+
+    Vector3f    PerlinNoise::m_p;
+    int         PerlinNoise::m_period;
+
+    void PerlinNoise::Setup(int period) {
+        m_period = period;
+    }
+
+    Noise::grad3 PerlinNoise::Gradient(int ix, int iy, int iz) {
+#if 0
+        Vector2f u = Hash23(ix, iy, iz);      // u.x, u.y in [0,1)
+        float z = 2.0f * u.x - 1.0f;
+        float a = float(TWO_PI * u.y);
+        float r = std::sqrt(std::max(0.0f, 1.0f - z * z));
+        return grad3(r * cos(a), r * sin(a), z);
 #else
-            uint32_t h = Hash(ix, iy, iz);
-            return gradLUT[h % 12];
+        uint32_t h = Hash(ix, iy, iz);
+        return gradLUT[h % 12];
 #endif
-        }
+    }
 
-        inline float DotGridGradient(int ix, int iy, int iz, float x, float y, float z) {
-            grad3 g = RandomGradient(ix, iy, iz);
-            float dx = x - (float)ix;
-            float dy = y - (float)iy;
-            float dz = z - (float)iz;
-            return dx * g.x + dy * g.y + dz * g.z;
-        }
-    };
+    float PerlinNoise::GradientDot(int ix, int iy, int iz) {
+        grad3 g = Gradient(ix % m_period, iy % m_period, iz % m_period);
+        float dx = m_p.x - (float)ix;
+        float dy = m_p.y - (float)iy;
+        float dz = m_p.z - (float)iz;
+        return dx * g.x + dy * g.y + dz * g.z;
+    }
 
-    float Perlin(float x, float y, float z) {
-        int x0 = (int)floorf(x);
-        int x1 = x0 + 1;
-        int y0 = (int)floorf(y);
-        int y1 = y0 + 1;
-        int z0 = (int)floorf(z);
-        int z1 = z0 + 1;
+    float PerlinNoise::Compute(Vector3f& p) {
+        m_p = p;
 
-        float n000 = DotGridGradient(x0, y0, z0, x, y, z);
-        float n100 = DotGridGradient(x1, y0, z0, x, y, z);
-        float n010 = DotGridGradient(x0, y1, z0, x, y, z);
-        float n110 = DotGridGradient(x1, y1, z0, x, y, z);
-        float n001 = DotGridGradient(x0, y0, z1, x, y, z);
-        float n101 = DotGridGradient(x1, y0, z1, x, y, z);
-        float n011 = DotGridGradient(x0, y1, z1, x, y, z);
-        float n111 = DotGridGradient(x1, y1, z1, x, y, z);
+        int x0 = (int)floorf(p.x),
+            x1 = x0 + 1;
+        int y0 = (int)floorf(p.y),
+            y1 = y0 + 1;
+        int z0 = (int)floorf(p.z),
+            z1 = z0 + 1;
 
-        float s = Fade(x - (float)x0);
+        float n000 = GradientDot(x0, y0, z0);
+        float n100 = GradientDot(x1, y0, z0);
+        float n010 = GradientDot(x0, y1, z0);
+        float n110 = GradientDot(x1, y1, z0);
+        float n001 = GradientDot(x0, y0, z1);
+        float n101 = GradientDot(x1, y0, z1);
+        float n011 = GradientDot(x0, y1, z1);
+        float n111 = GradientDot(x1, y1, z1);
+
+        float s = Fade(p.x - (float)x0);
         float nx00 = Lerp(n000, n100, s);
         float nx10 = Lerp(n010, n110, s);
         float nx01 = Lerp(n001, n101, s);
         float nx11 = Lerp(n011, n111, s);
 
-        s = Fade(y - (float)y0);
+        s = Fade(p.y - (float)y0);
         float nxy0 = Lerp(nx00, nx10, s);
         float nxy1 = Lerp(nx01, nx11, s);
 
-        return Lerp(nxy0, nxy1, Fade(z - (float)z0));
+        return Lerp(nxy0, nxy1, Fade(p.z - (float)z0));
     }
 
     // -------------------------------------------------------------------------------------------------
 
-    void BuildPermutation(std::vector<int>& perm, int period, uint32_t seed) {
-        perm.resize(period);
-        for (int i = 0; i < period; ++i) perm[i] = i;
+
+    Vector3f            ImprovedPerlinNoise::m_p;
+    int                 ImprovedPerlinNoise::m_period;
+    std::vector<int>    ImprovedPerlinNoise::m_perm;
+
+    void ImprovedPerlinNoise::Setup(int period, uint32_t seed) {
+        m_period = period;
+        BuildPermutation(seed);
+    }
+
+    void ImprovedPerlinNoise::BuildPermutation(uint32_t seed) {
+        m_perm.resize(m_period);
+        for (int i = 0; i < m_period; ++i) 
+            m_perm[i] = i;
         uint32_t s = seed ? seed : 0x9E3779B9u;
-        for (int i = period - 1; i > 0; --i) {
+        for (int i = m_period - 1; i > 0; --i) {
             s = s * 1664525u + 1013904223u;
             int j = int(s % uint32_t(i + 1));
-            std::swap(perm[i], perm[j]);
+            std::swap(m_perm[i], m_perm[j]);
         }
     }
 
-    // -------------------------------------------------------------------------------------------------
+    Noise::grad3 ImprovedPerlinNoise::Gradient(int x, int y, int z) {
+        int i = m_perm[(m_perm[(m_perm[x % m_period] + y) % m_period] + z) % m_period];
+        return gradLUT[i % 12];
+    }
 
-    namespace {
-        inline grad3 PermGradient(int x, int y, int z, const std::vector<int>& perm, int period) {
-            int a = perm[WrapInt(x, period)];
-            int b = perm[(a + WrapInt(y, period)) % period];
-            int c = perm[(b + WrapInt(z, period)) % period];
-            return gradLUT[c % 12];
-        }
+    float ImprovedPerlinNoise::GradientDot(int ix, int iy, int iz) {
+        grad3 g = Gradient(ix, iy, iz);
+        float dx = m_p.x - (float)ix;
+        float dy = m_p.y - (float)iy;
+        float dz = m_p.z - (float)iz;
+        return dx * g.x + dy * g.y + dz * g.z;
+    }
 
-        inline float DotPermGradient(int ix, int iy, int iz, float x, float y, float z, const std::vector<int>& perm, int period) {
-            grad3 g = PermGradient(ix, iy, iz, perm, period);
-            float dx = x - (float)ix;
-            float dy = y - (float)iy;
-            float dz = z - (float)iz;
-            return dx * g.x + dy * g.y + dz * g.z;
-        }
-    };
+    float ImprovedPerlinNoise::Compute(Vector3f& p) {
+        m_p = p;
+    
+        int x0 = (int)floorf(p.x),
+            x1 = x0 + 1;
+        int y0 = (int)floorf(p.y),
+            y1 = y0 + 1;
+        int z0 = (int)floorf(p.z),
+            z1 = z0 + 1;
 
-    float ImprovedPerlin(float x, float y, float z, const std::vector<int>& perm, int period) {
-        int x0 = (int)floorf(x), x1 = x0 + 1;
-        int y0 = (int)floorf(y), y1 = y0 + 1;
-        int z0 = (int)floorf(z), z1 = z0 + 1;
+        float n000 = GradientDot(x0, y0, z0);
+        float n100 = GradientDot(x1, y0, z0);
+        float n010 = GradientDot(x0, y1, z0);
+        float n110 = GradientDot(x1, y1, z0);
+        float n001 = GradientDot(x0, y0, z1);
+        float n101 = GradientDot(x1, y0, z1);
+        float n011 = GradientDot(x0, y1, z1);
+        float n111 = GradientDot(x1, y1, z1);
 
-        float n000 = DotPermGradient(x0, y0, z0, x, y, z, perm, period);
-        float n100 = DotPermGradient(x1, y0, z0, x, y, z, perm, period);
-        float n010 = DotPermGradient(x0, y1, z0, x, y, z, perm, period);
-        float n110 = DotPermGradient(x1, y1, z0, x, y, z, perm, period);
-        float n001 = DotPermGradient(x0, y0, z1, x, y, z, perm, period);
-        float n101 = DotPermGradient(x1, y0, z1, x, y, z, perm, period);
-        float n011 = DotPermGradient(x0, y1, z1, x, y, z, perm, period);
-        float n111 = DotPermGradient(x1, y1, z1, x, y, z, perm, period);
-
-        float sx = Fade(x - (float)x0);
-        float sy = Fade(y - (float)y0);
-        float sz = Fade(z - (float)z0);
+        float sx = Fade(m_p.x - (float)x0);
+        float sy = Fade(m_p.y - (float)y0);
+        float sz = Fade(m_p.z - (float)z0);
 
         float nx00 = Lerp(n000, n100, sx);
         float nx10 = Lerp(n010, n110, sx);
@@ -218,17 +234,17 @@ namespace Noise {
         }
     };
 
-    float SimplexPerlin(float x, float y, float z, int period) {
+    float SimplexPerlin(Vector3f& p, int period) {
         const float F = 1.f / 3.f;
         const float G = 1.f / 6.f;
 
-        float s = (x + y + z) * F;
+        float s = (p.x + p.y + p.z) * F;
 
-        GridPosi base((int)floorf(x + s), (int)floorf(y + s), (int)floorf(z + s));
+        GridPosi base((int)floorf(p.x + s), (int)floorf(p.y + s), (int)floorf(p.z + s));
         float t = base.Sum() * G;
 
         Simplexf pos;
-        pos.p[0] = (GridPosf(x, y, z) - base) + t;
+        pos.p[0] = (GridPosf(p.x, p.y, p.z) - base) + t;
 
         const Simplexi& offsets = SelectSimplex(pos.p[0]);
         pos.p[1] = (pos.p[0] - offsets.p[1]) + G;
@@ -245,12 +261,12 @@ namespace Noise {
                 corners.p[i].Wrap(period);
         }
 
-        auto contrib = [&](const GridPosf& p, uint32_t hash) {
-            float falloff = 0.6f - p.Dot(p);
+        auto contrib = [&](const GridPosf& pos, uint32_t hash) {
+            float falloff = 0.6f - pos.Dot(pos);
             if (falloff <= 0.f) 
                 return 0.f;
-            const grad3& g = gradLUT[hash % 12];
-            float dot = g.x * p.x + g.y * p.y + g.z * p.z;
+            const grad3& grad = gradLUT[hash % 12];
+            float dot = grad.x * pos.x + grad.y * pos.y + grad.z * pos.z;
             falloff *= falloff;
             return falloff * falloff * dot;
             };
@@ -283,7 +299,7 @@ namespace Noise {
         }
     };
 
-    float SimplexAshima(float x, float y, float z) {
+    float SimplexAshima(Vector3f& p) {
         const float F = 1.f / 3.f;
         const float G = 1.f / 6.f;
 
@@ -295,19 +311,19 @@ namespace Noise {
             return 1.79284291400159f - 0.85373472095314f * r;
             };
 
-        GridPosf v{ x, y, z };
+        GridPosf pos{ p.x, p.y, p.z };
 
-        float s = (v.x + v.y + v.z) * F;
+        float s = (pos.x + pos.y + pos.z) * F;
         GridPosf i{
-            floorf(v.x + s),
-            floorf(v.y + s),
-            floorf(v.z + s)
+            floorf(pos.x + s),
+            floorf(pos.y + s),
+            floorf(pos.z + s)
         };
 
         float t = (i.x + i.y + i.z) * G;
 
         Simplexf offsets;
-        offsets.p[0] = (v - i) + t;
+        offsets.p[0] = (pos - i) + t;
 
         GridPosf g{
             (offsets.p[0].x >= offsets.p[0].y) ? 1.f : 0.f,
@@ -382,11 +398,11 @@ namespace Noise {
     }
 
     // F1 (nächster Featurepunkt)
-    float Worley(float x, float y, float z, int period) {
-        GridPosf p(x, y, z);
-        p.Wrap(period);
+    float Worley(Vector3f& p, int period) {
+        GridPosf pos(p.x, p.y, p.z);
+        pos.Wrap(period);
 
-        GridPosi base((int)floorf(p.x), (int)floorf(p.y), (int)floorf(p.z));
+        GridPosi base((int)floorf(pos.x), (int)floorf(pos.y), (int)floorf(pos.z));
         GridPosi c;
 
         float dMin = FLT_MAX;
@@ -399,7 +415,7 @@ namespace Noise {
                     uint32_t h = Hash(c);
                     GridPosf j(HashToUnit01(h), HashToUnit01(h * 0x9E3779B1u), HashToUnit01(h * 0xBB67AE85u));
                     GridPosf o = j + c; // ((float)c.x + jx, (float)c.y + jy, (float)c.z + jz);
-                    GridPosf d = o - p;
+                    GridPosf d = o - pos;
                     float n = d.Dot(d);
                     if (n < dMin)
                         dMin = n;
@@ -485,8 +501,8 @@ namespace Noise {
 
     vec4 taylorInvSqrt(vec4 r) { return add(mul(r, -0.85373472095314f), 1.79284291400159f); }
 
-    float SimplexAshimaGLSL(float xCoord, float yCoord, float zCoord) {
-        vec3 v(xCoord, yCoord, zCoord);
+    float SimplexAshimaGLSL(Vector3f& pos) {
+        vec3 v(pos.x, pos.y, pos.z);
         const vec2 C = vec2(1.0f / 6.0f, 1.0f / 3.0f);
         const vec4 D = vec4(0.0f, 0.5, 1.0f, 2.0f);
         vec3 i = floor(v + dot(v, yyy(C)));

@@ -49,20 +49,6 @@ bool NoiseTexture3D::Create(int gridSize, const NoiseParams& params, String nois
     return true;
 }
 
-static float StretchTest(float v, float vMin, float vMax) {
-    float m = vMin + (vMax - vMin) * 0.5f;
-    if (v < m)
-        v = m - m * (m - v) / (m - vMin);
-    else
-        v = m + (1.0f - m) * (v - m) / (vMax - m);
-    if (v < 0.0f)
-        return 0.0f;
-    if (v > 1.0f)
-        return 1.0f;
-    return v;
-}
-
-
 
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
@@ -71,10 +57,15 @@ void NoiseTexture3D::ComputeNoise(void) {
 
 #if 1 // simple perlin
 
-    m_params.fbmParams.perturb = true;
+    m_params.fbmParams.perturb = 1;
+    m_params.normalize = 1;
 
-    PerlinFunctor noiseFn{};
-    FBM<PerlinFunctor> fbm(noiseFn, m_params.fbmParams);
+    SimplexAshimaFunctor ashimaFn{};
+    FBM<SimplexAshimaFunctor> ashimaFbm(ashimaFn, m_params.fbmParams);
+
+    PerlinNoise::Setup(m_params.cellsPerAxis);
+    PerlinFunctor perlinFn{ };
+    FBM<PerlinFunctor> perlinFbm(perlinFn, m_params.fbmParams);
 
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
@@ -82,16 +73,21 @@ void NoiseTexture3D::ComputeNoise(void) {
     int belowCoverage = 0;
 
     int i = 0;
+    Vector3f p;
+    float cellScale = float(m_params.cellsPerAxis) / float(m_gridSize - 1);
     for (int z = 0; z < m_gridSize; ++z) {
-        float w = float(z) / cellSize;
+        p.z = float(z) * cellScale;
         for (int y = 0; y < m_gridSize; ++y) {
-            float v = float(y) / cellSize;
+            p.y = float(y) * cellScale;
             for (int x = 0; x < m_gridSize; ++x) {
-                float u = float(x) / cellSize;
-#if 1
-                noise.x = 0.5f + Perlin(u, v, w) * 0.5f; // fbm.Value(u, v, w); // [0,1]
+                p.x = float(x) * cellScale;
+#if 0
+                fabs(PerlinNoise::Compute(p); // fbm.Value(u, p, w); // [0,1]
+                noise.x = 0.5f + PerlinNoise::Compute(p) * 0.5f; // fbm.Value(u, p, w); // [0,1]
+#elif 1
+                noise.x = perlinFbm.Value(p);
 #else
-                noise.x = fbm.Value(u, v, w);
+                noise.x = ashimaFbm.Value(p);
 #endif
                 minVals.Minimize(noise);
                 maxVals.Maximize(noise);
@@ -108,8 +104,7 @@ void NoiseTexture3D::ComputeNoise(void) {
 
 #else
 
-    std::vector<int> perm;
-    BuildPermutation(perm, m_params.cellsPerAxis, m_params.seed);
+    ImprovedPerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
     
     ImprovedPerlinFunctor baseNoiseFn{ perm, m_params.cellsPerAxis };
     FBM<ImprovedPerlinFunctor> baseFbm(baseNoiseFn, m_params.fbmParams);
@@ -129,14 +124,16 @@ void NoiseTexture3D::ComputeNoise(void) {
     int belowCoverage = 0;
 
     int i = 0;
+    Vector3f p;
+    float cellScale = float(m_params.cellsPerAxis) / float(m_gridSize - 1);
     for (int z = 0; z < m_gridSize; ++z) {
-        float w = float(z) / float(m_gridSize) * m_params.cellsPerAxis;
+        p.z = float(z) * cellScale;
         for (int y = 0; y < m_gridSize; ++y) {
-            float v = float(y) / float(m_gridSize) * m_params.cellsPerAxis;
+            p.y = float(y) * cellScale;
             for (int x = 0; x < m_gridSize; ++x) {
-                float u = float(x) / float(m_gridSize) * m_params.cellsPerAxis;
+                p.x = float(x) * cellScale;
 
-                noise.x = baseFbm.Value(u, v, w); // [0,1]
+                noise.x = baseFbm.Value(p); // [0,1]
                 minVals.Minimize(noise);
                 maxVals.Maximize(noise);
                 if (noise.x < 0.3125)
@@ -165,7 +162,7 @@ void NoiseTexture3D::ComputeNoise(void) {
         belowCoverage = 0;
         for (int i = 0; i < h; ) {
             if (m_params.normalize & 1) {
-                data[i] = StretchTest(data[i], minVals.x, maxVals.x);
+                data[i] = Conversions::Normalize(data[i], minVals.x, maxVals.x);
                 if (minVal > data[i])
                     minVal = data[i];
                 if (maxVal < data[i])
@@ -296,13 +293,16 @@ void CloudVolume3D::Compute(void) {
     float minVal = 1e6f, maxVal = 0.0f;
     int belowCoverage = 0;
     int isZero = 0;
+
+    Vector3f p;
+    float cellScale = float(m_params.cellsPerAxis) / float(m_gridSize - 1);
     for (int z = 0; z < m_gridSize; ++z) {
-        float w = (float(z) + 0.5f) / float(m_gridSize);
+        p.z = float(z) * cellScale;
         for (int y = 0; y < m_gridSize; ++y) {
-            float v = (float(y) + 0.5f) / float(m_gridSize);
+            p.y = float(y) * cellScale;
             for (int x = 0; x < m_gridSize; ++x) {
-                float u = (float(x) + 0.5f) / float(m_gridSize);
-                float n = fbm.Value(u, v, w);
+                p.x = float(x) * cellScale;
+                float n = fbm.Value(p);
                 data[i++] = n;
                 if (minVal > n)
                     minVal = n;
