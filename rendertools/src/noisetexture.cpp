@@ -71,21 +71,27 @@ void NoiseTexture3D::ComputeNoise(void) {
     shapeParams.fbmParams.perturb = 1;
     shapeParams.normalize = 1;
 
-    NoiseParams detailParams;
-    detailParams.fbmParams.octaves = 1;
-    detailParams.fbmParams.initialGain = 1.0f;
-    detailParams.fbmParams.gain = 1.0f;
-    detailParams.fbmParams.frequency = 4.0f;   // oder 3, 5 etc, ganzzahlig
-    detailParams.fbmParams.lacunarity = 2.0f;   // egal bei 1 Oktave
-    detailParams.fbmParams.perturb = 1;
-    detailParams.fbmParams.normalize = false;
-
     PerlinNoise::Setup(m_params.cellsPerAxis);
     PerlinFunctor shapeNoise{ };
     FBM<PerlinFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
 
+    NoiseParams detailParams;
+    detailParams.fbmParams.octaves = 1;
+    detailParams.fbmParams.initialGain = 1.0f;
+    detailParams.fbmParams.gain = 1.0f;
+    detailParams.fbmParams.frequency = 4.0f;   
+    detailParams.fbmParams.lacunarity = 2.0f;  
+    detailParams.fbmParams.perturb = 1;
+    detailParams.fbmParams.normalize = false;
+
     WorleyFunctor detailNoise{ m_params.cellsPerAxis };
     FBM<WorleyFunctor> detailFbm(detailNoise, detailParams.fbmParams);
+
+    detailParams.fbmParams.frequency = 8.0f;
+    detailParams.fbmParams.lacunarity = 4.0f;
+
+    WorleyFunctor fineDetailNoise{ m_params.cellsPerAxis };
+    FBM<WorleyFunctor> fineDetailFbm(fineDetailNoise, detailParams.fbmParams);
 
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
@@ -104,9 +110,9 @@ void NoiseTexture3D::ComputeNoise(void) {
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = (float(x) + 0.5f) * cellScale;
                 noise.x = shapeFbm.Value(p);      // [0,1]
-                noise.y = detailFbm.Value(p);      // [0,1], Peaks = Knubbel
-                noise.z = noise.x;
-                noise.a = 1.0f - noise.y;
+                noise.y = 1.0f - detailFbm.Value(p);      // [0,1], Peaks = Knubbel
+                noise.z = 1.0f - fineDetailFbm.Value(p);      // [0,1], Peaks = Knubbel
+                noise.a = noise.x;
                 data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
                 data[i++] = std::clamp(noise.y, 0.0f, 1.0f);
                 data[i++] = std::clamp(noise.z, 0.0f, 1.0f);
