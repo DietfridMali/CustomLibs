@@ -3,7 +3,8 @@
 #include <stdint.h>
 #include <vector>
 
-#include "array.hpp"
+#include "vector.hpp"
+
 #include "noise.h"
 
 // =================================================================================================
@@ -338,7 +339,7 @@ namespace Noise {
             Normalize(gradients.p[i]);
 
         auto contrib = [&](const GridPosf& o, const GridPosf& g) {
-            float falloff = 0.6f - o.x * o.x - o.y * o.y - o.z * o.z;
+            float falloff = 0.6f - o.Dot(o);
             if (falloff <= 0.f)
                 return 0.f;
             falloff *= falloff;
@@ -387,6 +388,134 @@ namespace Noise {
         float d = sqrtf(dMin) * (1.0f / 1.7320508075688772f);
         return std::clamp(d, 0.0f, 1.0f);
     }
+
+    // -------------------------------------------------------------------------------------------------
+
+
+#if 1
+    using vec2 = glm::vec2;
+    using vec3 = glm::vec3;
+    using vec4 = glm::vec4;
+
+#define xyz(v)   (v)
+#define xxx(v)   vec3(v.x, v.x, v.x)
+#define yyy(v)   vec3(v.y, v.y, v.y)
+#define xzx(v)   vec3(v.x, v.z, v.x)
+#define yzx(v)   vec3(v.y, v.z, v.x)
+#define zxy(v)   vec3(v.z, v.x, v.y)
+#define wyz(v)   vec3(v.w, v.y, v.z)
+#define xxyy(v)  vec4(v.x, v.x, v.y, v.y)
+#define yyyy(v)  vec4(v.y, v.y, v.y, v.y)
+#define xzyw(v)  vec4(v.x, v.z, v.y, v.w)
+#define xyzw(v)  (v)
+#define zzww(v)  vec4(v.z, v.z, v.w, v.w)
+
+    float mod289(float x) { return x - floor(x * (1.0f / 289.0f)) * 289.0f; }
+
+    vec3 mod289(vec3 x) {
+        return vec3(mod289(x.x), mod289(x.y), mod289(x.z));
+    }
+
+    vec4 mod289(vec4 x) { 
+        return vec4(mod289(x.x), mod289(x.y), mod289(x.z), mod289(x.w));
+    }
+
+    vec4 mul(vec4 v, float n) {
+        return vec4(v.x * n, v.y * n, v.z * n, v.w * n);
+    }
+
+    vec4 add(vec4 v, float n) {
+        return vec4(v.x + n, v.y + n, v.z + n, v.w + n);
+    }
+
+    vec4 permute(vec4 x) { return mod289((add(mul (x, 34.0), 1.0)) * x); }
+
+    vec4 taylorInvSqrt(vec4 r) { return add(mul(r, 0.85373472095314f), -1.79284291400159f); }
+
+    float dot(vec3 p, vec3 q) {
+        return p.x * q.x + p.y * q.y + p.z * q.z;
+    }
+
+    vec3 absv(vec3 v) {
+        return vec3(fabs(v.x), fabs(v.y), fabs(v.z)); 
+    }
+    vec4 absv(vec4 v) {
+        return vec4(fabs(v.x), fabs(v.y), fabs(v.z), fabs(v.w));
+    }
+
+    vec4 floorv(vec4 v) {
+        return vec4(floor(v.x), floor(v.y), floor(v.z), floor(v.w));
+    }
+
+    vec3 floorv(vec3 v) {
+        return vec3(floor(v.x), floor(v.y), floor(v.z));
+    }
+
+    vec3 sub(float n, vec3 v) {
+        return vec3(n - v.x, n - v.y, n - v.z);
+    }
+
+    vec4 sub(float n, vec4 v) {
+        return vec4(n - v.x, n - v.y, n - v.z, n - v.w);
+    }
+
+    float step(float edge, float v) {
+        return (v < edge) ? 0.0f : 1.0f;
+    }
+
+    vec4 step(vec4 edge, vec4 v) {
+        return vec4(step(edge.x, v.x), step(edge.y, v.y), step(edge.z, v.z), step(edge.w, v.w));
+    }
+
+    vec4 maxv(vec4 v, float n) {
+        return vec4(std::max(v.x, n), std::max(v.y, n), std::max(v.z, n), std::max(v.w, n));
+    }
+
+    float AshimaSimplexNoise(float xCoord, float yCoord, float zCoord) {
+        vec3 v(xCoord, yCoord, zCoord);
+        const vec2 C = vec2(1.0f / 6.0f, 1.0f / 3.0f);
+        const vec4 D = vec4(0.0f, 0.5, 1.0f, 2.0f);
+        vec3 i = floor(v + dot(v, yyy(C)));
+        vec3 x0 = v - i + dot(i, xxx(C));
+        vec3 g = step(yzx(x0), xyz(x0)), l = sub(1.0f, g);
+        vec3 i1 = min(xyz(g), zxy(l)),
+            i2 = max(xyz(g), zxy(l));
+        vec3 x1 = x0 - i1 + xxx(C),
+            x2 = x0 - i2 + yyy(C),
+            x3 = x0 - yyy(D);
+        i = mod289(i);
+        vec4 p = permute(
+            permute(
+                permute(i.z + vec4(0.0f, i1.z, i2.z, 1.0f))
+                + i.y + vec4(0.0f, i1.y, i2.y, 1.0f))
+            + i.x + vec4(0.0f, i1.x, i2.x, 1.0f));
+        float n_ = 0.142857142857f;
+        vec3  ns = n_ * wyz(D) - xzx(D);
+        vec4 j = p - mul(floorv(mul(p,ns.z * ns.z)), 49.0f);
+        vec4 x_ = floorv(mul(j, ns.z)),
+            y_ = floorv(j - mul(x_, 7.0f));
+        vec4 x = mul(x_, ns.x) + yyyy(ns),
+            y = mul(y_, ns.x) + yyyy(ns);
+        vec4 h = 1.0f - absv(x) - absv(y);
+        vec4 b0 = vec4(x.x, x.y, y.x, y.y),
+            b1 = vec4(x.z, x.w, y.z, y.w);
+        vec4 s0 = add(mul(floorv(b0), 2.0f), 1.0f),
+            s1 = add(mul(floorv(b1), 2.0f), 1.0f);
+        vec4 sh = -step(h, vec4(0.0f));
+        vec4 a0 = xzyw(b0) + xzyw(s0) * xxyy(sh);
+        vec4 a1 = xzyw(b1) + xzyw(s1) * zzww(sh);
+        vec3 p0 = vec3(a0.x, a0.y, h.x), p1 = vec3(a0.z, a0.w, h.y);
+        vec3 p2 = vec3(a1.x, a1.y, h.z), p3 = vec3(a1.z, a1.w, h.w);
+        vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+        p0 *= norm.x;
+        p1 *= norm.y;
+        p2 *= norm.z;
+        p3 *= norm.w;
+        vec4 m = maxv(sub(0.6f, vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3))), 0.0f);
+        m *= m;
+        return 42.0f * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
+    }
+#endif
 
     // -------------------------------------------------------------------------------------------------
 

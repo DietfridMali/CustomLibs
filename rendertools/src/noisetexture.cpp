@@ -434,22 +434,6 @@ bool CloudVolume3D::Create(int gridSize, const NoiseParams& params, String noise
     return true;
 }
 
-#if 0
-
-void CloudVolume3D::Compute() {
-    float* data = m_data.Data();
-    size_t idx = 0;
-
-    for (int z = 0; z < m_gridSize; ++z) {
-        for (int y = 0; y < m_gridSize; ++y) {
-            for (int x = 0; x < m_gridSize; ++x) {
-                data[idx++] = PerlinFBM3_Periodic(float(x) + 0.5f, float(y) + 0.5f, float(z) + 0.5f, m_gridSize, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed);
-            }
-        }
-    }
-}
-
-#else
 
 void CloudVolume3D::Compute(void) {
     SimplexAshimaFunctor noiseFn{};
@@ -459,6 +443,7 @@ void CloudVolume3D::Compute(void) {
     size_t i = 0;
     float minVal = 1e6f, maxVal = 0.0f;
     int belowCoverage = 0;
+    int isZero = 0;
     for (int z = 0; z < m_gridSize; ++z) {
         float w = (float(z) + 0.5f) / float(m_gridSize);
         for (int y = 0; y < m_gridSize; ++y) {
@@ -473,6 +458,8 @@ void CloudVolume3D::Compute(void) {
                     maxVal = n;
                 if (n < 0.3125)
                     ++belowCoverage;
+                if (n == 0)
+                    ++isZero;
             }
         }
     }
@@ -483,7 +470,6 @@ void CloudVolume3D::Compute(void) {
     }
 }
 
-#endif
 
 void CloudVolume3D::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
