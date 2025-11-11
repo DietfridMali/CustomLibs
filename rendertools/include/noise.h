@@ -191,6 +191,8 @@ namespace Noise
 
 	float SimplexAshima(float x, float y, float z);
 
+    float SimplexAshimaGLSL(float xCoord, float yCoord, float zCoord);
+
     float Worley(float x, float y, float z, int period);
 
     uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
@@ -223,6 +225,12 @@ namespace Noise
     struct SimplexAshimaFunctor {
         float operator()(float x, float y, float z) const {
             return Noise::SimplexAshima(x, y, z);
+        }
+    };
+
+    struct SimplexAshimaGLSLFunctor {
+        float operator()(float x, float y, float z) const {
+            return Noise::SimplexAshimaGLSL(x, y, z);
         }
     };
 

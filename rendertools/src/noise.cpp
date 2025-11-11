@@ -410,30 +410,12 @@ namespace Noise {
 #define xyzw(v)  (v)
 #define zzww(v)  vec4(v.z, v.z, v.w, v.w)
 
-    float mod289(float x) { return x - floor(x * (1.0f / 289.0f)) * 289.0f; }
-
-    vec3 mod289(vec3 x) {
-        return vec3(mod289(x.x), mod289(x.y), mod289(x.z));
-    }
-
-    vec4 mod289(vec4 x) { 
-        return vec4(mod289(x.x), mod289(x.y), mod289(x.z), mod289(x.w));
-    }
-
     vec4 mul(vec4 v, float n) {
         return vec4(v.x * n, v.y * n, v.z * n, v.w * n);
     }
 
     vec4 add(vec4 v, float n) {
         return vec4(v.x + n, v.y + n, v.z + n, v.w + n);
-    }
-
-    vec4 permute(vec4 x) { return mod289((add(mul (x, 34.0), 1.0)) * x); }
-
-    vec4 taylorInvSqrt(vec4 r) { return add(mul(r, 0.85373472095314f), -1.79284291400159f); }
-
-    float dot(vec3 p, vec3 q) {
-        return p.x * q.x + p.y * q.y + p.z * q.z;
     }
 
     vec3 absv(vec3 v) {
@@ -462,16 +444,38 @@ namespace Noise {
     float step(float edge, float v) {
         return (v < edge) ? 0.0f : 1.0f;
     }
+#if 0
+    float dot(vec3 p, vec3 q) {
+        return p.x * q.x + p.y * q.y + p.z * q.z;
+    }
 
     vec4 step(vec4 edge, vec4 v) {
         return vec4(step(edge.x, v.x), step(edge.y, v.y), step(edge.z, v.z), step(edge.w, v.w));
     }
 
+    vec3 step(vec3 edge, vec3 v) {
+        return vec3(step(edge.x, v.x), step(edge.y, v.y), step(edge.z, v.z));
+    }
+#endif
     vec4 maxv(vec4 v, float n) {
         return vec4(std::max(v.x, n), std::max(v.y, n), std::max(v.z, n), std::max(v.w, n));
     }
 
-    float AshimaSimplexNoise(float xCoord, float yCoord, float zCoord) {
+    float mod289(float x) { return x - floor(x * (1.0f / 289.0f)) * 289.0f; }
+
+    vec3 mod289(vec3 x) {
+        return vec3(mod289(x.x), mod289(x.y), mod289(x.z));
+    }
+
+    vec4 mod289(vec4 x) {
+        return vec4(mod289(x.x), mod289(x.y), mod289(x.z), mod289(x.w));
+    }
+
+    vec4 permute(vec4 x) { return mod289((add(mul(x, 34.0), 1.0)) * x); }
+
+    vec4 taylorInvSqrt(vec4 r) { return add(mul(r, -0.85373472095314f), 1.79284291400159f); }
+
+    float SimplexAshimaGLSL(float xCoord, float yCoord, float zCoord) {
         vec3 v(xCoord, yCoord, zCoord);
         const vec2 C = vec2(1.0f / 6.0f, 1.0f / 3.0f);
         const vec4 D = vec4(0.0f, 0.5, 1.0f, 2.0f);

@@ -436,8 +436,8 @@ bool CloudVolume3D::Create(int gridSize, const NoiseParams& params, String noise
 
 
 void CloudVolume3D::Compute(void) {
-    SimplexAshimaFunctor noiseFn{};
-    FBM<SimplexAshimaFunctor> fbm(noiseFn, m_params.fbmParams);
+    SimplexAshimaGLSLFunctor noiseFn{};
+    FBM<SimplexAshimaGLSLFunctor> fbm(noiseFn, m_params.fbmParams);
 
     float* data = m_data.Data();
     size_t i = 0;
