@@ -235,12 +235,23 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     std::vector<int> perm;
     BuildPermutation(perm, m_params.cellsPerAxis, m_params.seed);
-    ImprovedPerlinFunctor noiseFn{ perm, m_params.cellsPerAxis };
-    FBM<ImprovedPerlinFunctor> fbm(noiseFn, m_params.fbmParams);
+    
+    ImprovedPerlinFunctor baseNoiseFn{ perm, m_params.cellsPerAxis };
+    FBM<ImprovedPerlinFunctor> baseFbm(baseNoiseFn, m_params.fbmParams);
+    
+    WorleyFunctor detailNoiseFnG{ m_params.cellsPerAxis / 2};
+    FBM<WorleyFunctor> detailFbmG(detailNoiseFnG, m_params.fbmParams);
+    
+    WorleyFunctor detailNoiseFnB{ m_params.cellsPerAxis / 4 };
+    FBM<WorleyFunctor> detailFbmB(detailNoiseFnG, m_params.fbmParams);
+    
+    WorleyFunctor detailNoiseFnA{ m_params.cellsPerAxis / 8 };
+    FBM<WorleyFunctor> detailFbmA(detailNoiseFnG, m_params.fbmParams);
 
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
+    int belowCoverage = 0;
 
     int i = 0;
     for (int z = 0; z < m_gridSize; ++z) {
@@ -250,86 +261,52 @@ void NoiseTexture3D::ComputeNoise(void) {
             for (int x = 0; x < m_gridSize; ++x) {
                 float u = float(x) / float(m_gridSize) * m_params.cellsPerAxis;
 
-                noise.x = fbm.Value(u, v, w); // [0,1]
+                noise.x = baseFbm.Value(u, v, w); // [0,1]
                 minVals.Minimize(noise);
                 maxVals.Maximize(noise);
+                if (noise.x < 0.3125)
+                    ++belowCoverage;
 
                 data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
+#   if 0
+                noise.y = detailFbmG.Value(u, v, w);
+                noise.z = detailFbmB.Value(u, v, w);
+                noise.w = detailFbmA.Value(u, v, w);
+#   endif
             }
         }
     }
 
-#endif
-
-#   if 0
-    for (int z = 0; z < m_gridSize; ++z) {
-        for (int y = 0; y < m_gridSize; ++y) {
-            for (int x = 0; x < m_gridSize; ++x) {
-                noise.x = PerlinNoise(float(x) / cellSize, float(y) / cellSize, float(z) / cellSize);
-                // Perlin-fBm für Basis
-                float perlin = 0.0f;
-                float a = m_params.initialGain;
-                float f = m_params.baseFrequency * float(perlinPeriod);
-
-                for (int o = 0; o < m_params.octaves; ++o) {
-                    //float n = PerlinNoise3D(X * f, Y * f, Z * f, 8, m_params.seed ^ 0xA5A5A5u); // ~[-1,1]
-                    float n = PerlinNoise(X * f, Y * f, Z * f, perm, perlinPeriod);
-                    perlin += a * n;
-                    a *= m_params.gain;
-                    f *= m_params.lacunarity;
-                }
-
-                perlin = 0.5f + 0.5f * (perlin / perlinNorm);
-                perlin = std::clamp(perlin, 0.0f, 1.0f);
-
-                // Worley-fBm für Kanäle
-                //noise.x = WorleyF1_Periodic(X, Y, Z, m_gridSize, C_R, m_params.seed ^ 0x51u);
-                noise.x = perlin; // *(1.0f - noise.x);
-#   if 0
-                noise.x = std::pow(noise.x, 0.5f);
-                noise.x = std::clamp(noise.x, 0.0f, 1.0f);
-#   endif
-#   if 0
-#       if 1
-                noise.y = WorleyFBM_Periodic(X, Y, Z, m_gridSize, C_G, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0x1337u);
-                noise.z = WorleyFBM_Periodic(X, Y, Z, m_gridSize, C_B, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xBEEFu);
-                noise.w = WorleyFBM_Periodic(X, Y, Z, m_gridSize, C_A, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xCAFEu);
-#      else
-                noise.y = WorleyFBM_Tiled(X, Y, Z, m_gridSize, C_G, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0x1337u);
-                noise.z = WorleyFBM_Tiled(X, Y, Z, m_gridSize, C_B, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xBEEFu);
-                noise.w = WorleyFBM_Tiled(X, Y, Z, m_gridSize, C_A, m_params.octaves, m_params.lacunarity, m_params.gain, m_params.seed ^ 0xCAFEu);
-#       endif
-#   endif
-                minVals.Minimize(noise);
-                maxVals.Maximize(noise);
-
-                data[idx++] = std::clamp(noise.x, 0.0f, 1.0f);
-                data[idx++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
-                data[idx++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
-                data[idx++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
-            }
-        }
-    }
 #endif
 
 #if 1
+    float minVal = 1e6f;
+    float maxVal = 0.0f;
     if (m_params.normalize) {
         int h = i;
+        belowCoverage = 0;
         for (int i = 0; i < h; ) {
-            if (m_params.normalize & 1)
-                Conversions::Normalize(data[i], minVals.x, maxVals.x);
+            if (m_params.normalize & 1) {
+                data[i] = Conversions::Stretch(data[i], minVals.x, maxVals.x);
+                if (minVal > data[i])
+                    minVal = data[i];
+                if (maxVal < data[i])
+                    maxVal = data[i];
+                if (data[i] < 0.3125)
+                    ++belowCoverage;
+            }
             ++i;
             if (m_params.normalize & 2)
-                Conversions::Normalize(data[i++], minVals.y, maxVals.y);
+                data[i] = Conversions::Normalize(data[i], minVals.y, maxVals.y);
             ++i;
             if (m_params.normalize & 4)
-                Conversions::Normalize(data[i++], minVals.z, maxVals.z);
+                data[i] = Conversions::Normalize(data[i], minVals.z, maxVals.z);
             ++i;
             if (m_params.normalize & 8)
-                Conversions::Normalize(data[i++], minVals.w, maxVals.w);
+                data[i] = Conversions::Normalize(data[i], minVals.w, maxVals.w);
             ++i;
         }
     }
@@ -466,7 +443,7 @@ void CloudVolume3D::Compute(void) {
 
     if (m_params.normalize and (maxVal - minVal < 0.999f)) {
         for (; i; --i, ++data)
-            Conversions::Normalize(*data, minVal, maxVal);
+            Conversions::Stretch(*data, minVal, maxVal);
     }
 }
 

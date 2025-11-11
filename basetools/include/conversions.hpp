@@ -48,6 +48,15 @@ namespace Conversions
         return (v - vMin) / (vMax - vMin);
     }
 
+    static float Stretch(float v, float vMin, float vMax) {
+        float m = (vMax - vMin) * 0.5f;
+        float h = vMin + m;
+        if (v < m)
+            return m * (m - v) / h;
+        else
+            return (1.0f - m) * (v - m) / h;
+    }
+
     template <typename T, size_t N>
     constexpr size_t ArrayLength(const T(&)[N]) noexcept { return N; }
 

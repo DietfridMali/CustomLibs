@@ -444,19 +444,7 @@ namespace Noise {
     float step(float edge, float v) {
         return (v < edge) ? 0.0f : 1.0f;
     }
-#if 0
-    float dot(vec3 p, vec3 q) {
-        return p.x * q.x + p.y * q.y + p.z * q.z;
-    }
 
-    vec4 step(vec4 edge, vec4 v) {
-        return vec4(step(edge.x, v.x), step(edge.y, v.y), step(edge.z, v.z), step(edge.w, v.w));
-    }
-
-    vec3 step(vec3 edge, vec3 v) {
-        return vec3(step(edge.x, v.x), step(edge.y, v.y), step(edge.z, v.z));
-    }
-#endif
     vec4 maxv(vec4 v, float n) {
         return vec4(std::max(v.x, n), std::max(v.y, n), std::max(v.z, n), std::max(v.w, n));
     }
@@ -490,9 +478,9 @@ namespace Noise {
         i = mod289(i);
         vec4 p = permute(
             permute(
-                permute(i.z + vec4(0.0f, i1.z, i2.z, 1.0f))
-                + i.y + vec4(0.0f, i1.y, i2.y, 1.0f))
-            + i.x + vec4(0.0f, i1.x, i2.x, 1.0f));
+                permute(add(vec4(0.0f, i1.z, i2.z, 1.0f), i.z))
+                + add(vec4(0.0f, i1.y, i2.y, 1.0f), i.y))
+            + add(vec4(0.0f, i1.x, i2.x, 1.0f), i.x));
         float n_ = 0.142857142857f;
         vec3  ns = n_ * wyz(D) - xzx(D);
         vec4 j = p - mul(floorv(mul(p,ns.z * ns.z)), 49.0f);
