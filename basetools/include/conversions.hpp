@@ -52,7 +52,7 @@ namespace Conversions
     static float Stretch(float v, float vMin, float vMax) {
         float m = (vMax - vMin) * 0.5f;
         float h = vMin + m;
-        return (v < m) ? m * (m - v) / h : (1.0f - m) * (v - m) / h;
+        return (v < m) ? h * (m - v) / (m - vMin) : (1.0f - h) * (v - m) / (vMax - m);
     }
 
     template <typename T, size_t N>

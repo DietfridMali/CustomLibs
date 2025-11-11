@@ -17,141 +17,6 @@ using namespace Noise;
 #define NORMALIZE_NOISE 0
 
 // =================================================================================================
-// Helpers
-
-#if 0
-
-// Periodischer Worley 3D (F1) + invertiert + fBm
-float WorleyF1_Periodic(float X, float Y, float Z, int period, int cells, uint32_t seed) {
-    float scale = float(cells) / float(period);
-    float x = X * scale;
-    float y = Y * scale;
-    float z = Z * scale;
-    int cx = int(floorf(x));
-    int cy = int(floorf(y));
-    int cz = int(floorf(z));
-    float dmin = 1e9f;
-    for (int dz = -1; dz <= 1; dz++)
-        for (int dy = -1; dy <= 1; dy++)
-            for (int dx = -1; dx <= 1; dx++) {
-                int ix = Wrap(cx + dx, cells);
-                int iy = Wrap(cy + dy, cells);
-                int iz = Wrap(cz + dz, cells);
-                uint32_t h = Hash3D((uint32_t)ix, (uint32_t)iy, (uint32_t)iz, seed);
-                float jx = R01(h);
-                float jy = R01(h * 0x9e3779b9u + 0x7f4a7c15u);
-                float jz = R01(h * 0x85ebca6bu + 0xc2b2ae35u);
-                float fx = float(ix) + jx;
-                float fy = float(iy) + jy;
-                float fz = float(iz) + jz;
-                float dxw = x - fx;
-                float dyw = y - fy;
-                float dzw = z - fz;
-                dxw -= floorf(dxw / float(cells) + 0.5f) * float(cells);
-                dyw -= floorf(dyw / float(cells) + 0.5f) * float(cells);
-                dzw -= floorf(dzw / float(cells) + 0.5f) * float(cells);
-                float d = sqrtf(dxw * dxw + dyw * dyw + dzw * dzw);
-                if (d < dmin) dmin = d;
-            }
-    float invMax = 1.0f / 1.7320508075688772f;
-    return std::clamp(dmin * invMax, 0.0f, 1.0f);
-}
-
-
-float WorleyFBM_Periodic(float X, float Y, float Z, int period, int cells0, int oct, float lac, float gain, uint32_t seed) {
-    float a = 1.f;
-    float sum = 0.f;
-    float norm = 0.f;
-    int cells = cells0;
-    for (int i = 0; i < oct and cells <= period; i++) {
-        float v = WorleyF1_Periodic(X, Y, Z, period, cells, seed + uint32_t(i * 733));
-        sum += a * v;
-        norm += a;
-        a *= gain;
-        cells = int(cells * lac);
-    }
-    if (norm <= 0.f) return 0.5f;
-    return std::clamp(sum / norm, 0.0f, 1.0f);
-}
-
-float WorleyF1_Tiled(float u, float v, float w, int cells, uint32_t seed) {
-    u -= floorf(u);
-    v -= floorf(v);
-    w -= floorf(w);
-    float x = u * cells;
-    float y = v * cells;
-    float z = w * cells;
-    int ix = int(floorf(x));
-    int iy = int(floorf(y));
-    int iz = int(floorf(z));
-    float dmin = 1e9f;
-    for (int dz = -1; dz <= 1; dz++)
-        for (int dy = -1; dy <= 1; dy++)
-            for (int dx = -1; dx <= 1; dx++) {
-                int cx = Wrap(ix + dx, cells);
-                int cy = Wrap(iy + dy, cells);
-                int cz = Wrap(iz + dz, cells);
-                uint32_t h = Hash3D((uint32_t)cx, (uint32_t)cy, (uint32_t)cz, seed);
-                float jx = R01(h);
-                float jy = R01(h * 0x9e3779b9u + 0x7f4a7c15u);
-                float jz = R01(h * 0x85ebca6bu + 0xc2b2ae35u);
-                float fx = float(cx) + jx;
-                float fy = float(cy) + jy;
-                float fz = float(cz) + jz;
-                float dxw = x - fx;
-                float dyw = y - fy;
-                float dzw = z - fz;
-                dxw -= roundf(dxw / float(cells)) * float(cells);
-                dyw -= roundf(dyw / float(cells)) * float(cells);
-                dzw -= roundf(dzw / float(cells)) * float(cells);
-                float d = sqrtf(dxw * dxw + dyw * dyw + dzw * dzw);
-                if (d < dmin) dmin = d;
-            }
-    float invMax = 1.0f / 1.7320508075688772f;
-    return std::clamp(dmin * invMax, 0.0f, 1.0f);
-}
-
-
-float WorleyFBM_Tiled(float u, float v, float w, int maxCells, int cells0, int oct, float lac, float gain, uint32_t seed) {
-    float a = 1.f;
-    float sum = 0.f;
-    float norm = 0.f;
-    int cells = cells0;
-    for (int i = 0; i < oct && cells <= maxCells; i++) {
-        sum += a * WorleyF1_Tiled(u, v, w, cells, seed + uint32_t(i * 733));
-        norm += a;
-        a *= gain;
-        cells = int(cells * lac);
-    }
-    if (norm <= 0.f) return 0.5f;
-    return std::clamp(sum / norm, 0.0f, 1.0f);
-}
-
-#endif
-
-// =================================================================================================
-/* für volumetrische Wolken:
-    NoiseTexture3D shapeTex3D, detailTex3D;
-
-    Noise3DParams pShape;
-    pShape.seed = 0xA5A5A5u;
-    pShape.base = 2.032f;   // grobe Strukturen
-    pShape.lac = 2.3f;
-    pShape.oct = 5;
-    pShape.warp = 0.08f;
-
-    Noise3DParams pDetail = pShape;
-    pDetail.seed = 0x9e3779b9u;
-    pDetail.base = 0.6f;    // höhere Frequenz
-    pDetail.lac = 2.8f;
-    pDetail.oct = 4;
-    pDetail.warp = 0.05f;
-
-    shapeTex3D.Create(128, pShape);   // oder 256, wenn Speicher reicht
-    detailTex3D.Create(32,  pDetail);
-*/
-// --- Simplex periodisch (wie zuletzt bei dir) ---
-// -------------------------------------------------------------------------------------------------
 
 bool NoiseTexture3D::Allocate(int gridSize) {
     TextureBuffer* texBuf = new TextureBuffer();
@@ -190,13 +55,9 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     const float cellSize = float(m_gridSize) / float(m_params.cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
 
-#if 0 // simple perlin
+#if 1 // simple perlin
 
-    struct PerlinFunctor {
-        float operator()(float x, float y, float z) const {
-            return Perlin::Noise(x, y, z); // ~[-1,1]
-        }
-    };
+    m_params.fbmParams.perturb = true;
 
     PerlinFunctor noiseFn{};
     FBM<PerlinFunctor> fbm(noiseFn, m_params.fbmParams);
@@ -204,7 +65,7 @@ void NoiseTexture3D::ComputeNoise(void) {
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
-    int belowThreshold = 0;
+    int belowCoverage = 0;
 
     int i = 0;
     for (int z = 0; z < m_gridSize; ++z) {
@@ -213,8 +74,8 @@ void NoiseTexture3D::ComputeNoise(void) {
             float v = float(y) / cellSize;
             for (int x = 0; x < m_gridSize; ++x) {
                 float u = float(x) / cellSize;
-#if 0
-                noise.x = (1.0f + Perlin(u, v, w)) * 0.5f; // fbm.Value(u, v, w); // [0,1]
+#if 1
+                noise.x = 0.5f + Perlin(u, v, w) * 0.5f; // fbm.Value(u, v, w); // [0,1]
 #else
                 noise.x = fbm.Value(u, v, w);
 #endif
@@ -223,7 +84,7 @@ void NoiseTexture3D::ComputeNoise(void) {
 
                 data[i++] = std::clamp(noise.x, 0.0f, 1.0f);
                 if (noise.x < 0.3125)
-                    ++belowThreshold;
+                    ++belowCoverage;
                 data[i++] = 0.0f; // std::clamp(noise.y, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.z, 0.0f, 1.0f);
                 data[i++] = 0.0f; // std::clamp(noise.w, 0.0f, 1.0f);
