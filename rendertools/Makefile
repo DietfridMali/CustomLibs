@@ -21,6 +21,7 @@ FILES := \
  icosphere \
  linesegment \
  mesh \
+ noise \
  noisetexture \
  opengl_states \
  outlinerenderer \
