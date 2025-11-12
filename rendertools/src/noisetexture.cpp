@@ -56,8 +56,7 @@ static inline float Saturate(float v) {
 
 
 static float Modulate(float shape, float coarseDetail, float mediumDetail, float fineDetail) {
-    //return .5f * shape + .3f * coarseDetail + .2f * fineDetail;
-    return Saturate(.6f * shape + .25f * coarseDetail + .125f * mediumDetail + .75f * fineDetail);
+    return Saturate(.6125f * shape + .1625f * coarseDetail + .125f * mediumDetail + .1f * fineDetail);
 }
 
 
@@ -76,11 +75,11 @@ void NoiseTexture3D::ComputeNoise(void) {
     FBM<SimplexAshimaGLSLFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
 
     NoiseParams detailParams;
-    detailParams.fbmParams.frequency = 4.0f;
-    detailParams.fbmParams.lacunarity = 2.0f;
+    detailParams.fbmParams.frequency = 2.0f;
+    detailParams.fbmParams.lacunarity = 4.0f;
     detailParams.fbmParams.initialGain = 1.0f;
     detailParams.fbmParams.gain = 1.0f;
-    detailParams.fbmParams.octaves = 3;
+    detailParams.fbmParams.octaves = 4;
     detailParams.fbmParams.perturb = 1;
     detailParams.fbmParams.normalize = false;
 
@@ -94,7 +93,7 @@ void NoiseTexture3D::ComputeNoise(void) {
     FBM<WorleyFunctor> mediumDetailFbm(mediumDetailNoise, detailParams.fbmParams);
 
     detailParams.fbmParams.frequency = 32.0f;
-    detailParams.fbmParams.octaves = 1;
+    detailParams.fbmParams.octaves = 2;
 
     WorleyFunctor fineDetailNoise{ m_params.cellsPerAxis, m_params.seed ^ 0xBB67AE85u };
     FBM<WorleyFunctor> fineDetailFbm(fineDetailNoise, detailParams.fbmParams);
