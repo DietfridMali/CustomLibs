@@ -139,7 +139,9 @@ void NoiseTexture3D::ComputeNoise(void) {
 #endif
     int dataSize = i;
     if (m_params.normalize) {
+#ifdef _DEBUG
         belowCoverage = 0;
+#endif
         for (int i = 0; i < dataSize; ) {
             if (m_params.normalize & 1) {
                 data[i] = Conversions::Normalize(data[i], minVals.x, maxVals.x);
