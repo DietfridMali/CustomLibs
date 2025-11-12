@@ -15,7 +15,7 @@ public:
     uint16_t    m_port{ 0 };
     IPaddress   m_socketAddress{};
 
-    NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 9100)
+    NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 27015)
         : m_ipAddress(ipAddress), m_port(port)
     {
         UpdateSocketAddress();
