@@ -67,20 +67,20 @@ void NoiseTexture3D::ComputeNoise(void) {
     m_params.normalize = 1 + 2 + 4 + 8;
 
     NoiseParams shapeParams;
-    shapeParams.fbmParams.perturb = 1;
+    shapeParams.fbmParams.fold = 0;
     shapeParams.normalize = 1;
 
     PerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
-    SimplexAshimaGLSLFunctor shapeNoise{ };
-    FBM<SimplexAshimaGLSLFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
+    PerlinFunctor shapeNoise{ };
+    FBM<PerlinFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
 
     NoiseParams detailParams;
     detailParams.fbmParams.frequency = 2.0f;
     detailParams.fbmParams.lacunarity = 4.0f;
     detailParams.fbmParams.initialGain = 1.0f;
     detailParams.fbmParams.gain = 1.0f;
-    detailParams.fbmParams.octaves = 4;
-    detailParams.fbmParams.perturb = 1;
+    detailParams.fbmParams.octaves = 1;
+    detailParams.fbmParams.fold = 1;
     detailParams.fbmParams.normalize = false;
 
     WorleyFunctor coarseDetailNoise{ m_params.cellsPerAxis, m_params.seed ^ 0x9E3779B9u };
@@ -114,10 +114,10 @@ void NoiseTexture3D::ComputeNoise(void) {
             p.y = (float(y) + 0.5f) * cellScale;
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = (float(x) + 0.5f) * cellScale;
-                noise.x = shapeFbm.Value(p);      // [0,1]
-                noise.y = coarseDetailFbm.Value(p);      // [0,1], Peaks = Knubbel
-                noise.z = mediumDetailFbm.Value(p);      // [0,1], Peaks = Knubbel
-                noise.a = fineDetailFbm.Value(p);      // [0,1], Peaks = Knubbel
+                noise.x = shapeFbm.Value(p);      
+                noise.y = coarseDetailFbm.Value(p);
+                noise.z = mediumDetailFbm.Value(p);
+                noise.a = fineDetailFbm.Value(p);
                 data[i++] = Saturate(noise.x);
                 data[i++] = Saturate(noise.y);
                 data[i++] = Saturate(noise.z);

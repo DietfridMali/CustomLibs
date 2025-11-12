@@ -10,7 +10,7 @@ struct FBMParams {
     float initialGain{ .5f };
     float gain{ .5f };
     int octaves{ 5 };
-    int perturb{ 0 };
+    int fold{ 0 };
     bool normalize{ true };
 };
 
@@ -28,7 +28,7 @@ private:
         p *= f;
         for (int i = 0; i < m_params.octaves; ++i) {
             float v = m_noiseFn(p);
-            n += a * (m_params.perturb ? (v < 0) ? -v : v : v);
+            n += a * (m_params.fold ? (v < 0) ? -v : v : v);
             a *= m_params.gain;
             p *= m_params.lacunarity;
         }
@@ -53,9 +53,9 @@ public:
         float n = Compute(p);
         if (m_params.normalize)
             n /= m_normal;
-        if (not m_params.perturb)
+        if (not m_params.fold)
             n = 0.5f + 0.5f * n;
-        else if (m_params.perturb < 0)
+        else if (m_params.fold < 0)
             n = 1.0f - n;
         return std::clamp(n, 0.0f, 1.0f);
     }
