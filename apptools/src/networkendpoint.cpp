@@ -42,6 +42,7 @@ bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, uint16_t port
         m_socketAddress.host = SDL_SwapBE32(host);
     }
     if (port > 0) {
+        m_port = port;
         m_socketAddress.port = SDL_SwapBE16(m_port);
     }
     return true;

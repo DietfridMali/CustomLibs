@@ -64,8 +64,6 @@ public:
         return m_socketAddress;
     }
 
-    void Set(String ipAddress, uint16_t port = 0) noexcept;
-
     bool operator==(const NetworkEndpoint& other) const {
         return (m_ipAddress == other.m_ipAddress) and (m_port == other.m_port);
     }

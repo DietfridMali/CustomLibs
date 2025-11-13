@@ -12,7 +12,7 @@ bool UDPSocket::Open(const String& localAddress, uint16_t port) {
         return false;
     }
 #endif
-    Set(localAddress, port);
+    UpdateSocketAddress(localAddress, port);
     if (not (m_socket = SDLNet_UDP_Open(port)))
         return false;
     if (not m_packet)
