@@ -10,6 +10,7 @@
 #include <limits>
 #include <cctype>
 #include <cstring>
+#include <iostream>
 #include "array.hpp"
 
 // =================================================================================================
@@ -17,6 +18,8 @@
 class String {
 private:
     std::string m_str;
+
+    inline static bool m_logErrors{ false };
 
 public:
     // Konstruktoren
@@ -41,6 +44,8 @@ public:
     explicit String(size_t n) : m_str(std::to_string(n)) {}
 
     explicit String(float f) : m_str(std::to_string(f)) {}
+
+    void LogError(std::string caller) const;
 
     String(const String&) = default;
 
@@ -201,6 +206,14 @@ public:
             m_str.erase(0, start);
         return *this;
     }
+
+    template <typename T>
+    T ToNumber(std::string caller) const;
+
+    inline static void SetErrorLogging(bool logErrors) {
+        m_logErrors = logErrors;
+    }
+
 };
 
 // ---------- Inline-Funktionen (kurze Operatoren & Zuweisungen) ----------
@@ -287,43 +300,63 @@ inline String::operator char*() noexcept {
     return m_str.data();
 }
 
+inline void String::LogError(std::string caller) const {
+    std::string msg = caller + "Invalid argument '" + m_str + "'\n";
+    if (m_logErrors)
+        std::cerr << msg;
+    else
+        throw std::invalid_argument(msg);
+}
+
+template <typename T>
+inline T String::ToNumber(std::string caller) const {
+    if (IsEmpty())
+        return 0;
+    long long n;
+    try {
+        n = static_cast<size_t>(std::stoll(m_str));
+    }
+    catch (...) {
+        LogError(caller);
+        return 0;
+    }
+    if ((n < static_cast<long long>(std::numeric_limits<T>::min())) or (n > static_cast<long long>(std::numeric_limits<T>::max()))) {
+        LogError(caller);
+        return 0;
+    }
+    return static_cast<T>(n);
+}
+
 inline String::operator int() const {
-    return IsEmpty() ? 0 : std::stoi(m_str);
+    return ToNumber<int>("int");
 }
 
 inline String::operator size_t() const {
-    return IsEmpty() ? 0 : static_cast<size_t>(std::stoll(m_str));
+    return ToNumber<size_t>("size_t");
 }
 
 inline String::operator uint8_t() const {
-    if (IsEmpty())
-        return 0;
-    auto val = static_cast<size_t>(*this);
-    if (val > std::numeric_limits<uint8_t>::max())
-        throw std::out_of_range("value too large for uint16_t");
-    return static_cast<uint8_t>(val);
+    return ToNumber<uint8_t>("uint8_t");
 }
 
 inline String::operator uint16_t() const {
-    if (IsEmpty())
-        return 0;
-    auto val = static_cast<size_t>(*this);
-    if (val > std::numeric_limits<uint16_t>::max())
-        throw std::out_of_range("value too large for uint16_t");
-    return static_cast<uint16_t>(val);
+    return ToNumber<uint16_t>("uint16_t");
 }
 
 inline String::operator uint32_t() const {
-    if (IsEmpty())
-        return 0;
-    auto val = static_cast<size_t>(*this);
-    if (val > std::numeric_limits<uint32_t>::max())
-        throw std::out_of_range("value too large for uint32_t");
-    return static_cast<uint32_t>(val);
+    return ToNumber<uint16_t>("uint32_t");
 }
 
 inline String::operator float() const {
-    return IsEmpty() ? 0.0f : std::stof(m_str);
+    if (IsEmpty())
+        return 0.0f;
+    try {
+        return std::stof(m_str);
+    }
+    catch (...) {
+        LogError("float");
+        return 0.0;
+    }
 }
 
 inline String::operator bool() const noexcept {
@@ -354,5 +387,4 @@ inline char& String::operator[](int idx) noexcept {
 inline const char& String::operator[](int idx) const noexcept {
     return m_str[static_cast<size_t>(idx)];
 }
-
 // =================================================================================================
