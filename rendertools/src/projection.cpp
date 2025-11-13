@@ -55,7 +55,7 @@ Matrix4f Projection::ComputeOrthoProjection(float left, float right, float botto
 noexcept
 {
 #if USE_GLM
-#   if 1
+#   if 0
     Matrix4f m(glm::ortho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0));
 #       if 0 // erst aufrufenden Code überprüfen!
     Matrix4f m(glm::ortho(left, right, bottom, top, zNear, zFar));
