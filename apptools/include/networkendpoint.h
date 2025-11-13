@@ -16,9 +16,8 @@ public:
     IPaddress   m_socketAddress{};
 
     NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 27015)
-        : m_ipAddress(ipAddress), m_port(port)
     {
-        UpdateSocketAddress();
+        UpdateSocketAddress(ipAddress, port);
     }
 
     NetworkEndpoint(const IPaddress& socketAddress) noexcept { 
@@ -33,10 +32,9 @@ public:
         m_socketAddress = other.m_socketAddress;
     }
 
-    NetworkEndpoint(NetworkEndpoint&& other) {
-        m_ipAddress = std::move(other.m_ipAddress);
-        m_port = other.m_port;
-        m_socketAddress = other.m_socketAddress;
+    NetworkEndpoint(NetworkEndpoint&& other) noexcept {
+        if (UpdateSocketAddress(other.m_ipAddress, other.m_port))
+            m_ipAddress = std::move(other.m_ipAddress);
     }
 
     ~NetworkEndpoint() = default;
@@ -53,9 +51,9 @@ public:
         return m_port;
     }
 
-    inline void SetPort(uint16_t port) noexcept {
-        m_port = port;
-        UpdateSocketAddress();
+    inline bool SetPort(uint16_t port) noexcept {
+        String ipAddress("");
+        return UpdateSocketAddress(ipAddress, port);
     }
 
     inline const IPaddress& SocketAddress(void) const noexcept {
@@ -77,16 +75,12 @@ public:
     }
 
     NetworkEndpoint& operator=(const NetworkEndpoint& other) {
-        m_ipAddress = other.m_ipAddress;
-        m_port = other.m_port;
-        UpdateSocketAddress();
+        UpdateSocketAddress(other.m_ipAddress, other.m_port);
         return *this;
     }
 
     NetworkEndpoint& operator=(NetworkEndpoint&& other) noexcept {
-        m_ipAddress = other.m_ipAddress;
-        m_port = other.m_port;
-        UpdateSocketAddress();
+        UpdateSocketAddress(other.m_ipAddress, other.m_port);
         return *this;
     }
 
@@ -110,7 +104,7 @@ public:
 
     void UpdateFromSocketAddress(void);
 
-    void UpdateSocketAddress(void);
+    bool UpdateSocketAddress(const String& ipAddress, uint16_t port) noexcept;
 
     inline void Clear(void) noexcept {
         m_socketAddress.host = 0;

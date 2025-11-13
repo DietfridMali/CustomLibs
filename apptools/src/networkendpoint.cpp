@@ -1,4 +1,4 @@
-
+#include <cstdio>
 #include "networkendpoint.h"
 
 // =================================================================================================
@@ -23,24 +23,28 @@ NetworkEndpoint::NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrd
 }
 
 
-void NetworkEndpoint::UpdateSocketAddress(void) {
-    ManagedArray<String> fields = m_ipAddress.Split('.');
-    unsigned fieldValues[4] = { 0,0,0,0 };
-    int i = 0, l = fields.Length();
-    for (; i < l; ++i)
-        fieldValues[i] = fields[i].IsEmpty() ? 0 : uint16_t(fields[i]);
-    uint32_t host = (fieldValues[0] << 24) | (fieldValues[1] << 16) | (fieldValues[2] << 8) | fieldValues[3];
-    m_socketAddress.host = SDL_SwapBE32(host);
-    m_socketAddress.port = SDL_SwapBE16(m_port);
-}
-
-
-void NetworkEndpoint::Set(String ipAddress, uint16_t port) noexcept {
-    if (not ipAddress.IsEmpty())
+bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, uint16_t port) noexcept {
+    if (not ipAddress.IsEmpty()) {
+        ManagedArray<String> fields = ipAddress.Split('.');
+        unsigned fieldValues[4] = { 0,0,0,0 };
+        int i = 0, l = fields.Length();
+        for (; i < l; ++i) {
+            try {
+                fieldValues[i] = fields[i].IsEmpty() ? 0 : uint16_t(fields[i]);
+            }
+            catch (...) {
+                fprintf(stderr, "invalid ip address '%s'\n", (const char*) m_ipAddress);
+                return false;
+            }
+        }
         m_ipAddress = ipAddress;
-    if (port > 0)
-        m_port = port;
-    UpdateSocketAddress();
+        uint32_t host = (fieldValues[0] << 24) | (fieldValues[1] << 16) | (fieldValues[2] << 8) | fieldValues[3];
+        m_socketAddress.host = SDL_SwapBE32(host);
+    }
+    if (port > 0) {
+        m_socketAddress.port = SDL_SwapBE16(m_port);
+    }
+    return true;
 }
 
 
