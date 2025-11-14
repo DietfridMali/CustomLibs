@@ -1,5 +1,8 @@
 #pragma once
 
+#include <glm/glm.hpp>
+#include <glm/common.hpp>
+
 #include "FBM.h"
 
 // =================================================================================================
@@ -231,6 +234,23 @@ namespace Noise
         static float Compute(Vector3f& p);
     };
 
+    class CloudNoise {
+    public:
+        glm::vec4 Compute(glm::vec3 p);
+
+    private:
+        float WorleyFBM(glm::vec3 p, float freq);
+
+        float PerlinFBM(glm::vec3 p, float freq, int octaves);
+
+        float WorleyNoise(glm::vec3 uv, float freq);
+
+        float GradientNoise(glm::vec3 x, float freq);
+
+        float Remap(float x, float a, float b, float c, float d);
+
+        glm::vec3 Hash33(glm::vec3 p);
+    };
 
     // -------------------------------------------------------------------------------------------------
 

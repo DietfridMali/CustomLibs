@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdint.h>
 #include <vector>
+#include <cstdint>
+#include <cmath>
 
 #include "vector.hpp"
 #include "conversions.hpp"
@@ -534,7 +536,7 @@ namespace Noise {
 
     float SimplexAshimaGLSL(Vector3f& pos) {
         vec3 v(pos.x, pos.y, pos.z);
-        const vec2 C = vec2(1.0f / 6.0f, 1.0f / 3.0f);
+        const Vector2f C = Vector2f(1.0f / 6.0f, 1.0f / 3.0f);
         const vec4 D = vec4(0.0f, 0.5, 1.0f, 2.0f);
         vec3 i = floor(v + dot(v, yyy(C)));
         vec3 x0 = v - i + dot(i, xxx(C));
@@ -604,6 +606,151 @@ namespace Noise {
         return v;
     }
 
+    // -------------------------------------------------------------------------------------------------
+
+    using glm::vec2;
+    using glm::vec3;
+    using glm::vec4;
+
+    static constexpr uint32_t UI0 = 1597334673u;
+    static constexpr uint32_t UI1 = 3812015801u;
+    static constexpr uint32_t UI2 = 2798796415u;
+    static constexpr float UIF = 1.0f / 4294967295.0f;
+
+    vec3 CloudNoise::Hash33(vec3 p) {
+        int xi = static_cast<int>(p.x);
+        int yi = static_cast<int>(p.y);
+        int zi = static_cast<int>(p.z);
+
+        uint32_t ux = static_cast<uint32_t>(xi) * UI0;
+        uint32_t uy = static_cast<uint32_t>(yi) * UI1;
+        uint32_t uz = static_cast<uint32_t>(zi) * UI2;
+
+        uint32_t n = ux ^ uy ^ uz;
+
+        ux = n * UI0;
+        uy = n * UI1;
+        uz = n * UI2;
+
+        float fx = static_cast<float>(ux) * UIF;
+        float fy = static_cast<float>(uy) * UIF;
+        float fz = static_cast<float>(uz) * UIF;
+
+        return vec3(
+            -1.0f + 2.0f * fx,
+            -1.0f + 2.0f * fy,
+            -1.0f + 2.0f * fz
+        );
+    }
+
+    float CloudNoise::Remap(float x, float a, float b, float c, float d) {
+        return ((x - a) / (b - a)) * (d - c) + c;
+    }
+
+    float CloudNoise::GradientNoise(vec3 x, float freq) {
+        vec3 p = glm::floor(x);
+        vec3 w = glm::fract(x);
+
+        vec3 u = w * w * w * (w * (w * 6.0f - 15.0f) + 10.0f);
+
+        vec3 ga = Hash33(glm::mod(p + vec3(0.0f, 0.0f, 0.0f), freq));
+        vec3 gb = Hash33(glm::mod(p + vec3(1.0f, 0.0f, 0.0f), freq));
+        vec3 gc = Hash33(glm::mod(p + vec3(0.0f, 1.0f, 0.0f), freq));
+        vec3 gd = Hash33(glm::mod(p + vec3(1.0f, 1.0f, 0.0f), freq));
+        vec3 ge = Hash33(glm::mod(p + vec3(0.0f, 0.0f, 1.0f), freq));
+        vec3 gf = Hash33(glm::mod(p + vec3(1.0f, 0.0f, 1.0f), freq));
+        vec3 gg = Hash33(glm::mod(p + vec3(0.0f, 1.0f, 1.0f), freq));
+        vec3 gh = Hash33(glm::mod(p + vec3(1.0f, 1.0f, 1.0f), freq));
+
+        float va = glm::dot(ga, w - vec3(0.0f, 0.0f, 0.0f));
+        float vb = glm::dot(gb, w - vec3(1.0f, 0.0f, 0.0f));
+        float vc = glm::dot(gc, w - vec3(0.0f, 1.0f, 0.0f));
+        float vd = glm::dot(gd, w - vec3(1.0f, 1.0f, 0.0f));
+        float ve = glm::dot(ge, w - vec3(0.0f, 0.0f, 1.0f));
+        float vf = glm::dot(gf, w - vec3(1.0f, 0.0f, 1.0f));
+        float vg = glm::dot(gg, w - vec3(0.0f, 1.0f, 1.0f));
+        float vh = glm::dot(gh, w - vec3(1.0f, 1.0f, 1.0f));
+
+        return va +
+            u.x * (vb - va) +
+            u.y * (vc - va) +
+            u.z * (ve - va) +
+            u.x * u.y * (va - vb - vc + vd) +
+            u.y * u.z * (va - vc - ve + vg) +
+            u.z * u.x * (va - vb - ve + vf) +
+            u.x * u.y * u.z * (-va + vb + vc - vd + ve - vf - vg + vh);
+    }
+
+    float CloudNoise::WorleyNoise(vec3 uv, float freq) {
+        vec3 id = glm::floor(uv);
+        vec3 p = glm::fract(uv);
+
+        float minDist = 10000.0f;
+
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                for (int z = -1; z <= 1; ++z) {
+                    vec3 offset(
+                        static_cast<float>(x),
+                        static_cast<float>(y),
+                        static_cast<float>(z)
+                    );
+
+                    vec3 cell = glm::mod(id + offset, vec3(freq));
+                    vec3 h = Hash33(cell) * 0.5f + vec3(0.5f);
+                    h += offset;
+
+                    vec3 d = p - h;
+                    float dist = glm::dot(d, d);
+
+                    if (dist < minDist) {
+                        minDist = dist;
+                    }
+                }
+            }
+        }
+
+        return 1.0f - minDist;
+    }
+
+    float CloudNoise::PerlinFBM(vec3 p, float freq, int octaves) {
+        float G = std::exp2(-0.85f);
+        float amp = 1.0f;
+        float noise = 0.0f;
+
+        for (int i = 0; i < octaves; ++i) {
+            noise += amp * GradientNoise(p * freq, freq);
+            freq *= 2.0f;
+            amp *= G;
+        }
+
+        return noise;
+    }
+
+    float CloudNoise::WorleyFBM(vec3 p, float freq) {
+        return WorleyNoise(p * freq, freq) * 0.625f +
+               WorleyNoise(p * freq * 2.0f, freq * 2.0f) * 0.25f +
+               WorleyNoise(p * freq * 4.0f, freq * 4.0f) * 0.125f;
+    }
+
+    // Entspricht mainImage: erzeugt RGBA-Rauschwert für ein Pixel
+    vec4 CloudNoise::Compute(vec3 p) {
+        vec4 color(0.0f);
+
+        float slices = 128.0f;
+        float freq = 4.0f;
+
+        float pfbm = 0.5f * (1.0f + PerlinFBM(p, 4.0f, 7));
+        pfbm = std::fabs(pfbm * 2.0f - 1.0f);
+
+        color.g += WorleyFBM(p, freq);
+        color.b += WorleyFBM(p, freq * 2.0f);
+        color.a += WorleyFBM(p, freq * 4.0f);
+        color.r += Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f);
+
+        return color;
+    }
 };
+
 
 // =================================================================================================
