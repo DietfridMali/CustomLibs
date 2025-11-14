@@ -333,21 +333,25 @@ public:
 
 	virtual void SetParams(bool enforce = false) override;
 
-	bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "");
+	bool Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename = "");
 
 private:
-	int         m_gridSize;
+	Vector3i    m_gridDimensions;
     NoiseParams m_params;
 
 	ManagedArray<float>	m_data;
 
-	bool Allocate(int gridSize);
+	bool Allocate(Vector3i gridDimensions);
 
 	void ComputeNoise(void);
 
     bool LoadFromFile(const String& filename);
 
     bool SaveToFile(const String& filename) const;
+
+    inline uint32_t GridSize(void) const noexcept {
+        return uint32_t(m_gridDimensions.x) * uint32_t(m_gridDimensions.y) * uint32_t(m_gridDimensions.z);
+    }
 };
 
 // =================================================================================================

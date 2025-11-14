@@ -55,19 +55,8 @@ Matrix4f Projection::ComputeOrthoProjection(float left, float right, float botto
 noexcept
 {
 #if USE_GLM
-#   if 0
-    Matrix4f m(glm::ortho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0));
-#       if 0 // erst aufrufenden Code überprüfen!
     Matrix4f m(glm::ortho(left, right, bottom, top, zNear, zFar));
-#       endif
     return m;
-#else
-    m = Matrix4f({ Vector4f{ 2.0f,  0.0f,  0.0f, -1.0f },  // erste Zeile
-                   Vector4f{ 0.0f,  2.0f,  0.0f, -1.0f },  // zweite Zeile
-                   Vector4f{ 0.0f,  0.0f, -1.0f,  0.0f },  // dritte Zeile
-                   Vector4f{ 0.0f,  0.0f,  0.0f,  1.0f }   // vierte Zeile
-        });
-#   endif
 #else
     Matrix4f m({ Vector4f{ 2.0f,  0.0f,  0.0f,  0.0f },  // erste Zeile
                   Vector4f{ 0.0f,  2.0f,  0.0f,  0.0f },  // zweite Zeile
@@ -75,6 +64,7 @@ noexcept
                   Vector4f{-1.0f, -1.0f,  0.0f,  1.0f }   // vierte Zeile
         },
         false);
+    return rowMajor ? m : m.Transpose();
 #endif
 #if 0
     float rl = right - left;
@@ -88,7 +78,6 @@ noexcept
         Vector4f({  0.0f,      0.0f,        0.0f,          1.0f })
         });
 #endif
-    return rowMajor ? m : m.Transpose();
 }
 
 // =================================================================================================

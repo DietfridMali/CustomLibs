@@ -18,7 +18,7 @@ using namespace Noise;
 
 // =================================================================================================
 
-bool NoiseTexture3D::Allocate(int gridSize) {
+bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf) 
         return false;
@@ -26,19 +26,19 @@ bool NoiseTexture3D::Allocate(int gridSize) {
         delete texBuf; 
         return false; 
     }
-    m_gridSize = gridSize;
-    m_data.Resize(gridSize * gridSize * gridSize * 4);
-    texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, GL_R16F, GL_RED);
+    m_gridDimensions = gridDimensions;
+    m_data.Resize(GridSize() * 4);
+    texBuf->m_info = TextureBuffer::BufferInfo(gridDimensions.x, gridDimensions.y * gridDimensions.z, 1, GL_R16F, GL_RED);
     HasBuffer() = true;
     return true;
 }
 
 
-bool NoiseTexture3D::Create(int gridSize, const NoiseParams& params, String noiseFilename) {
+bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename) {
     if (not Texture::Create())
         return false;
     m_type = GL_TEXTURE_3D;
-    if (not Allocate(gridSize))
+    if (not Allocate(gridDimensions))
         return false;
     m_params = params;
     if (not LoadFromFile(noiseFilename)) {
@@ -63,16 +63,15 @@ static float Modulate(float shape, float coarseDetail, float mediumDetail, float
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
 
-    const float cellSize = float(m_gridSize) / float(m_params.cellsPerAxis); // Anzahl Perlin-Zellen pro Kachel
-    m_params.normalize = 1 + 2 + 4 + 8;
+    m_params.normalize = 0; // 1 + 2 + 4 + 8;
 
     NoiseParams shapeParams;
-    shapeParams.fbmParams.fold = 0;
-    shapeParams.normalize = 1;
+    shapeParams.fbmParams.fold = 1;
+    shapeParams.fbmParams.lacunarity = 2.6434f;
 
     PerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
-    PerlinFunctor shapeNoise{ };
-    FBM<PerlinFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
+    SimplexAshimaGLSLFunctor shapeNoise{ };
+    FBM<SimplexAshimaGLSLFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
 
     NoiseParams detailParams;
     detailParams.fbmParams.frequency = 2.0f;
@@ -107,17 +106,23 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     int i = 0;
     Vector3f p;
-    float cellScale = float(m_params.cellsPerAxis) / float(m_gridSize - 1);
-    for (int z = 0; z < m_gridSize; ++z) {
-        p.z = (float(z) + 0.5f) * cellScale;
-        for (int y = 0; y < m_gridSize; ++y) {
-            p.y = (float(y) + 0.5f) * cellScale;
-            for (int x = 0; x < m_gridSize; ++x) {
-                p.x = (float(x) + 0.5f) * cellScale;
-                noise.x = shapeFbm.Value(p);      
+    Vector3f cellScale{ 
+        (m_gridDimensions.x > 0) ? float(m_params.cellsPerAxis) / float(m_gridDimensions.x - 1) : 0.0f,
+        (m_gridDimensions.y > 0) ? float(m_params.cellsPerAxis) / float(m_gridDimensions.y - 1) : 0.0f,
+        (m_gridDimensions.z > 0) ? float(m_params.cellsPerAxis) / float(m_gridDimensions.z - 1) : 0.0f
+    };
+    for (int z = 0; z < m_gridDimensions.z; ++z) {
+        p.z = (float(z) + 0.5f) * cellScale.z;
+        for (int y = 0; y < m_gridDimensions.y; ++y) {
+            p.y = (float(y) + 0.5f) * cellScale.y;
+            for (int x = 0; x < m_gridDimensions.x; ++x) {
+                p.x = (float(x) + 0.5f) * cellScale.x;
+                noise.x = SimplexAshimaGLSL(p); // shapeFbm.Value(p);
+#if 0
                 noise.y = coarseDetailFbm.Value(p);
                 noise.z = mediumDetailFbm.Value(p);
                 noise.a = fineDetailFbm.Value(p);
+#endif
                 data[i++] = Saturate(noise.x);
                 data[i++] = Saturate(noise.y);
                 data[i++] = Saturate(noise.z);
@@ -199,7 +204,7 @@ void NoiseTexture3D::SetParams(bool enforce) {
 void NoiseTexture3D::Deploy(int) {
     if (Bind()) {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
         SetParams(false);
         glGenerateMipmap(GL_TEXTURE_3D);
         Release();
@@ -213,8 +218,8 @@ bool NoiseTexture3D::LoadFromFile(const String& filename) {
     if (not f)
         return false;
 
-    int voxelCount = size_t(m_gridSize) * size_t(m_gridSize) * size_t(m_gridSize) * 4u;
-    int expectedBytes = voxelCount * sizeof(float);
+    uint32_t voxelCount = GridSize() * 4;
+    uint32_t expectedBytes = voxelCount * sizeof(float);
 
     f.seekg(0, std::ios::end);
     std::streamoff fileSize = f.tellg();
@@ -238,8 +243,8 @@ bool NoiseTexture3D::SaveToFile(const String& filename) const {
     if (not f)
         return false;
 
-    size_t voxelCount = size_t(m_gridSize) * size_t(m_gridSize) * size_t(m_gridSize) * 4u;
-    size_t bytes = voxelCount * sizeof(float);
+    uint32_t voxelCount = GridSize() * 4u;
+    uint32_t bytes = voxelCount * sizeof(float);
 
     if (m_data.Length() != voxelCount)
         return false;
@@ -283,9 +288,20 @@ bool CloudVolume3D::Create(int gridSize, const NoiseParams& params, String noise
 
 
 void CloudVolume3D::Compute(void) {
+#if 0
+    m_params.normalize = 0;
+    m_params.fbmParams.lacunarity = 2.6434f;
+    m_params.fbmParams.fold = 1;
     SimplexAshimaGLSLFunctor noiseFn{};
     FBM<SimplexAshimaGLSLFunctor> fbm(noiseFn, m_params.fbmParams);
-
+#else
+    m_params.normalize = 1;
+    m_params.cellsPerAxis = 4;
+    m_params.fbmParams.fold = 0;
+    PerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
+    PerlinFunctor noiseFn{};
+    FBM<PerlinFunctor> fbm(noiseFn, m_params.fbmParams);
+#endif
     float* data = m_data.Data();
     size_t i = 0;
     float minVal = 1e6f, maxVal = 0.0f;
@@ -300,7 +316,11 @@ void CloudVolume3D::Compute(void) {
             p.y = float(y) * cellScale;
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = float(x) * cellScale;
+#if 0
                 float n = fbm.Value(p);
+#else
+                float n = 0.5f + 0.5f * PerlinNoise::Compute(p); 
+#endif
                 data[i++] = n;
                 if (minVal > n)
                     minVal = n;
@@ -316,7 +336,7 @@ void CloudVolume3D::Compute(void) {
 
     if (m_params.normalize and (maxVal - minVal < 0.999f)) {
         for (; i; --i, ++data)
-            Conversions::Stretch(*data, minVal, maxVal);
+            Conversions::Normalize(*data, minVal, maxVal);
     }
 }
 
