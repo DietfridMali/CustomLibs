@@ -356,7 +356,7 @@ private:
 
 // =================================================================================================
 
-class CloudVolume3D
+class CloudNoiseTexture
     : public Texture
 {
 public:

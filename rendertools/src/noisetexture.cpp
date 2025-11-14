@@ -65,38 +65,6 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     m_params.normalize = 0; // 1 + 2 + 4 + 8;
 
-    NoiseParams shapeParams;
-    shapeParams.fbmParams.fold = 1;
-    shapeParams.fbmParams.lacunarity = 2.6434f;
-
-    PerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
-    SimplexAshimaGLSLFunctor shapeNoise{ };
-    FBM<SimplexAshimaGLSLFunctor> shapeFbm(shapeNoise, shapeParams.fbmParams);
-
-    NoiseParams detailParams;
-    detailParams.fbmParams.frequency = 2.0f;
-    detailParams.fbmParams.lacunarity = 4.0f;
-    detailParams.fbmParams.initialGain = 1.0f;
-    detailParams.fbmParams.gain = 1.0f;
-    detailParams.fbmParams.octaves = 1;
-    detailParams.fbmParams.fold = 1;
-    detailParams.fbmParams.normalize = false;
-
-    WorleyFunctor coarseDetailNoise{ m_params.cellsPerAxis, m_params.seed ^ 0x9E3779B9u };
-    FBM<WorleyFunctor> coarseDetailFbm(coarseDetailNoise, detailParams.fbmParams);
-
-    detailParams.fbmParams.frequency = 16.0f;
-    detailParams.fbmParams.octaves = 2;
-
-    WorleyFunctor mediumDetailNoise{ m_params.cellsPerAxis, m_params.seed ^ 0xBB67AE85u };
-    FBM<WorleyFunctor> mediumDetailFbm(mediumDetailNoise, detailParams.fbmParams);
-
-    detailParams.fbmParams.frequency = 32.0f;
-    detailParams.fbmParams.octaves = 2;
-
-    WorleyFunctor fineDetailNoise{ m_params.cellsPerAxis, m_params.seed ^ 0xBB67AE85u };
-    FBM<WorleyFunctor> fineDetailFbm(fineDetailNoise, detailParams.fbmParams);
-
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
@@ -104,25 +72,17 @@ void NoiseTexture3D::ComputeNoise(void) {
     int belowCoverage = 0;
 #endif
 
+    CloudNoise generator;
+
     int i = 0;
     Vector3f p;
-    Vector3f cellScale{ 
-        (m_gridDimensions.x > 0) ? float(m_params.cellsPerAxis) / float(m_gridDimensions.x - 1) : 0.0f,
-        (m_gridDimensions.y > 0) ? float(m_params.cellsPerAxis) / float(m_gridDimensions.y - 1) : 0.0f,
-        (m_gridDimensions.z > 0) ? float(m_params.cellsPerAxis) / float(m_gridDimensions.z - 1) : 0.0f
-    };
     for (int z = 0; z < m_gridDimensions.z; ++z) {
-        p.z = (float(z) + 0.5f) * cellScale.z;
+        p.z = (float(z) + 0.5f) / float(m_gridDimensions.z);
         for (int y = 0; y < m_gridDimensions.y; ++y) {
-            p.y = (float(y) + 0.5f) * cellScale.y;
+            p.y = (float(y) + 0.5f) / float(m_gridDimensions.y);
             for (int x = 0; x < m_gridDimensions.x; ++x) {
-                p.x = (float(x) + 0.5f) * cellScale.x;
-                noise.x = SimplexAshimaGLSL(p); // shapeFbm.Value(p);
-#if 0
-                noise.y = coarseDetailFbm.Value(p);
-                noise.z = mediumDetailFbm.Value(p);
-                noise.a = fineDetailFbm.Value(p);
-#endif
+                p.x = (float(x) + 0.5f) / float(m_gridDimensions.x);
+                noise = generator.Compute(p);
                 data[i++] = Saturate(noise.x);
                 data[i++] = Saturate(noise.y);
                 data[i++] = Saturate(noise.z);
@@ -255,7 +215,7 @@ bool NoiseTexture3D::SaveToFile(const String& filename) const {
 
 // =================================================================================================
 
-bool CloudVolume3D::Allocate(int gridSize) {
+bool CloudNoiseTexture::Allocate(int gridSize) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf)
         return false;
@@ -271,7 +231,7 @@ bool CloudVolume3D::Allocate(int gridSize) {
 }
 
 
-bool CloudVolume3D::Create(int gridSize, const NoiseParams& params, String noiseFilename) {
+bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String noiseFilename) {
     if (not Texture::Create())
         return false;
     m_type = GL_TEXTURE_3D;
@@ -287,49 +247,31 @@ bool CloudVolume3D::Create(int gridSize, const NoiseParams& params, String noise
 }
 
 
-void CloudVolume3D::Compute(void) {
-#if 0
-    m_params.normalize = 0;
-    m_params.fbmParams.lacunarity = 2.6434f;
-    m_params.fbmParams.fold = 1;
-    SimplexAshimaGLSLFunctor noiseFn{};
-    FBM<SimplexAshimaGLSLFunctor> fbm(noiseFn, m_params.fbmParams);
-#else
-    m_params.normalize = 1;
-    m_params.cellsPerAxis = 4;
-    m_params.fbmParams.fold = 0;
-    PerlinNoise::Setup(m_params.cellsPerAxis, m_params.seed);
-    PerlinFunctor noiseFn{};
-    FBM<PerlinFunctor> fbm(noiseFn, m_params.fbmParams);
-#endif
+void CloudNoiseTexture::Compute(void) {
     float* data = m_data.Data();
     size_t i = 0;
     float minVal = 1e6f, maxVal = 0.0f;
-    int belowCoverage = 0;
-    int isZero = 0;
+
+    m_params.normalize = 0;
+
+    CloudNoise generator;
 
     Vector3f p;
-    float cellScale = float(m_params.cellsPerAxis) / float(m_gridSize - 1);
+    float cellScale = float(m_gridSize);
     for (int z = 0; z < m_gridSize; ++z) {
-        p.z = float(z) * cellScale;
+        p.z = float(z) / float(m_gridSize);
         for (int y = 0; y < m_gridSize; ++y) {
-            p.y = float(y) * cellScale;
+            p.y = float(y) / float(m_gridSize);
             for (int x = 0; x < m_gridSize; ++x) {
-                p.x = float(x) * cellScale;
-#if 0
-                float n = fbm.Value(p);
-#else
-                float n = 0.5f + 0.5f * PerlinNoise::Compute(p); 
-#endif
+                p.x = float(x) / float(m_gridSize);
+                Vector4f noise = generator.Compute(p);
+                float wfbm = noise.y * 0.625 + noise.z * 0.125 + noise.w * 0.25;
+                float n = generator.Remap(noise.x, wfbm - 1.0, 1.0, 0.0, 1.0);
                 data[i++] = n;
                 if (minVal > n)
                     minVal = n;
                 if (maxVal < n)
                     maxVal = n;
-                if (n < 0.3125)
-                    ++belowCoverage;
-                if (n == 0)
-                    ++isZero;
             }
         }
     }
@@ -341,7 +283,7 @@ void CloudVolume3D::Compute(void) {
 }
 
 
-void CloudVolume3D::SetParams(bool enforce) {
+void CloudNoiseTexture::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
         m_hasParams = true;
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -353,7 +295,7 @@ void CloudVolume3D::SetParams(bool enforce) {
 }
 
 
-void CloudVolume3D::Deploy(int) {
+void CloudNoiseTexture::Deploy(int) {
     if (Bind()) {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
@@ -364,7 +306,7 @@ void CloudVolume3D::Deploy(int) {
 }
 
 
-bool CloudVolume3D::LoadFromFile(const String& filename) {
+bool CloudNoiseTexture::LoadFromFile(const String& filename) {
     if (filename.IsEmpty())
         return false;
     std::ifstream f((const char*)filename, std::ios::binary);
@@ -389,7 +331,7 @@ bool CloudVolume3D::LoadFromFile(const String& filename) {
 }
 
 
-bool CloudVolume3D::SaveToFile(const String& filename) const {
+bool CloudNoiseTexture::SaveToFile(const String& filename) const {
     if (filename.IsEmpty())
         return false;
     std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);

@@ -71,10 +71,6 @@ namespace Noise {
     // -------------------------------------------------------------------------------------------------
     // 3D Perlin, nicht periodisch, ~[-1,1]
 
-    Vector3f    PerlinNoise::m_p;
-    int         PerlinNoise::m_period;
-    uint32_t    PerlinNoise::m_seed;
-
     void PerlinNoise::Setup(int period, uint32_t seed) {
         m_period = period;
         m_seed = seed;
@@ -134,11 +130,6 @@ namespace Noise {
     }
 
     // -------------------------------------------------------------------------------------------------
-
-    Vector3f            ImprovedPerlinNoise::m_p;
-    int                 ImprovedPerlinNoise::m_period;
-    uint32_t            ImprovedPerlinNoise::m_seed;
-    std::vector<int>    ImprovedPerlinNoise::m_perm;
 
     void ImprovedPerlinNoise::Setup(int period, uint32_t seed) {
         m_period = period;
@@ -464,9 +455,9 @@ namespace Noise {
 
 
 #if 1
-    using vec2 = glm::vec2;
-    using vec3 = glm::vec3;
-    using vec4 = glm::vec4;
+    using glm::vec2;
+    using glm::vec3;
+    using glm::vec4;
 
 #define xyz(v)   (v)
 #define xxx(v)   vec3(v.x, v.x, v.x)
@@ -643,8 +634,8 @@ namespace Noise {
         );
     }
 
-    float CloudNoise::Remap(float x, float a, float b, float c, float d) {
-        return ((x - a) / (b - a)) * (d - c) + c;
+    float CloudNoise::Remap(float x, float oldMin, float oldMax, float newMin, float newMax) {
+        return ((x - oldMin) / (oldMax - oldMin)) * (newMax - newMin) + newMin;
     }
 
     float CloudNoise::GradientNoise(vec3 x, float freq) {
@@ -751,6 +742,5 @@ namespace Noise {
         return color;
     }
 };
-
 
 // =================================================================================================

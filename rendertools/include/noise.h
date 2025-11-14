@@ -200,43 +200,45 @@ namespace Noise
 
     class PerlinNoise {
     private:
-        static Vector3f m_p;
-        static int      m_period;
-        static uint32_t m_seed;
+        Vector3f m_p;
+        int      m_period;
+        uint32_t m_seed;
 
-        static grad3 Gradient(int ix, int iy, int iz);
+        grad3 Gradient(int ix, int iy, int iz);
 
-        static float GradientDot(int ix, int iy, int iz);
+        float GradientDot(int ix, int iy, int iz);
 
     public:
-        static void Setup(int period, uint32_t seed);
+        void Setup(int period, uint32_t seed);
 
-        static float Compute(Vector3f& p);
+        float Compute(Vector3f& p);
     };
 
 
     class ImprovedPerlinNoise {
     private:
-        static Vector3f         m_p;
-        static int              m_period;
-        static uint32_t         m_seed;
-        static std::vector<int> m_perm;
+        Vector3f         m_p;
+        int              m_period;
+        uint32_t         m_seed;
+        std::vector<int> m_perm;
 
-        static void BuildPermutation(void);
+        void BuildPermutation(void);
 
-        static grad3 Gradient(int x, int y, int z);
+        grad3 Gradient(int x, int y, int z);
 
-        static float GradientDot(int ix, int iy, int iz);
+        float GradientDot(int ix, int iy, int iz);
 
     public:
-        static void Setup(int period, uint32_t seed = 0x9E3779B9u);
+        void Setup(int period, uint32_t seed = 0x9E3779B9u);
 
-        static float Compute(Vector3f& p);
+        float Compute(Vector3f& p);
     };
 
     class CloudNoise {
     public:
         glm::vec4 Compute(glm::vec3 p);
+
+        float Remap(float x, float oldMin, float oldMax, float newMin, float newMax);
 
     private:
         float WorleyFBM(glm::vec3 p, float freq);
@@ -247,41 +249,41 @@ namespace Noise
 
         float GradientNoise(glm::vec3 x, float freq);
 
-        float Remap(float x, float a, float b, float c, float d);
-
         glm::vec3 Hash33(glm::vec3 p);
     };
 
     // -------------------------------------------------------------------------------------------------
 
     struct PerlinFunctor {
-        float operator()(Vector3f& p) const {
-            return Noise::PerlinNoise::Compute(p); // ~[-1,1]
+        PerlinNoise generator;
+        float operator()(Vector3f& p) {
+            return generator.Compute(p); // ~[-1,1]
         }
     };
 
     struct ImprovedPerlinFunctor {
-        float operator()(Vector3f& p) const {
-            return Noise::ImprovedPerlinNoise::Compute(p); // ~[-1,1]
+        ImprovedPerlinNoise generator;
+        float operator()(Vector3f& p) {
+            return generator.Compute(p); // ~[-1,1]
         }
     };
 
     struct SimplexPerlinFunctor {
         int period;
         uint32_t seed;
-        float operator()(Vector3f& p) const {
+        float operator()(Vector3f& p) {
             return Noise::SimplexPerlin(p, period, seed);
         }
     };
 
     struct SimplexAshimaFunctor {
-        float operator()(Vector3f& p) const {
+        float operator()(Vector3f& p) {
             return Noise::SimplexAshima(p);
         }
     };
 
     struct SimplexAshimaGLSLFunctor {
-        float operator()(Vector3f& p) const {
+        float operator()(Vector3f& p) {
             return Noise::SimplexAshimaGLSL(p);
         }
     };
@@ -289,7 +291,7 @@ namespace Noise
     struct WorleyFunctor {
         int period;
         uint32_t seed;
-        float operator()(Vector3f& p) const {
+        float operator()(Vector3f& p) {
             return Noise::Worley(p, period, seed);
         }
     };
