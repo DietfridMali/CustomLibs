@@ -212,6 +212,7 @@ public:
 
     inline Matrix4f LookAt(Vector3f eye, Vector3f center, Vector3f up) noexcept {
         m = glm::lookAt(eye, center, up);
+        return *this;
     }
 
     Vector3f Unrotate(const Vector3f v);
