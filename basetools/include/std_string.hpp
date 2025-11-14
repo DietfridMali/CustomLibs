@@ -301,7 +301,7 @@ inline String::operator char*() noexcept {
 }
 
 inline void String::LogError(std::string caller) const {
-    std::string msg = caller + "Invalid argument '" + m_str + "'\n";
+    std::string msg = "String::" + caller + "(): Invalid argument '" + m_str + "'\n";
     if (m_logErrors)
         std::cerr << msg;
     else
