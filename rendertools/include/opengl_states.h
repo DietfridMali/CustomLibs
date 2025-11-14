@@ -154,7 +154,7 @@ public:
 			return FuncState<GLenum, GL_NONE>(state, stateID, glActiveTexture);
 		}
 
-		inline int DepthMask(int state) {
+		inline int SetDepthWrite(int state) {
 			static int32_t stateID = -1;
 			return FuncState<int, -1>(state, stateID, glDepthMask);
 		}
