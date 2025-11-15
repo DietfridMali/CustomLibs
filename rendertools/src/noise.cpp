@@ -726,14 +726,11 @@ namespace Noise {
 
     // Entspricht mainImage: erzeugt RGBA-Rauschwert für ein Pixel
     vec4 CloudNoise::Compute(vec3 p) {
-        vec4 color(0.0f);
-
-        float slices = 128.0f;
         float freq = 4.0f;
-
         float pfbm = 0.5f * (1.0f + PerlinFBM(p, 4.0f, 7));
         pfbm = std::fabs(pfbm * 2.0f - 1.0f);
 
+        vec4 color(0.0f);
         color.g += WorleyFBM(p, freq);
         color.b += WorleyFBM(p, freq * 2.0f);
         color.a += WorleyFBM(p, freq * 4.0f);

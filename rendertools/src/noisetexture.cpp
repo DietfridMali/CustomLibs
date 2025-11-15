@@ -8,6 +8,7 @@
 
 #include "noisetexture.h"
 #include "base_renderer.h"
+//#include "../../../../projects/smiley-battle/include/progressindicator.h"
 #include "conversions.hpp"
 
 #include "noise.h"
@@ -238,10 +239,38 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
     if (not Allocate(gridSize))
         return false;
     m_params = params;
-    if (not LoadFromFile(noiseFilename)) {
+    if (LoadFromFile(noiseFilename)) {
+    }
+    else {
         Compute();
         SaveToFile(noiseFilename);
     }
+    float* data = m_data.Data();
+    float minVal = 1e6f, maxVal = 0.0f;
+    for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
+        float n = *data;
+        if (minVal > n)
+            minVal = n;
+        if (maxVal < n)
+            maxVal = n;
+    }
+
+    SimpleArray<uint32_t, 101> distribution1;
+    distribution1.fill(0);
+    SimpleArray<uint32_t, 101> distribution2;
+    distribution2.fill(0);
+    SimpleArray<uint32_t, 101> distribution3;
+    distribution3.fill(0);
+
+    data = m_data.Data();
+    for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
+        float n = Conversions::Normalize(*data, minVal, maxVal);
+        *data = n * n;
+#if 0
+        ++distribution1[int(*data * 100)];
+#endif
+    }
+
     Deploy();
     return true;
 }
@@ -257,17 +286,20 @@ void CloudNoiseTexture::Compute(void) {
     CloudNoise generator;
 
     Vector3f p;
-    float cellScale = float(m_gridSize);
+    SimpleArray<int, 101> distribution;
+    distribution.fill(0);
     for (int z = 0; z < m_gridSize; ++z) {
-        p.z = float(z) / float(m_gridSize);
+        //progressIndicator.Update(1);
+        p.z = (float(z) + 0.5f) / float(m_gridSize);
         for (int y = 0; y < m_gridSize; ++y) {
-            p.y = float(y) / float(m_gridSize);
+            p.y = (float(y) + 0.5f) / float(m_gridSize);
             for (int x = 0; x < m_gridSize; ++x) {
-                p.x = float(x) / float(m_gridSize);
+                p.x = (float(x) + 0.5f) / float(m_gridSize);
                 Vector4f noise = generator.Compute(p);
-                float wfbm = noise.y * 0.625 + noise.z * 0.125 + noise.w * 0.25;
-                float n = generator.Remap(noise.x, wfbm - 1.0, 1.0, 0.0, 1.0);
+                float wfbm = noise.y * 0.625f + noise.z * 0.125f + noise.w * 0.25f;
+                float n = generator.Remap(noise.x, wfbm - 1.0f, 1.0f, 0.0f, 1.0f);
                 data[i++] = n;
+                ++distribution[int(n * 100)];
                 if (minVal > n)
                     minVal = n;
                 if (maxVal < n)
@@ -278,7 +310,7 @@ void CloudNoiseTexture::Compute(void) {
 
     if (m_params.normalize and (maxVal - minVal < 0.999f)) {
         for (; i; --i, ++data)
-            Conversions::Normalize(*data, minVal, maxVal);
+            *data = Conversions::Normalize(*data, minVal, maxVal);
     }
 }
 
