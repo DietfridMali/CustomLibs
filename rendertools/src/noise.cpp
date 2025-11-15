@@ -731,13 +731,13 @@ namespace Noise {
     vec4 CloudNoise::Compute(vec3 p) {
         float freq = 4.0f;
         float pfbm = 0.5f * (1.0f + PerlinFBM(p, 4.0f, 7));
-        pfbm = std::fabs(pfbm * 2.0f - 1.0f);
+        //pfbm = std::fabs(pfbm * 2.0f - 1.0f); this severely distorts the noise distribution
 
         vec4 color(0.0f);
         color.g = WorleyFBM(p, freq);
         color.b = WorleyFBM(p, freq * 4.0f);
         color.a = WorleyFBM(p, freq * 8.0f);
-        color.r = Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f);
+        color.r = pfbm; // Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f); - remap compresses the noise values
 
         return color;
     }
