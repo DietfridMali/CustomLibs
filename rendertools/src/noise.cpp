@@ -1,4 +1,4 @@
-
+Ôªø
 #include <math.h>
 #include <stdint.h>
 #include <vector>
@@ -98,7 +98,7 @@ namespace Noise {
         return dx * g.x + dy * g.y + dz * g.z;
     }
 
-    float PerlinNoise::Compute(Vector3f& p) {
+    float PerlinNoise::Compute(Vector3f p)  {
         m_p = p;
 
         int x0 = (int)floorf(p.x),
@@ -402,7 +402,7 @@ namespace Noise {
         return (h & 0x00FFFFFFu) * (1.0f / 16777216.0f);
     }
 
-    // F1 (n‰chster Featurepunkt)
+    // F1 (n√§chster Featurepunkt)
     float Worley(Vector3f& p, int period, uint32_t seed) {
         GridPosf pos(p.x, p.y, p.z);
         pos.Wrap(period);
@@ -609,6 +609,13 @@ namespace Noise {
     static constexpr uint32_t UI2 = 2798796415u;
     static constexpr float UIF = 1.0f / 4294967295.0f;
 
+    void CloudNoise::Setup(int basePeriod, uint32_t perlinSeed, uint32_t worleySeed) {
+        m_perlin.Setup(basePeriod, perlinSeed);
+        m_perlinSeed = perlinSeed;
+        m_worleySeed = worleySeed;
+    }
+    
+
     vec3 CloudNoise::Hash33(vec3 p) {
         int xi = static_cast<int>(p.x);
         int yi = static_cast<int>(p.y);
@@ -673,6 +680,58 @@ namespace Noise {
             u.x * u.y * u.z * (-va + vb + vc - vd + ve - vf - vg + vh);
     }
 
+#if 1
+
+    float CloudNoise::WorleyNoise(const Vector3f& p, float freq) {
+        int period = (int)freq;
+
+        GridPosf pos(p.x, p.y, p.z);
+        pos.Wrap(period);
+
+        GridPosi base((int)std::floor(pos.x),
+            (int)std::floor(pos.y),
+            (int)std::floor(pos.z));
+        GridPosi c;
+
+        float minDist = FLT_MAX;
+
+        for (int dz = -1; dz <= 1; ++dz) {
+            c.z = WrapInt(base.z + dz, period);
+            for (int dy = -1; dy <= 1; ++dy) {
+                c.y = WrapInt(base.y + dy, period);
+                for (int dx = -1; dx <= 1; ++dx) {
+                    c.x = WrapInt(base.x + dx, period);
+
+                    uint32_t h = Hash(c, m_worleySeed);
+                    float jx = HashToUnit01(h);
+                    float jy = HashToUnit01(h * 0x9E3779B1u);
+                    float jz = HashToUnit01(h * 0xBB67AE85u);
+
+                    GridPosf feature(
+                        (float)c.x + jx,
+                        (float)c.y + jy,
+                        (float)c.z + jz
+                    );
+
+                    GridPosf d = feature - pos;
+
+                    if (d.x > 0.5f * period) d.x -= period;
+                    if (d.x < -0.5f * period) d.x += period;
+                    if (d.y > 0.5f * period) d.y -= period;
+                    if (d.y < -0.5f * period) d.y += period;
+                    if (d.z > 0.5f * period) d.z -= period;
+                    if (d.z < -0.5f * period) d.z += period;
+
+                    float dist = d.Dot(d);
+                    if (dist < minDist)
+                        minDist = dist;
+                }
+            }
+        }
+        return 1.0f - minDist;
+    }
+
+#else
 
     float CloudNoise::WorleyNoise(vec3 uv, float freq) {
         vec3 id = glm::floor(uv);
@@ -705,39 +764,51 @@ namespace Noise {
         return 1.0f - minDist;
     }
 
+#endif
 
-    float CloudNoise::PerlinFBM(vec3 p, float freq, int octaves) {
+    float CloudNoise::PerlinFBM(Vector3f p, float freq, int octaves) {
         float G = std::exp2(-0.85f);
         float amp = 1.0f;
         float noise = 0.0f;
 
         for (int i = 0; i < octaves; ++i) {
+#if 1
+            m_perlin.Setup((int)freq, m_perlinSeed);
+            noise += amp * m_perlin.Compute(p * freq);
+#else
             noise += amp * GradientNoise(p * freq, freq);
+#endif
             freq *= 2.0f;
             amp *= G;
         }
-
         return noise;
     }
 
-    float CloudNoise::WorleyFBM(vec3 p, float freq) {
+    float CloudNoise::WorleyFBM(Vector3f p, float freq) {
         float n = WorleyNoise(p * freq, freq) * 0.625f +
-                  WorleyNoise(p * freq * 2.0f, freq * 4.0f) * 0.25f +
-                  WorleyNoise(p * freq * 4.0f, freq * 8.0f) * 0.125f;
+                  WorleyNoise(p * freq * 2.0f, freq * 2.0f) * 0.25f +
+                  WorleyNoise(p * freq * 4.0f, freq * 4.0f) * 0.125f;
         return std::max(0.f, 1.1f * n - .1f);
     }
 
-    // Entspricht mainImage: erzeugt RGBA-Rauschwert f¸r ein Pixel
-    vec4 CloudNoise::Compute(vec3 p) {
+    // Entspricht mainImage: erzeugt RGBA-Rauschwert f√ºr ein Pixel
+    RGBAColor CloudNoise::Compute(Vector3f p) {
         float freq = 4.0f;
+#if 0
+        // this severely distorts the noise distribution
         float pfbm = 0.5f * (1.0f + PerlinFBM(p, 4.0f, 7));
-        //pfbm = std::fabs(pfbm * 2.0f - 1.0f); this severely distorts the noise distribution
-
-        vec4 color(0.0f);
-        color.g = WorleyFBM(p, freq);
-        color.b = WorleyFBM(p, freq * 4.0f);
-        color.a = WorleyFBM(p, freq * 8.0f);
-        color.r = pfbm; // Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f); - remap compresses the noise values
+        pfbm = /*std::fabs*/(pfbm * 2.0f - 1.0f);
+#endif
+        RGBAColor color{
+            0.5f * (1.0f + PerlinFBM(p, 4.0f, 7)),
+            WorleyFBM(p, freq),
+            WorleyFBM(p, freq * 2.0f),
+            WorleyFBM(p, freq * 4.0f),
+        };
+#if 0
+        // remap compresses the noise values even more
+        color.r = Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f);
+#endif
 
         return color;
     }

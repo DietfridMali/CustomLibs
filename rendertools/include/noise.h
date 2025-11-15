@@ -4,6 +4,7 @@
 #include <glm/common.hpp>
 
 #include "FBM.h"
+#include "colordata.h"
 
 // =================================================================================================
 
@@ -211,7 +212,7 @@ namespace Noise
     public:
         void Setup(int period, uint32_t seed);
 
-        float Compute(Vector3f& p);
+        float Compute(Vector3f p);
     };
 
 
@@ -235,17 +236,24 @@ namespace Noise
     };
 
     class CloudNoise {
+    private:
+        PerlinNoise m_perlin;
+        uint32_t    m_perlinSeed;
+        uint32_t    m_worleySeed;
+
     public:
-        glm::vec4 Compute(glm::vec3 p);
+        void Setup(int basePeriod, uint32_t perlinSeed, uint32_t worleySeed);
+            
+        RGBAColor Compute(Vector3f p);
 
         float Remap(float x, float oldMin, float oldMax, float newMin, float newMax);
 
     private:
-        float WorleyFBM(glm::vec3 p, float freq);
+        float WorleyFBM(Vector3f p, float freq);
 
-        float PerlinFBM(glm::vec3 p, float freq, int octaves);
+        float PerlinFBM(Vector3f p, float freq, int octaves);
 
-        float WorleyNoise(glm::vec3 uv, float freq);
+        float WorleyNoise(const Vector3f& p, float freq);
 
         float GradientNoise(glm::vec3 x, float freq);
 

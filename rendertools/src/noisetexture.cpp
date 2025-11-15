@@ -50,8 +50,15 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
     float* data = m_data.Data();
+    SimpleArray<uint32_t, 101> d[4];
+    for (int i = 0; i < 4; ++i)
+        d[i].fill(0);
     for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
         Vector4f noise;
+#if 1
+        for (int i = 0; i < 4; ++i)
+            ++d[i][int(data[i] * 100)];
+#endif
         noise.x = *data++;
         noise.y = *data++;
         noise.z = *data++;
