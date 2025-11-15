@@ -99,9 +99,9 @@ void NoiseTexture3D::ComputeNoise(void) {
     int i = 0;
     Vector3f p;
     for (int z = 0; z < m_gridDimensions.z; ++z) {
-        p.z = (float(z) + 0.5f) / float(m_gridDimensions.z);
+        p.y = (float(z) + 0.5f) / float(m_gridDimensions.z);
         for (int y = 0; y < m_gridDimensions.y; ++y) {
-            p.y = (float(y) + 0.5f) / float(m_gridDimensions.y);
+            p.z = (float(y) + 0.5f) / float(m_gridDimensions.y);
             for (int x = 0; x < m_gridDimensions.x; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridDimensions.x);
                 noise = generator.Compute(p);
