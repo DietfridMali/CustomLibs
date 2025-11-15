@@ -134,9 +134,11 @@ String& Argument::GetVal(int i) {
 // =================================================================================================
 
 void ArgHandler::Add(const String& arg) {
-    Argument a;
-    String key = a.Create(arg);
-    m_argList.Insert(std::move(key), std::move(a));
+    if (not arg.IsEmpty()) {
+        Argument a;
+        String key = a.Create(arg);
+        m_argList.Insert(std::move(key), std::move(a));
+    }
 }
 
 
