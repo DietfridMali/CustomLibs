@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <cmath>
+#include <algorithm>
 
 #include "vector.hpp"
 #include "conversions.hpp"
@@ -672,6 +673,7 @@ namespace Noise {
             u.x * u.y * u.z * (-va + vb + vc - vd + ve - vf - vg + vh);
     }
 
+
     float CloudNoise::WorleyNoise(vec3 uv, float freq) {
         vec3 id = glm::floor(uv);
         vec3 p = glm::fract(uv);
@@ -700,9 +702,9 @@ namespace Noise {
                 }
             }
         }
-
         return 1.0f - minDist;
     }
+
 
     float CloudNoise::PerlinFBM(vec3 p, float freq, int octaves) {
         float G = std::exp2(-0.85f);
@@ -719,9 +721,10 @@ namespace Noise {
     }
 
     float CloudNoise::WorleyFBM(vec3 p, float freq) {
-        return WorleyNoise(p * freq, freq) * 0.625f +
-               WorleyNoise(p * freq * 2.0f, freq * 2.0f) * 0.25f +
-               WorleyNoise(p * freq * 4.0f, freq * 4.0f) * 0.125f;
+        float n = WorleyNoise(p * freq, freq) * 0.625f +
+                  WorleyNoise(p * freq * 2.0f, freq * 4.0f) * 0.25f +
+                  WorleyNoise(p * freq * 4.0f, freq * 8.0f) * 0.125f;
+        return std::max(0.f, 1.1f * n - .1f);
     }
 
     // Entspricht mainImage: erzeugt RGBA-Rauschwert für ein Pixel
@@ -731,10 +734,10 @@ namespace Noise {
         pfbm = std::fabs(pfbm * 2.0f - 1.0f);
 
         vec4 color(0.0f);
-        color.g += WorleyFBM(p, freq);
-        color.b += WorleyFBM(p, freq * 2.0f);
-        color.a += WorleyFBM(p, freq * 4.0f);
-        color.r += Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f);
+        color.g = WorleyFBM(p, freq);
+        color.b = WorleyFBM(p, freq * 4.0f);
+        color.a = WorleyFBM(p, freq * 8.0f);
+        color.r = Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f);
 
         return color;
     }

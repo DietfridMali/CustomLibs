@@ -46,6 +46,20 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         ComputeNoise();
         SaveToFile(noiseFilename);
     }
+
+    Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
+    Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
+    float* data = m_data.Data();
+    for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
+        Vector4f noise;
+        noise.x = *data++;
+        noise.y = *data++;
+        noise.z = *data++;
+        noise.w = *data++;
+        minVals.Minimize(noise);
+        maxVals.Maximize(noise);
+    }
+
     Deploy();
     return true;
 }
