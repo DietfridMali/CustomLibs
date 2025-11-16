@@ -98,10 +98,7 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
-    Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
-#ifdef _DEBUG
-    int belowCoverage = 0;
-#endif
+    Vector4f maxVals{ -1e6f, -1e6f, -1e6f, -1e6f };
 
     CloudNoise generator;
 
@@ -114,69 +111,27 @@ void NoiseTexture3D::ComputeNoise(void) {
             for (int x = 0; x < m_gridDimensions.x; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridDimensions.x);
                 Vector4f noise = generator.Compute(p);
-                data[i++] = Saturate(noise.x);
-                data[i++] = Saturate(noise.y);
-                data[i++] = Saturate(noise.z);
-                data[i++] = Saturate(noise.a);
+                if (m_params.normalize)
+                data[i++] = noise.x;
+                data[i++] = noise.y;
+                data[i++] = noise.z;
+                data[i++] = noise.a;
                 if (m_params.normalize) {
                     minVals.Minimize(noise);
                     maxVals.Maximize(noise);
                 }
-#ifdef _DEBUG
-                if (noise.x < 0.3125)
-                    ++belowCoverage;
-#endif
             }
         }
     }
-#ifdef _DEBUG
-    float minVal = 1e6f;
-    float maxVal = 0.0f;
-#endif
-    int dataSize = i;
-    if (m_params.normalize) {
-#ifdef _DEBUG
-        belowCoverage = 0;
-#endif
-        for (int i = 0; i < dataSize; ) {
-            if (m_params.normalize & 1) {
-                data[i] = Conversions::Normalize(data[i], minVals.x, maxVals.x);
-#ifdef _DEBUG
-                if (minVal > data[i])
-                    minVal = data[i];
-                if (maxVal < data[i])
-                    maxVal = data[i];
-                if (data[i] < 0.3125)
-                    ++belowCoverage;
-#endif
-            }
-            ++i;
-            if (m_params.normalize & 2)
-                data[i] = Conversions::Normalize(data[i], minVals.y, maxVals.y);
-            ++i;
-            if (m_params.normalize & 4)
-                data[i] = Conversions::Normalize(data[i], minVals.z, maxVals.z);
-            ++i;
-            if (m_params.normalize & 8)
-                data[i] = Conversions::Normalize(data[i], minVals.w, maxVals.w);
-            ++i;
+
+    data = m_data.Data();
+    //float* base = data;
+    int dataSize = i / 4;
+    for (int i = dataSize; i; --i) {
+        for (int j = 0; j < 4; ++j, ++data) {
+            *data = (m_params.normalize & (1 << j)) ? Conversions::Normalize(*data, minVals[j], maxVals[j]) : Saturate(*data);
         }
     }
-#if 0
-    // modulate base noise with detail noise
-    for (int i = 0; i < dataSize; i += 4) {
-        data[i] = Modulate(data[i], data[i + 1], data[i + 2], data[i + 3]);
-        if (minVal > data[i])
-            minVal = data[i];
-        if (maxVal < data[i])
-            maxVal = data[i];
-    }
-    if (maxVal - minVal < 0.999f) {
-        for (int i = 0; i < dataSize; i += 4) {
-            data[i] = Conversions::Normalize(data[i], minVal, maxVal);
-        }
-    }
-#endif
 }
 
 
@@ -249,6 +204,7 @@ bool NoiseTexture3D::SaveToFile(const String& filename) const {
 static float Amp(float v) {
     return 0.5f + 0.5f * cos(v * PI);
 }
+
 
 static float Amp2(float v) {
     return Amp(Amp(v));

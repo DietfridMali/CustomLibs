@@ -642,6 +642,11 @@ namespace Noise {
     }
     
 
+    float CloudNoise::Remap(float x, float oldMin, float oldMax, float newMin, float newMax) {
+        return ((x - oldMin) / (oldMax - oldMin)) * (newMax - newMin) + newMin;
+    }
+
+
     vec3 CloudNoise::Hash33(vec3 p) {
         int xi = static_cast<int>(p.x);
         int yi = static_cast<int>(p.y);
@@ -668,9 +673,6 @@ namespace Noise {
         );
     }
 
-    float CloudNoise::Remap(float x, float oldMin, float oldMax, float newMin, float newMax) {
-        return ((x - oldMin) / (oldMax - oldMin)) * (newMax - newMin) + newMin;
-    }
 
     float CloudNoise::GradientNoise(vec3 x, float freq) {
         vec3 p = glm::floor(x);
@@ -793,14 +795,16 @@ namespace Noise {
 #endif
 
     float CloudNoise::PerlinFBM(Vector3f p, float freq, int octaves) {
-        float G = std::exp2(-0.85f);
+        // alternativ: gain = 0.5f; octaves = 6; freq = 16;
+        // alternativ: gain = std::exp2(-0.5f); octaves = 7; freq = 8;
+        float gain = 0.75f; 
         float amp = 1.0f;
         float noise = 0.0f;
 
         for (int i = 0; i < octaves; ++i) {
 #if NOISE_TYPE
 #   if 1
-            m_perlin.Setup((int)freq, m_perlinSeed);
+            m_perlin.Setup((int)freq, m_perlinSeed + i * 0x9E3779B9u);
             noise += amp * m_perlin.Compute(p * freq);
 #   else
             noise += amp * PeriodicSimplexAshima(p * freq, int(freq)); // , m_perlinSeed);
@@ -809,13 +813,14 @@ namespace Noise {
             noise += amp * GradientNoise(p * freq, freq);
 #endif
             freq *= 2.0f;
-            amp *= G;
+            amp *= gain;
         }
         return noise;
     }
 
+
     float CloudNoise::WorleyFBM(Vector3f p, float freq) {
-#if 1 //NOISE_TYPE
+#if NOISE_TYPE
         float n = Worley(p * freq, int(freq), m_worleySeed) * 0.625f +
                   Worley(p * freq * 2.0f, int(freq * 2.0f), m_worleySeed) * 0.25f +
                   Worley(p * freq * 4.0f, int(freq * 4.0f), m_worleySeed) * 0.125f;
@@ -829,17 +834,17 @@ namespace Noise {
 
     // Entspricht mainImage: erzeugt RGBA-Rauschwert für ein Pixel
     RGBAColor CloudNoise::Compute(Vector3f p) {
-        float freq = 4.0f;
+        float baseFreq = 4.0f;
 #if 0
         // this severely distorts the noise distribution
-        float pfbm = 0.5f * (1.0f + PerlinFBM(p, 4.0f, 7));
+        float pfbm = 0.5f * (1.0f + PerlinFBM(p, baseFreq * 8, 7));
         pfbm = /*std::fabs*/(pfbm * 2.0f - 1.0f);
 #endif
         RGBAColor color{
             0.5f * (1.0f + PerlinFBM(p, 4.0f, 7)),
-            WorleyFBM(p, freq),
-            WorleyFBM(p, freq * 2.0f),
-            WorleyFBM(p, freq * 4.0f),
+            WorleyFBM(p, baseFreq),
+            WorleyFBM(p, baseFreq * 2.0f),
+            WorleyFBM(p, baseFreq * 4.0f),
         };
 #if 0
         // remap compresses the noise values even more
