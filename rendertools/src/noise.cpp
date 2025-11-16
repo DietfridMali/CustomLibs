@@ -600,6 +600,8 @@ namespace Noise {
 
     // -------------------------------------------------------------------------------------------------
 
+#define NOISE_TYPE 1
+
     using glm::vec2;
     using glm::vec3;
     using glm::vec4;
@@ -680,7 +682,7 @@ namespace Noise {
             u.x * u.y * u.z * (-va + vb + vc - vd + ve - vf - vg + vh);
     }
 
-#if 1
+#if NOISE_TYPE
 
     float CloudNoise::WorleyNoise(const Vector3f& p, float freq) {
         int period = (int)freq;
@@ -733,9 +735,9 @@ namespace Noise {
 
 #else
 
-    float CloudNoise::WorleyNoise(vec3 uv, float freq) {
+    float CloudNoise::WorleyNoise(const Vector3f& uv, float freq) {
         vec3 id = glm::floor(uv);
-        vec3 p = glm::fract(uv);
+        vec3 p = glm::fract(vec3(uv));
 
         float minDist = 10000.0f;
 
@@ -772,7 +774,7 @@ namespace Noise {
         float noise = 0.0f;
 
         for (int i = 0; i < octaves; ++i) {
-#if 1
+#if NOISE_TYPE
             m_perlin.Setup((int)freq, m_perlinSeed);
             noise += amp * m_perlin.Compute(p * freq);
 #else
@@ -807,7 +809,7 @@ namespace Noise {
         };
 #if 0
         // remap compresses the noise values even more
-        color.r = Remap(pfbm, 0.0f, 1.0f, color.g, 1.0f);
+        color.r = Remap(color.r, 0.0f, 1.0f, color.g, 1.0f);
 #endif
 
         return color;
