@@ -187,13 +187,17 @@ namespace Noise
 
     // -------------------------------------------------------------------------------------------------
     
-	float SimplexPerlin(Vector3f& p, int period, uint32_t seed);
+	float SimplexPerlin(Vector3f p, uint32_t seed);
 
-	float SimplexAshima(Vector3f& p);
+    float PeriodicSimplexPerlin(Vector3f p, int period, uint32_t seed);
 
-    float SimplexAshimaGLSL(Vector3f& p);
+	float SimplexAshima(Vector3f p);
 
-    float Worley(Vector3f& p, int period, uint32_t seed);
+    float PeriodicSimplexAshima(Vector3f p, int period);
+
+    float SimplexAshimaGLSL(Vector3f p);
+
+    float Worley(Vector3f p, int period, uint32_t seed);
 
     uint8_t Hash2iByte(int ix, int iy, uint32_t seed, uint32_t ch);
 
@@ -280,7 +284,7 @@ namespace Noise
         int period;
         uint32_t seed;
         float operator()(Vector3f& p) {
-            return Noise::SimplexPerlin(p, period, seed);
+            return Noise::PeriodicSimplexPerlin(p, period, seed);
         }
     };
 

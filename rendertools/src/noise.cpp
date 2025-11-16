@@ -239,7 +239,7 @@ namespace Noise {
         }
     };
 
-    float SimplexPerlin(Vector3f& p, int period, uint32_t seed) {
+    float SimplexPerlin(Vector3f p, uint32_t seed) {
         const float F = 1.f / 3.f;
         const float G = 1.f / 6.f;
 
@@ -260,12 +260,6 @@ namespace Noise {
         for (int i = 0; i < 4; ++i)
             corners.p[i] = base + offsets.p[i];
 
-
-        if (period > 1) {
-            for (int i = 0; i < 4; ++i)
-                corners.p[i].Wrap(period);
-        }
-
         auto contrib = [&](const GridPosf& pos, uint32_t hash) {
             float falloff = 0.6f - pos.Dot(pos);
             if (falloff <= 0.f) 
@@ -281,6 +275,26 @@ namespace Noise {
             n += contrib(pos.p[i], Hash(corners.p[i], seed));
 
         return 32.f * n;
+    }
+
+
+    inline float WrapFloat(float v, int period) {
+        float iv = floorf(v);
+        float fv = v - iv;
+        int wi = WrapInt((int)iv, period);
+        return (float)wi + fv;
+    }
+
+
+    float PeriodicSimplexPerlin(Vector3f p, int period, uint32_t seed) {
+        if (period > 1) {
+            p.x = WrapFloat(p.x, period);
+            p.y = WrapFloat(p.y, period);
+            p.z = WrapFloat(p.z, period);
+        }
+
+        // interne Periodenlogik hier AUS (period = 0 oder ganz weglassen)
+        return SimplexPerlin(p, seed);
     }
 
     // -------------------------------------------------------------------------------------------------
@@ -304,7 +318,7 @@ namespace Noise {
         }
     };
 
-    float SimplexAshima(Vector3f& p) {
+    float SimplexAshima(Vector3f p) {
         const float F = 1.f / 3.f;
         const float G = 1.f / 6.f;
 
@@ -396,6 +410,16 @@ namespace Noise {
         return 42.f * n;
     }
 
+
+    float PeriodicSimplexAshima(Vector3f p, int period) {
+        if (period > 0.f) {
+            p.x = WrapFloat(p.x, period);
+            p.y = WrapFloat(p.y, period);
+            p.z = WrapFloat(p.z, period);
+        }
+        return SimplexAshima(p);
+    }
+
     // -------------------------------------------------------------------------------------------------
 
     inline float HashToUnit01(uint32_t h) {
@@ -403,7 +427,7 @@ namespace Noise {
     }
 
     // F1 (nächster Featurepunkt)
-    float Worley(Vector3f& p, int period, uint32_t seed) {
+    float Worley(Vector3f p, int period, uint32_t seed) {
         GridPosf pos(p.x, p.y, p.z);
         pos.Wrap(period);
 
@@ -526,7 +550,7 @@ namespace Noise {
 
     vec4 taylorInvSqrt(vec4 r) { return add(mul(r, -0.85373472095314f), 1.79284291400159f); }
 
-    float SimplexAshimaGLSL(Vector3f& pos) {
+    float SimplexAshimaGLSL(Vector3f pos) {
         vec3 v(pos.x, pos.y, pos.z);
         const Vector2f C = Vector2f(1.0f / 6.0f, 1.0f / 3.0f);
         const vec4 D = vec4(0.0f, 0.5, 1.0f, 2.0f);
@@ -682,7 +706,7 @@ namespace Noise {
             u.x * u.y * u.z * (-va + vb + vc - vd + ve - vf - vg + vh);
     }
 
-#if NOISE_TYPE
+#if !NOISE_TYPE
 
     float CloudNoise::WorleyNoise(const Vector3f& p, float freq) {
         int period = (int)freq;
@@ -775,8 +799,12 @@ namespace Noise {
 
         for (int i = 0; i < octaves; ++i) {
 #if NOISE_TYPE
+#   if 1
             m_perlin.Setup((int)freq, m_perlinSeed);
             noise += amp * m_perlin.Compute(p * freq);
+#   else
+            noise += amp * PeriodicSimplexAshima(p * freq, int(freq)); // , m_perlinSeed);
+#   endif
 #else
             noise += amp * GradientNoise(p * freq, freq);
 #endif
@@ -787,9 +815,15 @@ namespace Noise {
     }
 
     float CloudNoise::WorleyFBM(Vector3f p, float freq) {
+#if 1 //NOISE_TYPE
+        float n = Worley(p * freq, int(freq), m_worleySeed) * 0.625f +
+                  Worley(p * freq * 2.0f, int(freq * 2.0f), m_worleySeed) * 0.25f +
+                  Worley(p * freq * 4.0f, int(freq * 4.0f), m_worleySeed) * 0.125f;
+#else
         float n = WorleyNoise(p * freq, freq) * 0.625f +
                   WorleyNoise(p * freq * 2.0f, freq * 2.0f) * 0.25f +
                   WorleyNoise(p * freq * 4.0f, freq * 4.0f) * 0.125f;
+#endif
         return std::max(0.f, 1.1f * n - .1f);
     }
 
