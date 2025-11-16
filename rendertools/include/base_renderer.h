@@ -265,12 +265,16 @@ public:
         return m_glVersion;
     }
 
-    inline void ShowFps(bool showFps) {
+    inline void ShowFps(bool showFps) noexcept {
         m_frameCounter.ShowFps(showFps);
     }
 
-    inline void ToggleFps(void) {
+    inline void ToggleFps(void) noexcept {
         m_frameCounter.Toggle();
+    }
+
+    inline float GetFps(void) noexcept {
+        return m_frameCounter.GetFps();
     }
 
     static void ClearGLError(void) noexcept;
