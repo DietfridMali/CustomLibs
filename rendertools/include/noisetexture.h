@@ -328,6 +328,11 @@ using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 class NoiseTexture3D
 	: public Texture
 {
+private:
+    Vector3i    m_gridDimensions;
+    NoiseParams m_params;
+    ManagedArray<float>	m_data;
+
 public:
 	virtual void Deploy(int bufferIndex = 0) override;
 
@@ -335,12 +340,11 @@ public:
 
 	bool Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename = "");
 
+    inline ManagedArray<float>& GetData(void) noexcept {
+        return m_data;
+    }
+
 private:
-	Vector3i    m_gridDimensions;
-    NoiseParams m_params;
-
-	ManagedArray<float>	m_data;
-
 	bool Allocate(Vector3i gridDimensions);
 
 	void ComputeNoise(void);

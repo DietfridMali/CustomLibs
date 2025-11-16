@@ -66,15 +66,16 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         minVals.Minimize(noise);
         maxVals.Maximize(noise);
     }
-
+#if 1
     data = m_data.Data();
     for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
-        for (int j = 1; j < 4; ++j) {
+        for (int j = 0; j < 4; ++j) {
             data[j] = Conversions::Normalize(data[j], minVals[j], maxVals[j]);
             //data[j] = sqrt(data[j]);
         }
         data += 4;
     }
+#endif
     Deploy();
     return true;
 }
@@ -93,7 +94,7 @@ static float Modulate(float shape, float coarseDetail, float mediumDetail, float
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
 
-    m_params.normalize = 0; // 1 + 2 + 4 + 8;
+    //m_params.normalize = 0; // 1 + 2 + 4 + 8;
 
     Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
@@ -293,36 +294,42 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
         if (maxVal < n)
             maxVal = n;
     }
-
-    SimpleArray<uint32_t, 101> distribution1;
-    distribution1.fill(0);
-    SimpleArray<uint32_t, 101> distribution2;
-    distribution2.fill(0);
-    SimpleArray<uint32_t, 101> distribution3;
-    distribution3.fill(0);
-
+#if 0
     data = m_data.Data();
     for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
         float n = Conversions::Normalize(*data, minVal, maxVal);
         *data = n * n;
-#if 0
-        ++distribution1[int(*data * 100)];
-#endif
     }
-
+#endif
     Deploy();
     return true;
 }
 
 
 void CloudNoiseTexture::Compute(void) {
-    float* data = m_data.Data();
     size_t i = 0;
     float minVal = 1e6f, maxVal = 0.0f;
 
-    m_params.normalize = 0;
-
     CloudNoise generator;
+
+#if 1
+    m_params.normalize = 1 + 2 + 4 + 8;
+    NoiseTexture3D rgbaNoise;
+    rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, "assets/textures/cloudshapes.bin");
+
+    float* rgbaData = rgbaNoise.GetData().Data();
+    float* data = m_data.Data();
+    uint32_t dataSize = m_gridSize * m_gridSize * m_gridSize;
+
+    for (int i = dataSize; i; --i) {
+        float perlin = Amp(rgbaData[0]);
+        perlin *= perlin;
+        float worley = Amp2(rgbaData[1]) * 0.625f + Amp2(rgbaData[2]) * 0.125f + Amp2(rgbaData[3]) * 0.25f;
+        *data++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
+        rgbaData += 4;
+    }
+
+#else
 
     Vector3f p;
     SimpleArray<int, 101> distribution;
@@ -352,6 +359,7 @@ void CloudNoiseTexture::Compute(void) {
         for (; i; --i, ++data)
             *data = Conversions::Normalize(*data, minVal, maxVal);
     }
+#endif
 }
 
 
