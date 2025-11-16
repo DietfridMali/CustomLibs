@@ -112,7 +112,7 @@ void NoiseTexture3D::ComputeNoise(void) {
             p.z = (float(y) + 0.5f) / float(m_gridDimensions.y);
             for (int x = 0; x < m_gridDimensions.x; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridDimensions.x);
-                noise = generator.Compute(p);
+                Vector4f noise = generator.Compute(p);
                 data[i++] = Saturate(noise.x);
                 data[i++] = Saturate(noise.y);
                 data[i++] = Saturate(noise.z);
@@ -245,6 +245,16 @@ bool NoiseTexture3D::SaveToFile(const String& filename) const {
 
 // =================================================================================================
 
+static float Amp(float v) {
+    return 0.5f + 0.5f * cos(v * PI);
+}
+
+static float Amp2(float v) {
+    return Amp(Amp(v));
+}
+
+
+
 bool CloudNoiseTexture::Allocate(int gridSize) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf)
@@ -318,21 +328,22 @@ void CloudNoiseTexture::Compute(void) {
     SimpleArray<int, 101> distribution;
     distribution.fill(0);
     for (int z = 0; z < m_gridSize; ++z) {
-        //progressIndicator.Update(1);
-        p.z = (float(z) + 0.5f) / float(m_gridSize);
+        p.y = (float(z) + 0.5f) / float(m_gridSize);
         for (int y = 0; y < m_gridSize; ++y) {
-            p.y = (float(y) + 0.5f) / float(m_gridSize);
+            p.z = (float(y) + 0.5f) / float(m_gridSize);
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridSize);
                 Vector4f noise = generator.Compute(p);
-                float wfbm = noise.y * 0.625f + noise.z * 0.125f + noise.w * 0.25f;
-                float n = generator.Remap(noise.x, wfbm - 1.0f, 1.0f, 0.0f, 1.0f);
-                data[i++] = n;
-                ++distribution[int(n * 100)];
-                if (minVal > n)
-                    minVal = n;
-                if (maxVal < n)
-                    maxVal = n;
+                float perlin = Amp(noise.x);
+                perlin *= perlin;
+                float worley = Amp2(noise.y) * 0.625f + Amp2(noise.z) * 0.125f + Amp2(noise.w) * 0.25f;
+                float d = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
+                data[i++] = d;
+                ++distribution[int(d * 100)];
+                if (minVal > d)
+                    minVal = d;
+                if (maxVal < d)
+                    maxVal = d;
             }
         }
     }
