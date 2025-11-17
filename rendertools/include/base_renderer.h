@@ -29,7 +29,7 @@ public:
         GLint minor{ 0 };
     };
 
-    enum class RenderPasses {
+    enum class RenderPassType {
         rpShadows,
         rpColor,
         rpFull
@@ -59,7 +59,7 @@ protected:
 
     RGBAColor               m_backgroundColor;
 
-    RenderPasses            m_renderPass;
+    RenderPassType          m_renderPass;
 
     MovingFrameCounter      m_frameCounter;
 
@@ -80,7 +80,7 @@ public:
         , m_sceneTop(0)
         , m_fov(0.0f)
         , m_aspectRatio(1.0f)
-        , m_renderPass(RenderPasses::rpColor)
+        , m_renderPass(RenderPassType::rpColor)
         , m_ndcScale(Vector2f::ONE)
         , m_ndcBias(Vector2f::ONE)
         , m_backgroundColor(ColorData::Black)
@@ -113,7 +113,7 @@ public:
 
     void SetupOpenGL(void) noexcept;
 
-    inline void SetRenderPass(RenderPasses renderPass) noexcept { m_renderPass = renderPass; }
+    inline void SetRenderPass(RenderPassType renderPass) noexcept { m_renderPass = renderPass; }
 
     void StartShadowPass(void) noexcept;
 
@@ -121,22 +121,22 @@ public:
 
     void StartFullPass(void) noexcept;
 
-    inline bool IsShadowPass(void) noexcept { return RenderPass() == RenderPasses::rpShadows; }
+    inline bool IsShadowPass(void) noexcept { return RenderPass() == RenderPassType::rpShadows; }
 
-    inline bool IsColorPass(void) noexcept { return RenderPass() == RenderPasses::rpColor; }
+    inline bool IsColorPass(void) noexcept { return RenderPass() == RenderPassType::rpColor; }
 
-    inline bool IsFullPass(void) noexcept { return RenderPass() == RenderPasses::rpFull; }
+    inline bool IsFullPass(void) noexcept { return RenderPass() == RenderPassType::rpFull; }
 
-    inline void StartRenderPass(RenderPasses pass) noexcept {
-        if (pass == RenderPasses::rpShadows)
+    inline void StartRenderPass(RenderPassType pass) noexcept {
+        if (pass == RenderPassType::rpShadows)
             StartShadowPass();
-        else if (pass == RenderPasses::rpColor)
+        else if (pass == RenderPassType::rpColor)
             StartColorPass();
         else
             StartFullPass();
     }
 
-    RenderPasses RenderPass(void) noexcept { return m_renderPass; }
+    RenderPassType RenderPass(void) noexcept { return m_renderPass; }
 
     virtual bool Start3DScene(void);
 
@@ -282,7 +282,7 @@ public:
     static bool CheckGLError(const char* operation = "") noexcept;
 };
 
-using RenderPassType = BaseRenderer::RenderPasses;
+using RenderPassType = BaseRenderer::RenderPassType;
 
 #define baseRenderer BaseRenderer::Instance()
 

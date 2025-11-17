@@ -242,9 +242,9 @@ void RenderMatrices::PopMatrix(MatrixType matrixType) {
     else
 #endif
     {
-        Matrices().Pop(matrixType);
+        Matrices()->Pop(matrixType);
 #ifdef _DEBUG
-        Matrices().Transformation(matrixType).AsArray();
+        Matrices()->Transformation(matrixType).AsArray();
 #endif
     }
 }

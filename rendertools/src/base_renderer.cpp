@@ -108,7 +108,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
 
 
 void BaseRenderer::StartShadowPass(void) noexcept {
-    m_renderPass = RenderPasses::rpShadows;
+    m_renderPass = RenderPassType::rpShadows;
     openGLStates.SetDepthTest(1);
     openGLStates.SetDepthWrite(1);
     openGLStates.DepthFunc(GL_LESS);                  
@@ -118,7 +118,7 @@ void BaseRenderer::StartShadowPass(void) noexcept {
 
 
 void BaseRenderer::StartColorPass(void) noexcept {
-    m_renderPass = RenderPasses::rpColor;
+    m_renderPass = RenderPassType::rpColor;
     openGLStates.SetDepthTest(1);
     openGLStates.SetDepthWrite(0);
     openGLStates.DepthFunc(GL_LEQUAL);                
@@ -128,7 +128,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
-    m_renderPass = RenderPasses::rpColor;
+    m_renderPass = RenderPassType::rpColor;
     openGLStates.SetDepthTest(1);
     openGLStates.SetDepthWrite(1);
     openGLStates.DepthFunc(GL_LEQUAL);                
