@@ -338,7 +338,7 @@ public:
 
 	virtual void SetParams(bool enforce = false) override;
 
-	bool Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename = "");
+	bool Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename = "", bool deploy = true);
 
     inline ManagedArray<float>& GetData(void) noexcept {
         return m_data;
@@ -377,7 +377,7 @@ private:
 
     bool Allocate(int gridSize);
 
-    void Compute();
+    void Compute(String textureFolder = "");
 
     bool LoadFromFile(const String& filename);
 

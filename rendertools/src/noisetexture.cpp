@@ -5,10 +5,10 @@
 #include <cmath>
 #include <algorithm>
 #include <fstream>
+#include <filesystem>
 
 #include "noisetexture.h"
 #include "base_renderer.h"
-//#include "../../../../projects/smiley-battle/include/progressindicator.h"
 #include "conversions.hpp"
 
 #include "noise.h"
@@ -35,7 +35,7 @@ bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
 }
 
 
-bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename) {
+bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename, bool deploy) {
     if (not Texture::Create())
         return false;
     m_type = GL_TEXTURE_3D;
@@ -55,7 +55,7 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         d[i].fill(0);
     for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
         Vector4f noise;
-#if 1
+#if 0
         for (int j = 0; j < 4; ++j)
             ++d[j][int(data[j] * 100)];
 #endif
@@ -66,7 +66,7 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         minVals.Minimize(noise);
         maxVals.Maximize(noise);
     }
-#if 1
+#if 0
     data = m_data.Data();
     for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
         for (int j = 0; j < 4; ++j) {
@@ -76,7 +76,8 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         data += 4;
     }
 #endif
-    Deploy();
+    if (deploy)
+        Deploy();
     return true;
 }
 
@@ -235,10 +236,9 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
     if (not Allocate(gridSize))
         return false;
     m_params = params;
-    if (LoadFromFile(noiseFilename)) {
-    }
-    else {
-        Compute();
+    if (not LoadFromFile(noiseFilename)) {
+        std::filesystem::path _p{ noiseFilename.GetStr() };
+        Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
     }
     float* data = m_data.Data();
@@ -262,7 +262,7 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
 }
 
 
-void CloudNoiseTexture::Compute(void) {
+void CloudNoiseTexture::Compute(String textureFolder) {
     size_t i = 0;
     float minVal = 1e6f, maxVal = 0.0f;
 
@@ -271,7 +271,7 @@ void CloudNoiseTexture::Compute(void) {
 #if 1
     m_params.normalize = 1 + 2 + 4 + 8;
     NoiseTexture3D rgbaNoise;
-    rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, "assets/textures/cloudshapes.bin");
+    rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, textureFolder + "/cloudnoise-rgba.bin", false);
 
     float* rgbaData = rgbaNoise.GetData().Data();
     float* data = m_data.Data();
@@ -284,6 +284,8 @@ void CloudNoiseTexture::Compute(void) {
         *data++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
         rgbaData += 4;
     }
+
+    rgbaNoise.GetData().Reset();
 
 #else
 

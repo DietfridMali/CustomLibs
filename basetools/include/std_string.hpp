@@ -66,6 +66,10 @@ public:
         return m_str;
     }
 
+    std::string GetStr(void) {
+        return m_str;
+    }
+
     String& operator+=(const String& other);
     String& operator+=(const char* s);
     String& operator+=(const char c);
