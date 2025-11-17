@@ -107,7 +107,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
 }
 
 
-void BaseRenderer::StartDepthPass(void) noexcept {
+void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPasses::rpShadows;
     openGLStates.SetDepthTest(1);
     openGLStates.SetDepthWrite(1);

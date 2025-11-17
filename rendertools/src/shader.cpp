@@ -4,6 +4,7 @@
 #include <ranges>
 
 #include "shader.h"
+#include "shadowmap.h"
 #include "base_renderer.h"
 
 #define PASSTHROUGH_MODE 0
@@ -124,8 +125,12 @@ void Shader::UpdateMatrices(void) {
         // both matrices must be column major
         SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
         SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
-        //if (not baseRenderer.IsShadowPass()) // depth shader doesn't have and doesn't use viewports
-            SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
+        SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
+        if (baseRenderer.IsShadowPass()) {
+            SetInt("renderShadow", shadowMap.IsAvailable() ? 1 : 0);
+            if (shadowMap.IsAvailable())
+                SetMatrixf("mShadowTransform", shadowMap.ShadowTransform());
+        }
 #if 0
         SetMatrix4f("mBaseModelView", baseRenderer.ModelView().AsArray(), false);
 #endif

@@ -1,12 +1,10 @@
 #include "shadowmap.h"
-#include "mapsegment.h"
-#include "maphandler.h"
 
 // =================================================================================================
 
 void ShadowMap::Setup(void) {
-	m_matrixIndex = renderer.AddMatrices();
-	m_matrices = renderer.Matrices(m_matrixIndex);
+	m_matrixIndex = baseRenderer.AddMatrices();
+	m_matrices = baseRenderer.Matrices(m_matrixIndex);
 }
 
 
@@ -28,9 +26,9 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 bool ShadowMap::Update(Vector3f lightDirection, float lightOffset) {
 	if (m_status < 0)
 		return false;
-	renderer.EnableCamera();
-	Matrix4f m = (renderer.Projection() * renderer.ModelView()).Inverse();
-	renderer.DisableCamera();
+	baseRenderer.EnableCamera();
+	Matrix4f m = (baseRenderer.Projection() * baseRenderer.ModelView()).Inverse();
+	baseRenderer.DisableCamera();
 	Vector3f center = Vector3f::ZERO;
 	for (int i = 0; i < 8; i++) {
 		Vector4f p = m * m_ndcCorners[i];
@@ -52,29 +50,12 @@ bool ShadowMap::Update(Vector3f lightDirection, float lightOffset) {
 	if ((m_status == 0) and not CreateMap(Vector2f(vMax.X() - vMin.X(), vMax.Y() - vMin.Y())))
 		return false;
 	// light projection
-	m_matrices->GetProjection() = renderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.X(), vMax.X(), vMin.Y(), vMax.Y(), -vMax.Z(), -vMin.Z());
+	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.X(), vMax.X(), vMin.Y(), vMax.Y(), -vMax.Z(), -vMin.Z());
 	// shadow transformation = light projection * light view * inverse(camera)
-	m_shadowTransform = renderer.ModelView().Inverse();
+	m_shadowTransform = baseRenderer.ModelView().Inverse();
 	m_shadowTransform *= m_matrices->ModelView();
 	m_shadowTransform *= m_matrices->GetProjection();
 	return true;
-}
-
-using RenderTypes = MapSegment::RenderTypes;
-using enum RenderTypes;
-
-
-void ShadowMap::Render(Vector3f lightDirection, float lightOffset) {
-	if (Update(lightDirection, lightOffset)) {
-		renderer.SelectMatrixStack(m_matrixIndex);
-		renderer.StartDepthPass();
-		m_map->Enable();
-		mapHandler.RenderPass(RenderPassType::rpShadows);
-		m_map->Disable();
-		renderer.PopMatrix(RenderMatrices::mtProjection);
-		renderer.PopMatrix();
-		renderer.SelectMatrixStack(0);
-	}
 }
 
 // =================================================================================================

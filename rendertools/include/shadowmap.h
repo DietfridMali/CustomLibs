@@ -3,7 +3,7 @@
 #include "array.hpp"
 #include "matrix.hpp"
 #include "basesingleton.hpp"
-#include "renderer.h"
+#include "base_renderer.h"
 
 // =================================================================================================
 
@@ -31,7 +31,26 @@ public:
 		return (m_status > 0);
 	}
 
-	void Render(Vector3f lightDirection, float lightOffset);
+	Matrix4f& ShadowTransform(void) noexcept {
+		return m_shadowTransform;
+	}
+
+	inline bool StartRender(void) noexcept {
+		if (not IsAvailable())
+			return false;
+		baseRenderer.SelectMatrixStack(m_matrixIndex);
+		baseRenderer.StartShadowPass();
+		m_map->Enable();
+		return true;
+	}
+
+	inline bool StopRender(void) noexcept {
+		if (not IsAvailable())
+			return false;
+		baseRenderer.SelectMatrixStack(0);
+		m_map->Disable();
+		return true;
+	}
 
 private:
 	bool CreateMap(Vector2f frustumSize);

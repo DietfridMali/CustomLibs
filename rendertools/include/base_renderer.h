@@ -115,7 +115,7 @@ public:
 
     inline void SetRenderPass(RenderPasses renderPass) noexcept { m_renderPass = renderPass; }
 
-    void StartDepthPass(void) noexcept;
+    void StartShadowPass(void) noexcept;
 
     void StartColorPass(void) noexcept;
 
@@ -129,7 +129,7 @@ public:
 
     inline void StartRenderPass(RenderPasses pass) noexcept {
         if (pass == RenderPasses::rpShadows)
-            StartDepthPass();
+            StartShadowPass();
         else if (pass == RenderPasses::rpColor)
             StartColorPass();
         else
