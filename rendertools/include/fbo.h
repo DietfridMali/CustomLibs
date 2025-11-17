@@ -52,6 +52,7 @@ public:
         dbExtra,
         dbSingle,
         dbCustom,
+        dbDepth,
         dbCount,
         dbNone = -1
     } eDrawBufferGroups;

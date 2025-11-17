@@ -166,7 +166,7 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
         return false;
     m_colorBufferCount = params.hasMRTs ? params.colorBufferCount : 1;
     m_vertexBufferCount = params.vertexBufferCount;
-    m_drawBuffers.Resize(m_colorBufferCount + m_vertexBufferCount);
+    m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_vertexBufferCount);
     m_name = params.name;
     return true;
 }
@@ -185,7 +185,10 @@ void FBO::Destroy(void) {
 
 bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
     int l = m_drawBuffers.Length();
-    if (drawBufferGroup == dbSingle) {
+    if (drawBufferGroup == dbDepth) {
+        m_drawBuffers[0] = GL_NONE;
+    }
+    else if (drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
         if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
             return false;

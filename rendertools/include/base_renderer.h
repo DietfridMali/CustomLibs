@@ -121,11 +121,11 @@ public:
 
     void StartFullPass(void) noexcept;
 
-    inline bool DepthPass(void) noexcept { return RenderPass() == RenderPasses::rpDepth; }
+    inline bool IsDepthPass(void) noexcept { return RenderPass() == RenderPasses::rpDepth; }
 
-    inline bool ColorPass(void) noexcept { return RenderPass() == RenderPasses::rpColor; }
+    inline bool IsColorPass(void) noexcept { return RenderPass() == RenderPasses::rpColor; }
 
-    inline bool FullPass(void) noexcept { return RenderPass() == RenderPasses::rpFull; }
+    inline bool IsFullPass(void) noexcept { return RenderPass() == RenderPasses::rpFull; }
 
     inline void StartRenderPass(RenderPasses pass) noexcept {
         if (pass == RenderPasses::rpDepth)

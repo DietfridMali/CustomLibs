@@ -11,7 +11,13 @@ const ShaderSource& DepthShader() {
         Standard2DVS(),
         R"(
         #version 330 core
-        void main() { }
+        uniform sampler2D source;
+        uniform vec4 surfaceColor;
+        in vec2 fragCoord;
+        void main() { 
+            if (texture(source, fract(fragCoord)).a * surfaceColor.a < 0.9)
+                discard;
+        }
         )"
         );
     return source;
@@ -85,7 +91,7 @@ const ShaderSource& PlainTextureShader() {
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture (source, tcOffset + (fragCoord - floor(fragCoord)) * tcScale);
+            vec4 texColor = texture (source, tcOffset + (fract(fragCoord)) * tcScale);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);

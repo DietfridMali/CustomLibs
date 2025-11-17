@@ -54,7 +54,7 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premult
 void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool premultiply) {
     if (decoration.HaveOutline()) {
         Shader* shader = baseShaderHandler.SetupShader("outline");
-        if (shader and not baseRenderer.DepthPass()) {
+        if (shader and not baseRenderer.IsDepthPass()) {
             shader->SetFloat("outlineWidth", decoration.outlineWidth);
             shader->SetVector4f("outlineColor", decoration.outlineColor);
             shader->SetFloat("offset", 0.0f); // 0.5f);
