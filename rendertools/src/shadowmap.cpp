@@ -12,7 +12,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	m_status = -1;
 	if (not (m_map = new FBO()))
 		return false;
-	int resolution = int(round(std::max(frustumSize.x / 0.1f, frustumSize.y / 0.1f)));
+	int resolution = int(round(std::max(frustumSize.x / 1.f, frustumSize.y / 1.f)));
 	int size;
 	for (size = 1; size < resolution; size <<= 1)
 		;

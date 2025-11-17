@@ -72,8 +72,10 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
 
 
 int FBO::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount) {
+#if 0
     if (not bufferCount)
         return -1;
+#endif
     for (int i = 0; i < bufferCount; ++i)
         CreateBuffer(m_bufferCount, attachmentIndex, bufferType, bufferType != BufferInfo::btDepth);
     return m_bufferCount - bufferCount;
@@ -160,7 +162,7 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
     }
     m_vertexBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     // depth buffer must be created last or draw buffer management will fail as it relies on all draw buffers being stored in bufferInfo contiguously, starting at index 0
-    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.colorBufferCount ? params.depthBufferCount : 0);
+    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     CreateRenderArea();
     if (not AttachBuffers(params.hasMRTs))
         return false;
@@ -266,7 +268,7 @@ bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup
         return false;
     if (bufferIndex >= 0)
         return m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor;
-    return (drawBufferGroup == dbAll) or (drawBufferGroup == dbColor);
+    return (drawBufferGroup == dbAll) or (drawBufferGroup == dbColor) or (drawBufferGroup == dbDepth);
 }
 
 

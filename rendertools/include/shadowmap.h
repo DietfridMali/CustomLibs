@@ -28,7 +28,7 @@ public:
 	bool Update(Vector3f lightDirection, float lightOffset);
 
 	int IsAvailable(void) noexcept {
-		return (m_status > 0);
+		return (m_status >= 0);
 	}
 
 	Matrix4f& ShadowTransform(void) noexcept {
@@ -40,7 +40,7 @@ public:
 			return false;
 		baseRenderer.SelectMatrixStack(m_matrixIndex);
 		baseRenderer.StartShadowPass();
-		m_map->Enable();
+		m_map->Enable(0, FBO::dbDepth);
 		return true;
 	}
 
