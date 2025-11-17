@@ -146,8 +146,8 @@ public:
     }
 
 
-    MatrixStack& AddMatrices(void) {
-        return *m_matrices.Append();
+    int AddMatrices(void) {
+        return m_matrices.Append() ? m_matrices.Length() - 1 : -1;
     }
 
 
