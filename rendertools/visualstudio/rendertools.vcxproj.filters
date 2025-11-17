@@ -159,6 +159,9 @@
     <ClInclude Include="..\include\noise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\shadowmap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\cube.cpp">
@@ -273,6 +276,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\noise.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\shadowmap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

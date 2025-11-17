@@ -141,6 +141,7 @@
     <ClInclude Include="..\include\shader.h" />
     <ClInclude Include="..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
+    <ClInclude Include="..\include\shadowmap.h" />
     <ClInclude Include="..\include\SSBO.hpp" />
     <ClInclude Include="..\include\texcoord.h" />
     <ClInclude Include="..\include\textrenderer.h" />
@@ -183,6 +184,7 @@
     <ClCompile Include="..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\shader_macros.cpp" />
     <ClCompile Include="..\src\noise.cpp" />
+    <ClCompile Include="..\src\shadowmap.cpp" />
     <ClCompile Include="..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\src\textureatlas.cpp" />

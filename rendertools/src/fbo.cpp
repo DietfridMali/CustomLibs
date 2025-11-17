@@ -469,7 +469,22 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params) {
 }
 
 
- // source < 0 means source contains a texture handle from some texture external to the FBO
+Texture* FBO::GetDepthTexture(void) {
+    SharedTextureHandle handle = BufferHandle(m_depthBufferIndex);
+    m_depthTexture.HasBuffer() = true;
+    if (m_depthTexture.m_handle != handle) {
+        m_depthTexture.m_handle = handle;
+#if 1
+        m_depthTexture.Bind(0);
+        m_depthTexture.SetParams(true);
+        //m_depthTexture.Release();
+#endif
+    }
+    return &m_depthTexture;
+}
+
+
+// source < 0 means source contains a texture handle from some texture external to the FBO
 bool FBO::Render(const FBORenderParams& params, const RGBAColor& color) {
     if (params.destination >= 0)
         m_lastDestination = params.destination;

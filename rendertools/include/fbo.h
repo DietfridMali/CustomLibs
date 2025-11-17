@@ -73,6 +73,7 @@ public:
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
     FBOTexture                  m_renderTexture;
+    FBOTexture                  m_depthTexture;
     bool                        m_pingPong;
     bool                        m_isAvailable;
     int                         m_lastDestination;
@@ -131,6 +132,8 @@ public:
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
     Texture* GetRenderTexture(const FBORenderParams& params);
+
+    Texture* GetDepthTexture(void);
 
     bool UpdateTransformation(const FBORenderParams& params);
 

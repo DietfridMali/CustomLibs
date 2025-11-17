@@ -225,7 +225,7 @@ void RenderMatrices::PushMatrix(MatrixType matrixType) {
     else
 #endif
     {
-        Matrices().Push(matrixType);
+        Matrices()->Push(matrixType);
     }
 }
 
