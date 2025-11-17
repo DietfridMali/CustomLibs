@@ -69,7 +69,7 @@ void ShadowMap::Render(Vector3f lightDirection, float lightOffset) {
 		renderer.SelectMatrixStack(m_matrixIndex);
 		renderer.StartDepthPass();
 		m_map->Enable();
-		mapHandler.RenderPass(RenderPassType::rpDepth);
+		mapHandler.RenderPass(RenderPassType::rpShadows);
 		m_map->Disable();
 		renderer.PopMatrix(RenderMatrices::mtProjection);
 		renderer.PopMatrix();

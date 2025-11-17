@@ -124,7 +124,7 @@ void Shader::UpdateMatrices(void) {
         // both matrices must be column major
         SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
         SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
-        //if (not baseRenderer.IsDepthPass()) // depth shader doesn't have and doesn't use viewports
+        //if (not baseRenderer.IsShadowPass()) // depth shader doesn't have and doesn't use viewports
             SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
 #if 0
         SetMatrix4f("mBaseModelView", baseRenderer.ModelView().AsArray(), false);

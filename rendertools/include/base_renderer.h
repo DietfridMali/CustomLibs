@@ -30,7 +30,7 @@ public:
     };
 
     enum class RenderPasses {
-        rpDepth,
+        rpShadows,
         rpColor,
         rpFull
     };
@@ -121,14 +121,14 @@ public:
 
     void StartFullPass(void) noexcept;
 
-    inline bool IsDepthPass(void) noexcept { return RenderPass() == RenderPasses::rpDepth; }
+    inline bool IsShadowPass(void) noexcept { return RenderPass() == RenderPasses::rpShadows; }
 
     inline bool IsColorPass(void) noexcept { return RenderPass() == RenderPasses::rpColor; }
 
     inline bool IsFullPass(void) noexcept { return RenderPass() == RenderPasses::rpFull; }
 
     inline void StartRenderPass(RenderPasses pass) noexcept {
-        if (pass == RenderPasses::rpDepth)
+        if (pass == RenderPasses::rpShadows)
             StartDepthPass();
         else if (pass == RenderPasses::rpColor)
             StartColorPass();

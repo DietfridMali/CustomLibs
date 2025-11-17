@@ -63,7 +63,7 @@ Shader* BaseShaderHandler::SelectShader(Texture* texture) {
 
 Shader* BaseShaderHandler::SetupShader(String shaderId) {
     Shader* shader;
-    if (baseRenderer.IsDepthPass())
+    if (baseRenderer.IsShadowPass())
         shaderId = "depthShader"; // override all shaders with simplest possible shader during depth pass
     if ((m_activeShaderId == shaderId) and (m_activeShader != nullptr))
         shader = m_activeShader;
@@ -82,7 +82,7 @@ Shader* BaseShaderHandler::SetupShader(String shaderId) {
         shader->Enable();
     }
     shader->UpdateMatrices();
-    return /*baseRenderer.IsDepthPass() ? nullptr : */ shader; // pretend no shader was loaded during depth pass so the app doesn't try to set uniforms
+    return /*baseRenderer.IsShadowPass() ? nullptr : */ shader; // pretend no shader was loaded during depth pass so the app doesn't try to set uniforms
 }
 
 
@@ -103,7 +103,7 @@ Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f
     Shader* shader = SetupShader("lineShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsDepthPass()) {
+        if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector2f("start", start);
             shader->SetVector2f("end", end);
@@ -119,7 +119,7 @@ Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f
     Shader* shader = SetupShader("ringShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsDepthPass()) {
+        if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector2f("center", center);
             shader->SetFloat("radius", radius);
@@ -137,7 +137,7 @@ Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector
     Shader* shader = SetupShader("circleShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsDepthPass()) {
+        if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector2f("center", center);
             shader->SetFloat("radius", radius);
@@ -152,7 +152,7 @@ Shader* BaseShaderHandler::LoadRectangleShader(const RGBAColor& color, const Vec
     Shader* shader = SetupShader("rectangleShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsDepthPass()) {
+        if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector2f("center", center);
             shader->SetVector2f("size", Vector2f(width, height));
@@ -169,7 +169,7 @@ Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RG
     Shader* shader = SetupShader("circleMaskShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsDepthPass()) {
+        if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector4f("maskColor", maskColor);
             shader->SetVector2f("center", center);
@@ -195,7 +195,7 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
     Shader* shader = SetupShader("plainTexture");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsDepthPass()) {
+        if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("tcOffset", tcOffset);
             shader->SetVector2f("tcScale", tcScale);
             //shader->SetInt("source", 0);
@@ -210,7 +210,7 @@ Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const G
     Shader* shader = SetupShader("blurTexture");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsDepthPass()) {
+        if (not baseRenderer.IsShadowPass()) {
             SetGaussBlurParams(shader, blur);
         //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
         }
@@ -222,7 +222,7 @@ Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const G
 Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f& tcOffset, const Vector2f& tcScale) {
     Shader* shader = SetupShader("grayScale");
     if (shader) {
-        if (baseRenderer.IsDepthPass())
+        if (baseRenderer.IsShadowPass())
             shader->SetVector4f("surfaceColor", ColorData::White);
         else {
             shader->SetVector2f("tcOffset", tcOffset);
@@ -236,7 +236,7 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f&
 
 Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, const GaussBlurParams& blur) {
     if (shader) {
-        if (baseRenderer.IsDepthPass())
+        if (baseRenderer.IsShadowPass())
             shader->SetVector4f("surfaceColor", ColorData::White);
         else {
             shader->SetVector2f("texelSize", baseRenderer.TexelSize());
@@ -250,7 +250,7 @@ Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, const GaussBlurPar
 
 Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, float aberration, int offsetType) { // offsetType: 0 - linear, 1 - radial
     if (shader) {
-        if (baseRenderer.IsDepthPass())
+        if (baseRenderer.IsShadowPass())
             shader->SetVector4f("surfaceColor", ColorData::White);
         else {
             shader->SetInt("offsetType", offsetType);
