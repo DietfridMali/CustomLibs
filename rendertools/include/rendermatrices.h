@@ -141,8 +141,8 @@ public:
     }
 
 
-    MatrixStack& Matrices(void) {
-        return m_matrices[m_activeStack];
+    MatrixStack* Matrices(int i = -1) {
+        return &m_matrices[(i < 0) ? m_activeStack : i];
     }
 
 
