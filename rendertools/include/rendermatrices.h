@@ -152,52 +152,52 @@ public:
 
 
     inline float ZNear(void) noexcept {
-        return Matrices().ZNear();
+        return Matrices()->ZNear();
     }
 
 
     inline float ZFar(void) noexcept {
-        return Matrices().ZFar();
+        return Matrices()->ZFar();
     }
 
 
     inline float FoV(void) noexcept {
-        return Matrices().FoV();
+        return Matrices()->FoV();
     }
 
 
     inline float AspectRatio(void) noexcept {
-        return Matrices().AspectRatio();
+        return Matrices()->AspectRatio();
     }
 
 
     inline Matrix4f& ModelView(void) noexcept {
-        return Matrices().ModelView();
+        return Matrices()->ModelView();
     }
 
 
     inline Matrix4f& Projection(void) noexcept {
-        return Matrices().GetProjection();
+        return Matrices()->GetProjection();
     }
 
 
     inline Matrix4f& Projection2D(void) noexcept {
-        return Matrices().Projection2D();
+        return Matrices()->Projection2D();
     }
 
 
     inline Matrix4f& Projection3D(void) noexcept {
-        return Matrices().Projection3D();
+        return Matrices()->Projection3D();
     }
 
 
     inline Matrix4f& FxProjection(void) noexcept {
-        return Matrices().FxProjection();
+        return Matrices()->FxProjection();
     }
 
 
     inline GLfloat* ProjectionMatrix(void) noexcept {
-        return (GLfloat*)Matrices().GetProjection().AsArray();
+        return (GLfloat*)Matrices()->GetProjection().AsArray();
     }
 
     // setup 3D transformation and projection
@@ -269,12 +269,12 @@ public:
     }
 
     void PushMatrix(Matrix4f& m) {
-        Matrices().Push(m);
+        Matrices()->Push(m);
     }
 
 
     Matrix4f& PopMatrix(Matrix4f& m) {
-        Matrices().Pop(m);
+        Matrices()->Pop(m);
         return m;
     }
 
