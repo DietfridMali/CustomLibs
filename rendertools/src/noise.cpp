@@ -624,7 +624,7 @@ namespace Noise {
 
     // -------------------------------------------------------------------------------------------------
 
-#define NOISE_TYPE 1
+#define NOISE_TYPE 0
 
     using glm::vec2;
     using glm::vec3;
