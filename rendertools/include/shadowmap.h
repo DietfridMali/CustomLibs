@@ -52,6 +52,10 @@ public:
 		return true;
 	}
 
+	Texture* ShadowTexture(void) noexcept {
+		return m_map ? m_map->GetDepthTexture() : nullptr;
+	}
+
 private:
 	bool CreateMap(Vector2f frustumSize);
 };
