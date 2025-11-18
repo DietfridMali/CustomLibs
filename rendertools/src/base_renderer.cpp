@@ -9,6 +9,7 @@
 //#include "quad.h"
 #include "tristate.h"
 #include "base_renderer.h"
+#include "base_shaderhandler.h"
 #include "shadowmap.h"
 
 List<::Viewport> BaseRenderer::viewportStack;
@@ -210,11 +211,13 @@ void BaseRenderer::Draw3DScene(void) {
             }
         if (shader == nullptr) 
             m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
-#if 1
+#if 0
         m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
         m_renderQuad.Render(shader, &m_renderTexture);
 #else
-        m_renderQuad.Render(shader, shadowMap.ShadowTexture());
+        if (shadowMap.ShadowTexture()) {
+            m_renderQuad.Render(baseShaderHandler.SetupShader("depthRenderer"), shadowMap.ShadowTexture());
+        }
         //m_renderQuad.Fill(ColorData::Orange);
 #endif
         if (shader != nullptr)

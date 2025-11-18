@@ -6,6 +6,7 @@
 // =================================================================================================
 
 const ShaderSource& DepthShader();
+const ShaderSource& DepthRenderer();
 const ShaderSource& LineShader();
 const ShaderSource& RingShader();
 const ShaderSource& CircleShader();
@@ -27,6 +28,7 @@ const ShaderSource& GaussBlurShader();
 BaseShaderCode::BaseShaderCode() {
     ManagedArray<const ShaderSource*> shaderSource = {
         &DepthShader(),
+        &DepthRenderer(),
         &LineShader(),
         &RingShader(),
         &CircleShader(),

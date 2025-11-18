@@ -14,14 +14,35 @@ const ShaderSource& DepthShader() {
         uniform sampler2D source;
         uniform vec4 surfaceColor;
         in vec2 fragCoord;
+        out float fragDepth;
         void main() { 
-#if 0
+#if 1
             if (texture(source, fract(fragCoord)).a * surfaceColor.a < 0.9)
                 discard;
 #endif
+            fragDepth = gl_FragCoord.z;
         }
         )"
         );
+    return source;
+}
+
+
+const ShaderSource& DepthRenderer() {
+    static const ShaderSource source(
+        "depthRenderer",
+        Standard2DVS(),
+        R"(
+        #version 330 core
+        uniform sampler2D source;
+        in vec2 fragCoord;
+        out vec4 fragColor;
+        void main() { 
+            float d = texture(source, fract(fragCoord)).r;
+            fragColor = vec4(d, d, d, 1.0f);
+        }
+        )"
+    );
     return source;
 }
 
