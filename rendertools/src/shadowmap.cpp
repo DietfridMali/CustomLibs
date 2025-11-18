@@ -53,6 +53,24 @@ bool ShadowMap::StopRender(void) noexcept {
 }
 
 
+void ShadowMap::Stabilize(float shadowMapSize)
+{
+	// Ursprungs-Punkt (0,0,0) in Shadow-Space
+	Vector4f shadowOrigin = m_shadowTransform * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+
+	// in Texelraum skalieren
+	shadowOrigin *= shadowMapSize * 0.5f;
+
+	Vector2f roundedOrigin = Vector2f::Round(Vector2f(shadowOrigin.x, shadowOrigin.y));
+	Vector2f offset = (roundedOrigin - Vector2f(shadowOrigin.x, shadowOrigin.y)) * (2.0f / shadowMapSize);
+
+	// Translation der Shadow-Matrix korrigieren
+	m_shadowTransform.T().x += offset.x;
+	m_shadowTransform.T().y += offset.y;
+}
+
+
+
 bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
 	if (m_status < 0)
 		return false;
@@ -126,6 +144,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 #if 0 // not needed, working with world coordinates in the shaders that get directly transformed into shadow space for the shadow map lookup
 	m_shadowTransform *= camera->ModelView().Inverse();
 #endif
+	Stabilize(float (m_map->GetWidth(true)));
 	return true;
 }
 

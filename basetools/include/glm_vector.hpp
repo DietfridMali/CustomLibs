@@ -170,6 +170,10 @@ public:
         return Vector(glm::ceil(v));
     }
 
+    inline static Vector Round(Vector v) {
+        return Vector(glm::round(v));
+    }
+
     float Dot(const Vector& other, int range = VEC_TYPE::length()) const noexcept {
         float dot = 0.0f;
         for (int i = 0; i < range; ++i) dot += (*this)[i] * other[i];

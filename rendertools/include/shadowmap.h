@@ -66,6 +66,8 @@ public:
 
 private:
 	bool CreateMap(Vector2f frustumSize);
+
+	void Stabilize(float shadowMapSize);
 };
 
 #define shadowMap	ShadowMap::Instance()
