@@ -131,7 +131,7 @@ public:
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
-    Texture* GetRenderTexture(const FBORenderParams& params);
+    Texture* GetRenderTexture(const FBORenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthTexture(void);
 

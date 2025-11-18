@@ -69,24 +69,26 @@ void Viewport::SetResized(int deltaLeft, int deltaTop, int deltaWidth, int delta
 
 
 void Viewport::BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept {
+#if 0
+    float sy = flipVertically ? -1.0f : 1.0f;
+    m_transformation = Matrix4f({
+        1.0f, 0.0f, 0.0f, 0.0f, // col 0
+        0.0f,   sy, 0.0f, 0.0f, // col 1
+        0.0f, 0.0f, 1.0f, 0.0f, // col 2
+        0.0f, 0.0f, 0.0f, 1.0f  // col 3 (Translation in W-Spalte)
+        });
+#else
+#   if 0
+    float sx = 1.0f, sy = flipVertically ? -1.0f : 1.0f;
+#   else
     float sx = Widthf() / float(windowWidth);
     float sy = Heightf() / float(windowHeight);
-    
+#   endif
     if (flipVertically) 
         sy = -sy; // Inhalte im Rect vertikal spiegeln
-
     float tx = 2.0f * (Leftf() + 0.5f * Widthf()) / float(windowWidth) - 1.0f;
     float ty = 1.0f - 2.0f * (Topf() + 0.5f * Heightf()) / float(windowHeight);
-#if 0
-    glm::mat4 M(1.0f);
-#   if 1
-    M[0][0] = sx;           // scale x
-    M[1][1] = sy;           // scale y (negativ => vertikal gespiegelt)
-    M[3][0] = tx;           // Offsets in W-Spalte (Translation)
-    M[3][1] = ty;
-#   endif
-    m_transformation = Matrix4f(M);
-#else
+
     m_transformation = Matrix4f({
           sx, 0.0f, 0.0f, 0.0f, // col 0
         0.0f,   sy, 0.0f, 0.0f, // col 1

@@ -27,10 +27,10 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 bool ShadowMap::StartRender(void) noexcept {
 	if (not IsAvailable())
 		return false;
-	EnableCamera();
 	baseRenderer.StartShadowPass();
 	m_map->Enable(0, FBO::dbDepth);
 	glClear(GL_DEPTH_BUFFER_BIT);
+	EnableCamera();
 	return true;
 }
 
@@ -47,9 +47,9 @@ bool ShadowMap::StopRender(void) noexcept {
 bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
 	if (m_status < 0)
 		return false;
+#if 0
 	MatrixStack* camera = baseRenderer.Matrices(0);
 	Matrix4f m = (camera->GetProjection() * camera->ModelView()).Inverse();
-#if 0
 	Vector3f center = Vector3f::ZERO;
 	for (int i = 0; i < 8; i++) {
 		Vector4f p = m * m_ndcCorners[i];
@@ -60,13 +60,15 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	}
 	center /= 8.0f;
 #endif
+
 	// light view
-	if (not center.IsValid())
+	//if (not center.IsValid())
 		center = (worldMin + worldMax) * 0.5f;
 	Vector3f worldSize = worldMax - worldMin;
 	lightOffset = sqrt(worldSize.Length());
 	lightOffset = worldSize.Length();
 	m_matrices->ModelView().LookAt(center + lightDirection * lightOffset, center, Vector3f(0.0f, 1.0f, 0.0f));
+
 #if 0
 	Vector3f corners[8] = {
 		{ worldMin.X(), worldMin.Y(), worldMin.Z() },
@@ -87,12 +89,16 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		vMin.Minimize(v);
 		vMax.Maximize(v);
 	}
-	if ((m_status == 0) and not CreateMap(Vector2f(vMax.X() - vMin.X(), vMax.Y() - vMin.Y())))
+	if ((m_status == 0) and not CreateMap(Vector2f(vMax.X() - vMin.X(), vMax.Z() - vMin.Z())))
 		return false;
+#if 0
 	// light projection
 	float s = std::max(vMax.x - vMin.x, vMax.y - vMin.y);
 	s *= sqrtf(2.0f);
 	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 1.0f, 200.0f);
+#	else
+	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, vMin.z, vMax.z);
+#	endif
 #else
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Y())))
 		return false;
@@ -100,15 +106,17 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 #	if 0
 	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().Create(1.0f, 45.0f, 1.0f, 200.0f);
 #	else
-	float s = std::max(worldSize.X(), worldSize.Y());
-	s *= 0.5f; // sqrtf(2.0f) * 0.5f;
+	float s = std::max(worldSize.X(), worldSize.Z());
+	//s *= 0.5f; // sqrtf(2.0f) * 0.5f;
 	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 0.1f, 200.0f);
 #	endif
 #endif
 	// shadow transformation = light projection * light view * inverse(camera)
-	m_shadowTransform = camera->ModelView().Inverse();
+	m_shadowTransform = m_matrices->GetProjection();
 	m_shadowTransform *= m_matrices->ModelView();
-	m_shadowTransform *= m_matrices->GetProjection();
+#if 0 // not needed, working with world coordinates in the shaders that get directly transformed into shadow space for the shadow map lookup
+	m_shadowTransform *= camera->ModelView().Inverse();
+#endif
 	return true;
 }
 

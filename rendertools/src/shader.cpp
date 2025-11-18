@@ -129,7 +129,8 @@ void Shader::UpdateMatrices(void) {
 #if 0
         SetInt("renderShadow", 0);
 #else
-        if (baseRenderer.IsShadowPass()) {
+        //if (not baseRenderer.IsShadowPass()) 
+        {
             SetInt("renderShadow", shadowMap.IsAvailable() ? 1 : 0);
             if (shadowMap.IsAvailable())
                 SetMatrix4f("mShadowTransform", shadowMap.ShadowTransform());

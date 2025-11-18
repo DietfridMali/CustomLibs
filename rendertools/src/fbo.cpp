@@ -63,6 +63,10 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
 
         default: // BufferInfo::btDepth
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
             break;
     }
@@ -358,7 +362,7 @@ void FBO::ReleaseBuffers(void) {
 
 
 void FBO::SetViewport(bool flipVertically) noexcept {
-    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
+    baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically);
 }
 
 
@@ -451,7 +455,7 @@ void FBO::Fill(RGBAColor color) {
 }
 
 
-Texture* FBO::GetRenderTexture(const FBORenderParams& params) {
+Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex) {
     if (params.source == params.destination)
         return nullptr;
     SharedTextureHandle handle = 
@@ -462,7 +466,8 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params) {
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
 #if 1
-        m_renderTexture.Bind(0);
+        if (tmuIndex > -1)
+            m_renderTexture.Bind(tmuIndex);
         m_renderTexture.SetParams(true);
         //m_renderTexture.Release();
 #endif

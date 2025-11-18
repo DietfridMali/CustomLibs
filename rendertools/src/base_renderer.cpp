@@ -114,8 +114,8 @@ void BaseRenderer::StartShadowPass(void) noexcept {
     openGLStates.SetDepthTest(1);
     openGLStates.SetDepthWrite(1);
     openGLStates.DepthFunc(GL_LESS);                  
-    //openGLStates.ColorMask(0, 0, 0, 0);
-    openGLStates.ColorMask(1, 1, 1, 1);
+    openGLStates.ColorMask(0, 0, 0, 0);
+    //openGLStates.ColorMask(1, 1, 1, 1);
     openGLStates.SetBlending(0);
 }
 
@@ -212,16 +212,26 @@ void BaseRenderer::Draw3DScene(void) {
             }
         if (shader == nullptr) 
             m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
-#if 0
-        m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
-        m_renderQuad.Render(shader, &m_renderTexture);
-#else
-        if (shadowMap.ShadowTexture()) {
-            Translate(0.5, 0.5, 0);
-            m_renderQuad.Render(baseShaderHandler.SetupShader("depthRenderer"), shadowMap.ShadowTexture());
-            Translate(-0.5, -0.5, 0);
+        static bool renderScene = true;
+
+#define TEST_RENDER 1
+
+#if TEST_RENDER
+        if (renderScene)
+#endif
+        {
+            m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
+            m_renderQuad.Render(shader, &m_renderTexture);
         }
-        //m_renderQuad.Fill(ColorData::Orange);
+#if TEST_RENDER
+        else { // test render shadow map
+            Texture* t = shadowMap.ShadowTexture();
+            if (t) {
+                Translate(0.5, 0.5, 0);
+                m_renderQuad.Render(baseShaderHandler.SetupShader("depthRenderer"), t);
+                Translate(-0.5, -0.5, 0);
+            }
+        }
 #endif
         if (shader != nullptr)
             PopMatrix();
@@ -282,7 +292,6 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept { //, bool isFBO) {
-#if 1
     if (windowWidth * windowHeight == 0) {
         if (m_drawBufferInfo.m_fbo) {
             windowWidth = m_drawBufferInfo.m_fbo->GetWidth(true);
@@ -292,6 +301,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
             windowWidth = m_windowWidth;
             windowHeight = m_windowHeight;
         }
+        glViewport(0, 0, windowWidth, windowHeight);
     }
 
     m_viewport = viewport;
@@ -300,13 +310,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
         m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
 #endif
     m_viewport.BuildTransformation(windowWidth, windowHeight, flipViewportVertically);
-#else
-    m_viewport = viewport;
-    if (flipVertically)
-        m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
-    glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
-    m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
-#endif
+    //glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
 }
 
 
