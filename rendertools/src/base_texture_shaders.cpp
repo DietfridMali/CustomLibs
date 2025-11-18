@@ -123,7 +123,7 @@ const ShaderSource& PlainTextureShader() {
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture (source, tcOffset + (fract(fragCoord)) * tcScale);
+            vec4 texColor = texture(surface, tcOffset + (fract(fragCoord)) * tcScale);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
@@ -164,7 +164,7 @@ const ShaderSource& MovingTextureShader() {
 #if 0
             fragColor = vec4(1,0,1,1);
 #else            
-            vec4 texColor = texture (source, fragCoord + direction * (time * speed));
+            vec4 texColor = texture(surface, fragCoord + direction * (time * speed));
             float a = texColor.a * surfaceColor.a;
             //if (a == 0) discard;
 

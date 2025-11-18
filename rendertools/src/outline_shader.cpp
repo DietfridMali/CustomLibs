@@ -26,7 +26,7 @@ const ShaderSource& OutlineShader() {
                     return;
                 }
                 float alpha = 0.0;
-                vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
+                vec2 texelSize = 1.0 / vec2(textureSize(surface, 0));
                 float dx = outlineWidth * texelSize.x;
                 int r = int(outlineWidth);
                 for (int x = r; x >= 0; x--, dx -= texelSize.x) {

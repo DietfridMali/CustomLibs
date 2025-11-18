@@ -52,8 +52,8 @@ const ShaderSource& BoxBlurShader() {
 #if 1
                 fragColor = GaussBlur(fragCoord, 3, 1);
 #else
-                //vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
-                //vec3 color = FxaaPixelShader(fragCoord, source, texelSize);
+                //vec2 texelSize = 1.0 / vec2(textureSize(surface, 0));
+                //vec3 color = FxaaPixelShader(fragCoord, surface, texelSize);
                 float a = texture(surface, fragCoord).a;
                 fragColor = vec4(color /** mix(1.0, a, premultiply)*/, a);
 #endif
@@ -102,8 +102,8 @@ const ShaderSource& FxaaShader() {
             return (lumaB < lumaMin || lumaB > lumaMax) ? rgbA : rgbB;
         }
         void main() {
-            vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
-            vec3 color = FxaaPixelShader(fragCoord, source, texelSize);
+            vec2 texelSize = 1.0 / vec2(textureSize(surface, 0));
+            vec3 color = FxaaPixelShader(fragCoord, surface, texelSize);
             float a = texture(surface, fragCoord).a;
             fragColor = vec4(color /** mix(1.0, a, premultiply)*/, a);
         }
@@ -131,7 +131,7 @@ const ShaderSource& GaussBlurShader() {
 #if 0
             fragColor = vec4(1,1,1,1);
 #else
-            vec2 texelSize = 1.0 / vec2(textureSize(source, 0));
+            vec2 texelSize = 1.0 / vec2(textureSize(surface, 0));
             vec2 offset = vec2 (1.0 - direction, direction);
     	    vec4 sum = vec4(0.0);
             int n = 2 * radius + 1;
