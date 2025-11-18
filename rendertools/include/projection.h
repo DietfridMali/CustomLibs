@@ -17,7 +17,7 @@ public:
     {
     }
 
-    Matrix4f Create(float aspectRatio, float fov = 45, bool rowMajor = false)
+    Matrix4f Create(float aspectRatio, float fov = 45, float zNear = 0.0f, float zFar = 0.0f, bool rowMajor = false)
         noexcept;
 
     Matrix4f ComputeProjection(bool rowMajor = false)

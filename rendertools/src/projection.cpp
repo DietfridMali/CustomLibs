@@ -6,11 +6,15 @@
 
 // =================================================================================================
 
-Matrix4f Projection::Create(float aspectRatio, float fov, bool rowMajor)
+Matrix4f Projection::Create(float aspectRatio, float fov, float zNear, float zFar, bool rowMajor)
 noexcept
 {
     m_aspectRatio = aspectRatio;
     m_fov = fov;
+    if (zNear != 0.0f)
+        m_zNear = zNear;
+    if (zFar != 0.0f)
+        m_zFar = zFar;
     return ComputeProjection(rowMajor);
 }
 
