@@ -25,7 +25,7 @@ private:
 public:
 	void Setup(void);
 
-	bool Update(Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
+	bool Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
 	int IsAvailable(void) noexcept {
 		return (m_status >= 0);

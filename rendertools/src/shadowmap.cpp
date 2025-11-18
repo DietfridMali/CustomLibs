@@ -42,11 +42,12 @@ bool ShadowMap::StopRender(void) noexcept {
 }
 
 
-bool ShadowMap::Update(Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
+bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
 	if (m_status < 0)
 		return false;
 	MatrixStack* camera = baseRenderer.Matrices(0);
 	Matrix4f m = (camera->GetProjection() * camera->ModelView()).Inverse();
+#if 0
 	Vector3f center = Vector3f::ZERO;
 	for (int i = 0; i < 8; i++) {
 		Vector4f p = m * m_ndcCorners[i];
@@ -56,8 +57,10 @@ bool ShadowMap::Update(Vector3f lightDirection, float lightOffset, Vector3f worl
 		center += m_frustumCorners[i];
 	}
 	center /= 8.0f;
+#endif
 	// light view
-	center = (worldMin + worldMax) * 0.5f;
+	if (not center.IsValid())
+		center = (worldMin + worldMax) * 0.5f;
 	Vector3f worldSize = worldMax - worldMin;
 	lightOffset = sqrt(worldSize.Length());
 	lightOffset = worldSize.Length();
@@ -96,7 +99,7 @@ bool ShadowMap::Update(Vector3f lightDirection, float lightOffset, Vector3f worl
 	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().Create(1.0f, 45.0f, 1.0f, 200.0f);
 #	else
 	float s = std::max(worldSize.X(), worldSize.Y());
-	s *= sqrtf(2.0f) * 0.5f;
+	s *= 0.5f; // sqrtf(2.0f) * 0.5f;
 	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 1.0f, 200.0f);
 #	endif
 #endif
