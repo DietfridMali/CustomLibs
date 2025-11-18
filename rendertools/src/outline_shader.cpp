@@ -15,7 +15,7 @@ const ShaderSource& OutlineShader() {
             #version 330
             in vec2 fragCoord;
             out vec4 fragColor;
-            uniform sampler2D source;
+            uniform sampler2D surface;
             uniform vec4 outlineColor;
             uniform float outlineWidth;
             //uniform float premultiply;

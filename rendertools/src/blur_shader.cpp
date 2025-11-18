@@ -13,7 +13,7 @@ const ShaderSource& BoxBlurShader() {
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
-            uniform sampler2D source;
+            uniform sampler2D surface;
             float FXAA_SPAN_MAX = 16.0;
             float FXAA_REDUCE_MIN = 1.0 / 128.0;
             float FXAA_REDUCE_MUL = 1.0 / 8.0;
@@ -71,7 +71,7 @@ const ShaderSource& FxaaShader() {
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
-        uniform sampler2D source;
+        uniform sampler2D surface;
         float FXAA_SPAN_MAX = 16.0;
         float FXAA_REDUCE_MIN = 1.0 / 128.0;
         float FXAA_REDUCE_MUL = 1.0 / 8.0;
@@ -120,7 +120,7 @@ const ShaderSource& GaussBlurShader() {
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
-        uniform sampler2D source;
+        uniform sampler2D surface;
         uniform float direction;
         in vec2 fragCoord;
         out vec4 fragColor;

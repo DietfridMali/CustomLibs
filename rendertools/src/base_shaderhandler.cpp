@@ -198,7 +198,7 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("tcOffset", tcOffset);
             shader->SetVector2f("tcScale", tcScale);
-            //shader->SetInt("source", 0);
+            //shader->SetInt("surface", 0);
             //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
         }
     }

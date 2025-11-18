@@ -189,7 +189,7 @@ const ShaderSource& CircleMaskShader() {
         R"(
             #version 330 core
 
-            uniform sampler2D source;
+            uniform sampler2D surface;
             uniform vec2 viewportSize;   // Pixel
             uniform vec4 surfaceColor;
             uniform vec4 maskColor;

@@ -21,7 +21,7 @@ const ShaderSource& DepthShader() {
         )",
         R"(
         #version 330 core
-        uniform sampler2D source;
+        uniform sampler2D surface;
         uniform vec4 surfaceColor;
         in vec2 fragCoord;
         void main() { 
@@ -42,7 +42,7 @@ const ShaderSource& DepthRenderer() {
         Standard2DVS(),
         R"(
         #version 330 core
-        uniform sampler2D source;
+        uniform sampler2D surface;
         in vec2 fragCoord;
         out vec4 fragColor;
         void main() { 
@@ -85,7 +85,7 @@ const ShaderSource& GrayScaleShader() {
         // #version 300 es
         // precision mediump float;
 
-        uniform sampler2D source;
+        uniform sampler2D surface;
         uniform vec2 tcOffset;
         uniform vec2 tcScale;
         uniform float brightness;
@@ -112,7 +112,7 @@ const ShaderSource& PlainTextureShader() {
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
-        uniform sampler2D source;
+        uniform sampler2D surface;
         uniform vec4 surfaceColor;
         uniform vec2 tcOffset;
         uniform vec2 tcScale;
@@ -141,7 +141,7 @@ const ShaderSource& MovingTextureShader() {
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
-        uniform sampler2D source;
+        uniform sampler2D surface;
         uniform vec4 surfaceColor;
         uniform vec2 direction;
         uniform float speed;
@@ -200,7 +200,7 @@ const ShaderSource& BlurTextureShader() {
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
-        uniform sampler2D source;
+        uniform sampler2D surface;
         uniform vec4 surfaceColor;
         //uniform float premultiply;
         in vec3 fragPos;
@@ -231,7 +231,7 @@ const ShaderSource& TintAndBlurShader() {
             // #version 300 es
             // precision mediump float;
 
-            uniform sampler2D source;
+            uniform sampler2D surface;
             in vec2 fragCoord;
             out vec4 fragColor;
             uniform float brightness;

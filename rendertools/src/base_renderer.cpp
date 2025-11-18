@@ -170,6 +170,7 @@ bool BaseRenderer::Start2DScene(void) {
         return false;
 #endif
     SetClearColor(m_backgroundColor);
+    glClearDepth(1.0);
     ResetDrawBuffers(m_screenBuffer, not m_screenIsAvailable);
     m_screenIsAvailable = true;
     ResetTransformation();

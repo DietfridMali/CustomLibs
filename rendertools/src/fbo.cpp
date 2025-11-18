@@ -271,7 +271,7 @@ bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup
     if (m_depthBufferIndex < 0)
         return false;
     if (bufferIndex >= 0)
-        return m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor;
+        return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
     return (drawBufferGroup == dbAll) or (drawBufferGroup == dbColor) or (drawBufferGroup == dbDepth);
 }
 
