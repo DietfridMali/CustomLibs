@@ -206,7 +206,7 @@ const ShaderSource& CircleMaskShader() {
                 fragColor = vec4(1,0,1,1);
 #else
                 vec2 fcDelta = fragCoord - center;
-                vec4 mask = texture(source, clamp(center + fcDelta * maskScale, 0.0, 1.0));
+                vec4 mask = texture(surface, clamp(center + fcDelta * maskScale, 0.0, 1.0));
                 if (mask.a > 0)
                     fragColor = mask; //Color;
                 else {

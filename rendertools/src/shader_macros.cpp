@@ -99,7 +99,7 @@ const String& GaussBlurFuncs() {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
                     vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
-                    vec4 c = texture(source, baseUV + offset);
+                    vec4 c = texture(surface, baseUV + offset);
                     sumRGB += c.rgb * c.a * w; // premultiplied
                     sumA   += c.a * w;
                     wSum   += w;
@@ -125,7 +125,7 @@ const String& GaussBlurFuncs() {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
                     vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
-                    vec4 c = texture(source, baseUV + offset);
+                    vec4 c = texture(surface, baseUV + offset);
                     sumRGB += c.rgb * c.a * w; // premultiplied
                     sumA   += c.a * w;
                     wSum   += w;
@@ -150,7 +150,7 @@ const String& GaussBlurFuncs() {
                     int ix = i + HALF;
                     int w = weight[ix] * weight[jy];
                     vec2 offset = vec2(float(i), float(j)) * texelSize * spread;
-                    vec4 c = texture(source, baseUV + offset);
+                    vec4 c = texture(surface, baseUV + offset);
                     sumRGB += c.rgb * c.a * w; // premultiplied
                     sumA   += c.a * w;
                     wSum   += w;
@@ -170,7 +170,7 @@ const String& GaussBlurFuncs() {
                 case 1:
                     return GaussBlur3x3(baseUV, (spread < 0) ? blurSpread : spread);
                 default:
-                    return texture(source, baseUV);
+                    return texture(surface, baseUV);
             }
         }
       )"
@@ -345,9 +345,9 @@ const String& ChromAbFuncs() {
         // Pure CA: compose RGB from source only (useful in a dedicated CA pass)
         vec3 ChromaticAberration(vec2 baseUV, vec2 dispUV) {
             vec2 offset = (offsetType == 1) ? RadialOffset(baseUV) : LinearOffset(dispUV);
-            float rC = texture(source, baseUV + offset).r;
-            float gC = texture(source, baseUV).g;
-            float bC = texture(source, baseUV - offset).b;
+            float rC = texture(surface, baseUV + offset).r;
+            float gC = texture(surface, baseUV).g;
+            float bC = texture(surface, baseUV - offset).b;
             return vec3(rC, gC, bC);
         }
 
@@ -357,9 +357,9 @@ const String& ChromAbFuncs() {
             if (aberration < 1e-6)
                 return baseColor;
             vec2 offset = (offsetType == 1) ? RadialOffset(baseUV) : LinearOffset(dispUV);
-            vec3 c0 = texture(source, baseUV).rgb;
-            float rS = texture(source, baseUV + offset).r;
-            float bS = texture(source, baseUV - offset).b;
+            vec3 c0 = texture(surface, baseUV).rgb;
+            float rS = texture(surface, baseUV + offset).r;
+            float bS = texture(surface, baseUV - offset).b;
             vec3 fringe = vec3(rS - c0.r, 0.0, bS - c0.b);
             return baseColor + fringe;
         }
