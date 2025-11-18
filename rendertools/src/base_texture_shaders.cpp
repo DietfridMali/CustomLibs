@@ -14,14 +14,12 @@ const ShaderSource& DepthShader() {
         uniform sampler2D source;
         uniform vec4 surfaceColor;
         in vec2 fragCoord;
-        out float fragDepth;
         void main() { 
 #if 1
             if (texture(source, fract(fragCoord)).a * surfaceColor.a < 0.9)
                 discard;
 #endif
-            fragDepth = gl_FragCoord.z;
-        }
+            }
         )"
         );
     return source;
@@ -38,7 +36,8 @@ const ShaderSource& DepthRenderer() {
         in vec2 fragCoord;
         out vec4 fragColor;
         void main() { 
-            float d = texture(source, fract(fragCoord)).r;
+            float d = texture(source, vec2(fragCoord.x, 1.0 - fragCoord.y)).r;
+            d = sqrt(d);
             fragColor = vec4(d, d, d, 1.0f);
         }
         )"

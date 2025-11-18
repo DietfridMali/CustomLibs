@@ -16,6 +16,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	int size;
 	for (size = 1; size < resolution; size <<= 1)
 		;
+	size = 2048;
 	if (not m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false }))
 		return false;
 	m_status = 1;
@@ -29,6 +30,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	EnableCamera();
 	baseRenderer.StartShadowPass();
 	m_map->Enable(0, FBO::dbDepth);
+	glClear(GL_DEPTH_BUFFER_BIT);
 	return true;
 }
 
@@ -100,7 +102,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 #	else
 	float s = std::max(worldSize.X(), worldSize.Y());
 	s *= 0.5f; // sqrtf(2.0f) * 0.5f;
-	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 1.0f, 200.0f);
+	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 0.1f, 200.0f);
 #	endif
 #endif
 	// shadow transformation = light projection * light view * inverse(camera)

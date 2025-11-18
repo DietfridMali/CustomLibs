@@ -39,17 +39,25 @@ public:
 
 	bool StopRender(void) noexcept;
 
-	Texture* ShadowTexture(void) noexcept {
+	inline FBO* GetMap(void) noexcept {
+		return m_map;
+	}
+
+	inline Texture* RenderTexture(void) noexcept {
+		return m_map ? m_map->GetRenderTexture({}) : nullptr;
+	}
+
+	inline Texture* ShadowTexture(void) noexcept {
 		return m_map ? m_map->GetDepthTexture() : nullptr;
 	}
 
-	void EnableCamera(void) noexcept {
+	inline void EnableCamera(void) noexcept {
 		baseRenderer.SelectMatrixStack(m_matrixIndex);
 		baseRenderer.PushViewport();
 		m_map->SetViewport();
 	}
 
-	void DisableCamera(void) noexcept {
+	inline void DisableCamera(void) noexcept {
 		baseRenderer.SelectMatrixStack(0);
 		baseRenderer.PopViewport();
 	}

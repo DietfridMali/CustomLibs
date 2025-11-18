@@ -114,7 +114,8 @@ void BaseRenderer::StartShadowPass(void) noexcept {
     openGLStates.SetDepthTest(1);
     openGLStates.SetDepthWrite(1);
     openGLStates.DepthFunc(GL_LESS);                  
-    openGLStates.ColorMask(0, 0, 0, 0);
+    //openGLStates.ColorMask(0, 0, 0, 0);
+    openGLStates.ColorMask(1, 1, 1, 1);
     openGLStates.SetBlending(0);
 }
 
@@ -216,7 +217,9 @@ void BaseRenderer::Draw3DScene(void) {
         m_renderQuad.Render(shader, &m_renderTexture);
 #else
         if (shadowMap.ShadowTexture()) {
+            Translate(0.5, 0.5, 0);
             m_renderQuad.Render(baseShaderHandler.SetupShader("depthRenderer"), shadowMap.ShadowTexture());
+            Translate(-0.5, -0.5, 0);
         }
         //m_renderQuad.Fill(ColorData::Orange);
 #endif
