@@ -13,7 +13,7 @@ public:
     float   m_zoom;
 
     Projection()
-        : m_zNear(0.1f), m_zFar(1000.0f), m_zoom(1.0f), m_aspectRatio(1920.0f / 1080.0f), m_fov(90.0f)
+        : m_zNear(0.1f), m_zFar(100.0f), m_zoom(1.0f), m_aspectRatio(1920.0f / 1080.0f), m_fov(90.0f)
     {
     }
 

@@ -9,6 +9,7 @@
 //#include "quad.h"
 #include "tristate.h"
 #include "base_renderer.h"
+#include "shadowmap.h"
 
 List<::Viewport> BaseRenderer::viewportStack;
 
@@ -213,7 +214,8 @@ void BaseRenderer::Draw3DScene(void) {
         m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
         m_renderQuad.Render(shader, &m_renderTexture);
 #else
-        m_renderQuad.Fill(ColorData::Orange);
+        m_renderQuad.Render(shader, shadowMap.ShadowTexture());
+        //m_renderQuad.Fill(ColorData::Orange);
 #endif
         if (shader != nullptr)
             PopMatrix();

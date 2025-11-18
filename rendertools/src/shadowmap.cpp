@@ -23,21 +23,43 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 }
 
 
-bool ShadowMap::Update(Vector3f lightDirection, float lightOffset) {
+bool ShadowMap::StartRender(void) noexcept {
+	if (not IsAvailable())
+		return false;
+	EnableCamera();
+	baseRenderer.StartShadowPass();
+	m_map->Enable(0, FBO::dbDepth);
+	return true;
+}
+
+
+bool ShadowMap::StopRender(void) noexcept {
+	if (not IsAvailable())
+		return false;
+	DisableCamera();
+	m_map->Disable();
+	return true;
+}
+
+
+bool ShadowMap::Update(Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
 	if (m_status < 0)
 		return false;
-	baseRenderer.EnableCamera();
-	Matrix4f m = (baseRenderer.Projection() * baseRenderer.ModelView()).Inverse();
-	baseRenderer.DisableCamera();
+	MatrixStack* camera = baseRenderer.Matrices(0);
+	Matrix4f m = (camera->GetProjection() * camera->ModelView()).Inverse();
 	Vector3f center = Vector3f::ZERO;
 	for (int i = 0; i < 8; i++) {
 		Vector4f p = m * m_ndcCorners[i];
 		m_frustumCorners[i] = Vector3f(p) / p.w;
+		m_frustumCorners[i].Maximize(worldMin);
+		m_frustumCorners[i].Minimize(worldMax);
 		center += m_frustumCorners[i];
 	}
 	center /= 8.0f;
 	// light view
-	m_matrices->ModelView().LookAt(center + lightDirection * lightOffset, center, Vector3f(0.0f, 1.0f, 0.0f));
+	center = (worldMin + worldMax) * 0.5f;
+	lightOffset = 10;
+	m_matrices->ModelView().LookAt(center - lightDirection * lightOffset, center, Vector3f(0.0f, 1.0f, 0.0f));
 
 	Vector3f vMin{ FLT_MAX, FLT_MAX, FLT_MAX };
 	Vector3f vMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
@@ -50,9 +72,9 @@ bool ShadowMap::Update(Vector3f lightDirection, float lightOffset) {
 	if ((m_status == 0) and not CreateMap(Vector2f(vMax.X() - vMin.X(), vMax.Y() - vMin.Y())))
 		return false;
 	// light projection
-	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.X(), vMax.X(), vMin.Y(), vMax.Y(), -vMax.Z(), -vMin.Z());
+	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-35.f, 35.f, -35.f, 35.f, 1.f, 200.f); // vMin.X(), vMax.X(), vMin.Y(), vMax.Y(), -vMax.Z(), -vMin.Z());
 	// shadow transformation = light projection * light view * inverse(camera)
-	m_shadowTransform = baseRenderer.ModelView().Inverse();
+	m_shadowTransform = camera->ModelView().Inverse();
 	m_shadowTransform *= m_matrices->ModelView();
 	m_shadowTransform *= m_matrices->GetProjection();
 	return true;

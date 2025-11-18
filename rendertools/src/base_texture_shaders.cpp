@@ -15,8 +15,10 @@ const ShaderSource& DepthShader() {
         uniform vec4 surfaceColor;
         in vec2 fragCoord;
         void main() { 
+#if 0
             if (texture(source, fract(fragCoord)).a * surfaceColor.a < 0.9)
                 discard;
+#endif
         }
         )"
         );

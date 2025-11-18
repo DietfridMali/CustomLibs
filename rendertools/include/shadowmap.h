@@ -25,7 +25,7 @@ private:
 public:
 	void Setup(void);
 
-	bool Update(Vector3f lightDirection, float lightOffset);
+	bool Update(Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
 	int IsAvailable(void) noexcept {
 		return (m_status >= 0);
@@ -35,25 +35,23 @@ public:
 		return m_shadowTransform;
 	}
 
-	inline bool StartRender(void) noexcept {
-		if (not IsAvailable())
-			return false;
-		baseRenderer.SelectMatrixStack(m_matrixIndex);
-		baseRenderer.StartShadowPass();
-		m_map->Enable(0, FBO::dbDepth);
-		return true;
-	}
+	bool StartRender(void) noexcept;
 
-	inline bool StopRender(void) noexcept {
-		if (not IsAvailable())
-			return false;
-		baseRenderer.SelectMatrixStack(0);
-		m_map->Disable();
-		return true;
-	}
+	bool StopRender(void) noexcept;
 
 	Texture* ShadowTexture(void) noexcept {
 		return m_map ? m_map->GetDepthTexture() : nullptr;
+	}
+
+	void EnableCamera(void) noexcept {
+		baseRenderer.SelectMatrixStack(m_matrixIndex);
+		baseRenderer.PushViewport();
+		m_map->SetViewport();
+	}
+
+	void DisableCamera(void) noexcept {
+		baseRenderer.SelectMatrixStack(0);
+		baseRenderer.PopViewport();
 	}
 
 private:
