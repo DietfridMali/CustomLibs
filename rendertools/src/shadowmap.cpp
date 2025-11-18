@@ -58,21 +58,34 @@ bool ShadowMap::Update(Vector3f lightDirection, float lightOffset, Vector3f worl
 	center /= 8.0f;
 	// light view
 	center = (worldMin + worldMax) * 0.5f;
-	lightOffset = 10;
+	Vector3f worldSize = worldMax - worldMin;
+	lightOffset = sqrt(worldSize.Length());
 	m_matrices->ModelView().LookAt(center - lightDirection * lightOffset, center, Vector3f(0.0f, 1.0f, 0.0f));
+
+	Vector3f corners[8] = {
+		{ worldMin.X(), worldMin.Y(), worldMin.Z() },
+		{ worldMax.X(), worldMin.Y(), worldMin.Z() },
+		{ worldMin.X(), worldMax.Y(), worldMin.Z() },
+		{ worldMax.X(), worldMax.Y(), worldMin.Z() },
+		{ worldMin.X(), worldMin.Y(), worldMax.Z() },
+		{ worldMax.X(), worldMin.Y(), worldMax.Z() },
+		{ worldMin.X(), worldMax.Y(), worldMax.Z() },
+		{ worldMax.X(), worldMax.Y(), worldMax.Z() }
+	};
 
 	Vector3f vMin{ FLT_MAX, FLT_MAX, FLT_MAX };
 	Vector3f vMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
 	for (int i = 0; i < 8; i++) {
-		Vector3f v = m_matrices->ModelView() * m_frustumCorners[i];
+		Vector3f v = m_matrices->ModelView() * corners[i];
 		vMin.Minimize(v);
 		vMax.Maximize(v);
 	}
 	if ((m_status == 0) and not CreateMap(Vector2f(vMax.X() - vMin.X(), vMax.Y() - vMin.Y())))
 		return false;
 	// light projection
-	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-35.f, 35.f, -35.f, 35.f, 1.f, 200.f); // vMin.X(), vMax.X(), vMin.Y(), vMax.Y(), -vMax.Z(), -vMin.Z());
+	Vector2f v{ std::max(fabs(vMin.x), fabs(vMax.x)) * sqrtf(2.0f) * 0.5f, std::max(fabs(vMin.y), fabs(vMax.y)) * sqrtf(2.0f) * 0.5f };
+	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-v.X(), v.X(), -v.Y(), v.Y(), -vMax.Z(), -vMin.Z());
 	// shadow transformation = light projection * light view * inverse(camera)
 	m_shadowTransform = camera->ModelView().Inverse();
 	m_shadowTransform *= m_matrices->ModelView();
