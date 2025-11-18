@@ -24,6 +24,15 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 }
 
 
+void ShadowMap::Destroy(void) noexcept {
+	if (m_map) {
+		delete m_map;
+		m_map = nullptr;
+		m_status = 0;
+	}
+}
+
+
 bool ShadowMap::StartRender(void) noexcept {
 	if (not IsAvailable())
 		return false;

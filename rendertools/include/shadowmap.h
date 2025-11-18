@@ -62,6 +62,8 @@ public:
 		baseRenderer.PopViewport();
 	}
 
+	void Destroy(void) noexcept;
+
 private:
 	bool CreateMap(Vector2f frustumSize);
 };

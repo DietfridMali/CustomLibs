@@ -73,7 +73,7 @@ public:
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
     FBOTexture                  m_renderTexture;
-    FBOTexture                  m_depthTexture;
+    FBOTexture                  m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
     bool                        m_isAvailable;
     int                         m_lastDestination;
