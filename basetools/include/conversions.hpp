@@ -196,6 +196,17 @@ namespace Conversions
     }
 
 
+    template<typename T> requires std::floating_point<T>
+    T Amplify(T v, T vMin, T vMax, T coeff) {
+        T halfRange = (vMax - vMin) / T(2);
+        T pivot = vMin + halfRange;
+        T x = (v - pivot) / halfRange;          // Normalize to [-1, 1]
+        T mag = std::pow(std::abs(x), coeff);   // Amplification/attenuation
+        T y = std::copysign(mag, x);            // restore sign
+        return pivot + y * halfRange;           // back to [vMin, vMax]
+    }
+
+
     template <typename T, typename... Args>
     std::unique_ptr<T> MakeUnique(Args&&... args) {
         return std::unique_ptr<T>{ new(std::nothrow) T(std::forward<Args>(args)...) };

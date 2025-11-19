@@ -115,7 +115,7 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
 // Every shader program should have at least modelview and projection matrices.
 // Also starts location indexing by calling m_locations.Start().
 void Shader::UpdateMatrices(void) {
-    m_locations.Start();
+    //m_locations.Start();
 #ifdef _DEBUG
     if (RenderMatrices::LegacyMode) {
         float glData[16];
@@ -126,7 +126,12 @@ void Shader::UpdateMatrices(void) {
     else 
     {
         // both matrices must be column major
-        if (not baseRenderer.IsShadowPass()) {
+#if 0
+        if (baseRenderer.IsShadowPass())
+            SetInt("transformationType", shadowMap.GetTransformationType());
+        else 
+#endif
+        {
             SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
             SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
             SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);

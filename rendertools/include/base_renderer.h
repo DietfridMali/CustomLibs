@@ -280,6 +280,14 @@ public:
     static void ClearGLError(void) noexcept;
 
     static bool CheckGLError(const char* operation = "") noexcept;
+
+    inline GLenum GetWinding(bool reverse = false) noexcept {
+        return reverse ? GL_CCW : GL_CW;
+    }
+
+    inline GLenum GetFrontFace(bool reverse = false) noexcept {
+        return reverse ? GL_FRONT : GL_BACK;
+    }
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

@@ -100,7 +100,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.BlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
     openGLStates.BlendEquation(GL_FUNC_ADD);
-    openGLStates.FrontFace(GL_CW);
+    openGLStates.FrontFace(GetWinding());
     openGLStates.SetFaceCulling(1);
     openGLStates.CullFace(GL_BACK);
     openGLStates.openGLStates.SetMultiSample(1);

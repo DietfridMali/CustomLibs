@@ -18,6 +18,7 @@ private:
 	SimpleArray<Vector3f, 8>	m_frustumCorners;	// index 8: center
 	MatrixStack*				m_matrices{ nullptr };
 	Matrix4f					m_shadowTransform;
+	int							m_transformationType{ 0 };
 	int							m_matrixIndex{ -1 };
 	FBO*						m_map{ nullptr };
 	int							m_status{ 0 };
@@ -26,8 +27,6 @@ public:
 	void Setup(void);
 
 	bool Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
-
-	void Advance(void);
 
 	int IsAvailable(void) noexcept {
 		return (m_status >= 0);
@@ -58,13 +57,13 @@ public:
 	}
 
 	inline void EnableCamera(void) noexcept {
-		baseRenderer.SelectMatrixStack(m_matrixIndex);
+		//baseRenderer.SelectMatrixStack(m_matrixIndex);
 		baseRenderer.PushViewport();
 		m_map->SetViewport();
 	}
 
 	inline void DisableCamera(void) noexcept {
-		baseRenderer.SelectMatrixStack(0);
+		//baseRenderer.SelectMatrixStack(0);
 		baseRenderer.PopViewport();
 	}
 
