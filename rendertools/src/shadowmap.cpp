@@ -88,13 +88,15 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	center /= 8.0f;
 #endif
 
+	MatrixStack* matrices = baseRenderer.Matrices(m_matrixIndex);
+
 	// light view
 	//if (not center.IsValid())
 		center = (worldMin + worldMax) * 0.5f;
 	Vector3f worldSize = worldMax - worldMin;
 	lightOffset = sqrt(worldSize.Length());
 	lightOffset = worldSize.Length();
-	m_matrices->ModelView().LookAt(center + lightDirection * lightOffset, center, Vector3f(0.0f, 1.0f, 0.0f));
+	matrices->ModelView().LookAt(center + lightDirection * lightOffset, center, Vector3f(0.0f, 1.0f, 0.0f));
 
 #if 0
 	Vector3f corners[8] = {
@@ -122,30 +124,35 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	// light projection
 	float s = std::max(vMax.x - vMin.x, vMax.y - vMin.y);
 	s *= sqrtf(2.0f);
-	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 1.0f, 200.0f);
+	matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 1.0f, 200.0f);
 #	else
-	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, vMin.z, vMax.z);
+	matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, vMin.z, vMax.z);
 #	endif
 #else
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Y())))
 		return false;
 	// light projection
 #	if 0
-	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().Create(1.0f, 45.0f, 1.0f, 200.0f);
+	matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().Create(1.0f, 45.0f, 1.0f, 200.0f);
 #	else
 	float s = std::max(worldSize.X(), worldSize.Z());
 	//s *= 0.5f; // sqrtf(2.0f) * 0.5f;
-	m_matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 0.1f, 200.0f);
+	matrices->GetProjection() = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 0.1f, 200.0f);
 #	endif
 #endif
 	// shadow transformation = light projection * light view * inverse(camera)
-	m_shadowTransform = m_matrices->GetProjection();
-	m_shadowTransform *= m_matrices->ModelView();
-#if 0 // not needed, working with world coordinates in the shaders that get directly transformed into shadow space for the shadow map lookup
-	m_shadowTransform *= camera->ModelView().Inverse();
-#endif
-	Stabilize(float (m_map->GetWidth(true)));
+	m_shadowTransform = matrices->GetProjection();
+	m_shadowTransform *= matrices->ModelView();
+	Matrix4f mv = baseRenderer.Matrices(0)->ModelView();
+	Matrix4f mvi = mv.Inverse(); // baseRenderer.Matrices(0)->ModelView().Inverse();
+	//m_shadowTransform *= mvi;
+	//Stabilize(float (m_map->GetWidth(true)));
 	return true;
+}
+
+
+void ShadowMap::Advance(void) {
+	m_shadowTransform *= baseRenderer.Matrices(0)->ModelView().Inverse();
 }
 
 // =================================================================================================

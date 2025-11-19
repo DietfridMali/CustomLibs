@@ -25,7 +25,7 @@ const ShaderSource& DepthShader() {
         uniform vec4 surfaceColor;
         in vec2 fragCoord;
         void main() { 
-#if 0
+#if 1
             if (texture(surface, fract(fragCoord)).a * surfaceColor.a < 0.9)
                 discard;
 #endif
@@ -47,7 +47,7 @@ const ShaderSource& DepthRenderer() {
         out vec4 fragColor;
         void main() { 
             float d = texture(surface, vec2(fragCoord.x, 1.0 - fragCoord.y)).r;
-            d = pow(d, 0.333333334);
+            d = pow(d, 2.0);
             fragColor = vec4(d, d, d, 1.0f);
         }
         )"

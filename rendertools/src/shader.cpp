@@ -116,22 +116,24 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
 // Also starts location indexing by calling m_locations.Start().
 void Shader::UpdateMatrices(void) {
     m_locations.Start();
+#ifdef _DEBUG
     if (RenderMatrices::LegacyMode) {
         float glData[16];
         SetMatrix4f("mModelView", GetFloatData(GL_MODELVIEW_MATRIX, 16, glData));
         SetMatrix4f("mProjection", GetFloatData(GL_PROJECTION_MATRIX, 16, glData));
     }
-    else {
+#endif
+    else 
+    {
         // both matrices must be column major
-        SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
-        SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
-        SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
-        if (not shadowMap.IsReady())
-            SetInt("renderShadow", 0);
-        else {
-            SetInt("renderShadow", 1);
-            SetMatrix4f("mShadowTransform", shadowMap.ShadowTransform());
+        if (not baseRenderer.IsShadowPass()) {
+            SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
+            SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
+            SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
+            SetInt("renderShadow", shadowMap.IsReady() ? 1 : 0);
         }
+        if (shadowMap.IsReady())
+            SetMatrix4f("mShadowTransform", shadowMap.ShadowTransform());
 #if 0
         SetMatrix4f("mBaseModelView", baseRenderer.ModelView().AsArray(), false);
 #endif

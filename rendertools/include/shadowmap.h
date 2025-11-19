@@ -27,6 +27,8 @@ public:
 
 	bool Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
+	void Advance(void);
+
 	int IsAvailable(void) noexcept {
 		return (m_status >= 0);
 	}
