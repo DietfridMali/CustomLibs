@@ -20,6 +20,7 @@ private:
 	int							m_status{ 0 };
 	bool						m_renderShadows{ true };
 	bool						m_applyShadows{ false };
+	Vector3f					m_lightPosition{ Vector3f::ZERO };
 
 public:
 	void Setup(void);
@@ -75,6 +76,14 @@ public:
 
 	inline void ApplyShadows(bool applyShadows) noexcept {
 		m_applyShadows = applyShadows;
+	}
+
+	inline const Vector3f& LightPosition() const noexcept {
+		return m_lightPosition;
+	}
+
+	inline Vector3f LightDirection(Vector3f p) noexcept {
+		return (m_lightPosition - p).Normalize();
 	}
 
 private:

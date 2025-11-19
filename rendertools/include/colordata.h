@@ -51,6 +51,18 @@ public:
         return *this;
     }
 
+    inline RGBAColor& operator*=(float n) {
+        this->R() *= n;
+        this->G() *= n;
+        this->B() *= n;
+        return *this;
+    }
+
+    inline RGBAColor operator*(float n) const {
+        return RGBAColor(this->R() * n, this->G() * n, this->B() * n, this->A());
+    }
+
+
     explicit operator RGBColor() const {
         return RGBColor(this->X(), this->Y(), this->Z());
     }

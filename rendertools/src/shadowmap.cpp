@@ -40,7 +40,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	EnableCamera();
 	openGLStates.SetDepthTest(1);
 	openGLStates.SetDepthWrite(1);
-	//openGLStates.CullFace(GL_FRONT);
+	openGLStates.CullFace(GL_FRONT);
 	return true;
 }
 
@@ -50,7 +50,7 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-	//openGLStates.CullFace(GL_BACK);
+	openGLStates.CullFace(GL_BACK);
 	return true;
 }
 
@@ -100,7 +100,8 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	Vector3f worldSize = worldMax - worldMin;
 	lightOffset = sqrt(worldSize.Length());
 	lightOffset = worldSize.Length();
-	lightView.LookAt(center + lightDirection * lightOffset, center, Vector3f(0.0f, 1.0f, 0.0f));
+	m_lightPosition = center + lightDirection * lightOffset;
+	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 
 #if 0
 	Vector3f corners[8] = {

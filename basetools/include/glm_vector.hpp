@@ -79,13 +79,15 @@ public:
     inline Vector& operator*=(float scalar)
         noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) * scalar))
     {
-        *this = static_cast<VEC_TYPE>(*this) * scalar; return *this;
+        *this = static_cast<VEC_TYPE>(*this) * scalar; 
+        return *this;
     }
 
     inline Vector& operator/=(float scalar)
         noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) / scalar))
     {
-        *this = static_cast<VEC_TYPE>(*this) / scalar; return *this;
+        *this = static_cast<VEC_TYPE>(*this) / scalar; 
+        return *this;
     }
 
     inline Vector operator*(float scalar) const

@@ -43,15 +43,41 @@ const ShaderSource& ActorDepthShader() {
         R"(
         #version 330
         layout(location = 0) in vec3 position;
+        layout(location = 1) in vec3 normal;
         uniform mat4 mModelView;
         uniform mat4 mShadowTransform;
+
+define CULL_FACES 0
+
+#if CULL_FACES
+
+        uniform mat4 mRotation;
+        uniform vec3 lightDir;
+        out vec3 lightNormal;
+        out vec3 faceNormal;
+#endif
         void main() {
             gl_Position = mShadowTransform * mModelView * vec4(position, 1.0);
+#if CULL_FACES
+            faceNormal = mat3(mRotation) * normal;
+            lightNormal = lightDir;
+#endif
             }
         )",
         R"(
         #version 330 core
+
+define CULL_FACES 0
+
+#if CULL_FACES
+        in vec3 faceNormal;
+        in vec3 lightNormal;
+##endif
         void main() { 
+#if CULL_FACES
+            if (dot(faceNormal, lightNormal) <= 0.0)
+                discard;
+#endif
             }
         )"
     );
