@@ -40,7 +40,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	EnableCamera();
 	openGLStates.SetDepthTest(1);
 	openGLStates.SetDepthWrite(1);
-	openGLStates.CullFace(GL_FRONT);
+	//openGLStates.CullFace(GL_FRONT);
 	return true;
 }
 
@@ -50,7 +50,7 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-	openGLStates.CullFace(GL_BACK);
+	//openGLStates.CullFace(GL_BACK);
 	return true;
 }
 

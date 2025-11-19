@@ -18,6 +18,8 @@ private:
 	Matrix4f					m_shadowTransform;
 	FBO*						m_map{ nullptr };
 	int							m_status{ 0 };
+	bool						m_renderShadows{ true };
+	bool						m_applyShadows{ false };
 
 public:
 	void Setup(void);
@@ -25,11 +27,11 @@ public:
 	bool Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
 	int IsAvailable(void) noexcept {
-		return (m_status >= 0);
+		return m_renderShadows and m_applyShadows and (m_status >= 0);
 	}
 
 	int IsReady(void) noexcept {
-		return (m_status > 0);
+		return m_renderShadows and m_applyShadows and (m_status > 0);
 	}
 
 	Matrix4f& ShadowTransform(void) noexcept {
@@ -62,6 +64,18 @@ public:
 	}
 
 	void Destroy(void) noexcept;
+
+	inline void SetRenderShadows(bool renderShadows) noexcept {
+		m_renderShadows = renderShadows;
+	}
+
+	inline bool RenderShadows(void) noexcept {
+		return m_renderShadows;
+	}
+
+	inline void ApplyShadows(bool applyShadows) noexcept {
+		m_applyShadows = applyShadows;
+	}
 
 private:
 	bool CreateMap(Vector2f frustumSize);

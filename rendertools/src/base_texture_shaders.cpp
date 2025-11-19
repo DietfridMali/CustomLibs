@@ -43,25 +43,15 @@ const ShaderSource& ActorDepthShader() {
         R"(
         #version 330
         layout(location = 0) in vec3 position;
-        layout(location = 1) in vec3 normals;
         uniform mat4 mModelView;
         uniform mat4 mShadowTransform;
-        out vec3 fragCoord;
         void main() {
             gl_Position = mShadowTransform * mModelView * vec4(position, 1.0);
-            fragCoord = normals;
-        }
+            }
         )",
         R"(
         #version 330 core
-        uniform samplerCube surface;
-        uniform vec4 surfaceColor;
-        in vec3 fragCoord;
         void main() { 
-#if 1
-            if (texture(surface, fragCoord).a * surfaceColor.a < 0.9)
-                discard;
-#endif
             }
         )"
     );
