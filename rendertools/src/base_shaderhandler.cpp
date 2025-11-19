@@ -61,10 +61,10 @@ Shader* BaseShaderHandler::SelectShader(Texture* texture) {
 }
 
 
-Shader* BaseShaderHandler::SetupShader(String shaderId) {
+Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
     Shader* shader;
     if (baseRenderer.IsShadowPass())
-        shaderId = "depthShader"; // override all shaders with simplest possible shader during depth pass
+        shaderId = depthShaderId; // override all shaders with simplest possible shader during depth pass
     if ((m_activeShaderId == shaderId) and (m_activeShader != nullptr))
         shader = m_activeShader;
     else {

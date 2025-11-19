@@ -3,8 +3,6 @@
 // =================================================================================================
 
 void ShadowMap::Setup(void) {
-	m_matrixIndex = baseRenderer.AddMatrices();
-	m_matrices = baseRenderer.Matrices(m_matrixIndex);
 }
 
 
@@ -34,7 +32,7 @@ void ShadowMap::Destroy(void) noexcept {
 
 
 bool ShadowMap::StartRender(void) noexcept {
-	if (not IsAvailable())
+	if (not IsReady())
 		return false;
 	baseRenderer.StartShadowPass();
 	m_map->Enable(0, FBO::dbDepth);
@@ -48,7 +46,7 @@ bool ShadowMap::StartRender(void) noexcept {
 
 
 bool ShadowMap::StopRender(void) noexcept {
-	if (not IsAvailable())
+	if (not IsReady())
 		return false;
 	DisableCamera();
 	m_map->Disable();
@@ -82,12 +80,14 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	MatrixStack* camera = baseRenderer.Matrices(0);
 	Matrix4f m = (camera->GetProjection() * camera->ModelView()).Inverse();
 	Vector3f center = Vector3f::ZERO;
+	SimpleArray<Vector3f, 8> frustumCorners;
+
 	for (int i = 0; i < 8; i++) {
 		Vector4f p = m * m_ndcCorners[i];
-		m_frustumCorners[i] = Vector3f(p) / p.w;
-		m_frustumCorners[i].Maximize(worldMin);
-		m_frustumCorners[i].Minimize(worldMax);
-		center += m_frustumCorners[i];
+		frustumCorners[i] = Vector3f(p) / p.w;
+		frustumCorners[i].Maximize(worldMin);
+		frustumCorners[i].Minimize(worldMax);
+		center += frustumCorners[i];
 	}
 	center /= 8.0f;
 #endif

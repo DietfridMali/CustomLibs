@@ -52,7 +52,9 @@ public:
     }
 
     Shader* SelectShader(Texture* texture);
-    Shader* SetupShader(String shaderId);
+
+    Shader* SetupShader(String shaderId, String depthShaderId = "depthShader");
+
     void StopShader(bool needLegacyMatrices = false);
 
     inline bool ShaderIsActive(Shader* shader = nullptr) const noexcept {
