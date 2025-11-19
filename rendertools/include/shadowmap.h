@@ -31,6 +31,10 @@ public:
 		return (m_status >= 0);
 	}
 
+	int IsReady(void) noexcept {
+		return (m_status > 0);
+	}
+
 	Matrix4f& ShadowTransform(void) noexcept {
 		return m_shadowTransform;
 	}

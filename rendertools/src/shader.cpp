@@ -126,7 +126,7 @@ void Shader::UpdateMatrices(void) {
         SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
         SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
         SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
-        if (not shadowMap.IsAvailable())
+        if (not shadowMap.IsReady())
             SetInt("renderShadow", 0);
         else {
             SetInt("renderShadow", 1);
