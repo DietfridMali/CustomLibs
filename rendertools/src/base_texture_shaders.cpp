@@ -42,21 +42,20 @@ const ShaderSource& ActorDepthShader() {
         "actorDepthShader",
         R"(
         #version 330
-        layout(location = 0) in vec3 position;
-        layout(location = 1) in vec3 normal;
+        layout(location = 0) in vec3 vertex;
         uniform mat4 mModelView;
         uniform mat4 mShadowTransform;
 
 #define CULL_FACES 1
 
 #if CULL_FACES
-        uniform mat4 mRotation;
+        uniform mat4 mModelRotation;
         out vec3 worldNormal;
 #endif
         void main() {
-            gl_Position = mShadowTransform * mModelView * vec4(position, 1.0);
+            gl_Position = mShadowTransform * mModelView * vec4(vertex, 1.0);
 #if CULL_FACES
-            worldNormal = mat3(mRotation) * normal;
+            worldNormal = mat3(mModelRotation) * vertex;
 #endif
             }
         )",
@@ -71,7 +70,7 @@ const ShaderSource& ActorDepthShader() {
 #endif
         void main() { 
 #if CULL_FACES
-            if (dot(worldNormal, lightDir) <= 0.0)
+            if (dot(worldNormal, lightDir) >= 0.0)
                 discard;
 #endif
             }

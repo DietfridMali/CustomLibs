@@ -22,6 +22,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 			m_status = 1;
 			return true;
 		}
+		m_maxShadowRadius *= 0.9f;
 	}
 	return false;
 }
@@ -82,6 +83,7 @@ void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matri
 void ShadowMap::CreateViewerAlignedTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
 	Matrix4f lightView, lightProj;
 
+	worldRadius = std::min(worldRadius, m_maxShadowRadius);
 	if (lightDistance == 0.0f)
 		lightDistance = 10.0f * worldRadius;
 
@@ -172,7 +174,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		center = (worldMin + worldMax) * 0.5f;
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
-	static int trafoType = 0;
+	static int trafoType = 2;
 	if (trafoType == 2)
 		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
 	if (trafoType == 1)
