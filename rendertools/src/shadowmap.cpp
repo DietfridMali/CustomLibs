@@ -2,7 +2,13 @@
 
 // =================================================================================================
 
-void ShadowMap::Setup(void) {
+bool ShadowMap::Setup(void) {
+	if (CreateMap(Vector2f::ZERO)) {
+		m_status = 1;
+		return true;
+	}
+	m_status = -1;
+	return false;
 }
 
 
@@ -14,7 +20,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	int size;
 	for (size = 1; size < resolution; size <<= 1)
 		;
-	size = 2048;
+	size = openGLStates.MaxTextureSize(); // 2048;
 	if (not m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false }))
 		return false;
 	m_status = 1;
@@ -57,53 +63,42 @@ bool ShadowMap::StopRender(void) noexcept {
 
 void ShadowMap::Stabilize(float shadowMapSize)
 {
-	// Ursprungs-Punkt (0,0,0) in Shadow-Space
 	Vector4f shadowOrigin = m_modelViewTransform * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
-
-	// in Texelraum skalieren
 	shadowOrigin *= shadowMapSize * 0.5f;
-
 	Vector2f roundedOrigin = Vector2f::Round(Vector2f(shadowOrigin.x, shadowOrigin.y));
 	Vector2f offset = (roundedOrigin - Vector2f(shadowOrigin.x, shadowOrigin.y)) * (2.0f / shadowMapSize);
-
-	// Translation der Shadow-Matrix korrigieren
 	m_modelViewTransform.T().x += offset.x;
 	m_modelViewTransform.T().y += offset.y;
 }
 
 
+void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matrix4f& lightProj) {
+	m_lightTransform = lightProj;
+	m_lightTransform *= lightView;
+	Stabilize(float(m_map->GetWidth(true)));
+	UpdateTransformation();
+}
 
-bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
-	if (m_status < 0)
-		return false;
-#if 0
-	MatrixStack* camera = baseRenderer.Matrices(0);
-	Matrix4f m = (camera->GetProjection() * camera->ModelView()).Inverse();
-	Vector3f center = Vector3f::ZERO;
-	SimpleArray<Vector3f, 8> frustumCorners;
 
-	for (int i = 0; i < 8; i++) {
-		Vector4f p = m * m_ndcCorners[i];
-		frustumCorners[i] = Vector3f(p) / p.w;
-		frustumCorners[i].Maximize(worldMin);
-		frustumCorners[i].Minimize(worldMax);
-		center += frustumCorners[i];
-	}
-	center /= 8.0f;
-#endif
-
+void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
 	Matrix4f lightView, lightProj;
 
-	// light view
-	//if (not center.IsValid())
-		center = (worldMin + worldMax) * 0.5f;
-	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
-	//lightOffset = 1.0f; // sqrt(worldSize.Length());
-	lightOffset = worldSize.Length();
+	m_lightPosition = center + lightDirection * lightDistance;
+	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
+	float halfFov = std::atan(worldRadius / lightDistance);
+	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+	CreateLightTransformation(lightView, lightProj);
+}
+
+
+void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax) {
+	Matrix4f lightView, lightProj;
+
+	float lightOffset = worldSize.Length();
 	m_lightPosition = center + lightDirection * lightOffset;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 
-#if 1
+	// transform view frustum to light space
 	Vector4f corners[8] = {
 		{ worldMin.X(), worldMin.Y(), worldMin.Z(), 1.0f },
 		{ worldMax.X(), worldMin.Y(), worldMin.Z(), 1.0f },
@@ -123,33 +118,25 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		vMin.Minimize(v);
 		vMax.Maximize(v);
 	}
+	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
+
+	CreateLightTransformation(lightView, lightProj);
+}
+
+
+bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
+	if (m_status < 0)
+		return false;
+	//if (not center.IsValid())
+		center = (worldMin + worldMax) * 0.5f;
+	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
-#if 0
-	// light projection
-	float s = std::max(vMax.x - vMin.x, vMax.y - vMin.y);
-	s *= sqrtf(2.0f);
-	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 1.0f, 200.0f);
-#	else
-	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
-#	endif
-#else
-	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Y())))
-		return false;
-	// light projection
-#	if 0
-	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, 90.0f, 1.0f, 200.0f);
-#	else
-	float s = std::max(worldSize.X(), worldSize.Z()) * 1.2f;
-	//s *= 0.5f; // sqrtf(2.0f) * 0.5f;
-	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 0.1f, 200.0f);
-#	endif
-#endif
-	// shadow transformation = light projection * light view * inverse(camera)
-	m_lightTransform = lightProj;
-	m_lightTransform *= lightView;
-	Stabilize(float(m_map->GetWidth(true)));
-	UpdateTransformation();
+	static bool useOrtho = false;
+	if (useOrtho)
+		CreateOrthoTransformation(center, lightDirection, worldSize, worldMin, worldMax);
+	else
+		CreatePerspectiveTransformation(center, lightDirection, 1000.0f, worldSize.Length() * 0.5f);
 	return true;
 }
 

@@ -29,8 +29,8 @@ bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
 		if (GL_TEXTURE0 + tmuIndex != currentTMU)
 			ActiveTexture(currentTMU);
 	}
-	if (m_maxTMU < tmuIndex + 1)
-		m_maxTMU = tmuIndex + 1;
+	if (m_maxUsedTMU < tmuIndex + 1)
+		m_maxUsedTMU = tmuIndex + 1;
 #endif
 	return true;
 }
@@ -38,7 +38,7 @@ bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
 
 int OpenGLStates::TextureIsBound(GLenum typeID, GLuint texture) {
 	int j = (typeID == GL_TEXTURE_2D) ? 0 : 1;
-	for (int i = 0; i < m_maxTMU; ++i)
+	for (int i = 0; i < m_maxUsedTMU; ++i)
 		if (m_bindings[i].handles[j] == texture)
 			return i;
 	return -1;

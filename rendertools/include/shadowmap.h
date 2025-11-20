@@ -24,7 +24,7 @@ private:
 	Vector3f					m_lightPosition{ Vector3f::ZERO };
 
 public:
-	void Setup(void);
+	bool Setup(void);
 
 	bool Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
@@ -93,6 +93,12 @@ private:
 	bool CreateMap(Vector2f frustumSize);
 
 	void Stabilize(float shadowMapSize);
+
+	void CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
+
+	void CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax);
+
+	void CreateLightTransformation(const Matrix4f& lightView, const Matrix4f& lightProj);
 };
 
 #define shadowMap	ShadowMap::Instance()

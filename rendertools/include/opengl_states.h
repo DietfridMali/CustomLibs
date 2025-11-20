@@ -19,7 +19,8 @@ class OpenGLStates
 	: public BaseSingleton<OpenGLStates>
 {
 private:
-	int	m_maxTMU{ 0 };
+	int	m_maxUsedTMU{ 0 };
+	int m_maxTextureSize{ 0 };
 	std::unordered_set<std::string> m_extensions;
 	bool m_haveExtensions{ false };
 
@@ -33,6 +34,7 @@ public:
 	OpenGLStates() {
 		GLint tmuCount = 0;
 		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &tmuCount);
+		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 		m_bindings.Resize(tmuCount);
 		m_bindings.Fill({ 0,0 });
 		DetermineExtensions();
@@ -42,6 +44,10 @@ public:
 
 	inline bool HasExtension(const char* extension) {
 		return m_extensions.find(extension) != m_extensions.end();
+	}
+
+	inline int MaxTextureSize(void) noexcept {
+		return m_maxTextureSize;
 	}
 
 	template<GLenum stateID>
