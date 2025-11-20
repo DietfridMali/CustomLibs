@@ -33,6 +33,7 @@ FILES := \
  rendermatrices \
  shader \
  shader_macros \
+ shadowmap \
  SSBO \
  textrenderer \
  textureatlas \
