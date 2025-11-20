@@ -18,7 +18,7 @@ private:
 	Matrix4f					m_lightTransform;
 	Matrix4f					m_modelViewTransform;
 	FBO*						m_map{ nullptr };
-	float						m_maxShadowRadius{ 10.0f };
+	float						m_maxShadowRadius{ 15.0f };
 	int							m_status{ 0 };
 	bool						m_renderShadows{ true };
 	bool						m_applyShadows{ false };

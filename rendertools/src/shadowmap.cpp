@@ -4,7 +4,6 @@
 
 bool ShadowMap::Setup(void) {
 	if (CreateMap(Vector2f::ZERO)) {
-		m_maxShadowRadius = 15.0f;
 		m_status = 1;
 		return true;
 	}
@@ -182,6 +181,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		center = (worldMin + worldMax) * 0.5f;
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
+#ifdef _DEBUG
 	static int trafoType = 2;
 	if (trafoType == 2)
 		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
@@ -189,6 +189,9 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		CreatePerspectiveTransformation(center, lightDirection, lightOffset, worldRadius);
 	else
 		CreateOrthoTransformation(center, lightDirection, worldSize, worldMin, worldMax);
+#else
+	CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+#endif
 	return true;
 }
 
