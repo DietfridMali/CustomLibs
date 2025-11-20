@@ -15,7 +15,8 @@ private:
 									{-1.0f, -1.0f, -1.0f, 1.0f}, {1.0f, -1.0f, -1.0f, 1.0f}, {1.0f, 1.0f, -1.0f, 1.0f}, {-1.0f, 1.0f, -1.0f, 1.0f},
 									{-1.0f, -1.0f,  1.0f, 1.0f}, {1.0f, -1.0f,  1.0f, 1.0f}, {1.0f, 1.0f,  1.0f, 1.0f}, {-1.0f, 1.0f,  1.0f, 1.0f}
 	};
-	Matrix4f					m_shadowTransform;
+	Matrix4f					m_lightTransform;
+	Matrix4f					m_modelViewTransform;
 	FBO*						m_map{ nullptr };
 	int							m_status{ 0 };
 	bool						m_renderShadows{ true };
@@ -27,6 +28,8 @@ public:
 
 	bool Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax);
 
+	void UpdateTransformation(void);
+
 	int IsAvailable(void) noexcept {
 		return m_renderShadows and m_applyShadows and (m_status >= 0);
 	}
@@ -36,7 +39,7 @@ public:
 	}
 
 	Matrix4f& ShadowTransform(void) noexcept {
-		return m_shadowTransform;
+		return m_modelViewTransform;
 	}
 
 	bool StartRender(void) noexcept;

@@ -58,7 +58,7 @@ bool ShadowMap::StopRender(void) noexcept {
 void ShadowMap::Stabilize(float shadowMapSize)
 {
 	// Ursprungs-Punkt (0,0,0) in Shadow-Space
-	Vector4f shadowOrigin = m_shadowTransform * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+	Vector4f shadowOrigin = m_modelViewTransform * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
 
 	// in Texelraum skalieren
 	shadowOrigin *= shadowMapSize * 0.5f;
@@ -67,8 +67,8 @@ void ShadowMap::Stabilize(float shadowMapSize)
 	Vector2f offset = (roundedOrigin - Vector2f(shadowOrigin.x, shadowOrigin.y)) * (2.0f / shadowMapSize);
 
 	// Translation der Shadow-Matrix korrigieren
-	m_shadowTransform.T().x += offset.x;
-	m_shadowTransform.T().y += offset.y;
+	m_modelViewTransform.T().x += offset.x;
+	m_modelViewTransform.T().y += offset.y;
 }
 
 
@@ -146,11 +146,19 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 #	endif
 #endif
 	// shadow transformation = light projection * light view * inverse(camera)
-	m_shadowTransform = lightProj;
-	m_shadowTransform *= lightView;
+	m_lightTransform = lightProj;
+	m_lightTransform *= lightView;
 	Stabilize(float(m_map->GetWidth(true)));
-	m_shadowTransform *= baseRenderer.Matrices(0)->ModelView().Inverse();
+	UpdateTransformation();
 	return true;
+}
+
+
+void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mModelView for a shader using shadow mapping changes (e.g. for moving geometry)
+	if (IsReady()) {
+		m_modelViewTransform = m_lightTransform;
+		m_modelViewTransform *= baseRenderer.Matrices(0)->ModelView().Inverse();
+	}
 }
 
 // =================================================================================================

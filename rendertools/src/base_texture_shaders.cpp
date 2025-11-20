@@ -47,35 +47,31 @@ const ShaderSource& ActorDepthShader() {
         uniform mat4 mModelView;
         uniform mat4 mShadowTransform;
 
-define CULL_FACES 0
+#define CULL_FACES 1
 
 #if CULL_FACES
-
         uniform mat4 mRotation;
-        uniform vec3 lightDir;
-        out vec3 lightNormal;
-        out vec3 faceNormal;
+        out vec3 worldNormal;
 #endif
         void main() {
             gl_Position = mShadowTransform * mModelView * vec4(position, 1.0);
 #if CULL_FACES
-            faceNormal = mat3(mRotation) * normal;
-            lightNormal = lightDir;
+            worldNormal = mat3(mRotation) * normal;
 #endif
             }
         )",
         R"(
         #version 330 core
 
-define CULL_FACES 0
+        uniform vec3 lightDir;
+#define CULL_FACES 1
 
 #if CULL_FACES
-        in vec3 faceNormal;
-        in vec3 lightNormal;
-##endif
+        in vec3 worldNormal;
+#endif
         void main() { 
 #if CULL_FACES
-            if (dot(faceNormal, lightNormal) <= 0.0)
+            if (dot(worldNormal, lightDir) <= 0.0)
                 discard;
 #endif
             }
@@ -96,7 +92,7 @@ const ShaderSource& DepthRenderer() {
         out vec4 fragColor;
         void main() { 
             float d = texture(surface, vec2(fragCoord.x, 1.0 - fragCoord.y)).r;
-            d = pow(d, 2.0);
+            d = pow(d, 0.5);
             fragColor = vec4(d, d, d, 1.0f);
         }
         )"
