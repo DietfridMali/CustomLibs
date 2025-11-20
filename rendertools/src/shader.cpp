@@ -122,8 +122,8 @@ void Shader::UpdateMatrices(void) {
         SetMatrix4f("mModelView", GetFloatData(GL_MODELVIEW_MATRIX, 16, glData));
         SetMatrix4f("mProjection", GetFloatData(GL_PROJECTION_MATRIX, 16, glData));
     }
+    else
 #endif
-    else 
     {
         // both matrices must be column major
 #if 0
