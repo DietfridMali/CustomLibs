@@ -4,6 +4,7 @@
 
 bool ShadowMap::Setup(void) {
 	if (CreateMap(Vector2f::ZERO)) {
+		m_maxShadowRadius = 15.0f;
 		m_status = 1;
 		return true;
 	}
@@ -80,21 +81,26 @@ void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matri
 }
 
 
-void ShadowMap::CreateViewerAlignedTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
+void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mModelView for a shader using shadow mapping changes (e.g. for moving geometry)
+	if (IsReady()) {
+		m_modelViewTransform = m_lightTransform;
+#if 1
+		m_modelViewTransform *= baseRenderer.Matrices(0)->ModelView().Inverse();
+#endif
+	}
+}
+
+
+void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
 	Matrix4f lightView, lightProj;
 
 	worldRadius = std::min(worldRadius, m_maxShadowRadius);
 	if (lightDistance == 0.0f)
 		lightDistance = 10.0f * worldRadius;
 
-	// Lichtposition wie gehabt
-	m_lightPosition = center + lightDirection * lightDistance;
-
-	// Forward-Achse der Lichtkamera (vom Licht zum Center)
 	Vector3f f = -lightDirection; // beide sind schon normalisiert
-
-	// Wunsch-"Rechts"-Achse: viewDir in Ebene orthogonal zu f projizieren
 	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+	center += (viewDir * worldRadius);
 	viewDir.Normalize();
 
 	float dotFV = f.Dot(viewDir);
@@ -104,6 +110,7 @@ void ShadowMap::CreateViewerAlignedTransformation(const Vector3f& center, const 
 	// Up-Vektor so wählen, dass lookAt(s) wirklich als "right" bekommt
 	Vector3f upParam = s.Cross(f);
 	upParam.Normalize();
+	m_lightPosition = center + lightDirection * lightDistance;
 
 	// View-Matrix mit ausgerichtetem Frustum
 	lightView.LookAt(m_lightPosition, center, upParam);
@@ -171,6 +178,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		center += f * worldRadius; // baseRenderer.Matrices(0)->ModelView().F()* worldRadius;
 	}
 	else
+		;
 		center = (worldMin + worldMax) * 0.5f;
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
@@ -182,14 +190,6 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	else
 		CreateOrthoTransformation(center, lightDirection, worldSize, worldMin, worldMax);
 	return true;
-}
-
-
-void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mModelView for a shader using shadow mapping changes (e.g. for moving geometry)
-	if (IsReady()) {
-		m_modelViewTransform = m_lightTransform;
-		m_modelViewTransform *= baseRenderer.Matrices(0)->ModelView().Inverse();
-	}
 }
 
 // =================================================================================================

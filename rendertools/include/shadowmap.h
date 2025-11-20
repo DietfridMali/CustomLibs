@@ -39,8 +39,8 @@ public:
 		return m_renderShadows and m_applyShadows and (m_status > 0);
 	}
 
-	Matrix4f& ShadowTransform(void) noexcept {
-		return m_modelViewTransform;
+	Matrix4f& GetTransformation(bool forClipSpace = true) noexcept {
+		return forClipSpace ? m_modelViewTransform : m_lightTransform;
 	}
 
 	bool StartRender(void) noexcept;
@@ -95,7 +95,7 @@ private:
 
 	void Stabilize(float shadowMapSize);
 
-	void CreateViewerAlignedTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
+	void CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
 
 	void CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
 

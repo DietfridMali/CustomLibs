@@ -138,7 +138,7 @@ void Shader::UpdateMatrices(void) {
             SetInt("renderShadow", shadowMap.IsReady() ? 1 : 0);
         }
         if (shadowMap.IsReady())
-            SetMatrix4f("mShadowTransform", shadowMap.ShadowTransform());
+            SetMatrix4f("mLightTransform", shadowMap.GetTransformation().AsArray(), false);
 #if 0
         SetMatrix4f("mBaseModelView", baseRenderer.ModelView().AsArray(), false);
 #endif

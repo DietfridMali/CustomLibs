@@ -10,13 +10,17 @@ const ShaderSource& DepthShader() {
         "depthShader",
         R"(
         #version 330
-        layout(location = 0) in vec3 position;
+        layout(location = 0) in vec3 vertex;
         layout(location = 1) in vec2 texCoord;
         uniform mat4 mModelView;
-        uniform mat4 mShadowTransform;
+        uniform mat4 mLightTransform;
         out vec2 fragCoord;
         void main() {
-            gl_Position = mShadowTransform * mModelView * vec4(position, 1.0);
+#if 1
+            gl_Position = mLightTransform * mModelView * vec4(vertex, 1.0);
+#else
+            gl_Position = mLightTransform * vec4(vertex, 1.0);
+#endif
             fragCoord = texCoord;
         }
         )",
@@ -44,16 +48,15 @@ const ShaderSource& ActorDepthShader() {
         #version 330
         layout(location = 0) in vec3 vertex;
         uniform mat4 mModelView;
-        uniform mat4 mShadowTransform;
-
-#define CULL_FACES 1
-
-#if CULL_FACES
         uniform mat4 mModelRotation;
+        uniform vec3 modelPosition;
+        uniform mat4 mLightTransform;
+#define CULL_FACES 0
+#if CULL_FACES
         out vec3 worldNormal;
 #endif
         void main() {
-            gl_Position = mShadowTransform * mModelView * vec4(vertex, 1.0);
+            gl_Position = mLightTransform * mModelView * vec4(vertex, 1.0);
 #if CULL_FACES
             worldNormal = mat3(mModelRotation) * vertex;
 #endif
@@ -63,8 +66,7 @@ const ShaderSource& ActorDepthShader() {
         #version 330 core
 
         uniform vec3 lightDir;
-#define CULL_FACES 1
-
+#define CULL_FACES 0
 #if CULL_FACES
         in vec3 worldNormal;
 #endif
