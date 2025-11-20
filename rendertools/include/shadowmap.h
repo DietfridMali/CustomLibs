@@ -94,6 +94,8 @@ private:
 
 	void Stabilize(float shadowMapSize);
 
+	void CreateViewerAlignedTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
+
 	void CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
 
 	void CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax);

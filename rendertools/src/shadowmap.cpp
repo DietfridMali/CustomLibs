@@ -16,15 +16,14 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	m_status = -1;
 	if (not (m_map = new FBO()))
 		return false;
-	int resolution = int(round(std::max(frustumSize.x / 1.f, frustumSize.y / 1.f)));
 	int size;
-	for (size = 1; size < resolution; size <<= 1)
-		;
-	size = openGLStates.MaxTextureSize(); // 2048;
-	if (not m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false }))
-		return false;
-	m_status = 1;
-	return true;
+	for (size = openGLStates.MaxTextureSize(); size >= 1024; size /= 2) {
+		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
+			m_status = 1;
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -80,9 +79,45 @@ void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matri
 }
 
 
+void ShadowMap::CreateViewerAlignedTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
+	Matrix4f lightView, lightProj;
+
+	if (lightDistance == 0.0f)
+		lightDistance = 10.0f * worldRadius;
+
+	// Lichtposition wie gehabt
+	m_lightPosition = center + lightDirection * lightDistance;
+
+	// Forward-Achse der Lichtkamera (vom Licht zum Center)
+	Vector3f f = -lightDirection; // beide sind schon normalisiert
+
+	// Wunsch-"Rechts"-Achse: viewDir in Ebene orthogonal zu f projizieren
+	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+	viewDir.Normalize();
+
+	float dotFV = f.Dot(viewDir);
+	Vector3f s = viewDir - f * dotFV;      // liegt jetzt senkrecht zu f
+	s.Normalize();                         // gewünschte X-Achse im Licht-Raum
+
+	// Up-Vektor so wählen, dass lookAt(s) wirklich als "right" bekommt
+	Vector3f upParam = s.Cross(f);
+	upParam.Normalize();
+
+	// View-Matrix mit ausgerichtetem Frustum
+	lightView.LookAt(m_lightPosition, center, upParam);
+
+	float halfFov = std::atan(worldRadius / lightDistance);
+	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, Conversions::RadToDeg(2.0f * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+
+	CreateLightTransformation(lightView, lightProj);
+}
+
+
 void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
 	Matrix4f lightView, lightProj;
 
+	if (lightDistance == 0.0f)
+		lightDistance = 10.0f * worldRadius;
 	m_lightPosition = center + lightDirection * lightDistance;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 	float halfFov = std::atan(worldRadius / lightDistance);
@@ -127,16 +162,23 @@ void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f
 bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
 	if (m_status < 0)
 		return false;
-	//if (not center.IsValid())
-		center = (worldMin + worldMax) * 0.5f;
 	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
+	float worldRadius = worldSize.Length() * 0.5f;
+	if (center.IsValid()) {
+		Vector3f f = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+		center += f * worldRadius; // baseRenderer.Matrices(0)->ModelView().F()* worldRadius;
+	}
+	else
+		center = (worldMin + worldMax) * 0.5f;
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
-	static bool useOrtho = false;
-	if (useOrtho)
-		CreateOrthoTransformation(center, lightDirection, worldSize, worldMin, worldMax);
+	static int trafoType = 0;
+	if (trafoType == 2)
+		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+	if (trafoType == 1)
+		CreatePerspectiveTransformation(center, lightDirection, lightOffset, worldRadius);
 	else
-		CreatePerspectiveTransformation(center, lightDirection, 1000.0f, worldSize.Length() * 0.5f);
+		CreateOrthoTransformation(center, lightDirection, worldSize, worldMin, worldMax);
 	return true;
 }
 
