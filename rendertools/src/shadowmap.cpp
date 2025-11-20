@@ -97,33 +97,33 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	// light view
 	//if (not center.IsValid())
 		center = (worldMin + worldMax) * 0.5f;
-	Vector3f worldSize = worldMax - worldMin;
-	lightOffset = sqrt(worldSize.Length());
+	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
+	//lightOffset = 1.0f; // sqrt(worldSize.Length());
 	lightOffset = worldSize.Length();
 	m_lightPosition = center + lightDirection * lightOffset;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 
-#if 0
-	Vector3f corners[8] = {
-		{ worldMin.X(), worldMin.Y(), worldMin.Z() },
-		{ worldMax.X(), worldMin.Y(), worldMin.Z() },
-		{ worldMin.X(), worldMax.Y(), worldMin.Z() },
-		{ worldMax.X(), worldMax.Y(), worldMin.Z() },
-		{ worldMin.X(), worldMin.Y(), worldMax.Z() },
-		{ worldMax.X(), worldMin.Y(), worldMax.Z() },
-		{ worldMin.X(), worldMax.Y(), worldMax.Z() },
-		{ worldMax.X(), worldMax.Y(), worldMax.Z() }
+#if 1
+	Vector4f corners[8] = {
+		{ worldMin.X(), worldMin.Y(), worldMin.Z(), 1.0f },
+		{ worldMax.X(), worldMin.Y(), worldMin.Z(), 1.0f },
+		{ worldMin.X(), worldMax.Y(), worldMin.Z(), 1.0f },
+		{ worldMax.X(), worldMax.Y(), worldMin.Z(), 1.0f },
+		{ worldMin.X(), worldMin.Y(), worldMax.Z(), 1.0f },
+		{ worldMax.X(), worldMin.Y(), worldMax.Z(), 1.0f },
+		{ worldMin.X(), worldMax.Y(), worldMax.Z(), 1.0f },
+		{ worldMax.X(), worldMax.Y(), worldMax.Z(), 1.0f }
 	};
 
-	Vector3f vMin{ FLT_MAX, FLT_MAX, FLT_MAX };
-	Vector3f vMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX };
+	Vector4f vMin{ FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+	Vector4f vMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
 
 	for (int i = 0; i < 8; i++) {
-		Vector3f v = m_matrices->ModelView() * corners[i];
+		Vector4f v = lightView * corners[i];
 		vMin.Minimize(v);
 		vMax.Maximize(v);
 	}
-	if ((m_status == 0) and not CreateMap(Vector2f(vMax.X() - vMin.X(), vMax.Z() - vMin.Z())))
+	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
 #if 0
 	// light projection
@@ -131,16 +131,16 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	s *= sqrtf(2.0f);
 	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 1.0f, 200.0f);
 #	else
-	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, vMin.z, vMax.z);
+	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
 #	endif
 #else
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Y())))
 		return false;
 	// light projection
 #	if 0
-	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, 45.0f, 1.0f, 200.0f);
+	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, 90.0f, 1.0f, 200.0f);
 #	else
-	float s = std::max(worldSize.X(), worldSize.Z());
+	float s = std::max(worldSize.X(), worldSize.Z()) * 1.2f;
 	//s *= 0.5f; // sqrtf(2.0f) * 0.5f;
 	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(-s, s, -s, s, 0.1f, 200.0f);
 #	endif

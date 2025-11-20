@@ -295,7 +295,8 @@ public:
 
     inline Vector Abs(void) const noexcept {           // FIX: const + Indexierung
         Vector v;
-        for (int i = 0; i < VEC_TYPE::length(); ++i) v[i] = std::fabs((*this)[i]);
+        for (int i = 0; i < VEC_TYPE::length(); ++i) 
+            v[i] = std::fabs((*this)[i]);
         return v;
     }
 
