@@ -22,7 +22,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 			m_status = 1;
 			return true;
 		}
-		m_maxShadowRadius *= 0.9f;
+		m_maxLightRadius *= 0.9f;
 	}
 	return false;
 }
@@ -93,29 +93,37 @@ void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mMod
 void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
 	Matrix4f lightView, lightProj;
 
-	worldRadius = std::min(worldRadius, m_maxShadowRadius);
-	if (lightDistance == 0.0f)
+	worldRadius = std::min(worldRadius, m_maxLightRadius);
+	if (lightDistance <= 0.0f)
 		lightDistance = 10.0f * worldRadius;
 
-	Vector3f f = -lightDirection; // beide sind schon normalisiert
+	// Viewer-Blickrichtung in Weltkoordinaten
 	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
-	center += (viewDir * worldRadius);
 	viewDir.Normalize();
 
-	float dotFV = f.Dot(viewDir);
-	Vector3f s = viewDir - f * dotFV;      // liegt jetzt senkrecht zu f
-	s.Normalize();                         // gewünschte X-Achse im Licht-Raum
+	// Frustumzentrum vor den Viewer schieben (Viewer knapp am hinteren Rand)
+	center += viewDir * worldRadius * 0.9f;
 
-	// Up-Vektor so wählen, dass lookAt(s) wirklich als "right" bekommt
+	Vector3f f = -lightDirection; // angenommen normalisiert
+	float dotFV = f.Dot(viewDir);
+
+	// X-Achse im Lichtraum: Projektionsanteil der Viewrichtung senkrecht zu f
+	Vector3f s = viewDir - f * dotFV;      // liegt senkrecht zu f
+	s.Normalize();
+
+	// Up-Vektor so wählen, dass LookAt(s) als Right bekommt
 	Vector3f upParam = s.Cross(f);
 	upParam.Normalize();
+
 	m_lightPosition = center + lightDirection * lightDistance;
 
-	// View-Matrix mit ausgerichtetem Frustum
 	lightView.LookAt(m_lightPosition, center, upParam);
 
 	float halfFov = std::atan(worldRadius / lightDistance);
-	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, Conversions::RadToDeg(2.0f * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+	float zNear = std::max(0.01f, lightDistance - worldRadius);
+	float zFar = lightDistance + worldRadius;
+
+	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
 
 	CreateLightTransformation(lightView, lightProj);
 }
