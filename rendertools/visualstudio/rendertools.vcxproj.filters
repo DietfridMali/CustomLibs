@@ -215,7 +215,7 @@
     <ClCompile Include="..\src\base_shaderhandler.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\shader_macros.cpp">
+    <ClCompile Include="..\src\base_shader_funcs.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\src\shader.cpp">

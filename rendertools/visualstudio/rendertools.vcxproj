@@ -182,7 +182,7 @@
     <ClCompile Include="..\src\rendermatrices.cpp" />
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\src\base_shaderhandler.cpp" />
-    <ClCompile Include="..\src\shader_macros.cpp" />
+    <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\src\noise.cpp" />
     <ClCompile Include="..\src\shadowmap.cpp" />
     <ClCompile Include="..\src\textrenderer.cpp" />
