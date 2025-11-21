@@ -180,12 +180,14 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		return false;
 	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
 	float worldRadius = worldSize.Length() * 0.5f;
-	if (center.IsValid()) {
+	if (not center.IsValid()) 
+#if 0
+	{
 		Vector3f f = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
 		center += f * worldRadius; // baseRenderer.Matrices(0)->ModelView().F()* worldRadius;
 	}
 	else
-		;
+#endif
 		center = (worldMin + worldMax) * 0.5f;
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
