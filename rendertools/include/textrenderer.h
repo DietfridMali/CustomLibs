@@ -37,11 +37,10 @@ private:
     eTextAlignments         m_textAlignment;
     TextDecoration          m_decoration;
     VAO                     m_vao;
-
     Mesh                    m_mesh;
     Dictionary<int, FBO*>   m_fbos;
-
     FontHandler*            m_font;
+    List<RGBAColor>         m_colorStack;
 
 public:
     static int CompareFBOs(void* context, const int& key1, const int& key2);
@@ -122,6 +121,15 @@ public:
 
     inline bool ApplyAA(void) noexcept {
         return m_decoration.ApplyAA();
+    }
+
+    inline void PushColor(void) noexcept {
+        m_colorStack.Push(m_color);
+    }
+
+    inline void PopColor(void) noexcept {
+        if (not m_colorStack.IsEmpty())
+            m_color = m_colorStack.Pop();
     }
 
 private:
