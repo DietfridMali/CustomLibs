@@ -7,6 +7,7 @@ FILES := \
  base_displayhandler \
  base_quad \
  base_renderer \
+ base_shader_funcs \
  base_shadercode \
  base_shaderhandler \
  base_texture_shaders \
@@ -32,7 +33,6 @@ FILES := \
  projection \
  rendermatrices \
  shader \
- shader_macros \
  shadowmap \
  SSBO \
  textrenderer \
