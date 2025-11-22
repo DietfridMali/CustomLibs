@@ -3,7 +3,7 @@
 // =================================================================================================
 // network data and address
 
-bool NetworkMessage::IsValid(int valueCount, int maxValueCount = -1) {
+bool NetworkMessage::IsValid(int valueCount, int maxValueCount) {
     /*
         check a message for a match with the requested keyword
         deconstruct message (Split payload it into separate values)
@@ -45,9 +45,9 @@ bool NetworkMessage::IsValid(int valueCount, int maxValueCount = -1) {
             }
         }
         else if (valueCount < 0) {
-            if (m_numValues >= -valueCount) {
-                m_result = ((maxValueCount > 0) and (m_numValues <= maxValueCount)) ? 1 : -1;
-                return m_result == 1;
+            if ((m_numValues >= -valueCount) and ((maxValueCount < 1) or (m_numValues <= maxValueCount))) {
+                m_result = 1;
+                return true;
             }
         }
 #ifdef _DEBUG
