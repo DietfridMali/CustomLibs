@@ -108,7 +108,7 @@ class NetworkMessage {
             return m_payload.IsEmpty();
         }
 
-        bool IsValid(int valueCount = 0, int maxValueCount = 0);
+        bool IsValid(int requiredValueCount = 0, int maxValueCount = 0);
 
         inline bool IsBroadcast(void) {
             return m_isBroadcast;

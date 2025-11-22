@@ -3,7 +3,7 @@
 // =================================================================================================
 // network data and address
 
-bool NetworkMessage::IsValid(int valueCount, int maxValueCount) {
+bool NetworkMessage::IsValid(int requiredValueCount, int maxValueCount) {
     /*
         check a message for a match with the requested keyword
         deconstruct message (Split payload it into separate values)
@@ -13,7 +13,7 @@ bool NetworkMessage::IsValid(int valueCount, int maxValueCount) {
     -----------
         keyword:
             the keyword to check the message for
-        valueCount:
+        requiredValueCount:
             number of application parameters that the message payload should contain.
             > 0: specifies the exact required number of parameters
             < 0: specifies the required minimum number of parameters
@@ -34,24 +34,24 @@ bool NetworkMessage::IsValid(int valueCount, int maxValueCount) {
                 m_numValues = 0;
             }
         }
-        if (valueCount == 0) {
+        if (requiredValueCount == 0) {
             m_result = 1;
             return true;
         }
-        if (valueCount > 0) {
-            if (m_numValues == valueCount) {
+        if (requiredValueCount > 0) {
+            if (m_numValues == requiredValueCount) {
                 m_result = 1;
                 return true;
             }
         }
-        else if (valueCount < 0) {
-            if ((m_numValues >= -valueCount) and ((maxValueCount < 1) or (m_numValues <= maxValueCount))) {
+        else if (requiredValueCount < 0) {
+            if ((m_numValues >= -requiredValueCount) and ((maxValueCount < 1) or (m_numValues <= maxValueCount))) {
                 m_result = 1;
                 return true;
             }
         }
 #ifdef _DEBUG
-        fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)\n", static_cast<char*>(keyword), valueCount, m_numValues);
+        fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)\n", static_cast<char*>(keyword), requiredValueCount, m_numValues);
 #endif
     }
     catch (...) {
