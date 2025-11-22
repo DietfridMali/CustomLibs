@@ -348,7 +348,7 @@ inline String::operator uint16_t() const {
 }
 
 inline String::operator uint32_t() const {
-    return ToNumber<uint16_t>("uint32_t");
+    return ToNumber<uint32_t>("uint32_t");
 }
 
 inline String::operator float() const {
