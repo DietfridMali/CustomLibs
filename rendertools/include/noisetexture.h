@@ -320,7 +320,6 @@ private:
 using ValueNoiseTexture = NoiseTexture<ValueNoiseR32F>;
 using FbmNoiseTexture = NoiseTexture<FbmNoiseR32F>;
 using HashNoiseTexture = NoiseTexture<HashNoiseRGBA8>;
-using BlueNoiseTexture = NoiseTexture<BlueNoiseR8>;
 using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 // =================================================================================================
@@ -386,3 +385,31 @@ private:
 
 // =================================================================================================
 
+class BlueNoiseTexture
+    : public Texture
+{
+public:
+    virtual void Deploy(int bufferIndex = 0) override;
+
+    virtual void SetParams(bool enforce = false) override;
+
+    bool Create(String noiseFilename = "");
+
+private:
+    Vector3i                m_gridSize{ 128, 128, 64 }; // fixed; using NVidia STBN data
+    ManagedArray<uint8_t>   m_data;
+
+    bool Allocate();
+
+    void Compute(String textureFolder = "");
+
+    bool LoadFromFile(const String& filename);
+
+    bool SaveToFile(const String& filename);
+
+    uint32_t BufferSize(void) noexcept {
+        return uint32_t(m_gridSize.x * m_gridSize.y * m_gridSize.z);
+    }
+};
+
+// =================================================================================================

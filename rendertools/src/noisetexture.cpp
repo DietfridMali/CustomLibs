@@ -142,7 +142,7 @@ void NoiseTexture3D::SetParams(bool enforce) {
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 }
@@ -327,7 +327,7 @@ void CloudNoiseTexture::SetParams(bool enforce) {
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 }
@@ -378,6 +378,114 @@ bool CloudNoiseTexture::SaveToFile(const String& filename) const {
 
     size_t voxelCount = size_t(m_gridSize) * size_t(m_gridSize) * size_t(m_gridSize);
     size_t bytes = voxelCount * sizeof(float);
+
+    if (m_data.Length() != voxelCount)
+        return false;
+
+    f.write(reinterpret_cast<const char*>(m_data.Data()), bytes);
+    return f.good();
+}
+
+// =================================================================================================
+
+bool BlueNoiseTexture::Allocate(void) {
+    TextureBuffer* texBuf = new TextureBuffer();
+    if (not texBuf)
+        return false;
+    if (not m_buffers.Append(texBuf)) {
+        delete texBuf;
+        return false;
+    }
+    m_data.Resize(BufferSize());
+    texBuf->m_info = TextureBuffer::BufferInfo(m_gridSize.x, m_gridSize.y * 64, 1, GL_R8, GL_RED);
+    HasBuffer() = true;
+    return true;
+}
+
+
+bool BlueNoiseTexture::Create(String noiseFilename) {
+    if (not Texture::Create())
+        return false;
+    m_type = GL_TEXTURE_3D;
+    if (not Allocate())
+        return false;
+    if (not LoadFromFile(noiseFilename)) {
+        std::filesystem::path _p{ noiseFilename.GetStr() };
+        Compute(_p.parent_path().string());
+        SaveToFile(noiseFilename);
+    }
+    Deploy();
+    return true;
+}
+
+
+void BlueNoiseTexture::Compute(String textureFolder) {
+    uint32_t layerSize = m_gridSize.x * m_gridSize.y;
+    for (int i = 0; i < 64; ++i) {
+        String filename = textureFolder + "/bluenoise/stbn_scalar_2Dx1Dx1D_128x128x64x1_" + String(i) + ".png";
+        SDL_Surface* image = IMG_Load(filename.Data());
+        memcpy(m_data.Data(layerSize * i), image->pixels, layerSize);
+    }
+}
+
+
+void BlueNoiseTexture::SetParams(bool enforce) {
+    if (enforce or not m_hasParams) {
+        m_hasParams = true;
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+}
+
+
+void BlueNoiseTexture::Deploy(int) {
+    if (Bind()) {
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, 128, 128, 64, 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(m_data.Data()));
+        SetParams(false);
+        glGenerateMipmap(GL_TEXTURE_3D);
+        Release();
+    }
+}
+
+
+bool BlueNoiseTexture::LoadFromFile(const String& filename) {
+    if (filename.IsEmpty())
+        return false;
+    std::ifstream f((const char*)filename, std::ios::binary);
+    if (not f)
+        return false;
+
+    uint32_t voxelCount = BufferSize();
+    uint32_t expectedBytes = voxelCount * sizeof(uint8_t);
+
+    f.seekg(0, std::ios::end);
+    std::streamoff fileSize = f.tellg();
+    f.seekg(0, std::ios::beg);
+
+    if (fileSize != std::streamoff(expectedBytes))
+        return false;
+
+    if (m_data.Length() != voxelCount)
+        m_data.Resize(voxelCount);
+
+    f.read(reinterpret_cast<char*>(m_data.Data()), expectedBytes);
+    return f.good();
+}
+
+
+bool BlueNoiseTexture::SaveToFile(const String& filename) {
+    if (filename.IsEmpty())
+        return false;
+    std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
+    if (not f)
+        return false;
+
+    size_t voxelCount = BufferSize();
+    size_t bytes = voxelCount * sizeof(uint8_t);
 
     if (m_data.Length() != voxelCount)
         return false;
