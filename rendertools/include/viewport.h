@@ -21,6 +21,7 @@ public:
     int         m_windowHeight;
     Vector2f    m_center;
     bool        m_flipVertically;
+    GLint       m_glViewport[4];
 
     Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
         : Rectangle(left, top, width, height) 
@@ -135,6 +136,14 @@ public:
             m_height = int(round(h));
         }
         return *this;
+    }
+
+    inline void GetGlViewport(void) noexcept {
+        glGetIntegerv(GL_VIEWPORT, m_glViewport);
+    }
+
+    inline void SetGlViewport(void) noexcept {
+        glViewport(m_glViewport[0], m_glViewport[1], m_glViewport[2], m_glViewport[3]);
     }
 
 };

@@ -227,6 +227,7 @@ public:
     void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipViewportVertically = false, bool flipWindowVertically = false) noexcept; // , bool isFBO = false);
 
     void PushViewport(void) {
+        m_viewport.GetGlViewport();
         viewportStack.Append(m_viewport);
     }
 
@@ -234,7 +235,7 @@ public:
         ::Viewport viewport;
         viewportStack.Pop(viewport);
         SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
-        //glViewport(0, 0, viewport.WindowWidth(), viewport.WindowHeight());
+        m_viewport.SetGlViewport();
     }
 
     inline TexCoord ViewportSize(void) noexcept {
