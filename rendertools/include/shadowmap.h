@@ -74,6 +74,10 @@ public:
 		m_renderShadows = renderShadows;
 	}
 
+	inline void ToggleRenderShadows(void) noexcept {
+		m_renderShadows = not m_renderShadows;
+	}
+
 	inline bool RenderShadows(void) noexcept {
 		return m_renderShadows;
 	}
