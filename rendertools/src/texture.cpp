@@ -380,7 +380,7 @@ void TiledTexture::SetParams(bool enforce) {
 void FBOTexture::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
         m_hasParams = true;
-#if 1
+#if 0
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 #else

@@ -234,6 +234,7 @@ public:
         ::Viewport viewport;
         viewportStack.Pop(viewport);
         SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
+        //glViewport(0, 0, viewport.WindowWidth(), viewport.WindowHeight());
     }
 
     inline TexCoord ViewportSize(void) noexcept {
