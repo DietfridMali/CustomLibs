@@ -336,8 +336,11 @@ void FBO::Disable(void) {
         if (m_activeHandle == m_handle.Data()) {
             m_activeHandle = GL_NONE;
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            baseRenderer.RestoreDrawBuffer();
         }
-        baseRenderer.RemoveDrawBuffer(this);
+        else {
+            baseRenderer.RemoveDrawBuffer(this);
+        }
     }
 }
 
