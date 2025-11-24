@@ -160,6 +160,10 @@ class BaseSoundHandler
 
         void SetMusicPlayback(bool play);
 
+        inline void ToggleMusicPlayback(void) noexcept {
+            SetMusicPlayback(not m_playMusic);
+        }
+
         bool GetMusicPlayback(void) {
             return m_playMusic;
         }
