@@ -1,6 +1,7 @@
 
 #include "vao.h"
 #include "base_shaderhandler.h"
+#include "base_renderer.h"
 
 // =================================================================================================
 
@@ -187,10 +188,92 @@ noexcept
     }
 }
 
+#ifdef _DEBUG
+
+bool checkVAO = false;
+
+static void DumpVBO(GLuint vbo, int count, const char* label) {
+    std::cout << "=== VBO Dump: " << label << " (ID: " << vbo << ") ===" << std::endl;
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    // VBO Größe checken
+    GLint size;
+    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+    std::cout << "Buffer size: " << size << " bytes" << std::endl;
+
+    // Daten auslesen (z.B. erste 'count' floats)
+    std::vector<float> data(count);
+    glGetBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(float), data.data());
+
+    for (int i = 0; i < count; i++) {
+        std::cout << "  [" << i << "] = " << data[i] << std::endl;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+
+static void CheckVAO(GLuint handle, const char* label = "") {
+#if 1
+    std::cout << "=== VAO Check: " << label << " (ID: " << handle << ") ===" << std::endl;
+#endif
+    glBindVertexArray(handle);
+
+    // Array Buffer Binding (sollte normalerweise 0 sein wenn VAO korrekt setup)
+    GLint arrayBuffer;
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
+#if 1
+    std::cout << "GL_ARRAY_BUFFER_BINDING: " << arrayBuffer << std::endl;
+#endif
+    // Element Buffer (wichtig für indexed drawing)
+    GLint elementBuffer;
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementBuffer);
+#if 1
+    std::cout << "GL_ELEMENT_ARRAY_BUFFER_BINDING: " << elementBuffer << std::endl;
+#endif
+    // Attribute 0-3 checken (Position, TexCoord, Normal, etc.)
+    for (int i = 0; i < 4; i++) {
+        GLint enabled, size, type, stride, bufferBinding;
+        GLvoid* pointer;
+
+        glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
+        if (enabled) {
+            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &size);
+            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_TYPE, &type);
+            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &stride);
+            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &bufferBinding);
+            glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &pointer);
+#if 1
+            std::cout << "  Attr " << i << ": enabled, size=" << size
+                << ", type=0x" << std::hex << type << std::dec
+                << ", stride=" << stride
+                << ", VBO=" << bufferBinding
+                << ", offset=" << (size_t)pointer << std::endl;
+            DumpVBO(bufferBinding, 4 * size, (size == 3) ? "vertices" : "texCoord");
+#endif
+        }
+#if 1
+        else {
+            std::cout << "  Attr " << i << ": DISABLED" << std::endl;
+        }
+#endif
+    }
+
+    glBindVertexArray(0);
+    baseRenderer.ClearGLError();
+}
+
+#endif
 
 void VAO::Render(Texture* texture)
 noexcept
 {
+#ifdef _DEBUG
+    float* data = (float*)(m_dataBuffers[0]->m_data);
+    if (checkVAO)
+        CheckVAO(m_handle);
+#endif
     if (not Enable())
         return;
 #if 1

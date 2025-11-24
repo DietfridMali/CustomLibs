@@ -165,7 +165,7 @@ public:
         noexcept
     {
         if (texture != nullptr)
-            texture->Enable();
+            return texture->Enable() ? texture : nullptr;
         return texture;
     }
 

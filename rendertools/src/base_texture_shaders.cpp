@@ -5,6 +5,31 @@
 
 // =================================================================================================
 
+const ShaderSource& TestShader() {
+    static const ShaderSource source(
+        "testShader",
+        R"(
+            #version 330 core
+            void main() {
+                vec2 positions[3];
+                positions[0] = vec2(-0.5, -0.5);
+                positions[1] = vec2( 0.5, -0.5);
+                positions[2] = vec2( 0.0,  0.5);
+                gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+            }
+        )",
+        R"(
+        #version 330
+        out vec4 fragColor;
+        void main() {
+            fragColor = vec4(1.0, 0.0, 1.0, 1.0); 
+        }
+        )"
+    );
+    return source;
+}
+
+
 const ShaderSource& DepthShader() {
     static const ShaderSource source(
         "depthShader",
@@ -111,7 +136,7 @@ const ShaderSource& PlainColorShader() {
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
         uniform vec4 surfaceColor;
-        out vec4 fragColor;
+        layout(location = 0) out vec4 fragColor;
         void main() { 
             fragColor = surfaceColor; 
         }
@@ -136,7 +161,7 @@ const ShaderSource& GrayScaleShader() {
         uniform vec2 tcScale;
         uniform float brightness;
         in vec2 fragCoord;
-        out vec4 fragColor;
+        layout(location = 0) out vec4 fragColor;
         void main() {
             vec4 texColor = texture(surface, tcOffset + fragCoord * tcScale);
             // Rec.601 Luminanzgewichte in Gamma-Space

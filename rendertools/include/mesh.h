@@ -159,7 +159,7 @@ public:
             m_vao->UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT);
     }
 
-    bool UpdateVAO(bool createVertexIndex = false);
+    bool UpdateVAO(bool createVertexIndex = false, bool forceUpdate = false);
 
     void ResetVAO(void);
 

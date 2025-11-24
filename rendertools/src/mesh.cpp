@@ -40,7 +40,7 @@ void Mesh::CreateVertexIndices(void) {
     m_indices.SetDirty(true);
 }
 
-bool Mesh::UpdateVAO(bool createVertexIndex) {
+bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
     if (not CreateVAO())
         return false;
     if (not createVertexIndex)
@@ -53,31 +53,31 @@ bool Mesh::UpdateVAO(bool createVertexIndex) {
         m_vao->m_indexBuffer.SetDynamic(true);
         UpdateIndexBuffer();
     }
-    else if (m_indices.IsDirty()) {
+    else if (m_indices.IsDirty(forceUpdate)) {
         m_indices.Setup();
         UpdateIndexBuffer();
     }
-    if (m_vertices.IsDirty()) {
+    if (m_vertices.IsDirty(forceUpdate)) {
         m_vertices.Setup();
         UpdateVertexBuffer();
         }
     int i = -1;
     for (auto& tc : m_texCoords) {
-        if (tc.HaveData() and tc.IsDirty()) {
+        if (tc.HaveData() and tc.IsDirty(forceUpdate)) {
             tc.Setup();
             UpdateTexCoordBuffer(++i);
         }
     }
-    if (m_vertexColors.IsDirty()) {
+    if (m_vertexColors.IsDirty(forceUpdate)) {
         m_vertexColors.Setup();
         UpdateColorBuffer();
     }
-    if (m_normals.IsDirty()) {
+    if (m_normals.IsDirty(forceUpdate)) {
         m_normals.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateNormalBuffer();
     }
-    if (m_floatBuffer.IsDirty()) {
+    if (m_floatBuffer.IsDirty(forceUpdate)) {
         m_floatBuffer.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateFloatDataBuffer();

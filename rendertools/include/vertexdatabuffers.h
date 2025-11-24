@@ -35,7 +35,9 @@ public:
         return m_componentCount;
     }
 
-    inline const bool IsDirty(void) const noexcept {
+    inline bool IsDirty(bool setDirty = false) noexcept {
+        if (setDirty)
+            m_isDirty = true;
         return m_isDirty;
     }
 

@@ -95,7 +95,9 @@ noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
 noexcept(noexcept(Bind()) && noexcept(Describe()))
 #endif
 {
+#ifdef _DEBUG
     baseRenderer.ClearGLError();
+#endif
     bool update;
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable()) {
