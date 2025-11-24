@@ -76,7 +76,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
 
 
 int FBO::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount) {
-#if 0
+#if 1
     if (not bufferCount)
         return -1;
 #endif
@@ -319,6 +319,7 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
 #ifdef _DEBUG
         if (not BaseRenderer::CheckGLError())
             return false;
+        m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 #endif
         m_activeHandle = m_handle.Data();
     }
