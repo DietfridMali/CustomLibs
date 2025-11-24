@@ -23,6 +23,10 @@ public:
         m_fbo = fbo;
         m_drawBuffers = drawBuffers;
     }
+
+    bool operator==(const DrawBufferInfo& other) const {
+        return other.m_fbo == m_fbo;
+    }
 };
 
 // =================================================================================================
@@ -61,7 +65,7 @@ class DrawBufferHandler
 
         void SetDrawBuffers(FBO* fbo, ManagedArray<GLuint>* drawBuffers);
 
-        void RestoreDrawBuffer(void);
+        void RemoveDrawBuffer(FBO* buffer);
 
         void ResetDrawBuffers(FBO* activeBuffer, bool clearBuffer = true);
 };

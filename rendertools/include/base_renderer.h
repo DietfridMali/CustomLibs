@@ -100,11 +100,19 @@ public:
     bool CreateScreenBuffer(void);
 
     virtual FBO* GetSceneBuffer(void) noexcept {
+#if 1
         return m_sceneBuffer;
+#else
+        return m_skyBuffer;
+#endif
     }
 
     FBO* GetSkyBuffer(void) noexcept {
+#if 1
         return m_skyBuffer;
+#else
+        return m_sceneBuffer;
+#endif
     }
 
     virtual void ActivateSceneViewport(void) noexcept {

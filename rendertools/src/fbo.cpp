@@ -177,7 +177,16 @@ void FBO::Destroy(void) {
         m_bufferInfo[i].m_handle.Release();
     }
     m_bufferCount = 0;
+    m_colorBufferCount = -1;
+    m_vertexBufferCount = 0;
+    m_vertexBufferIndex = -1;
+    m_depthBufferIndex = -1;
+    m_activeBufferIndex = -1;
+    m_drawBufferGroup = dbNone;
+    m_isAvailable = false;
+
     m_bufferInfo.Reset();
+    m_drawBuffers.Reset();
     m_handle.Release();
     //glDeleteFramebuffers(1, &m_handle);
 }
@@ -186,7 +195,8 @@ void FBO::Destroy(void) {
 bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
     int l = m_drawBuffers.Length();
     if (drawBufferGroup == dbDepth) {
-        m_drawBuffers[0] = GL_NONE;
+        for (int i = 0; i < l; ++i)
+            m_drawBuffers[i] = GL_NONE;
     }
     else if (drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
@@ -251,7 +261,6 @@ void FBO::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
         return false;
-    openGLStates.BindTexture2D(0, 0);
     if (reenable)
         glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
     else {
@@ -324,9 +333,11 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
 void FBO::Disable(void) {
     if (IsEnabled()) {
         ReleaseBuffers();
-        m_activeHandle = GL_NONE;
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        baseRenderer.RestoreDrawBuffer();
+        if (m_activeHandle == m_handle.Data()) {
+            m_activeHandle = GL_NONE;
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+        baseRenderer.RemoveDrawBuffer(this);
     }
 }
 

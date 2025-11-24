@@ -70,14 +70,21 @@ void DrawBufferHandler::SetDrawBuffers(FBO* fbo, ManagedArray<GLuint>* drawBuffe
 }
 
 
-void DrawBufferHandler::RestoreDrawBuffer(void) {
-    m_drawBufferStack.Pop(m_drawBufferInfo);
-    openGLStates.BindTexture2D(0, 0);
-    if (m_drawBufferInfo.m_fbo != nullptr)
-        m_drawBufferInfo.m_fbo->Reenable(false, true);
-    else
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    SetActiveDrawBuffers();
+void DrawBufferHandler::RemoveDrawBuffer(FBO* buffer) {
+    if (buffer == m_drawBufferStack.Last().m_fbo) {
+        m_drawBufferStack.Pop(m_drawBufferInfo);
+        openGLStates.BindTexture2D(0, 0);
+        if (m_drawBufferInfo.m_fbo != nullptr)
+            m_drawBufferInfo.m_fbo->Reenable(false, true);
+        else
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        SetActiveDrawBuffers();
+    }
+    else {
+        for (auto& dbi : m_drawBufferStack)
+            if (dbi.m_fbo == buffer)
+                m_drawBufferStack.Remove(dbi);
+    }
 }
 
 // =================================================================================================
