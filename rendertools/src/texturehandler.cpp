@@ -18,9 +18,21 @@ bool TextureHandler::DeleteTextures(const String& key, Texture** texture) {
 }
 
 
+bool TextureHandler::RedeployTextures(const String& key, Texture** texture) {
+    if (texture and *texture)
+        (*texture)->Redeploy();
+    return true;
+}
+
+
 void TextureHandler::Destroy(void) noexcept {
     Texture::UpdateLUT(false);
     Texture::textureLUT.Walk(&TextureHandler::DeleteTextures, this);
+}
+
+
+void TextureHandler::Redeploy(void) noexcept {
+    Texture::textureLUT.Walk(&TextureHandler::RedeployTextures, this);
 }
 
 

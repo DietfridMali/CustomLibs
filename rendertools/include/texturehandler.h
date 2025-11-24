@@ -30,6 +30,10 @@ public:
 
     bool DeleteTextures(const String& key, Texture** texture);
 
+    bool RedeployTextures(const String& key, Texture** texture);
+
+    void Redeploy(void) noexcept;
+
     void Destroy(void) noexcept;
 
     void SetTextureFolder(String textureFolder) noexcept {

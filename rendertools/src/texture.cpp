@@ -221,12 +221,35 @@ void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t out
 void Texture::Deploy(int bufferIndex)
 {
     if (Bind()) {
-        SetParams();
         TextureBuffer* texBuf = m_buffers[bufferIndex];
         uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.Data());
         glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
+        SetParams();
+#ifdef _DEBUG
+        baseRenderer.CheckGLError();
+#endif
         Release();
     }
+}
+
+
+bool Texture::Redeploy(void) {
+#if USE_SHARED_HANDLES
+    m_handle.Release();
+    m_handle = SharedTextureHandle();
+    m_isValid = m_handle.Claim() != 0;
+#else
+    glDeleteTextures(1, &m_handle);
+    glGenTextures(1, &m_handle);
+    m_isValid = m_handle != 0;
+#endif
+
+    if (not m_isValid)
+        return false;
+    m_tmuIndex = -1;
+    m_hasParams = false;
+    Deploy(0);
+    return true;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -363,7 +386,7 @@ noexcept
 
 void TiledTexture::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
-        Texture::SetParams();
+        Texture::SetParams(enforce);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glGenerateMipmap(GL_TEXTURE_2D);

@@ -195,6 +195,8 @@ public:
 
     virtual void Deploy(int bufferIndex = 0) override;
 
+    bool Redeploy(void);
+
     virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
 
     bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);

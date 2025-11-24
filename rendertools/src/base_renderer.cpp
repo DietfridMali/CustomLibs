@@ -221,8 +221,12 @@ void BaseRenderer::Draw3DScene(void) {
         if (renderScene)
 #endif
         {
+#if 0
+            Fill(ColorData::Orange);
+#else
             m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
             m_renderQuad.Render(shader, &m_renderTexture);
+#endif
         }
 #if TEST_RENDER
         else { // test render shadow map
