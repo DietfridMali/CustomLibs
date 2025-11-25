@@ -28,11 +28,6 @@ public:
 
     ManagedArray<SDL_DisplayMode>   m_displayModes;
     int                             m_activeDisplayMode{ 0 };
-#ifdef _DEBUG
-    bool                            m_fullScreen{ false };
-#else
-    bool                            m_fullScreen{ true };
-#endif
 
     BaseDisplayHandler()
         : m_width(0)
@@ -108,11 +103,11 @@ public:
     bool ChangeDisplayMode(int displayMode, bool useFullscreen);
 
     inline bool IsFullScreen(void) noexcept {
-        return m_fullScreen;
+        return m_isFullscreen;
     }
 
-    inline void SetFullScreen(bool fullScreen) noexcept {
-        m_fullScreen = fullScreen;
+    inline void SetFullScreen(bool useFullscreen) noexcept {
+        m_isFullscreen = useFullscreen;
     }
 
     bool SwitchDisplayMode(int direction);
