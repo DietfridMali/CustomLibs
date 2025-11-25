@@ -5,7 +5,7 @@
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 
-GLuint FBO::m_activeHandle = GL_NONE;
+GLint FBO::m_activeHandle = GL_NONE;
 
 // =================================================================================================
 
@@ -319,7 +319,6 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
             return false;
         m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 #endif
-        m_activeHandle = m_handle.Data();
     }
     return EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable);
 }
@@ -328,8 +327,7 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
 void FBO::Disable(void) {
     if (IsEnabled()) {
         ReleaseBuffers();
-        if (m_activeHandle == m_handle.Data()) {
-            m_activeHandle = GL_NONE;
+        if (IsEnabled()) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             baseRenderer.RestoreDrawBuffer();
         }

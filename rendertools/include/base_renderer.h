@@ -41,9 +41,6 @@ protected:
     FBO*                    m_skyBuffer;
     Texture                 m_renderTexture;
     bool                    m_screenIsAvailable;
-#ifdef _DEBUG
-    bool                    m_xchgSkyAndSceneBuffer{ false };
-#endif
 
     Viewport                m_viewport;
     Viewport                m_sceneViewport;
@@ -70,6 +67,9 @@ protected:
 
 public:
     GLVersion               m_glVersion;
+#ifdef _DEBUG
+    bool                    m_xchgSkyAndSceneBuffer{ false };
+#endif
 
     BaseRenderer()
         : m_screenBuffer(nullptr)
@@ -178,8 +178,6 @@ public:
     virtual bool EnableCamera(void) { return false; }
 
     virtual bool DisableCamera(void) { return false; }
-
-    inline FBO* SceneBuffer(void) noexcept { return m_sceneBuffer; }
 
     inline FBO* ScreenBuffer(void) noexcept { return m_screenBuffer; }
 

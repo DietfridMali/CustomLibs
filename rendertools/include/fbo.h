@@ -80,7 +80,7 @@ public:
     BaseQuad                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
 
-    static GLuint               m_activeHandle;
+    static GLint                m_activeHandle;
 
     struct FBOBufferParams {
         String name{ "" };
@@ -198,7 +198,10 @@ public:
     }
 
     inline bool IsEnabled(void) noexcept {
-        return (m_activeHandle != GL_NONE) and (m_activeHandle == m_handle.Data());
+#if 1
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &m_activeHandle);
+#endif
+        return (GLuint(m_activeHandle) != GL_NONE) and (GLuint(m_activeHandle) == m_handle.Data());
     }
 
     inline int GetLastDestination(void) noexcept {

@@ -97,6 +97,10 @@ public:
 
 
     Matrix4f& Pop(Matrix4f& m) {
+#ifdef _DEBUG
+        if (m_stack.IsEmpty())
+            return m;
+#endif
         m_stack.Pop(m);
         return m;
     }
