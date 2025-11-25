@@ -85,6 +85,7 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 
 void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.ClearColor(ColorData::Invisible);
+    glClearDepth(1.0);
     openGLStates.ColorMask(1, 1, 1, 1);
     openGLStates.SetDepthWrite(1);
     openGLStates.SetDepthTest(1);
@@ -170,7 +171,6 @@ bool BaseRenderer::Start2DScene(void) {
         return false;
 #endif
     SetClearColor(m_backgroundColor);
-    glClearDepth(1.0);
     ResetDrawBuffers(m_screenBuffer, not m_screenIsAvailable);
     m_screenIsAvailable = true;
     ResetTransformation();

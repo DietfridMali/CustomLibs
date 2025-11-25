@@ -41,6 +41,9 @@ protected:
     FBO*                    m_skyBuffer;
     Texture                 m_renderTexture;
     bool                    m_screenIsAvailable;
+#ifdef _DEBUG
+    bool                    m_xchgSkyAndSceneBuffer{ false };
+#endif
 
     Viewport                m_viewport;
     Viewport                m_sceneViewport;
@@ -100,18 +103,18 @@ public:
     bool CreateScreenBuffer(void);
 
     virtual FBO* GetSceneBuffer(void) noexcept {
-#if 1
-        return m_sceneBuffer;
+#ifdef _DEBUG
+        return m_xchgSkyAndSceneBuffer ? m_skyBuffer : m_sceneBuffer;
 #else
-        return m_skyBuffer;
+        return m_sceneBuffer;
 #endif
     }
 
     FBO* GetSkyBuffer(void) noexcept {
-#if 1
-        return m_skyBuffer;
+#ifdef _DEBUG
+        return m_xchgSkyAndSceneBuffer ? m_sceneBuffer : m_skyBuffer;
 #else
-        return m_sceneBuffer;
+        return m_skyBuffer;
 #endif
     }
 

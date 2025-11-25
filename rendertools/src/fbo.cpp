@@ -16,18 +16,24 @@ FBO::FBO() {
 
 void FBO::Init(void) {
     m_handle = SharedFramebufferHandle(0);
+    m_renderTexture.m_handle = SharedTextureHandle(0);
+    m_renderTexture.HasBuffer() = false;
+    m_depthTexture.m_handle = SharedTextureHandle(0);
+    m_depthTexture.HasBuffer() = false;
     m_width = 0;
     m_height = 0;
     m_scale = 1;
     m_bufferCount = 0;
-    m_pingPong = true;
-    m_isAvailable = false;
     m_colorBufferCount = -1;
     m_vertexBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_lastDestination = -1;
     m_activeBufferIndex = -1;
+    m_pingPong = true;
+    m_isAvailable = false;
     m_drawBufferGroup = dbNone;
+    m_bufferInfo.Reset();
+    m_drawBuffers.Reset();
 }
 
 
@@ -176,19 +182,8 @@ void FBO::Destroy(void) {
     for (int i = 0; i < m_bufferCount; i++) {
         m_bufferInfo[i].m_handle.Release();
     }
-    m_bufferCount = 0;
-    m_colorBufferCount = -1;
-    m_vertexBufferCount = 0;
-    m_vertexBufferIndex = -1;
-    m_depthBufferIndex = -1;
-    m_activeBufferIndex = -1;
-    m_drawBufferGroup = dbNone;
-    m_isAvailable = false;
-
-    m_bufferInfo.Reset();
-    m_drawBuffers.Reset();
     m_handle.Release();
-    //glDeleteFramebuffers(1, &m_handle);
+    Init();
 }
 
 
@@ -275,7 +270,7 @@ bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
-    return (drawBufferGroup == dbAll) or (drawBufferGroup == dbColor) or (drawBufferGroup == dbDepth);
+    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth);
 }
 
 
