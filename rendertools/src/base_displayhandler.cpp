@@ -170,7 +170,7 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
 
     if (displayMode < 0)
        displayMode = m_activeDisplayMode;
-#if 0 // always set window size and fullscreen or the window might not get centered when toggling fullscreen
+#if 0 // always set window size and fullscreen or the output might not get centered when toggling fullscreen
     if (m_activeDisplayMode != displayMode) 
 #endif
     {
