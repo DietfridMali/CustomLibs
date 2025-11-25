@@ -347,7 +347,7 @@ void BaseRenderer::PopViewport(void) {
     if ((viewport.Width() > WindowWidth()) or (viewport.Height() > WindowHeight()))
         return;
     SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
-#if 0
+#if 1
     m_viewport.SetGlViewport();
 #endif
 }
