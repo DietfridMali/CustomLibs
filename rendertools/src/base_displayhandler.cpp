@@ -58,14 +58,15 @@ int BaseDisplayHandler::FindDisplayMode(int width, int height) {
     int64_t dsMin = std::numeric_limits<int64_t>::max();
     for (int i = 0; i < m_displayModes.Length(); ++i) {
         SDL_DisplayMode& m = m_displayModes[i];
-        float da = float(m.w) / float(m.h) - aspectRatio;
+        float da = fabs(float(m.w) / float(m.h) - aspectRatio);
         int64_t ds = static_cast<int64_t>(std::llabs((int64_t(m.w) * int64_t(m.h)) - size));
         if (da < daMin) {
             daMin = da;
+            dsMin = ds;
             bestMode = i;
         }
         else if ((da == daMin) and (ds < dsMin)) {
-            ds = dsMin;
+            dsMin = ds;
             bestMode = i;
         }
     }
@@ -190,7 +191,9 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
     else if (m_fullScreen != fullscreen) {
         m_fullScreen = fullscreen;
         SDL_SetWindowFullscreen(m_window, m_fullScreen ? SDL_WINDOW_FULLSCREEN : 0);
+        SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     }
+    OnResize();
     return true;
 }
 

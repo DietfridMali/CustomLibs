@@ -125,6 +125,8 @@ public:
         lastDisplayMode = m_activeDisplayMode;
         return true;
     }
+
+    virtual void OnResize(void) {}
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()
