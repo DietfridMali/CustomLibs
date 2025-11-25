@@ -4,7 +4,7 @@
 #include "matrix.hpp"
 #include "glew.h"
 #include "shader.h"
-#include "projection.h"
+#include "projector.h"
 
 // =================================================================================================
 
@@ -24,6 +24,7 @@ public:
     Matrix4f        m_transformations[int(mtCount)]; // matrices are row major - let OpenGL transpose them when passing them with glUniformMatrix4fv
     Matrix4f        m_glProjection[3];
     Matrix4f        m_glModelView[3];
+    Projector       m_projector;
 
     List<Matrix4f>  m_stack;
 
@@ -85,6 +86,9 @@ public:
         return m_transformations [int(matrixType)];
     }
 
+    Projector& GetProjector(void) noexcept {
+        return m_projector;
+    }
 
     void Push(Matrix4f& m) {
         m_stack.Append(m);
@@ -195,13 +199,17 @@ public:
     }
 
 
+    inline Projector& GetProjector (void) noexcept {
+        return Matrices()->GetProjector();
+    }
+
     inline GLfloat* ProjectionMatrix(void) noexcept {
         return (GLfloat*)Matrices()->GetProjection().AsArray();
     }
 
+
     // setup 3D transformation and projection
     void SetupTransformation(void) noexcept;
-
 
     void ResetTransformation(void) noexcept;
 

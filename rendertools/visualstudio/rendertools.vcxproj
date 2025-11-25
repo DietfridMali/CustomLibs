@@ -132,7 +132,7 @@
     <ClInclude Include="..\include\noise.h" />
     <ClInclude Include="..\include\plane.h" />
     <ClInclude Include="..\include\prerenderedtexture.h" />
-    <ClInclude Include="..\include\projection.h" />
+    <ClInclude Include="..\include\projector.h" />
     <ClInclude Include="..\include\base_quad.h" />
     <ClInclude Include="..\include\rectangle.h" />
     <ClInclude Include="..\include\base_renderer.h" />

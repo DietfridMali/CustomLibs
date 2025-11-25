@@ -12,15 +12,15 @@ public:
     float   m_zFar;
     float   m_zoom;
 
-    Projection()
-        : m_zNear(0.1f), m_zFar(100.0f), m_zoom(1.0f), m_aspectRatio(1920.0f / 1080.0f), m_fov(90.0f)
+    Projector(float aspectRatio = 1920.0f / 1080.0f, float fov = 45, float zNear = 0.1f, float zFar = 100.0f, float zoom = 1.0f)
+        : m_aspectRatio(aspectRatio), m_fov(fov), m_zNear(zNear), m_zFar(zFar), m_zoom(zoom)
     {
     }
 
-    Matrix4f Create(float aspectRatio, float fov = 45, float zNear = 0.0f, float zFar = 0.0f, bool rowMajor = false)
+    void Setup(float aspectRatio, float fov = 45, float zNear = 0.0f, float zFar = 0.0f, float zoom = 1.0f)
         noexcept;
 
-    Matrix4f ComputeProjection(bool rowMajor = false)
+    Matrix4f Compute3DProjection(bool rowMajor = false)
         noexcept;
 
     Matrix4f ComputeOrthoProjection(float left, float right, float bottom, float top, float zNear, float zFar, bool rowMajor = false)

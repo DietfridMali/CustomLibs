@@ -123,8 +123,8 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	float zNear = std::max(0.01f, lightDistance - worldRadius);
 	float zFar = lightDistance + worldRadius;
 
-	Projection projector;
-	lightProj = projector.Create(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
+	Projector projector(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
+	lightProj = projector.Compute3DProjection();
 
 	CreateLightTransformation(lightView, lightProj);
 }
@@ -138,8 +138,8 @@ void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Ve
 	m_lightPosition = center + lightDirection * lightDistance;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 	float halfFov = std::atan(worldRadius / lightDistance);
-	Projection projector;
-	lightProj = projector.Create(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+	Projector projector(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+	lightProj = projector.Compute3DProjection();
 	CreateLightTransformation(lightView, lightProj);
 }
 
@@ -171,7 +171,7 @@ void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f
 		vMin.Minimize(v);
 		vMax.Maximize(v);
 	}
-	Projection projector;
+	Projector projector;
 	lightProj = projector.ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
 
 	CreateLightTransformation(lightView, lightProj);

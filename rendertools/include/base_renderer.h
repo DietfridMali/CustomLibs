@@ -7,7 +7,7 @@
 #include "basesingleton.hpp"
 #include "array.hpp"
 #include "matrix.hpp"
-#include "projection.h"
+#include "projector.h"
 #include "rendermatrices.h"
 #include "viewport.h"
 #include "fbo.h"

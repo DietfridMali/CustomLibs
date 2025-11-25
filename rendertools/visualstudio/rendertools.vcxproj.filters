@@ -51,7 +51,7 @@
     <ClInclude Include="..\include\outlinerenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\projection.h">
+    <ClInclude Include="..\include\projector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\base_quad.h">

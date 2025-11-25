@@ -6,20 +6,18 @@
 
 // =================================================================================================
 
-Matrix4f Projector::Create(float aspectRatio, float fov, float zNear, float zFar, bool rowMajor)
+void Projector::Setup(float aspectRatio, float fov, float zNear, float zFar, float zoom)
 noexcept
 {
     m_aspectRatio = aspectRatio;
     m_fov = fov;
-    if (zNear != 0.0f)
-        m_zNear = zNear;
-    if (zFar != 0.0f)
-        m_zFar = zFar;
-    return ComputeProjection(rowMajor);
+    m_zNear = zNear;
+    m_zFar = zFar;
+    m_zoom = zoom;
 }
 
 
-Matrix4f Projector::ComputeProjection(bool rowMajor)
+Matrix4f Projector::Compute3DProjection(bool rowMajor)
 noexcept
 {
 #if USE_GLM
