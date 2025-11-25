@@ -30,7 +30,7 @@ FILES := \
  plane \
  prerenderedtexture \
  primitive_shaders \
- projection \
+ projector \
  rendermatrices \
  shader \
  shadowmap \
