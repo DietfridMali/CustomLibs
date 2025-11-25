@@ -187,13 +187,14 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
         m_width = mode.w;
         m_height = mode.h;
         m_aspectRatio = float(m_width) / float(m_height);
+        OnResize();
     }
     else if (m_isFullscreen != useFullscreen) {
         m_isFullscreen = useFullscreen;
         SDL_SetWindowFullscreen(m_window, m_isFullscreen ? SDL_WINDOW_FULLSCREEN : 0);
         SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+        OnResize();
     }
-    OnResize();
     return true;
 }
 
