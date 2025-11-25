@@ -74,7 +74,7 @@ int BaseDisplayHandler::FindDisplayMode(int width, int height) {
 }
 
 
-void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool fullscreen, bool vSync) {
+void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync) {
     m_activeDisplayMode = FindDisplayMode(width, height);
     width = m_displayModes[m_activeDisplayMode].w;
     height = m_displayModes[m_activeDisplayMode].h;
@@ -82,7 +82,7 @@ void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool 
     SDL_GetDisplayBounds(0, &rect);
     m_maxWidth = rect.w;
     m_maxHeight = rect.h;
-    ComputeDimensions(width, height, fullscreen);
+    ComputeDimensions(width, height, useFullscreen);
     m_aspectRatio = float(m_width) / float(m_height);
     m_isLandscape = m_width > m_height;
     m_vSync = vSync;
@@ -90,16 +90,16 @@ void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool 
 }
 
 
-void BaseDisplayHandler::ComputeDimensions(int width, int height, bool fullscreen) noexcept {
+void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullscreen) noexcept {
     if (width * height == 0) {
         m_width = m_maxWidth;
         m_height = m_maxHeight;
-        m_fullscreen = true;
+        m_isFullscreen = true;
     }
     else {
         m_width = std::min(width, m_maxWidth);
         m_height = std::min(height, m_maxHeight);
-        m_fullscreen = fullscreen;
+        m_isFullscreen = useFullscreen;
     }
 }
 
@@ -113,15 +113,15 @@ BaseDisplayHandler::~BaseDisplayHandler() {
 void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     int screenType = SDL_WINDOW_OPENGL;
 #if 0
-    if (m_fullscreen) {
+    if (m_isFullscreen) {
         if ((m_width != m_maxWidth) or (m_height != m_maxHeight))
             screenType |= SDL_WINDOW_BORDERLESS;
         else
             screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
-        m_fullscreen = true;
+        m_isFullscreen = true;
     }
 #else
-    if (m_fullscreen)
+    if (m_isFullscreen)
         screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
 #endif
 #if 1
@@ -164,18 +164,18 @@ void BaseDisplayHandler::Update(void) {
 }
 
 
-bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
+bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) {
     if (displayMode >= m_displayModes.Length())
         return false;
 
     if (displayMode < 0)
-        displayMode = m_activeDisplayMode;
+       displayMode = m_activeDisplayMode;
 
     if (m_activeDisplayMode != displayMode) {
         m_activeDisplayMode = displayMode;
-        m_fullScreen = fullscreen;
+        m_isFullscreen = useFullscreen;
         SDL_DisplayMode mode = GetDisplayMode();
-        if (m_fullScreen) {
+        if (m_isFullscreen) {
             SDL_SetWindowDisplayMode(m_window, &mode);
             SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
         }
@@ -188,9 +188,9 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
         m_height = mode.h;
         m_aspectRatio = float(m_width) / float(m_height);
     }
-    else if (m_fullScreen != fullscreen) {
-        m_fullScreen = fullscreen;
-        SDL_SetWindowFullscreen(m_window, m_fullScreen ? SDL_WINDOW_FULLSCREEN : 0);
+    else if (m_isFullscreen != useFullscreen) {
+        m_isFullscreen = useFullscreen;
+        SDL_SetWindowFullscreen(m_window, m_isFullscreen ? SDL_WINDOW_FULLSCREEN : 0);
         SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     }
     OnResize();
@@ -199,12 +199,12 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
 
 
 bool BaseDisplayHandler::SwitchDisplayMode(int direction) {
-    return ChangeDisplayMode(m_activeDisplayMode + direction, m_fullScreen);
+    return ChangeDisplayMode(m_activeDisplayMode + direction, m_isFullscreen);
 }
 
 
 bool BaseDisplayHandler::ToggleFullscreen(void) {
-    return ChangeDisplayMode(-1, not m_fullscreen);
+    return ChangeDisplayMode(-1, not m_isFullscreen);
 }
 
 

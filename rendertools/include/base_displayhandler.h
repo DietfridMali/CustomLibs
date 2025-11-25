@@ -19,7 +19,7 @@ public:
     int             m_height;
     int             m_maxWidth;
     int             m_maxHeight;
-    bool            m_fullscreen;
+    bool            m_isFullscreen;
     bool            m_vSync;
     bool            m_isLandscape;
     float           m_aspectRatio;
@@ -39,7 +39,7 @@ public:
         , m_height(0)
         , m_maxWidth(0)
         , m_maxHeight(0)
-        , m_fullscreen(false)
+        , m_isFullscreen(false)
         , m_vSync(true)
         , m_isLandscape(false)
         , m_aspectRatio(1.0f)
@@ -56,13 +56,13 @@ public:
 
     int GetDisplayModes(void);
 
-    void Create (String windowTitle = "", int width = 1920, int height = 1080, bool fullscreen = true, bool vSync = false);
+    void Create (String windowTitle = "", int width = 1920, int height = 1080, bool useFullscreen = true, bool vSync = false);
 
     static BaseDisplayHandler& Instance(void) { return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance()); }
 
     int FindDisplayMode(int width, int height);
 
-    virtual void ComputeDimensions(int width, int height, bool fullscreen)
+    virtual void ComputeDimensions(int width, int height, bool useFullscreen)
         noexcept;
 
     virtual void SetupDisplay(String windowTitle);
@@ -105,7 +105,7 @@ public:
         m_activeDisplayMode = displayMode;
     }
 
-    bool ChangeDisplayMode(int displayMode, bool fullscreen);
+    bool ChangeDisplayMode(int displayMode, bool useFullscreen);
 
     inline bool IsFullScreen(void) noexcept {
         return m_fullScreen;
