@@ -148,9 +148,7 @@ bool BaseRenderer::Start3DScene(void) {
     FBO* sceneBuffer = GetSceneBuffer();
     if (not (sceneBuffer and sceneBuffer->IsAvailable()))
         return false;
-    glClearColor(1.0f, 0.5f, 0.0f, 1.0f);
     ResetDrawBuffers(sceneBuffer);
-    glClearColor(0, 0, 0, 0);
     SetupTransformation();
     SetViewport(m_sceneViewport);
     EnableCamera();
@@ -349,7 +347,9 @@ void BaseRenderer::PopViewport(void) {
     if ((viewport.Width() > WindowWidth()) or (viewport.Height() > WindowHeight()))
         return;
     SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
+#if 0
     m_viewport.SetGlViewport();
+#endif
 }
 
 
