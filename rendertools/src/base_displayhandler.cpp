@@ -170,8 +170,10 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
 
     if (displayMode < 0)
        displayMode = m_activeDisplayMode;
-
-    if (m_activeDisplayMode != displayMode) {
+#if 0 // always set window size and fullscreen or the window might not get centered when toggling fullscreen
+    if (m_activeDisplayMode != displayMode) 
+#endif
+    {
         m_activeDisplayMode = displayMode;
         m_isFullscreen = useFullscreen;
         SDL_DisplayMode mode = GetDisplayMode();
@@ -189,12 +191,14 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
         m_aspectRatio = float(m_width) / float(m_height);
         OnResize();
     }
+#if 0
     else if (m_isFullscreen != useFullscreen) {
         m_isFullscreen = useFullscreen;
         SDL_SetWindowFullscreen(m_window, m_isFullscreen ? SDL_WINDOW_FULLSCREEN : 0);
         SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
         OnResize();
     }
+#endif
     return true;
 }
 
@@ -205,6 +209,9 @@ bool BaseDisplayHandler::SwitchDisplayMode(int direction) {
 
 
 bool BaseDisplayHandler::ToggleFullscreen(void) {
+#ifdef _DEBUG
+    fprintf(stderr, "Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
+#endif
     return ChangeDisplayMode(-1, not m_isFullscreen);
 }
 
