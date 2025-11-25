@@ -182,7 +182,7 @@
     <ClCompile Include="..\src\mesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\projection.cpp">
+    <ClCompile Include="..\src\projector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_quad.cpp">

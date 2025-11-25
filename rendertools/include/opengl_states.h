@@ -206,6 +206,8 @@ public:
 		}
 
 		int TextureIsBound(GLenum typeID, GLuint texture);
+
+		void ReleaseBuffers(void) noexcept;
 	};
 
 #define openGLStates OpenGLStates::Instance()

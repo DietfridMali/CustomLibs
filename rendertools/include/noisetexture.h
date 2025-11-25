@@ -299,20 +299,22 @@ private:
         NoiseTraits<Tag>::Compute(m_data, gridSize, yPeriod, xPeriod, octaves);
     }
 
-    void Deploy(int bufferIndex = 0) {
-        if (Bind()) {
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            TextureBuffer* texBuf = m_buffers[bufferIndex];
-            glTexImage2D(GL_TEXTURE_2D, 0,
-                NoiseTraits<Tag>::IFmt,
-                texBuf->Width(), texBuf->Height(), 0,
-                NoiseTraits<Tag>::EFmt,
-                NoiseTraits<Tag>::Type,
-                reinterpret_cast<const void*>(m_data.Data()));
-            SetParams(false);
-            Release();
-        }
+    bool Deploy(int bufferIndex = 0) {
+        if (not Bind())
+            return false;
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        TextureBuffer* texBuf = m_buffers[bufferIndex];
+        glTexImage2D(GL_TEXTURE_2D, 0,
+            NoiseTraits<Tag>::IFmt,
+            texBuf->Width(), texBuf->Height(), 0,
+            NoiseTraits<Tag>::EFmt,
+            NoiseTraits<Tag>::Type,
+            reinterpret_cast<const void*>(m_data.Data()));
+        SetParams(false);
+        Release();
+        return true;
     }
+
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -333,7 +335,7 @@ private:
     ManagedArray<float>	m_data;
 
 public:
-	virtual void Deploy(int bufferIndex = 0) override;
+	virtual bool Deploy(int bufferIndex = 0) override;
 
 	virtual void SetParams(bool enforce = false) override;
 
@@ -363,7 +365,7 @@ class CloudNoiseTexture
     : public Texture
 {
 public:
-    virtual void Deploy(int bufferIndex = 0) override;
+    virtual bool Deploy(int bufferIndex = 0) override;
 
     virtual void SetParams(bool enforce = false) override;
 
@@ -389,7 +391,7 @@ class BlueNoiseTexture
     : public Texture
 {
 public:
-    virtual void Deploy(int bufferIndex = 0) override;
+    virtual bool Deploy(int bufferIndex = 0) override;
 
     virtual void SetParams(bool enforce = false) override;
 

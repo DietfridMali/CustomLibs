@@ -134,7 +134,7 @@ void BaseDisplayHandler::Update(void) {
 
 
 bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
-    if ((displayMode < 0) and (displayMode >= m_displayModes.Length()))
+    if ((displayMode < 0) or (displayMode >= m_displayModes.Length()))
         return false;
     if (m_activeDisplayMode != displayMode) {
         m_activeDisplayMode = displayMode;

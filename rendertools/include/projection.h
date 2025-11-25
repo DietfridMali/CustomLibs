@@ -4,7 +4,7 @@
 
 // =================================================================================================
 
-class Projection {
+class Projector {
 public:
     float   m_aspectRatio;
     float   m_fov;

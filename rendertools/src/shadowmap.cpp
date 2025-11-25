@@ -123,7 +123,8 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	float zNear = std::max(0.01f, lightDistance - worldRadius);
 	float zFar = lightDistance + worldRadius;
 
-	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
+	Projection projector;
+	lightProj = projector.Create(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
 
 	CreateLightTransformation(lightView, lightProj);
 }
@@ -137,7 +138,8 @@ void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Ve
 	m_lightPosition = center + lightDirection * lightDistance;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 	float halfFov = std::atan(worldRadius / lightDistance);
-	lightProj = baseRenderer.Matrices()->GetProjector().Create(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+	Projection projector;
+	lightProj = projector.Create(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
 	CreateLightTransformation(lightView, lightProj);
 }
 
@@ -169,7 +171,8 @@ void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f
 		vMin.Minimize(v);
 		vMax.Maximize(v);
 	}
-	lightProj = baseRenderer.Matrices()->GetProjector().ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
+	Projection projector;
+	lightProj = projector.ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
 
 	CreateLightTransformation(lightView, lightProj);
 }

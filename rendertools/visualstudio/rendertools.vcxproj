@@ -176,7 +176,7 @@
     <ClCompile Include="..\src\outline_shader.cpp" />
     <ClCompile Include="..\src\plane.cpp" />
     <ClCompile Include="..\src\prerenderedtexture.cpp" />
-    <ClCompile Include="..\src\projection.cpp" />
+    <ClCompile Include="..\src\projector.cpp" />
     <ClCompile Include="..\src\base_quad.cpp" />
     <ClCompile Include="..\src\base_renderer.cpp" />
     <ClCompile Include="..\src\rendermatrices.cpp" />

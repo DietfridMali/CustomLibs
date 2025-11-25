@@ -60,9 +60,9 @@ public:
 
     virtual void Release(int tmuIndex) = 0;
 
-    virtual void SetParams(bool enforce = false) = 0;
+    virtual void SetParams(bool forceUpdate = false) = 0;
 
-    virtual void Deploy(int bufferIndex = 0) = 0;
+    virtual bool Deploy(int bufferIndex = 0) = 0;
 
     virtual bool Enable(int tmuIndex = 0) = 0;
 
@@ -184,7 +184,7 @@ public:
 
     virtual void Release(int tmuIndex = 0) override;
 
-    virtual void SetParams(bool enforce = false) override;
+    virtual void SetParams(bool forceUpdate = false) override;
 
     void SetWrapping(int wrapMode = -1)
         noexcept;
@@ -193,7 +193,7 @@ public:
 
     virtual void Disable(int tmuIndex = 0) override;
 
-    virtual void Deploy(int bufferIndex = 0) override;
+    virtual bool Deploy(int bufferIndex = 0) override;
 
     bool Redeploy(void);
 
@@ -274,7 +274,7 @@ public:
 
     ~TiledTexture() = default;
 
-    virtual void SetParams(bool enforce = false) override;
+    virtual void SetParams(bool forceUpdate = false) override;
 };
 
 // =================================================================================================
@@ -287,7 +287,7 @@ public:
 
     ~FBOTexture() = default;
 
-    virtual void SetParams(bool enforce = false) override;
+    virtual void SetParams(bool forceUpdate = false) override;
 };
 
 // =================================================================================================
@@ -300,7 +300,7 @@ public:
 
     ~ShadowTexture() = default;
 
-    virtual void SetParams(bool enforce = false) override;
+    virtual void SetParams(bool forceUpdate = false) override;
 };
 
 // =================================================================================================

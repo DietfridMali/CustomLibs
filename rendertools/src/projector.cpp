@@ -2,11 +2,11 @@
 #include <algorithm>
 #include "glew.h"
 #include "conversions.hpp"
-#include "projection.h"
+#include "projector.h"
 
 // =================================================================================================
 
-Matrix4f Projection::Create(float aspectRatio, float fov, float zNear, float zFar, bool rowMajor)
+Matrix4f Projector::Create(float aspectRatio, float fov, float zNear, float zFar, bool rowMajor)
 noexcept
 {
     m_aspectRatio = aspectRatio;
@@ -19,7 +19,7 @@ noexcept
 }
 
 
-Matrix4f Projection::ComputeProjection(bool rowMajor)
+Matrix4f Projector::ComputeProjection(bool rowMajor)
 noexcept
 {
 #if USE_GLM
@@ -33,7 +33,7 @@ noexcept
 }
 
 
-Matrix4f Projection::ComputeFrustum(float left, float right, float bottom, float top, bool rowMajor)
+Matrix4f Projector::ComputeFrustum(float left, float right, float bottom, float top, bool rowMajor)
 noexcept
 {
 #if USE_GLM
@@ -55,7 +55,7 @@ noexcept
 }
 
 
-Matrix4f Projection::ComputeOrthoProjection(float left, float right, float bottom, float top, float zNear, float zFar, bool rowMajor)
+Matrix4f Projector::ComputeOrthoProjection(float left, float right, float bottom, float top, float zNear, float zFar, bool rowMajor)
 noexcept
 {
 #if USE_GLM

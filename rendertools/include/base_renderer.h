@@ -96,9 +96,9 @@ public:
 
     bool InitOpenGL(void) noexcept;
 
-    virtual void Init(int width, int height, float fov);
+    virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
-    virtual bool Create(int width = 1920, int height = 1080, float fov = 45);
+    virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
 
     bool CreateScreenBuffer(void);
 
@@ -240,12 +240,7 @@ public:
         viewportStack.Append(m_viewport);
     }
 
-    void PopViewport(void) {
-        ::Viewport viewport;
-        viewportStack.Pop(viewport);
-        SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
-        m_viewport.SetGlViewport();
-    }
+    void PopViewport(void);
 
     inline TexCoord ViewportSize(void) noexcept {
         return TexCoord(float(m_viewport.Width()), float(m_viewport.Height()));

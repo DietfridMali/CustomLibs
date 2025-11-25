@@ -163,9 +163,9 @@ void Texture::Release(int tmuIndex)
 }
 
 
-void Texture::SetParams(bool enforce)
+void Texture::SetParams(bool forceUpdate)
 {
-    if (enforce or not m_hasParams) {
+    if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
         if (m_useMipMaps) {
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -218,18 +218,20 @@ void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t out
 }
 
 
-void Texture::Deploy(int bufferIndex)
+bool Texture::Deploy(int bufferIndex)
 {
-    if (Bind()) {
-        TextureBuffer* texBuf = m_buffers[bufferIndex];
-        uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.Data());
-        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
-        SetParams();
+    if (not Bind())
+        return false;
+    TextureBuffer* texBuf = m_buffers[bufferIndex];
+    uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.Data());
+    glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
+    SetParams();
 #ifdef _DEBUG
-        baseRenderer.CheckGLError();
+    baseRenderer.CheckGLError();
 #endif
-        Release();
-    }
+    Release();
+    return true;
+    
 }
 
 
@@ -384,9 +386,9 @@ noexcept
 
 // =================================================================================================
 
-void TiledTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        Texture::SetParams(enforce);
+void TiledTexture::SetParams(bool forceUpdate) {
+    if (forceUpdate or not m_hasParams) {
+        Texture::SetParams(forceUpdate);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -400,8 +402,8 @@ void TiledTexture::SetParams(bool enforce) {
 
 // =================================================================================================
 
-void FBOTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
+void FBOTexture::SetParams(bool forceUpdate) {
+    if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
 #if 0
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -422,8 +424,8 @@ void FBOTexture::SetParams(bool enforce) {
 
 // =================================================================================================
 
-void ShadowTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
+void ShadowTexture::SetParams(bool forceUpdate) {
+    if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

@@ -148,14 +148,15 @@ void NoiseTexture3D::SetParams(bool enforce) {
 }
 
 
-void NoiseTexture3D::Deploy(int) {
-    if (Bind()) {
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
-        SetParams(false);
-        glGenerateMipmap(GL_TEXTURE_3D);
-        Release();
-    }
+bool NoiseTexture3D::Deploy(int) {
+    if (not Bind())
+        return false;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
+    SetParams(false);
+    glGenerateMipmap(GL_TEXTURE_3D);
+    Release();
+    return true;
 }
 
 bool NoiseTexture3D::LoadFromFile(const String& filename) {
@@ -333,14 +334,15 @@ void CloudNoiseTexture::SetParams(bool enforce) {
 }
 
 
-void CloudNoiseTexture::Deploy(int) {
-    if (Bind()) {
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
-        SetParams(false);
-        glGenerateMipmap(GL_TEXTURE_3D);
-        Release();
-    }
+bool CloudNoiseTexture::Deploy(int) {
+    if (not Bind())
+        return false;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
+    SetParams(false);
+    glGenerateMipmap(GL_TEXTURE_3D);
+    Release();
+    return true;
 }
 
 
@@ -441,14 +443,15 @@ void BlueNoiseTexture::SetParams(bool enforce) {
 }
 
 
-void BlueNoiseTexture::Deploy(int) {
-    if (Bind()) {
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, 128, 128, 64, 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(m_data.Data()));
-        SetParams(false);
-        glGenerateMipmap(GL_TEXTURE_3D);
-        Release();
-    }
+bool BlueNoiseTexture::Deploy(int) {
+    if (not Bind())
+        return false;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, 128, 128, 64, 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(m_data.Data()));
+    SetParams(false);
+    glGenerateMipmap(GL_TEXTURE_3D);
+    Release();
+    return true;
 }
 
 

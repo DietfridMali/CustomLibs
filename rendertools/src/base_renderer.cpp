@@ -24,7 +24,8 @@ static Texture* testTexture = nullptr;
 // rendered sideways. That's why BaseRenderer class has m_windowWidth, m_windowHeight and m_aspectRatio
 // separate from DisplayHandler.
 
-void BaseRenderer::Init(int width, int height, float fov) {
+void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
+    openGLStates.ReleaseBuffers();
     m_sceneWidth =
     m_windowWidth = width; // (width > height) ? width : height;
     m_sceneHeight =
@@ -34,7 +35,7 @@ void BaseRenderer::Init(int width, int height, float fov) {
     m_fov = fov;
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight); // just for code clarity
     SetupDrawBuffers();
-    CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov);
+    CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
     ResetTransformation();
     int w = m_windowWidth / 15;
     DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
@@ -60,8 +61,8 @@ bool BaseRenderer::CreateScreenBuffer(void) {
 }
 
 
-bool BaseRenderer::Create(int width, int height, float fov) {
-    Init(width, height, fov);
+bool BaseRenderer::Create(int width, int height, float fov, float zNear, float zFar) {
+    Init(width, height, fov, zNear, zFar);
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
     SetupOpenGL();
     m_drawBufferStack.Clear();
@@ -147,7 +148,9 @@ bool BaseRenderer::Start3DScene(void) {
     FBO* sceneBuffer = GetSceneBuffer();
     if (not (sceneBuffer and sceneBuffer->IsAvailable()))
         return false;
+    glClearColor(1.0f, 0.5f, 0.0f, 1.0f);
     ResetDrawBuffers(sceneBuffer);
+    glClearColor(0, 0, 0, 0);
     SetupTransformation();
     SetViewport(m_sceneViewport);
     EnableCamera();
@@ -336,6 +339,19 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     m_renderQuad.Fill(color);
     baseRenderer.PopMatrix();
 }
+
+
+void BaseRenderer::PopViewport(void) {
+    if (viewportStack.IsEmpty())
+        return;
+    ::Viewport viewport;
+    viewportStack.Pop(viewport);
+    if ((viewport.Width() > WindowWidth()) or (viewport.Height() > WindowHeight()))
+        return;
+    SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
+    m_viewport.SetGlViewport();
+}
+
 
 
 void BaseRenderer::ClearGLError(void) noexcept {

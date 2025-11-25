@@ -21,7 +21,6 @@ public:
 
     using enum MatrixType;
 
-    Projection      m_projector;
     Matrix4f        m_transformations[int(mtCount)]; // matrices are row major - let OpenGL transpose them when passing them with glUniformMatrix4fv
     Matrix4f        m_glProjection[3];
     Matrix4f        m_glModelView[3];
@@ -86,10 +85,6 @@ public:
         return m_transformations [int(matrixType)];
     }
 
-    ::Projection& GetProjector(void) noexcept {
-        return m_projector;
-    }
-
 
     void Push(Matrix4f& m) {
         m_stack.Append(m);
@@ -135,7 +130,7 @@ public:
     }
 
 
-    void CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov);
+    void CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov, float zNear, float zFar);
 
     inline int SelectMatrixStack(int i) {
         int current = m_activeStack;

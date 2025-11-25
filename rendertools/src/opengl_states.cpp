@@ -56,4 +56,15 @@ void OpenGLStates::DetermineExtensions(void) {
 	}
 }
 
+
+void OpenGLStates::ReleaseBuffers(void) noexcept {
+	glUseProgram(0);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glActiveTexture(GL_TEXTURE0);
+}
+
 // =================================================================================================

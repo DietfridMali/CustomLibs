@@ -10,7 +10,7 @@ public:
 
     virtual void SetParams(void);
 
-    virtual void Deploy(int bufferIndex = 0);
+    virtual bool Deploy(int bufferIndex = 0);
 
 };
 
