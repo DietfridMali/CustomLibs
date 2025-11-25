@@ -135,7 +135,6 @@ void Shader::UpdateMatrices(void) {
             SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
             SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
             SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
-            SetInt("renderShadow", shadowMap.IsReady() ? 1 : 0);
         }
         if (shadowMap.IsReady())
             SetMatrix4f("mLightTransform", shadowMap.GetTransformation().AsArray(), false);
