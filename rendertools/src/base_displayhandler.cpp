@@ -3,6 +3,8 @@
 #include "glew.h"
 #include "SDL.h"
 #include "base_displayhandler.h"
+#include <cstdint>
+#include <limits>
 #include <stdlib.h>
 #include <math.h>
 #include <algorithm>
@@ -46,8 +48,35 @@ int BaseDisplayHandler::GetDisplayModes(void) {
     return m_displayModes.Length();
 }
 
+// find display mode closest to width*height with aspect ratio width/height
+// aspect ratio comes first
+int BaseDisplayHandler::FindDisplayMode(int width, int height) {
+    float aspectRatio = float(width) / float(height);
+    int64_t size = int64_t(width) * int64_t(height);
+    int bestMode = -1;
+    float daMin = 1e6;
+    int64_t dsMin = std::numeric_limits<int64_t>::max();
+    for (int i = 0; i < m_displayModes.Length(); ++i) {
+        SDL_DisplayMode& m = m_displayModes[i];
+        float da = float(m.w) / float(m.h) - aspectRatio;
+        int64_t ds = static_cast<int64_t>(std::llabs((int64_t(m.w) * int64_t(m.h)) - size));
+        if (da < daMin) {
+            daMin = da;
+            bestMode = i;
+        }
+        else if ((da == daMin) and (ds < dsMin)) {
+            ds = dsMin;
+            bestMode = i;
+        }
+    }
+    return bestMode;
+}
+
 
 void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool fullscreen, bool vSync) {
+    m_activeDisplayMode = FindDisplayMode(width, height);
+    width = m_displayModes[m_activeDisplayMode].w;
+    height = m_displayModes[m_activeDisplayMode].h;
     SDL_Rect rect;
     SDL_GetDisplayBounds(0, &rect);
     m_maxWidth = rect.w;
@@ -128,14 +157,19 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     SDL_GL_SetSwapInterval(m_vSync ? 1 : 0);
 }
 
+
 void BaseDisplayHandler::Update(void) {
     SDL_GL_SwapWindow(m_window);
 }
 
 
 bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
-    if ((displayMode < 0) or (displayMode >= m_displayModes.Length()))
+    if (displayMode >= m_displayModes.Length())
         return false;
+
+    if (displayMode < 0)
+        displayMode = m_activeDisplayMode;
+
     if (m_activeDisplayMode != displayMode) {
         m_activeDisplayMode = displayMode;
         m_fullScreen = fullscreen;
@@ -158,6 +192,16 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool fullscreen) {
         SDL_SetWindowFullscreen(m_window, m_fullScreen ? SDL_WINDOW_FULLSCREEN : 0);
     }
     return true;
+}
+
+
+bool BaseDisplayHandler::SwitchDisplayMode(int direction) {
+    return ChangeDisplayMode(m_activeDisplayMode + direction, m_fullScreen);
+}
+
+
+bool BaseDisplayHandler::ToggleFullscreen(void) {
+    return ChangeDisplayMode(-1, not m_fullscreen);
 }
 
 

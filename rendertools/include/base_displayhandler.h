@@ -45,6 +45,7 @@ public:
         , m_aspectRatio(1.0f)
         , m_window(nullptr)
         , m_context(SDL_GLContext(0))
+        , m_activeDisplayMode(0)
     { 
         _instance = this;
     }
@@ -58,6 +59,8 @@ public:
     void Create (String windowTitle = "", int width = 1920, int height = 1080, bool fullscreen = true, bool vSync = false);
 
     static BaseDisplayHandler& Instance(void) { return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance()); }
+
+    int FindDisplayMode(int width, int height);
 
     virtual void ComputeDimensions(int width, int height, bool fullscreen)
         noexcept;
@@ -108,14 +111,13 @@ public:
         return m_fullScreen;
     }
 
-    inline bool ToggleFullScreen(void) noexcept {
-        return m_fullScreen = not m_fullScreen;
-    }
-
     inline void SetFullScreen(bool fullScreen) noexcept {
         m_fullScreen = fullScreen;
     }
 
+    bool SwitchDisplayMode(int direction);
+
+    bool ToggleFullscreen(void);
 
     inline bool DisplayModeHasChanged(int& lastDisplayMode) noexcept {
         if (lastDisplayMode == m_activeDisplayMode)
