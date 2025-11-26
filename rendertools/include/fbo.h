@@ -149,7 +149,7 @@ public:
 
     bool Render(const FBORenderParams& params, const RGBAColor& color);
 
-    inline bool Render(const FBORenderParams& params, RGBAColor&& color = ColorData::White) {
+    inline bool Render(const FBORenderParams& params, RGBAColor&& color) {
         return Render(params, static_cast<const RGBAColor&>(color));
     }
 

@@ -236,7 +236,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
 void TextRenderer::RenderToScreen(FBO* fbo, int flipVertically) {
 #if USE_TEXT_FBOS
     if (m_font)
-        fbo->RenderToScreen({ .source = fbo ? fbo->GetLastDestination() : -1, .clearBuffer = false, .flipVertically = flipVertically, .scale = m_scale }, m_color); // render outline to viewport
+        fbo->Render({ .source = fbo ? fbo->GetLastDestination() : -1, .clearBuffer = false, .flipVertically = flipVertically, .scale = m_scale }, m_color); // render outline to viewport
 #endif
 }
 
