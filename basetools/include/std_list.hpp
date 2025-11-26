@@ -165,13 +165,19 @@ public:
 
     // ----------------------------------------------------------
     
-    bool Discard(int32_t i)
+    inline bool Discard(int32_t i)
     {
         auto it = ElementAt(i);
         if (it == m_list.end())
             return false;
         m_list.erase(it);
         return true;
+    }
+
+
+    inline auto Erase(int32_t i) {
+        auto it = ElementAt(i);
+        return (it == m_list.end()) ? it : m_list.Erase(it);
     }
 
 
