@@ -149,7 +149,7 @@ public:
 
     bool Render(const FBORenderParams& params, const RGBAColor& color);
 
-    inline bool Render(const FBORenderParams& params, RGBAColor&& color) {
+    inline bool Render(const FBORenderParams& params, RGBAColor&& color = ColorData::White) {
         return Render(params, static_cast<const RGBAColor&>(color));
     }
 
@@ -165,16 +165,6 @@ public:
 
     bool AutoRender(const FBORenderParams& params) {
         return AutoRender(params, ColorData::White);
-    }
-
-    bool RenderToScreen(const FBORenderParams& params, const RGBAColor&);
-
-    bool RenderToScreen(const FBORenderParams& params, RGBAColor&& color) {
-        return RenderToScreen(params, static_cast<const RGBAColor&>(color));
-    }
-
-    inline bool RenderToScreen(const FBORenderParams& params) {
-        return RenderToScreen(params, ColorData::White);
     }
 
     inline int GetWidth(bool scaled = false) {

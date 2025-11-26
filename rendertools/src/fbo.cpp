@@ -505,9 +505,4 @@ bool FBO::AutoRender(const FBORenderParams& params, const RGBAColor& color) {
     return Render({ .source = m_lastDestination, .destination = NextBuffer(m_lastDestination), .clearBuffer = params.clearBuffer, .scale = params.scale, .shader = params.shader }, color);
 }
 
-
-bool FBO::RenderToScreen(const FBORenderParams& params, const RGBAColor& color) {
-    return Render(params, color);
-}
-
 // =================================================================================================

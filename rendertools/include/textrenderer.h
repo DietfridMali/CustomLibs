@@ -47,8 +47,6 @@ public:
 
     TextRenderer(RGBAColor color = ColorData::White, const TextDecoration& decoration = {}, float scale = 1.0f);
 
-    void Setup(void);
-
     void Fill(Vector4f color);
 
     void RenderToBuffer(String text, eTextAlignments alignment, FBO* fbo, Viewport& viewport, int renderAreaWidth = 0, int renderAreaHeight = 0, int flipVertically = 0);
