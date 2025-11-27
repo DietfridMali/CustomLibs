@@ -169,7 +169,7 @@ public:
 
     bool UpdateVAO(bool createVertexIndex = false, bool forceUpdate = false);
 
-    void ComputeTangents(void);
+    void UpdateTangents(void);
 
     void ResetVAO(void);
 

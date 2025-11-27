@@ -41,7 +41,7 @@ void Mesh::CreateVertexIndices(void) {
 }
 
 
-void Mesh::ComputeTangents(void) {
+void Mesh::UpdateTangents(void) {
     ManagedArray<Vector3f> vertices;
     vertices.Resize(m_vertices.AppDataLength());
     int i = 0;
@@ -158,13 +158,13 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateNormalBuffer();
     }
+    if (m_tangents.IsDirty())
+        UpdateTangents();
     if (m_floatBuffer.IsDirty(forceUpdate)) {
         m_floatBuffer.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateFloatDataBuffer();
     }
-    if (m_tangents.IsDirty())
-        ComputeTangents();
     m_vao->Disable();
     return true;
 }
