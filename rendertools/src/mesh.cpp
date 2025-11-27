@@ -57,7 +57,7 @@ void Mesh::UpdateTangents(void) {
     ManagedArray<TexCoord> texCoords;
     texCoords.Resize(m_vertices.AppDataLength());
     i = 0;
-    for (auto tc : m_vertices.AppData())
+    for (auto tc : m_texCoords[0].AppData())
         texCoords[i++] = tc;
 
     ManagedArray<Vector3f> tangents;
@@ -68,10 +68,10 @@ void Mesh::UpdateTangents(void) {
 
     ManagedArray<GLuint>& indices = m_indices.GLData();
 
-    for (int i = 0, l = indices.Length(); i; ++i) {
-        GLuint i0 = indices[i + 0];
-        GLuint i1 = indices[i + 1];
-        GLuint i2 = indices[i + 2];
+    for (int i = 0, l = indices.Length(); i < l;) {
+        GLuint i0 = indices[i++];
+        GLuint i1 = indices[i++];
+        GLuint i2 = indices[i++];
 
         Vector3f edge1 = vertices[i1] - vertices[i0];
         Vector3f edge2 = vertices[i2] - vertices[i0];
@@ -105,11 +105,10 @@ void Mesh::UpdateTangents(void) {
         if (t.Dot(t) * b.Dot(b) == 0.0f) {
             Vector3f ref = (fabs(n.z) < 0.999f) ? Vector3f(0.0f, 0.0f, 1.0f) : Vector3f(0.0f, 1.0f, 0.0f);
             t = ref.Cross(n).Normalize();
-            b = n.Cross(t);
             AddTangent(Vector4f(t, 1.0f));
         }
         else {
-            t = t - n * n.Dot(t);
+            t -= n * n.Dot(t);
             t.Normalize();
             float handedness = (n.Cross(t).Dot(b) < 0.0f) ? -1.0f : 1.0f;
             AddTangent(Vector4f(t, handedness));
@@ -120,7 +119,7 @@ void Mesh::UpdateTangents(void) {
 }
 
 
-bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
+bool Mesh::UpdateVAO(bool createVertexIndex, bool createTangents, bool forceUpdate) {
     if (not CreateVAO())
         return false;
     if (not createVertexIndex)
@@ -158,7 +157,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateNormalBuffer();
     }
-    if (m_tangents.IsDirty())
+    if (createTangents and m_tangents.IsDirty())
         UpdateTangents();
     if (m_floatBuffer.IsDirty(forceUpdate)) {
         m_floatBuffer.Setup();
@@ -168,6 +167,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
     m_vao->Disable();
     return true;
 }
+
 
 void Mesh::ResetVAO(void) {
     m_indices.Reset();
