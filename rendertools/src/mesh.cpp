@@ -115,6 +115,8 @@ void Mesh::ComputeTangents(void) {
             AddTangent(Vector4f(t, handedness));
         }
     }
+    m_tangents.Setup();
+    UpdateTangentBuffer();
 }
 
 

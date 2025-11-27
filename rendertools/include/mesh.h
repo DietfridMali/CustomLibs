@@ -123,6 +123,8 @@ public:
 
     inline TexCoordBuffer& TexCoords(int i) noexcept { return m_texCoords [i]; }
 
+    inline TangentBuffer& Tangents(void) noexcept { return m_tangents; }
+
     inline ColorBuffer& VertexColors(void) noexcept { return m_vertexColors; }
 
     inline IndexBuffer& Indices(void) noexcept { return m_indices; }
@@ -137,6 +139,11 @@ public:
     inline void UpdateTexCoordBuffer(int i) {
         if (m_vao)
             m_vao->UpdateDataBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT);
+    }
+
+    inline void UpdateTangentBuffer(void) {
+        if (m_vao)
+            m_vao->UpdateDataBuffer("Tangent", 0, m_tangents, GL_FLOAT);
     }
 
     inline void UpdateColorBuffer(void) {
