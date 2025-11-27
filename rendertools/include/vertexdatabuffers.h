@@ -246,7 +246,7 @@ public:
 class TangentBuffer
     : public VertexDataBuffer <Vector4f, GLfloat> {
 public:
-    VertexBuffer(size_t listSegmentSize = 1)
+    TangentBuffer(size_t listSegmentSize = 1)
         : VertexDataBuffer(4, listSegmentSize)
     {
     }

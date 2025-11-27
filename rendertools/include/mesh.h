@@ -198,6 +198,14 @@ public:
         AddVertex(static_cast<const Vector3f&>(v));
     }
 
+    inline void AddTangent(const Vector4f& v) {
+        m_tangents.Append(v);
+    }
+
+    inline void AddTangent(Vector4f& v) {
+        AddTangent(static_cast<const Vector4f&>(v));
+    }
+
     inline void AddTexCoord(const TexCoord& tc, int i = 0) {
         m_texCoords[i].Append(tc);
     }
