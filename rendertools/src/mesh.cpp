@@ -67,6 +67,7 @@ void Mesh::UpdateTangents(void) {
     bitangents.Resize(m_vertices.AppDataLength());
 
     ManagedArray<GLuint>& indices = m_indices.GLData();
+    m_tangents.AppData().Reset();
 
     for (int i = 0, l = indices.Length(); i < l;) {
         GLuint i0 = indices[i++];
@@ -126,7 +127,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool createTangents, bool forceUpda
         createVertexIndex = (m_shape == GL_QUADS);
     m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape, m_isDynamic);
     m_vao->Enable();
-    m_tangents.SetDirty(m_vertices.IsDirty() or m_texCoords[0].IsDirty());
+    m_tangents.SetDirty(m_vertices.IsDirty() or m_texCoords[0].IsDirty() or m_normals.IsDirty());
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = GL_TRIANGLES;
