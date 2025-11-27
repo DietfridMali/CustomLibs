@@ -233,7 +233,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
     std::cout << "GL_ELEMENT_ARRAY_BUFFER_BINDING: " << elementBuffer << std::endl;
 #endif
     // Attribute 0-3 checken (Position, TexCoord, Normal, etc.)
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 7; i++) {
         GLint enabled, size, type, stride, bufferBinding;
         GLvoid* pointer;
 
@@ -250,7 +250,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
                 << ", stride=" << stride
                 << ", VBO=" << bufferBinding
                 << ", offset=" << (size_t)pointer << std::endl;
-            DumpVBO(bufferBinding, 4 * size, (size == 3) ? "vertices" : "texCoord");
+            DumpVBO(bufferBinding, 4 * size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
 #endif
         }
 #if 1
@@ -271,7 +271,7 @@ noexcept
 {
 #ifdef _DEBUG
     float* data = (float*)(m_dataBuffers[0]->m_data);
-    if (checkVAO)
+     if (checkVAO)
         CheckVAO(m_handle);
 #endif
     if (not Enable())
