@@ -40,6 +40,68 @@ void Mesh::CreateVertexIndices(void) {
     m_indices.SetDirty(true);
 }
 
+
+void Mesh::ComputeTangents(void) {
+    ManagedArray<Vector3f>& tangents;
+    ManagedArray<Vector3f>& biTangents;
+    ManagedArray<Vector4f>& vertexTangents = m_tangents.GLData();
+    m_tangents.Resize(m_vertices.GLDataLength());
+    m_bitangents.Resize(m_vertices.GLDataLength());
+    m_vertexTangents.Resize(m_vertices.GLDataLength());
+    ManagedArray<GLUint>& indices = m_indices.GLData();
+
+    for (int i = 0, l = m_indices.Length(); i; ++i) {
+        GLuint i0 = indices[i + 0];
+        GLuint i1 = indices[i + 1];
+        GLuint i2 = indices[i + 2];
+
+        Vector3f edge1 = positions[i1] - positions[i0];
+        Vector3f edge2 = positions[i2] - positions[i0];
+
+        Vector2f deltaUV1 = texcoords[i1] - texcoords[i0];
+        Vector2f deltaUV2 = texcoords[i2] - texcoords[i0];
+
+        float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+        if (det != 0.0f) {
+            float r = 1.0f / det;
+
+            float r = 1.0f / det;
+
+            Vector3f tangent = (edge1 * deltaUV2.y - edge2 * deltaUV1.y) * r;
+            Vector3f bitangent = (edge2 * deltaUV1.x - edge1 * deltaUV2.x) * r;
+
+            tangents[i0] += tangent;
+            tangents[i1] += tangent;
+            tangents[i2] += tangent;
+
+            bitangents[i0] += bitangent;
+            bitangents[i1] += bitangent;
+            bitangents[i2] += bitangent;
+        }
+        // fallback for det == 0.0f see below
+    }
+
+    for (size_t i = 0; i < positions.size(); ++i) {
+        Vector3f n = normalize(normals[i]);
+        Vector3f t = tangents[i];
+        Vector3f b = bitangents[i];
+
+        if (t.Dot(t) * b.Dot(b) == 0.0f) {
+            Vector3f ref = (fabs(n.z) < 0.999f) ? Vector3f(0.0f, 0.0f, 1.0f) : Vector3f(0.0f, 1.0f, 0.0f);
+            t = ref.Cross(ref, n).Normalize();
+            b = n.Cross(t);
+            vertexTangents[i] = Vector4f(t, 1.0f);
+        }
+        else {
+            t = t - n * n.Dot(t);
+            t.Normalize();
+            float handedness = (n.Cross(t).Dot(b) < 0.0f) ? -1.0f : 1.0f;
+            vertexTangents[i] = Vector4f(t, handedness);
+        }
+    }
+}
+
+
 bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
     if (not CreateVAO())
         return false;
@@ -47,6 +109,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
         createVertexIndex = (m_shape == GL_QUADS);
     m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape, m_isDynamic);
     m_vao->Enable();
+    m_tangents.SetDirty(m_vertices.IsDirty() or m_texCoords[0].IsDirty());
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = GL_TRIANGLES;
@@ -82,6 +145,8 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool forceUpdate) {
         // in the case of an icosphere, the vertices also are the vertex normals
         UpdateFloatDataBuffer();
     }
+    if (m_tangents.IsDirty())
+        ComputeTangents();
     m_vao->Disable();
     return true;
 }

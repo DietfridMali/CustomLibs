@@ -60,6 +60,7 @@ public:
     TextureList         m_textures;
     VertexBuffer        m_vertices;
     VertexBuffer        m_normals;
+    TangentBuffer       m_tangents;
     SimpleArray<TexCoordBuffer, 3>  m_texCoords;
     ColorBuffer         m_vertexColors;
     IndexBuffer         m_indices;
@@ -160,6 +161,8 @@ public:
     }
 
     bool UpdateVAO(bool createVertexIndex = false, bool forceUpdate = false);
+
+    void ComputeTangents(void);
 
     void ResetVAO(void);
 

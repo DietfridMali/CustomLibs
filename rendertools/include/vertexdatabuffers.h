@@ -215,10 +215,37 @@ class VertexBuffer : public VertexDataBuffer <Vector3f, GLfloat> {
 };
 
 // =================================================================================================
+// Buffer for vertex data (4D xyzw vector of type numpy.float32). Also used for normal data.
+// A pre-populated data buffer can be passed to the constructor
+
+class TangentBuffer 
+    : public VertexDataBuffer <Vector4f, GLfloat> {
+public:
+    VertexBuffer(size_t listSegmentSize = 1)
+        : VertexDataBuffer(4, listSegmentSize)
+    {
+    }
+
+    // Create a densely packed numpy array from the vertex data
+    virtual ManagedArray<GLfloat>& Setup(void) {
+        if (HaveAppData()) {
+            m_glData.Resize(m_appData.Length() * 3);
+            GLfloat* glData = m_glData.Data();
+            for (auto& v : m_appData) {
+                memcpy(glData, v.Data(), v.DataSize());
+                glData += 4;
+            }
+        }
+        return m_glData;
+    }
+};
+
+// =================================================================================================
 // Buffer for texture coordinate data (2D uv vector). Also used for color information
 // A pre-populated data buffer can be passed to the constructor
 
-class TexCoordBuffer : public VertexDataBuffer <TexCoord, GLfloat> {
+class TexCoordBuffer 
+    : public VertexDataBuffer <TexCoord, GLfloat> {
 public:
         TexCoordBuffer(size_t listSegmentSize = 1) 
             : VertexDataBuffer(2, listSegmentSize) 
@@ -241,7 +268,8 @@ public:
 // Buffer for color data (4D rgba vector of type numpy.float32). 
 // A pre-populated data buffer can be passed to the constructor
 
-class ColorBuffer : public VertexDataBuffer <RGBAColor, GLfloat> {
+class ColorBuffer 
+    : public VertexDataBuffer <RGBAColor, GLfloat> {
 public:
     ColorBuffer(size_t listSegmentSize = 1) 
         : VertexDataBuffer(4, listSegmentSize) 
