@@ -194,7 +194,8 @@ protected:
 // Buffer for vertex data (4D xyzw vector of type numpy.float32). Also used for normal data.
 // A pre-populated data buffer can be passed to the constructor
 
-class VertexBuffer : public VertexDataBuffer <Vector3f, GLfloat> {
+class VertexBuffer 
+    : public VertexDataBuffer <Vector3f, GLfloat> {
     public:
         VertexBuffer(size_t listSegmentSize = 1) 
             : VertexDataBuffer(3, listSegmentSize) 
@@ -212,32 +213,6 @@ class VertexBuffer : public VertexDataBuffer <Vector3f, GLfloat> {
             }
             return m_glData;
         }
-};
-
-// =================================================================================================
-// Buffer for vertex data (4D xyzw vector of type numpy.float32). Also used for normal data.
-// A pre-populated data buffer can be passed to the constructor
-
-class TangentBuffer 
-    : public VertexDataBuffer <Vector4f, GLfloat> {
-public:
-    VertexBuffer(size_t listSegmentSize = 1)
-        : VertexDataBuffer(4, listSegmentSize)
-    {
-    }
-
-    // Create a densely packed numpy array from the vertex data
-    virtual ManagedArray<GLfloat>& Setup(void) {
-        if (HaveAppData()) {
-            m_glData.Resize(m_appData.Length() * 3);
-            GLfloat* glData = m_glData.Data();
-            for (auto& v : m_appData) {
-                memcpy(glData, v.Data(), v.DataSize());
-                glData += 4;
-            }
-        }
-        return m_glData;
-    }
 };
 
 // =================================================================================================
@@ -262,6 +237,32 @@ public:
             }
             return m_glData;
         }
+};
+
+// =================================================================================================
+// Buffer for vertex data (4D xyzw vector of type numpy.float32). Also used for normal data.
+// A pre-populated data buffer can be passed to the constructor
+
+class TangentBuffer
+    : public VertexDataBuffer <Vector4f, GLfloat> {
+public:
+    VertexBuffer(size_t listSegmentSize = 1)
+        : VertexDataBuffer(4, listSegmentSize)
+    {
+    }
+
+    // Create a densely packed numpy array from the vertex data
+    virtual ManagedArray<GLfloat>& Setup(void) {
+        if (HaveAppData()) {
+            m_glData.Resize(m_appData.Length() * 4);
+            GLfloat* glData = m_glData.Data();
+            for (auto& v : m_appData) {
+                memcpy(glData, v.Data(), v.DataSize());
+                glData += 4;
+            }
+        }
+        return m_glData;
+    }
 };
 
 // =================================================================================================
@@ -293,7 +294,8 @@ public:
 // Requires an additional componentCount parameter, as index count depends on the vertex count of the 
 // primitive being rendered (quad: 4, triangle: 3, line: 2, point: 1)
 
-class IndexBuffer : public VertexDataBuffer <ManagedArray<GLuint>, GLuint> {
+class IndexBuffer 
+    : public VertexDataBuffer <ManagedArray<GLuint>, GLuint> {
     public:
     IndexBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1) 
         : VertexDataBuffer(componentCount, listSegmentSize) 
@@ -322,7 +324,8 @@ class IndexBuffer : public VertexDataBuffer <ManagedArray<GLuint>, GLuint> {
 // Requires an additional componentCount parameter, as index count depends on the vertex count of the 
 // primitive being rendered (quad: 4, triangle: 3, line: 2, point: 1)
 
-class FloatDataBuffer : public VertexDataBuffer <GLfloat, GLfloat> {
+class FloatDataBuffer 
+    : public VertexDataBuffer <GLfloat, GLfloat> {
 public:
     FloatDataBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1)
         : VertexDataBuffer(componentCount, listSegmentSize)
