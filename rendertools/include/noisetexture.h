@@ -174,13 +174,13 @@ struct NoiseTraits<WeatherNoiseRG8> {
 
     static void Compute(ManagedArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves) {
         data.Resize(gridSize * gridSize * 2);
+#if 0
         uint8_t* dst = data.Data();
 
         for (int y = 0; y < gridSize; ++y) {
             for (int x = 0; x < gridSize; ++x) {
                 float u = (x + 0.5f) / gridSize * xPeriod;
                 float v = (y + 0.5f) / gridSize * yPeriod;
-#if 0
                 // Coverage: großskaliges fbm
                 float cov = fbmPeriodic(u, v, xPeriod, yPeriod, octaves, 2.0f, 0.5f);
                 cov = std::clamp((cov - 0.35f) * 1.6f, 0.0f, 1.0f);
@@ -191,9 +191,9 @@ struct NoiseTraits<WeatherNoiseRG8> {
 
                 *dst++ = ToByte01(cov);
                 *dst++ = ToByte01(hb);
-#endif
             }
         }
+#endif
     }
 };
 
