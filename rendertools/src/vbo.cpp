@@ -88,7 +88,7 @@ noexcept
 }
 
 
-bool VBO::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+bool VBO::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
 #if USE_SHARED_HANDLES
 noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
 #else
@@ -98,14 +98,14 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
 #ifdef _DEBUG
     baseRenderer.ClearGLError();
 #endif
-    bool update;
+    bool updateSubData;
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable()) {
 #else
     if (m_handle != 0) {                     // BUGFIX: fehlende Klammer im #else-Zweig ergänzt
 #endif
-        if (m_isDynamic)
-            update = m_size == dataSize;
+        if (m_isDynamic or forceUpdate)
+            updateSubData = m_size == dataSize;
         else {
             Bind();
             Describe();
@@ -121,9 +121,9 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
 #endif
             return false;
 
-        update = false;
+        updateSubData = false;
     }
-    if (not update) {
+    if (not updateSubData) {
         m_type = type;
         m_bufferType = bufferType;
         m_itemSize = ComponentSize(componentType) * componentCount;
@@ -135,7 +135,7 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
     m_data = reinterpret_cast<char*>(data);
     m_size = GLsizei(dataSize);
     Bind();
-    if (m_isDynamic and update)
+    if (m_isDynamic and updateSubData)
         glBufferSubData(m_bufferType, 0, dataSize, data);
     else
         glBufferData(m_bufferType, dataSize, data, m_isDynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);

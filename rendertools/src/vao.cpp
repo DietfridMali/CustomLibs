@@ -114,19 +114,21 @@ noexcept
 }
 
 // add a vertex or index data buffer
-bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
 noexcept
 {
     if (strcmp(type, "Index"))
-        return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount);
+        return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
     UpdateIndexBuffer(data, dataSize, componentType);
     return true;
 }
 
 
-bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
 noexcept
 {
+    if (dataSize == 0)
+        return false;
     bool disabled = not IsActive() or not IsBound();
     if (disabled)
         Enable();
@@ -139,7 +141,7 @@ noexcept
         index = m_dataBuffers.Length() - 1;
     }
     if (vbo)
-        vbo->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount);
+        vbo->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount, forceUpdate);
 
     if (disabled)
         Disable();
@@ -147,13 +149,13 @@ noexcept
 }
 
 
-void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
+void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate)
 noexcept
 {
     bool disabled = not IsActive() or not IsBound();
     if (disabled)
         Enable();
-    m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize, componentType);
+    m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize, componentType, forceUpdate);
     if (disabled)
         Disable();
 }
@@ -192,10 +194,12 @@ noexcept
 
 bool checkVAO = false;
 
-static void DumpVBO(GLuint vbo, int count, const char* label) {
+static void DumpVBO(GLuint vbo, int elemSize, const char* label) {
     std::cout << "=== VBO Dump: " << label << " (ID: " << vbo << ") ===" << std::endl;
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    GLint bufSize;
+    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufSize);
 
     // VBO Größe checken
     GLint size;
@@ -203,6 +207,7 @@ static void DumpVBO(GLuint vbo, int count, const char* label) {
     std::cout << "Buffer size: " << size << " bytes" << std::endl;
 
     // Daten auslesen (z.B. erste 'count' floats)
+    int count = bufSize / elemSize;
     std::vector<float> data(count);
     glGetBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(float), data.data());
 
@@ -234,7 +239,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
 #endif
     // Attribute 0-3 checken (Position, TexCoord, Normal, etc.)
     for (int i = 0; i < 7; i++) {
-        GLint enabled, size, type, stride, bufferBinding;
+        GLint enabled, bufSize, size, type, stride, bufferBinding;
         GLvoid* pointer;
 
         glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
@@ -250,7 +255,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
                 << ", stride=" << stride
                 << ", VBO=" << bufferBinding
                 << ", offset=" << (size_t)pointer << std::endl;
-            DumpVBO(bufferBinding, 4 * size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
+            DumpVBO(bufferBinding, size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
 #endif
         }
 #if 1

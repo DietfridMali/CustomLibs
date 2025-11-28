@@ -136,34 +136,34 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool createTangents, bool forceUpda
     }
     else if (m_indices.IsDirty(forceUpdate)) {
         m_indices.Setup();
-        UpdateIndexBuffer();
+        UpdateIndexBuffer(forceUpdate);
     }
     if (m_vertices.IsDirty(forceUpdate)) {
         m_vertices.Setup();
-        UpdateVertexBuffer();
+        UpdateVertexBuffer(forceUpdate);
         }
     int i = -1;
     for (auto& tc : m_texCoords) {
         if (tc.HaveData() and tc.IsDirty(forceUpdate)) {
             tc.Setup();
-            UpdateTexCoordBuffer(++i);
+            UpdateTexCoordBuffer(++i, forceUpdate);
         }
     }
     if (m_vertexColors.IsDirty(forceUpdate)) {
         m_vertexColors.Setup();
-        UpdateColorBuffer();
+        UpdateColorBuffer(forceUpdate);
     }
     if (m_normals.IsDirty(forceUpdate)) {
         m_normals.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
-        UpdateNormalBuffer();
+        UpdateNormalBuffer(forceUpdate);
     }
     if (createTangents and m_tangents.IsDirty())
         UpdateTangents();
     if (m_floatBuffer.IsDirty(forceUpdate)) {
         m_floatBuffer.Setup();
         // in the case of an icosphere, the vertices also are the vertex normals
-        UpdateFloatDataBuffer();
+        UpdateFloatDataBuffer(forceUpdate);
     }
     m_vao->Disable();
     return true;

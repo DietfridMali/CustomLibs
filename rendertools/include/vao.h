@@ -179,9 +179,9 @@ public:
     VBO* FindBuffer(const char* type, int id, int& index)
         noexcept;
 
-    bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, size_t componentType) noexcept {
+    bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, size_t componentType, bool forceUpdate = false) noexcept {
         if (buffer.IsDirty()) {
-            if (not UpdateDataBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount())))
+            if (not UpdateDataBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount()), forceUpdate))
                 return false;
             buffer.SetDirty(false);
         }
@@ -189,9 +189,9 @@ public:
     }
         
 
-    void UpdateIndexBuffer(IndexBuffer& buffer, size_t componentType) noexcept {
+    void UpdateIndexBuffer(IndexBuffer& buffer, size_t componentType, bool forceUpdate = false) noexcept {
         if (buffer.IsDirty()) {
-            UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), componentType);
+            UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, forceUpdate);
             buffer.SetDirty(false);
         }
     }
@@ -201,13 +201,13 @@ public:
 
     protected:
         // add a vertex or index data buffer
-        bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0)
+        bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0, bool forceUpdate = false)
             noexcept;
 
-        bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount)
+        bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate = false)
             noexcept;
 
-        void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType)
+        void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate = false)
             noexcept;
 };
 

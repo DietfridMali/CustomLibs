@@ -131,40 +131,40 @@ public:
 
     inline FloatDataBuffer& FloatBuffer(void) noexcept { return m_floatBuffer; }
 
-    inline void UpdateVertexBuffer(void) {
+    inline void UpdateVertexBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Vertex", 0, m_vertices, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Vertex", 0, m_vertices, GL_FLOAT, forceUpdate);
     }
 
-    inline void UpdateTexCoordBuffer(int i) {
+    inline void UpdateTexCoordBuffer(int i, bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT);
+            m_vao->UpdateDataBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT, forceUpdate);
     }
 
-    inline void UpdateTangentBuffer(void) {
+    inline void UpdateTangentBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Tangent", 0, m_tangents, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Tangent", 0, m_tangents, GL_FLOAT, forceUpdate);
     }
 
-    inline void UpdateColorBuffer(void) {
+    inline void UpdateColorBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Color", 0, m_vertexColors, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Color", 0, m_vertexColors, GL_FLOAT, forceUpdate);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
-    inline void UpdateNormalBuffer(void) {
+    inline void UpdateNormalBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Normal", 0, m_normals, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Normal", 0, m_normals, GL_FLOAT, forceUpdate);
     }
 
-    inline void UpdateFloatDataBuffer(void) {
+    inline void UpdateFloatDataBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Float", 0, m_floatBuffer, GL_FLOAT);
+            m_vao->UpdateDataBuffer("Float", 0, m_floatBuffer, GL_FLOAT, forceUpdate);
     }
 
-    inline void UpdateIndexBuffer(void) {
+    inline void UpdateIndexBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT);
+            m_vao->UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT, forceUpdate);
     }
 
     bool UpdateVAO(bool createVertexIndex = false, bool createTangents = false, bool forceUpdate = false);
