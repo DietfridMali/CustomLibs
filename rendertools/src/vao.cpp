@@ -155,7 +155,7 @@ noexcept
     bool disabled = not IsActive() or not IsBound();
     if (disabled)
         Enable();
-    m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize, componentType, forceUpdate);
+    m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize, componentType, 1, forceUpdate);
     if (disabled)
         Disable();
 }

@@ -110,7 +110,7 @@ public:
     // dataSize: buffer size in bytes
     // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
     // componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
-    bool Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount = 1, bool forceUpdate = false)
+    bool Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate = false)
 #if USE_SHARED_HANDLES
         noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
 #else
