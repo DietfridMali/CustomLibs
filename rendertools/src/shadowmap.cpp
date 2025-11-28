@@ -14,6 +14,7 @@ bool ShadowMap::Setup(void) {
 
 bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	m_status = -1;
+#if !DEMO
 	if (not (m_map = new FBO()))
 		return false;
 	int size;
@@ -24,6 +25,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 		}
 		m_maxLightRadius *= 0.9f;
 	}
+#endif
 	return false;
 }
 
