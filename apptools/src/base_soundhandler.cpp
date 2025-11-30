@@ -188,8 +188,8 @@ SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams&
 }
 
 
-void BaseSoundHandler::Stop(int id) {
-    ConditionalStop([id](const SoundObject& so) { return so.m_id == id; });
+void BaseSoundHandler::Stop(int id, void* owner) {
+    ConditionalStop([id, owner](const SoundObject& so) { return (so.m_id == id) and (not owner or (so.m_owner == owner)); }, owner);
 }
 
 

@@ -136,7 +136,11 @@ class BaseSoundHandler
 
         void FadeOut(int id, int fadeTime);
             
-        void Stop(int id);
+        void Stop(int id, void* owner = nullptr);
+
+        inline bool IsPlaying(int id) {
+            return Mix_Playing(id);
+        }
 
         void StopSoundsByOwner(void* owner);
 
@@ -210,7 +214,7 @@ private:
         SoundObject& GetChannel(void);
 
         template <typename Predicate>
-        void ConditionalStop(Predicate condition)
+        void ConditionalStop(Predicate condition, void* owner = nullptr)
         {
             for (auto it = m_busyChannels.begin(); it != m_busyChannels.end(); )
             {
@@ -218,6 +222,10 @@ private:
                 if (not (condition(c) and c.Stop()))
                     ++it;
                 else {
+#ifdef _DEBUG
+                    if (owner and (c.m_owner != owner))
+                        fprintf(stderr, "stopped other owner's sound\n");
+#endif
                     m_idleChannels.Append(c);
                     // Achtung: erase mit reverse_iterator!
                     it = m_busyChannels.Discard(it);
