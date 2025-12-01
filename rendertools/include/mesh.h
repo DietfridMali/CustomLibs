@@ -241,6 +241,10 @@ public:
         m_normals.Append(static_cast<const Vector3f&>(n));
     }
 
+    inline void AddIndex(GLuint i) {
+        m_indices.Append(i);
+    }
+
     inline void AddIndices(ManagedArray<GLuint>& i) {
         m_indices.Append(i);
     }
