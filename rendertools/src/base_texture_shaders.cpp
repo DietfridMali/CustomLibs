@@ -30,6 +30,28 @@ const ShaderSource& TestShader() {
 }
 
 
+const ShaderSource& StencilShader() {
+    static const ShaderSource source(
+        "stencilShader",
+        R"(
+            #version 330 core
+            layout(location = 0) in vec3 position;
+            uniform mat4 mModelView;
+            uniform mat4 mProjection;
+            uniform mat4 mViewport;
+            void main() {
+                gl_Position = mViewport * mProjection * vec4(position, 1.0);
+            }
+        )"
+        R"(
+            #version 330 core
+            void main() { }
+        )"
+    );
+    return source;
+}
+
+
 const ShaderSource& DepthShader() {
     static const ShaderSource source(
         "depthShader",

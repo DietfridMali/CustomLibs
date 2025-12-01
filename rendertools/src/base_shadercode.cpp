@@ -6,6 +6,7 @@
 // =================================================================================================
 
 const ShaderSource& TestShader();
+const ShaderSource& StencilShader();
 const ShaderSource& DepthShader();
 const ShaderSource& ActorDepthShader();
 const ShaderSource& DepthRenderer();
@@ -30,6 +31,7 @@ const ShaderSource& GaussBlurShader();
 BaseShaderCode::BaseShaderCode() {
     ManagedArray<const ShaderSource*> shaderSource = {
         &TestShader(),
+        &StencilShader(),
         &DepthShader(),
         &ActorDepthShader(),
         &DepthRenderer(),
