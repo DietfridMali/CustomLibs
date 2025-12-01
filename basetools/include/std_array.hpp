@@ -1,10 +1,13 @@
 #pragma once
 
 #include <vector>
+#include <string>
 #include <cstdint>
 #include <cassert>
 #include <stdexcept>
 #include <algorithm>
+#include <fstream>
+#include <filesystem>
 
 // =================================================================================================
 
@@ -344,6 +347,42 @@ public:
     inline void SetDefaultValue(const DATA_T& defaultValue) {
         m_defaultValue = defaultValue;
     }
+
+
+    bool LoadFromFile(const std::string & filename, uint32_t elemCount) {
+        if (filename.empty())
+            return false;
+        std::ifstream f(filename.c_str(), std::ios::binary);
+        if (not f)
+            return false;
+
+        f.seekg(0, std::ios::end);
+        std::streamoff fileSize = f.tellg();
+        f.seekg(0, std::ios::beg);
+
+        size_t dataSize = size_t(elemCount) * sizeof(DATA_T);
+
+        if (fileSize != std::streamoff(dataSize))
+            return false;
+
+        if (Length() != dataSize)
+            Resize(dataSize);
+
+        f.read(reinterpret_cast<char*>(Data()), dataSize);
+        return f.good();
+    }
+
+
+    bool SaveToFile(const std::string& filename) const {
+        if (filename.empty())
+            return false;
+        std::ofstream f(filename.c_str(), std::ios::binary | std::ios::trunc);
+        if (not f)
+            return false;
+        f.write(reinterpret_cast<const char*>(Data()), size_t(Length()) * sizeof(DATA_T));
+        return f.good();
+    }
+
 };
 
 // =================================================================================================

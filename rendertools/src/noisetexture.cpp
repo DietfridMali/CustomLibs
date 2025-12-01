@@ -347,31 +347,12 @@ bool CloudNoiseTexture::Deploy(int) {
 
 
 bool CloudNoiseTexture::LoadFromFile(const String& filename) {
-    if (filename.IsEmpty())
-        return false;
-    std::ifstream f((const char*)filename, std::ios::binary);
-    if (not f)
-        return false;
-
-    int voxelCount = size_t(m_gridSize) * size_t(m_gridSize) * size_t(m_gridSize);
-    int expectedBytes = voxelCount * sizeof(float);
-
-    f.seekg(0, std::ios::end);
-    std::streamoff fileSize = f.tellg();
-    f.seekg(0, std::ios::beg);
-
-    if (fileSize != std::streamoff(expectedBytes))
-        return false;
-
-    if (m_data.Length() != voxelCount)
-        m_data.Resize(voxelCount);
-
-    f.read(reinterpret_cast<char*>(m_data.Data()), expectedBytes);
-    return f.good();
+    return m_data.LoadFromFile(filename, size_t(m_gridSize) * size_t(m_gridSize) * size_t(m_gridSize));
 }
 
 
 bool CloudNoiseTexture::SaveToFile(const String& filename) const {
+    return m_data.SaveToFile(filename);
     if (filename.IsEmpty())
         return false;
     std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
@@ -456,45 +437,12 @@ bool BlueNoiseTexture::Deploy(int) {
 
 
 bool BlueNoiseTexture::LoadFromFile(const String& filename) {
-    if (filename.IsEmpty())
-        return false;
-    std::ifstream f((const char*)filename, std::ios::binary);
-    if (not f)
-        return false;
-
-    uint32_t voxelCount = BufferSize();
-    uint32_t expectedBytes = voxelCount * sizeof(uint8_t);
-
-    f.seekg(0, std::ios::end);
-    std::streamoff fileSize = f.tellg();
-    f.seekg(0, std::ios::beg);
-
-    if (fileSize != std::streamoff(expectedBytes))
-        return false;
-
-    if (m_data.Length() != voxelCount)
-        m_data.Resize(voxelCount);
-
-    f.read(reinterpret_cast<char*>(m_data.Data()), expectedBytes);
-    return f.good();
+    return m_data.LoadFromFile(filename, BufferSize());
 }
 
 
 bool BlueNoiseTexture::SaveToFile(const String& filename) {
-    if (filename.IsEmpty())
-        return false;
-    std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
-    if (not f)
-        return false;
-
-    size_t voxelCount = BufferSize();
-    size_t bytes = voxelCount * sizeof(uint8_t);
-
-    if (m_data.Length() != voxelCount)
-        return false;
-
-    f.write(reinterpret_cast<const char*>(m_data.Data()), bytes);
-    return f.good();
+    return m_data.SaveToFile(filename);
 }
 
 // =================================================================================================
