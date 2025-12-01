@@ -88,7 +88,7 @@ public:
         String name{ "" };
         int colorBufferCount{ 1 };
         int depthBufferCount{ 0 };
-        int stencilBufferCount{ 1 };
+        int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
         bool hasMRTs{ false };
     };

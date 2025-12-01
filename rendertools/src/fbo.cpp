@@ -170,7 +170,7 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
     m_height = height;
     m_scale = scale;
     m_bufferCount = 0;
-    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount);
+    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
