@@ -17,6 +17,7 @@ public:
     typedef enum {
         btColor,
         btDepth,
+        btStencil,
         btVertex
     } eBufferType;
 
@@ -67,6 +68,7 @@ public:
     int                         m_vertexBufferCount;
     int                         m_vertexBufferIndex;
     int                         m_depthBufferIndex;
+    int                         m_stencilBufferIndex;
     int                         m_activeBufferIndex;
     ManagedArray<BufferInfo>    m_bufferInfo;
     DrawBufferList              m_drawBuffers; 
@@ -86,6 +88,7 @@ public:
         String name{ "" };
         int colorBufferCount{ 1 };
         int depthBufferCount{ 0 };
+        int stencilBufferCount{ 1 };
         int vertexBufferCount{ 0 };
         bool hasMRTs{ false };
     };
