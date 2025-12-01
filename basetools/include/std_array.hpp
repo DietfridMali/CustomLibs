@@ -189,6 +189,15 @@ public:
     }
 
 
+    ManagedArray operator+(const ManagedArray& other) const {
+        ManagedArray result;
+        result.Reserve(Length() + other.Length());
+        result.m_array.insert(result.m_array.end(), m_array.begin(), m_array.end());
+        result.m_array.insert(result.m_array.end(),other.m_array.begin(), other.m_array.end());
+        return result;
+    }
+
+
     void Fill(DATA_T value) noexcept {
         std::fill(m_array.begin(), m_array.end(), value);
     }

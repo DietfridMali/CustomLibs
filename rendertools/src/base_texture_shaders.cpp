@@ -42,7 +42,7 @@ const ShaderSource& StencilShader() {
             void main() {
                 gl_Position = mViewport * mProjection * vec4(position, 1.0);
             }
-        )"
+        )",
         R"(
             #version 330 core
             void main() { }
