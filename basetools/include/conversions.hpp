@@ -165,6 +165,12 @@ namespace Conversions
         return var.has_value() ? var.value() : defVal;
     }
 
+    // "double sided decay":
+    //    0 ... 1 .. 1 .. 1 ... 0
+    //    |--d--|         |--d--|
+    // min|-----t---------t-----|max
+    //        |                |
+    //        v                v
     // fade value in and out depending on how close it is to minValue and maxValue.
     // threshold determines where to start or stop fading
     inline float Rampi(int64_t value, int64_t minValue, int64_t maxValue, int64_t threshold) noexcept {
@@ -194,6 +200,11 @@ namespace Conversions
             return 0.0f;
         double d = std::min(value - minValue, maxValue - value);
         return (d >= threshold) ? 1.0f : d / threshold;
+    }
+
+
+    inline float Decayf(float value, float maxValue) noexcept {
+        return (maxValue == 0.0f) ? 0.0f : (maxValue - value) / maxValue;
     }
 
 
