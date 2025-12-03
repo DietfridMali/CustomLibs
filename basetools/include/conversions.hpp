@@ -165,7 +165,8 @@ namespace Conversions
         return var.has_value() ? var.value() : defVal;
     }
 
-
+    // fade value in and out depending on how close it is to minValue and maxValue.
+    // threshold determines where to start or stop fading
     inline float Rampi(int64_t value, int64_t minValue, int64_t maxValue, int64_t threshold) noexcept {
         if (threshold < 1)
             return 0.0f;
