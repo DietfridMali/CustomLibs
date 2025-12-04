@@ -95,7 +95,7 @@ namespace Conversions
         using Unsign = std::make_unsigned_t<Int>;
 
         if constexpr (std::signed_integral<Int>) {
-            if (i < 0) throw std::domain_error("isqrt_fast: negativer Eingangswert");
+            if (i < 0) throw std::domain_error("fast isqrt: negative input value");
         }
 
         Unsign n = static_cast<Unsign>(i);
@@ -223,6 +223,11 @@ namespace Conversions
     std::unique_ptr<T> MakeUnique(Args&&... args) {
         return std::unique_ptr<T>{ new(std::nothrow) T(std::forward<Args>(args)...) };
     }
+
+    template <typename T>
+    T Sqr(T v) {
+        return v * v;
+    };
 };
 
 // =================================================================================================
