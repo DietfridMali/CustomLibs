@@ -78,7 +78,7 @@ const ShaderSource& DepthShader() {
         in vec2 fragCoord;
         void main() { 
 #if 1
-            if (texture(surface, fract(fragCoord)).a * surfaceColor.a < 0.9)
+            if (texture(surface, /*fract*/(fragCoord)).a * surfaceColor.a < 0.9)
                 discard;
 #endif
             }
@@ -216,7 +216,7 @@ const ShaderSource& PlainTextureShader() {
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture(surface, tcOffset + (fract(fragCoord)) * tcScale);
+            vec4 texColor = texture(surface, tcOffset + tcScale * /*fract*/(fragCoord));
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
