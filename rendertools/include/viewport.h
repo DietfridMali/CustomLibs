@@ -138,6 +138,16 @@ public:
         return *this;
     }
 
+    Viewport operator*(float scale) {
+        if (fabs(scale) < Conversions::NumericTolerance)
+            return *this;
+        float w = float(m_width) * scale;
+        float h = float(m_height) * scale;
+        if (w * h <= Conversions::NumericTolerance)
+            return *this;
+        return Viewport (int(round(m_center.X() - w * 0.5f)), int(round(m_center.Y() - h * 0.5f)), int(round(w)), int(round(h)));
+    }
+
     inline void GetGlViewport(void) noexcept {
         glGetIntegerv(GL_VIEWPORT, m_glViewport);
     }
