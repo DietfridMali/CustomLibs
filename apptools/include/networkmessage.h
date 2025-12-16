@@ -76,6 +76,10 @@ class NetworkMessage {
             return m_address;
         }
 
+        inline int64_t NetworkID(void) noexcept {
+            return m_address.NetworkID();
+        }
+
         inline const String& IpAddress(void) const noexcept {
             return m_address.IpAddress();
         }

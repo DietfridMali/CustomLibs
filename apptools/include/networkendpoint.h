@@ -56,6 +56,10 @@ public:
         return UpdateSocketAddress(ipAddress, port);
     }
 
+    inline int64_t NetworkID(void) noexcept {
+        return (int64_t(m_socketAddress.host) << 16) | int64_t(m_socketAddress.port);
+    }
+
     inline const IPaddress& SocketAddress(void) const noexcept {
         return m_socketAddress;
     }

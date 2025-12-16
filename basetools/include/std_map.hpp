@@ -57,6 +57,24 @@ public:
         return nullptr;
     }
 
+
+    iterator Erase(iterator it) {
+        return m_map.erase(it);
+    }
+
+    iterator Erase(const_iterator it) {
+        return m_map.erase(it);
+    }
+
+    iterator Erase(iterator first, iterator last) {
+        return m_map.erase(first, last);
+    }
+
+    template<typename Predicate>
+    auto EraseIf(Predicate pred) -> typename std::map<KEY_T, DATA_T>::size_type {
+        return std::erase_if(m_map, [&](auto& kv) { return pred(kv.second); } );
+    }
+
     bool Find(const KEY_T& key, DATA_T& value) {
         auto it = m_map.find(key);
         if (it == m_map.end())
