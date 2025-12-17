@@ -182,6 +182,7 @@ const ShaderSource& GrayScaleShader() {
         uniform vec2 tcOffset;
         uniform vec2 tcScale;
         uniform float brightness;
+        uniform bool invert;
         in vec2 fragCoord;
         layout(location = 0) out vec4 fragColor;
         void main() {
@@ -189,7 +190,7 @@ const ShaderSource& GrayScaleShader() {
             // Rec.601 Luminanzgewichte in Gamma-Space
             float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
             gray *= brightness;
-            fragColor = vec4(vec3(gray), texColor.a);
+            fragColor = vec4(vec3(invert ? 1.0 - gray : gray), texColor.a);
         }
         )");
     return source;
@@ -331,6 +332,7 @@ const ShaderSource& TintAndBlurShader() {
             uniform float contrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
             uniform float gamma;        // Gammawert (z.B. 2.2 für Standard-Monitor)
             uniform vec4 tint;
+            uniform bool invert;
         )") +
         GaussBlurFuncs() +
         TintFuncs() +
@@ -345,7 +347,7 @@ const ShaderSource& TintAndBlurShader() {
             gray = pow(gray, 1.0 / gamma);
             gray *= brightness;
             vec3 finalRGB = mix(vec3(gray), tint.rgb * gray, tint.a);
-            fragColor = vec4(finalRGB, texColor.a);
+            fragColor = vec4(invert ? vec3(1.0) - finalRGB : finalRGB, texColor.a);
         }
         )")
     );

@@ -57,7 +57,7 @@ bool TextureAtlas::RenderColored(int glyphIndex, RGBAColor color) {
 
 
 bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
-	return Render(baseShaderHandler.LoadGrayscaleShader(brightness, GlyphOffset(glyphIndex), m_scale));
+	return Render(baseShaderHandler.LoadGrayscaleShader(brightness, false, GlyphOffset(glyphIndex), m_scale));
 }
 
 

@@ -222,13 +222,14 @@ Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const G
 }
 
 
-Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, const Vector2f& tcOffset, const Vector2f& tcScale) {
+Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, bool invert, const Vector2f& tcOffset, const Vector2f& tcScale) {
     Shader* shader = SetupShader("grayScale");
     if (shader) {
         if (baseRenderer.IsShadowPass())
             shader->SetVector4f("surfaceColor", ColorData::White);
         else {
             shader->SetInt("surface", 0);
+            shader->SetInt("invert", invert ? 1 : 0);
             shader->SetVector2f("tcOffset", tcOffset);
             shader->SetVector2f("tcScale", tcScale);
             shader->SetFloat("brightness", brightness);
