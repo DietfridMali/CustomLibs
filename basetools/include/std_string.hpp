@@ -95,6 +95,7 @@ public:
     explicit operator uint8_t() const;
     explicit operator uint16_t() const;
     explicit operator uint32_t() const;
+    explicit operator int64_t() const;
     explicit operator float() const;
     explicit operator bool() const noexcept;
 
@@ -349,6 +350,10 @@ inline String::operator uint16_t() const {
 
 inline String::operator uint32_t() const {
     return ToNumber<uint32_t>("uint32_t");
+}
+
+inline String::operator int64_t() const {
+    return ToNumber<int64_t>("int64_t");
 }
 
 inline String::operator float() const {

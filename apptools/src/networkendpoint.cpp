@@ -6,6 +6,8 @@
 void NetworkEndpoint::UpdateFromSocketAddress(void) {
     uint32_t host = SDL_SwapBE32(m_socketAddress.host);
     m_port = SDL_SwapBE16(m_socketAddress.port);
+    m_id.host = m_socketAddress.host;
+    m_id.port = m_socketAddress.port;
     m_ipAddress.Format("{:d}.{:d}.{:d}.{:d}", (unsigned) ((host >> 24) & 0xFF), (unsigned)((host >> 16) & 0xFF), (unsigned)((host >> 8) & 0xFF), (unsigned)(host & 0xFF));
 }
 
@@ -45,6 +47,8 @@ bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, uint16_t port
         m_port = port;
         m_socketAddress.port = SDL_SwapBE16(m_port);
     }
+	m_id.host = m_socketAddress.host;
+	m_id.port = m_socketAddress.port;
     return true;
 }
 

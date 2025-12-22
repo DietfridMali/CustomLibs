@@ -8,33 +8,54 @@
 
 enum class ByteOrder { Host, Network };
 
-class NetworkEndpoint 
-{
-public:
-    String      m_ipAddress{ "" };
-    uint16_t    m_port{ 0 };
-    IPaddress   m_socketAddress{};
+union NetworkID {
+        int64_t     id{ 0 };
+    struct {
+        uint32_t    host;
+        uint16_t    port;
+    };
+};
 
-    NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 27015)
-    {
+typedef enum {
+	ntIPv4,
+    ntSteam
+} eNetworkType;
+
+class NetworkEndpoint {
+public:
+	NetworkID       m_id{ 0 };
+	eNetworkType    m_type{ ntIPv4 };
+    String          m_ipAddress{ "" };
+    uint16_t        m_port{ 0 };
+    IPaddress       m_socketAddress{};
+
+    bool UpdateSocketAddress(const String& ipAddress, uint16_t port) noexcept;
+
+    void UpdateFromSocketAddress(void);
+
+    NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 27015) {
         UpdateSocketAddress(ipAddress, port);
     }
 
     NetworkEndpoint(const IPaddress& socketAddress) noexcept { 
-        *this = socketAddress; 
+        m_socketAddress = socketAddress;
+        UpdateFromSocketAddress();
     }
 
     NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrder = ByteOrder::Host);
 
     NetworkEndpoint(const NetworkEndpoint& other) {
+		m_id = other.m_id;
         m_ipAddress = other.m_ipAddress;
         m_port = other.m_port;
         m_socketAddress = other.m_socketAddress;
     }
 
     NetworkEndpoint(NetworkEndpoint&& other) noexcept {
-        if (UpdateSocketAddress(other.m_ipAddress, other.m_port))
+        if (UpdateSocketAddress(other.m_ipAddress, other.m_port)) {
+			m_id = std::move(other.m_id);
             m_ipAddress = std::move(other.m_ipAddress);
+        }
     }
 
     ~NetworkEndpoint() = default;
@@ -56,8 +77,12 @@ public:
         return UpdateSocketAddress(ipAddress, port);
     }
 
-    inline int64_t NetworkID(void) noexcept {
-        return (int64_t(m_socketAddress.host) << 16) | int64_t(m_socketAddress.port);
+    inline int64_t GetNetworkID(void) noexcept {
+        return m_id.id;
+    }
+
+    inline int64_t SetNetworkID(int64_t id) noexcept {
+        m_id.id = id;
     }
 
     inline const IPaddress& SocketAddress(void) const noexcept {
@@ -103,10 +128,6 @@ public:
 
     // Subnet-Directed Broadcast x.y.z.255:port (angenommen /24)
     NetworkEndpoint DirectedBroadcast(uint16_t port) noexcept;
-
-    void UpdateFromSocketAddress(void);
-
-    bool UpdateSocketAddress(const String& ipAddress, uint16_t port) noexcept;
 
     inline void Clear(void) noexcept {
         m_socketAddress.host = 0;
