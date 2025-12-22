@@ -9,7 +9,7 @@
 enum class ByteOrder { Host, Network };
 
 union NetworkID {
-        int64_t     id{ 0 };
+        uint64_t    id{ 0 };
     struct {
         uint32_t    host;
         uint16_t    port;
@@ -24,7 +24,7 @@ typedef enum {
 class NetworkEndpoint {
 public:
 	NetworkID       m_id{ 0 };
-	eNetworkType    m_type{ ntIPv4 };
+    eNetworkType    m_type{ ntIPv4 };
     String          m_ipAddress{ "" };
     uint16_t        m_port{ 0 };
     IPaddress       m_socketAddress{};
@@ -77,13 +77,27 @@ public:
         return UpdateSocketAddress(ipAddress, port);
     }
 
-    inline int64_t GetNetworkID(void) noexcept {
+    inline uint64_t& NetworkID(void) noexcept {
+        return m_id.id;
+	}
+
+    inline uint64_t GetNetworkID(void) noexcept {
         return m_id.id;
     }
 
-    inline int64_t SetNetworkID(int64_t id) noexcept {
+    inline uint64_t SetNetworkID(uint64_t id) noexcept {
         m_id.id = id;
     }
+
+    inline eNetworkType GetType(void) const noexcept {
+        return ntIpv4;
+	}
+
+    inline void SetType(eNetworkType type) noexcept {
+        m_type = type;
+	}
+
+    void UpdateSteamID(uint64_t steamId) noexcept;
 
     inline const IPaddress& SocketAddress(void) const noexcept {
         return m_socketAddress;

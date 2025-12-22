@@ -76,8 +76,12 @@ class NetworkMessage {
             return m_address;
         }
 
-        inline int64_t NetworkID(void) noexcept {
-            return m_address.NetworkID();
+        inline uint64_t GetNetworkID(void) noexcept {
+            return m_address.GetNetworkID();
+        }
+
+        inline void SetNetworkID(uint64_t id) noexcept {
+            return m_address.SetNetworkID(id);
         }
 
         inline const String& IpAddress(void) const noexcept {
@@ -223,6 +227,11 @@ class NetworkMessage {
         inline uint32_t ToUInt32(String caller, String valueName, int valueIndex, uint32_t minVal = std::numeric_limits<uint32_t> ::lowest(), uint32_t maxVal = std::numeric_limits<uint32_t>::max()) {
             uint32_t v;
             return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
+        }
+
+        inline uint32_t ToInt64(String caller, String valueName, int valueIndex, int64_t minVal = std::numeric_limits<int64_t> ::lowest(), int64_t maxVal = std::numeric_limits<int64_t>::max()) {
+            int64_t v;
+            return FieldToNumber<int64_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
         inline float ToFloat(String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), float maxVal = std::numeric_limits<float>::max()) {

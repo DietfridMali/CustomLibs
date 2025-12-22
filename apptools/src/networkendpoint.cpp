@@ -8,6 +8,7 @@ void NetworkEndpoint::UpdateFromSocketAddress(void) {
     m_port = SDL_SwapBE16(m_socketAddress.port);
     m_id.host = m_socketAddress.host;
     m_id.port = m_socketAddress.port;
+    m_type = ntIpV4;
     m_ipAddress.Format("{:d}.{:d}.{:d}.{:d}", (unsigned) ((host >> 24) & 0xFF), (unsigned)((host >> 16) & 0xFF), (unsigned)((host >> 8) & 0xFF), (unsigned)(host & 0xFF));
 }
 
@@ -22,6 +23,16 @@ NetworkEndpoint::NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrd
         m_socketAddress.port = port;
     }
     UpdateFromSocketAddress();
+}
+
+
+void NetworkEndpoint::UpdateSteamID(uint64_t steamId) noexcept {
+    m_type = ntSteam;
+    m_networkId = steamId;
+    m_socketAddress.host = 0;
+    m_socketAddress.port = 0;
+    m_ipAddress = "";
+    m_port = 0;
 }
 
 
@@ -49,6 +60,7 @@ bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, uint16_t port
     }
 	m_id.host = m_socketAddress.host;
 	m_id.port = m_socketAddress.port;
+    m_type = ntIpV4;
     return true;
 }
 
