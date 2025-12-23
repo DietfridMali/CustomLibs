@@ -375,7 +375,7 @@ public:
             return false;
 
         if (Length() != dataSize)
-            Resize(dataSize);
+            Resize(int(dataSize));
 
         f.read(reinterpret_cast<char*>(Data()), dataSize);
         return f.good();

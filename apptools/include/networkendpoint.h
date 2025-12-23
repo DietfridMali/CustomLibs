@@ -29,11 +29,11 @@ public:
     uint16_t        m_port{ 0 };
     IPaddress       m_socketAddress{};
 
-    bool UpdateSocketAddress(const String& ipAddress, uint16_t port) noexcept;
+    bool UpdateSocketAddress(const String& ipAddress, int32_t port) noexcept;
 
     void UpdateFromSocketAddress(void);
 
-    NetworkEndpoint(String ipAddress = "127.0.0.1", uint16_t port = 27015) {
+    NetworkEndpoint(String ipAddress = "0.0.0.0", uint16_t port = 0) {
         UpdateSocketAddress(ipAddress, port);
     }
 
@@ -72,7 +72,7 @@ public:
         return m_port;
     }
 
-    inline bool SetPort(uint16_t port) noexcept {
+    inline bool SetPort(int32_t port) noexcept {
         String ipAddress("");
         return UpdateSocketAddress(ipAddress, port);
     }
@@ -97,7 +97,7 @@ public:
         m_type = type;
 	}
 
-    void UpdateSteamID(uint64_t steamId) noexcept;
+    void UpdateNetworkID(uint64_t networkID, eNetworkType networkType = ntSteam) noexcept;
 
     inline const IPaddress& SocketAddress(void) const noexcept {
         return m_socketAddress;
@@ -108,7 +108,11 @@ public:
     }
 
     bool operator==(const NetworkEndpoint& other) const {
-        return (m_ipAddress == other.m_ipAddress) and (m_port == other.m_port);
+        if (*this == other)
+            return true;
+        if (m_type != other.m_type)
+            return false;
+        return (m_type == ntIPv4) ? (m_ipAddress == other.m_ipAddress) and (m_port == other.m_port) : (m_id.id == other.m_id.id);
     }
 
     bool operator!=(const NetworkEndpoint& other) const {

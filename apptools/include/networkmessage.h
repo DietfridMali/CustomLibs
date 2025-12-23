@@ -205,6 +205,14 @@ class NetworkMessage {
             return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
 
+        inline bool ToInt64(int64_t& v, String caller, String valueName, int valueIndex, int64_t minVal = std::numeric_limits<int64_t> ::lowest(), int64_t maxVal = std::numeric_limits<int64_t>::max()) {
+            return FieldToNumber<int64_t>(v, caller, valueName, valueIndex, minVal, maxVal);
+        }
+
+        inline bool ToUInt64(uint64_t& v, String caller, String valueName, int valueIndex, uint64_t minVal = std::numeric_limits<uint64_t> ::lowest(), uint64_t maxVal = std::numeric_limits<uint64_t>::max()) {
+            return FieldToNumber<uint64_t>(v, caller, valueName, valueIndex, minVal, maxVal);
+        }
+
         inline bool ToFloat(float& v, String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), float maxVal = std::numeric_limits<float>::max()) {
             return FieldToNumber<float>(v, caller, valueName, valueIndex, minVal, maxVal);
         }
@@ -229,9 +237,14 @@ class NetworkMessage {
             return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
-        inline uint64_t ToInt64(String caller, String valueName, int valueIndex, int64_t minVal = std::numeric_limits<int64_t> ::lowest(), int64_t maxVal = std::numeric_limits<int64_t>::max()) {
+        inline int64_t ToInt64(String caller, String valueName, int valueIndex, int64_t minVal = std::numeric_limits<int64_t> ::lowest(), int64_t maxVal = std::numeric_limits<int64_t>::max()) {
             int64_t v;
             return FieldToNumber<int64_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
+        }
+
+        inline uint64_t ToUInt64(String caller, String valueName, int valueIndex, uint64_t minVal = std::numeric_limits<uint64_t> ::lowest(), uint64_t maxVal = std::numeric_limits<uint64_t>::max()) {
+            uint64_t v;
+            return FieldToNumber<uint64_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
         inline float ToFloat(String caller, String valueName, int valueIndex, float minVal = std::numeric_limits<float> ::lowest(), float maxVal = std::numeric_limits<float>::max()) {
