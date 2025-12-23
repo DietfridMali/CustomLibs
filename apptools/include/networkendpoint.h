@@ -85,12 +85,12 @@ public:
         return m_id.id;
     }
 
-    inline uint64_t SetNetworkID(uint64_t id) noexcept {
+    inline void SetNetworkID(uint64_t id) noexcept {
         m_id.id = id;
     }
 
     inline eNetworkType GetType(void) const noexcept {
-        return ntIpv4;
+        return m_type;
 	}
 
     inline void SetType(eNetworkType type) noexcept {

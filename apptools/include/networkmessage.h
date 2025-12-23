@@ -36,12 +36,12 @@ class NetworkMessage {
     */
 
     public:
-        String                  m_payload;
+        String                  m_payload{ "" };
         NetworkEndpoint         m_address;
-        int                     m_numValues;
-        int                     m_result;
-        bool                    m_isBroadcast; // used for sending this message as a broadcast in a LAN
-        bool                    m_valueError;
+        int                     m_numValues{ 0 };
+        int                     m_result{ -1 };
+        bool                    m_isBroadcast{ false }; // used for sending this message as a broadcast in a LAN
+        bool                    m_valueError{ false };
         ManagedArray<String>    m_values;
 
         NetworkMessage() 
@@ -81,7 +81,7 @@ class NetworkMessage {
         }
 
         inline void SetNetworkID(uint64_t id) noexcept {
-            return m_address.SetNetworkID(id);
+            m_address.SetNetworkID(id);
         }
 
         inline const String& IpAddress(void) const noexcept {
@@ -229,7 +229,7 @@ class NetworkMessage {
             return FieldToNumber<uint32_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
 
-        inline uint32_t ToInt64(String caller, String valueName, int valueIndex, int64_t minVal = std::numeric_limits<int64_t> ::lowest(), int64_t maxVal = std::numeric_limits<int64_t>::max()) {
+        inline uint64_t ToInt64(String caller, String valueName, int valueIndex, int64_t minVal = std::numeric_limits<int64_t> ::lowest(), int64_t maxVal = std::numeric_limits<int64_t>::max()) {
             int64_t v;
             return FieldToNumber<int64_t>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }

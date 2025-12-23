@@ -44,9 +44,9 @@ public:
     explicit String(int64_t n) : m_str(std::to_string(n)) {}
 
     explicit String(uint64_t n) : m_str(std::to_string(n)) {}
-
+#if 0
     explicit String(size_t n) : m_str(std::to_string(n)) {}
-
+#endif
     explicit String(float f) : m_str(std::to_string(f)) {}
 
     void LogError(std::string caller) const;
@@ -95,12 +95,14 @@ public:
     operator const char* () const noexcept;
     operator char* () noexcept;
     explicit operator int() const;
-    explicit operator size_t() const;
     explicit operator uint8_t() const;
     explicit operator uint16_t() const;
     explicit operator uint32_t() const;
     explicit operator int64_t() const;
     explicit operator uint64_t() const;
+#if 0
+    explicit operator size_t() const;
+#endif
     explicit operator float() const;
     explicit operator bool() const noexcept;
 
@@ -361,9 +363,11 @@ inline String::operator int64_t() const {
     return ToNumber<int64_t>("int64_t");
 }
 
+#if 0
 inline String::operator uint64_t() const {
     return ToNumber<uint64_t>("uint64_t");
 }
+#endif
 
 inline String::operator float() const {
     if (IsEmpty())
