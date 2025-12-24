@@ -75,7 +75,7 @@ UDPData UDPSocket::Receive(int minLength) { // return sender address in message.
     int n = SDLNet_UDP_Recv(m_socket, m_packet);
     if ((n <= 0) or (m_packet->len > MaxPacketSize))
         return { nullptr, 0 };
-    if (SocketAddress().host == m_packet->address.host)
+    if ((SocketAddress().host == m_packet->address.host) and (SocketAddress().port == m_packet->address.port))
         return { nullptr, 0 };
     if ((minLength > 0) and (m_packet->len < minLength))
         return { nullptr, 0 };

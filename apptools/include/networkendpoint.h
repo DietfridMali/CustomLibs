@@ -108,7 +108,7 @@ public:
     }
 
     bool operator==(const NetworkEndpoint& other) const {
-        if (*this == other)
+        if (this == &other)
             return true;
         if (m_type != other.m_type)
             return false;
