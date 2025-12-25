@@ -324,19 +324,22 @@ template <typename T>
 inline T String::ToNumber(std::string caller) const {
     if (IsEmpty())
         return 0;
-    long long n;
-    try {
-        n = static_cast<size_t>(std::stoll(m_str));
+    if constexpr (std::is_signed_v<T>) {
+        long long n = std::stoll(m_str, nullptr, 10);
+        if ((n < static_cast<long long>(std::numeric_limits<T>::min())) or (n > static_cast<long long>(std::numeric_limits<T>::max()))) {
+            LogError(caller);
+            return 0;
+        }
+        return static_cast<T>(n);
     }
-    catch (...) {
-        LogError(caller);
-        return 0;
+    else {
+        unsigned long long n = std::stoull(m_str, nullptr, 10);
+        if (n > static_cast<unsigned long long>(std::numeric_limits<T>::max())) {
+            LogError(caller);
+            return 0;
+        }
+        return static_cast<T>(n);
     }
-    if ((n < static_cast<long long>(std::numeric_limits<T>::min())) or (n > static_cast<long long>(std::numeric_limits<T>::max()))) {
-        LogError(caller);
-        return 0;
-    }
-    return static_cast<T>(n);
 }
 
 inline String::operator int() const {
