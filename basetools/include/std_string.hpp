@@ -342,11 +342,11 @@ inline T String::ToNumber(std::string caller) const {
 inline String::operator int() const {
     return ToNumber<int>("int");
 }
-
+#if 0
 inline String::operator size_t() const {
     return ToNumber<size_t>("size_t");
 }
-
+#endif
 inline String::operator uint8_t() const {
     return ToNumber<uint8_t>("uint8_t");
 }
