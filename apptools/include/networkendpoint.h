@@ -45,10 +45,7 @@ public:
     NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrder = ByteOrder::Host);
 
     NetworkEndpoint(const NetworkEndpoint& other) {
-		m_id = other.m_id;
-        m_ipAddress = other.m_ipAddress;
-        m_port = other.m_port;
-        m_socketAddress = other.m_socketAddress;
+		*this = other;
     }
 
     NetworkEndpoint(NetworkEndpoint&& other) noexcept {
@@ -120,12 +117,16 @@ public:
     }
 
     NetworkEndpoint& operator=(const NetworkEndpoint& other) {
-        UpdateSocketAddress(other.m_ipAddress, other.m_port);
+        m_id = other.m_id;
+        m_ipAddress = other.m_ipAddress;
+        m_port = other.m_port;
+        m_socketAddress = other.m_socketAddress;
+		m_type = other.m_type;
         return *this;
     }
 
     NetworkEndpoint& operator=(NetworkEndpoint&& other) noexcept {
-        UpdateSocketAddress(other.m_ipAddress, other.m_port);
+		*this = static_cast<const NetworkEndpoint&>(other);
         return *this;
     }
 
