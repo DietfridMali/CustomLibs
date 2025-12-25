@@ -363,11 +363,9 @@ inline String::operator int64_t() const {
     return ToNumber<int64_t>("int64_t");
 }
 
-#if 0
 inline String::operator uint64_t() const {
     return ToNumber<uint64_t>("uint64_t");
 }
-#endif
 
 inline String::operator float() const {
     if (IsEmpty())
