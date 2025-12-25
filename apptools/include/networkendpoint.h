@@ -149,6 +149,7 @@ public:
     NetworkEndpoint DirectedBroadcast(uint16_t port) noexcept;
 
     inline void Clear(void) noexcept {
+		m_id.id = 0;
         m_socketAddress.host = 0;
         m_socketAddress.port = 0;
         UpdateFromSocketAddress();
