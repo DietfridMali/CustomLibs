@@ -8,12 +8,12 @@
 
 bool Skybox::LoadTextures(const String& textureFolder) {
 	static List<String> fileNames = {
-		"skybox-right.png",
 		"skybox-left.png",
+		"skybox-right.png",
 		"skybox-top.png",
 		"skybox-bottom.png",
 		"skybox-front.png",
-		"skybox-back.png"
+		"skybox-rear.png"
 	};
 	String id = "skybox";
     m_texture = textureHandler.GetCubemap(id);
@@ -54,7 +54,7 @@ bool Skybox::Setup(const String& textureFolder) {
 Shader* Skybox::LoadShader(Matrix4f& view) {
     Shader* shader = baseShaderHandler.SetupShader("skybox");
     if (shader) {
-        shader->SetMatrix4f("view", view.AsArray(), false);
+        shader->SetMatrix4f("mView", view.AsArray(), false);
     }
     return shader;
 }

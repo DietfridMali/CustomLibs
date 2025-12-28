@@ -127,7 +127,7 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool createTangents, bool forceUpda
         createVertexIndex = (m_shape == GL_QUADS);
     m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape, m_isDynamic);
     m_vao->Enable();
-    m_tangents.SetDirty(m_vertices.IsDirty() or m_texCoords[0].IsDirty() or m_normals.IsDirty());
+    m_tangents.SetDirty(m_tangents.HaveData() and m_vertices.IsDirty() or m_texCoords[0].IsDirty() or m_normals.IsDirty());
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = GL_TRIANGLES;
