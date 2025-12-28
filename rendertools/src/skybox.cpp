@@ -8,12 +8,12 @@
 
 bool Skybox::LoadTextures(const String& textureFolder) {
 	static List<String> fileNames = {
-		"skybox-left.png",
-		"skybox-right.png",
-		"skybox-top.png",
-		"skybox-bottom.png",
-		"skybox-front.png",
-		"skybox-rear.png"
+		"sky_lf.png",
+		"sky_rt.png",
+		"sky_up.png",
+		"sky_dn.png",
+		"sky_ft.png",
+		"sky_bk.png"
 	};
 	String id = "skybox";
     m_texture = textureHandler.GetCubemap(id);
