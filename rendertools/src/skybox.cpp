@@ -25,7 +25,7 @@ bool Skybox::LoadTextures(const String& textureFolder) {
 }
 
 
-bool Skybox::Create(const String& textureFolder) {
+bool Skybox::Setup(const String& textureFolder) {
 	if (not LoadTextures(textureFolder))
 		return false;
 

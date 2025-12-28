@@ -21,7 +21,7 @@ public:
 
 	~Skybox() = default;
 
-	bool Create(const String& textureFolder);
+	bool Setup(const String& textureFolder);
 
 	void Render(Matrix4f& view);
 
