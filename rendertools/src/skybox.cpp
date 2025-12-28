@@ -7,8 +7,8 @@
 // =================================================================================================
 
 static List<String> skyboxDirections = { "lf", "rt", "up", "dn", "ft", "bk" }; 
-static List<String> skyTextureSizes = { "4k", "2k", "1k" };
-static List<String> skyTextureTypes = { "bright", "medium", "dark" };
+static List<String> skyTextureSizes = { "-4k", "-2k", "-1k" };
+static List<String> skyTextureTypes = { "bright-", "medium-", "dark-" };
 
 
 Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& type, const String& size) {
@@ -19,7 +19,7 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& type, c
 
 	List<String> filenames;
 	for (int i = 0; i < skyboxDirections.Length(); i++) 
-		filenames.Append(String::Concat("sky-", skyboxDirections[i], size, ".png"));
+		filenames.Append(String::Concat("sky-", type, skyboxDirections[i], size, ".png"));
 	
 	texture = new Cubemap();
 	if (not texture->CreateFromFile(textureFolder, filenames, {})) {
@@ -92,23 +92,26 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 }
 
 
-void Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
-	if (m_skybox) {
-		Shader* shader = LoadShader(view, lightDirection, brightness);
-		if (shader) {
-			Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(0));
-			Tristate<int> depthWrite(-1, 1, openGLStates.SetDepthWrite(0));
-			Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
-			for (int i = 0; i < 3; i++)
-				m_skyTextures[i]->Enable(i);
-			m_skybox->Render(nullptr);
-			for (int i = 0; i < 3; i++)
-				m_skyTextures[i]->Release(i);
-			openGLStates.DepthFunc(depthFunc);
-			openGLStates.SetDepthWrite(depthWrite);
-			openGLStates.SetFaceCulling(faceCulling);
-		}
-	}
+bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
+	if (not m_skybox)
+		return false;
+
+	Shader* shader = LoadShader(view, lightDirection, brightness);
+	if (not shader)
+		return false;
+
+	Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(0));
+	Tristate<int> depthWrite(-1, 1, openGLStates.SetDepthWrite(0));
+	Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
+	for (int i = 0; i < 3; i++)
+		m_skyTextures[i]->Enable(i);
+	m_skybox->Render(nullptr);
+	for (int i = 0; i < 3; i++)
+		m_skyTextures[i]->Release(i);
+	openGLStates.DepthFunc(depthFunc);
+	openGLStates.SetDepthWrite(depthWrite);
+	openGLStates.SetFaceCulling(faceCulling);
+	return true;
 };
 
 // =================================================================================================

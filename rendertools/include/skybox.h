@@ -23,7 +23,11 @@ public:
 
 	bool Setup(const String& textureFolder);
 
-	void Render(Matrix4f& view, Vector3f lightDirection, float brightness);
+	bool Render(Matrix4f& view, Vector3f lightDirection, float brightness);
+
+	inline bool IsAvailable(void) const noexcept {
+		return (m_skybox != nullptr);
+	}
 
 private:
 	Cubemap* LoadTextures(const String& textureFolder, const String& type, const String& size);
