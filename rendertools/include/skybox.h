@@ -26,9 +26,11 @@ public:
 	void Render(Matrix4f& view, Vector3f lightDirection, float brightness);
 
 private:
-	Cubemap* LoadTextures(const String& textureFolder, List<String>& filenames);
+	Cubemap* LoadTextures(const String& textureFolder, const String& type, const String& size);
 
 	Shader* LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness);
+
+	int MaxTextureSize(void);
 };
 
 #define skybox Skybox::Instance()

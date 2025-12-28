@@ -6,17 +6,22 @@
 
 // =================================================================================================
 
-static List<String> skyFilenames[3] = {
-	{ "bright-sky-lf.png", "bright-sky-rt.png", "bright-sky-up.png", "bright-sky-dn.png", "bright-sky-ft.png", "bright-sky-bk.png" },
-	{ "medium-sky-lf.png", "medium-sky-rt.png", "medium-sky-up.png", "medium-sky-dn.png", "medium-sky-ft.png", "medium-sky-bk.png" },
-	{ "dark-sky-lf.png", "dark-sky-rt.png", "dark-sky-up.png", "dark-sky-dn.png", "dark-sky-ft.png", "dark-sky-bk.png" }
-};
+static List<String> skyboxDirections = { "lf", "rt", "up", "dn", "ft", "bk" }; 
+static List<String> skyTextureSizes = { "4k", "2k", "1k" };
+static List<String> skyTextureTypes = { "bright", "medium", "dark" };
 
-Cubemap* Skybox::LoadTextures(const String& textureFolder, List<String>& filenames) {
-	String id = "skybox";
-    Cubemap* texture = textureHandler.GetCubemap(id);
+
+Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& type, const String& size) {
+	String id = String("skybox-") + type;
+	Cubemap* texture = textureHandler.GetCubemap(id);
     if (not texture)
         return nullptr;
+
+	List<String> filenames;
+	for (int i = 0; i < skyboxDirections.Length(); i++) 
+		filenames.Append(String::Concat("sky-", skyboxDirections[i], size, ".png"));
+	
+	texture = new Cubemap();
 	if (not texture->CreateFromFile(textureFolder, filenames, {})) {
 		delete texture;
 		return nullptr;
@@ -25,9 +30,25 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, List<String>& filenam
 }
 
 
+int Skybox::MaxTextureSize(void) {
+	int maxSize = openGLStates.MaxTextureSize();
+	if (maxSize >= 4096)
+		return 0;
+	if (maxSize >= 2048)
+		return 1;
+	if (maxSize >= 1024)
+		return 2;
+	return -1;
+}
+
+
 bool Skybox::Setup(const String& textureFolder) {
+	int textureSize = MaxTextureSize();
+	if (textureSize < 0)
+		return false;
+
 	for (int i = 0; i < 3; i++) {
-		if (not (m_skyTextures[i] = LoadTextures(textureFolder, skyFilenames[i]))) {
+		if (not (m_skyTextures[i] = LoadTextures(textureFolder, skyTextureTypes[i], skyTextureSizes[i]))) {
 			while (--i >= 0)
 				delete m_skyTextures[i];
 			return false;
