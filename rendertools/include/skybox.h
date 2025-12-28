@@ -23,12 +23,12 @@ public:
 
 	bool Setup(const String& textureFolder);
 
-	void Render(Matrix4f& view);
+	void Render(Matrix4f& view, Vector3f lightDirection, float brightness);
 
 private:
 	bool LoadTextures(const String& textureFolder);
 
-	Shader* LoadShader(Matrix4f& view);
+	Shader* LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness);
 };
 
 #define skybox Skybox::Instance()

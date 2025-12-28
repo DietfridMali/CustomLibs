@@ -51,18 +51,20 @@ bool Skybox::Setup(const String& textureFolder) {
 }
 
 
-Shader* Skybox::LoadShader(Matrix4f& view) {
+Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness) {
     Shader* shader = baseShaderHandler.SetupShader("skybox");
     if (shader) {
         shader->SetMatrix4f("mView", view.AsArray(), false);
+		shader->SetVector3f("lightDirection", lightDirection);
+		shader->SetFloat("brightness", brightness * brightness);
     }
     return shader;
 }
 
 
-void Skybox::Render(Matrix4f& view) {
+void Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 	if (m_texture and m_skybox) {
-		Shader* shader = LoadShader(view);
+		Shader* shader = LoadShader(view, lightDirection, brightness);
 		if (shader) {
 			Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(0));
 			Tristate<int> depthWrite(-1, 1, openGLStates.SetDepthWrite(0));
