@@ -56,7 +56,7 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
     if (shader) {
         shader->SetMatrix4f("mView", view.AsArray(), false);
 		shader->SetVector3f("lightDirection", lightDirection);
-		shader->SetFloat("brightness", brightness * brightness);
+		shader->SetFloat("brightness", brightness); // *brightness);
     }
     return shader;
 }
