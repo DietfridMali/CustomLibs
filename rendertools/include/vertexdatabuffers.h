@@ -301,7 +301,7 @@ class IndexBuffer
         : VertexDataBuffer(componentCount, listSegmentSize) 
     { }
 
-    // Create a densely packed numpy array from the vertex data
+    // Create a densely packed array from the vertex data
     virtual ManagedArray<GLuint>& Setup(void) {
         if (HaveAppData()) {
             uint32_t* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
