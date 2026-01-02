@@ -107,6 +107,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     openGLStates.CullFace(GL_BACK);
     openGLStates.openGLStates.SetMultiSample(1);
     openGLStates.SetPolygonOffsetFill(0);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glViewport(0, 0, m_windowWidth, m_windowHeight);
 }
 
