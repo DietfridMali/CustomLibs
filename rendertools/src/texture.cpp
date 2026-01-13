@@ -151,8 +151,7 @@ bool Texture::Bind(int tmuIndex)
 }
 
 
-void Texture::Release(int tmuIndex)
-{
+void Texture::Release(int tmuIndex) {
     if (IsAvailable()) {
         if (m_tmuIndex >= 0) {
             openGLStates.BindTexture(m_type, 0, m_tmuIndex);
@@ -163,8 +162,7 @@ void Texture::Release(int tmuIndex)
 }
 
 
-void Texture::SetParams(bool forceUpdate)
-{
+void Texture::SetParams(bool forceUpdate) {
     if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
         if (m_useMipMaps) {
