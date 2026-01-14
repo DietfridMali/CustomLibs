@@ -1,5 +1,7 @@
 #include "shadowmap.h"
 
+#define APPLY_POLYGON_OFFSET 1
+
 // =================================================================================================
 
 bool ShadowMap::Setup(void) {
@@ -48,9 +50,8 @@ bool ShadowMap::StartRender(void) noexcept {
 	EnableCamera();
 	openGLStates.SetDepthTest(1);
 	openGLStates.SetDepthWrite(1);
-#if 1
 	openGLStates.CullFace(GL_FRONT);
-#else
+#if APPLY_POLYGON_OFFSET
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(2.0f, 4.0f);
 #endif
@@ -63,9 +64,8 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-#if 1
 	openGLStates.CullFace(GL_BACK);
-#else
+#if APPLY_POLYGON_OFFSET
 	glDisable(GL_POLYGON_OFFSET_FILL);
 #endif
 	return true;
@@ -106,7 +106,7 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 
 	worldRadius = std::min(worldRadius, m_maxLightRadius);
 	if (lightDistance <= 0.0f)
-		lightDistance = 10.0f * worldRadius;
+		lightDistance = 100.0f * worldRadius;
 
 	// Viewer-Blickrichtung in Weltkoordinaten
 	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
