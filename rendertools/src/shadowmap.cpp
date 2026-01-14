@@ -48,7 +48,12 @@ bool ShadowMap::StartRender(void) noexcept {
 	EnableCamera();
 	openGLStates.SetDepthTest(1);
 	openGLStates.SetDepthWrite(1);
+#if 1
 	openGLStates.CullFace(GL_FRONT);
+#else
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(2.0f, 4.0f);
+#endif
 	return true;
 }
 
@@ -58,7 +63,11 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
+#if 1
 	openGLStates.CullFace(GL_BACK);
+#else
+	glDisable(GL_POLYGON_OFFSET_FILL);
+#endif
 	return true;
 }
 
@@ -104,7 +113,7 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	viewDir.Normalize();
 
 	// Frustumzentrum vor den Viewer schieben (Viewer knapp am hinteren Rand)
-	center += viewDir * worldRadius * 0.9f;
+	center += viewDir * worldRadius * 0.8f;
 
 	Vector3f f = -lightDirection; // angenommen normalisiert
 	float dotFV = f.Dot(viewDir);
@@ -200,7 +209,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	static int trafoType = 2;
 	if (trafoType == 2)
 		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
-	if (trafoType == 1)
+	else if (trafoType == 1)
 		CreatePerspectiveTransformation(center, lightDirection, lightOffset, worldRadius);
 	else
 		CreateOrthoTransformation(center, lightDirection, worldSize, worldMin, worldMax);
