@@ -90,7 +90,7 @@ std::optional<NetworkEndpoint> InternetServices::StunQueryIPv4(const char* serve
 
 #pragma comment(lib, "ws2_32.lib")
 
-String InternetServices::GetLocalAddress(void) {
+String InternetServices::GetLanAddress(void) {
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
         return String("");
@@ -135,7 +135,7 @@ String InternetServices::GetLocalAddress(void) {
 #include <sys/socket.h>
 #include <unistd.h>
 
-String InternetServices::GetLocalAddress(void) {
+String InternetServices::GetLanAddress(void) {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
         return String("");
