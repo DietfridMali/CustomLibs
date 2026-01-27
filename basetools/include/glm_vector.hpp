@@ -295,6 +295,11 @@ public:
         return other - (*this * 2.0f * this->Dot(other));
     }
 
+    template <typename T>
+	inline Vector Distance(T&& other) const noexcept {
+		return (*this - std::forward<T>(other)).Length();
+    }
+
     inline Vector Abs(void) const noexcept {           // FIX: const + Indexierung
         Vector v;
         for (int i = 0; i < VEC_TYPE::length(); ++i) 

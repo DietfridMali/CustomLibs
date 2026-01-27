@@ -62,6 +62,7 @@
     <ClInclude Include="..\include\stringutils.hpp" />
     <ClInclude Include="..\include\tablesize.h" />
     <ClInclude Include="..\include\timer.h" />
+    <ClInclude Include="..\include\triangulararray.hpp" />
     <ClInclude Include="..\include\tristate.h" />
     <ClInclude Include="..\include\type_helper.hpp" />
     <ClInclude Include="..\include\vector.hpp" />

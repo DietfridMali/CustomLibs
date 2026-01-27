@@ -165,6 +165,9 @@
     <ClInclude Include="..\include\hiressleep.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\triangulararray.hpp">
+      <Filter>Header Files\std</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">
