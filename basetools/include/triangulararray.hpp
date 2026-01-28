@@ -1,6 +1,7 @@
 #pragma once
 
 #include "array.hpp"
+#include <utility>
 
 // =================================================================================================
 
@@ -27,7 +28,12 @@ public:
 		return (y > x) ? (y * (y + 1)) / 2 + x : (x * (x + 1)) / 2 + y;
 	}
 
-	DATA_T& operator()(uint32_t x, uint32_t y) {
+	inline auto operator()(uint32_t x, uint32_t y) -> decltype(std::declval<ManagedArray<DATA_T>&>()[0]) {
+		uint32_t i = Index(x, y);
+		return m_data[i];
+	}
+
+	inline auto operator()(uint32_t x, uint32_t y) const -> decltype(std::declval<const ManagedArray<DATA_T>&>()[0]) {
 		uint32_t i = Index(x, y);
 		return m_data[i];
 	}
