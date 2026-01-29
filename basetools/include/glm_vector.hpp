@@ -278,6 +278,13 @@ public:
         return true;
     }
 
+    bool IsZero() const noexcept {
+        for (int i = 0; i < VEC_TYPE::length(); ++i)
+            if ((*this)[i])
+                return false;
+        return true;
+    }
+
     static Vector Perp(const Vector& v0, const Vector& v1, const Vector& v2)
         noexcept(noexcept((v1 - v0).Cross(v2 - v0)))
     {
