@@ -25,6 +25,7 @@
     <ClInclude Include="..\include\avltree.hpp" />
     <ClInclude Include="..\include\avltreetraits.h" />
     <ClInclude Include="..\include\basicdatapool.hpp" />
+    <ClInclude Include="..\include\collisionmath.h" />
     <ClInclude Include="..\include\conversions.hpp" />
     <ClInclude Include="..\include\custom_array.hpp" />
     <ClInclude Include="..\include\custom_list.hpp" />
@@ -68,6 +69,7 @@
     <ClInclude Include="..\include\vector.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\collisionmath.cpp" />
     <ClCompile Include="..\src\custom_matrix.cpp" />
     <ClCompile Include="..\src\custom_string.cpp" />
     <ClCompile Include="..\src\custom_vector.cpp" />

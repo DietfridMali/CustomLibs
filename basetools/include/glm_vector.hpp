@@ -303,7 +303,7 @@ public:
     }
 
     template <typename T>
-	inline Vector Distance(T&& other) const noexcept {
+	inline float Distance(T&& other) const noexcept {
 		return (*this - std::forward<T>(other)).Length();
     }
 

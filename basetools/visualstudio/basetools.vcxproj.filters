@@ -168,6 +168,9 @@
     <ClInclude Include="..\include\triangulararray.hpp">
       <Filter>Header Files\std</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\collisionmath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">
@@ -195,6 +198,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\vector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\collisionmath.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
