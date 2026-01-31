@@ -3,6 +3,8 @@
 #include "collisionmath.h"
 #include "tuple"
 
+// =================================================================================================
+
 namespace CollisionMath {
 
     // compute intersection point of two (infinitely long) lines extending from p0 in directon v0 and from p1 in direction v1
@@ -67,13 +69,13 @@ namespace CollisionMath {
     }
 
 
-    public float LinePointDistance3D(Vector3f lp0, Vector3f lp1, Vector3f p) {
+    float LinePointDistance3D(Vector3f lp0, Vector3f lp1, Vector3f p) {
         Vector3f vp = p - lp0;
         Vector3f vl = lp1 - lp0;
         Vector3f cp = vp.Cross(vl);
-        float ll = vl.Length;
-        float cl = cp.Length;
-        return (ll * cl == 0) ? vp.Length : ll / cl;
+        float ll = vl.Length();
+        float cl = cp.Length();
+        return ((ll * cl) == 0.0f) ? vp.Length : ll / cl;
     }
 
 
@@ -122,3 +124,5 @@ namespace CollisionMath {
     }
 
 }
+
+// =================================================================================================
