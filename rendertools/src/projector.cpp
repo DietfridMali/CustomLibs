@@ -37,16 +37,16 @@ noexcept
 #if USE_GLM
     return Matrix4f();
 #else
-    float nearPlane = 2.0f * m_zNear;
+    float nearCoplanarRectangle = 2.0f * m_zNear;
     float depth = m_zFar - m_zNear;
 
     float width = right - left;
     float height = top - bottom;
     Matrix4f m({
-        Vector4f{ nearPlane / width,               0.0f,        (left + right) / width,  0.0f },
-        Vector4f{              0.0f, nearPlane / height,       (top + bottom) / height,  0.0f },
+        Vector4f{ nearCoplanarRectangle / width,               0.0f,        (left + right) / width,  0.0f },
+        Vector4f{              0.0f, nearCoplanarRectangle / height,       (top + bottom) / height,  0.0f },
         Vector4f{              0.0f,               0.0f,   -(m_zFar + m_zNear) / depth, -1.0f },
-        Vector4f{              0.0f,               0.0f, (-nearPlane * m_zFar) / depth,  0.0f }
+        Vector4f{              0.0f,               0.0f, (-nearCoplanarRectangle * m_zFar) / depth,  0.0f }
         }, false);
     return rowMajor ? m.Transpose() : m;
 #endif

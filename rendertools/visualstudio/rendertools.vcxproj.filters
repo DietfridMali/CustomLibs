@@ -108,7 +108,7 @@
     <ClInclude Include="..\include\linesegment.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\plane.h">
+    <ClInclude Include="..\include\coplanar_rectangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\movement.h">
@@ -206,7 +206,7 @@
     <ClCompile Include="..\src\viewport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\plane.cpp">
+    <ClCompile Include="..\src\coplanar_rectangle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\outlinerenderer.cpp">

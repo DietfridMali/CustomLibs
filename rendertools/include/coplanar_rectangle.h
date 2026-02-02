@@ -10,7 +10,7 @@
 // =================================================================================================
 // Geometric computations in planes and rectangles in a plane
 
-class Plane 
+class CoplanarRectangle 
     : public Vector3f {
 
 public:
@@ -22,12 +22,12 @@ public:
     float                   m_tolerance;
     float                   m_toleranceSquared;
 
-    Plane()
+    CoplanarRectangle()
         noexcept;
 
-    Plane(std::initializer_list<Vector3f> vertices);
+    CoplanarRectangle(std::initializer_list<Vector3f> vertices);
 
-    Plane& operator= (std::initializer_list<Vector3f> vertices);
+    CoplanarRectangle& operator= (std::initializer_list<Vector3f> vertices);
 
     void Init(std::initializer_list<Vector3f> vertices);
 
@@ -49,7 +49,7 @@ public:
 
     // project point p on this plane (i.e. compute a point in the plane 
     // so that a vector from that point to p is parallel to the plane's normal)
-    float Project(const Vector3f& p, Vector3f& vPlanePoint)
+    float Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
         noexcept;
 
     float PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared)
@@ -77,7 +77,7 @@ public:
         // compute the intersection of a vector v between two points with a plane
         // Will return None if v parallel to the plane or doesn't intersect with plane 
         // (i.e. both points are on the same side of the plane)
-    int LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vPlanePoint)
+    int LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vCoplanarRectanglePoint)
         noexcept;
 
     int SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
@@ -97,6 +97,8 @@ public:
     float SegmentDistance(Vector3f s1, Vector3f s2)
         noexcept;
 
+    float PointDistance(Vector3f p)
+        noexcept;
 
     void Translate(Vector3f t)
         noexcept;

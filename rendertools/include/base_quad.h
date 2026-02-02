@@ -7,7 +7,7 @@
 #include "vertexdatabuffers.h"
 #include "texturehandler.h"
 #include "colordata.h"
-#include "plane.h"
+#include "coplanar_rectangle.h"
 #include "mesh.h"
 
 #define USE_STATIC_VAO 0
@@ -15,7 +15,7 @@
 // =================================================================================================
 
 class BaseQuad
-    : public Plane
+    : public CoplanarRectangle
     , public Mesh
 {
 public:
@@ -79,7 +79,7 @@ public:
     }
 
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false)
-        : Plane(vertices)
+        : CoplanarRectangle(vertices)
         , m_isAvailable(true)
         , m_privateVAO(false)
         , m_premultiply(false)

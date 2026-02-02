@@ -5,12 +5,12 @@
 #include <stdint.h>
 #include <math.h>
 #include "conversions.hpp"
-#include "plane.h"
+#include "coplanar_rectangle.h"
 
 // =================================================================================================
 // Geometric computations in planes and rectangles in a plane
 
-Plane::Plane()
+CoplanarRectangle::CoplanarRectangle()
 noexcept
     : m_tolerance(Conversions::NumericTolerance), m_toleranceSquared(Conversions::NumericTolerance* Conversions::NumericTolerance)
 {
@@ -19,20 +19,20 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-Plane::Plane(std::initializer_list<Vector3f> vertices) {
+CoplanarRectangle::CoplanarRectangle(std::initializer_list<Vector3f> vertices) {
     Init(vertices);
 }
 
 // -------------------------------------------------------------------------------------------------
 
-Plane& Plane::operator= (std::initializer_list<Vector3f> vertices) {
+CoplanarRectangle& CoplanarRectangle::operator= (std::initializer_list<Vector3f> vertices) {
     Init(vertices);
     return *this;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-int Plane::Winding(void)
+int CoplanarRectangle::Winding(void)
 noexcept
 {
     Vector3f e0 = m_coordinates[1] - m_coordinates[0];
@@ -43,7 +43,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-void Plane::Init(std::initializer_list<Vector3f> vertices) {
+void CoplanarRectangle::Init(std::initializer_list<Vector3f> vertices) {
     m_tolerance = Conversions::NumericTolerance;
     m_coordinates = vertices;
 #if 0
@@ -63,7 +63,7 @@ void Plane::Init(std::initializer_list<Vector3f> vertices) {
 
 // -------------------------------------------------------------------------------------------------
 
-void Plane::Translate(Vector3f t)
+void CoplanarRectangle::Translate(Vector3f t)
 noexcept
 {
     m_center += t;
@@ -76,17 +76,17 @@ noexcept
 // -------------------------------------------------------------------------------------------------
 // project point p onto plane (i.e. compute a point in the plane 
 // so that a vector from that point to p is perpendicular to the plane)
-float Plane::Project(const Vector3f& p, Vector3f& vPlanePoint)
+float CoplanarRectangle::Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
 noexcept
 {
     float d = Distance(p);
-    vPlanePoint = p - m_normal * d;
+    vCoplanarRectanglePoint = p - m_normal * d;
     return d;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-float Plane::NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
+float CoplanarRectangle::NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
 noexcept
 {
     Vector3f vLine = p1 - p0; // Richtungsvektor der Linie
@@ -104,8 +104,10 @@ noexcept
 }
 
 // -------------------------------------------------------------------------------------------------
+// if clampToSegment is true, the distance is computed to the line segment p0 - p1. Otherwise p0,p1 define an infinite line
+// and the perpendicular distance from p2 to that line is computed
 
-float Plane::PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared)
+float CoplanarRectangle::PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared)
 noexcept
 {
     Vector3f v = p1;
@@ -131,8 +133,8 @@ noexcept
 // compute the intersection of a vector v between two points with a plane
 // Will return None if v parallel to the plane or doesn't intersect with plane 
 // (i.e. both points are on the same side of the plane)
-// returns: -1 -> no hit, 0 -> touched at vPlanePoint, 1 -> penetrated at vPlanePoint
-int Plane::LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vPlanePoint)
+// returns: -1 -> no hit, 0 -> touched at vCoplanarRectanglePoint, 1 -> penetrated at vCoplanarRectanglePoint
+int CoplanarRectangle::LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vCoplanarRectanglePoint)
 noexcept
 {
     Vector3f vLine = p1 - p0;
@@ -149,26 +151,26 @@ noexcept
 
     if (fabs(denom) < m_tolerance) {
         if (fabs(dist) <= m_tolerance) {
-            vPlanePoint = p0;
+            vCoplanarRectanglePoint = p0;
             return 0;
         }
-        vPlanePoint = Vector3f::NONE;
+        vCoplanarRectanglePoint = Vector3f::NONE;
         return -1;
     }
 
     float t = -dist / denom;
     if (t < 0.0f or t > 1.0f) {
-        vPlanePoint = Vector3f::NONE;
+        vCoplanarRectanglePoint = Vector3f::NONE;
         return -1; // Kein Kontakt
     }
-    vPlanePoint = p0 + vLine * t;
+    vCoplanarRectanglePoint = p0 + vLine * t;
     return (t > 0.0f and t < 1.0f) ? 1 : 0;
 }
 
 // -------------------------------------------------------------------------------------------------
 // find point on line p0 - p1 with distance d to plane
-// returns: -1 -> no point found, 0: line is parallel to plane, 1: point returned in vPlanePoint
-int Plane::PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
+// returns: -1 -> no point found, 0: line is parallel to plane, 1: point returned in vCoplanarRectanglePoint
+int CoplanarRectangle::PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
 noexcept
 {
     float denom = line.Normal().Dot(line.Velocity());
@@ -189,7 +191,7 @@ noexcept
 // -------------------------------------------------------------------------------------------------
 // barycentric method for testing whether a point lies in an arbitrarily shaped triangle
 // not needed for rectangular shapes in a plane
-bool Plane::TriangleContains(const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c)
+bool CoplanarRectangle::TriangleContains(const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c)
 noexcept
 {
     Vector3f ab = b - a;
@@ -211,7 +213,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-bool Plane::Contains(Vector3f& p, bool barycentric)
+bool CoplanarRectangle::Contains(Vector3f& p, bool barycentric)
 noexcept
 {
     // barycentric method is rather computation heavy and not needed for rectangles in a plane
@@ -232,7 +234,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-bool Plane::SpherePenetratesQuad(LineSegment& line, float radius)
+bool CoplanarRectangle::SpherePenetratesQuad(LineSegment& line, float radius)
 noexcept
 {
     // Projektion von p0 in die Ebene und Innen-Test
@@ -255,7 +257,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-int Plane::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
+int CoplanarRectangle::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
 noexcept
 {
     float d0 = Distance(line.pts.p0);
@@ -286,10 +288,10 @@ noexcept
         if (AllowMovement(t) and limits.Contains(t)) {
             Vector3f candidate = line.pts.p0 + line.Velocity() * t;
             float d = Distance(candidate);
-            Vector3f vPlane = candidate - m_normal * d;
-            if (Contains(vPlane)) {
+            Vector3f vCoplanarRectangle = candidate - m_normal * d;
+            if (Contains(vCoplanarRectangle)) {
                 endPoint = candidate;
-                collisionPoint = vPlane;
+                collisionPoint = vCoplanarRectangle;
                 return (line.Normal().Dot(m_normal) >= 0) ? 0 : 1;
             }
         }
@@ -332,10 +334,10 @@ static float SegmentSegmentDistance(Vector3f p0, Vector3f p1, Vector3f q0, Vecto
           c = v.Dot(v), 
           d = u.Dot(w), 
           e = v.Dot(w);
-    float D = a * c - b * b;
+    float denom = a * c - b * b;
     float sc, tc;
 
-    if (D < Conversions::NumericTolerance) { // Quasi-parallel segments
+    if (denom < m_toleranceSquared) { // Quasi-parallel segments
         sc = 0.0f;
         tc = (b > c ? d / b : e / c);
     }
@@ -352,7 +354,7 @@ static float SegmentSegmentDistance(Vector3f p0, Vector3f p1, Vector3f q0, Vecto
 
 // -------------------------------------------------------------------------------------------------
 
-float Plane::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
+float CoplanarRectangle::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
     // rect[0] is origin, rect[1] and rect[3] define the two perpendicular axes
     Vector3f axisX = m_coordinates[1] - m_coordinates[0];
     Vector3f axisY = m_coordinates[3] - m_coordinates[0];
@@ -360,15 +362,15 @@ float Plane::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
     float height = axisY.Length();
 
     // Normalize axes for projection
-    Vector3f u = axisX * (1.0f / ((width > Conversions::NumericTolerance) ? width : 1.0f));
-    Vector3f v = axisY * (1.0f / ((height > Conversions::NumericTolerance) ? height : 1.0f));
-    Vector3f normal = u.Cross(v); // Plane normal
+    Vector3f u = axisX * (1.0f / ((width > m_toleranceSquared) ? width : 1.0f));
+    Vector3f v = axisY * (1.0f / ((height > m_toleranceSquared) ? height : 1.0f));
+    Vector3f normal = u.Cross(v); // CoplanarRectangle normal
 
     // 1. Intersection & Quasi-Parallel check
     Vector3f segDir = s2 - s1;
     float denom = normal.Dot(segDir);
 
-    if (std::abs(denom) > Conversions::NumericTolerance) { // Not parallel
+    if (std::abs(denom) > m_toleranceSquared) { // Not parallel
         float t = normal.Dot(m_coordinates[0] - s1) / denom;
         if ((t >= 0.0f) and (t <= 1.0f)) {
             Vector3f hit = s1 + segDir * t;
@@ -376,10 +378,10 @@ float Plane::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
             // Since edges are 90 deg, we check bounds via dot product
             float projX = relHit.Dot(u);
             float projY = relHit.Dot(v);
-            if ((projX >= -Conversions::NumericTolerance) and 
-                (projX <= width + Conversions::NumericTolerance) and 
-                (projY >= -Conversions::NumericTolerance) and 
-                (projY <= height + Conversions::NumericTolerance)) {
+            if ((projX >= -m_toleranceSquared) and
+                (projX <= width + m_toleranceSquared) and
+                (projY >= -m_toleranceSquared) and
+                (projY <= height + m_toleranceSquared)) {
                 return 0.0f; // Intersection!
             }
         }
@@ -403,6 +405,19 @@ float Plane::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
         };
 
     return std::min({ minDist, CheckEndpoint(s1), CheckEndpoint(s2) });
+}
+
+// -------------------------------------------------------------------------------------------------
+
+float CoplanarRectangle::PointDistance(Vector3f p) noexcept {
+	Vector3f pIntersect;
+	float distToCoplanarRectangle = Project(p, pIntersect);
+    if (Contains(pIntersect))
+        return distToCoplanarRectangle;
+    float minDist = std::numeric_limits<float>::max();
+    for (int i = 0; i < 4; ++i)
+        minDist = std::min(minDist, PointToLineDistanceEx(p, m_coordinates[i], m_coordinates[(i + 1) % 4]), true, false);
+    return minDist;
 }
 
 // =================================================================================================

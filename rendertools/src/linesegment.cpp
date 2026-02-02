@@ -198,7 +198,7 @@ noexcept
     auto acceptT = [&](float t) -> bool {
         if (not limits.Contains(t)) return false;
         if (t > 1.0f + tol)         return false;     // nur t ≤ 1
-        return true;                                   // t kann < 0 sein – Filter später in Plane::SphereIntersection
+        return true;                                   // t kann < 0 sein – Filter später in CoplanarRectangle::SphereIntersection
         };
     auto keepBestT = [&](float t) {
         if (not acceptT(t)) return;

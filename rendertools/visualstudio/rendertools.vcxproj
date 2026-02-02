@@ -132,7 +132,7 @@
     <ClInclude Include="..\include\opengl_states.h" />
     <ClInclude Include="..\include\outlinerenderer.h" />
     <ClInclude Include="..\include\noise.h" />
-    <ClInclude Include="..\include\plane.h" />
+    <ClInclude Include="..\include\coplanar_rectangle.h" />
     <ClInclude Include="..\include\prerenderedtexture.h" />
     <ClInclude Include="..\include\projector.h" />
     <ClInclude Include="..\include\base_quad.h" />
@@ -176,7 +176,7 @@
     <ClCompile Include="..\src\opengl_states.cpp" />
     <ClCompile Include="..\src\outlinerenderer.cpp" />
     <ClCompile Include="..\src\outline_shader.cpp" />
-    <ClCompile Include="..\src\plane.cpp" />
+    <ClCompile Include="..\src\coplanar_rectangle.cpp" />
     <ClCompile Include="..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\src\projector.cpp" />
     <ClCompile Include="..\src\base_quad.cpp" />

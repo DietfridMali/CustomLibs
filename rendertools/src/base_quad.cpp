@@ -97,7 +97,7 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
         };
 
     if (vertices.size() and not equals(m_vertices.AppData().StdList(), vertices)) {
-        Plane::Init(vertices);
+        CoplanarRectangle::Init(vertices);
         m_vertices.AppData() = vertices;
         m_vertices.SetDirty(true);
     }
