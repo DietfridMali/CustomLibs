@@ -24,6 +24,10 @@ public:
 		m_width = 0;
 	}
 
+	inline void Fill(const DATA_T& value) noexcept {
+		m_data.Fill(value);
+	}
+
 	inline uint32_t Index(uint32_t x, uint32_t y) const noexcept {
 		return (y > x) ? (y * (y + 1)) / 2 + x : (x * (x + 1)) / 2 + y;
 	}

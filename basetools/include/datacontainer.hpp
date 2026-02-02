@@ -27,8 +27,8 @@ public:
         return m_dataTable;
     }
 
-    inline DATA_T& Append(DATA_T data) {
-        return *m_dataList.Append(data);
+    inline DATA_T* Append(DATA_T data) {
+        return m_dataList.Append(data);
     }
 
     inline DATA_T& operator[](const int i) {
@@ -66,10 +66,21 @@ public:
         m_dataList.Clear();
     }
 
+private:
+    template<typename T>
+    static constexpr bool deleteable = requires(T v) {
+        delete v;
+    };
+
+public:
     void Destroy(void) {
+        if constexpr (deleteable<DATA_T>) {
+            for (auto data : m_dataList)
+                delete data;
+            for (auto data : m_dataTable)
+                delete data;
+        }
         m_dataList.Clear();
-        for (int i = 0; i < Count(); i++)
-            delete m_dataTable[i];
         m_dataTable.Reset();
     }
 

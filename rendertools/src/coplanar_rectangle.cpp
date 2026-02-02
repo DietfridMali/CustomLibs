@@ -325,7 +325,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 // Shortest distance between two line segments (P0P1 and Q0Q1)
-static float SegmentSegmentDistance(Vector3f p0, Vector3f p1, Vector3f q0, Vector3f q1) {
+static float SegmentSegmentDistance(Vector3f p0, Vector3f p1, Vector3f q0, Vector3f q1, float tolerance) {
     Vector3f u = p1 - p0, 
              v = q1 - q0, 
              w = p0 - q0;
@@ -337,13 +337,13 @@ static float SegmentSegmentDistance(Vector3f p0, Vector3f p1, Vector3f q0, Vecto
     float denom = a * c - b * b;
     float sc, tc;
 
-    if (denom < m_toleranceSquared) { // Quasi-parallel segments
+    if (denom < tolerance) { // Quasi-parallel segments
         sc = 0.0f;
         tc = (b > c ? d / b : e / c);
     }
     else {
-        sc = (b * e - c * d) / D;
-        tc = (a * e - b * d) / D;
+        sc = (b * e - c * d) / denom;
+        tc = (a * e - b * d) / denom;
     }
     sc = std::clamp(sc, 0.0f, 1.0f);
     tc = std::clamp(tc, 0.0f, 1.0f);
@@ -390,7 +390,7 @@ float CoplanarRectangle::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
     // 2. Minimum distance to the 4 boundary edges
     float minDist = std::numeric_limits<float>::max();
     for (int i = 0; i < 4; ++i) {
-        minDist = std::min(minDist, SegmentSegmentDistance(s1, s2, m_coordinates[i], m_coordinates[(i + 1) % 4]));
+        minDist = std::min(minDist, SegmentSegmentDistance(s1, s2, m_coordinates[i], m_coordinates[(i + 1) % 4], m_toleranceSquared));
     }
 
     // 3. Endpoint projections (handles case where segment is directly above rectangle)
@@ -416,7 +416,7 @@ float CoplanarRectangle::PointDistance(Vector3f p) noexcept {
         return distToCoplanarRectangle;
     float minDist = std::numeric_limits<float>::max();
     for (int i = 0; i < 4; ++i)
-        minDist = std::min(minDist, PointToLineDistanceEx(p, m_coordinates[i], m_coordinates[(i + 1) % 4]), true, false);
+        minDist = std::min(minDist, PointToLineDistanceEx(p, m_coordinates[i], m_coordinates[(i + 1) % 4], true, false));
     return minDist;
 }
 
