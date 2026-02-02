@@ -55,7 +55,7 @@ public:
     float PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared)
         noexcept;
 
-        inline float PointToLineDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
+    inline float PointToLineDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
         return PointToLineDistanceEx(p0, p1, p2, false, false);
     }
 
@@ -93,6 +93,10 @@ public:
 
     bool Contains(Vector3f& p, bool barycentric = false)
         noexcept;
+
+    float SegmentDistance(Vector3f s1, Vector3f s2)
+        noexcept;
+
 
     void Translate(Vector3f t)
         noexcept;

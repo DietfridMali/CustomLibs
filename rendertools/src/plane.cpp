@@ -321,4 +321,88 @@ noexcept
     return 1;
 }
 
+// -------------------------------------------------------------------------------------------------
+// Shortest distance between two line segments (P0P1 and Q0Q1)
+static float SegmentSegmentDistance(Vector3f p0, Vector3f p1, Vector3f q0, Vector3f q1) {
+    Vector3f u = p1 - p0, 
+             v = q1 - q0, 
+             w = p0 - q0;
+    float a = u.Dot(u), 
+          b = u.Dot(v), 
+          c = v.Dot(v), 
+          d = u.Dot(w), 
+          e = v.Dot(w);
+    float D = a * c - b * b;
+    float sc, tc;
+
+    if (D < Conversions::NumericTolerance) { // Quasi-parallel segments
+        sc = 0.0f;
+        tc = (b > c ? d / b : e / c);
+    }
+    else {
+        sc = (b * e - c * d) / D;
+        tc = (a * e - b * d) / D;
+    }
+    sc = std::clamp(sc, 0.0f, 1.0f);
+    tc = std::clamp(tc, 0.0f, 1.0f);
+	p0 += u * sc;
+	q0 += v * tc;
+    return (p0 - q0).Length();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+float Plane::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
+    // rect[0] is origin, rect[1] and rect[3] define the two perpendicular axes
+    Vector3f axisX = m_coordinates[1] - m_coordinates[0];
+    Vector3f axisY = m_coordinates[3] - m_coordinates[0];
+    float width = axisX.Length();
+    float height = axisY.Length();
+
+    // Normalize axes for projection
+    Vector3f u = axisX * (1.0f / ((width > Conversions::NumericTolerance) ? width : 1.0f));
+    Vector3f v = axisY * (1.0f / ((height > Conversions::NumericTolerance) ? height : 1.0f));
+    Vector3f normal = u.Cross(v); // Plane normal
+
+    // 1. Intersection & Quasi-Parallel check
+    Vector3f segDir = s2 - s1;
+    float denom = normal.Dot(segDir);
+
+    if (std::abs(denom) > Conversions::NumericTolerance) { // Not parallel
+        float t = normal.Dot(m_coordinates[0] - s1) / denom;
+        if ((t >= 0.0f) and (t <= 1.0f)) {
+            Vector3f hit = s1 + segDir * t;
+            Vector3f relHit = hit - m_coordinates[0];
+            // Since edges are 90 deg, we check bounds via dot product
+            float projX = relHit.Dot(u);
+            float projY = relHit.Dot(v);
+            if ((projX >= -Conversions::NumericTolerance) and 
+                (projX <= width + Conversions::NumericTolerance) and 
+                (projY >= -Conversions::NumericTolerance) and 
+                (projY <= height + Conversions::NumericTolerance)) {
+                return 0.0f; // Intersection!
+            }
+        }
+    }
+
+    // 2. Minimum distance to the 4 boundary edges
+    float minDist = std::numeric_limits<float>::max();
+    for (int i = 0; i < 4; ++i) {
+        minDist = std::min(minDist, SegmentSegmentDistance(s1, s2, m_coordinates[i], m_coordinates[(i + 1) % 4]));
+    }
+
+    // 3. Endpoint projections (handles case where segment is directly above rectangle)
+    auto CheckEndpoint = [&](Vector3f p) {
+        Vector3f relP = p - m_coordinates[0];
+        float projX = relP.Dot(u);
+        float projY = relP.Dot(v);
+        if ((projX >= 0.0f) and (projX <= width) and (projY >= 0.0f) and (projY <= height)) {
+            return std::abs(relP.Dot(normal));
+        }
+        return std::numeric_limits<float>::max();
+        };
+
+    return std::min({ minDist, CheckEndpoint(s1), CheckEndpoint(s2) });
+}
+
 // =================================================================================================
