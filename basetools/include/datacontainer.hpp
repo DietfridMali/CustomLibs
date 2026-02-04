@@ -39,6 +39,10 @@ public:
         return m_dataTable[i];
     }
 
+    inline DATA_T* Data(const int i) noexcept {
+        return m_dataTable.Data(i);
+	}
+
     inline int Count(void) {
         return static_cast<int>(m_dataList.IsEmpty() ? m_dataTable.Length() : m_dataList.Length());
     }
