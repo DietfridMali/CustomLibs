@@ -70,14 +70,6 @@ public:
         m_dataList.Clear();
     }
 
-    bool LoadFromFile(const std::string& filename) {
-        return m_dataTable.LoadFromFile(filename);
-    }
-
-    bool SaveToFile(const std::string& filename) {
-        return m_dataTable.SaveToFile(filename);
-    }
-
 private:
     template<typename T>
     static constexpr bool deleteable = requires(T v) {
