@@ -41,6 +41,14 @@ public:
 		uint32_t i = Index(x, y);
 		return m_data[i];
 	}
+
+	bool LoadFromFile(const std::string& filename) {
+		return m_data.LoadFromFile(filename);
+	}
+
+	bool SaveToFile(const std::string& filename) {
+		return m_data.SaveToFile(filename);
+	}
 };
 
 // =================================================================================================
