@@ -360,7 +360,7 @@ public:
     }
 
 
-    bool LoadFromFile(const std::string & filename, uint32_t elemCount) {
+    bool LoadFromFile(const std::string & filename, uint32_t elemCount = 0) {
         if (filename.empty())
             return false;
         std::ifstream f(filename.c_str(), std::ios::binary);
@@ -370,9 +370,9 @@ public:
         f.seekg(0, std::ios::end);
         std::streamoff fileSize = f.tellg();
         f.seekg(0, std::ios::beg);
-
+        if (elemCount == 0)
+			elemCount = uint32_t(fileSize) / sizeof(DATA_T);
         size_t dataSize = size_t(elemCount) * sizeof(DATA_T);
-
         if (fileSize != std::streamoff(dataSize))
             return false;
 
