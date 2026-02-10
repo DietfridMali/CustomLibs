@@ -111,7 +111,6 @@ public:
         return m_center;
     };
 
-private:
     bool SpherePenetratesQuad(LineSegment& line, float radius)
         noexcept;
 };
