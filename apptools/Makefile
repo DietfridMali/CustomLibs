@@ -10,6 +10,7 @@ FILES := \
  internetservices \
  networkendpoint \
  networkmessage \
+ ntpclient \
  textfileloader \
  udp
 
