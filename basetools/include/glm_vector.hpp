@@ -242,7 +242,9 @@ public:
     inline Vector Normal() const
         noexcept(noexcept(Vector(glm::normalize(static_cast<VEC_TYPE>(*this)))))
     {
-        return Vector(glm::normalize(static_cast<VEC_TYPE>(*this)));
+        Vector v = *this;
+        v.Normalize();
+        return v;
     }
 
     float Min() const noexcept {
