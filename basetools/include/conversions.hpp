@@ -74,6 +74,8 @@ namespace Conversions
 
     constexpr float NumericTolerance = 0.000001f;
 
+    constexpr float NumericToleranceSquared = 0.000001f * 0.000001f;
+
     template<typename T>
     struct Interval {
         T min = std::numeric_limits<T>::lowest();
