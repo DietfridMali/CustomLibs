@@ -252,7 +252,7 @@ public:
         return Move(other);
     }
 
-    List& operator=(List&& other) {           // move von rvalue-Quelle
+    List& operator=(List&& other) noexcept {           // move von rvalue-Quelle
         return Move(std::move(other));
     }
 

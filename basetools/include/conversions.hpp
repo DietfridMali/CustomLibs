@@ -17,33 +17,36 @@ constexpr float TWO_PI = 6.28318530717958647692f;
 
 // =================================================================================================
 
+#pragma warning(push)
+#pragma warning(disable:4505)
+
 namespace Conversions
 {
-    static float DegToRad(float deg)
+    inline float DegToRad(float deg)
         noexcept
     {
         return static_cast<float>((static_cast<double>(deg) / 180.0 * PI));
     }
 
-    static float RadToDeg(float rad)
+    inline float RadToDeg(float rad)
         noexcept
     {
         return static_cast<float>((static_cast<double>(rad) * 180.0 / PI));
     }
 
-    static float DotToRad(float dot)
+    inline float DotToRad(float dot)
         noexcept
     {
         return static_cast<float>(acos(dot));
     }
 
-    static float DotToDeg(float dot)
+    inline float DotToDeg(float dot)
         noexcept
     {
         return RadToDeg(DotToRad(dot));
     }
 
-    static float Normalize(float v, float vMin, float vMax) {
+    inline float Normalize(float v, float vMin, float vMax) {
         return (v - vMin) / (vMax - vMin);
     }
 
@@ -231,5 +234,7 @@ namespace Conversions
         return v * v;
     };
 };
+
+#pragma warning(pop)
 
 // =================================================================================================

@@ -89,7 +89,7 @@ public:
 
     String GetName(void) { return m_name; }
 
-    virtual void Create(int quality, Texture* texture, List<String> textureNames) {}
+    virtual void Create(int, Texture*, List<String>) {}
 
     virtual void Destroy(void);
 

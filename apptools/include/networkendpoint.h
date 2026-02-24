@@ -8,6 +8,8 @@
 
 enum class ByteOrder { Host, Network };
 
+#pragma warning(push)
+#pragma warning(disable:4201)
 union NetworkID {
         uint64_t    id{ 0 };
     struct {
@@ -15,6 +17,7 @@ union NetworkID {
         uint16_t    port;
     };
 };
+#pragma warning(pop)
 
 typedef enum {
 	ntIPv4,

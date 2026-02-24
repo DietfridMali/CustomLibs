@@ -239,7 +239,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
 #endif
     // Attribute 0-3 checken (Position, TexCoord, Normal, etc.)
     for (int i = 0; i < 7; i++) {
-        GLint enabled, bufSize, size, type, stride, bufferBinding;
+        GLint enabled, size, type, stride, bufferBinding;
         GLvoid* pointer;
 
         glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);

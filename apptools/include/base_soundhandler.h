@@ -30,6 +30,7 @@ class SoundObject
 
         SoundObject(int id = -1, String name = String(""), int channel = -1, Mix_Chunk * sound = nullptr, Vector4f position = {0, 0, 0}, float volume = 1.0f)
             : m_id(id)
+            , m_name(name)
             , m_channel(channel)
             , m_sound(sound)
             , m_position(position)
@@ -107,7 +108,10 @@ class BaseSoundHandler
 
         virtual bool Setup(String soundFolder);
 
+#pragma warning(push)
+#pragma warning(disable:4100)
         virtual int32_t GetSoundNames(List<String>& soundNames) { return 0; }
+#pragma warning(pop)
 
         static BaseSoundHandler& Instance(void) { return dynamic_cast<BaseSoundHandler&>(PolymorphSingleton::Instance()); }
 
@@ -121,7 +125,10 @@ class BaseSoundHandler
         }
 
         // update all sound volumes depending on application specific cirumstances (e.g. listener or sound source have been moving)
+#pragma warning(push)
+#pragma warning(disable:4100)
         virtual void UpdateSound(SoundObject& soundObject) { }
+#pragma warning(pop)
 
 
         // play back the sound with the name 'name'. Position, viewer and DistFunc serve for computing the sound volume
@@ -205,7 +212,10 @@ class BaseSoundHandler
 
 private:
         // compute stereo panning from the angle between the viewer direction and the vector from the viewer to the sound source
-        virtual float Pan(Vector3f& position) { return 0.0f; }
+#pragma warning(push)
+#pragma warning(disable:4100)
+    virtual float Pan(Vector3f& position) { return 0.0f; }
+#pragma warning(pop)
 
         void UpdateVolume(SoundObject& soundObject, float distance);
 

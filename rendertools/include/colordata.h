@@ -71,9 +71,9 @@ public:
         return A() > 0.0f;
     }
 
-    RGBAColor Mix(const RGBAColor& other, float t) const noexcept {
-        t = std::clamp(t, 0.0f, 1.0f);
-        return RGBAColor(std::lerp(R(), other.R(), t), std::lerp(G(), other.G(), t), std::lerp(B(), other.B(), t), std::lerp(A(), other.A(), t));
+    RGBAColor Mix(const RGBAColor& other, float gradient) const noexcept {
+        gradient = std::clamp(gradient, 0.0f, 1.0f);
+        return RGBAColor(std::lerp(R(), other.R(), gradient), std::lerp(G(), other.G(), gradient), std::lerp(B(), other.B(), gradient), std::lerp(A(), other.A(), gradient));
     }
 
     RGBAColor Premultiplied(void) const {
@@ -123,9 +123,9 @@ public:
         return RGBAColor(scale.R(), scale.G(), scale.B(), 1.0f);
     }
 
-    inline float PosterizeComponent(float c, uint16_t g = 15) noexcept {
+    inline float PosterizeComponent(float c, uint16_t gradient = 15) noexcept {
         uint16_t i = uint16_t(round(c * 255.0f));
-        return float(std::max<uint32_t>(0, ((i / g + g / 2) * g - g))) / 255.0f;
+        return float(std::max<uint32_t>(0, ((i / gradient + gradient / 2) * gradient - gradient))) / 255.0f;
     }
 
     inline RGBAColor& Posterize(uint8_t gradients = 15) noexcept {

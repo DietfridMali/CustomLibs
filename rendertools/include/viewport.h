@@ -13,7 +13,8 @@ struct ScreenCoord {
     int y;
 };
 
-class Viewport : public Rectangle
+class Viewport 
+    : public Rectangle
 {
 public:
     Matrix4f    m_transformation;
@@ -29,7 +30,9 @@ public:
         , m_windowHeight(0)
         , m_center({ float(left) + float (width) * 0.5f, float(top) + float(height) * 0.5f })
         , m_flipVertically(false)
-    { }
+    { 
+        m_glViewport[0] = m_glViewport[1] = m_glViewport[2] = m_glViewport[3] = 0;
+    }
 
     Viewport(Vector2i center, int width = 0, int height = 0)
         : Rectangle(center.x - width / 2, center.y - height / 2, width, height)
@@ -37,7 +40,9 @@ public:
         , m_windowHeight(0)
         , m_center({ float(center.x), float(center.y) })
         , m_flipVertically(false)
-    { }
+    { 
+        m_glViewport[0] = m_glViewport[1] = m_glViewport[2] = m_glViewport[3] = 0;
+    }
 
     Viewport(Rectangle& r)
         : Rectangle (r.m_left, r.m_top, r.m_width, r.m_height) 
@@ -45,7 +50,9 @@ public:
         , m_windowHeight(0)
         , m_center({ float(r.m_left) + float(r.m_width) * 0.5f, float(r.m_top) + float(r.m_height) * 0.5f })
         , m_flipVertically(false)
-    { }
+    { 
+        m_glViewport[0] = m_glViewport[1] = m_glViewport[2] = m_glViewport[3] = 0;
+    }
 
     void Fill(const RGBColor& color, float alpha = 1.0f, float scale = 1.0f);
 

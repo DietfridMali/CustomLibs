@@ -162,7 +162,7 @@ public:
 
 		inline int SetDepthWrite(int state) {
 			static int32_t stateID = -1;
-			return FuncState<int, -1>(state, stateID, glDepthMask);
+			return FuncState<int, GLboolean(-1)>(GLboolean(state), stateID, glDepthMask);
 		}
 
 		inline std::tuple<GLboolean, GLboolean, GLboolean, GLboolean>ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a) {

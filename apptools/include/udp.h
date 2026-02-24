@@ -32,7 +32,10 @@ public:
         , m_socket(nullptr)
         , m_packet(nullptr)
         , m_channel(-1)
-    { }
+    { 
+        m_address.host = 0;
+        m_address.port = 0;
+    }
 
     ~UDPSocket() {
         Close(true);

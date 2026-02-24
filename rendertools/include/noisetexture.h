@@ -31,8 +31,6 @@ static inline float Hash2i(int ix, int iy) {
     return s - std::floor(s);
 }
 
-static inline uint32_t Hash3D(uint32_t x, uint32_t y, uint32_t z, uint32_t seed);
-
 // -------------------------------------------------------------------------------------------------
 // Traits
 template<class Tag> struct NoiseTraits;
@@ -77,17 +75,23 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glGenerateMipmap(target);
     }
+
+#pragma warning(push)
+#pragma warning(disable:4100)
     static void Compute(ManagedArray<float>& data, int gridSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
+#pragma warning(pop)
+#if 0
         data.Resize(gridSize * gridSize);
         float* dataPtr = data.Data();
         for (int y = 0; y < gridSize; ++y) {
             for (int x = 0; x < gridSize; ++x) {
                 float sx = (x + 0.5f) / gridSize * float(yPeriod);
                 float sy = (y + 0.5f) / gridSize * float(xPeriod);
-                //float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
-                //*dataPtr++ = std::clamp(n, 0.0f, 1.0f);
+                float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
+                *dataPtr++ = std::clamp(n, 0.0f, 1.0f);
             }
         }
+#endif
     }
 };
 
@@ -110,7 +114,12 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
     }
 
     // 'octave' ist hier der z-Slice-Index [0..gridSize-1]
-    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed) {
+#pragma warning(push)
+#pragma warning(disable:4100)
+    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed)
+#pragma warning(pop)
+    {
+#if 0
         data.Resize(gridSize * gridSize * 4);
         uint8_t* dataPtr = data.Data();
 
@@ -126,7 +135,6 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
         const int C_B = C0 * 2;
         const int C_A = C0 * 4;
         const int C_R = 32;            // für (1−Worley) im R-Kanal
-#if 0
         for (int y = 0; y < gridSize; ++y) {
             float yP = ((y + 0.5f) * fy) * float(P);
             for (int x = 0; x < gridSize; ++x) {
@@ -172,7 +180,11 @@ struct NoiseTraits<WeatherNoiseRG8> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
     }
 
-    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves) {
+#pragma warning(push)
+#pragma warning(disable:4100)
+    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves)
+#pragma warning(pop)
+    {
         data.Resize(gridSize * gridSize * 2);
 #if 0
         uint8_t* dst = data.Data();
@@ -330,7 +342,7 @@ class NoiseTexture3D
 	: public Texture
 {
 private:
-    Vector3i    m_gridDimensions;
+    Vector3i    m_gridDimensions{ 0, 0, 0 };
     NoiseParams m_params;
     ManagedArray<float>	m_data;
 

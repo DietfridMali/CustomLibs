@@ -74,8 +74,12 @@ class Shader
 
         using KeyType = String;
 
-        Shader(String name = "", String vs = "", String fs = "") : 
-            m_handle(0), m_name(name) 
+#pragma warning(push)
+#pragma warning(disable:4100)
+        Shader(String name = "", String vs = "", String fs = "")
+#pragma warning(pop)
+            : m_handle(0)
+            , m_name(name) 
         { 
             // always resize m_uniforms so that any index passed to its operator[] will be valid (i.e. resize the underlying std::vector if needed)
             m_uniforms.SetAutoFit(true);
@@ -347,7 +351,11 @@ class Shader
 
         // -----------------------------------------------------------------------------------------
 
-        static inline float* GetFloatData(GLenum id, int32_t size, float* data) noexcept {
+#pragma warning(push)
+#pragma warning(disable:4100)
+        static inline float* GetFloatData(GLenum id, int32_t size, float* data) noexcept 
+#pragma warning(pop)
+        {
             glGetFloatv(id, (GLfloat*)data);
             return data;
         }

@@ -78,10 +78,13 @@ public:
         Mesh::Init(GL_QUADS, 100);
     }
 
+#pragma warning(push)
+#pragma warning(disable:4100)
     BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false)
+#pragma warning(pop)
         : CoplanarRectangle(vertices)
         , m_isAvailable(true)
-        , m_privateVAO(false)
+        , m_privateVAO(privateVAO)
         , m_premultiply(false)
     {
         Mesh::Init(GL_QUADS, 100);

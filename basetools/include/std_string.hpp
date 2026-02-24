@@ -199,7 +199,7 @@ public:
 
     static String Concat(std::initializer_list<String> values);
 
-    static int Compare(void* context, const String& s1, const String& s2) noexcept {
+    static int Compare(void*, const String& s1, const String& s2) noexcept {
         return (s1.Length() or s2.Length()) ? std::strcmp(static_cast<const char*>(s1), static_cast<const char*>(s2)) : 0;
     }
 
