@@ -6,6 +6,7 @@
 #include <cmath>
 #include <algorithm>
 
+#include "std_defines.h"
 #include "vector.hpp"
 #include "conversions.hpp"
 

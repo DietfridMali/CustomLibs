@@ -1,9 +1,7 @@
 #pragma once
 
-#include "std_defines.h"
-
 #include <algorithm>
-
+#include "std_defines.h"
 
 #include "memorymanager.h"
 

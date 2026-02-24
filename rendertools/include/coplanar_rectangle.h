@@ -1,8 +1,10 @@
 # pragma once
 
+#include <math.h>
 #include <initializer_list>
 #include <string.h>
-#include <math.h>
+
+#include "std_defines.h"
 #include "array.hpp"
 #include "vector.hpp"
 #include "linesegment.h"

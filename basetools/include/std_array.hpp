@@ -151,7 +151,7 @@ public:
     inline int GetIndex(int32_t x, int32_t y) const noexcept { return int(y * m_width + x); }
 
     inline DATA_T* operator()(int32_t x, int32_t y, bool rangeCheck) {
-        int i = GetCheckedIndex(x, y);
+        int i = rangeCheck ? GetCheckedIndex(x, y) : GetIndex(x, y);
         return (i < 0) ? nullptr : Data(AutoFit(i));
     }
 

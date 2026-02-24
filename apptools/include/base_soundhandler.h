@@ -1,5 +1,6 @@
 #pragma once
 
+#include <math.h>
 #include "std_defines.h"
 #include "conversions.hpp"
 #include "SDL.h"
@@ -10,8 +11,6 @@
 #include "list.hpp"
 #include "dictionary.hpp"
 #include "basesingleton.hpp"
-
-#include <math.h>
 
 // =================================================================================================
 

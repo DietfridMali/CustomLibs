@@ -1,8 +1,7 @@
 #pragma once
 
-#include "std_defines.h"
-
 #include <string>
+#include "std_defines.h"
 
 #include "basesingleton.hpp"
 #include "string.hpp"

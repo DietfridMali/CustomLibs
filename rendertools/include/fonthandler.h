@@ -1,7 +1,5 @@
 #pragma once
 
-#include "SDL_ttf.h"
-
 #include "vector.hpp"
 #include "base_quad.h"
 #include "texture.h"
@@ -11,6 +9,7 @@
 #include "colordata.h"
 #include "tablesize.h"
 #include "textureatlas.h"
+#include "SDL_ttf.h"
 
 #define EXTERNAL_ATLAS 1
 

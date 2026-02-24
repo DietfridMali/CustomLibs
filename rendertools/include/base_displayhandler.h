@@ -1,9 +1,10 @@
 #pragma once
 
-#include "std_defines.h"
-#include <stdlib.h>
 #include <math.h>
+#include <stdlib.h>
 #include <functional>
+
+#include "std_defines.h"
 #include "string.hpp"
 #include "basesingleton.hpp"
 #include "sdlhandler.h"

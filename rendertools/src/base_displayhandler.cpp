@@ -3,12 +3,6 @@
 #include "glew.h"
 #include "SDL.h"
 #include "base_displayhandler.h"
-#include <cstdint>
-#include <limits>
-#include <stdlib.h>
-#include <math.h>
-#include <algorithm>
-#include <stdexcept>
 
 // =================================================================================================
 

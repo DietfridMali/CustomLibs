@@ -1,9 +1,10 @@
 #pragma once
 
-#include <utility>
-
-#include <stdlib.h>
 #include <math.h>
+#include <utility>
+#include <stdlib.h>
+
+#include "std_defines.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
 #include "matrix.hpp"
@@ -180,8 +181,6 @@ public:
     virtual bool DisableCamera(void) { return false; }
 
     inline FBO* ScreenBuffer(void) noexcept { return m_screenBuffer; }
-
-    bool SetActiveBuffer(FBO* buffer, bool clearBuffer = false);
 
     inline int WindowWidth(void) noexcept { return m_windowWidth; }
 

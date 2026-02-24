@@ -1,7 +1,6 @@
 #pragma once
 
 #include "std_defines.h"
-
 #include "glew.h"
 #include "array.hpp"
 #include "string.hpp"

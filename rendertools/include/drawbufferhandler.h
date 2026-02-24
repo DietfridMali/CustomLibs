@@ -1,8 +1,10 @@
 #pragma once
-#include <utility>
 
-#include <stdlib.h>
 #include <math.h>
+#include <utility>
+#include <stdlib.h>
+
+#include "std_defines.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
 #include "fbo.h"

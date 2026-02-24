@@ -1,9 +1,11 @@
 
+#include <math.h>
 #include <algorithm>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <math.h>
+
+#include "std_defines.h"
 #include "conversions.hpp"
 #include "coplanar_rectangle.h"
 

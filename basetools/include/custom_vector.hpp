@@ -1,18 +1,16 @@
 ﻿# pragma once
 
+#include <math.h>
 #include <cstddef>
 #include <array>
 #include <utility>
 #include <stdexcept>
-
-#include <math.h>
 #include <string.h>
+
+#include "std_defines.h"
 
 // =================================================================================================
 // Vector math for 3D rendering
-
-#include <math.h>
-#include <string.h>
 
 template <typename DATA_T, size_t dimensions>
 class Vector {

@@ -9,3 +9,6 @@
 #ifndef NOMINMAX
 #   define NOMINMAX
 #endif
+#ifndef HAVE_M_PI
+#	define HAVE_M_PI
+#endif

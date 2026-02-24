@@ -1,11 +1,11 @@
 
+#include <math.h>
+
+#include "std_defines.h"
 #include "matrix.hpp"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
 #include "conversions.hpp"
-
-#define _USE_MATH_DEFINES
-#include <math.h>
 
 // =================================================================================================
 
