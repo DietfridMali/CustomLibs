@@ -2,7 +2,11 @@
 
 #include <stdint.h>
 
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL_net.h"
+#pragma warning(pop)
+
 #include "string.hpp"
 #include "networkmessage.h"
 #include "networkendpoint.h"

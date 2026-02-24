@@ -3,7 +3,12 @@
 #include <stdio.h>
 #include <stdexcept>
 #include "texturebuffer.h"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL_image.h"
+#pragma warning(pop)
+
 #include "opengl_states.h"
 
 // =================================================================================================

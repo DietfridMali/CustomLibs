@@ -2,7 +2,11 @@
 
 #include "string.hpp"
 #include "array.hpp"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL_net.h"
+#pragma warning(pop)
 
 // =================================================================================================
 

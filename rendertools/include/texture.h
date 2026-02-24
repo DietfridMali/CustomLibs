@@ -14,8 +14,11 @@
 #include "opengl_states.h"
 #include "texturebuffer.h"
 
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL.h"
 #include "SDL_image.h"
+#pragma warning(pop)
 
 class Texture;
 
@@ -128,7 +131,7 @@ public:
 
     Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_CLAMP_TO_EDGE);
 
-    ~Texture();
+    ~Texture() noexcept;
 
     inline void Register(String& name) {
        m_name = name;

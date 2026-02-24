@@ -5,6 +5,12 @@
 #include <cstring>
 #include <ctime>
 
+#pragma warning(push)
+#pragma warning(disable:26819)
+#include "SDL.h"
+#include "SDL_net.h"
+#pragma warning(pop)
+
 // =================================================================================================
 
 // Hilfsfunktionen für Netz-Byteorder ohne Alignment-Probleme

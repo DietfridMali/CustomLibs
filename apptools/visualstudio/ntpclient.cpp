@@ -6,7 +6,11 @@
 #include <ctime>
 #include "udp.h"
 #include "networkendpoint.h"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL_net.h"
+#pragma warning(pop)
 
 #define NTP_UNIX_EPOCH_DIFF 2208988800u
 

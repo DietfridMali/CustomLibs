@@ -3,8 +3,13 @@
 #include <math.h>
 #include "std_defines.h"
 #include "conversions.hpp"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL.h"
 #include "SDL_mixer.h"
+#pragma warning(pop)
+
 #include "string.hpp"
 #include "vector.hpp"
 #include "array.hpp"

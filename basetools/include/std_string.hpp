@@ -183,13 +183,13 @@ public:
 
     inline String ToLowercase() const {
         std::string tmp = m_str;
-        std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return std::tolower(c); });
+        std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return String(tmp);
     }
 
     inline String ToUppercase() const {
         std::string tmp = m_str;
-        std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return std::toupper(c); });
+        std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
         return String(tmp);
     }
 

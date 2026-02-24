@@ -8,8 +8,7 @@
 #include <optional>
 #include <string>
 #include <cstring>
-#include <SDL.h>
-#include <SDL_net.h>
+
 #include "string.hpp"
 #include "udp.h"
 

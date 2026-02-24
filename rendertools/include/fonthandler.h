@@ -9,7 +9,11 @@
 #include "colordata.h"
 #include "tablesize.h"
 #include "textureatlas.h"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL_ttf.h"
+#pragma warning(pop)
 
 #define EXTERNAL_ATLAS 1
 

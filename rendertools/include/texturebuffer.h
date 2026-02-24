@@ -11,8 +11,11 @@
 #include "avltree.hpp"
 #include "opengl_states.h"
 
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL.h"
 #include "SDL_image.h"
+#pragma warning(pop)
 
 class Texture;
 

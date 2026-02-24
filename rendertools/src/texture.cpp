@@ -2,8 +2,15 @@
 #include <utility>
 #include <stdio.h>
 #include <stdexcept>
-#include "texture.h"
+
+#include "std_defines.h"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL_image.h"
+#pragma warning(pop)
+
+#include "texture.h"
 #include "opengl_states.h"
 #include "base_renderer.h"
 

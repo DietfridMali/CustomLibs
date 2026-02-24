@@ -1,6 +1,9 @@
 #pragma once
 
+#pragma warning(push)
+#pragma warning(disable:26819)
 #include "SDL_ttf.h"
+#pragma warning(pop)
 
 #include "vector.hpp"
 #include "base_quad.h"
