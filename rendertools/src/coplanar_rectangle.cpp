@@ -109,15 +109,15 @@ noexcept
 // if clampToSegment is true, the distance is computed to the line segment p0 - p1. Otherwise p0,p1 define an infinite line
 // and the perpendicular distance from p2 to that line is computed
 
-float CoplanarRectangle::PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared)
+float CoplanarRectangle::PointToLineDistanceEx(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1, bool clampToSegment, bool squared)
 noexcept
 {
-    Vector3f v = p1;
-    v -= p0;
+    Vector3f v = lp1;
+    v -= lp0;
     float l2 = v.Dot(v);
 
-    Vector3f u = p2;
-    u -= p0;
+    Vector3f u = p;
+    u -= lp0;
 
     if (l2 > m_toleranceSquared) { // otherwise line too short, compute point to point distance p0 <-> p2
         // u = p2 - (p0 + v * t) -> u = p2 - p0 - v * t;
@@ -251,7 +251,7 @@ noexcept
     radius *= radius;
     radius += m_toleranceSquared;
     for (int i = 0; i < 4; ++i) {
-        if (PointToSegmentDistanceSquared(m_coordinates[i], m_coordinates[(i + 1) % 4], line.pts.p0) <= radius)
+        if (PointToSegmentDistanceSquared(line.pts.p0, m_coordinates[i], m_coordinates[(i + 1) % 4]) <= radius)
             return true;
     }
     return false;
@@ -411,14 +411,16 @@ float CoplanarRectangle::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
 
 // -------------------------------------------------------------------------------------------------
 
-float CoplanarRectangle::PointDistance(Vector3f p) noexcept {
+float CoplanarRectangle::PointDistance(Vector3f p, bool intersectRectangle) noexcept {
 	Vector3f pIntersect;
-	float distToCoplanarRectangle = Project(p, pIntersect);
+	float distToPlane = Project(p, pIntersect);
     if (Contains(pIntersect))
-        return distToCoplanarRectangle;
+        return distToPlane;
     float minDist = std::numeric_limits<float>::max();
-    for (int i = 0; i < 4; ++i)
-        minDist = std::min(minDist, PointToLineDistanceEx(p, m_coordinates[i], m_coordinates[(i + 1) % 4], true, false));
+    if (not intersectRectangle) {
+        for (int i = 0; i < 4; ++i)
+            minDist = std::min(minDist, PointToLineDistanceEx(p, m_coordinates[i], m_coordinates[(i + 1) % 4], true, false));
+    }
     return minDist;
 }
 

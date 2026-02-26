@@ -13,8 +13,7 @@
 // Geometric computations in planes and rectangles in a plane
 
 class CoplanarRectangle 
-    : public Vector3f {
-
+{
 public:
     ManagedArray<Vector3f>  m_coordinates;
     Vector3f                m_normal;
@@ -54,23 +53,23 @@ public:
     float Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
         noexcept;
 
-    float PointToLineDistanceEx(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2, bool clampToSegment, bool squared)
+    float PointToLineDistanceEx(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1, bool clampToSegment, bool squared)
         noexcept;
 
-    inline float PointToLineDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-        return PointToLineDistanceEx(p0, p1, p2, false, false);
+    inline float PointToLineDistance(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1) noexcept {
+        return PointToLineDistanceEx(p, lp0, lp1, false, false);
     }
 
-    inline float PointToLineDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-        return PointToLineDistanceEx(p0, p1, p2, false, true);
+    inline float PointToLineDistanceSquared(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1) noexcept {
+        return PointToLineDistanceEx(p, lp0, lp1, false, true);
     }
 
-    inline float PointToSegmentDistance(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-        return PointToLineDistanceEx(p0, p1, p2, true, false);
+    inline float PointToSegmentDistance(const Vector3f& p, const Vector3f& sp0, const Vector3f& sp1) noexcept {
+        return PointToLineDistanceEx(p, sp0, sp1, true, false);
     }
 
-    inline float PointToSegmentDistanceSquared(const Vector3f& p0, const Vector3f& p1, const Vector3f& p2) noexcept {
-        return PointToLineDistanceEx(p0, p1, p2, true, true);
+    inline float PointToSegmentDistanceSquared(const Vector3f& p, const Vector3f& sp0, const Vector3f& sp1) noexcept {
+        return PointToLineDistanceEx(p, sp0, sp1, true, true);
     }
 
     float NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
@@ -99,7 +98,7 @@ public:
     float SegmentDistance(Vector3f s1, Vector3f s2)
         noexcept;
 
-    float PointDistance(Vector3f p)
+    float PointDistance(Vector3f p, bool intersectRectangle = false)
         noexcept;
 
     void Translate(Vector3f t)
