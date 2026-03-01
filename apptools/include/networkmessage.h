@@ -270,6 +270,11 @@ class NetworkMessage {
         inline bool ValueError(void) noexcept {
             return m_valueError;
         }
+
+        const String& operator[](int32_t i) const noexcept {
+			static String emptyString("");
+            return ((i >= 0) and (i < m_values.Length())) ? m_values[i] : emptyString;
+		}
 };
 
 // =================================================================================================
