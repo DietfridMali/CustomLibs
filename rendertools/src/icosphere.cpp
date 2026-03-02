@@ -266,7 +266,7 @@ void RectangleIcoSphere::Refine(SegmentedList<VertexIndices>& faces, int quality
 void RectangleIcoSphere::CreateTriangleVertexIndices(void) {
     m_indices.Setup();
     uint32_t l = m_indices.GLDataLength(); // number of vertices
-    ManagedArray<GLuint> triIndices((l / 2) * 3);
+    AutoArray<GLuint> triIndices((l / 2) * 3);
     uint32_t* p4 = m_indices.GLData().Data(); // p4 points at the 4 vertex indices of the current quad
     uint32_t* p3 = triIndices.Data(); // 6 indices for 4 vertices
     l /= 4; // quad count

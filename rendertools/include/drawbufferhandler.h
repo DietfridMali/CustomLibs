@@ -14,14 +14,14 @@
 class DrawBufferInfo {
 public:
     FBO*                    m_fbo;
-    ManagedArray<GLuint>*   m_drawBuffers;
+    AutoArray<GLuint>*   m_drawBuffers;
 
 public:
-    DrawBufferInfo(FBO* fbo = nullptr, ManagedArray<GLuint>* drawBuffers = nullptr) {
+    DrawBufferInfo(FBO* fbo = nullptr, AutoArray<GLuint>* drawBuffers = nullptr) {
         Update(fbo, drawBuffers);
     }
 
-    inline void Update (FBO* fbo, ManagedArray<GLuint>* drawBuffers) {
+    inline void Update (FBO* fbo, AutoArray<GLuint>* drawBuffers) {
         m_fbo = fbo;
         m_drawBuffers = drawBuffers;
     }
@@ -38,7 +38,7 @@ class DrawBufferHandler
 {
     protected:
         FBO*                    m_activeBuffer;
-        ManagedArray<GLuint>    m_defaultDrawBuffers;
+        AutoArray<GLuint>    m_defaultDrawBuffers;
         DrawBufferInfo          m_drawBufferInfo;
         List<DrawBufferInfo>    m_drawBufferStack;
         int                     m_windowWidth;
@@ -55,7 +55,7 @@ class DrawBufferHandler
 
         bool SetActiveBuffer(FBO* buffer, bool clearBuffer = false);
 
-        inline ManagedArray<GLuint>* ActiveDrawBuffers(void) {
+        inline AutoArray<GLuint>* ActiveDrawBuffers(void) {
             return m_drawBufferInfo.m_drawBuffers;
         }
 
@@ -65,7 +65,7 @@ class DrawBufferHandler
 
         void SaveDrawBuffer();
 
-        void SetDrawBuffers(FBO* fbo, ManagedArray<GLuint>* drawBuffers);
+        void SetDrawBuffers(FBO* fbo, AutoArray<GLuint>* drawBuffers);
 
         void RestoreDrawBuffer(void);
 

@@ -77,7 +77,7 @@ class MovingFrameCounter
     : public BaseFrameCounter
 {
 private:
-    SimpleArray<uint64_t, FrameWindowSize>  m_movingFrameTimes{};
+    StaticArray<uint64_t, FrameWindowSize>  m_movingFrameTimes{};
     uint64_t                                m_movingTotalTicks{ 0 };
     int                                     m_movingFrameIndex{ 0 };
     int                                     m_movingFrameCount{ 0 };

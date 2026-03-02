@@ -61,7 +61,7 @@ void DrawBufferHandler::SaveDrawBuffer() {
 }
 
 
-void DrawBufferHandler::SetDrawBuffers(FBO* fbo, ManagedArray<GLuint>* drawBuffers) {
+void DrawBufferHandler::SetDrawBuffers(FBO* fbo, AutoArray<GLuint>* drawBuffers) {
     if ((fbo == nullptr) or (m_drawBufferInfo.m_fbo == nullptr) or (fbo->m_handle != m_drawBufferInfo.m_fbo->m_handle)) {
         SaveDrawBuffer();
         m_drawBufferInfo = DrawBufferInfo(fbo, drawBuffers);

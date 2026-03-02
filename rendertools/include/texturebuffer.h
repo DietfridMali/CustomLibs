@@ -75,7 +75,7 @@ public:
 #if USE_SHARED_POINTERS
     SharedPointer<uint8_t>  m_data;
 #else
-    ManagedArray<uint8_t>   m_data;
+    AutoArray<uint8_t>   m_data;
 #endif
 #ifdef _DEBUG
     String              m_name{ "" };

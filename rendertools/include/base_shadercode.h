@@ -90,7 +90,7 @@ public:
     BaseShaderCode();
     ~BaseShaderCode() = default;
 
-    void AddShaders(ManagedArray<const ShaderSource*>& shaderSource);
+    void AddShaders(AutoArray<const ShaderSource*>& shaderSource);
 
     inline Shader* GetShader(String shaderId) {
         Shader** shader = m_shaders.Find(shaderId);

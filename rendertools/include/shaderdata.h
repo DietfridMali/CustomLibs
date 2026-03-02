@@ -7,7 +7,7 @@
 
 // =================================================================================================
 // The following code is meant to make caching of uniform variable locations and data as easy as possible.
-// Each shader will hold a list (ManagedArray / std::vector) of uniform variable class instances as 
+// Each shader will hold a list (AutoArray / std::vector) of uniform variable class instances as 
 // defined below.
 
 struct UniformHandle
@@ -219,7 +219,7 @@ struct FixedUniformArray
 class ShaderLocationTable {
 public:
 private:
-    ManagedArray<UniformHandle> m_locations;
+    AutoArray<UniformHandle> m_locations;
     int                         m_index{ -1 };
 
 public:
@@ -270,7 +270,7 @@ public:
     };
 
 private:
-    ManagedArray<ShaderLocation> m_locations;
+    AutoArray<ShaderLocation> m_locations;
 
 public:
     ShaderLocationTable() = default;

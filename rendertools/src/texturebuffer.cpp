@@ -243,7 +243,7 @@ static void ComputeOutline(RGBA8* colorBuffer, uint8_t* maskBuffer, int w, int h
 
 
 static void Outline(RGBA8* colorBuffer, int w, int h, int nPasses) {
-    ManagedArray<uint8_t> maskBuffer(w * h);
+    AutoArray<uint8_t> maskBuffer(w * h);
     PrepareOutline(colorBuffer, maskBuffer.Data(), w * h);
     ComputeOutline(colorBuffer, maskBuffer.Data(), w, h, nPasses);
 }
@@ -369,7 +369,7 @@ static void BoxBlurV(T* dest, T* src, int w, int h, int r)
     }
 }
 
-using GaussKernel = SimpleArray<double, 31>;
+using GaussKernel = StaticArray<double, 31>;
 
 static void ComputeKernel(GaussKernel& kernel, int r) {
     kernel.fill(0.0);
@@ -391,7 +391,7 @@ static void ComputeKernel(GaussKernel& kernel, int r) {
 // Kernel-Caching: ein Eintrag pro Radius 0..15, Länge 31 (Mitte = Index 15)
 static GaussKernel& GetKernel(int r)
 {
-    static SimpleArray<GaussKernel, 16> kernels;
+    static StaticArray<GaussKernel, 16> kernels;
     static bool haveKernel[16] = { false };
 
     if (not haveKernel[r]) {
@@ -485,12 +485,12 @@ static void GaussBlurV(T* dest, T* src, int w, int h, int r)
 
 void TextureBuffer::BoxBlur(uint16_t strength) {
     if (m_info.m_componentCount == 3) {
-        ManagedArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
+        AutoArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
         BoxBlurH<RGB8>(blurBuffer.Data(), reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
         BoxBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
     }
     else if (m_info.m_componentCount == 4) {
-        ManagedArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
+        AutoArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
         BoxBlurH<RGBA8>(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
         BoxBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
     }
@@ -499,12 +499,12 @@ void TextureBuffer::BoxBlur(uint16_t strength) {
 
 void TextureBuffer::GaussBlur(uint16_t strength) {
     if (m_info.m_componentCount == 3) {
-        ManagedArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
+        AutoArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
         GaussBlurH<RGB8>(blurBuffer.Data(), reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
         GaussBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
     }
     else if (m_info.m_componentCount == 4) {
-        ManagedArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
+        AutoArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
         GaussBlurH<RGBA8>(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
         GaussBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
     }

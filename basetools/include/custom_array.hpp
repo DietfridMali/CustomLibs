@@ -97,7 +97,7 @@ public:
 // =================================================================================================
 
 template < typename DATA_T, typename POINTER_T = DATA_T* >
-class ManagedArray
+class AutoArray
 	: public ArrayBuffer<DATA_T, POINTER_T>
 	, public QuickSort < DATA_T >
 #if DEBUG_MALLOC 
@@ -152,7 +152,7 @@ public:
 	public:
 		explicit Iterator() : m_start(nullptr), m_end(nullptr), m_current(nullptr) {}
 
-		Iterator(ManagedArray& a) : m_start(a.Start()), m_end(a.End() + 1), m_current(nullptr) {}
+		Iterator(AutoArray& a) : m_start(a.Start()), m_end(a.End() + 1), m_current(nullptr) {}
 
 		operator bool() const {
 			return m_current != nullptr;
@@ -194,41 +194,41 @@ public:
 
 	// ----------------------------------------
 
-	ManagedArray(const char* name = "")
+	AutoArray(const char* name = "")
 		: m_name(name), m_info(), m_none(DATA_T())
 	{
 		// fprintf(stderr, "%s\n", __FUNCSIG__);
 	}
 
-	explicit ManagedArray(const int32_t capacity)
+	explicit AutoArray(const int32_t capacity)
 		: m_info(), m_none(DATA_T())
 	{
 		// fprintf(stderr, "%s\n", __FUNCSIG__);
 		Reserve(capacity);
 	}
 
-	explicit ManagedArray(const int32_t width, const int32_t height)
+	explicit AutoArray(const int32_t width, const int32_t height)
 		: m_info(width, height), m_none(DATA_T())
 	{
 		// fprintf(stderr, "%s\n", __FUNCSIG__);
 		Reserve(width, height);
 	}
 
-	ManagedArray(ManagedArray const& other)
+	AutoArray(AutoArray const& other)
 		: m_info(), m_none(DATA_T())
 	{
 		// fprintf(stderr, "%s\n", __FUNCSIG__);
 		CopyData(other);
 	}
 
-	ManagedArray(ManagedArray&& other)
+	AutoArray(AutoArray&& other)
 		: m_info(), m_none(DATA_T())
 	{
 		// fprintf(stderr, "%s\n", __FUNCSIG__);
 		Move(other);
 	}
 
-	explicit ManagedArray(DATA_T const* data, int32_t capacity, int32_t offset = 0)
+	explicit AutoArray(DATA_T const* data, int32_t capacity, int32_t offset = 0)
 		: m_info(0, 0, offset), m_none(DATA_T())
 	{
 		// fprintf(stderr, "%s\n", __FUNCSIG__);
@@ -236,7 +236,7 @@ public:
 		memcpy(Data(), data, sizeof(DATA_T) * capacity);
 	}
 
-	ManagedArray(std::initializer_list<DATA_T> data)
+	AutoArray(std::initializer_list<DATA_T> data)
 		: m_info(), m_none(DATA_T())
 	{
 		// fprintf(stderr, "%s\n", __FUNCSIG__);
@@ -247,7 +247,7 @@ public:
 		//memcpy(m_handle, data.begin(), sizeof(DATA_T) * data.size());
 	}
 
-	~ManagedArray() {
+	~AutoArray() {
 		Destroy();
 	}
 
@@ -519,19 +519,19 @@ public:
 
 	// ----------------------------------------
 
-	inline ManagedArray<DATA_T>& operator= (ManagedArray<DATA_T> const& source) {
+	inline AutoArray<DATA_T>& operator= (AutoArray<DATA_T> const& source) {
 		return CopyData(source.Data(), source.Capacity());
 	}
 
 	// ----------------------------------------
 
-	inline ManagedArray<DATA_T>& operator= (ManagedArray<DATA_T>&& source) noexcept {
+	inline AutoArray<DATA_T>& operator= (AutoArray<DATA_T>&& source) noexcept {
 		return Move(source);
 	}
 
 	// ----------------------------------------
 
-	inline ManagedArray<DATA_T>& operator= (std::initializer_list<DATA_T> data) {
+	inline AutoArray<DATA_T>& operator= (std::initializer_list<DATA_T> data) {
 		Reserve(int32_t(data.size()));
 		Init();
 		memcpy(Data(), data.begin(), sizeof(DATA_T) * data.size());
@@ -548,7 +548,7 @@ public:
 
 	// ----------------------------------------
 
-	ManagedArray& CopyData(const ManagedArray& source, bool allowStatic = true, int32_t offset = 0) {
+	AutoArray& CopyData(const AutoArray& source, bool allowStatic = true, int32_t offset = 0) {
 		if ((this != &source) and source.Data()) {
 			if (allowStatic and source.IsStatic()) {
 				Base::m_isStatic = true;
@@ -562,7 +562,7 @@ public:
 
 	// ----------------------------------------
 
-	ManagedArray& CopyData(DATA_T const* sourceData, int32_t count, int32_t offset = 0) {
+	AutoArray& CopyData(DATA_T const* sourceData, int32_t count, int32_t offset = 0) {
 		if (Resize(count + offset, false))
 			memcpy(Data(offset), sourceData, std::min(m_info.capacity - offset, count) * sizeof(DATA_T));
 		return *this;
@@ -570,7 +570,7 @@ public:
 
 	// ----------------------------------------
 
-	ManagedArray& Move(ManagedArray& source) {
+	AutoArray& Move(AutoArray& source) {
 		Destroy();
 		memcpy(&m_info, &source.m_info, sizeof(ArrayInfo));
 		BufferHandle() = std::move(source.BufferHandle());
@@ -581,15 +581,15 @@ public:
 
 	// ----------------------------------------
 
-	inline DATA_T operator+ (ManagedArray<DATA_T>& source) {
-		ManagedArray<DATA_T> a(*this);
+	inline DATA_T operator+ (AutoArray<DATA_T>& source) {
+		AutoArray<DATA_T> a(*this);
 		a += source;
 		return a;
 	}
 
 	// ----------------------------------------
 
-	inline DATA_T& operator+= (ManagedArray<DATA_T>& source) {
+	inline DATA_T& operator+= (AutoArray<DATA_T>& source) {
 		int32_t offset = m_info.capacity;
 		if (BufferHandle())
 			Resize(m_info.capacity + source.m_info.capacity);
@@ -598,13 +598,13 @@ public:
 
 	// ----------------------------------------
 
-	inline bool operator== (ManagedArray<DATA_T>& other) {
+	inline bool operator== (AutoArray<DATA_T>& other) {
 		return (m_info.capacity == other.m_info.capacity) and not (m_info.capacity and memcmp(Data(), other.Data()));
 	}
 
 	// ----------------------------------------
 
-	inline bool operator!= (ManagedArray<DATA_T>& other) {
+	inline bool operator!= (AutoArray<DATA_T>& other) {
 		return (m_info.capacity != other.m_info.capacity) or (m_info.capacity and memcmp(Data(), other.Data()));
 	}
 
@@ -745,16 +745,16 @@ public:
 
 // =================================================================================================
 
-inline int32_t operator- (char* v, ManagedArray<char>& a) { return a.Index(v); }
-inline int32_t operator- (uint8_t* v, ManagedArray<uint8_t>& a) { return a.Index(v); }
-inline int32_t operator- (int16_t* v, ManagedArray<int16_t>& a) { return a.Index(v); }
-inline int32_t operator- (uint16_t* v, ManagedArray<uint16_t>& a) { return a.Index(v); }
-inline int32_t operator- (uint32_t* v, ManagedArray<uint32_t>& a) { return a.Index(v); }
-inline int32_t operator- (int32_t* v, ManagedArray<int32_t>& a) { return a.Index(v); }
+inline int32_t operator- (char* v, AutoArray<char>& a) { return a.Index(v); }
+inline int32_t operator- (uint8_t* v, AutoArray<uint8_t>& a) { return a.Index(v); }
+inline int32_t operator- (int16_t* v, AutoArray<int16_t>& a) { return a.Index(v); }
+inline int32_t operator- (uint16_t* v, AutoArray<uint16_t>& a) { return a.Index(v); }
+inline int32_t operator- (uint32_t* v, AutoArray<uint32_t>& a) { return a.Index(v); }
+inline int32_t operator- (int32_t* v, AutoArray<int32_t>& a) { return a.Index(v); }
 
 // =================================================================================================
 
-class CharArray : public ManagedArray<char> {
+class CharArray : public AutoArray<char> {
 public:
 	inline char* operator= (const char* source) {
 		int32_t l = int32_t(strlen(source) + 1);
@@ -768,9 +768,9 @@ public:
 // =================================================================================================
 
 template<typename DATA_T>
-using SharedArray = ManagedArray<DATA_T, SharedPointer<DATA_T>>;
+using SharedArray = AutoArray<DATA_T, SharedPointer<DATA_T>>;
 
-class ByteArray : public ManagedArray<uint8_t> {
+class ByteArray : public AutoArray<uint8_t> {
 public:
 	ByteArray(const int32_t nLength) {
 		Reserve(nLength);
@@ -778,7 +778,7 @@ public:
 	}
 };
 
-class ShortArray : public ManagedArray<int16_t> {
+class ShortArray : public AutoArray<int16_t> {
 public:
 	ShortArray(const int32_t nLength) {
 		Reserve(nLength);
@@ -786,7 +786,7 @@ public:
 	}
 };
 
-class UShortArray : public ManagedArray<uint16_t> {
+class UShortArray : public AutoArray<uint16_t> {
 public:
 	UShortArray(const int32_t nLength) {
 		Reserve(nLength);
@@ -794,7 +794,7 @@ public:
 	}
 };
 
-class IntArray : public ManagedArray<int32_t> {
+class IntArray : public AutoArray<int32_t> {
 public:
 	IntArray(const int32_t nLength) {
 		Reserve(nLength);
@@ -802,7 +802,7 @@ public:
 	}
 };
 
-class UIntArray : public ManagedArray<int32_t> {
+class UIntArray : public AutoArray<int32_t> {
 public:
 	UIntArray(const int32_t nLength) {
 		Reserve(nLength);
@@ -810,7 +810,7 @@ public:
 	}
 };
 
-class SizeArray : public ManagedArray<size_t> {
+class SizeArray : public AutoArray<size_t> {
 public:
 	SizeArray(const int32_t nLength) {
 		Reserve(nLength);
@@ -818,7 +818,7 @@ public:
 	}
 };
 
-class FloatArray : public ManagedArray<float> {
+class FloatArray : public AutoArray<float> {
 public:
 	FloatArray(const int32_t nLength) {
 		Reserve(nLength);
@@ -829,7 +829,7 @@ public:
 // =================================================================================================
 
 template < class DATA_T, int32_t capacity >
-class StaticArray : public ManagedArray < DATA_T > {
+class StaticArray : public AutoArray < DATA_T > {
 
 protected:
 	DATA_T		m_buffer[capacity];
@@ -847,7 +847,7 @@ public:
 // =================================================================================================
 
 template < typename DATA_T >
-class Array2D : public ManagedArray < DATA_T > {
+class Array2D : public AutoArray < DATA_T > {
 public:
 	int32_t	m_rows;
 	int32_t	m_cols;

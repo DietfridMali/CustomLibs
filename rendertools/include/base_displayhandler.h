@@ -27,7 +27,7 @@ public:
     SDL_Window*     m_window;
     SDL_GLContext   m_context;
 
-    ManagedArray<SDL_DisplayMode>   m_displayModes;
+    AutoArray<SDL_DisplayMode>   m_displayModes;
     int                             m_activeDisplayMode{ 0 };
 
     BaseDisplayHandler()
@@ -85,7 +85,7 @@ public:
         return m_context;
     }
 
-    inline const ManagedArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
+    inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
         return m_displayModes;
     }
 

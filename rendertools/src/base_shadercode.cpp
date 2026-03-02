@@ -29,7 +29,7 @@ const ShaderSource& GaussBlurShader();
 // -------------------------------------------------------------------------------------------------
 
 BaseShaderCode::BaseShaderCode() {
-    ManagedArray<const ShaderSource*> shaderSource = {
+    AutoArray<const ShaderSource*> shaderSource = {
         &TestShader(),
         &StencilShader(),
         &DepthShader(),
@@ -55,7 +55,7 @@ BaseShaderCode::BaseShaderCode() {
 }
 
 
-void BaseShaderCode::AddShaders(ManagedArray<const ShaderSource*>& shaderSource) {
+void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
     for (const ShaderSource* source : shaderSource) {
         Shader* shader = new Shader(source->m_name);
         if (shader->Create(source->m_vs, source->m_fs)) 

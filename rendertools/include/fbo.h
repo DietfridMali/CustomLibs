@@ -45,7 +45,7 @@ public:
 
 class FBO {
 public:
-    using DrawBufferList = ManagedArray <GLuint>;
+    using DrawBufferList = AutoArray <GLuint>;
 
     typedef enum {
         dbAll,
@@ -70,7 +70,7 @@ public:
     int                         m_depthBufferIndex;
     int                         m_stencilBufferIndex;
     int                         m_activeBufferIndex;
-    ManagedArray<BufferInfo>    m_bufferInfo;
+    AutoArray<BufferInfo>    m_bufferInfo;
     DrawBufferList              m_drawBuffers; 
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;

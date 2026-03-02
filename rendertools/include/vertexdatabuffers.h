@@ -54,7 +54,7 @@ class VertexDataBuffer
 {
     protected:
         SegmentedList<APP_DATA_T>   m_appData;
-        ManagedArray<GL_DATA_T>     m_glData;
+        AutoArray<GL_DATA_T>     m_glData;
 
 #pragma warning(push)
 #pragma warning(disable:4100)
@@ -80,12 +80,12 @@ class VertexDataBuffer
         }
 
 public:
-        inline void SetGLData(ManagedArray<GL_DATA_T>& glData) { // directly set m_glData without going over m_appData
+        inline void SetGLData(AutoArray<GL_DATA_T>& glData) { // directly set m_glData without going over m_appData
             m_glData = glData;
             m_isDirty = true;
         }
 
-        virtual ManagedArray<GL_DATA_T>& Setup(void) = 0;
+        virtual AutoArray<GL_DATA_T>& Setup(void) = 0;
 
         inline void Reset(void) {
             m_appData.Clear();
@@ -101,7 +101,7 @@ public:
             return m_appData;
         }
 
-        inline ManagedArray<GL_DATA_T>& GLData(void) noexcept {
+        inline AutoArray<GL_DATA_T>& GLData(void) noexcept {
             return m_glData;
         }
 
@@ -205,7 +205,7 @@ class VertexBuffer
         { }
 
         // Create a densely packed numpy array from the vertex data
-        virtual ManagedArray<GLfloat>& Setup(void) {
+        virtual AutoArray<GLfloat>& Setup(void) {
             if (HaveAppData()) {
                 m_glData.Resize(m_appData.Length() * 3);
                 GLfloat* glData = m_glData.Data();
@@ -230,7 +230,7 @@ public:
         { }
 
         // Create a densely packed numpy array from the vertex data
-        virtual ManagedArray<GLfloat>& Setup(void) {
+        virtual AutoArray<GLfloat>& Setup(void) {
             if (HaveAppData()) {
                 GLfloat* glData = m_glData.Resize(m_appData.Length() * 2);
                 for (auto& v : m_appData) {
@@ -255,7 +255,7 @@ public:
     }
 
     // Create a densely packed numpy array from the vertex data
-    virtual ManagedArray<GLfloat>& Setup(void) {
+    virtual AutoArray<GLfloat>& Setup(void) {
         if (HaveAppData()) {
             m_glData.Resize(m_appData.Length() * 4);
             GLfloat* glData = m_glData.Data();
@@ -280,7 +280,7 @@ public:
     { }
 
     // Create a densely packed numpy array from the vertex data
-    virtual ManagedArray<GLfloat>& Setup(void) {
+    virtual AutoArray<GLfloat>& Setup(void) {
         if (HaveAppData()) {
             float* glData = m_glData.Resize(m_appData.Length() * 4);
             for (auto& v : m_appData) {
@@ -298,14 +298,14 @@ public:
 // primitive being rendered (quad: 4, triangle: 3, line: 2, point: 1)
 
 class IndexBuffer 
-    : public VertexDataBuffer <ManagedArray<GLuint>, GLuint> {
+    : public VertexDataBuffer <AutoArray<GLuint>, GLuint> {
     public:
     IndexBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1) 
         : VertexDataBuffer(componentCount, listSegmentSize) 
     { }
 
     // Create a densely packed array from the vertex data
-    virtual ManagedArray<GLuint>& Setup(void) {
+    virtual AutoArray<GLuint>& Setup(void) {
         if (HaveAppData()) {
             uint32_t* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
             for (auto& v : m_appData) {
@@ -336,7 +336,7 @@ public:
     }
 
     // Create a densely packed numpy array from the vertex data
-    virtual ManagedArray<GLfloat>& Setup(void) {
+    virtual AutoArray<GLfloat>& Setup(void) {
         if (HaveAppData()) {
             float* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
             for (auto& v : m_appData) {

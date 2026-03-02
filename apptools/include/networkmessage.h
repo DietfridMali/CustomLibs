@@ -42,7 +42,7 @@ class NetworkMessage {
         int                     m_result{ -1 };
         bool                    m_isBroadcast{ false }; // used for sending this message as a broadcast in a LAN
         bool                    m_valueError{ false };
-        ManagedArray<String>    m_values;
+        AutoArray<String>    m_values;
 
         NetworkMessage() 
             : m_numValues (0)

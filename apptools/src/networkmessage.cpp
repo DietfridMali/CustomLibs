@@ -74,7 +74,7 @@ bool NetworkMessage::ToNetworkEndpoint(String caller, String valueName, int valu
     if (not IsValidIndex(caller, valueName, valueIndex))
         return false;
     try {
-        ManagedArray<String> ipParts = m_values[valueIndex].Split(':');
+        AutoArray<String> ipParts = m_values[valueIndex].Split(':');
         if (ipParts.Length() != 2)
             return false;
         address.SocketAddress().host = StringToNumber<uint32_t>(caller, valueName, ipParts[0]);
@@ -97,7 +97,7 @@ bool NetworkMessage::ToVector3f(Vector3f& v, String caller, String valueName, in
     if (not IsValidIndex(caller, valueName, valueIndex))
         return false;
     try {
-        ManagedArray<String> coords = m_values[valueIndex].Split(',');
+        AutoArray<String> coords = m_values[valueIndex].Split(',');
         if (coords.Length() != 3)
             return InvalidDataError(caller, valueName, m_values[valueIndex]);
         Vector3f w;

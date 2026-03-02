@@ -15,7 +15,7 @@
 class CoplanarRectangle 
 {
 public:
-    ManagedArray<Vector3f>  m_coordinates;
+    AutoArray<Vector3f>  m_coordinates;
     Vector3f                m_normal;
     Vector3f                m_center;
     Vector3f                m_refEdges[2];

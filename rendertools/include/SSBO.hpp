@@ -20,7 +20,7 @@ class SSBO
 {
 public:
 	SharedGLHandle			m_handle;
-	ManagedArray<DATA_T>	m_data;
+	AutoArray<DATA_T>	m_data;
 
 	SSBO()
 	{

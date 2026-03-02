@@ -50,7 +50,7 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ 0.0f, 0.0f, 0.0f, 0.0f };
     float* data = m_data.Data();
-    SimpleArray<uint32_t, 101> d[4];
+    StaticArray<uint32_t, 101> d[4];
     for (int i = 0; i < 4; ++i)
         d[i].fill(0);
     for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
@@ -291,7 +291,7 @@ void CloudNoiseTexture::Compute(String textureFolder) {
 #else
 
     Vector3f p;
-    SimpleArray<int, 101> distribution;
+    StaticArray<int, 101> distribution;
     distribution.fill(0);
     for (int z = 0; z < m_gridSize; ++z) {
         p.y = (float(z) + 0.5f) / float(m_gridSize);

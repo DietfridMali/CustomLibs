@@ -12,7 +12,7 @@
 // =================================================================================================
 
 template<typename DATA_T>
-class ManagedArray {
+class AutoArray {
 private:
     std::vector<DATA_T> m_array;
     int32_t             m_width{ 0 };
@@ -22,29 +22,29 @@ private:
     DATA_T              m_defaultValue{};
 
 public:
-    // Konstruktor für 1D-ManagedArray
-    inline ManagedArray(int32_t size = 0)
+    // Konstruktor für 1D-AutoArray
+    inline AutoArray(int32_t size = 0)
         : m_array(static_cast<size_t>(size)) {
     }
 
-    inline ManagedArray(std::initializer_list<DATA_T> data)
+    inline AutoArray(std::initializer_list<DATA_T> data)
         : m_array(data)
     {
     }
 
-    // Konstruktor für 2D-ManagedArray
-    inline ManagedArray(int32_t width, int32_t height)
+    // Konstruktor für 2D-AutoArray
+    inline AutoArray(int32_t width, int32_t height)
         : m_array(static_cast<size_t>(width)* static_cast<size_t>(height)),
         m_width(width), m_height(height) {
         assert(width * height > 0 and "Width and height must be > 0");
 #if defined(_DEBUG)
         if (width * height <= 0)
-            throw std::invalid_argument("ManagedArray: invalid width or height arguments (must both be > 0)");
+            throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
         Resize(width * height);
 #endif    
     }
 
-    ManagedArray(const ManagedArray& other)
+    AutoArray(const AutoArray& other)
         : m_array(other.m_array),
         m_width(other.m_width),
         m_height(other.m_height),
@@ -55,7 +55,7 @@ public:
     }
 
     // Move-Konstruktor
-    ManagedArray(ManagedArray&& other) noexcept
+    AutoArray(AutoArray&& other) noexcept
         : m_array(std::move(other.m_array)),
         m_width(std::exchange(other.m_width, 0)),
         m_height(std::exchange(other.m_height, 0)),
@@ -66,7 +66,7 @@ public:
     }
 
     // Copy-Zuweisungsoperator
-    ManagedArray& operator=(const ManagedArray& other) {
+    AutoArray& operator=(const AutoArray& other) {
         if (this != &other) {
             m_array = other.m_array;
             m_width = other.m_width;
@@ -79,7 +79,7 @@ public:
     }
 
     // Move-Zuweisungsoperator
-    ManagedArray& operator=(ManagedArray&& other) noexcept {
+    AutoArray& operator=(AutoArray&& other) noexcept {
         if (this != &other) {
             m_array = std::move(other.m_array);
             m_width = std::exchange(other.m_width, 0);
@@ -91,7 +91,7 @@ public:
         return *this;
     }
 
-    ManagedArray& operator=(std::initializer_list<DATA_T> data) {
+    AutoArray& operator=(std::initializer_list<DATA_T> data) {
         m_array = data;
         return *this;
     }
@@ -166,7 +166,7 @@ public:
 
     void Append(const DATA_T& data) { m_array.push_back(data); }
 
-    ManagedArray<DATA_T>& Append(ManagedArray<DATA_T>& other, bool copyData) {
+    AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
         Reserve(Length() + other.Length());
         if (copyData)
             m_array.insert(m_array.end(), other.begin(), other.end());
@@ -177,13 +177,13 @@ public:
         return *this;
     }
 
-    ManagedArray& operator+=(const ManagedArray& other) {
+    AutoArray& operator+=(const AutoArray& other) {
         if (std::addressof(other) == this) 
             return *this;
-        return Append(const_cast<ManagedArray&>(other), true);
+        return Append(const_cast<AutoArray&>(other), true);
     }
 
-    ManagedArray& operator+=(ManagedArray&& other) {
+    AutoArray& operator+=(AutoArray&& other) {
         if (std::addressof(other) == this) 
             return *this;
         return Append(other, false);
@@ -191,8 +191,8 @@ public:
     }
 
 
-    ManagedArray operator+(const ManagedArray& other) const {
-        ManagedArray result;
+    AutoArray operator+(const AutoArray& other) const {
+        AutoArray result;
         result.Reserve(Length() + other.Length());
         result.m_array.insert(result.m_array.end(), m_array.begin(), m_array.end());
         result.m_array.insert(result.m_array.end(),other.m_array.begin(), other.m_array.end());
@@ -237,7 +237,7 @@ public:
     DATA_T* DataRow(int32_t y) {
 #if defined(_DEBUG)
         if (m_width * m_height <= 0)
-            throw std::invalid_argument("ManagedArray: invalid width or height arguments (must both be > 0)");
+            throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
 #endif    
         return Data(y * m_width);
     }
@@ -398,49 +398,49 @@ public:
 
 // =================================================================================================
 
-class ByteArray : public ManagedArray<uint8_t> {
+class ByteArray : public AutoArray<uint8_t> {
 public:
     ByteArray(const int32_t nLength) {
         Resize(nLength);
     }
 };
 
-class ShortArray : public ManagedArray<int16_t> {
+class ShortArray : public AutoArray<int16_t> {
 public:
     ShortArray(const int32_t nLength) {
         Resize(nLength);
     }
 };
 
-class UShortArray : public ManagedArray<uint16_t> {
+class UShortArray : public AutoArray<uint16_t> {
 public:
     UShortArray(const int32_t nLength) {
         Resize(nLength);
     }
 };
 
-class IntArray : public ManagedArray<int32_t> {
+class IntArray : public AutoArray<int32_t> {
 public:
     IntArray(const int32_t nLength) {
         Resize(nLength);
     }
 };
 
-class UIntArray : public ManagedArray<uint32_t> {
+class UIntArray : public AutoArray<uint32_t> {
 public:
     UIntArray(const int32_t nLength) {
         Resize(nLength);
     }
 };
 
-class SizeArray : public ManagedArray<size_t> {
+class SizeArray : public AutoArray<size_t> {
 public:
     SizeArray(const int32_t nLength) {
         Resize(nLength);
     }
 };
 
-class FloatArray : public ManagedArray<float> {
+class FloatArray : public AutoArray<float> {
 public:
     FloatArray(const int32_t nLength) {
         Resize(nLength);

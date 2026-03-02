@@ -23,4 +23,4 @@
 #include <array>
 
 template <typename DATA_T, size_t size>
-using SimpleArray = std::array<DATA_T, size>;
+using StaticArray = std::array<DATA_T, size>;

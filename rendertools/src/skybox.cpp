@@ -67,7 +67,7 @@ bool Skybox::Setup(const String& textureFolder) {
 		v *= 2.0f;
 		m_skybox->AddVertex(v);
 	}
-	ManagedArray<GLuint> indices;
+	AutoArray<GLuint> indices;
 	indices.Resize(sizeof(Cube::triangleIndices) / sizeof(GLuint));
 	memcpy(indices.Data(), Cube::triangleIndices, sizeof(Cube::triangleIndices));
 	m_skybox->SetIndices(indices);

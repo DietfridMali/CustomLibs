@@ -18,7 +18,7 @@ class BaseShaderHandler
     : public PolymorphSingleton<BaseShaderHandler>
 {
 public:
-    ManagedArray<FloatArray*>   m_kernels;
+    AutoArray<FloatArray*>   m_kernels;
     Shader*                     m_activeShader;
     String                      m_activeShaderId;
     Texture                     m_grayNoise;

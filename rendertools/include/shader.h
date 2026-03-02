@@ -69,7 +69,7 @@ class Shader
         String          m_name;
         String          m_vs;
         String          m_fs;
-        ManagedArray<UniformHandle*>    m_uniforms;
+        AutoArray<UniformHandle*>    m_uniforms;
         ShaderLocationTable             m_locations;
 
         using KeyType = String;
@@ -258,14 +258,14 @@ class Shader
         GLint SetMatrix4f(const char* name, const float* data, bool transpose = false)
             noexcept;
 
-        inline GLint SetMatrix4f(const char* name, ManagedArray<GLfloat>& data, bool transpose = false) noexcept {
+        inline GLint SetMatrix4f(const char* name, AutoArray<GLfloat>& data, bool transpose = false) noexcept {
             return SetMatrix4f(name, data.Data(), transpose);
         }
 
         GLint SetMatrix3f(const char* name, float* data, bool transpose = false)
             noexcept;
 
-        inline GLint SetMatrix3f(const char* name, ManagedArray<GLfloat>& data, bool transpose) noexcept {
+        inline GLint SetMatrix3f(const char* name, AutoArray<GLfloat>& data, bool transpose) noexcept {
             return SetMatrix3f(name, data.Data(), transpose);
         }
 
@@ -360,7 +360,7 @@ class Shader
             return data;
         }
 
-        static inline ManagedArray<float>& GetFloatData(GLenum id, int32_t size, ManagedArray<float>& glData) noexcept {
+        static inline AutoArray<float>& GetFloatData(GLenum id, int32_t size, AutoArray<float>& glData) noexcept {
             if (glData.Length() < size)
                 try {
                 glData.Resize(size);

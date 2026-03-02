@@ -137,7 +137,7 @@ public:
     }
 
 #if 0    
-    inline Matrix4f& operator= (const ManagedArray<float>& data) {
+    inline Matrix4f& operator= (const AutoArray<float>& data) {
         FromArray(data.Data());
         return *this;
     }

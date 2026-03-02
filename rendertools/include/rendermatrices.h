@@ -119,7 +119,7 @@ public:
 
 class RenderMatrices {
 public:
-    ManagedArray<MatrixStack>   m_matrices;
+    AutoArray<MatrixStack>   m_matrices;
     int                         m_activeStack;
 
     static bool                 LegacyMode;

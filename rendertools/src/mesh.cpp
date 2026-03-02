@@ -42,31 +42,31 @@ void Mesh::CreateVertexIndices(void) {
 
 
 void Mesh::UpdateTangents(void) {
-    ManagedArray<Vector3f> vertices;
+    AutoArray<Vector3f> vertices;
     vertices.Resize(m_vertices.AppDataLength());
     int i = 0;
     for (auto v : m_vertices.AppData())
         vertices[i++] = v;
 
-    ManagedArray<Vector3f> normals;
+    AutoArray<Vector3f> normals;
     normals.Resize(m_vertices.AppDataLength());
     i = 0;
     for (auto n : m_normals.AppData())
         normals[i++] = n;
 
-    ManagedArray<TexCoord> texCoords;
+    AutoArray<TexCoord> texCoords;
     texCoords.Resize(m_vertices.AppDataLength());
     i = 0;
     for (auto tc : m_texCoords[0].AppData())
         texCoords[i++] = tc;
 
-    ManagedArray<Vector3f> tangents;
+    AutoArray<Vector3f> tangents;
     tangents.Resize(m_vertices.AppDataLength());
 
-    ManagedArray<Vector3f> bitangents;
+    AutoArray<Vector3f> bitangents;
     bitangents.Resize(m_vertices.AppDataLength());
 
-    ManagedArray<GLuint>& indices = m_indices.GLData();
+    AutoArray<GLuint>& indices = m_indices.GLData();
     m_tangents.AppData().Reset();
 
     for (int i = 0, l = indices.Length(); i < l;) {

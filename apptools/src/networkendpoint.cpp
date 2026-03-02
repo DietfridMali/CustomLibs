@@ -38,7 +38,7 @@ void NetworkEndpoint::UpdateNetworkID(uint64_t networkID, eNetworkType networkTy
 
 bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, int32_t port) noexcept {
     if (not ipAddress.IsEmpty()) {
-        ManagedArray<String> fields = ipAddress.Split('.');
+        AutoArray<String> fields = ipAddress.Split('.');
         unsigned fieldValues[4] = { 0,0,0,0 };
         int i = 0, l = fields.Length();
         for (; i < l; ++i) {
@@ -67,7 +67,7 @@ bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, int32_t port)
 
 NetworkEndpoint NetworkEndpoint::DirectedBroadcast(uint16_t port) noexcept {
     // nutzt vorhandene IP-String-Repräsentation
-    ManagedArray<String> f = m_ipAddress.Split('.');
+    AutoArray<String> f = m_ipAddress.Split('.');
     if (f.Length() != 4) 
         return LimitedBroadcast(port);
     //String ipAddress;

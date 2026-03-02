@@ -8,7 +8,7 @@
 #include "string.hpp"
 #include "array.hpp"
 
-using FileList = ManagedArray<String>;
+using FileList = AutoArray<String>;
 
 // =================================================================================================
 

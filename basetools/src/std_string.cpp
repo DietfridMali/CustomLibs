@@ -23,8 +23,8 @@ String String::Replace(const char* oldPattern, const char* newPattern, int repet
 }
 
 
-ManagedArray<String> String::Split(const String& str, char delimiter) {
-    ManagedArray<String> result;
+AutoArray<String> String::Split(const String& str, char delimiter) {
+    AutoArray<String> result;
     std::stringstream ss(str);
     std::string item;
     while (std::getline(ss, item, delimiter)) {

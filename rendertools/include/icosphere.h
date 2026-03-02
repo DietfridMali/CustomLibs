@@ -15,7 +15,7 @@
 // vertices are normalized. The more iterations this is run through, the finer the resulting mesh
 // becomes and the smoother does the sphere look.
 
-using VertexIndices = ManagedArray<GLuint>;
+using VertexIndices = AutoArray<GLuint>;
 
 class IcoSphere
     : public Mesh

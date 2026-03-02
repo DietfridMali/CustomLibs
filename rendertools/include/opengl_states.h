@@ -28,7 +28,7 @@ private:
 		GLuint	handles[2]; // texture2D, cubemap
 	};
 
-	ManagedArray<textureBindings> m_bindings;
+	AutoArray<textureBindings> m_bindings;
 
 public:
 	OpenGLStates() {
@@ -88,7 +88,7 @@ public:
 
 		template <class T>
 		struct StateRegistry {
-			static inline ManagedArray<T> list{};
+			static inline AutoArray<T> list{};
 		};
 
 		template <typename STATE_T, STATE_T unknown, class FUNC_T>
@@ -113,7 +113,7 @@ public:
 
 		template <class... Args>
 		struct MultiStateRegistry {
-			static inline ManagedArray<std::tuple<Args...>> list{};
+			static inline AutoArray<std::tuple<Args...>> list{};
 		};
 
 		template<class F, class... Args>

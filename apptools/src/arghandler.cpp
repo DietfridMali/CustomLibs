@@ -80,7 +80,7 @@ ArgValue::ArgumentList* ArgValue::Parse(const char* delims) {
     ArgumentList* subValues = new ArgumentList();
     ArgValue* argV;
     for (int i = 0; i < l; i++) {
-        ManagedArray<String> values = m_value.Split(delims[i]);
+        AutoArray<String> values = m_value.Split(delims[i]);
         if (values.Length() > 1) {
             for (auto& v : values) {
                 argV = new ArgValue(v, delims + i + 1);
@@ -107,7 +107,7 @@ String& ArgValue::GetVal (int i) {
 
 String Argument::Create(String arg) {
     arg = arg.Split('#')[0];
-    ManagedArray<String> values = arg.Replace("= ", "=", 1).Replace(" =", "=", 1).Replace("\n", "", 1).Split('=');
+    AutoArray<String> values = arg.Replace("= ", "=", 1).Replace(" =", "=", 1).Replace("\n", "", 1).Split('=');
     m_key = values[0].ToLowercase();
     if (values.Length() > 1)
         m_values = ArgValue(values[1]);

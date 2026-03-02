@@ -50,7 +50,7 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glGenerateMipmap(target);
     }
-    static void Compute(ManagedArray<float>& data, int gridSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
+    static void Compute(AutoArray<float>& data, int gridSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
         data.Resize(gridSize * gridSize);
         float* dataPtr = data.Data();
         for (int y = 0; y < gridSize; ++y)
@@ -78,7 +78,7 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-    static void Compute(ManagedArray<float>& data, int gridSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
+    static void Compute(AutoArray<float>& data, int gridSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
 #pragma warning(pop)
 #if 0
         data.Resize(gridSize * gridSize);
@@ -116,7 +116,7 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
     // 'octave' ist hier der z-Slice-Index [0..gridSize-1]
 #pragma warning(push)
 #pragma warning(disable:4100)
-    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed)
+    static void Compute(AutoArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed)
 #pragma warning(pop)
     {
 #if 0
@@ -182,7 +182,7 @@ struct NoiseTraits<WeatherNoiseRG8> {
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves)
+    static void Compute(AutoArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves)
 #pragma warning(pop)
     {
         data.Resize(gridSize * gridSize * 2);
@@ -227,7 +227,7 @@ template<> struct NoiseTraits<BlueNoiseR8> {
         glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
     }
 
-    static void Compute(ManagedArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/) {
+    static void Compute(AutoArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/) {
         const int N = gridSize;
         data.Resize(N * N);
         // Zwischenspeicher für White Noise
@@ -294,7 +294,7 @@ public:
     }
 
 private:
-    ManagedArray<typename NoiseTraits<Tag>::PixelT> m_data;
+    AutoArray<typename NoiseTraits<Tag>::PixelT> m_data;
 
     bool Allocate(int gridSize) {
         auto* texBuf = new TextureBuffer();
@@ -344,7 +344,7 @@ class NoiseTexture3D
 private:
     Vector3i    m_gridDimensions{ 0, 0, 0 };
     NoiseParams m_params;
-    ManagedArray<float>	m_data;
+    AutoArray<float>	m_data;
 
 public:
 	virtual bool Deploy(int bufferIndex = 0) override;
@@ -353,7 +353,7 @@ public:
 
 	bool Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename = "", bool deploy = true);
 
-    inline ManagedArray<float>& GetData(void) noexcept {
+    inline AutoArray<float>& GetData(void) noexcept {
         return m_data;
     }
 
@@ -386,7 +386,7 @@ public:
 private:
     int                 m_gridSize{ 0 };
     NoiseParams         m_params;
-    ManagedArray<float> m_data;
+    AutoArray<float> m_data;
 
     bool Allocate(int gridSize);
 
@@ -411,7 +411,7 @@ public:
 
 private:
     Vector3i                m_gridSize{ 128, 128, 64 }; // fixed; using NVidia STBN data
-    ManagedArray<uint8_t>   m_data;
+    AutoArray<uint8_t>   m_data;
 
     bool Allocate();
 

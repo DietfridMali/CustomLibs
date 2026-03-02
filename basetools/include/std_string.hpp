@@ -155,9 +155,9 @@ public:
 
     String Replace(const char* oldPattern, const char* newPattern = "", int repetitions = 0) const;
 
-    static ManagedArray<String> Split(const String& str, char delim);
+    static AutoArray<String> Split(const String& str, char delim);
 
-    inline ManagedArray<String> Split(char delim) const {
+    inline AutoArray<String> Split(char delim) const {
         return Split(m_str, delim);
     }
 

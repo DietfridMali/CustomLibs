@@ -61,7 +61,7 @@ public:
     VertexBuffer        m_vertices;
     VertexBuffer        m_normals;
     TangentBuffer       m_tangents;
-    SimpleArray<TexCoordBuffer, 3>  m_texCoords;
+    StaticArray<TexCoordBuffer, 3>  m_texCoords;
     ColorBuffer         m_vertexColors;
     IndexBuffer         m_indices;
     FloatDataBuffer     m_floatBuffer;
@@ -245,11 +245,11 @@ public:
         m_indices.Append(i);
     }
 
-    inline void AddIndices(ManagedArray<GLuint>& i) {
+    inline void AddIndices(AutoArray<GLuint>& i) {
         m_indices.Append(i);
     }
 
-    inline void SetIndices(ManagedArray<GLuint>& i) {
+    inline void SetIndices(AutoArray<GLuint>& i) {
         m_indices.SetGLData(i);
     }
 

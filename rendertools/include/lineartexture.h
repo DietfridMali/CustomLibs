@@ -34,7 +34,7 @@ class LinearTexture
     : public Texture
 {
 public:
-    ManagedArray<DATA_T>    m_data;
+    AutoArray<DATA_T>    m_data;
     bool                    m_isRepeating;
 
     LinearTexture()
@@ -73,7 +73,7 @@ public:
     }
 
 
-    inline bool Create(ManagedArray<DATA_T>& data, bool isRepeating) {
+    inline bool Create(AutoArray<DATA_T>& data, bool isRepeating) {
         if (not Texture::Create())
             return false;
         m_isRepeating = isRepeating;
@@ -99,7 +99,7 @@ public:
     }
 
 
-    inline int Upload(ManagedArray<DATA_T>& data) {
+    inline int Upload(AutoArray<DATA_T>& data) {
         if (m_buffers.Length() == 0) 
             return 0;
         const int l = std::min(GetWidth(), int(data.Length()));

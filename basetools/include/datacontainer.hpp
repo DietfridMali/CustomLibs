@@ -9,7 +9,7 @@ template<typename DATA_T>
 class DataContainer {
 public:
     using DataList = List<DATA_T>;
-    using DataTable = ManagedArray<DATA_T>;
+    using DataTable = AutoArray<DATA_T>;
 
     DataList    m_dataList;
     DataTable   m_dataTable;
