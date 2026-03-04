@@ -121,6 +121,7 @@
     <ClInclude Include="..\include\fbo.h" />
     <ClInclude Include="..\include\fonthandler.h" />
     <ClInclude Include="..\include\framecounter.h" />
+    <ClInclude Include="..\include\glbreader.h" />
     <ClInclude Include="..\include\gputimer.h" />
     <ClInclude Include="..\include\skybox.h" />
     <ClInclude Include="..\include\icosphere.h" />
@@ -168,6 +169,7 @@
     <ClCompile Include="..\src\fbo.cpp" />
     <ClCompile Include="..\src\fonthandler.cpp" />
     <ClCompile Include="..\src\framecounter.cpp" />
+    <ClCompile Include="..\src\glbreader.cpp" />
     <ClCompile Include="..\src\icosphere.cpp" />
     <ClCompile Include="..\src\linesegment.cpp" />
     <ClCompile Include="..\src\primitive_shaders.cpp" />
