@@ -14,18 +14,25 @@ class ShaderSource {
 public:
     using KeyType = String;
 
-    String m_name;
-    String m_vs;
-    String m_fs;
+    String m_name{ "" };
+    String m_vs{ "" };
+    String m_fs{ "" };
+	String m_gs{ "" };
 
     ShaderSource() { }
 
-    explicit ShaderSource(String name, String vs, String fs)
-        : m_name(name), m_vs(vs), m_fs(fs)
+    explicit ShaderSource(String name, String vs, String fs, String gs = "")
+		: m_name(name)
+        , m_vs(vs)
+        , m_fs(fs)
+        , m_gs(gs)
     { }
 
     ShaderSource(const ShaderSource& other)
-        : m_name(other.m_name), m_vs(other.m_vs), m_fs(other.m_fs)
+        : m_name(other.m_name)
+        , m_vs(other.m_vs)
+        , m_fs(other.m_fs)
+        , m_gs(other.m_gs)
     {
     }
 

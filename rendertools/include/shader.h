@@ -69,14 +69,14 @@ class Shader
         String          m_name;
         String          m_vs;
         String          m_fs;
-        AutoArray<UniformHandle*>    m_uniforms;
-        ShaderLocationTable             m_locations;
+        AutoArray<UniformHandle*>   m_uniforms;
+        ShaderLocationTable         m_locations;
 
         using KeyType = String;
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-        Shader(String name = "", String vs = "", String fs = "")
+        Shader(String name = "", String vs = "", String fs = "", String gs = "")
 #pragma warning(pop)
             : m_handle(0)
             , m_name(name) 
@@ -121,10 +121,10 @@ class Shader
 
         GLuint Compile(const char* code, GLuint type);
 
-        GLuint Link(GLuint vsHandle, GLuint fsHandle);
+        GLuint Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle = 0);
 
-        inline bool Create(const String& vsCode, const String& fsCode) {
-            m_handle = Link(Compile((const char*)vsCode, GL_VERTEX_SHADER), Compile((const char*)fsCode, GL_FRAGMENT_SHADER));
+        inline bool Create(const String& vsCode, const String& fsCode, const String& gsCode) {
+            m_handle = Link(Compile((const char*)vsCode, GL_VERTEX_SHADER), Compile((const char*)fsCode, GL_FRAGMENT_SHADER), Compile((const char*)gsCode, GL_GEOMETRY_SHADER));
             return m_handle != 0;
         }
 

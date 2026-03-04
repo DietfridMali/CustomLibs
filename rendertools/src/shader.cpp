@@ -66,6 +66,8 @@ String Shader::GetInfoLog (GLuint handle, bool isProgram)
 
 
 GLuint Shader::Compile(const char* code, GLuint type) {
+    if (not code and *code)
+		return 0;
     GLuint handle = glCreateShader(type);
     glShaderSource(handle, 1, (GLchar**)&code, nullptr);
     glCompileShader(handle);
@@ -83,7 +85,7 @@ GLuint Shader::Compile(const char* code, GLuint type) {
 }
 
 
-GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
+GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle) {
     if (not vsHandle or not fsHandle)
         return 0;
     GLuint handle = glCreateProgram();
@@ -91,6 +93,8 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle) {
         return 0;
     glAttachShader(handle, vsHandle);
     glAttachShader(handle, fsHandle);
+	if (gsHandle)
+        glAttachShader(handle, gsHandle);
     glLinkProgram(handle);
     GLint isLinked = 0;
     glGetProgramiv(handle, GL_LINK_STATUS, &isLinked);
