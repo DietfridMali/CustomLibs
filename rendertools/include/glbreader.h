@@ -5,23 +5,24 @@
 #include <vector>
 #include <stdexcept>
 #include <cstdint>
-#include <unordered_map>
-
-// somewhere in exactly one .cpp before including tiny_gltf.h
-#define TINYGLTF_IMPLEMENTATION
-#define TINYGLTF_NO_STB_IMAGE
-#define TINYGLTF_NO_STB_IMAGE_WRITE
 
 #include "tiny_gltf.h"
+#include "glm_vector.hpp"
+#include "Matrix4f.hpp"
+#include "List.hpp"
 
 class GLBReader {
 public:
+    struct ShapeKeySet {
+        std::string name;
+        AutoArray<Vector3f> deltas; // triangle soup: same length as vertices
+    };
+
     struct MeshData {
-        AutoArray<Vector3f> vertices;
-        AutoArray<Vector4f> colors;
-        AutoArray<Vector3f> morph0;
-        AutoArray<Vector3f> morph1;
-        AutoArray<Vector3f> triNormals;
+        AutoArray<Vector3f> vertices;     // triangle soup: 3 * triCount
+        AutoArray<Vector4f> colors;       // 3 * triCount
+        AutoArray<Vector3f> triNormals;   // 1 * triCount (face normal)
+        List<ShapeKeySet> shapeKeys;      // N sets, each has 3 * triCount deltas
     };
 
 public:
@@ -36,16 +37,16 @@ public:
     }
 
 private:
-    static glm::mat4 NodeLocalMatrix(const tinygltf::Node& node);
+    static Matrix4f NodeLocalMatrix(const tinygltf::Node& node);
     static void ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, std::vector<Vector3f>& out);
-    static void ReadAccessorIndices(const tinygltf::Model& model, int accessorIndex, std::vector<uint32_t>& out);
+    static void ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, std::vector<uint32_t>& out);
     static Vector4f PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex);
 
-    void AppendMeshFromNode(int nodeIndex, glm::mat4 parentM);
-    void AppendMesh(int meshIndex, glm::mat4 worldM);
+    void EnsureShapeKeyCount(int32_t targetCount);
+    void AppendFromNode(int nodeIndex, Matrix4f parentM);
+    void AppendMesh(int meshIndex, Matrix4f worldM);
 
 private:
     tinygltf::Model m_model;
     MeshData m_data;
-}; 
-
+};

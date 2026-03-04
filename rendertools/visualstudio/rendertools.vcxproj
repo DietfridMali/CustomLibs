@@ -197,6 +197,7 @@
     <ClCompile Include="..\src\texturehandler.cpp" />
     <ClCompile Include="..\src\base_texture_shaders.cpp" />
     <ClCompile Include="..\src\textureprocessing.cpp" />
+    <ClCompile Include="..\src\tiny_gltf.cpp" />
     <ClCompile Include="..\src\vao.cpp" />
     <ClCompile Include="..\src\vbo.cpp" />
     <ClCompile Include="..\src\viewport.cpp" />
