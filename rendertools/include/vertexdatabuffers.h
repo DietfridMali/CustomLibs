@@ -85,13 +85,27 @@ public:
             m_isDirty = true;
         }
 
+
+		inline void CopyGLData(AutoArray<APP_DATA_T>& appData) { // directly set m_glData without going over m_appData
+			m_glData.Resize(appData.Length() * m_componentCount);
+			GL_DATA_T* glData = m_glData.Data();
+            for (auto data : appData) {
+                memcpy(glData, data.Data(), m_componentCount * sizeof(GL_DATA_T));
+				glData += m_componentCount;
+            }
+            m_isDirty = true;
+        }
+
+
         virtual AutoArray<GL_DATA_T>& Setup(void) = 0;
+
 
         inline void Reset(void) {
             m_appData.Clear();
             m_glData.Reset();
             m_isDirty = false;
         }
+
 
         inline operator GLvoid*() {
             return (GLvoid*)m_glData.data();

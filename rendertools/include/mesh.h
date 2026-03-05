@@ -56,20 +56,21 @@ class Mesh
     : public AbstractMesh
 {
 public:
-    String              m_name{ "" };
-    TextureList         m_textures;
-    VertexBuffer        m_vertices;
-    VertexBuffer        m_normals;
-    TangentBuffer       m_tangents;
+    String                          m_name{ "" };
+    TextureList                     m_textures;
+    VertexBuffer                    m_vertices;
+    VertexBuffer                    m_normals;
+    TangentBuffer                   m_tangents;
     StaticArray<TexCoordBuffer, 3>  m_texCoords;
-    ColorBuffer         m_vertexColors;
-    IndexBuffer         m_indices;
-    FloatDataBuffer     m_floatBuffer;
-    VAO*                m_vao{ nullptr };
-    GLenum              m_shape{ 0 };
-    Vector3f            m_vMin{ Vector3f::ZERO };
-    Vector3f            m_vMax{ Vector3f::ZERO };
-    bool                m_isDynamic{ false };
+    ColorBuffer                     m_vertexColors;
+    IndexBuffer                     m_indices;
+    List<FloatDataBuffer>           m_floatBuffers;
+    List<VertexBuffer>              m_offsetBuffers;
+    VAO*                            m_vao{ nullptr };
+    GLenum                          m_shape{ 0 };
+    Vector3f                        m_vMin{ Vector3f::ZERO };
+    Vector3f                        m_vMax{ Vector3f::ZERO };
+    bool                            m_isDynamic{ false };
 
     static uint32_t quadTriangleIndices[6];
 
@@ -129,7 +130,9 @@ public:
 
     inline IndexBuffer& Indices(void) noexcept { return m_indices; }
 
-    inline FloatDataBuffer& FloatBuffer(void) noexcept { return m_floatBuffer; }
+    inline FloatDataBuffer& FloatBuffer(int i) noexcept { return m_floatBuffers[i]; }
+
+    inline VertexBuffer& OffsetBuffer(int i) noexcept { return m_offsetBuffers[i]; }
 
     inline void UpdateVertexBuffer(bool forceUpdate = false) {
         if (m_vao)
@@ -157,9 +160,14 @@ public:
             m_vao->UpdateDataBuffer("Normal", 0, m_normals, GL_FLOAT, forceUpdate);
     }
 
-    inline void UpdateFloatDataBuffer(bool forceUpdate = false) {
+    inline void UpdateFloatDataBuffer(int i, bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Float", 0, m_floatBuffer, GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("Float", i, m_floatBuffers[i], GL_FLOAT, forceUpdate);
+    }
+
+    inline void UpdateOffsetBuffer(int i, bool forceUpdate = false) {
+        if (m_vao)
+            m_vao->UpdateDataBuffer("Offset", i, m_offsetBuffers[i], GL_FLOAT, forceUpdate);
     }
 
     inline void UpdateIndexBuffer(bool forceUpdate = false) {
@@ -194,6 +202,14 @@ public:
 
     void DisableTexture(void)
         noexcept;
+
+    inline void AddFloatBuffer(void) noexcept {
+        m_floatBuffers.Append();
+    }
+
+    inline void AddOffsetBuffer(void) noexcept {
+        m_offsetBuffers.Append();
+    }
 
     inline void AddVertex(const Vector3f& v) {
         m_vertices.Append(v);
@@ -253,8 +269,8 @@ public:
         m_indices.SetGLData(i);
     }
 
-    inline void AddFloat(const float n) {
-        m_floatBuffer.Append(n);
+    inline void AddFloat(int i, const float n) {
+        m_floatBuffers[i].Append(n);
     }
 
     inline bool IsEmpty(void)

@@ -1,4 +1,4 @@
-// GLBReader.h
+// GLBLoader.h
 #pragma once
 
 #include <cstdint>
@@ -10,10 +10,11 @@
 #include "array.hpp"
 #include "matrix.hpp"
 #include "list.hpp"
+#include "colordata.h"
 
 // =================================================================================================
 
-class GLBReader {
+class GLBLoader {
 public:
     struct ShapeKeySet {
         String name;
@@ -21,27 +22,31 @@ public:
     };
 
     struct MeshData {
-        AutoArray<Vector3f> vertices;    // triangle soup: 3 * triCount
-        AutoArray<Vector4f> colors;      // 3 * triCount
-        AutoArray<Vector3f> triNormals;  // 1 * triCount
-        List<ShapeKeySet> shapeKeys;     // N sets, each has 3 * triCount deltas
+        AutoArray<Vector3f>     vertices;   // triangle soup: 3 * triCount
+        AutoArray<RGBAColor>    colors;     // 3 * triCount
+        AutoArray<Vector3f>     normals;    // 1 * triCount
+        List<ShapeKeySet>       shapeKeys;  // N sets, each has 3 * triCount deltas
     };
 
 public:
     bool Load(const String& filename);
 
-    MeshData& Data() { return m_data; }
+    inline MeshData& Data() { 
+        return m_data; 
+    }
 
-    const MeshData& Data() const { return m_data; }
+    inline const MeshData& Data() const { 
+        return m_data; 
+    }
 
 private:
     struct PrimitiveInput {
-        AutoArray<Vector3f> basePos;
-        AutoArray<uint32_t> indices;
-        AutoArray<AutoArray<Vector3f>> morphPos; // [target][vertex]
-        Vector4f baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-        int32_t targetCount{ 0 };
-        int32_t triCount{ 0 };
+        AutoArray<Vector3f>             basePos;
+        AutoArray<uint32_t>             indices;
+        AutoArray<AutoArray<Vector3f>>  morphPos; // [target][vertex]
+        RGBAColor                       baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
+        int32_t                         targetCount{ 0 };
+        int32_t                         triCount{ 0 };
     };
 
 private:
@@ -58,6 +63,27 @@ private:
     bool AppendFromNode(int nodeIndex, Matrix4f parentM);
 
     bool AppendMesh(int meshIndex, Matrix4f worldM);
+
+public:
+	inline AutoArray<Vector3f>& GetVertices(void) noexcept {
+        return m_data.vertices; 
+    }
+
+    inline AutoArray<Vector3f>& GetNormals(void) noexcept {
+        return m_data.normals;
+    }
+
+    inline AutoArray<RGBAColor>& GetColors(void) noexcept {
+        return m_data.colors;
+    }
+
+    inline int HasShapeKeys(void) const noexcept {
+        return m_data.shapeKeys.Length();
+	}
+
+    inline AutoArray<Vector3f>& GetShapeKeys(int i) noexcept {
+        return m_data.shapeKeys[i].deltas;
+    }
 
 private:
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
@@ -78,6 +104,7 @@ private:
 
 private:
     tinygltf::Model m_model;
+
     MeshData m_data;
 };
 

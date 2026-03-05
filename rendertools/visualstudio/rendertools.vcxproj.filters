@@ -165,7 +165,7 @@
     <ClInclude Include="..\include\skybox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\glbreader.h">
+    <ClInclude Include="..\include\glbloader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -290,7 +290,7 @@
     <ClCompile Include="..\src\skybox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\glbreader.cpp">
+    <ClCompile Include="..\src\glbloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\tiny_gltf.cpp">
