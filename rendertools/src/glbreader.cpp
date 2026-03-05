@@ -14,11 +14,13 @@ static Vector3f TransformPosition(Matrix4f m, Vector3f p) {
     return Vector3f(r.x, r.y, r.z);
 }
 
+
 static Vector3f TransformDelta(Matrix4f m, Vector3f d) {
     glm::mat3 a = glm::mat3(m.m);
     glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
     return Vector3f(r.x, r.y, r.z);
 }
+
 
 bool GLBReader::AppendMesh(int meshIndex, Matrix4f worldM) {
     if (meshIndex < 0 or meshIndex >= static_cast<int>(m_model.meshes.size())) {
@@ -37,6 +39,7 @@ bool GLBReader::AppendMesh(int meshIndex, Matrix4f worldM) {
     return true;
 }
 
+
 bool GLBReader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     if (not ValidateTriangles(prim))
         return false;
@@ -45,25 +48,19 @@ bool GLBReader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     if (not LoadPositions(prim, in))
         return false;
-
     if (not LoadMorphTargets(prim, in))
         return false;
-
     in.baseColor = PrimitiveBaseColor(m_model, prim.material);
-
     if (not LoadIndices(prim, in))
         return false;
-
     ReserveOutput(in);
-
     AutoArray<ShapeKeySet*> keyPtrs;
     BuildShapeKeyPointers(keyPtrs);
-
     if (not AppendTriangles(in, worldM, keyPtrs))
         return false;
-
     return true;
 }
+
 
 bool GLBReader::ValidateTriangles(tinygltf::Primitive& prim) {
     int mode = prim.mode;
@@ -77,6 +74,7 @@ bool GLBReader::ValidateTriangles(tinygltf::Primitive& prim) {
     }
     return true;
 }
+
 
 bool GLBReader::LoadPositions(tinygltf::Primitive& prim, PrimitiveInput& in) {
     auto itPos = prim.attributes.find("POSITION");
@@ -97,13 +95,11 @@ bool GLBReader::LoadPositions(tinygltf::Primitive& prim, PrimitiveInput& in) {
     return true;
 }
 
+
 bool GLBReader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.targetCount = static_cast<int32_t>(prim.targets.size());
-
     CheckShapeKeyCount(in.targetCount);
-
     in.morphPos.Resize(in.targetCount);
-
     for (int32_t t = 0; t < in.targetCount; ++t) {
         in.morphPos[t].Resize(in.basePos.Length(), Vector3f(0.0f, 0.0f, 0.0f));
 
@@ -113,13 +109,12 @@ bool GLBReader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) 
                 return false;
         }
     }
-
     return true;
 }
 
+
 bool GLBReader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.indices.Clear();
-
     if (prim.indices >= 0) {
         if (not ReadAccessorIndicesU32(m_model, prim.indices, in.indices))
             return false;
@@ -134,11 +129,10 @@ bool GLBReader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
         fprintf(stderr, "GLBReader: index count not divisible by 3\n");
         return false;
     }
-
     in.triCount = in.indices.Length() / 3;
-
     return true;
 }
+
 
 void GLBReader::ReserveOutput(const PrimitiveInput& in) {
     int32_t addVertexCount = in.triCount * 3;
@@ -151,17 +145,17 @@ void GLBReader::ReserveOutput(const PrimitiveInput& in) {
         sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
 }
 
+
 void GLBReader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = m_data.shapeKeys.Length();
-
     keyPtrs.Resize(globalKeyCount);
-
     int32_t k = 0;
     for (auto& sk : m_data.shapeKeys) {
         keyPtrs[k] = &sk;
         k += 1;
     }
 }
+
 
 bool GLBReader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = keyPtrs.Length();
@@ -214,6 +208,7 @@ bool GLBReader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoA
     return true;
 }
 
+
 bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, AutoArray<Vector3f>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
         fprintf(stderr, "GLBReader: accessor index out of range\n");
@@ -265,7 +260,6 @@ bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
     }
 
     out.Resize(static_cast<int32_t>(acc.count));
-
     for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
         size_t off = base + i * stride;
 
@@ -282,6 +276,7 @@ bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
 
     return true;
 }
+
 
 bool GLBReader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
@@ -313,7 +308,6 @@ bool GLBReader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
     auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
 
     size_t elemSize = 0;
-
     if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
         elemSize = 1;
     else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
@@ -358,7 +352,6 @@ bool GLBReader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
             out[static_cast<int32_t>(i)] = v;
         }
     }
-
     return true;
 }
 
