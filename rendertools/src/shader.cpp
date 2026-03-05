@@ -66,7 +66,7 @@ String Shader::GetInfoLog (GLuint handle, bool isProgram)
 
 
 GLuint Shader::Compile(const char* code, GLuint type) {
-    if (not code and *code)
+    if (not code or not *code)
 		return 0;
     GLuint handle = glCreateShader(type);
     glShaderSource(handle, 1, (GLchar**)&code, nullptr);

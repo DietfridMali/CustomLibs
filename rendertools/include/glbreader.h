@@ -7,14 +7,18 @@
 #include <cstdint>
 
 #include "tiny_gltf.h"
-#include "glm_vector.hpp"
-#include "Matrix4f.hpp"
-#include "List.hpp"
+#include "string.hpp"
+#include "vector.hpp"
+#include "array.hpp"
+#include "matrix.hpp"
+#include "list.hpp"
+
+// =================================================================================================
 
 class GLBReader {
 public:
     struct ShapeKeySet {
-        std::string name;
+        String name;
         AutoArray<Vector3f> deltas; // triangle soup: same length as vertices
     };
 
@@ -26,7 +30,7 @@ public:
     };
 
 public:
-    bool Load(const std::string& filename);
+    bool Load(const String& filename);
 
     MeshData& Data() {
         return m_data;
@@ -38,15 +42,22 @@ public:
 
 private:
     static Matrix4f NodeLocalMatrix(const tinygltf::Node& node);
-    static void ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, std::vector<Vector3f>& out);
-    static void ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, std::vector<uint32_t>& out);
+    
+    static bool ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, std::vector<Vector3f>& out);
+    
+    static bool ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, std::vector<uint32_t>& out);
+    
     static Vector4f PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex);
 
-    void EnsureShapeKeyCount(int32_t targetCount);
-    void AppendFromNode(int nodeIndex, Matrix4f parentM);
-    void AppendMesh(int meshIndex, Matrix4f worldM);
+    void CheckShapeKeyCount(int32_t targetCount);
+
+    bool AppendFromNode(int nodeIndex, Matrix4f parentM);
+
+    bool AppendMesh(int meshIndex, Matrix4f worldM);
 
 private:
     tinygltf::Model m_model;
-    MeshData m_data;
+    MeshData        m_data;
 };
+
+// =================================================================================================

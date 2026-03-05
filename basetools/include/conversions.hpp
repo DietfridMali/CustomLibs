@@ -46,6 +46,14 @@ namespace Conversions
         return RadToDeg(DotToRad(dot));
     }
 
+    template<typename T>
+    constexpr bool OutOfBounds(T val, T minVal, T maxVal)
+        requires requires (T a, T b) { a < b; a > b; }
+    {
+        return (val < minVal) or (val > maxVal);
+    }
+
+
     inline float Normalize(float v, float vMin, float vMax) {
         return (v - vMin) / (vMax - vMin);
     }
@@ -68,6 +76,7 @@ namespace Conversions
     template <typename T, size_t N>
     constexpr size_t ArrayLength(const T(&)[N]) noexcept { return N; }
 
+    
     template<typename T>
     constexpr int Sign(T val)
         noexcept

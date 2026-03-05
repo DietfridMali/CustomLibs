@@ -15,6 +15,8 @@
 
 #define CACHE_SHADER_DATA 1
 
+// =================================================================================================
+
 namespace UniformFuncs {
     template<typename S, int C> struct gl_uniform;               // Primary
 
