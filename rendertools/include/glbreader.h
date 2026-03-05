@@ -1,10 +1,8 @@
 // GLBReader.h
 #pragma once
 
-#include <string>
-#include <vector>
-#include <stdexcept>
 #include <cstdint>
+#include <cstdio>
 
 #include "tiny_gltf.h"
 #include "string.hpp"
@@ -19,14 +17,14 @@ class GLBReader {
 public:
     struct ShapeKeySet {
         String name;
-        AutoArray<Vector3f> deltas;
+        AutoArray<Vector3f> deltas; // triangle soup: same length as vertices
     };
 
     struct MeshData {
-        AutoArray<Vector3f> vertices;
-        AutoArray<Vector4f> colors;
-        AutoArray<Vector3f> triNormals;
-        List<ShapeKeySet> shapeKeys;
+        AutoArray<Vector3f> vertices;    // triangle soup: 3 * triCount
+        AutoArray<Vector4f> colors;      // 3 * triCount
+        AutoArray<Vector3f> triNormals;  // 1 * triCount
+        List<ShapeKeySet> shapeKeys;     // N sets, each has 3 * triCount deltas
     };
 
 public:
@@ -80,7 +78,6 @@ private:
 
 private:
     tinygltf::Model m_model;
-
     MeshData m_data;
 };
 

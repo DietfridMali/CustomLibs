@@ -1,10 +1,10 @@
 // GLBReader.cpp
 #include "GLBReader.h"
 
+#include <algorithm>
 #include <cstring>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include "conversions.hpp"
 
 // =================================================================================================
 
@@ -14,13 +14,103 @@ static Vector3f TransformPosition(Matrix4f m, Vector3f p) {
     return Vector3f(r.x, r.y, r.z);
 }
 
-
 static Vector3f TransformDelta(Matrix4f m, Vector3f d) {
     glm::mat3 a = glm::mat3(m.m);
     glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
     return Vector3f(r.x, r.y, r.z);
 }
 
+// =================================================================================================
+
+bool GLBReader::Load(const String& filename) {
+    m_data.vertices.Clear();
+    m_data.colors.Clear();
+    m_data.triNormals.Clear();
+    m_data.shapeKeys.Clear();
+
+    tinygltf::TinyGLTF loader;
+    std::string errorMsg;
+    std::string warningMsg;
+
+    std::string fn = filename;
+
+    if (not loader.LoadBinaryFromFile(&m_model, &errorMsg, &warningMsg, fn)) {
+        fprintf(stderr, "GLBReader: LoadBinaryFromFile failed: %s\n", errorMsg.c_str());
+        return false;
+    }
+
+    if (m_model.scenes.empty()) {
+        fprintf(stderr, "GLBReader: no scenes found\n");
+        return false;
+    }
+
+    int sceneIndex = m_model.defaultScene;
+    if (sceneIndex < 0 or sceneIndex >= static_cast<int>(m_model.scenes.size())) {
+        sceneIndex = 0;
+    }
+
+    auto& scene = m_model.scenes[static_cast<size_t>(sceneIndex)];
+
+    Matrix4f identity;
+
+    for (size_t i = 0; i < scene.nodes.size(); ++i) {
+        int nodeIndex = scene.nodes[i];
+        if (not AppendFromNode(nodeIndex, identity)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// =================================================================================================
+
+void GLBReader::CheckShapeKeyCount(int32_t targetCount) {
+    int32_t keyCount = m_data.shapeKeys.Length();
+    if (keyCount >= targetCount) {
+        return;
+    }
+
+    int32_t existingVertexCount = m_data.vertices.Length();
+
+    for (int32_t i = keyCount; i < targetCount; ++i) {
+        ShapeKeySet sk;
+        sk.name = String("shapeKey") + String(i);
+        sk.deltas.Resize(existingVertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+        m_data.shapeKeys.Append(std::move(sk));
+    }
+}
+
+// =================================================================================================
+
+bool GLBReader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
+    if (nodeIndex < 0 or nodeIndex >= static_cast<int>(m_model.nodes.size())) {
+        fprintf(stderr, "GLBReader: node index out of range\n");
+        return false;
+    }
+
+    auto& node = m_model.nodes[static_cast<size_t>(nodeIndex)];
+
+    Matrix4f localM = NodeLocalMatrix(node);
+    Matrix4f worldM = parentM * localM;
+
+    if (node.mesh >= 0) {
+        if (not AppendMesh(node.mesh, worldM)) {
+            return false;
+        }
+    }
+
+    for (size_t i = 0; i < node.children.size(); ++i) {
+        int childIndex = node.children[i];
+        if (not AppendFromNode(childIndex, worldM)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// =================================================================================================
 
 bool GLBReader::AppendMesh(int meshIndex, Matrix4f worldM) {
     if (meshIndex < 0 or meshIndex >= static_cast<int>(m_model.meshes.size())) {
@@ -32,60 +122,73 @@ bool GLBReader::AppendMesh(int meshIndex, Matrix4f worldM) {
 
     for (size_t p = 0; p < mesh.primitives.size(); ++p) {
         auto& prim = mesh.primitives[p];
-
-        if (not AppendPrimitive(prim, worldM))
+        if (not AppendPrimitive(prim, worldM)) {
             return false;
+        }
     }
+
     return true;
 }
 
+// =================================================================================================
 
 bool GLBReader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
-    if (not ValidateTriangles(prim))
+    if (not ValidateTriangles(prim)) {
         return false;
+    }
 
     PrimitiveInput in;
 
-    if (not LoadPositions(prim, in))
+    if (not LoadPositions(prim, in)) {
         return false;
-    if (not LoadMorphTargets(prim, in))
+    }
+
+    if (not LoadMorphTargets(prim, in)) {
         return false;
+    }
+
     in.baseColor = PrimitiveBaseColor(m_model, prim.material);
-    if (not LoadIndices(prim, in))
+
+    if (not LoadIndices(prim, in)) {
         return false;
+    }
+
     ReserveOutput(in);
+
     AutoArray<ShapeKeySet*> keyPtrs;
     BuildShapeKeyPointers(keyPtrs);
-    if (not AppendTriangles(in, worldM, keyPtrs))
+
+    if (not AppendTriangles(in, worldM, keyPtrs)) {
         return false;
+    }
+
     return true;
 }
 
-
 bool GLBReader::ValidateTriangles(tinygltf::Primitive& prim) {
     int mode = prim.mode;
-
-    if (mode == -1)
+    if (mode == -1) {
         mode = 4;
+    }
 
     if (mode != 4) {
         fprintf(stderr, "GLBReader: primitive mode is not TRIANGLES\n");
         return false;
     }
+
     return true;
 }
 
-
 bool GLBReader::LoadPositions(tinygltf::Primitive& prim, PrimitiveInput& in) {
     auto itPos = prim.attributes.find("POSITION");
-
     if (itPos == prim.attributes.end()) {
         fprintf(stderr, "GLBReader: primitive POSITION missing\n");
         return false;
     }
 
-    if (not ReadAccessorVec3Float(m_model, itPos->second, in.basePos))
+    if (not ReadAccessorVec3Float(m_model, itPos->second, in.basePos)) {
         return false;
+    }
 
     if (in.basePos.IsEmpty()) {
         fprintf(stderr, "GLBReader: primitive POSITION empty\n");
@@ -95,44 +198,51 @@ bool GLBReader::LoadPositions(tinygltf::Primitive& prim, PrimitiveInput& in) {
     return true;
 }
 
-
 bool GLBReader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.targetCount = static_cast<int32_t>(prim.targets.size());
     CheckShapeKeyCount(in.targetCount);
+
     in.morphPos.Resize(in.targetCount);
+
     for (int32_t t = 0; t < in.targetCount; ++t) {
         in.morphPos[t].Resize(in.basePos.Length(), Vector3f(0.0f, 0.0f, 0.0f));
 
-        auto it = prim.targets[static_cast<size_t>(t)].find("POSITION");
-        if (it != prim.targets[static_cast<size_t>(t)].end()) {
-            if (not ReadAccessorVec3Float(m_model, it->second, in.morphPos[t]))
+        auto& target = prim.targets[static_cast<size_t>(t)];
+        auto it = target.find("POSITION");
+        if (it != target.end()) {
+            if (not ReadAccessorVec3Float(m_model, it->second, in.morphPos[t])) {
                 return false;
+            }
         }
     }
+
     return true;
 }
 
-
 bool GLBReader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.indices.Clear();
+
     if (prim.indices >= 0) {
-        if (not ReadAccessorIndicesU32(m_model, prim.indices, in.indices))
+        if (not ReadAccessorIndicesU32(m_model, prim.indices, in.indices)) {
             return false;
+        }
     }
     else {
         in.indices.Resize(in.basePos.Length());
-        for (int32_t i = 0; i < in.indices.Length(); ++i)
+        for (int32_t i = 0; i < in.indices.Length(); ++i) {
             in.indices[i] = static_cast<uint32_t>(i);
+        }
     }
 
     if ((in.indices.Length() % 3) != 0) {
         fprintf(stderr, "GLBReader: index count not divisible by 3\n");
         return false;
     }
+
     in.triCount = in.indices.Length() / 3;
+
     return true;
 }
-
 
 void GLBReader::ReserveOutput(const PrimitiveInput& in) {
     int32_t addVertexCount = in.triCount * 3;
@@ -141,21 +251,21 @@ void GLBReader::ReserveOutput(const PrimitiveInput& in) {
     m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
     m_data.triNormals.Reserve(m_data.triNormals.Length() + in.triCount);
 
-    for (auto& sk : m_data.shapeKeys)
+    for (auto& sk : m_data.shapeKeys) {
         sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
+    }
 }
-
 
 void GLBReader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = m_data.shapeKeys.Length();
     keyPtrs.Resize(globalKeyCount);
+
     int32_t k = 0;
     for (auto& sk : m_data.shapeKeys) {
         keyPtrs[k] = &sk;
         k += 1;
     }
 }
-
 
 bool GLBReader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = keyPtrs.Length();
@@ -177,7 +287,6 @@ bool GLBReader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoA
         Vector3f p2 = TransformPosition(worldM, in.basePos[static_cast<int32_t>(i2)]);
 
         Vector3f n = Vector3f::Normal(p0, p1, p2);
-
         m_data.triNormals.Append(n);
 
         m_data.vertices.Append(p0);
@@ -208,6 +317,48 @@ bool GLBReader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoA
     return true;
 }
 
+// =================================================================================================
+
+Matrix4f GLBReader::NodeLocalMatrix(const tinygltf::Node& node) {
+    if (node.matrix.size() == 16) {
+        float data[16];
+        for (int i = 0; i < 16; ++i) {
+            data[i] = static_cast<float>(node.matrix[static_cast<size_t>(i)]);
+        }
+        return Matrix4f(data);
+    }
+
+    glm::vec3 t(0.0f, 0.0f, 0.0f);
+    glm::quat r(1.0f, 0.0f, 0.0f, 0.0f);
+    glm::vec3 s(1.0f, 1.0f, 1.0f);
+
+    if (node.translation.size() == 3) {
+        t.x = static_cast<float>(node.translation[0]);
+        t.y = static_cast<float>(node.translation[1]);
+        t.z = static_cast<float>(node.translation[2]);
+    }
+
+    if (node.rotation.size() == 4) {
+        r.x = static_cast<float>(node.rotation[0]);
+        r.y = static_cast<float>(node.rotation[1]);
+        r.z = static_cast<float>(node.rotation[2]);
+        r.w = static_cast<float>(node.rotation[3]);
+    }
+
+    if (node.scale.size() == 3) {
+        s.x = static_cast<float>(node.scale[0]);
+        s.y = static_cast<float>(node.scale[1]);
+        s.z = static_cast<float>(node.scale[2]);
+    }
+
+    glm::mat4 tm = glm::translate(glm::mat4(1.0f), t);
+    glm::mat4 rm = glm::mat4_cast(r);
+    glm::mat4 sm = glm::scale(glm::mat4(1.0f), s);
+
+    return Matrix4f(tm * rm * sm);
+}
+
+// =================================================================================================
 
 bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, AutoArray<Vector3f>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
@@ -221,20 +372,24 @@ bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
         fprintf(stderr, "GLBReader: sparse accessors not supported\n");
         return false;
     }
+
     if (acc.type != TINYGLTF_TYPE_VEC3) {
         fprintf(stderr, "GLBReader: accessor is not VEC3\n");
         return false;
     }
+
     if (acc.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
         fprintf(stderr, "GLBReader: accessor componentType is not FLOAT\n");
         return false;
     }
+
     if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
         fprintf(stderr, "GLBReader: bufferView index out of range\n");
         return false;
     }
 
     auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+
     if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
         fprintf(stderr, "GLBReader: buffer index out of range\n");
         return false;
@@ -243,8 +398,9 @@ bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
     auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
 
     size_t stride = static_cast<size_t>(view.byteStride);
-    if (stride == 0)
+    if (stride == 0) {
         stride = sizeof(float) * 3;
+    }
 
     if (stride < sizeof(float) * 3) {
         fprintf(stderr, "GLBReader: invalid stride for VEC3\n");
@@ -260,6 +416,7 @@ bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
     }
 
     out.Resize(static_cast<int32_t>(acc.count));
+
     for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
         size_t off = base + i * stride;
 
@@ -277,7 +434,6 @@ bool GLBReader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
     return true;
 }
 
-
 bool GLBReader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
         fprintf(stderr, "GLBReader: accessor index out of range\n");
@@ -290,16 +446,19 @@ bool GLBReader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
         fprintf(stderr, "GLBReader: sparse accessors not supported\n");
         return false;
     }
+
     if (acc.type != TINYGLTF_TYPE_SCALAR) {
         fprintf(stderr, "GLBReader: indices accessor is not SCALAR\n");
         return false;
     }
+
     if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
         fprintf(stderr, "GLBReader: bufferView index out of range\n");
         return false;
     }
 
     auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+
     if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
         fprintf(stderr, "GLBReader: buffer index out of range\n");
         return false;
@@ -308,20 +467,29 @@ bool GLBReader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
     auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
 
     size_t elemSize = 0;
-    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
         elemSize = 1;
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+    }
+    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
         elemSize = 2;
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+    }
+    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
         elemSize = 4;
+    }
     else {
         fprintf(stderr, "GLBReader: unsupported index componentType\n");
         return false;
     }
 
     size_t stride = static_cast<size_t>(view.byteStride);
-    if (stride == 0)
+    if (stride == 0) {
         stride = elemSize;
+    }
+
+    if (stride < elemSize) {
+        fprintf(stderr, "GLBReader: invalid stride for indices\n");
+        return false;
+    }
 
     size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
     size_t need = base + stride * static_cast<size_t>(acc.count);
@@ -352,7 +520,30 @@ bool GLBReader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
             out[static_cast<int32_t>(i)] = v;
         }
     }
+
     return true;
+}
+
+// =================================================================================================
+
+Vector4f GLBReader::PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex) {
+    if (materialIndex < 0 or materialIndex >= static_cast<int>(model.materials.size())) {
+        return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+
+    auto& mat = model.materials[static_cast<size_t>(materialIndex)];
+    auto& f = mat.pbrMetallicRoughness.baseColorFactor;
+
+    if (f.size() == 4) {
+        return Vector4f(
+            static_cast<float>(f[0]),
+            static_cast<float>(f[1]),
+            static_cast<float>(f[2]),
+            static_cast<float>(f[3])
+        );
+    }
+
+    return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 // =================================================================================================
