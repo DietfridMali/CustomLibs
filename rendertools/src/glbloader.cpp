@@ -15,6 +15,14 @@ static Vector3f TransformPosition(Matrix4f m, Vector3f p) {
     return Vector3f(r.x, r.y, r.z);
 }
 
+static Vector3f TransformNormal(Matrix4f m, Vector3f n) {
+    glm::mat3 a = glm::transpose(glm::inverse(glm::mat3(m.m)));
+    glm::vec3 r = a * glm::vec3(n.x, n.y, n.z);
+    Vector3f out(r.x, r.y, r.z);
+    out.Normalize();
+    return out;
+}
+
 static Vector3f TransformDelta(Matrix4f m, Vector3f d) {
     glm::mat3 a = glm::mat3(m.m);
     glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
@@ -140,13 +148,12 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     PrimitiveInput in;
 
-    if (not LoadPositions(prim, in)) {
+    if (not LoadVertices(prim, in))
         return false;
-    }
-
-    if (not LoadMorphTargets(prim, in)) {
+    if (not LoadNormals(prim, in)) 
         return false;
-    }
+    if (not LoadMorphTargets(prim, in)) 
+        return false;
 
     in.baseColor = PrimitiveBaseColor(m_model, prim.material);
 
@@ -184,24 +191,44 @@ bool GLBLoader::ValidateTriangles(tinygltf::Primitive& prim) {
     return true;
 }
 
-bool GLBLoader::LoadPositions(tinygltf::Primitive& prim, PrimitiveInput& in) {
+
+bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     auto itPos = prim.attributes.find("POSITION");
     if (itPos == prim.attributes.end()) {
         fprintf(stderr, "GLBLoader: primitive POSITION missing\n");
         return false;
     }
 
-    if (not ReadAccessorVec3Float(m_model, itPos->second, in.basePos)) {
+    if (not ReadAccessorVec3Float(m_model, itPos->second, in.baseVertices)) {
         return false;
     }
 
-    if (in.basePos.IsEmpty()) {
+    if (in.baseVertices.IsEmpty()) {
         fprintf(stderr, "GLBLoader: primitive POSITION empty\n");
         return false;
     }
 
     return true;
 }
+
+
+bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in) {
+    in.baseNormals.Clear();
+    in.haveNormals = false;
+
+    auto itNormal = prim.attributes.find("NORMAL");
+    if (itNormal == prim.attributes.end()) 
+        return true;
+    if (not ReadAccessorVec3Float(m_model, itNormal->second, in.baseNormals))
+        return false;
+    if (in.baseNormals.Length() != in.baseVertices.Length()) {
+        fprintf(stderr, "GLBLoader: NORMAL count does not match POSITION count\n");
+        return false;
+    }
+    in.haveNormals = true;
+    return true;
+}
+
 
 bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.targetCount = static_cast<int32_t>(prim.targets.size());
@@ -210,7 +237,7 @@ bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) 
     in.morphPos.Resize(in.targetCount);
 
     for (int32_t t = 0; t < in.targetCount; ++t) {
-        in.morphPos[t].Resize(in.basePos.Length(), Vector3f(0.0f, 0.0f, 0.0f));
+        in.morphPos[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
 
         auto& target = prim.targets[static_cast<size_t>(t)];
         auto it = target.find("POSITION");
@@ -233,7 +260,7 @@ bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
         }
     }
     else {
-        in.indices.Resize(in.basePos.Length());
+        in.indices.Resize(in.baseVertices.Length());
         for (int32_t i = 0; i < in.indices.Length(); ++i) {
             in.indices[i] = static_cast<uint32_t>(i);
         }
@@ -254,7 +281,7 @@ void GLBLoader::ReserveOutput(const PrimitiveInput& in) {
 
     m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
     m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
-    m_data.normals.Reserve(m_data.normals.Length() + in.triCount);
+    m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
 
     for (auto& sk : m_data.shapeKeys) {
         sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
@@ -280,23 +307,36 @@ bool GLBLoader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoA
         uint32_t i1 = in.indices[t * 3 + 1];
         uint32_t i2 = in.indices[t * 3 + 2];
 
-        if (i0 >= static_cast<uint32_t>(in.basePos.Length()) or
-            i1 >= static_cast<uint32_t>(in.basePos.Length()) or
-            i2 >= static_cast<uint32_t>(in.basePos.Length())) {
+        if (i0 >= static_cast<uint32_t>(in.baseVertices.Length()) or
+            i1 >= static_cast<uint32_t>(in.baseVertices.Length()) or
+            i2 >= static_cast<uint32_t>(in.baseVertices.Length())) {
             fprintf(stderr, "GLBLoader: index out of range\n");
             return false;
         }
 
-        Vector3f p0 = TransformPosition(worldM, in.basePos[static_cast<int32_t>(i0)]);
-        Vector3f p1 = TransformPosition(worldM, in.basePos[static_cast<int32_t>(i1)]);
-        Vector3f p2 = TransformPosition(worldM, in.basePos[static_cast<int32_t>(i2)]);
-
-        Vector3f n = Vector3f::Normal(p0, p1, p2);
-        m_data.normals.Append(n);
+        Vector3f p0 = TransformPosition(worldM, in.baseVertices[static_cast<int32_t>(i0)]);
+        Vector3f p1 = TransformPosition(worldM, in.baseVertices[static_cast<int32_t>(i1)]);
+        Vector3f p2 = TransformPosition(worldM, in.baseVertices[static_cast<int32_t>(i2)]);
 
         m_data.vertices.Append(p0);
         m_data.vertices.Append(p1);
         m_data.vertices.Append(p2);
+
+        if (in.haveNormals) {
+            Vector3f n0 = TransformNormal(worldM, in.baseNormals[static_cast<int32_t>(i0)]);
+            Vector3f n1 = TransformNormal(worldM, in.baseNormals[static_cast<int32_t>(i1)]);
+            Vector3f n2 = TransformNormal(worldM, in.baseNormals[static_cast<int32_t>(i2)]);
+            m_data.normals.Append(n0);
+            m_data.normals.Append(n1);
+            m_data.normals.Append(n2);
+        }
+        else {
+            Vector3f n = Vector3f::Normal(p0, p1, p2);
+            n.Normalize();
+            m_data.normals.Append(n);
+            m_data.normals.Append(n);
+            m_data.normals.Append(n);
+        }
 
         m_data.colors.Append(in.baseColor);
         m_data.colors.Append(in.baseColor);

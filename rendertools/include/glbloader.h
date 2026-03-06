@@ -44,12 +44,14 @@ public:
 
 private:
     struct PrimitiveInput {
-        AutoArray<Vector3f>             basePos;
+        AutoArray<Vector3f>             baseVertices;
+        AutoArray<Vector3f>             baseNormals;
         AutoArray<uint32_t>             indices;
         AutoArray<AutoArray<Vector3f>>  morphPos; // [target][vertex]
         RGBAColor                       baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
         int32_t                         targetCount{ 0 };
         int32_t                         triCount{ 0 };
+		bool    			            haveNormals{ false };   
     };
 
 private:
@@ -93,7 +95,9 @@ private:
 
     bool ValidateTriangles(tinygltf::Primitive& prim);
 
-    bool LoadPositions(tinygltf::Primitive& prim, PrimitiveInput& in);
+    bool LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in);
+
+    bool LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in);
 
     bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in);
 
