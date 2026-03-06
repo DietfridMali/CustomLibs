@@ -279,7 +279,7 @@ public:
         return m_vertices.IsEmpty();
     }
 
-    virtual bool Render(Texture* texture);
+    virtual bool Render(Texture* texture, float alpha = 1.0f);
 };
 
 // =================================================================================================
