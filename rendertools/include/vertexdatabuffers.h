@@ -187,6 +187,7 @@ protected:
             if (other.HaveData()) {
                 m_appData = other.m_appData;
                 m_glData = other.m_glData;
+				m_isDirty = other.m_isDirty;
             }
             m_componentCount = other.m_componentCount;
         }
@@ -196,14 +197,28 @@ protected:
     VertexDataBuffer& Move(VertexDataBuffer& other) {
         if (this != &other) {
             Reset();
-            if (other.HaveData()) {
+            if (other.HaveData() and (other.m_componentCount > 0)) {
                 m_appData = std::move(other.m_appData);
                 m_glData = std::move(other.m_glData);
+                m_isDirty = other.m_isDirty;
             }
             m_componentCount = other.m_componentCount;
             other.m_componentCount = 0;
         }
         return *this;
+    }
+
+public:
+    VertexDataBuffer(const VertexDataBuffer& other)
+        : BaseVertexDataBuffer(other.m_componentCount)
+    {
+        Copy(other);
+    }
+
+    VertexDataBuffer(VertexDataBuffer&& other) noexcept
+        : BaseVertexDataBuffer(other.m_componentCount)
+    {
+        Move(other);
     }
 };
 
