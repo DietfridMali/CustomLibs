@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <cstdio>
 
+
+#define TINYGLTF_NO_STB_IMAGE
+#define TINYGLTF_NO_STB_IMAGE_WRITE
 #include "tiny_gltf.h"
 #include "string.hpp"
 #include "vector.hpp"
