@@ -8,7 +8,7 @@
 const ShaderSource& TestShader();
 const ShaderSource& StencilShader();
 const ShaderSource& DepthShader();
-const ShaderSource& ActorDepthShader();
+const ShaderSource& SphereDepthShader();
 const ShaderSource& DepthRenderer();
 const ShaderSource& LineShader();
 const ShaderSource& RingShader();
@@ -33,7 +33,7 @@ BaseShaderCode::BaseShaderCode() {
         &TestShader(),
         &StencilShader(),
         &DepthShader(),
-        &ActorDepthShader(),
+        &SphereDepthShader(),
         &DepthRenderer(),
         &LineShader(),
         &RingShader(),

@@ -88,9 +88,9 @@ const ShaderSource& DepthShader() {
 }
 
 
-const ShaderSource& ActorDepthShader() {
+const ShaderSource& SphereDepthShader() {
     static const ShaderSource source(
-        "actorDepthShader",
+        "sphereDepthShader",
         R"(
         #version 330
         layout(location = 0) in vec3 vertex;
