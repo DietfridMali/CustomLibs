@@ -19,7 +19,7 @@ public:
     String m_fs{ "" };
 	String m_gs{ "" };
 
-    ShaderSource() { }
+    ShaderSource() = default;
 
     explicit ShaderSource(String name, String vs, String fs, String gs = "")
 		: m_name(name)
