@@ -5,6 +5,7 @@
 #include <cstring>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include "conversions.hpp"
 
 // =================================================================================================
 
@@ -148,6 +149,10 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     }
 
     in.baseColor = PrimitiveBaseColor(m_model, prim.material);
+
+    static Conversions::FloatInterval placeholderColor{ 0.99f, 0.992f };
+    if (placeholderColor.Contains(in.baseColor.R()) and placeholderColor.Contains(in.baseColor.G()) and placeholderColor.Contains(in.baseColor.B()))
+        in.baseColor = RGBAColor(0.0f, 0.0f, 0.0f, -1.0f);
 
     if (not LoadIndices(prim, in)) {
         return false;
