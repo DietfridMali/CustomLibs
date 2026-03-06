@@ -235,7 +235,7 @@ noexcept
         texture->Disable();
 }
 
-bool Mesh::Render(Texture* texture) {
+bool Mesh::Render(Texture* texture, float alpha) {
     if (not m_vao->IsValid())
         return false;
     m_vao->Render(texture);

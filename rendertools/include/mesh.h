@@ -21,7 +21,7 @@ public:
 
     virtual void Destroy(void) = 0;
 
-    virtual bool Render(Texture* texture) = 0;
+    virtual bool Render(Texture* texture, float alpha = 1.0) = 0;
 
     virtual ~AbstractMesh() = default;
 };
