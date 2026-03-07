@@ -108,9 +108,7 @@ private:
 
     bool LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in);
 
-    bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& out);
-
-    bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<int32_t>& groupIndex, int32_t groupCount, AutoArray<Vector3f>& out);
+    bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals);
 
     bool ComputeMorphNormals(PrimitiveInput& in);
 

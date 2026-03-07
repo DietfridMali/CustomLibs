@@ -5,12 +5,10 @@
 #include <cstring>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <cmath>
-#include <unordered_map>
 #include "conversions.hpp"
 
-#define COMPUTE_NORMALS         1
-#define ANGLE_WEIGHTED_NORMALS  0
+#define COMPUTE_NORMALS 1
+#define ANGLE_WEIGHTED_NORMALS 0
 
 // =================================================================================================
 
@@ -21,11 +19,11 @@ static Vector3f TransformPosition(Matrix4f m, Vector3f p) {
 }
 
 static Vector3f TransformNormal(Matrix4f m, Vector3f n) {
-    Vector4f h(n.x, n.y, n.z, 0.0f);
-    Vector4f r = m * h;
-    Vector3f normals(r.x, r.y, r.z);
-    normals.Normalize();
-    return normals;
+    glm::mat3 a = glm::transpose(glm::inverse(glm::mat3(m.m)));
+    glm::vec3 r = a * glm::vec3(n.x, n.y, n.z);
+    Vector3f out(r.x, r.y, r.z);
+    out.Normalize();
+    return out;
 }
 
 static Vector3f TransformDelta(Matrix4f m, Vector3f d) {
@@ -35,8 +33,8 @@ static Vector3f TransformDelta(Matrix4f m, Vector3f d) {
 }
 
 static Vector3f TransformNormalDelta(Matrix4f m, Vector3f d) {
-    Vector4f h(d.x, d.y, d.z, 0.0f);
-    Vector4f r = m * h;
+    glm::mat3 a = glm::transpose(glm::inverse(glm::mat3(m.m)));
+    glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
     return Vector3f(r.x, r.y, r.z);
 }
 
@@ -79,6 +77,7 @@ bool GLBLoader::Load(const String& filename) {
             return false;
         }
     }
+
     return true;
 }
 
@@ -104,7 +103,7 @@ void GLBLoader::CheckShapeKeyCount(int32_t targetCount) {
 
 bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
     if (nodeIndex < 0 or nodeIndex >= static_cast<int>(m_model.nodes.size())) {
-        fprintf(stderr, "GLBLoader: node index normals of range\n");
+        fprintf(stderr, "GLBLoader: node index out of range\n");
         return false;
     }
 
@@ -121,8 +120,9 @@ bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
 
     for (size_t i = 0; i < node.children.size(); ++i) {
         int childIndex = node.children[i];
-        if (not AppendFromNode(childIndex, worldM)) 
+        if (not AppendFromNode(childIndex, worldM)) {
             return false;
+        }
     }
 
     return true;
@@ -132,7 +132,7 @@ bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
 
 bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM) {
     if (meshIndex < 0 or meshIndex >= static_cast<int>(m_model.meshes.size())) {
-        fprintf(stderr, "GLBLoader: mesh index normals of range\n");
+        fprintf(stderr, "GLBLoader: mesh index out of range\n");
         return false;
     }
 
@@ -140,8 +140,9 @@ bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM) {
 
     for (size_t p = 0; p < mesh.primitives.size(); ++p) {
         auto& prim = mesh.primitives[p];
-        if (not AppendPrimitive(prim, worldM)) 
+        if (not AppendPrimitive(prim, worldM)) {
             return false;
+        }
     }
 
     return true;
@@ -156,6 +157,8 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     PrimitiveInput in;
 
+    in.baseColor = PrimitiveBaseColor(m_model, prim.material);
+
     if (not LoadVertices(prim, in))
         return false;
     if (not LoadMorphTargets(prim, in))
@@ -163,19 +166,14 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     if (not LoadIndices(prim, in))
         return false;
 
-    in.baseColor = PrimitiveBaseColor(m_model, prim.material);
-    static Conversions::FloatInterval placeholderColor{ 0.99f, 0.992f };
-    if (placeholderColor.Contains(in.baseColor.R()) and placeholderColor.Contains(in.baseColor.G()) and placeholderColor.Contains(in.baseColor.B()))
-        in.baseColor = RGBAColor(0.0f, 0.0f, 0.0f, -1.0f);
-
 #if COMPUTE_NORMALS
-    if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals)) 
+    if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals))
         return false;
     in.haveNormals = true;
     if (not ComputeMorphNormals(in))
         return false;
 #else
-    if (not LoadNormals(prim, in)) 
+    if (not LoadNormals(prim, in))
         return false;
 #endif
 
@@ -184,8 +182,10 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     AutoArray<ShapeKeySet*> keyPtrs;
     BuildShapeKeyPointers(keyPtrs);
 
-    if (not AppendTriangles(in, worldM, keyPtrs)) 
+    if (not AppendTriangles(in, worldM, keyPtrs)) {
         return false;
+    }
+
     return true;
 }
 
@@ -193,12 +193,15 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
 bool GLBLoader::ValidateTriangles(tinygltf::Primitive& prim) {
     int mode = prim.mode;
-    if (mode == -1) 
+    if (mode == -1) {
         mode = 4;
+    }
+
     if (mode != 4) {
         fprintf(stderr, "GLBLoader: primitive mode is not TRIANGLES\n");
         return false;
     }
+
     return true;
 }
 
@@ -230,7 +233,7 @@ bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.haveNormals = false;
 
     auto itNormal = prim.attributes.find("NORMAL");
-    if (itNormal == prim.attributes.end()) 
+    if (itNormal == prim.attributes.end())
         return true;
     if (not ReadAccessorVec3Float(m_model, itNormal->second, in.baseNormals))
         return false;
@@ -253,6 +256,7 @@ static float CornerAngle(Vector3f a, Vector3f b) {
     float cosVal = a.Dot(b);
     return std::atan2(sinLen, cosVal);
 }
+
 
 bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals) {
     int32_t vertexCount = vertices.Length();
@@ -379,8 +383,9 @@ bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoAr
 
         Vector3f  c = e0.Cross(e1);
         float l2 = c.Dot(c);
-        if (l2 <= 1e-20f) 
+        if (l2 <= 1e-20f) {
             continue;
+        }
 
         Vector3f n(c.x, c.y, c.z);
 
@@ -390,13 +395,15 @@ bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoAr
     }
 
     for (int32_t i = 0; i < vertexCount; ++i) {
-        if (normals[i].Length() > 1e-12f) 
+        if (normals[i].Length() > 1e-12f) {
             normals[i].Normalize();
-        else if (vertices[i].Length() < 1e-12f) 
-            normals[i] = Vector3f(0.0f, 0.0f, 1.0f);
-        else {
+        }
+        else if (vertices[i].Length() > 1e-12f) {
             normals[i] = vertices[i];
             normals[i].Normalize();
+        }
+        else {
+            normals[i] = Vector3f(0.0f, 0.0f, 1.0f);
         }
     }
 
@@ -404,7 +411,6 @@ bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoAr
 }
 
 #endif
-
 
 // -------------------------------------------------------------------------------------------------
 
@@ -422,7 +428,7 @@ bool GLBLoader::ComputeMorphNormals(PrimitiveInput& in) {
         for (int32_t i = 0; i < in.baseVertices.Length(); ++i)
             morphedVertices[i] = in.baseVertices[i] + vertexDeltas[i];
 
-        if (not ComputeNormals(morphedVertices, in.indices, morphedNormals)) 
+        if (not ComputeNormals(morphedVertices, in.indices, morphedNormals))
             return false;
 
         in.morphNormals[t].Resize(in.baseVertices.Length());
@@ -485,18 +491,15 @@ bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     }
     else {
         in.indices.Resize(in.baseVertices.Length());
-        for (int32_t i = 0; i < in.indices.Length(); ++i) {
+        for (int32_t i = 0; i < in.indices.Length(); ++i) 
             in.indices[i] = static_cast<uint32_t>(i);
-        }
     }
 
     if ((in.indices.Length() % 3) != 0) {
         fprintf(stderr, "GLBLoader: index count not divisible by 3\n");
         return false;
     }
-
     in.triCount = in.indices.Length() / 3;
-
     return true;
 }
 
@@ -541,7 +544,7 @@ bool GLBLoader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoA
         if (i0 >= static_cast<uint32_t>(in.baseVertices.Length()) or
             i1 >= static_cast<uint32_t>(in.baseVertices.Length()) or
             i2 >= static_cast<uint32_t>(in.baseVertices.Length())) {
-            fprintf(stderr, "GLBLoader: index normals of range\n");
+            fprintf(stderr, "GLBLoader: index out of range\n");
             return false;
         }
 
@@ -646,9 +649,9 @@ Matrix4f GLBLoader::NodeLocalMatrix(const tinygltf::Node& node) {
 
 // =================================================================================================
 
-bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, AutoArray<Vector3f>& normals) {
+bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, AutoArray<Vector3f>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
-        fprintf(stderr, "GLBLoader: accessor index normals of range\n");
+        fprintf(stderr, "GLBLoader: accessor index out of range\n");
         return false;
     }
 
@@ -670,14 +673,14 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
     }
 
     if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-        fprintf(stderr, "GLBLoader: bufferView index normals of range\n");
+        fprintf(stderr, "GLBLoader: bufferView index out of range\n");
         return false;
     }
 
     auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
 
     if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-        fprintf(stderr, "GLBLoader: buffer index normals of range\n");
+        fprintf(stderr, "GLBLoader: buffer index out of range\n");
         return false;
     }
 
@@ -701,7 +704,7 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
         return false;
     }
 
-    normals.Resize(static_cast<int32_t>(acc.count));
+    out.Resize(static_cast<int32_t>(acc.count));
 
     for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
         size_t off = base + i * stride;
@@ -714,7 +717,7 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
         std::memcpy(&fy, buf.data.data() + off + 4, sizeof(float));
         std::memcpy(&fz, buf.data.data() + off + 8, sizeof(float));
 
-        normals[static_cast<int32_t>(i)] = Vector3f(fx, fy, fz);
+        out[static_cast<int32_t>(i)] = Vector3f(fx, fy, fz);
     }
 
     return true;
@@ -722,9 +725,9 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& normals) {
+bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
-        fprintf(stderr, "GLBLoader: accessor index normals of range\n");
+        fprintf(stderr, "GLBLoader: accessor index out of range\n");
         return false;
     }
 
@@ -741,14 +744,14 @@ bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
     }
 
     if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-        fprintf(stderr, "GLBLoader: bufferView index normals of range\n");
+        fprintf(stderr, "GLBLoader: bufferView index out of range\n");
         return false;
     }
 
     auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
 
     if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-        fprintf(stderr, "GLBLoader: buffer index normals of range\n");
+        fprintf(stderr, "GLBLoader: buffer index out of range\n");
         return false;
     }
 
@@ -767,8 +770,9 @@ bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
     }
 
     size_t stride = static_cast<size_t>(view.byteStride);
-    if (stride == 0) 
+    if (stride == 0) {
         stride = elemSize;
+    }
 
     if (stride < elemSize) {
         fprintf(stderr, "GLBLoader: invalid stride for indices\n");
@@ -783,7 +787,7 @@ bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
         return false;
     }
 
-    normals.Resize(static_cast<int32_t>(acc.count));
+    out.Resize(static_cast<int32_t>(acc.count));
 
     for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
         size_t off = base + i * stride;
@@ -791,17 +795,17 @@ bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
         if (elemSize == 1) {
             uint8_t v;
             std::memcpy(&v, buf.data.data() + off, 1);
-            normals[static_cast<int32_t>(i)] = static_cast<uint32_t>(v);
+            out[static_cast<int32_t>(i)] = static_cast<uint32_t>(v);
         }
         else if (elemSize == 2) {
             uint16_t v;
             std::memcpy(&v, buf.data.data() + off, 2);
-            normals[static_cast<int32_t>(i)] = static_cast<uint32_t>(v);
+            out[static_cast<int32_t>(i)] = static_cast<uint32_t>(v);
         }
         else {
             uint32_t v;
             std::memcpy(&v, buf.data.data() + off, 4);
-            normals[static_cast<int32_t>(i)] = v;
+            out[static_cast<int32_t>(i)] = v;
         }
     }
 
@@ -819,14 +823,18 @@ Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materia
     auto& f = mat.pbrMetallicRoughness.baseColorFactor;
 
     if (f.size() == 4) {
-        return Vector4f(
+        Vector4f color = Vector4f(
             static_cast<float>(f[0]),
             static_cast<float>(f[1]),
             static_cast<float>(f[2]),
             static_cast<float>(f[3])
         );
-    }
 
+        static Conversions::FloatInterval placeholderColor{ 0.99f, 0.992f };
+        if (placeholderColor.Contains(color.R()) and placeholderColor.Contains(color.G()) and placeholderColor.Contains(color.B()))
+            return RGBAColor(0.0f, 0.0f, 0.0f, -1.0f);
+        return color;
+        }
     return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
