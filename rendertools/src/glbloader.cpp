@@ -10,6 +10,19 @@
 #define COMPUTE_NORMALS 1
 #define ANGLE_WEIGHTED_NORMALS 0
 
+// This glb loader is specifically designed to load a particular model and fix inconsistencies in the model data.
+// It is not a general-purpose glb loader and does not support all features of the glTF format. 
+// It assumes that the model is a sphere with openings for a mouth and eyes and comes with shape keys for 
+// several animation targets. The sphere vertices all have a special color assigned that isn't used for the 
+// model in-game; this color is used to identify hull vertices. The renderer will replace this color with 
+// the actual color of the smiley depending on the player color.
+// This loader corrects each animation target's hull shape by removing all dents and protrusions,
+// recalculates normals based on weighted face normals, and adjusts all morph targets accordingly.
+// It does so because the Blender created smiley model used in Smiley-Battle is beautiful, but has tiny flaws
+// that make it look bad when rendered with full lighting, shadowing and self-shadowing.
+// The output is an non indexed triangle soup, with three vertices and colors per triangle and so on.
+// In case a properly constructed model is available, this loader can be easily adapted to just load the model data without any corrections.
+
 // =================================================================================================
 
 static Vector3f TransformPosition(Matrix4f m, Vector3f p) {
@@ -59,11 +72,14 @@ int GLBLoader::CompareVertices(void* context, const Vector3f& v1, const Vector3f
 // -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::Load(const String& filename) {
+	if (LoadFromFile(filename + String(".bin")))
+        return true;
+
     m_data.vertices.Clear();
-    m_data.isHullVertex.Clear();
     m_data.colors.Clear();
     m_data.normals.Clear();
     m_data.shapeKeys.Clear();
+    isHullVertex.Clear();
     hullVertexMap.Clear();
     hullVertexMap.SetComparator(CompareVertices);
 
@@ -71,7 +87,7 @@ bool GLBLoader::Load(const String& filename) {
     std::string errorMsg;
     std::string warningMsg;
 
-    std::string fn = filename;
+    std::string fn = filename + String(".glb");
 
     if (not loader.LoadBinaryFromFile(&m_model, &errorMsg, &warningMsg, fn)) {
         fprintf(stderr, "GLBLoader: LoadBinaryFromFile failed: %s\n", errorMsg.c_str());
@@ -98,6 +114,11 @@ bool GLBLoader::Load(const String& filename) {
         }
     }
     StitchPrimitives();
+	SaveToFile(filename + String(".bin"));
+
+    m_model = tinygltf::Model();
+    isHullVertex.Clear();
+    hullVertexMap.Clear();
     return true;
 }
 
@@ -575,9 +596,9 @@ void GLBLoader::ReserveOutput(const PrimitiveData& in) {
     int32_t addVertexCount = in.triCount * 3;
 
     m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
-    m_data.isHullVertex.Reserve(m_data.isHullVertex.Length() + addVertexCount);
     m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
     m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
+    isHullVertex.Reserve(isHullVertex.Length() + addVertexCount);
 
     for (auto& sk : m_data.shapeKeys) {
         sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
@@ -613,7 +634,7 @@ bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<Sh
             if (in.isHull and not hullVertexMap.Find(p[j]))
                 hullVertexMap.Insert(p[j], m_data.vertices.Length());
             m_data.vertices.Append(p[j]);
-            m_data.isHullVertex.Append(in.isHull);
+            isHullVertex.Append(in.isHull);
             m_data.colors.Append(in.baseColor);
 
             if (in.haveNormals) {
@@ -901,7 +922,7 @@ void GLBLoader::StitchPrimitives(void) {
         for (int32_t i = 0; i < l; ++i)
             morphedVertices[i] = m_data.vertices[i] + sk.deltas[i];
         for (int32_t i = 0; i < l; ++i) {
-            if (m_data.isHullVertex[i])
+            if (isHullVertex[i])
                 continue;
             int32_t* indexPtr = hullVertexMap.Find(m_data.vertices[i]);
             if (not indexPtr)
@@ -912,4 +933,161 @@ void GLBLoader::StitchPrimitives(void) {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::SaveToFile(const String& filename) const {
+    std::ofstream f((const char*) filename, std::ios::binary | std::ios::trunc);
+    if (not f)
+        return false;
+
+    auto writeU32 = [&](uint32_t v) -> bool {
+        f.write(reinterpret_cast<const char*>(&v), sizeof(v));
+        return f.good();
+        };
+
+    auto writeBuffer = [&](const void* data, size_t size) -> bool {
+        if (size == 0)
+            return true;
+        f.write(reinterpret_cast<const char*>(data), size);
+        return f.good();
+        };
+
+    uint32_t vertexCount = uint32_t(m_data.vertices.Length());
+    uint32_t colorCount = uint32_t(m_data.colors.Length());
+    uint32_t normalCount = uint32_t(m_data.normals.Length());
+    uint32_t shapeKeyCount = uint32_t(m_data.shapeKeys.Length());
+
+    if (not writeU32(vertexCount))
+        return false;
+    if (not writeU32(colorCount))
+        return false;
+    if (not writeU32(normalCount))
+        return false;
+    if (not writeU32(shapeKeyCount))
+        return false;
+
+    if (not writeBuffer(m_data.vertices.Data(), size_t(vertexCount) * sizeof(Vector3f)))
+        return false;
+    if (not writeBuffer(m_data.colors.Data(), size_t(colorCount) * sizeof(RGBAColor)))
+        return false;
+    if (not writeBuffer(m_data.normals.Data(), size_t(normalCount) * sizeof(Vector3f)))
+        return false;
+
+    for (auto& sk : m_data.shapeKeys) {
+        std::string name = sk.name;
+        uint32_t nameLen = uint32_t(name.size());
+        uint32_t deltaCount = uint32_t(sk.deltas.Length());
+        uint32_t normalDeltaCount = uint32_t(sk.normalDeltas.Length());
+
+        if (not writeU32(nameLen))
+            return false;
+        if (not writeBuffer(name.data(), size_t(nameLen)))
+            return false;
+
+        if (not writeU32(deltaCount))
+            return false;
+        if (not writeBuffer(sk.deltas.Data(), size_t(deltaCount) * sizeof(Vector3f)))
+            return false;
+
+        if (not writeU32(normalDeltaCount))
+            return false;
+        if (not writeBuffer(sk.normalDeltas.Data(), size_t(normalDeltaCount) * sizeof(Vector3f)))
+            return false;
+    }
+
+    return f.good();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::LoadFromFile(const String& filename) {
+    std::ifstream f((const char*) filename, std::ios::binary);
+    if (not f)
+        return false;
+
+    auto readU32 = [&](uint32_t& v) -> bool {
+        f.read(reinterpret_cast<char*>(&v), sizeof(v));
+        return f.good();
+        };
+
+    auto readBuffer = [&](void* data, size_t size) -> bool {
+        if (size == 0)
+            return true;
+        f.read(reinterpret_cast<char*>(data), size);
+        return f.good();
+        };
+
+    uint32_t vertexCount;
+    uint32_t colorCount;
+    uint32_t normalCount;
+    uint32_t shapeKeyCount;
+
+    if (not readU32(vertexCount))
+        return false;
+    if (not readU32(colorCount))
+        return false;
+    if (not readU32(normalCount))
+        return false;
+    if (not readU32(shapeKeyCount))
+        return false;
+
+    m_data.vertices.Clear();
+    m_data.colors.Clear();
+    m_data.normals.Clear();
+    m_data.shapeKeys.Clear();
+    m_model = tinygltf::Model();
+
+    m_data.vertices.Resize(int32_t(vertexCount));
+    m_data.colors.Resize(int32_t(colorCount));
+    m_data.normals.Resize(int32_t(normalCount));
+
+    if (not readBuffer(m_data.vertices.Data(), size_t(vertexCount) * sizeof(Vector3f)))
+        return false;
+    if (not readBuffer(m_data.colors.Data(), size_t(colorCount) * sizeof(RGBAColor)))
+        return false;
+    if (not readBuffer(m_data.normals.Data(), size_t(normalCount) * sizeof(Vector3f)))
+        return false;
+
+    if (m_data.colors.Length() != m_data.vertices.Length())
+        return false;
+    if (m_data.normals.Length() != m_data.vertices.Length())
+        return false;
+
+    for (uint32_t k = 0; k < shapeKeyCount; ++k) {
+        ShapeKeySet sk;
+        uint32_t nameLen;
+        uint32_t deltaCount;
+        uint32_t normalDeltaCount;
+
+        if (not readU32(nameLen))
+            return false;
+
+        std::string name;
+        name.resize(size_t(nameLen));
+        if (not readBuffer(name.data(), size_t(nameLen)))
+            return false;
+        sk.name = String(name.c_str());
+
+        if (not readU32(deltaCount))
+            return false;
+        sk.deltas.Resize(int32_t(deltaCount));
+        if (not readBuffer(sk.deltas.Data(), size_t(deltaCount) * sizeof(Vector3f)))
+            return false;
+
+        if (not readU32(normalDeltaCount))
+            return false;
+        sk.normalDeltas.Resize(int32_t(normalDeltaCount));
+        if (not readBuffer(sk.normalDeltas.Data(), size_t(normalDeltaCount) * sizeof(Vector3f)))
+            return false;
+
+        if (sk.deltas.Length() != m_data.vertices.Length())
+            return false;
+        if (sk.normalDeltas.Length() != m_data.vertices.Length())
+            return false;
+
+        m_data.shapeKeys.Append(std::move(sk));
+    }
+
+    return f.good();
+}
 // =================================================================================================

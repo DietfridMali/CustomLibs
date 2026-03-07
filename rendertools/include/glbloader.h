@@ -31,7 +31,6 @@ public:
         AutoArray<RGBAColor>        colors;     // 3 * triCount
         AutoArray<Vector3f>         normals;    // 1 * triCount
         List<ShapeKeySet>           shapeKeys;  // N sets, each has 3 * triCount deltas
-        AutoArray<uint8_t>          isHullVertex;
     };
 
 public:
@@ -104,6 +103,7 @@ public:
 private:
     tinygltf::Model m_model;
     MeshData m_data;
+    AutoArray<uint8_t>         isHullVertex;
     AVLTree<Vector3f, int32_t> hullVertexMap;
 
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
@@ -135,6 +135,10 @@ private:
     void RecomputeMorphDeltas(ShapeKeySet& sk, const AutoArray<Vector3f>& morphedVertices);
 
     void StitchPrimitives(void);
+
+    bool SaveToFile(const String& filename) const;
+
+    bool LoadFromFile(const String& filename);
 };
 
 // =================================================================================================
