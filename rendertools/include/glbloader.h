@@ -97,6 +97,9 @@ public:
     }
 
 private:
+    tinygltf::Model m_model;
+    MeshData        m_data;
+
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
 
     bool ValidateTriangles(tinygltf::Primitive& prim);
@@ -106,6 +109,8 @@ private:
     bool LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in);
 
     bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& out);
+
+    bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<int32_t>& groupIndex, int32_t groupCount, AutoArray<Vector3f>& out);
 
     bool ComputeMorphNormals(PrimitiveInput& in);
 
@@ -118,11 +123,6 @@ private:
     void BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs);
 
     bool AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
-
-private:
-    tinygltf::Model m_model;
-
-    MeshData m_data;
 };
 
 // =================================================================================================
