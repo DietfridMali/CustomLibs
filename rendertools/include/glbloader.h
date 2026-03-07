@@ -103,8 +103,8 @@ public:
 
 private:
     tinygltf::Model m_model;
-    MeshData        m_data;
-    AVLTree<Vector3f, int32_t> hullVertexMap; // maps unique vertex positions to their index in vertices
+    MeshData m_data;
+    AVLTree<Vector3f, int32_t> hullVertexMap;
 
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
 
@@ -112,15 +112,19 @@ private:
 
     bool LoadVertices(tinygltf::Primitive& prim, PrimitiveData& in);
 
+    bool LoadIndices(tinygltf::Primitive& prim, PrimitiveData& in);
+
+    void WeldVertices(PrimitiveData& in);
+
     bool LoadNormals(tinygltf::Primitive& prim, PrimitiveData& in);
+
+    bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in);
+
+    void CorrectMorphTargets(PrimitiveData& in);
 
     bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals);
 
     bool ComputeMorphNormals(PrimitiveData& in);
-
-    bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in);
-
-    bool LoadIndices(tinygltf::Primitive& prim, PrimitiveData& in);
 
     void ReserveOutput(const PrimitiveData& in);
 

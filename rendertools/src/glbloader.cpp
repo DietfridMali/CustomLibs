@@ -180,10 +180,12 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     if (not LoadVertices(prim, in))
         return false;
-    if (not LoadMorphTargets(prim, in))
-        return false;
     if (not LoadIndices(prim, in))
         return false;
+    WeldVertices(in);
+    if (not LoadMorphTargets(prim, in))
+        return false;
+	CorrectMorphTargets(in);
 
 #if COMPUTE_NORMALS
     if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals))
@@ -240,6 +242,35 @@ bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveData& in) {
         return false;
     }
     return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void GLBLoader::WeldVertices(PrimitiveData& in) {
+    AVLTree<Vector3f, int32_t> vertexMap;
+    vertexMap.Clear();
+    vertexMap.SetComparator(CompareVertices);
+
+    AutoArray<int32_t> indexMap;
+    int32_t vertexCount = in.baseVertices.Length();
+    indexMap.Resize(vertexCount);
+
+    for (int32_t i = 0; i < vertexCount; ++i) {
+        Vector3f v = in.baseVertices[i];
+        int32_t* indexPtr = vertexMap.Find(v);
+        if (indexPtr)
+            indexMap[i] = *indexPtr;
+        else {
+            vertexMap.Insert(v, i);
+            indexMap[i] = i;
+        }
+    }
+
+    int32_t indexCount = in.indices.Length();
+    for (int32_t i = 0; i < indexCount; ++i) {
+        uint32_t idx = in.indices[i];
+        in.indices[i] = static_cast<uint32_t>(indexMap[static_cast<int32_t>(idx)]);
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -430,6 +461,22 @@ bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoAr
 
 // -------------------------------------------------------------------------------------------------
 
+void GLBLoader::CorrectMorphTargets(PrimitiveData& in) {
+    if (in.isHull) {
+    for (int32_t t = 0; t < in.targetCount; ++t) {
+        AutoArray<Vector3f>& vertexDeltas = in.morphVertices[t];
+        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
+            Vector3f v = in.baseVertices[i] + vertexDeltas[i];
+            v.Normalize();
+            v *= 0.5f;
+            vertexDeltas[i] = v - in.baseVertices[i];
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 bool GLBLoader::ComputeMorphNormals(PrimitiveData& in) {
     in.morphNormals.Resize(in.targetCount);
 
@@ -460,6 +507,7 @@ bool GLBLoader::ComputeMorphNormals(PrimitiveData& in) {
     }
     return true;
 }
+
 // -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in) {
@@ -559,24 +607,15 @@ void GLBLoader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
 bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = keyPtrs.Length();
 
-	AVLTree<Vector3f, int32_t> vertexMap; // for remapping duplicate vertices to the same index in the output arrays
-	vertexMap.Clear();
-	vertexMap.SetComparator(CompareVertices);
-
     for (int32_t i = 0, t = 0; t < in.triCount; ++t, i += 3) {
         int32_t indices[3];
         Vector3f p[3];
         for (int32_t j = 0; j < 3; ++j) {
             indices[j] = int32_t(in.indices[i + j]);
             p[j] = in.baseVertices[indices[j]];
-            int32_t* indexPtr = vertexMap.Find(p[j]);
-            if (indexPtr)
-                in.indices[i + j] = *indexPtr;
-            else
-                vertexMap.Insert(p[j], *indexPtr);
 			p[j] = TransformPosition(worldM, p[j]);
             if (in.isHull and not hullVertexMap.Find(p[j]))
-                vertexMap.Insert(p[j], m_data.vertices.Length());
+                hullVertexMap.Insert(p[j], m_data.vertices.Length());
             m_data.vertices.Append(p[j]);
             m_data.isHullVertex.Append(in.isHull);
             m_data.colors.Append(in.baseColor);
@@ -850,14 +889,14 @@ void GLBLoader::StitchPrimitives(void) {
     for (auto& sk : m_data.shapeKeys) {
         int32_t l = m_data.vertices.Length();
         for (int i = 0; i < l; ++i) {
-            if (not m_data.isHullVertex[i])
+            if (m_data.isHullVertex[i])
 				continue;
             Vector3f& iv = m_data.vertices[i];
             int32_t* indexPtr = hullVertexMap.Find(iv);
-            if (indexPtr) {
-                Vector3f v = m_data.vertices[*indexPtr] + sk.deltas[*indexPtr];
-                sk.deltas[i] = v - iv;
-            }
+            if (not indexPtr)
+				continue;
+            Vector3f v = m_data.vertices[*indexPtr] + sk.deltas[*indexPtr];
+            sk.deltas[i] = v - iv;
 		}
     }
 }
