@@ -105,7 +105,7 @@ public:
 #pragma warning(pop)
 
     ~AVLTree() {
-        Destroy();
+        Clear();
     }
 
     inline void SetComparator(Comparator compareNodes, void* context = nullptr) noexcept {
@@ -597,7 +597,7 @@ private:
     //-----------------------------------------------------------------------------
 
 public:
-    void Destroy(void) noexcept
+    void Clear(void) noexcept
     {
         DestroyNodes(m_info.root);
     }
@@ -779,7 +779,7 @@ public:
     }
 
     AVLTree& operator=(const AVLTree& other) {
-        Destroy();
+        Clear();
         Copy(other);
         return *this;
     }

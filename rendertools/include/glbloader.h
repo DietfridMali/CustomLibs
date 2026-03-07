@@ -13,6 +13,7 @@
 #include "array.hpp"
 #include "matrix.hpp"
 #include "list.hpp"
+#include "avltree.hpp"
 #include "colordata.h"
 
 // =================================================================================================
@@ -26,10 +27,11 @@ public:
     };
 
     struct MeshData {
-        AutoArray<Vector3f>     vertices;   // triangle soup: 3 * triCount
-        AutoArray<RGBAColor>    colors;     // 3 * triCount
-        AutoArray<Vector3f>     normals;    // 1 * triCount
-        List<ShapeKeySet>       shapeKeys;  // N sets, each has 3 * triCount deltas
+        AutoArray<Vector3f>         vertices;   // triangle soup: 3 * triCount
+        AutoArray<RGBAColor>        colors;     // 3 * triCount
+        AutoArray<Vector3f>         normals;    // 1 * triCount
+        List<ShapeKeySet>           shapeKeys;  // N sets, each has 3 * triCount deltas
+        AutoArray<uint8_t>          isHullVertex;
     };
 
 public:
@@ -72,6 +74,8 @@ private:
 
     bool AppendMesh(int meshIndex, Matrix4f worldM);
 
+    static int CompareVertices(void* context, const Vector3f& v1, const Vector3f& v2);
+
 public:
 	inline AutoArray<Vector3f>& GetVertices(void) noexcept {
         return m_data.vertices; 
@@ -100,6 +104,7 @@ public:
 private:
     tinygltf::Model m_model;
     MeshData        m_data;
+    AVLTree<Vector3f, int32_t> hullVertexMap; // maps unique vertex positions to their index in vertices
 
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
 
@@ -121,7 +126,9 @@ private:
 
     void BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs);
 
-    bool AppendTriangles(const PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
+    bool AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
+
+    void StitchPrimitives(void);
 };
 
 // =================================================================================================

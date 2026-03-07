@@ -40,11 +40,32 @@ static Vector3f TransformNormalDelta(Matrix4f m, Vector3f d) {
 
 // -------------------------------------------------------------------------------------------------
 
+int GLBLoader::CompareVertices(void* context, const Vector3f& v1, const Vector3f& v2) {
+    if (v1.X() < v2.X())
+        return -1;
+    if (v1.X() > v2.X())
+        return 1;
+    if (v1.Y() < v2.Y())
+        return -1;
+    if (v1.Y() > v2.Y())
+        return 1;
+    if (v1.Z() < v2.Z())
+        return -1;
+    if (v1.Z() > v2.Z())
+        return 1;
+    return 0;
+}
+
+// -------------------------------------------------------------------------------------------------
+
 bool GLBLoader::Load(const String& filename) {
     m_data.vertices.Clear();
+    m_data.isHullVertex.Clear();
     m_data.colors.Clear();
     m_data.normals.Clear();
     m_data.shapeKeys.Clear();
+    hullVertexMap.Clear();
+    hullVertexMap.SetComparator(CompareVertices);
 
     tinygltf::TinyGLTF loader;
     std::string errorMsg;
@@ -63,9 +84,8 @@ bool GLBLoader::Load(const String& filename) {
     }
 
     int sceneIndex = m_model.defaultScene;
-    if (sceneIndex < 0 or sceneIndex >= static_cast<int>(m_model.scenes.size())) {
-        sceneIndex = 0;
-    }
+    if (sceneIndex < 0 or sceneIndex >= static_cast<int>(m_model.scenes.size()))
+		sceneIndex = 0;
 
     auto& scene = m_model.scenes[static_cast<size_t>(sceneIndex)];
 
@@ -77,7 +97,6 @@ bool GLBLoader::Load(const String& filename) {
             return false;
         }
     }
-
     return true;
 }
 
@@ -161,7 +180,6 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     if (not LoadVertices(prim, in))
         return false;
-    in.isHull = in.baseColor.A() < 0.0f;
     if (not LoadMorphTargets(prim, in))
         return false;
     if (not LoadIndices(prim, in))
@@ -215,15 +233,12 @@ bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveData& in) {
         return false;
     }
 
-    if (not ReadAccessorVec3Float(m_model, itPos->second, in.baseVertices)) {
+    if (not ReadAccessorVec3Float(m_model, itPos->second, in.baseVertices))
         return false;
-    }
-
     if (in.baseVertices.IsEmpty()) {
         fprintf(stderr, "GLBLoader: primitive POSITION empty\n");
         return false;
     }
-
     return true;
 }
 
@@ -516,6 +531,7 @@ void GLBLoader::ReserveOutput(const PrimitiveData& in) {
     int32_t addVertexCount = in.triCount * 3;
 
     m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
+    m_data.isHullVertex.Reserve(m_data.isHullVertex.Length() + addVertexCount);
     m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
     m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
 
@@ -540,74 +556,54 @@ void GLBLoader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendTriangles(const PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
+bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = keyPtrs.Length();
 
+	AVLTree<Vector3f, int32_t> vertexMap; // for remapping duplicate vertices to the same index in the output arrays
+	vertexMap.Clear();
+	vertexMap.SetComparator(CompareVertices);
+
     for (int32_t i = 0, t = 0; t < in.triCount; ++t, i += 3) {
-        uint32_t i0 = in.indices[i + 0];
-        uint32_t i1 = in.indices[i + 1];
-        uint32_t i2 = in.indices[i + 2];
+        int32_t indices[3];
+        Vector3f p[3];
+        for (int32_t j = 0; j < 3; ++j) {
+            indices[j] = int32_t(in.indices[i + j]);
+            p[j] = in.baseVertices[indices[j]];
+            int32_t* indexPtr = vertexMap.Find(p[j]);
+            if (indexPtr)
+                in.indices[i + j] = *indexPtr;
+            else
+                vertexMap.Insert(p[j], *indexPtr);
+			p[j] = TransformPosition(worldM, p[j]);
+            if (in.isHull and not hullVertexMap.Find(p[j]))
+                vertexMap.Insert(p[j], m_data.vertices.Length());
+            m_data.vertices.Append(p[j]);
+            m_data.isHullVertex.Append(in.isHull);
+            m_data.colors.Append(in.baseColor);
 
-        if (i0 >= static_cast<uint32_t>(in.baseVertices.Length()) or
-            i1 >= static_cast<uint32_t>(in.baseVertices.Length()) or
-            i2 >= static_cast<uint32_t>(in.baseVertices.Length())) {
-            fprintf(stderr, "GLBLoader: index out of range\n");
-            return false;
+            if (in.haveNormals) {
+                Vector3f n = TransformNormal(worldM, in.baseNormals[indices[j]]);
+                m_data.normals.Append(n);
+            }
         }
 
-        Vector3f p0 = TransformPosition(worldM, in.baseVertices[static_cast<int32_t>(i0)]);
-        Vector3f p1 = TransformPosition(worldM, in.baseVertices[static_cast<int32_t>(i1)]);
-        Vector3f p2 = TransformPosition(worldM, in.baseVertices[static_cast<int32_t>(i2)]);
-
-        m_data.vertices.Append(p0);
-        m_data.vertices.Append(p1);
-        m_data.vertices.Append(p2);
-
-        if (in.haveNormals) {
-            Vector3f n0 = TransformNormal(worldM, in.baseNormals[static_cast<int32_t>(i0)]);
-            Vector3f n1 = TransformNormal(worldM, in.baseNormals[static_cast<int32_t>(i1)]);
-            Vector3f n2 = TransformNormal(worldM, in.baseNormals[static_cast<int32_t>(i2)]);
-            m_data.normals.Append(n0);
-            m_data.normals.Append(n1);
-            m_data.normals.Append(n2);
+        if (not in.haveNormals) {
+            Vector3f n = Vector3f::Normal(p[0], p[1], p[2]);
+            for (int j = 0; j < 3; ++j) 
+                m_data.normals.Append(n);
         }
-        else {
-            Vector3f n = Vector3f::Normal(p0, p1, p2);
-            m_data.normals.Append(n);
-            m_data.normals.Append(n);
-            m_data.normals.Append(n);
-        }
-
-        m_data.colors.Append(in.baseColor);
-        m_data.colors.Append(in.baseColor);
-        m_data.colors.Append(in.baseColor);
 
         for (int32_t k = 0; k < globalKeyCount; ++k) {
-            Vector3f d0(0.0f, 0.0f, 0.0f);
-            Vector3f d1(0.0f, 0.0f, 0.0f);
-            Vector3f d2(0.0f, 0.0f, 0.0f);
-
-            Vector3f dn0(0.0f, 0.0f, 0.0f);
-            Vector3f dn1(0.0f, 0.0f, 0.0f);
-            Vector3f dn2(0.0f, 0.0f, 0.0f);
-
-            if (k < in.targetCount) {
-                d0 = TransformDelta(worldM, in.morphVertices[k][static_cast<int32_t>(i0)]);
-                d1 = TransformDelta(worldM, in.morphVertices[k][static_cast<int32_t>(i1)]);
-                d2 = TransformDelta(worldM, in.morphVertices[k][static_cast<int32_t>(i2)]);
-
-                dn0 = TransformNormalDelta(worldM, in.morphNormals[k][static_cast<int32_t>(i0)]);
-                dn1 = TransformNormalDelta(worldM, in.morphNormals[k][static_cast<int32_t>(i1)]);
-                dn2 = TransformNormalDelta(worldM, in.morphNormals[k][static_cast<int32_t>(i2)]);
+            for (int j = 0; j < 3; ++j) {
+                Vector3f d(0.0f, 0.0f, 0.0f);
+                Vector3f dn(0.0f, 0.0f, 0.0f);
+                if (k < in.targetCount) {
+                    d = TransformDelta(worldM, in.morphVertices[k][indices[j]]);
+                    dn = TransformNormalDelta(worldM, in.morphNormals[k][indices[j]]);
+                }
+                keyPtrs[k]->deltas.Append(d);
+                keyPtrs[k]->normalDeltas.Append(dn);
             }
-
-            keyPtrs[k]->deltas.Append(d0);
-            keyPtrs[k]->deltas.Append(d1);
-            keyPtrs[k]->deltas.Append(d2);
-
-            keyPtrs[k]->normalDeltas.Append(dn0);
-            keyPtrs[k]->normalDeltas.Append(dn1);
-            keyPtrs[k]->normalDeltas.Append(dn2);
         }
     }
     return true;
@@ -618,9 +614,8 @@ bool GLBLoader::AppendTriangles(const PrimitiveData& in, Matrix4f worldM, AutoAr
 Matrix4f GLBLoader::NodeLocalMatrix(const tinygltf::Node& node) {
     if (node.matrix.size() == 16) {
         float data[16];
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; i < 16; ++i)
             data[i] = static_cast<float>(node.matrix[static_cast<size_t>(i)]);
-        }
         return Matrix4f(data);
     }
 
@@ -843,6 +838,28 @@ Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materia
         return color;
         }
     return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void GLBLoader::StitchPrimitives(void) {
+    // for each morph target => for(auto& sk : shapeKeys):
+	// morph non-hull vertices that are connected to hull vertices. To detect such vertices, 
+    // look them up in hullVertexMap and retrieve the corresponding hull vertex index from it. This may need a test whether the vertices are identical or a small delta must be allowed.
+	// Then replace the morphed non hull vertex with the morphed hull vertex and recompute the morph deltas for the non-hull vertex.
+    for (auto& sk : m_data.shapeKeys) {
+        int32_t l = m_data.vertices.Length();
+        for (int i = 0; i < l; ++i) {
+            if (not m_data.isHullVertex[i])
+				continue;
+            Vector3f& iv = m_data.vertices[i];
+            int32_t* indexPtr = hullVertexMap.Find(iv);
+            if (indexPtr) {
+                Vector3f v = m_data.vertices[*indexPtr] + sk.deltas[*indexPtr];
+                sk.deltas[i] = v - iv;
+            }
+		}
+    }
 }
 
 // =================================================================================================
