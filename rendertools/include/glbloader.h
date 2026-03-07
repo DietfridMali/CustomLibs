@@ -34,7 +34,7 @@ public:
     };
 
 public:
-    bool Load(const String& filename);
+    bool Load(const String& filename, bool fixModel = false);
 
     inline MeshData& Data() { 
         return m_data; 
@@ -101,10 +101,12 @@ public:
     }
 
 private:
-    tinygltf::Model m_model;
-    MeshData m_data;
-    AutoArray<uint8_t>         isHullVertex;
-    AVLTree<Vector3f, int32_t> hullVertexMap;
+    tinygltf::Model             m_model;
+    MeshData                    m_data;
+    AutoArray<uint8_t>          m_isHullVertex;
+    AVLTree<Vector3f, int32_t>  m_hullVertexMap;
+    bool                        m_fixModel{ false };
+
 
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
 

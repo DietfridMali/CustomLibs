@@ -7,8 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "conversions.hpp"
 
-#define COMPUTE_NORMALS 1
-#define ANGLE_WEIGHTED_NORMALS 0
+#define ANGLE_WEIGHTED_NORMALS  1
 
 // This glb loader is specifically designed to load a particular model and fix inconsistencies in the model data.
 // It is not a general-purpose glb loader and does not support all features of the glTF format. 
@@ -71,17 +70,18 @@ int GLBLoader::CompareVertices(void* context, const Vector3f& v1, const Vector3f
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::Load(const String& filename) {
+bool GLBLoader::Load(const String& filename, bool fixModel) {
 	if (LoadFromFile(filename + String(".bin")))
         return true;
 
+    m_fixModel = fixModel;
     m_data.vertices.Clear();
     m_data.colors.Clear();
     m_data.normals.Clear();
     m_data.shapeKeys.Clear();
-    isHullVertex.Clear();
-    hullVertexMap.Clear();
-    hullVertexMap.SetComparator(CompareVertices);
+    m_isHullVertex.Clear();
+    m_hullVertexMap.Clear();
+    m_hullVertexMap.SetComparator(CompareVertices);
 
     tinygltf::TinyGLTF loader;
     std::string errorMsg;
@@ -113,12 +113,13 @@ bool GLBLoader::Load(const String& filename) {
             return false;
         }
     }
-    StitchPrimitives();
+    if (m_fixModel)
+        StitchPrimitives();
 	SaveToFile(filename + String(".bin"));
 
     m_model = tinygltf::Model();
-    isHullVertex.Clear();
-    hullVertexMap.Clear();
+    m_isHullVertex.Clear();
+    m_hullVertexMap.Clear();
     return true;
 }
 
@@ -205,21 +206,22 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
         return false;
     if (not LoadIndices(prim, in))
         return false;
-    WeldVertices(in);
+    if (m_fixModel)
+        WeldVertices(in);
     if (not LoadMorphTargets(prim, in))
         return false;
-	CorrectMorphTargets(in);
-
-#if COMPUTE_NORMALS
-    if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals))
-        return false;
-    in.haveNormals = true;
-    if (not ComputeMorphNormals(in))
-        return false;
-#else
-    if (not LoadNormals(prim, in))
-        return false;
-#endif
+    if (m_fixModel) {
+        CorrectMorphTargets(in);
+        if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals))
+            return false;
+        in.haveNormals = true;
+        if (not ComputeMorphNormals(in))
+            return false;
+    }
+    else {
+        if (not LoadNormals(prim, in))
+            return false;
+        }
 
     ReserveOutput(in);
 
@@ -550,18 +552,18 @@ bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in) {
                 return false;
             }
         }
-#if !COMPUTE_NORMALS
-        auto itNormal = target.find("NORMAL");
-        if (itNormal != target.end()) {
-            if (not ReadAccessorVec3Float(m_model, itNormal->second, in.morphNormals[t])) {
-                return false;
-            }
-            if (in.morphNormals[t].Length() != in.baseVertices.Length()) {
-                fprintf(stderr, "GLBLoader: morph NORMAL count does not match POSITION count\n");
-                return false;
+        if (not m_fixModel) {
+            auto itNormal = target.find("NORMAL");
+            if (itNormal != target.end()) {
+                if (not ReadAccessorVec3Float(m_model, itNormal->second, in.morphNormals[t])) {
+                    return false;
+                }
+                if (in.morphNormals[t].Length() != in.baseVertices.Length()) {
+                    fprintf(stderr, "GLBLoader: morph NORMAL count does not match POSITION count\n");
+                    return false;
+                }
             }
         }
-#endif
     }
     return true;
 }
@@ -598,7 +600,8 @@ void GLBLoader::ReserveOutput(const PrimitiveData& in) {
     m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
     m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
     m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
-    isHullVertex.Reserve(isHullVertex.Length() + addVertexCount);
+	if (m_fixModel)
+        m_isHullVertex.Reserve(m_isHullVertex.Length() + addVertexCount);
 
     for (auto& sk : m_data.shapeKeys) {
         sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
@@ -631,10 +634,12 @@ bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<Sh
             indices[j] = int32_t(in.indices[i + j]);
             p[j] = in.baseVertices[indices[j]];
 			p[j] = TransformPosition(worldM, p[j]);
-            if (in.isHull and not hullVertexMap.Find(p[j]))
-                hullVertexMap.Insert(p[j], m_data.vertices.Length());
+            if (m_fixModel) {
+                if (in.isHull and not m_hullVertexMap.Find(p[j]))
+                    m_hullVertexMap.Insert(p[j], m_data.vertices.Length());
+                m_isHullVertex.Append(in.isHull);
+            }
             m_data.vertices.Append(p[j]);
-            isHullVertex.Append(in.isHull);
             m_data.colors.Append(in.baseColor);
 
             if (in.haveNormals) {
@@ -922,9 +927,9 @@ void GLBLoader::StitchPrimitives(void) {
         for (int32_t i = 0; i < l; ++i)
             morphedVertices[i] = m_data.vertices[i] + sk.deltas[i];
         for (int32_t i = 0; i < l; ++i) {
-            if (isHullVertex[i])
+            if (m_isHullVertex[i])
                 continue;
-            int32_t* indexPtr = hullVertexMap.Find(m_data.vertices[i]);
+            int32_t* indexPtr = m_hullVertexMap.Find(m_data.vertices[i]);
             if (not indexPtr)
                 continue;
             morphedVertices[i] = morphedVertices[*indexPtr];
