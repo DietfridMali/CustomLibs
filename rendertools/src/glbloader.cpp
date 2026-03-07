@@ -97,6 +97,7 @@ bool GLBLoader::Load(const String& filename) {
             return false;
         }
     }
+    StitchPrimitives();
     return true;
 }
 
@@ -177,6 +178,7 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     PrimitiveData in;
 
     in.baseColor = PrimitiveBaseColor(m_model, prim.material);
+	in.isHull = in.baseColor.A() < 0.0f;
 
     if (not LoadVertices(prim, in))
         return false;
@@ -488,14 +490,8 @@ bool GLBLoader::ComputeMorphNormals(PrimitiveData& in) {
 
         morphedVertices.Resize(in.baseVertices.Length());
 
-        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
+        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) 
             morphedVertices[i] = in.baseVertices[i] + vertexDeltas[i];
-            if (in.isHull) {
-                morphedVertices[i].Normalize();
-                morphedVertices[i] *= 0.5f;
-				vertexDeltas[i] = morphedVertices[i] - in.baseVertices[i];
-            }
-        }
 
         if (not ComputeNormals(morphedVertices, in.indices, morphedNormals))
             return false;
