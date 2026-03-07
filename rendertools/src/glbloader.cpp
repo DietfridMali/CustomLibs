@@ -7,6 +7,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "conversions.hpp"
 
+#define COMPUTE_NORMALS 1
+#define ANGLE_WEIGHTED_NORMALS 0
+
 // =================================================================================================
 
 static Vector3f TransformPosition(Matrix4f m, Vector3f p) {
@@ -29,7 +32,13 @@ static Vector3f TransformDelta(Matrix4f m, Vector3f d) {
     return Vector3f(r.x, r.y, r.z);
 }
 
-// =================================================================================================
+static Vector3f TransformNormalDelta(Matrix4f m, Vector3f d) {
+    glm::mat3 a = glm::transpose(glm::inverse(glm::mat3(m.m)));
+    glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
+    return Vector3f(r.x, r.y, r.z);
+}
+
+// -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::Load(const String& filename) {
     m_data.vertices.Clear();
@@ -72,13 +81,12 @@ bool GLBLoader::Load(const String& filename) {
     return true;
 }
 
-// =================================================================================================
+// -------------------------------------------------------------------------------------------------
 
 void GLBLoader::CheckShapeKeyCount(int32_t targetCount) {
     int32_t keyCount = m_data.shapeKeys.Length();
-    if (keyCount >= targetCount) {
+    if (keyCount >= targetCount)
         return;
-    }
 
     int32_t existingVertexCount = m_data.vertices.Length();
 
@@ -86,11 +94,12 @@ void GLBLoader::CheckShapeKeyCount(int32_t targetCount) {
         ShapeKeySet sk;
         sk.name = String("shapeKey") + String(i);
         sk.deltas.Resize(existingVertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+        sk.normalDeltas.Resize(existingVertexCount, Vector3f(0.0f, 0.0f, 0.0f));
         m_data.shapeKeys.Append(std::move(sk));
     }
 }
 
-// =================================================================================================
+// -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
     if (nodeIndex < 0 or nodeIndex >= static_cast<int>(m_model.nodes.size())) {
@@ -119,7 +128,7 @@ bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
     return true;
 }
 
-// =================================================================================================
+// -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM) {
     if (meshIndex < 0 or meshIndex >= static_cast<int>(m_model.meshes.size())) {
@@ -139,7 +148,7 @@ bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM) {
     return true;
 }
 
-// =================================================================================================
+// -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     if (not ValidateTriangles(prim)) {
@@ -150,10 +159,22 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     if (not LoadVertices(prim, in))
         return false;
+#if COMPUTE_NORMALS
+    if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals)) 
+        return false;
+    in.haveNormals = true;
+    if (not ComputeMorphNormals(in))
+        return false;
+#else
     if (not LoadNormals(prim, in)) 
         return false;
-    if (not LoadMorphTargets(prim, in)) 
+#endif
+    if (not LoadMorphTargets(prim, in))
         return false;
+#if COMPUTE_NORMALS
+    if (not ComputeMorphNormals(in))
+        return false;
+#endif
 
     in.baseColor = PrimitiveBaseColor(m_model, prim.material);
 
@@ -177,6 +198,8 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     return true;
 }
 
+// -------------------------------------------------------------------------------------------------
+
 bool GLBLoader::ValidateTriangles(tinygltf::Primitive& prim) {
     int mode = prim.mode;
     if (mode == -1) {
@@ -191,6 +214,7 @@ bool GLBLoader::ValidateTriangles(tinygltf::Primitive& prim) {
     return true;
 }
 
+// -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     auto itPos = prim.attributes.find("POSITION");
@@ -211,6 +235,7 @@ bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     return true;
 }
 
+// -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.baseNormals.Clear();
@@ -229,27 +254,241 @@ bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in) {
     return true;
 }
 
+// -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) {
-    in.targetCount = static_cast<int32_t>(prim.targets.size());
-    CheckShapeKeyCount(in.targetCount);
+#if ANGLE_WEIGHTED_NORMALS
 
-    in.morphPos.Resize(in.targetCount);
+static float CornerAngle(Vector3f a, Vector3f b) {
+    Vector3f c = a.Cross(b);
+    float sinLen2 = c.Dot(c);
+    float sinLen = (sinLen2 > 0.0f) ? std::sqrt(sinLen2) : 0.0f;
+    float cosVal = a.Dot(b);
+    return std::atan2(sinLen, cosVal);
+}
 
-    for (int32_t t = 0; t < in.targetCount; ++t) {
-        in.morphPos[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
 
-        auto& target = prim.targets[static_cast<size_t>(t)];
-        auto it = target.find("POSITION");
-        if (it != target.end()) {
-            if (not ReadAccessorVec3Float(m_model, it->second, in.morphPos[t])) {
-                return false;
-            }
+bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& out) {
+    int32_t vertexCount = vertices.Length();
+    if (vertexCount <= 0) {
+        fprintf(stderr, "GLBLoader: no vertices for normal computation\n");
+        return false;
+    }
+
+    if ((indices.Length() % 3) != 0) {
+        fprintf(stderr, "GLBLoader: index count not divisible by 3 in ComputeNormals\n");
+        return false;
+    }
+
+    out.Resize(vertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+
+    int32_t triCount = indices.Length() / 3;
+
+    for (int32_t t = 0; t < triCount; ++t) {
+        uint32_t i0 = indices[t * 3 + 0];
+        uint32_t i1 = indices[t * 3 + 1];
+        uint32_t i2 = indices[t * 3 + 2];
+
+        if (i0 >= static_cast<uint32_t>(vertexCount) or
+            i1 >= static_cast<uint32_t>(vertexCount) or
+            i2 >= static_cast<uint32_t>(vertexCount)) {
+            fprintf(stderr, "GLBLoader: index out of range in ComputeNormals\n");
+            return false;
+        }
+
+        Vector3f p0 = vertices[static_cast<int32_t>(i0)];
+        Vector3f p1 = vertices[static_cast<int32_t>(i1)];
+        Vector3f p2 = vertices[static_cast<int32_t>(i2)];
+
+        Vector3f e01(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
+        Vector3f e02(p2.x - p0.x, p2.y - p0.y, p2.z - p0.z);
+        Vector3f e10(p0.x - p1.x, p0.y - p1.y, p0.z - p1.z);
+        Vector3f e12(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+        Vector3f e20(p0.x - p2.x, p0.y - p2.y, p0.z - p2.z);
+        Vector3f e21(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
+
+        Vector3f faceCross = e01.Cross(e02);
+        float faceCrossLen2 = faceCross.Dot(faceCross);
+        if (faceCrossLen2 <= 1e-20f) {
+            continue;
+        }
+
+        float faceCrossLen = std::sqrt(faceCrossLen2);
+        Vector3f faceNormal(
+            faceCross.x / faceCrossLen,
+            faceCross.y / faceCrossLen,
+            faceCross.z / faceCrossLen
+        );
+
+        float a0 = CornerAngle(e01, e02);
+        float a1 = CornerAngle(e12, e10);
+        float a2 = CornerAngle(e20, e21);
+
+        out[static_cast<int32_t>(i0)] = out[static_cast<int32_t>(i0)] + Vector3f(
+            faceNormal.x * a0,
+            faceNormal.y * a0,
+            faceNormal.z * a0
+        );
+        out[static_cast<int32_t>(i1)] = out[static_cast<int32_t>(i1)] + Vector3f(
+            faceNormal.x * a1,
+            faceNormal.y * a1,
+            faceNormal.z * a1
+        );
+        out[static_cast<int32_t>(i2)] = out[static_cast<int32_t>(i2)] + Vector3f(
+            faceNormal.x * a2,
+            faceNormal.y * a2,
+            faceNormal.z * a2
+        );
+    }
+
+    for (int32_t i = 0; i < vertexCount; ++i) {
+        float len2 = out[i].Dot(out[i]);
+        if (len2 > 1e-24f) {
+            out[i].Normalize();
+        }
+        else {
+            out[i] = Vector3f(0.0f, 0.0f, 1.0f);
         }
     }
 
     return true;
 }
+
+#else
+
+bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& out) {
+    int32_t vertexCount = vertices.Length();
+    if (vertexCount <= 0) {
+        fprintf(stderr, "GLBLoader: no vertices for normal computation\n");
+        return false;
+    }
+
+    if ((indices.Length() % 3) != 0) {
+        fprintf(stderr, "GLBLoader: index count not divisible by 3 in ComputeNormals\n");
+        return false;
+    }
+
+    out.Resize(vertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+
+    int32_t triCount = indices.Length() / 3;
+
+    for (int32_t t = 0; t < triCount; ++t) {
+        uint32_t i0 = indices[t * 3 + 0];
+        uint32_t i1 = indices[t * 3 + 1];
+        uint32_t i2 = indices[t * 3 + 2];
+
+        if (i0 >= static_cast<uint32_t>(vertexCount) or
+            i1 >= static_cast<uint32_t>(vertexCount) or
+            i2 >= static_cast<uint32_t>(vertexCount)) {
+            fprintf(stderr, "GLBLoader: index out of range in ComputeNormals\n");
+            return false;
+        }
+
+        Vector3f p0 = vertices[static_cast<int32_t>(i0)];
+        Vector3f p1 = vertices[static_cast<int32_t>(i1)];
+        Vector3f p2 = vertices[static_cast<int32_t>(i2)];
+
+        Vector3f e0(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
+        Vector3f e1(p2.x - p0.x, p2.y - p0.y, p2.z - p0.z);
+
+        Vector3f  c = e0.Cross(e1);
+        float l2 = c.Dot(c);
+        if (l2 <= 1e-20f) {
+            continue;
+        }
+
+        Vector3f n(c.x, c.y, c.z);
+
+        out[static_cast<int32_t>(i0)] = out[static_cast<int32_t>(i0)] + n;
+        out[static_cast<int32_t>(i1)] = out[static_cast<int32_t>(i1)] + n;
+        out[static_cast<int32_t>(i2)] = out[static_cast<int32_t>(i2)] + n;
+    }
+
+    for (int32_t i = 0; i < vertexCount; ++i) {
+        if (out[i].Length() > 1e-12f) {
+            out[i].Normalize();
+        }
+        else if (vertices[i].Length() > 1e-12f) {
+            out[i] = vertices[i];
+            out[i].Normalize();
+        }
+        else {
+            out[i] = Vector3f(0.0f, 0.0f, 1.0f);
+        }
+    }
+
+    return true;
+}
+
+#endif
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::ComputeMorphNormals(PrimitiveInput& in) {
+    in.morphNormals.Resize(in.targetCount);
+
+    for (int32_t t = 0; t < in.targetCount; ++t) {
+        AutoArray<Vector3f> morphedVertices;
+        AutoArray<Vector3f> morphedNormals;
+        AutoArray<Vector3f>& vertexDeltas = in.morphVertices[t];
+        AutoArray<Vector3f>& normalDeltas = in.morphNormals[t];
+
+        morphedVertices.Resize(in.baseVertices.Length());
+
+        for (int32_t i = 0; i < in.baseVertices.Length(); ++i)
+            morphedVertices[i] = in.baseVertices[i] + vertexDeltas[i];
+
+        if (not ComputeNormals(morphedVertices, in.indices, morphedNormals)) 
+            return false;
+
+        in.morphNormals[t].Resize(in.baseVertices.Length());
+        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
+            normalDeltas[i] = morphedNormals[i] - in.baseNormals[i];
+        }
+    }
+    return true;
+}
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) {
+    in.targetCount = static_cast<int32_t>(prim.targets.size());
+    CheckShapeKeyCount(in.targetCount);
+
+    in.morphVertices.Resize(in.targetCount);
+    in.morphNormals.Resize(in.targetCount);
+
+    for (int32_t t = 0; t < in.targetCount; ++t) {
+        in.morphVertices[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
+        in.morphNormals[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
+
+        auto& target = prim.targets[static_cast<size_t>(t)];
+
+        auto itPos = target.find("POSITION");
+        if (itPos != target.end()) {
+            if (not ReadAccessorVec3Float(m_model, itPos->second, in.morphVertices[t])) {
+                return false;
+            }
+            if (in.morphVertices[t].Length() != in.baseVertices.Length()) {
+                fprintf(stderr, "GLBLoader: morph POSITION count does not match POSITION count\n");
+                return false;
+            }
+        }
+#if !COMPUTE_NORMALS
+        auto itNormal = target.find("NORMAL");
+        if (itNormal != target.end()) {
+            if (not ReadAccessorVec3Float(m_model, itNormal->second, in.morphNormals[t])) {
+                return false;
+            }
+            if (in.morphNormals[t].Length() != in.baseVertices.Length()) {
+                fprintf(stderr, "GLBLoader: morph NORMAL count does not match POSITION count\n");
+                return false;
+            }
+        }
+#endif
+    }
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
 
 bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     in.indices.Clear();
@@ -276,6 +515,8 @@ bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
     return true;
 }
 
+// -------------------------------------------------------------------------------------------------
+
 void GLBLoader::ReserveOutput(const PrimitiveInput& in) {
     int32_t addVertexCount = in.triCount * 3;
 
@@ -285,8 +526,11 @@ void GLBLoader::ReserveOutput(const PrimitiveInput& in) {
 
     for (auto& sk : m_data.shapeKeys) {
         sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
+        sk.normalDeltas.Reserve(sk.normalDeltas.Length() + addVertexCount);
     }
 }
+
+// -------------------------------------------------------------------------------------------------
 
 void GLBLoader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = m_data.shapeKeys.Length();
@@ -299,13 +543,15 @@ void GLBLoader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+
 bool GLBLoader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = keyPtrs.Length();
 
-    for (int32_t t = 0; t < in.triCount; ++t) {
-        uint32_t i0 = in.indices[t * 3 + 0];
-        uint32_t i1 = in.indices[t * 3 + 1];
-        uint32_t i2 = in.indices[t * 3 + 2];
+    for (int32_t i = 0, t = 0; t < in.triCount; ++t, i += 3) {
+        uint32_t i0 = in.indices[i + 0];
+        uint32_t i1 = in.indices[i + 1];
+        uint32_t i2 = in.indices[i + 2];
 
         if (i0 >= static_cast<uint32_t>(in.baseVertices.Length()) or
             i1 >= static_cast<uint32_t>(in.baseVertices.Length()) or
@@ -332,7 +578,6 @@ bool GLBLoader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoA
         }
         else {
             Vector3f n = Vector3f::Normal(p0, p1, p2);
-            n.Normalize();
             m_data.normals.Append(n);
             m_data.normals.Append(n);
             m_data.normals.Append(n);
@@ -347,22 +592,33 @@ bool GLBLoader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoA
             Vector3f d1(0.0f, 0.0f, 0.0f);
             Vector3f d2(0.0f, 0.0f, 0.0f);
 
+            Vector3f dn0(0.0f, 0.0f, 0.0f);
+            Vector3f dn1(0.0f, 0.0f, 0.0f);
+            Vector3f dn2(0.0f, 0.0f, 0.0f);
+
             if (k < in.targetCount) {
-                d0 = TransformDelta(worldM, in.morphPos[k][static_cast<int32_t>(i0)]);
-                d1 = TransformDelta(worldM, in.morphPos[k][static_cast<int32_t>(i1)]);
-                d2 = TransformDelta(worldM, in.morphPos[k][static_cast<int32_t>(i2)]);
+                d0 = TransformDelta(worldM, in.morphVertices[k][static_cast<int32_t>(i0)]);
+                d1 = TransformDelta(worldM, in.morphVertices[k][static_cast<int32_t>(i1)]);
+                d2 = TransformDelta(worldM, in.morphVertices[k][static_cast<int32_t>(i2)]);
+
+                dn0 = TransformNormalDelta(worldM, in.morphNormals[k][static_cast<int32_t>(i0)]);
+                dn1 = TransformNormalDelta(worldM, in.morphNormals[k][static_cast<int32_t>(i1)]);
+                dn2 = TransformNormalDelta(worldM, in.morphNormals[k][static_cast<int32_t>(i2)]);
             }
 
             keyPtrs[k]->deltas.Append(d0);
             keyPtrs[k]->deltas.Append(d1);
             keyPtrs[k]->deltas.Append(d2);
+
+            keyPtrs[k]->normalDeltas.Append(dn0);
+            keyPtrs[k]->normalDeltas.Append(dn1);
+            keyPtrs[k]->normalDeltas.Append(dn2);
         }
     }
-
     return true;
 }
 
-// =================================================================================================
+// -------------------------------------------------------------------------------------------------
 
 Matrix4f GLBLoader::NodeLocalMatrix(const tinygltf::Node& node) {
     if (node.matrix.size() == 16) {
@@ -479,6 +735,8 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
     return true;
 }
 
+// -------------------------------------------------------------------------------------------------
+
 bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
         fprintf(stderr, "GLBLoader: accessor index out of range\n");
@@ -569,7 +827,7 @@ bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
     return true;
 }
 
-// =================================================================================================
+// -------------------------------------------------------------------------------------------------
 
 Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex) {
     if (materialIndex < 0 or materialIndex >= static_cast<int>(model.materials.size())) {

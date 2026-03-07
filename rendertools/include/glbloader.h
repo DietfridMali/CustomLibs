@@ -22,6 +22,7 @@ public:
     struct ShapeKeySet {
         String name;
         AutoArray<Vector3f> deltas; // triangle soup: same length as vertices
+        AutoArray<Vector3f> normalDeltas; // triangle soup: same length as vertices
     };
 
     struct MeshData {
@@ -47,7 +48,8 @@ private:
         AutoArray<Vector3f>             baseVertices;
         AutoArray<Vector3f>             baseNormals;
         AutoArray<uint32_t>             indices;
-        AutoArray<AutoArray<Vector3f>>  morphPos; // [target][vertex]
+        AutoArray<AutoArray<Vector3f>>  morphVertices; // [target][vertex]
+        AutoArray<AutoArray<Vector3f>>  morphNormals;  // [target][vertex]
         RGBAColor                       baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
         int32_t                         targetCount{ 0 };
         int32_t                         triCount{ 0 };
@@ -90,6 +92,10 @@ public:
         return m_data.shapeKeys[i].deltas;
     }
 
+    inline AutoArray<Vector3f>& GetNormalShapeKeys(int i) noexcept {
+        return m_data.shapeKeys[i].normalDeltas;
+    }
+
 private:
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
 
@@ -98,6 +104,10 @@ private:
     bool LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in);
 
     bool LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in);
+
+    bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& out);
+
+    bool ComputeMorphNormals(PrimitiveInput& in);
 
     bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in);
 
