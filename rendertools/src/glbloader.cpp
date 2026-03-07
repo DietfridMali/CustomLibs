@@ -877,23 +877,38 @@ Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materia
 
 // -------------------------------------------------------------------------------------------------
 
+void GLBLoader::RecomputeMorphDeltas(ShapeKeySet& sk, const AutoArray<Vector3f>& morphedVertices) {
+    int32_t l = m_data.vertices.Length();
+    if (morphedVertices.Length() != l) {
+        fprintf(stderr, "GLBLoader: morphed vertex count does not match base vertex count in RecomputeMorphDeltas\n");
+        return;
+    }
+
+    sk.deltas.Resize(l);
+
+    for (int32_t i = 0; i < l; ++i) {
+        sk.deltas[i] = morphedVertices[i] - m_data.vertices[i];
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
 void GLBLoader::StitchPrimitives(void) {
-    // for each morph target => for(auto& sk : shapeKeys):
-	// morph non-hull vertices that are connected to hull vertices. To detect such vertices, 
-    // look them up in hullVertexMap and retrieve the corresponding hull vertex index from it. This may need a test whether the vertices are identical or a small delta must be allowed.
-	// Then replace the morphed non hull vertex with the morphed hull vertex and recompute the morph deltas for the non-hull vertex.
     for (auto& sk : m_data.shapeKeys) {
         int32_t l = m_data.vertices.Length();
-        for (int i = 0; i < l; ++i) {
+        AutoArray<Vector3f> morphedVertices;
+        morphedVertices.Resize(l);
+        for (int32_t i = 0; i < l; ++i)
+            morphedVertices[i] = m_data.vertices[i] + sk.deltas[i];
+        for (int32_t i = 0; i < l; ++i) {
             if (m_data.isHullVertex[i])
-				continue;
-            Vector3f& iv = m_data.vertices[i];
-            int32_t* indexPtr = hullVertexMap.Find(iv);
+                continue;
+            int32_t* indexPtr = hullVertexMap.Find(m_data.vertices[i]);
             if (not indexPtr)
-				continue;
-            Vector3f v = m_data.vertices[*indexPtr] + sk.deltas[*indexPtr];
-            sk.deltas[i] = v - iv;
-		}
+                continue;
+            morphedVertices[i] = morphedVertices[*indexPtr];
+        }
+        RecomputeMorphDeltas(sk, morphedVertices);
     }
 }
 

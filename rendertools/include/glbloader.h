@@ -132,6 +132,8 @@ private:
 
     bool AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
 
+    void RecomputeMorphDeltas(ShapeKeySet& sk, const AutoArray<Vector3f>& morphedVertices);
+
     void StitchPrimitives(void);
 };
 
