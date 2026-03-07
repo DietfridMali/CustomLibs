@@ -19,6 +19,7 @@ FILES := \
  fbo \
  fonthandler \
  framecounter \
+ glbloader \
  icosphere \
  linesegment \
  mesh \
