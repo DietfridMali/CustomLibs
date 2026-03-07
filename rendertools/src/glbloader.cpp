@@ -155,7 +155,7 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
         return false;
     }
 
-    PrimitiveInput in;
+    PrimitiveData in;
 
     in.baseColor = PrimitiveBaseColor(m_model, prim.material);
 
@@ -208,7 +208,7 @@ bool GLBLoader::ValidateTriangles(tinygltf::Primitive& prim) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in) {
+bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveData& in) {
     auto itPos = prim.attributes.find("POSITION");
     if (itPos == prim.attributes.end()) {
         fprintf(stderr, "GLBLoader: primitive POSITION missing\n");
@@ -229,7 +229,7 @@ bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in) {
+bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveData& in) {
     in.baseNormals.Clear();
     in.haveNormals = false;
 
@@ -415,7 +415,7 @@ bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoAr
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ComputeMorphNormals(PrimitiveInput& in) {
+bool GLBLoader::ComputeMorphNormals(PrimitiveData& in) {
     in.morphNormals.Resize(in.targetCount);
 
     for (int32_t t = 0; t < in.targetCount; ++t) {
@@ -447,7 +447,7 @@ bool GLBLoader::ComputeMorphNormals(PrimitiveInput& in) {
 }
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) {
+bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in) {
     in.targetCount = static_cast<int32_t>(prim.targets.size());
     CheckShapeKeyCount(in.targetCount);
 
@@ -488,7 +488,7 @@ bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in) 
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
+bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveData& in) {
     in.indices.Clear();
 
     if (prim.indices >= 0) {
@@ -512,7 +512,7 @@ bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in) {
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::ReserveOutput(const PrimitiveInput& in) {
+void GLBLoader::ReserveOutput(const PrimitiveData& in) {
     int32_t addVertexCount = in.triCount * 3;
 
     m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
@@ -540,7 +540,7 @@ void GLBLoader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
+bool GLBLoader::AppendTriangles(const PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
     int32_t globalKeyCount = keyPtrs.Length();
 
     for (int32_t i = 0, t = 0; t < in.triCount; ++t, i += 3) {

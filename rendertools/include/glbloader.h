@@ -44,7 +44,7 @@ public:
     }
 
 private:
-    struct PrimitiveInput {
+    struct PrimitiveData {
         AutoArray<Vector3f>             baseVertices;
         AutoArray<Vector3f>             baseNormals;
         AutoArray<uint32_t>             indices;
@@ -105,23 +105,23 @@ private:
 
     bool ValidateTriangles(tinygltf::Primitive& prim);
 
-    bool LoadVertices(tinygltf::Primitive& prim, PrimitiveInput& in);
+    bool LoadVertices(tinygltf::Primitive& prim, PrimitiveData& in);
 
-    bool LoadNormals(tinygltf::Primitive& prim, PrimitiveInput& in);
+    bool LoadNormals(tinygltf::Primitive& prim, PrimitiveData& in);
 
     bool ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals);
 
-    bool ComputeMorphNormals(PrimitiveInput& in);
+    bool ComputeMorphNormals(PrimitiveData& in);
 
-    bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveInput& in);
+    bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in);
 
-    bool LoadIndices(tinygltf::Primitive& prim, PrimitiveInput& in);
+    bool LoadIndices(tinygltf::Primitive& prim, PrimitiveData& in);
 
-    void ReserveOutput(const PrimitiveInput& in);
+    void ReserveOutput(const PrimitiveData& in);
 
     void BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs);
 
-    bool AppendTriangles(const PrimitiveInput& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
+    bool AppendTriangles(const PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
 };
 
 // =================================================================================================
