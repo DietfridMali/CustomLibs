@@ -54,6 +54,7 @@ private:
         int32_t                         targetCount{ 0 };
         int32_t                         triCount{ 0 };
 		bool    			            haveNormals{ false };   
+        bool                            isHull{ false };
     };
 
 private:

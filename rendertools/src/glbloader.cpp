@@ -161,6 +161,7 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     if (not LoadVertices(prim, in))
         return false;
+    in.isHull = in.baseColor.A() < 0.0f;
     if (not LoadMorphTargets(prim, in))
         return false;
     if (not LoadIndices(prim, in))
@@ -425,8 +426,14 @@ bool GLBLoader::ComputeMorphNormals(PrimitiveInput& in) {
 
         morphedVertices.Resize(in.baseVertices.Length());
 
-        for (int32_t i = 0; i < in.baseVertices.Length(); ++i)
+        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
             morphedVertices[i] = in.baseVertices[i] + vertexDeltas[i];
+            if (in.isHull) {
+                morphedVertices[i].Normalize();
+                morphedVertices[i] *= 0.5f;
+				vertexDeltas[i] = morphedVertices[i] - in.baseVertices[i];
+            }
+        }
 
         if (not ComputeNormals(morphedVertices, in.indices, morphedNormals))
             return false;
