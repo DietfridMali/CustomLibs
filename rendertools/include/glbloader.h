@@ -100,6 +100,12 @@ public:
         return m_data.shapeKeys[i].normalDeltas;
     }
 
+    void Reset(void);
+
+    ~GLBLoader() {
+		Reset();
+    }
+
 private:
     tinygltf::Model             m_model;
     MeshData                    m_data;

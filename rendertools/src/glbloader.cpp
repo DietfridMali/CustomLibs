@@ -70,17 +70,23 @@ int GLBLoader::CompareVertices(void* context, const Vector3f& v1, const Vector3f
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::Load(const String& filename, bool fixModel) {
-	if (LoadFromFile(filename + String(".bin")))
-        return true;
-
-    m_fixModel = fixModel;
+void GLBLoader::Reset(void) {
     m_data.vertices.Clear();
     m_data.colors.Clear();
     m_data.normals.Clear();
     m_data.shapeKeys.Clear();
     m_isHullVertex.Clear();
     m_hullVertexMap.Clear();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::Load(const String& filename, bool fixModel) {
+	if (LoadFromFile(filename + String(".bin")))
+        return true;
+
+    m_fixModel = fixModel;
+    Reset();
     m_hullVertexMap.SetComparator(CompareVertices);
 
     tinygltf::TinyGLTF loader;
