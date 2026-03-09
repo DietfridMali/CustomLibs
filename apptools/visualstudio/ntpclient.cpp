@@ -14,6 +14,8 @@
 
 #define NTP_UNIX_EPOCH_DIFF 2208988800u
 
+// =================================================================================================
+
 uint32_t QueryCurrentDateNTP(int timeoutSeconds) {
     if (timeoutSeconds <= 0) timeoutSeconds = 1;
     UDPSocket sock;
@@ -66,3 +68,5 @@ uint32_t QueryCurrentDateNTP(int timeoutSeconds) {
     sock.Close(true);
     return day * 100000u + month * 1000u + year;
 }
+
+// =================================================================================================
