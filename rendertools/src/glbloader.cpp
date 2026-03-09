@@ -1,5 +1,5 @@
 // GLBLoader.cpp
-#include "GLBLoader.h"
+#include "glbloader.h"
 
 #include <algorithm>
 #include <cstring>
