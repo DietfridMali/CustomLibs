@@ -65,7 +65,7 @@
     <ClCompile Include="..\src\filelist.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ntpclient.cpp">
+    <ClCompile Include="..\src\ntpclient.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

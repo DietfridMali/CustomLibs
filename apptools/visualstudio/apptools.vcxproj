@@ -35,9 +35,9 @@
     <ClCompile Include="..\src\networkmessage.cpp" />
     <ClCompile Include="..\src\base_soundhandler.cpp" />
     <ClCompile Include="..\src\internetservices.cpp" />
+    <ClCompile Include="..\src\ntpclient.cpp" />
     <ClCompile Include="..\src\textfileloader.cpp" />
     <ClCompile Include="..\src\udp.cpp" />
-    <ClCompile Include="ntpclient.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
