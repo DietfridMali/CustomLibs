@@ -28,7 +28,7 @@ FILES := \
  opengl_states \
  outlinerenderer \
  outline_shader \
- plane \
+ coplanar_rectangle \
  prerenderedtexture \
  primitive_shaders \
  projector \
