@@ -35,6 +35,7 @@ FILES := \
  rendermatrices \
  shader \
  shadowmap \
+ skybox \
  SSBO \
  textrenderer \
  textureatlas \
