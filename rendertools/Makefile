@@ -42,6 +42,7 @@ FILES := \
  texture \
  texturebuffer \
  texturehandler \
+ tiny_gltf \
  vao \
  vbo \
  viewport
