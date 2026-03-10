@@ -1,5 +1,5 @@
 .RECIPEPREFIX := >
-CXX := g++
+CXX ?= g++
 #CXX := clang++
 AR  := ar
 
