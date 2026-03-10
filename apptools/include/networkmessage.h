@@ -178,6 +178,8 @@ class NetworkMessage {
             return false;
         }
 
+#pragma warning(push)
+#pragma warning(disable:4701) // unreferenced formal parameter
         template <typename T>
         inline T StringToNumber(String caller, String valueName, String value, T minVal = std::numeric_limits<T>::lowest(), T maxVal = std::numeric_limits<T>::max()) {
             T v;
@@ -251,6 +253,7 @@ class NetworkMessage {
             float v;
             return FieldToNumber<float>(v, caller, valueName, valueIndex, minVal, maxVal) ? v : minVal;
         }
+#pragma warning(pop)
 
         /*
         return i-th parameter value as 3D float vector

@@ -4,7 +4,6 @@
 #include "colordata.h"
 #include "textrenderer.h"
 #include "base_renderer.h"
-#include <format>
 
 // =================================================================================================
 
@@ -15,9 +14,10 @@ void BaseFrameCounter::Draw(bool update) {
         m_fps = GetFps();
     if (m_showFps) {
         baseRenderer.SetViewport(m_viewport);
-        std::string s = std::format("{:7.1f} fps", m_fps);
+        char s[20];
+		sprintf(s, "%7.1f fps", m_fps);
         textRenderer.SetColor(m_color);
-        textRenderer.Render(s, TextRenderer::taLeft, true, 0, 0, false);
+        textRenderer.Render(String(s), TextRenderer::taLeft, true, 0, 0, false);
     }
 }
 
