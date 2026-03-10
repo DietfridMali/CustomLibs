@@ -1,6 +1,6 @@
 .RECIPEPREFIX := >
-# CXX := g++
-CXX := clang++
+CXX := g++
+#CXX := clang++
 AR  := ar
 
 FILES := std_string glm_matrix format
