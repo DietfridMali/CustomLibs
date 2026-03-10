@@ -37,7 +37,7 @@ OPTFLAGS := -O3
 DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIONS
 
 ifeq ($(TARGET),DEBUG)
-  CXXFLAGS := -std=c++20 $(DBGFLAGS) $(DEFINES) -D_DEBUG $(INCLUDES) -MMD -MP
+  CXXFLAGS := -std=c++20 $(DBGFLAGS) $(DEFINES) -D_DEBUG $(INCLUDES) -MMD -MP -fPIE
   OBJDIR := obj/debug
   LIB_SUFFIX := d
 else ifeq ($(TARGET),RELEASE)
