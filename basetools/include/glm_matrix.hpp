@@ -68,7 +68,7 @@ public:
         noexcept;
 
     static Matrix4f Translation(const Vector3f& v)
-        noexcept(noexcept(Translation(std::declval<float>(), std::declval<float>(), std::declval<float>())))
+        noexcept
     {
         return Translation(v.X(), v.Y(), v.Z());
     }
