@@ -32,7 +32,7 @@ ifeq ($(TARGET),DEBUG)
   OBJDIR := obj/debug
   LIB_SUFFIX := d
 else ifeq ($(TARGET),RELEASE)
-  CXXFLAGS := -std=c++20 $(OPTFLAGS) $(DEFINES) -DNDEBUG $(INCLUDES) -MMD -MP
+  CXXFLAGS := -std=c++20 $(OPTFLAGS) $(DEFINES) -DNDEBUG $(INCLUDES) -MMD -MP -fPIE
   OBJDIR := obj/release
   LIB_SUFFIX :=
 else
