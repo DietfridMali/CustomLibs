@@ -25,6 +25,9 @@
     <Filter Include="Header Files\general">
       <UniqueIdentifier>{5f509756-3b25-4beb-bac9-a44631646e3d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\fmt">
+      <UniqueIdentifier>{852ccd5a-f1f4-4822-af94-f2a62f156eb3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\allocator.h">
@@ -168,6 +171,15 @@
     <ClInclude Include="..\include\triangulararray.hpp">
       <Filter>Header Files\std</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\fmt\core.h">
+      <Filter>Header Files\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\fmt\format.h">
+      <Filter>Header Files\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\fmt\format-inl.h">
+      <Filter>Header Files\fmt</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">
@@ -195,6 +207,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\vector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\format.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -36,6 +36,9 @@
     <ClInclude Include="..\include\custom_vector.hpp" />
     <ClInclude Include="..\include\datacontainer.hpp" />
     <ClInclude Include="..\include\dictionary.hpp" />
+    <ClInclude Include="..\include\fmt\core.h" />
+    <ClInclude Include="..\include\fmt\format-inl.h" />
+    <ClInclude Include="..\include\fmt\format.h" />
     <ClInclude Include="..\include\glm_matrix.hpp" />
     <ClInclude Include="..\include\glm_vector.hpp" />
     <ClInclude Include="..\include\hiressleep.h" />
@@ -71,6 +74,7 @@
     <ClCompile Include="..\src\custom_matrix.cpp" />
     <ClCompile Include="..\src\custom_string.cpp" />
     <ClCompile Include="..\src\custom_vector.cpp" />
+    <ClCompile Include="..\src\format.cpp" />
     <ClCompile Include="..\src\glm_matrix.cpp" />
     <ClCompile Include="..\src\glm_vector.cpp" />
     <ClCompile Include="..\src\matrix.cpp" />
@@ -172,6 +176,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -194,6 +199,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>None</DebugInformationFormat>
       <CallingConvention>FastCall</CallingConvention>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>

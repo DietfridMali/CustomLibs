@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-//#include <format>
 #include <list>
 #include <initializer_list>
 #include <sstream>
@@ -12,6 +11,7 @@
 #include <cstring>
 #include <iostream>
 #include "array.hpp"
+#include <fmt/format.h>
 
 // =================================================================================================
 
@@ -206,7 +206,7 @@ public:
     template <typename... Args>
     void Format(std::string_view fmt, Args&&... args) {
         auto hold = std::tuple<std::decay_t<Args>...>(std::forward<Args>(args)...);
-        m_str = std::apply([&](auto&... largs) { return std::vformat(fmt, std::make_format_args(largs...)); }, hold);
+        m_str = std::apply([&](auto&... largs) { return fmt::vformat(fmt, std::make_format_args(largs...)); }, hold);
     }
 
 
