@@ -80,11 +80,11 @@ public:
         String ipAddress("");
         return UpdateSocketAddress(ipAddress, port);
     }
-
+#if 0
     inline uint64_t& NetworkID(void) noexcept {
         return m_id.id;
 	}
-
+#endif
     inline uint64_t GetNetworkID(void) noexcept {
         return m_id.id;
     }

@@ -6,7 +6,7 @@
 #include <unordered_set>
 
 #include "glew.h"
-#include <glm/glm.hpp>
+
 #include "array.hpp"
 #include "basesingleton.hpp"
 #include "colordata.h"

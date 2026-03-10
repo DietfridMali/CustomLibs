@@ -1,7 +1,5 @@
 #pragma once
 
-#include <glm/glm.hpp>
-#include <glm/common.hpp>
 
 #include "FBM.h"
 #include "colordata.h"

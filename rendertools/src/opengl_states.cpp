@@ -1,8 +1,7 @@
 
 #include "opengl_states.h"
 #include "array.hpp"
-#include <glm/glm.hpp>
-#include <glm/vector_relational.hpp>
+
 #include "base_renderer.h"
 
 // =================================================================================================

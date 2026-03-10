@@ -1,8 +1,11 @@
 #pragma once
 
+#pragma warning(push)
+#pragma warning(disable:4459)
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#pragma warning(pop)
 #include <initializer_list>
 #include <algorithm>
 #include "conversions.hpp"
@@ -68,7 +71,7 @@ public:
         noexcept;
 
     static Matrix4f Translation(const Vector3f& v)
-        noexcept
+        noexcept(noexcept(Translation(std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         return Translation(v.X(), v.Y(), v.Z());
     }
@@ -132,7 +135,7 @@ public:
 
     // ===== Member transforms =====
     Matrix4f& Translate(float x, float y, float z)
-        noexcept
+        noexcept(noexcept(Translation(std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         m *= Translation(x, y, z).m;
         return *this;
@@ -179,6 +182,10 @@ public:
         return *this;
     }
 
+    static inline Vector3f Rotate(const Matrix4f& mm, const Vector3f& v);
+
+    Vector3f Unrotate(const Vector3f v);
+
     // ===== LinAlg =====
     Matrix4f Transpose() const
         noexcept(noexcept(glm::transpose(std::declval<glm::mat4>())))
@@ -201,8 +208,6 @@ public:
     Matrix4f AffineInverse(void)
         noexcept; // bewusst ohne noexcept
 
-    static inline Vector3f Rotate(const Matrix4f& mm, const Vector3f& v);
-
     template <typename T> 
         requires std::same_as<std::decay_t<T>, Vector3f>
     Vector3f Rotate(T&& v) const
@@ -214,8 +219,6 @@ public:
         m = glm::lookAt(eye, center, up);
         return *this;
     }
-
-    Vector3f Unrotate(const Vector3f v);
 
     float Det() const
         noexcept(noexcept(glm::determinant(std::declval<glm::mat4>())))

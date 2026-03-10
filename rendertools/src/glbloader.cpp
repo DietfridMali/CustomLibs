@@ -3,8 +3,11 @@
 
 #include <algorithm>
 #include <cstring>
+#pragma warning(push)
+#pragma warning(disable:4459)
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#pragma warning(pop)
 #include "conversions.hpp"
 
 #define ANGLE_WEIGHTED_NORMALS  1
