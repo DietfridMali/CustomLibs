@@ -132,7 +132,7 @@ public:
 
     // ===== Member transforms =====
     Matrix4f& Translate(float x, float y, float z)
-        noexcept(noexcept(Translation(std::declval<float>(), std::declval<float>(), std::declval<float>())))
+        noexcept
     {
         m *= Translation(x, y, z).m;
         return *this;
