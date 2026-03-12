@@ -1,5 +1,7 @@
 .RECIPEPREFIX := >
-CXX ?= g++
+ifeq ($(strip $(CXX)),)
+  CXX := g++
+endif
 #CXX := clang++
 AR  := ar
 
