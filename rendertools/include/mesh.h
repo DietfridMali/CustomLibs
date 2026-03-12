@@ -207,8 +207,16 @@ public:
         m_floatBuffers.Append();
     }
 
+    inline void ResetFloatBuffers(void) noexcept {
+        m_floatBuffers.Clear();
+    }
+
     inline void AddOffsetBuffer(void) noexcept {
         m_offsetBuffers.Append();
+    }
+
+    inline void ResetOffsetBuffers(void) noexcept {
+        m_floatBuffers.Clear();
     }
 
     inline void AddVertex(const Vector3f& v) {
