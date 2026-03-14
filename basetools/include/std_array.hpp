@@ -107,11 +107,13 @@ public:
     inline int32_t DataSize() const noexcept { return Length() * static_cast<int32_t>(sizeof(DATA_T)); }
 
     inline int32_t AutoFit(int32_t i) {
-        if (m_autoFit and IsValidSize(static_cast<size_t>(i)) and (i >= Length())) {
+        if (not m_autoFit)
+			return (i < Length()) ? i : -1;
+        if (ValidatedSize(static_cast<size_t>(i)) < 0)
+            return -1;
+        if (i >= Length())
             m_array.resize(static_cast<size_t>(i) + 1, m_defaultValue);
-            return i;
-        }
-        return -1;
+        return i;
     }
 
     // 1D-Indexzugriff
@@ -137,8 +139,8 @@ public:
     inline DATA_T& operator()(int32_t x, int32_t y) {
         assert(m_width > 0 and m_height > 0);
 #if defined(_DEBUG)
-        int32_t i = y * m_width + x;
-        if (AutoFit(i) < 0)
+        int32_t i = AutoFit(ValidatedSize(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)));
+        if (i < 0)
             throw std::out_of_range("AutoArray::operator(): indices out of range");
         return m_array.at(static_cast<size_t>(i));
 #else
@@ -146,12 +148,12 @@ public:
 #endif
     }
 
-    inline bool IsValidSize(size_t size) const noexcept {
-        return size <= static_cast<size_t>(std::numeric_limits<int32_t>::max());
+    inline int32_t ValidatedSize(size_t size) const noexcept {
+        return (size > static_cast<size_t>(std::numeric_limits<int32_t>::max())) ? -1 : int32_t(size);
     }
 
-    inline bool IsValidSize(int32_t x, int32_t y) const noexcept {
-		return IsValidSize(static_cast<size_t>(x) * static_cast<size_t>(y));
+    inline int32_t ValidatedSize(int32_t x, int32_t y) const noexcept {
+		return ((x < 0) or (y < 0)) ? -1 : ValidatedSize(static_cast<size_t>(x) * static_cast<size_t>(y));
     }
 
     inline bool IsValidIndex(int32_t i) const noexcept { 
@@ -189,8 +191,9 @@ public:
     }
 
     AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
-        if (IsValidSize(Length() + other.Length())) {
-            Reserve(Length() + other.Length());
+        int32_t size = ValidatedSize(Length() + other.Length());
+		if (size >= 0) {
+            Reserve(size);
             if (copyData)
                 m_array.insert(m_array.end(), other.begin(), other.end());
             else {
@@ -217,8 +220,9 @@ public:
 
     AutoArray operator+(const AutoArray& other) const {
         AutoArray result;
-        if (IsValidSize(Length() + other.Length())) {
-            result.Reserve(Length() + other.Length());
+        int32_t size = ValidatedSize(Length() + other.Length());
+        if (size >= 0) {
+            result.m_array.reserve(static_cast<size_t>(size));
             result.m_array.insert(result.m_array.end(), m_array.begin(), m_array.end());
             result.m_array.insert(result.m_array.end(), other.m_array.begin(), other.m_array.end());
         }
@@ -296,7 +300,7 @@ public:
     }
 
     inline bool AllowResize(size_t newSize) const noexcept { 
-        return IsValidSize(newSize)and (m_isShrinkable or (newSize > static_cast<size_t>(Length())));
+        return (ValidatedSize(newSize) > -1) and (m_isShrinkable or (newSize > static_cast<size_t>(Length())));
     }
 
     // Resize-Methoden
