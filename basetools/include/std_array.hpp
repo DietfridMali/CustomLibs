@@ -107,14 +107,17 @@ public:
     inline int32_t DataSize() const noexcept { return Length() * static_cast<int32_t>(sizeof(DATA_T)); }
 
     inline int32_t AutoFit(int32_t i) {
-        if (m_autoFit and (i >= 0) and (i < std::numeric_limits<int32_t>::max()) and (i >= Length()))
+        if (m_autoFit and IsValidSize(static_cast<size_t>(i)) and (i >= Length())) {
             m_array.resize(static_cast<size_t>(i) + 1, m_defaultValue);
-        return i;
+            return i;
+        }
+        return -1;
     }
 
     // 1D-Indexzugriff
     inline decltype(auto) operator[](int32_t i) {
-        AutoFit(i);
+		if (AutoFit(i) < 0)
+            throw std::out_of_range("AutoArray::operator[]: index out of range");
 #if defined(_DEBUG)
         return m_array.at(static_cast<size_t>(i));
 #else
@@ -135,24 +138,41 @@ public:
         assert(m_width > 0 and m_height > 0);
 #if defined(_DEBUG)
         int32_t i = y * m_width + x;
-        AutoFit(i);
+        if (AutoFit(i) < 0)
+            throw std::out_of_range("AutoArray::operator(): indices out of range");
         return m_array.at(static_cast<size_t>(i));
 #else
         return m_array[static_cast<size_t>(y * m_width + x)];
 #endif
     }
 
-    inline bool IsValidIndex(int32_t i) const noexcept { return (i >= 0) and (m_autoFit or (i < Length())); }
+    inline bool IsValidSize(size_t size) const noexcept {
+        return size <= static_cast<size_t>(std::numeric_limits<int32_t>::max());
+    }
 
-    inline bool IsValidIndex(int32_t x, int32_t y) const noexcept { return (x >= 0) and (m_autoFit or (x < m_width)) and (y >= 0) and (m_autoFit or (y < m_height)); }
+    inline bool IsValidSize(int32_t x, int32_t y) const noexcept {
+		return IsValidSize(static_cast<size_t>(x) * static_cast<size_t>(y));
+    }
 
-    inline int GetCheckedIndex(int32_t x, int32_t y) const noexcept { return IsValidIndex(x, y) ? int(y * m_width + x) : -1; }
+    inline bool IsValidIndex(int32_t i) const noexcept { 
+        return (i >= 0) and (m_autoFit or (i < Length())); 
+    }
 
-    inline int GetIndex(int32_t x, int32_t y) const noexcept { return int(y * m_width + x); }
+    inline bool IsValidIndex(int32_t x, int32_t y) const noexcept { 
+        return (x >= 0) and (m_autoFit or (x < m_width)) and (y >= 0) and (m_autoFit or (y < m_height)); 
+    }
+
+    inline int32_t GetCheckedIndex(int32_t x, int32_t y) const noexcept { 
+        return IsValidIndex(x, y) ? int32_t(y * m_width + x) : -1; 
+    }
+
+    inline int32_t GetIndex(int32_t x, int32_t y) const noexcept { 
+        return int32_t(y * m_width + x); 
+    }
 
     inline DATA_T* operator()(int32_t x, int32_t y, bool rangeCheck) {
-        int i = rangeCheck ? GetCheckedIndex(x, y) : GetIndex(x, y);
-        return (i < 0) ? nullptr : Data(AutoFit(i));
+        int32_t i = AutoFit(rangeCheck ? GetCheckedIndex(x, y) : GetIndex(x, y));
+        return (i < 0) ? nullptr : Data(i);
     }
 
     inline const DATA_T& operator()(int32_t x, int32_t y) const {
@@ -164,7 +184,9 @@ public:
 #endif
     }
 
-    void Append(const DATA_T& data) { m_array.push_back(data); }
+    void Append(const DATA_T& data) { 
+        m_array.push_back(data); 
+    }
 
     AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
         Reserve(Length() + other.Length());
@@ -226,13 +248,21 @@ public:
     }
 #if 0
     // Zeiger auf Rohdaten (z.B. für OpenGL)
-    inline DATA_T* Data(int32_t i = 0) noexcept { return m_array.data() + i; }
+    inline DATA_T* Data(int32_t i = 0) noexcept { 
+        return m_array.data() + i; 
+    }
 
-    inline const DATA_T* Data(int32_t i = 0) const noexcept { return m_array.data() + i; }
+    inline const DATA_T* Data(int32_t i = 0) const noexcept { 
+        return m_array.data() + i; 
+    }
 #else
-    inline auto Data(int32_t i = 0) noexcept { return m_array.data() + i; }
+    inline auto Data(int32_t i = 0) noexcept { 
+        return m_array.data() + i; 
+    }
 
-    inline auto Data(int32_t i = 0) const noexcept { return m_array.data() + i; }
+    inline auto Data(int32_t i = 0) const noexcept { 
+        return m_array.data() + i; 
+    }
 #endif
     DATA_T* DataRow(int32_t y) {
 #if defined(_DEBUG)
@@ -244,10 +274,6 @@ public:
 
     inline void Reserve(int32_t capacity) {
         m_array.reserve(static_cast<size_t>(std::max(capacity, 0)));
-    }
-
-	inline bool IsValidSize(size_t size) const noexcept { 
-        return size <= static_cast<size_t>(std::numeric_limits<int32_t>::max()); 
     }
 
     inline bool AllowResize(size_t newSize) const noexcept { 
@@ -314,8 +340,8 @@ public:
 
 
     template<typename KEY_T, typename COMPARE_T>
-    int FindLinear(const KEY_T& key, COMPARE_T compare) const {
-        int i = 0;
+    int32_t FindLinear(const KEY_T& key, COMPARE_T compare) const {
+        int32_t i = 0;
         for (const auto& data : m_array) {
             if (not compare(data, key))
                 return i;
@@ -326,7 +352,7 @@ public:
 
 
     template<typename KEY_T, typename COMPARE_T>
-    int FindBinary(const KEY_T& key, COMPARE_T compare) const {
+    int32_t FindBinary(const KEY_T& key, COMPARE_T compare) const {
         auto it = std::lower_bound(
             m_array.begin(), m_array.end(), key,
             [&](const DATA_T& data, const KEY_T& key) {
@@ -334,7 +360,7 @@ public:
             }
         );
         if (it != m_array.end() and compare(*it, key) == 0)
-            return static_cast<int>(std::distance(m_array.begin(), it));
+            return static_cast<int32_t>(std::distance(m_array.begin(), it));
         else
             return -1;
     }
@@ -381,7 +407,7 @@ public:
             return false;
 
         if (Length() != elemCount)
-            Resize(int(elemCount));
+            Resize(int32_t(elemCount));
 
         f.read(reinterpret_cast<char*>(Data()), dataSize);
         return f.good();
