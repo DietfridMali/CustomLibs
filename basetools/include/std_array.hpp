@@ -108,7 +108,7 @@ public:
 
     inline int32_t AutoFit(int32_t i) {
         if (m_autoFit and (i >= 0) and (i < std::numeric_limits<int32_t>::max()) and (i >= Length()))
-            m_array.resize(i + 1, m_defaultValue);
+            m_array.resize(size_t(i) + 1, m_defaultValue);
         return i;
     }
 
