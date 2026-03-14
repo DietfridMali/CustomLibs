@@ -24,7 +24,7 @@ private:
 public:
     // Konstruktor für 1D-AutoArray
     inline AutoArray(int32_t size = 0)
-        : m_array(std::max(static_cast<size_t>(size), static_cast<size_t>(0))) {
+        : m_array(static_cast<size_t>(std::max<int32_t>(size, 0))) {
     }
 
     inline AutoArray(std::initializer_list<DATA_T> data)
