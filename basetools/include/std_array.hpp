@@ -24,7 +24,7 @@ private:
 public:
     // Konstruktor für 1D-AutoArray
     inline AutoArray(int32_t size = 0)
-        : m_array(std::max(static_cast<size_t>(size), 0)) {
+        : m_array(std::max(static_cast<size_t>(size), static_cast<size_t>(0))) {
     }
 
     inline AutoArray(std::initializer_list<DATA_T> data)
@@ -247,7 +247,7 @@ public:
     }
 
 	inline bool IsValidSize(size_t size) const noexcept { 
-        return size <= std::numeric_limits<int32_t>::max(); 
+        return size <= static_cast<size_t>(std::numeric_limits<int32_t>::max()); 
     }
 
     inline bool AllowResize(size_t newSize) const noexcept { 
