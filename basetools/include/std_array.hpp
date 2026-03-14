@@ -107,7 +107,7 @@ public:
     inline int32_t DataSize() const noexcept { return Length() * static_cast<int32_t>(sizeof(DATA_T)); }
 
     inline int32_t AutoFit(int32_t i) {
-        if (m_autoFit and (i >= Length()))
+        if (m_autoFit and (i >= 0) and (i < std::numeric_limits<int32_t>::max()) and (i >= Length()))
             m_array.resize(i + 1, m_defaultValue);
         return i;
     }
