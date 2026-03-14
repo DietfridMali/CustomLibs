@@ -189,12 +189,14 @@ public:
     }
 
     AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
-        Reserve(Length() + other.Length());
-        if (copyData)
-            m_array.insert(m_array.end(), other.begin(), other.end());
-        else {
-            m_array.insert(m_array.end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
-            other.Clear();
+        if (IsValidSize(Length() + other.Length()) {
+            Reserve(Length() + other.Length());
+            if (copyData)
+                m_array.insert(m_array.end(), other.begin(), other.end());
+            else {
+                m_array.insert(m_array.end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
+                other.Clear();
+            }
         }
         return *this;
     }
@@ -215,9 +217,11 @@ public:
 
     AutoArray operator+(const AutoArray& other) const {
         AutoArray result;
-        result.Reserve(Length() + other.Length());
-        result.m_array.insert(result.m_array.end(), m_array.begin(), m_array.end());
-        result.m_array.insert(result.m_array.end(),other.m_array.begin(), other.m_array.end());
+        if (IsValidSize(Length() + other.Length())) {
+            result.Reserve(Length() + other.Length());
+            result.m_array.insert(result.m_array.end(), m_array.begin(), m_array.end());
+            result.m_array.insert(result.m_array.end(), other.m_array.begin(), other.m_array.end());
+        }
         return result;
     }
 
@@ -226,12 +230,23 @@ public:
         std::fill(m_array.begin(), m_array.end(), value);
     }
 
+
     DATA_T* Append(void) {
+		if (Length() == std::numeric_limits<int32_t>::max())
+            return nullptr;
         m_array.emplace_back();
         return &m_array.back();
     }
 
-    void Push(DATA_T data) { m_array.push_back(data); }
+
+    bool Push(DATA_T data) { 
+        if (Length() < std::numeric_limits<int32_t>::max()) {
+            m_array.push_back(data);
+            return true;
+        }
+        return false;
+    }
+
 
     DATA_T Pop(void) {
         if (m_array.empty())
@@ -241,8 +256,12 @@ public:
         return data;
     }
 
+    
     template<typename... Args>
     DATA_T* Append(Args&&... args) {
+        auto argCount = sizeof...(Args);
+		if (size_t(Length()) + argCount > static_cast<size_t>(std::numeric_limits<int32_t>::max()))
+            return nullptr;
         m_array.emplace_back(std::forward<Args>(args)...);
         return &m_array.back();
     }
