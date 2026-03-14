@@ -189,7 +189,7 @@ public:
     }
 
     AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
-        if (IsValidSize(Length() + other.Length()) {
+        if (IsValidSize(Length() + other.Length())) {
             Reserve(Length() + other.Length());
             if (copyData)
                 m_array.insert(m_array.end(), other.begin(), other.end());
