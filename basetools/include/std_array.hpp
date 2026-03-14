@@ -24,7 +24,7 @@ private:
 public:
     // Konstruktor für 1D-AutoArray
     inline AutoArray(int32_t size = 0)
-        : m_array(static_cast<size_t>(size)) {
+        : m_array(std::max(static_cast<size_t>(size), 0)) {
     }
 
     inline AutoArray(std::initializer_list<DATA_T> data)
@@ -243,11 +243,15 @@ public:
     }
 
     inline void Reserve(int32_t capacity) {
-        m_array.reserve(static_cast<size_t>(capacity));
+        m_array.reserve(static_cast<size_t>(std::max(capacity, 0)));
+    }
+
+	inline bool IsValidSize(size_t size) const noexcept { 
+        return size <= std::numeric_limits<int32_t>::max(); 
     }
 
     inline bool AllowResize(size_t newSize) const noexcept { 
-        return m_isShrinkable or (newSize > static_cast<size_t>(Length())); 
+        return m_isShrinkable or (IsValidSize (newSize) and (newSize > static_cast<size_t>(Length()))); 
     }
 
     // Resize-Methoden
@@ -376,8 +380,8 @@ public:
         if (fileSize != std::streamoff(dataSize))
             return false;
 
-        if (Length() != dataSize)
-            Resize(int(dataSize));
+        if (Length() != elemCount)
+            Resize(int(elemCount));
 
         f.read(reinterpret_cast<char*>(Data()), dataSize);
         return f.good();
