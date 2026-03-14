@@ -501,7 +501,7 @@ public:
 	// ----------------------------------------
 
 	inline DATA_T* DataRow(int32_t y) {
-		return Data(y * m_info.width);
+		return IsValidIndex (0, y) ? Data(y * m_info.width) : nullptr;
 	}
 
 	// ----------------------------------------

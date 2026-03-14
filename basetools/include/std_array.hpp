@@ -22,6 +22,8 @@ private:
     DATA_T              m_defaultValue{};
 
 public:
+	static const int32_t MaxIndex = std::numeric_limits<int32_t>::max();
+
     // Konstruktor für 1D-AutoArray
     inline AutoArray(int32_t size = 0)
         : m_array(static_cast<size_t>(std::max<int32_t>(size, 0))) {
@@ -34,12 +36,14 @@ public:
 
     // Konstruktor für 2D-AutoArray
     inline AutoArray(int32_t width, int32_t height)
-        : m_array(static_cast<size_t>(width)* static_cast<size_t>(height)),
-        m_width(width), m_height(height) {
+        : m_array(ValidatedSize2D(width, height, 0))
+        {
         assert(width * height > 0 and "Width and height must be > 0");
 #if defined(_DEBUG)
         if (width * height <= 0)
             throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
+        m_width = (Length() > 0) and (ValidatedSize(width, 0) > -1) ? width : 0;
+        m_height = (Length() > 0) and (ValidatedSize(height, 0) > -1) ? height : 0;
         Resize(width * height);
 #endif    
     }
@@ -148,12 +152,12 @@ public:
 #endif
     }
 
-    inline int32_t ValidatedSize(size_t size) const noexcept {
-        return (size > static_cast<size_t>(std::numeric_limits<int32_t>::max())) ? -1 : int32_t(size);
+    inline int32_t ValidatedSize(size_t size, int32_t defaultSize = -1) const noexcept {
+        return (size > static_cast<size_t>(MaxIndex)) ? defaultSize : int32_t(size);
     }
 
-    inline int32_t ValidatedSize(int32_t x, int32_t y) const noexcept {
-		return ((x < 0) or (y < 0)) ? -1 : ValidatedSize(static_cast<size_t>(x) * static_cast<size_t>(y));
+    inline int32_t ValidatedSize2D(int32_t x, int32_t y, int32_t defaultSize = -1) const noexcept {
+		return ((x < 0) or (y < 0)) ? defaultSize : ValidatedSize(static_cast<size_t>(x) * static_cast<size_t>(y), defaultSize);
     }
 
     inline bool IsValidIndex(int32_t i) const noexcept { 
@@ -161,7 +165,7 @@ public:
     }
 
     inline bool IsValidIndex(int32_t x, int32_t y) const noexcept { 
-        return (x >= 0) and (m_autoFit or (x < m_width)) and (y >= 0) and (m_autoFit or (y < m_height)); 
+        return m_autoFit ? ValidatedSize2D(x, y) > -1 : (x >= 0) and (y >= 0) and (x < m_width) and (y < m_height);
     }
 
     inline int32_t GetCheckedIndex(int32_t x, int32_t y) const noexcept { 
@@ -187,7 +191,8 @@ public:
     }
 
     void Append(const DATA_T& data) { 
-        m_array.push_back(data); 
+        if (Length() < MaxIndex)
+            m_array.push_back(data);
     }
 
     AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
@@ -236,7 +241,7 @@ public:
 
 
     DATA_T* Append(void) {
-		if (Length() == std::numeric_limits<int32_t>::max())
+		if (Length() == MaxIndex)
             return nullptr;
         m_array.emplace_back();
         return &m_array.back();
@@ -244,7 +249,7 @@ public:
 
 
     bool Push(DATA_T data) { 
-        if (Length() < std::numeric_limits<int32_t>::max()) {
+        if (Length() < MaxIndex) {
             m_array.push_back(data);
             return true;
         }
@@ -264,7 +269,7 @@ public:
     template<typename... Args>
     DATA_T* Append(Args&&... args) {
         auto argCount = sizeof...(Args);
-		if (size_t(Length()) + argCount > static_cast<size_t>(std::numeric_limits<int32_t>::max()))
+		if (size_t(Length()) + argCount > static_cast<size_t>(MaxIndex))
             return nullptr;
         m_array.emplace_back(std::forward<Args>(args)...);
         return &m_array.back();
@@ -296,7 +301,8 @@ public:
     }
 
     inline void Reserve(int32_t capacity) {
-        m_array.reserve(static_cast<size_t>(std::max(capacity, 0)));
+        if (ValidatedSize(capacity) > -1)
+            m_array.reserve(static_cast<size_t>(capacity));
     }
 
     inline bool AllowResize(size_t newSize) const noexcept { 
@@ -317,9 +323,8 @@ public:
     }
 
     inline DATA_T* Resize(int32_t width, int32_t height) {
-        size_t newSize = static_cast<size_t>(width) * static_cast<size_t>(height);
-        if (AllowResize(newSize)) {
-            m_array.resize(newSize);
+		if (ValidatedSize2D(width, height) > -1) {
+            m_array.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
             m_width = width;
             m_height = height;
         }
