@@ -251,7 +251,7 @@ public:
     }
 
     inline bool AllowResize(size_t newSize) const noexcept { 
-        return m_isShrinkable or (IsValidSize (newSize) and (newSize > static_cast<size_t>(Length()))); 
+        return IsValidSize(newSize)and (m_isShrinkable or (newSize > static_cast<size_t>(Length())));
     }
 
     // Resize-Methoden
