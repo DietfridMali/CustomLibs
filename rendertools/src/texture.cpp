@@ -330,8 +330,10 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
 #endif
             SDL_Surface* image = IMG_Load(fullName.Data());
             if (not image) {
-                const char* imgError = IMG_GetError();
-                fprintf(stderr, "Couldn't load '%s (%s)'\n", (char*)(fullName), imgError);
+                if (params.isRequired) {
+                    const char* imgError = IMG_GetError();
+                    fprintf(stderr, "Couldn't load '%s (%s)'\n", (char*)(fullName), imgError);
+                }
                 return false;
             }
             texBuf = new TextureBuffer();

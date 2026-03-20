@@ -434,7 +434,7 @@ public:
         if (fileSize != std::streamoff(dataSize))
             return false;
 
-        if (Length() != elemCount)
+        if (Length() != int32_t(elemCount))
             Resize(int32_t(elemCount));
 
         f.read(reinterpret_cast<char*>(Data()), dataSize);

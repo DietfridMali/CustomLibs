@@ -51,13 +51,19 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
         if (not t) {
             fileNames.Append(name);
             if (not ((t = getTexture(name)) and t->CreateFromFile(textureFolder, fileNames, params))) {
+                if (t) {
+                    delete t;
+                    t = nullptr;
+                }
+                if (params.isRequired) {
 #ifdef _DEBUG
-                fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)(textureFolder + name));
+                    fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)(textureFolder + name));
 #endif
-                for (auto& h : textures)
-                    delete h;
-                textures.Clear();
-                break;
+                    for (auto& h : textures)
+                        delete h;
+                    textures.Clear();
+                    break;
+                }
             }
         }
         //t->m_id.name = n.Split('.')[0];
