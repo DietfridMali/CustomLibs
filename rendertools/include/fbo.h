@@ -70,7 +70,7 @@ public:
     int                         m_depthBufferIndex;
     int                         m_stencilBufferIndex;
     int                         m_activeBufferIndex;
-    AutoArray<BufferInfo>    m_bufferInfo;
+    AutoArray<BufferInfo>       m_bufferInfo;
     DrawBufferList              m_drawBuffers; 
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;

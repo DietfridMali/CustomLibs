@@ -17,7 +17,7 @@
 
 class AbstractMesh {
 public:
-    virtual void Create(int quality, Texture* texture, List<String> textureNames) = 0;
+    virtual bool Create(void) = 0;
 
     virtual void Destroy(void) = 0;
 
@@ -90,7 +90,7 @@ public:
 
     String GetName(void) { return m_name; }
 
-    virtual void Create(int, Texture*, List<String>) {}
+    virtual bool Create(void) {}
 
     virtual void Destroy(void);
 
