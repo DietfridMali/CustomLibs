@@ -21,6 +21,8 @@ public:
 
     virtual void Destroy(void) = 0;
 
+    virtual bool Update(void) = 0;
+
     virtual bool Render(Texture* texture, float alpha = 1.0) = 0;
 
     virtual ~AbstractMesh() = default;
@@ -90,7 +92,9 @@ public:
 
     String GetName(void) { return m_name; }
 
-    virtual bool Create(void) {}
+    virtual bool Create(void) { return true; }
+
+    virtual bool Update(void) { return true; }
 
     virtual void Destroy(void);
 
