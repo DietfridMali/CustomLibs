@@ -8,7 +8,7 @@
 template<typename DATA_T>
 class TriangularArray {
 public:
-	int32_t					m_width;
+	int32_t				m_width;
 	AutoArray<DATA_T>	m_data;
 	TriangularArray() 
 		: m_width(0)
