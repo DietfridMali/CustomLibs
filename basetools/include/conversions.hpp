@@ -73,6 +73,12 @@ namespace Conversions
 #endif
     }
 
+
+    inline float Remap(float v, float oldMin, float oldMax, float newMin, float newMax) {
+        return std::lerp(newMin, newMax, (v - oldMin) / (oldMax - oldMin));
+    }
+
+
     template <typename T, size_t N>
     constexpr size_t ArrayLength(const T(&)[N]) noexcept { return N; }
 
