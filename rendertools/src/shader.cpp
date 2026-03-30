@@ -101,6 +101,8 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle) {
     if (isLinked == GL_TRUE) {
         glDetachShader(handle, vsHandle);
         glDetachShader(handle, fsHandle);
+        if (gsHandle)
+            glDetachShader(handle, gsHandle);
         return handle;
     }
 #ifdef _DEBUG
@@ -111,6 +113,8 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle) {
 #endif
     glDeleteShader(vsHandle);
     glDeleteShader(fsHandle);
+    if (gsHandle)
+		glDeleteShader(gsHandle);
     glDeleteProgram(handle);
     return 0;
 }

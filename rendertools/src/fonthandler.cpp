@@ -96,7 +96,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
         return false;
 
     if (m_font) {
-        if ((fontName == fontName) and (fontSize == m_fontSize))
+        if ((fontName == m_fontName) and (fontSize == m_fontSize))
             return true;
         TTF_CloseFont(m_font);
         m_font = nullptr;
@@ -129,8 +129,10 @@ bool FontHandler::CreateTexture(const char* szChar, char key, int index)
     SDL_Surface* surface = (strlen(szChar) == 1)
         ? TTF_RenderText_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255))
         : TTF_RenderUTF8_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255));
-    if (not info.texture->CreateFromSurface(surface, {})) {
+    if ((surface == nullptr) or not info.texture->CreateFromSurface(surface, {})) {
         delete info.texture;
+        if (surface)
+			SDL_FreeSurface(surface);
         info = GlyphInfo();
         return false;
         }

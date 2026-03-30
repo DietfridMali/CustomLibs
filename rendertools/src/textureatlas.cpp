@@ -33,6 +33,8 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 	m_size.SetRows(int(ceil(float(glyphCount) / float(m_size.GetCols()))));
 	if (not m_atlas->Create(m_size.GetCols() * glyphSize.width, m_size.GetRows() * glyphSize.height, scale, { .name = name })) {
 		m_atlas->Destroy();
+		delete m_atlas;
+		m_atlas = nullptr;
 		return false;
 	}
 	m_scale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));

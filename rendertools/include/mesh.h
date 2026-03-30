@@ -220,7 +220,7 @@ public:
     }
 
     inline void ResetOffsetBuffers(void) noexcept {
-        m_floatBuffers.Clear();
+        m_offsetBuffers.Clear();
     }
 
     inline void AddVertex(const Vector3f& v) {
