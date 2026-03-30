@@ -226,7 +226,7 @@ void BaseSoundHandler::Destroy(void) {
     if (m_haveAudio) {
         m_haveAudio = false;
         for (auto& sound : m_sounds)
-			Mix_FreeChunk(sound.m_value);
+			Mix_FreeChunk(sound.second);
         for (auto& so : m_busyChannels)
             so.Stop();
         Mix_CloseAudio();
