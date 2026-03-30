@@ -62,6 +62,10 @@ public:
 
     PrerenderedText(int bufferCount = 0, Viewport viewport = Viewport(), float scale = 1.0f);
 
+    ~PrerenderedText() {
+        Destroy();
+	}
+
     void Destroy() {
         m_text.Destroy();
         PrerenderedItem::Destroy();
