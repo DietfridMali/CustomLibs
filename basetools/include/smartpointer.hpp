@@ -139,7 +139,7 @@ public:
 
     DATA_T& operator*() {
         // throw exception if m_data->m_handle == nullptr
-        return *m_resource->m_handle;
+        return *m_data->m_handle;
     }
 
 

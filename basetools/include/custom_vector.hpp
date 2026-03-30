@@ -49,13 +49,13 @@ public:
         for (auto it = data.begin(); (it != data.end()) and (i < dimensions); it++)
             m_data[i++] = *it;
         for (; i < dimensions; i++)
-            m_data[i++] = (DATA_T)0;
+            m_data[i] = (DATA_T)0;
     }
 
     Vector(const DATA_T* data, uint32_t size = dimensions) {
         memcpy(m_data, data, size * sizeof(DATA_T));
         if (size < dimensions)
-            memset(m_data + size, (dimensions - size) * sizeof(DATA_T), 0);
+            memset(m_data + size, 0, (dimensions - size) * sizeof(DATA_T));
     }
 
     static const Vector<DATA_T, dimensions> NONE;
