@@ -33,6 +33,8 @@ class ArgValue
 
         ~ArgValue () {
             if (m_subValues) {
+				for (auto& v : *m_subValues)
+                    delete v;
                 delete m_subValues;
                 m_subValues = nullptr;
             }

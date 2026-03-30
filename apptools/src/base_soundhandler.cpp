@@ -134,8 +134,8 @@ SoundObject& BaseSoundHandler::GetChannel(void) {
     }
     else {
         m_busyChannels[0].Stop();
-        m_busyChannels.Append(m_busyChannels.First());
-        m_idleChannels.DiscardFirst();
+        m_idleChannels.Append(m_busyChannels.First());
+        m_busyChannels.DiscardFirst();
     }
     return m_busyChannels[-1];
 }
@@ -206,7 +206,7 @@ void BaseSoundHandler::Cleanup(void) {
 
 
 void BaseSoundHandler::FadeOut(int id, int fadeTime) {
-    for (auto so : m_busyChannels)
+    for (auto& so : m_busyChannels)
         if ((so.m_id == id) and so.Busy()) {
             so.FadeOut(fadeTime);
             break;
@@ -225,6 +225,8 @@ void BaseSoundHandler::Update(void) {
 void BaseSoundHandler::Destroy(void) {
     if (m_haveAudio) {
         m_haveAudio = false;
+        for (auto& sound : m_sounds)
+			Mix_FreeChunk(sound.m_value);
         for (auto& so : m_busyChannels)
             so.Stop();
         Mix_CloseAudio();
