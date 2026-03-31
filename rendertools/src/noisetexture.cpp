@@ -17,6 +17,8 @@ using namespace Noise;
 
 #define NORMALIZE_NOISE 0
 
+#define CLOUD_STRUCTURE 2
+
 // =================================================================================================
 
 bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
@@ -97,7 +99,6 @@ void NoiseTexture3D::ComputeNoise(void) {
 
     //m_params.normalize = 0; // 1 + 2 + 4 + 8;
 
-    Vector4f noise;
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ -1e6f, -1e6f, -1e6f, -1e6f };
 
@@ -112,12 +113,11 @@ void NoiseTexture3D::ComputeNoise(void) {
             for (int x = 0; x < m_gridDimensions.x; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridDimensions.x);
                 Vector4f noise = generator.Compute(p);
-                if (m_params.normalize)
-                data[i++] = noise.x;
-                data[i++] = noise.y;
-                data[i++] = noise.z;
-                data[i++] = noise.a;
                 if (m_params.normalize) {
+                    data[i++] = noise.x;
+                    data[i++] = noise.y;
+                    data[i++] = noise.z;
+                    data[i++] = noise.a;
                     minVals.Minimize(noise);
                     maxVals.Maximize(noise);
                 }
@@ -213,7 +213,6 @@ static float Amp2(float v) {
 }
 
 
-
 bool CloudNoiseTexture::Allocate(int gridSize) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf)
@@ -281,7 +280,13 @@ void CloudNoiseTexture::Compute(String textureFolder) {
     for (int i = dataSize; i; --i) {
         float perlin = Amp(rgbaData[0]);
         perlin *= perlin;
-        float worley = Amp2(rgbaData[1]) * 0.625f + Amp2(rgbaData[2]) * 0.125f + Amp2(rgbaData[3]) * 0.25f;
+#if CLOUD_STRUCTURE == 0
+        float worley = Amp2(rgbaData[1]) * 0.625f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.125f; // standard
+#elif CLOUD_STRUCTURE == 1
+        float worley = Amp2(rgbaData[1]) * 0.5f + Amp2(rgbaData[2]) * 0.3f + Amp2(rgbaData[3]) * 0.2f; // more filaments
+#else
+        float worley = Amp2(rgbaData[1]) * 0.65f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.1f; // smoother and more billowy
+#endif
         *data++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
         rgbaData += 4;
     }
@@ -353,20 +358,6 @@ bool CloudNoiseTexture::LoadFromFile(const String& filename) {
 
 bool CloudNoiseTexture::SaveToFile(const String& filename) const {
     return m_data.SaveToFile(filename);
-    if (filename.IsEmpty())
-        return false;
-    std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
-    if (not f)
-        return false;
-
-    size_t voxelCount = size_t(m_gridSize) * size_t(m_gridSize) * size_t(m_gridSize);
-    size_t bytes = voxelCount * sizeof(float);
-
-    if (m_data.Length() != voxelCount)
-        return false;
-
-    f.write(reinterpret_cast<const char*>(m_data.Data()), bytes);
-    return f.good();
 }
 
 // =================================================================================================
