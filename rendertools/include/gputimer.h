@@ -27,7 +27,7 @@ struct GpuTimer {
         // (kein extra code nötig; wir lesen Ergebnisse erst später)
     }
 
-    // Call einmal pro Frame NACH dem Swap → liest Frame-(frame+1)%N aus
+    // Call einmal pro Frame NACH dem Swap -> liest Frame-(frame+1)%N aus
     void resolve() {
         int readIdx = (frame + 1) % FramesInFlight;
         for (auto& s : slots[readIdx]) {
