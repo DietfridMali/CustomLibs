@@ -42,10 +42,9 @@ public:
 #if defined(_DEBUG)
         if (width * height <= 0)
             throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
+#endif    
         m_width = (Length() > 0) and (ValidatedSize(width, 0) > -1) ? width : 0;
         m_height = (Length() > 0) and (ValidatedSize(height, 0) > -1) ? height : 0;
-        Resize(width * height);
-#endif    
     }
 
     AutoArray(const AutoArray& other)
