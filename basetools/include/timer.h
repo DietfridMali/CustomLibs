@@ -28,13 +28,13 @@ protected:
     int64_t m_slack;
 
 public:
-    static inline int64_t Upscale(int t) noexcept {
+    static inline int64_t Upscale(int32_t t) noexcept {
         return int64_t(t) * 1000;
     }
 
 
-    static inline int Downscale(int64_t t) noexcept {
-        return int((t + 500) / 1000);
+    static inline int32_t Downscale(int64_t t) noexcept {
+        return int32_t((t + 500) / 1000);
     }
 
 
@@ -50,12 +50,13 @@ public:
     }
 
 
-    static inline int64_t GetHiresTime() noexcept { // micro seconds
+    static inline int64_t GetHiresTime(int64_t scale = 1) noexcept { // micro seconds
         const int64_t t = int64_t(SDL_GetPerformanceCounter()) - BaseTime();
         const int64_t f = Frequency();
         const int64_t q = t / f;      // Sekunden
         const int64_t r = t % f;      // Rest-Ticks
-        return q * 1000000 + (r * 1000000 + f / 2) / f; // rundet
+        int64_t time = q * 1000000 + (r * 1000000 + f / 2) / f; // rundet
+        return (scale == 1) ? time : (time + scale / 2) / scale;
     }
 
 
@@ -184,77 +185,77 @@ class Timer
     : public HiresTimer
 {
 public:
-    static inline int GetTime(void) noexcept {
+    static inline int32_t GetTime(void) noexcept {
         return Downscale(GetHiresTime());
     }
 
-    Timer(int duration = 0)
+    Timer(int32_t duration = 0)
         : HiresTimer(Upscale(duration))
     {
     }
 
 
-    inline void SetDuration(int duration)
+    inline void SetDuration(int32_t duration)
         noexcept
     {
         m_duration = Upscale(duration);
     }
 
 
-    inline int Start(int offset = 0)
+    inline int32_t Start(int32_t offset = 0)
         noexcept
     {
         return Downscale(HiresTimer::Start(Upscale(offset)));
     }
 
 
-    inline int TakeLapTime(void)
+    inline int32_t TakeLapTime(void)
         noexcept
     {
         return Downscale(HiresTimer::TakeLapTime());
     }
 
 
-    bool HasExpired(int time = 0, bool restart = false)
+    bool HasExpired(int32_t time = 0, bool restart = false)
         noexcept
     {
         return HiresTimer::HasExpired(Upscale(time), restart);
     }
 
 
-    inline int StartTime(void)
+    inline int32_t StartTime(void)
         const noexcept
     {
         return Downscale(m_startTime);
     }
 
 
-    inline int EndTime(void)
+    inline int32_t EndTime(void)
         const noexcept
     {
         return Downscale(m_endTime);
     }
 
 
-    inline void SetStartTime(int startTime) noexcept {
+    inline void SetStartTime(int32_t startTime) noexcept {
         m_startTime = Upscale(startTime);
     }
 
-    inline int Duration(void)
+    inline int32_t Duration(void)
         const noexcept
     {
         return Downscale(m_duration);
     }
 
 
-    inline int LapTime(void)
+    inline int32_t LapTime(void)
         const noexcept
     {
         return Downscale(m_lapTime);
     }
 
 
-    inline int RemainingTime(void)
+    inline int32_t RemainingTime(void)
         noexcept
     {
         return Downscale(HiresTimer::RemainingTime());
@@ -268,21 +269,21 @@ public:
     }
 
 
-    inline bool IsRemaining(int time)
+    inline bool IsRemaining(int32_t time)
         noexcept
     {
         return HiresTimer::IsRemaining(Upscale(time));
     }
 
 
-    inline void Sleep(int t) {
+    inline void Sleep(int32_t t) {
         if (t > 0)
             hiresSleep.Sleep(Upscale(t));
     }
 
 
     // compute ramp value derived from current time and timer's start and end times and a threshold value
-    inline float Ramp(int threshold, int t = -1) noexcept {
+    inline float Ramp(int32_t threshold, int32_t t = -1) noexcept {
         return HiresTimer::Ramp(Upscale(threshold), Upscale(t));
     }
 };
