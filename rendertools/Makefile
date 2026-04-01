@@ -67,7 +67,8 @@ SRCDIR := src
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
 DEFINES := -DUSE_STD=1 -DUSE_GLM=1 -DLINUX -DFMT_UNICODE=0
-SANITIZEFLAGS := -fsanitize=address,undefined
+#SANITIZEFLAGS := -fsanitize=address,undefined
+SANITIZEFLAGS := 
 OPTFLAGS := -O3
 DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIONS
 
