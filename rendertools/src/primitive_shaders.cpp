@@ -142,7 +142,26 @@ const ShaderSource& RingShader() {
 const ShaderSource& CircleShader() {
     static const ShaderSource source(
         "circleShader",
-        Standard2DVS(),
+        R"(
+            //#version 140
+            //#extension GL_ARB_explicit_attrib_location : enable
+            #version 330
+            layout(location = 0) in vec3 position;
+            layout(location = 1) in vec2 texCoord;
+            uniform mat4 mModelView;
+            uniform mat4 mProjection;
+            uniform mat4 mViewport;
+            out vec3 fragPos;
+            out vec2 fragCoord;
+            out float vertexY;
+            void main() {
+                vec4 viewPos = mModelView * vec4 (position, 1.0);
+                gl_Position = mViewport * mProjection * viewPos;
+                fragCoord = texCoord;
+                fragPos = viewPos.xyz;
+                vertexY = position.y;
+                }
+        )",
         R"(
             #version 330 core
             
@@ -150,9 +169,12 @@ const ShaderSource& CircleShader() {
             uniform vec4 surfaceColor;
             uniform vec2 center;
             uniform float radius;      // [0..1] in UV
+            uniform float fillLevel;  // 0.0 = leer, 1.0 = voll verfügbar
+            uniform float brightness;
             uniform bool antialias;    // billigstes AA
 
             in vec2 fragCoord;         // [0..viewportSize]
+            in float vertexY;
             out vec4 fragColor;
 
             void main() {
@@ -173,8 +195,9 @@ const ShaderSource& CircleShader() {
                     if (d > 0.0) discard;
                     alpha = 1.0;
                 }
-
-                fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+                float gray = dot(surfaceColor.rgb, vec3(0.299, 0.587, 0.114)) * brightness;
+                vec3 color = (vertexY <= fillLevel) ? surfaceColor.rgb : vec3(gray);
+                fragColor = vec4(color, surfaceColor.a * alpha);
 #endif
             }
         )");
