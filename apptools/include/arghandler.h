@@ -127,8 +127,8 @@ public:
 
     float FloatVal(const char* key, int i = 0, float defVal = 0.0f, bool onlyDebug = true);
 
-    float FloatValChecked(const char* key, int i = 0, float defVal = 0.0f, int minVal = 0.0f, int maxVal = 0.0f, bool onlyDebug = true) {
-        int v = FloatVal(key, i, defVal, onlyDebug);
+    float FloatValChecked(const char* key, int i = 0, float defVal = 0.0f, float minVal = 0.0f, float maxVal = 0.0f, bool onlyDebug = true) {
+        float v = FloatVal(key, i, defVal, onlyDebug);
         return ((v >= minVal) and (v <= maxVal)) ? v : defVal;
     }
 
