@@ -90,39 +90,49 @@ class Argument
 
 // =================================================================================================
 
-class ArgHandler 
+class ArgHandler
     : public BaseSingleton<ArgHandler>
 {
-    public:
-        Dictionary<String, Argument>    m_argList;
+public:
+    Dictionary<String, Argument>    m_argList;
 
-        ArgHandler() {
+    ArgHandler() {
 #if !(USE_STD || USE_STD_MAP)
-            m_argList.SetComparator(String::Compare);
+        m_argList.SetComparator(String::Compare);
 #endif
-        }
+    }
 
-        bool LineFilter (String& line);
-            
-        void Add(const String& arg);
+    bool LineFilter(String& line);
 
-        void Add(String&& arg) {
-            Add(static_cast<const String&>(arg));
-        }
+    void Add(const String& arg);
 
-        int LoadArgs(int argC, char** argV);
+    void Add(String&& arg) {
+        Add(static_cast<const String&>(arg));
+    }
 
-        int LoadArgs(const char* fileName = "smileybattle.ini");
+    int LoadArgs(int argC, char** argV);
 
-        Argument* GetArg(const char* key);
+    int LoadArgs(const char* fileName = "smileybattle.ini");
 
-        const String StrVal(const char* key, int i = 0, String defVal = String (""), bool onlyDebug = true);
+    Argument* GetArg(const char* key);
 
-        int IntVal(const char* key, int i = 0, int defVal = 0, bool onlyDebug = true);
+    const String StrVal(const char* key, int i = 0, String defVal = String(""), bool onlyDebug = true);
 
-        float FloatVal(const char* key, int i = 0, float defVal = 0.0f, bool onlyDebug = true);
+    int IntVal(const char* key, int i = 0, int defVal = 0, bool onlyDebug = true);
 
-        bool BoolVal(const char* key, int i = 0, bool defVal = false, bool onlyDebug = true);
+    inline int IntValChecked(const char* key, int i = 0, int defVal = 0, int minVal = 0, int maxVal = 0, bool onlyDebug = true) {
+        int v = IntVal(key, i, defVal, onlyDebug);
+        return ((v >= minVal) and (v <= maxVal)) ? v : defVal;
+    }
+
+    float FloatVal(const char* key, int i = 0, float defVal = 0.0f, bool onlyDebug = true);
+
+    float FloatValChecked(const char* key, int i = 0, float defVal = 0.0f, int minVal = 0.0f, int maxVal = 0.0f, bool onlyDebug = true) {
+        int v = FloatVal(key, i, defVal, onlyDebug);
+        return ((v >= minVal) and (v <= maxVal)) ? v : defVal;
+    }
+
+    bool BoolVal(const char* key, int i = 0, bool defVal = false, bool onlyDebug = true);
  };
 
 #define argHandler ArgHandler::Instance()

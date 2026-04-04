@@ -210,7 +210,7 @@ bool ArgHandler::BoolVal(const char* key, int i, bool defVal, bool onlyDebug) {
     if (onlyDebug)
         return defVal;
 #endif
-    return bool(IntVal(key, i, int(defVal)));
+    return bool(IntValChecked(key, i, int(defVal), 0, 1));
 }
 
 // =================================================================================================

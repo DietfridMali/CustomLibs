@@ -58,10 +58,10 @@ bool BaseSoundHandler::Setup(String soundFolder) {
 #ifdef _DEBUG
     m_soundLevel = argHandler.IntVal("soundlevel", 0, 0);
 #endif
-    SetMasterVolume(float(argHandler.IntVal("soundvolume", 0, 100, false)) * 0.01f);
-    SetMusicVolume(float(argHandler.IntVal("musicvolume", 0, 100, false)) * 0.01f);
-    SetSoundPlayback(argHandler.IntVal("playsound", 0, 1, false) == 1);
-    SetMusicPlayback(argHandler.IntVal("playmusic", 0, 1, false) == 1);
+    SetMasterVolume(float(argHandler.IntValChecked("soundvolume", 0, 100, 0, 100, false)) * 0.01f);
+    SetMusicVolume(float(argHandler.IntValChecked("musicvolume", 0, 100, 0, 100, false)) * 0.01f);
+    SetSoundPlayback(argHandler.BoolVal("playsound", 0, 1, false));
+    SetMusicPlayback(argHandler.BoolVal("playmusic", 0, 1, false));
     m_maxAudibleDistance = 30.0f;
     Destroy();
 #if 1
