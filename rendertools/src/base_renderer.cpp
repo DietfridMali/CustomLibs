@@ -293,7 +293,7 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 }
 
 
-// Mapped NDC_local ∈ [-1..1] auf das Ziel-Rect im Full-NDC:
+// Mapped NDC_local in [-1..1] auf das Ziel-Rect im Full-NDC:
 // x' = sx * x + cx,  y' = sy * y + cy
 // Column-major Initializer-Reihenfolge (GLM!):
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]

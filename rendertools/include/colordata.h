@@ -111,7 +111,7 @@ public:
 
     // Liefert die MULTIPLIKATIVE Skalen-"Farbe" (RGB um 1.0 herum),
 // die aus der Tint-Grundfarbe (*this) berechnet wird.
-// strength ∈ [0,1], keepLuminance = L(scale) auf 1 normieren.
+// strength in [0,1], keepLuminance = L(scale) auf 1 normieren.
     RGBAColor Tint(float strength = 1.0f, bool perceptive = true) const noexcept  {
         float pivot = GrayValue(perceptive);
         if (pivot < Conversions::NumericTolerance)
