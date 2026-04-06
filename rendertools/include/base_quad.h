@@ -123,18 +123,26 @@ public:
 
     Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
 
-    bool Render(Shader* shader, std::initializer_list<Texture*> textures = {}, const RGBAColor& color = ColorData::White);
+    bool Render(Shader* shader, std::span<Texture* const> textures = {}, const RGBAColor& color = ColorData::White);
 
-    inline bool Render(Shader* shader, std::initializer_list<Texture*> textures, RGBAColor&& color) {
-        return Render(shader, textures, static_cast<const RGBAColor&>(color));
+    inline bool Render(Shader* shader, std::initializer_list<Texture*> textures) {
+        return Render(shader, std::span<Texture* const>(textures.begin(), textures.size()));
     }
 
-    inline bool Render(std::initializer_list<Texture*> textures = {}) {
+    inline bool Render(Shader* shader, Texture* texture) {
+        return Render(shader, texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{});
+    }
+
+    inline bool Render(Shader* shader, Texture* texture, const RGBAColor& color) {
+        return Render(shader, texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{}, color);
+    }
+
+    inline bool Render(std::span<Texture* const> textures = {}) {
         return Render(nullptr, textures);
     }
 #if 0
-    inline bool Render(Shader* shader, Texture* texture, RGBAColor&& color) {
-        return Render(shader, texture ? { texture } : {}, static_cast<const RGBAColor&>(color));
+    inline bool Render(Shader* shader, Texture* texture, const RGBAColor& color) {
+        return Render(shader, texture ? { texture } : {}, color);
     }
 
     inline bool Render(Texture* texture = nullptr) {

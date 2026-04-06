@@ -161,7 +161,7 @@ public:
     void Disable(void)
         noexcept;
 
-    inline bool EnableTextures(std::initializer_list<Texture*> textures)
+    inline bool EnableTextures(std::span<Texture* const> textures)
         noexcept
     {
         int tmu = 0;
@@ -172,7 +172,7 @@ public:
         return true;
     }
 
-    inline void DisableTextures(std::initializer_list<Texture*> textures)
+    inline void DisableTextures(std::span<Texture* const> textures)
         noexcept
     {
         for (Texture* texture : textures)
@@ -200,7 +200,7 @@ public:
         }
     }
 
-    void Render(std::initializer_list<Texture*> textures = {})
+    void Render(std::span<Texture* const> textures = {})
         noexcept;
 
     protected:

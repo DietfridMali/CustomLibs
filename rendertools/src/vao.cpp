@@ -271,7 +271,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
 
 #endif
 
-void VAO::Render(std::initializer_list<Texture*> textures)
+void VAO::Render(std::span<Texture* const> textures)
 noexcept
 {
 #ifdef _DEBUG

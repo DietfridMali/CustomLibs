@@ -249,20 +249,16 @@ public:
         return TexCoord(1.0f / float(m_viewport.Width()), 1.0f / (m_viewport.Height()));
     }
 
-    void Render(Shader* shader, std::initializer_list<Texture*> textures = {}, const RGBAColor& color = ColorData::White);
+    void Render(Shader* shader, std::span<Texture* const> textures = {}, const RGBAColor& color = ColorData::White);
 
-    void Render(Shader* shader, std::initializer_list<Texture*> textures, RGBAColor&& color) {
-        Render(shader, textures, static_cast<const RGBAColor&>(color));
-    }
-#if 0
-    inline void Render(Shader* shader, Texture* texture = nullptr, const RGBAColor& color = ColorData::White) {
-        Render(shader, texture ? { texture } : {}, color);
+    inline void Render(Shader* shader, std::initializer_list<Texture*> textures, const RGBAColor& color = ColorData::White) {
+        return Render(shader, std::span<Texture* const>(textures.begin(), textures.size()), color);
     }
 
-    inline void Render(Shader* shader, Texture* texture, RGBAColor&& color) {
-        Render(shader, texture ? { texture } : {}, static_cast<const RGBAColor&>(color));
+    inline void Render(Shader* shader, Texture* texture, const RGBAColor& color) {
+        Render(shader, texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{}, color);
     }
-#endif
+
     void Fill(const RGBAColor& color, float scale = 1.0f);
 
     void Fill(RGBAColor&& color, float scale = 1.0f) {
