@@ -133,6 +133,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
     SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+    //SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "0"); 
 #endif
     try {
         m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, screenType);

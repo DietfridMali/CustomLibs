@@ -257,12 +257,12 @@ static void CheckVAO(GLuint handle, const char* label = "") {
                 << ", offset=" << (size_t)pointer << std::endl;
             DumpVBO(bufferBinding, size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
 #endif
-        }
-#if 1
-        else {
-            std::cout << "  Attr " << i << ": DISABLED" << std::endl;
-        }
-#endif
+            }
+    #if 1
+            else {
+                std::cout << "  Attr " << i << ": DISABLED" << std::endl;
+            }
+    #endif
     }
 
     glBindVertexArray(0);
@@ -291,7 +291,9 @@ noexcept
     else
         glDrawArrays(m_shape, 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
 #endif
-
+#ifdef _DEBUG
+    BaseRenderer::CheckGLError();
+#endif
     Disable();
     DisableTextures(textures);
 }
