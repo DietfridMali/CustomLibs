@@ -32,9 +32,7 @@ public:
 		m_maxUsedTMU = 0;
 	}
 
-	int Find(GLuint handle, int tmuIndex = -1);
-
-	void Update(GLuint handle, int tmuIndex);
+	int Find(GLuint handle, int tmuIndex = -1) noexcept;
 
 	int Bind(GLuint handle, int tmuIndex);
 
@@ -42,6 +40,12 @@ public:
 
 	inline GLenum GetType(void) const noexcept {
 		return m_type;
+	}
+
+	bool Update(GLuint handle, int tmuIndex) noexcept;
+
+	inline GLuint Query(int tmuIndex) const  noexcept {
+		return ((tmuIndex >= 0) and (tmuIndex < m_maxUsedTMU)) ? m_bindings[tmuIndex] : 0;
 	}
 };
 
@@ -219,6 +223,10 @@ public:
 		int BindTexture(GLenum type, GLuint handle, int tmuIndex);
 
 		bool ReleaseTexture(GLenum type, GLuint handle, int tmuIndex = -1);
+
+		int GetBoundTexture(GLenum type, GLuint handle);
+
+		int SetBoundTexture(GLenum type, GLuint handle, int tmuIndex);
 
 		template <GLenum typeID>
 		inline bool BindTexture(GLuint texture, int tmuIndex) {

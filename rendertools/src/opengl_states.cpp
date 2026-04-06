@@ -8,30 +8,7 @@
 
 // =================================================================================================
 
-void OpenGLStates::DetermineExtensions(void) {
-	GLint extCount = 0;
-	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
-	m_extensions.reserve(extCount);
-	for (GLint i = 0; i < extCount; ++i) {
-		const char* s = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
-		if (s)
-			m_extensions.emplace(s);
-	}
-}
-
-
-void OpenGLStates::ReleaseBuffers(void) noexcept {
-	glUseProgram(0);
-	glBindVertexArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glActiveTexture(GL_TEXTURE0);
-}
-
-
-int TMUBindingInfo::Find(GLuint handle, int tmuIndex) {
+int TMUBindingInfo::Find(GLuint handle, int tmuIndex) noexcept {
 	for (int i = 0; i < m_maxUsedTMU; ++i)
 		if (m_bindings[i] == handle) {
 			return i;
@@ -40,8 +17,13 @@ int TMUBindingInfo::Find(GLuint handle, int tmuIndex) {
 }
 
 
-void TMUBindingInfo::Update(GLuint handle, int tmuIndex) {
+bool TMUBindingInfo::Update(GLuint handle, int tmuIndex) noexcept {
+	if (tmuIndex < 0) or (tmuIndex >= m_bindings.Length())
+		return false;
+	if (m_maxUsedTMU < tmuIndex + 1)
+		m_maxUsedTMU = tmuIndex + 1;
 	m_bindings[tmuIndex] = handle;
+	return true;
 }
 
 
@@ -60,11 +42,11 @@ int TMUBindingInfo::Bind(GLuint handle, int tmuIndex) {
 	else if (tmuIndex < 0)
 		return std::numeric_limits<int>::min();
 
-	m_bindings[tmuIndex] = handle;
+	if (not Update(tmuIndex, handle))
+		return -1;
+
 	glActiveTexture(GL_TEXTURE0 + tmuIndex);
 	glBindTexture(m_type, handle);
-	if (m_maxUsedTMU < tmuIndex + 1)
-		m_maxUsedTMU = tmuIndex + 1;
 	return handle ? tmuIndex : -1;
 }
 
@@ -86,6 +68,26 @@ TMUBindingInfo* OpenGLStates::FindInfo(GLenum type) {
 		if (info.GetType() == type)
 			return &info;
 	return nullptr;
+}
+
+
+int OpenGLStates::GetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
+#if TRACK_TMU_USAGE
+	TMUBindingInfo* info = FindInfo(type);
+	if (info)
+		return info->Query(tmuIndex);
+#endif
+	return -1;
+}
+
+
+int OpenGLStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
+#if TRACK_TMU_USAGE
+	TMUBindingInfo* info = FindInfo(type);
+	if (info)
+		return info->Update(handle, tmuIndex);
+#endif
+	return -1;
 }
 
 
@@ -130,6 +132,29 @@ int OpenGLStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 bool OpenGLStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
 	TMUBindingInfo* info = FindInfo(type);
 	return info ? info->Release(handle, tmuIndex) : false;
+}
+
+
+void OpenGLStates::DetermineExtensions(void) {
+	GLint extCount = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
+	m_extensions.reserve(extCount);
+	for (GLint i = 0; i < extCount; ++i) {
+		const char* s = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
+		if (s)
+			m_extensions.emplace(s);
+	}
+}
+
+
+void OpenGLStates::ReleaseBuffers(void) noexcept {
+	glUseProgram(0);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glActiveTexture(GL_TEXTURE0);
 }
 
 // =================================================================================================

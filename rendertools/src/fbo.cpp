@@ -482,13 +482,12 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex) {
     m_renderTexture.HasBuffer() = true;
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
-#if 1
         if (tmuIndex > -1) {
+			GLuint boundHandle = openGLStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
             m_renderTexture.Enable(tmuIndex);
             m_renderTexture.SetParams(true);
+            openGLStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
         }
-        //m_renderTexture.Release();
-#endif
     }
     return &m_renderTexture;
 }
