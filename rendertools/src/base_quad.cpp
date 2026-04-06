@@ -166,7 +166,7 @@ void BaseQuad::ResetTransformation(void) {
 
 
 bool BaseQuad::Render(Shader* shader, std::initializer_list<Texture*> textures, const RGBAColor& color) {
-    if (not (shader or (shader = LoadShader(texture != nullptr, color))))
+    if (not (shader or (shader = LoadShader(textures.size() != 0, color))))
         return false;
     if (UpdateVAO()) {
         m_vao->Render(textures);
@@ -175,16 +175,18 @@ bool BaseQuad::Render(Shader* shader, std::initializer_list<Texture*> textures, 
         }
 
     if (baseRenderer.LegacyMode) {
-        if (texture and texture->Enable()) {
-            Tristate<int> blending (-1, 0, openGLStates.SetBlending(1));
-            glBegin(GL_QUADS);
-            for (auto& v : m_vertices.AppData()) {
-                glColor4f(1, 1, 1, 1);
-                glVertex3f(v.X(), v.Y(), v.Z());
+		for (Texture* texture : textures) {
+            if (texture and texture->Enable()) {
+                Tristate<int> blending (-1, 0, openGLStates.SetBlending(1));
+                glBegin(GL_QUADS);
+                for (auto& v : m_vertices.AppData()) {
+                    glColor4f(1, 1, 1, 1);
+                    glVertex3f(v.X(), v.Y(), v.Z());
+                }
+                glEnd();
+                texture->Disable();
+                openGLStates.SetBlending(blending);
             }
-            glEnd();
-            texture->Disable();
-            openGLStates.SetBlending(blending);
         }
     }
     return false;
@@ -193,7 +195,7 @@ bool BaseQuad::Render(Shader* shader, std::initializer_list<Texture*> textures, 
 
 // fill 2D area defined by x and y components of vertices with color color
 bool BaseQuad::Fill(const RGBAColor& color) {
-    if (Render(nullptr, nullptr, color))
+    if (Render(nullptr, {}, color))
         return true;
     if (not baseRenderer.LegacyMode)
         return false;

@@ -94,7 +94,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 		float c = float(glyphIndex) / float(m_size.GetSize());
 #if 1
 		//renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
-		renderQuad.Render(shader, glyph, true);
+		renderQuad.Render(shader, { glyph }, true);
 #else
 		renderQuad.Fill(RGBAColor(c, c, c, 1)); 
 #endif

@@ -282,7 +282,7 @@ noexcept
     if (not Enable())
         return;
 #if 1
-    if (baseShaderHandler.ShaderIsActive() and (textures.size() > 0) and not EnableTexture(textures))
+    if (baseShaderHandler.ShaderIsActive() and (textures.size() > 0) and not EnableTextures(textures))
         return;
 #endif
 #if 1

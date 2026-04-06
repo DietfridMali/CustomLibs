@@ -125,16 +125,24 @@ public:
 
     bool Render(Shader* shader, std::initializer_list<Texture*> textures = {}, const RGBAColor& color = ColorData::White);
 
+    inline bool Render(Shader* shader, std::initializer_list<Texture*> textures, RGBAColor&& color) {
+        return Render(shader, textures, static_cast<const RGBAColor&>(color));
+    }
+
+    inline bool Render(std::initializer_list<Texture*> textures = {}) {
+        return Render(nullptr, textures);
+    }
+#if 0
     inline bool Render(Shader* shader, Texture* texture, RGBAColor&& color) {
-        return Render(shader, texture, static_cast<const RGBAColor&>(color));
+        return Render(shader, texture ? { texture } : {}, static_cast<const RGBAColor&>(color));
     }
 
-    inline bool Render(Texture* texture) {
-        return Render(nullptr, texture);
+    inline bool Render(Texture* texture = nullptr) {
+        return Render(nullptr, texture ? { texture } : {});
     }
-
+#endif
     inline bool Render(RGBAColor color = ColorData::White) {
-        return Render(nullptr, nullptr, static_cast<const RGBAColor&>(color));
+        return Render(nullptr, {}, static_cast<const RGBAColor&>(color));
     }
 
     // fill 2D area defined by x and y components of vertices with color color

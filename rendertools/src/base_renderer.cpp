@@ -227,7 +227,7 @@ void BaseRenderer::Draw3DScene(void) {
             Fill(ColorData::Orange);
 #else
             m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
-            m_renderQuad.Render(shader, &m_renderTexture);
+            m_renderQuad.Render(shader, { &m_renderTexture });
 #endif
         }
 #if TEST_RENDER
@@ -235,7 +235,7 @@ void BaseRenderer::Draw3DScene(void) {
             Texture* t = shadowMap.ShadowTexture();
             if (t) {
                 Translate(0.5, 0.5, 0);
-                m_renderQuad.Render(baseShaderHandler.SetupShader("depthRenderer"), t);
+                m_renderQuad.Render(baseShaderHandler.SetupShader("depthRenderer"), { t });
                 Translate(-0.5, -0.5, 0);
             }
         }
@@ -257,7 +257,7 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
     m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = (bRotate ? 90.0f : 0.0f) });
 #endif
 #if 1
-    m_renderQuad.Render(nullptr, texture, color); // bFlipVertically);
+    m_renderQuad.Render(nullptr, { texture }, color); // bFlipVertically);
 #else
     m_renderQuad.Fill(color); // bFlipVertically);
 #endif
