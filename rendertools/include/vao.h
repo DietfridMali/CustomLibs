@@ -172,10 +172,9 @@ public:
     inline void DisableTextures(std::span<Texture* const> textures = {})
         noexcept
     {
-        int tmu = 0;
         for (Texture* texture : textures) {
             if (texture != nullptr)
-                texture->Disable(tmu++);
+                texture->Disable();
         }
     }
 

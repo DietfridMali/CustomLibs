@@ -148,23 +148,24 @@ bool Texture::Bind(int tmuIndex)
 {
     if (not IsAvailable())
         return false;
-    m_tmuIndex = tmuIndex;
+    m_tmuIndex = 
 #if USE_SHARED_HANDLES
-    openGLStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
+        openGLStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
 #else
-    openGLStates.BindTexture(m_type, m_handle, tmuIndex);
+        openGLStates.BindTexture(m_type, m_handle, tmuIndex);
 #endif
-    return true;
+    return m_tmuIndex >= 0;
 }
 
 
-void Texture::Release(int tmuIndex) {
-    if (IsAvailable()) {
-        if (m_tmuIndex >= 0) {
-            openGLStates.BindTexture(m_type, 0, m_tmuIndex);
-            m_tmuIndex = -1;
-        }
-        //openGLStates.ActiveTexture(GL_TEXTURE0);
+void Texture::Release(void) {
+    if (m_tmuIndex >= 0) {
+#if USE_SHARED_HANDLES
+        openGLStates.ReleaseTexture(m_handle.Data(), m_tmuIndex);
+#else
+        openGLStates.ReleaseTexture(m_handle, m_tmuIndex);
+#endif
+        m_tmuIndex = -1;
     }
 }
 
@@ -198,22 +199,6 @@ noexcept
         glTexParameteri(m_type, GL_TEXTURE_WRAP_T, m_wrapMode);
         Release();
     }
-}
-
-
-bool Texture::Enable(int tmuIndex)
-{
-    if (not Bind(tmuIndex))
-        return false;
-    //SetParams();
-    //SetWrapping();
-    return true;
-}
-
-
-void Texture::Disable(int tmuIndex)
-{
-    Release(tmuIndex);
 }
 
 

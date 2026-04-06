@@ -116,7 +116,7 @@ bool FBO::AttachBuffer(int bufferIndex) {
     if (bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
 #endif
         return true;
-    int tmu = openGLStates.TextureIsBound(GL_TEXTURE_2D, bufferInfo.m_handle);
+    int tmu = openGLStates.BoundTMU(bufferInfo.m_handle, bufferInfo.m_tmuIndex);
     if (tmu != -1)
         openGLStates.BindTexture2D(0, tmu);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
@@ -375,7 +375,7 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
 void FBO::ReleaseBuffers(void) {
     for (int i = 0; i < m_bufferCount; i++) {
         if (m_bufferInfo[i].m_tmuIndex >= 0) {
-            Texture::Release<GL_TEXTURE_2D>(m_bufferInfo[i].m_tmuIndex);
+            openGLStates.ReleaseTexture(m_bufferInfo[i].m_handle, m_bufferInfo[i].m_tmuIndex);
             m_bufferInfo[i].m_tmuIndex = -1;
         }
     }

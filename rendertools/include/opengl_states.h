@@ -24,19 +24,15 @@ private:
 	std::unordered_set<std::string> m_extensions;
 	bool m_haveExtensions{ false };
 
-	struct textureBindings {
-		GLuint	handles[2]; // texture2D, cubemap
-	};
-
-	AutoArray<textureBindings> m_bindings;
+	AutoArray<GLuint> m_tmuBindings;
 
 public:
 	OpenGLStates() {
 		GLint tmuCount = 0;
 		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &tmuCount);
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
-		m_bindings.Resize(tmuCount);
-		m_bindings.Fill({ 0,0 });
+		m_tmuBindings.Resize(tmuCount);
+		m_tmuBindings.Fill(0);
 		DetermineExtensions();
 	}
 
@@ -190,7 +186,11 @@ public:
 			return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
 		}
 
-		bool BindTexture(GLenum typeID, GLuint texture, int tmuIndex);
+		int BoundTMU(GLuint handle, int tmuIndex = -1);
+
+		bool BindTexture(GLenum typeID, GLuint handle, int tmuIndex);
+
+		void ReleaseTexture(GLuint handle, int tmuIndex = -1);
 
 		template <GLenum typeID>
 		inline bool BindTexture(GLuint texture, int tmuIndex) {
@@ -204,8 +204,6 @@ public:
 		inline bool BindCubemap(GLuint texture, int tmuIndex) {
 			return BindTexture<GL_TEXTURE_CUBE_MAP>(texture, tmuIndex);
 		}
-
-		int TextureIsBound(GLenum typeID, GLuint texture);
 
 		void ReleaseBuffers(void) noexcept;
 	};

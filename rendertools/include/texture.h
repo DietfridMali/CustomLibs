@@ -61,15 +61,11 @@ public:
 
     virtual bool Bind(int tmuIndex) = 0;
 
-    virtual void Release(int tmuIndex) = 0;
+    virtual void Release(void) = 0;
 
     virtual void SetParams(bool forceUpdate = false) = 0;
 
     virtual bool Deploy(int bufferIndex = 0) = 0;
-
-    virtual bool Enable(int tmuIndex = 0) = 0;
-
-    virtual void Disable(int tmuIndex = 0) = 0;
 
     virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
 };
@@ -185,16 +181,20 @@ public:
 
     virtual bool Bind(int tmuIndex = 0) override;
 
-    virtual void Release(int tmuIndex = 0) override;
+    virtual void Release(void) override;
+
+    inline bool Enable(int tmuIndex = 0) {
+        return Bind(tmuIndex);
+    }
+
+    inline void Disable(void) {
+        Release();
+    }
 
     virtual void SetParams(bool forceUpdate = false) override;
 
     void SetWrapping(int wrapMode = -1)
         noexcept;
-
-    virtual bool Enable(int tmuIndex = 0) override;
-
-    virtual void Disable(int tmuIndex = 0) override;
 
     virtual bool Deploy(int bufferIndex = 0) override;
 
