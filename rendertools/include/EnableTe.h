@@ -161,19 +161,23 @@ public:
     void Disable(void)
         noexcept;
 
-    inline Texture* EnableTexture(Texture* texture)
+    inline bool EnableTextures(std::initializer_list<Texture*> textures)
         noexcept
     {
-        if (texture != nullptr)
-            return texture->Enable() ? texture : nullptr;
-        return texture;
+        int tmu = 0;
+        for (Texture* texture : textures)
+            if (texture != nullptr)
+                if (not texture->Enable(tmu++))
+                    return false;
+        return true;
     }
 
-    inline void DisableTexture(Texture* texture)
+    inline void DisableTextures(std::initializer_list<Texture*> textures)
         noexcept
     {
-        if (texture != nullptr)
-            texture->Disable();
+        for (Texture* texture : textures)
+            if (texture != nullptr)
+                texture->Disable();
     }
 
     VBO* FindBuffer(const char* type, int id, int& index)
@@ -196,7 +200,7 @@ public:
         }
     }
 
-    void Render(Texture* texture = nullptr)
+    void Render(std::initializer_list<Texture*> textures = {})
         noexcept;
 
     protected:

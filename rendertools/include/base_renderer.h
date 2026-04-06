@@ -249,10 +249,10 @@ public:
         return TexCoord(1.0f / float(m_viewport.Width()), 1.0f / (m_viewport.Height()));
     }
 
-    void Render(Shader* shader, Texture* texture = nullptr, const RGBAColor& color = ColorData::White);
+    void Render(Shader* shader, std::initializer_list<Texture*> textures = {}, const RGBAColor& color = ColorData::White);
 
-    void Render(Shader* shader, Texture* texture, RGBAColor&& color) {
-        Render(shader, texture, static_cast<const RGBAColor&>(color));
+    void Render(Shader* shader, std::initializer_list<Texture*> textures, RGBAColor&& color) {
+        Render(shader, textures, static_cast<const RGBAColor&>(color));
     }
 
     void Fill(const RGBAColor& color, float scale = 1.0f);

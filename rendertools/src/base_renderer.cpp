@@ -321,12 +321,12 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 }
 
 
-void BaseRenderer::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
+void BaseRenderer::Render(Shader* shader, std::initializer_list<Texture*> textures, const RGBAColor& color) {
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
     if (shader)
         shader->UpdateMatrices();
-    m_renderQuad.Render(shader, texture, color);
+    m_renderQuad.Render(shader, textures, color);
     baseRenderer.PopMatrix();
 }
 

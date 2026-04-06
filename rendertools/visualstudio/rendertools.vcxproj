@@ -152,7 +152,7 @@
     <ClInclude Include="..\include\textureatlas.h" />
     <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\include\texturehandler.h" />
-    <ClInclude Include="..\include\vao.h" />
+    <ClInclude Include="..\include\EnableTe.h" />
     <ClInclude Include="..\include\vbo.h" />
     <ClInclude Include="..\include\vertexdatabuffers.h" />
     <ClInclude Include="..\include\viewport.h" />

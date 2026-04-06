@@ -165,11 +165,11 @@ void BaseQuad::ResetTransformation(void) {
 }
 
 
-bool BaseQuad::Render(Shader* shader, Texture* texture, const RGBAColor& color) {
+bool BaseQuad::Render(Shader* shader, std::initializer_list<Texture*> textures, const RGBAColor& color) {
     if (not (shader or (shader = LoadShader(texture != nullptr, color))))
         return false;
     if (UpdateVAO()) {
-        m_vao->Render(texture);
+        m_vao->Render(textures);
         ResetTransformation();
         return true;
         }

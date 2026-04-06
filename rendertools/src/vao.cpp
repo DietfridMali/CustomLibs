@@ -271,7 +271,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
 
 #endif
 
-void VAO::Render(Texture* texture)
+void VAO::Render(std::initializer_list<Texture*> textures)
 noexcept
 {
 #ifdef _DEBUG
@@ -282,7 +282,7 @@ noexcept
     if (not Enable())
         return;
 #if 1
-    if (baseShaderHandler.ShaderIsActive() and texture and not EnableTexture(texture))
+    if (baseShaderHandler.ShaderIsActive() and (textures.size() > 0) and not EnableTexture(textures))
         return;
 #endif
 #if 1
@@ -292,7 +292,7 @@ noexcept
         glDrawArrays(m_shape, 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
 #endif
     Disable();
-    DisableTexture(texture);
+    DisableTextures(textures);
 }
 
 // =================================================================================================

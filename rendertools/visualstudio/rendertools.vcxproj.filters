@@ -72,7 +72,7 @@
     <ClInclude Include="..\include\texcoord.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\vao.h">
+    <ClInclude Include="..\include\EnableTe.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\vbo.h">
