@@ -107,7 +107,7 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 		m_skyTextures[i]->Enable(i);
 	m_skybox->Render(nullptr);
 	for (int i = 0; i < 3; i++)
-		m_skyTextures[i]->Release(i);
+		m_skyTextures[i]->Disable();
 	openGLStates.DepthFunc(depthFunc);
 	openGLStates.SetDepthWrite(depthWrite);
 	openGLStates.SetFaceCulling(faceCulling);

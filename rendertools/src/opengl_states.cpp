@@ -8,68 +8,13 @@
 
 // =================================================================================================
 
-int OpenGLStates::BoundTMU(GLuint handle, int tmuIndex) {
-#if TRACK_TMU_USAGE
-	if ((tmuIndex >= 0) and )tmuIndex < m_maxUsedTMU) and (m_tmuBindings[tmuIndex] == handle))
-		return tmuIndex;
-	for (int i = 0; i < m_maxUsedTMU; ++i)
-		if (m_tmuBindings[i] == handle)
-			return i;
-#endif
-	return -1;
-}
-
-
-int OpenGLStates::BindTexture(GLenum typeID, GLuint handle, int tmuIndex) {
-	if (tmuIndex < 0)
-		return false;
-#if 0
-	baseRenderer.ClearGLError();
-	GLint tex = 0;
-	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
-#endif
-#if !TRACK_TMU_USAGE
-	ActiveTexture(GL_TEXTURE0 + tmuIndex);
-	glBindTexture(typeID, handle);
-#else
-	if (handle != 0) {
-		int boundTMU = BoundTMU(handle, tmuIndex);
-		if (boundTMU == tmuIndex)
-			return tmuIndex;
-		// binding to a different TMU, so unbind from previous TMU if bound
-		ActiveTexture(GL_TEXTURE0 + boundTMU);
-		glBindTexture(typeID, 0);
-		m_tmuBindings[boundTMU] = 0;
-	}
-	else if (tmuIndex < 0)
-		return std::numeric_limits<int>::min();
-	m_tmuBindings[tmuIndex] = handle;
-	ActiveTexture(GL_TEXTURE0 + tmuIndex);
-	glBindTexture(typeID, handle);
-	if (m_maxUsedTMU < tmuIndex + 1)
-		m_maxUsedTMU = tmuIndex + 1;
-#endif
-	return (handle == 0) ? -1 : tmuIndex;
-}
-
-
-bool OpenGLStates::ReleaseTexture(GLuint handle, int tmuIndex) {
-	int boundTMU = BoundTMU(handle, tmuIndex);
-	if (boundTMU < 0)
-		return false;
-	m_tmuBindings[boundTMU] = 0;
-	ActiveTexture(GL_TEXTURE0 + boundTMU);
-	glBindTexture(typeID, 0);
-	return true;
-}
-
 void OpenGLStates::DetermineExtensions(void) {
 	GLint extCount = 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
 	m_extensions.reserve(extCount);
 	for (GLint i = 0; i < extCount; ++i) {
 		const char* s = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
-		if (s) 
+		if (s)
 			m_extensions.emplace(s);
 	}
 }
@@ -83,6 +28,108 @@ void OpenGLStates::ReleaseBuffers(void) noexcept {
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glActiveTexture(GL_TEXTURE0);
+}
+
+
+int TMUBindingInfo::Find(GLuint handle, int tmuIndex) {
+	for (int i = 0; i < m_maxUsedTMU; ++i)
+		if (m_bindings[i] == handle) {
+			return i;
+		}
+	return -1;
+}
+
+
+void TMUBindingInfo::Update(GLuint handle, int tmuIndex) {
+	m_bindings[tmuIndex] = handle;
+}
+
+
+int TMUBindingInfo::Bind(GLuint handle, int tmuIndex) {
+	if (handle != 0) {
+		int boundTMU = Find(handle, tmuIndex);
+		if (boundTMU == tmuIndex)
+			return tmuIndex;
+		// binding to a different TMU, so unbind from previous TMU if bound
+		glActiveTexture(GL_TEXTURE0 + boundTMU);
+		glBindTexture(m_type, 0);
+		m_bindings[boundTMU] = 0;
+		return tmuIndex;
+	}
+	
+	if (tmuIndex < 0)
+		return std::numeric_limits<int>::min();
+
+	m_bindings[tmuIndex] = handle;
+	glActiveTexture(GL_TEXTURE0 + tmuIndex);
+	glBindTexture(m_type, handle);
+	if (m_maxUsedTMU < tmuIndex + 1)
+		m_maxUsedTMU = tmuIndex + 1;
+	return -1;
+}
+
+
+bool TMUBindingInfo::Release(GLuint handle, int tmuIndex) {
+	int boundTMU = Find(handle, tmuIndex);
+	if (boundTMU < 0)
+		return false;
+	m_bindings[boundTMU] = 0;
+	glActiveTexture(GL_TEXTURE0 + boundTMU);
+	glBindTexture(m_type, 0);
+	return true;
+}
+
+// =================================================================================================
+
+TMUBindingInfo* OpenGLStates::FindInfo(GLenum type) {
+	for (TMUBindingInfo& info : m_tmuBindings)
+		if (info.GetType() == type)
+			return &info;
+	return nullptr;
+}
+
+
+int OpenGLStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
+#if TRACK_TMU_USAGE
+	TMUBindingInfo* info = FindInfo(type);
+	if (info)
+		return info->Find(handle, tmuIndex);
+#endif
+	return -1;
+}
+
+
+int OpenGLStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
+#if 0
+	baseRenderer.ClearGLError();
+	GLint tex = 0;
+	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
+#endif
+
+#if !TRACK_TMU_USAGE
+
+	ActiveTexture(GL_TEXTURE0 + tmuIndex);
+	glBindTexture(typeID, handle);
+
+#else
+
+	TMUBindingInfo* info = FindInfo(type);
+	if (handle != 0) {
+		if ((info == nullptr) and not (info = m_tmuBindings.Append(TMUBindingInfo(type))))
+			return -1;
+	}
+	else if (info == nullptr)
+		return std::numeric_limits<int>::min();
+	return info->Bind(handle, tmuIndex);
+
+#endif
+	return (handle == 0) ? -1 : tmuIndex;
+}
+
+
+bool OpenGLStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
+	TMUBindingInfo* info = FindInfo(type);
+	return info ? info->Release(handle, tmuIndex) : false;
 }
 
 // =================================================================================================

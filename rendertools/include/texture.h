@@ -24,6 +24,8 @@ class Texture;
 
 using TextureList = List<Texture*>;
 
+using TextureArray = AutoArray<Texture*>;
+
 #ifdef USE_SHARED_HANDLES
 #   undef USE_SHARED_HANDLES
 #endif

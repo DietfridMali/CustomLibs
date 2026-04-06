@@ -8,6 +8,7 @@
 #include "glew.h"
 
 #include "array.hpp"
+#include "list.hpp"
 #include "basesingleton.hpp"
 #include "colordata.h"
 
@@ -15,24 +16,49 @@
 
 // =================================================================================================
 
-class OpenGLStates 
+class TMUBindingInfo {
+private:
+	GLenum m_type{ GL_TEXTURE_2D };
+	GLint m_tmuCount{ 0 };
+	GLint m_maxUsedTMU{ 0 };
+	AutoArray<GLuint> m_bindings;
+
+public:
+	TMUBindingInfo(GLenum type = 0) {
+		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_tmuCount);
+		m_bindings.Resize(m_tmuCount);
+		m_bindings.Fill(0);
+		m_type = type;
+		m_maxUsedTMU = 0;
+	}
+
+	int Find(GLuint handle, int tmuIndex = -1);
+
+	void Update(GLuint handle, int tmuIndex);
+
+	int Bind(GLuint handle, int tmuIndex);
+
+	bool Release(GLuint handle, int tmuIndex);
+
+	inline GLenum GetType(void) const noexcept {
+		return m_type;
+	}
+};
+
+
+class OpenGLStates
 	: public BaseSingleton<OpenGLStates>
 {
 private:
-	int	m_maxUsedTMU{ 0 };
 	int m_maxTextureSize{ 0 };
 	std::unordered_set<std::string> m_extensions;
 	bool m_haveExtensions{ false };
 
-	AutoArray<GLuint> m_tmuBindings;
+	List<TMUBindingInfo> m_tmuBindings;
 
 public:
 	OpenGLStates() {
-		GLint tmuCount = 0;
-		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &tmuCount);
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
-		m_tmuBindings.Resize(tmuCount);
-		m_tmuBindings.Fill(0);
 		DetermineExtensions();
 	}
 
@@ -186,11 +212,13 @@ public:
 			return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
 		}
 
-		int BoundTMU(GLuint handle, int tmuIndex = -1);
+		TMUBindingInfo* FindInfo(GLenum type);
 
-		bool BindTexture(GLenum typeID, GLuint handle, int tmuIndex);
+		int BoundTMU(GLenum type, GLuint handle, int tmuIndex = -1);
 
-		void ReleaseTexture(GLuint handle, int tmuIndex = -1);
+		int BindTexture(GLenum type, GLuint handle, int tmuIndex);
+
+		bool ReleaseTexture(GLenum type, GLuint handle, int tmuIndex = -1);
 
 		template <GLenum typeID>
 		inline bool BindTexture(GLuint texture, int tmuIndex) {
