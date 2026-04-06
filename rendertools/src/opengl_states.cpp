@@ -4,6 +4,8 @@
 
 #include "base_renderer.h"
 
+#define TRACK_TMU_USAGE 0
+
 // =================================================================================================
 
 bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
@@ -15,7 +17,7 @@ bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
 	GLint tex = 0;
 	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
 #endif
-#if 1
+#if !TRACK_TMU_USAGE
 	ActiveTexture(GL_TEXTURE0 + tmuIndex);
 	glBindTexture(typeID, texture);
 #else
@@ -36,10 +38,12 @@ bool OpenGLStates::BindTexture(GLenum typeID, GLuint texture, int tmuIndex) {
 
 
 int OpenGLStates::TextureIsBound(GLenum typeID, GLuint texture) {
+#if TRACK_TMU_USAGE
 	int j = (typeID == GL_TEXTURE_2D) ? 0 : 1;
 	for (int i = 0; i < m_maxUsedTMU; ++i)
 		if (m_bindings[i].handles[j] == texture)
 			return i;
+#endif
 	return -1;
 }
 

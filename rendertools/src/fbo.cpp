@@ -110,10 +110,14 @@ bool FBO::DetachBuffer(int bufferIndex) {
 
 bool FBO::AttachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
+#ifdef _DEBUG
+    if (bufferInfo.m_attachment == GL_NONE)
+#else
     if (bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
+#endif
         return true;
-    GLenum tmu = openGLStates.TextureIsBound(GL_TEXTURE_2D, bufferInfo.m_handle);
-    if (tmu != GL_NONE)
+    int tmu = openGLStates.TextureIsBound(GL_TEXTURE_2D, bufferInfo.m_handle);
+    if (tmu != -1)
         openGLStates.BindTexture2D(0, tmu);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
@@ -209,7 +213,10 @@ bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) 
         m_drawBufferGroup = dbSingle;
         if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
             return false;
-        if (m_activeBufferIndex != bufferIndex) {
+#ifdef NDEBUG
+        if (m_activeBufferIndex != bufferIndex) 
+#endif
+        {
             m_activeBufferIndex = bufferIndex;
             m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
             AttachBuffer(bufferIndex);
@@ -486,6 +493,10 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex) {
         //m_renderTexture.Release();
 #endif
     }
+    else if (tmuIndex > -1)
+        m_renderTexture.Bind(tmuIndex);
+    if ((tmuIndex > -1) and (params.source >= 0))
+		m_bufferInfo[params.source].m_tmuIndex = tmuIndex;
     return &m_renderTexture;
 }
 
