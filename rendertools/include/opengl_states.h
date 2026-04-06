@@ -224,7 +224,7 @@ public:
 
 		bool ReleaseTexture(GLenum type, GLuint handle, int tmuIndex = -1);
 
-		int GetBoundTexture(GLenum type, GLuint handle);
+		int GetBoundTexture(GLenum type, int tmuIndex);
 
 		int SetBoundTexture(GLenum type, GLuint handle, int tmuIndex);
 

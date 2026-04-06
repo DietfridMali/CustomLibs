@@ -18,7 +18,7 @@ int TMUBindingInfo::Find(GLuint handle, int tmuIndex) noexcept {
 
 
 bool TMUBindingInfo::Update(GLuint handle, int tmuIndex) noexcept {
-	if (tmuIndex < 0) or (tmuIndex >= m_bindings.Length())
+	if ((tmuIndex < 0) or (tmuIndex >= m_bindings.Length())
 		return false;
 	if (m_maxUsedTMU < tmuIndex + 1)
 		m_maxUsedTMU = tmuIndex + 1;
@@ -71,7 +71,7 @@ TMUBindingInfo* OpenGLStates::FindInfo(GLenum type) {
 }
 
 
-int OpenGLStates::GetBoundTexture(GLenum type, GLuint handle) {
+int OpenGLStates::GetBoundTexture(GLenum type, int tmuIndex) {
 #if TRACK_TMU_USAGE
 	TMUBindingInfo* info = FindInfo(type);
 	if (info)
