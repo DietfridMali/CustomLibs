@@ -51,13 +51,13 @@ int TMUBindingInfo::Bind(GLuint handle, int tmuIndex) {
 		if (boundTMU == tmuIndex)
 			return tmuIndex;
 		// binding to a different TMU, so unbind from previous TMU if bound
-		glActiveTexture(GL_TEXTURE0 + boundTMU);
-		glBindTexture(m_type, 0);
-		m_bindings[boundTMU] = 0;
-		return tmuIndex;
+		if (boundTMU >= 0) {
+			glActiveTexture(GL_TEXTURE0 + boundTMU);
+			glBindTexture(m_type, 0);
+			m_bindings[boundTMU] = 0;
+		}
 	}
-	
-	if (tmuIndex < 0)
+	else if (tmuIndex < 0)
 		return std::numeric_limits<int>::min();
 
 	m_bindings[tmuIndex] = handle;
@@ -65,7 +65,7 @@ int TMUBindingInfo::Bind(GLuint handle, int tmuIndex) {
 	glBindTexture(m_type, handle);
 	if (m_maxUsedTMU < tmuIndex + 1)
 		m_maxUsedTMU = tmuIndex + 1;
-	return -1;
+	return handle ? tmuIndex : -1;
 }
 
 
