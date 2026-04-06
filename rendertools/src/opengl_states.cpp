@@ -71,7 +71,7 @@ TMUBindingInfo* OpenGLStates::FindInfo(GLenum type) {
 }
 
 
-int OpenGLStates::GetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
+int OpenGLStates::GetBoundTexture(GLenum type, GLuint handle) {
 #if TRACK_TMU_USAGE
 	TMUBindingInfo* info = FindInfo(type);
 	if (info)
