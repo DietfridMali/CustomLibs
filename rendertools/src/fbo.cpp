@@ -116,7 +116,7 @@ bool FBO::AttachBuffer(int bufferIndex) {
     if (bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
 #endif
         return true;
-    int tmu = openGLStates.BoundTMU(bufferInfo.m_handle, bufferInfo.m_tmuIndex);
+    int tmu = openGLStates.BoundTMU(GL_TEXTURE_2D, bufferInfo.m_handle, bufferInfo.m_tmuIndex);
     if (tmu != -1)
         openGLStates.BindTexture2D(0, tmu);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);

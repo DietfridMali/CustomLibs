@@ -161,9 +161,9 @@ bool Texture::Bind(int tmuIndex)
 void Texture::Release(void) {
     if (m_tmuIndex >= 0) {
 #if USE_SHARED_HANDLES
-        openGLStates.ReleaseTexture(m_handle.Data(), m_tmuIndex);
+        openGLStates.ReleaseTexture(m_type, m_handle.Data(), m_tmuIndex);
 #else
-        openGLStates.ReleaseTexture(m_handle, m_tmuIndex);
+        openGLStates.ReleaseTexture(m_type, m_handle, m_tmuIndex);
 #endif
         m_tmuIndex = -1;
     }
