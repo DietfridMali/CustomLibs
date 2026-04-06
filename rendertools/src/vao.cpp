@@ -291,6 +291,7 @@ noexcept
     else
         glDrawArrays(m_shape, 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
 #endif
+
     Disable();
     DisableTextures(textures);
 }

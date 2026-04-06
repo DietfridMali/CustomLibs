@@ -163,8 +163,9 @@ public:
     {
         int tmu = 0;
 		for (Texture* texture : textures) {
-             if (texture != nullptr and not texture->Enable(tmu++))
+             if ((texture != nullptr) and not texture->Enable(tmu))
                 return false;
+             ++tmu;
         }
         return true;
     }
