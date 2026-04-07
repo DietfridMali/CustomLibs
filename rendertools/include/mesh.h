@@ -23,7 +23,7 @@ public:
 
     virtual bool Update(void) = 0;
 
-    virtual bool Render(Texture* texture, float alpha = 1.0) = 0;
+    virtual bool Render(std::span<Texture* const> textures, float alpha = 1.0) = 0;
 
     virtual ~AbstractMesh() = default;
 };
@@ -54,7 +54,7 @@ public:
 };
 
 
-class Mesh 
+class Mesh
     : public AbstractMesh
 {
 public:
@@ -68,7 +68,7 @@ public:
     IndexBuffer                     m_indices;
     List<FloatDataBuffer>           m_floatBuffers;
     List<VertexBuffer>              m_offsetBuffers;
-    VAO*                            m_vao{ nullptr };
+    VAO* m_vao{ nullptr };
     GLenum                          m_shape{ 0 };
     Vector3f                        m_vMin{ Vector3f::ZERO };
     Vector3f                        m_vMax{ Vector3f::ZERO };
@@ -126,7 +126,7 @@ public:
 
     inline VertexBuffer& Normals(void) noexcept { return m_normals; }
 
-    inline TexCoordBuffer& TexCoords(int i) noexcept { return m_texCoords [i]; }
+    inline TexCoordBuffer& TexCoords(int i) noexcept { return m_texCoords[i]; }
 
     inline TangentBuffer& Tangents(void) noexcept { return m_tangents; }
 
@@ -291,7 +291,11 @@ public:
         return m_vertices.IsEmpty();
     }
 
-    virtual bool Render(Texture* texture, float alpha = 1.0f);
+    virtual bool Render(std::span<Texture* const> textures = {}, float alpha = 1.0);
+
+    inline bool Render(Texture* texture = nullptr, float alpha = 1.0) {
+        return Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{}, alpha);
+    }
 };
 
 // =================================================================================================

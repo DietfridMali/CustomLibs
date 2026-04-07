@@ -238,10 +238,10 @@ noexcept
         texture->Disable();
 }
 
-bool Mesh::Render(Texture* texture, float alpha) {
+bool Mesh::Render(std::span<Texture* const> textures, float alpha) {
     if (not m_vao->IsValid())
         return false;
-    m_vao->Render(texture);
+    m_vao->Render(textures);
     return true;
 }
 
