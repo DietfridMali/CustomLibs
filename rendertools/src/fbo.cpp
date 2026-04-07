@@ -116,7 +116,10 @@ bool FBO::AttachBuffer(int bufferIndex) {
     if (bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
 #endif
         return true;
-    openGLStates.ReleaseTexture(GL_TEXTURE_2D, 0, bufferInfo.m_handle);
+    BaseRenderer::CheckGLError("FBO::AttachBuffer");
+    GLuint h = bufferInfo.m_handle;
+    openGLStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
+    BaseRenderer::CheckGLError("FBO::AttachBuffer");
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
     return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();

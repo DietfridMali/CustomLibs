@@ -49,6 +49,7 @@ public:
 	}
 };
 
+// =================================================================================================
 
 class OpenGLStates
 	: public BaseSingleton<OpenGLStates>

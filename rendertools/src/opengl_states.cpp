@@ -42,7 +42,7 @@ int TMUBindingInfo::Bind(GLuint handle, int tmuIndex) {
 	else if (tmuIndex < 0)
 		return std::numeric_limits<int>::min();
 
-	if (not Update(tmuIndex, handle))
+	if (not Update(handle, tmuIndex))
 		return -1;
 
 	glActiveTexture(GL_TEXTURE0 + tmuIndex);
