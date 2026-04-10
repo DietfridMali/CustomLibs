@@ -173,21 +173,6 @@ bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const 
         ResetTransformation();
         return true;
         }
-
-    if (baseRenderer.LegacyMode) {
-		for (Texture* texture : textures) {
-            if (texture and texture->Enable()) {
-                Tristate<int> blending (-1, 0, openGLStates.SetBlending(1));
-                glBegin(GL_QUADS);
-                for (auto& v : m_vertices.AppData()) {
-                    glColor4f(1, 1, 1, 1);
-                    glVertex3f(v.X(), v.Y(), v.Z());
-                }
-                glEnd();
-                texture->Disable();
-                openGLStates.SetBlending(blending);
-            }
-        }
     }
     return false;
 }
@@ -195,19 +180,7 @@ bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const 
 
 // fill 2D area defined by x and y components of vertices with color color
 bool BaseQuad::Fill(const RGBAColor& color) {
-    if (Render(nullptr, {}, color))
-        return true;
-    if (not baseRenderer.LegacyMode)
-        return false;
-    //openGLStates.SetTexture2D(false);
-    glBegin(GL_QUADS);
-    glColor4f(color.R(), color.G(), color.B(), color.A());
-    glVertex2f(0, 0);
-    glVertex2f(0, 1);
-    glVertex2f(1, 1);
-    glVertex2f(1, 0);
-    glEnd();
-    return true;
+    return Render(nullptr, {}, color);
 }
 
 // =================================================================================================
