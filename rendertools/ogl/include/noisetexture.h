@@ -342,8 +342,8 @@ class NoiseTexture3D
 	: public Texture
 {
 private:
-    Vector3i    m_gridDimensions{ 0, 0, 0 };
-    NoiseParams m_params;
+    Vector3i            m_gridDimensions{ 0, 0, 0 };
+    NoiseParams         m_params;
     AutoArray<float>	m_data;
 
 public:

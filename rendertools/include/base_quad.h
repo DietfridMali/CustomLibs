@@ -75,7 +75,7 @@ public:
         , m_privateVAO(false)
         , m_premultiply(false)
     {
-        Mesh::Init(GL_QUADS, 100);
+        Mesh::Init(MeshTopology::Quads, 100);
     }
 
 #pragma warning(push)
@@ -87,7 +87,7 @@ public:
         , m_privateVAO(privateVAO)
         , m_premultiply(false)
     {
-        Mesh::Init(GL_QUADS, 100);
+        Mesh::Init(MeshTopology::Quads, 100);
         Setup(vertices, texCoords);
     }
 

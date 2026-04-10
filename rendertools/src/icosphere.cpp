@@ -8,13 +8,13 @@
 // vertices are normalized. The more iterations this is run through, the finer the resulting mesh
 // becomes and the smoother does the sphere look.
 
-GLuint IcoSphere::AddVertexIndices(Dictionary<VertexKey, GLuint>& indexLookup, GLuint i1, GLuint i2) { // find index pair i1,i2 in 
+uint32_t IcoSphere::AddVertexIndices(Dictionary<VertexKey, uint32_t>& indexLookup, uint32_t i1, uint32_t i2) { // find index pair i1,i2 in 
     VertexKey key;
     if (i1 < i2)
         key = { i1, i2 };
     else
         key = { i2, i1 };
-    GLuint* keyPtr = indexLookup.Find(key);
+    uint32_t* keyPtr = indexLookup.Find(key);
     if (keyPtr)
         return *keyPtr;
     indexLookup.Insert(key, m_vertexCount);
@@ -26,7 +26,7 @@ GLuint IcoSphere::AddVertexIndices(Dictionary<VertexKey, GLuint>& indexLookup, G
 }
 
 
-List<Vector3f> IcoSphere::CreateFaceNormals(VertexBuffer& vertices, SegmentedList<std::span<GLuint>>& faces) {
+List<Vector3f> IcoSphere::CreateFaceNormals(VertexBuffer& vertices, SegmentedList<std::span<uint32_t>>& faces) {
     List<Vector3f> faceNormals;
     for (auto& f : faces)
         faceNormals.Append(Vector3f::Normal(vertices[f[0]], vertices[f[1]], vertices[f[2]]));
@@ -95,14 +95,14 @@ void TriangleIcoSphere::CreateIcosahedron(void) {
 
 void TriangleIcoSphere::SubDivide(SegmentedList<VertexIndices>& faces) {
     SegmentedList<VertexIndices> subFaces;
-    Dictionary<VertexKey, GLuint> indexLookup;
+    Dictionary<VertexKey, uint32_t> indexLookup;
 #if !(USE_STD || USE_STD_MAP)
     indexLookup.SetComparator(IcoSphere::KeyCmp);
 #endif
     for (auto& f : faces) {
-        GLuint i0 = AddVertexIndices(indexLookup, f[0], f[1]);
-        GLuint i1 = AddVertexIndices(indexLookup, f[1], f[2]);
-        GLuint i2 = AddVertexIndices(indexLookup, f[2], f[0]);
+        uint32_t i0 = AddVertexIndices(indexLookup, f[0], f[1]);
+        uint32_t i1 = AddVertexIndices(indexLookup, f[1], f[2]);
+        uint32_t i2 = AddVertexIndices(indexLookup, f[2], f[0]);
         VertexIndices* a;
         a = subFaces.Append();
         *a = { f[0], i0, i2 };
@@ -224,20 +224,20 @@ void RectangleIcoSphere::CreateIcosahedron(void) {
 // So store them in a lookup table that is indexed with the vertex indices of the parent edge.
 void RectangleIcoSphere::SubDivide(SegmentedList<VertexIndices>& faces) {
     SegmentedList<VertexIndices> subFaces;
-    Dictionary<VertexKey, GLuint> indexLookup;
+    Dictionary<VertexKey, uint32_t> indexLookup;
 #if !(USE_STD || USE_STD_MAP)
     indexLookup.SetComparator(IcoSphere::KeyCmp);
 #endif
     for (auto& f : faces) {
-        GLuint f0 = f[0];
-        GLuint f1 = f[1];
-        GLuint f2 = f[2];
-        GLuint f3 = f[3];
-        GLuint i0 = AddVertexIndices(indexLookup, f0, f1);
-        GLuint i1 = AddVertexIndices(indexLookup, f1, f2);
-        GLuint i2 = AddVertexIndices(indexLookup, f2, f3);
-        GLuint i3 = AddVertexIndices(indexLookup, f3, f0);
-        GLuint i4 = m_vertexCount++;
+        uint32_t f0 = f[0];
+        uint32_t f1 = f[1];
+        uint32_t f2 = f[2];
+        uint32_t f3 = f[3];
+        uint32_t i0 = AddVertexIndices(indexLookup, f0, f1);
+        uint32_t i1 = AddVertexIndices(indexLookup, f1, f2);
+        uint32_t i2 = AddVertexIndices(indexLookup, f2, f3);
+        uint32_t i3 = AddVertexIndices(indexLookup, f3, f0);
+        uint32_t i4 = m_vertexCount++;
         Vector3f v = m_vertices[int(i0)] + m_vertices[int(i1)] + m_vertices[int(i2)] + m_vertices[int(i3)];
         v.Normalize();
         v *= 0.5f;
@@ -266,7 +266,7 @@ void RectangleIcoSphere::Refine(SegmentedList<VertexIndices>& faces, int quality
 void RectangleIcoSphere::CreateTriangleVertexIndices(void) {
     m_indices.Setup();
     uint32_t l = m_indices.GLDataLength(); // number of vertices
-    AutoArray<GLuint> triIndices((l / 2) * 3);
+    AutoArray<uint32_t> triIndices((l / 2) * 3);
     uint32_t* p4 = m_indices.GLData().Data(); // p4 points at the 4 vertex indices of the current quad
     uint32_t* p3 = triIndices.Data(); // 6 indices for 4 vertices
     l /= 4; // quad count
@@ -277,7 +277,7 @@ void RectangleIcoSphere::CreateTriangleVertexIndices(void) {
     m_indices.Reset();
     m_indices.SetGLData(triIndices);
     m_indices.SetDirty(true);
-    m_shape = GL_TRIANGLES;
+    m_shape = MeshTopology::Triangles;
 }
 
 // =================================================================================================

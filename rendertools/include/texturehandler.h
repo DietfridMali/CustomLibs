@@ -1,6 +1,6 @@
 #pragma once
 
-#include "glew.h"
+#include "rendertypes.h"
 #include "texture.h"
 #include "cubemap.h"
 #include "list.hpp"
@@ -91,7 +91,7 @@ public:
         return CreateTextures(textureFolder, textureNames, [&](String& name) { return GetCubemap(name); }, params);
     }
 
-    TextureList CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, const TextureCreationParams& params);
+    TextureList CreateByType(String textureFolder, List<String>& textureNames, TextureType textureType, const TextureCreationParams& params);
 
 };
 

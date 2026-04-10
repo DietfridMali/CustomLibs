@@ -30,7 +30,7 @@
     <ClInclude Include="framework.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\cube.h">
+    <ClInclude Include="..\..\include\cube.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cubemap.h">
@@ -42,34 +42,37 @@
     <ClInclude Include="..\include\fbo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\icosphere.h">
+    <ClInclude Include="..\..\include\icosphere.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\mesh.h">
+    <ClInclude Include="..\..\include\mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\outlinerenderer.h">
+    <ClInclude Include="..\..\include\outlinerenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\projector.h">
+    <ClInclude Include="..\..\include\projector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\base_quad.h">
+    <ClInclude Include="..\..\include\base_quad.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\rectangle.h">
+    <ClInclude Include="..\..\include\rectangle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\rendertypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\base_renderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\rendermatrices.h">
+    <ClInclude Include="..\..\include\rendermatrices.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\SSBO.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\texcoord.h">
+    <ClInclude Include="..\..\include\texcoord.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\EnableTe.h">
@@ -78,25 +81,25 @@
     <ClInclude Include="..\include\vbo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\vertexdatabuffers.h">
+    <ClInclude Include="..\..\include\vertexdatabuffers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\viewport.h">
+    <ClInclude Include="..\..\include\viewport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\colordata.h">
+    <ClInclude Include="..\..\include\colordata.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\drawbufferhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\framecounter.h">
+    <ClInclude Include="..\..\include\framecounter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\base_shaderhandler.h">
+    <ClInclude Include="..\..\include\base_shaderhandler.h">
       <Filter>Header Files\Shader</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\base_shadercode.h">
+    <ClInclude Include="..\..\include\base_shadercode.h">
       <Filter>Header Files\Shader</Filter>
     </ClInclude>
     <ClInclude Include="..\include\shader.h">
@@ -105,13 +108,13 @@
     <ClInclude Include="..\include\shaderdata.h">
       <Filter>Header Files\Shader</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\linesegment.h">
+    <ClInclude Include="..\..\include\linesegment.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\coplanar_rectangle.h">
+    <ClInclude Include="..\..\include\coplanar_rectangle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\movement.h">
+    <ClInclude Include="..\..\include\movement.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\opengl_states.h">
@@ -120,22 +123,22 @@
     <ClInclude Include="..\include\gputimer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\fonthandler.h">
+    <ClInclude Include="..\..\include\fonthandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\prerenderedtexture.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\textrenderer.h">
+    <ClInclude Include="..\..\include\textrenderer.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
     <ClInclude Include="..\include\texture.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\textureatlas.h">
+    <ClInclude Include="..\..\include\textureatlas.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\texturehandler.h">
+    <ClInclude Include="..\..\include\texturehandler.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
     <ClInclude Include="..\include\noisetexture.h">
@@ -150,22 +153,22 @@
     <ClInclude Include="..\include\lineartexture.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\billboard.h">
+    <ClInclude Include="..\..\include\billboard.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\FBM.h">
+    <ClInclude Include="..\..\include\FBM.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\noise.h">
+    <ClInclude Include="..\..\include\noise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\shadowmap.h">
+    <ClInclude Include="..\..\include\shadowmap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\skybox.h">
+    <ClInclude Include="..\..\include\skybox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\glbloader.h">
+    <ClInclude Include="..\..\include\glbloader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\vao.h">
@@ -173,7 +176,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\cube.cpp">
+    <ClCompile Include="..\..\src\cube.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cubemap.cpp">
@@ -185,22 +188,22 @@
     <ClCompile Include="..\src\fbo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\icosphere.cpp">
+    <ClCompile Include="..\..\src\icosphere.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\mesh.cpp">
+    <ClCompile Include="..\..\src\mesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\projector.cpp">
+    <ClCompile Include="..\..\src\projector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\base_quad.cpp">
+    <ClCompile Include="..\..\src\base_quad.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\rendermatrices.cpp">
+    <ClCompile Include="..\..\src\rendermatrices.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\vao.cpp">
@@ -209,19 +212,19 @@
     <ClCompile Include="..\src\vbo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\viewport.cpp">
+    <ClCompile Include="..\..\src\viewport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\coplanar_rectangle.cpp">
+    <ClCompile Include="..\..\src\coplanar_rectangle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\outlinerenderer.cpp">
+    <ClCompile Include="..\..\src\outlinerenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\linesegment.cpp">
+    <ClCompile Include="..\..\src\linesegment.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\base_shaderhandler.cpp">
+    <ClCompile Include="..\..\src\base_shaderhandler.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_shader_funcs.cpp">
@@ -245,19 +248,19 @@
     <ClCompile Include="..\src\drawbufferhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\framecounter.cpp">
+    <ClCompile Include="..\..\src\framecounter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\opengl_states.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\fonthandler.cpp">
+    <ClCompile Include="..\..\src\fonthandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\primitive_shaders.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\textureatlas.cpp">
+    <ClCompile Include="..\..\src\textureatlas.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\textrenderer.cpp">
@@ -278,13 +281,13 @@
     <ClCompile Include="..\src\texturebuffer.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\textureprocessing.cpp">
+    <ClCompile Include="..\..\src\textureprocessing.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\billboard.cpp">
+    <ClCompile Include="..\..\src\billboard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\noise.cpp">
+    <ClCompile Include="..\..\src\noise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\shadowmap.cpp">
@@ -293,10 +296,10 @@
     <ClCompile Include="..\src\skybox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\glbloader.cpp">
+    <ClCompile Include="..\..\src\glbloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\tiny_gltf.cpp">
+    <ClCompile Include="..\..\src\tiny_gltf.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

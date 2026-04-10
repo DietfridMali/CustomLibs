@@ -5,7 +5,7 @@
 
 uint32_t Mesh::quadTriangleIndices[6] = { 0, 1, 2, 0, 2, 3 };
 
-void Mesh::Init(GLenum shape, int32_t listSegmentSize) {
+void Mesh::Init(MeshTopology shape, int32_t listSegmentSize) {
     m_shape = shape;
     m_indices.m_componentCount = ShapeSize();
     //float f = std::numeric_limits<float>::lowest();
@@ -25,7 +25,7 @@ bool Mesh::CreateVAO(void) {
         return true;
     if (not (m_vao = new VAO()))
         return false;
-    return m_vao->Create(GL_QUADS, m_isDynamic);
+    return m_vao->Create(MeshTopology::Quads, m_isDynamic);
 }
 
 // This only works for linearly increasing quad vertex indices starting at 0!
@@ -66,13 +66,13 @@ void Mesh::UpdateTangents(void) {
     AutoArray<Vector3f> bitangents;
     bitangents.Resize(m_vertices.AppDataLength());
 
-    AutoArray<GLuint>& indices = m_indices.GLData();
+    AutoArray<uint32_t>& indices = m_indices.GLData();
     m_tangents.AppData().Reset();
 
     for (int i = 0, l = indices.Length(); i < l;) {
-        GLuint i0 = indices[i++];
-        GLuint i1 = indices[i++];
-        GLuint i2 = indices[i++];
+        uint32_t i0 = indices[i++];
+        uint32_t i1 = indices[i++];
+        uint32_t i2 = indices[i++];
 
         Vector3f edge1 = vertices[i1] - vertices[i0];
         Vector3f edge2 = vertices[i2] - vertices[i0];
@@ -124,13 +124,13 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool createTangents, bool forceUpda
     if (not CreateVAO())
         return false;
     if (not createVertexIndex)
-        createVertexIndex = (m_shape == GL_QUADS);
-    m_vao->Create(createVertexIndex ? GL_TRIANGLES : m_shape, m_isDynamic);
+        createVertexIndex = (m_shape == MeshTopology::Quads);
+    m_vao->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_isDynamic);
     m_vao->Enable();
     m_tangents.SetDirty((m_tangents.HaveData() and m_vertices.IsDirty()) or m_texCoords[0].IsDirty() or m_normals.IsDirty());
     if (createVertexIndex) {
         CreateVertexIndices();
-        m_shape = GL_TRIANGLES;
+        m_shape = MeshTopology::Triangles;
         m_vao->m_indexBuffer.SetDynamic(true);
         UpdateIndexBuffer();
     }
@@ -195,7 +195,7 @@ void Mesh::ResetVAO(void) {
         m_vao->Destroy();
 }
 
-void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, GLenum textureType) {
+void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, TextureType textureType) {
     if (not textureNames.IsEmpty())
         m_textures += textureHandler.CreateByType(textureFolder, textureNames, textureType, {});
     else if (texture != nullptr)

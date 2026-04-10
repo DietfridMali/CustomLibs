@@ -1,6 +1,6 @@
 #pragma once
 
-#include "glew.h"
+#include <cstdint>
 #include "vector.hpp"
 #include "array.hpp"
 #include "list.hpp"
@@ -107,8 +107,8 @@ public:
         }
 
 
-        inline operator GLvoid*() {
-            return (GLvoid*)m_glData.data();
+        inline operator void*() {
+            return (void*)m_glData.data();
         }
 
         inline SegmentedList<APP_DATA_T>& AppData(void) noexcept {
@@ -222,18 +222,18 @@ public:
 // Buffer for vertex data (4D xyzw vector of type numpy.float32). Also used for normal data.
 // A pre-populated data buffer can be passed to the constructor
 
-class VertexBuffer 
-    : public VertexDataBuffer <Vector3f, GLfloat> {
+class VertexBuffer
+    : public VertexDataBuffer <Vector3f, float> {
     public:
-        VertexBuffer(size_t listSegmentSize = 1) 
-            : VertexDataBuffer(3, listSegmentSize) 
+        VertexBuffer(size_t listSegmentSize = 1)
+            : VertexDataBuffer(3, listSegmentSize)
         { }
 
         // Create a densely packed numpy array from the vertex data
-        virtual AutoArray<GLfloat>& Setup(void) {
+        virtual AutoArray<float>& Setup(void) {
             if (HaveAppData()) {
                 m_glData.Resize(m_appData.Length() * 3);
-                GLfloat* glData = m_glData.Data();
+                float* glData = m_glData.Data();
                 for (auto& v : m_appData) {
                     memcpy(glData, v.Data(), v.DataSize());
                     glData += 3;
@@ -247,17 +247,17 @@ class VertexBuffer
 // Buffer for texture coordinate data (2D uv vector). Also used for color information
 // A pre-populated data buffer can be passed to the constructor
 
-class TexCoordBuffer 
-    : public VertexDataBuffer <TexCoord, GLfloat> {
+class TexCoordBuffer
+    : public VertexDataBuffer <TexCoord, float> {
 public:
-        TexCoordBuffer(size_t listSegmentSize = 1) 
-            : VertexDataBuffer(2, listSegmentSize) 
+        TexCoordBuffer(size_t listSegmentSize = 1)
+            : VertexDataBuffer(2, listSegmentSize)
         { }
 
         // Create a densely packed numpy array from the vertex data
-        virtual AutoArray<GLfloat>& Setup(void) {
+        virtual AutoArray<float>& Setup(void) {
             if (HaveAppData()) {
-                GLfloat* glData = m_glData.Resize(m_appData.Length() * 2);
+                float* glData = m_glData.Resize(m_appData.Length() * 2);
                 for (auto& v : m_appData) {
                     memcpy(glData, v.Data(), v.DataSize());
                     glData += 2;
@@ -272,7 +272,7 @@ public:
 // A pre-populated data buffer can be passed to the constructor
 
 class TangentBuffer
-    : public VertexDataBuffer <Vector4f, GLfloat> {
+    : public VertexDataBuffer <Vector4f, float> {
 public:
     TangentBuffer(size_t listSegmentSize = 1)
         : VertexDataBuffer(4, listSegmentSize)
@@ -280,10 +280,10 @@ public:
     }
 
     // Create a densely packed numpy array from the vertex data
-    virtual AutoArray<GLfloat>& Setup(void) {
+    virtual AutoArray<float>& Setup(void) {
         if (HaveAppData()) {
             m_glData.Resize(m_appData.Length() * 4);
-            GLfloat* glData = m_glData.Data();
+            float* glData = m_glData.Data();
             for (auto& v : m_appData) {
                 memcpy(glData, v.Data(), v.DataSize());
                 glData += 4;
@@ -297,15 +297,15 @@ public:
 // Buffer for color data (4D rgba vector of type numpy.float32). 
 // A pre-populated data buffer can be passed to the constructor
 
-class ColorBuffer 
-    : public VertexDataBuffer <RGBAColor, GLfloat> {
+class ColorBuffer
+    : public VertexDataBuffer <RGBAColor, float> {
 public:
-    ColorBuffer(size_t listSegmentSize = 1) 
-        : VertexDataBuffer(4, listSegmentSize) 
+    ColorBuffer(size_t listSegmentSize = 1)
+        : VertexDataBuffer(4, listSegmentSize)
     { }
 
     // Create a densely packed numpy array from the vertex data
-    virtual AutoArray<GLfloat>& Setup(void) {
+    virtual AutoArray<float>& Setup(void) {
         if (HaveAppData()) {
             float* glData = m_glData.Resize(m_appData.Length() * 4);
             for (auto& v : m_appData) {
@@ -322,15 +322,15 @@ public:
 // Requires an additional componentCount parameter, as index count depends on the vertex count of the 
 // primitive being rendered (quad: 4, triangle: 3, line: 2, point: 1)
 
-class IndexBuffer 
-    : public VertexDataBuffer <AutoArray<GLuint>, GLuint> {
+class IndexBuffer
+    : public VertexDataBuffer <AutoArray<uint32_t>, uint32_t> {
     public:
-    IndexBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1) 
-        : VertexDataBuffer(componentCount, listSegmentSize) 
+    IndexBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1)
+        : VertexDataBuffer(componentCount, listSegmentSize)
     { }
 
     // Create a densely packed array from the vertex data
-    virtual AutoArray<GLuint>& Setup(void) {
+    virtual AutoArray<uint32_t>& Setup(void) {
         if (HaveAppData()) {
             uint32_t* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
             for (auto& v : m_appData) {
@@ -342,7 +342,7 @@ class IndexBuffer
     }
 
     IndexBuffer& operator= (IndexBuffer const& other) {
-        Copy (other);
+        Copy(other);
         return *this;
     }
 };
@@ -352,8 +352,8 @@ class IndexBuffer
 // Requires an additional componentCount parameter, as index count depends on the vertex count of the 
 // primitive being rendered (quad: 4, triangle: 3, line: 2, point: 1)
 
-class FloatDataBuffer 
-    : public VertexDataBuffer <GLfloat, GLfloat> {
+class FloatDataBuffer
+    : public VertexDataBuffer <float, float> {
 public:
     FloatDataBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1)
         : VertexDataBuffer(componentCount, listSegmentSize)
@@ -361,7 +361,7 @@ public:
     }
 
     // Create a densely packed numpy array from the vertex data
-    virtual AutoArray<GLfloat>& Setup(void) {
+    virtual AutoArray<float>& Setup(void) {
         if (HaveAppData()) {
             float* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
             for (auto& v : m_appData) {

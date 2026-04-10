@@ -2,6 +2,7 @@
 
 #include "glew.h"
 #include "list.hpp"
+#include "rendertypes.h"
 #include "sharedglhandle.hpp"
 #include "vertexdatabuffers.h"
 #include "vbo.h"
@@ -42,7 +43,7 @@ public:
 #else
     GLuint              m_handle;
 #endif
-    GLenum              m_shape{ GL_QUADS };
+    MeshTopology        m_shape{ MeshTopology::Quads };
     bool                m_isDynamic{ false };
     bool                m_isBound{ false };
 
@@ -76,11 +77,11 @@ public:
         m_indexBuffer.SetDynamic(m_isDynamic);
     }
 
-    inline void SetShape(GLenum shape) noexcept {
+    inline void SetShape(MeshTopology shape) noexcept {
         m_shape = shape;
     }
 
-    bool Create(GLuint shape = GL_QUADS, bool isDynamic = false)
+    bool Create(MeshTopology shape = MeshTopology::Quads, bool isDynamic = false)
         noexcept;
 
     ~VAO() {
@@ -183,22 +184,9 @@ public:
     VBO* FindBuffer(const char* type, int id, int& index)
         noexcept;
 
-    bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, size_t componentType, bool forceUpdate = false) noexcept {
-        if (forceUpdate or buffer.IsDirty()) {
-            if (not UpdateDataBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, size_t(buffer.ComponentCount()), forceUpdate))
-                return false;
-            buffer.SetDirty(false);
-        }
-        return true;
-    }
-        
+    bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;
 
-    void UpdateIndexBuffer(IndexBuffer& buffer, size_t componentType, bool forceUpdate = false) noexcept {
-        if (forceUpdate or buffer.IsDirty()) {
-            UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, forceUpdate);
-            buffer.SetDirty(false);
-        }
-    }
+    void UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;
 
     void Render(std::span<Texture* const> textures = {})
         noexcept;

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "glew.h"
+#include <cstdint>
 #include "vector.hpp"
 #include "basesingleton.hpp"
 
-class Cube 
+class Cube
     : public BaseSingleton<Cube>
 {
 public:
@@ -17,9 +17,9 @@ public:
 
     static constexpr int triangleIndexCount = 12;
 
-    static GLuint triangleIndices[triangleIndexCount][3];
+    static uint32_t triangleIndices[triangleIndexCount][3];
 
     static constexpr int quadIndexCount = 6;
 
-    static GLuint quadIndices[quadIndexCount][4];
+    static uint32_t quadIndices[quadIndexCount][4];
 };

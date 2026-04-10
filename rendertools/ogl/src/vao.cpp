@@ -5,6 +5,22 @@
 
 // =================================================================================================
 
+static GLenum ToGLenum(MeshTopology topology) noexcept {
+    switch (topology) {
+        case MeshTopology::Triangles: return GL_TRIANGLES;
+        case MeshTopology::Lines:     return GL_LINES;
+        case MeshTopology::Points:    return GL_POINTS;
+        case MeshTopology::Quads:     return GL_QUADS; // should not reach glDraw* â€” quads are converted to triangles in mesh.cpp
+        default:                      return GL_TRIANGLES;
+    }
+}
+
+static GLenum ToGLenum(ComponentType ct) noexcept {
+    return ct == ComponentType::UInt32 ? GL_UNSIGNED_INT : GL_FLOAT;
+}
+
+// =================================================================================================
+
 VAO* VAO::activeVAO = 0;
 List<VAO*> VAO::vaoStack;
 
@@ -25,7 +41,7 @@ List<VAO*> VAO::vaoStack;
 // TODO: Expand shader for all kinds of inputs (texture coordinates, normals)
 // See also https://qastack.com.de/programming/8704801/glvertexattribpointer-clarification
 
-bool VAO::Create(GLuint shape, bool isDynamic)
+bool VAO::Create(MeshTopology shape, bool isDynamic)
 noexcept
 {
     m_shape = shape;
@@ -111,6 +127,22 @@ noexcept
         ++i;
     }
     return nullptr;
+}
+
+bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
+    if (forceUpdate or buffer.IsDirty()) {
+        if (not UpdateDataBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), ToGLenum(componentType), size_t(buffer.ComponentCount()), forceUpdate))
+            return false;
+        buffer.SetDirty(false);
+    }
+    return true;
+}
+
+void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
+    if (forceUpdate or buffer.IsDirty()) {
+        UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), ToGLenum(componentType), forceUpdate);
+        buffer.SetDirty(false);
+    }
 }
 
 // add a vertex or index data buffer
@@ -201,7 +233,7 @@ static void DumpVBO(GLuint vbo, int elemSize, const char* label) {
     GLint bufSize;
     glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufSize);
 
-    // VBO Größe checken
+    // VBO Grï¿½ï¿½e checken
     GLint size;
     glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
     std::cout << "Buffer size: " << size << " bytes" << std::endl;
@@ -231,7 +263,7 @@ static void CheckVAO(GLuint handle, const char* label = "") {
 #if 1
     std::cout << "GL_ARRAY_BUFFER_BINDING: " << arrayBuffer << std::endl;
 #endif
-    // Element Buffer (wichtig für indexed drawing)
+    // Element Buffer (wichtig fï¿½r indexed drawing)
     GLint elementBuffer;
     glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementBuffer);
 #if 1
@@ -287,9 +319,9 @@ noexcept
 #endif
 #if 1
     if (m_indexBuffer.m_data)
-        glDrawElements(m_shape, m_indexBuffer.m_itemCount, m_indexBuffer.m_componentType, nullptr); // draw using an index buffer
+        glDrawElements(ToGLenum(m_shape), m_indexBuffer.m_itemCount, m_indexBuffer.m_componentType, nullptr); // draw using an index buffer
     else
-        glDrawArrays(m_shape, 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
+        glDrawArrays(ToGLenum(m_shape), 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
 #endif
     Disable();
     DisableTextures(textures);

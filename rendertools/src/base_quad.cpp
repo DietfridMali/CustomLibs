@@ -172,7 +172,6 @@ bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const 
         m_vao->Render(textures);
         ResetTransformation();
         return true;
-        }
     }
     return false;
 }

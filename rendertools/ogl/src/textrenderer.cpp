@@ -31,7 +31,7 @@ int TextRenderer::CompareFBOs(void* context, const int& key1, const int& key2) {
 TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, float scale)
     : m_color(color), m_scale(scale), m_font(nullptr), m_textAlignment(taCenter), m_decoration(decoration)
 { 
-    m_mesh.Init(GL_QUADS, 100);
+    m_mesh.Init(MeshTopology::Quads, 100);
     m_mesh.SetDynamic(true);
 }
 

@@ -59,7 +59,7 @@ bool Skybox::Setup(const String& textureFolder) {
 		return false;
 
 	m_skybox->SetDynamic(false);
-	m_skybox->Init(GL_TRIANGLES, 1);
+	m_skybox->Init(MeshTopology::Triangles, 1);
 	
 	Vector3f offset({ 0.5f, 0.5f, 0.5f }), v;
 	for (int i = 0; i < Cube::vertexCount; i++) {

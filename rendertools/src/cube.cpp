@@ -14,7 +14,7 @@ Vector3f Cube::vertices[Cube::vertexCount] = {
 };
 
 
-GLuint Cube::triangleIndices[Cube::triangleIndexCount][3] = {
+uint32_t Cube::triangleIndices[Cube::triangleIndexCount][3] = {
     {0, 1, 5}, {0, 5, 4}, // left
     {2, 3, 7}, {2, 7, 6}, // right
     {1, 2, 6}, {1, 6, 5}, // front
@@ -24,7 +24,7 @@ GLuint Cube::triangleIndices[Cube::triangleIndexCount][3] = {
 };
 
 
-GLuint Cube::quadIndices[Cube::quadIndexCount][4] = {
+uint32_t Cube::quadIndices[Cube::quadIndexCount][4] = {
     {0, 1, 5, 4},
     {2, 3, 7, 6},
     {1, 2, 6, 5},

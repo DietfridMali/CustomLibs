@@ -3,6 +3,7 @@
 #define _TEXTURE_H
 
 #include "std_defines.h"
+#include "rendertypes.h"
 #include "glew.h"
 #include "array.hpp"
 #include "string.hpp"
@@ -236,6 +237,12 @@ public:
         noexcept
     {
         return m_type;
+    }
+
+    inline TextureType GetTextureType(void) const noexcept {
+        if (m_type == GL_TEXTURE_3D)    return TextureType::Texture3D;
+        if (m_type == GL_TEXTURE_CUBE_MAP) return TextureType::CubeMap;
+        return TextureType::Texture2D;
     }
 
     inline int WrapMode(void)

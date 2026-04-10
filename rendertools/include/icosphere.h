@@ -1,4 +1,3 @@
-#include "glew.h"
 #include "vector.hpp"
 #include "texture.h"
 #include "vertexdatabuffers.h"
@@ -15,19 +14,19 @@
 // vertices are normalized. The more iterations this is run through, the finer the resulting mesh
 // becomes and the smoother does the sphere look.
 
-using VertexIndices = AutoArray<GLuint>;
+using VertexIndices = AutoArray<uint32_t>;
 
 class IcoSphere
     : public Mesh
 {
 public:
-    GLuint          m_vertexCount;
-    GLuint          m_faceCount;
+    uint32_t        m_vertexCount;
+    uint32_t        m_faceCount;
     List<Vector3f>  m_faceNormals;
 
     class VertexKey {
     public:
-        GLuint  i1, i2;
+        uint32_t  i1, i2;
 #if (USE_STD || USE_STD_MAP)
         bool operator<(const VertexKey& other) const noexcept {
             // Lexikografischer Vergleich wie in KeyCmp:
@@ -47,21 +46,21 @@ public:
     }
 #endif
 
-    IcoSphere(GLenum shape = GL_TRIANGLES)
+    IcoSphere(MeshTopology shape = MeshTopology::Triangles)
         : Mesh(false), m_vertexCount(0), m_faceCount(0)
     {
         Mesh::Init(shape, 100);
         Mesh::SetName("IcoSphere");
     }
 
-    IcoSphere(GLenum shape, Texture* texture, String textureFolder, List<String> textureNames)
+    IcoSphere(MeshTopology shape, Texture* texture, String textureFolder, List<String> textureNames)
         : Mesh(false)
     {
         m_vertexCount = 0;
         m_faceCount = 0;
         Mesh::SetDynamic(false);
         Mesh::Init(shape, 100);
-        Mesh::SetupTexture(texture, textureFolder, textureNames, GL_TEXTURE_CUBE_MAP);
+        Mesh::SetupTexture(texture, textureFolder, textureNames, TextureType::CubeMap);
     }
 
     void Destroy(void) {
@@ -70,9 +69,9 @@ public:
     }
 
 protected:
-    GLuint AddVertexIndices(Dictionary<VertexKey, GLuint>& indexLookup, GLuint i1, GLuint i2);
+    uint32_t AddVertexIndices(Dictionary<VertexKey, uint32_t>& indexLookup, uint32_t i1, uint32_t i2);
 
-    List<Vector3f> CreateFaceNormals(VertexBuffer& vertices, SegmentedList<std::span<GLuint>>& faces);
+    List<Vector3f> CreateFaceNormals(VertexBuffer& vertices, SegmentedList<std::span<uint32_t>>& faces);
 
 };
 
@@ -83,11 +82,11 @@ class TriangleIcoSphere
     : public IcoSphere {
 public:
     TriangleIcoSphere(Texture* texture, String textureFolder, List<String> textureNames)
-        : IcoSphere(GL_TRIANGLES, texture, textureFolder, textureNames)
+        : IcoSphere(MeshTopology::Triangles, texture, textureFolder, textureNames)
     {
     }
 
-    TriangleIcoSphere() : IcoSphere(GL_TRIANGLES) {}
+    TriangleIcoSphere() : IcoSphere(MeshTopology::Triangles) {}
 
     void Create(int quality);
 
@@ -111,11 +110,11 @@ class RectangleIcoSphere
     : public IcoSphere {
 public:
     RectangleIcoSphere(Texture* texture, String textureFolder, List<String> textureNames)
-        : IcoSphere(GL_TRIANGLES, texture, textureFolder, textureNames)
+        : IcoSphere(MeshTopology::Triangles, texture, textureFolder, textureNames)
     {
     }
 
-    RectangleIcoSphere() : IcoSphere(GL_QUADS) {}
+    RectangleIcoSphere() : IcoSphere(MeshTopology::Quads) {}
 
     void Create(int quality);
 

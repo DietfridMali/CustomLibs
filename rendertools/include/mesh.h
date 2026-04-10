@@ -3,7 +3,7 @@
 
 #include <limits>
 
-#include "glew.h"
+#include "rendertypes.h"
 #include "sharedpointer.hpp"
 #include "texture.h"
 #include "vao.h"
@@ -69,7 +69,7 @@ public:
     List<FloatDataBuffer>           m_floatBuffers;
     List<VertexBuffer>              m_offsetBuffers;
     VAO* m_vao{ nullptr };
-    GLenum                          m_shape{ 0 };
+    MeshTopology                    m_shape{ MeshTopology::Quads };
     Vector3f                        m_vMin{ Vector3f::ZERO };
     Vector3f                        m_vMax{ Vector3f::ZERO };
     bool                            m_isDynamic{ false };
@@ -84,7 +84,7 @@ public:
         Destroy();
     }
 
-    void Init(GLenum shape, int32_t listSegmentSize);
+    void Init(MeshTopology shape, int32_t listSegmentSize);
 
     bool CreateVAO(void);
 
@@ -104,7 +104,7 @@ public:
             m_vao->SetDynamic(isDynamic);
     }
 
-    inline void SetShape(GLenum shape) noexcept {
+    inline void SetShape(MeshTopology shape) noexcept {
         m_shape = shape;
         if (m_vao)
             m_vao->SetShape(shape);
@@ -113,11 +113,11 @@ public:
     inline uint32_t ShapeSize(void)
         noexcept
     {
-        if (m_shape == GL_QUADS)
+        if (m_shape == MeshTopology::Quads)
             return 4;
-        if (m_shape == GL_TRIANGLES)
+        if (m_shape == MeshTopology::Triangles)
             return 3;
-        if (m_shape == GL_LINES)
+        if (m_shape == MeshTopology::Lines)
             return 2;
         return 1;
     }
@@ -140,43 +140,43 @@ public:
 
     inline void UpdateVertexBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Vertex", 0, m_vertices, GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("Vertex", 0, m_vertices, ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateTexCoordBuffer(int i, bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("TexCoord", i, m_texCoords[i], GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("TexCoord", i, m_texCoords[i], ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateTangentBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Tangent", 0, m_tangents, GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("Tangent", 0, m_tangents, ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateColorBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Color", 0, m_vertexColors, GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("Color", 0, m_vertexColors, ComponentType::Float, forceUpdate);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Normal", 0, m_normals, GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("Normal", 0, m_normals, ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateFloatDataBuffer(int i, bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Float", i, m_floatBuffers[i], GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("Float", i, m_floatBuffers[i], ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateOffsetBuffer(int i, bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateDataBuffer("Offset", i, m_offsetBuffers[i], GL_FLOAT, forceUpdate);
+            m_vao->UpdateDataBuffer("Offset", i, m_offsetBuffers[i], ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateIndexBuffer(bool forceUpdate = false) {
         if (m_vao)
-            m_vao->UpdateIndexBuffer(m_indices, GL_UNSIGNED_INT, forceUpdate);
+            m_vao->UpdateIndexBuffer(m_indices, ComponentType::UInt32, forceUpdate);
     }
 
     bool UpdateVAO(bool createVertexIndex = false, bool createTangents = false, bool forceUpdate = false);
@@ -192,7 +192,7 @@ public:
         return m_vao;
     }
 
-    void SetupTexture(Texture* texture, String textureFolder = "", List<String> textureNames = List<String>(), GLenum textureType = GL_TEXTURE_2D);
+    void SetupTexture(Texture* texture, String textureFolder = "", List<String> textureNames = List<String>(), TextureType textureType = TextureType::Texture2D);
 
     virtual void PushTexture(Texture* texture);
 
@@ -269,15 +269,15 @@ public:
         m_normals.Append(static_cast<const Vector3f&>(n));
     }
 
-    inline void AddIndex(GLuint i) {
+    inline void AddIndex(uint32_t i) {
         m_indices.Append(i);
     }
 
-    inline void AddIndices(AutoArray<GLuint>& i) {
+    inline void AddIndices(AutoArray<uint32_t>& i) {
         m_indices.Append(i);
     }
 
-    inline void SetIndices(AutoArray<GLuint>& i) {
+    inline void SetIndices(AutoArray<uint32_t>& i) {
         m_indices.SetGLData(i);
     }
 

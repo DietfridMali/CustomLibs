@@ -1,6 +1,7 @@
 
 #include "texturehandler.h"
 #include "list.hpp"
+#include "noisetexture.h"
 
 // =================================================================================================
 // Very simple class for texture tracking
@@ -73,8 +74,14 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
 }
 
 
-TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, GLenum textureType, const TextureCreationParams& params) {
-    return CreateTextures(textureFolder, textureNames, [&](String& name) { return (textureType == GL_TEXTURE_CUBE_MAP) ? GetCubemap(name) : GetStandardTexture(name); }, params);
+TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, TextureType textureType, const TextureCreationParams& params) {
+    TextureGetter getter;
+    switch (textureType) {
+        case TextureType::CubeMap:   getter = [&](String& name) { return GetCubemap(name); }; break;
+        case TextureType::Texture3D: getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); }; break;
+        default:                     getter = [&](String& name) { return GetStandardTexture(name); }; break;
+    }
+    return CreateTextures(textureFolder, textureNames, getter, params);
 }
 
 // =================================================================================================
