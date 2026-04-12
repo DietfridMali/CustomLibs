@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "std_defines.h"
 #include "glew.h"
@@ -9,7 +9,7 @@
 #include "sharedpointer.hpp"
 #include "sharedglhandle.hpp"
 #include "avltree.hpp"
-#include "opengl_states.h"
+#include "gfxstates.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)

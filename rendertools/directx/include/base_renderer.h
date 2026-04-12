@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <math.h>
 #include <utility>
@@ -14,7 +14,7 @@
 #include "viewport.h"
 #include "fbo.h"
 #include "drawbufferhandler.h"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -186,13 +186,13 @@ public:
 
     // Sets the clear color for the next frame; no immediate API call in DX12.
     inline void SetClearColor(const RGBAColor& color) noexcept {
-        openGLStates.ClearColor(color);
+        gfxStates.ClearColor(color);
     }
     inline void SetClearColor(RGBAColor&& color) noexcept {
         SetClearColor(static_cast<const RGBAColor&>(color));
     }
     inline void ResetClearColor(void) noexcept {
-        openGLStates.ClearColor(RGBAColor{ 0.f, 0.f, 0.f, 0.f });
+        gfxStates.ClearColor(RGBAColor{ 0.f, 0.f, 0.f, 0.f });
     }
 
     inline BaseQuad& RenderQuad(void)     noexcept { return m_renderQuad; }
@@ -235,7 +235,7 @@ public:
     inline void ToggleFps(void)        noexcept { m_frameCounter.Toggle(); }
     inline float GetFps(void)          noexcept { return m_frameCounter.GetFps(); }
 
-    // Winding helpers — return GL enum values (defined in opengl_states.h compat section).
+    // Winding helpers — return GL enum values (defined in gfxstates.h compat section).
     inline GLenum GetWinding(bool reverse = false)  noexcept { return reverse ? GLenum(GL_CCW) : GLenum(GL_CW); }
     inline GLenum GetFrontFace(bool reverse = false) noexcept { return reverse ? GLenum(GL_FRONT) : GLenum(GL_BACK); }
 

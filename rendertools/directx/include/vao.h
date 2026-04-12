@@ -117,13 +117,13 @@ public:
 protected:
     bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize,
                       size_t componentType, size_t componentCount = 0,
-                      bool forceUpdate = false) noexcept;
+                      bool forceUpdate = false) noexcept;  // componentType cast to ComponentType internally
 
     bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize,
                           size_t componentType, size_t componentCount,
                           bool forceUpdate = false) noexcept;
 
-    void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType,
+    void UpdateIndexBuffer(void* data, size_t dataSize, ComponentType componentType,
                            bool forceUpdate = false) noexcept;
 };
 

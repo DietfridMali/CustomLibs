@@ -1,5 +1,5 @@
-
-#include "opengl_states.h"
+﻿
+#include "gfxstates.h"
 #include "array.hpp"
 
 #include "base_renderer.h"
@@ -8,7 +8,7 @@
 
 // =================================================================================================
 
-int TMUBindingInfo::Find(GLuint handle, int tmuIndex) noexcept {
+int TextureSlotInfo::Find(GLuint handle, int tmuIndex) noexcept {
 	for (int i = 0; i < m_maxUsedTMU; ++i)
 		if (m_bindings[i] == handle) {
 			return i;
@@ -17,7 +17,7 @@ int TMUBindingInfo::Find(GLuint handle, int tmuIndex) noexcept {
 }
 
 
-bool TMUBindingInfo::Update(GLuint handle, int tmuIndex) noexcept {
+bool TextureSlotInfo::Update(GLuint handle, int tmuIndex) noexcept {
 	if ((tmuIndex < 0) or (tmuIndex >= m_bindings.Length()))
 		return false;
 	if (m_maxUsedTMU < tmuIndex + 1)
@@ -27,7 +27,7 @@ bool TMUBindingInfo::Update(GLuint handle, int tmuIndex) noexcept {
 }
 
 
-int TMUBindingInfo::Bind(GLuint handle, int tmuIndex) {
+int TextureSlotInfo::Bind(GLuint handle, int tmuIndex) {
 	if (handle != 0) {
 		int boundTMU = Find(handle, tmuIndex);
 		if (boundTMU == tmuIndex)
@@ -51,7 +51,7 @@ int TMUBindingInfo::Bind(GLuint handle, int tmuIndex) {
 }
 
 
-bool TMUBindingInfo::Release(GLuint handle, int tmuIndex) {
+bool TextureSlotInfo::Release(GLuint handle, int tmuIndex) {
 	int boundTMU = Find(handle, tmuIndex);
 	if (boundTMU < 0)
 		return false;
@@ -63,17 +63,17 @@ bool TMUBindingInfo::Release(GLuint handle, int tmuIndex) {
 
 // =================================================================================================
 
-TMUBindingInfo* OpenGLStates::FindInfo(GLenum type) {
-	for (TMUBindingInfo& info : m_tmuBindings)
+TextureSlotInfo* GfxStates::FindInfo(GLenum type) {
+	for (TextureSlotInfo& info : m_tmuBindings)
 		if (info.GetType() == type)
 			return &info;
 	return nullptr;
 }
 
 
-int OpenGLStates::GetBoundTexture(GLenum type, int tmuIndex) {
+int GfxStates::GetBoundTexture(GLenum type, int tmuIndex) {
 #if TRACK_TMU_USAGE
-	TMUBindingInfo* info = FindInfo(type);
+	TextureSlotInfo* info = FindInfo(type);
 	if (info)
 		return info->Query(tmuIndex);
 #endif
@@ -81,9 +81,9 @@ int OpenGLStates::GetBoundTexture(GLenum type, int tmuIndex) {
 }
 
 
-int OpenGLStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
+int GfxStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
 #if TRACK_TMU_USAGE
-	TMUBindingInfo* info = FindInfo(type);
+	TextureSlotInfo* info = FindInfo(type);
 	if (info)
 		return info->Update(handle, tmuIndex);
 #endif
@@ -91,9 +91,9 @@ int OpenGLStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-int OpenGLStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
+int GfxStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
 #if TRACK_TMU_USAGE
-	TMUBindingInfo* info = FindInfo(type);
+	TextureSlotInfo* info = FindInfo(type);
 	if (info)
 		return info->Find(handle, tmuIndex);
 #endif
@@ -101,7 +101,7 @@ int OpenGLStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-int OpenGLStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
+int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 #if 0
 	baseRenderer.ClearGLError();
 	GLint tex = 0;
@@ -115,9 +115,9 @@ int OpenGLStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 
 #else
 
-	TMUBindingInfo* info = FindInfo(type);
+	TextureSlotInfo* info = FindInfo(type);
 	if (handle != 0) {
-		if ((info == nullptr) and not (info = m_tmuBindings.Append(TMUBindingInfo(type))))
+		if ((info == nullptr) and not (info = m_tmuBindings.Append(TextureSlotInfo(type))))
 			return -1;
 	}
 	else if (info == nullptr)
@@ -129,13 +129,13 @@ int OpenGLStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-bool OpenGLStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
-	TMUBindingInfo* info = FindInfo(type);
+bool GfxStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
+	TextureSlotInfo* info = FindInfo(type);
 	return info ? info->Release(handle, tmuIndex) : false;
 }
 
 
-void OpenGLStates::DetermineExtensions(void) {
+void GfxStates::DetermineExtensions(void) {
 	GLint extCount = 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
 	m_extensions.reserve(extCount);
@@ -147,7 +147,7 @@ void OpenGLStates::DetermineExtensions(void) {
 }
 
 
-void OpenGLStates::ReleaseBuffers(void) noexcept {
+void GfxStates::ReleaseBuffers(void) noexcept {
 	glUseProgram(0);
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

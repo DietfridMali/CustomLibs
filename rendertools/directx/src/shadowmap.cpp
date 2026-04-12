@@ -1,4 +1,4 @@
-#include "shadowmap.h"
+﻿#include "shadowmap.h"
 
 #define APPLY_POLYGON_OFFSET 1
 
@@ -20,7 +20,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	if (not (m_map = new FBO()))
 		return false;
 	int size;
-	for (size = openGLStates.MaxTextureSize(); size >= 1024; size /= 2) {
+	for (size = gfxStates.MaxTextureSize(); size >= 1024; size /= 2) {
 		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
 			m_status = 1;
 			return true;
@@ -46,14 +46,14 @@ bool ShadowMap::StartRender(void) noexcept {
 		return false;
 	baseRenderer.StartShadowPass();
 	m_map->Enable(0, FBO::dbDepth);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	// DX12: depth clear is handled by FBO::Enable / OMSetRenderTargets + ClearDepthStencilView
 	EnableCamera();
-	openGLStates.SetDepthTest(1);
-	openGLStates.SetDepthWrite(1);
-	openGLStates.CullFace(GL_FRONT);
+	gfxStates.SetDepthTest(1);
+	gfxStates.SetDepthWrite(1);
+	gfxStates.CullFace(GL_FRONT);
 #if APPLY_POLYGON_OFFSET
-	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(2.0f, 4.0f);
+	// DX12: polygon offset is configured via D3D12_RASTERIZER_DESC (DepthBias / SlopeScaledDepthBias)
+	// in the PSO — no per-draw API call needed here.
 #endif
 	return true;
 }
@@ -64,9 +64,9 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-	openGLStates.CullFace(GL_BACK);
+	gfxStates.CullFace(GL_BACK);
 #if APPLY_POLYGON_OFFSET
-	glDisable(GL_POLYGON_OFFSET_FILL);
+	// DX12: polygon offset lives in PSO rasterizer state — no per-draw disable call needed.
 #endif
 	return true;
 }
@@ -122,7 +122,7 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	Vector3f s = viewDir - f * dotFV;      // liegt senkrecht zu f
 	s.Normalize();
 
-	// Up-Vektor so w�hlen, dass LookAt(s) als Right bekommt
+	// Up-Vektor so w�hlen, dass LookAt(s) als Right bekommt
 	Vector3f upParam = s.Cross(f);
 	upParam.Normalize();
 

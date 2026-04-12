@@ -1,11 +1,11 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include "fbo.h"
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 #include "command_queue.h"
 #include "dx12context.h"
-#include "opengl_states.h"
+#include "gfxstates.h"
 
 // =================================================================================================
 // DX12 FBO implementation

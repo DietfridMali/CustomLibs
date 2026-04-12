@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <stdlib.h>
 #include <algorithm>
@@ -22,7 +22,7 @@ static Texture* testTexture = nullptr;
 // DX12 BaseRenderer
 //
 // GL-specific calls (glewInit, glClear, glViewport, glGetError …) are removed.
-// openGLStates now tracks DX12 render state (see opengl_states.h) instead of calling GL.
+// GfxStates now tracks DX12 render state (see gfxstates.h) instead of calling GL.
 // Viewport management: RSSetViewports is called where glViewport was.
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
@@ -33,7 +33,7 @@ bool BaseRenderer::InitDX12(void) noexcept {
 
 
 void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
-    openGLStates.ReleaseBuffers();
+    gfxStates.ReleaseBuffers();
     m_sceneWidth =
     m_windowWidth  = width;
     m_sceneHeight =
@@ -73,21 +73,21 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
 
 
 void BaseRenderer::SetupOpenGL(void) noexcept {
-    // Default DX12 render state — same values as the OGL version but stored in openGLStates
+    // Default DX12 render state — same values as the OGL version but stored in GfxStates
     // (no immediate API calls here; state is applied to the PSO on demand).
-    openGLStates.ClearColor(ColorData::Invisible);
-    openGLStates.ColorMask(true, true, true, true);
-    openGLStates.SetDepthWrite(1);
-    openGLStates.SetDepthTest(1);
-    openGLStates.DepthFunc(GL_LEQUAL);
-    openGLStates.SetBlending(0);
-    openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    openGLStates.BlendEquation(GL_FUNC_ADD);
-    openGLStates.FrontFace(GetWinding());
-    openGLStates.SetFaceCulling(1);
-    openGLStates.CullFace(GL_BACK);
-    openGLStates.SetMultiSample(1);     // no-op in DX12 (MSAA configured at PSO creation)
-    openGLStates.SetPolygonOffsetFill(0); // no-op in DX12
+    gfxStates.ClearColor(ColorData::Invisible);
+    gfxStates.ColorMask(true, true, true, true);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.SetDepthTest(1);
+    gfxStates.DepthFunc(GL_LEQUAL);
+    gfxStates.SetBlending(0);
+    gfxStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gfxStates.BlendEquation(GL_FUNC_ADD);
+    gfxStates.FrontFace(GetWinding());
+    gfxStates.SetFaceCulling(1);
+    gfxStates.CullFace(GL_BACK);
+    gfxStates.SetMultiSample(1);     // no-op in DX12 (MSAA configured at PSO creation)
+    gfxStates.SetPolygonOffsetFill(0); // no-op in DX12
 
     // Set the initial viewport via the DX12 command list.
     auto* list = cmdQueue.List();
@@ -108,31 +108,31 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
 
 void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
-    openGLStates.SetDepthTest(1);
-    openGLStates.SetDepthWrite(1);
-    openGLStates.DepthFunc(GL_LESS);
-    openGLStates.ColorMask(false, false, false, false);
-    openGLStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GL_LESS);
+    gfxStates.ColorMask(false, false, false, false);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
-    openGLStates.SetDepthTest(1);
-    openGLStates.SetDepthWrite(0);
-    openGLStates.DepthFunc(GL_LEQUAL);
-    openGLStates.ColorMask(true, true, true, true);
-    openGLStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.DepthFunc(GL_LEQUAL);
+    gfxStates.ColorMask(true, true, true, true);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
-    openGLStates.SetDepthTest(1);
-    openGLStates.SetDepthWrite(1);
-    openGLStates.DepthFunc(GL_LEQUAL);
-    openGLStates.ColorMask(true, true, true, true);
-    openGLStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GL_LEQUAL);
+    gfxStates.ColorMask(true, true, true, true);
+    gfxStates.SetBlending(0);
 }
 
 
@@ -194,8 +194,8 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() && Start2DScene()) {
-        Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
-        openGLStates.SetFaceCulling(0);
+        gfxStates.DepthFunc(GL_ALWAYS);
+        gfxStates.SetFaceCulling(0);
         SetViewport(m_sceneViewport, 0, 0, false);
 
         Shader* shader;
@@ -218,8 +218,6 @@ void BaseRenderer::Draw3DScene(void) {
         }
         if (shader != nullptr)
             PopMatrix();
-
-        openGLStates.DepthFunc(depthFunc);
     }
 }
 
@@ -237,8 +235,8 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
-            openGLStates.SetFaceCulling(0);
+            gfxStates.DepthFunc(GL_ALWAYS);
+            gfxStates.SetFaceCulling(0);
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
             // Transition back buffer to render target, clear it, then blit the screen FBO.
@@ -272,7 +270,6 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
                 barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
                 list->ResourceBarrier(1, &barrier);
             }
-            openGLStates.DepthFunc(depthFunc);
         }
     }
 }

@@ -10,14 +10,13 @@
 // For the DX12 port this is fine for both dynamic and static meshes; a future optimisation
 // would copy static buffers into a default-heap resource.
 
-static DXGI_FORMAT IndexFormatFromComponentType(size_t componentType) noexcept
+static DXGI_FORMAT IndexFormatFromComponentType(ComponentType componentType) noexcept
 {
-    if (componentType == GL_UNSIGNED_SHORT) return DXGI_FORMAT_R16_UINT;
-    return DXGI_FORMAT_R32_UINT;                // GL_UNSIGNED_INT (default)
+    return (componentType == ComponentType::UInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 }
 
 
-VBO::VBO(const char* type, int id, GLenum bufferType, bool isDynamic) noexcept
+VBO::VBO(const char* type, int id, GfxBufferTarget bufferType, bool isDynamic) noexcept
     : m_index(-1)
     , m_id(id)
     , m_type(type)
@@ -27,18 +26,18 @@ VBO::VBO(const char* type, int id, GLenum bufferType, bool isDynamic) noexcept
     , m_itemSize(0)
     , m_itemCount(0)
     , m_componentCount(0)
-    , m_componentType(0)
+    , m_componentType(ComponentType::Float)
     , m_isDynamic(isDynamic)
 { }
 
 
 size_t VBO::ComponentSize(size_t componentType) noexcept
 {
-    switch (componentType) {
-        case GL_FLOAT:          return 4;
-        case GL_UNSIGNED_INT:   return 4;
-        case GL_UNSIGNED_SHORT: return 2;
-        default:                return 4;
+    switch (ComponentType(componentType)) {
+        case ComponentType::UInt16: return 2;
+        case ComponentType::Float:
+        case ComponentType::UInt32:
+        default:                    return 4;
     }
 }
 
@@ -89,9 +88,9 @@ VBO& VBO::Move(VBO& other) noexcept
 }
 
 
-bool VBO::Update(const char* type, GLenum bufferType, int index,
+bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index,
                  void* data, size_t dataSize,
-                 size_t componentType, size_t componentCount,
+                 ComponentType componentType, size_t componentCount,
                  bool /*forceUpdate*/) noexcept
 {
     if (!data || dataSize == 0) return false;
@@ -102,13 +101,13 @@ bool VBO::Update(const char* type, GLenum bufferType, int index,
     m_type           = type;
     m_bufferType     = bufferType;
     m_index          = index;
-    m_componentType  = GLenum(componentType);
+    m_componentType  = componentType;
     m_componentCount = int(componentCount);
 
-    size_t compSz = ComponentSize(componentType);
+    size_t compSz = ComponentSize(size_t(componentType));
     m_itemSize   = compSz * componentCount;
-    m_itemCount  = GLsizei(dataSize / (m_itemSize > 0 ? m_itemSize : 1));
-    m_size       = GLsizei(dataSize);
+    m_itemCount  = uint32_t(dataSize / (m_itemSize > 0 ? m_itemSize : 1));
+    m_size       = uint32_t(dataSize);
 
     // (Re-)create GPU buffer if size changed or not yet created
     if (!m_resource || m_resource->GetDesc().Width < dataSize) {
@@ -138,7 +137,7 @@ bool VBO::Update(const char* type, GLenum bufferType, int index,
 
     D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = m_resource->GetGPUVirtualAddress();
 
-    if (bufferType == GL_ELEMENT_ARRAY_BUFFER) {
+    if (bufferType == GfxBufferTarget::Index) {
         m_ibv.BufferLocation = gpuAddr;
         m_ibv.SizeInBytes    = UINT(dataSize);
         m_ibv.Format         = IndexFormatFromComponentType(componentType);
@@ -155,8 +154,8 @@ bool VBO::Update(const char* type, GLenum bufferType, int index,
 void VBO::Destroy(void) noexcept
 {
     m_resource.Reset();
-    m_vbv = {};
-    m_ibv = {};
+    m_vbv        = {};
+    m_ibv        = {};
     m_size       = 0;
     m_itemCount  = 0;
     m_itemSize   = 0;

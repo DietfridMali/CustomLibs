@@ -1,4 +1,4 @@
-﻿#define NOMINMAX
+#define NOMINMAX
 
 #include <stdlib.h>
 #include <algorithm>
@@ -7,7 +7,6 @@
 #include "conversions.hpp"
 #include "glew.h"
 //#include "quad.h"
-#include "tristate.h"
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
@@ -25,7 +24,7 @@ static Texture* testTexture = nullptr;
 // separate from DisplayHandler.
 
 void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
-    openGLStates.ReleaseBuffers();
+    gfxStates.ReleaseBuffers();
     m_sceneWidth =
     m_windowWidth = width; // (width > height) ? width : height;
     m_sceneHeight =
@@ -85,28 +84,28 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 
 
 void BaseRenderer::SetupOpenGL(void) noexcept {
-    openGLStates.ClearColor(ColorData::Invisible);
+    gfxStates.ClearColor(ColorData::Invisible);
     glClearDepth(1.0);
-    openGLStates.ColorMask(1, 1, 1, 1);
-    openGLStates.SetDepthWrite(1);
-    openGLStates.SetDepthTest(1);
-    openGLStates.DepthFunc(GL_LEQUAL);
-    openGLStates.SetBlending(0);
+    gfxStates.ColorMask(1, 1, 1, 1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.SetDepthTest(1);
+    gfxStates.DepthFunc(GL_LEQUAL);
+    gfxStates.SetBlending(0);
 #if 1
 #   if 1
-    openGLStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gfxStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 #   else
-    openGLStates.BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    gfxStates.BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #   endif
 #else
-    openGLStates.BlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    gfxStates.BlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
-    openGLStates.BlendEquation(GL_FUNC_ADD);
-    openGLStates.FrontFace(GetWinding());
-    openGLStates.SetFaceCulling(1);
-    openGLStates.CullFace(GL_BACK);
-    openGLStates.openGLStates.SetMultiSample(1);
-    openGLStates.SetPolygonOffsetFill(0);
+    gfxStates.BlendEquation(GL_FUNC_ADD);
+    gfxStates.FrontFace(GetWinding());
+    gfxStates.SetFaceCulling(1);
+    gfxStates.CullFace(GL_BACK);
+    gfxStates.SetMultiSample(1);
+    gfxStates.SetPolygonOffsetFill(0);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glViewport(0, 0, m_windowWidth, m_windowHeight);
 }
@@ -114,32 +113,32 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
 
 void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
-    openGLStates.SetDepthTest(1);
-    openGLStates.SetDepthWrite(1);
-    openGLStates.DepthFunc(GL_LESS);                  
-    openGLStates.ColorMask(0, 0, 0, 0);
-    //openGLStates.ColorMask(1, 1, 1, 1);
-    openGLStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GL_LESS);                  
+    gfxStates.ColorMask(0, 0, 0, 0);
+    //gfxStates.ColorMask(1, 1, 1, 1);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
-    openGLStates.SetDepthTest(1);
-    openGLStates.SetDepthWrite(0);
-    openGLStates.DepthFunc(GL_LEQUAL);                
-    openGLStates.ColorMask(1, 1, 1, 1);
-    openGLStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.DepthFunc(GL_LEQUAL);                
+    gfxStates.ColorMask(1, 1, 1, 1);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
-    openGLStates.SetDepthTest(1);
-    openGLStates.SetDepthWrite(1);
-    openGLStates.DepthFunc(GL_LEQUAL);                
-    openGLStates.ColorMask(1, 1, 1, 1);
-    openGLStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GL_LEQUAL);                
+    gfxStates.ColorMask(1, 1, 1, 1);
+    gfxStates.SetBlending(0);
 }
 
 
@@ -194,8 +193,8 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
-        openGLStates.DepthFunc(GL_ALWAYS);
-        openGLStates.SetFaceCulling(0);
+        gfxStates.DepthFunc(GL_ALWAYS);
+        gfxStates.SetFaceCulling(0);
         SetViewport(m_sceneViewport, 0, 0, false);
 #if 0
         if (GetSceneBuffer()->Enable(true)) {
@@ -270,8 +269,8 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
-            openGLStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
+            gfxStates.DepthFunc(GL_ALWAYS);
+            gfxStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 #if 0
             if (m_screenBuffer->Enable(true)) {
@@ -282,7 +281,6 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             glClear(GL_COLOR_BUFFER_BIT);
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
-            openGLStates.DepthFunc(depthFunc);
         }
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "gfxtypes.h"   // GfxTypes::Int/Uint/Float/Enum/Handle — resolved per API via include path
 
 // =================================================================================================
 // API-neutral enumerations for mesh topology, component data types, and texture types.
@@ -15,7 +16,18 @@ enum class MeshTopology : uint8_t {
 
 enum class ComponentType : uint8_t {
     Float  = 0,
-    UInt32 = 1
+    UInt32 = 1,
+    UInt16 = 2
+};
+
+enum class GfxBufferTarget : uint8_t {
+    Vertex = 0,
+    Index  = 1
+};
+
+enum class GfxWrapMode : uint8_t {
+    Repeat      = 0,
+    ClampToEdge = 1
 };
 
 enum class TextureType : uint8_t {

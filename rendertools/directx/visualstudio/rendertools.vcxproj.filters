@@ -117,7 +117,7 @@
     <ClInclude Include="..\..\include\movement.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\opengl_states.h">
+    <ClInclude Include="..\include\gfxstates.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gputimer.h">
@@ -251,7 +251,7 @@
     <ClCompile Include="..\..\src\framecounter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\opengl_states.cpp">
+    <ClCompile Include="..\src\gfxstates.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\fonthandler.cpp">

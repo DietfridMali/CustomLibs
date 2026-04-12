@@ -1,4 +1,4 @@
-
+﻿
 #pragma once
 
 #include "glew.h"
@@ -10,7 +10,7 @@ public:
 	static inline bool IsAvailable;
 	
 	BaseSSBO() {
-		IsAvailable = openGLStates.HasExtension("GL_ARB_shader_storage_buffer_object");
+		IsAvailable = gfxStates.HasExtension("GL_ARB_shader_storage_buffer_object");
 	}
 };
 

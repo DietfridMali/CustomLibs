@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <type_traits>
 #include <cstring>
@@ -10,7 +10,7 @@
 #include "array.hpp"
 #include "vector.hpp"
 #include "string.hpp"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "shaderdata.h"
 
 // =================================================================================================

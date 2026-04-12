@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #define _TEXTURE_H
 
@@ -12,7 +12,7 @@
 #include "sharedpointer.hpp"
 #include "sharedglhandle.hpp"
 #include "avltree.hpp"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "texturebuffer.h"
 
 #pragma warning(push)
@@ -260,8 +260,8 @@ public:
         noexcept
     {
         if (tmuIndex >= 0)
-            openGLStates.BindTexture<typeID>(0, tmuIndex);
-        openGLStates.ActiveTexture(GL_TEXTURE0); // always reset!
+            gfxStates.BindTexture<typeID>(0, tmuIndex);
+        gfxStates.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 
     inline bool& HasBuffer(void)

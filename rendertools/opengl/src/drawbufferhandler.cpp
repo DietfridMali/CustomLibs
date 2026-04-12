@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <stdlib.h>
 #include <algorithm>
@@ -7,7 +7,7 @@
 #include "conversions.hpp"
 #include "glew.h"
 //#include "quad.h"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "drawbufferhandler.h"
 
 // =================================================================================================
@@ -72,7 +72,7 @@ void DrawBufferHandler::SetDrawBuffers(FBO* fbo, AutoArray<GLuint>* drawBuffers)
 
 void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
-    openGLStates.BindTexture2D(0, 0);
+    gfxStates.BindTexture2D(0, 0);
     if (m_drawBufferInfo.m_fbo != nullptr)
         m_drawBufferInfo.m_fbo->Reenable(false, true);
     else

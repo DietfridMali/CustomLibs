@@ -1,6 +1,5 @@
 
 #include <algorithm>
-#include "glew.h"
 #include "conversions.hpp"
 #include "projector.h"
 

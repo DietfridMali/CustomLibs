@@ -1,4 +1,4 @@
-
+ï»¿
 #include <utility>
 #include <stdio.h>
 #include <stdexcept>
@@ -9,7 +9,7 @@
 #include "SDL_image.h"
 #pragma warning(pop)
 
-#include "opengl_states.h"
+#include "gfxstates.h"
 
 // =================================================================================================
 
@@ -89,7 +89,7 @@ uint8_t TextureBuffer::Premultiply(uint16_t c, uint16_t a) noexcept {
 
 
 void TextureBuffer::Premultiply(void) {
-    if (m_info.m_format == GL_RGBA8) {
+    if (m_info.m_componentCount == 4) {
         RGBA8* p = reinterpret_cast<RGBA8*>(m_data.Data());
         for (int i = m_info.m_dataSize / 4; i; --i, ++p) {
             uint16_t a = uint16_t (p->a);
@@ -105,8 +105,9 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount, void* da
     m_info.m_width = width;
     m_info.m_height = height;
     m_info.m_componentCount = componentCount;
-    m_info.m_format = (componentCount == 1) ? GL_RED : (componentCount == 3) ? GL_RGB : GL_RGBA;
-    m_info.m_internalFormat = (componentCount == 1) ? GL_R8 : (componentCount == 3) ? GL_RGB8 : GL_RGBA8;
+    // Format/internalFormat are not used in DX12 (format is selected at deploy time from componentCount)
+    m_info.m_format         = 0;
+    m_info.m_internalFormat = 0;
     m_info.m_dataSize = width * height * componentCount;
     try {
 #if USE_SHARED_POINTERS
@@ -388,7 +389,7 @@ static void ComputeKernel(GaussKernel& kernel, int r) {
 }
 
 
-// Kernel-Caching: ein Eintrag pro Radius 0..15, Länge 31 (Mitte = Index 15)
+// Kernel-Caching: ein Eintrag pro Radius 0..15, Lï¿½nge 31 (Mitte = Index 15)
 static GaussKernel& GetKernel(int r)
 {
     static StaticArray<GaussKernel, 16> kernels;

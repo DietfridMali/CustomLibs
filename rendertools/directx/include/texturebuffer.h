@@ -1,7 +1,6 @@
-#pragma once
+﻿#pragma once
 
 #include "std_defines.h"
-#include "glew.h"
 #include "array.hpp"
 #include "string.hpp"
 #include "list.hpp"
@@ -9,7 +8,7 @@
 #include "sharedpointer.hpp"
 #include "sharedglhandle.hpp"
 #include "avltree.hpp"
-#include "opengl_states.h"
+#include "gfxstates.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -42,14 +41,14 @@ public:
 
     class BufferInfo {
     public:
-        int     m_width;
-        int     m_height;
-        int     m_componentCount;
-        GLenum  m_internalFormat;
-        GLenum  m_format;
-        int     m_dataSize;
+        int32_t     m_width;
+        int32_t     m_height;
+        int32_t     m_componentCount;
+        uint32_t    m_internalFormat;
+        uint32_t    m_format;
+        int32_t     m_dataSize;
 
-        BufferInfo(int width = 0, int height = 0, int componentCount = 0, int internalFormat = 0, int format = 0)
+        BufferInfo(int32_t width = 0, int32_t height = 0, int32_t componentCount = 0, uint32_t internalFormat = 0, uint32_t format = 0)
             : m_width(width)
             , m_height(height)
             , m_componentCount(componentCount)

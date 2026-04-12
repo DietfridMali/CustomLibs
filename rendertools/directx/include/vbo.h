@@ -1,7 +1,7 @@
 #pragma once
 
 #include "framework.h"
-#include "opengl_states.h"
+#include "rendertypes.h"
 #include <cstring>
 
 // =================================================================================================
@@ -23,22 +23,22 @@ public:
     int                      m_index;          // vertex attribute slot (layout location)
     const char*              m_type;           // debug tag ("vertices", "normals", …)
     int                      m_id;
-    GLenum                   m_bufferType;     // GL_ARRAY_BUFFER or GL_ELEMENT_ARRAY_BUFFER
+    GfxBufferTarget          m_bufferType;     // Vertex or Index
     char*                    m_data;           // system-memory mirror (not used in DX12)
 
     ComPtr<ID3D12Resource>   m_resource;       // committed buffer on upload heap
-    D3D12_VERTEX_BUFFER_VIEW m_vbv{};          // valid when m_bufferType == GL_ARRAY_BUFFER
-    D3D12_INDEX_BUFFER_VIEW  m_ibv{};          // valid when m_bufferType == GL_ELEMENT_ARRAY_BUFFER
+    D3D12_VERTEX_BUFFER_VIEW m_vbv{};          // valid when m_bufferType == GfxBufferTarget::Vertex
+    D3D12_INDEX_BUFFER_VIEW  m_ibv{};          // valid when m_bufferType == GfxBufferTarget::Index
 
-    GLsizei                  m_size;           // total buffer size in bytes
+    uint32_t                 m_size;           // total buffer size in bytes
     size_t                   m_itemSize;       // bytes per vertex element (stride)
-    GLsizei                  m_itemCount;
+    uint32_t                 m_itemCount;
     int                      m_componentCount;
-    GLenum                   m_componentType;  // GL_FLOAT / GL_UNSIGNED_INT / GL_UNSIGNED_SHORT
+    ComponentType            m_componentType;  // Float / UInt32 / UInt16
     bool                     m_isDynamic;
 
     VBO(const char* type = "", int id = 0,
-        GLenum bufferType = GL_ARRAY_BUFFER, bool isDynamic = true) noexcept;
+        GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
     void Reset(void) {
         m_resource.Reset();
@@ -63,11 +63,10 @@ public:
     inline void Describe(void)        noexcept {}
 
     // Upload new data and (re-)create the GPU resource if needed.
-    // componentType : GL_FLOAT | GL_UNSIGNED_INT | GL_UNSIGNED_SHORT
     // componentCount: components per vertex element (e.g. 3 for float3)
-    bool Update(const char* type, GLenum bufferType, int index,
+    bool Update(const char* type, GfxBufferTarget bufferType, int index,
                 void* data, size_t dataSize,
-                size_t componentType, size_t componentCount,
+                ComponentType componentType, size_t componentCount,
                 bool forceUpdate = false) noexcept;
 
     void Destroy(void) noexcept;

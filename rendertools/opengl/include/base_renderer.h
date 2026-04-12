@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <math.h>
 #include <utility>
@@ -13,7 +13,7 @@
 #include "viewport.h"
 #include "fbo.h"
 #include "drawbufferhandler.h"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "framecounter.h"
 
 // =================================================================================================

@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <utility>
 #include <stdio.h>
@@ -13,7 +13,7 @@
 #pragma warning(pop)
 
 #include "texture.h"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "base_renderer.h"
 #include "descriptor_heap.h"
 #include "command_queue.h"
@@ -119,11 +119,11 @@ static bool UploadTextureData(
 
 // =================================================================================================
 
-Texture::Texture(uint32_t handle, int type, int wrapMode)
+Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
     : m_handle(handle)
     , m_type(type)
     , m_tmuIndex(-1)
-    , m_wrapMode(wrapMode)
+    , m_wrapMode(wrap)
     , m_name("")
 {
     SetupLUT();
@@ -222,7 +222,7 @@ bool Texture::Bind(int tmuIndex)
 {
     if (!IsAvailable()) return false;
     m_tmuIndex = tmuIndex;
-    openGLStates.BindTexture(m_type, m_handle, tmuIndex);
+    gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
     return true;
 }
 
@@ -230,7 +230,7 @@ bool Texture::Bind(int tmuIndex)
 void Texture::Release(void)
 {
     if (m_tmuIndex >= 0) {
-        openGLStates.BindTexture(m_type, UINT32_MAX, m_tmuIndex);
+        gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
         m_tmuIndex = -1;
     }
 }
@@ -255,7 +255,7 @@ bool Texture::Deploy(int bufferIndex)
 
     int w        = tb->m_info.m_width;
     int h        = tb->m_info.m_height;
-    int channels = tb->m_info.m_channels;
+    int channels = tb->m_info.m_componentCount;
     if (w <= 0 || h <= 0) return false;
 
     // (Re-)create the default-heap texture resource
@@ -265,7 +265,7 @@ bool Texture::Deploy(int bufferIndex)
     rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     rd.Width            = UINT(w);
     rd.Height           = UINT(h);
-    rd.DepthOrArraySize = (m_type == GL_TEXTURE_CUBE_MAP) ? 6 : 1;
+    rd.DepthOrArraySize = (m_type == TextureType::CubeMap) ? 6 : 1;
     rd.MipLevels        = 1;
     rd.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
     rd.SampleDesc.Count = 1;
@@ -291,7 +291,7 @@ bool Texture::Deploy(int bufferIndex)
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
     srvDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
-    srvDesc.ViewDimension           = (m_type == GL_TEXTURE_CUBE_MAP)
+    srvDesc.ViewDimension           = (m_type == TextureType::CubeMap)
                                     ? D3D12_SRV_DIMENSION_TEXTURECUBE
                                     : D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -359,10 +359,10 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
 
     SDL_LockSurface(converted);
 
-    tb->m_info.m_width    = w;
-    tb->m_info.m_height   = h;
-    tb->m_info.m_channels = 4;
-    tb->Resize(w * h * 4);
+    tb->m_info.m_width          = w;
+    tb->m_info.m_height         = h;
+    tb->m_info.m_componentCount = 4;
+    tb->m_data.Resize(w * h * 4);
     std::memcpy(tb->DataBuffer(), converted->pixels, w * h * 4);
 
     SDL_UnlockSurface(converted);
@@ -392,7 +392,7 @@ void Texture::Cartoonize(uint16_t /*blurStrength*/, uint16_t /*gradients*/, uint
 
 void Texture::SetWrapping(int wrapMode) noexcept
 {
-    if (wrapMode >= 0) m_wrapMode = wrapMode;
+    if (wrapMode >= 0) m_wrapMode = GfxWrapMode(wrapMode);
     // Wrapping is configured via static samplers / PSO; no per-texture state in DX12.
 }
 

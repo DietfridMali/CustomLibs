@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <optional>
 #include <tuple>
@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "glew.h"
+#include "gfxtypes.h"
 
 #include "array.hpp"
 #include "list.hpp"
@@ -16,7 +17,7 @@
 
 // =================================================================================================
 
-class TMUBindingInfo {
+class TextureSlotInfo {
 private:
 	GLenum m_type{ GL_TEXTURE_2D };
 	GLint m_tmuCount{ 0 };
@@ -24,7 +25,7 @@ private:
 	AutoArray<GLuint> m_bindings;
 
 public:
-	TMUBindingInfo(GLenum type = 0) {
+	TextureSlotInfo(GLenum type = 0) {
 		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_tmuCount);
 		m_bindings.Resize(m_tmuCount);
 		m_bindings.Fill(0);
@@ -51,18 +52,18 @@ public:
 
 // =================================================================================================
 
-class OpenGLStates
-	: public BaseSingleton<OpenGLStates>
+class GfxStates
+	: public BaseSingleton<GfxStates>
 {
 private:
 	int m_maxTextureSize{ 0 };
 	std::unordered_set<std::string> m_extensions;
 	bool m_haveExtensions{ false };
 
-	List<TMUBindingInfo> m_tmuBindings;
+	List<TextureSlotInfo> m_tmuBindings;
 
 public:
-	OpenGLStates() {
+	GfxStates() {
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 		DetermineExtensions();
 	}
@@ -217,7 +218,7 @@ public:
 			return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
 		}
 
-		TMUBindingInfo* FindInfo(GLenum type);
+		TextureSlotInfo* FindInfo(GLenum type);
 
 		int BoundTMU(GLenum type, GLuint handle, int tmuIndex = -1);
 
@@ -245,6 +246,6 @@ public:
 		void ReleaseBuffers(void) noexcept;
 	};
 
-#define openGLStates OpenGLStates::Instance()
+#define gfxStates GfxStates::Instance()
 
 	// =================================================================================================

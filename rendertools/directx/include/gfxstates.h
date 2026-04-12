@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <tuple>
@@ -132,6 +132,18 @@ using GLenum = unsigned int;
 #endif
 
 // =================================================================================================
+// Map API-neutral TextureType to the GLenum tag used as slot-group key in the state tracker.
+#include "rendertypes.h"
+
+inline GLenum TextureTypeToGLenum(TextureType t) noexcept {
+    switch (t) {
+        case TextureType::Texture3D: return GLenum(GL_TEXTURE_3D);
+        case TextureType::CubeMap:   return GLenum(GL_TEXTURE_CUBE_MAP);
+        default:                     return GLenum(GL_TEXTURE_2D);
+    }
+}
+
+// =================================================================================================
 // TextureSlotInfo: replaces TMUBindingInfo.
 // Tracks the SRV descriptor-heap index (uint32_t) bound to each texture slot (0-based).
 // Void*-handles are not used; the caller passes a uint32_t SRV index directly.
@@ -202,7 +214,7 @@ struct RenderState {
 
 // =================================================================================================
 
-class OpenGLStates : public BaseSingleton<OpenGLStates>
+class GfxStates : public BaseSingleton<GfxStates>
 {
 private:
     RenderState             m_state;
@@ -211,7 +223,7 @@ private:
     int                     m_maxTextureSize{ 4096 };
 
 public:
-    OpenGLStates() = default;
+    GfxStates() = default;
 
     // Call once after DX12 device creation to set hardware limits.
     void Init(int maxTextureSize = 4096) noexcept { m_maxTextureSize = maxTextureSize; }
@@ -406,6 +418,6 @@ public:
     void ReleaseBuffers(void) noexcept;
 };
 
-#define openGLStates OpenGLStates::Instance()
+#define gfxStates GfxStates::Instance()
 
 // =================================================================================================

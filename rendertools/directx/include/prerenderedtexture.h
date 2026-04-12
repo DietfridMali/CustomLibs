@@ -1,7 +1,5 @@
 #pragma once
 
-
-#include "glew.h"
 #include "vector.hpp"
 #include "colordata.h"
 #include "rectangle.h"

@@ -1,4 +1,4 @@
-
+ï»¿
 #include <utility>
 #include <stdio.h>
 #include <stdexcept>
@@ -9,7 +9,7 @@
 #include "SDL_image.h"
 #pragma warning(pop)
 
-#include "opengl_states.h"
+#include "gfxstates.h"
 
 // =================================================================================================
 
@@ -388,7 +388,7 @@ static void ComputeKernel(GaussKernel& kernel, int r) {
 }
 
 
-// Kernel-Caching: ein Eintrag pro Radius 0..15, Länge 31 (Mitte = Index 15)
+// Kernel-Caching: ein Eintrag pro Radius 0..15, Lï¿½nge 31 (Mitte = Index 15)
 static GaussKernel& GetKernel(int r)
 {
     static StaticArray<GaussKernel, 16> kernels;

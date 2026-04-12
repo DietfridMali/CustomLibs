@@ -1,7 +1,6 @@
 #include "glew.h"
 #include "conversions.hpp"
 #include "fbo.h"
-#include "tristate.h"
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 
@@ -51,7 +50,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
     baseRenderer.ClearGLError();
-    openGLStates.BindTexture2D(bufferInfo.m_handle, 0);
+    gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
     if (bufferType == BufferInfo::btDepth) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
@@ -81,7 +80,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     }
-    openGLStates.BindTexture2D(0, 0);
+    gfxStates.BindTexture2D(0, 0);
     ++m_bufferCount;
 }
 
@@ -117,7 +116,7 @@ bool FBO::AttachBuffer(int bufferIndex) {
 #endif
         return true;
     GLuint h = bufferInfo.m_handle;
-    openGLStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
+    gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
     return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
@@ -316,7 +315,7 @@ bool FBO::ReattachBuffers(void) {
 bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
-    openGLStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
+    gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
     Clear(bufferIndex, drawBufferGroup, clear);
 #ifdef _DEBUG
     return baseRenderer.CheckGLError();
@@ -365,7 +364,7 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
     for (int i = 0; i < m_bufferCount; ++i)
         if ((i != bufferIndex) and (m_bufferInfo[i].m_tmuIndex == tmuIndex))
             m_bufferInfo[i].m_tmuIndex = -1;
-    openGLStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, tmuIndex);
+    gfxStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, tmuIndex);
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
     return true;
 }
@@ -373,7 +372,7 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
 
 void FBO::ReleaseBuffers(void) {
     for (int i = 0; i < m_bufferCount; i++) {
-        openGLStates.ReleaseTexture(GL_TEXTURE_2D, m_bufferInfo[i].m_handle);
+        gfxStates.ReleaseTexture(GL_TEXTURE_2D, m_bufferInfo[i].m_handle);
         m_bufferInfo[i].m_tmuIndex = -1;
     }
 }
@@ -411,19 +410,18 @@ bool FBO::UpdateTransformation(const FBORenderParams& params) {
 
 
 bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RGBAColor& color) {
-    Tristate<int> blending(-1, 0, 0);
     if (params.destination < 0) // rendering to the current render target
-        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(1));
+        gfxStates.SetBlending(1);
     else { // rendering to another FBO (than the main buffer)
         if (not Enable(params.destination, FBO::dbSingle, params.clearBuffer))
             return false;
         m_lastDestination = params.destination;
-        blending = Tristate<int>(-1, 0, openGLStates.SetBlending(0));
+        gfxStates.SetBlending(0);
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
-    Tristate<GLenum> depthFunc(GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
-    Tristate<int> faceCulling(-1, 1, openGLStates.SetFaceCulling(0));
+    gfxStates.DepthFunc(GL_ALWAYS);
+    gfxStates.SetFaceCulling(0);
     if (params.shader) {
         if (applyTransformation)
             params.shader->UpdateMatrices();
@@ -456,9 +454,6 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
             m_viewportArea.Render(nullptr, source, color); // texture has been assigned to m_viewportArea above
         }
     }
-    openGLStates.SetBlending(blending);
-    openGLStates.SetFaceCulling(faceCulling);
-    openGLStates.DepthFunc(depthFunc);
     baseRenderer.PopMatrix();
     if (params.destination > -1)
         Disable();
@@ -484,10 +479,10 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex) {
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
         if (tmuIndex > -1) {
-			GLuint boundHandle = openGLStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
+			GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
             m_renderTexture.Enable(tmuIndex);
             m_renderTexture.SetParams(true);
-            openGLStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
+            gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
         }
     }
     return &m_renderTexture;

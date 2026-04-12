@@ -2,9 +2,9 @@
 
 #include "vector.hpp"
 #include "matrix.hpp"
-#include "glew.h"
 #include "shader.h"
 #include "projector.h"
+#include "gfxtypes.h"   // GfxTypes::Float — resolved to GL or DX12 definition via include path
 
 // =================================================================================================
 
@@ -73,8 +73,8 @@ public:
     }
 
 
-    inline GLfloat* ProjectionMatrix(void) noexcept {
-        return (GLfloat*)m_transformations[int(mtProjection)].AsArray();
+    inline const GfxTypes::Float* ProjectionMatrix(void) noexcept {
+        return m_transformations[int(mtProjection)].AsArray();
     }
 
 
@@ -203,8 +203,8 @@ public:
         return Matrices()->GetProjector();
     }
 
-    inline GLfloat* ProjectionMatrix(void) noexcept {
-        return (GLfloat*)Matrices()->GetProjection().AsArray();
+    inline const GfxTypes::Float* ProjectionMatrix(void) noexcept {
+        return Matrices()->GetProjection().AsArray();
     }
 
 
@@ -216,16 +216,19 @@ public:
 
     template<typename T>
     void SetMatrix(T&& m, MatrixStack::MatrixType matrixType = mtModelView) noexcept {
-        if (matrixType == MatrixStack::mtModelView) {
+        if (matrixType == MatrixStack::mtModelView)
             ModelView() = std::forward<T>(m);
+        else
+            Projection() = std::forward<T>(m);
+#ifdef OPENGL
+        if (matrixType == MatrixStack::mtModelView) {
             glMatrixMode(GL_MODELVIEW);
             glLoadMatrixf(std::forward<T>(m).Transpose().AsArray());
-        }
-        else {
-            Projection() = std::forward<T>(m);
+        } else {
             glMatrixMode(GL_PROJECTION);
             glLoadMatrixf(std::forward<T>(m).Transpose().AsArray());
         }
+#endif
     }
 
 

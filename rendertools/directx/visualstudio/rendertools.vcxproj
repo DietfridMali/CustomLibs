@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -80,7 +80,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -101,7 +101,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -141,7 +141,7 @@
     <ClInclude Include="..\..\include\mesh.h" />
     <ClInclude Include="..\..\include\movement.h" />
     <ClInclude Include="..\include\noisetexture.h" />
-    <ClInclude Include="..\include\opengl_states.h" />
+    <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\outlinerenderer.h" />
     <ClInclude Include="..\..\include\noise.h" />
     <ClInclude Include="..\..\include\coplanar_rectangle.h" />
@@ -157,19 +157,17 @@
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
     <ClInclude Include="..\..\include\shadowmap.h" />
-    <ClInclude Include="..\include\SSBO.hpp" />
     <ClInclude Include="..\..\include\texcoord.h" />
     <ClInclude Include="..\..\include\textrenderer.h" />
     <ClInclude Include="..\include\texture.h" />
     <ClInclude Include="..\..\include\textureatlas.h" />
     <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\..\include\texturehandler.h" />
-    <ClInclude Include="..\include\EnableTe.h" />
     <ClInclude Include="..\include\vao.h" />
     <ClInclude Include="..\include\vbo.h" />
     <ClInclude Include="..\..\include\vertexdatabuffers.h" />
     <ClInclude Include="..\..\include\viewport.h" />
-    <ClInclude Include="framework.h" />
+    <ClInclude Include="..\include\framework.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\base_shadercode.cpp" />
@@ -191,7 +189,7 @@
     <ClCompile Include="..\src\primitive_shaders.cpp" />
     <ClCompile Include="..\..\src\mesh.cpp" />
     <ClCompile Include="..\src\noisetexture.cpp" />
-    <ClCompile Include="..\src\opengl_states.cpp" />
+    <ClCompile Include="..\src\gfxstates.cpp" />
     <ClCompile Include="..\..\src\outlinerenderer.cpp" />
     <ClCompile Include="..\src\outline_shader.cpp" />
     <ClCompile Include="..\..\src\coplanar_rectangle.cpp" />

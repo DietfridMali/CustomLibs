@@ -1,4 +1,4 @@
-
+ï»¿
 #include <utility>
 #include <stdio.h>
 #include <stdexcept>
@@ -11,7 +11,7 @@
 #pragma warning(pop)
 
 #include "texture.h"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "base_renderer.h"
 
 #define USE_TEXTURE_LUT 1
@@ -84,7 +84,7 @@ void Texture::Destroy(void)
                 delete p;
         }
         m_buffers.Clear();
-        m_hasBuffer = false; // BUGFIX: Status zurücksetzen
+        m_hasBuffer = false; // BUGFIX: Status zurï¿½cksetzen
     }
 }
 
@@ -150,9 +150,9 @@ bool Texture::Bind(int tmuIndex)
         return false;
     m_tmuIndex = 
 #if USE_SHARED_HANDLES
-        openGLStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
+        gfxStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
 #else
-        openGLStates.BindTexture(m_type, m_handle, tmuIndex);
+        gfxStates.BindTexture(m_type, m_handle, tmuIndex);
 #endif
     return m_tmuIndex >= 0;
 }
@@ -161,9 +161,9 @@ bool Texture::Bind(int tmuIndex)
 void Texture::Release(void) {
     if (m_tmuIndex >= 0) {
 #if USE_SHARED_HANDLES
-        openGLStates.ReleaseTexture(m_type, m_handle.Data(), m_tmuIndex);
+        gfxStates.ReleaseTexture(m_type, m_handle.Data(), m_tmuIndex);
 #else
-        openGLStates.ReleaseTexture(m_type, m_handle, m_tmuIndex);
+        gfxStates.ReleaseTexture(m_type, m_handle, m_tmuIndex);
 #endif
         m_tmuIndex = -1;
     }

@@ -6,7 +6,7 @@
 
 class Cubemap : public Texture {
 public:
-    Cubemap() : Texture(0, GL_TEXTURE_CUBE_MAP) {}
+    Cubemap() : Texture(0, TextureType::CubeMap) {}
 
     virtual void SetParams(void);
 

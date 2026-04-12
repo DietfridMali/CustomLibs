@@ -31,14 +31,16 @@ void RenderMatrices::CreateMatrices(int windowWidth, int windowHeight, float asp
 
 
 void RenderMatrices::SetupTransformation(void) noexcept {
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode(GL_PROJECTION);
-        glLoadMatrixf(Projection3D().AsArray()); // already column major
+        glLoadMatrixf(Projection3D().AsArray());
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
     }
 #if !DEBUG_MATRICES
     else
+#endif
 #endif
     {
         ModelView() = Matrix4f::IDENTITY;
@@ -51,6 +53,7 @@ void RenderMatrices::ResetTransformation(void) noexcept {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "resetting transformation\n");
 #endif
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -61,6 +64,7 @@ void RenderMatrices::ResetTransformation(void) noexcept {
 #if !DEBUG_MATRICES
     else
 #endif
+#endif
     {
         ModelView() = Matrix4f::IDENTITY;
         Projection() = Projection2D();
@@ -69,7 +73,7 @@ void RenderMatrices::ResetTransformation(void) noexcept {
 
 
 bool RenderMatrices::CheckModelView(void) noexcept {
-#if DEBUG_MATRICES
+#if DEBUG_MATRICES && defined(OPENGL)
     float glData[16], mData[16];
     Shader::GetFloatData(GL_MODELVIEW_MATRIX, 16, glData);
     memcpy(mData, ModelView().AsArray(), sizeof(mData));
@@ -84,7 +88,7 @@ bool RenderMatrices::CheckModelView(void) noexcept {
 
 
 bool RenderMatrices::CheckProjection(void) noexcept {
-#if DEBUG_MATRICES
+#if DEBUG_MATRICES && defined(OPENGL)
     float glData[16], mData[16];
     Shader::GetFloatData(GL_PROJECTION_MATRIX, 16, glData);
     memcpy(mData, Projection().AsArray(), sizeof(mData));
@@ -102,22 +106,14 @@ Matrix4f& RenderMatrices::Scale(float xScale, float yScale, float zScale, const 
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "   Scale(%1.2f, %1.2f, %1.2f)\n", xScale, yScale, zScale);
 #endif
-#if DEBUG_MATRICES
-    float glData[16];
-    Shader::GetFloatData(GL_MODELVIEW_MATRIX, 16, glData);
-    Matrix4f m;
-    m = ModelView().IsColMajor() ? ModelView() : ModelView().Transpose(m, 3);
-    CheckModelView();
-#endif
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode)
         glScalef(xScale, yScale, zScale);
 #if !DEBUG_MATRICES
     else
 #endif
-        ModelView().Scale(xScale, yScale, zScale);
-#if DEBUG_MATRICES
-    CheckModelView();
 #endif
+        ModelView().Scale(xScale, yScale, zScale);
     return ModelView();
 }
 
@@ -126,53 +122,30 @@ Matrix4f& RenderMatrices::Translate(float xTranslate, float yTranslate, float zT
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "   Translate(%1.2f, %1.2f, %1.2f)\n", xTranslate, yTranslate, zTranslate);
 #endif
-#if DEBUG_MATRICES
-    float glData[16];
-    Shader::GetFloatData(GL_MODELVIEW_MATRIX, 16, glData);
-    Matrix4f m;
-    m = ModelView().IsColMajor() ? ModelView() : ModelView().Transpose(m, 3);
-#endif
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode) {
         glTranslatef(xTranslate, yTranslate, zTranslate);
     }
 #if !DEBUG_MATRICES
     else
 #endif
+#endif
     {
-#if USE_GLM
         ModelView().Translate(xTranslate, yTranslate, zTranslate);
-#else
-#   if 1
-        ModelView().Translate(xTranslate, yTranslate, zTranslate);
-#   else
-        Matrix4f t = Matrix4f::Translation(xTranslate, yTranslate, zTranslate, ModelView().IsColMajor());
-        ModelView() = t * ModelView();
-#   endif
-#endif
     }
-#if DEBUG_MATRICES
-    CheckModelView();
-#endif
     return ModelView();
 }
 
 
 Matrix4f& RenderMatrices::Rotate(float angle, float xScale, float yScale, float zScale, const char* caller) noexcept {
-#if DEBUG_MATRICES
-    float glData[16];
-    Shader::GetFloatData(GL_MODELVIEW_MATRIX, 16, glData);
-    Matrix4f m = ModelView();
-    CheckModelView();
-#endif
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode)
         glRotatef(angle, xScale, yScale, zScale);
 #if !DEBUG_MATRICES
     else
 #endif
-        ModelView().Rotate(angle, xScale, yScale, zScale);
-#if DEBUG_MATRICES
-    CheckModelView();
 #endif
+        ModelView().Rotate(angle, xScale, yScale, zScale);
     return ModelView();
 }
 
@@ -183,21 +156,14 @@ Matrix4f& RenderMatrices::Rotate(Matrix4f& r) noexcept {
     memcpy(mData, r.AsArray(), sizeof(mData));
     fprintf(stderr, "   Rotate(%1.2f, %1.2f, %1.2f, %1.2f, %1.2f, %1.2f, %1.2f, %1.2f, %1.2f)\n", mData[0], mData[1], mData[2], mData[3], mData[4], mData[5], mData[6], mData[7], mData[8]);
 #endif
-#if DEBUG_MATRICES
-    float glData[16];
-    Shader::GetFloatData(GL_MODELVIEW_MATRIX, 16, glData);
-    Matrix4f m = ModelView();
-    CheckModelView();
-#endif
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode)
         glMultMatrixf(r.AsArray());
 #if !DEBUG_MATRICES
     else
 #endif
-        ModelView().Rotate(r);
-#if DEBUG_MATRICES
-    CheckModelView();
 #endif
+        ModelView().Rotate(r);
     return ModelView();
 }
 
@@ -219,12 +185,14 @@ void RenderMatrices::PushMatrix(MatrixType matrixType) {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "PushMatrix\n");
 #endif
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode((matrixType == mtModelView) ? GL_MODELVIEW : GL_PROJECTION);
         glPushMatrix();
     }
 #if !DEBUG_MATRICES
     else
+#endif
 #endif
     {
         Matrices()->Push(matrixType);
@@ -236,12 +204,14 @@ void RenderMatrices::PopMatrix(MatrixType matrixType) {
 #if LOG_MATRIX_OPERATIONS
     fprintf(stderr, "PopMatrix\n");
 #endif
+#ifdef OPENGL
     if (DEBUG_MATRICES or LegacyMode) {
         glMatrixMode((matrixType == mtModelView) ? GL_MODELVIEW : GL_PROJECTION);
         glPopMatrix();
     }
 #if !DEBUG_MATRICES
     else
+#endif
 #endif
     {
         Matrices()->Pop(matrixType);
@@ -253,10 +223,12 @@ void RenderMatrices::PopMatrix(MatrixType matrixType) {
 
 
 void RenderMatrices::UpdateLegacyMatrices(void) noexcept {
+#ifdef OPENGL
     glMatrixMode(GL_PROJECTION);
     glLoadMatrixf(Projection().AsArray());
     glMatrixMode(GL_MODELVIEW);
     glLoadMatrixf(ModelView().AsArray());
+#endif
 }
 
 // =================================================================================================

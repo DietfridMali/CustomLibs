@@ -19,9 +19,9 @@ static D3D_PRIMITIVE_TOPOLOGY ToD3DTopology(MeshTopology topology) noexcept
     }
 }
 
-static DXGI_FORMAT ToIndexFormat(GLenum componentType) noexcept
+static DXGI_FORMAT ToIndexFormat(ComponentType componentType) noexcept
 {
-    return (componentType == GL_UNSIGNED_SHORT) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+    return (componentType == ComponentType::UInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 }
 
 // =================================================================================================
@@ -92,7 +92,7 @@ bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffe
     if (forceUpdate || buffer.IsDirty()) {
         if (!UpdateDataBuffer(type, id,
                               buffer.GLDataBuffer(), buffer.GLDataSize(),
-                              GLenum(componentType == ComponentType::UInt32 ? GL_UNSIGNED_INT : GL_FLOAT),
+                              componentType,
                               size_t(buffer.ComponentCount()), forceUpdate))
             return false;
         buffer.SetDirty(false);
@@ -105,8 +105,7 @@ void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType,
                              bool forceUpdate) noexcept
 {
     if (forceUpdate || buffer.IsDirty()) {
-        GLenum fmt = (componentType == ComponentType::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-        UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), fmt, forceUpdate);
+        UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, forceUpdate);
         buffer.SetDirty(false);
     }
 }
@@ -136,16 +135,16 @@ bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize
         vbo->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
     }
-    return vbo->Update(type, GL_ARRAY_BUFFER, index, data, dataSize,
-                       componentType, componentCount, forceUpdate);
+    return vbo->Update(type, GfxBufferTarget::Vertex, index, data, dataSize,
+                       ComponentType(componentType), componentCount, forceUpdate);
 }
 
 
 void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType,
                               bool forceUpdate) noexcept
 {
-    m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize,
-                          componentType, 1, forceUpdate);
+    m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize,
+                          ComponentType(componentType), 1, forceUpdate);
 }
 
 
@@ -166,7 +165,7 @@ bool VAO::Enable(void) noexcept
         int bound = 0;
         for (auto vbo : m_dataBuffers) {
             if (bound >= kMaxStreams) break;
-            if (vbo && vbo->IsValid() && vbo->m_bufferType == GL_ARRAY_BUFFER) {
+            if (vbo && vbo->IsValid() && vbo->m_bufferType == GfxBufferTarget::Vertex) {
                 views[vbo->m_index >= 0 ? vbo->m_index : bound] = vbo->m_vbv;
             }
             ++bound;

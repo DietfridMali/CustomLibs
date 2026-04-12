@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #define _TEXTURE_H
 
@@ -10,7 +10,7 @@
 #include "list.hpp"
 #include "conversions.hpp"
 #include "avltree.hpp"
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "texturebuffer.h"
 
 #pragma warning(push)
@@ -26,7 +26,7 @@
 //   • ComPtr<ID3D12Resource> m_resource — default-heap texture resource.
 //   • uint32_t m_handle — SRV descriptor-heap index (UINT32_MAX = invalid).
 //     Named m_handle for source compatibility (FBO::BufferHandle assignment, etc.).
-//   • Bind(slot)  → openGLStates.BindTexture2D(m_handle, slot)
+//   • Bind(slot)  → gfxStates.BindTexture2D(m_handle, slot)
 //   • Deploy()    → uploads pixel data to GPU via a temporary upload resource.
 //
 // SharedTextureHandle / SharedGLHandle are NOT used in DX12.
@@ -81,9 +81,9 @@ public:
     String                      m_name;
     List<TextureBuffer*>        m_buffers;
     List<String>                m_filenames;
-    GLenum                      m_type{ GL_TEXTURE_2D };
+    TextureType                 m_type{ TextureType::Texture2D };
     int                         m_tmuIndex{ -1 };
-    int                         m_wrapMode{ GL_REPEAT };
+    GfxWrapMode                 m_wrapMode{ GfxWrapMode::Repeat };
     int                         m_useMipMaps{ false };
     bool                        m_hasBuffer{ false };
     bool                        m_hasParams{ false };
@@ -109,9 +109,9 @@ public:
         return updateLUT;
     }
 
-    explicit Texture(uint32_t handle = UINT32_MAX,
-                     int type     = GL_TEXTURE_2D,
-                     int wrapMode = GL_CLAMP_TO_EDGE);
+    explicit Texture(uint32_t handle   = UINT32_MAX,
+                     TextureType type  = TextureType::Texture2D,
+                     GfxWrapMode wrap  = GfxWrapMode::ClampToEdge);
 
     ~Texture() noexcept;
 
@@ -157,21 +157,17 @@ public:
     inline int GetWidth(int i = 0)   noexcept { return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width  : 0; }
     inline int GetHeight(int i = 0)  noexcept { return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0; }
     inline uint8_t* GetData(int i = 0)        { return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr; }
-    inline int  Type(void)     noexcept { return m_type; }
-    inline int  WrapMode(void) noexcept { return m_wrapMode; }
+    inline TextureType  Type(void)     noexcept { return m_type; }
+    inline GfxWrapMode  WrapMode(void) noexcept { return m_wrapMode; }
     inline String GetName(void)        { return m_name; }
 
-    inline TextureType GetTextureType(void) const noexcept {
-        if (m_type == GL_TEXTURE_CUBE_MAP) return TextureType::CubeMap;
-        return TextureType::Texture2D;
-    }
+    inline TextureType GetTextureType(void) const noexcept { return m_type; }
 
-    // Static release helpers — clear the slot in openGLStates.
-    template<GLenum typeID>
+    // Static release helpers — clear the slot in gfxStates.
+    template<TextureType typeID>
     static inline void Release(int tmuIndex) noexcept {
         if (tmuIndex >= 0)
-            openGLStates.BindTexture(typeID, UINT32_MAX, tmuIndex);
-        openGLStates.ActiveTexture(GL_TEXTURE0);
+            gfxStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
     }
 
     inline bool& HasBuffer(void) noexcept { return m_hasBuffer; }
@@ -186,7 +182,7 @@ public:
 class TiledTexture : public Texture
 {
 public:
-    TiledTexture() : Texture(UINT32_MAX, GL_TEXTURE_2D, GL_REPEAT) {}
+    TiledTexture() : Texture(UINT32_MAX, TextureType::Texture2D, GfxWrapMode::Repeat) {}
     ~TiledTexture() = default;
     virtual void SetParams(bool forceUpdate = false) override;
 };

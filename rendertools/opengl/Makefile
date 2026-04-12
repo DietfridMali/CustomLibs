@@ -1,4 +1,4 @@
-.RECIPEPREFIX := >
+﻿.RECIPEPREFIX := >
 ifeq ($(strip $(CXX)),)
   CXX := g++
 endif
@@ -27,7 +27,7 @@ FILES := \
  mesh \
  noise \
  noisetexture \
- opengl_states \
+ gfxstates \
  outlinerenderer \
  outline_shader \
  coplanar_rectangle \

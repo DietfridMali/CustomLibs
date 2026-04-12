@@ -1,10 +1,10 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <stdlib.h>
 #include <algorithm>
 #include <utility>
 
-#include "opengl_states.h"
+#include "gfxstates.h"
 #include "drawbufferhandler.h"
 #include "command_queue.h"
 #include "base_displayhandler.h"
@@ -79,7 +79,7 @@ void DrawBufferHandler::RestoreDrawBuffer(void) {
     DrawBufferInfo info;
     m_drawBufferStack.Pop(info);
     m_drawBufferInfo = info;
-    openGLStates.BindTexture2D(0, 0); // clear slot 0 from the active SRV table
+    gfxStates.BindTexture2D(0, 0); // clear slot 0 from the active SRV table
     if (m_drawBufferInfo.m_fbo)
         m_drawBufferInfo.m_fbo->Reenable(false, true);
     SetActiveDrawBuffers();

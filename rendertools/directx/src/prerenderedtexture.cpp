@@ -1,5 +1,4 @@
 
-#include "glew.h"
 #include "vector.hpp"
 #include "base_quad.h"
 #include "texture.h"

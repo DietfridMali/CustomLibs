@@ -2,10 +2,7 @@
 
 #include <memory>
 #include <functional>
-#include <cstddef> // für std::size_t
-
-// Für OpenGL-Typen und Funktionen
-#include "glew.h" // oder <GL/glew.h> oder <GL/glcorearb.h> je nach System/Projekt
+#include <cstddef> // fÃ¼r std::size_t
 
 // =================================================================================================
 
@@ -161,6 +158,10 @@ public:
 
 // =================================================================================================
 
+#ifdef OPENGL
+
+#include "glew.h"
+
 using glBufferAllocator = std::remove_pointer_t<decltype(&glGenTextures)>;
 using glBufferReleaser = std::remove_pointer_t<decltype(&glDeleteTextures)>;
 
@@ -221,5 +222,7 @@ public:
     {
     }
 };
+
+#endif // OPENGL
 
 // =================================================================================================

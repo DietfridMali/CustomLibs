@@ -1,4 +1,5 @@
-﻿
+#define NOMINMAX
+
 // --- tileable fBM noise (periodisch in X/Y) ---------------------------------
 #include <vector>
 #include <cstdint>
@@ -6,6 +7,7 @@
 #include <algorithm>
 #include <fstream>
 #include <filesystem>
+#include <cstring>
 
 #include "noisetexture.h"
 #include "base_renderer.h"
@@ -20,31 +22,134 @@ using namespace Noise;
 #define CLOUD_STRUCTURE 2
 
 // =================================================================================================
+// Helper: upload a 3D (Texture3D) resource via an upload buffer and return the committed resource.
+// pixelStride: bytes per voxel.  The 3D resource is laid out as depth slices stored contiguously.
+
+static ComPtr<ID3D12Resource> Upload3DTexture(
+    ID3D12Device*    device,
+    int w, int h, int d,
+    DXGI_FORMAT      fmt,
+    uint32_t         pixelStride,
+    const void*      data) noexcept
+{
+    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
+    D3D12_RESOURCE_DESC rd{};
+    rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    rd.Width            = UINT(w);
+    rd.Height           = UINT(h);
+    rd.DepthOrArraySize = UINT16(d);
+    rd.MipLevels        = 1;
+    rd.Format           = fmt;
+    rd.SampleDesc.Count = 1;
+    rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    ComPtr<ID3D12Resource> resource;
+    if (FAILED(device->CreateCommittedResource(
+        &hp, D3D12_HEAP_FLAG_NONE, &rd,
+        D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+        IID_PPV_ARGS(&resource))))
+        return nullptr;
+
+    UINT64 uploadSize = 0;
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+    UINT rowCount = 0; UINT64 rowSize = 0;
+    device->GetCopyableFootprints(&rd, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
+
+    D3D12_HEAP_PROPERTIES uhp{ D3D12_HEAP_TYPE_UPLOAD };
+    D3D12_RESOURCE_DESC upDesc{};
+    upDesc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
+    upDesc.Width            = uploadSize;
+    upDesc.Height           = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
+    upDesc.SampleDesc.Count = 1;
+    upDesc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ComPtr<ID3D12Resource> upload;
+    if (FAILED(device->CreateCommittedResource(&uhp, D3D12_HEAP_FLAG_NONE, &upDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
+        return nullptr;
+
+    const uint8_t* src = static_cast<const uint8_t*>(data);
+    uint8_t* mapped = nullptr;
+    D3D12_RANGE mapRange{ 0, 0 };
+    if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) return nullptr;
+    for (UINT r = 0; r < rowCount; ++r)
+        std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch,
+                    src    + r * UINT(w) * pixelStride,
+                    UINT(w) * pixelStride);
+    upload->Unmap(0, nullptr);
+
+    auto* list = cmdQueue.List();
+    if (!list) return nullptr;
+
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+    srcLoc.pResource        = upload.Get();
+    srcLoc.Type             = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    srcLoc.PlacedFootprint  = layout;
+    dstLoc.pResource        = resource.Get();
+    dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dstLoc.SubresourceIndex = 0;
+    list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type                    = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags                   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.Transition.pResource    = resource.Get();
+    barrier.Transition.StateBefore  = D3D12_RESOURCE_STATE_COPY_DEST;
+    barrier.Transition.StateAfter   = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource  = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    list->ResourceBarrier(1, &barrier);
+
+    cmdQueue.Execute();
+    cmdQueue.WaitIdle();
+
+    return resource;
+}
+
+
+// Helper: allocate a SRV for a 3D texture resource
+static bool CreateSRV3D(uint32_t& handleOut, ID3D12Resource* resource, DXGI_FORMAT fmt) {
+    if (handleOut == UINT32_MAX) {
+        DescriptorHandle hdl = descriptorHeaps.AllocSRV();
+        if (!hdl.IsValid()) return false;
+        handleOut = hdl.index;
+    }
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    srvDesc.Format                     = fmt;
+    srvDesc.ViewDimension              = D3D12_SRV_DIMENSION_TEXTURE3D;
+    srvDesc.Shader4ComponentMapping    = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture3D.MipLevels        = 1;
+    dx12Context.Device()->CreateShaderResourceView(
+        resource, &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(handleOut));
+    return true;
+}
+
+// =================================================================================================
 
 bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
     TextureBuffer* texBuf = new TextureBuffer();
-    if (not texBuf) 
+    if (!texBuf)
         return false;
-    if (not m_buffers.Append(texBuf)) { 
-        delete texBuf; 
-        return false; 
+    if (!m_buffers.Append(texBuf)) {
+        delete texBuf;
+        return false;
     }
     m_gridDimensions = gridDimensions;
     m_data.Resize(GridSize() * 4);
-    texBuf->m_info = TextureBuffer::BufferInfo(gridDimensions.x, gridDimensions.y * gridDimensions.z, 1, GL_R16F, GL_RED);
+    // Store dimensions; format tags unused in DX12 (0 = unused)
+    texBuf->m_info = TextureBuffer::BufferInfo(gridDimensions.x, gridDimensions.y * gridDimensions.z, 1, 0, 0);
     HasBuffer() = true;
     return true;
 }
 
 
 bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename, bool deploy) {
-    if (not Texture::Create())
+    if (!Texture::Create())
         return false;
-    m_type = GL_TEXTURE_3D;
-    if (not Allocate(gridDimensions))
+    m_type = TextureType::Texture3D;
+    if (!Allocate(gridDimensions))
         return false;
     m_params = params;
-    if (not LoadFromFile(noiseFilename)) {
+    if (!LoadFromFile(noiseFilename)) {
         ComputeNoise();
         SaveToFile(noiseFilename);
     }
@@ -57,10 +162,6 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         d[i].fill(0);
     for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
         Vector4f noise;
-#if 0
-        for (int j = 0; j < 4; ++j)
-            ++d[j][int(data[j] * 100)];
-#endif
         noise.x = *data++;
         noise.y = *data++;
         noise.z = *data++;
@@ -68,16 +169,6 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         minVals.Minimize(noise);
         maxVals.Maximize(noise);
     }
-#if 0
-    data = m_data.Data();
-    for (uint32_t i = m_gridDimensions.x * m_gridDimensions.y * m_gridDimensions.z; i; --i) {
-        for (int j = 0; j < 4; ++j) {
-            data[j] = Conversions::Normalize(data[j], minVals[j], maxVals[j]);
-            //data[j] = sqrt(data[j]);
-        }
-        data += 4;
-    }
-#endif
     if (deploy)
         Deploy();
     return true;
@@ -96,8 +187,6 @@ static float Modulate(float shape, float coarseDetail, float mediumDetail, float
 
 void NoiseTexture3D::ComputeNoise(void) {
     float* data = m_data.Data();
-
-    //m_params.normalize = 0; // 1 + 2 + 4 + 8;
 
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ -1e6f, -1e6f, -1e6f, -1e6f };
@@ -126,7 +215,6 @@ void NoiseTexture3D::ComputeNoise(void) {
     }
 
     data = m_data.Data();
-    //float* base = data;
     int dataSize = i / 4;
     for (int i = dataSize; i; --i) {
         for (int j = 0; j < 4; ++j, ++data) {
@@ -136,37 +224,44 @@ void NoiseTexture3D::ComputeNoise(void) {
 }
 
 
-void NoiseTexture3D::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
+void NoiseTexture3D::SetParams(bool /*enforce*/) {
+    // Static samplers in root signature handle filtering and wrapping.
+    m_hasParams = true;
 }
 
 
 bool NoiseTexture3D::Deploy(int) {
-    if (not Bind())
-        return false;
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
-    SetParams(false);
-    glGenerateMipmap(GL_TEXTURE_3D);
-    Release();
+    if (m_data.IsEmpty()) return false;
+
+    ID3D12Device* device = dx12Context.Device();
+    if (!device) return false;
+
+    // RGBA16F — 4 channels × float16 per voxel
+    // We store as float32; convert or upload as RGBA32F and accept the memory cost.
+    constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    constexpr uint32_t    stride = 16;  // 4 × float32
+
+    m_resource = Upload3DTexture(device,
+        m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z,
+        fmt, stride, m_data.Data());
+    if (!m_resource) return false;
+
+    if (!CreateSRV3D(m_handle, m_resource.Get(), fmt)) return false;
+
+    m_isValid   = true;
+    m_hasBuffer = true;
     return true;
 }
+
 
 bool NoiseTexture3D::LoadFromFile(const String& filename) {
     if (filename.IsEmpty())
         return false;
     std::ifstream f((const char*)filename, std::ios::binary);
-    if (not f)
+    if (!f)
         return false;
 
-    uint32_t voxelCount = GridSize() * 4;
+    uint32_t voxelCount    = GridSize() * 4;
     uint32_t expectedBytes = voxelCount * sizeof(float);
 
     f.seekg(0, std::ios::end);
@@ -188,11 +283,11 @@ bool NoiseTexture3D::SaveToFile(const String& filename) const {
     if (filename.IsEmpty())
         return false;
     std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
-    if (not f)
+    if (!f)
         return false;
 
     uint32_t voxelCount = GridSize() * 4u;
-    uint32_t bytes = voxelCount * sizeof(float);
+    uint32_t bytes      = voxelCount * sizeof(float);
 
     if (m_data.Length() != voxelCount)
         return false;
@@ -215,28 +310,28 @@ static float Amp2(float v) {
 
 bool CloudNoiseTexture::Allocate(int gridSize) {
     TextureBuffer* texBuf = new TextureBuffer();
-    if (not texBuf)
+    if (!texBuf)
         return false;
-    if (not m_buffers.Append(texBuf)) {
+    if (!m_buffers.Append(texBuf)) {
         delete texBuf;
         return false;
     }
     m_gridSize = gridSize;
     m_data.Resize(size_t(gridSize) * gridSize * gridSize);
-    texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, GL_R16F, GL_RED);
+    texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, 0, 0);
     HasBuffer() = true;
     return true;
 }
 
 
 bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String noiseFilename) {
-    if (not Texture::Create())
+    if (!Texture::Create())
         return false;
-    m_type = GL_TEXTURE_3D;
-    if (not Allocate(gridSize))
+    m_type = TextureType::Texture3D;
+    if (!Allocate(gridSize))
         return false;
     m_params = params;
-    if (not LoadFromFile(noiseFilename)) {
+    if (!LoadFromFile(noiseFilename)) {
         std::filesystem::path _p{ noiseFilename.GetStr() };
         Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
@@ -245,27 +340,15 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
     float minVal = 1e6f, maxVal = 0.0f;
     for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
         float n = *data;
-        if (minVal > n)
-            minVal = n;
-        if (maxVal < n)
-            maxVal = n;
+        if (minVal > n) minVal = n;
+        if (maxVal < n) maxVal = n;
     }
-#if 0
-    data = m_data.Data();
-    for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
-        float n = Conversions::Normalize(*data, minVal, maxVal);
-        *data = n * n;
-    }
-#endif
     Deploy();
     return true;
 }
 
 
 void CloudNoiseTexture::Compute(String textureFolder) {
-    size_t i = 0;
-    float minVal = 1e6f, maxVal = 0.0f;
-
     CloudNoise generator;
 
 #if 1
@@ -274,30 +357,26 @@ void CloudNoiseTexture::Compute(String textureFolder) {
     rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, textureFolder + "/cloudnoise-rgba.bin", false);
 
     float* rgbaData = rgbaNoise.GetData().Data();
-    float* data = m_data.Data();
+    float* data     = m_data.Data();
     uint32_t dataSize = m_gridSize * m_gridSize * m_gridSize;
 
     for (int i = dataSize; i; --i) {
         float perlin = Amp(rgbaData[0]);
         perlin *= perlin;
 #if CLOUD_STRUCTURE == 0
-        float worley = Amp2(rgbaData[1]) * 0.625f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.125f; // standard
+        float worley = Amp2(rgbaData[1]) * 0.625f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.125f;
 #elif CLOUD_STRUCTURE == 1
-        float worley = Amp2(rgbaData[1]) * 0.5f + Amp2(rgbaData[2]) * 0.3f + Amp2(rgbaData[3]) * 0.2f; // more filaments
+        float worley = Amp2(rgbaData[1]) * 0.5f   + Amp2(rgbaData[2]) * 0.3f  + Amp2(rgbaData[3]) * 0.2f;
 #else
-        float worley = Amp2(rgbaData[1]) * 0.65f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.1f; // smoother and more billowy
+        float worley = Amp2(rgbaData[1]) * 0.65f  + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.1f;
 #endif
         *data++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
         rgbaData += 4;
     }
 
     rgbaNoise.GetData().Reset();
-
 #else
-
     Vector3f p;
-    StaticArray<int, 101> distribution;
-    distribution.fill(0);
     for (int z = 0; z < m_gridSize; ++z) {
         p.y = (float(z) + 0.5f) / float(m_gridSize);
         for (int y = 0; y < m_gridSize; ++y) {
@@ -305,48 +384,41 @@ void CloudNoiseTexture::Compute(String textureFolder) {
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridSize);
                 Vector4f noise = generator.Compute(p);
-                float perlin = Amp(noise.x);
+                float perlin   = Amp(noise.x);
                 perlin *= perlin;
-                float worley = Amp2(noise.y) * 0.625f + Amp2(noise.z) * 0.125f + Amp2(noise.w) * 0.25f;
-                float d = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
-                data[i++] = d;
-                ++distribution[int(d * 100)];
-                if (minVal > d)
-                    minVal = d;
-                if (maxVal < d)
-                    maxVal = d;
+                float worley   = Amp2(noise.y) * 0.625f + Amp2(noise.z) * 0.125f + Amp2(noise.w) * 0.25f;
+                *m_data.Data()++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
             }
         }
-    }
-
-    if (m_params.normalize and (maxVal - minVal < 0.999f)) {
-        for (; i; --i, ++data)
-            *data = Conversions::Normalize(*data, minVal, maxVal);
     }
 #endif
 }
 
 
-void CloudNoiseTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
+void CloudNoiseTexture::SetParams(bool /*enforce*/) {
+    m_hasParams = true;
 }
 
 
 bool CloudNoiseTexture::Deploy(int) {
-    if (not Bind())
-        return false;
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
-    SetParams(false);
-    glGenerateMipmap(GL_TEXTURE_3D);
-    Release();
+    if (m_data.IsEmpty()) return false;
+
+    ID3D12Device* device = dx12Context.Device();
+    if (!device) return false;
+
+    // Single-channel float32 → R32_FLOAT
+    constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32_FLOAT;
+    constexpr uint32_t    stride = 4;
+
+    m_resource = Upload3DTexture(device,
+        m_gridSize, m_gridSize, m_gridSize,
+        fmt, stride, m_data.Data());
+    if (!m_resource) return false;
+
+    if (!CreateSRV3D(m_handle, m_resource.Get(), fmt)) return false;
+
+    m_isValid   = true;
+    m_hasBuffer = true;
     return true;
 }
 
@@ -364,26 +436,26 @@ bool CloudNoiseTexture::SaveToFile(const String& filename) const {
 
 bool BlueNoiseTexture::Allocate(void) {
     TextureBuffer* texBuf = new TextureBuffer();
-    if (not texBuf)
+    if (!texBuf)
         return false;
-    if (not m_buffers.Append(texBuf)) {
+    if (!m_buffers.Append(texBuf)) {
         delete texBuf;
         return false;
     }
     m_data.Resize(BufferSize());
-    texBuf->m_info = TextureBuffer::BufferInfo(m_gridSize.x, m_gridSize.y * 64, 1, GL_R8, GL_RED);
+    texBuf->m_info = TextureBuffer::BufferInfo(m_gridSize.x, m_gridSize.y * 64, 1, 0, 0);
     HasBuffer() = true;
     return true;
 }
 
 
 bool BlueNoiseTexture::Create(String noiseFilename) {
-    if (not Texture::Create())
+    if (!Texture::Create())
         return false;
-    m_type = GL_TEXTURE_3D;
-    if (not Allocate())
+    m_type = TextureType::Texture3D;
+    if (!Allocate())
         return false;
-    if (not LoadFromFile(noiseFilename)) {
+    if (!LoadFromFile(noiseFilename)) {
         std::filesystem::path _p{ noiseFilename.GetStr() };
         Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
@@ -398,31 +470,37 @@ void BlueNoiseTexture::Compute(String textureFolder) {
     for (int i = 0; i < 64; ++i) {
         String filename = textureFolder + "/bluenoise/stbn_scalar_2Dx1Dx1D_128x128x64x1_" + String(i) + ".png";
         SDL_Surface* image = IMG_Load(filename.Data());
-        memcpy(m_data.Data(layerSize * i), image->pixels, layerSize);
+        if (image) {
+            std::memcpy(m_data.Data(layerSize * i), image->pixels, layerSize);
+            SDL_FreeSurface(image);
+        }
     }
 }
 
 
-void BlueNoiseTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    }
+void BlueNoiseTexture::SetParams(bool /*enforce*/) {
+    m_hasParams = true;
 }
 
 
 bool BlueNoiseTexture::Deploy(int) {
-    if (not Bind())
-        return false;
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, 128, 128, 64, 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(m_data.Data()));
-    SetParams(false);
-    glGenerateMipmap(GL_TEXTURE_3D);
-    Release();
+    if (m_data.IsEmpty()) return false;
+
+    ID3D12Device* device = dx12Context.Device();
+    if (!device) return false;
+
+    constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R8_UNORM;
+    constexpr uint32_t    stride = 1;
+
+    m_resource = Upload3DTexture(device,
+        128, 128, 64,
+        fmt, stride, m_data.Data());
+    if (!m_resource) return false;
+
+    if (!CreateSRV3D(m_handle, m_resource.Get(), fmt)) return false;
+
+    m_isValid   = true;
+    m_hasBuffer = true;
     return true;
 }
 

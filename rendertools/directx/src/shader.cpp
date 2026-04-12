@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <utility>
 #include <cstring>
@@ -15,7 +15,7 @@
 #include "command_queue.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"
-#include "opengl_states.h"
+#include "gfxstates.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -474,7 +474,7 @@ void Shader::Enable(void)
     if (!list) return;
 
     // Get / create PSO for current render state
-    const RenderState& state = openGLStates.State();
+    const RenderState& state = gfxStates.State();
     ID3D12PipelineState* pso = GetOrCreatePSO(state);
     if (!pso) return;
 

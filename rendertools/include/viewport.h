@@ -5,6 +5,7 @@
 #include "matrix.hpp"
 #include "base_quad.h"
 #include "colordata.h"
+#include "gfxtypes.h"   // GfxTypes::Int — resolved to GL or DX12 definition via include path
 
 // =================================================================================================
 
@@ -22,7 +23,7 @@ public:
     int         m_windowHeight;
     Vector2f    m_center;
     bool        m_flipVertically;
-    GLint       m_glViewport[4];
+    GfxTypes::Int   m_glViewport[4];
 
     Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
         : Rectangle(left, top, width, height) 
@@ -155,6 +156,7 @@ public:
         return Viewport (int(round(m_center.X() - w * 0.5f)), int(round(m_center.Y() - h * 0.5f)), int(round(w)), int(round(h)));
     }
 
+#ifdef OPENGL
     inline void GetGlViewport(void) noexcept {
         glGetIntegerv(GL_VIEWPORT, m_glViewport);
     }
@@ -162,6 +164,7 @@ public:
     inline void SetGlViewport(void) noexcept {
         glViewport(m_glViewport[0], m_glViewport[1], m_glViewport[2], m_glViewport[3]);
     }
+#endif // OPENGL
 
 };
 

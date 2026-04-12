@@ -1,4 +1,4 @@
-#include "opengl_states.h"
+﻿#include "gfxstates.h"
 
 // =================================================================================================
 // TextureSlotInfo
@@ -65,9 +65,9 @@ bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
 }
 
 // =================================================================================================
-// OpenGLStates
+// GfxStates
 
-TextureSlotInfo* OpenGLStates::FindInfo(GLenum typeTag) {
+TextureSlotInfo* GfxStates::FindInfo(GLenum typeTag) {
     for (auto& info : m_slotInfos)
         if (info.GetTypeTag() == typeTag)
             return &info;
@@ -76,7 +76,7 @@ TextureSlotInfo* OpenGLStates::FindInfo(GLenum typeTag) {
 }
 
 
-int OpenGLStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+int GfxStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return -1;
     return (slotIndex >= 0) ? (info->Query(slotIndex) == srvIndex ? slotIndex : -1)
@@ -84,28 +84,28 @@ int OpenGLStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
 }
 
 
-int OpenGLStates::BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+int GfxStates::BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return -1;
     return info->Bind(srvIndex, slotIndex);
 }
 
 
-bool OpenGLStates::ReleaseTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+bool GfxStates::ReleaseTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return false;
     return info->Release(srvIndex, slotIndex);
 }
 
 
-int OpenGLStates::GetBoundTexture(GLenum typeTag, int slotIndex) {
+int GfxStates::GetBoundTexture(GLenum typeTag, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return 0;
     return int(info->Query(slotIndex));
 }
 
 
-int OpenGLStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return -1;
     info->Update(srvIndex, slotIndex);
@@ -113,7 +113,7 @@ int OpenGLStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotInd
 }
 
 
-void OpenGLStates::ReleaseBuffers(void) noexcept {
+void GfxStates::ReleaseBuffers(void) noexcept {
     for (auto& info : m_slotInfos)
         info = TextureSlotInfo(info.GetTypeTag());
 }

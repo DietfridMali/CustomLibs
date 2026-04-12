@@ -8,7 +8,6 @@
 #include "colordata.h"
 #include "textrenderer.h"
 #include "base_renderer.h"
-#include "tristate.h"
 
 #ifndef _WIN32
 #   include <locale>
@@ -159,7 +158,7 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
     baseRenderer.ResetTransformation();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
 #endif
-    Tristate<GLenum> depthFunc (GL_NONE, GL_LEQUAL, openGLStates.DepthFunc(GL_ALWAYS));
+    gfxStates.DepthFunc(GL_ALWAYS);
     float letterScale = 2 * xOffset / float(textWidth);
     // reusing xOffset here
     if (alignment == taLeft)
@@ -174,7 +173,6 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
     RenderGlyphs(text, xOffset, yOffset, letterScale, flipVertically < 0);
 #endif
     baseRenderer.PopMatrix();
-    openGLStates.DepthFunc(depthFunc);
 }
 
 

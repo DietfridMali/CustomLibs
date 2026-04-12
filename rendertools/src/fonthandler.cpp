@@ -1,13 +1,11 @@
 //pragma once
 
 #include <algorithm>
-#include "glew.h"
 #include "conversions.hpp"
 #include "colordata.h"
 #include "fonthandler.h"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
-#include "tristate.h"
 
 #ifndef _WIN32
 #   include <locale>
@@ -66,16 +64,14 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
 int FontHandler::BuildAtlas(void) {
     if (not m_atlas.Enable())
         return -1;
-    Tristate<int> blending(-1, 0, openGLStates.SetBlending(1));
-    Tristate<int> faceCulling(-1, 0, openGLStates.SetFaceCulling(0));
+    gfxStates.SetBlending(1);
+    gfxStates.SetFaceCulling(0);
     baseRenderer.ResetTransformation();
     m_atlas.Initialize();
     baseRenderer.PushViewport();
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
     baseRenderer.PopViewport();
     m_atlas.Disable();
-    openGLStates.SetBlending(blending);
-    openGLStates.SetFaceCulling(faceCulling);
     return m_glyphDict.Size(); 
 }
 
@@ -153,7 +149,7 @@ int FontHandler::CreateTextures(void) {
         if (CreateTexture(szChar, *info, i))
             ++i;
     }
-    if (CreateTexture((const char*)m_euroChar, '€', i))
+    if (CreateTexture((const char*)m_euroChar, '?', i))
         ++i;
     return i;
 }

@@ -1,6 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #include "texture.h"
+#include "dx12context.h"
+#include "command_queue.h"
+#include "descriptor_heap.h"
 #include "noise.h"
 #include "FBM.h"
 
@@ -8,16 +11,18 @@
 // 4 layers of periodic noise: R - Perlin-Worley, GBA: Worley-FBM with doubled frequency for each successive channel
 // Tags
 
-struct ValueNoiseR32F {};     // dein aktueller #if 1 Pfad (Hash2i, 1 Kanal)
-struct FbmNoiseR32F {};   // dein #else Pfad (fbmPeriodic, 1 Kanal)
-struct HashNoiseRGBA8 {};         // neu: 4 Kanäle uint8, weißes Tile-Noise
+struct ValueNoiseR32F {};     // Hash2i, 1 channel, float32
+struct FbmNoiseR32F {};       // fbmPeriodic, 1 channel, float32
+struct HashNoiseRGBA8 {};     // 4 channels uint8, white tile-noise
+struct WeatherNoiseRG8 {};
+struct BlueNoiseR8 {};
 
 // -------------------------------------------------------------------------------------------------
 // Helpers
 
-static inline int  Wrap(int a, int p) { 
-    int r = a % p; 
-    return r < 0 ? r + p : r; 
+static inline int  Wrap(int a, int p) {
+    int r = a % p;
+    return r < 0 ? r + p : r;
 }
 
 static inline uint8_t ToByte01(float v) {
@@ -35,21 +40,13 @@ static inline float Hash2i(int ix, int iy) {
 // Traits
 template<class Tag> struct NoiseTraits;
 
-// 2D value noise (unverändert)
+// 2D value noise (float32, 1 channel)
 template<> struct NoiseTraits<ValueNoiseR32F> {
     using PixelT = float;
-    static constexpr GLenum IFmt = GL_R32F;
-    static constexpr GLenum EFmt = GL_RED;
-    static constexpr GLenum Type = GL_FLOAT;
-    static constexpr int    Components = 1;
+    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R32_FLOAT;
+    static constexpr uint32_t    pixelStride = 4;   // sizeof(float)
+    static constexpr int         Components  = 1;
 
-    static void SetParams(GLenum target) {
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glGenerateMipmap(target);
-    }
     static void Compute(AutoArray<float>& data, int gridSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
         data.Resize(gridSize * gridSize);
         float* dataPtr = data.Data();
@@ -60,125 +57,48 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
 };
 
 // -------------------------------------------------------------------------------------------------
-// 2D fbm (unverändert)
+// 2D fbm (float32, 1 channel)
 template<> struct NoiseTraits<FbmNoiseR32F> {
     using PixelT = float;
-    static constexpr GLenum IFmt = GL_R32F;
-    static constexpr GLenum EFmt = GL_RED;
-    static constexpr GLenum Type = GL_FLOAT;
-    static constexpr int    Components = 1;
-
-    static void SetParams(GLenum target) {
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glGenerateMipmap(target);
-    }
+    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R32_FLOAT;
+    static constexpr uint32_t    pixelStride = 4;
+    static constexpr int         Components  = 1;
 
 #pragma warning(push)
 #pragma warning(disable:4100)
     static void Compute(AutoArray<float>& data, int gridSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
 #pragma warning(pop)
-#if 0
+        // fbmPeriodic path disabled — only stub allocation
         data.Resize(gridSize * gridSize);
-        float* dataPtr = data.Data();
-        for (int y = 0; y < gridSize; ++y) {
-            for (int x = 0; x < gridSize; ++x) {
-                float sx = (x + 0.5f) / gridSize * float(yPeriod);
-                float sy = (y + 0.5f) / gridSize * float(xPeriod);
-                float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
-                *dataPtr++ = std::clamp(n, 0.0f, 1.0f);
-            }
-        }
-#endif
     }
 };
 
 // -------------------------------------------------------------------------------------------------
-// RGBA8: R = Perlin × (1−Worley), G/B/A = Worley-fBm, je Kanal doppelte Grundfrequenz
+// RGBA8: R = Perlin × (1−Worley), G/B/A = Worley-fBm, doubled base frequency per channel
 template<> struct NoiseTraits<HashNoiseRGBA8> {
     using PixelT = uint8_t;
-    static constexpr GLenum IFmt = GL_RGBA8;
-    static constexpr GLenum EFmt = GL_RGBA;
-    static constexpr GLenum Type = GL_UNSIGNED_BYTE;
-    static constexpr int    Components = 4;
+    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8G8B8A8_UNORM;
+    static constexpr uint32_t    pixelStride = 4;
+    static constexpr int         Components  = 4;
 
-    static void SetParams(GLenum target) {
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
-    }
-
-    // 'octave' ist hier der z-Slice-Index [0..gridSize-1]
 #pragma warning(push)
 #pragma warning(disable:4100)
     static void Compute(AutoArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int octave, uint32_t seed)
 #pragma warning(pop)
     {
-#if 0
+        // Disabled — noise computation kept in #if 0 in OGL version
         data.Resize(gridSize * gridSize * 4);
-        uint8_t* dataPtr = data.Data();
-
-        const int   P = gridSize;                 // Periode in allen Achsen
-        const float fx = 1.0f / float(gridSize);
-        const float fy = 1.0f / float(gridSize);
-        const float fz = 1.0f / float(gridSize);
-        const float zP = ((octave + 0.5f) * fz) * float(P);
-
-        // Worley-Basiszellen: G, B=2×G, A=2×B
-        const int C0 = 16;             // teilt 128
-        const int C_G = C0;
-        const int C_B = C0 * 2;
-        const int C_A = C0 * 4;
-        const int C_R = 32;            // für (1−Worley) im R-Kanal
-        for (int y = 0; y < gridSize; ++y) {
-            float yP = ((y + 0.5f) * fy) * float(P);
-            for (int x = 0; x < gridSize; ++x) {
-                float xP = ((x + 0.5f) * fx) * float(P);
-                // R: Perlin × (1 − Worley)
-                float per = PerlinFBM3_Periodic(xP, yP, zP, P, 1, 2.0f, 0.5f, seed ^ 0xA5A5A5u);
-                float wR = WorleyInv_Periodic(xP * (float)C_R / float(P),
-                    yP * (float)C_R / float(P),
-                    zP * (float)C_R / float(P), C_R, seed ^ 0x51u);
-                float R = std::clamp(per * wR, 0.0f, 1.0f);
-
-                // G/B/A: Worley-fBm mit doppelnder Grundfrequenz je Kanal
-                float G = WorleyFBM_Periodic(xP, yP, zP, P, C_G, 4, 2.0f, 0.5f, seed ^ 0x1337u);
-                float B = WorleyFBM_Periodic(xP, yP, zP, P, C_B, 4, 2.0f, 0.5f, seed ^ 0xBEEFu);
-                float A = WorleyFBM_Periodic(xP, yP, zP, P, C_A, 4, 2.0f, 0.5f, seed ^ 0xCAFEu);
-
-                *dataPtr++ = ToByte01(R);
-                *dataPtr++ = ToByte01(G);
-                *dataPtr++ = ToByte01(B);
-                *dataPtr++ = ToByte01(A);
-            }
-        }
-#endif
     }
 };
 
 // -------------------------------------------------------------------------------------------------
 
-struct WeatherNoiseRG8 {};
-
 template<>
 struct NoiseTraits<WeatherNoiseRG8> {
     using PixelT = uint8_t;
-    static constexpr GLenum IFmt = GL_RG8;
-    static constexpr GLenum EFmt = GL_RG;
-    static constexpr GLenum Type = GL_UNSIGNED_BYTE;
-    static constexpr int    Components = 2;
-
-    static void SetParams(GLenum target) {
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    }
+    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8G8_UNORM;
+    static constexpr uint32_t    pixelStride = 2;
+    static constexpr int         Components  = 2;
 
 #pragma warning(push)
 #pragma warning(disable:4100)
@@ -186,64 +106,30 @@ struct NoiseTraits<WeatherNoiseRG8> {
 #pragma warning(pop)
     {
         data.Resize(gridSize * gridSize * 2);
-#if 0
-        uint8_t* dst = data.Data();
-
-        for (int y = 0; y < gridSize; ++y) {
-            for (int x = 0; x < gridSize; ++x) {
-                float u = (x + 0.5f) / gridSize * xPeriod;
-                float v = (y + 0.5f) / gridSize * yPeriod;
-                // Coverage: großskaliges fbm
-                float cov = fbmPeriodic(u, v, xPeriod, yPeriod, octaves, 2.0f, 0.5f);
-                cov = std::clamp((cov - 0.35f) * 1.6f, 0.0f, 1.0f);
-
-                // HeightBias: unabhängigeres fbm, um vertikale Verteilung zu modifizieren
-                float hb = fbmPeriodic(u + 19.3f, v + 7.1f, xPeriod, yPeriod, 3, 2.0f, 0.5f);
-                hb = 0.25f + 0.5f * hb; // 0.25..0.75
-
-                *dst++ = ToByte01(cov);
-                *dst++ = ToByte01(hb);
-            }
-        }
-#endif
     }
 };
 
 // -------------------------------------------------------------------------------------------------
 
-struct BlueNoiseR8 {};
-
 template<> struct NoiseTraits<BlueNoiseR8> {
     using PixelT = uint8_t;
-    static constexpr GLenum IFmt = GL_R8;
-    static constexpr GLenum EFmt = GL_RED;
-    static constexpr GLenum Type = GL_UNSIGNED_BYTE;
-    static constexpr int    Components = 1;
-
-    static void SetParams(GLenum target) {
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    }
+    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8_UNORM;
+    static constexpr uint32_t    pixelStride = 1;
+    static constexpr int         Components  = 1;
 
     static void Compute(AutoArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/) {
         const int N = gridSize;
         data.Resize(N * N);
-        // Zwischenspeicher für White Noise
         std::vector<float> white(N * N);
 
-        // White Noise (periodisch durch Wrap in Hash)
         for (int y = 0; y < N; ++y) {
             for (int x = 0; x < N; ++x) {
-                // Pseudozufall über vorhandenen Hash
                 uint32_t h = Noise::HashXYC32(x, y, 0x1234567u, 0u);
-                float v = (h & 0x00FFFFFFu) * (1.0f / 16777216.0f); // [0,1)
+                float v = (h & 0x00FFFFFFu) * (1.0f / 16777216.0f);
                 white[y * N + x] = v;
             }
         }
 
-        // Lokaler Highpass: Wert - lokaler Mittelwert (3x3) + 0.5
         uint8_t* dst = data.Data();
         for (int y = 0; y < N; ++y) {
             for (int x = 0; x < N; ++x) {
@@ -256,7 +142,7 @@ template<> struct NoiseTraits<BlueNoiseR8> {
                     }
                 }
                 float m = sum * (1.0f / 9.0f);
-                float v = white[y * N + x] - m + 0.5f; // Highpass + Rezentrierung
+                float v = white[y * N + x] - m + 0.5f;
                 v = std::clamp(v, 0.0f, 1.0f);
                 *dst++ = ToByte01(v);
             }
@@ -265,102 +151,190 @@ template<> struct NoiseTraits<BlueNoiseR8> {
 };
 
 // -------------------------------------------------------------------------------------------------
-// Texture-Wrapper wie im Original
+// Texture-Wrapper — DX12 implementation
 template<class Tag>
-class NoiseTexture 
+class NoiseTexture
     : public Texture {
 public:
     bool Create(int gridSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
-        if (not Texture::Create()) 
+        if (!Texture::Create())
             return false;
-        if (not Allocate(gridSize)) 
+        if (!Allocate(gridSize))
             return false;
         Compute(gridSize, yPeriod, xPeriod, octaves, seed);
         Deploy();
         return true;
     }
 
-    void SetParams(bool enforce) {
-        if (enforce || not m_hasParams) {
-            m_hasParams = true;
-            NoiseTraits<Tag>::SetParams(GL_TEXTURE_2D);
-        }
+    void SetParams(bool /*enforce*/) override {
+        // Static samplers in the root signature handle filtering and wrapping — no per-texture state.
+        m_hasParams = true;
     }
-
-    const std::vector<typename NoiseTraits<Tag>::PixelT>& Data() const { return m_data; }
 
     inline bool IsAvailable(void) noexcept {
-        return HasBuffer() and (m_data.Length() != 0);
+        return m_isValid && (m_data.Length() != 0);
     }
+
+    const AutoArray<typename NoiseTraits<Tag>::PixelT>& Data() const { return m_data; }
 
 private:
     AutoArray<typename NoiseTraits<Tag>::PixelT> m_data;
 
     bool Allocate(int gridSize) {
         auto* texBuf = new TextureBuffer();
-        if (not texBuf) return false;
-        if (not m_buffers.Append(texBuf)) { delete texBuf; return false; }
-        const GLenum IF = NoiseTraits<Tag>::IFmt;
-        const GLenum EF = NoiseTraits<Tag>::EFmt;
-        texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, IF, EF);
+        if (!texBuf) return false;
+        if (!m_buffers.Append(texBuf)) { delete texBuf; return false; }
+        texBuf->m_info = TextureBuffer::BufferInfo(
+            gridSize, gridSize,
+            NoiseTraits<Tag>::Components,
+            0, 0);  // internalFormat/format unused in DX12
         HasBuffer() = true;
         return true;
     }
 
     void Compute(int gridSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
-        NoiseTraits<Tag>::Compute(m_data, gridSize, yPeriod, xPeriod, octaves);
+        NoiseTraits<Tag>::Compute(m_data, gridSize, yPeriod, xPeriod, octaves, seed);
     }
 
-    bool Deploy(int bufferIndex = 0) {
-        if (not Bind())
+    bool Deploy(int /*bufferIndex*/ = 0) override {
+        if (m_buffers.IsEmpty() || m_data.IsEmpty()) return false;
+        TextureBuffer* texBuf = m_buffers[0];
+        const int w = texBuf->m_info.m_width;
+        const int h = texBuf->m_info.m_height;
+        if (w <= 0 || h <= 0) return false;
+
+        ID3D12Device* device = dx12Context.Device();
+        if (!device) return false;
+
+        constexpr DXGI_FORMAT fmt    = NoiseTraits<Tag>::dxgiFormat;
+        constexpr uint32_t    stride = NoiseTraits<Tag>::pixelStride;
+
+        // (Re-)create Texture2D resource
+        m_resource.Reset();
+        D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
+        D3D12_RESOURCE_DESC rd{};
+        rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        rd.Width            = UINT(w);
+        rd.Height           = UINT(h);
+        rd.DepthOrArraySize = 1;
+        rd.MipLevels        = 1;
+        rd.Format           = fmt;
+        rd.SampleDesc.Count = 1;
+        rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+        if (FAILED(device->CreateCommittedResource(
+            &hp, D3D12_HEAP_FLAG_NONE, &rd,
+            D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+            IID_PPV_ARGS(&m_resource))))
             return false;
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        TextureBuffer* texBuf = m_buffers[bufferIndex];
-        glTexImage2D(GL_TEXTURE_2D, 0,
-            NoiseTraits<Tag>::IFmt,
-            texBuf->Width(), texBuf->Height(), 0,
-            NoiseTraits<Tag>::EFmt,
-            NoiseTraits<Tag>::Type,
-            reinterpret_cast<const void*>(m_data.Data()));
-        SetParams(false);
-        Release();
+
+        // Upload buffer
+        UINT64 uploadSize = 0;
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+        UINT rowCount = 0; UINT64 rowSize = 0;
+        device->GetCopyableFootprints(&rd, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
+
+        D3D12_HEAP_PROPERTIES uhp{ D3D12_HEAP_TYPE_UPLOAD };
+        D3D12_RESOURCE_DESC upDesc{};
+        upDesc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
+        upDesc.Width            = uploadSize;
+        upDesc.Height           = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
+        upDesc.SampleDesc.Count = 1;
+        upDesc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+        ComPtr<ID3D12Resource> upload;
+        if (FAILED(device->CreateCommittedResource(&uhp, D3D12_HEAP_FLAG_NONE, &upDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
+            return false;
+
+        const uint8_t* src = reinterpret_cast<const uint8_t*>(m_data.Data());
+        uint8_t* mapped = nullptr;
+        D3D12_RANGE mapRange{ 0, 0 };
+        if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) return false;
+        for (UINT r = 0; r < rowCount; ++r)
+            std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch,
+                        src + r * UINT(w) * stride,
+                        UINT(w) * stride);
+        upload->Unmap(0, nullptr);
+
+        auto* list = cmdQueue.List();
+        if (!list) return false;
+
+        D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+        srcLoc.pResource        = upload.Get();
+        srcLoc.Type             = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        srcLoc.PlacedFootprint  = layout;
+        dstLoc.pResource        = m_resource.Get();
+        dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dstLoc.SubresourceIndex = 0;
+        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type                        = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags                       = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        barrier.Transition.pResource        = m_resource.Get();
+        barrier.Transition.StateBefore      = D3D12_RESOURCE_STATE_COPY_DEST;
+        barrier.Transition.StateAfter       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        barrier.Transition.Subresource      = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        list->ResourceBarrier(1, &barrier);
+
+        cmdQueue.Execute();
+        cmdQueue.WaitIdle();
+
+        // Create / update SRV
+        if (m_handle == UINT32_MAX) {
+            DescriptorHandle hdl = descriptorHeaps.AllocSRV();
+            if (!hdl.IsValid()) return false;
+            m_handle = hdl.index;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.Format                  = fmt;
+        srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Texture2D.MipLevels     = 1;
+
+        device->CreateShaderResourceView(m_resource.Get(),
+            &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_handle));
+
+        m_isValid   = true;
+        m_hasBuffer = true;
         return true;
     }
-
 };
 
 // -------------------------------------------------------------------------------------------------
 
-using ValueNoiseTexture = NoiseTexture<ValueNoiseR32F>;
-using FbmNoiseTexture = NoiseTexture<FbmNoiseR32F>;
-using HashNoiseTexture = NoiseTexture<HashNoiseRGBA8>;
+using ValueNoiseTexture   = NoiseTexture<ValueNoiseR32F>;
+using FbmNoiseTexture     = NoiseTexture<FbmNoiseR32F>;
+using HashNoiseTexture    = NoiseTexture<HashNoiseRGBA8>;
 using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 // =================================================================================================
 
 class NoiseTexture3D
-	: public Texture
+    : public Texture
 {
 private:
     Vector3i            m_gridDimensions{ 0, 0, 0 };
     NoiseParams         m_params;
-    AutoArray<float>	m_data;
+    AutoArray<float>    m_data;
 
 public:
-	virtual bool Deploy(int bufferIndex = 0) override;
+    virtual bool Deploy(int bufferIndex = 0) override;
 
-	virtual void SetParams(bool enforce = false) override;
+    virtual void SetParams(bool enforce = false) override;
 
-	bool Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename = "", bool deploy = true);
+    bool Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename = "", bool deploy = true);
 
     inline AutoArray<float>& GetData(void) noexcept {
         return m_data;
     }
 
 private:
-	bool Allocate(Vector3i gridDimensions);
+    bool Allocate(Vector3i gridDimensions);
 
-	void ComputeNoise(void);
+    void ComputeNoise(void);
 
     bool LoadFromFile(const String& filename);
 
@@ -386,7 +360,7 @@ public:
 private:
     int                 m_gridSize{ 0 };
     NoiseParams         m_params;
-    AutoArray<float> m_data;
+    AutoArray<float>    m_data;
 
     bool Allocate(int gridSize);
 
@@ -410,8 +384,8 @@ public:
     bool Create(String noiseFilename = "");
 
 private:
-    Vector3i                m_gridSize{ 128, 128, 64 }; // fixed; using NVidia STBN data
-    AutoArray<uint8_t>   m_data;
+    Vector3i                m_gridSize{ 128, 128, 64 };  // fixed; NVidia STBN data
+    AutoArray<uint8_t>      m_data;
 
     bool Allocate();
 
