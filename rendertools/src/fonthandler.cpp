@@ -39,7 +39,6 @@ Shader* FontHandler::LoadShader(void) {
     return baseShaderHandler.LoadPlainTextureShader(ColorData::White);
 }
 
-
 bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
     Shader* shader = LoadShader();
     if (not shader)
@@ -57,6 +56,10 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
         info->texture = nullptr;
 #endif
     }
+#ifdef _DEBUG
+    else
+        fprintf(stderr, "unknown glyph\n");
+#endif
     return true;
 }
 
@@ -117,7 +120,7 @@ bool FontHandler::Create(String fontFolder, String fontName, int fontSize, Strin
 }
 
 
-bool FontHandler::CreateTexture(const char* szChar, char key, int index)
+bool FontHandler::CreateTexture(const char* szChar, String key, int index)
 {
     GlyphInfo info{ new Texture(), String (key), index };
     if (info.texture == nullptr)
@@ -133,7 +136,8 @@ bool FontHandler::CreateTexture(const char* szChar, char key, int index)
         return false;
         }
     info.texture->Deploy();
-    m_glyphDict.Insert(info.name, info);
+    if (not m_glyphDict.Insert(info.name, info))
+        return false;
     info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());
     m_maxGlyphSize.width = std::max(m_maxGlyphSize.width, info.texture->GetWidth());
     m_maxGlyphSize.height = std::max(m_maxGlyphSize.height, info.texture->GetHeight());
@@ -146,10 +150,10 @@ int FontHandler::CreateTextures(void) {
     int32_t i = 0;
     for (char* info = m_glyphs.Data(); *info; info++) {
         szChar[0] = *info;
-        if (CreateTexture(szChar, *info, i))
+        if (CreateTexture(szChar, String(*info), i))
             ++i;
     }
-    if (CreateTexture((const char*)m_euroChar, '?', i))
+    if (CreateTexture((const char*)m_euroChar, String(m_euroChar), i))
         ++i;
     return i;
 }

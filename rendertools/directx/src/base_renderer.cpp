@@ -106,6 +106,18 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
 }
 
 
+void BaseRenderer::SetDefaultStates(void) noexcept {
+    gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
+    gfxStates.SetDepthTest(1);
+    gfxStates.DepthFunc(GL_LEQUAL);
+    gfxStates.SetBlending(0);
+    gfxStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gfxStates.FrontFace(GetWinding());
+    gfxStates.SetFaceCulling(1);
+    gfxStates.CullFace(GL_BACK);
+}
+
+
 void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
     gfxStates.SetDepthTest(1);
@@ -127,7 +139,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
-    m_renderPass = RenderPassType::rpColor;
+    m_renderPass = RenderPassType::rpFull;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GL_LEQUAL);

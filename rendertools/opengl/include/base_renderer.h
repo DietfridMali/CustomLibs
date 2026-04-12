@@ -125,6 +125,8 @@ public:
 
     void SetupOpenGL(void) noexcept;
 
+    void SetDefaultStates(void) noexcept;
+
     inline void SetRenderPass(RenderPassType renderPass) noexcept { m_renderPass = renderPass; }
 
     void StartShadowPass(void) noexcept;

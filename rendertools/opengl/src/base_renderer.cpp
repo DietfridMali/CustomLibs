@@ -83,14 +83,23 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 }
 
 
-void BaseRenderer::SetupOpenGL(void) noexcept {
-    gfxStates.ClearColor(ColorData::Invisible);
-    glClearDepth(1.0);
-    gfxStates.ColorMask(1, 1, 1, 1);
-    gfxStates.SetDepthWrite(1);
+void BaseRenderer::SetDefaultStates(void) noexcept {
+    gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
     gfxStates.SetDepthTest(1);
     gfxStates.DepthFunc(GL_LEQUAL);
     gfxStates.SetBlending(0);
+    gfxStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gfxStates.FrontFace(GetWinding());
+    gfxStates.SetFaceCulling(1);
+    gfxStates.CullFace(GL_BACK);
+}
+
+void BaseRenderer::SetupOpenGL(void) noexcept {
+    SetDefaultStates();
+    gfxStates.SetDepthWrite(1);
+    gfxStates.ClearColor(ColorData::Invisible);
+    glClearDepth(1.0);
+    gfxStates.ColorMask(1, 1, 1, 1);
 #if 1
 #   if 1
     gfxStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -101,9 +110,6 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     gfxStates.BlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
     gfxStates.BlendEquation(GL_FUNC_ADD);
-    gfxStates.FrontFace(GetWinding());
-    gfxStates.SetFaceCulling(1);
-    gfxStates.CullFace(GL_BACK);
     gfxStates.SetMultiSample(1);
     gfxStates.SetPolygonOffsetFill(0);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -133,7 +139,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
-    m_renderPass = RenderPassType::rpColor;
+    m_renderPass = RenderPassType::rpFull;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GL_LEQUAL);                

@@ -98,7 +98,7 @@ private:
 
     bool InitFont(String fontFolder, String fontName, int fontSize, String glyphs);
 
-    bool CreateTexture(const char* szChar, char key, int index);
+    bool CreateTexture(const char* szChar, String key, int index);
 
     int CreateTextures(void);
 
