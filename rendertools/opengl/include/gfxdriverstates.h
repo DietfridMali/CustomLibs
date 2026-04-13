@@ -102,6 +102,23 @@ public:
 
 		inline int SetStencilTest(int state) { return SetState<GL_STENCIL_TEST>(state); }
 
+		inline void StencilFunc(GLenum func, uint8_t ref, uint8_t mask) {
+			static int32_t stateID = -1;
+			FuncState(stateID, std::make_tuple(func, GLint(ref), GLuint(mask)),
+				[](GLenum f, GLint r, GLuint m) { glStencilFunc(f, r, m); });
+		}
+
+		inline void StencilOp(GLenum sfail, GLenum dpfail, GLenum dppass) {
+			static int32_t stateID = -1;
+			FuncState(stateID, std::make_tuple(sfail, dpfail, dppass), glStencilOp);
+		}
+
+		inline void StencilOpBack(GLenum sfail, GLenum dpfail, GLenum dppass) {
+			static int32_t stateID = -1;
+			FuncState(stateID, std::make_tuple(sfail, dpfail, dppass),
+				[](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
+		}
+
 		inline int SetPolygonOffsetFill(int state) { return SetState<GL_POLYGON_OFFSET_FILL>(state); }
 
 		inline int SetDither(int state) { return SetState<GL_DITHER>(state); }

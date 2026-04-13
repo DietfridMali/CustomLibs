@@ -1,329 +1,311 @@
-﻿
+
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
 
 // =================================================================================================
+// HLSL shader strings for the DirectX 12 backend — 2-D primitive shaders.
+//
+// All shaders use Standard2DVS() except CircleShader (needs vertexY pass-through).
+// PS strings are self-contained.  fwidth() is available natively in HLSL PS.
+// bool uniforms are represented as int (0 = false, non-zero = true) in cbuffers.
+// =================================================================================================
 
+
+// -------------------------------------------------------------------------------------------------
+// SDF line segment with optional AA, round caps.
+// ShaderConstants: viewportSize, start (UV), end (UV), surfaceColor, strength, antialias.
 const ShaderSource& LineShader() {
     static const ShaderSource source(
         "lineShader",
         Standard2DVS(),
         R"(
-            #version 330 core
-
-            uniform vec2 viewportSize;   // Pixel
-            uniform vec4 surfaceColor;
-            uniform vec2 start;          // [0..1] UV
-            uniform vec2 end;            // [0..1] UV
-            uniform float strength;      // [0..1] UV, bezogen auf min(viewportSize)
-            uniform bool antialias;
-
-            in vec2 fragCoord;           // [0..1] UV
-            out vec4 fragColor;
-
-            void main() {
-                // Umrechnung in Pixel
-                vec2 pxFragCoord = fragCoord * viewportSize;
-                vec2 pxStart = start * viewportSize;
-                vec2 pxEnd = end * viewportSize;
-
-                vec2 v = pxEnd - pxStart;
-                float len2 = dot(v, v);
-
-                float pxStrength = strength * min(viewportSize.x, viewportSize.y);
-                float r = 0.5 * max(pxStrength, 0.0);
-
-                float d; // signed distance: <0 innen
+            cbuffer ShaderConstants : register(b1) {
+                float2 viewportSize;
+                float2 start;
+                float2 end;
+                float4 surfaceColor;
+                float  strength;
+                int    antialias;
+            };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float2 pxFragCoord = i.fragCoord * viewportSize;
+                float2 pxStart     = start * viewportSize;
+                float2 pxEnd       = end   * viewportSize;
+                float2 v           = pxEnd - pxStart;
+                float  len2        = dot(v, v);
+                float  pxStrength  = strength * min(viewportSize.x, viewportSize.y);
+                float  r           = 0.5 * max(pxStrength, 0.0);
+                float  d;
                 if (len2 < 1e-6) {
-                    d = length(pxFragCoord - pxStart) - r;                  // Punkt
-                } 
-                else {
-                    vec2 w = pxFragCoord - pxStart;
-                    float t = clamp(dot(w, v) / len2, 0.0, 1.0);
-                    vec2 proj = pxStart + t * v;
-                    d = length(pxFragCoord - proj) - r;                     // Linie mit runden Kappen
+                    d = length(pxFragCoord - pxStart) - r;
+                } else {
+                    float2 w    = pxFragCoord - pxStart;
+                    float  t    = clamp(dot(w, v) / len2, 0.0, 1.0);
+                    float2 proj = pxStart + t * v;
+                    d = length(pxFragCoord - proj) - r;
                 }
-
                 float alpha;
-                if (antialias) {
-                    float pxWidth = 0.5 * fwidth(d);  // ~1 Pixel weich
+                if (antialias != 0) {
+                    float pxWidth = 0.5 * fwidth(d);
                     alpha = 1.0 - smoothstep(0.0, pxWidth, d);
-                } 
-                else {
+                } else {
                     alpha = step(d, 0.0);
                 }
-
-                fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+                return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-            )");
+        )"
+    );
     return source;
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// SDF ring / arc with optional AA and angular segment clipping.
+// ShaderConstants: center (UV), radius, strength, surfaceColor, antialias, viewportSize,
+//                  startAngle, endAngle (degrees, 0 = 12 o'clock, CW increasing).
 const ShaderSource& RingShader() {
     static const ShaderSource source(
         "ringShader",
         Standard2DVS(),
         R"(
-            #version 330 core
-
-            uniform vec2  center;          // [0..1] UV
-            uniform float radius;          // [0..1] UV (außen, bezogen auf min(viewportSize))
-            uniform float strength;        // [0..1] UV (Dicke)
-            uniform vec4  surfaceColor;
-            uniform bool  antialias;
-            uniform vec2  viewportSize;    // Pixel
-
-            uniform float startAngle;      // [0..360)
-            uniform float endAngle;        // [0..360)
-
-            in vec2 fragCoord;             // [0..1] UV
-            out vec4 fragColor;
-
-            const float PI = 3.14159265358979323846;
-
+            cbuffer ShaderConstants : register(b1) {
+                float2 center;
+                float2 viewportSize;
+                float4 surfaceColor;
+                float  radius;
+                float  strength;
+                float  startAngle;
+                float  endAngle;
+                int    antialias;
+            };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            static const float PI = 3.14159265358979323846;
             float Rad2Deg(float r) { return r * (180.0 / PI); }
-
-            // Winkel mit 0°=12 Uhr, CW steigend
-            float Degrees(vec2 d) {
-                float r = 0.5 * PI - atan(-d.y, d.x);     
+            // Angle with 0=12 o'clock, increasing clockwise.
+            float Degrees(float2 d) {
+                float r = 0.5 * PI - atan2(-d.y, d.x);
                 r -= floor(r / (2.0 * PI)) * (2.0 * PI);
                 return Rad2Deg(r);
             }
-
-
-            void main() {
-                float pxScale     = min(viewportSize.x, viewportSize.y);
-                vec2  pxDelta     = (fragCoord - center) * viewportSize;
-                float pxDist      = length(pxDelta);
-                float pxRadius    = radius   * pxScale;
-                float pxStrength  = strength * pxScale;
-
-                // Winkel 0..360
-                float a = Degrees(pxDelta);
-                if (a < 0.0) 
-                    a += 360.0;
-
-                // optional Segment (Start..Ende, Ende inkl.)
-                bool renderSegment = startAngle != endAngle;
+            float4 PSMain(PSInput i) : SV_Target {
+                float  pxScale    = min(viewportSize.x, viewportSize.y);
+                float2 pxDelta    = (i.fragCoord - center) * viewportSize;
+                float  pxDist     = length(pxDelta);
+                float  pxRadius   = radius   * pxScale;
+                float  pxStrength = strength * pxScale;
+                float  a          = Degrees(pxDelta);
+                if (a < 0.0) a += 360.0;
+                bool renderSegment = (startAngle != endAngle);
                 if (renderSegment && (a < startAngle || a > endAngle))
                     discard;
-
                 float outerR = pxRadius;
                 float innerR = max(pxRadius - pxStrength, 0.0);
-
-                float dOuter = pxDist - outerR;   // <0: innen vom Außenrand
-                float dInner = innerR - pxDist;   // <0: außen vom Innenrand
-
+                float dOuter = pxDist - outerR;
+                float dInner = innerR - pxDist;
                 float alpha;
-                if (antialias) {
+                if (antialias != 0) {
                     float pxWidth = 0.5 * fwidth(pxDist);
-                    if (dOuter > pxWidth || dInner > pxWidth) 
-                        discard;
+                    if (dOuter > pxWidth || dInner > pxWidth) discard;
                     float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
                     alpha = aOuter * aInner;
-                } 
-                else {
-                    if (dOuter > 0.0 || dInner > 0.0) 
-                        discard;
+                } else {
+                    if (dOuter > 0.0 || dInner > 0.0) discard;
                     alpha = 1.0;
                 }
-
-                fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+                return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-        )");
+        )"
+    );
     return source;
 }
 
 
-// render a b/w mask with color applied.
+// -------------------------------------------------------------------------------------------------
+// SDF filled circle with fill-level (lower half in greyscale when unfilled).
+// Uses its own VS to pass vertexY.
+// ShaderConstants: viewportSize, surfaceColor, center (UV), radius (UV), fillLevel, brightness, antialias.
 const ShaderSource& CircleShader() {
     static const ShaderSource source(
         "circleShader",
         R"(
-            //#version 140
-            //#extension GL_ARB_explicit_attrib_location : enable
-            #version 330
-            layout(location = 0) in vec3 position;
-            layout(location = 1) in vec2 texCoord;
-            uniform mat4 mModelView;
-            uniform mat4 mProjection;
-            uniform mat4 mViewport;
-            out vec3 fragPos;
-            out vec2 fragCoord;
-            out float vertexY;
-            void main() {
-                vec4 viewPos = mModelView * vec4 (position, 1.0);
-                gl_Position = mViewport * mProjection * viewPos;
-                fragCoord = texCoord;
-                fragPos = viewPos.xyz;
-                vertexY = position.y;
-                }
+            cbuffer FrameConstants : register(b0) {
+                column_major float4x4 mModelView;
+                column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+                column_major float4x4 mLightTransform;
+            };
+            struct VSInput { float3 pos : POSITION; float2 tc : TEXCOORD; };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+                float  vertexY   : TEXCOORD2;
+            };
+            PSInput VSMain(VSInput i) {
+                PSInput o;
+                float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
+                o.pos      = mul(mViewport, mul(mProjection, viewPos));
+                o.fragCoord = i.tc;
+                o.fragPos   = viewPos.xyz;
+                o.vertexY   = i.pos.y;
+                return o;
+            }
         )",
         R"(
-            #version 330 core
-            
-            uniform vec2 viewportSize;   // Pixel
-            uniform vec4 surfaceColor;
-            uniform vec2 center;
-            uniform float radius;      // [0..1] in UV
-            uniform float fillLevel;  // 0.0 = leer, 1.0 = voll verfügbar
-            uniform float brightness;
-            uniform bool antialias;    // billigstes AA
-
-            in vec2 fragCoord;         // [0..viewportSize]
-            in float vertexY;
-            out vec4 fragColor;
-
-            void main() {
-#if 0
-                fragColor = vec4(1,0,1,1);
-#else
-                vec2 pxDelta = (fragCoord - center) * viewportSize;
-                float pxDist = length(pxDelta);
-                float pxRadius = radius * min(viewportSize.x, viewportSize.y);
-                float d = pxDist - pxRadius;   // <0 = innen
-
-                float alpha;
-                if (antialias) {
-                    float pxWidth = 0.5 * fwidth(pxDist);  // ~1 Pixel Übergang
+            cbuffer ShaderConstants : register(b1) {
+                float2 viewportSize;
+                float2 center;
+                float4 surfaceColor;
+                float  radius;
+                float  fillLevel;
+                float  brightness;
+                int    antialias;
+            };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+                float  vertexY   : TEXCOORD2;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float2 pxDelta  = (i.fragCoord - center) * viewportSize;
+                float  pxDist   = length(pxDelta);
+                float  pxRadius = radius * min(viewportSize.x, viewportSize.y);
+                float  d        = pxDist - pxRadius;
+                float  alpha;
+                if (antialias != 0) {
+                    float pxWidth = 0.5 * fwidth(pxDist);
                     if (d > pxWidth) discard;
                     alpha = 1.0 - smoothstep(0.0, pxWidth, d);
                 } else {
                     if (d > 0.0) discard;
                     alpha = 1.0;
                 }
-                float gray = dot(surfaceColor.rgb, vec3(0.299, 0.587, 0.114)) * brightness;
-                vec3 color = (vertexY <= fillLevel) ? surfaceColor.rgb : vec3(gray);
-                fragColor = vec4(color, surfaceColor.a * alpha);
-#endif
+                float  gray  = dot(surfaceColor.rgb, float3(0.299, 0.587, 0.114)) * brightness;
+                float3 color = (i.vertexY <= fillLevel) ? surfaceColor.rgb
+                                                        : float3(gray, gray, gray);
+                return float4(color, surfaceColor.a * alpha);
             }
-        )");
+        )"
+    );
     return source;
 }
 
-// render a b/w mask with color applied.
+
+// -------------------------------------------------------------------------------------------------
+// Circle mask: blends a texture inside a circular region.
+// ShaderConstants: viewportSize, surfaceColor, maskColor, center, radius (UV),
+//                  maskScale, antialias.
 const ShaderSource& CircleMaskShader() {
     static const ShaderSource source(
         "circleMaskShader",
         Standard2DVS(),
         R"(
-            #version 330 core
-
-            uniform sampler2D surface;
-            uniform vec2 viewportSize;   // Pixel
-            uniform vec4 surfaceColor;
-            uniform vec4 maskColor;
-            uniform vec2 center;
-            uniform float radius;      // [0..1] in UV
-            uniform float maskScale;
-            uniform bool antialias;    // billigstes AA
-
-            in vec2 fragCoord;         // [0..viewportSize]
-            out vec4 fragColor;
-
-            void main() {
-#if 0
-                fragColor = vec4(1,0,1,1);
-#else
-                vec2 fcDelta = fragCoord - center;
-                vec4 mask = texture(surface, clamp(center + fcDelta * maskScale, 0.0, 1.0));
+            cbuffer ShaderConstants : register(b1) {
+                float2 viewportSize;
+                float2 center;
+                float4 surfaceColor;
+                float4 maskColor;
+                float  radius;
+                float  maskScale;
+                int    antialias;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float2 fcDelta = i.fragCoord - center;
+                float4 mask    = surface.Sample(s0, clamp(center + fcDelta * maskScale, 0.0, 1.0));
                 if (mask.a > 0)
-                    fragColor = mask; //Color;
-                else {
-                    vec2 pxDelta = (fragCoord - center) * viewportSize;
-                    float pxDist = length(pxDelta);
-                    float pxRadius = radius * min(viewportSize.x, viewportSize.y);
-                    float d = pxDist - pxRadius;   // <0 = innen
-
-                    float alpha;
-                    if (antialias) {
-                        float pxWidth = 0.5 * fwidth(pxDist);  // ~1 Pixel Übergang
-                        if (d > pxWidth) 
-                            discard;
-                        alpha = 1.0 - smoothstep(0.0, pxWidth, d);
-                    } 
-                    else {
-                        if (d > 0.0) 
-                            discard;
-                        alpha = 1.0;
-                    }
-                    fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+                    return mask;
+                float2 pxDelta  = (i.fragCoord - center) * viewportSize;
+                float  pxDist   = length(pxDelta);
+                float  pxRadius = radius * min(viewportSize.x, viewportSize.y);
+                float  d        = pxDist - pxRadius;
+                float  alpha;
+                if (antialias != 0) {
+                    float pxWidth = 0.5 * fwidth(pxDist);
+                    if (d > pxWidth) discard;
+                    alpha = 1.0 - smoothstep(0.0, pxWidth, d);
+                } else {
+                    if (d > 0.0) discard;
+                    alpha = 1.0;
                 }
-#endif
+                return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-        )");
+        )"
+    );
     return source;
 }
 
 
-// render a b/w mask with color applied.
+// -------------------------------------------------------------------------------------------------
+// SDF rounded rectangle, solid fill or stroke, optional AA.
+// ShaderConstants: viewportSize, surfaceColor, center (UV), size (half-size UV),
+//                  strength (stroke width, 0 = filled), radius, antialias.
 const ShaderSource& RectangleShader() {
     static const ShaderSource source(
         "rectangleShader",
         Standard2DVS(),
         R"(
-            #version 330 core
-
-            in vec2 fragCoord;         // UV [0..1]
-            out vec4 fragColor;
-
-            uniform vec2 viewportSize; // [px]
-            uniform vec4 surfaceColor;
-            uniform vec2 center;       // [uv]
-            uniform vec2 size;         // UV, Rect liegt innerhalb center +/- size  (=> size = Halbgröße)
-            uniform float strength;    // relativ zu min(viewportSize)
-            uniform float radius;      // relativ zu min(viewportSize)
-            uniform bool  antialias;
-
-            vec2  pxFragCoord;
-            vec2  pxCenter;
-            vec2  pxSize;     // Halbgröße in Pixeln
-            float pxRadius;
-
-            // SDF in pixel space to keep thickness and radius pixel perfect and isotropic
-            float sdRoundRect() {
-                vec2 q = abs(pxFragCoord - pxCenter) - (pxSize - vec2(pxRadius));
-                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - pxRadius; // <0 innen
+            cbuffer ShaderConstants : register(b1) {
+                float2 viewportSize;
+                float2 center;
+                float2 size;
+                float4 surfaceColor;
+                float  strength;
+                float  radius;
+                int    antialias;
+            };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float sdRoundRect(float2 pxFrag, float2 pxCenter, float2 pxHalf, float pxR) {
+                float2 q = abs(pxFrag - pxCenter) - (pxHalf - float2(pxR, pxR));
+                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - pxR;
             }
-
-            void main() {
-                // UV -> Pixel (Zuweisung an die globalen px*-Variablen)
-                pxFragCoord = fragCoord * viewportSize;
-                pxCenter    = center    * viewportSize;
-                pxSize      = size      * viewportSize;   // size = half size here
-                pxRadius    = clamp(radius * min(viewportSize.x, viewportSize.y),0.0, min(pxSize.x, pxSize.y));
-
-                float sd  = sdRoundRect();                    // distance to outer border [px]
-                float aaw = antialias ? fwidth(sd) : 0.0;     // ~1 px
-
+            float4 PSMain(PSInput i) : SV_Target {
+                float2 pxFragCoord = i.fragCoord * viewportSize;
+                float2 pxCenter    = center * viewportSize;
+                float2 pxSize      = size   * viewportSize;
+                float  pxRadius    = clamp(radius * min(viewportSize.x, viewportSize.y),
+                                           0.0, min(pxSize.x, pxSize.y));
+                float sd  = sdRoundRect(pxFragCoord, pxCenter, pxSize, pxRadius);
+                float aaw = (antialias != 0) ? fwidth(sd) : 0.0;
                 if (strength <= 0.0) {
                     if (sd > aaw) discard;
                     float alpha = 1.0 - smoothstep(0.0, aaw, sd);
-                    fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
-                } 
-                else {
+                    return float4(surfaceColor.rgb, surfaceColor.a * alpha);
+                } else {
                     float pxStrength = strength * min(viewportSize.x, viewportSize.y);
-                    float sdi = sd + pxStrength;              // Distanz zur Innenkante
-
-                    // hard discard outside of the aa corridor
-                    if (sd > aaw || sdi < -aaw) 
-                        discard;
-
-                    // konstante Dicke: Coverages MULTIPLIZIEREN statt min()
-                    float covOuter = 1.0 - smoothstep(0.0, aaw, sd);   // Außenkante
-                    float covInner =        smoothstep(0.0, aaw, sdi); // Innenkante
+                    float sdi = sd + pxStrength;
+                    if (sd > aaw || sdi < -aaw) discard;
+                    float covOuter = 1.0 - smoothstep(0.0, aaw, sd);
+                    float covInner =       smoothstep(0.0, aaw, sdi);
                     float alpha    = covOuter * covInner;
-
-                    if (alpha <= 0.0) 
-                        discard;
-                    fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
+                    if (alpha <= 0.0) discard;
+                    return float4(surfaceColor.rgb, surfaceColor.a * alpha);
                 }
             }
-        )");
-
+        )"
+    );
     return source;
 }
 

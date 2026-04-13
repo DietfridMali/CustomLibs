@@ -66,10 +66,12 @@ public:
     String  m_name;
     String  m_vs;     // VS source (for reference / reload)
     String  m_fs;     // PS source (for reference / reload)
+    String  m_gs;     // GS source (optional)
 
     // HLSL bytecodes
     ComPtr<ID3DBlob>  m_vsBlob;
     ComPtr<ID3DBlob>  m_psBlob;
+    ComPtr<ID3DBlob>  m_gsBlob;  // optional
 
     // Shared root signature (fixed layout, created once per shader)
     ComPtr<ID3D12RootSignature> m_rootSignature;
@@ -105,7 +107,7 @@ public:
     using KeyType = String;
 
     Shader(String name = "", String vs = "", String fs = "", String gs = "")
-        : m_name(std::move(name)), m_vs(std::move(vs)), m_fs(std::move(fs))
+        : m_name(std::move(name)), m_vs(std::move(vs)), m_fs(std::move(fs)), m_gs(std::move(gs))
     {
         m_uniforms.SetAutoFit(true);
         m_uniforms.SetShrinkable(false);
@@ -128,12 +130,12 @@ public:
                  ComPtr<ID3DBlob>& blobOut) noexcept;
 
     // Link: build root signature, reflect b1 fields, allocate CBs.
-    // gsCode is ignored in DX12 (geometry shaders require additional PSO changes — future work).
+    // gsCode is optional; when non-empty a geometry shader stage is compiled and linked.
     bool Create(const String& vsCode, const String& fsCode, const String& gsCode = "");
 
     void Destroy(void) noexcept;
 
-    inline bool IsValid(void) const noexcept { return m_vsBlob && m_psBlob; }
+    inline bool IsValid(void) const noexcept { return m_vsBlob && m_psBlob; }  // GS is optional
 
     // -----------------------------------------------------------------------------------------
     // Runtime
@@ -160,9 +162,10 @@ public:
     bool CreateRootSignature(void) noexcept;
     bool CreateCBs(void) noexcept;
     ID3D12PipelineState* GetOrCreatePSO(const RenderState& state) noexcept;
-    static D3D12_BLEND    ToD3DBlend(GLenum gl) noexcept;
-    static D3D12_BLEND_OP ToD3DBlendOp(GLenum gl) noexcept;
+    static D3D12_BLEND           ToD3DBlend(GLenum gl) noexcept;
+    static D3D12_BLEND_OP        ToD3DBlendOp(GLenum gl) noexcept;
     static D3D12_COMPARISON_FUNC ToD3DCompFunc(GLenum gl) noexcept;
+    static D3D12_STENCIL_OP      ToD3DStencilOp(GLenum gl) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as OGL, return int (was GLint)

@@ -4,6 +4,8 @@
 
 // =================================================================================================
 
+#ifdef OPENGL  // OGL-only; not available in DX12 path
+
 struct GpuTimer {
     static constexpr int FramesInFlight = 3; // ring, um Stalls zu vermeiden
     struct Slot { GLuint q = 0; const char* label = nullptr; };
@@ -51,3 +53,5 @@ struct ScopedGpuTimer {
 };
 
 // =================================================================================================
+
+#endif  // 0

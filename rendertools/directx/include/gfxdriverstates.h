@@ -120,6 +120,35 @@ using GLenum = unsigned int;
 #ifndef GL_CCW
 #   define GL_CCW                       0x0901u
 #endif
+// Stencil operations
+#ifndef GL_KEEP
+#   define GL_KEEP                      0x1E00u
+#endif
+#ifndef GL_REPLACE
+#   define GL_REPLACE                   0x1E01u
+#endif
+#ifndef GL_INCR
+#   define GL_INCR                      0x1E02u
+#endif
+#ifndef GL_DECR
+#   define GL_DECR                      0x1E03u
+#endif
+#ifndef GL_INCR_WRAP
+#   define GL_INCR_WRAP                 0x8507u
+#endif
+#ifndef GL_DECR_WRAP
+#   define GL_DECR_WRAP                 0x8508u
+#endif
+// Texture wrap modes
+#ifndef GL_REPEAT
+#   define GL_REPEAT                    0x2901u
+#endif
+#ifndef GL_CLAMP_TO_EDGE
+#   define GL_CLAMP_TO_EDGE             0x812Fu
+#endif
+#ifndef GL_MIRRORED_REPEAT
+#   define GL_MIRRORED_REPEAT           0x8370u
+#endif
 // Texture types (used as type tags)
 #ifndef GL_TEXTURE_2D
 #   define GL_TEXTURE_2D                0x0DE1u
@@ -189,6 +218,19 @@ struct RenderState {
     uint8_t  colorMask  { 0x0F };
     // Scissor
     uint8_t  scissorTest{ 0 };
+    // Stencil comparison (applied to both faces)
+    GLenum   stencilFunc      { GL_ALWAYS };
+    // Front-face stencil operations
+    GLenum   stencilSFail     { GL_KEEP };
+    GLenum   stencilDPFail    { GL_KEEP };
+    GLenum   stencilDPPass    { GL_KEEP };
+    // Back-face stencil operations (for single-pass two-sided algorithms)
+    GLenum   stencilBackSFail { GL_KEEP };
+    GLenum   stencilBackDPFail{ GL_KEEP };
+    GLenum   stencilBackDPPass{ GL_KEEP };
+    // Stencil reference value and mask
+    uint8_t  stencilRef       { 0 };
+    uint8_t  stencilMask      { 0xFF };
 
     bool operator==(const RenderState& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;
@@ -274,6 +316,33 @@ public:
             m_stateDirty = true;
         }
         return prev;
+    }
+
+    inline void StencilFunc(GLenum func, uint8_t ref, uint8_t mask) {
+        if (func != m_state.stencilFunc || ref != m_state.stencilRef || mask != m_state.stencilMask) {
+            m_state.stencilFunc = func;
+            m_state.stencilRef  = ref;
+            m_state.stencilMask = mask;
+            m_stateDirty = true;
+        }
+    }
+
+    inline void StencilOp(GLenum sfail, GLenum dpfail, GLenum dppass) {
+        if (sfail != m_state.stencilSFail || dpfail != m_state.stencilDPFail || dppass != m_state.stencilDPPass) {
+            m_state.stencilSFail  = sfail;
+            m_state.stencilDPFail = dpfail;
+            m_state.stencilDPPass = dppass;
+            m_stateDirty = true;
+        }
+    }
+
+    inline void StencilOpBack(GLenum sfail, GLenum dpfail, GLenum dppass) {
+        if (sfail != m_state.stencilBackSFail || dpfail != m_state.stencilBackDPFail || dppass != m_state.stencilBackDPPass) {
+            m_state.stencilBackSFail  = sfail;
+            m_state.stencilBackDPFail = dpfail;
+            m_state.stencilBackDPPass = dppass;
+            m_stateDirty = true;
+        }
     }
 
     inline int SetPolygonOffsetFill(int) noexcept { return 0; }

@@ -127,7 +127,6 @@ public:
     void SetViewport(bool flipVertically = false) noexcept;
     void Fill(RGBAColor color);
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
-
     // Render helpers (same as OGL)
     Texture* GetRenderTexture(const FBORenderParams& params, int tmuIndex = 0);
     Texture* GetDepthTexture(void);
@@ -166,7 +165,10 @@ public:
     inline bool DetachBuffer(int)   { return true; }
     inline void ReleaseBuffers()    {}
     inline int  DepthBufferIndex()  noexcept { return m_colorBufferCount; }
+#pragma warning(push)
+#pragma warning(disable:4100)  // unreferenced formal parameter (VertexBufferIndex)
     inline int  VertexBufferIndex(int i = 0) noexcept { return 0; }
+#pragma warning(pop)
 
 private:
     bool CreateColorBuffer(int i, int width, int height);

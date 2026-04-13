@@ -33,13 +33,26 @@
 // -------------------------------------------------------------------------------------------------
 // Fixed input layout (must match the HLSL vertex shader input semantics)
 
+// Default input layout matching mesh.h UpdateVAO() stream order:
+//   slot 0: POSITION  float3  - vertex positions
+//   slot 1: TEXCOORD0 float2  - primary texcoord (texCoord[0])
+//   slot 2: TEXCOORD1 float2  - secondary texcoord (texCoord[1] / borderTexCoord)
+//   slot 3: COLOR0    float4  - colour / wallScale (use .xy for vec2)
+//   slot 4: NORMAL    float4  - normal / decalNormal  (float4 to cover both vec3+padding and vec4)
+//   slot 5: TANGENT   float4  - tangent (with handedness in .w)
+//   slot 6: TEXCOORD2 float4  - extra per-vertex data (morph-target offsets, etc.)
+//
+// NOTE: meshes that supply a float3 normal at slot 4 must pad to float4 (w = 0).
+// Sphere/smiley meshes that put normals at slot 1 (layout(location=1) in the old GLSL)
+// should instead write a dummy float2 at slot 1 and the normal at slot 4.
 static const D3D12_INPUT_ELEMENT_DESC kInputLayout[] = {
     { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,        1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,        2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
     { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT,  3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "TANGENT",  0, DXGI_FORMAT_R32G32B32_FLOAT,    4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,       5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "NORMAL",   0, DXGI_FORMAT_R32G32B32A32_FLOAT,  4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT,  5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT,  6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 };
 static constexpr UINT kInputLayoutCount = UINT(std::size(kInputLayout));
 
@@ -203,12 +216,14 @@ bool Shader::CreateCBs(void) noexcept
 }
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& /*gsCode*/)
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode)
 {
     Destroy();
 
     if (!Compile((const char*)vsCode, "VSMain", "vs_5_0", m_vsBlob)) return false;
     if (!Compile((const char*)fsCode, "PSMain", "ps_5_0", m_psBlob)) return false;
+    if (gsCode.Length() > 0)
+        Compile((const char*)gsCode, "GSMain", "gs_5_0", m_gsBlob);  // optional — failure is non-fatal
 
     // Reflect b1 fields from PS blob (look for cbuffer named "ShaderConstants")
     {
@@ -273,6 +288,39 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& /*
         }
     }
 
+    // Also check GS for additional b1 variables
+    if (m_gsBlob) {
+        ComPtr<ID3D12ShaderReflection> refl;
+        if (SUCCEEDED(D3DReflect(m_gsBlob->GetBufferPointer(), m_gsBlob->GetBufferSize(),
+                                 IID_PPV_ARGS(&refl)))) {
+            D3D12_SHADER_DESC sd{};
+            refl->GetDesc(&sd);
+            for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
+                ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
+                D3D12_SHADER_BUFFER_DESC cbd{};
+                cb->GetDesc(&cbd);
+                if (strcmp(cbd.Name, "ShaderConstants") == 0) {
+                    if (cbd.Size > m_b1Size) m_b1Size = cbd.Size;
+                    for (UINT j = 0; j < cbd.Variables; ++j) {
+                        ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
+                        D3D12_SHADER_VARIABLE_DESC vd{};
+                        var->GetDesc(&vd);
+                        if (!(vd.uFlags & D3D_SVF_USED)) continue;
+                        bool found = false;
+                        for (auto& kv : m_b1Fields)
+                            if (kv.first == String(vd.Name)) { found = true; break; }
+                        if (!found) {
+                            auto* entry = m_b1Fields.Append();
+                            if (entry)
+                                *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     if (!CreateRootSignature()) return false;
     if (!CreateCBs())           return false;
 
@@ -293,6 +341,7 @@ void Shader::Destroy(void) noexcept
     m_b1Buffer.Reset();
     m_vsBlob.Reset();
     m_psBlob.Reset();
+    m_gsBlob.Reset();
 }
 
 
@@ -302,6 +351,7 @@ Shader& Shader::Copy(const Shader& other)
     m_name = other.m_name;
     m_vs   = other.m_vs;
     m_fs   = other.m_fs;
+    m_gs   = other.m_gs;
     return *this;
 }
 
@@ -313,8 +363,10 @@ Shader& Shader::Move(Shader& other) noexcept
         m_name         = std::move(other.m_name);
         m_vs           = std::move(other.m_vs);
         m_fs           = std::move(other.m_fs);
+        m_gs           = std::move(other.m_gs);
         m_vsBlob       = std::move(other.m_vsBlob);
         m_psBlob       = std::move(other.m_psBlob);
+        m_gsBlob       = std::move(other.m_gsBlob);
         m_rootSignature = std::move(other.m_rootSignature);
         m_psoCache     = std::move(other.m_psoCache);
         m_b0Staging    = other.m_b0Staging;
@@ -360,6 +412,20 @@ D3D12_BLEND_OP Shader::ToD3DBlendOp(GLenum gl) noexcept
         case GL_MIN:                   return D3D12_BLEND_OP_MIN;
         case GL_MAX:                   return D3D12_BLEND_OP_MAX;
         default:                       return D3D12_BLEND_OP_ADD;
+    }
+}
+
+
+D3D12_STENCIL_OP Shader::ToD3DStencilOp(GLenum gl) noexcept
+{
+    switch (gl) {
+        case GL_ZERO:      return D3D12_STENCIL_OP_ZERO;
+        case GL_REPLACE:   return D3D12_STENCIL_OP_REPLACE;
+        case GL_INCR:      return D3D12_STENCIL_OP_INCR_SAT;
+        case GL_DECR:      return D3D12_STENCIL_OP_DECR_SAT;
+        case GL_INCR_WRAP: return D3D12_STENCIL_OP_INCR;
+        case GL_DECR_WRAP: return D3D12_STENCIL_OP_DECR;
+        default:           return D3D12_STENCIL_OP_KEEP;
     }
 }
 
@@ -418,11 +484,23 @@ ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
     ds.DepthWriteMask = state.depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
     ds.DepthFunc      = ToD3DCompFunc(state.depthFunc);
     ds.StencilEnable  = state.stencilTest ? TRUE : FALSE;
+    ds.StencilReadMask  = state.stencilMask;
+    ds.StencilWriteMask = state.stencilMask;
+    ds.FrontFace = { ToD3DStencilOp(state.stencilSFail),
+                     ToD3DStencilOp(state.stencilDPFail),
+                     ToD3DStencilOp(state.stencilDPPass),
+                     ToD3DCompFunc(state.stencilFunc) };
+    ds.BackFace  = { ToD3DStencilOp(state.stencilBackSFail),
+                     ToD3DStencilOp(state.stencilBackDPFail),
+                     ToD3DStencilOp(state.stencilBackDPPass),
+                     ToD3DCompFunc(state.stencilFunc) };
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
     psoDesc.pRootSignature     = m_rootSignature.Get();
     psoDesc.VS                 = { m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize() };
     psoDesc.PS                 = { m_psBlob->GetBufferPointer(), m_psBlob->GetBufferSize() };
+    if (m_gsBlob)
+        psoDesc.GS             = { m_gsBlob->GetBufferPointer(), m_gsBlob->GetBufferSize() };
     psoDesc.InputLayout        = { kInputLayout, kInputLayoutCount };
     psoDesc.RasterizerState    = rast;
     psoDesc.BlendState         = blend;
@@ -430,7 +508,7 @@ ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets   = 1;
     psoDesc.RTVFormats[0]      = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.DSVFormat          = DXGI_FORMAT_D32_FLOAT;
+    psoDesc.DSVFormat          = DXGI_FORMAT_D24_UNORM_S8_UINT;
     psoDesc.SampleMask         = UINT_MAX;
     psoDesc.SampleDesc.Count   = 1;
 
@@ -486,6 +564,7 @@ void Shader::Enable(void)
     // Set pipeline state and root signature
     list->SetPipelineState(pso);
     list->SetGraphicsRootSignature(m_rootSignature.Get());
+    list->OMSetStencilRef(state.stencilRef);
 
     // Root param 0: b0 (FrameConstants)
     if (m_b0Buffer)

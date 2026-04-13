@@ -4,43 +4,52 @@
 #include "base_shadercode.h"
 
 // =================================================================================================
+// HLSL shader strings for the DirectX 12 backend — outline post-process shader.
+// =================================================================================================
 
+
+// -------------------------------------------------------------------------------------------------
+// Outline: blends an outline colour around non-transparent pixels.
+// Uses Offset2DVS().  textureSize() replaced by texelSize from cbuffer.
+// ShaderConstants: vsOffset, texelSize, outlineColor, outlineWidth.
 const ShaderSource& OutlineShader() {
     static const ShaderSource outlineShader(
         "outline",
         Offset2DVS(),
         R"(
-            //#version 140
-            //#extension GL_ARB_explicit_attrib_location : enable
-            #version 330
-            in vec2 fragCoord;
-            out vec4 fragColor;
-            uniform sampler2D surface;
-            uniform vec4 outlineColor;
-            uniform float outlineWidth;
-            //uniform float premultiply;
-            void main() {
-                vec4 color = texture(surface, fragCoord);
+            cbuffer ShaderConstants : register(b1) {
+                float  vsOffset;      // VS 'offset'; PS ignores
+                float  outlineWidth;  // in texels
+                float2 texelSize;
+                float4 outlineColor;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 color = surface.Sample(s0, i.fragCoord);
                 if (color.a > 0.0) {
-                    fragColor = vec4(mix (outlineColor.rgb, color.rgb, color.a), 1);
-                    return;
+                    return float4(lerp(outlineColor.rgb, color.rgb, color.a), 1.0);
                 }
                 float alpha = 0.0;
-                vec2 texelSize = 1.0 / vec2(textureSize(surface, 0));
                 float dx = outlineWidth * texelSize.x;
-                int r = int(outlineWidth);
+                int   r  = int(outlineWidth);
                 for (int x = r; x >= 0; x--, dx -= texelSize.x) {
                     float dy = outlineWidth * texelSize.y;
                     for (int y = r; y >= 0; y--, dy -= texelSize.y) {
-                        alpha = max(alpha, texture(surface, fragCoord + vec2(-dx, -dy)).a);
-                        alpha = max(alpha, texture(surface, fragCoord + vec2(-dx,  dy)).a);
-                        alpha = max(alpha, texture(surface, fragCoord + vec2( dx,  dy)).a);
-                        alpha = max(alpha, texture(surface, fragCoord + vec2( dx, -dy)).a);
-                        }
+                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2(-dx, -dy)).a);
+                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2(-dx,  dy)).a);
+                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2( dx,  dy)).a);
+                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2( dx, -dy)).a);
                     }
-                fragColor = (alpha > 0.0) ? vec4(outlineColor.rgb /** mix(1.0, alpha, premultiply)*/, alpha) : vec4(0.0);
                 }
-            )"
+                return (alpha > 0.0) ? float4(outlineColor.rgb, alpha) : (float4)0;
+            }
+        )"
     );
     return outlineShader;
 }

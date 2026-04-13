@@ -1,127 +1,115 @@
-﻿
+
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
 
 // =================================================================================================
+// HLSL shader strings for the DirectX 12 backend — base texture / utility shaders.
+//
+// Convention (same as base_shader_funcs.cpp):
+//   Standard2DVS() is used as the VS for 2-D full-screen / UI passes.
+//   All PS strings are self-contained (declare own cbuffer, textures, PSInput struct).
+//   Static samplers from root signature: s0 = linear clamp, s1 = linear wrap.
+// =================================================================================================
 
+
+// -------------------------------------------------------------------------------------------------
+// Hardcoded-triangle test: no vertex buffer needed, just SV_VertexID.
 const ShaderSource& TestShader() {
     static const ShaderSource source(
         "testShader",
         R"(
-            #version 330 core
-            void main() {
-                vec2 positions[3];
-                positions[0] = vec2(-0.5, -0.5);
-                positions[1] = vec2( 0.5, -0.5);
-                positions[2] = vec2( 0.0,  0.5);
-                gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+            struct PSInput { float4 pos : SV_Position; };
+            PSInput VSMain(uint vertexID : SV_VertexID) {
+                float2 positions[3];
+                positions[0] = float2(-0.5, -0.5);
+                positions[1] = float2( 0.5, -0.5);
+                positions[2] = float2( 0.0,  0.5);
+                PSInput o;
+                o.pos = float4(positions[vertexID], 0.0, 1.0);
+                return o;
             }
         )",
         R"(
-        #version 330
-        out vec4 fragColor;
-        void main() {
-            fragColor = vec4(1.0, 0.0, 1.0, 1.0); 
-        }
+            struct PSInput { float4 pos : SV_Position; };
+            float4 PSMain(PSInput i) : SV_Target {
+                return float4(1.0, 0.0, 1.0, 1.0);
+            }
         )"
     );
     return source;
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// Stencil pass: transforms position through viewport*projection, PS discards everything
+// (depth/stencil write only).
 const ShaderSource& StencilShader() {
     static const ShaderSource source(
         "stencilShader",
         R"(
-            #version 330 core
-            layout(location = 0) in vec3 position;
-            uniform mat4 mModelView;
-            uniform mat4 mProjection;
-            uniform mat4 mViewport;
-            void main() {
-                gl_Position = mViewport * mProjection * vec4(position, 1.0);
+            cbuffer FrameConstants : register(b0) {
+                column_major float4x4 mModelView;
+                column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+                column_major float4x4 mLightTransform;
+            };
+            struct VSInput { float3 pos : POSITION; };
+            struct PSInput { float4 pos : SV_Position; };
+            PSInput VSMain(VSInput i) {
+                PSInput o;
+                o.pos = mul(mViewport, mul(mProjection, float4(i.pos, 1.0)));
+                return o;
             }
         )",
         R"(
-            #version 330 core
-            void main() { }
+            struct PSInput { float4 pos : SV_Position; };
+            float4 PSMain(PSInput i) : SV_Target {
+                discard;
+                return (float4)0;
+            }
         )"
     );
     return source;
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// Shadow/depth pass: projects through light transform, PS does alpha-cutout test.
 const ShaderSource& DepthShader() {
     static const ShaderSource source(
         "depthShader",
         R"(
-        #version 330
-        layout(location = 0) in vec3 vertex;
-        layout(location = 1) in vec2 texCoord;
-        uniform mat4 mModelView;
-        uniform mat4 mLightTransform;
-        out vec2 fragCoord;
-        void main() {
-#if 1
-            gl_Position = mLightTransform * mModelView * vec4(vertex, 1.0);
-#else
-            gl_Position = mLightTransform * vec4(vertex, 1.0);
-#endif
-            fragCoord = texCoord;
-        }
-        )",
-        R"(
-        #version 330 core
-        uniform sampler2D surface;
-        uniform vec4 surfaceColor;
-        in vec2 fragCoord;
-        void main() { 
-#if 1
-            if (texture(surface, /*fract*/(fragCoord)).a * surfaceColor.a < 0.9)
-                discard;
-#endif
-            }
-        )"
-        );
-    return source;
-}
-
-
-const ShaderSource& SphereDepthShader() {
-    static const ShaderSource source(
-        "sphereDepthShader",
-        R"(
-        #version 330
-        layout(location = 0) in vec3 vertex;
-        uniform mat4 mModelView;
-        uniform mat4 mModelRotation;
-        uniform vec3 modelPosition;
-        uniform mat4 mLightTransform;
-#define CULL_FACES 0
-#if CULL_FACES
-        out vec3 worldNormal;
-#endif
-        void main() {
-            gl_Position = mLightTransform * mModelView * vec4(vertex, 1.0);
-#if CULL_FACES
-            worldNormal = mat3(mModelRotation) * vertex;
-#endif
+            cbuffer FrameConstants : register(b0) {
+                column_major float4x4 mModelView;
+                column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+                column_major float4x4 mLightTransform;
+            };
+            struct VSInput { float3 pos : POSITION; float2 tc : TEXCOORD; };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+            PSInput VSMain(VSInput i) {
+                PSInput o;
+                o.pos       = mul(mLightTransform, mul(mModelView, float4(i.pos, 1.0)));
+                o.fragCoord = i.tc;
+                return o;
             }
         )",
         R"(
-        #version 330 core
-
-        uniform vec3 lightDir;
-#define CULL_FACES 0
-#if CULL_FACES
-        in vec3 worldNormal;
-#endif
-        void main() { 
-#if CULL_FACES
-            if (dot(worldNormal, lightDir) >= 0.0)
-                discard;
-#endif
+            cbuffer ShaderConstants : register(b1) { float4 surfaceColor; };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float2 fragCoord : TEXCOORD0;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                if (surface.Sample(s0, i.fragCoord).a * surfaceColor.a < 0.9)
+                    discard;
+                return (float4)0;
             }
         )"
     );
@@ -129,155 +117,178 @@ const ShaderSource& SphereDepthShader() {
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// Sphere shadow pass: projects sphere vertex through light transform (no face culling active).
+const ShaderSource& SphereDepthShader() {
+    static const ShaderSource source(
+        "sphereDepthShader",
+        R"(
+            cbuffer FrameConstants : register(b0) {
+                column_major float4x4 mModelView;
+                column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+                column_major float4x4 mLightTransform;
+            };
+            struct VSInput { float3 pos : POSITION; };
+            struct PSInput { float4 pos : SV_Position; };
+            PSInput VSMain(VSInput i) {
+                PSInput o;
+                o.pos = mul(mLightTransform, mul(mModelView, float4(i.pos, 1.0)));
+                return o;
+            }
+        )",
+        R"(
+            struct PSInput { float4 pos : SV_Position; };
+            float4 PSMain(PSInput i) : SV_Target {
+                return (float4)0;
+            }
+        )"
+    );
+    return source;
+}
+
+
+// -------------------------------------------------------------------------------------------------
+// Debug visualiser: renders a depth texture as a linearised greyscale image.
 const ShaderSource& DepthRenderer() {
     static const ShaderSource source(
         "depthRenderer",
         Standard2DVS(),
         R"(
-        #version 330 core
-        uniform sampler2D surface;
-        in vec2 fragCoord;
-        out vec4 fragColor;
-        void main() { 
-            float d = texture(surface, vec2(fragCoord.x, 1.0 - fragCoord.y)).r;
-            d = pow(d, 0.5);
-            fragColor = vec4(d, d, d, 1.0f);
-        }
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float d = surface.Sample(s0, float2(i.fragCoord.x, 1.0 - i.fragCoord.y)).r;
+                d = pow(d, 0.5);
+                return float4(d, d, d, 1.0);
+            }
         )"
     );
     return source;
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// Solid colour fill (no texture).
 const ShaderSource& PlainColorShader() {
     static const ShaderSource source(
         "plainColor",
         Standard2DVS(),
         R"(
-        //#version 140
-        //#extension GL_ARB_explicit_attrib_location : enable
-        #version 330
-        uniform vec4 surfaceColor;
-        layout(location = 0) out vec4 fragColor;
-        void main() { 
-            fragColor = surfaceColor; 
-        }
+            cbuffer ShaderConstants : register(b1) { float4 surfaceColor; };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                return surfaceColor;
+            }
         )"
-        );
+    );
     return source;
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// Greyscale conversion with brightness and optional invert.
 const ShaderSource& GrayScaleShader() {
     static const ShaderSource source(
         "grayScale",
         Standard2DVS(),
         R"(
-        #version 330 core
-        // Für OpenGL ES 3.0 statt dessen:
-        // #version 300 es
-        // precision mediump float;
-
-        uniform sampler2D surface;
-        uniform vec2 tcOffset;
-        uniform vec2 tcScale;
-        uniform float brightness;
-        uniform bool invert;
-        in vec2 fragCoord;
-        layout(location = 0) out vec4 fragColor;
-        void main() {
-            vec4 texColor = texture(surface, tcOffset + fragCoord * tcScale);
-            // Rec.601 Luminanzgewichte in Gamma-Space
-            float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
-            gray *= brightness;
-            fragColor = vec4(vec3(invert ? 1.0 - gray : gray), texColor.a);
-        }
-        )");
+            cbuffer ShaderConstants : register(b1) {
+                float2 tcOffset;
+                float2 tcScale;
+                float  brightness;
+                int    invert;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 texColor = surface.Sample(s0, tcOffset + i.fragCoord * tcScale);
+                // Rec.601 luma weights in gamma space
+                float gray = dot(texColor.rgb, float3(0.299, 0.587, 0.114));
+                gray *= brightness;
+                float3 rgb = (invert != 0) ? float3(1.0 - gray, 1.0 - gray, 1.0 - gray)
+                                           : float3(gray, gray, gray);
+                return float4(rgb, texColor.a);
+            }
+        )"
+    );
     return source;
 }
 
 
-// render a b/w mask with color applied.
+// -------------------------------------------------------------------------------------------------
+// Textured quad with per-fragment tint colour; alpha zero → discard.
 const ShaderSource& PlainTextureShader() {
     static const ShaderSource source(
         "plainTexture",
         Standard2DVS(),
         R"(
-        //#version 140
-        //#extension GL_ARB_explicit_attrib_location : enable
-        #version 330
-        uniform sampler2D surface;
-        uniform vec4 surfaceColor;
-        uniform vec2 tcOffset;
-        uniform vec2 tcScale;
-        //uniform float premultiply;
-        in vec3 fragPos;
-        in vec2 fragCoord;
-
-        layout(location = 0) out vec4 fragColor;
-        
-        void main() {
-            vec4 texColor = texture(surface, tcOffset + tcScale * /*fract*/(fragCoord));
-            float a = texColor.a * surfaceColor.a;
-            if (a == 0) discard;
-            fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
+            cbuffer ShaderConstants : register(b1) {
+                float4 surfaceColor;
+                float2 tcOffset;
+                float2 tcScale;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 texColor = surface.Sample(s0, tcOffset + tcScale * i.fragCoord);
+                float a = texColor.a * surfaceColor.a;
+                if (a == 0) discard;
+                return float4(texColor.rgb * surfaceColor.rgb, a);
             }
-        )");
+        )"
+    );
     return source;
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// Scrolling / animated texture with SmoothBoost contrast enhancement.
+// ShaderConstants: surfaceColor, direction (scroll dir), speed, time.
 const ShaderSource& MovingTextureShader() {
     static const ShaderSource source(
         "movingTexture",
         Standard2DVS(),
         String(R"(
-        //#version 140
-        //#extension GL_ARB_explicit_attrib_location : enable
-        #version 330
-        uniform sampler2D surface;
-        uniform vec4 surfaceColor;
-        uniform vec2 direction;
-        uniform float speed;
-        uniform float time;
-        //uniform float premultiply;
-        in vec3 fragPos;
-        in vec2 fragCoord;
-
-        layout(location = 0) out vec4 fragColor;
-
-        // Konstanten
-        const vec3  LUMA          = vec3(0.2126, 0.7152, 0.0722);
-        const float THRESHOLD     = 0.6;   // 0..1 (linear space)
-        const float GAMMA_BRIGHT  = 2.2;   // >1 => stärkeres Aufhellen über Threshold
-        const float GAMMA_DARK    = 1.5;   // >1 => stärkeres Abdunkeln unter Threshold
+            cbuffer ShaderConstants : register(b1) {
+                float4 surfaceColor;
+                float2 direction;
+                float  speed;
+                float  time;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
         )") +
         BoostFuncs() +
         String(R"(
-        void main() {
-#if 0
-            fragColor = vec4(1,0,1,1);
-#else            
-            vec4 texColor = texture(surface, fragCoord + direction * (time * speed));
-            float a = texColor.a * surfaceColor.a;
-            //if (a == 0) discard;
-
-            vec3 rgbColor = texColor.rgb * surfaceColor.rgb;
-#   if 1
-            fragColor = vec4(SmoothBoost(rgbColor, 2.0), 1.0); 
-#   else
-            float L = dot(rgbColor, LUMA);
-            float r = L / max(THRESHOLD, 1e-6);
-
-            float L2 = (r < 1.0)
-                        ? THRESHOLD * pow(r, GAMMA_DARK)
-                        : THRESHOLD * pow(r, 1.0 / GAMMA_BRIGHT);
-
-            float s = (L > 0.0) ? (L2 / L) : 0.0;
-            fragColor = vec4(rgbColor * s, a); 
-            //fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
-#   endif
-#endif
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 texColor = surface.Sample(s0, i.fragCoord + direction * (time * speed));
+                float3 rgbColor = texColor.rgb * surfaceColor.rgb;
+                return float4(SmoothBoost(rgbColor, 2.0), 1.0);
             }
         )")
     );
@@ -285,29 +296,35 @@ const ShaderSource& MovingTextureShader() {
 }
 
 
-// render a b/w mask with color applied.
+// -------------------------------------------------------------------------------------------------
+// Gaussian-blurred texture with tint colour; alpha zero → discard.
+// ShaderConstants: surfaceColor, texelSize, blurStrength, blurSpread.
 const ShaderSource& BlurTextureShader() {
     static const ShaderSource source(
         "blurTexture",
         Standard2DVS(),
         String(R"(
-        //#version 140
-        //#extension GL_ARB_explicit_attrib_location : enable
-        #version 330
-        uniform sampler2D surface;
-        uniform vec4 surfaceColor;
-        //uniform float premultiply;
-        in vec3 fragPos;
-        in vec2 fragCoord;
-        )")
-        + GaussBlurFuncs() +
+            cbuffer ShaderConstants : register(b1) {
+                float4 surfaceColor;
+                float2 texelSize;
+                int    blurStrength;
+                float  blurSpread;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+        )") +
+        GaussBlurFuncs() +
         String(R"(
-        layout(location = 0) out vec4 fragColor;
-        void main() {
-            vec4 texColor = GaussBlur(fragCoord, -1, -1);
-            float a = texColor.a * surfaceColor.a;
-            if (a == 0) discard;
-            fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 texColor = GaussBlur(i.fragCoord, -1, -1);
+                float a = texColor.a * surfaceColor.a;
+                if (a == 0) discard;
+                return float4(texColor.rgb * surfaceColor.rgb, a);
             }
         )")
     );
@@ -315,40 +332,47 @@ const ShaderSource& BlurTextureShader() {
 }
 
 
+// -------------------------------------------------------------------------------------------------
+// Gaussian blur + greyscale conversion + contrast/gamma/brightness + optional tint/invert.
+// ShaderConstants: texelSize, blurStrength, blurSpread, brightness, contrast, gamma, invert, tint.
 const ShaderSource& TintAndBlurShader() {
     static const ShaderSource source(
         "tintAndBlur",
         Standard2DVS(),
         String(R"(
-            #version 330 core
-            // Für OpenGL ES 3.0 statt dessen:
-            // #version 300 es
-            // precision mediump float;
-
-            uniform sampler2D surface;
-            in vec2 fragCoord;
-            out vec4 fragColor;
-            uniform float brightness;
-            uniform float contrast;     // Kontrastfaktor (>1 = mehr Kontrast, z.B. 1.5)
-            uniform float gamma;        // Gammawert (z.B. 2.2 für Standard-Monitor)
-            uniform vec4 tint;
-            uniform bool invert;
+            cbuffer ShaderConstants : register(b1) {
+                float2 texelSize;
+                int    blurStrength;
+                float  blurSpread;
+                float  brightness;
+                float  contrast;
+                float  gamma;
+                int    invert;
+                float4 tint;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
         )") +
         GaussBlurFuncs() +
         TintFuncs() +
         String(R"(
-        void main() {
-            vec2 baseUV = fragCoord;
-            vec4 texColor = GaussBlur(baseUV, -1, -1);
-            // Rec.601 Luminanzgewichte in Gamma-Space
-            float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
-            gray = (gray - 0.5) * contrast + 0.5;
-            gray = clamp(gray, 0.0, 1.0);
-            gray = pow(gray, 1.0 / gamma);
-            gray *= brightness;
-            vec3 finalRGB = mix(vec3(gray), tint.rgb * gray, tint.a);
-            fragColor = vec4(invert ? vec3(1.0) - finalRGB : finalRGB, texColor.a);
-        }
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 texColor = GaussBlur(i.fragCoord, -1, -1);
+                // Rec.601 luma in gamma space
+                float gray = dot(texColor.rgb, float3(0.299, 0.587, 0.114));
+                gray = (gray - 0.5) * contrast + 0.5;
+                gray = clamp(gray, 0.0, 1.0);
+                gray = pow(gray, 1.0 / gamma);
+                gray *= brightness;
+                float3 finalRGB = lerp(float3(gray, gray, gray), tint.rgb * gray, tint.a);
+                float3 rgb = (invert != 0) ? float3(1.0, 1.0, 1.0) - finalRGB : finalRGB;
+                return float4(rgb, texColor.a);
+            }
         )")
     );
     return source;

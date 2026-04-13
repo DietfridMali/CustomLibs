@@ -11,7 +11,7 @@
 // DX12 FBO implementation
 
 static constexpr DXGI_FORMAT kColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D32_FLOAT;
+static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -128,7 +128,8 @@ bool FBO::CreateDepthBuffer(int width, int height)
 
     D3D12_CLEAR_VALUE cv{};
     cv.Format = kDepthFormat;
-    cv.DepthStencil.Depth = 1.0f;
+    cv.DepthStencil.Depth   = 1.0f;
+    cv.DepthStencil.Stencil = 0;
 
     m_depthResource = CreateRTResource(device, width, height, kDepthFormat,
                                         D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv);
