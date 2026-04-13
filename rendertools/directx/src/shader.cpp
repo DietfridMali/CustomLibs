@@ -91,8 +91,7 @@ static void UploadCBData(ID3D12Resource* resource, const void* data, uint32_t si
 
 // =================================================================================================
 
-bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target,
-                     ComPtr<ID3DBlob>& blobOut) noexcept
+bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut) noexcept
 {
     if (!hlslCode || !*hlslCode) return false;
 
@@ -114,11 +113,33 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
             fprintf(stderr, "Shader '%s' (%s) compile error:\n%s\n",
                     (const char*)m_name, target,
                     static_cast<const char*>(errBlob->GetBufferPointer()));
+        PrintShaderSource(hlslCode, target);
 #endif
         return false;
     }
     return true;
 }
+
+
+#ifdef _DEBUG
+void Shader::PrintShaderSource(const char* hlslCode, const char* title) noexcept
+{
+    if (!hlslCode || !*hlslCode) return;
+    const std::string_view src(hlslCode);
+    const size_t lineCount = std::ranges::count(src, '\n') + 1;
+    const int width = static_cast<int>(std::to_string(lineCount).size());
+    fprintf(stderr, "\n%s\n", title);
+    int lineNo = 0;
+    for (auto&& chunk : src | std::views::split('\n')) {
+        std::string_view line(chunk.begin(), chunk.end());
+        if (!line.empty() && line.back() == '\r')
+            line.remove_suffix(1);
+        fprintf(stderr, "%*d: %.*s\n", width, ++lineNo,
+                static_cast<int>(line.size()), line.data());
+    }
+    fprintf(stderr, "\n");
+}
+#endif
 
 
 bool Shader::CreateRootSignature(void) noexcept
@@ -152,7 +173,7 @@ bool Shader::CreateRootSignature(void) noexcept
     params[2].ParameterType                       = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
     params[2].DescriptorTable.NumDescriptorRanges = 1;
     params[2].DescriptorTable.pDescriptorRanges   = &srvRange;
-    params[2].ShaderVisibility                     = D3D12_SHADER_VISIBILITY_PIXEL;
+    params[2].ShaderVisibility                    = D3D12_SHADER_VISIBILITY_PIXEL;
 
     // Static samplers: s0 = linear clamp, s1 = linear repeat
     D3D12_STATIC_SAMPLER_DESC samplers[2]{};
@@ -220,10 +241,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 {
     Destroy();
 
-    if (!Compile((const char*)vsCode, "VSMain", "vs_5_0", m_vsBlob)) return false;
-    if (!Compile((const char*)fsCode, "PSMain", "ps_5_0", m_psBlob)) return false;
+    if (!Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob)) return false;
+    if (!Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob)) return false;
     if (gsCode.Length() > 0)
-        Compile((const char*)gsCode, "GSMain", "gs_5_0", m_gsBlob);  // optional — failure is non-fatal
+        Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
 
     // Reflect b1 fields from PS blob (look for cbuffer named "ShaderConstants")
     {

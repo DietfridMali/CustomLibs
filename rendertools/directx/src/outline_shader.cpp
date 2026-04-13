@@ -41,10 +41,10 @@ const ShaderSource& OutlineShader() {
                 for (int x = r; x >= 0; x--, dx -= texelSize.x) {
                     float dy = outlineWidth * texelSize.y;
                     for (int y = r; y >= 0; y--, dy -= texelSize.y) {
-                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2(-dx, -dy)).a);
-                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2(-dx,  dy)).a);
-                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2( dx,  dy)).a);
-                        alpha = max(alpha, surface.Sample(s0, i.fragCoord + float2( dx, -dy)).a);
+                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2(-dx, -dy), 0).a);
+                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2(-dx,  dy), 0).a);
+                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2( dx,  dy), 0).a);
+                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2( dx, -dy), 0).a);
                     }
                 }
                 return (alpha > 0.0) ? float4(outlineColor.rgb, alpha) : (float4)0;

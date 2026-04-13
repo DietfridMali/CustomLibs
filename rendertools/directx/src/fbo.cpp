@@ -105,7 +105,9 @@ bool FBO::CreateColorBuffer(int i, int width, int height)
     srvd.Texture2D.MipLevels     = 1;
     device->CreateShaderResourceView(m_colorResources[i].Get(), &srvd, m_srvHandles[i].cpu);
 
-    // Transition to SRV state so it can be sampled before first render pass
+    // Transition to SRV state so it can be sampled before first render pass.
+    // Only update the tracked state if the transition was actually issued —
+    // if no command list is open yet the resource stays in RENDER_TARGET.
     auto* list = cmdQueue.List();
     if (list) {
         D3D12_RESOURCE_BARRIER b{};
@@ -115,8 +117,10 @@ bool FBO::CreateColorBuffer(int i, int width, int height)
         b.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         list->ResourceBarrier(1, &b);
+        m_colorStates[i] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    } else {
+        m_colorStates[i] = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
-    m_colorStates[i] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     return true;
 }
 
@@ -242,7 +246,8 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup,
     m_drawBufferGroup   = drawBufferGroup;
 
     auto* list = cmdQueue.List();
-    if (!list) return false;
+    if (!list) 
+        return false;
 
     BindRenderTargets(list);
 
@@ -327,6 +332,15 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex)
     m_renderTexture.m_isValid  = true;
     m_renderTexture.Bind(tmuIndex);
     return &m_renderTexture;
+}
+
+
+void FBO::ClearStencil(void)
+{
+    if (!m_dsvHandle.IsValid()) return;
+    auto* list = cmdQueue.List();
+    if (!list) return;
+    list->ClearDepthStencilView(m_dsvHandle.cpu, D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 }
 
 

@@ -133,6 +133,7 @@ public:
     void Fill(RGBAColor color);
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
+    inline void ClearStencil(void) { glClear(GL_STENCIL_BUFFER_BIT); }
 
     Texture* GetRenderTexture(const FBORenderParams& params, int tmuIndex = 0);
 

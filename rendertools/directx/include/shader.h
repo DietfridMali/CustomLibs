@@ -125,7 +125,7 @@ public:
     // -----------------------------------------------------------------------------------------
     // Creation / destruction
 
-    // Compile a single HLSL stage.  entryPoint: "VSMain" or "PSMain"; target: "vs_5_0"/"ps_5_0"
+    // Compile a single HLSL stage.  entryPoint: "VSMain" or "PSMain"; target: "vs_5_1"/"ps_5_1"
     bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
                  ComPtr<ID3DBlob>& blobOut) noexcept;
 
@@ -223,6 +223,11 @@ public:
     int SetVector4fArray(const char* name, const Vector4f* data, int length) noexcept;
 
     // -----------------------------------------------------------------------------------------
+    // Debug helpers
+#ifdef _DEBUG
+    static void PrintShaderSource(const char* hlslCode, const char* title) noexcept;
+#endif
+
     // Source-compat stubs (no-ops in DX12)
     static void ClearGLError() noexcept {}
     static bool CheckGLError(const char* = "") noexcept { return true; }

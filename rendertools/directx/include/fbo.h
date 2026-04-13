@@ -127,6 +127,8 @@ public:
     void SetViewport(bool flipVertically = false) noexcept;
     void Fill(RGBAColor color);
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
+    void ClearStencil(void);
+
     // Render helpers (same as OGL)
     Texture* GetRenderTexture(const FBORenderParams& params, int tmuIndex = 0);
     Texture* GetDepthTexture(void);
