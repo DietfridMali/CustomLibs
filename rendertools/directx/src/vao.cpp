@@ -92,7 +92,7 @@ bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffe
     if (forceUpdate || buffer.IsDirty()) {
         if (!UpdateDataBuffer(type, id,
                               buffer.GLDataBuffer(), buffer.GLDataSize(),
-                              componentType,
+                              size_t(componentType),
                               size_t(buffer.ComponentCount()), forceUpdate))
             return false;
         buffer.SetDirty(false);
@@ -105,7 +105,7 @@ void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType,
                              bool forceUpdate) noexcept
 {
     if (forceUpdate || buffer.IsDirty()) {
-        UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), componentType, forceUpdate);
+        UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate);
         buffer.SetDirty(false);
     }
 }

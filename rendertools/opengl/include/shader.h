@@ -143,6 +143,8 @@ class Shader
             return m_handle;
         }
 
+        inline bool IsValid(void) const noexcept { return m_handle != 0; }
+
 
         inline bool HaveBuffer(GLint location) noexcept {
             if (static_cast<int32_t>(location) >= m_uniforms.Length()) {

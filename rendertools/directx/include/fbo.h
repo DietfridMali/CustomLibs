@@ -150,6 +150,9 @@ public:
     inline int  GetLastDestination(void)       noexcept { return m_lastDestination; }
     inline void SetLastDestination(int i)      noexcept { m_lastDestination = i; }
     inline int  NextBuffer(int i)              noexcept { return (i + 1) % m_bufferCount; }
+    inline FBOTexture* GetTexture(void)        noexcept { return &m_renderTexture; }
+    // In DX12 there is no explicit framebuffer binding state — always report enabled.
+    inline bool IsEnabled(void)                noexcept { return true; }
 
     // Returns the SRV index for the given color buffer — used by base_renderer.cpp:
     //   m_renderTexture.m_handle = fbo->BufferHandle(0);

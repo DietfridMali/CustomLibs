@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 #include "drawbufferhandler.h"
 #include "command_queue.h"
 #include "base_displayhandler.h"
@@ -79,7 +79,7 @@ void DrawBufferHandler::RestoreDrawBuffer(void) {
     DrawBufferInfo info;
     m_drawBufferStack.Pop(info);
     m_drawBufferInfo = info;
-    gfxStates.BindTexture2D(0, 0); // clear slot 0 from the active SRV table
+    gfxDriverStates.BindTexture2D(0, 0); // clear slot 0 from the active SRV table
     if (m_drawBufferInfo.m_fbo)
         m_drawBufferInfo.m_fbo->Reenable(false, true);
     SetActiveDrawBuffers();

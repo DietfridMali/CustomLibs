@@ -1,5 +1,5 @@
-﻿
-#include "gfxstates.h"
+
+#include "gfxdriverstates.h"
 #include "array.hpp"
 
 #include "base_renderer.h"
@@ -63,7 +63,7 @@ bool TextureSlotInfo::Release(GLuint handle, int tmuIndex) {
 
 // =================================================================================================
 
-TextureSlotInfo* GfxStates::FindInfo(GLenum type) {
+TextureSlotInfo* GfxDriverStates::FindInfo(GLenum type) {
 	for (TextureSlotInfo& info : m_tmuBindings)
 		if (info.GetType() == type)
 			return &info;
@@ -71,7 +71,7 @@ TextureSlotInfo* GfxStates::FindInfo(GLenum type) {
 }
 
 
-int GfxStates::GetBoundTexture(GLenum type, int tmuIndex) {
+int GfxDriverStates::GetBoundTexture(GLenum type, int tmuIndex) {
 #if TRACK_TMU_USAGE
 	TextureSlotInfo* info = FindInfo(type);
 	if (info)
@@ -81,7 +81,7 @@ int GfxStates::GetBoundTexture(GLenum type, int tmuIndex) {
 }
 
 
-int GfxStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
+int GfxDriverStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
 #if TRACK_TMU_USAGE
 	TextureSlotInfo* info = FindInfo(type);
 	if (info)
@@ -91,7 +91,7 @@ int GfxStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-int GfxStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
+int GfxDriverStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
 #if TRACK_TMU_USAGE
 	TextureSlotInfo* info = FindInfo(type);
 	if (info)
@@ -101,7 +101,7 @@ int GfxStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
+int GfxDriverStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 #if 0
 	baseRenderer.ClearGLError();
 	GLint tex = 0;
@@ -129,13 +129,13 @@ int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-bool GfxStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
+bool GfxDriverStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
 	TextureSlotInfo* info = FindInfo(type);
 	return info ? info->Release(handle, tmuIndex) : false;
 }
 
 
-void GfxStates::DetermineExtensions(void) {
+void GfxDriverStates::DetermineExtensions(void) {
 	GLint extCount = 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
 	m_extensions.reserve(extCount);
@@ -147,7 +147,7 @@ void GfxStates::DetermineExtensions(void) {
 }
 
 
-void GfxStates::ReleaseBuffers(void) noexcept {
+void GfxDriverStates::ReleaseBuffers(void) noexcept {
 	glUseProgram(0);
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);

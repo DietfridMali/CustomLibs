@@ -1,4 +1,4 @@
-//pragma once
+﻿//pragma once
 
 #include <algorithm>
 #include "conversions.hpp"
@@ -67,8 +67,8 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
 int FontHandler::BuildAtlas(void) {
     if (not m_atlas.Enable())
         return -1;
-    gfxStates.SetBlending(1);
-    gfxStates.SetFaceCulling(0);
+    gfxDriverStates.SetBlending(1);
+    gfxDriverStates.SetFaceCulling(0);
     baseRenderer.ResetTransformation();
     m_atlas.Initialize();
     baseRenderer.PushViewport();

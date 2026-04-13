@@ -1,7 +1,7 @@
-#pragma once
+﻿#pragma once
 
 #include <cstdint>
-#include "gfxtypes.h"   // GfxTypes::Int/Uint/Float/Enum/Handle — resolved per API via include path
+#include "gfxdrivertypes.h"   // GfxDriverTypes::Int/Uint/Float/Enum/Handle — resolved per API via include path
 
 // =================================================================================================
 // API-neutral enumerations for mesh topology, component data types, and texture types.

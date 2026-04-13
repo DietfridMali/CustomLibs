@@ -15,7 +15,7 @@
 #include "command_queue.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -392,12 +392,12 @@ ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
     // Rasterizer
     D3D12_RASTERIZER_DESC rast{};
     rast.FillMode              = D3D12_FILL_MODE_SOLID;
-    rast.CullMode              = (state.faceCulling && state.cullMode == GL_BACK)  ? D3D12_CULL_MODE_BACK
-                               : (state.faceCulling && state.cullMode == GL_FRONT) ? D3D12_CULL_MODE_FRONT
-                               :                                                      D3D12_CULL_MODE_NONE;
+    rast.CullMode              = (state.cullMode == GL_BACK)  ? D3D12_CULL_MODE_BACK
+                               : (state.cullMode == GL_FRONT) ? D3D12_CULL_MODE_FRONT
+                               :                                D3D12_CULL_MODE_NONE;
     rast.FrontCounterClockwise = (state.frontFace == GL_CCW) ? TRUE : FALSE;
     rast.DepthClipEnable       = TRUE;
-    rast.MultisampleEnable     = state.multiSample ? TRUE : FALSE;
+    rast.MultisampleEnable     = FALSE;
 
     // Blend
     D3D12_BLEND_DESC blend{};
@@ -434,18 +434,19 @@ ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
     psoDesc.SampleMask         = UINT_MAX;
     psoDesc.SampleDesc.Count   = 1;
 
-    PsoEntry* entry = m_psoCache.Append();
-    if (!entry) return nullptr;
-    entry->state = state;
-    HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&entry->pso));
+    ComPtr<ID3D12PipelineState> newPso;
+    HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&newPso));
     if (FAILED(hr)) {
 #ifdef _DEBUG
         fprintf(stderr, "Shader '%s': PSO creation failed (hr=0x%08X)\n",
                 (const char*)m_name, (unsigned)hr);
 #endif
-        m_psoCache.Remove(*entry);
         return nullptr;
     }
+    PsoEntry* entry = m_psoCache.Append();
+    if (!entry) return nullptr;
+    entry->state = state;
+    entry->pso   = std::move(newPso);
     return entry->pso.Get();
 }
 
@@ -474,7 +475,7 @@ void Shader::Enable(void)
     if (!list) return;
 
     // Get / create PSO for current render state
-    const RenderState& state = gfxStates.State();
+    const RenderState& state = gfxDriverStates.State();
     ID3D12PipelineState* pso = GetOrCreatePSO(state);
     if (!pso) return;
 

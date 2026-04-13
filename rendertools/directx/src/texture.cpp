@@ -13,7 +13,7 @@
 #pragma warning(pop)
 
 #include "texture.h"
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 #include "base_renderer.h"
 #include "descriptor_heap.h"
 #include "command_queue.h"
@@ -222,7 +222,7 @@ bool Texture::Bind(int tmuIndex)
 {
     if (!IsAvailable()) return false;
     m_tmuIndex = tmuIndex;
-    gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
+    gfxDriverStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
     return true;
 }
 
@@ -230,7 +230,7 @@ bool Texture::Bind(int tmuIndex)
 void Texture::Release(void)
 {
     if (m_tmuIndex >= 0) {
-        gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
+        gfxDriverStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
         m_tmuIndex = -1;
     }
 }

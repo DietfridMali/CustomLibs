@@ -13,7 +13,7 @@
 #include "viewport.h"
 #include "fbo.h"
 #include "drawbufferhandler.h"
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -237,7 +237,7 @@ public:
     void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipViewportVertically = false, bool flipWindowVertically = false) noexcept; // , bool isFBO = false);
 
     void PushViewport(void) {
-        m_viewport.GetGlViewport();
+        m_viewport.GetGpuViewport();
         viewportStack.Append(m_viewport);
     }
 

@@ -5,7 +5,7 @@
 #include "base_shaderhandler.h"
 #include "command_queue.h"
 #include "dx12context.h"
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 
 // =================================================================================================
 // DX12 FBO implementation

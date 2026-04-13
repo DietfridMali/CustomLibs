@@ -1,11 +1,12 @@
-#pragma once
+﻿#pragma once
 
+#include "gfxdrivertypes.h"   // GfxDriverTypes::Int — resolved to GL or DX12 definition via include path
+#include "gfxdriverstates.h"  // GfxDriverStates singleton — GetViewport/SetViewport
 #include "rectangle.h"
 #include "vector.hpp"
 #include "matrix.hpp"
 #include "base_quad.h"
 #include "colordata.h"
-#include "gfxtypes.h"   // GfxTypes::Int — resolved to GL or DX12 definition via include path
 
 // =================================================================================================
 
@@ -23,7 +24,7 @@ public:
     int         m_windowHeight;
     Vector2f    m_center;
     bool        m_flipVertically;
-    GfxTypes::Int   m_glViewport[4];
+    GfxDriverTypes::Int   m_glViewport[4];
 
     Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
         : Rectangle(left, top, width, height) 
@@ -156,15 +157,13 @@ public:
         return Viewport (int(round(m_center.X() - w * 0.5f)), int(round(m_center.Y() - h * 0.5f)), int(round(w)), int(round(h)));
     }
 
-#ifdef OPENGL
-    inline void GetGlViewport(void) noexcept {
-        glGetIntegerv(GL_VIEWPORT, m_glViewport);
+    inline void GetGpuViewport(void) noexcept {
+        gfxDriverStates.GetViewport(m_glViewport);
     }
 
-    inline void SetGlViewport(void) noexcept {
-        glViewport(m_glViewport[0], m_glViewport[1], m_glViewport[2], m_glViewport[3]);
+    inline void SetGpuViewport(void) noexcept {
+        gfxDriverStates.SetViewport(m_glViewport);
     }
-#endif // OPENGL
 
 };
 

@@ -10,7 +10,7 @@
 #include "array.hpp"
 #include "vector.hpp"
 #include "string.hpp"
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 #include "shaderdata.h"
 
 // =================================================================================================

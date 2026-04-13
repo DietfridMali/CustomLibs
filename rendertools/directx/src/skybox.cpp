@@ -1,7 +1,7 @@
 ﻿
 #include "skybox.h"
 #include "cube.h"
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 #include "tristate.h"
 
 // =================================================================================================
@@ -31,7 +31,7 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& type, c
 
 
 int Skybox::MaxTextureSize(void) {
-	int maxSize = gfxStates.MaxTextureSize();
+	int maxSize = gfxDriverStates.MaxTextureSize();
 	if (maxSize >= 4096)
 		return 0;
 	if (maxSize >= 2048)
@@ -67,8 +67,8 @@ bool Skybox::Setup(const String& textureFolder) {
 		v *= 2.0f;
 		m_skybox->AddVertex(v);
 	}
-	AutoArray<GfxTypes::Uint> indices;
-	indices.Resize(sizeof(Cube::triangleIndices) / sizeof(GfxTypes::Uint));
+	AutoArray<GfxDriverTypes::Uint> indices;
+	indices.Resize(sizeof(Cube::triangleIndices) / sizeof(GfxDriverTypes::Uint));
 	memcpy(indices.Data(), Cube::triangleIndices, sizeof(Cube::triangleIndices));
 	m_skybox->SetIndices(indices);
 	m_skybox->UpdateVAO();
@@ -100,9 +100,9 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 	if (not shader)
 		return false;
 
-	gfxStates.SetFaceCulling(0);
-	gfxStates.SetDepthWrite(0);
-	gfxStates.DepthFunc(GL_ALWAYS);
+	gfxDriverStates.SetFaceCulling(0);
+	gfxDriverStates.SetDepthWrite(0);
+	gfxDriverStates.DepthFunc(GL_ALWAYS);
 	for (int i = 0; i < 3; i++)
 		m_skyTextures[i]->Enable(i);
 	m_skybox->Render(nullptr);

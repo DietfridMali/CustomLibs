@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef Rectangle
+#	undef Rectangle
+#endif
+
 // =================================================================================================
 
 class Rectangle {

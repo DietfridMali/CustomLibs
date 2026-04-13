@@ -10,7 +10,7 @@ public:
 	static inline bool IsAvailable;
 	
 	BaseSSBO() {
-		IsAvailable = gfxStates.HasExtension("GL_ARB_shader_storage_buffer_object");
+		IsAvailable = gfxDriverStates.HasExtension("GL_ARB_shader_storage_buffer_object");
 	}
 };
 

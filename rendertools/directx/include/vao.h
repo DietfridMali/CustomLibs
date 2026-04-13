@@ -123,7 +123,7 @@ protected:
                           size_t componentType, size_t componentCount,
                           bool forceUpdate = false) noexcept;
 
-    void UpdateIndexBuffer(void* data, size_t dataSize, ComponentType componentType,
+    void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType,
                            bool forceUpdate = false) noexcept;
 };
 

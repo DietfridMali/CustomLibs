@@ -7,7 +7,7 @@
 #include "conversions.hpp"
 #include "glew.h"
 //#include "quad.h"
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 #include "drawbufferhandler.h"
 
 // =================================================================================================
@@ -72,7 +72,7 @@ void DrawBufferHandler::SetDrawBuffers(FBO* fbo, AutoArray<GLuint>* drawBuffers)
 
 void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
-    gfxStates.BindTexture2D(0, 0);
+    gfxDriverStates.BindTexture2D(0, 0);
     if (m_drawBufferInfo.m_fbo != nullptr)
         m_drawBufferInfo.m_fbo->Reenable(false, true);
     else

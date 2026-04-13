@@ -8,7 +8,7 @@
 #include "vector.hpp"
 #include "base_quad.h"
 #include "fbo.h"
-#include "avltree.hpp" // faster lookup than std::map
+#include "dictionary.hpp" // Dictionary<K,V> — faster lookup than std::map
 #include "colordata.h"
 #include "tablesize.h"
 #include "outlinerenderer.h"

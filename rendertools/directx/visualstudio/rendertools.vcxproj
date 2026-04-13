@@ -141,6 +141,8 @@
     <ClInclude Include="..\..\include\mesh.h" />
     <ClInclude Include="..\..\include\movement.h" />
     <ClInclude Include="..\include\noisetexture.h" />
+    <ClInclude Include="..\include\gfxdriverstates.h" />
+    <ClInclude Include="..\include\gfxdrivertypes.h" />
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\outlinerenderer.h" />
     <ClInclude Include="..\..\include\noise.h" />

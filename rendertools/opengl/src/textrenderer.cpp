@@ -1,4 +1,4 @@
-//pragma once
+﻿//pragma once
 
 #include <algorithm>
 #include "glew.h"
@@ -158,7 +158,7 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
     baseRenderer.ResetTransformation();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
 #endif
-    gfxStates.DepthFunc(GL_ALWAYS);
+    gfxDriverStates.DepthFunc(GL_ALWAYS);
     float letterScale = 2 * xOffset / float(textWidth);
     // reusing xOffset here
     if (alignment == taLeft)

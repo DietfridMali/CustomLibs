@@ -51,9 +51,9 @@ Shader* BaseShaderHandler::SelectShader(Texture* texture) {
     if (not texture)
         shaderId = "color";
     // select shader depending on texture type
-    else if (texture->Type() == GL_TEXTURE_CUBE_MAP)
+    else if (texture->GetTextureType() == TextureType::CubeMap)
         shaderId = "cubemap";
-    else if (texture->Type() == GL_TEXTURE_2D)
+    else if (texture->GetTextureType() == TextureType::Texture2D)
         shaderId = "texture";
     else
         return nullptr;
@@ -71,7 +71,7 @@ Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
         shader = GetShader(shaderId);
         if (shader == nullptr)
             return nullptr;
-        if (shader->m_handle == 0) {
+        if (!shader->IsValid()) {
 #ifdef _DEBUG
             fprintf(stderr, "*** shader'%s' is not available\r\n", (char*)shaderId);
 #endif

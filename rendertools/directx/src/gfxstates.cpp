@@ -1,4 +1,4 @@
-﻿#include "gfxstates.h"
+#include "gfxdriverstates.h"
 
 // =================================================================================================
 // TextureSlotInfo
@@ -65,9 +65,9 @@ bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
 }
 
 // =================================================================================================
-// GfxStates
+// GfxDriverStates
 
-TextureSlotInfo* GfxStates::FindInfo(GLenum typeTag) {
+TextureSlotInfo* GfxDriverStates::FindInfo(GLenum typeTag) {
     for (auto& info : m_slotInfos)
         if (info.GetTypeTag() == typeTag)
             return &info;
@@ -76,7 +76,7 @@ TextureSlotInfo* GfxStates::FindInfo(GLenum typeTag) {
 }
 
 
-int GfxStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+int GfxDriverStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return -1;
     return (slotIndex >= 0) ? (info->Query(slotIndex) == srvIndex ? slotIndex : -1)
@@ -84,28 +84,28 @@ int GfxStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
 }
 
 
-int GfxStates::BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+int GfxDriverStates::BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return -1;
     return info->Bind(srvIndex, slotIndex);
 }
 
 
-bool GfxStates::ReleaseTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+bool GfxDriverStates::ReleaseTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return false;
     return info->Release(srvIndex, slotIndex);
 }
 
 
-int GfxStates::GetBoundTexture(GLenum typeTag, int slotIndex) {
+int GfxDriverStates::GetBoundTexture(GLenum typeTag, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return 0;
     return int(info->Query(slotIndex));
 }
 
 
-int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
+int GfxDriverStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (!info) return -1;
     info->Update(srvIndex, slotIndex);
@@ -113,7 +113,7 @@ int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
 }
 
 
-void GfxStates::ReleaseBuffers(void) noexcept {
+void GfxDriverStates::ReleaseBuffers(void) noexcept {
     for (auto& info : m_slotInfos)
         info = TextureSlotInfo(info.GetTypeTag());
 }

@@ -9,7 +9,7 @@
 #include "SDL_image.h"
 #pragma warning(pop)
 
-#include "gfxstates.h"
+#include "gfxdriverstates.h"
 
 // =================================================================================================
 
