@@ -1,4 +1,5 @@
 #include "command_queue.h"
+#include "cbv_allocator.h"
 
 #include <cstdio>
 
@@ -44,12 +45,16 @@ bool CommandQueue::Create(ID3D12Device* device) noexcept {
         return false;
     }
 
+    if (not cbvAllocator.Create(device))
+        return false;
+
     return true;
 }
 
 
 void CommandQueue::Destroy(void) noexcept {
     WaitIdle();
+    cbvAllocator.Destroy();
     if (m_fenceEvent) {
         CloseHandle(m_fenceEvent);
         m_fenceEvent = nullptr;
@@ -79,13 +84,25 @@ bool CommandQueue::BeginFrame(void) noexcept {
         fprintf(stderr, "CommandQueue::BeginFrame: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
+
+    cbvAllocator.Reset(m_frameIndex);
     m_isRecording = true;
     return true;
 }
 
 
 bool CommandQueue::Open(void) noexcept {
-    if (m_isRecording) return true;
+    if (m_isRecording)
+        return true;
+    // Wait for GPU to finish with this frame's allocator before resetting it.
+    if (m_fence and m_fenceEvent and (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex])) {
+        HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent);
+        if (FAILED(hr)) {
+            fprintf(stderr, "CommandQueue::Open: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
+            return false;
+        }
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
     HRESULT hr = m_allocators[m_frameIndex]->Reset();
     if (FAILED(hr)) {
         fprintf(stderr, "CommandQueue::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
@@ -96,6 +113,8 @@ bool CommandQueue::Open(void) noexcept {
         fprintf(stderr, "CommandQueue::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
+
+    cbvAllocator.Reset(m_frameIndex);
     m_isRecording = true;
     return true;
 }
@@ -104,7 +123,9 @@ bool CommandQueue::Open(void) noexcept {
 void CommandQueue::Execute(void) noexcept {
     if (!m_isRecording) return;
     m_isRecording = false;
-    m_list->Close();
+    HRESULT hr = m_list->Close();
+    if (FAILED(hr))
+        fprintf(stderr, "CommandQueue::Execute: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
     ID3D12CommandList* lists[] = { m_list.Get() };
     m_queue->ExecuteCommandLists(1, lists);
 }
@@ -112,7 +133,8 @@ void CommandQueue::Execute(void) noexcept {
 
 void CommandQueue::EndFrame(void) noexcept {
     Execute();
-    const UINT64 fenceValue = ++m_fenceValues[m_frameIndex];
+    const UINT64 fenceValue = ++m_fenceCounter;   // always increasing across all frames
+    m_fenceValues[m_frameIndex] = fenceValue;      // store so BeginFrame can wait on it
     m_queue->Signal(m_fence.Get(), fenceValue);
     m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
 }
@@ -121,13 +143,13 @@ void CommandQueue::EndFrame(void) noexcept {
 void CommandQueue::WaitIdle(void) noexcept {
     if (!m_queue || !m_fence || !m_fenceEvent)
         return;
-    const UINT64 value = m_fenceValues[m_frameIndex] + 1;
+    const UINT64 value = ++m_fenceCounter;
+    m_fenceValues[m_frameIndex] = value;
     m_queue->Signal(m_fence.Get(), value);
     if (m_fence->GetCompletedValue() < value) {
         m_fence->SetEventOnCompletion(value, m_fenceEvent);
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
-    m_fenceValues[m_frameIndex] = value;
 }
 
 // =================================================================================================

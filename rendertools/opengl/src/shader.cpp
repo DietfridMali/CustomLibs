@@ -122,69 +122,42 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle) {
 // set modelview, projection and viewport matrices in shader. 
 // Every shader program should have at least modelview and projection matrices.
 // Also starts location indexing by calling m_locations.Start().
-void Shader::UpdateMatrices(void) {
-    //m_locations.Start();
-#ifdef _DEBUG
-    if (RenderMatrices::LegacyMode) {
-        float glData[16];
-        SetMatrix4f("mModelView", GetFloatData(GL_MODELVIEW_MATRIX, 16, glData));
-        SetMatrix4f("mProjection", GetFloatData(GL_PROJECTION_MATRIX, 16, glData));
-    }
-    else
-#endif
-    {
-        // both matrices must be column major
-#if 0
-        if (baseRenderer.IsShadowPass())
-            SetInt("transformationType", shadowMap.GetTransformationType());
-        else 
-#endif
-        {
-            SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
-            SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
-            SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
-        }
-        if (shadowMap.IsReady())
-            SetMatrix4f("mLightTransform", shadowMap.GetTransformation().AsArray(), false);
-#if 0
-        SetMatrix4f("mBaseModelView", baseRenderer.ModelView().AsArray(), false);
-#endif
-    }
-#if 0
-    baseRenderer.CheckModelView();
-    baseRenderer.CheckProjection();
-    float glmData[16];
-    memcpy(glmData, baseRenderer.Projection().AsArray(), sizeof(glmData));
-#endif
+bool Shader::UpdateMatrices(void) {
+    SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
+    SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
+    SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
+    if (shadowMap.IsReady())
+        SetMatrix4f("mLightTransform", shadowMap.GetTransformation().AsArray(), false);
+    return true;
 }
 
 
 GLint Shader::SetMatrix4f(const char* name, const float* data, bool transpose) noexcept {
+#if CACHE_SHADER_DATA
     GLint* location = m_locations[name]; // .Current();
-#if PASSTHROUGH_MODE
-    GetLocation(name, location);
-    if (*location >= 0)
-        glUniformMatrix4fv(*location, 1, GLboolean(transpose), data);
-    return location;
-#else
     if (UpdateUniform<const float*, UniformArray16f>(name, location, data))
         glUniformMatrix4fv(*location, 1, GLboolean(transpose), data);
     return *location;
+#else
+    GLint location = GetLocation(name);
+    if (location >= 0)
+        glUniformMatrix4fv(location, 1, GLboolean(transpose), data);
+    return location;
 #endif
 }
 
 
 GLint Shader::SetMatrix3f(const char* name, float* data, bool transpose) noexcept {
+#if CACHE_SHADER_DATA
     GLint* location = m_locations[name]; // .Current();
-#if PASSTHROUGH_MODE
-    GetLocation(name, location);
-    if (*location >= 0)
-        glUniformMatrix3fv(*location, 1, GLboolean(transpose), data);
-    return location;
-#else
-    if (UpdateUniform<float*, UniformArray9f>(name, location, data))
+-    if (UpdateUniform<float*, UniformArray9f>(name, location, data))
         glUniformMatrix3fv(*location, 1, GLboolean(transpose), data);
     return *location;
+#else
+    GLint location = GetLocation(name);
+    if (location >= 0)
+        glUniformMatrix3fv(location, 1, GLboolean(transpose), data);
+    return location;
 #endif
 }
 

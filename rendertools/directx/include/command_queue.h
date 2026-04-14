@@ -18,6 +18,7 @@ public:
     ComPtr<ID3D12GraphicsCommandList>   m_list;
     ComPtr<ID3D12Fence>                 m_fence;
     UINT64                              m_fenceValues[FRAME_COUNT]{};
+    UINT64                              m_fenceCounter{ 0 };    // global monotonic counter — always increasing
     HANDLE                              m_fenceEvent{ nullptr };
     UINT                                m_frameIndex{ 0 };
     bool                                m_isRecording{ false };
@@ -55,7 +56,8 @@ public:
 
 // =================================================================================================
 
-class CommandQueueHandler : public BaseSingleton<CommandQueueHandler>
+class CommandQueueHandler 
+    : public BaseSingleton<CommandQueueHandler>
 {
 public:
     CommandQueue m_cmdQueue;
@@ -68,7 +70,9 @@ public:
         m_cmdQueue.Destroy();
     }
 
-    inline CommandQueue& Get(void) noexcept { return m_cmdQueue; }
+    inline CommandQueue& Get(void) noexcept { 
+        return m_cmdQueue; 
+    }
 };
 
 #define cmdQueue CommandQueueHandler::Instance().Get()

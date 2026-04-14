@@ -68,6 +68,8 @@ public:
         return (shader == nullptr) ? m_activeShader != nullptr : m_activeShader == shader;
     }
 
+    inline Shader* ActiveShader(void) const noexcept { return m_activeShader; }
+
     inline Shader* GetShader(String shaderId) {
         return m_shaderCode->GetShader(shaderId);
     }

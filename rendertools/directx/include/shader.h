@@ -83,19 +83,21 @@ public:
     };
     AutoArray<PsoEntry>  m_psoCache;
 
-    // b0 — FrameConstants (matrices)
+    // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
     FrameConstants          m_b0Staging{};
-    ComPtr<ID3D12Resource>  m_b0Buffer;
 
-    // b1 — per-shader constants
+    // b1 — per-shader constants; written per-draw to a cbvAllocator sub-allocation
     struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
     uint32_t                     m_b1Size{ 0 };
     std::vector<uint8_t>         m_b1Staging;
-    ComPtr<ID3D12Resource>       m_b1Buffer;
     bool                         m_b1Dirty{ true };
 
     // Field map (uniform name → b1 byte offset + size), filled from HLSL reflection
     AutoArray<std::pair<String, FieldInfo>> m_b1Fields;
+
+    // Per-shader input layout — only the elements the VS actually reads (from D3DReflect).
+    // Used instead of the global kInputLayout so unused slots don't require bound buffers.
+    std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;
 
     // Location table (name → resolved b1 offset, same pattern as OGL for compat)
     AutoArray<UniformHandle*>  m_uniforms;
@@ -146,26 +148,28 @@ public:
     // No-op in DX12 (PSO changes are driven by RenderState changes in the next Enable call).
     inline void Disable(void) noexcept {}
 
-    // Upload b0 (matrices) to GPU.  Called from UpdateMatrices() and from Shader setters.
-    void UploadB0(void) noexcept;
-
-    // Upload b1 (shader constants) to GPU.  Called from Enable().
-    void UploadB1(void) noexcept;
+    // Allocate a b1 slot from cbvAllocator, write m_b1Staging, bind root param 1.
+    // Called from VAO::Render() just before each draw.
+    bool UploadB1(void) noexcept;
 
     // Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).
     // Reads from baseRenderer / shadowMap, same as OGL.
-    void UpdateMatrices(void);
+    bool UpdateMatrices(void);
 
     // -----------------------------------------------------------------------------------------
     // PSO helpers (internal)
 
     bool CreateRootSignature(void) noexcept;
-    bool CreateCBs(void) noexcept;
+
     ID3D12PipelineState* GetOrCreatePSO(const RenderState& state) noexcept;
-    static D3D12_BLEND           ToD3DBlend(GLenum gl) noexcept;
-    static D3D12_BLEND_OP        ToD3DBlendOp(GLenum gl) noexcept;
+
+    static D3D12_BLEND ToD3DBlend(GLenum gl) noexcept;
+
+    static D3D12_BLEND_OP ToD3DBlendOp(GLenum gl) noexcept;
+
     static D3D12_COMPARISON_FUNC ToD3DCompFunc(GLenum gl) noexcept;
-    static D3D12_STENCIL_OP      ToD3DStencilOp(GLenum gl) noexcept;
+
+    static D3D12_STENCIL_OP ToD3DStencilOp(GLenum gl) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as OGL, return int (was GLint)

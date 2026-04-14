@@ -13,7 +13,7 @@
 // (i.e. the resulting text is widened horizontally)
 // then buffer[1] is used as source and rendered to buffer[2], applying the vertical outline shader
 // now buffer[2] contains a "fatter" version of the original text(buffer[0])
-// render buffer[2] in the desired outline color and then buffer[2] on top of it : Voilà, there is your text with an outline
+// render buffer[2] in the desired outline color and then buffer[2] on top of it : Voilï¿½, there is your text with an outline
 
 
 #define AUTORENDER 0
@@ -25,7 +25,9 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premult
         if (params.shader == nullptr)
             return;
         BaseRenderer::ClearGLError();
+#ifdef OPENGL
         params.shader->SetInt("surface", 0);
+#endif
         params.shader->SetFloat("offset", 0.0f);
         //params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
         if (aaMethod.method != "gaussblur") {
@@ -56,7 +58,9 @@ void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool
     if (decoration.HaveOutline()) {
         Shader* shader = baseShaderHandler.SetupShader("outline");
         if (shader and not baseRenderer.IsShadowPass()) {
+#ifdef OPENGL
             shader->SetInt("surface", 0);
+#endif
             shader->SetFloat("outlineWidth", decoration.outlineWidth);
             shader->SetVector4f("outlineColor", decoration.outlineColor);
             shader->SetFloat("offset", 0.0f); // 0.5f);

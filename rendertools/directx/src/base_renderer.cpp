@@ -67,6 +67,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
     SetupOpenGL();
     m_drawBufferStack.Clear();
     m_renderTexture.HasBuffer() = true;
+    m_renderTexture.m_isValid = true;  // wrapper — handle set per-frame in Draw3DScene / DrawScreen
     m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
     return true;
 }
@@ -173,6 +174,7 @@ bool BaseRenderer::Stop3DScene(void) {
 
 bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
+    cmdQueue.Open();   // ensure the command list is open (no-op if already recording)
     SetClearColor(m_backgroundColor);
     ResetDrawBuffers(m_screenBuffer, !m_screenIsAvailable);
     m_screenIsAvailable = true;
@@ -247,12 +249,17 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
+            gfxDriverStates.SetDepthTest(0);
+            gfxDriverStates.SetDepthWrite(0);
             gfxDriverStates.DepthFunc(GL_ALWAYS);
             gfxDriverStates.SetFaceCulling(0);
-            SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
-            // Ensure a command list is open for recording the back-buffer transitions.
+            // Open the command list before any DX12 state commands.
             cmdQueue.Open();
+            // Ensure the screen FBO color buffer is in PSR state.
+            // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
+            // in which case the RENDER_TARGET → PSR transition was never recorded.
+            m_screenBuffer->Disable();
             auto* list = cmdQueue.List();
             if (list && baseDisplayHandler.CurrentBackBuffer()) {
                 // Transition back buffer PRESENT → RENDER_TARGET, clear it, blit screen FBO.
@@ -260,7 +267,10 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
                 D3D12_CPU_DESCRIPTOR_HANDLE rtv = baseDisplayHandler.CurrentRTV();
                 constexpr float black[4] = { 0.f, 0.f, 0.f, 0.f };
                 list->ClearRenderTargetView(rtv, black, 0, nullptr);
+                list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
             }
+            // Set viewport after the list is open so RSSetViewports is actually recorded.
+            SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
@@ -278,8 +288,7 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 }
 
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight,
-                                bool flipViewportVertically, bool flipWindowVertically) noexcept {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept {
     if (windowWidth * windowHeight == 0) {
         if (m_drawBufferInfo.m_fbo) {
             windowWidth  = m_drawBufferInfo.m_fbo->GetWidth(true);

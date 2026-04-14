@@ -228,6 +228,17 @@ bool Texture::Bind(int tmuIndex)
     if (!IsAvailable()) return false;
     m_tmuIndex = tmuIndex;
     gfxDriverStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
+
+    // DX12: bind this texture to its slot in the root signature.
+    // Root params 2..17 are individual 1-entry descriptor tables for t0..t15.
+    // SetDescriptorHeaps is called once in Shader::Enable(); here we only
+    // update the per-slot root parameter.
+    auto* list = cmdQueue.List();
+    if (list and (m_handle != UINT32_MAX)) {
+        auto& heap = descriptorHeaps.m_srvHeap;
+        if (heap.m_heap)
+            list->SetGraphicsRootDescriptorTable(UINT(2 + tmuIndex), heap.GpuHandle(m_handle));
+    }
     return true;
 }
 

@@ -194,6 +194,11 @@ void VAO::Render(std::span<Texture* const> textures) noexcept
 
     EnableTextures(textures);
 
+    // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
+    // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
+    if (Shader* sh = baseShaderHandler.ActiveShader())
+        sh->UploadB1();
+
     auto* list = cmdQueue.List();
     if (list) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))

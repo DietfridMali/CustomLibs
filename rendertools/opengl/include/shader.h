@@ -13,7 +13,11 @@
 #include "texture.h"
 #include "shaderdata.h"
 
-#define CACHE_SHADER_DATA 1
+#ifdef _DEBUG
+#   define CACHE_SHADER_DATA 0
+#else
+#   define CACHE_SHADER_DATA 0
+#endif
 
 // =================================================================================================
 
@@ -143,7 +147,9 @@ class Shader
             return m_handle;
         }
 
-        inline bool IsValid(void) const noexcept { return m_handle != 0; }
+        inline bool IsValid(void) const noexcept { 
+            return m_handle != 0; 
+        }
 
 
         inline bool HaveBuffer(GLint location) noexcept {
@@ -158,6 +164,9 @@ class Shader
             return true;
         }
 
+        inline GLint GetLocation(const char* name) noexcept {
+            return glGetUniformLocation(m_handle, name);
+        }
 
         template <typename UNIFORM_T>
         inline UNIFORM_T* GetUniform(const char* name, GLint* location) noexcept {
@@ -221,7 +230,7 @@ class Shader
             }
             return *location;
 #else
-            GLint location = glGetUniformLocation(m_handle, name);
+            GLint location = GetLocation(name);
             if (location >= 0) {
                 if constexpr (std::is_same_v<T, int>)
                     glUniform1i(location, static_cast<GLint>(data));
@@ -250,7 +259,7 @@ class Shader
                 UniformFuncs::gl_uniform<Base, C>::fn(*location, GLsizei(length), reinterpret_cast<const Base*>(data));
             return *location;
 #else
-            GLint location = glGetUniformLocation(m_handle, name);
+            GLint location = GetLocation(name);
             if (location >= 0) 
                 UniformFuncs::gl_uniform<Base, C>::fn(location, GLsizei(length), reinterpret_cast<const Base*>(data));
             return location;
@@ -385,7 +394,7 @@ class Shader
             glUseProgram(0);
         }
 
-        void UpdateMatrices(void);
+        bool UpdateMatrices(void);
 
         inline const bool operator< (String const& name) const { return m_name < name; }
 

@@ -23,15 +23,15 @@ static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device,
 {
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
-    rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    rd.Width            = UINT(w);
-    rd.Height           = UINT(h);
+    rd.Dimension  = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    rd.Width      = UINT(w);
+    rd.Height     = UINT(h);
     rd.DepthOrArraySize = 1;
-    rd.MipLevels        = 1;
-    rd.Format           = fmt;
+    rd.MipLevels  = 1;
+    rd.Format     = fmt;
     rd.SampleDesc.Count = 1;
-    rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    rd.Flags            = (fmt == kDepthFormat)
+    rd.Layout     = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    rd.Flags      = (fmt == kDepthFormat)
                         ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
                         : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
                         | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
@@ -53,7 +53,7 @@ FBO::FBO()
 void FBO::Init(void)
 {
     m_width = m_height = 0;
-    m_scale  = 1;
+    m_scale = 1;
     m_bufferCount = m_colorBufferCount = 0;
     m_activeBufferIndex = 0;
     m_lastDestination = -1;
@@ -75,34 +75,36 @@ void FBO::Init(void)
 bool FBO::CreateColorBuffer(int i, int width, int height)
 {
     ID3D12Device* device = dx12Context.Device();
-    if (!device) return false;
+    if (not device) 
+        return false;
 
     D3D12_CLEAR_VALUE cv{};
     cv.Format = kColorFormat;
     cv.Color[3] = 1.0f;
 
-    m_colorResources[i] = CreateRTResource(device, width, height, kColorFormat,
-                                            D3D12_RESOURCE_STATE_RENDER_TARGET, &cv);
-    if (!m_colorResources[i]) return false;
+    m_colorResources[i] = CreateRTResource(device, width, height, kColorFormat, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv);
+    if (not m_colorResources[i])
+        return false;
     m_colorStates[i] = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
     // RTV
     m_rtvHandles[i] = descriptorHeaps.AllocRTV();
-    if (!m_rtvHandles[i].IsValid()) return false;
+    if (not m_rtvHandles[i].IsValid()) 
+        return false;
     D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
-    rtvd.Format        = kColorFormat;
+    rtvd.Format  = kColorFormat;
     rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
     device->CreateRenderTargetView(m_colorResources[i].Get(), &rtvd, m_rtvHandles[i].cpu);
 
     // SRV
     m_srvHandles[i] = descriptorHeaps.AllocSRV();
-    if (!m_srvHandles[i].IsValid()) return false;
+    if (not m_srvHandles[i].IsValid()) return false;
     m_srvIndices[i] = m_srvHandles[i].index;
     D3D12_SHADER_RESOURCE_VIEW_DESC srvd{};
-    srvd.Format                  = kColorFormat;
-    srvd.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvd.Format = kColorFormat;
+    srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvd.Texture2D.MipLevels     = 1;
+    srvd.Texture2D.MipLevels = 1;
     device->CreateShaderResourceView(m_colorResources[i].Get(), &srvd, m_srvHandles[i].cpu);
 
     // Transition to SRV state so it can be sampled before first render pass.
@@ -112,9 +114,9 @@ bool FBO::CreateColorBuffer(int i, int width, int height)
     if (list) {
         D3D12_RESOURCE_BARRIER b{};
         b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        b.Transition.pResource   = m_colorResources[i].Get();
+        b.Transition.pResource = m_colorResources[i].Get();
         b.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-        b.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        b.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         list->ResourceBarrier(1, &b);
         m_colorStates[i] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -128,22 +130,22 @@ bool FBO::CreateColorBuffer(int i, int width, int height)
 bool FBO::CreateDepthBuffer(int width, int height)
 {
     ID3D12Device* device = dx12Context.Device();
-    if (!device) return false;
+    if (not device) return false;
 
     D3D12_CLEAR_VALUE cv{};
     cv.Format = kDepthFormat;
-    cv.DepthStencil.Depth   = 1.0f;
+    cv.DepthStencil.Depth = 1.0f;
     cv.DepthStencil.Stencil = 0;
 
-    m_depthResource = CreateRTResource(device, width, height, kDepthFormat,
-                                        D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv);
-    if (!m_depthResource) return false;
+    m_depthResource = CreateRTResource(device, width, height, kDepthFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv);
+    if (not m_depthResource) return false;
 
     m_dsvHandle = descriptorHeaps.AllocDSV();
-    if (!m_dsvHandle.IsValid()) return false;
+    if (not m_dsvHandle.IsValid())
+        return false;
 
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-    dsvd.Format        = kDepthFormat;
+    dsvd.Format = kDepthFormat;
     dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dx12Context.Device()->CreateDepthStencilView(m_depthResource.Get(), &dsvd, m_dsvHandle.cpu);
     return true;
@@ -153,26 +155,32 @@ bool FBO::CreateDepthBuffer(int width, int height)
 bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params)
 {
     Destroy();
-    m_name             = params.name;
-    m_width            = width;
-    m_height           = height;
-    m_scale            = scale;
+    m_name = params.name;
+    m_width = width;
+    m_height = height;
+    m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, FBO_MAX_COLOR_BUFFERS);
-    m_bufferCount      = m_colorBufferCount;
-    m_pingPong         = m_bufferCount > 1;
+    m_bufferCount = m_colorBufferCount;
+    m_pingPong = m_bufferCount > 1;
 
     int w = width * scale;
     int h = height * scale;
 
     for (int i = 0; i < m_colorBufferCount; ++i) {
-        if (!CreateColorBuffer(i, w, h)) { Destroy(); return false; }
+        if (not CreateColorBuffer(i, w, h)) { 
+            Destroy(); 
+            return false; 
+        }
     }
 
-    if (params.depthBufferCount > 0 || params.colorBufferCount > 0) {
-        if (!CreateDepthBuffer(w, h)) { Destroy(); return false; }
+    if ((params.depthBufferCount > 0) or (params.colorBufferCount > 0)) {
+        if (not CreateDepthBuffer(w, h)) { 
+            Destroy(); 
+            return false; 
+        }
     }
 
-    m_viewport    = Viewport(0, 0, w, h);
+    m_viewport = Viewport(0, 0, w, h);
     m_isAvailable = true;
     return true;
 }
@@ -197,12 +205,13 @@ void FBO::Destroy(void)
 void FBO::TransitionColor(ID3D12GraphicsCommandList* list, int i,
                            D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
 {
-    if (before == after || !list || !m_colorResources[i]) return;
+    if ((before == after) or not list or not m_colorResources[i]) 
+        return;
     D3D12_RESOURCE_BARRIER b{};
     b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource   = m_colorResources[i].Get();
+    b.Transition.pResource = m_colorResources[i].Get();
     b.Transition.StateBefore = before;
-    b.Transition.StateAfter  = after;
+    b.Transition.StateAfter = after;
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     list->ResourceBarrier(1, &b);
     m_colorStates[i] = after;
@@ -211,13 +220,15 @@ void FBO::TransitionColor(ID3D12GraphicsCommandList* list, int i,
 
 void FBO::BindRenderTargets(ID3D12GraphicsCommandList* list)
 {
-    if (!list || !m_isAvailable) return;
+    if (not list or not m_isAvailable) 
+        return;
 
     // Collect RTV handles for active color buffers, transition from SRV → RTV.
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[FBO_MAX_COLOR_BUFFERS]{};
     int count = 0;
     for (int i = 0; i < m_colorBufferCount; ++i) {
-        if (!m_colorResources[i]) continue;
+        if (not m_colorResources[i]) 
+            continue;
         TransitionColor(list, i, m_colorStates[i], D3D12_RESOURCE_STATE_RENDER_TARGET);
         rtvs[count++] = m_rtvHandles[i].cpu;
     }
@@ -229,8 +240,8 @@ void FBO::BindRenderTargets(ID3D12GraphicsCommandList* list)
 
     // Viewport & scissor
     D3D12_VIEWPORT vp{};
-    vp.Width    = float(m_width * m_scale);
-    vp.Height   = float(m_height * m_scale);
+    vp.Width = float(m_width * m_scale);
+    vp.Height = float(m_height * m_scale);
     vp.MaxDepth = 1.0f;
     list->RSSetViewports(1, &vp);
     D3D12_RECT sc{ 0, 0, m_width * m_scale, m_height * m_scale };
@@ -238,15 +249,15 @@ void FBO::BindRenderTargets(ID3D12GraphicsCommandList* list)
 }
 
 
-bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup,
-                  bool clear, bool reenable)
+bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable)
 {
-    if (!m_isAvailable) return false;
+    if (not m_isAvailable) 
+        return false;
     m_activeBufferIndex = (bufferIndex < 0) ? 0 : (bufferIndex % m_bufferCount);
-    m_drawBufferGroup   = drawBufferGroup;
+    m_drawBufferGroup = drawBufferGroup;
 
     auto* list = cmdQueue.List();
-    if (!list) 
+    if (not list) 
         return false;
 
     BindRenderTargets(list);
@@ -297,7 +308,7 @@ void FBO::SetViewport(bool flipVertically) noexcept
 void FBO::Fill(RGBAColor color)
 {
     auto* list = cmdQueue.List();
-    if (!list) return;
+    if (not list) return;
     float c[4] = { color.R(), color.G(), color.B(), color.A() };
     for (int i = 0; i < m_colorBufferCount; ++i)
         if (m_rtvHandles[i].IsValid())
@@ -307,9 +318,9 @@ void FBO::Fill(RGBAColor color)
 
 void FBO::Clear(int bufferIndex, eDrawBufferGroups /*drawBufferGroup*/, bool clear)
 {
-    if (!clear) return;
+    if (not clear) return;
     auto* list = cmdQueue.List();
-    if (!list) return;
+    if (not list) return;
     const float zero[4] = { 0, 0, 0, 0 };
     if (bufferIndex < 0) {
         for (int i = 0; i < m_colorBufferCount; ++i)
@@ -323,23 +334,26 @@ void FBO::Clear(int bufferIndex, eDrawBufferGroups /*drawBufferGroup*/, bool cle
 }
 
 
-Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex)
+Texture* FBO::GetRenderTexture(const FBORenderParams& params, int /*tmuIndex*/)
 {
     int src = params.source % m_bufferCount;
-    if (!m_colorResources[src]) return nullptr;
+    if (not m_colorResources[src]) return nullptr;
     m_renderTexture.m_handle = m_srvIndices[src];
     m_renderTexture.m_resource = m_colorResources[src];
-    m_renderTexture.m_isValid  = true;
-    m_renderTexture.Bind(tmuIndex);
+    m_renderTexture.m_isValid = true;
+    // DX12: do not bind here — the root signature must be set first via Shader::Enable().
+    // The VAO binds the texture at draw time via EnableTextures() → Texture::Bind().
     return &m_renderTexture;
 }
 
 
 void FBO::ClearStencil(void)
 {
-    if (!m_dsvHandle.IsValid()) return;
+    if (not m_dsvHandle.IsValid()) 
+        return;
     auto* list = cmdQueue.List();
-    if (!list) return;
+    if (not list) 
+        return;
     list->ClearDepthStencilView(m_dsvHandle.cpu, D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 }
 
@@ -360,7 +374,7 @@ bool FBO::UpdateTransformation(const FBORenderParams& params)
     baseRenderer.PushMatrix();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
     float scale = params.scale;
-    baseRenderer.Scale(scale, params.flipVertically == -1 ? -scale : scale, 1.0f);
+    baseRenderer.Scale(scale, scale, 1.0f);
     if (params.rotation != 0.0f)
         baseRenderer.Rotate(params.rotation, 0.0f, 0.0f, 1.0f);
     return true;
@@ -369,11 +383,11 @@ bool FBO::UpdateTransformation(const FBORenderParams& params)
 
 bool FBO::RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color)
 {
-    if (!texture) return false;
+    if (not texture) return false;
     bool transformed = UpdateTransformation(params);
-    baseRenderer.RenderToViewport(texture, color,
-        params.rotation != 0.0f, params.flipVertically != 0);
-    if (transformed) baseRenderer.PopMatrix();
+    baseRenderer.RenderToViewport(texture, color, params.rotation != 0.0f, false);
+    if (transformed) 
+        baseRenderer.PopMatrix();
     return true;
 }
 
@@ -381,7 +395,7 @@ bool FBO::RenderTexture(Texture* texture, const FBORenderParams& params, const R
 bool FBO::Render(const FBORenderParams& params, const RGBAColor& color)
 {
     Texture* tex = GetRenderTexture(params);
-    if (!tex) return false;
+    if (not tex) return false;
     int dst = params.destination;
     if (dst >= 0) {
         // ping-pong: bind destination as RTV

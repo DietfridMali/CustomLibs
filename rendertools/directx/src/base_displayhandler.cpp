@@ -239,7 +239,9 @@ void BaseDisplayHandler::Update(void) {
     cmdQueue.EndFrame();
     UINT syncInterval = m_vSync ? 1 : 0;
     UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
-    m_swapChain->Present(syncInterval, presentFlags);
+    HRESULT hr = m_swapChain->Present(syncInterval, presentFlags);
+    if (FAILED(hr))
+        fprintf(stderr, "BaseDisplayHandler::Update: Present failed (hr=0x%08X)\n", (unsigned)hr);
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
     // Open fresh command list for the next frame.
     // Also reset active-shader tracking — BeginFrame() resets all DX12 command-list state,
