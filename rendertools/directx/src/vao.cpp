@@ -57,7 +57,7 @@ VAO& VAO::Copy(VAO const& other)
         Destroy();
         m_dataBuffers = other.m_dataBuffers;
         m_indexBuffer = other.m_indexBuffer;
-        m_shape       = other.m_shape;
+        m_shape = other.m_shape;
     }
     return *this;
 }
@@ -69,7 +69,7 @@ VAO& VAO::Move(VAO& other) noexcept
         Destroy();
         m_dataBuffers = std::move(other.m_dataBuffers);
         m_indexBuffer = std::move(other.m_indexBuffer);
-        m_shape       = other.m_shape;
+        m_shape = other.m_shape;
     }
     return *this;
 }
@@ -79,7 +79,10 @@ VBO* VAO::FindBuffer(const char* type, int id, int& index) noexcept
 {
     int i = 0;
     for (auto vbo : m_dataBuffers) {
-        if (vbo->IsType(type) and vbo->HasID(id)) { index = i; return vbo; }
+        if (vbo->IsType(type) and vbo->HasID(id)) { 
+            index = i; 
+            return vbo; 
+        }
         ++i;
     }
     return nullptr;
@@ -125,9 +128,9 @@ bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize
         return false;
     int index = -1;
     VBO* vbo = FindBuffer(type, id, index);
-    if (!vbo) {
+    if (not vbo) {
         vbo = new (std::nothrow) VBO();
-        if (!vbo) 
+        if (not vbo) 
             return false;
         m_dataBuffers.Append(vbo);
         vbo->SetDynamic(m_isDynamic);
@@ -171,10 +174,8 @@ bool VAO::Enable(void) noexcept
     }
 
     // Bind index buffer if present
-    if (m_indexBuffer.IsValid()) {
+    if (m_indexBuffer.IsValid()) 
         list->IASetIndexBuffer(&m_indexBuffer.m_ibv);
-    }
-
     list->IASetPrimitiveTopology(ToD3DTopology(m_shape));
     return true;
 }

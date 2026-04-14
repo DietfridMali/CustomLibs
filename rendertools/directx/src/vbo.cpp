@@ -136,7 +136,8 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* 
     // Upload data
     void* mapped = nullptr;
     D3D12_RANGE range{ 0, 0 };
-    if (FAILED(m_resource->Map(0, &range, &mapped))) return false;
+    if (FAILED(m_resource->Map(0, &range, &mapped))) 
+        return false;
     std::memcpy(mapped, data, dataSize);
     m_resource->Unmap(0, nullptr);
 
