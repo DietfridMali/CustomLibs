@@ -80,7 +80,7 @@ bool FBO::CreateColorBuffer(int i, int width, int height)
 
     D3D12_CLEAR_VALUE cv{};
     cv.Format = kColorFormat;
-    cv.Color[3] = 1.0f;
+    // All zeros (including alpha) to match the zero[4] clear in FBO::Enable.
 
     m_colorResources[i] = CreateRTResource(device, width, height, kColorFormat, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv);
     if (not m_colorResources[i])

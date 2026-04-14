@@ -18,6 +18,7 @@
 #include "descriptor_heap.h"
 #include "command_queue.h"
 #include "dx12context.h"
+#include "dx12upload.h"
 
 // =================================================================================================
 // DX12 Texture implementation
@@ -35,84 +36,17 @@ int Texture::CompareTextures(void* context, const String& k1, const String& k2) 
 // Upload pixel data to a default-heap texture resource via a temporary upload buffer.
 static bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixelData, int width, int height, int channels) noexcept
 {
-    DXGI_FORMAT fmt = (channels == 4) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;
-
-    UINT64 uploadSize = 0;
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-    UINT rowCount = 0;
-    UINT64 rowSize = 0;
-    D3D12_RESOURCE_DESC desc = dstResource->GetDesc();
-    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
-
-    // Upload heap resource
-    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-    D3D12_RESOURCE_DESC upDesc{};
-    upDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    upDesc.Width = uploadSize;
-    upDesc.Height = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
-    upDesc.SampleDesc.Count = 1;
-    upDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    ComPtr<ID3D12Resource> upload;
-    HRESULT hr = device->CreateCommittedResource(
-        &hp, D3D12_HEAP_FLAG_NONE, &upDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload));
-    if (FAILED(hr)) 
-        return false;
-
-    // Copy to upload heap with row padding
-    uint8_t* mapped = nullptr;
-    D3D12_RANGE mapRange{ 0, 0 };
-    if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) 
-        return false;
-    for (UINT r = 0; r < rowCount; ++r) {
-        const uint8_t* src = pixelData + r * UINT(width) * channels;
-        uint8_t* dst = mapped + layout.Offset + r * layout.Footprint.RowPitch;
-
-        if (channels == 4) {
-            std::memcpy(dst, src, UINT(width) * 4);
-        } else if (channels == 3) {
-            // Expand RGB → RGBA
-            for (int x = 0; x < width; ++x) {
-                dst[x * 4 + 0] = src[x * 3 + 0];
-                dst[x * 4 + 1] = src[x * 3 + 1];
-                dst[x * 4 + 2] = src[x * 3 + 2];
-                dst[x * 4 + 3] = 255;
-            }
-        } else {
-            std::memcpy(dst, src, rowSize);
-        }
-    }
-    upload->Unmap(0, nullptr);
-
-    auto* cq = commandQueueHandler.GetOpen();
+    auto* cq = commandQueueHandler.GetOpenClean();
     if (not cq)
         return false;
-    auto* list = cq->List();
 
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource = dstResource;
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    ComPtr<ID3D12Resource> upload;
+    if (not UploadSubresource(device, cq->List(), dstResource, 0, pixelData, width, height, channels, upload))
+        return false;
 
-    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
-    srcLoc.pResource = upload.Get();
-    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    srcLoc.PlacedFootprint = layout;
-    dstLoc.pResource = dstResource;
-    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    dstLoc.SubresourceIndex = 0;
-
-    list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-    list->ResourceBarrier(1, &barrier);
-
-    // Flush: submit, wait for GPU, reset+close the list so the debug layer releases its
-    // reference to 'upload'. The buffer can safely go out of scope after this returns.
-    cmdQueue.Flush();
-
+    // Flush resets the list so the debug layer releases its reference to upload
+    // before upload goes out of scope.
+    cq->Flush();
     return true;
 }
 
@@ -220,7 +154,8 @@ bool Texture::IsAvailable(void)
 
 bool Texture::Bind(int tmuIndex)
 {
-    if (not IsAvailable()) return false;
+    if (not IsAvailable()) 
+        return false;
     m_tmuIndex = tmuIndex;
     gfxDriverStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
 
@@ -308,9 +243,7 @@ bool Texture::Deploy(int bufferIndex)
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    srvDesc.ViewDimension = (m_type == TextureType::CubeMap)
-                                    ? D3D12_SRV_DIMENSION_TEXTURECUBE
-                                    : D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.ViewDimension = (m_type == TextureType::CubeMap) ? D3D12_SRV_DIMENSION_TEXTURECUBE : D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.Texture2D.MipLevels = 1;
 

@@ -84,6 +84,15 @@ public:
     CommandQueue* GetOpen(void) noexcept {
         return m_cmdQueue.Open() ? &m_cmdQueue : nullptr;
     }
+
+    // If the list is currently recording (e.g. pending FBO render commands), flush it first.
+    // Call this at the start of any upload/deploy operation to ensure a clean list.
+    // During frame rendering this is a no-op (BeginFrame resets the list, EndFrame submits it).
+    CommandQueue* GetOpenClean(void) noexcept {
+        if (m_cmdQueue.m_isRecording)
+            m_cmdQueue.Flush();
+        return m_cmdQueue.Open() ? &m_cmdQueue : nullptr;
+    }
 };
 
 #define commandQueueHandler CommandQueueHandler::Instance()

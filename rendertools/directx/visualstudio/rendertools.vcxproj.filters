@@ -191,6 +191,12 @@
     <ClInclude Include="..\include\vbo.h">
       <Filter>DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\cbv_allocator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\dx12upload.h">
+      <Filter>DirectX</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->
@@ -328,6 +334,12 @@
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\vbo.cpp">
+      <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cbv_allocator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\dx12upload.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
   </ItemGroup>

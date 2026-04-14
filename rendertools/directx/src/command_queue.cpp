@@ -1,5 +1,6 @@
 #include "command_queue.h"
 #include "cbv_allocator.h"
+#include "dx12context.h"
 
 #include <cstdio>
 
@@ -31,6 +32,7 @@ bool CommandQueue::Create(ID3D12Device* device) noexcept {
         fprintf(stderr, "CommandQueue: CreateCommandList failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
+    m_list->SetName(L"MainCommandList");
     m_list->Close();
 
     hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
@@ -125,10 +127,21 @@ void CommandQueue::Execute(void) noexcept {
         return;
     m_isRecording = false;
     HRESULT hr = m_list->Close();
-    if (FAILED(hr))
+    if (FAILED(hr)) {
         fprintf(stderr, "CommandQueue::Execute: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
+        return;
+    }
     ID3D12CommandList* lists[] = { m_list.Get() };
     m_queue->ExecuteCommandLists(1, lists);
+#ifdef _DEBUG
+    dx12Context.DrainMessages();
+    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
+    if (FAILED(removed)) {
+        fprintf(stderr, "CommandQueue::Execute: device removed after execute (0x%08X)\n", (unsigned)removed);
+        dx12Context.DumpDRED();
+    }
+    fflush(stderr);
+#endif
 }
 
 
@@ -170,6 +183,15 @@ void CommandQueue::WaitIdle(void) noexcept {
         m_fence->SetEventOnCompletion(value, m_fenceEvent);
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
+#ifdef _DEBUG
+    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
+    if (FAILED(removed)) {
+        fprintf(stderr, "CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
+        dx12Context.DrainMessages();
+        dx12Context.DumpDRED();
+        fflush(stderr);
+    }
+#endif
 }
 
 // =================================================================================================

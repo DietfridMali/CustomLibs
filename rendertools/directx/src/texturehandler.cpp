@@ -2,6 +2,7 @@
 #include "texturehandler.h"
 #include "list.hpp"
 #include "noisetexture.h"
+#include <format>
 
 // =================================================================================================
 // Very simple class for texture tracking
@@ -48,9 +49,14 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
     TextureList textures;
     for (auto& name : textureNames) {
         List<String> fileNames; // must be local here so it gets reset every loop iteration
-        Texture* t = FindTexture(name);
+        String key;
+        if (params.keyDecoration.IsEmpty())
+            key = name;
+        else
+            key.Format((const char*)params.keyDecoration, (const char*)name);
+        Texture* t = FindTexture(key);
         if (not t) {
-            fileNames.Append(name);
+            fileNames.Append(key);
             if (not ((t = getTexture(name)) and t->CreateFromFile(textureFolder, fileNames, params))) {
                 if (t) {
                     delete t;
@@ -68,7 +74,8 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
             }
         }
         //t->m_id.name = n.Split('.')[0];
-        textures.Append(t);
+        if (t)
+            textures.Append(t);
     }
     return textures;
 }
@@ -77,9 +84,17 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
 TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, TextureType textureType, const TextureCreationParams& params) {
     TextureGetter getter;
     switch (textureType) {
-        case TextureType::CubeMap:   getter = [&](String& name) { return GetCubemap(name); }; break;
-        case TextureType::Texture3D: getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); }; break;
-        default:                     getter = [&](String& name) { return GetStandardTexture(name); }; break;
+        case TextureType::CubeMap:   
+            getter = [&](String& name) { return GetCubemap(name); }; 
+            break;
+
+        case TextureType::Texture3D: 
+            getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); }; 
+            break;
+
+        default:                     
+            getter = [&](String& name) { return GetStandardTexture(name); }; 
+            break;
     }
     return CreateTextures(textureFolder, textureNames, getter, params);
 }

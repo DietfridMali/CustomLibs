@@ -49,6 +49,7 @@ struct TextureCreationParams {
     uint16_t    blur{ 4 };
     uint16_t    gradients{ 7 };
     uint16_t    outline{ 4 };
+	String	    keyDecoration{ "" };
 };
 
 // =================================================================================================

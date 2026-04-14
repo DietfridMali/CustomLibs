@@ -133,6 +133,10 @@ public:
         return m_data.Data();
     }
 
+    inline size_t DataSize(void) noexcept {
+        return m_data.DataSize();
+    }
+
     inline int Width(void) noexcept {
         return m_info.m_width;
     }

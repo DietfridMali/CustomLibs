@@ -17,6 +17,7 @@ public:
 
 #ifdef _DEBUG
     ComPtr<ID3D12Debug>         m_debugController;
+    ComPtr<ID3D12InfoQueue>     m_infoQueue;
 #endif
 
     // Creates the DXGI factory, selects the best adapter (highest VRAM, non-software),
@@ -24,6 +25,13 @@ public:
     bool Create(bool enableDebugLayer = false) noexcept;
 
     inline ID3D12Device* Device(void) const noexcept { return m_device.Get(); }
+
+#ifdef _DEBUG
+    // Drains all pending D3D12 InfoQueue messages to stderr.
+    void DrainMessages(void) noexcept;
+    // Dumps DRED auto-breadcrumbs to stderr after device removal.
+    void DumpDRED(void) noexcept;
+#endif
 
 private:
     bool SelectAdapter(void) noexcept;

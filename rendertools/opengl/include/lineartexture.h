@@ -35,7 +35,7 @@ class LinearTexture
 {
 public:
     AutoArray<DATA_T>    m_data;
-    bool                    m_isRepeating;
+    bool                 m_isRepeating;
 
     LinearTexture()
         : m_isRepeating(false)

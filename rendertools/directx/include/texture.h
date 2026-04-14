@@ -46,6 +46,7 @@ struct TextureCreationParams {
     uint16_t blur{ 4 };
     uint16_t gradients{ 7 };
     uint16_t outline{ 4 };
+    String   keyDecoration{ "{}" };
 };
 
 // =================================================================================================
@@ -59,8 +60,7 @@ public:
     virtual void Release(void)  = 0;
     virtual void SetParams(bool forceUpdate = false) = 0;
     virtual bool Deploy(int bufferIndex = 0) = 0;
-    virtual bool Load(String& folder, List<String>& fileNames,
-                      const TextureCreationParams& params) = 0;
+    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
 };
 
 // =================================================================================================
@@ -69,7 +69,8 @@ struct RenderOffsets { float x, y; };
 
 // =================================================================================================
 
-class Texture : public AbstractTexture
+class Texture 
+    : public AbstractTexture
 {
 public:
     // m_handle stores the SRV descriptor-heap index (UINT32_MAX = invalid).
@@ -109,9 +110,7 @@ public:
         return updateLUT;
     }
 
-    explicit Texture(uint32_t handle   = UINT32_MAX,
-                     TextureType type  = TextureType::Texture2D,
-                     GfxWrapMode wrap  = GfxWrapMode::ClampToEdge);
+    explicit Texture(uint32_t handle = UINT32_MAX, TextureType type = TextureType::Texture2D, GfxWrapMode wrap = GfxWrapMode::ClampToEdge);
 
     ~Texture() noexcept;
 
@@ -120,48 +119,99 @@ public:
         textureLUT.Insert(m_name, this);
     }
 
-    Texture(const Texture& other)   { Copy(other); }
-    Texture(Texture&& other) noexcept { Move(other); }
-    Texture& operator=(const Texture& other)   { return Copy(other); }
-    Texture& operator=(Texture&& other) noexcept { return Move(other); }
+    Texture(const Texture& other) { 
+        Copy(other); 
+    }
+
+    Texture(Texture&& other) noexcept { 
+        Move(other); 
+    }
+
+    Texture& operator=(const Texture& other) { 
+        return Copy(other); 
+    }
+    Texture& operator=(Texture&& other) noexcept { 
+        return Move(other); 
+    }
 
     Texture& Copy(const Texture& other);
+
     Texture& Move(Texture& other) noexcept;
 
-    inline bool operator==(const Texture& o) const noexcept { return m_handle == o.m_handle; }
-    inline bool operator!=(const Texture& o) const noexcept { return m_handle != o.m_handle; }
+    inline bool operator==(const Texture& o) const noexcept { 
+        return m_handle == o.m_handle; 
+    }
 
-    virtual bool Create(void)          override;
-    virtual void Destroy(void)         override;
-    virtual bool IsAvailable(void)     override;
+    inline bool operator!=(const Texture& o) const noexcept { 
+        return m_handle != o.m_handle; 
+    }
+
+    virtual bool Create(void) override;
+
+    
+    virtual void Destroy(void) override;
+    
+    virtual bool IsAvailable(void) override;
+    
     virtual bool Bind(int tmuIndex = 0) override;
-    virtual void Release(void)         override;
+    
+    virtual void Release(void) override;
+    
     virtual void SetParams(bool forceUpdate = false) override;
-    virtual bool Deploy(int bufferIndex = 0)         override;
-    virtual bool Load(String& folder, List<String>& fileNames,
-                      const TextureCreationParams& params) override;
+    
+    virtual bool Deploy(int bufferIndex = 0) override;
+    
+    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
 
-    inline bool Enable(int tmuIndex = 0) { return Bind(tmuIndex); }
-    inline void Disable(void)            { Release(); }
+    inline bool Enable(int tmuIndex = 0) { 
+        return Bind(tmuIndex); 
+    }
+
+    inline void Disable(void) {
+        Release();
+    }
 
     void SetWrapping(int wrapMode = -1) noexcept;
 
     bool Redeploy(void);
 
-    bool CreateFromFile(String folder, List<String>& fileNames,
-                        const TextureCreationParams& params);
+    bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
+
     bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
+    
     void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
 
-    inline size_t TextureCount(void) noexcept { return m_buffers.Length(); }
-    inline int GetWidth(int i = 0)   noexcept { return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width  : 0; }
-    inline int GetHeight(int i = 0)  noexcept { return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0; }
-    inline uint8_t* GetData(int i = 0)        { return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr; }
-    inline TextureType  Type(void)     noexcept { return m_type; }
-    inline GfxWrapMode  WrapMode(void) noexcept { return m_wrapMode; }
-    inline String GetName(void)        { return m_name; }
+    inline size_t TextureCount(void) noexcept { 
+        return m_buffers.Length(); 
+    }
+    
+    inline int GetWidth(int i = 0) noexcept { 
+        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width  : 0; 
+    }
+    
+    inline int GetHeight(int i = 0)  noexcept { 
+        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0; 
+    }
+    
+    inline uint8_t* GetData(int i = 0) { 
+        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr; 
+    }
+    
+    inline TextureType Type(void) noexcept { 
+        return m_type; 
+    }
+    
+    inline GfxWrapMode  WrapMode(void) noexcept { 
+        return m_wrapMode; 
+    }
+    
+    inline String GetName(void) { 
+        return m_name; 
+    }
 
-    inline TextureType GetTextureType(void) const noexcept { return m_type; }
+    inline TextureType GetTextureType(void) const noexcept { 
+        return m_type; 
+    }
 
     // Static release helpers — clear the slot in gfxDriverStates.
     template<TextureType typeID>
@@ -170,26 +220,31 @@ public:
             gfxDriverStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
     }
 
-    inline bool& HasBuffer(void) noexcept { return m_hasBuffer; }
+    inline bool& HasBuffer(void) noexcept { 
+        return m_hasBuffer; 
+    }
 
-    static RenderOffsets ComputeOffsets(int w, int h,
-                                        int viewportWidth, int viewportHeight,
-                                        int renderAreaWidth, int renderAreaHeight) noexcept;
+    static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight) noexcept;
 };
 
 // =================================================================================================
 
-class TiledTexture : public Texture
+class TiledTexture 
+    : public Texture
 {
 public:
-    TiledTexture() : Texture(UINT32_MAX, TextureType::Texture2D, GfxWrapMode::Repeat) {}
+    TiledTexture() 
+        : Texture(UINT32_MAX, TextureType::Texture2D, GfxWrapMode::Repeat) 
+    {}
     ~TiledTexture() = default;
+    
     virtual void SetParams(bool forceUpdate = false) override;
 };
 
 // =================================================================================================
 
-class FBOTexture : public Texture
+class FBOTexture 
+    : public Texture
 {
 public:
     FBOTexture() = default;
