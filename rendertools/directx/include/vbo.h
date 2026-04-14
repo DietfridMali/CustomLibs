@@ -37,8 +37,7 @@ public:
     ComponentType            m_componentType;  // Float / UInt32 / UInt16
     bool                     m_isDynamic;
 
-    VBO(const char* type = "", int id = 0,
-        GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
+    VBO(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
     void Reset(void) {
         m_resource.Reset();
@@ -48,19 +47,32 @@ public:
         m_isDynamic = true;
     }
 
-    VBO(VBO const& other)            { Copy(other); }
-    VBO& operator=(VBO const& other) { Copy(other); return *this; }
-    VBO& operator=(VBO&& other) noexcept { Move(other); return *this; }
+    VBO(VBO const& other) { 
+        Copy(other); 
+    }
+    
+    VBO& operator=(VBO const& other) { 
+        Copy(other); 
+        return *this; 
+    }
+    
+    VBO& operator=(VBO&& other) noexcept { 
+        Move(other); 
+        return *this; 
+    }
 
     VBO& Copy(VBO const& other);
     VBO& Move(VBO& other) noexcept;
 
     // No-ops — binding handled by VAO::Enable() in DX12.
-    inline void Bind(void)            noexcept {}
-    inline void Release(void)         noexcept {}
-    inline void EnableAttribs(void)   noexcept {}
-    inline void DisableAttribs(void)  noexcept {}
-    inline void Describe(void)        noexcept {}
+    inline void Bind(void) noexcept {}
+    inline void Release(void) noexcept {}
+    inline void EnableAttribs(void) noexcept {}
+    inline void DisableAttribs(void) noexcept {}
+    inline void Describe(void) noexcept {}
+
+    bool Create(ID3D12Device* device, size_t dataSize);
+
 
     // Upload new data and (re-)create the GPU resource if needed.
     // componentCount: components per vertex element (e.g. 3 for float3)
@@ -73,15 +85,27 @@ public:
 
     size_t ComponentSize(size_t componentType) noexcept;
 
-    inline bool IsType(const char* type)  noexcept { return !strcmp(m_type, type); }
-    inline bool HasID(int id)             noexcept { return m_id == id; }
-    inline void SetDynamic(bool d)        noexcept { m_isDynamic = d; }
+    inline bool IsType(const char* type) noexcept { 
+        return !strcmp(m_type, type); 
+    }
+
+    inline bool HasID(int id) noexcept { 
+        return m_id == id; 
+    }
+
+    inline void SetDynamic(bool d) noexcept { 
+        m_isDynamic = d; 
+    }
 
     // Returns stride (bytes per vertex element) — used by VAO when building VBVs.
-    inline UINT Stride() const noexcept { return UINT(m_itemSize); }
+    inline UINT Stride() const noexcept { 
+        return UINT(m_itemSize); 
+    }
 
     // Returns true when the GPU resource exists and is ready to bind.
-    inline bool IsValid() const noexcept { return m_resource != nullptr; }
+    inline bool IsValid() const noexcept { 
+        return m_resource != nullptr; 
+    }
 };
 
 // =================================================================================================

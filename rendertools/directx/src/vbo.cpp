@@ -34,10 +34,12 @@ VBO::VBO(const char* type, int id, GfxBufferTarget bufferType, bool isDynamic) n
 size_t VBO::ComponentSize(size_t componentType) noexcept
 {
     switch (ComponentType(componentType)) {
-        case ComponentType::UInt16: return 2;
+        case ComponentType::UInt16: 
+            return 2;
         case ComponentType::Float:
         case ComponentType::UInt32:
-        default:                    return 4;
+        default:                    
+            return 4;
     }
 }
 
@@ -45,20 +47,20 @@ size_t VBO::ComponentSize(size_t componentType) noexcept
 VBO& VBO::Copy(VBO const& other)
 {
     if (this != &other) {
-        m_index          = other.m_index;
-        m_type           = other.m_type;
-        m_id             = other.m_id;
-        m_bufferType     = other.m_bufferType;
-        m_data           = other.m_data;
-        m_resource       = other.m_resource;    // shared ref-count via ComPtr
-        m_vbv            = other.m_vbv;
-        m_ibv            = other.m_ibv;
-        m_size           = other.m_size;
-        m_itemSize       = other.m_itemSize;
-        m_itemCount      = other.m_itemCount;
+        m_index = other.m_index;
+        m_type = other.m_type;
+        m_id = other.m_id;
+        m_bufferType = other.m_bufferType;
+        m_data = other.m_data;
+        m_resource = other.m_resource;    // shared ref-count via ComPtr
+        m_vbv = other.m_vbv;
+        m_ibv = other.m_ibv;
+        m_size = other.m_size;
+        m_itemSize = other.m_itemSize;
+        m_itemCount = other.m_itemCount;
         m_componentCount = other.m_componentCount;
-        m_componentType  = other.m_componentType;
-        m_isDynamic      = other.m_isDynamic;
+        m_componentType = other.m_componentType;
+        m_isDynamic = other.m_isDynamic;
     }
     return *this;
 }
@@ -67,65 +69,68 @@ VBO& VBO::Copy(VBO const& other)
 VBO& VBO::Move(VBO& other) noexcept
 {
     if (this != &other) {
-        m_index          = other.m_index;
-        m_type           = other.m_type;
-        m_id             = other.m_id;
-        m_bufferType     = other.m_bufferType;
-        m_data           = other.m_data;
-        m_resource       = std::move(other.m_resource);
-        m_vbv            = other.m_vbv;
-        m_ibv            = other.m_ibv;
-        other.m_vbv      = {};
-        other.m_ibv      = {};
-        m_size           = other.m_size;
-        m_itemSize       = other.m_itemSize;
-        m_itemCount      = other.m_itemCount;
+        m_index = other.m_index;
+        m_type = other.m_type;
+        m_id = other.m_id;
+        m_bufferType = other.m_bufferType;
+        m_data = other.m_data;
+        m_resource = std::move(other.m_resource);
+        m_vbv = other.m_vbv;
+        m_ibv = other.m_ibv;
+        other.m_vbv = {};
+        other.m_ibv = {};
+        m_size = other.m_size;
+        m_itemSize = other.m_itemSize;
+        m_itemCount = other.m_itemCount;
         m_componentCount = other.m_componentCount;
-        m_componentType  = other.m_componentType;
-        m_isDynamic      = other.m_isDynamic;
+        m_componentType = other.m_componentType;
+        m_isDynamic = other.m_isDynamic;
     }
     return *this;
 }
 
 
-bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index,
-                 void* data, size_t dataSize,
-                 ComponentType componentType, size_t componentCount,
-                 bool /*forceUpdate*/) noexcept
+bool VBO::Create(ID3D12Device* device, size_t dataSize) {
+    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
+    D3D12_RESOURCE_DESC rd{};
+    rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    rd.Width = dataSize;
+    rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
+    rd.SampleDesc.Count = 1;
+    rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    HRESULT hr = device->CreateCommittedResource(
+        &hp, D3D12_HEAP_FLAG_NONE, &rd,
+        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+        IID_PPV_ARGS(&m_resource));
+    return not FAILED(hr);
+}
+
+
+bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* data, size_t dataSize, ComponentType componentType, size_t componentCount, bool /*forceUpdate*/) noexcept
 {
-    if (!data || dataSize == 0) return false;
+    if (not data or (dataSize == 0))
+        return false;
 
     ID3D12Device* device = dx12Context.Device();
-    if (!device) return false;
+    if (not device) 
+        return false;
 
-    m_type           = type;
-    m_bufferType     = bufferType;
-    m_index          = index;
-    m_componentType  = componentType;
+    m_type = type;
+    m_bufferType = bufferType;
+    m_index = index;
+    m_componentType = componentType;
     m_componentCount = int(componentCount);
 
     size_t compSz = ComponentSize(size_t(componentType));
-    m_itemSize   = compSz * componentCount;
-    m_itemCount  = uint32_t(dataSize / (m_itemSize > 0 ? m_itemSize : 1));
-    m_size       = uint32_t(dataSize);
+    m_itemSize = compSz * componentCount;
+    m_itemCount = uint32_t(dataSize / ((m_itemSize > 0) ? m_itemSize : 1));
+    m_size = uint32_t(dataSize);
 
     // (Re-)create GPU buffer if size changed or not yet created
-    if (!m_resource || m_resource->GetDesc().Width < dataSize) {
-        m_resource.Reset();
-
-        D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-        D3D12_RESOURCE_DESC rd{};
-        rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        rd.Width     = dataSize;
-        rd.Height    = rd.DepthOrArraySize = rd.MipLevels = 1;
-        rd.SampleDesc.Count = 1;
-        rd.Layout    = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        HRESULT hr = device->CreateCommittedResource(
-            &hp, D3D12_HEAP_FLAG_NONE, &rd,
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-            IID_PPV_ARGS(&m_resource));
-        if (FAILED(hr)) return false;
+    if (not m_resource or (m_resource->GetDesc().Width < dataSize)) {
+        if (not Create(device, dataSize))
+            return false;
     }
 
     // Upload data
@@ -139,12 +144,13 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index,
 
     if (bufferType == GfxBufferTarget::Index) {
         m_ibv.BufferLocation = gpuAddr;
-        m_ibv.SizeInBytes    = UINT(dataSize);
-        m_ibv.Format         = IndexFormatFromComponentType(componentType);
-    } else {
+        m_ibv.SizeInBytes = UINT(dataSize);
+        m_ibv.Format = IndexFormatFromComponentType(componentType);
+    } 
+    else {
         m_vbv.BufferLocation = gpuAddr;
-        m_vbv.SizeInBytes    = UINT(dataSize);
-        m_vbv.StrideInBytes  = UINT(m_itemSize);
+        m_vbv.SizeInBytes = UINT(dataSize);
+        m_vbv.StrideInBytes = UINT(m_itemSize);
     }
 
     return true;
@@ -154,11 +160,11 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index,
 void VBO::Destroy(void) noexcept
 {
     m_resource.Reset();
-    m_vbv        = {};
-    m_ibv        = {};
-    m_size       = 0;
-    m_itemCount  = 0;
-    m_itemSize   = 0;
+    m_vbv = {};
+    m_ibv = {};
+    m_size = 0;
+    m_itemCount = 0;
+    m_itemSize = 0;
 }
 
 // =================================================================================================
