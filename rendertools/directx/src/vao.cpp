@@ -89,8 +89,7 @@ VBO* VAO::FindBuffer(const char* type, int id, int& index) noexcept
 }
 
 
-bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer,
-                            ComponentType componentType, bool forceUpdate) noexcept
+bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
         if (!UpdateDataBuffer(type, id,
