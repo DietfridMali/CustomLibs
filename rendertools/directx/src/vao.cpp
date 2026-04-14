@@ -79,7 +79,7 @@ VBO* VAO::FindBuffer(const char* type, int id, int& index) noexcept
 {
     int i = 0;
     for (auto vbo : m_dataBuffers) {
-        if (vbo->IsType(type) && vbo->HasID(id)) { index = i; return vbo; }
+        if (vbo->IsType(type) and vbo->HasID(id)) { index = i; return vbo; }
         ++i;
     }
     return nullptr;
@@ -89,7 +89,7 @@ VBO* VAO::FindBuffer(const char* type, int id, int& index) noexcept
 bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer,
                             ComponentType componentType, bool forceUpdate) noexcept
 {
-    if (forceUpdate || buffer.IsDirty()) {
+    if (forceUpdate or buffer.IsDirty()) {
         if (!UpdateDataBuffer(type, id,
                               buffer.GLDataBuffer(), buffer.GLDataSize(),
                               size_t(componentType),
@@ -101,18 +101,16 @@ bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffe
 }
 
 
-void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType,
-                             bool forceUpdate) noexcept
+void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
-    if (forceUpdate || buffer.IsDirty()) {
+    if (forceUpdate or buffer.IsDirty()) {
         UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate);
         buffer.SetDirty(false);
     }
 }
 
 
-bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize,
-                        size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
 {
     if (strcmp(type, "Index"))
         return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
@@ -121,30 +119,27 @@ bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize,
 }
 
 
-bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize,
-                             size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
 {
-    if (dataSize == 0) return false;
-
+    if (dataSize == 0) 
+        return false;
     int index = -1;
     VBO* vbo = FindBuffer(type, id, index);
     if (!vbo) {
         vbo = new (std::nothrow) VBO();
-        if (!vbo) return false;
+        if (!vbo) 
+            return false;
         m_dataBuffers.Append(vbo);
         vbo->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
     }
-    return vbo->Update(type, GfxBufferTarget::Vertex, index, data, dataSize,
-                       ComponentType(componentType), componentCount, forceUpdate);
+    return vbo->Update(type, GfxBufferTarget::Vertex, index, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
 }
 
 
-void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType,
-                              bool forceUpdate) noexcept
+void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
 {
-    m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize,
-                          ComponentType(componentType), 1, forceUpdate);
+    m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
 }
 
 
@@ -154,7 +149,8 @@ bool VAO::Enable(void) noexcept
     m_isBound = true;
 
     auto* list = cmdQueue.List();
-    if (!list) return true;
+    if (!list) 
+        return true;
 
     // Bind all vertex buffer streams
     int vbCount = m_dataBuffers.Length();
@@ -164,9 +160,10 @@ bool VAO::Enable(void) noexcept
         D3D12_VERTEX_BUFFER_VIEW views[kMaxStreams]{};
         int bound = 0;
         for (auto vbo : m_dataBuffers) {
-            if (bound >= kMaxStreams) break;
-            if (vbo && vbo->IsValid() && vbo->m_bufferType == GfxBufferTarget::Vertex) {
-                views[vbo->m_index >= 0 ? vbo->m_index : bound] = vbo->m_vbv;
+            if (bound >= kMaxStreams) 
+                break;
+            if (vbo and vbo->IsValid() and (vbo->m_bufferType == GfxBufferTarget::Vertex)) {
+                views[(vbo->m_index >= 0) ? vbo->m_index : bound] = vbo->m_vbv;
             }
             ++bound;
         }
@@ -192,18 +189,19 @@ void VAO::Disable(void) noexcept
 
 void VAO::Render(std::span<Texture* const> textures) noexcept
 {
-    if (!Enable()) return;
+    if (!Enable()) 
+        return;
 
     EnableTextures(textures);
 
     auto* list = cmdQueue.List();
     if (list) {
-        if (m_indexBuffer.IsValid() && m_indexBuffer.m_itemCount > 0)
+        if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
             list->DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
         else {
             // Non-indexed: sum up vertex count from first VBO
             UINT vertCount = 0;
-            if (m_dataBuffers.Length() > 0 && m_dataBuffers[0])
+            if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
                 vertCount = UINT(m_dataBuffers[0]->m_itemCount);
             if (vertCount > 0)
                 list->DrawInstanced(vertCount, 1, 0, 0);

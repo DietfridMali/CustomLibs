@@ -170,9 +170,12 @@ const String& GaussBlurFuncs() {
         float4 GaussBlur(float2 baseUV, int strength, float spread) {
             int   s  = (strength < 0) ? blurStrength : strength;
             float sp = (spread   < 0) ? blurSpread   : spread;
-            if (s == 3) return GaussBlur7x7(baseUV, sp);
-            if (s == 2) return GaussBlur5x5(baseUV, sp);
-            if (s == 1) return GaussBlur3x3(baseUV, sp);
+            if (s == 3) 
+                return GaussBlur7x7(baseUV, sp);
+            if (s == 2) 
+                return GaussBlur5x5(baseUV, sp);
+            if (s == 1) 
+                return GaussBlur3x3(baseUV, sp);
             return surface.Sample(s0, baseUV);
         }
     )");
@@ -186,20 +189,25 @@ const String& BoostFuncs() {
         float Boost(float v, float strength) {
             return (v < 0.5) ? pow(v, 1.0/strength) : pow(v, strength);
         }
+
         float3 Boost(float3 v, float strength) {
             return float3(Boost(v.x,strength), Boost(v.y,strength), Boost(v.z,strength));
         }
+
         float SmoothBoost(float v, float strength) {
             float dark  = pow(v, strength);
             float light = pow(v, 1.0/strength);
             return lerp(dark, light, smoothstep(0.45, 0.55, v));
         }
+
         float3 SmoothBoost(float3 v, float strength) {
             return float3(SmoothBoost(v.r,strength), SmoothBoost(v.g,strength), SmoothBoost(v.b,strength));
         }
+
         float SinBoost(float v, float strength) {
             return sin(Boost(v, strength) * 0.5 * 3.14159265358979f);
         }
+
         float3 SinBoost(float3 v, float strength) {
             return float3(SinBoost(v.r,strength), SinBoost(v.g,strength), SinBoost(v.b,strength));
         }
@@ -222,9 +230,9 @@ const String& SRGBFuncs() {
 const String& TintFuncs() {
     static const String source(R"(
         float3 ApplyExponentialTint(float3 color, float3 tintScale, float e) {
-            float3 s    = pow(max(tintScale, 1e-6), max(e, 0.0));
+            float3 s = pow(max(tintScale, 1e-6), max(e, 0.0));
             float3 denom = max(color * s, 1e-6);
-            float  t    = min(1.0, min(1.0/denom.r, min(1.0/denom.g, 1.0/denom.b)));
+            float  t = min(1.0, min(1.0/denom.r, min(1.0/denom.g, 1.0/denom.b)));
             return (color * t) * s;
         }
         float3 ApplyTint(float3 color, float3 tintScale) {
@@ -257,6 +265,7 @@ const String& NoiseFuncs() {
 
 
 // -------------------------------------------------------------------------------------------------
+
 const String& RandFuncs() {
     static const String source(R"(
         static uint _rngState;
@@ -266,7 +275,7 @@ const String& RandFuncs() {
             _rngState = (u == 0u) ? 1u : u;
         }
         uint _lcg() { _rngState = _rngState * 1664525u + 1013904223u; return _rngState; }
-        float rand()    { return (float)_lcg() * (1.0/4294967296.0); }
+        float rand() { return (float)_lcg() * (1.0/4294967296.0); }
         int   randn(int n) { return (int)(_lcg() % (uint)max(n,1)); }
     )");
     return source;
@@ -282,7 +291,7 @@ const String& EdgeFadeFunc() {
             if (ef > 1e-6) {
                 float2 edgeXY  = min(baseUV, 1.0 - baseUV);
                 float  edgeMin = min(edgeXY.x, edgeXY.y);
-                float  w       = smoothstep(0.0, ef, edgeMin);
+                float  w = smoothstep(0.0, ef, edgeMin);
                 dispUV *= w;
                 float2 limit = max(edgeXY - 1e-4, 0.0);
                 dispUV = clamp(dispUV, -limit, limit);

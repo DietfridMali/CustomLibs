@@ -33,9 +33,12 @@ int BaseDisplayHandler::GetDisplayModes(void) {
         [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
             int64_t areaA = int64_t(a.w) * int64_t(a.h);
             int64_t areaB = int64_t(b.w) * int64_t(b.h);
-            if (areaA != areaB) return areaA > areaB;
-            if (a.w != b.w) return a.w > b.w;
-            if (a.refresh_rate != b.refresh_rate) return a.refresh_rate > b.refresh_rate;
+            if (areaA != areaB) 
+                return areaA > areaB;
+            if (a.w != b.w) 
+                return a.w > b.w;
+            if (a.refresh_rate != b.refresh_rate) 
+                return a.refresh_rate > b.refresh_rate;
             return a.format > b.format;
         });
 
@@ -92,13 +95,13 @@ void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool 
 
 void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullscreen) noexcept {
     if (width * height == 0) {
-        m_width       = m_maxWidth;
-        m_height      = m_maxHeight;
+        m_width = m_maxWidth;
+        m_height = m_maxHeight;
         m_isFullscreen = true;
     }
     else {
-        m_width        = std::min(width,  m_maxWidth);
-        m_height       = std::min(height, m_maxHeight);
+        m_width = std::min(width,  m_maxWidth);
+        m_height = std::min(height, m_maxHeight);
         m_isFullscreen = useFullscreen;
     }
 }
