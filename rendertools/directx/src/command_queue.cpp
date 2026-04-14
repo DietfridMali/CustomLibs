@@ -121,7 +121,8 @@ bool CommandQueue::Open(void) noexcept {
 
 
 void CommandQueue::Execute(void) noexcept {
-    if (!m_isRecording) return;
+    if (!m_isRecording) 
+        return;
     m_isRecording = false;
     HRESULT hr = m_list->Close();
     if (FAILED(hr))
@@ -137,6 +138,25 @@ void CommandQueue::EndFrame(void) noexcept {
     m_fenceValues[m_frameIndex] = fenceValue;      // store so BeginFrame can wait on it
     m_queue->Signal(m_fence.Get(), fenceValue);
     m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
+}
+
+
+void CommandQueue::Flush(void) noexcept {
+    if (not m_isRecording)
+        fprintf(stderr, "CommandQueue::Flush: called with list not recording — reset will not release debug layer refs\n");
+    Execute();
+    WaitIdle();
+    // Reset the allocator and list so the D3D12 debug layer releases its resource references.
+    // The list is closed immediately — call Open() when recording is needed again.
+    if (m_allocators[m_frameIndex] and m_list) {
+        HRESULT hr = m_allocators[m_frameIndex]->Reset();
+        if (FAILED(hr))
+            fprintf(stderr, "CommandQueue::Flush: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        hr = m_list->Reset(m_allocators[m_frameIndex].Get(), nullptr);
+        if (FAILED(hr))
+            fprintf(stderr, "CommandQueue::Flush: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        m_list->Close();
+    }
 }
 
 

@@ -71,6 +71,14 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 		baseRenderer.PushViewport();
 		m_atlas->Enable();
 	}
+	else {
+#ifndef OPENGL
+		// The command list may have been reset (e.g. after Texture::Deploy/Flush) even though
+		// the FBO is still logically enabled. Reenable re-opens the list and rebinds render targets.
+		if (not m_atlas->Reenable())
+			return false;
+#endif
+	}
 	int x = m_size.Col(glyphIndex);
 	int y = m_size.Row(glyphIndex);
 	int l, t, w, h;
@@ -94,7 +102,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 		float c = float(glyphIndex) / float(m_size.GetSize());
 #if 1
 		//renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
-		renderQuad.Render(shader, { glyph }, true);
+		renderQuad.Render(shader, { glyph });
 #else
 		renderQuad.Fill(RGBAColor(c, c, c, 1)); 
 #endif

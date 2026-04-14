@@ -256,9 +256,10 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
     m_activeBufferIndex = (bufferIndex < 0) ? 0 : (bufferIndex % m_bufferCount);
     m_drawBufferGroup = drawBufferGroup;
 
-    auto* list = cmdQueue.List();
-    if (not list) 
+    auto* cq = commandQueueHandler.GetOpen();
+    if (not cq)
         return false;
+    auto* list = cq->List();
 
     BindRenderTargets(list);
 

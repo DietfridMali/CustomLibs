@@ -33,11 +33,7 @@ int Texture::CompareTextures(void* context, const String& k1, const String& k2) 
 // Helpers
 
 // Upload pixel data to a default-heap texture resource via a temporary upload buffer.
-static bool UploadTextureData(
-    ID3D12Device*    device,
-    ID3D12Resource*  dstResource,
-    const uint8_t*   pixelData,
-    int              width, int height, int channels) noexcept
+static bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixelData, int width, int height, int channels) noexcept
 {
     DXGI_FORMAT fmt = (channels == 4) ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM;
 
@@ -52,10 +48,10 @@ static bool UploadTextureData(
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
     D3D12_RESOURCE_DESC upDesc{};
     upDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    upDesc.Width     = uploadSize;
-    upDesc.Height    = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
+    upDesc.Width = uploadSize;
+    upDesc.Height = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
     upDesc.SampleDesc.Count = 1;
-    upDesc.Layout    = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    upDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     ComPtr<ID3D12Resource> upload;
     HRESULT hr = device->CreateCommittedResource(
@@ -67,7 +63,8 @@ static bool UploadTextureData(
     // Copy to upload heap with row padding
     uint8_t* mapped = nullptr;
     D3D12_RANGE mapRange{ 0, 0 };
-    if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) return false;
+    if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) 
+        return false;
     for (UINT r = 0; r < rowCount; ++r) {
         const uint8_t* src = pixelData + r * UINT(width) * channels;
         uint8_t* dst = mapped + layout.Offset + r * layout.Footprint.RowPitch;
@@ -88,35 +85,33 @@ static bool UploadTextureData(
     }
     upload->Unmap(0, nullptr);
 
-    // Issue copy command — open the list if it's not already recording.
-    if (!cmdQueue.Open())
+    auto* cq = commandQueueHandler.GetOpen();
+    if (not cq)
         return false;
-    auto* list = cmdQueue.List();
-    if (!list)
-        return false;
+    auto* list = cq->List();
 
     D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type  = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource   = dstResource;
+    barrier.Transition.pResource = dstResource;
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 
     D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
-    srcLoc.pResource       = upload.Get();
-    srcLoc.Type            = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    srcLoc.pResource = upload.Get();
+    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     srcLoc.PlacedFootprint = layout;
-    dstLoc.pResource       = dstResource;
-    dstLoc.Type            = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dstLoc.pResource = dstResource;
+    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
     dstLoc.SubresourceIndex = 0;
 
     list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     list->ResourceBarrier(1, &barrier);
 
-    // Keep upload buffer alive until the GPU finishes (simplistic: flush immediately)
-    cmdQueue.Execute();
-    cmdQueue.WaitIdle();
+    // Flush: submit, wait for GPU, reset+close the list so the debug layer releases its
+    // reference to 'upload'. The buffer can safely go out of scope after this returns.
+    cmdQueue.Flush();
 
     return true;
 }
@@ -150,17 +145,17 @@ Texture& Texture::Copy(const Texture& other)
 {
     if (this != &other) {
         Destroy();
-        m_handle     = other.m_handle;
-        m_resource   = other.m_resource;  // shared
-        m_name       = other.m_name;
-        m_buffers    = other.m_buffers;
-        m_filenames  = other.m_filenames;
-        m_type       = other.m_type;
-        m_wrapMode   = other.m_wrapMode;
+        m_handle = other.m_handle;
+        m_resource = other.m_resource;  // shared
+        m_name = other.m_name;
+        m_buffers = other.m_buffers;
+        m_filenames = other.m_filenames;
+        m_type = other.m_type;
+        m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer  = other.m_hasBuffer;
-        m_hasParams  = other.m_hasParams;
-        m_isValid    = other.m_isValid;
+        m_hasBuffer = other.m_hasBuffer;
+        m_hasParams = other.m_hasParams;
+        m_isValid = other.m_isValid;
     }
     return *this;
 }
@@ -170,17 +165,17 @@ Texture& Texture::Move(Texture& other) noexcept
 {
     if (this != &other) {
         Destroy();
-        m_handle     = std::exchange(other.m_handle, UINT32_MAX);
-        m_resource   = std::move(other.m_resource);
-        m_name       = std::move(other.m_name);
-        m_buffers    = std::move(other.m_buffers);
-        m_filenames  = std::move(other.m_filenames);
-        m_type       = other.m_type;
-        m_wrapMode   = other.m_wrapMode;
+        m_handle = std::exchange(other.m_handle, UINT32_MAX);
+        m_resource = std::move(other.m_resource);
+        m_name = std::move(other.m_name);
+        m_buffers = std::move(other.m_buffers);
+        m_filenames = std::move(other.m_filenames);
+        m_type = other.m_type;
+        m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer  = other.m_hasBuffer;
-        m_hasParams  = other.m_hasParams;
-        m_isValid    = std::exchange(other.m_isValid, false);
+        m_hasBuffer = other.m_hasBuffer;
+        m_hasParams = other.m_hasParams;
+        m_isValid = std::exchange(other.m_isValid, false);
     }
     return *this;
 }
@@ -191,9 +186,9 @@ bool Texture::Create(void)
     Destroy();
     // Allocate an SRV descriptor index.
     DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-    if (!hdl.IsValid()) 
+    if (not hdl.IsValid()) 
         return false;
-    m_handle  = hdl.index;
+    m_handle = hdl.index;
     m_isValid = true;
     return true;
 }
@@ -225,7 +220,7 @@ bool Texture::IsAvailable(void)
 
 bool Texture::Bind(int tmuIndex)
 {
-    if (!IsAvailable()) return false;
+    if (not IsAvailable()) return false;
     m_tmuIndex = tmuIndex;
     gfxDriverStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
 
@@ -265,31 +260,31 @@ bool Texture::Deploy(int bufferIndex)
     if (bufferIndex >= m_buffers.Length()) 
         return false;
     TextureBuffer* tb = m_buffers[bufferIndex];
-    if (!tb) 
+    if (not tb) 
         return false;
 
     ID3D12Device* device = dx12Context.Device();
-    if (!device) 
+    if (not device) 
         return false;
 
-    int w        = tb->m_info.m_width;
-    int h        = tb->m_info.m_height;
+    int w = tb->m_info.m_width;
+    int h = tb->m_info.m_height;
     int channels = tb->m_info.m_componentCount;
-    if (w <= 0 || h <= 0) 
+    if (w <= 0 or h <= 0) 
         return false;
 
     // (Re-)create the default-heap texture resource
     m_resource.Reset();
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
-    rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    rd.Width            = UINT(w);
-    rd.Height           = UINT(h);
+    rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    rd.Width = UINT(w);
+    rd.Height = UINT(h);
     rd.DepthOrArraySize = (m_type == TextureType::CubeMap) ? 6 : 1;
-    rd.MipLevels        = 1;
-    rd.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
+    rd.MipLevels = 1;
+    rd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     rd.SampleDesc.Count = 1;
-    rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
     HRESULT hr = device->CreateCommittedResource(
         &hp, D3D12_HEAP_FLAG_NONE, &rd,
@@ -300,28 +295,29 @@ bool Texture::Deploy(int bufferIndex)
 
     // Upload pixel data
     const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-    if (!UploadTextureData(device, m_resource.Get(), pixels, w, h, channels))
+    if (not UploadTextureData(device, m_resource.Get(), pixels, w, h, channels))
         return false;
 
     // Create / update SRV
     if (m_handle == UINT32_MAX) {
         DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-        if (!hdl.IsValid()) return false;
+        if (not hdl.IsValid()) 
+            return false;
         m_handle = hdl.index;
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format                  = DXGI_FORMAT_R8G8B8A8_UNORM;
-    srvDesc.ViewDimension           = (m_type == TextureType::CubeMap)
+    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.ViewDimension = (m_type == TextureType::CubeMap)
                                     ? D3D12_SRV_DIMENSION_TEXTURECUBE
                                     : D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels     = 1;
+    srvDesc.Texture2D.MipLevels = 1;
 
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
     device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
 
-    m_isValid   = true;
+    m_isValid = true;
     m_hasBuffer = true;
     return true;
 }
@@ -340,18 +336,17 @@ bool Texture::Load(String& folder, List<String>& fileNames,
 }
 
 
-bool Texture::CreateFromFile(String folder, List<String>& fileNames,
-                              const TextureCreationParams& params)
+bool Texture::CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params)
 {
     for (auto& fname : fileNames) {
         String fullPath = folder + "/" + fname;
         SDL_Surface* surface = IMG_Load((const char*)fullPath);
-        if (!surface) {
+        if (not surface) {
             if (params.isRequired)
                 fprintf(stderr, "Texture::CreateFromFile: failed to load '%s'\n", (const char*)fullPath);
             continue;
         }
-        if (!CreateFromSurface(surface, params)) {
+        if (not CreateFromSurface(surface, params)) {
             SDL_FreeSurface(surface);
             return false;
         }
@@ -365,12 +360,12 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames,
 
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
 {
-    if (!surface) 
+    if (not surface) 
         return false;
 
     // Convert to RGBA if needed
     SDL_Surface* converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-    if (!converted) 
+    if (not converted) 
         return false;
 
     int w = converted->w;
@@ -378,15 +373,15 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
 
     // Store pixel data in a TextureBuffer
     TextureBuffer* tb = new (std::nothrow) TextureBuffer();
-    if (!tb) { 
+    if (not tb) { 
         SDL_FreeSurface(converted); 
         return false; 
     }
 
     SDL_LockSurface(converted);
 
-    tb->m_info.m_width          = w;
-    tb->m_info.m_height         = h;
+    tb->m_info.m_width = w;
+    tb->m_info.m_height = h;
     tb->m_info.m_componentCount = 4;
     tb->m_data.Resize(w * h * 4);
     std::memcpy(tb->DataBuffer(), converted->pixels, w * h * 4);
@@ -394,14 +389,14 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     SDL_UnlockSurface(converted);
     SDL_FreeSurface(converted);
 
-    if (!m_buffers.IsEmpty())
+    if (not m_buffers.IsEmpty())
         m_buffers.Clear();
     m_buffers.Append(tb);
     m_hasBuffer = true;
 
-    if (!Create()) 
+    if (not Create()) 
         return false;
-    if (!Deploy(0)) 
+    if (not Deploy(0)) 
         return false;
 
     if (params.cartoonize)

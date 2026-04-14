@@ -49,6 +49,11 @@ public:
     // Called internally by EndFrame; can also be used for mid-frame flushes.
     void Execute(void) noexcept;
 
+    // Execute + WaitIdle + reset allocator/list and close immediately.
+    // Releases the debug layer's resource tracking without leaving the list open.
+    // Use this for one-shot uploads (e.g. Texture::Deploy); call Open() afterwards to record more.
+    void Flush(void) noexcept;
+
     inline ID3D12CommandQueue*          Queue(void) const noexcept { return m_queue.Get(); }
     inline ID3D12GraphicsCommandList*   List(void)  const noexcept { return m_isRecording ? m_list.Get() : nullptr; }
     inline UINT                         FrameIndex(void) const noexcept { return m_frameIndex; }
@@ -70,11 +75,18 @@ public:
         m_cmdQueue.Destroy();
     }
 
-    inline CommandQueue& Get(void) noexcept { 
-        return m_cmdQueue; 
+    inline CommandQueue& Get(void) noexcept {
+        return m_cmdQueue;
+    }
+
+    // Opens the command list if not already recording, then returns a pointer to the queue.
+    // Returns nullptr if Open() fails. Use this wherever a recording list is required.
+    CommandQueue* GetOpen(void) noexcept {
+        return m_cmdQueue.Open() ? &m_cmdQueue : nullptr;
     }
 };
 
+#define commandQueueHandler CommandQueueHandler::Instance()
 #define cmdQueue CommandQueueHandler::Instance().Get()
 
 // =================================================================================================
