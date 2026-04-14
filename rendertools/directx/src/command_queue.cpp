@@ -79,11 +79,31 @@ bool CommandQueue::BeginFrame(void) noexcept {
         fprintf(stderr, "CommandQueue::BeginFrame: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
+    m_isRecording = true;
+    return true;
+}
+
+
+bool CommandQueue::Open(void) noexcept {
+    if (m_isRecording) return true;
+    HRESULT hr = m_allocators[m_frameIndex]->Reset();
+    if (FAILED(hr)) {
+        fprintf(stderr, "CommandQueue::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        return false;
+    }
+    hr = m_list->Reset(m_allocators[m_frameIndex].Get(), nullptr);
+    if (FAILED(hr)) {
+        fprintf(stderr, "CommandQueue::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        return false;
+    }
+    m_isRecording = true;
     return true;
 }
 
 
 void CommandQueue::Execute(void) noexcept {
+    if (!m_isRecording) return;
+    m_isRecording = false;
     m_list->Close();
     ID3D12CommandList* lists[] = { m_list.Get() };
     m_queue->ExecuteCommandLists(1, lists);

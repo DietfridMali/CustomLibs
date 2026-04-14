@@ -20,6 +20,7 @@ public:
     UINT64                              m_fenceValues[FRAME_COUNT]{};
     HANDLE                              m_fenceEvent{ nullptr };
     UINT                                m_frameIndex{ 0 };
+    bool                                m_isRecording{ false };
 
     // Creates the queue, two command allocators, the command list (initially closed) and the fence.
     bool Create(ID3D12Device* device) noexcept;
@@ -30,6 +31,10 @@ public:
     // Waits for the current frame's allocator to be free, resets it and the command list.
     // Must be called at the start of every frame before recording commands.
     bool BeginFrame(void) noexcept;
+
+    // Opens the command list for recording without a fence wait.
+    // No-op if already recording. Used for one-shot uploads outside a frame.
+    bool Open(void) noexcept;
 
     // Closes the command list, executes it, signals the fence, then advances the frame index.
     // Must be called after all commands for the current frame have been recorded.
@@ -44,7 +49,7 @@ public:
     void Execute(void) noexcept;
 
     inline ID3D12CommandQueue*          Queue(void) const noexcept { return m_queue.Get(); }
-    inline ID3D12GraphicsCommandList*   List(void)  const noexcept { return m_list.Get(); }
+    inline ID3D12GraphicsCommandList*   List(void)  const noexcept { return m_isRecording ? m_list.Get() : nullptr; }
     inline UINT                         FrameIndex(void) const noexcept { return m_frameIndex; }
 };
 

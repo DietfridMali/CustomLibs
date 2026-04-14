@@ -61,7 +61,8 @@ static bool UploadTextureData(
     HRESULT hr = device->CreateCommittedResource(
         &hp, D3D12_HEAP_FLAG_NONE, &upDesc,
         D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload));
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) 
+        return false;
 
     // Copy to upload heap with row padding
     uint8_t* mapped = nullptr;
@@ -87,9 +88,12 @@ static bool UploadTextureData(
     }
     upload->Unmap(0, nullptr);
 
-    // Issue copy command
+    // Issue copy command — open the list if it's not already recording.
+    if (!cmdQueue.Open())
+        return false;
     auto* list = cmdQueue.List();
-    if (!list) return false;
+    if (!list)
+        return false;
 
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type  = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -187,7 +191,8 @@ bool Texture::Create(void)
     Destroy();
     // Allocate an SRV descriptor index.
     DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-    if (!hdl.IsValid()) return false;
+    if (!hdl.IsValid()) 
+        return false;
     m_handle  = hdl.index;
     m_isValid = true;
     return true;
@@ -246,17 +251,21 @@ void Texture::SetParams(bool /*forceUpdate*/)
 
 bool Texture::Deploy(int bufferIndex)
 {
-    if (bufferIndex >= m_buffers.Length()) return false;
+    if (bufferIndex >= m_buffers.Length()) 
+        return false;
     TextureBuffer* tb = m_buffers[bufferIndex];
-    if (!tb) return false;
+    if (!tb) 
+        return false;
 
     ID3D12Device* device = dx12Context.Device();
-    if (!device) return false;
+    if (!device) 
+        return false;
 
     int w        = tb->m_info.m_width;
     int h        = tb->m_info.m_height;
     int channels = tb->m_info.m_componentCount;
-    if (w <= 0 || h <= 0) return false;
+    if (w <= 0 || h <= 0) 
+        return false;
 
     // (Re-)create the default-heap texture resource
     m_resource.Reset();
@@ -275,7 +284,8 @@ bool Texture::Deploy(int bufferIndex)
         &hp, D3D12_HEAP_FLAG_NONE, &rd,
         D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
         IID_PPV_ARGS(&m_resource));
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) 
+        return false;
 
     // Upload pixel data
     const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
@@ -344,18 +354,23 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames,
 
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
 {
-    if (!surface) return false;
+    if (!surface) 
+        return false;
 
     // Convert to RGBA if needed
     SDL_Surface* converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-    if (!converted) return false;
+    if (!converted) 
+        return false;
 
     int w = converted->w;
     int h = converted->h;
 
     // Store pixel data in a TextureBuffer
     TextureBuffer* tb = new (std::nothrow) TextureBuffer();
-    if (!tb) { SDL_FreeSurface(converted); return false; }
+    if (!tb) { 
+        SDL_FreeSurface(converted); 
+        return false; 
+    }
 
     SDL_LockSurface(converted);
 
@@ -373,8 +388,10 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     m_buffers.Append(tb);
     m_hasBuffer = true;
 
-    if (!Create()) return false;
-    if (!Deploy(0)) return false;
+    if (!Create()) 
+        return false;
+    if (!Deploy(0)) 
+        return false;
 
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);

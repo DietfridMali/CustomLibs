@@ -42,6 +42,7 @@ public:
     ComPtr<IDXGISwapChain3>         m_swapChain;
     ComPtr<ID3D12Resource>          m_backBuffers[BACK_BUFFER_COUNT];
     DescriptorHandle                m_rtvHandles[BACK_BUFFER_COUNT];
+    D3D12_RESOURCE_STATES           m_backBufferStates[BACK_BUFFER_COUNT]{};
     UINT                            m_backBufferIndex{ 0 };
 
     AutoArray<SDL_DisplayMode>      m_displayModes;
@@ -85,6 +86,12 @@ public:
 
     // Present the current back buffer, advance to the next one.
     virtual void Update(void);
+
+    // Transition current back buffer PRESENT → RENDER_TARGET. Call before rendering.
+    void BeginBackBuffer(void) noexcept;
+
+    // Transition current back buffer RENDER_TARGET → PRESENT. Call before Present().
+    void EndBackBuffer(void) noexcept;
 
     // Returns the current back buffer resource (set as render target before drawing).
     inline ID3D12Resource* CurrentBackBuffer(void) const noexcept {

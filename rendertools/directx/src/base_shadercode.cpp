@@ -57,7 +57,7 @@ BaseShaderCode::BaseShaderCode() {
 
 void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
     for (const ShaderSource* source : shaderSource) {
-        Shader* shader = new Shader(source->m_name);
+        Shader* shader = new Shader(source->m_name, source->m_vs, source->m_fs, source->m_gs);
         if (shader->Create(source->m_vs, source->m_fs, source->m_gs)) 
             m_shaders[source->m_name] = shader;
 #ifdef _DEBUG

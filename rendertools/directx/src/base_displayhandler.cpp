@@ -1,5 +1,6 @@
 #include "std_defines.h"
 #include "base_displayhandler.h"
+#include "base_shaderhandler.h"
 #include "command_queue.h"
 #include "dx12context.h"
 
@@ -187,8 +188,39 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
         rtvDesc.Format        = BACK_BUFFER_FORMAT;
         rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
         device->CreateRenderTargetView(m_backBuffers[i].Get(), &rtvDesc, m_rtvHandles[i].cpu);
+        m_backBufferStates[i] = D3D12_RESOURCE_STATE_PRESENT;
     }
     return true;
+}
+
+
+void BaseDisplayHandler::BeginBackBuffer(void) noexcept {
+    auto* list = cmdQueue.List();
+    if (!list) return;
+    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_RENDER_TARGET) return;
+    D3D12_RESOURCE_BARRIER b{};
+    b.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource   = m_backBuffers[m_backBufferIndex].Get();
+    b.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+    b.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    list->ResourceBarrier(1, &b);
+    m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_RENDER_TARGET;
+}
+
+
+void BaseDisplayHandler::EndBackBuffer(void) noexcept {
+    auto* list = cmdQueue.List();
+    if (!list) return;
+    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT) return;
+    D3D12_RESOURCE_BARRIER b{};
+    b.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource   = m_backBuffers[m_backBufferIndex].Get();
+    b.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    b.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
+    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    list->ResourceBarrier(1, &b);
+    m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_PRESENT;
 }
 
 
@@ -200,10 +232,17 @@ void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
 
 void BaseDisplayHandler::Update(void) {
     if (!m_swapChain) return;
+    // Execute all recorded commands for this frame, then present.
+    cmdQueue.EndFrame();
     UINT syncInterval = m_vSync ? 1 : 0;
     UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
     m_swapChain->Present(syncInterval, presentFlags);
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+    // Open fresh command list for the next frame.
+    // Also reset active-shader tracking — BeginFrame() resets all DX12 command-list state,
+    // so every shader must call SetPipelineState() again on the new list.
+    cmdQueue.BeginFrame();
+    baseShaderHandler.InvalidateActiveShader();
 }
 
 

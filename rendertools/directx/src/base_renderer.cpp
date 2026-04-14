@@ -251,18 +251,12 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             gfxDriverStates.SetFaceCulling(0);
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
-            // Transition back buffer to render target, clear it, then blit the screen FBO.
+            // Ensure a command list is open for recording the back-buffer transitions.
+            cmdQueue.Open();
             auto* list = cmdQueue.List();
             if (list && baseDisplayHandler.CurrentBackBuffer()) {
-                D3D12_RESOURCE_BARRIER barrier{};
-                barrier.Type  = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-                barrier.Transition.pResource   = baseDisplayHandler.CurrentBackBuffer();
-                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-                barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                list->ResourceBarrier(1, &barrier);
-
+                // Transition back buffer PRESENT → RENDER_TARGET, clear it, blit screen FBO.
+                baseDisplayHandler.BeginBackBuffer();
                 D3D12_CPU_DESCRIPTOR_HANDLE rtv = baseDisplayHandler.CurrentRTV();
                 constexpr float black[4] = { 0.f, 0.f, 0.f, 0.f };
                 list->ClearRenderTargetView(rtv, black, 0, nullptr);
@@ -271,17 +265,9 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
 
-            // Transition back buffer back to present state.
-            if (list && baseDisplayHandler.CurrentBackBuffer()) {
-                D3D12_RESOURCE_BARRIER barrier{};
-                barrier.Type  = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-                barrier.Transition.pResource   = baseDisplayHandler.CurrentBackBuffer();
-                barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-                barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
-                barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-                list->ResourceBarrier(1, &barrier);
-            }
+            // Transition back buffer RENDER_TARGET → PRESENT before Present().
+            if (list && baseDisplayHandler.CurrentBackBuffer())
+                baseDisplayHandler.EndBackBuffer();
         }
     }
 }
