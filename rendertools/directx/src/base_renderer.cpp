@@ -35,13 +35,13 @@ bool BaseRenderer::InitDirectX(void) noexcept {
 void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
     gfxDriverStates.ReleaseBuffers();
     m_sceneWidth =
-    m_windowWidth  = width;
+    m_windowWidth = width;
     m_sceneHeight =
     m_windowHeight = height;
-    m_viewport     = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
+    m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
     m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
-    m_fov           = fov;
-    m_aspectRatio   = float(m_windowWidth) / float(m_windowHeight);
+    m_fov = fov;
+    m_aspectRatio = float(m_windowWidth) / float(m_windowHeight);
     SetupDrawBuffers();
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
     ResetTransformation();
@@ -179,6 +179,8 @@ bool BaseRenderer::Start2DScene(void) {
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
+    gfxDriverStates.SetDepthWrite(0);
+    gfxDriverStates.SetDepthTest(0);
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) {
         // No screen FBO: clear the swap chain back buffer directly.
         auto* list = commandListHandler.CurrentList();

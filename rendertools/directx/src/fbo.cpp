@@ -183,7 +183,7 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
         }
     }
 
-    if ((params.depthBufferCount > 0) or (params.colorBufferCount > 0)) {
+    if (params.depthBufferCount > 0 /* or (params.colorBufferCount > 0) */) {
         if (not CreateDepthBuffer(w, h)) {
             Destroy();
             return false;
