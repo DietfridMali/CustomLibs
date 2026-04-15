@@ -34,7 +34,7 @@
 // -------------------------------------------------------------------------------------------------
 // Fixed input layout (must match the HLSL vertex shader input semantics)
 
-// Default input layout matching mesh.h UpdateVAO() stream order:
+// Default input layout matching mesh.h UpdateGfxData() stream order:
 //   slot 0: POSITION  float3  - vertex positions
 //   slot 1: TEXCOORD0 float2  - primary texcoord (texCoord[0])
 //   slot 2: TEXCOORD1 float2  - secondary texcoord (texCoord[1] / borderTexCoord)

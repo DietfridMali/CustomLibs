@@ -71,7 +71,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     if (flipVertically)
         y = -y;
 
-    m_mesh.ResetGfxDataLayout();
+    m_mesh.ResetGfxData();
     for (auto glyph : text) {
         FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
 

@@ -183,7 +183,7 @@ public:
 
     void UpdateTangents(void);
 
-    void ResetGfxDataLayout(void);
+    void ResetGfxData(void);
 
     void CreateVertexIndices(void);
 

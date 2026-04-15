@@ -184,7 +184,7 @@ bool Mesh::UpdateGfxData(bool createVertexIndex, bool createTangents, bool force
 }
 
 
-void Mesh::ResetGfxDataLayout(void) {
+void Mesh::ResetGfxData(void) {
     m_indices.Reset();
     m_vertices.Reset();
     for (auto& tc : m_texCoords)

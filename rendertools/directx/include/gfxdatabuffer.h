@@ -6,19 +6,19 @@
 #include <vector>
 
 // =================================================================================================
-// DX12 VBO — wraps a committed GPU resource (upload heap) and exposes vertex / index buffer views.
+// DX12 GfxDataBuffer — wraps a committed GPU resource (upload heap) and exposes vertex / index buffer views.
 //
-// In the OGL version the VBO held a GLuint (via SharedGLHandle) and was described with
+// In the OGL version the GfxDataBuffer held a GLuint (via SharedGLHandle) and was described with
 // glVertexAttribPointer / glBindBuffer.  In DX12 we use:
 //   • A committed resource on the upload heap (CPU-writable, GPU-readable).
 //   • D3D12_VERTEX_BUFFER_VIEW for vertex attribute streams (GL_ARRAY_BUFFER).
 //   • D3D12_INDEX_BUFFER_VIEW  for the index stream (GL_ELEMENT_ARRAY_BUFFER).
 //
 // Bind() / Release() / EnableAttribs() / DisableAttribs() / Describe() are kept as no-ops so
-// that VAO code compiles unchanged.  The actual IASetVertexBuffers / IASetIndexBuffer calls are
-// emitted by VAO::Enable().
+// that GfxDataLayout code compiles unchanged.  The actual IASetVertexBuffers / IASetIndexBuffer calls are
+// emitted by GfxDataLayout::Enable().
 
-class VBO
+class GfxDataBuffer
 {
 public:
     int                      m_index;          // vertex attribute slot (layout location)
@@ -49,7 +49,7 @@ public:
     ComponentType            m_componentType;  // Float / UInt32 / UInt16
     bool                     m_isDynamic;
 
-    VBO(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
+    GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
     void Reset(void) {
         m_resource.Reset();
@@ -61,24 +61,24 @@ public:
         m_isDynamic = true;
     }
 
-    VBO(VBO const& other) { 
+    GfxDataBuffer(GfxDataBuffer const& other) { 
         Copy(other); 
     }
     
-    VBO& operator=(VBO const& other) { 
+    GfxDataBuffer& operator=(GfxDataBuffer const& other) { 
         Copy(other); 
         return *this; 
     }
     
-    VBO& operator=(VBO&& other) noexcept { 
+    GfxDataBuffer& operator=(GfxDataBuffer&& other) noexcept { 
         Move(other); 
         return *this; 
     }
 
-    VBO& Copy(VBO const& other);
-    VBO& Move(VBO& other) noexcept;
+    GfxDataBuffer& Copy(GfxDataBuffer const& other);
+    GfxDataBuffer& Move(GfxDataBuffer& other) noexcept;
 
-    // No-ops — binding handled by VAO::Enable() in DX12.
+    // No-ops — binding handled by GfxDataLayout::Enable() in DX12.
     inline void Bind(void) noexcept {}
     inline void Release(void) noexcept {}
     inline void EnableAttribs(void) noexcept {}
@@ -111,7 +111,7 @@ public:
         m_isDynamic = d; 
     }
 
-    // Returns stride (bytes per vertex element) — used by VAO when building VBVs.
+    // Returns stride (bytes per vertex element) — used by GfxDataLayout when building VBVs.
     inline UINT Stride() const noexcept { 
         return UINT(m_itemSize); 
     }

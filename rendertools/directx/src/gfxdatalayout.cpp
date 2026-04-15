@@ -1,12 +1,12 @@
 #define NOMINMAX
 
-#include "vao.h"
+#include "gfxDataLayout.h"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
 #include "commandlist.h"
 
 // =================================================================================================
-// DX12 VAO implementation
+// DX12 GfxDataLayout implementation
 
 static D3D_PRIMITIVE_TOPOLOGY ToD3DTopology(MeshTopology topology) noexcept
 {
@@ -26,12 +26,12 @@ static DXGI_FORMAT ToIndexFormat(ComponentType componentType) noexcept
 
 // =================================================================================================
 
-VAO* VAO::activeVAO = nullptr;
-List<VAO*> VAO::vaoStack;
+GfxDataLayout* GfxDataLayout::activeLayout = nullptr;
+List<GfxDataLayout*> GfxDataLayout::layoutStack;
 
 // =================================================================================================
 
-bool VAO::Create(MeshTopology shape, bool isDynamic) noexcept
+bool GfxDataLayout::Create(MeshTopology shape, bool isDynamic) noexcept
 {
     m_shape = shape;
     SetDynamic(isDynamic);
@@ -39,19 +39,19 @@ bool VAO::Create(MeshTopology shape, bool isDynamic) noexcept
 }
 
 
-void VAO::Destroy(void) noexcept
+void GfxDataLayout::Destroy(void) noexcept
 {
     Disable();
-    for (auto& vbo : m_dataBuffers) {
-        vbo->Destroy();
-        delete vbo;
+    for (auto& GfxDataBuffer : m_dataBuffers) {
+        GfxDataBuffer->Destroy();
+        delete GfxDataBuffer;
     }
     m_indexBuffer.Destroy();
     m_dataBuffers.Clear();
 }
 
 
-VAO& VAO::Copy(VAO const& other)
+GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other)
 {
     if (this != &other) {
         Destroy();
@@ -63,7 +63,7 @@ VAO& VAO::Copy(VAO const& other)
 }
 
 
-VAO& VAO::Move(VAO& other) noexcept
+GfxDataLayout& GfxDataLayout::Move(GfxDataLayout& other) noexcept
 {
     if (this != &other) {
         Destroy();
@@ -75,13 +75,13 @@ VAO& VAO::Move(VAO& other) noexcept
 }
 
 
-VBO* VAO::FindBuffer(const char* type, int id, int& index) noexcept
+GfxDataBuffer* GfxDataLayout::FindBuffer(const char* type, int id, int& index) noexcept
 {
     int i = 0;
-    for (auto vbo : m_dataBuffers) {
-        if (vbo->IsType(type) and vbo->HasID(id)) { 
+    for (auto GfxDataBuffer : m_dataBuffers) {
+        if (GfxDataBuffer->IsType(type) and GfxDataBuffer->HasID(id)) { 
             index = i; 
-            return vbo; 
+            return GfxDataBuffer; 
         }
         ++i;
     }
@@ -89,7 +89,7 @@ VBO* VAO::FindBuffer(const char* type, int id, int& index) noexcept
 }
 
 
-bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
         if (not UpdateDataBuffer(type, id,
@@ -103,7 +103,7 @@ bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffe
 }
 
 
-void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
+void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
         UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate);
@@ -112,7 +112,7 @@ void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bo
 }
 
 
-bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
 {
     if (strcmp(type, "Index"))
         return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
@@ -121,31 +121,31 @@ bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, si
 }
 
 
-bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
 {
     if (dataSize == 0) 
         return false;
     int index = -1;
-    VBO* vbo = FindBuffer(type, id, index);
-    if (not vbo) {
-        vbo = new (std::nothrow) VBO();
-        if (not vbo) 
+    GfxDataBuffer* GfxDataBuffer = FindBuffer(type, id, index);
+    if (not GfxDataBuffer) {
+        GfxDataBuffer = new (std::nothrow) GfxDataBuffer();
+        if (not GfxDataBuffer) 
             return false;
-        m_dataBuffers.Append(vbo);
-        vbo->SetDynamic(m_isDynamic);
+        m_dataBuffers.Append(GfxDataBuffer);
+        GfxDataBuffer->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
     }
-    return vbo->Update(type, GfxBufferTarget::Vertex, index, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
+    return GfxDataBuffer->Update(type, GfxBufferTarget::Vertex, index, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
 }
 
 
-void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
+void GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
 {
     m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
 }
 
 
-bool VAO::Enable(void) noexcept
+bool GfxDataLayout::Enable(void) noexcept
 {
     Activate();
     m_isBound = true;
@@ -161,11 +161,11 @@ bool VAO::Enable(void) noexcept
         constexpr int kMaxStreams = 8;
         D3D12_VERTEX_BUFFER_VIEW views[kMaxStreams]{};
         int bound = 0;
-        for (auto vbo : m_dataBuffers) {
+        for (auto GfxDataBuffer : m_dataBuffers) {
             if (bound >= kMaxStreams) 
                 break;
-            if (vbo and vbo->IsValid() and (vbo->m_bufferType == GfxBufferTarget::Vertex)) {
-                views[(vbo->m_index >= 0) ? vbo->m_index : bound] = vbo->m_vbv;
+            if (GfxDataBuffer and GfxDataBuffer->IsValid() and (GfxDataBuffer->m_bufferType == GfxBufferTarget::Vertex)) {
+                views[(GfxDataBuffer->m_index >= 0) ? GfxDataBuffer->m_index : bound] = GfxDataBuffer->m_vbv;
             }
             ++bound;
         }
@@ -180,14 +180,14 @@ bool VAO::Enable(void) noexcept
 }
 
 
-void VAO::Disable(void) noexcept
+void GfxDataLayout::Disable(void) noexcept
 {
     Deactivate();
     m_isBound = false;
 }
 
 
-void VAO::Render(std::span<Texture* const> textures) noexcept
+void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 {
     if (not Enable()) 
         return;
@@ -203,7 +203,7 @@ void VAO::Render(std::span<Texture* const> textures) noexcept
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
             commandListHandler.DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
         else {
-            // Non-indexed: sum up vertex count from first VBO
+            // Non-indexed: sum up vertex count from first GfxDataBuffer
             UINT vertCount = 0;
             if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
                 vertCount = UINT(m_dataBuffers[0]->m_itemCount);

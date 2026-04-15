@@ -48,7 +48,7 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
 // =================================================================================================
 
 void BaseQuad::Init(void) {
-    // just create the gfxDataLayout and its vbos
+    // just create the gfxDataLayout and its GfxDataBuffers
     Setup(defaultVertices[0], defaultTexCoords[0]);
 }
 

@@ -185,10 +185,10 @@
     <ClInclude Include="..\include\texturebuffer.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\vao.h">
+    <ClInclude Include="..\include\gfxdatalayout.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\vbo.h">
+    <ClInclude Include="..\include\gfxdatabuffer.h">
       <Filter>DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cbv_allocator.h">
@@ -330,10 +330,10 @@
     <ClCompile Include="..\src\texturebuffer.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\vao.cpp">
+    <ClCompile Include="..\src\gfxdatalayout.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\vbo.cpp">
+    <ClCompile Include="..\src\gfxdatabuffer.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cbv_allocator.cpp">

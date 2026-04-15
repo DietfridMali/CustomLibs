@@ -149,7 +149,7 @@ public:
     inline void Disable(void) noexcept {}
 
     // Allocate a b1 slot from cbvAllocator, write m_b1Staging, bind root param 1.
-    // Called from VAO::Render() just before each draw.
+    // Called from GfxDataLayout::Render() just before each draw.
     bool UploadB1(void) noexcept;
 
     // Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).

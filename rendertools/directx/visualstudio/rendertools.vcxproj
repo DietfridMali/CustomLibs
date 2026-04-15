@@ -167,8 +167,8 @@
     <ClInclude Include="..\..\include\textureatlas.h" />
     <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\..\include\texturehandler.h" />
-    <ClInclude Include="..\include\vao.h" />
-    <ClInclude Include="..\include\vbo.h" />
+    <ClInclude Include="..\include\gfxdatalayout.h" />
+    <ClInclude Include="..\include\gfxdatabuffer.h" />
     <ClInclude Include="..\..\include\vertexdatabuffers.h" />
     <ClInclude Include="..\..\include\viewport.h" />
     <ClInclude Include="..\include\framework.h" />
@@ -218,8 +218,8 @@
     <ClCompile Include="..\src\base_texture_shaders.cpp" />
     <ClCompile Include="..\..\src\textureprocessing.cpp" />
     <ClCompile Include="..\..\src\tiny_gltf.cpp" />
-    <ClCompile Include="..\src\vao.cpp" />
-    <ClCompile Include="..\src\vbo.cpp" />
+    <ClCompile Include="..\src\gfxdatalayout.cpp" />
+    <ClCompile Include="..\src\gfxdatabuffer.cpp" />
     <ClCompile Include="..\..\src\viewport.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

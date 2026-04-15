@@ -1,11 +1,11 @@
 #define NOMINMAX
 
-#include "vbo.h"
+#include "gfxdatabuffer.h"
 #include "commandlist.h"
 #include "dx12context.h"
 
 // =================================================================================================
-// DX12 VBO implementation
+// DX12 GfxDataBuffer implementation
 //
 // Data is kept on an upload-heap committed resource (CPU-writable, GPU-readable).
 // For the DX12 port this is fine for both dynamic and static meshes; a future optimisation
@@ -17,7 +17,7 @@ static DXGI_FORMAT IndexFormatFromComponentType(ComponentType componentType) noe
 }
 
 
-VBO::VBO(const char* type, int id, GfxBufferTarget bufferType, bool isDynamic) noexcept
+GfxDataBuffer::GfxDataBuffer(const char* type, int id, GfxBufferTarget bufferType, bool isDynamic) noexcept
     : m_index(-1)
     , m_id(id)
     , m_type(type)
@@ -32,7 +32,7 @@ VBO::VBO(const char* type, int id, GfxBufferTarget bufferType, bool isDynamic) n
 { }
 
 
-size_t VBO::ComponentSize(size_t componentType) noexcept
+size_t GfxDataBuffer::ComponentSize(size_t componentType) noexcept
 {
     switch (ComponentType(componentType)) {
         case ComponentType::UInt16: 
@@ -45,7 +45,7 @@ size_t VBO::ComponentSize(size_t componentType) noexcept
 }
 
 
-VBO& VBO::Copy(VBO const& other)
+GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
 {
     if (this != &other) {
         m_index = other.m_index;
@@ -67,7 +67,7 @@ VBO& VBO::Copy(VBO const& other)
 }
 
 
-VBO& VBO::Move(VBO& other) noexcept
+GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
 {
     if (this != &other) {
         m_index = other.m_index;
@@ -91,7 +91,7 @@ VBO& VBO::Move(VBO& other) noexcept
 }
 
 
-bool VBO::Create(ID3D12Device* device, size_t dataSize) {
+bool GfxDataBuffer::Create(ID3D12Device* device, size_t dataSize) {
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
     D3D12_RESOURCE_DESC rd{};
     rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -108,7 +108,7 @@ bool VBO::Create(ID3D12Device* device, size_t dataSize) {
 }
 
 
-bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* data, size_t dataSize, ComponentType componentType, size_t componentCount, bool /*forceUpdate*/) noexcept
+bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int index, void* data, size_t dataSize, ComponentType componentType, size_t componentCount, bool /*forceUpdate*/) noexcept
 {
     if (not data or (dataSize == 0))
         return false;
@@ -208,7 +208,7 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* 
 }
 
 
-void VBO::Destroy(void) noexcept
+void GfxDataBuffer::Destroy(void) noexcept
 {
     for (UINT i = 0; i < FRAME_COUNT; ++i)
         m_chunks[i].clear();
