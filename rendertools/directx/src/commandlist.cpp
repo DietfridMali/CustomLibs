@@ -7,7 +7,7 @@
 // =================================================================================================
 // CommandQueue
 
-bool CommandQueue::Create(ID3D12Device* device) noexcept {
+bool CommandQueue::Create(ID3D12Device* device, const String& name) noexcept {
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type  = D3D12_COMMAND_LIST_TYPE_DIRECT;
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -32,6 +32,9 @@ bool CommandQueue::Create(ID3D12Device* device) noexcept {
 
     if (not cbvAllocator.Create(device))
         return false;
+
+    if (not name.IsEmpty())
+        m_queue->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
 
     return true;
 }
@@ -98,7 +101,7 @@ ID3D12GraphicsCommandList* CommandQueue::List(void) const noexcept {
 
 // =================================================================================================
 
-bool CommandList::Create(ID3D12Device* device) noexcept {
+bool CommandList::Create(ID3D12Device* device, const String& name) noexcept {
     for (UINT i = 0; i < FRAME_COUNT; ++i) {
         HRESULT hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
         if (FAILED(hr)) {
@@ -112,6 +115,8 @@ bool CommandList::Create(ID3D12Device* device) noexcept {
         return false;
     }
     m_list->Close();
+    if (not name.IsEmpty())
+        m_list->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
     return true;
 }
 
@@ -207,9 +212,9 @@ bool CommandListHandler::s_logCalls = false;
 #endif
 
 bool CommandListHandler::Create(ID3D12Device* device) noexcept {
-    if (not m_cmdQueue.Create(device))
+    if (not m_cmdQueue.Create(device, "MainQueue"))
         return false;
-    if (not m_uploadCmdList.Create(device))
+    if (not m_uploadCmdList.Create(device, "upload"))
         return false;
     return true;
 }

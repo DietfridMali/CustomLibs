@@ -44,18 +44,29 @@ D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GpuHandle(UINT index) const noexcept
 
 
 DescriptorHandle DescriptorHeap::Allocate(void) noexcept {
-    if (IsFull()) {
-        fprintf(stderr, "DescriptorHeap: heap full (capacity=%u, type=%d)\n",
-                m_capacity, (int)m_type);
-        return {};
+    UINT idx;
+    if (m_freeList.Length() > 0) {
+        idx = m_freeList.Pop();
+    } else {
+        if (m_count >= m_capacity) {
+            fprintf(stderr, "DescriptorHeap: heap full (capacity=%u, type=%d)\n",
+                    m_capacity, (int)m_type);
+            return {};
+        }
+        idx = m_count++;
     }
-    const UINT idx = m_count++;
     DescriptorHandle h;
     h.index = idx;
     h.cpu   = CpuHandle(idx);
     if (m_gpuVisible)
         h.gpu = GpuHandle(idx);
     return h;
+}
+
+
+void DescriptorHeap::Free(UINT index) noexcept {
+    if (index < m_count)
+        m_freeList.Append(index);
 }
 
 

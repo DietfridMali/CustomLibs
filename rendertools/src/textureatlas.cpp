@@ -111,7 +111,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	}
 
 	if (enableLocally) {
-		m_atlas->Disable();
+		m_atlas->Disable(true);
 		baseRenderer.PopViewport();
 	}
 	return shader != nullptr;

@@ -84,9 +84,9 @@ public:
 		return m_atlas ? m_atlas->Enable() : false;
 	}
 
-	inline void Disable(void) {
+	inline void Disable(bool flush = false) {
 		if (m_atlas)
-			m_atlas->Disable();
+			m_atlas->Disable(flush);
 	}
 
 	inline void SetViewport(void) {

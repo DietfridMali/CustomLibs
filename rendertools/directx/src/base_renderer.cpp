@@ -28,7 +28,7 @@ static Texture* testTexture = nullptr;
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
 bool BaseRenderer::InitDirectX(void) noexcept {
-    return m_cmdList.Create(dx12Context.Device());
+    return m_cmdList.Create(dx12Context.Device(), "renderer");
 }
 
 

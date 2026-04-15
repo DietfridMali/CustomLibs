@@ -104,26 +104,31 @@ public:
     // -------------------------------------------------------------------------
 
     FBO();
-    ~FBO() { Destroy(); }
+
+    ~FBO() { 
+        Destroy(); 
+    }
 
     void Init(void);
+
     bool Create(int width, int height, int scale, const FBOBufferParams& params);
+
     void Destroy(void);
 
-    // Enable / disable — set this FBO's RTVs as the active render target.
-    bool Enable(int bufferIndex = -1,
-                eDrawBufferGroups drawBufferGroup = dbAll,
-                bool clear = true,
-                bool reenable = false);
+	void SetName(const String& name) noexcept {
+		m_name = name;
+	}
 
-    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup,
-                       bool clear, bool reenable);
+    // Enable / disable — set this FBO's RTVs as the active render target.
+    bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
+
+    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
 
     inline bool Reenable(bool clear = false, bool reenable = false) {
         return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, reenable);
     }
 
-    void Disable(void);
+    void Disable(bool flush = false);
 
     // Called by DrawBufferHandler::SetActiveDrawBuffers().
     void BindRenderTargets(ID3D12GraphicsCommandList* list);
@@ -131,58 +136,133 @@ public:
     inline CommandList& GetCmdList(void) noexcept { return m_cmdList; }
 
     void SetViewport(bool flipVertically = false) noexcept;
+
     void Fill(RGBAColor color);
+
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
+
     void ClearStencil(void);
 
     // Render helpers (same as OGL)
     Texture* GetRenderTexture(const FBORenderParams& params, int tmuIndex = 0);
-    Texture* GetDepthTexture(void);
-    bool     UpdateTransformation(const FBORenderParams& params);
-    bool     RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color);
-    inline bool RenderTexture(Texture* tex, const FBORenderParams& p, RGBAColor&& c) { return RenderTexture(tex, p, static_cast<const RGBAColor&>(c)); }
-    inline bool RenderTexture(Texture* tex, const FBORenderParams& p)                { return RenderTexture(tex, p, ColorData::White); }
-    bool         Render(const FBORenderParams& params, const RGBAColor& color);
-    inline bool  Render(const FBORenderParams& p, RGBAColor&& c) { return Render(p, static_cast<const RGBAColor&>(c)); }
-    inline bool  Render(const FBORenderParams& p)                { return Render(p, ColorData::White); }
-    bool         AutoRender(const FBORenderParams& params, const RGBAColor& color);
-    inline bool  AutoRender(const FBORenderParams& p, RGBAColor&& c) { return AutoRender(p, static_cast<const RGBAColor&>(c)); }
-    inline bool  AutoRender(const FBORenderParams& p)                { return AutoRender(p, ColorData::White); }
 
-    inline int  GetWidth(bool scaled = false) noexcept { return scaled ? m_width * m_scale : m_width; }
-    inline int  GetHeight(bool scaled = false) noexcept { return scaled ? m_height * m_scale : m_height; }
-    inline int  GetScale(void)   noexcept { return m_scale; }
-    inline bool IsAvailable(void) noexcept { return m_isAvailable; }
-    inline Viewport& GetViewport(void) noexcept { return m_viewport; }
-    inline int  GetLastDestination(void) noexcept { return m_lastDestination; }
-    inline void SetLastDestination(int i) noexcept { m_lastDestination = i; }
-    inline int  NextBuffer(int i) noexcept { return (i + 1) % m_bufferCount; }
-    inline FBOTexture* GetTexture(void) noexcept { return &m_renderTexture; }
+    Texture* GetDepthTexture(void);
+    
+    bool UpdateTransformation(const FBORenderParams& params);
+    
+    bool RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color);
+    
+    inline bool RenderTexture(Texture* tex, const FBORenderParams& p, RGBAColor&& c) { 
+        return RenderTexture(tex, p, static_cast<const RGBAColor&>(c)); 
+    }
+    
+    inline bool RenderTexture(Texture* tex, const FBORenderParams& p) { 
+        return RenderTexture(tex, p, ColorData::White); 
+    }
+    
+    bool Render(const FBORenderParams& params, const RGBAColor& color);
+    
+    inline bool Render(const FBORenderParams& p, RGBAColor&& c) { 
+        return Render(p, static_cast<const RGBAColor&>(c)); 
+    }
+    
+    inline bool  Render(const FBORenderParams& p) { 
+        return Render(p, ColorData::White); 
+    }
+    
+    bool AutoRender(const FBORenderParams& params, const RGBAColor& color);
+    
+    inline bool  AutoRender(const FBORenderParams& p, RGBAColor&& c) { 
+        return AutoRender(p, static_cast<const RGBAColor&>(c)); 
+    }
+    
+    inline bool  AutoRender(const FBORenderParams& p) { 
+        return AutoRender(p, ColorData::White); 
+    }
+
+    inline int  GetWidth(bool scaled = false) noexcept { 
+        return scaled ? m_width * m_scale : m_width; 
+    }
+    
+    inline int GetHeight(bool scaled = false) noexcept { 
+        return scaled ? m_height * m_scale : m_height; 
+    }
+    
+    inline int GetScale(void) noexcept { 
+        return m_scale; 
+    }
+    
+    inline bool IsAvailable(void) noexcept { 
+        return m_isAvailable; 
+    }
+    
+    inline Viewport& GetViewport(void) noexcept { 
+        return m_viewport; 
+    }
+    
+    inline int  GetLastDestination(void) noexcept { 
+        return m_lastDestination; 
+    }
+    
+    inline void SetLastDestination(int i) noexcept { 
+        m_lastDestination = i; 
+    }
+    
+    inline int  NextBuffer(int i) noexcept { 
+        return (i + 1) % m_bufferCount; 
+    }
+    
+    inline FBOTexture* GetTexture(void) noexcept { 
+        return &m_renderTexture; 
+    }
+
     // In DX12 there is no explicit framebuffer binding state — always report enabled.
-    inline bool IsEnabled(void)  noexcept { return true; }
+    inline bool IsEnabled(void)  noexcept { 
+        return true; 
+    }
 
     // Returns the SRV index for the given color buffer — used by base_renderer.cpp:
     //   m_renderTexture.m_handle = fbo->BufferHandle(0);
     uint32_t& BufferHandle(int bufferIndex);
 
-    inline bool operator==(const FBO& o) const noexcept { return this == &o; }
-    inline bool operator!=(const FBO& o) const noexcept { return this != &o; }
+    inline bool operator==(const FBO& o) const noexcept { 
+        return this == &o; 
+    }
+    
+    inline bool operator!=(const FBO& o) const noexcept { 
+        return this != &o;
+    }
 
     // Stubs kept for OGL-compat callers
-    inline bool AttachBuffer(int)   { return true; }
-    inline bool DetachBuffer(int)   { return true; }
-    inline void ReleaseBuffers()    {}
-    inline int  DepthBufferIndex() noexcept { return m_colorBufferCount; }
+    inline bool AttachBuffer(int) { 
+        return true; 
+    }
+    
+    inline bool DetachBuffer(int) { 
+        return true; 
+    }
+    
+    inline void ReleaseBuffers() {}
+    
+    inline int  DepthBufferIndex() noexcept {
+        return m_colorBufferCount; 
+    }
+
 #pragma warning(push)
 #pragma warning(disable:4100)  // unreferenced formal parameter (VertexBufferIndex)
-    inline int  VertexBufferIndex(int i = 0) noexcept { return 0; }
+    inline int  VertexBufferIndex(int i = 0) noexcept { 
+        return 0; 
+    }
 #pragma warning(pop)
 
 private:
+
     bool CreateColorBuffer(int i, int width, int height);
+
     bool CreateDepthBuffer(int width, int height);
-    void TransitionColor(ID3D12GraphicsCommandList* list, int i,
-                         D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
+
+    void TransitionColor(ID3D12GraphicsCommandList* list, int i, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
+
     void CreateRenderArea(void);
 };
 

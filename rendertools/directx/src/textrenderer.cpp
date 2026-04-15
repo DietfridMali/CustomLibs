@@ -218,7 +218,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
             }
             fbo->m_lastDestination = 0;
             RenderText(text, td.width, offset.x, offset.y, alignment);
-            fbo->Disable();
+            fbo->Disable(true);
             if (fbo->IsAvailable()) {
                 if (HaveOutline())
                     RenderOutline(fbo, m_decoration);

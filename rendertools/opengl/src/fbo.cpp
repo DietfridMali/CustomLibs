@@ -341,7 +341,7 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
 }
 
 
-void FBO::Disable(void) {
+void FBO::Disable(bool flush = false) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
         if (IsEnabled()) {

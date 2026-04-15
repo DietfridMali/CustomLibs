@@ -3,6 +3,7 @@
 #include "framework.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
+#include "string.hpp"
 
 #ifdef _DEBUG
 #include <source_location>
@@ -27,7 +28,8 @@ public:
     HANDLE                      m_fenceEvent{ nullptr };
     UINT                        m_frameIndex{ 0 };
 
-    bool Create(ID3D12Device* device) noexcept;
+    bool Create(ID3D12Device* device, const String& name = "") noexcept;
+
     void Destroy(void) noexcept;
 
     // Waits for the GPU to finish with the current frame slot, then resets the CBV allocator.
@@ -74,7 +76,7 @@ public:
     ComPtr<ID3D12CommandAllocator>     m_allocators[FRAME_COUNT];
     bool                               m_isRecording{ false };
 
-    bool Create(ID3D12Device* device) noexcept;
+    bool Create(ID3D12Device* device, const String& name = "") noexcept;
 
     void Destroy(void) noexcept;
 

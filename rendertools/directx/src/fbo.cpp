@@ -171,7 +171,7 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
     int h = height * scale;
 
     // Create the FBO's own command list and open it so CreateColorBuffer can record barriers.
-    if (not m_cmdList.Create(device))
+    if (not m_cmdList.Create(device, m_name.IsEmpty() ? String("FBO") : m_name))
         return false;
     if (not m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex()))
         return false;
@@ -203,12 +203,15 @@ void FBO::Destroy(void)
 {
     m_cmdList.Destroy();
     for (int i = 0; i < FBO_MAX_COLOR_BUFFERS; ++i) {
+        descriptorHeaps.FreeRTV(m_rtvHandles[i]);
+        descriptorHeaps.FreeSRV(m_srvHandles[i]);
         m_colorResources[i].Reset();
         m_rtvHandles[i] = {};
         m_srvHandles[i] = {};
         m_srvIndices[i] = UINT32_MAX;
         m_colorStates[i] = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     }
+    descriptorHeaps.FreeDSV(m_dsvHandle);
     m_depthResource.Reset();
     m_dsvHandle = {};
     m_isAvailable = false;
@@ -290,13 +293,16 @@ bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool
 }
 
 
-void FBO::Disable(void)
+void FBO::Disable(bool flush)
 {
     // Transition all color buffers back to PSR so they can be sampled in subsequent passes.
     auto* list = m_cmdList.List();
     for (int i = 0; i < m_colorBufferCount; ++i)
         TransitionColor(list, i, m_colorStates[i], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    m_cmdList.Close();
+    if (flush)
+        m_cmdList.Flush();
+    else
+        m_cmdList.Close();
 }
 
 

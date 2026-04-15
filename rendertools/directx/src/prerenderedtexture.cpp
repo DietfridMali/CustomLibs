@@ -19,7 +19,7 @@ bool PrerenderedItem::Create(int bufferCount) {
         m_fbo.Destroy();
     }
     m_bufferCount = bufferCount;
-    m_fbo.Create(m_viewport.m_width, m_viewport.m_height, 2, { .colorBufferCount = bufferCount } );
+    m_fbo.Create(m_viewport.m_width, m_viewport.m_height, 2, { .name = "Text", .colorBufferCount = bufferCount } );
     return true;
 }
 
