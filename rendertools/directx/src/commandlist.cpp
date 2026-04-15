@@ -179,6 +179,7 @@ void CommandList::Flush(void) noexcept {
     CheckDeviceRemoved("Flush");
 #endif
     commandListHandler.CmdQueue().WaitIdle();
+    DisposeResources();
     // Reset allocator + list so the debug layer releases resource refs; leave closed.
     UINT fi = commandListHandler.CmdQueue().FrameIndex();
     hr = m_allocators[fi]->Reset();
@@ -189,6 +190,13 @@ void CommandList::Flush(void) noexcept {
         fprintf(stderr, "CommandList::Flush: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
     else
         m_list->Close();
+}
+
+
+void CommandList::DisposeResources(void) noexcept {
+    for (auto& fn : m_disposableResources)
+        fn();
+    m_disposableResources.Clear();
 }
 
 

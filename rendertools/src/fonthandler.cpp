@@ -51,15 +51,22 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
         // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
         info->atlasSize = scale * m_atlas.GlyphScale();
         m_atlas.Add(info->texture, info->index, scale);
-#if 1 //def NDEBUG
-        delete info->texture;
-        info->texture = nullptr;
-#endif
     }
 #ifdef _DEBUG
     else
         fprintf(stderr, "unknown glyph\n");
 #endif
+    return true;
+}
+
+
+// FontHandler is gfx api agnostic, but for directx, textures must be kept until the command list used to render the glyphs 
+// to the atlas has been executed.  So we keep the textures in memory until the atlas is built, then free them.
+bool FontHandler::FreeGlyph(const String& key, GlyphInfo* info) { 
+    if (info) {
+        delete info->texture;
+        info->texture = nullptr;
+    }
     return true;
 }
 
@@ -74,8 +81,9 @@ int FontHandler::BuildAtlas(void) {
     baseRenderer.PushViewport();
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
     baseRenderer.PopViewport();
-    m_atlas.Disable();
-    return m_glyphDict.Size(); 
+    m_atlas.Disable(true);
+    m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
+    return m_glyphDict.Size();
 }
 
 

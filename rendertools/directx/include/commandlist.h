@@ -4,6 +4,7 @@
 #include "basesingleton.hpp"
 #include "array.hpp"
 #include "string.hpp"
+#include <functional>
 
 #ifdef _DEBUG
 #include <source_location>
@@ -75,6 +76,7 @@ public:
     ComPtr<ID3D12GraphicsCommandList>  m_list;
     ComPtr<ID3D12CommandAllocator>     m_allocators[FRAME_COUNT];
     bool                               m_isRecording{ false };
+    AutoArray<std::function<void()>>   m_disposableResources;
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
 
@@ -85,6 +87,14 @@ public:
     void Close(void) noexcept;
 
     void Flush(void) noexcept;
+
+    // Registers a callback to be invoked after this list's GPU work has completed.
+    // Use for resources that must outlive recording but can be freed after execution.
+    inline void AddResource(std::function<void()> fn) {
+        m_disposableResources.Append(std::move(fn));
+    }
+
+    void DisposeResources(void) noexcept;
 
     inline ID3D12GraphicsCommandList* List(void) const noexcept {
         return m_isRecording ? m_list.Get() : nullptr;

@@ -107,6 +107,8 @@ private:
     bool CreateAtlas(void);
 
     bool RenderGlyphToAtlas(const String& key, GlyphInfo* info);
+
+    bool FreeGlyph(const String& key, GlyphInfo* info);
 };
 
 // =================================================================================================
