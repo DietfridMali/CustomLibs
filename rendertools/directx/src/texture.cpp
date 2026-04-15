@@ -343,7 +343,7 @@ RenderOffsets Texture::ComputeOffsets(int w, int h,
 // =================================================================================================
 
 void TiledTexture::SetParams(bool /*forceUpdate*/) { m_hasParams = true; }
-void FBOTexture::SetParams(bool /*forceUpdate*/)   { m_hasParams = true; }
+void RenderTargetTexture::SetParams(bool /*forceUpdate*/)   { m_hasParams = true; }
 void ShadowTexture::SetParams(bool /*forceUpdate*/) { m_hasParams = true; }
 
 // =================================================================================================

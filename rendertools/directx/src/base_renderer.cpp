@@ -54,7 +54,7 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
 bool BaseRenderer::CreateScreenBuffer(void) {
     if (m_screenBuffer)
         delete m_screenBuffer;
-    if (not (m_screenBuffer = new FBO()))
+    if (not (m_screenBuffer = new RenderTarget()))
         return false;
     m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 });
     return true;
@@ -150,7 +150,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
 bool BaseRenderer::Start3DScene(void) {
     SetupDirectX();
     m_frameCounter.Start();
-    FBO* sceneBuffer = GetSceneBuffer();
+    RenderTarget* sceneBuffer = GetSceneBuffer();
     if (not (sceneBuffer and sceneBuffer->IsAvailable()))
         return false;
     ResetDrawBuffers(sceneBuffer);
@@ -182,7 +182,7 @@ bool BaseRenderer::Start2DScene(void) {
     gfxDriverStates.SetDepthWrite(0);
     gfxDriverStates.SetDepthTest(0);
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) {
-        // No screen FBO: clear the swap chain back buffer directly.
+        // No screen RenderTarget: clear the swap chain back buffer directly.
         auto* list = commandListHandler.CurrentList();
         if (list) {
             baseDisplayHandler.BeginBackBuffer();  // PRESENT → RENDER_TARGET
@@ -257,13 +257,13 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             gfxDriverStates.SetFaceCulling(0);
 
             m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex());
-            // Ensure the screen FBO color buffer is in PSR state.
+            // Ensure the screen RenderTarget color buffer is in PSR state.
             // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
             // in which case the RENDER_TARGET → PSR transition was never recorded.
             m_screenBuffer->Disable();
             auto* list = commandListHandler.CurrentList();
             if (list && baseDisplayHandler.CurrentBackBuffer()) {
-                // Transition back buffer PRESENT → RENDER_TARGET, clear it, blit screen FBO.
+                // Transition back buffer PRESENT → RENDER_TARGET, clear it, blit screen RenderTarget.
                 baseDisplayHandler.BeginBackBuffer();
                 D3D12_CPU_DESCRIPTOR_HANDLE rtv = baseDisplayHandler.CurrentRTV();
                 constexpr float black[4] = { 0.f, 0.f, 0.f, 0.f };
@@ -291,9 +291,9 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept {
     if (windowWidth * windowHeight == 0) {
-        if (m_drawBufferInfo.m_fbo) {
-            windowWidth  = m_drawBufferInfo.m_fbo->GetWidth(true);
-            windowHeight = m_drawBufferInfo.m_fbo->GetHeight(true);
+        if (m_drawBufferInfo.m_renderTarget) {
+            windowWidth  = m_drawBufferInfo.m_renderTarget->GetWidth(true);
+            windowHeight = m_drawBufferInfo.m_renderTarget->GetHeight(true);
         }
         else {
             windowWidth  = m_windowWidth;

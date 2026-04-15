@@ -25,7 +25,7 @@
 // Replaces the OGL Texture (GLuint / SharedTextureHandle) with:
 //   • ComPtr<ID3D12Resource> m_resource — default-heap texture resource.
 //   • uint32_t m_handle — SRV descriptor-heap index (UINT32_MAX = invalid).
-//     Named m_handle for source compatibility (FBO::BufferHandle assignment, etc.).
+//     Named m_handle for source compatibility (RenderTarget::BufferHandle assignment, etc.).
 //   • Bind(slot)  → gfxDriverStates.BindTexture2D(m_handle, slot)
 //   • Deploy()    → uploads pixel data to GPU via a temporary upload resource.
 //
@@ -75,7 +75,7 @@ class Texture
 public:
     // m_handle stores the SRV descriptor-heap index (UINT32_MAX = invalid).
     // Named m_handle for source-level compatibility with existing assignment sites
-    // (e.g. m_renderTexture.m_handle = fbo->BufferHandle(0)).
+    // (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)).
     uint32_t                    m_handle{ UINT32_MAX };
 
     ComPtr<ID3D12Resource>      m_resource;   // default-heap resource (D3D12_RESOURCE_DIMENSION_TEXTURE2D)
@@ -243,12 +243,12 @@ public:
 
 // =================================================================================================
 
-class FBOTexture 
+class RenderTargetTexture 
     : public Texture
 {
 public:
-    FBOTexture() = default;
-    ~FBOTexture() = default;
+    RenderTargetTexture() = default;
+    ~RenderTargetTexture() = default;
     virtual void SetParams(bool forceUpdate = false) override;
 };
 

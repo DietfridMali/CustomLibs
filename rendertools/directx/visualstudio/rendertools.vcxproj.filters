@@ -79,7 +79,7 @@
     <ClInclude Include="..\..\include\noise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\outlinerenderer.h">
+    <ClInclude Include="..\..\include\texteffects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\base_quad.h">
@@ -143,7 +143,7 @@
     <ClInclude Include="..\include\dx12context.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\fbo.h">
+    <ClInclude Include="..\include\rendertarget.h">
       <Filter>DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\framework.h">
@@ -236,7 +236,7 @@
     <ClCompile Include="..\..\src\noise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\outlinerenderer.cpp">
+    <ClCompile Include="..\..\src\texteffects.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\projector.cpp">
@@ -291,7 +291,7 @@
     <ClCompile Include="..\src\dx12context.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\fbo.cpp">
+    <ClCompile Include="..\src\rendertarget.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\gfxstates.cpp">

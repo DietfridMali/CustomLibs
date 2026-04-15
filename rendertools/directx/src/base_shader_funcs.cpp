@@ -14,7 +14,7 @@
 //                     Texture2D / SamplerState declarations, and static globals.
 //
 //   Static samplers (from root signature):
-//     s0 = linear clamp   (screen-space / FBO textures)
+//     s0 = linear clamp   (screen-space / RenderTarget textures)
 //     s1 = linear wrap    (world / material textures)
 // =================================================================================================
 

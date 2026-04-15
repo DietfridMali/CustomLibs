@@ -66,7 +66,7 @@ public:
 //            so cmdQueue.List() returns this list for the duration of recording.
 // Close() — close list, pop stack, register for frame-end submission via CommandListHandler.
 // Flush() — close list, pop stack, submit immediately + WaitIdle, no registration.
-//            Used for one-shot setup (FBO::Create, resource uploads).
+//            Used for one-shot setup (RenderTarget::Create, resource uploads).
 
 class CommandList
 {

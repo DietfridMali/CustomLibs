@@ -12,7 +12,7 @@
 #include "projector.h"
 #include "rendermatrices.h"
 #include "viewport.h"
-#include "fbo.h"
+#include "rendertarget.h"
 #include "drawbufferhandler.h"
 #include "gfxdriverstates.h"
 #include "framecounter.h"
@@ -20,7 +20,7 @@
 // =================================================================================================
 // DX12 BaseRenderer
 //
-// Manages the 3D scene FBOs, coordinate transforms, viewports, and the render loop.
+// Manages the 3D scene render targets, coordinate transforms, viewports, and the render loop.
 // "OpenGL" terminology is preserved in function names for source compatibility with the game layer
 // (SetupOpenGL → SetupDX12 internally, but callers still see SetupOpenGL for now).
 
@@ -37,9 +37,9 @@ public:
     };
 
 protected:
-    FBO*                    m_screenBuffer;
-    FBO*                    m_sceneBuffer;
-    FBO*                    m_skyBuffer;
+    RenderTarget*           m_screenBuffer;
+    RenderTarget*           m_sceneBuffer;
+    RenderTarget*           m_skyBuffer;
     Texture                 m_renderTexture;
     CommandList             m_cmdList;
     bool                    m_screenIsAvailable;
@@ -106,7 +106,7 @@ public:
 
     bool CreateScreenBuffer(void);
 
-    virtual FBO* GetSceneBuffer(void) noexcept {
+    virtual RenderTarget* GetSceneBuffer(void) noexcept {
 #ifdef _DEBUG
         return m_xchgSkyAndSceneBuffer ? m_skyBuffer : m_sceneBuffer;
 #else
@@ -114,7 +114,7 @@ public:
 #endif
     }
 
-    FBO* GetSkyBuffer(void) noexcept {
+    RenderTarget* GetSkyBuffer(void) noexcept {
 #ifdef _DEBUG
         return m_xchgSkyAndSceneBuffer ? m_sceneBuffer : m_skyBuffer;
 #else
@@ -185,7 +185,7 @@ public:
     virtual bool EnableCamera(void)  { return false; }
     virtual bool DisableCamera(void) { return false; }
 
-    inline FBO* ScreenBuffer(void) noexcept { return m_screenBuffer; }
+    inline RenderTarget* ScreenBuffer(void) noexcept { return m_screenBuffer; }
 
     inline int WindowWidth(void) noexcept { return m_windowWidth; }
 

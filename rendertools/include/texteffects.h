@@ -1,11 +1,11 @@
 #pragma once
 
-#include "fbo.h"
+#include "rendertarget.h"
 #include "colordata.h"
 
 // =================================================================================================
 
-class OutlineRenderer {
+class TextEffects {
 public:
     struct AAMethod {
         String  method = "";
@@ -21,9 +21,9 @@ public:
         inline bool ApplyAA() const { return aaMethod.ApplyAA(); };
     };
 
-    void AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premultiply = false);
+    void AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply = false);
 
-    void RenderOutline(FBO* fbo, const Decoration& decoration, bool premultiply = false);
+    void RenderOutline(RenderTarget* renderTarget, const Decoration& decoration, bool premultiply = false);
 };
 
 // =================================================================================================

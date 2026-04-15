@@ -111,9 +111,9 @@ const ShaderSource& FxaaShader() {
 
 // -------------------------------------------------------------------------------------------------
 // Separable Gaussian blur with per-shader kernel (up to 33 taps).
-// 'coeffsPacked' packs 4 coefficients per float4; C++ must upload as 9 × float4.
+// 'coeffs' packs 4 coefficients per float4; C++ must upload as 9 × float4.
 // ShaderConstants: vsOffset, direction (0=horiz,1=vert), radius (half-kernel size),
-//                  texelSize, coeffsPacked[9].
+//                  texelSize, coeffs[9].
 const ShaderSource& GaussBlurShader() {
     static const ShaderSource gaussBlurShader(
         "gaussblur",
@@ -126,7 +126,7 @@ const ShaderSource& GaussBlurShader() {
                 float  _pad0;
                 float2 texelSize;
                 float2 _pad1;
-                float4 coeffsPacked[9];   // 36 coefficients; coeffs[i] = coeffsPacked[i/4][i%4]
+                float4 coeffs[9];   // 36 coefficients; coeffs[i] = coeffs[i/4][i%4]
             };
             Texture2D    surface : register(t0);
             SamplerState s0      : register(s0);
@@ -136,7 +136,7 @@ const ShaderSource& GaussBlurShader() {
                 float2 fragCoord : TEXCOORD1;
             };
             float GetCoeff(int i) {
-                float4 v = coeffsPacked[i >> 2];
+                float4 v = coeffs[i >> 2];
                 int    r = i & 3;
                 if (r == 0) return v.x;
                 if (r == 1) return v.y;

@@ -131,7 +131,7 @@
     <ClInclude Include="..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
     <ClInclude Include="..\include\dx12upload.h" />
-    <ClInclude Include="..\include\fbo.h" />
+    <ClInclude Include="..\include\rendertarget.h" />
     <ClInclude Include="..\..\include\fonthandler.h" />
     <ClInclude Include="..\..\include\framecounter.h" />
     <ClInclude Include="..\..\include\glbloader.h" />
@@ -146,7 +146,7 @@
     <ClInclude Include="..\include\gfxdriverstates.h" />
     <ClInclude Include="..\include\gfxdrivertypes.h" />
     <ClInclude Include="..\include\gfxstates.h" />
-    <ClInclude Include="..\..\include\outlinerenderer.h" />
+    <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\noise.h" />
     <ClInclude Include="..\..\include\coplanar_rectangle.h" />
     <ClInclude Include="..\include\prerenderedtexture.h" />
@@ -186,7 +186,7 @@
     <ClCompile Include="..\src\base_displayhandler.cpp" />
     <ClCompile Include="..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\src\dx12upload.cpp" />
-    <ClCompile Include="..\src\fbo.cpp" />
+    <ClCompile Include="..\src\rendertarget.cpp" />
     <ClCompile Include="..\..\src\fonthandler.cpp" />
     <ClCompile Include="..\..\src\framecounter.cpp" />
     <ClCompile Include="..\..\src\glbloader.cpp" />
@@ -196,7 +196,7 @@
     <ClCompile Include="..\..\src\mesh.cpp" />
     <ClCompile Include="..\src\noisetexture.cpp" />
     <ClCompile Include="..\src\gfxstates.cpp" />
-    <ClCompile Include="..\..\src\outlinerenderer.cpp" />
+    <ClCompile Include="..\..\src\texteffects.cpp" />
     <ClCompile Include="..\src\outline_shader.cpp" />
     <ClCompile Include="..\..\src\coplanar_rectangle.cpp" />
     <ClCompile Include="..\src\prerenderedtexture.cpp" />

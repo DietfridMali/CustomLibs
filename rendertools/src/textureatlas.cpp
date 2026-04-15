@@ -25,7 +25,7 @@ void TextureAtlas::Initialize(void) {
 bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale) {
 	if (m_atlas)
 		delete m_atlas;
-	m_atlas = new FBO();
+	m_atlas = new RenderTarget();
 	if (not m_atlas)
 		return false;
 	m_glyphSize = glyphSize;
@@ -75,7 +75,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	else {
 #ifndef OPENGL
 		// The command list may have been reset (e.g. after Texture::Deploy/Flush) even though
-		// the FBO is still logically enabled. Reenable re-opens the list and rebinds render targets.
+		// the RenderTarget is still logically enabled. Reenable re-opens the list and rebinds render targets.
 		if (not m_atlas->Reenable())
 			return false;
 #endif

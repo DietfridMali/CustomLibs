@@ -11,7 +11,7 @@
 #   include <locale>
 #endif
 
-#define USE_TEXT_FBOS 1
+#define USE_TEXT_RTS 1
 #define USE_ATLAS 1
 #define TEST_ATLAS 0
 

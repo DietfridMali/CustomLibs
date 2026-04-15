@@ -13,7 +13,7 @@
 #   include <locale>
 #endif
 
-#define USE_TEXT_FBOS 1
+#define USE_TEXT_RTS 1
 #define USE_ATLAS 1
 #define TEST_ATLAS 0
 
@@ -22,7 +22,7 @@ using TextDimensions = TextureAtlas::GlyphSize;
 
 // =================================================================================================
 
-int TextRenderer::CompareFBOs(void* context, const int& key1, const int& key2) {
+int TextRenderer::CompareRenderTargets(void* context, const int& key1, const int& key2) {
     return (key1 < key2) ? -1 : (key1 > key2) ? 1 : 0;
 }
 
@@ -35,14 +35,12 @@ TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, fl
 }
 
 
-FBO* TextRenderer::GetFBO(float scale) {
-    FBO** fboRef = m_fbos.Find(FBOID(baseRenderer.GetViewport().m_width, baseRenderer.GetViewport().m_height));
-    if (fboRef != nullptr)
-        return *fboRef;
-    FBO* fbo = new FBO();
-    fbo->Create(baseRenderer.GetViewport().m_width, baseRenderer.GetViewport().m_height, 2, {.name = "text", .colorBufferCount = 2});
-    m_fbos.Insert(FBOID(fbo), fbo);
-    return fbo;
+RenderTarget* TextRenderer::GetRenderTarget(int scale) {
+    if (m_renderTarget)
+        delete m_renderTarget;
+    m_renderTarget = new RenderTarget();
+    m_renderTarget->Create(baseRenderer.GetViewport().m_width, baseRenderer.GetViewport().m_height, scale, {.name = "text", .colorBufferCount = 2});
+    return m_renderTarget;
 }
 
 
@@ -66,7 +64,11 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     baseRenderer.ClearGLError();
-    m_font->GetFBO()->Render({}, ColorData::Yellow);
+    RenderTarget* renderTarget = m_font->GetRenderTarget();
+    if (renderTarget) {
+        renderTarget->Render({}, ColorData::Yellow);
+        delete renderTarget;
+    }
     return;
 #endif
 
@@ -182,16 +184,16 @@ int TextRenderer::SourceBuffer(bool hasOutline, bool antiAliased) {
 
 
 void TextRenderer::Fill(Vector4f color) {
-    FBO* fbo = GetFBO(1);
-    if (fbo != nullptr)
-        fbo->Fill(color);
+    RenderTarget* renderTarget = GetRenderTarget(1);
+    if (renderTarget != nullptr)
+        renderTarget->Fill(color);
 }
 
 
-void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* fbo, Viewport& viewport, int renderAreaWidth, int renderAreaHeight, int flipVertically) {
+void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, RenderTarget* renderTarget, Viewport& viewport, int renderAreaWidth, int renderAreaHeight, int flipVertically) {
     if (m_font) {
-        if (fbo)
-            fbo->m_name = String::Concat ("[", text, "]");
+        if (renderTarget)
+            renderTarget->m_name = String::Concat ("[", text, "]");
         TextDimensions td = m_font->TextSize(text);
         float outlineWidth = m_decoration.outlineWidth * 2;
         td.width += int(2 * outlineWidth + 0.5f);
@@ -207,23 +209,34 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
         td.width -= int(2 * outlineWidth + 0.5f);
         td.height -= int(2 * outlineWidth + 0.5f);
 
-        if (not fbo)
+        if (not renderTarget)
             RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
-        else if (fbo->Enable(-1, FBO::dbAll, true)) {
+        else if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
             baseRenderer.PushViewport();
-            fbo->SetViewport();
+            renderTarget->SetViewport();
             if (outlineWidth > 0) {
-                offset.x -= outlineWidth / float(fbo->m_width);
-                offset.y -= outlineWidth / float(fbo->m_height);
+                offset.x -= outlineWidth / float(renderTarget->m_width);
+                offset.y -= outlineWidth / float(renderTarget->m_height);
             }
-            fbo->m_lastDestination = 0;
+            renderTarget->m_lastDestination = 0;
             RenderText(text, td.width, offset.x, offset.y, alignment);
-            fbo->Disable(true);
-            if (fbo->IsAvailable()) {
-                if (HaveOutline())
-                    RenderOutline(fbo, m_decoration);
-                else if (ApplyAA())
-                    AntiAlias(fbo, m_decoration.aaMethod);
+            uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
+#ifndef OPENGL
+            renderTarget->Disable(true);
+#else
+            renderTarget->Disable();
+#endif
+            if (postProcess != 0) {
+#ifndef OPENGL
+                renderTarget->Enable(-1, RenderTarget::dbAll, true);
+#endif
+                if (postProcess == 1)
+                    RenderOutline(renderTarget, m_decoration);
+                else 
+                    AntiAlias(renderTarget, m_decoration.aaMethod);
+#ifndef OPENGL
+                renderTarget->Disable(true);
+#endif
             }
             baseRenderer.PopViewport();
         }
@@ -231,23 +244,23 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, FBO* f
 }
 
 
-void TextRenderer::RenderToScreen(FBO* fbo, int flipVertically) {
-#if USE_TEXT_FBOS
+void TextRenderer::RenderToScreen(RenderTarget* renderTarget, int flipVertically) {
+#if USE_TEXT_RTS
     if (m_font)
-        fbo->Render({ .source = fbo ? fbo->GetLastDestination() : -1, .clearBuffer = false, .flipVertically = flipVertically, .scale = m_scale }, m_color); // render outline to viewport
+        renderTarget->Render({ .source = renderTarget ? renderTarget->GetLastDestination() : -1, .clearBuffer = false, .flipVertically = flipVertically, .scale = m_scale }, m_color); // render outline to viewport
 #endif
 }
 
 
-void TextRenderer::Render(String text, eTextAlignments alignment, int flipVertically, int renderAreaWidth, int renderAreaHeight, bool useFBO) {
+void TextRenderer::Render(String text, eTextAlignments alignment, int flipVertically, int renderAreaWidth, int renderAreaHeight, bool useRenderTarget) {
     if (m_font and (text.Length() > 0)) {
-        if (not useFBO)
+        if (not useRenderTarget)
             RenderToBuffer(text, alignment, nullptr, baseRenderer.GetViewport(), renderAreaWidth, renderAreaHeight, flipVertically);
         else {
-            FBO* fbo = GetFBO(2.0f);
-            if (fbo != nullptr) {
-                RenderToBuffer(text, alignment, fbo, baseRenderer.GetViewport(), renderAreaWidth, renderAreaHeight);
-                RenderToScreen(fbo, flipVertically); // render outline to viewport
+            GetRenderTarget(2);
+            if (m_renderTarget != nullptr) {
+                RenderToBuffer(text, alignment, m_renderTarget, baseRenderer.GetViewport(), renderAreaWidth, renderAreaHeight);
+                RenderToScreen(m_renderTarget, flipVertically); // render outline to viewport
             }
         }
     }

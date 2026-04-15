@@ -7,11 +7,11 @@
 
 #include "vector.hpp"
 #include "base_quad.h"
-#include "fbo.h"
+#include "rendertarget.h"
 #include "dictionary.hpp" // Dictionary<K,V> — faster lookup than std::map
 #include "colordata.h"
 #include "tablesize.h"
-#include "outlinerenderer.h"
+#include "texteffects.h"
 #include "mesh.h"
 #include "fonthandler.h"
 #include "basesingleton.hpp"
@@ -21,11 +21,11 @@
 // =================================================================================================
 
 class TextRenderer 
-    : public OutlineRenderer 
+    : public TextEffects 
     , public BaseSingleton<TextRenderer>
 {
 public:
-    using TextDecoration = OutlineRenderer::Decoration;
+    using TextDecoration = TextEffects::Decoration;
     using TextDimensions = FontHandler::TextDimensions;
 
     typedef enum {
@@ -36,27 +36,27 @@ public:
 
 private:
     RGBAColor               m_color;
-    float                   m_scale;
+    float                   m_scale{ 1.0f };
     eTextAlignments         m_textAlignment;
     TextDecoration          m_decoration;
     VAO                     m_vao;
     Mesh                    m_mesh;
-    Dictionary<int, FBO*>   m_fbos;
+    RenderTarget*                    m_renderTarget{ nullptr };
     FontHandler*            m_font;
     List<RGBAColor>         m_colorStack;
 
 public:
-    static int CompareFBOs(void* context, const int& key1, const int& key2);
+    static int CompareRenderTargets(void* context, const int& key1, const int& key2);
 
     TextRenderer(RGBAColor color = ColorData::White, const TextDecoration& decoration = {}, float scale = 1.0f);
 
     void Fill(Vector4f color);
 
-    void RenderToBuffer(String text, eTextAlignments alignment, FBO* fbo, Viewport& viewport, int renderAreaWidth = 0, int renderAreaHeight = 0, int flipVertically = 0);
+    void RenderToBuffer(String text, eTextAlignments alignment, RenderTarget* renderTarget, Viewport& viewport, int renderAreaWidth = 0, int renderAreaHeight = 0, int flipVertically = 0);
 
-    void RenderToScreen(FBO* fbo, int flipVertically = 0);
+    void RenderToScreen(RenderTarget* renderTarget, int flipVertically = 0);
 
-    void Render(String text, eTextAlignments alignment = taLeft, int flipVertically = 0, int renderAreaWidth = 0, int renderAreaHeight = 0, bool useFBO = true);
+    void Render(String text, eTextAlignments alignment = taLeft, int flipVertically = 0, int renderAreaWidth = 0, int renderAreaHeight = 0, bool useRenderTarget = true);
 
     inline FontHandler* SetFont(FontHandler * font) noexcept {
         FontHandler* currentFont = m_font;
@@ -98,7 +98,7 @@ public:
         return true;
     }
 
-    void SetAAMethod(const OutlineRenderer::AAMethod& aaMethod) noexcept {
+    void SetAAMethod(const TextEffects::AAMethod& aaMethod) noexcept {
         m_decoration.aaMethod = aaMethod;
     }
 
@@ -136,7 +136,7 @@ public:
 private:
     BaseQuad& CreateQuad(BaseQuad& q, float x, float y, float w, Texture* t, bool flipVertically);
 
-    FBO* GetFBO(float scale);
+    RenderTarget* GetRenderTarget(int scale);
 
     Shader* LoadShader(void);
 
@@ -150,12 +150,12 @@ private:
 
     int SourceBuffer(bool hasOutline, bool antiAliased);
 
-    static inline int FBOID(const int width, const int height) noexcept {
+    static inline int RenderTargetID(const int width, const int height) noexcept {
         return width << 16 | height;
     }
 
-    static inline int FBOID(const FBO* fbo) noexcept {
-        return FBOID (fbo->m_width, fbo->m_height);
+    static inline int RenderTargetID(const RenderTarget* renderTarget) noexcept {
+        return RenderTargetID (renderTarget->m_width, renderTarget->m_height);
     }
 };
 

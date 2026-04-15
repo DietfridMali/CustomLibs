@@ -6,14 +6,14 @@
 #include "base_quad.h"
 #include "texture.h"
 #include "viewport.h"
-#include "fbo.h"
+#include "rendertarget.h"
 #include "textrenderer.h"
 
 // =================================================================================================
 
 class PrerenderedItem {
 public:
-    FBO         m_fbo;
+    RenderTarget         m_renderTarget;
     Viewport    m_viewport;
     int         m_bufferCount;
 
@@ -26,8 +26,8 @@ public:
     { }
 
 
-    FBO& GetFBO(void) noexcept {
-        return m_fbo;
+    RenderTarget& GetRenderTarget(void) noexcept {
+        return m_renderTarget;
     }
 
     void SetViewport(Viewport& viewport) noexcept {
@@ -41,7 +41,7 @@ public:
     bool Create(int bufferCount = 1);
 
     void Destroy() {
-        m_fbo.Destroy();
+        m_renderTarget.Destroy();
     }
 
     virtual void Render(void) {}

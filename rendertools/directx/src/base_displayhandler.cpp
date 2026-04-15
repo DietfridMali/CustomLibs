@@ -241,13 +241,13 @@ void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
 void BaseDisplayHandler::Update(void) {
     if (not m_swapChain) 
         return;
-    // Blit screen FBO to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
+    // Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
     // No-op in the normal game loop where DrawScreen() was already called explicitly.
     // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
     EndBackBuffer();
     // Close the main renderer list — registers it for submission.
     baseRenderer.GetCmdList().Close();
-    // Submit all registered lists (FBO lists first, main list last — registration order).
+    // Submit all registered lists (RenderTarget lists first, main list last — registration order).
     commandListHandler.ExecuteAll();
     commandListHandler.CmdQueue().EndFrame();
     UINT syncInterval = m_vSync ? 1 : 0;

@@ -3,7 +3,7 @@
 #include "vector.hpp"
 #include "tablesize.h"
 #include "texture.h"
-#include "fbo.h"
+#include "rendertarget.h"
 #include "colordata.h"
 
 // =================================================================================================
@@ -36,7 +36,7 @@ public:
 	};
 
 protected:
-	FBO*		m_atlas;
+	RenderTarget*		m_atlas;
 	TableSize	m_size;
 	GlyphSize	m_glyphSize;
 	Vector2f	m_scale;
@@ -106,7 +106,7 @@ public:
 		return m_atlas ? m_atlas->GetHeight(scaled) : 0;
 	}
 
-	inline FBO* GetFBO(void) noexcept {
+	inline RenderTarget* GetRenderTarget(void) noexcept {
 		return m_atlas;
 	}
 

@@ -9,29 +9,29 @@
 #include "commandlist.h"
 
 // =================================================================================================
-// DX12 FBO (Frame Buffer Object)
+// DX12 RenderTarget (Frame Buffer Object)
 //
-// In OpenGL an FBO bound a set of texture attachments as render targets.  In DX12 render targets
+// In OpenGL an RenderTarget bound a set of texture attachments as render targets.  In DX12 render targets
 // are set with OMSetRenderTargets and must be backed by RTV descriptors.
 //
 // This class manages:
-//   • Up to FBO_MAX_COLOR_BUFFERS color render targets (default-heap Texture2D resources + RTV).
+//   • Up to RT_MAX_COLOR_BUFFERS color render targets (default-heap Texture2D resources + RTV).
 //   • One depth/stencil target (default-heap Texture2D with D32_FLOAT format + DSV).
 //   • SRV descriptors for each color buffer so they can be sampled in subsequent passes.
 //   • BufferHandle(i) returns a uint32_t& (SRV index) compatible with Texture::m_handle.
 //   • BindRenderTargets(list) → OMSetRenderTargets, called by DrawBufferHandler.
 //   • Ping-pong: destination >= 0 issues a Resource Barrier SRV→RTV and back after render.
-//   • destination == -1: bind current FBO's RTVs without resource barriers.
+//   • destination == -1: bind current RenderTarget's RTVs without resource barriers.
 //
-// FBOBufferParams and FBORenderParams are kept identical to the OGL version for source compat.
+// RTBufferParams and RTRenderParams are kept identical to the OGL version for source compat.
 
-static constexpr int FBO_MAX_COLOR_BUFFERS = 4;
+static constexpr int RT_MAX_COLOR_BUFFERS = 4;
 
 #define INVALID_BUFFER_INDEX 0x80000000
 
 // =================================================================================================
 
-class FBO
+class RenderTarget
 {
 public:
     typedef enum {
@@ -45,7 +45,7 @@ public:
         dbNone = -1
     } eDrawBufferGroups;
 
-    struct FBOBufferParams {
+    struct RTBufferParams {
         String name{ "" };
         int colorBufferCount{ 1 };
         int depthBufferCount{ 0 };
@@ -54,7 +54,7 @@ public:
         bool hasMRTs{ false };
     };
 
-    struct FBORenderParams {
+    struct RTRenderParams {
         int    source{ 0 };
         int    destination{ -1 };
         bool   clearBuffer{ true };
@@ -78,48 +78,57 @@ public:
     int          m_lastDestination{ -1 };
     bool         m_pingPong{ false };
     bool         m_isAvailable{ false };
+	bool         m_haveRTVs{ false };
     eDrawBufferGroups m_drawBufferGroup{ dbAll };
 
     Viewport     m_viewport;
     Viewport*    m_viewportSave{ nullptr };
-    FBOTexture   m_renderTexture;   // lightweight proxy used for FBO→quad rendering
-    FBOTexture   m_depthTexture;
+    RenderTargetTexture   m_renderTexture;   // lightweight proxy used for RenderTarget→quad rendering
+    RenderTargetTexture   m_depthTexture;
 
     // DX12 resources (one entry per color buffer slot)
-    ComPtr<ID3D12Resource>  m_colorResources[FBO_MAX_COLOR_BUFFERS];
-    DescriptorHandle        m_rtvHandles[FBO_MAX_COLOR_BUFFERS];
-    DescriptorHandle        m_srvHandles[FBO_MAX_COLOR_BUFFERS];
-    uint32_t                m_srvIndices[FBO_MAX_COLOR_BUFFERS];  // mirrors m_srvHandles[i].index
+    ComPtr<ID3D12Resource>  m_colorResources[RT_MAX_COLOR_BUFFERS];
+    DescriptorHandle        m_rtvHandles[RT_MAX_COLOR_BUFFERS];
+    DescriptorHandle        m_srvHandles[RT_MAX_COLOR_BUFFERS];
+    uint32_t                m_srvIndices[RT_MAX_COLOR_BUFFERS];  // mirrors m_srvHandles[i].index
 
     // Depth/stencil
     ComPtr<ID3D12Resource>  m_depthResource;
     DescriptorHandle        m_dsvHandle;
 
     // Current resource state for each color buffer (needed for barriers)
-    D3D12_RESOURCE_STATES   m_colorStates[FBO_MAX_COLOR_BUFFERS]{};
+    D3D12_RESOURCE_STATES   m_colorStates[RT_MAX_COLOR_BUFFERS]{};
 
-    // Own command list — all rendering into this FBO is recorded here.
+    // Own command list — all rendering into this RenderTarget is recorded here.
     CommandList             m_cmdList;
 
     // -------------------------------------------------------------------------
 
-    FBO();
+    RenderTarget();
 
-    ~FBO() { 
+    ~RenderTarget() { 
         Destroy(); 
     }
 
     void Init(void);
 
-    bool Create(int width, int height, int scale, const FBOBufferParams& params);
+    bool Create(int width, int height, int scale, const RTBufferParams& params);
 
     void Destroy(void);
 
-	void SetName(const String& name) noexcept {
+    bool AllocRTV(ID3D12Device* device, D3D12_RENDER_TARGET_VIEW_DESC& rtvd, int i);
+
+    bool AllocRTVs(void);
+
+    void FreeRTVs(void);
+
+    void FreeSRVs(void);
+    
+    void SetName(const String& name) noexcept {
 		m_name = name;
 	}
 
-    // Enable / disable — set this FBO's RTVs as the active render target.
+    // Enable / disable — set this RenderTarget's RTVs as the active render target.
     bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
 
     bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
@@ -144,39 +153,39 @@ public:
     void ClearStencil(void);
 
     // Render helpers (same as OGL)
-    Texture* GetRenderTexture(const FBORenderParams& params, int tmuIndex = 0);
+    Texture* GetRenderTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthTexture(void);
     
-    bool UpdateTransformation(const FBORenderParams& params);
+    bool UpdateTransformation(const RTRenderParams& params);
     
-    bool RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color);
+    bool RenderTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
     
-    inline bool RenderTexture(Texture* tex, const FBORenderParams& p, RGBAColor&& c) { 
+    inline bool RenderTexture(Texture* tex, const RTRenderParams& p, RGBAColor&& c) { 
         return RenderTexture(tex, p, static_cast<const RGBAColor&>(c)); 
     }
     
-    inline bool RenderTexture(Texture* tex, const FBORenderParams& p) { 
+    inline bool RenderTexture(Texture* tex, const RTRenderParams& p) { 
         return RenderTexture(tex, p, ColorData::White); 
     }
     
-    bool Render(const FBORenderParams& params, const RGBAColor& color);
+    bool Render(const RTRenderParams& params, const RGBAColor& color);
     
-    inline bool Render(const FBORenderParams& p, RGBAColor&& c) { 
+    inline bool Render(const RTRenderParams& p, RGBAColor&& c) { 
         return Render(p, static_cast<const RGBAColor&>(c)); 
     }
     
-    inline bool  Render(const FBORenderParams& p) { 
+    inline bool  Render(const RTRenderParams& p) { 
         return Render(p, ColorData::White); 
     }
     
-    bool AutoRender(const FBORenderParams& params, const RGBAColor& color);
+    bool AutoRender(const RTRenderParams& params, const RGBAColor& color);
     
-    inline bool  AutoRender(const FBORenderParams& p, RGBAColor&& c) { 
+    inline bool  AutoRender(const RTRenderParams& p, RGBAColor&& c) { 
         return AutoRender(p, static_cast<const RGBAColor&>(c)); 
     }
     
-    inline bool  AutoRender(const FBORenderParams& p) { 
+    inline bool  AutoRender(const RTRenderParams& p) { 
         return AutoRender(p, ColorData::White); 
     }
 
@@ -212,7 +221,7 @@ public:
         return (i + 1) % m_bufferCount; 
     }
     
-    inline FBOTexture* GetTexture(void) noexcept { 
+    inline RenderTargetTexture* GetTexture(void) noexcept { 
         return &m_renderTexture; 
     }
 
@@ -222,14 +231,14 @@ public:
     }
 
     // Returns the SRV index for the given color buffer — used by base_renderer.cpp:
-    //   m_renderTexture.m_handle = fbo->BufferHandle(0);
+    //   m_renderTexture.m_handle = renderTarget->BufferHandle(0);
     uint32_t& BufferHandle(int bufferIndex);
 
-    inline bool operator==(const FBO& o) const noexcept { 
+    inline bool operator==(const RenderTarget& o) const noexcept { 
         return this == &o; 
     }
     
-    inline bool operator!=(const FBO& o) const noexcept { 
+    inline bool operator!=(const RenderTarget& o) const noexcept { 
         return this != &o;
     }
 

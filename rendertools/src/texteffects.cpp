@@ -1,12 +1,12 @@
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
-#include "outlinerenderer.h"
+#include "texteffects.h"
 #include "base_renderer.h"
 
 // =================================================================================================
 // the(text) outline renderer works as follows :
-// it uses render - to - texture with an FBO
-// the FBO has three color buffers
+// it uses render - to - texture with an RenderTarget
+// the RenderTarget has three color buffers
 // the text goes to the first color buffer.it must be sized down so that there is enough room around it for the outline
 // the width of which is defined by the outlineWidth parameter
 // the outline renderer uses buffer[0] as source and renders it to buffer[1], applying the outline shader in horizontal direction
@@ -18,35 +18,45 @@
 
 #define AUTORENDER 0
 
-void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premultiply) {
+void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply) {
     if (aaMethod.ApplyAA()) {
-        FBO::FBORenderParams params = { .clearBuffer = true, .scale = 1.0f };
-        params.shader = baseShaderHandler.SetupShader(aaMethod.method);
-        if (params.shader == nullptr)
-            return;
+        RenderTarget::RTRenderParams params = { .clearBuffer = true, .scale = 1.0f };
         BaseRenderer::ClearGLError();
 #ifdef OPENGL
         params.shader->SetInt("surface", 0);
+#else
+        {
+#   if 0
+            int nextBuf = renderTarget->NextBuffer(renderTarget->GetLastDestination());
+            renderTarget->Enable(nextBuf, RenderTarget::dbAll, false);
+            renderTarget->SetLastDestination(nextBuf);
+#   else
+            //renderTarget->Enable(-1, RenderTarget::dbAll, false);
+#   endif
+        }
 #endif
+        params.shader = baseShaderHandler.SetupShader(aaMethod.method);
+        if (params.shader == nullptr)
+            return;
         params.shader->SetFloat("offset", 0.0f);
         //params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
         if (aaMethod.method != "gaussblur") {
             params.shader->SetVector2f("texelSize", baseRenderer.TexelSize());
-            fbo->AutoRender(params);
+            renderTarget->AutoRender(params);
         }
         else {
             FloatArray* kernel = baseShaderHandler.GetKernel(aaMethod.strength);
             if (kernel != nullptr) {
-                params.shader->SetFloatArray("coeffs", *kernel);
+                params.shader->SetFloatArray("coeffsPacked", *kernel);
                 params.shader->SetInt("radius", aaMethod.strength);
-                params.destination = fbo->GetLastDestination();
+                params.destination = renderTarget->GetLastDestination();
                 
                 for (int i = 0; i < 2; ++i) {
                     // the following code only works if not called multiple times in a loop!
                     params.shader->SetFloat("direction", float (i));
                     params.source = params.destination;
-                    params.destination = fbo->NextBuffer(params.source);
-                    fbo->Render(params);
+                    params.destination = renderTarget->NextBuffer(params.source);
+                    renderTarget->Render(params);
                 }
             }
         }
@@ -54,20 +64,26 @@ void OutlineRenderer::AntiAlias(FBO* fbo, const AAMethod& aaMethod, bool premult
 }
 
 
-void OutlineRenderer::RenderOutline(FBO* fbo, const Decoration& decoration, bool premultiply) {
+void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& decoration, bool premultiply) {
     if (decoration.HaveOutline()) {
         Shader* shader = baseShaderHandler.SetupShader("outline");
         if (shader and not baseRenderer.IsShadowPass()) {
 #ifdef OPENGL
             shader->SetInt("surface", 0);
+#else
+            {
+                int nextBuf = renderTarget->NextBuffer(renderTarget->GetLastDestination());
+                renderTarget->Enable(nextBuf, RenderTarget::dbAll, false);
+                renderTarget->SetLastDestination(nextBuf);
+            }
 #endif
             shader->SetFloat("outlineWidth", decoration.outlineWidth);
             shader->SetVector4f("outlineColor", decoration.outlineColor);
             shader->SetFloat("offset", 0.0f); // 0.5f);
             //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
-            fbo->AutoRender({ .clearBuffer = true, .shader = shader });
+            renderTarget->AutoRender({ .clearBuffer = true, .shader = shader });
         }
-        AntiAlias(fbo, decoration.aaMethod);
+        AntiAlias(renderTarget, decoration.aaMethod);
     }
 }
 

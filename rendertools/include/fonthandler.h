@@ -3,7 +3,7 @@
 #include "vector.hpp"
 #include "base_quad.h"
 #include "texture.h"
-#include "fbo.h"
+#include "rendertarget.h"
 #include "mesh.h"
 #include "avltree.hpp" // faster lookup than std::map
 #include "colordata.h"
@@ -75,8 +75,8 @@ public:
         return m_atlas;
     }
 
-    inline FBO* GetFBO(void) noexcept {
-        return m_atlas.GetFBO();
+    inline RenderTarget* GetRenderTarget(void) noexcept {
+        return m_atlas.GetRenderTarget();
     }
 
     inline Texture* GetTexture(void) noexcept {
