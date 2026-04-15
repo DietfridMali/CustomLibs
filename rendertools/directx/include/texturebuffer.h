@@ -59,7 +59,7 @@ public:
         }
 
         void Reset(void)
-            noexcept
+ noexcept
         {
             m_width = 0;
             m_height = 0;
@@ -103,31 +103,31 @@ public:
     TextureBuffer(SDL_Surface* source, bool premultiply, bool flipVertically);
 
     void Reset(void)
-        noexcept;
+ noexcept;
 
     bool Allocate(int width, int height, int componentCount, void* data = nullptr) noexcept;
 
     TextureBuffer& Create(SDL_Surface* source, bool premultiply, bool flipVertically);
 
     void FlipSurface(SDL_Surface* source)
-        noexcept;
+ noexcept;
 
     uint8_t Premultiply(uint16_t c, uint16_t a) noexcept;
 
     void Premultiply(void);
 
     TextureBuffer& operator= (const TextureBuffer& other)
-        noexcept;
+ noexcept;
 
     TextureBuffer& operator= (TextureBuffer&& other)
-        noexcept;
+ noexcept;
     // CTextureBuffer& operator= (CTextureBuffer&& other);
 
     TextureBuffer& Copy(TextureBuffer& other)
-        noexcept;
+ noexcept;
 
     TextureBuffer& Move(TextureBuffer& other)
-        noexcept;
+ noexcept;
 
     inline uint8_t* DataBuffer(void) noexcept {
         return m_data.Data();

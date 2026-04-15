@@ -65,9 +65,9 @@ public:
 
     void Destroy(void) noexcept;
 
-    inline bool IsValid(void)   noexcept { return true; }  // always "valid" in DX12
-    inline bool IsBound(void)   noexcept { return m_isBound; }
-    inline bool IsActive(void)  noexcept { return this == activeVAO; }
+    inline bool IsValid(void) noexcept { return true; }  // always "valid" in DX12
+    inline bool IsBound(void) noexcept { return m_isBound; }
+    inline bool IsActive(void) noexcept { return this == activeVAO; }
 
     inline void Activate(void) noexcept {
         if (not IsActive()) { PushVAO(activeVAO); activeVAO = this; }

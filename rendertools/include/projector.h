@@ -18,16 +18,16 @@ public:
     }
 
     void Setup(float aspectRatio, float fov = 45, float zNear = 0.0f, float zFar = 0.0f, float zoom = 1.0f)
-        noexcept;
+ noexcept;
 
     Matrix4f Compute3DProjection(bool rowMajor = false)
-        noexcept;
+ noexcept;
 
     Matrix4f ComputeOrthoProjection(float left, float right, float bottom, float top, float zNear, float zFar, bool rowMajor = false)
-        noexcept;
+ noexcept;
 
     Matrix4f ComputeFrustum(float left, float right, float bottom, float top, bool rowMajor = false)
-        noexcept;
+ noexcept;
 
     inline float ZNear(void) noexcept {
         return m_zNear;

@@ -255,8 +255,8 @@ public:
 
     inline const RenderState& State(void) const noexcept { return m_state; }
     inline bool  IsStateDirty(void)  const noexcept { return m_stateDirty; }
-    inline void  ClearStateDirty(void)     noexcept { m_stateDirty = false; }
-    inline void  MarkStateDirty(void)      noexcept { m_stateDirty = true; }
+    inline void  ClearStateDirty(void) noexcept { m_stateDirty = false; }
+    inline void  MarkStateDirty(void) noexcept { m_stateDirty = true; }
 
     inline bool HasExtension(const char*) const noexcept { return false; }
     inline int  MaxTextureSize(void)      const noexcept { return m_maxTextureSize; }
@@ -346,8 +346,8 @@ public:
     }
 
     inline int SetPolygonOffsetFill(int) noexcept { return 0; }
-    inline int SetDither(int)            noexcept { return 0; }
-    inline int SetMultiSample(int)       noexcept { return 0; }
+    inline int SetDither(int) noexcept { return 0; }
+    inline int SetMultiSample(int) noexcept { return 0; }
 
     inline GLenum DepthFunc(GLenum state) {
         GLenum prev = m_state.depthFunc;

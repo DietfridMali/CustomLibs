@@ -104,7 +104,7 @@ public:
     BaseQuad& Copy(const BaseQuad& other);
 
     BaseQuad& Move(BaseQuad& other)
-        noexcept;
+ noexcept;
 
     BaseQuad& operator= (const BaseQuad& other) {
         return Copy(other);
@@ -119,7 +119,7 @@ public:
     }
 
     float ComputeAspectRatio(void)
-        noexcept;
+ noexcept;
 
     Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
 

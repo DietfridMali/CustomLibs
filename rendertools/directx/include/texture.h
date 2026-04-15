@@ -189,7 +189,7 @@ public:
         return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width  : 0; 
     }
     
-    inline int GetHeight(int i = 0)  noexcept { 
+    inline int GetHeight(int i = 0) noexcept { 
         return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0; 
     }
     

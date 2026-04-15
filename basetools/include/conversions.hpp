@@ -23,25 +23,25 @@ constexpr float TWO_PI = 6.28318530717958647692f;
 namespace Conversions
 {
     inline float DegToRad(float deg)
-        noexcept
+ noexcept
     {
         return static_cast<float>((static_cast<double>(deg) / 180.0 * PI));
     }
 
     inline float RadToDeg(float rad)
-        noexcept
+ noexcept
     {
         return static_cast<float>((static_cast<double>(rad) * 180.0 / PI));
     }
 
     inline float DotToRad(float dot)
-        noexcept
+ noexcept
     {
         return static_cast<float>(acos(dot));
     }
 
     inline float DotToDeg(float dot)
-        noexcept
+ noexcept
     {
         return RadToDeg(DotToRad(dot));
     }
@@ -85,7 +85,7 @@ namespace Conversions
     
     template<typename T>
     constexpr int Sign(T val)
-        noexcept
+ noexcept
     {
         return (T(0) < val) - (val < T(0));
     }
@@ -99,7 +99,7 @@ namespace Conversions
         T min = std::numeric_limits<T>::lowest();
         T max = std::numeric_limits<T>::max();
         bool Contains(T v) const
-            noexcept
+ noexcept
         {
             return v >= this->min and v <= this->max;
         }
@@ -155,7 +155,7 @@ namespace Conversions
     // in other words: 2D dimension {a, b} of a number, so that a and b are as close together as possible
     template <std::integral Int>
     IntDimensions<Int> NearestDivisors(Int n)
-        noexcept
+ noexcept
     {
         if (n == 0)
             return { 0, 0 };

@@ -149,17 +149,17 @@ public:
     inline bool  AutoRender(const FBORenderParams& p, RGBAColor&& c) { return AutoRender(p, static_cast<const RGBAColor&>(c)); }
     inline bool  AutoRender(const FBORenderParams& p)                { return AutoRender(p, ColorData::White); }
 
-    inline int  GetWidth(bool scaled = false)  noexcept { return scaled ? m_width * m_scale : m_width; }
+    inline int  GetWidth(bool scaled = false) noexcept { return scaled ? m_width * m_scale : m_width; }
     inline int  GetHeight(bool scaled = false) noexcept { return scaled ? m_height * m_scale : m_height; }
-    inline int  GetScale(void)                 noexcept { return m_scale; }
-    inline bool IsAvailable(void)              noexcept { return m_isAvailable; }
-    inline Viewport& GetViewport(void)         noexcept { return m_viewport; }
-    inline int  GetLastDestination(void)       noexcept { return m_lastDestination; }
-    inline void SetLastDestination(int i)      noexcept { m_lastDestination = i; }
-    inline int  NextBuffer(int i)              noexcept { return (i + 1) % m_bufferCount; }
-    inline FBOTexture* GetTexture(void)        noexcept { return &m_renderTexture; }
+    inline int  GetScale(void)   noexcept { return m_scale; }
+    inline bool IsAvailable(void) noexcept { return m_isAvailable; }
+    inline Viewport& GetViewport(void) noexcept { return m_viewport; }
+    inline int  GetLastDestination(void) noexcept { return m_lastDestination; }
+    inline void SetLastDestination(int i) noexcept { m_lastDestination = i; }
+    inline int  NextBuffer(int i) noexcept { return (i + 1) % m_bufferCount; }
+    inline FBOTexture* GetTexture(void) noexcept { return &m_renderTexture; }
     // In DX12 there is no explicit framebuffer binding state — always report enabled.
-    inline bool IsEnabled(void)                noexcept { return true; }
+    inline bool IsEnabled(void)  noexcept { return true; }
 
     // Returns the SRV index for the given color buffer — used by base_renderer.cpp:
     //   m_renderTexture.m_handle = fbo->BufferHandle(0);
@@ -172,7 +172,7 @@ public:
     inline bool AttachBuffer(int)   { return true; }
     inline bool DetachBuffer(int)   { return true; }
     inline void ReleaseBuffers()    {}
-    inline int  DepthBufferIndex()  noexcept { return m_colorBufferCount; }
+    inline int  DepthBufferIndex() noexcept { return m_colorBufferCount; }
 #pragma warning(push)
 #pragma warning(disable:4100)  // unreferenced formal parameter (VertexBufferIndex)
     inline int  VertexBufferIndex(int i = 0) noexcept { return 0; }

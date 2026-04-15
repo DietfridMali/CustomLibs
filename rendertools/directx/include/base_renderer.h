@@ -98,12 +98,11 @@ public:
     inline CommandList& GetCmdList(void) noexcept { return m_cmdList; }
 
     // DX12 one-time init (no equivalent of glewInit).
-    bool InitDX12(void) noexcept;
+    bool InitDirectX(void) noexcept;
 
     virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
-    virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f,
-                        float zNear = 0.1f, float zFar = 100.0f);
+    virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
 
     bool CreateScreenBuffer(void);
 
@@ -129,19 +128,29 @@ public:
 
     // Sets default DX12 pipeline state (depth, blend, rasterizer …).
     // Mirrors SetupOpenGL from the OGL version — same call sites, DX12 internals.
-    void SetupOpenGL(void) noexcept;
+    void SetupDirectX(void) noexcept;
 
     void SetDefaultStates(void) noexcept;
 
     inline void SetRenderPass(RenderPassType renderPass) noexcept { m_renderPass = renderPass; }
 
     void StartShadowPass(void) noexcept;
-    void StartColorPass(void)  noexcept;
-    void StartFullPass(void)   noexcept;
 
-    inline bool IsShadowPass(void) noexcept { return RenderPass() == RenderPassType::rpShadows; }
-    inline bool IsColorPass(void)  noexcept { return RenderPass() == RenderPassType::rpColor; }
-    inline bool IsFullPass(void)   noexcept { return RenderPass() == RenderPassType::rpFull; }
+    void StartColorPass(void) noexcept;
+
+    void StartFullPass(void) noexcept;
+
+    inline bool IsShadowPass(void) noexcept { 
+        return RenderPass() == RenderPassType::rpShadows; 
+    }
+    
+    inline bool IsColorPass(void) noexcept { 
+        return RenderPass() == RenderPassType::rpColor; 
+    }
+    
+    inline bool IsFullPass(void) noexcept { 
+        return RenderPass() == RenderPassType::rpFull; 
+    }
 
     inline void StartRenderPass(RenderPassType pass) noexcept {
         if (pass == RenderPassType::rpShadows)      StartShadowPass();
@@ -152,36 +161,52 @@ public:
     RenderPassType RenderPass(void) noexcept { return m_renderPass; }
 
     virtual bool Start3DScene(void);
+
     virtual bool Stop3DScene(void);
+
     virtual bool Start2DScene(void);
+
     virtual bool Stop2DScene(void);
 
-    virtual bool UsePostEffectShader(void)    { return false; }
+    virtual bool UsePostEffectShader(void) { return false; }
+
     virtual Shader* LoadPostEffectShader(void){ return nullptr; }
 
     inline void SetSceneViewport(Viewport viewport) noexcept { m_sceneViewport = viewport; }
-    inline ::Viewport GetSceneViewport(void)        noexcept { return m_sceneViewport; }
+
+    inline ::Viewport GetSceneViewport(void) noexcept { return m_sceneViewport; }
 
     virtual void Draw3DScene(void);
+
     virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically);
+
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);
 
     virtual bool EnableCamera(void)  { return false; }
     virtual bool DisableCamera(void) { return false; }
 
     inline FBO* ScreenBuffer(void) noexcept { return m_screenBuffer; }
-    inline int WindowWidth(void)   noexcept { return m_windowWidth; }
-    inline int WindowHeight(void)  noexcept { return m_windowHeight; }
-    inline int SceneWidth(void)    noexcept { return m_sceneWidth; }
-    inline int SceneHeight(void)   noexcept { return m_sceneHeight; }
-    inline int SceneLeft(void)     noexcept { return m_sceneLeft; }
-    inline int SceneTop(void)      noexcept { return m_sceneTop; }
-    inline float FOV(void)         noexcept { return m_fov; }
+
+    inline int WindowWidth(void) noexcept { return m_windowWidth; }
+
+    inline int WindowHeight(void) noexcept { return m_windowHeight; }
+
+    inline int SceneWidth(void) noexcept { return m_sceneWidth; }
+
+    inline int SceneHeight(void) noexcept { return m_sceneHeight; }
+
+    inline int SceneLeft(void) noexcept { return m_sceneLeft; }
+
+    inline int SceneTop(void) noexcept { return m_sceneTop; }
+
+    inline float FOV(void) noexcept { return m_fov; }
+
     inline float AspectRatio(void) noexcept { return m_aspectRatio; }
 
     inline Matrix4f& ViewportTransformation(void) noexcept { return m_viewport.Transformation(); }
-    inline Vector2f& NDCScale(void)               noexcept { return m_ndcScale; }
-    inline Vector2f& NDCBias(void)                noexcept { return m_ndcBias; }
+
+    inline Vector2f& NDCScale(void) noexcept { return m_ndcScale; }
+    inline Vector2f& NDCBias(void)  noexcept { return m_ndcBias; }
     inline MovingFrameCounter& FrameCounter(void) noexcept { return m_frameCounter; }
 
     template <typename T>
@@ -200,8 +225,8 @@ public:
         gfxDriverStates.ClearColor(RGBAColor{ 0.f, 0.f, 0.f, 0.f });
     }
 
-    inline BaseQuad& RenderQuad(void)     noexcept { return m_renderQuad; }
-    inline ::Viewport& GetViewport(void)  noexcept { return m_viewport; }
+    inline BaseQuad& RenderQuad(void) noexcept { return m_renderQuad; }
+    inline ::Viewport& GetViewport(void) noexcept { return m_viewport; }
 
     void SetViewport(bool flipVertically = false) noexcept;
     void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0,
@@ -236,16 +261,16 @@ public:
         Fill(RGBAColor(std::forward<T>(color), alpha), scale);
     }
 
-    inline void ShowFps(bool showFps)  noexcept { m_frameCounter.ShowFps(showFps); }
-    inline void ToggleFps(void)        noexcept { m_frameCounter.Toggle(); }
-    inline float GetFps(void)          noexcept { return m_frameCounter.GetFps(); }
+    inline void ShowFps(bool showFps) noexcept { m_frameCounter.ShowFps(showFps); }
+    inline void ToggleFps(void) noexcept { m_frameCounter.Toggle(); }
+    inline float GetFps(void) noexcept { return m_frameCounter.GetFps(); }
 
     // Winding helpers — return GL enum values (defined in gfxdriverstates.h compat section).
-    inline GLenum GetWinding(bool reverse = false)  noexcept { return reverse ? GLenum(GL_CCW) : GLenum(GL_CW); }
+    inline GLenum GetWinding(bool reverse = false) noexcept { return reverse ? GLenum(GL_CCW) : GLenum(GL_CW); }
     inline GLenum GetFrontFace(bool reverse = false) noexcept { return reverse ? GLenum(GL_FRONT) : GLenum(GL_BACK); }
 
     // DX12: no per-frame GL error checking. These are kept as no-ops for source compatibility.
-    static void ClearGLError(void)                    noexcept {}
+    static void ClearGLError(void)      noexcept {}
     static bool CheckGLError(const char* = "") noexcept { return true; }
 };
 

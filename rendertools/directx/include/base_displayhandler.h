@@ -103,11 +103,11 @@ public:
         return m_rtvHandles[m_backBufferIndex].cpu;
     }
 
-    inline int    GetWidth(void)       noexcept { return m_width; }
-    inline int    GetHeight(void)      noexcept { return m_height; }
+    inline int    GetWidth(void) noexcept { return m_width; }
+    inline int    GetHeight(void) noexcept { return m_height; }
     inline float  GetAspectRatio(void) noexcept { return m_aspectRatio; }
-    inline SDL_Window*    GetWindow(void)   noexcept { return m_window; }
-    inline HWND           GetHwnd(void)     noexcept { return m_hwnd; }
+    inline SDL_Window*    GetWindow(void) noexcept { return m_window; }
+    inline HWND           GetHwnd(void) noexcept { return m_hwnd; }
     inline IDXGISwapChain3* SwapChain(void) noexcept { return m_swapChain.Get(); }
 
     inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
@@ -123,7 +123,7 @@ public:
 
     bool ChangeDisplayMode(int displayMode, bool useFullscreen);
 
-    inline bool IsFullScreen(void)               noexcept { return m_isFullscreen; }
+    inline bool IsFullScreen(void) noexcept { return m_isFullscreen; }
     inline void SetFullScreen(bool useFullscreen) noexcept { m_isFullscreen = useFullscreen; }
 
     bool SwitchDisplayMode(int direction);

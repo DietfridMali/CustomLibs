@@ -77,7 +77,7 @@ public:
 
     // Gleichheitsoperator
     inline bool operator==(const SharedHandle& other) const
-        noexcept
+ noexcept
     {
         if (!m_info and !other.m_info)
             return true;
@@ -87,49 +87,49 @@ public:
     }
 
     inline bool operator!=(const SharedHandle& other) const
-        noexcept
+ noexcept
     {
         return not operator==(other);
     }
 
     bool operator==(const HANDLE_T handle) const
-        noexcept
+ noexcept
     {
         return m_info ? m_info->handle == handle : false;
     }
 
     inline HANDLE_T Data() const
-        noexcept
+ noexcept
     {
         return m_info ? m_info->handle : HANDLE_T{};
     }
 
     inline operator HANDLE_T() const
-        noexcept
+ noexcept
     {
         return Data();
     }
 
     inline bool IsAvailable(void) const
-        noexcept
+ noexcept
     {
         return Data() != HANDLE_T{};
     }
 
     inline operator bool() const
-        noexcept
+ noexcept
     {
         return this->IsAvailable();
     }
 
     inline bool operator!() const
-        noexcept
+ noexcept
     {
         return not this->IsAvailable();
     }
 
     inline void Release()
-        noexcept
+ noexcept
     {
         if (m_info and m_info->handle and m_releaser)
             m_info.reset(); // custom deleter ruft releaser automatisch
@@ -137,7 +137,7 @@ public:
 
     // Claim: gibt alten frei, legt neuen an (wenn allocator gesetzt)
     HANDLE_T Claim()
-        noexcept
+ noexcept
     {
         Release();
         if (!m_allocator)
@@ -150,7 +150,7 @@ public:
     }
 
     inline std::size_t RefCount() const
-        noexcept
+ noexcept
     {
         return m_info ? m_info.use_count() : 0;
     }

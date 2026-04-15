@@ -111,7 +111,7 @@ public:
     }
 
     inline uint32_t ShapeSize(void)
-        noexcept
+ noexcept
     {
         if (m_shape == MeshTopology::Quads)
             return 4;
@@ -199,13 +199,13 @@ public:
     virtual void PopTexture(void);
 
     virtual Texture* GetTexture(void)
-        noexcept;
+ noexcept;
 
     bool EnableTexture(void)
-        noexcept;
+ noexcept;
 
     void DisableTexture(void)
-        noexcept;
+ noexcept;
 
     inline void AddFloatBuffer(void) noexcept {
         m_floatBuffers.Append();
@@ -286,7 +286,7 @@ public:
     }
 
     inline bool IsEmpty(void)
-        noexcept(noexcept(m_vertices.IsEmpty()))
+ noexcept(noexcept(m_vertices.IsEmpty()))
     {
         return m_vertices.IsEmpty();
     }

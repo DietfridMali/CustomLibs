@@ -44,10 +44,7 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
     rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     rd.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    HRESULT hr = device->CreateCommittedResource(
-        &hp, D3D12_HEAP_FLAG_NONE, &rd,
-        D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-        IID_PPV_ARGS(&m_resource));
+    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource));
     if (FAILED(hr))
         return false;
 

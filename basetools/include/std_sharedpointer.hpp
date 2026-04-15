@@ -132,7 +132,7 @@ public:
     // ---- nur noexcept ergänzt (kein Umbau) ----
 
     bool operator==(const SharedPointer& other) const
-        noexcept
+ noexcept
     {
         if (!m_isArray && !other.m_isArray)
             return Data() == other.Data();
@@ -142,7 +142,7 @@ public:
     }
 
     inline bool operator!=(const SharedPointer& other) const
-        noexcept
+ noexcept
     {
         return !(*this == other);
     }

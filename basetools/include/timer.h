@@ -71,14 +71,14 @@ public:
 
 
     inline void SetDuration(int64_t duration)
-        noexcept
+ noexcept
     {
         m_duration = duration;
     }
 
 
     int64_t Start(int64_t offset = 0)
-        noexcept
+ noexcept
     {
         m_startTime = GetHiresTime() + offset;
         m_endTime = m_startTime + m_duration;
@@ -87,14 +87,14 @@ public:
 
 
     inline int64_t TakeLapTime(void)
-        noexcept
+ noexcept
     {
         return m_lapTime = GetHiresTime() - m_startTime;
     }
 
 
     bool HasExpired(int64_t time = 0, bool restart = false)
-        noexcept
+ noexcept
     {
         TakeLapTime();
         if ((m_startTime > 0) and (m_lapTime < (time ? time : m_duration)))
@@ -138,14 +138,14 @@ public:
 
 
     inline int64_t RemainingTime(void)
-        noexcept
+ noexcept
     {
         return m_duration - TakeLapTime();
     }
 
 
     inline float Progress(bool clamped = false)
-        noexcept
+ noexcept
     {
         float progress = float(TakeLapTime()) / float(m_duration);
         return clamped ? std::clamp(progress, 0.0f, 1.0f) : progress;
@@ -153,7 +153,7 @@ public:
 
 
     inline bool IsRemaining(int64_t time)
-        noexcept
+ noexcept
     {
         return RemainingTime() >= time;
     }
@@ -166,7 +166,7 @@ public:
 
 
     void Delay(void)
-        noexcept
+ noexcept
     {
         Sleep(m_duration - m_slack - TakeLapTime());
         m_slack = TakeLapTime() - m_duration;
@@ -196,28 +196,28 @@ public:
 
 
     inline void SetDuration(int32_t duration)
-        noexcept
+ noexcept
     {
         m_duration = Upscale(duration);
     }
 
 
     inline int32_t Start(int32_t offset = 0)
-        noexcept
+ noexcept
     {
         return Downscale(HiresTimer::Start(Upscale(offset)));
     }
 
 
     inline int32_t TakeLapTime(void)
-        noexcept
+ noexcept
     {
         return Downscale(HiresTimer::TakeLapTime());
     }
 
 
     bool HasExpired(int32_t time = 0, bool restart = false)
-        noexcept
+ noexcept
     {
         return HiresTimer::HasExpired(Upscale(time), restart);
     }
@@ -256,21 +256,21 @@ public:
 
 
     inline int32_t RemainingTime(void)
-        noexcept
+ noexcept
     {
         return Downscale(HiresTimer::RemainingTime());
     }
 
 
     inline float Progress(bool clamped = false)
-        noexcept
+ noexcept
     {
         return HiresTimer::Progress(clamped);
     }
 
 
     inline bool IsRemaining(int32_t time)
-        noexcept
+ noexcept
     {
         return HiresTimer::IsRemaining(Upscale(time));
     }

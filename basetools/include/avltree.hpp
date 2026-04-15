@@ -121,7 +121,7 @@ public:
 
 public:
     DATA_T* Find(const KEY_T& key)
-        noexcept(noexcept(m_info.compareNodes(m_info.context, key, std::declval<const KEY_T&>())))
+ noexcept(noexcept(m_info.compareNodes(m_info.context, key, std::declval<const KEY_T&>())))
     {
         if (not m_info.root)
             return nullptr;
@@ -140,7 +140,7 @@ public:
     }
 
     inline DATA_T* Find(KEY_T&& key)
-        noexcept(noexcept(Find(static_cast<const KEY_T&>(key))))
+ noexcept(noexcept(Find(static_cast<const KEY_T&>(key))))
     {
         return Find(static_cast<const KEY_T&>(key));
     }

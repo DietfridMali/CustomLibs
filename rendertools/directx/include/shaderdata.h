@@ -34,7 +34,7 @@ struct UniformHandle
     virtual ~UniformHandle() = default;
 
     inline int&    Location(void) noexcept { return m_location; }
-    inline String& Name(void)    noexcept { return m_name; }
+    inline String& Name(void) noexcept { return m_name; }
 
     bool operator<(const UniformHandle& o) const noexcept { return m_name < o.m_name; }
     bool operator>(const UniformHandle& o) const noexcept { return m_name > o.m_name; }
@@ -96,7 +96,7 @@ struct UniformArray : public UniformHandle
     }
     bool operator!=(const DATA_T* other) const noexcept { return !(*this == other); }
 
-    DATA_T*       Data()   noexcept       { return m_data.get(); }
+    DATA_T*       Data() noexcept       { return m_data.get(); }
     const DATA_T* Data()   const noexcept { return m_data.get(); }
     size_t        Length() const noexcept { return m_length; }
     size_t        Size()   const noexcept { return m_size; }
@@ -138,7 +138,7 @@ public:
               m_location(std::numeric_limits<int>::min())
         { }
 
-        inline String& Name()    noexcept { return m_name; }
+        inline String& Name() noexcept { return m_name; }
         inline int*    Location() noexcept { return &m_location; }
 
         inline bool operator==(const String& name) const {

@@ -247,15 +247,15 @@ bool Mesh::Render(std::span<Texture* const> textures, float alpha) {
 
 void Mesh::Destroy(void)
 noexcept(
-    noexcept(m_vertices.Destroy()) &&
-    noexcept(m_normals.Destroy()) &&
-    noexcept(m_texCoords[0].Destroy()) &&
-    noexcept(m_texCoords[1].Destroy()) &&
-    noexcept(m_texCoords[2].Destroy()) &&
-    noexcept(m_vertexColors.Destroy()) &&
-    noexcept(m_indices.Destroy()) &&
-    noexcept(m_textures.Clear()) &&
-    noexcept(m_vao->Destroy()))
+ noexcept(m_vertices.Destroy()) &&
+ noexcept(m_normals.Destroy()) &&
+ noexcept(m_texCoords[0].Destroy()) &&
+ noexcept(m_texCoords[1].Destroy()) &&
+ noexcept(m_texCoords[2].Destroy()) &&
+ noexcept(m_vertexColors.Destroy()) &&
+ noexcept(m_indices.Destroy()) &&
+ noexcept(m_textures.Clear()) &&
+ noexcept(m_vao->Destroy()))
 {
     m_vertices.Destroy();
     m_normals.Destroy();

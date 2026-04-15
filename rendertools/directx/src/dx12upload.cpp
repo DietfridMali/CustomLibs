@@ -41,7 +41,7 @@ bool UploadSubresource(ID3D12Device* device,
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
     D3D12_RESOURCE_DESC upDesc{};
     upDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    upDesc.Width = uploadSize;
+    upDesc.Width = UINT64(layout.Footprint.RowPitch) * rowCount;
     upDesc.Height = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
     upDesc.SampleDesc.Count = 1;
     upDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
@@ -57,21 +57,15 @@ bool UploadSubresource(ID3D12Device* device,
     if (FAILED(outUpload->Map(0, &mapRange, (void**)&mapped)))
         return false;
 
-    for (UINT r = 0; r < rowCount; ++r) {
-        const uint8_t* src = pixels + r * UINT(width) * channels;
-        uint8_t* dst = mapped + layout.Offset + r * layout.Footprint.RowPitch;
-        if (channels == 4) {
-            std::memcpy(dst, src, UINT(width) * 4);
-        } else if (channels == 3) {
-            for (int x = 0; x < width; ++x) {
-                dst[x * 4 + 0] = src[x * 3 + 0];
-                dst[x * 4 + 1] = src[x * 3 + 1];
-                dst[x * 4 + 2] = src[x * 3 + 2];
-                dst[x * 4 + 3] = 255;
-            }
-        } else {
-            std::memcpy(dst, src, rowSize);
-        }
+    UINT srcRowBytes = UINT(width) * UINT(channels);
+    if (layout.Footprint.RowPitch == srcRowBytes) {
+        std::memcpy(mapped + layout.Offset, pixels, rowCount * srcRowBytes);
+    }
+    else {
+        for (UINT r = 0; r < rowCount; ++r)
+            std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch,
+                        pixels + r * srcRowBytes,
+                        srcRowBytes);
     }
     outUpload->Unmap(0, nullptr);
 

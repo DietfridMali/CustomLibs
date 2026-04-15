@@ -27,7 +27,7 @@ static Texture* testTexture = nullptr;
 // Viewport management: RSSetViewports is called where glViewport was.
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
-bool BaseRenderer::InitDX12(void) noexcept {
+bool BaseRenderer::InitDirectX(void) noexcept {
     return m_cmdList.Create(dx12Context.Device());
 }
 
@@ -64,7 +64,8 @@ bool BaseRenderer::CreateScreenBuffer(void) {
 bool BaseRenderer::Create(int width, int height, float fov, float zNear, float zFar) {
     Init(width, height, fov, zNear, zFar);
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
-    SetupOpenGL();
+    InitDirectX();
+    SetupDirectX();
     m_drawBufferStack.Clear();
     m_renderTexture.HasBuffer() = true;
     m_renderTexture.m_isValid = true;  // wrapper — handle set per-frame in Draw3DScene / DrawScreen
@@ -73,7 +74,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
 }
 
 
-void BaseRenderer::SetupOpenGL(void) noexcept {
+void BaseRenderer::SetupDirectX(void) noexcept {
     // Default DX12 render state — same values as the OGL version but stored in GfxDriverStates
     // (no immediate API calls here; state is applied to the PSO on demand).
     gfxDriverStates.ClearColor(ColorData::Invisible);
@@ -87,9 +88,6 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     gfxDriverStates.FrontFace(GetWinding());
     gfxDriverStates.SetFaceCulling(1);
     gfxDriverStates.CullFace(GL_BACK);
-    gfxDriverStates.SetMultiSample(1);     // no-op in DX12 (MSAA configured at PSO creation)
-    gfxDriverStates.SetPolygonOffsetFill(0); // no-op in DX12
-
     // Set the initial viewport via the DX12 command list.
     auto* list = commandListHandler.CurrentList();
     if (list) {
@@ -150,7 +148,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
 
 
 bool BaseRenderer::Start3DScene(void) {
-    SetupOpenGL();
+    SetupDirectX();
     m_frameCounter.Start();
     FBO* sceneBuffer = GetSceneBuffer();
     if (not (sceneBuffer and sceneBuffer->IsAvailable()))

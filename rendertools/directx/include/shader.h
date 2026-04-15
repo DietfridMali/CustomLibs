@@ -190,7 +190,7 @@ public:
 
     int SetVector2f(const char* name, const Vector2f& data) noexcept;
     int SetVector2f(const char* name, Vector2f&& data) noexcept { return SetVector2f(name, static_cast<const Vector2f&>(data)); }
-    int SetVector2f(const char* name, float x, float y)  noexcept { return SetVector2f(name, Vector2f(x, y)); }
+    int SetVector2f(const char* name, float x, float y) noexcept { return SetVector2f(name, Vector2f(x, y)); }
 
     int SetVector3f(const char* name, const Vector3f& data) noexcept;
     int SetVector3f(const char* name, Vector3f&& data) noexcept { return SetVector3f(name, static_cast<const Vector3f&>(data)); }
@@ -199,13 +199,13 @@ public:
     int SetVector4f(const char* name, Vector4f&& data) noexcept { return SetVector4f(name, static_cast<const Vector4f&>(data)); }
 
     int SetVector2i(const char* name, const Vector2i& data) noexcept;
-    int SetVector2i(const char* name, Vector2i&& data)       noexcept { return SetVector2i(name, static_cast<const Vector2i&>(data)); }
+    int SetVector2i(const char* name, Vector2i&& data) noexcept { return SetVector2i(name, static_cast<const Vector2i&>(data)); }
 
     int SetVector3i(const char* name, const Vector3i& data) noexcept;
-    int SetVector3i(const char* name, Vector3i&& data)       noexcept { return SetVector3i(name, static_cast<const Vector3i&>(data)); }
+    int SetVector3i(const char* name, Vector3i&& data) noexcept { return SetVector3i(name, static_cast<const Vector3i&>(data)); }
 
     int SetVector4i(const char* name, const Vector4i& data) noexcept;
-    int SetVector4i(const char* name, Vector4i&& data)       noexcept { return SetVector4i(name, static_cast<const Vector4i&>(data)); }
+    int SetVector4i(const char* name, Vector4i&& data) noexcept { return SetVector4i(name, static_cast<const Vector4i&>(data)); }
 
     int SetMatrix4f(const char* name, const float* data, bool transpose = false) noexcept;
     int SetMatrix4f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {

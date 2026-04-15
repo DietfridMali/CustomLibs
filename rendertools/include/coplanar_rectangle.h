@@ -24,7 +24,7 @@ public:
     float                   m_toleranceSquared;
 
     CoplanarRectangle()
-        noexcept;
+ noexcept;
 
     CoplanarRectangle(std::initializer_list<Vector3f> vertices);
 
@@ -33,7 +33,7 @@ public:
     void Init(std::initializer_list<Vector3f> vertices);
 
     int Winding(void)
-        noexcept;
+ noexcept;
 
         // distance to plane (v0, v1, v2)
         inline float Distance(const Vector3f& v) {
@@ -51,10 +51,10 @@ public:
     // project point p on this plane (i.e. compute a point in the plane 
     // so that a vector from that point to p is parallel to the plane's normal)
     float Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
-        noexcept;
+ noexcept;
 
     float PointToLineDistanceEx(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1, bool clampToSegment, bool squared)
-        noexcept;
+ noexcept;
 
     inline float PointToLineDistance(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1) noexcept {
         return PointToLineDistanceEx(p, lp0, lp1, false, false);
@@ -73,36 +73,36 @@ public:
     }
 
     float NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
-        noexcept;
+ noexcept;
 
         // compute the intersection of a vector v between two points with a plane
         // Will return None if v parallel to the plane or doesn't intersect with plane 
         // (i.e. both points are on the same side of the plane)
     int LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vCoplanarRectanglePoint)
-        noexcept;
+ noexcept;
 
     int SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
-        noexcept;
+ noexcept;
 
     int PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
-        noexcept;
+ noexcept;
 
         // barycentric method for testing whether a point lies in an arbitrarily shaped triangle
         // not needed for rectangular shapes in a plane
     bool TriangleContains(const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c)
-        noexcept;
+ noexcept;
 
     bool Contains(Vector3f& p, bool barycentric = false)
-        noexcept;
+ noexcept;
 
     float SegmentDistance(Vector3f s1, Vector3f s2)
-        noexcept;
+ noexcept;
 
     float PointDistance(Vector3f p, bool intersectRectangle = false)
-        noexcept;
+ noexcept;
 
     void Translate(Vector3f t)
-        noexcept;
+ noexcept;
 
     inline Vector3f& GetNormal(void) noexcept {
         return m_normal;
@@ -113,7 +113,7 @@ public:
     };
 
     bool SpherePenetratesQuad(LineSegment& line, float radius)
-        noexcept;
+ noexcept;
 };
 
 // =================================================================================================

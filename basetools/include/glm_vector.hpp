@@ -55,7 +55,7 @@ public:
     }
 
     inline Vector& operator+=(const Vector& other)
-        noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other)))
+ noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other)))
     {
         *this = static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other); 
         return *this;
@@ -71,27 +71,27 @@ public:
     }
 
     inline Vector& operator-=(const Vector& other)
-        noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) - static_cast<VEC_TYPE>(other)))
+ noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) - static_cast<VEC_TYPE>(other)))
     {
         *this = static_cast<VEC_TYPE>(*this) - static_cast<VEC_TYPE>(other); return *this;
     }
 
     inline Vector& operator*=(float scalar)
-        noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) * scalar))
+ noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) * scalar))
     {
         *this = static_cast<VEC_TYPE>(*this) * scalar; 
         return *this;
     }
 
     inline Vector& operator/=(float scalar)
-        noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) / scalar))
+ noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = static_cast<VEC_TYPE>(*this) / scalar))
     {
         *this = static_cast<VEC_TYPE>(*this) / scalar; 
         return *this;
     }
 
     inline Vector operator*(float scalar) const
-        noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this)* scalar)))
+ noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this)* scalar)))
     {
         return Vector(static_cast<VEC_TYPE>(*this) * scalar);
     }
@@ -117,7 +117,7 @@ public:
     inline Vector& operator/=(Vector&& other) noexcept { return (*this /= static_cast<const Vector&>(other)); }
 
     Vector operator/(float scalar) const
-        noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this) / scalar)))
+ noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this) / scalar)))
     {
         return Vector(static_cast<VEC_TYPE>(*this) / scalar);
     }
@@ -129,13 +129,13 @@ public:
     }
 
     Vector operator+(const Vector& other) const
-        noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other))))
+ noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other))))
     {
         return Vector(static_cast<VEC_TYPE>(*this) + static_cast<VEC_TYPE>(other));
     }
 
     Vector operator-(const Vector& other) const
-        noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this) - static_cast<VEC_TYPE>(other))))
+ noexcept(noexcept(Vector(static_cast<VEC_TYPE>(*this) - static_cast<VEC_TYPE>(other))))
     {
         return Vector(static_cast<VEC_TYPE>(*this) - static_cast<VEC_TYPE>(other));
     }
@@ -190,11 +190,11 @@ public:
     }
 
     Vector Cross(const Vector& other) const
-        noexcept(
+ noexcept(
             std::is_same_v<VEC_TYPE, glm::vec3> ?
-            noexcept(glm::cross(std::declval<glm::vec3>(), std::declval<glm::vec3>()))
+ noexcept(glm::cross(std::declval<glm::vec3>(), std::declval<glm::vec3>()))
             : std::is_same_v<VEC_TYPE, glm::vec4> ?
-            noexcept(glm::cross(std::declval<glm::vec3>(), std::declval<glm::vec3>()))
+ noexcept(glm::cross(std::declval<glm::vec3>(), std::declval<glm::vec3>()))
             : false
             )
     {
@@ -219,19 +219,19 @@ public:
     }
 
     inline float Length() const
-        noexcept(noexcept(glm::length(static_cast<VEC_TYPE>(*this))))
+ noexcept(noexcept(glm::length(static_cast<VEC_TYPE>(*this))))
     {
         return glm::length(static_cast<VEC_TYPE>(*this));
     }
 
     inline float LengthSquared() const
-        noexcept(noexcept(glm::dot(static_cast<VEC_TYPE>(*this), static_cast<VEC_TYPE>(*this))))
+ noexcept(noexcept(glm::dot(static_cast<VEC_TYPE>(*this), static_cast<VEC_TYPE>(*this))))
     {
         return glm::dot(static_cast<VEC_TYPE>(*this), static_cast<VEC_TYPE>(*this));
     }
 
     inline Vector& Normalize()
-        noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = glm::normalize(static_cast<VEC_TYPE>(*this))))
+ noexcept(noexcept(static_cast<VEC_TYPE&>(*this) = glm::normalize(static_cast<VEC_TYPE>(*this))))
     {
         float l = LengthSquared();
         if ((l != 0.0f) and (l != 1.0f))
@@ -240,7 +240,7 @@ public:
     }
 
     inline Vector Normal() const
-        noexcept(noexcept(Vector(glm::normalize(static_cast<VEC_TYPE>(*this)))))
+ noexcept(noexcept(Vector(glm::normalize(static_cast<VEC_TYPE>(*this)))))
     {
         Vector v = *this;
         v.Normalize();
@@ -288,13 +288,13 @@ public:
     }
 
     static Vector Perp(const Vector& v0, const Vector& v1, const Vector& v2)
-        noexcept(noexcept((v1 - v0).Cross(v2 - v0)))
+ noexcept(noexcept((v1 - v0).Cross(v2 - v0)))
     {
         return (v1 - v0).Cross(v2 - v0);
     }
 
     static Vector Normal(const Vector& v0, const Vector& v1, const Vector& v2)
-        noexcept(noexcept(Perp(v0, v1, v2).Normalize()))
+ noexcept(noexcept(Perp(v0, v1, v2).Normalize()))
     {
         return Perp(v0, v1, v2).Normalize();
     }
