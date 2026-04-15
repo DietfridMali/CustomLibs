@@ -74,8 +74,8 @@ struct UniformArray : public UniformHandle
     UniformArray() = default;
 
     bool Copy(const DATA_T* data, size_t length) {
-        if (!data || length == 0) { m_data.reset(); m_size = m_length = 0; return true; }
-        if (!m_data || m_length != length) {
+        if (not data || length == 0) { m_data.reset(); m_size = m_length = 0; return true; }
+        if (not m_data || m_length != length) {
             m_length = length;
             m_size   = m_length * sizeof(DATA_T);
             m_data   = std::make_unique<DATA_T[]>(m_length);
@@ -161,7 +161,7 @@ public:
         ShaderLocation* loc;
         try { loc = m_locations.Append(); }
         catch (...) { return nullptr; }
-        if (!loc) return nullptr;
+        if (not loc) return nullptr;
         *loc = ShaderLocation(name);
         return loc->Location();
     }

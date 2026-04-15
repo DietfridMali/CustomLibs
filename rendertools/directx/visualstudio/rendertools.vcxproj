@@ -123,7 +123,7 @@
     <ClInclude Include="..\..\include\colordata.h" />
     <ClInclude Include="..\..\include\cube.h" />
     <ClInclude Include="..\include\cbv_allocator.h" />
-    <ClInclude Include="..\include\command_queue.h" />
+    <ClInclude Include="..\include\commandlist.h" />
     <ClInclude Include="..\include\descriptor_heap.h" />
     <ClInclude Include="..\include\dx12context.h" />
     <ClInclude Include="..\include\cubemap.h" />
@@ -179,7 +179,7 @@
     <ClCompile Include="..\src\blur_shader.cpp" />
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cbv_allocator.cpp" />
-    <ClCompile Include="..\src\command_queue.cpp" />
+    <ClCompile Include="..\src\commandlist.cpp" />
     <ClCompile Include="..\src\descriptor_heap.cpp" />
     <ClCompile Include="..\src\dx12context.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />

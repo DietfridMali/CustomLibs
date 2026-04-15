@@ -3,7 +3,7 @@
 #include "vao.h"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
-#include "command_queue.h"
+#include "commandlist.h"
 
 // =================================================================================================
 // DX12 VAO implementation
@@ -92,7 +92,7 @@ VBO* VAO::FindBuffer(const char* type, int id, int& index) noexcept
 bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
-        if (!UpdateDataBuffer(type, id,
+        if (not UpdateDataBuffer(type, id,
                               buffer.GLDataBuffer(), buffer.GLDataSize(),
                               size_t(componentType),
                               size_t(buffer.ComponentCount()), forceUpdate))
@@ -150,8 +150,8 @@ bool VAO::Enable(void) noexcept
     Activate();
     m_isBound = true;
 
-    auto* list = cmdQueue.List();
-    if (!list) 
+    auto* list = commandListHandler.CurrentList();
+    if (not list) 
         return true;
 
     // Bind all vertex buffer streams
@@ -189,7 +189,7 @@ void VAO::Disable(void) noexcept
 
 void VAO::Render(std::span<Texture* const> textures) noexcept
 {
-    if (!Enable()) 
+    if (not Enable()) 
         return;
 
     EnableTextures(textures);
@@ -199,7 +199,7 @@ void VAO::Render(std::span<Texture* const> textures) noexcept
     if (Shader* sh = baseShaderHandler.ActiveShader())
         sh->UploadB1();
 
-    auto* list = cmdQueue.List();
+    auto* list = commandListHandler.CurrentList();
     if (list) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
             list->DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);

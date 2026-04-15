@@ -41,6 +41,7 @@ protected:
     FBO*                    m_sceneBuffer;
     FBO*                    m_skyBuffer;
     Texture                 m_renderTexture;
+    CommandList             m_cmdList;
     bool                    m_screenIsAvailable;
 
     Viewport                m_viewport;
@@ -93,6 +94,8 @@ public:
     static BaseRenderer& Instance(void) {
         return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance());
     }
+
+    inline CommandList& GetCmdList(void) noexcept { return m_cmdList; }
 
     // DX12 one-time init (no equivalent of glewInit).
     bool InitDX12(void) noexcept;

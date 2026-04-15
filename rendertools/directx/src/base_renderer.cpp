@@ -9,8 +9,9 @@
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
-#include "command_queue.h"
+#include "commandlist.h"
 #include "base_displayhandler.h"
+#include "dx12context.h"
 
 List<::Viewport> BaseRenderer::viewportStack;
 
@@ -27,8 +28,7 @@ static Texture* testTexture = nullptr;
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
 bool BaseRenderer::InitDX12(void) noexcept {
-    // Nothing to initialize per-renderer in DX12; DX12Context already set up the device.
-    return true;
+    return m_cmdList.Create(dx12Context.Device());
 }
 
 
@@ -54,7 +54,7 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
 bool BaseRenderer::CreateScreenBuffer(void) {
     if (m_screenBuffer)
         delete m_screenBuffer;
-    if (!(m_screenBuffer = new FBO()))
+    if (not (m_screenBuffer = new FBO()))
         return false;
     m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 });
     return true;
@@ -91,7 +91,7 @@ void BaseRenderer::SetupOpenGL(void) noexcept {
     gfxDriverStates.SetPolygonOffsetFill(0); // no-op in DX12
 
     // Set the initial viewport via the DX12 command list.
-    auto* list = cmdQueue.List();
+    auto* list = commandListHandler.CurrentList();
     if (list) {
         D3D12_VIEWPORT vp{};
         vp.TopLeftX = 0.0f;
@@ -153,7 +153,7 @@ bool BaseRenderer::Start3DScene(void) {
     SetupOpenGL();
     m_frameCounter.Start();
     FBO* sceneBuffer = GetSceneBuffer();
-    if (!(sceneBuffer && sceneBuffer->IsAvailable()))
+    if (not (sceneBuffer and sceneBuffer->IsAvailable()))
         return false;
     ResetDrawBuffers(sceneBuffer);
     SetupTransformation();
@@ -164,7 +164,7 @@ bool BaseRenderer::Start3DScene(void) {
 
 
 bool BaseRenderer::Stop3DScene(void) {
-    if (!GetSceneBuffer()->IsAvailable())
+    if (not GetSceneBuffer()->IsAvailable())
         return false;
     DisableCamera();
     ResetTransformation();
@@ -174,18 +174,20 @@ bool BaseRenderer::Stop3DScene(void) {
 
 bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
-    cmdQueue.Open();   // ensure the command list is open (no-op if already recording)
+    m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex());
     SetClearColor(m_backgroundColor);
     ResetDrawBuffers(m_screenBuffer, !m_screenIsAvailable);
     m_screenIsAvailable = true;
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
-    if (!(m_screenBuffer && m_screenBuffer->IsAvailable())) {
+    if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) {
         // No screen FBO: clear the swap chain back buffer directly.
-        auto* list = cmdQueue.List();
+        auto* list = commandListHandler.CurrentList();
         if (list) {
+            baseDisplayHandler.BeginBackBuffer();  // PRESENT → RENDER_TARGET
             D3D12_CPU_DESCRIPTOR_HANDLE rtv = baseDisplayHandler.CurrentRTV();
+            list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
             float clearColor[4] = {
                 m_backgroundColor.R(), m_backgroundColor.G(),
                 m_backgroundColor.B(), m_backgroundColor.A()
@@ -199,7 +201,7 @@ bool BaseRenderer::Start2DScene(void) {
 
 
 bool BaseRenderer::Stop2DScene(void) {
-    if (!m_screenIsAvailable)
+    if (not m_screenIsAvailable)
         return false;
     ResetDrawBuffers(nullptr);
     return true;
@@ -213,13 +215,13 @@ void BaseRenderer::Draw3DScene(void) {
         SetViewport(m_sceneViewport, 0, 0, false);
 
         Shader* shader;
-        if (!UsePostEffectShader())
+        if (not UsePostEffectShader())
             shader = nullptr;
         else {
             PushMatrix();
             Translate(0.5, 0.5, 0);
             Scale(1, -1, 1);
-            if (!(shader = LoadPostEffectShader()))
+            if (not (shader = LoadPostEffectShader()))
                 PopMatrix();
         }
         if (shader == nullptr)
@@ -254,13 +256,12 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             gfxDriverStates.DepthFunc(GL_ALWAYS);
             gfxDriverStates.SetFaceCulling(0);
 
-            // Open the command list before any DX12 state commands.
-            cmdQueue.Open();
+            m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex());
             // Ensure the screen FBO color buffer is in PSR state.
             // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
             // in which case the RENDER_TARGET → PSR transition was never recorded.
             m_screenBuffer->Disable();
-            auto* list = cmdQueue.List();
+            auto* list = commandListHandler.CurrentList();
             if (list && baseDisplayHandler.CurrentBackBuffer()) {
                 // Transition back buffer PRESENT → RENDER_TARGET, clear it, blit screen FBO.
                 baseDisplayHandler.BeginBackBuffer();
@@ -276,7 +277,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
 
             // Transition back buffer RENDER_TARGET → PRESENT before Present().
-            if (list && baseDisplayHandler.CurrentBackBuffer())
+            if (list and baseDisplayHandler.CurrentBackBuffer())
                 baseDisplayHandler.EndBackBuffer();
         }
     }
@@ -299,7 +300,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
             windowHeight = m_windowHeight;
         }
         // Set the full-surface DX12 viewport.
-        auto* list = cmdQueue.List();
+        auto* list = commandListHandler.CurrentList();
         if (list) {
             D3D12_VIEWPORT vp{};
             vp.TopLeftX = 0.0f;

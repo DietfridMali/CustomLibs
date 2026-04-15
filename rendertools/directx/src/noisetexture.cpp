@@ -10,8 +10,13 @@
 #include <cstring>
 
 #include "noisetexture.h"
-#include "base_renderer.h"
 #include "conversions.hpp"
+#include "dx12upload.h"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
+#include "SDL_image.h"
+#pragma warning(pop)
 
 #include "noise.h"
 
@@ -21,96 +26,12 @@ using namespace Noise;
 
 #define CLOUD_STRUCTURE 2
 
-// =================================================================================================
-// Helper: upload a 3D (Texture3D) resource via an upload buffer and return the committed resource.
-// pixelStride: bytes per voxel.  The 3D resource is laid out as depth slices stored contiguously.
-
-static ComPtr<ID3D12Resource> Upload3DTexture(
-    ID3D12Device*    device,
-    int w, int h, int d,
-    DXGI_FORMAT      fmt,
-    uint32_t         pixelStride,
-    const void*      data) noexcept
-{
-    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
-    D3D12_RESOURCE_DESC rd{};
-    rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
-    rd.Width            = UINT(w);
-    rd.Height           = UINT(h);
-    rd.DepthOrArraySize = UINT16(d);
-    rd.MipLevels        = 1;
-    rd.Format           = fmt;
-    rd.SampleDesc.Count = 1;
-    rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-
-    ComPtr<ID3D12Resource> resource;
-    if (FAILED(device->CreateCommittedResource(
-        &hp, D3D12_HEAP_FLAG_NONE, &rd,
-        D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-        IID_PPV_ARGS(&resource))))
-        return nullptr;
-
-    UINT64 uploadSize = 0;
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-    UINT rowCount = 0; UINT64 rowSize = 0;
-    device->GetCopyableFootprints(&rd, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
-
-    D3D12_HEAP_PROPERTIES uhp{ D3D12_HEAP_TYPE_UPLOAD };
-    D3D12_RESOURCE_DESC upDesc{};
-    upDesc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
-    upDesc.Width            = uploadSize;
-    upDesc.Height           = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
-    upDesc.SampleDesc.Count = 1;
-    upDesc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    ComPtr<ID3D12Resource> upload;
-    if (FAILED(device->CreateCommittedResource(&uhp, D3D12_HEAP_FLAG_NONE, &upDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
-        return nullptr;
-
-    const uint8_t* src = static_cast<const uint8_t*>(data);
-    uint8_t* mapped = nullptr;
-    D3D12_RANGE mapRange{ 0, 0 };
-    if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) return nullptr;
-    for (UINT r = 0; r < rowCount; ++r)
-        std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch,
-                    src    + r * UINT(w) * pixelStride,
-                    UINT(w) * pixelStride);
-    upload->Unmap(0, nullptr);
-
-    auto* list = cmdQueue.List();
-    if (!list) return nullptr;
-
-    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
-    srcLoc.pResource        = upload.Get();
-    srcLoc.Type             = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    srcLoc.PlacedFootprint  = layout;
-    dstLoc.pResource        = resource.Get();
-    dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    dstLoc.SubresourceIndex = 0;
-    list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type                    = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Flags                   = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource    = resource.Get();
-    barrier.Transition.StateBefore  = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter   = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.Subresource  = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    list->ResourceBarrier(1, &barrier);
-
-    cmdQueue.Execute();
-    cmdQueue.WaitIdle();
-
-    return resource;
-}
-
-
 // Helper: allocate a SRV for a 3D texture resource
 static bool CreateSRV3D(uint32_t& handleOut, ID3D12Resource* resource, DXGI_FORMAT fmt) {
     if (handleOut == UINT32_MAX) {
         DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-        if (!hdl.IsValid()) return false;
+        if (not hdl.IsValid())
+            return false;
         handleOut = hdl.index;
     }
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
@@ -127,9 +48,9 @@ static bool CreateSRV3D(uint32_t& handleOut, ID3D12Resource* resource, DXGI_FORM
 
 bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
     TextureBuffer* texBuf = new TextureBuffer();
-    if (!texBuf)
+    if (not texBuf)
         return false;
-    if (!m_buffers.Append(texBuf)) {
+    if (not m_buffers.Append(texBuf)) {
         delete texBuf;
         return false;
     }
@@ -143,13 +64,13 @@ bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
 
 
 bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, String noiseFilename, bool deploy) {
-    if (!Texture::Create())
+    if (not Texture::Create())
         return false;
     m_type = TextureType::Texture3D;
-    if (!Allocate(gridDimensions))
+    if (not Allocate(gridDimensions))
         return false;
     m_params = params;
-    if (!LoadFromFile(noiseFilename)) {
+    if (not LoadFromFile(noiseFilename)) {
         ComputeNoise();
         SaveToFile(noiseFilename);
     }
@@ -231,22 +152,23 @@ void NoiseTexture3D::SetParams(bool /*enforce*/) {
 
 
 bool NoiseTexture3D::Deploy(int) {
-    if (m_data.IsEmpty()) return false;
+    if (m_data.IsEmpty())
+        return false;
 
     ID3D12Device* device = dx12Context.Device();
-    if (!device) return false;
+    if (not device)
+        return false;
 
     // RGBA16F — 4 channels × float16 per voxel
-    // We store as float32; convert or upload as RGBA32F and accept the memory cost.
+    // We store as float32; upload as RGBA32F.
     constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32G32B32A32_FLOAT;
     constexpr uint32_t    stride = 16;  // 4 × float32
 
-    m_resource = Upload3DTexture(device,
-        m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z,
-        fmt, stride, m_data.Data());
-    if (!m_resource) return false;
-
-    if (!CreateSRV3D(m_handle, m_resource.Get(), fmt)) return false;
+    m_resource = UploadTexture3DData(device, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, fmt, stride, m_data.Data());
+    if (not m_resource)
+        return false;
+    if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
+        return false;
 
     m_isValid   = true;
     m_hasBuffer = true;
@@ -258,7 +180,7 @@ bool NoiseTexture3D::LoadFromFile(const String& filename) {
     if (filename.IsEmpty())
         return false;
     std::ifstream f((const char*)filename, std::ios::binary);
-    if (!f)
+    if (not f)
         return false;
 
     uint32_t voxelCount    = GridSize() * 4;
@@ -283,7 +205,7 @@ bool NoiseTexture3D::SaveToFile(const String& filename) const {
     if (filename.IsEmpty())
         return false;
     std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
-    if (!f)
+    if (not f)
         return false;
 
     uint32_t voxelCount = GridSize() * 4u;
@@ -310,9 +232,9 @@ static float Amp2(float v) {
 
 bool CloudNoiseTexture::Allocate(int gridSize) {
     TextureBuffer* texBuf = new TextureBuffer();
-    if (!texBuf)
+    if (not texBuf)
         return false;
-    if (!m_buffers.Append(texBuf)) {
+    if (not m_buffers.Append(texBuf)) {
         delete texBuf;
         return false;
     }
@@ -325,13 +247,13 @@ bool CloudNoiseTexture::Allocate(int gridSize) {
 
 
 bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String noiseFilename) {
-    if (!Texture::Create())
+    if (not Texture::Create())
         return false;
     m_type = TextureType::Texture3D;
-    if (!Allocate(gridSize))
+    if (not Allocate(gridSize))
         return false;
     m_params = params;
-    if (!LoadFromFile(noiseFilename)) {
+    if (not LoadFromFile(noiseFilename)) {
         std::filesystem::path _p{ noiseFilename.GetStr() };
         Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
@@ -401,21 +323,22 @@ void CloudNoiseTexture::SetParams(bool /*enforce*/) {
 
 
 bool CloudNoiseTexture::Deploy(int) {
-    if (m_data.IsEmpty()) return false;
+    if (m_data.IsEmpty())
+        return false;
 
     ID3D12Device* device = dx12Context.Device();
-    if (!device) return false;
+    if (not device)
+        return false;
 
     // Single-channel float32 → R32_FLOAT
     constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32_FLOAT;
     constexpr uint32_t    stride = 4;
 
-    m_resource = Upload3DTexture(device,
-        m_gridSize, m_gridSize, m_gridSize,
-        fmt, stride, m_data.Data());
-    if (!m_resource) return false;
-
-    if (!CreateSRV3D(m_handle, m_resource.Get(), fmt)) return false;
+    m_resource = UploadTexture3DData(device, m_gridSize, m_gridSize, m_gridSize, fmt, stride, m_data.Data());
+    if (not m_resource)
+        return false;
+    if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
+        return false;
 
     m_isValid   = true;
     m_hasBuffer = true;
@@ -436,9 +359,9 @@ bool CloudNoiseTexture::SaveToFile(const String& filename) const {
 
 bool BlueNoiseTexture::Allocate(void) {
     TextureBuffer* texBuf = new TextureBuffer();
-    if (!texBuf)
+    if (not texBuf)
         return false;
-    if (!m_buffers.Append(texBuf)) {
+    if (not m_buffers.Append(texBuf)) {
         delete texBuf;
         return false;
     }
@@ -450,12 +373,12 @@ bool BlueNoiseTexture::Allocate(void) {
 
 
 bool BlueNoiseTexture::Create(String noiseFilename) {
-    if (!Texture::Create())
+    if (not Texture::Create())
         return false;
     m_type = TextureType::Texture3D;
-    if (!Allocate())
+    if (not Allocate())
         return false;
-    if (!LoadFromFile(noiseFilename)) {
+    if (not LoadFromFile(noiseFilename)) {
         std::filesystem::path _p{ noiseFilename.GetStr() };
         Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
@@ -484,20 +407,21 @@ void BlueNoiseTexture::SetParams(bool /*enforce*/) {
 
 
 bool BlueNoiseTexture::Deploy(int) {
-    if (m_data.IsEmpty()) return false;
+    if (m_data.IsEmpty())
+        return false;
 
     ID3D12Device* device = dx12Context.Device();
-    if (!device) return false;
+    if (not device)
+        return false;
 
     constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R8_UNORM;
     constexpr uint32_t    stride = 1;
 
-    m_resource = Upload3DTexture(device,
-        128, 128, 64,
-        fmt, stride, m_data.Data());
-    if (!m_resource) return false;
-
-    if (!CreateSRV3D(m_handle, m_resource.Get(), fmt)) return false;
+    m_resource = UploadTexture3DData(device, 128, 128, 64, fmt, stride, m_data.Data());
+    if (not m_resource)
+        return false;
+    if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
+        return false;
 
     m_isValid   = true;
     m_hasBuffer = true;

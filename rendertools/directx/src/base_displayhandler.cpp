@@ -1,7 +1,8 @@
 #include "std_defines.h"
 #include "base_displayhandler.h"
+#include "base_renderer.h"
 #include "base_shaderhandler.h"
-#include "command_queue.h"
+#include "commandlist.h"
 #include "dx12context.h"
 
 #pragma warning(push)
@@ -116,7 +117,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     m_window = SDL_CreateWindow(windowTitle,
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         m_width, m_height, windowFlags);
-    if (!m_window) {
+    if (not m_window) {
         fprintf(stderr, "BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
         exit(1);
     }
@@ -124,7 +125,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     // ---- Extract the Win32 HWND from the SDL window ----
     SDL_SysWMinfo wmInfo{};
     SDL_VERSION(&wmInfo.version);
-    if (!SDL_GetWindowWMInfo(m_window, &wmInfo)) {
+    if (not SDL_GetWindowWMInfo(m_window, &wmInfo)) {
         fprintf(stderr, "BaseDisplayHandler: SDL_GetWindowWMInfo failed (%s)\n", SDL_GetError());
         exit(1);
     }
@@ -147,7 +148,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
 
     ComPtr<IDXGISwapChain1> swapChain1;
     IDXGIFactory4* factory = dx12Context.m_factory.Get();
-    ID3D12CommandQueue* queue = cmdQueue.Queue();
+    ID3D12CommandQueue* queue = commandListHandler.GetQueue();
 
     HRESULT hr = factory->CreateSwapChainForHwnd(queue, m_hwnd, &scDesc,
         nullptr, nullptr, &swapChain1);
@@ -165,7 +166,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         exit(1);
     }
 
-    if (!AcquireBackBuffers()) {
+    if (not AcquireBackBuffers()) {
         fprintf(stderr, "BaseDisplayHandler: AcquireBackBuffers failed\n");
         exit(1);
     }
@@ -182,9 +183,9 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
             return false;
         }
         // Allocate or reuse RTV descriptor slot
-        if (!m_rtvHandles[i].IsValid())
+        if (not m_rtvHandles[i].IsValid())
             m_rtvHandles[i] = descriptorHeaps.AllocRTV();
-        if (!m_rtvHandles[i].IsValid())
+        if (not m_rtvHandles[i].IsValid())
             return false;
 
         D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
@@ -198,14 +199,16 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
 
 
 void BaseDisplayHandler::BeginBackBuffer(void) noexcept {
-    auto* list = cmdQueue.List();
-    if (!list) return;
-    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_RENDER_TARGET) return;
+    auto* list = commandListHandler.CurrentList();
+    if (not list) 
+        return;
+    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_RENDER_TARGET) 
+        return;
     D3D12_RESOURCE_BARRIER b{};
-    b.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource   = m_backBuffers[m_backBufferIndex].Get();
+    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource = m_backBuffers[m_backBufferIndex].Get();
     b.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-    b.Transition.StateAfter  = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    b.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     list->ResourceBarrier(1, &b);
     m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -213,14 +216,16 @@ void BaseDisplayHandler::BeginBackBuffer(void) noexcept {
 
 
 void BaseDisplayHandler::EndBackBuffer(void) noexcept {
-    auto* list = cmdQueue.List();
-    if (!list) return;
-    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT) return;
+    auto* list = commandListHandler.CurrentList();
+    if (not list) 
+        return;
+    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT) 
+        return;
     D3D12_RESOURCE_BARRIER b{};
-    b.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource   = m_backBuffers[m_backBufferIndex].Get();
+    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource = m_backBuffers[m_backBufferIndex].Get();
     b.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    b.Transition.StateAfter  = D3D12_RESOURCE_STATE_PRESENT;
+    b.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     list->ResourceBarrier(1, &b);
     m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_PRESENT;
@@ -234,19 +239,23 @@ void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
 
 
 void BaseDisplayHandler::Update(void) {
-    if (!m_swapChain) return;
-    // Execute all recorded commands for this frame, then present.
-    cmdQueue.EndFrame();
+    if (not m_swapChain) return;
+    // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
+    EndBackBuffer();
+    // Close the main renderer list — registers it for submission.
+    baseRenderer.GetCmdList().Close();
+    // Submit all registered lists (FBO lists first, main list last — registration order).
+    commandListHandler.ExecuteAll();
+    commandListHandler.CmdQueue().EndFrame();
     UINT syncInterval = m_vSync ? 1 : 0;
     UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
     HRESULT hr = m_swapChain->Present(syncInterval, presentFlags);
     if (FAILED(hr))
         fprintf(stderr, "BaseDisplayHandler::Update: Present failed (hr=0x%08X)\n", (unsigned)hr);
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-    // Open fresh command list for the next frame.
-    // Also reset active-shader tracking — BeginFrame() resets all DX12 command-list state,
-    // so every shader must call SetPipelineState() again on the new list.
-    cmdQueue.BeginFrame();
+    // Wait for the next frame slot to be free, reset CBV allocator.
+    // Active-shader tracking is invalidated because BeginFrame resets all DX12 command-list state.
+    commandListHandler.CmdQueue().BeginFrame();
     baseShaderHandler.InvalidateActiveShader();
 }
 
@@ -287,7 +296,7 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
     // Resize the swap chain back buffers
     if (m_swapChain) {
         // GPU must be idle before resize
-        cmdQueue.WaitIdle();
+        commandListHandler.CmdQueue().WaitIdle();
         ReleaseBackBuffers();
         HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT,
             UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, 0);

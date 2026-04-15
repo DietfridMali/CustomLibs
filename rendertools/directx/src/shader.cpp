@@ -13,7 +13,7 @@
 #include "cbv_allocator.h"
 #include "shadowmap.h"
 #include "base_renderer.h"
-#include "command_queue.h"
+#include "commandlist.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"
 #include "gfxdriverstates.h"
@@ -103,7 +103,7 @@ void Shader::PrintShaderSource(const char* hlslCode, const char* title) noexcept
     int lineNo = 0;
     for (auto&& chunk : src | std::views::split('\n')) {
         std::string_view line(chunk.begin(), chunk.end());
-        if (!line.empty() && line.back() == '\r')
+        if (not line.empty() && line.back() == '\r')
             line.remove_suffix(1);
         fprintf(stderr, "%*d: %.*s\n", width, ++lineNo,
                 static_cast<int>(line.size()), line.data());
@@ -203,8 +203,8 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 {
     Destroy();
 
-    if (!Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob)) return false;
-    if (!Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob)) return false;
+    if (not Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob)) return false;
+    if (not Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob)) return false;
     if (gsCode.Length() > 0)
         Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
 
@@ -280,12 +280,12 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
                         ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
                         D3D12_SHADER_VARIABLE_DESC vd{};
                         var->GetDesc(&vd);
-                        if (!(vd.uFlags & D3D_SVF_USED)) continue;
+                        if (not (vd.uFlags & D3D_SVF_USED)) continue;
                         // only add if not already present
                         bool found = false;
                         for (auto& kv : m_b1Fields)
                             if (kv.first == String(vd.Name)) { found = true; break; }
-                        if (!found) {
+                        if (not found) {
                             auto* entry = m_b1Fields.Append();
                             if (entry)
                                 *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
@@ -314,11 +314,11 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
                         ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
                         D3D12_SHADER_VARIABLE_DESC vd{};
                         var->GetDesc(&vd);
-                        if (!(vd.uFlags & D3D_SVF_USED)) continue;
+                        if (not (vd.uFlags & D3D_SVF_USED)) continue;
                         bool found = false;
                         for (auto& kv : m_b1Fields)
                             if (kv.first == String(vd.Name)) { found = true; break; }
-                        if (!found) {
+                        if (not found) {
                             auto* entry = m_b1Fields.Append();
                             if (entry)
                                 *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
@@ -330,7 +330,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         }
     }
 
-    if (!CreateRootSignature())
+    if (not CreateRootSignature())
         return false;
 
     if (m_b1Size > 0)
@@ -551,7 +551,7 @@ ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
 
 bool Shader::UploadB1(void) noexcept
 {
-    auto* list = cmdQueue.List();
+    auto* list = commandListHandler.CurrentList();
     if (not list)
         return false;
 
@@ -574,14 +574,14 @@ void Shader::Enable(void)
     if (not IsValid()) 
         return;
 
-    auto* list = cmdQueue.List();
+    auto* list = commandListHandler.CurrentList();
     if (not list) 
         return;
 
     // Get / create PSO for current render state
     const RenderState& state = gfxDriverStates.State();
     ID3D12PipelineState* pso = GetOrCreatePSO(state);
-    if (!pso) return;
+    if (not pso) return;
 
     // Set pipeline state and root signature.
     // Root CBVs (b0, b1) are bound per-draw in UpdateMatrices() and UploadB1().
@@ -604,7 +604,7 @@ void Shader::Enable(void)
 
 bool Shader::UpdateMatrices(void)
 {
-    auto* list = cmdQueue.List();
+    auto* list = commandListHandler.CurrentList();
     if (not list)
         return false;
 
@@ -651,7 +651,7 @@ bool Shader::TrySetB0Field(const char* name, const float* data) noexcept
 int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
 {
     int* pOffset = m_locations[name];
-    if (!pOffset) return -1;
+    if (not pOffset) return -1;
 
     if (*pOffset == std::numeric_limits<int>::min()) {
         // First access: resolve from reflection table

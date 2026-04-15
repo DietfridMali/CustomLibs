@@ -2,8 +2,8 @@
 
 #include "texture.h"
 #include "dx12context.h"
-#include "command_queue.h"
 #include "descriptor_heap.h"
+#include "dx12upload.h"
 #include "noise.h"
 #include "FBM.h"
 
@@ -157,9 +157,9 @@ class NoiseTexture
     : public Texture {
 public:
     bool Create(int gridSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
-        if (!Texture::Create())
+        if (not Texture::Create())
             return false;
-        if (!Allocate(gridSize))
+        if (not Allocate(gridSize))
             return false;
         Compute(gridSize, yPeriod, xPeriod, octaves, seed);
         Deploy();
@@ -182,8 +182,12 @@ private:
 
     bool Allocate(int gridSize) {
         auto* texBuf = new TextureBuffer();
-        if (!texBuf) return false;
-        if (!m_buffers.Append(texBuf)) { delete texBuf; return false; }
+        if (not texBuf) 
+            return false;
+        if (not m_buffers.Append(texBuf)) {
+            delete texBuf;
+            return false;
+        }
         texBuf->m_info = TextureBuffer::BufferInfo(
             gridSize, gridSize,
             NoiseTraits<Tag>::Components,
@@ -197,17 +201,20 @@ private:
     }
 
     bool Deploy(int /*bufferIndex*/ = 0) override {
-        if (m_buffers.IsEmpty() || m_data.IsEmpty()) return false;
+        if (m_buffers.IsEmpty() or m_data.IsEmpty())
+            return false;
         TextureBuffer* texBuf = m_buffers[0];
         const int w = texBuf->m_info.m_width;
         const int h = texBuf->m_info.m_height;
-        if (w <= 0 || h <= 0) return false;
+        if (w <= 0 or h <= 0)
+            return false;
 
         ID3D12Device* device = dx12Context.Device();
-        if (!device) return false;
+        if (not device)
+            return false;
 
-        constexpr DXGI_FORMAT fmt    = NoiseTraits<Tag>::dxgiFormat;
-        constexpr uint32_t    stride = NoiseTraits<Tag>::pixelStride;
+        constexpr DXGI_FORMAT fmt = NoiseTraits<Tag>::dxgiFormat;
+        constexpr uint32_t stride = NoiseTraits<Tag>::pixelStride;
 
         // (Re-)create Texture2D resource
         m_resource.Reset();
@@ -228,63 +235,15 @@ private:
             IID_PPV_ARGS(&m_resource))))
             return false;
 
-        // Upload buffer
-        UINT64 uploadSize = 0;
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-        UINT rowCount = 0; UINT64 rowSize = 0;
-        device->GetCopyableFootprints(&rd, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
-
-        D3D12_HEAP_PROPERTIES uhp{ D3D12_HEAP_TYPE_UPLOAD };
-        D3D12_RESOURCE_DESC upDesc{};
-        upDesc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
-        upDesc.Width            = uploadSize;
-        upDesc.Height           = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
-        upDesc.SampleDesc.Count = 1;
-        upDesc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        ComPtr<ID3D12Resource> upload;
-        if (FAILED(device->CreateCommittedResource(&uhp, D3D12_HEAP_FLAG_NONE, &upDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
-            return false;
-
         const uint8_t* src = reinterpret_cast<const uint8_t*>(m_data.Data());
-        uint8_t* mapped = nullptr;
-        D3D12_RANGE mapRange{ 0, 0 };
-        if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) return false;
-        for (UINT r = 0; r < rowCount; ++r)
-            std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch,
-                        src + r * UINT(w) * stride,
-                        UINT(w) * stride);
-        upload->Unmap(0, nullptr);
-
-        auto* list = cmdQueue.List();
-        if (!list) return false;
-
-        D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
-        srcLoc.pResource        = upload.Get();
-        srcLoc.Type             = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        srcLoc.PlacedFootprint  = layout;
-        dstLoc.pResource        = m_resource.Get();
-        dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        dstLoc.SubresourceIndex = 0;
-        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type                        = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Flags                       = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        barrier.Transition.pResource        = m_resource.Get();
-        barrier.Transition.StateBefore      = D3D12_RESOURCE_STATE_COPY_DEST;
-        barrier.Transition.StateAfter       = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.Subresource      = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        list->ResourceBarrier(1, &barrier);
-
-        cmdQueue.Execute();
-        cmdQueue.WaitIdle();
+        if (not UploadTextureData(device, m_resource.Get(), src, w, h, int(stride)))
+            return false;
 
         // Create / update SRV
         if (m_handle == UINT32_MAX) {
             DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-            if (!hdl.IsValid()) return false;
+            if (not hdl.IsValid())
+                return false;
             m_handle = hdl.index;
         }
 

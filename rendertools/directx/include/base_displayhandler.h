@@ -17,7 +17,7 @@
 //
 // Startup order (caller's responsibility):
 //   1. DX12Context::Create()
-//   2. CommandQueueHandler::Create(device)
+//   2. CommandListHandler::Create(device)
 //   3. DescriptorHeapHandler::Create(device)
 //   4. BaseDisplayHandler::Create()
 

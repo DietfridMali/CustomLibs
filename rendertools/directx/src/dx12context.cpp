@@ -47,7 +47,7 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
         return false;
     }
 
-    if (!SelectAdapter()) {
+    if (not SelectAdapter()) {
         fprintf(stderr, "DX12Context: No suitable DX12 adapter found\n");
         return false;
     }
@@ -88,8 +88,11 @@ void DX12Context::DumpDRED(void) noexcept {
             UINT last = node->pLastBreadcrumbValue ? *node->pLastBreadcrumbValue : 0;
             fprintf(stderr, "DRED node %d: CL=%s CQ=%s  ops=%u last=%u\n",
                 n, clName, cqName, node->BreadcrumbCount, last);
-            for (UINT i = (last > 3 ? last - 3 : 0); i <= last && i < node->BreadcrumbCount; ++i)
-                fprintf(stderr, "  [%u] op=%u\n", i, (unsigned)node->pCommandHistory[i]);
+            UINT from = (last > 3 ? last - 3 : 0);
+            UINT to   = std::min(last + 10, node->BreadcrumbCount - 1);
+            for (UINT i = from; i <= to; ++i)
+                fprintf(stderr, "  [%u] op=%u%s\n", i, (unsigned)node->pCommandHistory[i],
+                    i == last ? " <-- last completed" : (i > last ? " <-- pending/hung" : ""));
         }
     }
 

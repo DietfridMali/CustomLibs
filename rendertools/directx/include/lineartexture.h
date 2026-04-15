@@ -5,7 +5,7 @@
 #endif
 
 #include "dx12context.h"
-#include "command_queue.h"
+#include "dx12upload.h"
 #include "descriptor_heap.h"
 #include <cstdint>
 #include <cstring>
@@ -46,13 +46,16 @@ public:
 
 
     virtual bool Deploy(int /*bufferIndex*/) override {
-        if (m_buffers.IsEmpty()) return false;
+        if (m_buffers.IsEmpty())
+            return false;
         TextureBuffer* tb = m_buffers[0];
         int width = tb->m_info.m_width;
-        if (width <= 0) return false;
+        if (width <= 0)
+            return false;
 
         ID3D12Device* device = dx12Context.Device();
-        if (!device) return false;
+        if (not device)
+            return false;
 
         // (Re-)create a Texture2D with height=1
         m_resource.Reset();
@@ -67,66 +70,21 @@ public:
         rd.SampleDesc.Count = 1;
         rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-        HRESULT hr = device->CreateCommittedResource(
+        if (FAILED(device->CreateCommittedResource(
             &hp, D3D12_HEAP_FLAG_NONE, &rd,
             D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-            IID_PPV_ARGS(&m_resource));
-        if (FAILED(hr)) return false;
-
-        // Upload the data row
-        UINT64 uploadSize = 0;
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-        UINT rowCount = 0; UINT64 rowSize = 0;
-        device->GetCopyableFootprints(&rd, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
-
-        D3D12_HEAP_PROPERTIES uhp{ D3D12_HEAP_TYPE_UPLOAD };
-        D3D12_RESOURCE_DESC upDesc{};
-        upDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-        upDesc.Width     = uploadSize;
-        upDesc.Height    = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
-        upDesc.SampleDesc.Count = 1;
-        upDesc.Layout    = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-        ComPtr<ID3D12Resource> upload;
-        if (FAILED(device->CreateCommittedResource(&uhp, D3D12_HEAP_FLAG_NONE, &upDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
+            IID_PPV_ARGS(&m_resource))))
             return false;
 
         const uint8_t* src = static_cast<const uint8_t*>(tb->DataBuffer());
-        uint8_t* mapped = nullptr;
-        D3D12_RANGE mapRange{ 0, 0 };
-        if (FAILED(upload->Map(0, &mapRange, (void**)&mapped))) return false;
-        std::memcpy(mapped + layout.Offset, src, UINT(width) * GfxTexTraits<DATA_T>::pixelSize);
-        upload->Unmap(0, nullptr);
-
-        auto* list = cmdQueue.List();
-        if (!list) return false;
-
-        D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
-        srcLoc.pResource       = upload.Get();
-        srcLoc.Type            = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        srcLoc.PlacedFootprint = layout;
-        dstLoc.pResource       = m_resource.Get();
-        dstLoc.Type            = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        dstLoc.SubresourceIndex = 0;
-        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type  = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        barrier.Transition.pResource   = m_resource.Get();
-        barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        list->ResourceBarrier(1, &barrier);
-
-        cmdQueue.Execute();
-        cmdQueue.WaitIdle();
+        if (not UploadTextureData(device, m_resource.Get(), src, width, 1, int(GfxTexTraits<DATA_T>::pixelSize)))
+            return false;
 
         // Create / update SRV
         if (m_handle == UINT32_MAX) {
             DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-            if (!hdl.IsValid()) return false;
+            if (not hdl.IsValid())
+                return false;
             m_handle = hdl.index;
         }
 
@@ -146,9 +104,11 @@ public:
 
 
     inline bool Create(AutoArray<DATA_T>& data, bool isRepeating) {
-        if (!Texture::Create()) return false;
+        if (not Texture::Create())
+            return false;
         m_isRepeating = isRepeating;
-        if (!Allocate(static_cast<int>(data.Length()))) return false;
+        if (not Allocate(static_cast<int>(data.Length())))
+            return false;
         Upload(data);
         return true;
     }
@@ -156,8 +116,12 @@ public:
 
     bool Allocate(int length) {
         TextureBuffer* tb = new (std::nothrow) TextureBuffer();
-        if (!tb) return false;
-        if (!m_buffers.Append(tb)) { delete tb; return false; }
+        if (not tb)
+            return false;
+        if (not m_buffers.Append(tb)) {
+            delete tb;
+            return false;
+        }
         tb->m_info = TextureBuffer::BufferInfo(
             length, 1,
             int(GfxTexTraits<DATA_T>::channels),

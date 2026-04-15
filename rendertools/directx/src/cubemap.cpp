@@ -3,7 +3,6 @@
 #include "cubemap.h"
 #include "texturebuffer.h"
 #include "descriptor_heap.h"
-#include "command_queue.h"
 #include "dx12context.h"
 #include "dx12upload.h"
 
@@ -31,15 +30,6 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
     if (w <= 0 or h <= 0)
         return false;
 
-    bool wasRecording = commandQueueHandler.Get().m_isRecording;
-    if (FAILED(device->GetDeviceRemovedReason())) {
-        fprintf(stderr, "Cubemap::Deploy: device already removed at entry (wasRecording=%d)\n", wasRecording);
-        fflush(stderr);
-        return false;
-    }
-    fprintf(stderr, "Cubemap::Deploy: enter w=%d h=%d wasRecording=%d\n", w, h, wasRecording);
-    fflush(stderr);
-
     // (Re-)create cubemap resource: 6-slice array
     m_resource.Reset();
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
@@ -61,38 +51,12 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
     if (FAILED(hr))
         return false;
 
-    // Upload all 6 faces into a single command list; each face has its own upload buffer.
-    // All upload buffers are kept alive in uploads[] until after Flush().
-    auto* cq = commandQueueHandler.GetOpenClean();
-    if (not cq) {
-        fprintf(stderr, "Cubemap::Deploy: GetOpenClean failed (device removed: 0x%08X)\n",
-            (unsigned)device->GetDeviceRemovedReason());
-        fflush(stderr);
-        return false;
-    }
-    auto* list = cq->List();
-
     int faceCount = m_buffers.Length();
-    ComPtr<ID3D12Resource> uploads[6];
-    for (int face = 0; face < 6; ++face) {
-        TextureBuffer* tb = m_buffers[face < faceCount ? face : faceCount - 1];
-        if (not UploadSubresource(device, list, m_resource.Get(), UINT(face), tb->DataBuffer(), w, h, 4, uploads[face], /*addBarrier=*/false))
-            return false;
-    }
-
-#if 1
-    SubresourceBarrier(list, m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-#else
-    D3D12_RESOURCE_BARRIER barrier{};
-    barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    barrier.Flags                  = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.Transition.pResource   = m_resource.Get();
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    list->ResourceBarrier(1, &barrier);
-#endif
-    cq->Flush();
+    const uint8_t* faces[6];
+    for (int i = 0; i < 6; ++i)
+        faces[i] = m_buffers[i < faceCount ? i : faceCount - 1]->DataBuffer();
+    if (not UploadTextureData(device, m_resource.Get(), faces, 6, w, h, 4))
+        return false;
 
     // Create / update SRV
     if (m_handle == UINT32_MAX) {

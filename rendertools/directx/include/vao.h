@@ -35,7 +35,7 @@ public:
     static inline void PushVAO(VAO* vao) noexcept { vaoStack.Append(vao); }
 
     static inline VAO* PopVAO(void) noexcept {
-        if (!vaoStack.Length()) return nullptr;
+        if (not vaoStack.Length()) return nullptr;
         VAO* vao = nullptr;
         vaoStack.Pop(vao);
         return vao;
@@ -70,7 +70,7 @@ public:
     inline bool IsActive(void)  noexcept { return this == activeVAO; }
 
     inline void Activate(void) noexcept {
-        if (!IsActive()) { PushVAO(activeVAO); activeVAO = this; }
+        if (not IsActive()) { PushVAO(activeVAO); activeVAO = this; }
     }
 
     inline void Deactivate(void) noexcept {

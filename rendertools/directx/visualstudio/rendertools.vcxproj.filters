@@ -128,7 +128,7 @@
     <ClInclude Include="..\include\base_renderer.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\command_queue.h">
+    <ClInclude Include="..\include\commandlist.h">
       <Filter>DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cubemap.h">
@@ -276,7 +276,7 @@
     <ClCompile Include="..\src\blur_shader.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\command_queue.cpp">
+    <ClCompile Include="..\src\commandlist.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cubemap.cpp">

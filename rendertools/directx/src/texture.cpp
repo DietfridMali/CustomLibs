@@ -16,7 +16,7 @@
 #include "gfxdriverstates.h"
 #include "base_renderer.h"
 #include "descriptor_heap.h"
-#include "command_queue.h"
+#include "commandlist.h"
 #include "dx12context.h"
 #include "dx12upload.h"
 
@@ -28,26 +28,6 @@ uint32_t Texture::nullHandle = UINT32_MAX;
 int Texture::CompareTextures(void* context, const String& k1, const String& k2) {
     int i = String::Compare(nullptr, k1, k2);
     return (i < 0) ? -1 : (i > 0) ? 1 : 0;
-}
-
-// -------------------------------------------------------------------------------------------------
-// Helpers
-
-// Upload pixel data to a default-heap texture resource via a temporary upload buffer.
-static bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixelData, int width, int height, int channels) noexcept
-{
-    auto* cq = commandQueueHandler.GetOpenClean();
-    if (not cq)
-        return false;
-
-    ComPtr<ID3D12Resource> upload;
-    if (not UploadSubresource(device, cq->List(), dstResource, 0, pixelData, width, height, channels, upload))
-        return false;
-
-    // Flush resets the list so the debug layer releases its reference to upload
-    // before upload goes out of scope.
-    cq->Flush();
-    return true;
 }
 
 // =================================================================================================
@@ -163,7 +143,7 @@ bool Texture::Bind(int tmuIndex)
     // Root params 2..17 are individual 1-entry descriptor tables for t0..t15.
     // SetDescriptorHeaps is called once in Shader::Enable(); here we only
     // update the per-slot root parameter.
-    auto* list = cmdQueue.List();
+    auto* list = commandListHandler.CurrentList();
     if (list and (m_handle != UINT32_MAX)) {
         auto& heap = descriptorHeaps.m_srvHeap;
         if (heap.m_heap)

@@ -6,6 +6,7 @@
 #include "texture.h"
 #include "colordata.h"
 #include "descriptor_heap.h"
+#include "commandlist.h"
 
 // =================================================================================================
 // DX12 FBO (Frame Buffer Object)
@@ -97,6 +98,9 @@ public:
     // Current resource state for each color buffer (needed for barriers)
     D3D12_RESOURCE_STATES   m_colorStates[FBO_MAX_COLOR_BUFFERS]{};
 
+    // Own command list — all rendering into this FBO is recorded here.
+    CommandList             m_cmdList;
+
     // -------------------------------------------------------------------------
 
     FBO();
@@ -123,6 +127,8 @@ public:
 
     // Called by DrawBufferHandler::SetActiveDrawBuffers().
     void BindRenderTargets(ID3D12GraphicsCommandList* list);
+
+    inline CommandList& GetCmdList(void) noexcept { return m_cmdList; }
 
     void SetViewport(bool flipVertically = false) noexcept;
     void Fill(RGBAColor color);

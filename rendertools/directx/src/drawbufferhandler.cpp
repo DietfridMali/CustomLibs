@@ -6,7 +6,7 @@
 
 #include "gfxdriverstates.h"
 #include "drawbufferhandler.h"
-#include "command_queue.h"
+#include "commandlist.h"
 #include "base_displayhandler.h"
 
 // =================================================================================================
@@ -17,8 +17,8 @@
 
 
 void DrawBufferHandler::SetActiveDrawBuffers(void) {
-    auto* list = cmdQueue.List();
-    if (!list) return;
+    auto* list = commandListHandler.CurrentList();
+    if (not list) return;
 
     if (m_drawBufferInfo.m_fbo) {
         // FBO provides its own RTV/DSV handles — set them as render target.
@@ -56,7 +56,7 @@ void DrawBufferHandler::ResetDrawBuffers(FBO* activeBuffer, bool clearBuffer) {
         if (info.m_fbo)
             info.m_fbo->Disable();
     }
-    if (!SetActiveBuffer(activeBuffer, clearBuffer))
+    if (not SetActiveBuffer(activeBuffer, clearBuffer))
         SetActiveDrawBuffers();
 }
 
