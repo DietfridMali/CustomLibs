@@ -21,11 +21,11 @@
 class GfxDataLayout
 {
 public:
-    List<GfxDataBuffer*>          m_dataBuffers;
-    GfxDataBuffer                 m_indexBuffer;
-    MeshTopology        m_shape{ MeshTopology::Quads };
-    bool                m_isDynamic{ false };
-    bool                m_isBound{ false };
+    List<GfxDataBuffer*>    m_dataBuffers;
+    GfxDataBuffer           m_indexBuffer;
+    MeshTopology            m_shape{ MeshTopology::Quads };
+    bool                    m_isDynamic{ false };
+    bool                    m_isBound{ false };
 
     static GfxDataLayout*         activeLayout;
     static List<GfxDataLayout*>   layoutStack;

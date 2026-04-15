@@ -126,16 +126,16 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_
     if (dataSize == 0) 
         return false;
     int index = -1;
-    GfxDataBuffer* GfxDataBuffer = FindBuffer(type, id, index);
-    if (not GfxDataBuffer) {
-        GfxDataBuffer = new (std::nothrow) GfxDataBuffer();
-        if (not GfxDataBuffer) 
+    GfxDataBuffer* buffer = FindBuffer(type, id, index);
+    if (not buffer) {
+        buffer = new (std::nothrow) GfxDataBuffer();
+        if (not buffer) 
             return false;
-        m_dataBuffers.Append(GfxDataBuffer);
-        GfxDataBuffer->SetDynamic(m_isDynamic);
+        m_dataBuffers.Append(buffer);
+        buffer->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
     }
-    return GfxDataBuffer->Update(type, GfxBufferTarget::Vertex, index, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
+    return buffer->Update(type, GfxBufferTarget::Vertex, index, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
 }
 
 

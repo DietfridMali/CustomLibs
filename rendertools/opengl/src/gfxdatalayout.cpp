@@ -152,18 +152,18 @@ noexcept
         Enable();
 
     int index;
-    GfxDataBuffer* gfxDataBuffer = FindBuffer(type, id, index);
-    if (not gfxDataBuffer and (gfxDataBuffer = new GfxDataBuffer())) { // otherwise index has been initialized by FindBuffer()
-        m_dataBuffers.Append(gfxDataBuffer);
-        gfxDataBuffer->SetDynamic(m_isDynamic);
+    GfxDataBuffer* buffer = FindBuffer(type, id, index);
+    if (not buffer and (buffer = new GfxDataBuffer())) { // otherwise index has been initialized by FindBuffer()
+        m_dataBuffers.Append(buffer);
+        buffer->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
     }
-    if (gfxDataBuffer)
-        gfxDataBuffer->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount, forceUpdate);
+    if (buffer)
+        buffer->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount, forceUpdate);
 
     if (disabled)
         Disable();
-    return gfxDataBuffer != nullptr;
+    return buffer != nullptr;
 }
 
 
