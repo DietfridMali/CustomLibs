@@ -60,7 +60,7 @@ public:
     // Reset active-shader tracking so the next SetupShader() call forces a full Enable().
     // Must be called after a DX12 BeginFrame() (new command list clears all pipeline state).
     inline void InvalidateActiveShader(void) noexcept {
-        m_activeShader   = nullptr;
+        m_activeShader = nullptr;
         m_activeShaderId = "";
     }
 

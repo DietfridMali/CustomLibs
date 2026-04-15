@@ -4,6 +4,11 @@
 #include "basesingleton.hpp"
 #include "array.hpp"
 
+#ifdef _DEBUG
+#include <source_location>
+#include <cstdio>
+#endif
+
 // =================================================================================================
 // Frame protocol:
 //   CommandListHandler::ExecuteAll()  — submit all registered lists
@@ -103,7 +108,7 @@ class CommandListHandler
 public:
     CommandQueue                            m_cmdQueue;
     CommandList                             m_uploadCmdList;   // dedicated list for one-shot uploads
-    AutoArray<ID3D12GraphicsCommandList*>   m_pendingLists;
+    AutoArray<CommandList*>                 m_pendingLists;    // registered at Open(), cleared after ExecuteAll
     AutoArray<ID3D12GraphicsCommandList*>   m_listStack;
     ID3D12GraphicsCommandList*              m_currentList{ nullptr };
 
@@ -127,16 +132,58 @@ public:
 
     void PopList(void) noexcept;
 
-    // Enqueues a closed list for frame-end submission — called by CommandList::Close.
-    void Register(ID3D12GraphicsCommandList* list) noexcept;
+    // Called by CommandList::Open — registers the list for frame-end submission tracking.
+    // m_isRecording distinguishes open (true) from closed/ready (false) at ExecuteAll time.
+    void Register(CommandList* cl) noexcept;
 
-    // Submits all registered lists to the GPU queue in registration order, then clears the queue.
+    // Submits all closed lists (m_isRecording == false) to the GPU queue in registration order.
+    // In debug builds, warns about any CommandLists still open (m_isRecording == true).
+    // Clears m_pendingLists afterwards.
     void ExecuteAll(void) noexcept;
 
     // Returns an open, clean CommandList for one-shot uploads.
     // If already recording (previous upload not flushed), flushes it first.
     // The caller is responsible for calling Flush() on the returned list.
     CommandList* GetOpenClean(void) noexcept;
+
+#ifdef _DEBUG
+    // Set to true to print every logged GPU call (DrawInstanced etc.) with file/line to stderr.
+    // Defaults to false to avoid flooding the output in normal operation.
+    static bool s_logCalls;
+
+    inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst,
+                               std::source_location loc = std::source_location::current()) noexcept {
+        if (s_logCalls)
+            fprintf(stderr, "[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), loc.line());
+        if (m_currentList)
+            m_currentList->DrawInstanced(vtxCount, instCount, startVtx, startInst);
+    }
+
+    inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst,
+                                      std::source_location loc = std::source_location::current()) noexcept {
+        if (s_logCalls)
+            fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), loc.line());
+        if (m_currentList)
+            m_currentList->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVtx, startInst);
+    }
+
+    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION* dst, UINT dstX, UINT dstY, UINT dstZ,
+                                   const D3D12_TEXTURE_COPY_LOCATION* src, const D3D12_BOX* srcBox,
+                                   std::source_location loc = std::source_location::current()) noexcept {
+        if (s_logCalls)
+            fprintf(stderr, "[CTR] %s:%u\n", loc.file_name(), loc.line());
+        if (m_currentList)
+            m_currentList->CopyTextureRegion(dst, dstX, dstY, dstZ, src, srcBox);
+    }
+
+    inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER* barriers,
+                                 std::source_location loc = std::source_location::current()) noexcept {
+        if (s_logCalls)
+            fprintf(stderr, "[RB]  n=%u  %s:%u\n", numBarriers, loc.file_name(), loc.line());
+        if (m_currentList)
+            m_currentList->ResourceBarrier(numBarriers, barriers);
+    }
+#endif
 };
 
 #define commandListHandler CommandListHandler::Instance()

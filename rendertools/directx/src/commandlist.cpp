@@ -141,6 +141,7 @@ bool CommandList::Open(UINT frameIndex) noexcept {
     }
     m_isRecording = true;
     commandListHandler.PushList(m_list.Get());
+    commandListHandler.Register(this);
     return true;
 }
 
@@ -153,7 +154,6 @@ void CommandList::Close(void) noexcept {
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
     commandListHandler.PopList();
-    commandListHandler.Register(m_list.Get());
 }
 
 
@@ -202,6 +202,10 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept {
 // =================================================================================================
 // CommandListHandler
 
+#ifdef _DEBUG
+bool CommandListHandler::s_logCalls = false;
+#endif
+
 bool CommandListHandler::Create(ID3D12Device* device) noexcept {
     if (not m_cmdQueue.Create(device))
         return false;
@@ -229,21 +233,33 @@ void CommandListHandler::PopList(void) noexcept {
 }
 
 
-void CommandListHandler::Register(ID3D12GraphicsCommandList* list) noexcept {
-    if (list)
-        m_pendingLists.Push(list);
+void CommandListHandler::Register(CommandList* cl) noexcept {
+    if (not cl)
+        return;
+    for (auto l : m_pendingLists)
+        if (cl == l)
+            return;
+    m_pendingLists.Push(cl);
 }
 
 
+
 void CommandListHandler::ExecuteAll(void) noexcept {
-    int count = m_pendingLists.Length();
-    if (count == 0)
+    if (m_pendingLists.IsEmpty())
         return;
-    ID3D12CommandList* submitBuf[64];
-    int n = count < 64 ? count : 64;
-    for (int i = 0; i < n; ++i)
-        submitBuf[i] = m_pendingLists[i];
-    m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), submitBuf);
+	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
+    int n = 0;
+    for (auto l : m_pendingLists) {
+#ifdef _DEBUG
+        if (l->m_isRecording) {
+            fprintf(stderr, "CommandListHandler::ExecuteAll: CommandList %p still open — closing\n", static_cast<void*>(l));
+            l->Close();
+        }
+#endif
+        execList[n++] = l->m_list.Get();
+    }
+    if (n > 0)
+        m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.Data());
 #ifdef _DEBUG
     dx12Context.DrainMessages();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
@@ -254,6 +270,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     fflush(stderr);
 #endif
     m_pendingLists.Clear();
+    m_listStack.Clear();
 }
 
 

@@ -71,6 +71,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 		baseRenderer.PushViewport();
 		m_atlas->Enable();
 	}
+#if 0
 	else {
 #ifndef OPENGL
 		// The command list may have been reset (e.g. after Texture::Deploy/Flush) even though
@@ -79,6 +80,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 			return false;
 #endif
 	}
+#endif
 	int x = m_size.Col(glyphIndex);
 	int y = m_size.Row(glyphIndex);
 	int l, t, w, h;

@@ -199,17 +199,16 @@ void VAO::Render(std::span<Texture* const> textures) noexcept
     if (Shader* sh = baseShaderHandler.ActiveShader())
         sh->UploadB1();
 
-    auto* list = commandListHandler.CurrentList();
-    if (list) {
+    if (commandListHandler.CurrentList()) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
-            list->DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
+            commandListHandler.DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
         else {
             // Non-indexed: sum up vertex count from first VBO
             UINT vertCount = 0;
             if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
                 vertCount = UINT(m_dataBuffers[0]->m_itemCount);
             if (vertCount > 0)
-                list->DrawInstanced(vertCount, 1, 0, 0);
+                commandListHandler.DrawInstanced(vertCount, 1, 0, 0);
         }
     }
 
