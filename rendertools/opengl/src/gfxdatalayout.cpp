@@ -237,7 +237,7 @@ static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label)
 }
 
 
-static void checkLayout(GLuint handle, const char* label = "") {
+static void CheckLayout(GLuint handle, const char* label = "") {
 #if 1
     std::cout << "=== GfxDataLayout Check: " << label << " (ID: " << handle << ") ===" << std::endl;
 #endif
@@ -295,7 +295,7 @@ noexcept
 #ifdef _DEBUG
     float* data = (float*)(m_dataBuffers[0]->m_data);
      if (checkLayout)
-        checkLayout(m_handle);
+        CheckLayout(m_handle);
 #endif
     if (not Enable())
         return;
