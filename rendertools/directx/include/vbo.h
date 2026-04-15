@@ -3,6 +3,7 @@
 #include "framework.h"
 #include "rendertypes.h"
 #include <cstring>
+#include <vector>
 
 // =================================================================================================
 // DX12 VBO — wraps a committed GPU resource (upload heap) and exposes vertex / index buffer views.
@@ -30,6 +31,17 @@ public:
     D3D12_VERTEX_BUFFER_VIEW m_vbv{};          // valid when m_bufferType == GfxBufferTarget::Vertex
     D3D12_INDEX_BUFFER_VIEW  m_ibv{};          // valid when m_bufferType == GfxBufferTarget::Index
 
+    // Per-frame-slot chunk pool for dynamic multi-buffering.
+    // FRAME_COUNT slots (indexed by cmdQueue.FrameIndex()) each hold a growing list of
+    // upload-heap buffers. On each new recording session the slot's chunk index resets to 0,
+    // which is safe because BeginFrame has already waited for the fence that covers the
+    // previous use of this slot (2 frames ago with FRAME_COUNT=2).
+    static constexpr UINT    FRAME_COUNT = 2;
+    std::vector<ComPtr<ID3D12Resource>> m_chunks[FRAME_COUNT];
+    int                      m_chunkIndex[FRAME_COUNT]{};
+    uint64_t                 m_lastCmdListId[FRAME_COUNT]{};
+    uint64_t                 m_lastExecutionId[FRAME_COUNT]{};
+
     uint32_t                 m_size;           // total buffer size in bytes
     size_t                   m_itemSize;       // bytes per vertex element (stride)
     uint32_t                 m_itemCount;
@@ -41,6 +53,8 @@ public:
 
     void Reset(void) {
         m_resource.Reset();
+        for (UINT i = 0; i < FRAME_COUNT; ++i)
+            m_chunks[i].clear();
         m_vbv = {};
         m_ibv = {};
         m_id  = 0;

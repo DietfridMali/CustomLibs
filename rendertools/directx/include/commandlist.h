@@ -77,6 +77,8 @@ public:
     ComPtr<ID3D12CommandAllocator>     m_allocators[FRAME_COUNT];
     bool                               m_isRecording{ false };
     AutoArray<std::function<void()>>   m_disposableResources;
+    uint64_t                           m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
+    uint64_t                           m_executionId{ 0 };  // increments on each Open()
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
 
@@ -122,7 +124,10 @@ public:
     CommandList                             m_uploadCmdList;   // dedicated list for one-shot uploads
     AutoArray<CommandList*>                 m_pendingLists;    // registered at Open(), cleared after ExecuteAll
     AutoArray<ID3D12GraphicsCommandList*>   m_listStack;
+    AutoArray<CommandList*>                 m_cmdListObjStack;
     ID3D12GraphicsCommandList*              m_currentList{ nullptr };
+    CommandList*                            m_currentCmdList{ nullptr };
+    uint64_t                                m_cmdListId{ 1 };
 
     bool Create(ID3D12Device* device) noexcept;
 
@@ -139,10 +144,17 @@ public:
     // Returns the currently recording list (top of stack), or nullptr if none is open.
     inline ID3D12GraphicsCommandList* CurrentList(void) const noexcept { return m_currentList; }
 
+    // Returns the currently recording CommandList object (top of obj-stack), or nullptr.
+    inline CommandList* GetCurrentCmdListObj(void) const noexcept { return m_currentCmdList; }
+
     // Stack management — called by CommandList::Open / Close / Flush.
     void PushList(ID3D12GraphicsCommandList* list) noexcept;
 
     void PopList(void) noexcept;
+
+    void PushCmdList(CommandList* cl) noexcept;
+
+    void PopCmdList(void) noexcept;
 
     // Called by CommandList::Open — registers the list for frame-end submission tracking.
     // m_isRecording distinguishes open (true) from closed/ready (false) at ExecuteAll time.
@@ -152,6 +164,10 @@ public:
     // In debug builds, warns about any CommandLists still open (m_isRecording == true).
     // Clears m_pendingLists afterwards.
     void ExecuteAll(void) noexcept;
+
+    // Allocates a new CommandList on the heap, assigns it a unique m_id, calls Create().
+    // Returns the pointer on success, nullptr on failure. Caller owns the memory.
+    CommandList* CreateCmdList(const String& name = "") noexcept;
 
     // Returns an open, clean CommandList for one-shot uploads.
     // If already recording (previous upload not flushed), flushes it first.
@@ -163,24 +179,21 @@ public:
     // Defaults to false to avoid flooding the output in normal operation.
     static bool s_logCalls;
 
-    inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst,
-                               std::source_location loc = std::source_location::current()) noexcept {
+    inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), loc.line());
         if (m_currentList)
             m_currentList->DrawInstanced(vtxCount, instCount, startVtx, startInst);
     }
 
-    inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst,
-                                      std::source_location loc = std::source_location::current()) noexcept {
+    inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), loc.line());
         if (m_currentList)
             m_currentList->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVtx, startInst);
     }
 
-    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION* dst, UINT dstX, UINT dstY, UINT dstZ,
-                                   const D3D12_TEXTURE_COPY_LOCATION* src, const D3D12_BOX* srcBox,
+    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION* dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION* src, const D3D12_BOX* srcBox,
                                    std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[CTR] %s:%u\n", loc.file_name(), loc.line());

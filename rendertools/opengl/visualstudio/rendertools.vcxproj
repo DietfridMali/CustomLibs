@@ -142,7 +142,7 @@
     <ClInclude Include="..\..\include\movement.h" />
     <ClInclude Include="..\include\noisetexture.h" />
     <ClInclude Include="..\include\gfxstates.h" />
-    <ClInclude Include="..\..\include\outlinerenderer.h" />
+    <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\noise.h" />
     <ClInclude Include="..\..\include\coplanar_rectangle.h" />
     <ClInclude Include="..\include\prerenderedtexture.h" />
@@ -165,8 +165,8 @@
     <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\..\include\texturehandler.h" />
     <ClInclude Include="..\include\EnableTe.h" />
-    <ClInclude Include="..\include\vao.h" />
-    <ClInclude Include="..\include\vbo.h" />
+    <ClInclude Include="..\include\gfxdatalayout.h" />
+    <ClInclude Include="..\include\gfxdatabuffer.h" />
     <ClInclude Include="..\..\include\vertexdatabuffers.h" />
     <ClInclude Include="..\..\include\viewport.h" />
     <ClInclude Include="framework.h" />
@@ -189,7 +189,7 @@
     <ClCompile Include="..\..\src\mesh.cpp" />
     <ClCompile Include="..\src\noisetexture.cpp" />
     <ClCompile Include="..\src\gfxstates.cpp" />
-    <ClCompile Include="..\..\src\outlinerenderer.cpp" />
+    <ClCompile Include="..\..\src\texteffects.cpp" />
     <ClCompile Include="..\src\outline_shader.cpp" />
     <ClCompile Include="..\..\src\coplanar_rectangle.cpp" />
     <ClCompile Include="..\src\prerenderedtexture.cpp" />
@@ -211,8 +211,8 @@
     <ClCompile Include="..\src\base_texture_shaders.cpp" />
     <ClCompile Include="..\..\src\textureprocessing.cpp" />
     <ClCompile Include="..\..\src\tiny_gltf.cpp" />
-    <ClCompile Include="..\src\vao.cpp" />
-    <ClCompile Include="..\src\vbo.cpp" />
+    <ClCompile Include="..\src\gfxdatalayout.cpp" />
+    <ClCompile Include="..\src\gfxdatabuffer.cpp" />
     <ClCompile Include="..\..\src\viewport.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

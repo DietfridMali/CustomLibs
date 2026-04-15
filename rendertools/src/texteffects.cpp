@@ -47,7 +47,7 @@ void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod
         else {
             FloatArray* kernel = baseShaderHandler.GetKernel(aaMethod.strength);
             if (kernel != nullptr) {
-                params.shader->SetFloatArray("coeffsPacked", *kernel);
+                params.shader->SetFloatArray("coeffs", *kernel);
                 params.shader->SetInt("radius", aaMethod.strength);
                 params.destination = renderTarget->GetLastDestination();
                 

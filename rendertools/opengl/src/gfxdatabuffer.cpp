@@ -1,4 +1,4 @@
-#include "vbo.h"
+#include "gfxDataBuffer.h"
 #include "base_renderer.h"
 
 // =================================================================================================
@@ -8,7 +8,7 @@
 // dataSize: buffer size in bytes
 // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
 // componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
-VBO::VBO(const char* type, int id, GLint bufferType, bool isDynamic) noexcept
+GfxDataBuffer::GfxDataBuffer(const char* type, int id, GLint bufferType, bool isDynamic) noexcept
     : m_index(-1)
     , m_id(id)
     , m_type(type)
@@ -28,7 +28,7 @@ VBO::VBO(const char* type, int id, GLint bufferType, bool isDynamic) noexcept
 { }
 
 
-size_t VBO::ComponentSize(size_t componentType)
+size_t GfxDataBuffer::ComponentSize(size_t componentType)
 noexcept
 {
     switch (componentType) {
@@ -44,7 +44,7 @@ noexcept
 }
 
 
-VBO& VBO::Copy(VBO const& other) {
+GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other) {
     if (this != &other) {
         m_index = other.m_index;
         m_type = other.m_type;
@@ -63,7 +63,7 @@ VBO& VBO::Copy(VBO const& other) {
 }
 
 
-VBO& VBO::Move(VBO& other)
+GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other)
 noexcept
 {
     if (this != &other) {
@@ -88,7 +88,7 @@ noexcept
 }
 
 
-bool VBO::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
+bool GfxDataBuffer::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
 #if USE_SHARED_HANDLES
 noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
 #else
@@ -144,7 +144,7 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
     }
 
 #ifdef _DEBUG
-void VBO::Describe(void)
+void GfxDataBuffer::Describe(void)
 {
     if (m_index > -1) {
         glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
@@ -153,7 +153,7 @@ void VBO::Describe(void)
 }
 #endif
 
-void VBO::Destroy(void)
+void GfxDataBuffer::Destroy(void)
 noexcept
 {
     if (m_handle) {

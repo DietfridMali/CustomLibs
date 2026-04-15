@@ -3,14 +3,14 @@
 #include "vector.hpp"
 #include "texcoord.h"
 #include "shader.h"
-#include "vao.h"
+#include "gfxDataLayout.h"
 #include "vertexdatabuffers.h"
 #include "texturehandler.h"
 #include "colordata.h"
 #include "coplanar_rectangle.h"
 #include "mesh.h"
 
-#define USE_STATIC_VAO 0
+#define USE_STATIC_GFX_DATA 0
 
 // =================================================================================================
 
@@ -19,7 +19,7 @@ class BaseQuad
     , public Mesh
 {
 public:
-    //static VAO* m_vao;
+    //static GfxDataLayout* m_gfxDataLayout;
 
     struct TransformationParams {
         bool            centerOrigin{ false };
@@ -35,11 +35,11 @@ public:
 
     //static inline constexpr TransformationParams defaultTransformationParams = TransformationParams{};
 
-#if USE_STATIC_VAO 
-    static VAO              staticVAO;
+#if USE_STATIC_GFX_DATA 
+    static GfxDataLayout   staticGfxData;
 #endif
 #if 0
-    VAO*                    m_vao;
+    GfxDataLayout*          m_gfxDataLayout;
     VertexBuffer            m_vertexBuffer;
     TexCoordBuffer          m_texCoordBuffer;
 #endif
@@ -47,7 +47,7 @@ public:
     float                   m_aspectRatio;
     float                   m_offset;
     bool                    m_isAvailable;
-    bool                    m_privateVAO;
+    bool                    m_privateGfxData;
     bool                    m_premultiply;
     TransformationParams    m_transformations;
 
@@ -72,7 +72,7 @@ public:
         : m_aspectRatio(1.0f)
         , m_offset(0.0f)
         , m_isAvailable(false)
-        , m_privateVAO(false)
+        , m_privateGfxData(false)
         , m_premultiply(false)
     {
         Mesh::Init(MeshTopology::Quads, 100);
@@ -80,11 +80,11 @@ public:
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false)
+    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateGfxData = false)
 #pragma warning(pop)
         : CoplanarRectangle(vertices)
         , m_isAvailable(true)
-        , m_privateVAO(privateVAO)
+        , m_privateGfxData(privateGfxData)
         , m_premultiply(false)
     {
         Mesh::Init(MeshTopology::Quads, 100);
@@ -99,7 +99,7 @@ public:
 
     void Init(void);
 
-    virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateVAO = false);
+    virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateGfxData = false);
 
     BaseQuad& Copy(const BaseQuad& other);
 
@@ -114,8 +114,8 @@ public:
         return Move(other);
     }
 
-    inline VAO& GetVAO(void) {
-        return *m_vao;
+    inline GfxDataLayout& GetGfxDataLayout(void) {
+        return *m_gfxDataLayout;
     }
 
     float ComputeAspectRatio(void)

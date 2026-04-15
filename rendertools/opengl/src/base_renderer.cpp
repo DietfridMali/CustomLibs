@@ -63,7 +63,7 @@ bool BaseRenderer::CreateScreenBuffer(void) {
 bool BaseRenderer::Create(int width, int height, float fov, float zNear, float zFar) {
     Init(width, height, fov, zNear, zFar);
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
-    SetupOpenGL();
+    SetupGraphics();
     m_drawBufferStack.Clear();
     m_renderTexture.HasBuffer() = true;
     m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
@@ -94,7 +94,7 @@ void BaseRenderer::SetDefaultStates(void) noexcept {
     gfxDriverStates.CullFace(GL_BACK);
 }
 
-void BaseRenderer::SetupOpenGL(void) noexcept {
+void BaseRenderer::SetupGraphics(void) noexcept {
     SetDefaultStates();
     gfxDriverStates.SetDepthWrite(1);
     gfxDriverStates.ClearColor(ColorData::Invisible);
@@ -149,7 +149,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
 
 
 bool BaseRenderer::Start3DScene(void) {
-    SetupOpenGL();
+    SetupGraphics();
     m_frameCounter.Start();
     RenderTarget* sceneBuffer = GetSceneBuffer();
     if (not (sceneBuffer and sceneBuffer->IsAvailable()))

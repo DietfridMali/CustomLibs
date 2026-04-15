@@ -123,7 +123,7 @@ public:
         SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight));
     }
 
-    void SetupOpenGL(void) noexcept;
+    void SetupGraphics(void) noexcept;
 
     void SetDefaultStates(void) noexcept;
 

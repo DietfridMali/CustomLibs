@@ -5,27 +5,12 @@
 #include "rendertypes.h"
 #include "sharedglhandle.hpp"
 #include "vertexdatabuffers.h"
-#include "vbo.h"
+#include "gfxDataBuffer.h"
 #include "vector.hpp"
 #include "texture.h"
 #include "shader.h"
 
 // =================================================================================================
-// "Premium version of" OpenGL vertex array objects. CVAO instances offer methods to convert python
-// lists into the corresponding lists of OpenGL items (vertices, normals, texture coordinates, etc)
-// The current implementation requires a fixed order of array buffer creation to comply with the 
-// corresponding layout positions in the shaders implemented here.
-// Currently offers shaders for cubemap and regular (2D) texturing.
-// Implements loading of varying textures, so an application item derived from or using a CVAO instance
-// (e.g. an ico sphere) can be reused by different other application items that require different 
-// texturing. This implementation basically allows for reusing one single ico sphere instance whereever
-// a sphere is needed.
-// Supports indexed and non indexed vertex buffer objects.
-//
-// // Due to the current shader implementation (fixed position layout), buffers need to be passed in a
-// fixed sequence: vertices, colors, ...
-// TODO: Expand shader for all kinds of inputs (texture coordinates, normals)
-// See also https://qastack.com.de/programming/8704801/glvertexattribpointer-clarification
 
 #ifdef USE_SHARED_HANDLES
 #   undef USE_SHARED_HANDLES
@@ -33,11 +18,11 @@
 
 #define USE_SHARED_HANDLES 1
 
-class VAO
+class GfxDataLayout
 {
 public:
-    List<VBO*>          m_dataBuffers;
-    VBO                 m_indexBuffer;
+    List<GfxDataBuffer*>          m_dataBuffers;
+    GfxDataBuffer                 m_indexBuffer;
 #if USE_SHARED_HANDLES
     SharedGLHandle      m_handle;
 #else
@@ -47,33 +32,33 @@ public:
     bool                m_isDynamic{ false };
     bool                m_isBound{ false };
 
-    static VAO*         activeVAO;
-    static List<VAO*>   vaoStack;
+    static GfxDataLayout*         activeLayout;
+    static List<GfxDataLayout*>   layoutStack;
 
-    VAO() = default;
+    GfxDataLayout() = default;
 
-    static inline void PushVAO(VAO* vao)
+    static inline void PushGfxDataLayout(GfxDataLayout* gfxDataLayout)
         noexcept
     {
-        vaoStack.Append(vao);
+        layoutStack.Append(gfxDataLayout);
     }
 
-    static inline VAO* PopVAO(void)
+    static inline GfxDataLayout* PopGfxDataLayout(void)
         noexcept
     {
-        if (not vaoStack.Length())
+        if (not layoutStack.Length())
             return nullptr;
-        VAO* vao = nullptr;
-        vaoStack.Pop(vao);
-        return vao;
+        GfxDataLayout* gfxDataLayout = nullptr;
+        layoutStack.Pop(gfxDataLayout);
+        return gfxDataLayout;
     }
 
     inline void SetDynamic(bool isDynamic)
         noexcept
     {
         m_isDynamic = isDynamic;
-        for (auto vbo : m_dataBuffers)
-            vbo->SetDynamic(isDynamic);
+        for (auto gfxDataBuffer : m_dataBuffers)
+            gfxDataBuffer->SetDynamic(isDynamic);
         m_indexBuffer.SetDynamic(m_isDynamic);
     }
 
@@ -84,29 +69,29 @@ public:
     bool Create(MeshTopology shape = MeshTopology::Quads, bool isDynamic = false)
         noexcept;
 
-    ~VAO() {
+    ~GfxDataLayout() {
         Destroy();
     }
 
-    VAO(VAO const& other) {
+    GfxDataLayout(GfxDataLayout const& other) {
         Copy(other);
     }
 
-    VAO(VAO&& other) noexcept {
+    GfxDataLayout(GfxDataLayout&& other) noexcept {
         Move(other);
     }
 
-    VAO& operator=(const VAO& other) {
+    GfxDataLayout& operator=(const GfxDataLayout& other) {
         return Copy(other);
     }
 
-    VAO& operator=(VAO&& other) noexcept {
+    GfxDataLayout& operator=(GfxDataLayout&& other) noexcept {
         return Move(other);
     }
 
-    VAO& Copy(VAO const& other);
+    GfxDataLayout& Copy(GfxDataLayout const& other);
 
-    VAO& Move(VAO& other)
+    GfxDataLayout& Move(GfxDataLayout& other)
         noexcept;
 
     void Destroy(void)
@@ -131,15 +116,15 @@ public:
     inline bool IsActive(void)
         noexcept
     {
-        return this == activeVAO;
+        return this == activeLayout;
     }
 
     inline void Activate(void)
         noexcept
     {
         if (not IsActive()) {
-            PushVAO(activeVAO);
-            activeVAO = this;
+            PushGfxDataLayout(activeLayout);
+            activeLayout = this;
         }
     }
 
@@ -147,9 +132,9 @@ public:
         noexcept
     {
         if (IsActive()) {
-            activeVAO = PopVAO();
-            if (activeVAO and activeVAO->IsBound())
-                activeVAO->Enable();
+            activeLayout = PopGfxDataLayout();
+            if (activeLayout and activeLayout->IsBound())
+                activeLayout->Enable();
         }
     }
 
@@ -181,7 +166,7 @@ public:
     }
 
 
-    VBO* FindBuffer(const char* type, int id, int& index)
+    GfxDataBuffer* FindBuffer(const char* type, int id, int& index)
         noexcept;
 
     bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;

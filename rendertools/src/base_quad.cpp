@@ -2,8 +2,8 @@
 #define NOMINMAX
 #include <algorithm>
 
-#include "vbo.h"
-#include "vao.h"
+#include "gfxDataBuffer.h"
+#include "gfxDataLayout.h"
 #include "base_quad.h"
 #include "base_shaderhandler.h"
 #include "type_helper.hpp"
@@ -11,12 +11,12 @@
 #include "conversions.hpp"
 #include "tristate.h"
 
-// caution: the VAO shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this vao is initialized.
-// VAO::Init takes care of that by first assigning a handle-less shared gl handle 
-// VAO* BaseQuad::m_vao = nullptr;
+// caution: the GfxDataLayout shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this gfxDataLayout is initialized.
+// GfxDataLayout::Init takes care of that by first assigning a handle-less shared gl handle 
+// GfxDataLayout* BaseQuad::m_gfxDataLayout = nullptr;
 
-#if USE_STATIC_VAO 
-VAO BaseQuad::staticVAO;
+#if USE_STATIC_GFX_DATA 
+GfxDataLayout BaseQuad::staticGfxDataLayout;
 #endif
 
 // =================================================================================================
@@ -48,15 +48,15 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
 // =================================================================================================
 
 void BaseQuad::Init(void) {
-    // just create the vao and its vbos
+    // just create the gfxDataLayout and its vbos
     Setup(defaultVertices[0], defaultTexCoords[0]);
 }
 
 
 BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
-        if (m_privateVAO)
-            m_vao->Copy(*other.m_vao);
+        if (m_privateGfxData)
+            m_gfxDataLayout->Copy(*other.m_gfxDataLayout);
         m_vertices = other.m_vertices;
         m_texCoords[0] = other.m_texCoords[0];
         m_aspectRatio = other.m_aspectRatio;
@@ -70,9 +70,9 @@ BaseQuad& BaseQuad::Move(BaseQuad& other)
 noexcept
 {
     if (this != &other) {
-        m_vao = other.m_vao;
-        if ((m_privateVAO = other.m_privateVAO))
-            other.m_vao = nullptr;
+        m_gfxDataLayout = other.m_gfxDataLayout;
+        if ((m_privateGfxData = other.m_privateGfxData))
+            other.m_gfxDataLayout = nullptr;
         m_vertices = std::move(other.m_vertices);
         m_texCoords[0] = std::move(other.m_texCoords[0]);
         m_aspectRatio = other.m_aspectRatio;
@@ -90,7 +90,7 @@ void BaseQuad::UpdateTexCoords(void) {
 }
 
 
-bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords, bool privateVAO) {
+bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords, bool privateGfxData) {
 
     auto equals = [](auto const& c, std::initializer_list<typename std::decay_t<decltype(*c.begin())>> il) {
         return c.size() == il.size() && std::equal(c.begin(), c.end(), il.begin());
@@ -111,10 +111,10 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     }
     UpdateTexCoords();
 
-    if (not CreateVAO())
+    if (not CreateGfxDataLayout())
         return false;
     //SetShape(GL_TRIANGLES); // trigger building of triangle index everytime new vertices are loaded
-    UpdateVAO();
+    UpdateGfxData();
     //SetShape(GL_QUADS); // trigger building of triangle index everytime new vertices are loaded
     m_aspectRatio = ComputeAspectRatio();
     return true;
@@ -168,8 +168,8 @@ void BaseQuad::ResetTransformation(void) {
 bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
     if (not (shader or (shader = LoadShader(textures.size() != 0, color))))
         return false;
-    if (UpdateVAO()) {
-        m_vao->Render(textures);
+    if (UpdateGfxData()) {
+        m_gfxDataLayout->Render(textures);
         ResetTransformation();
         return true;
     }

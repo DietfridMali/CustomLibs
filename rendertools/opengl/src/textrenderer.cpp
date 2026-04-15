@@ -71,7 +71,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     if (flipVertically)
         y = -y;
 
-    m_mesh.ResetVAO();
+    m_mesh.ResetGfxDataLayout();
     for (auto glyph : text) {
         FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
 
@@ -99,7 +99,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
             m_mesh.AddTexCoord(tc);
         }
     }
-    m_mesh.UpdateVAO(true);
+    m_mesh.UpdateGfxData(true);
     m_mesh.Render(m_font->GetTexture());
 }
 
@@ -111,7 +111,7 @@ BaseQuad& TextRenderer::CreateQuad(BaseQuad& q, float x, float y, float w, Textu
     else
         q.Setup({ Vector3f{x, y, 0.0}, Vector3f{x + w, y, 0.0}, Vector3f{x + w, -y, 0.0}, Vector3f{x, -y, 0.0} },
                 { TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } });
-    q.GetVAO().SetDynamic(true);
+    q.GetGfxDataLayout().SetDynamic(true);
     return q;
 }
 

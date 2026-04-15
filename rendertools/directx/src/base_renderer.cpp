@@ -28,7 +28,9 @@ static Texture* testTexture = nullptr;
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
 bool BaseRenderer::InitDirectX(void) noexcept {
-    return m_cmdList.Create(dx12Context.Device(), "renderer");
+    delete m_cmdList;
+    m_cmdList = commandListHandler.CreateCmdList("renderer");
+    return m_cmdList != nullptr;
 }
 
 
@@ -65,7 +67,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
     Init(width, height, fov, zNear, zFar);
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
     InitDirectX();
-    SetupDirectX();
+    SetupGraphics();
     m_drawBufferStack.Clear();
     m_renderTexture.HasBuffer() = true;
     m_renderTexture.m_isValid = true;  // wrapper — handle set per-frame in Draw3DScene / DrawScreen
@@ -74,7 +76,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
 }
 
 
-void BaseRenderer::SetupDirectX(void) noexcept {
+void BaseRenderer::SetupGraphics(void) noexcept {
     // Default DX12 render state — same values as the OGL version but stored in GfxDriverStates
     // (no immediate API calls here; state is applied to the PSO on demand).
     gfxDriverStates.ClearColor(ColorData::Invisible);
@@ -148,7 +150,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
 
 
 bool BaseRenderer::Start3DScene(void) {
-    SetupDirectX();
+    SetupGraphics();
     m_frameCounter.Start();
     RenderTarget* sceneBuffer = GetSceneBuffer();
     if (not (sceneBuffer and sceneBuffer->IsAvailable()))
@@ -172,7 +174,7 @@ bool BaseRenderer::Stop3DScene(void) {
 
 bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
-    m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex());
+    m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex());
     SetClearColor(m_backgroundColor);
     ResetDrawBuffers(m_screenBuffer, !m_screenIsAvailable);
     m_screenIsAvailable = true;
@@ -256,7 +258,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             gfxDriverStates.DepthFunc(GL_ALWAYS);
             gfxDriverStates.SetFaceCulling(0);
 
-            m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex());
+            m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex());
             // Ensure the screen RenderTarget color buffer is in PSR state.
             // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
             // in which case the RENDER_TARGET → PSR transition was never recorded.

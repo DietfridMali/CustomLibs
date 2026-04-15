@@ -125,7 +125,7 @@ public:
         return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, reenable);
     }
 
-    void Disable(void);
+	void Disable(bool flush = false); // only required for DX12 compatibility for calls from higher app layers that are gfx api agnostic
 
     void SetViewport(bool flipVertically = false)
         noexcept;

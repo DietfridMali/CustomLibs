@@ -20,12 +20,12 @@ void Mesh::Init(MeshTopology shape, int32_t listSegmentSize) {
     m_indices = IndexBuffer(ShapeSize(), listSegmentSize);
 }
 
-bool Mesh::CreateVAO(void) {
-    if (m_vao)
+bool Mesh::CreateGfxDataLayout(void) {
+    if (m_gfxDataLayout)
         return true;
-    if (not (m_vao = new VAO()))
+    if (not (m_gfxDataLayout = new GfxDataLayout()))
         return false;
-    return m_vao->Create(MeshTopology::Quads, m_isDynamic);
+    return m_gfxDataLayout->Create(MeshTopology::Quads, m_isDynamic);
 }
 
 // This only works for linearly increasing quad vertex indices starting at 0!
@@ -120,18 +120,18 @@ void Mesh::UpdateTangents(void) {
 }
 
 
-bool Mesh::UpdateVAO(bool createVertexIndex, bool createTangents, bool forceUpdate) {
-    if (not CreateVAO())
+bool Mesh::UpdateGfxData(bool createVertexIndex, bool createTangents, bool forceUpdate) {
+    if (not CreateGfxDataLayout())
         return false;
     if (not createVertexIndex)
         createVertexIndex = (m_shape == MeshTopology::Quads);
-    m_vao->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_isDynamic);
-    m_vao->Enable();
+    m_gfxDataLayout->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_isDynamic);
+    m_gfxDataLayout->Enable();
     m_tangents.SetDirty((m_tangents.HaveData() and m_vertices.IsDirty()) or m_texCoords[0].IsDirty() or m_normals.IsDirty());
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = MeshTopology::Triangles;
-        m_vao->m_indexBuffer.SetDynamic(true);
+        m_gfxDataLayout->m_indexBuffer.SetDynamic(true);
         UpdateIndexBuffer();
     }
     else if (m_indices.IsDirty(forceUpdate)) {
@@ -179,20 +179,20 @@ bool Mesh::UpdateVAO(bool createVertexIndex, bool createTangents, bool forceUpda
         }
         ++i;
     }
-    m_vao->Disable();
+    m_gfxDataLayout->Disable();
     return true;
 }
 
 
-void Mesh::ResetVAO(void) {
+void Mesh::ResetGfxDataLayout(void) {
     m_indices.Reset();
     m_vertices.Reset();
     for (auto& tc : m_texCoords)
         tc.Reset();
     m_vertexColors.Reset();
     m_normals.Reset();
-    if (m_vao)
-        m_vao->Destroy();
+    if (m_gfxDataLayout)
+        m_gfxDataLayout->Destroy();
 }
 
 void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, TextureType textureType) {
@@ -239,9 +239,9 @@ noexcept
 }
 
 bool Mesh::Render(std::span<Texture* const> textures, float alpha) {
-    if (not m_vao->IsValid())
+    if (not m_gfxDataLayout->IsValid())
         return false;
-    m_vao->Render(textures);
+    m_gfxDataLayout->Render(textures);
     return true;
 }
 
@@ -255,7 +255,7 @@ noexcept(
  noexcept(m_vertexColors.Destroy()) &&
  noexcept(m_indices.Destroy()) &&
  noexcept(m_textures.Clear()) &&
- noexcept(m_vao->Destroy()))
+ noexcept(m_gfxDataLayout->Destroy()))
 {
     m_vertices.Destroy();
     m_normals.Destroy();
@@ -268,10 +268,10 @@ noexcept(
     m_vertexColors.Destroy();
     m_indices.Destroy();
     m_textures.Clear();
-    if (m_vao)
-        m_vao->Destroy();
-    delete m_vao;
-    m_vao = nullptr;
+    if (m_gfxDataLayout)
+        m_gfxDataLayout->Destroy();
+    delete m_gfxDataLayout;
+    m_gfxDataLayout = nullptr;
     m_vMax = Vector3f{ -1e6, -1e6, -1e6 }; 
     m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; 
 }

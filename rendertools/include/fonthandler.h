@@ -46,7 +46,7 @@ private:
     String                      m_glyphs;
     RGBAColor                   m_color;
     GlyphSize                   m_maxGlyphSize;
-    VAO                         m_vao;
+    GfxDataLayout                         m_gfxDataLayout;
     bool                        m_isAvailable;
 
     AVLTree<String, GlyphInfo>  m_glyphDict;

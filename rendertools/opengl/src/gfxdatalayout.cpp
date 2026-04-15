@@ -1,5 +1,5 @@
 
-#include "vao.h"
+#include "gfxDataLayout.h"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
 
@@ -21,27 +21,13 @@ static GLenum ToGLenum(ComponentType ct) noexcept {
 
 // =================================================================================================
 
-VAO* VAO::activeVAO = 0;
-List<VAO*> VAO::vaoStack;
+GfxDataLayout* GfxDataLayout::activeLayout = 0;
+List<GfxDataLayout*> GfxDataLayout::layoutStack;
 
 // =================================================================================================
-// "Premium version of" OpenGL vertex array objects. CVAO instances offer methods to convert python
-// lists into the corresponding lists of OpenGL items (vertices, normals, texture coordinates, etc)
-// The current implementation requires a fixed order of array buffer creation to comply with the 
-// corresponding layout positions in the shaders implemented here.
-// Currently offers shaders for cubemap and regular (2D) texturing.
-// Implements loading of varying textures, so an application item derived from or using a CVAO instance
-// (e.g. an ico sphere) can be reused by different other application items that require different 
-// texturing. This implementation basically allows for reusing one single ico sphere instance whereever
-// a sphere is needed.
-// Supports indexed and non indexed vertex buffer objects.
-//
-// // Due to the current shader implementation (fixed position layout), buffers need to be passed in a
-// fixed sequence: vertices, colors, ...
-// TODO: Expand shader for all kinds of inputs (texture coordinates, normals)
-// See also https://qastack.com.de/programming/8704801/glvertexattribpointer-clarification
+// Interface to OpenGL VAOs
 
-bool VAO::Create(MeshTopology shape, bool isDynamic)
+bool GfxDataLayout::Create(MeshTopology shape, bool isDynamic)
 noexcept
 {
     m_shape = shape;
@@ -62,13 +48,13 @@ noexcept
 }
 
 
-void VAO::Destroy(void)
+void GfxDataLayout::Destroy(void)
 noexcept
 {
     Disable();
-    for (auto& vbo : m_dataBuffers) {
-        vbo->Destroy();
-        delete vbo;
+    for (auto& gfxDataBuffer : m_dataBuffers) {
+        gfxDataBuffer->Destroy();
+        delete gfxDataBuffer;
     }
     m_indexBuffer.Destroy();
     m_dataBuffers.Clear();
@@ -84,7 +70,7 @@ noexcept
 }
 
 
-VAO& VAO::Copy(VAO const& other) {
+GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other) {
     if (this != &other) {
         Destroy();
         m_dataBuffers = other.m_dataBuffers;
@@ -96,7 +82,7 @@ VAO& VAO::Copy(VAO const& other) {
 }
 
 
-VAO& VAO::Move(VAO& other)
+GfxDataLayout& GfxDataLayout::Move(GfxDataLayout& other)
 noexcept
 {
     if (this != &other) {
@@ -115,21 +101,21 @@ noexcept
 }
 
 
-VBO* VAO::FindBuffer(const char* type, int id, int& index)
+GfxDataBuffer* GfxDataLayout::FindBuffer(const char* type, int id, int& index)
 noexcept
 {
     int i = 0;
-    for (auto vbo : m_dataBuffers) {
-        if (vbo->IsType(type) and vbo->HasID(id)) {
+    for (auto gfxDataBuffer : m_dataBuffers) {
+        if (gfxDataBuffer->IsType(type) and gfxDataBuffer->HasID(id)) {
             index = i;
-            return vbo;
+            return gfxDataBuffer;
         }
         ++i;
     }
     return nullptr;
 }
 
-bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
     if (forceUpdate or buffer.IsDirty()) {
         if (not UpdateDataBuffer(type, id, buffer.GLDataBuffer(), buffer.GLDataSize(), ToGLenum(componentType), size_t(buffer.ComponentCount()), forceUpdate))
             return false;
@@ -138,7 +124,7 @@ bool VAO::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffe
     return true;
 }
 
-void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
+void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
     if (forceUpdate or buffer.IsDirty()) {
         UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), ToGLenum(componentType), forceUpdate);
         buffer.SetDirty(false);
@@ -146,7 +132,7 @@ void VAO::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bo
 }
 
 // add a vertex or index data buffer
-bool VAO::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
+bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
 noexcept
 {
     if (strcmp(type, "Index"))
@@ -156,7 +142,7 @@ noexcept
 }
 
 
-bool VAO::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
 noexcept
 {
     if (dataSize == 0)
@@ -166,22 +152,22 @@ noexcept
         Enable();
 
     int index;
-    VBO* vbo = FindBuffer(type, id, index);
-    if (not vbo and (vbo = new VBO())) { // otherwise index has been initialized by FindBuffer()
-        m_dataBuffers.Append(vbo);
-        vbo->SetDynamic(m_isDynamic);
+    GfxDataBuffer* gfxDataBuffer = FindBuffer(type, id, index);
+    if (not gfxDataBuffer and (gfxDataBuffer = new GfxDataBuffer())) { // otherwise index has been initialized by FindBuffer()
+        m_dataBuffers.Append(gfxDataBuffer);
+        gfxDataBuffer->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
     }
-    if (vbo)
-        vbo->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount, forceUpdate);
+    if (gfxDataBuffer)
+        gfxDataBuffer->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount, forceUpdate);
 
     if (disabled)
         Disable();
-    return vbo != nullptr;
+    return gfxDataBuffer != nullptr;
 }
 
 
-void VAO::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate)
+void GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate)
 noexcept
 {
     bool disabled = not IsActive() or not IsBound();
@@ -193,7 +179,7 @@ noexcept
 }
 
 
-bool VAO::Enable(void)
+bool GfxDataLayout::Enable(void)
 noexcept
 {
     if (not m_handle.IsAvailable())
@@ -212,7 +198,7 @@ noexcept
 }
 
 
-void VAO::Disable(void)
+void GfxDataLayout::Disable(void)
 noexcept
 {
     Deactivate();
@@ -224,16 +210,16 @@ noexcept
 
 #ifdef _DEBUG
 
-bool checkVAO = false;
+bool checkLayout = false;
 
-static void DumpVBO(GLuint vbo, int elemSize, const char* label) {
-    std::cout << "=== VBO Dump: " << label << " (ID: " << vbo << ") ===" << std::endl;
+static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label) {
+    std::cout << "=== gfxDataBufferId Dump: " << label << " (ID: " << gfxDataBufferId << ") ===" << std::endl;
 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, gfxDataBufferId);
     GLint bufSize;
     glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufSize);
 
-    // VBO Gr��e checken
+    // gfxDataBufferId Gr��e checken
     GLint size;
     glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
     std::cout << "Buffer size: " << size << " bytes" << std::endl;
@@ -251,13 +237,13 @@ static void DumpVBO(GLuint vbo, int elemSize, const char* label) {
 }
 
 
-static void CheckVAO(GLuint handle, const char* label = "") {
+static void checkLayout(GLuint handle, const char* label = "") {
 #if 1
-    std::cout << "=== VAO Check: " << label << " (ID: " << handle << ") ===" << std::endl;
+    std::cout << "=== GfxDataLayout Check: " << label << " (ID: " << handle << ") ===" << std::endl;
 #endif
     glBindVertexArray(handle);
 
-    // Array Buffer Binding (sollte normalerweise 0 sein wenn VAO korrekt setup)
+    // Array Buffer Binding (sollte normalerweise 0 sein wenn GfxDataLayout korrekt setup)
     GLint arrayBuffer;
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
 #if 1
@@ -285,9 +271,9 @@ static void CheckVAO(GLuint handle, const char* label = "") {
             std::cout << "  Attr " << i << ": enabled, size=" << size
                 << ", type=0x" << std::hex << type << std::dec
                 << ", stride=" << stride
-                << ", VBO=" << bufferBinding
+                << ", gfxDataBufferId=" << bufferBinding
                 << ", offset=" << (size_t)pointer << std::endl;
-            DumpVBO(bufferBinding, size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
+            DumpGfxData(bufferBinding, size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
 #endif
             }
     #if 1
@@ -303,13 +289,13 @@ static void CheckVAO(GLuint handle, const char* label = "") {
 
 #endif
 
-void VAO::Render(std::span<Texture* const> textures)
+void GfxDataLayout::Render(std::span<Texture* const> textures)
 noexcept
 {
 #ifdef _DEBUG
     float* data = (float*)(m_dataBuffers[0]->m_data);
-     if (checkVAO)
-        CheckVAO(m_handle);
+     if (checkLayout)
+        checkLayout(m_handle);
 #endif
     if (not Enable())
         return;

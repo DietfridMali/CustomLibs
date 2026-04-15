@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "vbo.h"
+#include "commandlist.h"
 #include "dx12context.h"
 
 // =================================================================================================
@@ -113,7 +114,7 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* 
         return false;
 
     ID3D12Device* device = dx12Context.Device();
-    if (not device) 
+    if (not device)
         return false;
 
     m_type = type;
@@ -127,16 +128,65 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* 
     m_itemCount = uint32_t(dataSize / ((m_itemSize > 0) ? m_itemSize : 1));
     m_size = uint32_t(dataSize);
 
-    // (Re-)create GPU buffer if size changed or not yet created
-    if (not m_resource or (m_resource->GetDesc().Width < dataSize)) {
-        if (not Create(device, dataSize))
-            return false;
+    CommandList* cl = commandListHandler.GetCurrentCmdListObj();
+    if (m_isDynamic and cl) {
+        // Multi-buffer path: each Update within one recording session gets its own chunk.
+        // The chunk pool is per frame slot (indexed by FrameIndex()), so reuse is safe
+        // because BeginFrame waits for the fence covering the previous use of this slot.
+        UINT fi = commandListHandler.CmdQueue().FrameIndex();
+        if (cl->m_id != m_lastCmdListId[fi] or cl->m_executionId != m_lastExecutionId[fi]) {
+            m_chunkIndex[fi] = 0;
+            m_lastCmdListId[fi]    = cl->m_id;
+            m_lastExecutionId[fi]  = cl->m_executionId;
+        }
+
+        int ci = m_chunkIndex[fi];
+        if (ci >= int(m_chunks[fi].size())) {
+            // grow pool: allocate new chunk
+            m_chunks[fi].emplace_back();
+            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
+            D3D12_RESOURCE_DESC rd{};
+            rd.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
+            rd.Width            = dataSize;
+            rd.Height           = rd.DepthOrArraySize = rd.MipLevels = 1;
+            rd.SampleDesc.Count = 1;
+            rd.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+                D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_chunks[fi].back()));
+            if (FAILED(hr)) {
+                m_chunks[fi].pop_back();
+                return false;
+            }
+        } else if (m_chunks[fi][ci]->GetDesc().Width < dataSize) {
+            // existing chunk too small — reallocate in place
+            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
+            D3D12_RESOURCE_DESC rd{};
+            rd.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
+            rd.Width            = dataSize;
+            rd.Height           = rd.DepthOrArraySize = rd.MipLevels = 1;
+            rd.SampleDesc.Count = 1;
+            rd.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            m_chunks[fi][ci].Reset();
+            HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+                D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_chunks[fi][ci]));
+            if (FAILED(hr))
+                return false;
+        }
+
+        m_resource = m_chunks[fi][ci];
+        ++m_chunkIndex[fi];
+    } else {
+        // Static / no active command list: (re-)create single buffer if size changed
+        if (not m_resource or (m_resource->GetDesc().Width < dataSize)) {
+            if (not Create(device, dataSize))
+                return false;
+        }
     }
 
     // Upload data
     void* mapped = nullptr;
     D3D12_RANGE range{ 0, 0 };
-    if (FAILED(m_resource->Map(0, &range, &mapped))) 
+    if (FAILED(m_resource->Map(0, &range, &mapped)))
         return false;
     std::memcpy(mapped, data, dataSize);
     m_resource->Unmap(0, nullptr);
@@ -145,13 +195,13 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* 
 
     if (bufferType == GfxBufferTarget::Index) {
         m_ibv.BufferLocation = gpuAddr;
-        m_ibv.SizeInBytes = UINT(dataSize);
-        m_ibv.Format = IndexFormatFromComponentType(componentType);
-    } 
+        m_ibv.SizeInBytes    = UINT(dataSize);
+        m_ibv.Format         = IndexFormatFromComponentType(componentType);
+    }
     else {
-        m_vbv.BufferLocation = gpuAddr;
-        m_vbv.SizeInBytes = UINT(dataSize);
-        m_vbv.StrideInBytes = UINT(m_itemSize);
+        m_vbv.BufferLocation  = gpuAddr;
+        m_vbv.SizeInBytes     = UINT(dataSize);
+        m_vbv.StrideInBytes   = UINT(m_itemSize);
     }
 
     return true;
@@ -160,6 +210,8 @@ bool VBO::Update(const char* type, GfxBufferTarget bufferType, int index, void* 
 
 void VBO::Destroy(void) noexcept
 {
+    for (UINT i = 0; i < FRAME_COUNT; ++i)
+        m_chunks[i].clear();
     m_resource.Reset();
     m_vbv = {};
     m_ibv = {};

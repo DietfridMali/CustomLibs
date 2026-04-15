@@ -14,7 +14,7 @@
 // =================================================================================================
 // OpenGL vertex buffer handling: Creation, sending attributes to OpenGL, binding for rendering
 
-class VBO
+class GfxDataBuffer
 {
 public:
 
@@ -35,7 +35,7 @@ public:
     GLenum              m_componentType;
     bool                m_isDynamic;
 
-    VBO(const char* type = "", int id = 0, GLint bufferType = GL_ARRAY_BUFFER, bool isDynamic = true)
+    GfxDataBuffer(const char* type = "", int id = 0, GLint bufferType = GL_ARRAY_BUFFER, bool isDynamic = true)
         noexcept;
 
     void Reset(void) {
@@ -48,23 +48,23 @@ public:
         m_isDynamic = true;
     }
 
-    VBO(VBO const& other) {
+    GfxDataBuffer(GfxDataBuffer const& other) {
         Copy(other);
     }
 
-    VBO& operator=(VBO const& other) {
+    GfxDataBuffer& operator=(GfxDataBuffer const& other) {
         Copy(other);
         return *this;
     }
 
-    VBO& operator=(VBO&& other) noexcept {
+    GfxDataBuffer& operator=(GfxDataBuffer&& other) noexcept {
         Move(other);
         return *this;
     }
 
-    VBO& Copy(VBO const& other);
+    GfxDataBuffer& Copy(GfxDataBuffer const& other);
 
-    VBO& Move(VBO& other)
+    GfxDataBuffer& Move(GfxDataBuffer& other)
         noexcept;
 
     inline void Bind(void)

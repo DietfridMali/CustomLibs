@@ -100,7 +100,7 @@ public:
     D3D12_RESOURCE_STATES   m_colorStates[RT_MAX_COLOR_BUFFERS]{};
 
     // Own command list — all rendering into this RenderTarget is recorded here.
-    CommandList             m_cmdList;
+    CommandList*            m_cmdList{ nullptr };
 
     // -------------------------------------------------------------------------
 
@@ -142,7 +142,7 @@ public:
     // Called by DrawBufferHandler::SetActiveDrawBuffers().
     void BindRenderTargets(ID3D12GraphicsCommandList* list);
 
-    inline CommandList& GetCmdList(void) noexcept { return m_cmdList; }
+    inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
 
     void SetViewport(bool flipVertically = false) noexcept;
 

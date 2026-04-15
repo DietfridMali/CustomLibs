@@ -108,7 +108,7 @@ bool RenderTarget::CreateColorBuffer(int i, int width, int height)
 
     // Transition RT → PSR using the RenderTarget's own list (already open from Create()).
     // m_colorStates[i] accurately reflects the actual GPU state because the list IS open.
-    auto* list = m_cmdList.List();
+    auto* list = m_cmdList->List();
     if (list) {
         D3D12_RESOURCE_BARRIER b{};
         b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -170,9 +170,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     int h = height * scale;
 
     // Create the RenderTarget's own command list and open it so CreateColorBuffer can record barriers.
-    if (not m_cmdList.Create(device, m_name.IsEmpty() ? String("RenderTarget") : m_name))
+    delete m_cmdList;
+    m_cmdList = commandListHandler.CreateCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name);
+    if (not m_cmdList)
         return false;
-    if (not m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex()))
+    if (not m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex()))
         return false;
 
     for (int i = 0; i < m_colorBufferCount; ++i) {
@@ -191,7 +193,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     }
 
     // Submit the initial RT→PSR barriers immediately and wait; leaves the list closed.
-    m_cmdList.Flush();
+    m_cmdList->Flush();
 
     m_viewport = Viewport(0, 0, w, h);
     m_isAvailable = true;
@@ -245,7 +247,8 @@ void RenderTarget::FreeSRVs(void) {
 
 void RenderTarget::Destroy(void)
 {
-    m_cmdList.Destroy();
+    delete m_cmdList;
+    m_cmdList = nullptr;
     FreeRTVs();
     FreeSRVs();
     for (int i = 0; i < m_colorBufferCount; ++i) {
@@ -312,9 +315,9 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
     m_activeBufferIndex = (bufferIndex < 0) ? 0 : (bufferIndex % m_bufferCount);
     m_drawBufferGroup = drawBufferGroup;
 
-    if (not m_cmdList.Open(commandListHandler.CmdQueue().FrameIndex()))
+    if (not m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex()))
         return false;
-    auto* list = m_cmdList.List();
+    auto* list = m_cmdList->List();
 
     BindRenderTargets(list);
 
@@ -339,15 +342,15 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
 void RenderTarget::Disable(bool flush)
 {
     // Transition all color buffers back to PSR so they can be sampled in subsequent passes.
-    auto* list = m_cmdList.List();
+    auto* list = m_cmdList->List();
     for (int i = 0; i < m_colorBufferCount; ++i)
         TransitionColor(list, i, m_colorStates[i], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     if (flush) {
-        m_cmdList.Flush();
+        m_cmdList->Flush();
         FreeRTVs();
     }
     else
-        m_cmdList.Close();
+        m_cmdList->Close();
 }
 
 
@@ -368,7 +371,7 @@ void RenderTarget::SetViewport(bool flipVertically) noexcept
 
 void RenderTarget::Fill(RGBAColor color)
 {
-    auto* list = m_cmdList.List();
+    auto* list = m_cmdList->List();
     if (not list)
         return;
     float c[4] = { color.R(), color.G(), color.B(), color.A() };
@@ -382,7 +385,7 @@ void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups /*drawBufferGroup*/,
 {
     if (not clear)
         return;
-    auto* list = m_cmdList.List();
+    auto* list = m_cmdList->List();
     if (not list)
         return;
     const float zero[4] = { 0, 0, 0, 0 };
@@ -414,7 +417,7 @@ void RenderTarget::ClearStencil(void)
 {
     if (not m_dsvHandle.IsValid())
         return;
-    auto* list = m_cmdList.List();
+    auto* list = m_cmdList->List();
     if (not list)
         return;
     list->ClearDepthStencilView(m_dsvHandle.cpu, D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
@@ -465,7 +468,7 @@ bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
     int dst = params.destination;
     if (dst >= 0) {
         dst = dst % m_bufferCount;
-        auto* list = m_cmdList.List();
+        auto* list = m_cmdList->List();
         if (list) {
             TransitionColor(list, dst, m_colorStates[dst], D3D12_RESOURCE_STATE_RENDER_TARGET);
             list->OMSetRenderTargets(1, &m_rtvHandles[dst].cpu, FALSE,
@@ -478,7 +481,7 @@ bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
     }
     RenderTexture(tex, params, color);
     if (dst >= 0) {
-        auto* list = m_cmdList.List();
+        auto* list = m_cmdList->List();
         TransitionColor(list, dst, D3D12_RESOURCE_STATE_RENDER_TARGET,
                         D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     }

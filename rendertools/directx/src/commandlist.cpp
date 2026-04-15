@@ -115,6 +115,7 @@ bool CommandList::Create(ID3D12Device* device, const String& name) noexcept {
         return false;
     }
     m_list->Close();
+    m_id = commandListHandler.m_cmdListId++;
     if (not name.IsEmpty())
         m_list->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
     return true;
@@ -145,7 +146,9 @@ bool CommandList::Open(UINT frameIndex) noexcept {
         return false;
     }
     m_isRecording = true;
+    ++m_executionId;
     commandListHandler.PushList(m_list.Get());
+    commandListHandler.PushCmdList(this);
     commandListHandler.Register(this);
     return true;
 }
@@ -159,6 +162,7 @@ void CommandList::Close(void) noexcept {
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
     commandListHandler.PopList();
+    commandListHandler.PopCmdList();
 }
 
 
@@ -173,6 +177,7 @@ void CommandList::Flush(void) noexcept {
         return;
     }
     commandListHandler.PopList();
+    commandListHandler.PopCmdList();
     ID3D12CommandList* lists[] = { m_list.Get() };
     commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
 #ifdef _DEBUG
@@ -246,6 +251,18 @@ void CommandListHandler::PopList(void) noexcept {
 }
 
 
+void CommandListHandler::PushCmdList(CommandList* cl) noexcept {
+    if (m_currentCmdList)
+        m_cmdListObjStack.Push(m_currentCmdList);
+    m_currentCmdList = cl;
+}
+
+
+void CommandListHandler::PopCmdList(void) noexcept {
+    m_currentCmdList = (m_cmdListObjStack.Length() > 0) ? m_cmdListObjStack.Pop() : nullptr;
+}
+
+
 void CommandListHandler::Register(CommandList* cl) noexcept {
     if (not cl)
         return;
@@ -284,6 +301,19 @@ void CommandListHandler::ExecuteAll(void) noexcept {
 #endif
     m_pendingLists.Clear();
     m_listStack.Clear();
+}
+
+
+CommandList* CommandListHandler::CreateCmdList(const String& name) noexcept {
+    ID3D12Device* device = dx12Context.Device();
+    if (not device)
+        return nullptr;
+    CommandList* cl = new CommandList();
+    if (not cl->Create(device, name)) {
+        delete cl;
+        return nullptr;
+    }
+    return cl;
 }
 
 

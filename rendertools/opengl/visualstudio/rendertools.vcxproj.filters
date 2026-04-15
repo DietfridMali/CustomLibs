@@ -48,7 +48,7 @@
     <ClInclude Include="..\..\include\mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\outlinerenderer.h">
+    <ClInclude Include="..\..\include\texteffects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\projector.h">
@@ -78,7 +78,7 @@
     <ClInclude Include="..\include\EnableTe.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\vbo.h">
+    <ClInclude Include="..\include\gfxdatabuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\vertexdatabuffers.h">
@@ -177,7 +177,7 @@
     <ClInclude Include="..\..\include\glbloader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\vao.h">
+    <ClInclude Include="..\include\gfxdatalayout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxtypes.h">
@@ -215,10 +215,10 @@
     <ClCompile Include="..\..\src\rendermatrices.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\vao.cpp">
+    <ClCompile Include="..\src\gfxdatalayout.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\vbo.cpp">
+    <ClCompile Include="..\src\gfxdatabuffer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\viewport.cpp">
@@ -227,7 +227,7 @@
     <ClCompile Include="..\..\src\coplanar_rectangle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\outlinerenderer.cpp">
+    <ClCompile Include="..\..\src\texteffects.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\linesegment.cpp">

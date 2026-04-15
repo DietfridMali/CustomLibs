@@ -41,7 +41,7 @@ protected:
     RenderTarget*           m_sceneBuffer;
     RenderTarget*           m_skyBuffer;
     Texture                 m_renderTexture;
-    CommandList             m_cmdList;
+    CommandList*            m_cmdList{ nullptr };
     bool                    m_screenIsAvailable;
 
     Viewport                m_viewport;
@@ -70,6 +70,11 @@ public:
     bool                    m_xchgSkyAndSceneBuffer{ false };
 #endif
 
+    virtual ~BaseRenderer() {
+        delete m_cmdList;
+        m_cmdList = nullptr;
+    }
+
     BaseRenderer()
         : m_screenBuffer(nullptr)
         , m_sceneBuffer(nullptr)
@@ -95,7 +100,7 @@ public:
         return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance());
     }
 
-    inline CommandList& GetCmdList(void) noexcept { return m_cmdList; }
+    inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
 
     // DX12 one-time init (no equivalent of glewInit).
     bool InitDirectX(void) noexcept;
@@ -128,7 +133,7 @@ public:
 
     // Sets default DX12 pipeline state (depth, blend, rasterizer …).
     // Mirrors SetupOpenGL from the OGL version — same call sites, DX12 internals.
-    void SetupDirectX(void) noexcept;
+    void SetupGraphics(void) noexcept;
 
     void SetDefaultStates(void) noexcept;
 

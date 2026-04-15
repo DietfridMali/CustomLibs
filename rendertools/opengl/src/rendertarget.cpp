@@ -291,7 +291,7 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 }
 
 
-void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) { // clear color has been set in Renderer.SetupOpenGL()
+void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) { // clear color has been set in Renderer.SetupGraphics()
     if (clear) {
         baseRenderer.PushViewport();
         glViewport(0, 0, m_width * m_scale, m_height * m_scale);
@@ -341,7 +341,7 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
 }
 
 
-void RenderTarget::Disable(bool flush = false) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+void RenderTarget::Disable(bool flush) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
         if (IsEnabled()) {

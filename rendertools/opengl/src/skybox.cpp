@@ -70,7 +70,7 @@ bool Skybox::Setup(const String& textureFolder) {
 	indices.Resize(sizeof(Cube::triangleIndices) / sizeof(GLuint));
 	memcpy(indices.Data(), Cube::triangleIndices, sizeof(Cube::triangleIndices));
 	m_skybox->SetIndices(indices);
-	m_skybox->UpdateVAO();
+	m_skybox->UpdateGfxData();
 	return true;
 }
 
