@@ -18,14 +18,14 @@
 
 void DrawBufferHandler::SetActiveDrawBuffers(void) {
     glDrawBuffers(ActiveDrawBuffers()->Length(), ActiveDrawBuffers()->Data());
-    if (m_drawBufferInfo.m_fbo)
-        glViewport(0, 0, m_drawBufferInfo.m_fbo->GetWidth(true), m_drawBufferInfo.m_fbo->GetHeight(true));
+    if (m_drawBufferInfo.m_renderTarget)
+        glViewport(0, 0, m_drawBufferInfo.m_renderTarget->GetWidth(true), m_drawBufferInfo.m_renderTarget->GetHeight(true));
     else
         glViewport(0, 0, m_windowWidth, m_windowHeight);
 }
 
 
-bool DrawBufferHandler::SetActiveBuffer(FBO* buffer, bool clearBuffer) {
+bool DrawBufferHandler::SetActiveBuffer(RenderTarget* buffer, bool clearBuffer) {
     if (m_activeBuffer != buffer) {
         if (m_activeBuffer)
             m_activeBuffer->Disable();
@@ -39,15 +39,15 @@ void DrawBufferHandler::SetupDrawBuffers(void) {
     m_defaultDrawBuffers.Resize(1);
     m_defaultDrawBuffers[0] = GL_BACK;
     m_drawBufferInfo.Update(nullptr, &m_defaultDrawBuffers);
-    ResetDrawBuffers(nullptr); // required to initialize m_drawBufferInfo. If not done here, subsequent renders to FBOs ahead of main rendering loop will crash the app
+    ResetDrawBuffers(nullptr); // required to initialize m_drawBufferInfo. If not done here, subsequent renders to render targets ahead of main rendering loop will crash the app
 }
 
 
-void DrawBufferHandler::ResetDrawBuffers(FBO* activeBuffer, bool clearBuffer) {
+void DrawBufferHandler::ResetDrawBuffers(RenderTarget* activeBuffer, bool clearBuffer) {
     // m_defaultDrawBufferInfo must always be the first entry in the drawBufferStack, so it must be the final draw buffer info retrieved
     while ((m_drawBufferStack.Length() > 0) and m_drawBufferStack.Pop(m_drawBufferInfo)) {
-        if (m_drawBufferInfo.m_fbo)
-            m_drawBufferInfo.m_fbo->Disable();
+        if (m_drawBufferInfo.m_renderTarget)
+            m_drawBufferInfo.m_renderTarget->Disable();
     }
     //m_drawBufferInfo.Update(nullptr, &m_defaultDrawBuffers);
     if (not SetActiveBuffer(activeBuffer, clearBuffer)) {
@@ -61,10 +61,10 @@ void DrawBufferHandler::SaveDrawBuffer() {
 }
 
 
-void DrawBufferHandler::SetDrawBuffers(FBO* fbo, AutoArray<GLuint>* drawBuffers) {
-    if ((fbo == nullptr) or (m_drawBufferInfo.m_fbo == nullptr) or (fbo->m_handle != m_drawBufferInfo.m_fbo->m_handle)) {
+void DrawBufferHandler::SetDrawBuffers(RenderTarget* renderTarget, AutoArray<GLuint>* drawBuffers) {
+    if ((renderTarget == nullptr) or (m_drawBufferInfo.m_renderTarget == nullptr) or (renderTarget->m_handle != m_drawBufferInfo.m_renderTarget->m_handle)) {
         SaveDrawBuffer();
-        m_drawBufferInfo = DrawBufferInfo(fbo, drawBuffers);
+        m_drawBufferInfo = DrawBufferInfo(renderTarget, drawBuffers);
     }
     SetActiveDrawBuffers();
 }
@@ -73,17 +73,17 @@ void DrawBufferHandler::SetDrawBuffers(FBO* fbo, AutoArray<GLuint>* drawBuffers)
 void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
     gfxDriverStates.BindTexture2D(0, 0);
-    if (m_drawBufferInfo.m_fbo != nullptr)
-        m_drawBufferInfo.m_fbo->Reenable(false, true);
+    if (m_drawBufferInfo.m_renderTarget != nullptr)
+        m_drawBufferInfo.m_renderTarget->Reenable(false, true);
     else
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     SetActiveDrawBuffers();
 }
 
 
-void DrawBufferHandler::RemoveDrawBuffer(FBO* buffer) {
+void DrawBufferHandler::RemoveDrawBuffer(RenderTarget* buffer) {
     for (auto& dbi : m_drawBufferStack)
-        if (dbi.m_fbo == buffer)
+        if (dbi.m_renderTarget == buffer)
             m_drawBufferStack.Remove(dbi);
 }
 

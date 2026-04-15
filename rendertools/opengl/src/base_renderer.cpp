@@ -53,9 +53,9 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
 bool BaseRenderer::CreateScreenBuffer(void) {
     if (m_screenBuffer)
         delete m_screenBuffer;
-    if (not (m_screenBuffer = new FBO()))
+    if (not (m_screenBuffer = new RenderTarget()))
         return false;
-    m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 }); // FBO for entire screen incl. 2D elements (e.g. UI)
+    m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 }); // RenderTarget for entire screen incl. 2D elements (e.g. UI)
     return true;
 }
 
@@ -151,7 +151,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
 bool BaseRenderer::Start3DScene(void) {
     SetupOpenGL();
     m_frameCounter.Start();
-    FBO* sceneBuffer = GetSceneBuffer();
+    RenderTarget* sceneBuffer = GetSceneBuffer();
     if (not (sceneBuffer and sceneBuffer->IsAvailable()))
         return false;
     ResetDrawBuffers(sceneBuffer);
@@ -302,11 +302,11 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // Column-major Initializer-Reihenfolge (GLM!):
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept { //, bool isFBO) {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept { //, bool isRenderTarget) {
     if (windowWidth * windowHeight == 0) {
-        if (m_drawBufferInfo.m_fbo) {
-            windowWidth = m_drawBufferInfo.m_fbo->GetWidth(true);
-            windowHeight = m_drawBufferInfo.m_fbo->GetHeight(true);
+        if (m_drawBufferInfo.m_renderTarget) {
+            windowWidth = m_drawBufferInfo.m_renderTarget->GetWidth(true);
+            windowHeight = m_drawBufferInfo.m_renderTarget->GetHeight(true);
         }
         else {
             windowWidth = m_windowWidth;

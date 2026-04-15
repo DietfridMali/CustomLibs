@@ -17,7 +17,7 @@ bool ShadowMap::Setup(void) {
 bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	m_status = -1;
 #if !DEMO
-	if (not (m_map = new FBO()))
+	if (not (m_map = new RenderTarget()))
 		return false;
 	int size;
 	for (size = gfxDriverStates.MaxTextureSize(); size >= 1024; size /= 2) {
@@ -45,7 +45,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	if (not IsReady())
 		return false;
 	baseRenderer.StartShadowPass();
-	m_map->Enable(0, FBO::dbDepth);
+	m_map->Enable(0, RenderTarget::dbDepth);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	EnableCamera();
 	gfxDriverStates.SetDepthTest(1);

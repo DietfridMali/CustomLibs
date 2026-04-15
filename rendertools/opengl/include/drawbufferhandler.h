@@ -7,27 +7,27 @@
 #include "std_defines.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
-#include "fbo.h"
+#include "rendertarget.h"
 
 // =================================================================================================
 
 class DrawBufferInfo {
 public:
-    FBO*                    m_fbo;
+    RenderTarget*                    m_renderTarget;
     AutoArray<GLuint>*   m_drawBuffers;
 
 public:
-    DrawBufferInfo(FBO* fbo = nullptr, AutoArray<GLuint>* drawBuffers = nullptr) {
-        Update(fbo, drawBuffers);
+    DrawBufferInfo(RenderTarget* renderTarget = nullptr, AutoArray<GLuint>* drawBuffers = nullptr) {
+        Update(renderTarget, drawBuffers);
     }
 
-    inline void Update (FBO* fbo, AutoArray<GLuint>* drawBuffers) {
-        m_fbo = fbo;
+    inline void Update (RenderTarget* renderTarget, AutoArray<GLuint>* drawBuffers) {
+        m_renderTarget = renderTarget;
         m_drawBuffers = drawBuffers;
     }
 
     bool operator==(const DrawBufferInfo& other) const {
-        return other.m_fbo == m_fbo;
+        return other.m_renderTarget == m_renderTarget;
     }
 };
 
@@ -37,7 +37,7 @@ public:
 class DrawBufferHandler
 {
     protected:
-        FBO*                    m_activeBuffer;
+        RenderTarget*                    m_activeBuffer;
         AutoArray<GLuint>    m_defaultDrawBuffers;
         DrawBufferInfo          m_drawBufferInfo;
         List<DrawBufferInfo>    m_drawBufferStack;
@@ -53,7 +53,7 @@ class DrawBufferHandler
             m_windowHeight = windowHeight;
         }
 
-        bool SetActiveBuffer(FBO* buffer, bool clearBuffer = false);
+        bool SetActiveBuffer(RenderTarget* buffer, bool clearBuffer = false);
 
         inline AutoArray<GLuint>* ActiveDrawBuffers(void) {
             return m_drawBufferInfo.m_drawBuffers;
@@ -65,13 +65,13 @@ class DrawBufferHandler
 
         void SaveDrawBuffer();
 
-        void SetDrawBuffers(FBO* fbo, AutoArray<GLuint>* drawBuffers);
+        void SetDrawBuffers(RenderTarget* renderTarget, AutoArray<GLuint>* drawBuffers);
 
         void RestoreDrawBuffer(void);
 
-        void RemoveDrawBuffer(FBO* buffer);
+        void RemoveDrawBuffer(RenderTarget* buffer);
 
-        void ResetDrawBuffers(FBO* activeBuffer, bool clearBuffer = true);
+        void ResetDrawBuffers(RenderTarget* activeBuffer, bool clearBuffer = true);
 };
 
 // =================================================================================================

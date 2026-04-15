@@ -11,7 +11,7 @@
 #include "projector.h"
 #include "rendermatrices.h"
 #include "viewport.h"
-#include "fbo.h"
+#include "rendertarget.h"
 #include "drawbufferhandler.h"
 #include "gfxdriverstates.h"
 #include "framecounter.h"
@@ -37,9 +37,9 @@ public:
     };
 
 protected:
-    FBO*                    m_screenBuffer;
-    FBO*                    m_sceneBuffer;
-    FBO*                    m_skyBuffer;
+    RenderTarget*                    m_screenBuffer;
+    RenderTarget*                    m_sceneBuffer;
+    RenderTarget*                    m_skyBuffer;
     Texture                 m_renderTexture;
     bool                    m_screenIsAvailable;
 
@@ -103,7 +103,7 @@ public:
 
     bool CreateScreenBuffer(void);
 
-    virtual FBO* GetSceneBuffer(void) noexcept {
+    virtual RenderTarget* GetSceneBuffer(void) noexcept {
 #ifdef _DEBUG
         return m_xchgSkyAndSceneBuffer ? m_skyBuffer : m_sceneBuffer;
 #else
@@ -111,7 +111,7 @@ public:
 #endif
     }
 
-    FBO* GetSkyBuffer(void) noexcept {
+    RenderTarget* GetSkyBuffer(void) noexcept {
 #ifdef _DEBUG
         return m_xchgSkyAndSceneBuffer ? m_sceneBuffer : m_skyBuffer;
 #else
@@ -182,7 +182,7 @@ public:
 
     virtual bool DisableCamera(void) { return false; }
 
-    inline FBO* ScreenBuffer(void) noexcept { return m_screenBuffer; }
+    inline RenderTarget* ScreenBuffer(void) noexcept { return m_screenBuffer; }
 
     inline int WindowWidth(void) noexcept { return m_windowWidth; }
 
@@ -234,7 +234,7 @@ public:
     void SetViewport(bool flipVertically = false)
         noexcept;
 
-    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipViewportVertically = false, bool flipWindowVertically = false) noexcept; // , bool isFBO = false);
+    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipViewportVertically = false, bool flipWindowVertically = false) noexcept; // , bool isRenderTarget = false);
 
     void PushViewport(void) {
         m_viewport.GetGpuViewport();

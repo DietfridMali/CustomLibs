@@ -39,7 +39,7 @@
     <ClInclude Include="..\include\base_displayhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\fbo.h">
+    <ClInclude Include="..\include\rendertarget.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\icosphere.h">
@@ -194,7 +194,7 @@
     <ClCompile Include="..\src\base_displayhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\fbo.cpp">
+    <ClCompile Include="..\src\rendertarget.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\icosphere.cpp">

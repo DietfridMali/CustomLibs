@@ -43,7 +43,7 @@ public:
 
 // =================================================================================================
 
-class FBO {
+class RenderTarget {
 public:
     using DrawBufferList = AutoArray <GLuint>;
 
@@ -74,8 +74,8 @@ public:
     DrawBufferList              m_drawBuffers; 
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
-    FBOTexture                  m_renderTexture;
-    FBOTexture                  m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
+    RenderTargetTexture                  m_renderTexture;
+    RenderTargetTexture                  m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
     bool                        m_isAvailable;
     int                         m_lastDestination;
@@ -84,7 +84,7 @@ public:
 
     static GLint                m_activeHandle;
 
-    struct FBOBufferParams {
+    struct RTBufferParams {
         String name{ "" };
         int colorBufferCount{ 1 };
         int depthBufferCount{ 0 };
@@ -93,7 +93,7 @@ public:
         bool hasMRTs{ false };
     };
 
-    struct FBORenderParams {
+    struct RTRenderParams {
         int source{ 0 };
         int destination{ -1 };
         bool clearBuffer{ true };
@@ -105,15 +105,15 @@ public:
         Shader* shader{ nullptr };
     };
 
-    FBO();
+    RenderTarget();
 
-    ~FBO() {
+    ~RenderTarget() {
         Destroy();
     }
 
     void Init(void);
 
-    bool Create(int width, int height, int scale, const FBOBufferParams& params);
+    bool Create(int width, int height, int scale, const RTBufferParams& params);
 
     void Destroy(void);
 
@@ -135,39 +135,39 @@ public:
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
     inline void ClearStencil(void) { glClear(GL_STENCIL_BUFFER_BIT); }
 
-    Texture* GetRenderTexture(const FBORenderParams& params, int tmuIndex = 0);
+    Texture* GetRenderTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthTexture(void);
 
-    bool UpdateTransformation(const FBORenderParams& params);
+    bool UpdateTransformation(const RTRenderParams& params);
 
-    bool RenderTexture(Texture* texture, const FBORenderParams& params, const RGBAColor& color);
+    bool RenderTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
 
-    inline bool RenderTexture(Texture* texture, const FBORenderParams& params, RGBAColor&& color) {
+    inline bool RenderTexture(Texture* texture, const RTRenderParams& params, RGBAColor&& color) {
         return RenderTexture(texture, params, static_cast<const RGBAColor&>(color));
     }
 
-    inline bool RenderTexture(Texture* texture, const FBORenderParams& params) {
+    inline bool RenderTexture(Texture* texture, const RTRenderParams& params) {
         return RenderTexture(texture, params, ColorData::White);
     }
 
-    bool Render(const FBORenderParams& params, const RGBAColor& color);
+    bool Render(const RTRenderParams& params, const RGBAColor& color);
 
-    inline bool Render(const FBORenderParams& params, RGBAColor&& color) {
+    inline bool Render(const RTRenderParams& params, RGBAColor&& color) {
         return Render(params, static_cast<const RGBAColor&>(color));
     }
 
-    inline bool Render(const FBORenderParams& params) {
+    inline bool Render(const RTRenderParams& params) {
         return Render(params, ColorData::White);
     }
 
-    bool AutoRender(const FBORenderParams& params, const RGBAColor& color);
+    bool AutoRender(const RTRenderParams& params, const RGBAColor& color);
 
-    bool AutoRender(const FBORenderParams& params, RGBAColor&& color) {
+    bool AutoRender(const RTRenderParams& params, RGBAColor&& color) {
         return AutoRender(params, static_cast<const RGBAColor&>(color));
     }
 
-    bool AutoRender(const FBORenderParams& params) {
+    bool AutoRender(const RTRenderParams& params) {
         return AutoRender(params, ColorData::White);
     }
 
@@ -214,7 +214,7 @@ public:
         return m_bufferInfo[bufferIndex].m_handle;
     }
 
-    FBOTexture* GetTexture(void) noexcept {
+    RenderTargetTexture* GetTexture(void) noexcept {
         return &m_renderTexture;
     }
 
@@ -252,12 +252,12 @@ public:
     }
 
 
-    inline bool operator==(const FBO& other) const noexcept {
+    inline bool operator==(const RenderTarget& other) const noexcept {
         return m_handle == other.m_handle;
     }
 
 
-    inline bool operator!=(const FBO& other) const noexcept {
+    inline bool operator!=(const RenderTarget& other) const noexcept {
         return m_handle != other.m_handle;
     }
 

@@ -1,19 +1,19 @@
 ﻿#include "glew.h"
 #include "conversions.hpp"
-#include "fbo.h"
+#include "rendertarget.h"
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
 
-GLint FBO::m_activeHandle = GL_NONE;
+GLint RenderTarget::m_activeHandle = GL_NONE;
 
 // =================================================================================================
 
-FBO::FBO() {
+RenderTarget::RenderTarget() {
     Init();
 }
 
 
-void FBO::Init(void) {
+void RenderTarget::Init(void) {
     m_handle = SharedFramebufferHandle(0);
     m_renderTexture.m_handle = SharedTextureHandle(0);
     m_renderTexture.HasBuffer() = false;
@@ -36,7 +36,7 @@ void FBO::Init(void) {
 }
 
 
-void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType, bool isMRT) {
+void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType, bool isMRT) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     bufferInfo.Init();
     if (bufferType == BufferInfo::btDepth)
@@ -85,7 +85,7 @@ void FBO::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBuffe
 }
 
 
-int FBO::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount) {
+int RenderTarget::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount) {
 #if 1
     if (not bufferCount)
         return -1;
@@ -96,7 +96,7 @@ int FBO::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmen
 }
 
 
-bool FBO::DetachBuffer(int bufferIndex) {
+bool RenderTarget::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
         return true;
@@ -107,7 +107,7 @@ bool FBO::DetachBuffer(int bufferIndex) {
 }
 
 
-bool FBO::AttachBuffer(int bufferIndex) {
+bool RenderTarget::AttachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
 #ifdef _DEBUG
     if (bufferInfo.m_attachment == GL_NONE)
@@ -126,7 +126,7 @@ bool FBO::AttachBuffer(int bufferIndex) {
 }
 
 
-bool FBO::AttachBuffers(bool hasMRTs) {
+bool RenderTarget::AttachBuffers(bool hasMRTs) {
     if (not m_handle.Claim())
         return false;
     BaseRenderer::ClearGLError();
@@ -158,13 +158,13 @@ bool FBO::AttachBuffers(bool hasMRTs) {
 }
 
 
-void FBO::CreateRenderArea(void) {
+void RenderTarget::CreateRenderArea(void) {
     m_viewportArea.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter], BaseQuad::defaultTexCoords[BaseQuad::tcRegular]);
     m_viewport = Viewport(0, 0, m_width * m_scale, m_height * m_scale);
 }
 
 
-bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params) {
+bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams& params) {
     if (width * height == 0)
         return false;
     m_handle = SharedFramebufferHandle(0);
@@ -192,7 +192,7 @@ bool FBO::Create(int width, int height, int scale, const FBOBufferParams& params
 }
 
 
-void FBO::Destroy(void) {
+void RenderTarget::Destroy(void) {
     for (int i = 0; i < m_bufferCount; i++) {
         m_bufferInfo[i].m_handle.Release();
     }
@@ -201,7 +201,7 @@ void FBO::Destroy(void) {
 }
 
 
-bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
+bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
     int l = m_drawBuffers.Length();
     if (drawBufferGroup == dbDepth) {
         for (int i = 0; i < l; ++i)
@@ -254,7 +254,7 @@ bool FBO::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) 
 }
 
 
-void FBO::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
+void RenderTarget::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
     m_drawBuffers = drawBuffers;
     m_activeBufferIndex = -1;
     m_drawBufferGroup = dbCustom;
@@ -262,15 +262,15 @@ void FBO::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 
 
 // select draw buffer works in conjunction with Renderer::SetDrawBuffers
-// The renderer keeps track of draw buffers and FBOs and stores those being temporarily overriden
-// by other FBOs in a stack. Basically, the current OpenGL draw buffer is set using
-// Renderer::SetDrawBuffers. However, when disabling a temporary render target (FBO), the 
+// The renderer keeps track of draw buffers and render targets and stores those being temporarily overriden
+// by other render targets in a stack. Basically, the current OpenGL draw buffer is set using
+// Renderer::SetDrawBuffers. However, when disabling a temporary render target (RenderTarget), the 
 // previous render target is automatically restored, which means calling its SetDrawBuffers
-// function. To avoid FBO::SetDrawBuffers and Renderer::SetDrawBuffers looping forever,
+// function. To avoid RenderTarget::SetDrawBuffers and Renderer::SetDrawBuffers looping forever,
 // in that case, true is passed for reenable, causing SetDrawBuffers to directly call
 // glDrawBuffers. The effect of that construction is that you can transparently nest 
-// multiple FBO draw buffers.
-bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
+// multiple RenderTarget draw buffers.
+bool RenderTarget::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
         return false;
     if (reenable)
@@ -282,7 +282,7 @@ bool FBO::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, boo
 }
 
 
-bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
+bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
     if (m_depthBufferIndex < 0)
         return false;
     if (bufferIndex >= 0)
@@ -291,7 +291,7 @@ bool FBO::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup
 }
 
 
-void FBO::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) { // clear color has been set in Renderer.SetupOpenGL()
+void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) { // clear color has been set in Renderer.SetupOpenGL()
     if (clear) {
         baseRenderer.PushViewport();
         glViewport(0, 0, m_width * m_scale, m_height * m_scale);
@@ -304,7 +304,7 @@ void FBO::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) 
 }
 
 
-bool FBO::ReattachBuffers(void) {
+bool RenderTarget::ReattachBuffers(void) {
     for (int i = 0; i < m_bufferInfo.Length(); i++)
         if (not AttachBuffer(i))
             return false;
@@ -312,7 +312,7 @@ bool FBO::ReattachBuffers(void) {
 }
 
 
-bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
+bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
     gfxDriverStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
@@ -325,7 +325,7 @@ bool FBO::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool
 }
 
 
-bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
+bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not m_isAvailable)
         return false;
     //BaseRenderer::ClearGLError();
@@ -341,7 +341,7 @@ bool FBO::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear,
 }
 
 
-void FBO::Disable(bool flush = false) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+void RenderTarget::Disable(bool flush = false) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
         if (IsEnabled()) {
@@ -355,7 +355,7 @@ void FBO::Disable(bool flush = false) { // flush only required for compatibility
 }
 
 
-bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
+bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
     if (bufferIndex < 0)
         return false;
     BaseRenderer::ClearGLError();
@@ -370,7 +370,7 @@ bool FBO::BindBuffer(int bufferIndex, int tmuIndex) {
 }
 
 
-void FBO::ReleaseBuffers(void) {
+void RenderTarget::ReleaseBuffers(void) {
     for (int i = 0; i < m_bufferCount; i++) {
         gfxDriverStates.ReleaseTexture(GL_TEXTURE_2D, m_bufferInfo[i].m_handle);
         m_bufferInfo[i].m_tmuIndex = -1;
@@ -378,12 +378,12 @@ void FBO::ReleaseBuffers(void) {
 }
 
 
-void FBO::SetViewport(bool flipVertically) noexcept {
+void RenderTarget::SetViewport(bool flipVertically) noexcept {
     baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically);
 }
 
 
-bool FBO::UpdateTransformation(const FBORenderParams& params) {
+bool RenderTarget::UpdateTransformation(const RTRenderParams& params) {
     bool haveTransformation = false;
     if (params.centerOrigin) {
         haveTransformation = true;
@@ -409,11 +409,11 @@ bool FBO::UpdateTransformation(const FBORenderParams& params) {
 }
 
 
-bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RGBAColor& color) {
+bool RenderTarget::RenderTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color) {
     if (params.destination < 0) // rendering to the current render target
         gfxDriverStates.SetBlending(1);
-    else { // rendering to another FBO (than the main buffer)
-        if (not Enable(params.destination, FBO::dbSingle, params.clearBuffer))
+    else { // rendering to another RenderTarget (than the main buffer)
+        if (not Enable(params.destination, RenderTarget::dbSingle, params.clearBuffer))
             return false;
         m_lastDestination = params.destination;
         gfxDriverStates.SetBlending(0);
@@ -461,14 +461,14 @@ bool FBO::RenderTexture(Texture* source, const FBORenderParams& params, const RG
 }
 
 
-void FBO::Fill(RGBAColor color) {
+void RenderTarget::Fill(RGBAColor color) {
     baseRenderer.Translate(0.5, 0.5, 0);
     m_viewportArea.Fill(static_cast<RGBColor>(color), color.A());
     baseRenderer.Translate(-0.5, -0.5, 0);
 }
 
 
-Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex) {
+Texture* RenderTarget::GetRenderTexture(const RTRenderParams& params, int tmuIndex) {
     if (params.source == params.destination)
         return nullptr;
     SharedTextureHandle handle = 
@@ -489,7 +489,7 @@ Texture* FBO::GetRenderTexture(const FBORenderParams& params, int tmuIndex) {
 }
 
 
-Texture* FBO::GetDepthTexture(void) {
+Texture* RenderTarget::GetDepthTexture(void) {
     SharedTextureHandle handle = BufferHandle(m_depthBufferIndex);
     m_depthTexture.HasBuffer() = true;
     if (m_depthTexture.m_handle != handle) {
@@ -504,15 +504,15 @@ Texture* FBO::GetDepthTexture(void) {
 }
 
 
-// source < 0 means source contains a texture handle from some texture external to the FBO
-bool FBO::Render(const FBORenderParams& params, const RGBAColor& color) {
+// source < 0 means source contains a texture handle from some texture external to the RenderTarget
+bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color) {
     if (params.destination >= 0)
         m_lastDestination = params.destination;
     return RenderTexture((params.source == params.destination) ? nullptr : GetRenderTexture(params), params, color);
 }
 
 
-bool FBO::AutoRender(const FBORenderParams& params, const RGBAColor& color) {
+bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color) {
     return Render({ .source = m_lastDestination, .destination = NextBuffer(m_lastDestination), .clearBuffer = params.clearBuffer, .scale = params.scale, .shader = params.shader }, color);
 }
 

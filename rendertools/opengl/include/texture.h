@@ -292,13 +292,13 @@ public:
 
 // =================================================================================================
 
-class FBOTexture
+class RenderTargetTexture
     : public Texture
 {
 public:
-    FBOTexture() = default;
+    RenderTargetTexture() = default;
 
-    ~FBOTexture() = default;
+    ~RenderTargetTexture() = default;
 
     virtual void SetParams(bool forceUpdate = false) override;
 };

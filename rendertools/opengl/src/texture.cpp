@@ -394,7 +394,7 @@ void TiledTexture::SetParams(bool forceUpdate) {
 
 // =================================================================================================
 
-void FBOTexture::SetParams(bool forceUpdate) {
+void RenderTargetTexture::SetParams(bool forceUpdate) {
     if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
 #if 0
