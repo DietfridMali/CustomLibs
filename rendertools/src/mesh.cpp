@@ -20,7 +20,7 @@ void Mesh::Init(MeshTopology shape, int32_t listSegmentSize) {
     m_indices = IndexBuffer(ShapeSize(), listSegmentSize);
 }
 
-bool Mesh::CreateGfxDataLayout(void) {
+bool Mesh::CreateLayout(void) {
     if (m_gfxDataLayout)
         return true;
     if (not (m_gfxDataLayout = new GfxDataLayout()))
@@ -120,8 +120,8 @@ void Mesh::UpdateTangents(void) {
 }
 
 
-bool Mesh::UpdateGfxData(bool createVertexIndex, bool createTangents, bool forceUpdate) {
-    if (not CreateGfxDataLayout())
+bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpdate) {
+    if (not CreateLayout())
         return false;
     if (not createVertexIndex)
         createVertexIndex = (m_shape == MeshTopology::Quads);

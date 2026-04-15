@@ -111,10 +111,10 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     }
     UpdateTexCoords();
 
-    if (not CreateGfxDataLayout())
+    if (not CreateLayout())
         return false;
     //SetShape(GL_TRIANGLES); // trigger building of triangle index everytime new vertices are loaded
-    UpdateGfxData();
+    UpdateData();
     //SetShape(GL_QUADS); // trigger building of triangle index everytime new vertices are loaded
     m_aspectRatio = ComputeAspectRatio();
     return true;
@@ -168,7 +168,7 @@ void BaseQuad::ResetTransformation(void) {
 bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
     if (not (shader or (shader = LoadShader(textures.size() != 0, color))))
         return false;
-    if (UpdateGfxData()) {
+    if (UpdateData()) {
         m_gfxDataLayout->Render(textures);
         ResetTransformation();
         return true;

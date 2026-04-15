@@ -86,7 +86,7 @@ public:
 
     void Init(MeshTopology shape, int32_t listSegmentSize);
 
-    bool CreateGfxDataLayout(void);
+    bool CreateLayout(void);
 
     void SetName(String name) { m_name = name; }
 
@@ -179,7 +179,7 @@ public:
             m_gfxDataLayout->UpdateIndexBuffer(m_indices, ComponentType::UInt32, forceUpdate);
     }
 
-    bool UpdateGfxData(bool createVertexIndex = false, bool createTangents = false, bool forceUpdate = false);
+    bool UpdateData(bool createVertexIndex = false, bool createTangents = false, bool forceUpdate = false);
 
     void UpdateTangents(void);
 

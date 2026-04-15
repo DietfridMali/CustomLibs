@@ -43,7 +43,7 @@ void TriangleIcoSphere::Create(int quality) {
     m_faceCount = m_indices.AppDataLength();
     m_vertices.SetDirty(true);
     m_indices.SetDirty(true);
-    UpdateGfxData();
+    UpdateData();
 }
 
 
@@ -139,7 +139,7 @@ void RectangleIcoSphere::Create(int quality) {
     m_normals.SetDirty(true);
     m_indices.SetDirty(true);
     CreateTriangleVertexIndices();
-    UpdateGfxData();
+    UpdateData();
 }
 
 

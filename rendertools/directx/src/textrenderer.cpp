@@ -103,7 +103,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
             m_mesh.AddTexCoord(tc);
         }
     }
-    m_mesh.UpdateGfxData(true);
+    m_mesh.UpdateData(true);
     m_mesh.Render(m_font->GetTexture());
 }
 
