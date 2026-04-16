@@ -48,7 +48,7 @@
     <ClInclude Include="..\include\quicksort.hpp" />
     <ClInclude Include="..\include\random.hpp" />
     <ClInclude Include="..\include\segmentedlist.hpp" />
-    <ClInclude Include="..\include\sharedglhandle.hpp" />
+    <ClInclude Include="..\include\sharedgfxhandle.hpp" />
     <ClInclude Include="..\include\sharedpointer.hpp" />
     <ClInclude Include="..\include\sharedresource.hpp" />
     <ClInclude Include="..\include\simpledatapool.hpp" />
@@ -58,7 +58,7 @@
     <ClInclude Include="..\include\std_defines.h" />
     <ClInclude Include="..\include\std_list.hpp" />
     <ClInclude Include="..\include\std_map.hpp" />
-    <ClInclude Include="..\include\std_sharedglhandle.hpp" />
+    <ClInclude Include="..\include\std_sharedgfxhandle.hpp" />
     <ClInclude Include="..\include\std_sharedpointer.hpp" />
     <ClInclude Include="..\include\std_string.hpp" />
     <ClInclude Include="..\include\string.hpp" />

@@ -35,7 +35,7 @@ noexcept
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable())
         return true;
-    m_handle = SharedGLHandle(0, glGenVertexArrays, glDeleteVertexArrays); // need to set allocate and release functions
+    m_handle = SharedGfxHandle(0, glGenVertexArrays, glDeleteVertexArrays); // need to set allocate and release functions
     if (m_handle.Claim() == 0)
         return false;
     return true;

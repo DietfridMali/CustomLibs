@@ -3,7 +3,7 @@
 
 #include "glew.h"
 #include "array.hpp"
-#include "sharedglhandle.hpp"
+#include "sharedgfxhandle.hpp"
 
 class BaseSSBO {
 public:
@@ -19,12 +19,12 @@ class SSBO
 	: public BaseSSBO
 {
 public:
-	SharedGLHandle			m_handle;
+	SharedGfxHandle			m_handle;
 	AutoArray<DATA_T>	m_data;
 
 	SSBO()
 	{
-		m_handle = SharedGLHandle(0, glGenBuffers, glDeleteBuffers);
+		m_handle = SharedGfxHandle(0, glGenBuffers, glDeleteBuffers);
 	}
 
 

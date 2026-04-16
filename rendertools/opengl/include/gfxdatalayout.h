@@ -3,7 +3,7 @@
 #include "glew.h"
 #include "list.hpp"
 #include "rendertypes.h"
-#include "sharedglhandle.hpp"
+#include "sharedgfxhandle.hpp"
 #include "vertexdatabuffers.h"
 #include "gfxdatabuffer.h"
 #include "vector.hpp"
@@ -21,16 +21,16 @@
 class GfxDataLayout
 {
 public:
-    List<GfxDataBuffer*>          m_dataBuffers;
-    GfxDataBuffer                 m_indexBuffer;
+    List<GfxDataBuffer*>    m_dataBuffers;
+    GfxDataBuffer           m_indexBuffer;
 #if USE_SHARED_HANDLES
-    SharedGLHandle      m_handle;
+    SharedGfxHandle          m_handle;
 #else
-    GLuint              m_handle;
+    GLuint                  m_handle;
 #endif
-    MeshTopology        m_shape{ MeshTopology::Quads };
-    bool                m_isDynamic{ false };
-    bool                m_isBound{ false };
+    MeshTopology            m_shape{ MeshTopology::Quads };
+    bool                    m_isDynamic{ false };
+    bool                    m_isBound{ false };
 
     static GfxDataLayout*         activeLayout;
     static List<GfxDataLayout*>   layoutStack;

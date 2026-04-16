@@ -7,7 +7,7 @@
 #include "list.hpp"
 #include "conversions.hpp"
 #include "sharedpointer.hpp"
-#include "sharedglhandle.hpp"
+#include "sharedgfxhandle.hpp"
 #include "avltree.hpp"
 #include "gfxdriverstates.h"
 

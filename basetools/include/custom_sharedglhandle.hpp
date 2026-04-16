@@ -60,20 +60,20 @@ public:
 
 // =================================================================================================
 
-class SharedGLHandle
+class SharedGfxHandle
     : public SharedResourceHandler<GLuint>
 {
 public:
     using Base = SharedResourceHandler<GLuint>;
 
 
-    SharedGLHandle()
+    SharedGfxHandle()
         : Base(nullptr)
     {
     }
 
 
-    SharedGLHandle(GLuint handle, glBufferAllocator allocate, glBufferReleaser release)
+    SharedGfxHandle(GLuint handle, glBufferAllocator allocate, glBufferReleaser release)
         : Base(new SharedGLBufferHandle(handle, allocate, release))
     {
     }
@@ -109,33 +109,33 @@ public:
 // =================================================================================================
 
 class SharedTextureHandle
-    : public SharedGLHandle
+    : public SharedGfxHandle
 {
 public:
     SharedTextureHandle(GLuint handle = 0)
-        : SharedGLHandle(handle, glGenTextures, glDeleteTextures)
+        : SharedGfxHandle(handle, glGenTextures, glDeleteTextures)
     { }
 };
 
 // =================================================================================================
 
 class SharedBufferHandle
-    : public SharedGLHandle
+    : public SharedGfxHandle
 {
 public:
     SharedBufferHandle(GLuint handle = 0)
-        : SharedGLHandle(handle, glGenBuffers, glDeleteBuffers)
+        : SharedGfxHandle(handle, glGenBuffers, glDeleteBuffers)
     { }
 };
 
 // =================================================================================================
 
 class SharedFramebufferHandle
-    : public SharedGLHandle
+    : public SharedGfxHandle
 {
 public:
     SharedFramebufferHandle(GLuint handle = 0)
-        : SharedGLHandle(handle, glGenFramebuffers, glDeleteFramebuffers)
+        : SharedGfxHandle(handle, glGenFramebuffers, glDeleteFramebuffers)
     {
     }
 };

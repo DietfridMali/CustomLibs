@@ -2,7 +2,7 @@
 
 #include "glew.h"
 #include "sharedpointer.hpp"
-#include "sharedglhandle.hpp"
+#include "sharedgfxhandle.hpp"
 #include <cstring>
 
 #ifdef USE_SHARED_HANDLES
@@ -24,7 +24,7 @@ public:
     GLenum              m_bufferType;
     char* m_data;
 #if USE_SHARED_HANDLES
-    SharedGLHandle      m_handle;
+    SharedGfxHandle     m_handle;
 #else
     GLuint              m_handle;
 #endif
@@ -40,7 +40,7 @@ public:
 
     void Reset(void) {
 #if USE_SHARED_HANDLES
-        m_handle = SharedGLHandle();
+        m_handle = SharedGfxHandle();
 #else
         m_handle = 0;
 #endif

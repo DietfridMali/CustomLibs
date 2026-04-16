@@ -166,16 +166,16 @@ using glBufferAllocator = std::remove_pointer_t<decltype(&glGenTextures)>;
 using glBufferReleaser = std::remove_pointer_t<decltype(&glDeleteTextures)>;
 
 
-class SharedGLHandle 
+class SharedGfxHandle 
     : public SharedHandle<GLuint> 
 {
 public:
-    SharedGLHandle() = default;
+    SharedGfxHandle() = default;
 
     using SharedHandle<GLuint>::operator=;
     using SharedHandle<GLuint>::SharedHandle;
 
-    SharedGLHandle(GLuint handle, glBufferAllocator allocator, glBufferReleaser releaser)
+    SharedGfxHandle(GLuint handle, glBufferAllocator allocator, glBufferReleaser releaser)
         : SharedHandle<GLuint>(
             handle,
             [allocator]() { GLuint h; if (allocator == nullptr) h = 0; else allocator(1, &h); return h; },
@@ -184,12 +184,12 @@ public:
     {
     }
 
-    SharedGLHandle& operator=(GLuint h) noexcept {
+    SharedGfxHandle& operator=(GLuint h) noexcept {
         SharedHandle<GLuint>::operator=(h);
         return *this;
     }
 
-    SharedGLHandle& operator=(std::nullptr_t) noexcept {
+    SharedGfxHandle& operator=(std::nullptr_t) noexcept {
         SharedHandle<GLuint>::operator=(nullptr);
         return *this;
     }
@@ -197,28 +197,28 @@ public:
 };
 
 
-class SharedTextureHandle : public SharedGLHandle {
+class SharedTextureHandle : public SharedGfxHandle {
 public:
     explicit SharedTextureHandle(GLuint handle = 0)
-        : SharedGLHandle(handle, glGenTextures, glDeleteTextures)
+        : SharedGfxHandle(handle, glGenTextures, glDeleteTextures)
     {
     }
 };
 
 
-class SharedBufferHandle : public SharedGLHandle {
+class SharedBufferHandle : public SharedGfxHandle {
 public:
     explicit SharedBufferHandle(GLuint handle = 0)
-        : SharedGLHandle(handle, glGenBuffers, glDeleteBuffers)
+        : SharedGfxHandle(handle, glGenBuffers, glDeleteBuffers)
     {
     }
 };
 
 
-class SharedFramebufferHandle : public SharedGLHandle {
+class SharedFramebufferHandle : public SharedGfxHandle {
 public:
     explicit SharedFramebufferHandle(GLuint handle = 0)
-        : SharedGLHandle(handle, glGenFramebuffers, glDeleteFramebuffers)
+        : SharedGfxHandle(handle, glGenFramebuffers, glDeleteFramebuffers)
     {
     }
 };
