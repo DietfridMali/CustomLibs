@@ -22,22 +22,12 @@ void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod
     if (aaMethod.ApplyAA()) {
         RenderTarget::RTRenderParams params = { .clearBuffer = true, .scale = 1.0f };
         BaseRenderer::ClearGLError();
-#ifdef OPENGL
-        params.shader->SetInt("surface", 0);
-#else
-        {
-#   if 0
-            int nextBuf = renderTarget->NextBuffer(renderTarget->GetLastDestination());
-            renderTarget->Enable(nextBuf, RenderTarget::dbAll, false);
-            renderTarget->SetLastDestination(nextBuf);
-#   else
-            //renderTarget->Enable(-1, RenderTarget::dbAll, false);
-#   endif
-        }
-#endif
         params.shader = baseShaderHandler.SetupShader(aaMethod.method);
         if (params.shader == nullptr)
             return;
+#ifdef OPENGL
+        params.shader->SetInt("surface", 0);
+#endif
         params.shader->SetFloat("offset", 0.0f);
         //params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
         if (aaMethod.method != "gaussblur") {

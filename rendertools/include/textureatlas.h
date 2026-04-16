@@ -36,10 +36,10 @@ public:
 	};
 
 protected:
-	RenderTarget*		m_atlas;
-	TableSize	m_size;
-	GlyphSize	m_glyphSize;
-	Vector2f	m_scale;
+	RenderTarget*	m_atlas;
+	TableSize		m_size;
+	GlyphSize		m_glyphSize;
+	Vector2f		m_scale;
 
 	static BaseQuad	renderQuad;
 

@@ -93,7 +93,9 @@ public:
         _instance = this;
     }
 
-    static BaseRenderer& Instance(void) { return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance()); }
+    static BaseRenderer& Instance(void) { 
+        return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance()); 
+    }
 
     bool InitOpenGL(void) noexcept;
 
