@@ -73,12 +73,13 @@ class CommandList
 public:
     static constexpr UINT FRAME_COUNT = 2;
 
-    ComPtr<ID3D12GraphicsCommandList>  m_list;
-    ComPtr<ID3D12CommandAllocator>     m_allocators[FRAME_COUNT];
-    bool                               m_isRecording{ false };
-    AutoArray<std::function<void()>>   m_disposableResources;
-    uint64_t                           m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
-    uint64_t                           m_executionCounter{ 0 };  // increments on each Open()
+    ComPtr<ID3D12GraphicsCommandList>   m_list;
+    ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
+    bool                                m_isRecording{ false };
+    AutoArray<std::function<void()>>    m_disposableResources;
+    uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
+    uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
+    String                              m_name{ "" };
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
 
@@ -102,11 +103,15 @@ public:
         return m_isRecording ? m_list.Get() : nullptr;
     }
 
-	uint64_t GetId(void) const noexcept {
+	inline uint64_t GetId(void) const noexcept {
 		return m_id;
 	}
 
-	uint64_t GetExecutionCounter(void) const noexcept {
+	inline String GetName(void) const noexcept {
+		return m_name;
+	}
+
+    inline uint64_t GetExecutionCounter(void) const noexcept {
 		return m_executionCounter;
 	}
 

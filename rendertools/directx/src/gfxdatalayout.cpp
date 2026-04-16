@@ -106,8 +106,8 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuf
 void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
-        UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate);
-        buffer.SetDirty(false);
+        if (UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate))
+            buffer.SetDirty(false);
     }
 }
 
@@ -116,20 +116,19 @@ bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t da
 {
     if (strcmp(type, "Index"))
         return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
-    UpdateIndexBuffer(data, dataSize, componentType, forceUpdate);
-    return true;
+    return UpdateIndexBuffer(data, dataSize, componentType, forceUpdate);
 }
 
 
 bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
 {
-    if (dataSize == 0) 
+    if (dataSize == 0)
         return false;
     int index = -1;
     GfxDataBuffer* buffer = FindBuffer(type, id, index);
     if (not buffer) {
         buffer = new (std::nothrow) GfxDataBuffer();
-        if (not buffer) 
+        if (not buffer)
             return false;
         m_dataBuffers.Append(buffer);
         buffer->SetDynamic(m_isDynamic);
@@ -139,9 +138,9 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_
 }
 
 
-void GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
 {
-    m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
+    return m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
 }
 
 

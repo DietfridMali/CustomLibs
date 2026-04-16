@@ -50,6 +50,7 @@ size_t GfxDataBuffer::ComponentSize(size_t componentType) noexcept
 GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
 {
     if (this != &other) {
+        ResourceDescriptor::operator=(other);
         m_index = other.m_index;
         m_type = other.m_type;
         m_id = other.m_id;
@@ -72,6 +73,7 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
 GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
 {
     if (this != &other) {
+        ResourceDescriptor::operator=(std::move(other));
         m_index = other.m_index;
         m_type = other.m_type;
         m_id = other.m_id;
@@ -102,10 +104,7 @@ bool GfxDataBuffer::Create(ID3D12Device* device, size_t dataSize) {
     rd.SampleDesc.Count = 1;
     rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    HRESULT hr = device->CreateCommittedResource(
-        &hp, D3D12_HEAP_FLAG_NONE, &rd,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-        IID_PPV_ARGS(&m_resource));
+    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_resource));
 #ifdef _DEBUG
     if (not FAILED(hr)) {
         char name[128];
@@ -119,17 +118,15 @@ bool GfxDataBuffer::Create(ID3D12Device* device, size_t dataSize) {
 
 bool GfxDataBuffer::Reset(void) {
     CommandList* cl = commandListHandler.GetCurrentCmdListObj();
-    if (not cl)
-        return false;
-    if (GetOwner() != cl->GetId()) {
+    if (GetOwnerId() != cl->GetId()) {
         // Owner change: log if a previous owner existed, then claim new owner.
         // Do NOT reset chunkIndex — the old CL may still reference earlier chunks.
 #ifdef _DEBUG
-        if (GetOwner() != 0)
-            fprintf(stderr, "GfxDataBuffer[%s/%d]: Update() called from command list %llu, but buffer was last used by command list %llu\n",
-                m_type, m_id, (unsigned long long)cl->GetId(), (unsigned long long)GetOwner());
+        if (GetOwnerName() != cl->GetName())
+            fprintf(stderr, "GfxDataBuffer[%s/%d]: Update() called from command '%s', but buffer was last used by command list '%s'\n",
+                    m_type, m_id, (const char*) cl->GetName(), (const char*)GetOwnerName());
 #endif
-        SetOwner(cl->GetId());
+        SetOwner(cl->GetId(), cl->GetName());
         SetExecutionId(cl->GetExecutionCounter());
         return true;
     }
@@ -152,29 +149,22 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     if (not device)
         return false;
 
-    if (not Reset())
-        return false;
-
     m_type = type;
     m_bufferType = bufferType;
     m_index = index;
     m_componentType = componentType;
     m_componentCount = int(componentCount);
 
-    size_t compSz = ComponentSize(size_t(componentType));
-    m_itemSize = compSz * componentCount;
+    m_itemSize = ComponentSize(size_t(componentType)) * componentCount;
     m_itemCount = uint32_t(dataSize / ((m_itemSize > 0) ? m_itemSize : 1));
     m_size = uint32_t(dataSize);
-#if 0
-    if (m_isDynamic and cl) 
-#else
-    if (true) 
-#endif
-    {
+    if (commandListHandler.GetCurrentCmdListObj()) {
+        if (not Reset())
+            return false;
         // Multi-buffer path: each Update within one recording session gets its own chunk.
         // The chunk pool is per frame slot (indexed by FrameIndex()), so reuse is safe
         // because BeginFrame waits for the fence covering the previous use of this slot.
-        m_resource = m_dataChunkHandler.Update(commandListHandler.CmdQueue().FrameIndex(), dataSize);
+        m_resource = m_dataChunkHandler.Update(commandListHandler.CmdQueue().FrameIndex(), dataSize, GetOwnerName(), GetExecutionId());
         if (m_resource == nullptr)
             return false;
     } 

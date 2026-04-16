@@ -118,6 +118,7 @@ bool CommandList::Create(ID3D12Device* device, const String& name) noexcept {
     m_id = commandListHandler.m_cmdListId++;
     if (not name.IsEmpty())
         m_list->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
+    m_name = name;
     return true;
 }
 
