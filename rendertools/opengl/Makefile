@@ -31,7 +31,6 @@ OPENGL_FILES := \
  shader \
  shadowmap \
  skybox \
- SSBO \
  textrenderer \
  texture \
  texturebuffer \
