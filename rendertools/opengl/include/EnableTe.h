@@ -4,7 +4,7 @@
 #include "list.hpp"
 #include "sharedglhandle.hpp"
 #include "vertexdatabuffers.h"
-#include "gfxDataBuffer.h"
+#include "gfxdatabuffer.h"
 #include "vector.hpp"
 #include "texture.h"
 #include "shader.h"

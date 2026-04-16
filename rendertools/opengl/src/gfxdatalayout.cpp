@@ -1,5 +1,5 @@
 
-#include "gfxDataLayout.h"
+#include "gfxdatalayout.h"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
 

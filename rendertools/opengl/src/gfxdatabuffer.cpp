@@ -1,4 +1,4 @@
-#include "gfxDataBuffer.h"
+#include "gfxdatabuffer.h"
 #include "base_renderer.h"
 
 // =================================================================================================
