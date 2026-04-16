@@ -15,8 +15,8 @@
 //   • D3D12_INDEX_BUFFER_VIEW  for the index stream (GL_ELEMENT_ARRAY_BUFFER).
 //
 // Bind() / Release() / EnableAttribs() / DisableAttribs() / Describe() are kept as no-ops so
-// that gfxdatalayout.h code compiles unchanged.  The actual IASetVertexBuffers / IASetIndexBuffer calls are
-// emitted by gfxdatalayout.h::Enable().
+// that GfxDataLayout code compiles unchanged.  The actual IASetVertexBuffers / IASetIndexBuffer calls are
+// emitted by GfxDataLayout::Enable().
 
 class GfxDataBuffer
 {
@@ -78,7 +78,7 @@ public:
     GfxDataBuffer& Copy(GfxDataBuffer const& other);
     GfxDataBuffer& Move(GfxDataBuffer& other) noexcept;
 
-    // No-ops — binding handled by gfxdatalayout.h::Enable() in DX12.
+    // No-ops — binding handled by GfxDataLayout::Enable() in DX12.
     inline void Bind(void) noexcept {}
     inline void Release(void) noexcept {}
     inline void EnableAttribs(void) noexcept {}
@@ -111,7 +111,7 @@ public:
         m_isDynamic = d; 
     }
 
-    // Returns stride (bytes per vertex element) — used by gfxdatalayout.h when building VBVs.
+    // Returns stride (bytes per vertex element) — used by GfxDataLayout when building VBVs.
     inline UINT Stride() const noexcept { 
         return UINT(m_itemSize); 
     }

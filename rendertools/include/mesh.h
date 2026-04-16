@@ -6,7 +6,7 @@
 #include "rendertypes.h"
 #include "sharedpointer.hpp"
 #include "texture.h"
-#include "gfxdatalayout.h.h"
+#include "gfxdatalayout.h"
 #include "vertexdatabuffers.h"
 
 // =================================================================================================
@@ -68,7 +68,7 @@ public:
     IndexBuffer                     m_indices;
     List<FloatDataBuffer>           m_floatBuffers;
     List<VertexBuffer>              m_offsetBuffers;
-    gfxdatalayout.h* m_gfxdatalayout.h{ nullptr };
+    GfxDataLayout* m_gfxDataLayout{ nullptr };
     MeshTopology                    m_shape{ MeshTopology::Quads };
     Vector3f                        m_vMin{ Vector3f::ZERO };
     Vector3f                        m_vMax{ Vector3f::ZERO };
@@ -100,14 +100,14 @@ public:
 
     inline void SetDynamic(bool isDynamic) {
         m_isDynamic = isDynamic;
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->SetDynamic(isDynamic);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->SetDynamic(isDynamic);
     }
 
     inline void SetShape(MeshTopology shape) noexcept {
         m_shape = shape;
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->SetShape(shape);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->SetShape(shape);
     }
 
     inline uint32_t ShapeSize(void)
@@ -139,44 +139,44 @@ public:
     inline VertexBuffer& OffsetBuffer(int i) noexcept { return m_offsetBuffers[i]; }
 
     inline void UpdateVertexBuffer(bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateDataBuffer("Vertex", 0, m_vertices, ComponentType::Float, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("Vertex", 0, m_vertices, ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateTexCoordBuffer(int i, bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateDataBuffer("TexCoord", i, m_texCoords[i], ComponentType::Float, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("TexCoord", i, m_texCoords[i], ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateTangentBuffer(bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateDataBuffer("Tangent", 0, m_tangents, ComponentType::Float, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("Tangent", 0, m_tangents, ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateColorBuffer(bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateDataBuffer("Color", 0, m_vertexColors, ComponentType::Float, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("Color", 0, m_vertexColors, ComponentType::Float, forceUpdate);
     }
 
     // in the case of an icosphere, the vertices also are the vertex normals
     inline void UpdateNormalBuffer(bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateDataBuffer("Normal", 0, m_normals, ComponentType::Float, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("Normal", 0, m_normals, ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateFloatDataBuffer(int i, bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateDataBuffer("Float", i, m_floatBuffers[i], ComponentType::Float, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("Float", i, m_floatBuffers[i], ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateOffsetBuffer(int i, bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateDataBuffer("Offset", i, m_offsetBuffers[i], ComponentType::Float, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("Offset", i, m_offsetBuffers[i], ComponentType::Float, forceUpdate);
     }
 
     inline void UpdateIndexBuffer(bool forceUpdate = false) {
-        if (m_gfxdatalayout.h)
-            m_gfxdatalayout.h->UpdateIndexBuffer(m_indices, ComponentType::UInt32, forceUpdate);
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateIndexBuffer(m_indices, ComponentType::UInt32, forceUpdate);
     }
 
     bool UpdateData(bool createVertexIndex = false, bool createTangents = false, bool forceUpdate = false);
@@ -187,9 +187,9 @@ public:
 
     void CreateVertexIndices(void);
 
-    inline gfxdatalayout.h* Getgfxdatalayout.h(void) noexcept
+    inline GfxDataLayout* GetGfxDataLayout(void) noexcept
     {
-        return m_gfxdatalayout.h;
+        return m_gfxDataLayout;
     }
 
     void SetupTexture(Texture* texture, String textureFolder = "", List<String> textureNames = List<String>(), TextureType textureType = TextureType::Texture2D);

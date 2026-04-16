@@ -39,7 +39,7 @@ private:
     float               m_scale{ 1.0f };
     eTextAlignments     m_textAlignment;
     TextDecoration      m_decoration;
-    gfxdatalayout.h                 m_gfxdatalayout.h;
+    GfxDataLayout                 m_gfxDataLayout;
     Mesh                m_mesh;
     RenderTarget*       m_renderTarget{ nullptr };
     FontHandler*        m_font;

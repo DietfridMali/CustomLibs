@@ -21,11 +21,11 @@ void Mesh::Init(MeshTopology shape, int32_t listSegmentSize) {
 }
 
 bool Mesh::CreateLayout(void) {
-    if (m_gfxdatalayout.h)
+    if (m_gfxDataLayout)
         return true;
-    if (not (m_gfxdatalayout.h = new gfxdatalayout.h()))
+    if (not (m_gfxDataLayout = new GfxDataLayout()))
         return false;
-    return m_gfxdatalayout.h->Create(MeshTopology::Quads, m_isDynamic);
+    return m_gfxDataLayout->Create(MeshTopology::Quads, m_isDynamic);
 }
 
 // This only works for linearly increasing quad vertex indices starting at 0!
@@ -125,13 +125,13 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
         return false;
     if (not createVertexIndex)
         createVertexIndex = (m_shape == MeshTopology::Quads);
-    m_gfxdatalayout.h->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_isDynamic);
-    m_gfxdatalayout.h->Enable();
+    m_gfxDataLayout->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_isDynamic);
+    m_gfxDataLayout->Enable();
     m_tangents.SetDirty((m_tangents.HaveData() and m_vertices.IsDirty()) or m_texCoords[0].IsDirty() or m_normals.IsDirty());
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = MeshTopology::Triangles;
-        m_gfxdatalayout.h->m_indexBuffer.SetDynamic(true);
+        m_gfxDataLayout->m_indexBuffer.SetDynamic(true);
         UpdateIndexBuffer();
     }
     else if (m_indices.IsDirty(forceUpdate)) {
@@ -179,7 +179,7 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
         }
         ++i;
     }
-    m_gfxdatalayout.h->Disable();
+    m_gfxDataLayout->Disable();
     return true;
 }
 
@@ -191,8 +191,8 @@ void Mesh::ResetGfxData(void) {
         tc.Reset();
     m_vertexColors.Reset();
     m_normals.Reset();
-    if (m_gfxdatalayout.h)
-        m_gfxdatalayout.h->Destroy();
+    if (m_gfxDataLayout)
+        m_gfxDataLayout->Destroy();
 }
 
 void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, TextureType textureType) {
@@ -239,9 +239,9 @@ noexcept
 }
 
 bool Mesh::Render(std::span<Texture* const> textures, float alpha) {
-    if (not m_gfxdatalayout.h->IsValid())
+    if (not m_gfxDataLayout->IsValid())
         return false;
-    m_gfxdatalayout.h->Render(textures);
+    m_gfxDataLayout->Render(textures);
     return true;
 }
 
@@ -255,7 +255,7 @@ noexcept(
  noexcept(m_vertexColors.Destroy()) &&
  noexcept(m_indices.Destroy()) &&
  noexcept(m_textures.Clear()) &&
- noexcept(m_gfxdatalayout.h->Destroy()))
+ noexcept(m_gfxDataLayout->Destroy()))
 {
     m_vertices.Destroy();
     m_normals.Destroy();
@@ -268,10 +268,10 @@ noexcept(
     m_vertexColors.Destroy();
     m_indices.Destroy();
     m_textures.Clear();
-    if (m_gfxdatalayout.h)
-        m_gfxdatalayout.h->Destroy();
-    delete m_gfxdatalayout.h;
-    m_gfxdatalayout.h = nullptr;
+    if (m_gfxDataLayout)
+        m_gfxDataLayout->Destroy();
+    delete m_gfxDataLayout;
+    m_gfxDataLayout = nullptr;
     m_vMax = Vector3f{ -1e6, -1e6, -1e6 }; 
     m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; 
 }

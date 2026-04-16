@@ -1,12 +1,12 @@
 #define NOMINMAX
 
-#include "gfxdatalayout.h.h"
+#include "gfxdatalayout.h"
 #include "base_shaderhandler.h"
 #include "base_renderer.h"
 #include "commandlist.h"
 
 // =================================================================================================
-// DX12 gfxdatalayout.h implementation
+// DX12 GfxDataLayout implementation
 
 static D3D_PRIMITIVE_TOPOLOGY ToD3DTopology(MeshTopology topology) noexcept
 {
@@ -26,12 +26,12 @@ static DXGI_FORMAT ToIndexFormat(ComponentType componentType) noexcept
 
 // =================================================================================================
 
-gfxdatalayout.h* gfxdatalayout.h::activeLayout = nullptr;
-List<gfxdatalayout.h*> gfxdatalayout.h::layoutStack;
+GfxDataLayout* GfxDataLayout::activeLayout = nullptr;
+List<GfxDataLayout*> GfxDataLayout::layoutStack;
 
 // =================================================================================================
 
-bool gfxdatalayout.h::Create(MeshTopology shape, bool isDynamic) noexcept
+bool GfxDataLayout::Create(MeshTopology shape, bool isDynamic) noexcept
 {
     m_shape = shape;
     SetDynamic(isDynamic);
@@ -39,7 +39,7 @@ bool gfxdatalayout.h::Create(MeshTopology shape, bool isDynamic) noexcept
 }
 
 
-void gfxdatalayout.h::Destroy(void) noexcept
+void GfxDataLayout::Destroy(void) noexcept
 {
     Disable();
     for (auto& GfxDataBuffer : m_dataBuffers) {
@@ -51,7 +51,7 @@ void gfxdatalayout.h::Destroy(void) noexcept
 }
 
 
-gfxdatalayout.h& gfxdatalayout.h::Copy(gfxdatalayout.h const& other)
+GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other)
 {
     if (this != &other) {
         Destroy();
@@ -63,7 +63,7 @@ gfxdatalayout.h& gfxdatalayout.h::Copy(gfxdatalayout.h const& other)
 }
 
 
-gfxdatalayout.h& gfxdatalayout.h::Move(gfxdatalayout.h& other) noexcept
+GfxDataLayout& GfxDataLayout::Move(GfxDataLayout& other) noexcept
 {
     if (this != &other) {
         Destroy();
@@ -75,7 +75,7 @@ gfxdatalayout.h& gfxdatalayout.h::Move(gfxdatalayout.h& other) noexcept
 }
 
 
-GfxDataBuffer* gfxdatalayout.h::FindBuffer(const char* type, int id, int& index) noexcept
+GfxDataBuffer* GfxDataLayout::FindBuffer(const char* type, int id, int& index) noexcept
 {
     int i = 0;
     for (auto GfxDataBuffer : m_dataBuffers) {
@@ -89,7 +89,7 @@ GfxDataBuffer* gfxdatalayout.h::FindBuffer(const char* type, int id, int& index)
 }
 
 
-bool gfxdatalayout.h::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
         if (not UpdateDataBuffer(type, id,
@@ -103,7 +103,7 @@ bool gfxdatalayout.h::UpdateDataBuffer(const char* type, int id, BaseVertexDataB
 }
 
 
-void gfxdatalayout.h::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
+void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
         UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate);
@@ -112,7 +112,7 @@ void gfxdatalayout.h::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType compo
 }
 
 
-bool gfxdatalayout.h::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
 {
     if (strcmp(type, "Index"))
         return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
@@ -121,7 +121,7 @@ bool gfxdatalayout.h::UpdateBuffer(const char* type, int id, void* data, size_t 
 }
 
 
-bool gfxdatalayout.h::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
 {
     if (dataSize == 0) 
         return false;
@@ -139,13 +139,13 @@ bool gfxdatalayout.h::UpdateDataBuffer(const char* type, int id, void* data, siz
 }
 
 
-void gfxdatalayout.h::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
+void GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
 {
     m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
 }
 
 
-bool gfxdatalayout.h::Enable(void) noexcept
+bool GfxDataLayout::Enable(void) noexcept
 {
     Activate();
     m_isBound = true;
@@ -180,14 +180,14 @@ bool gfxdatalayout.h::Enable(void) noexcept
 }
 
 
-void gfxdatalayout.h::Disable(void) noexcept
+void GfxDataLayout::Disable(void) noexcept
 {
     Deactivate();
     m_isBound = false;
 }
 
 
-void gfxdatalayout.h::Render(std::span<Texture* const> textures) noexcept
+void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 {
     if (not Enable()) 
         return;

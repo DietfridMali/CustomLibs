@@ -3,7 +3,7 @@
 #include <algorithm>
 
 #include "gfxdatabuffer.h"
-#include "gfxdatalayout.h.h"
+#include "gfxdatalayout.h"
 #include "base_quad.h"
 #include "base_shaderhandler.h"
 #include "type_helper.hpp"
@@ -11,12 +11,12 @@
 #include "conversions.hpp"
 #include "tristate.h"
 
-// caution: the gfxdatalayout.h shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this gfxdatalayout.h is initialized.
-// gfxdatalayout.h::Init takes care of that by first assigning a handle-less shared gl handle 
-// gfxdatalayout.h* BaseQuad::m_gfxdatalayout.h = nullptr;
+// caution: the GfxDataLayout shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this gfxDataLayout is initialized.
+// GfxDataLayout::Init takes care of that by first assigning a handle-less shared gl handle 
+// GfxDataLayout* BaseQuad::m_gfxDataLayout = nullptr;
 
 #if USE_STATIC_GFX_DATA 
-gfxdatalayout.h BaseQuad::staticgfxdatalayout.h;
+GfxDataLayout BaseQuad::staticGfxDataLayout;
 #endif
 
 // =================================================================================================
@@ -48,7 +48,7 @@ std::initializer_list<TexCoord> BaseQuad::defaultTexCoords[6] = {
 // =================================================================================================
 
 void BaseQuad::Init(void) {
-    // just create the gfxdatalayout.h and its GfxDataBuffers
+    // just create the gfxDataLayout and its GfxDataBuffers
     Setup(defaultVertices[0], defaultTexCoords[0]);
 }
 
@@ -56,7 +56,7 @@ void BaseQuad::Init(void) {
 BaseQuad& BaseQuad::Copy(const BaseQuad& other) {
     if (this != &other) {
         if (m_privateGfxData)
-            m_gfxdatalayout.h->Copy(*other.m_gfxdatalayout.h);
+            m_gfxDataLayout->Copy(*other.m_gfxDataLayout);
         m_vertices = other.m_vertices;
         m_texCoords[0] = other.m_texCoords[0];
         m_aspectRatio = other.m_aspectRatio;
@@ -70,9 +70,9 @@ BaseQuad& BaseQuad::Move(BaseQuad& other)
 noexcept
 {
     if (this != &other) {
-        m_gfxdatalayout.h = other.m_gfxdatalayout.h;
+        m_gfxDataLayout = other.m_gfxDataLayout;
         if ((m_privateGfxData = other.m_privateGfxData))
-            other.m_gfxdatalayout.h = nullptr;
+            other.m_gfxDataLayout = nullptr;
         m_vertices = std::move(other.m_vertices);
         m_texCoords[0] = std::move(other.m_texCoords[0]);
         m_aspectRatio = other.m_aspectRatio;
@@ -169,7 +169,7 @@ bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const 
     if (not (shader or (shader = LoadShader(textures.size() != 0, color))))
         return false;
     if (UpdateData()) {
-        m_gfxdatalayout.h->Render(textures);
+        m_gfxDataLayout->Render(textures);
         ResetTransformation();
         return true;
     }

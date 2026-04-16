@@ -21,7 +21,7 @@ OPENGL_FILES := \
  cubemap \
  drawbufferhandler \
  gfxdatabuffer \
- gfxdatalayout.h \
+ gfxdatalayout \
  gfxstates \
  noisetexture \
  outline_shader \

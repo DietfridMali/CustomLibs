@@ -46,7 +46,7 @@ private:
     String                      m_glyphs;
     RGBAColor                   m_color;
     GlyphSize                   m_maxGlyphSize;
-    gfxdatalayout.h                         m_gfxdatalayout.h;
+    GfxDataLayout                         m_gfxDataLayout;
     bool                        m_isAvailable;
 
     AVLTree<String, GlyphInfo>  m_glyphDict;

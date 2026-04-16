@@ -3,7 +3,7 @@
 #include "vector.hpp"
 #include "texcoord.h"
 #include "shader.h"
-#include "gfxDataLayout.h"
+#include "gfxdatalayout.h"
 #include "vertexdatabuffers.h"
 #include "texturehandler.h"
 #include "colordata.h"
