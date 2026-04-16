@@ -29,7 +29,7 @@
 //   • Bind(slot)  → gfxDriverStates.BindTexture2D(m_handle, slot)
 //   • Deploy()    → uploads pixel data to GPU via a temporary upload resource.
 //
-// SharedTextureHandle / SharedGLHandle are NOT used in DX12.
+// SharedTextureHandle / SharedGfxHandle are NOT used in DX12.
 
 class Texture;
 

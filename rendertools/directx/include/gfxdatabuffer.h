@@ -8,7 +8,7 @@
 // =================================================================================================
 // DX12 GfxDataBuffer — wraps a committed GPU resource (upload heap) and exposes vertex / index buffer views.
 //
-// In the OGL version the GfxDataBuffer held a GLuint (via SharedGLHandle) and was described with
+// In the OGL version the GfxDataBuffer held a GLuint (via SharedGfxHandle) and was described with
 // glVertexAttribPointer / glBindBuffer.  In DX12 we use:
 //   • A committed resource on the upload heap (CPU-writable, GPU-readable).
 //   • D3D12_VERTEX_BUFFER_VIEW for vertex attribute streams (GL_ARRAY_BUFFER).
