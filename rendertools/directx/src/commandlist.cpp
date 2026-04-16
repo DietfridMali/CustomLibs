@@ -146,7 +146,7 @@ bool CommandList::Open(UINT frameIndex) noexcept {
         return false;
     }
     m_isRecording = true;
-    ++m_executionId;
+    ++m_executionCounter;
     commandListHandler.PushList(m_list.Get());
     commandListHandler.PushCmdList(this);
     commandListHandler.Register(this);

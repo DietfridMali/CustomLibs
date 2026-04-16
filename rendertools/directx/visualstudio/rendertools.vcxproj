@@ -122,6 +122,7 @@
     <ClInclude Include="..\..\include\billboard.h" />
     <ClInclude Include="..\..\include\colordata.h" />
     <ClInclude Include="..\..\include\cube.h" />
+    <ClInclude Include="..\..\include\resource_descriptor.h" />
     <ClInclude Include="..\include\cbv_allocator.h" />
     <ClInclude Include="..\include\commandlist.h" />
     <ClInclude Include="..\include\descriptor_heap.h" />
@@ -156,6 +157,7 @@
     <ClInclude Include="..\..\include\rendertypes.h" />
     <ClInclude Include="..\include\base_renderer.h" />
     <ClInclude Include="..\..\include\rendermatrices.h" />
+    <ClInclude Include="..\include\resource_chunkhandler.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
@@ -204,6 +206,7 @@
     <ClCompile Include="..\..\src\base_quad.cpp" />
     <ClCompile Include="..\src\base_renderer.cpp" />
     <ClCompile Include="..\..\src\rendermatrices.cpp" />
+    <ClCompile Include="..\src\resource_chunkhandler.cpp" />
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\base_shader_funcs.cpp" />

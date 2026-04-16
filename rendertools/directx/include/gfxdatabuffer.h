@@ -2,8 +2,9 @@
 
 #include "framework.h"
 #include "rendertypes.h"
+#include "resource_descriptor.h"
+#include "resource_chunkhandler.h"
 #include <cstring>
-#include <vector>
 
 // =================================================================================================
 // DX12 GfxDataBuffer — wraps a committed GPU resource (upload heap) and exposes vertex / index buffer views.
@@ -19,6 +20,7 @@
 // emitted by GfxDataLayout::Enable().
 
 class GfxDataBuffer
+	: public ResourceDescriptor
 {
 public:
     int                      m_index;          // vertex attribute slot (layout location)
@@ -37,10 +39,8 @@ public:
     // which is safe because BeginFrame has already waited for the fence that covers the
     // previous use of this slot (2 frames ago with FRAME_COUNT=2).
     static constexpr UINT    FRAME_COUNT = 2;
-    std::vector<ComPtr<ID3D12Resource>> m_chunks[FRAME_COUNT];
-    int                      m_chunkIndex[FRAME_COUNT]{};
-    uint64_t                 m_lastCmdListId[FRAME_COUNT]{};
-    uint64_t                 m_lastExecutionId[FRAME_COUNT]{};
+
+	GfxDataChunkHandler     m_dataChunkHandler{FRAME_COUNT};
 
     uint32_t                 m_size;           // total buffer size in bytes
     size_t                   m_itemSize;       // bytes per vertex element (stride)
@@ -51,15 +51,16 @@ public:
 
     GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
-    void Reset(void) {
+    void Clear(void) {
         m_resource.Reset();
-        for (UINT i = 0; i < FRAME_COUNT; ++i)
-            m_chunks[i].clear();
+        m_dataChunkHandler.Clear();
         m_vbv = {};
         m_ibv = {};
         m_id  = 0;
         m_isDynamic = true;
     }
+
+    bool Reset(void);
 
     GfxDataBuffer(GfxDataBuffer const& other) { 
         Copy(other); 
@@ -76,6 +77,7 @@ public:
     }
 
     GfxDataBuffer& Copy(GfxDataBuffer const& other);
+
     GfxDataBuffer& Move(GfxDataBuffer& other) noexcept;
 
     // No-ops — binding handled by GfxDataLayout::Enable() in DX12.

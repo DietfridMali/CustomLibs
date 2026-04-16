@@ -78,7 +78,7 @@ public:
     bool                               m_isRecording{ false };
     AutoArray<std::function<void()>>   m_disposableResources;
     uint64_t                           m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
-    uint64_t                           m_executionId{ 0 };  // increments on each Open()
+    uint64_t                           m_executionCounter{ 0 };  // increments on each Open()
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
 
@@ -101,6 +101,14 @@ public:
     inline ID3D12GraphicsCommandList* List(void) const noexcept {
         return m_isRecording ? m_list.Get() : nullptr;
     }
+
+	uint64_t GetId(void) const noexcept {
+		return m_id;
+	}
+
+	uint64_t GetExecutionCounter(void) const noexcept {
+		return m_executionCounter;
+	}
 
 #ifdef _DEBUG
     void CheckDeviceRemoved(const char* context) noexcept;

@@ -197,6 +197,12 @@
     <ClInclude Include="..\include\dx12upload.h">
       <Filter>DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\resource_descriptor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\resource_chunkhandler.h">
+      <Filter>DirectX</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->
@@ -340,6 +346,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\dx12upload.cpp">
+      <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\resource_chunkhandler.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
   </ItemGroup>
