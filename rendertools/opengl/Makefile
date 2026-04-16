@@ -1,24 +1,48 @@
-﻿.RECIPEPREFIX := >
+.RECIPEPREFIX := >
 ifeq ($(strip $(CXX)),)
   CXX := g++
 endif
 #CXX := clang++
 AR  := ar
 
-FILES := \
+# OpenGL-spezifische Quelldateien (src/ relativ zu diesem Makefile)
+OPENGL_SRCDIR := src
+
+# API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
+SRCDIR := ../src
+
+OPENGL_FILES := \
  base_displayhandler \
- base_quad \
  base_renderer \
  base_shader_funcs \
  base_shadercode \
- base_shaderhandler \
  base_texture_shaders \
- billboard \
  blur_shader \
- cube \
  cubemap \
  drawbufferhandler \
- fbo \
+ gfxdatabuffer \
+ gfxdatalayout \
+ gfxstates \
+ noisetexture \
+ outline_shader \
+ prerenderedtexture \
+ primitive_shaders \
+ rendertarget \
+ shader \
+ shadowmap \
+ skybox \
+ SSBO \
+ textrenderer \
+ texture \
+ texturebuffer \
+ texturehandler
+
+COMMON_FILES := \
+ base_quad \
+ base_shaderhandler \
+ billboard \
+ coplanar_rectangle \
+ cube \
  fonthandler \
  framecounter \
  glbloader \
@@ -26,30 +50,15 @@ FILES := \
  linesegment \
  mesh \
  noise \
- noisetexture \
- gfxstates \
- outlinerenderer \
- outline_shader \
- coplanar_rectangle \
- prerenderedtexture \
- primitive_shaders \
  projector \
  rendermatrices \
- shader \
- shadowmap \
- skybox \
- SSBO \
- textrenderer \
+ texteffects \
  textureatlas \
- texture \
- texturebuffer \
- texturehandler \
+ textureprocessing \
  tiny_gltf \
- vao \
- vbo \
  viewport
 
-INCDIRS := ./include ../basetools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2
+INCDIRS := ./include ../include ../../basetools/include ../../../ExternalLibs/glew/include/GL /usr/include/SDL2
 
 .PHONY: all clean DEBUG RELEASE
 
@@ -62,13 +71,11 @@ else ifneq (,$(filter RELEASE,$(MAKECMDGOALS)))
   TARGET := RELEASE
 endif
 
-SRCDIR := src
-
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
 DEFINES := -DUSE_STD=1 -DUSE_GLM=1 -DLINUX -DFMT_UNICODE=0
 #SANITIZEFLAGS := -fsanitize=address,undefined
-SANITIZEFLAGS := 
+SANITIZEFLAGS :=
 OPTFLAGS := -O3
 DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIONS
 
@@ -84,8 +91,11 @@ else
   $(error TARGET must be DEBUG or RELEASE)
 endif
 
-SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
-OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(FILES)))
+OPENGL_SOURCES := $(addprefix $(OPENGL_SRCDIR)/,$(addsuffix .cpp,$(OPENGL_FILES)))
+COMMON_SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(COMMON_FILES)))
+OPENGL_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(OPENGL_FILES)))
+COMMON_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(COMMON_FILES)))
+OBJECTS := $(OPENGL_OBJECTS) $(COMMON_OBJECTS)
 
 LIB := librendertools$(LIB_SUFFIX).a
 
@@ -96,6 +106,10 @@ all: $(LIB)
 
 $(LIB): $(OBJECTS)
 >$(AR) rcs $@ $^
+
+$(OBJDIR)/%.o: $(OPENGL_SRCDIR)/%.cpp
+>@mkdir -p $(OBJDIR)
+>$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 >@mkdir -p $(OBJDIR)
