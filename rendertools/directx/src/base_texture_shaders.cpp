@@ -12,10 +12,10 @@
 //   Static samplers from root signature: s0 = linear clamp, s1 = linear wrap.
 // =================================================================================================
 
-static const ShaderDataAttributes kVtxAttrs[] = {
+static const ShaderDataAttributes VtxAttrs[] = {
     { "Vertex", 0, ShaderDataAttributes::Float3 },
 };
-static const ShaderDataAttributes kVtxTcAttrs[] = {
+static const ShaderDataAttributes VtxTcAttrs[] = {
     { "Vertex",   0, ShaderDataAttributes::Float3 },
     { "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
@@ -77,7 +77,7 @@ const ShaderSource& StencilShader() {
                 return (float4)0;
             }
         )",
-        ShaderDataLayout(kVtxAttrs, 1)
+        ShaderDataLayout(VtxAttrs, 1)
     );
     return source;
 }
@@ -121,7 +121,7 @@ const ShaderSource& DepthShader() {
                 return (float4)0;
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }
@@ -153,7 +153,7 @@ const ShaderSource& SphereDepthShader() {
                 return (float4)0;
             }
         )",
-        ShaderDataLayout(kVtxAttrs, 1)
+        ShaderDataLayout(VtxAttrs, 1)
     );
     return source;
 }
@@ -179,7 +179,7 @@ const ShaderSource& DepthRenderer() {
                 return float4(d, d, d, 1.0);
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }
@@ -202,7 +202,7 @@ const ShaderSource& PlainColorShader() {
                 return surfaceColor;
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }
@@ -238,7 +238,7 @@ const ShaderSource& GrayScaleShader() {
                 return float4(rgb, texColor.a);
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }
@@ -270,7 +270,7 @@ const ShaderSource& PlainTextureShader() {
                 return float4(texColor.rgb * surfaceColor.rgb, a);
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }
@@ -306,7 +306,7 @@ const ShaderSource& MovingTextureShader() {
                 return float4(SmoothBoost(rgbColor, 2.0), 1.0);
             }
         )"),
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }
@@ -343,7 +343,7 @@ const ShaderSource& BlurTextureShader() {
                 return float4(texColor.rgb * surfaceColor.rgb, a);
             }
         )"),
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }
@@ -391,7 +391,7 @@ const ShaderSource& TintAndBlurShader() {
                 return float4(rgb, texColor.a);
             }
         )"),
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return source;
 }

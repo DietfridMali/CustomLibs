@@ -6,7 +6,7 @@
 // =================================================================================================
 // HLSL shader strings for the DirectX 12 backend — blur / AA post-process shaders.
 
-static const ShaderDataAttributes kVtxTcAttrs[] = {
+static const ShaderDataAttributes VtxTcAttrs[] = {
     { "Vertex",   0, ShaderDataAttributes::Float3 },
     { "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
@@ -45,7 +45,7 @@ const ShaderSource& BoxBlurShader() {
                 return GaussBlur(i.fragCoord, 3, 1);
             }
         )"),
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return boxBlurShader;
 }
@@ -110,7 +110,7 @@ const ShaderSource& FxaaShader() {
                 return float4(color, a);
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return fxaaShader;
 }
@@ -161,7 +161,7 @@ const ShaderSource& GaussBlurShader() {
                 return float4(sum.rgb, sum.a);
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return gaussBlurShader;
 }

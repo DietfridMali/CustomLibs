@@ -7,7 +7,7 @@
 // HLSL shader strings for the DirectX 12 backend — outline post-process shader.
 // =================================================================================================
 
-static const ShaderDataAttributes kVtxTcAttrs[] = {
+static const ShaderDataAttributes VtxTcAttrs[] = {
     { "Vertex",   0, ShaderDataAttributes::Float3 },
     { "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
@@ -55,7 +55,7 @@ const ShaderSource& OutlineShader() {
                 return (alpha > 0.0) ? float4(outlineColor.rgb, alpha) : (float4)0;
             }
         )",
-        ShaderDataLayout(kVtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2)
     );
     return outlineShader;
 }
