@@ -15,11 +15,7 @@ static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
 // -------------------------------------------------------------------------------------------------
 
-static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device,
-                                                int w, int h,
-                                                DXGI_FORMAT fmt,
-                                                D3D12_RESOURCE_STATES initState,
-                                                const D3D12_CLEAR_VALUE* clearVal) noexcept
+static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt, D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal, const char* name = "", int id = 0) noexcept
 {
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
@@ -36,10 +32,16 @@ static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device,
                         : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET
                         | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-    ComPtr<ID3D12Resource> res;
-    device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
-        initState, clearVal, IID_PPV_ARGS(&res));
-    return res;
+    ComPtr<ID3D12Resource> resource;
+    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, initState, clearVal, IID_PPV_ARGS(&resource));
+#ifdef _DEBUG
+    if (not FAILED(hr)) {
+        char name[128];
+        snprintf(name, sizeof(name), "RenderTarget[%s/%d]", name, id);
+        resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+    }
+#endif
+    return resource;
 }
 
 // =================================================================================================
@@ -81,7 +83,7 @@ bool RenderTarget::CreateColorBuffer(int i, int width, int height)
     D3D12_CLEAR_VALUE cv{};
     cv.Format = kColorFormat;
 
-    m_colorResources[i] = CreateRTResource(device, width, height, kColorFormat, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv);
+    m_colorResources[i] = CreateRTResource(device, width, height, kColorFormat, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, "color", i);
     if (not m_colorResources[i])
         return false;
     m_colorStates[i] = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -134,7 +136,7 @@ bool RenderTarget::CreateDepthBuffer(int width, int height)
     cv.DepthStencil.Depth = 1.0f;
     cv.DepthStencil.Stencil = 0;
 
-    m_depthResource = CreateRTResource(device, width, height, kDepthFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv);
+    m_depthResource = CreateRTResource(device, width, height, kDepthFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, "depth", 0);
     if (not m_depthResource)
         return false;
 

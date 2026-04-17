@@ -8,6 +8,7 @@
 #include "vector.hpp"
 #include "texture.h"
 #include "shader.h"
+#include "commandlist.h"
 
 // =================================================================================================
 // DX12 GfxDataLayout
@@ -24,6 +25,7 @@ public:
     List<GfxDataBuffer*>    m_dataBuffers;
     GfxDataBuffer           m_indexBuffer;
     MeshTopology            m_shape{ MeshTopology::Quads };
+	CommandList*            m_updateList{ nullptr };  
     bool                    m_isDynamic{ false };
     bool                    m_isBound{ false };
 
@@ -112,6 +114,18 @@ public:
     bool Enable(void) noexcept;
 
     void Disable(void) noexcept;
+
+    bool StartUpdate(void) noexcept;
+
+    void FinishUpdate(void) noexcept;
+
+    inline bool StartRender(void) noexcept {
+        return Enable(); 
+    }
+
+    inline void FinishRender(void) noexcept {
+        Disable();
+    }
 
     inline bool EnableTextures(std::span<Texture* const> textures = {}) noexcept {
         int tmu = 0;

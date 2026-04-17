@@ -24,6 +24,34 @@ static DXGI_FORMAT ToIndexFormat(ComponentType componentType) noexcept
     return (componentType == ComponentType::UInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 }
 
+// Fixed input-slot mapping matching kInputLayout in shader.cpp:
+//   slot 0: Vertex, slot 1: TexCoord/0, slot 2: TexCoord/1, slot 3: Color,
+//   slot 4: Normal, slot 5: Tangent,    slot 6: TexCoord/2
+// Returns -1 for unknown types (caller falls back to insertion order).
+static int FixedSlotForBuffer(const char* type, int id) noexcept
+{
+    if (strcmp(type, "Vertex") == 0)
+        return 0;
+    if (strcmp(type, "TexCoord") == 0) {
+        if (id == 0)
+            return 1;
+        if (id == 1)
+            return 2;
+        if (id == 2)
+            return 6;
+        return -1;
+    }
+    if (strcmp(type, "Color") == 0)
+        return 3;
+    if (strcmp(type, "Normal") == 0)
+        return 4;
+    if (strcmp(type, "Tangent") == 0)
+        return 5;
+    if (strcmp(type, "Offset") == 0)
+        return 5 + id;  // id=0→slot 5 (TANGENT), id=1→slot 6 (TEXCOORD2), id=2→slot 7, id=3→slot 8
+    return -1;
+}
+
 // =================================================================================================
 
 GfxDataLayout* GfxDataLayout::activeLayout = nullptr;
@@ -124,17 +152,21 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_
 {
     if (dataSize == 0)
         return false;
-    int index = -1;
-    GfxDataBuffer* buffer = FindBuffer(type, id, index);
+    int foundIndex = -1;
+    GfxDataBuffer* buffer = FindBuffer(type, id, foundIndex);
     if (not buffer) {
         buffer = new (std::nothrow) GfxDataBuffer();
         if (not buffer)
             return false;
         m_dataBuffers.Append(buffer);
         buffer->SetDynamic(m_isDynamic);
-        index = m_dataBuffers.Length() - 1;
+        foundIndex = int(m_dataBuffers.Length()) - 1;
     }
-    return buffer->Update(type, GfxBufferTarget::Vertex, index, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
+    int slot = FixedSlotForBuffer(type, id);
+    if (slot < 0)
+        slot = foundIndex;
+
+    return buffer->Update(type, GfxBufferTarget::Vertex, slot, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
 }
 
 
@@ -157,18 +189,20 @@ bool GfxDataLayout::Enable(void) noexcept
     int vbCount = m_dataBuffers.Length();
     if (vbCount > 0) {
         // Build views array; use a fixed stack buffer (max 8 streams)
-        constexpr int kMaxStreams = 8;
+        constexpr int kMaxStreams = 12;
         D3D12_VERTEX_BUFFER_VIEW views[kMaxStreams]{};
-        int bound = 0;
+        int maxSlot = 0;
         for (auto GfxDataBuffer : m_dataBuffers) {
-            if (bound >= kMaxStreams) 
-                break;
-            if (GfxDataBuffer and GfxDataBuffer->IsValid() and (GfxDataBuffer->m_bufferType == GfxBufferTarget::Vertex)) {
-                views[(GfxDataBuffer->m_index >= 0) ? GfxDataBuffer->m_index : bound] = GfxDataBuffer->m_vbv;
+            if (not GfxDataBuffer or not GfxDataBuffer->IsValid() or (GfxDataBuffer->m_bufferType != GfxBufferTarget::Vertex))
+                continue;
+            int slot = (GfxDataBuffer->m_index >= 0) ? GfxDataBuffer->m_index : maxSlot;
+            if (slot < kMaxStreams) {
+                views[slot] = GfxDataBuffer->m_vbv;
+                if (slot >= maxSlot)
+                    maxSlot = slot + 1;
             }
-            ++bound;
         }
-        list->IASetVertexBuffers(0, bound, views);
+        list->IASetVertexBuffers(0, maxSlot, views);
     }
 
     // Bind index buffer if present
@@ -186,9 +220,30 @@ void GfxDataLayout::Disable(void) noexcept
 }
 
 
+
+bool GfxDataLayout::StartUpdate(void) noexcept {
+    if (commandListHandler.GetCurrentCmdListObj())
+        return true;  // no-op in DX12
+	if (m_updateList == nullptr) {
+		m_updateList = commandListHandler.CreateCmdList();
+		if (m_updateList == nullptr)
+			return false;
+	}
+	if (not m_updateList->IsRecording())
+	    m_updateList->Open(commandListHandler.CmdQueue().FrameIndex());
+    return true;
+}
+
+
+void GfxDataLayout::FinishUpdate(void) noexcept {
+	if (m_updateList and m_updateList->IsRecording())
+		m_updateList->Close();
+}
+
+
 void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 {
-    if (not Enable()) 
+    if (not StartRender ()) 
         return;
 
     EnableTextures(textures);
@@ -212,7 +267,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
     }
 
     DisableTextures(textures);
-    Disable();
+    FinishRender();
 }
 
 // =================================================================================================

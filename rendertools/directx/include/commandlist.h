@@ -115,6 +115,10 @@ public:
 		return m_executionCounter;
 	}
 
+	inline bool IsRecording(void) const noexcept {
+		return m_isRecording;
+	}
+
 #ifdef _DEBUG
     void CheckDeviceRemoved(const char* context) noexcept;
 #endif

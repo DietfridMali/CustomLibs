@@ -27,15 +27,16 @@ struct CbAlloc {
 class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
 {
     static constexpr UINT kAlign       = 256;
-    static constexpr UINT kInitCap     = 64u * 1024u;   // 64 KB = 256 slots per frame
+    static constexpr UINT kInitCap     = 512u * 1024u;   // 64 KB = 256 slots per frame
     static constexpr UINT kMaxCap      = 1024u * 1024u; // 1 MB hard ceiling
 
     struct FrameData {
         ComPtr<ID3D12Resource>    resource;
-        uint8_t*                  cpuBase  = nullptr;
-        D3D12_GPU_VIRTUAL_ADDRESS gpuBase  = 0;
-        UINT                      offset   = 0;
-        UINT                      capacity = 0;
+        uint8_t*                  cpuBase    = nullptr;
+        D3D12_GPU_VIRTUAL_ADDRESS gpuBase    = 0;
+        UINT                      offset     = 0;
+        UINT                      capacity   = 0;
+        UINT                      peakOffset = 0;
     };
 
     FrameData  m_frames[2];   // FRAME_COUNT = 2

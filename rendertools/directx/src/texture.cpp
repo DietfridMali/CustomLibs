@@ -204,6 +204,11 @@ bool Texture::Deploy(int bufferIndex)
     HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource));
     if (FAILED(hr)) 
         return false;
+#ifdef _DEBUG
+    char name[128];
+    snprintf(name, sizeof(name), "Texture[%s]", (const char*)m_name);
+    m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
 
     // Upload pixel data
     const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());

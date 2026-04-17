@@ -164,7 +164,7 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
         // Multi-buffer path: each Update within one recording session gets its own chunk.
         // The chunk pool is per frame slot (indexed by FrameIndex()), so reuse is safe
         // because BeginFrame waits for the fence covering the previous use of this slot.
-        m_resource = m_dataChunkHandler.Update(commandListHandler.CmdQueue().FrameIndex(), dataSize, GetOwnerName(), GetExecutionId());
+        m_resource = m_dataChunkHandler.Update(commandListHandler.CmdQueue().FrameIndex(), dataSize, GetOwnerName(), m_type, GetExecutionId());
         if (m_resource == nullptr)
             return false;
     } 

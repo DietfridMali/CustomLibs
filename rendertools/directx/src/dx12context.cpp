@@ -62,6 +62,8 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
     if (enableDebugLayer) {
         if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&m_infoQueue)))) {
             // All severity breaks disabled — DrainMessages() after each Execute prints everything.
+            m_infoQueue->SetBreakOnID(D3D12_MESSAGE_ID(209), TRUE);  // vertex buffer stride < input layout stride
+            m_infoQueue->SetBreakOnID(D3D12_MESSAGE_ID(210), TRUE);  // vertex buffer too small for draw call
         }
     }
 #endif

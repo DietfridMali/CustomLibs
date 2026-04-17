@@ -17,14 +17,8 @@ void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resourc
 }
 
 
-bool UploadSubresource(ID3D12Device* device,
-                       ID3D12GraphicsCommandList* list,
-                       ID3D12Resource* dstResource,
-                       UINT subresource,
-                       const uint8_t* pixels,
-                       int width, int height, int channels,
-                       ComPtr<ID3D12Resource>& outUpload,
-                       bool addBarrier) noexcept
+bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID3D12Resource* dstResource, UINT subresource, 
+                       const uint8_t* pixels, int width, int height, int channels, ComPtr<ID3D12Resource>& outUpload, bool addBarrier) noexcept
 {
     D3D12_RESOURCE_DESC dstDesc = dstResource->GetDesc();
 
@@ -46,11 +40,14 @@ bool UploadSubresource(ID3D12Device* device,
     upDesc.SampleDesc.Count = 1;
     upDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    HRESULT hr = device->CreateCommittedResource(
-        &hp, D3D12_HEAP_FLAG_NONE, &upDesc,
-        D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&outUpload));
+    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &upDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&outUpload));
     if (FAILED(hr))
         return false;
+#ifdef _DEBUG
+    char name[128];
+    snprintf(name, sizeof(name), "Texture Subresource[%d,%d]", width, height);
+    outUpload->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
 
     uint8_t* mapped = nullptr;
     D3D12_RANGE mapRange{ 0, 0 };
@@ -122,6 +119,11 @@ ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, i
     ComPtr<ID3D12Resource> resource;
     if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resource))))
         return nullptr;
+#ifdef _DEBUG
+    char name[128];
+    snprintf(name, sizeof(name), "Texture3D - resource[%d,%d]", w, h);
+    resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
 
     UINT64 uploadSize = 0;
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
@@ -140,6 +142,10 @@ ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, i
     ComPtr<ID3D12Resource> upload;
     if (FAILED(device->CreateCommittedResource(&uhp, D3D12_HEAP_FLAG_NONE, &upDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
         return nullptr;
+#ifdef _DEBUG
+    snprintf(name, sizeof(name), "Texture3D - upload[%d,%d]", w, h);
+    upload->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
 
     const uint8_t* src = static_cast<const uint8_t*>(data);
     uint8_t* mapped = nullptr;

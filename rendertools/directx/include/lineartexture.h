@@ -70,11 +70,13 @@ public:
         rd.SampleDesc.Count = 1;
         rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-        if (FAILED(device->CreateCommittedResource(
-            &hp, D3D12_HEAP_FLAG_NONE, &rd,
-            D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-            IID_PPV_ARGS(&m_resource))))
+        if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
+#ifdef _DEBUG
+        char name[128];
+        snprintf(name, sizeof(name), "LinearTexture[%s]", (const char*)m_name);
+        m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
 
         const uint8_t* src = static_cast<const uint8_t*>(tb->DataBuffer());
         if (not UploadTextureData(device, m_resource.Get(), src, width, 1, int(GfxTexTraits<DATA_T>::pixelSize)))

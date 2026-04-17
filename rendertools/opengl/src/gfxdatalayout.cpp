@@ -297,7 +297,7 @@ noexcept
      if (checkLayout)
         CheckLayout(m_handle);
 #endif
-    if (not Enable())
+    if (not StartRender())
         return;
 #if 1
     if (baseShaderHandler.ShaderIsActive() and (textures.size() > 0) and not EnableTextures(textures))
@@ -309,8 +309,8 @@ noexcept
     else
         glDrawArrays(ToGLenum(m_shape), 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
 #endif
-    Disable();
     DisableTextures(textures);
+    FinishRender();
 }
 
 // =================================================================================================

@@ -144,6 +144,24 @@ public:
     void Disable(void)
         noexcept;
 
+    inline bool StartUpdate(void) noexcept {
+        return Enable();  
+    }
+
+    inline void FinishUpdate(void) noexcept {
+        Disable();
+    }
+
+    inline bool StartRender(void) noexcept {
+        return Enable(); 
+    }
+
+    inline void FinishRender(void) noexcept {
+        Disable();
+    }
+
+
+
     inline bool EnableTextures(std::span<Texture* const> textures = {})
         noexcept
     {

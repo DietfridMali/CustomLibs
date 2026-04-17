@@ -19,7 +19,7 @@ public:
         m_usedChunks = 0;
     }
 
-    ComPtr<ID3D12Resource> Update(size_t dataSize, const char* ownerName, uint64_t execId);
+    ComPtr<ID3D12Resource> Update(size_t dataSize, const char* ownerName, const char* type, uint64_t execId);
 
     inline ComPtr<ID3D12Resource> GetResource(void) {
         return (m_usedChunks > 0) ? m_chunks[m_usedChunks - 1] : nullptr;
@@ -56,8 +56,8 @@ public:
             m_chunkLists[i].Clear();
     }
 
-    ComPtr<ID3D12Resource> Update(uint32_t fi, size_t dataSize, const char* ownerName, uint64_t execId) {
-        return (fi >= m_frameCount) ? nullptr : m_chunkLists[fi].Update(dataSize, ownerName, execId);
+    ComPtr<ID3D12Resource> Update(uint32_t fi, size_t dataSize, const char* ownerName, const char* type, uint64_t execId) {
+        return (fi >= m_frameCount) ? nullptr : m_chunkLists[fi].Update(dataSize, ownerName, type, execId);
     }
 };
 
