@@ -11,22 +11,34 @@
 
 // =================================================================================================
 
+#include "shaderdatalayout.h"
+
+// =================================================================================================
+
 class ShaderSource {
 public:
     using KeyType = String;
 
-    String m_name{ "" };
-    String m_vs{ "" };
-    String m_fs{ "" };
-	String m_gs{ "" };
+    String           m_name{ "" };
+    String           m_vs{ "" };
+    String           m_fs{ "" };
+    String           m_gs{ "" };
+    ShaderDataLayout m_dataLayout;
 
     ShaderSource() = default;
 
     explicit ShaderSource(String name, String vs, String fs, String gs = "")
-		: m_name(name)
+        : m_name(name)
         , m_vs(vs)
         , m_fs(fs)
         , m_gs(gs)
+    { }
+
+    explicit ShaderSource(String name, String vs, String fs, ShaderDataLayout layout)
+        : m_name(name)
+        , m_vs(vs)
+        , m_fs(fs)
+        , m_dataLayout(layout)
     { }
 
     ShaderSource(const ShaderSource& other)
@@ -34,6 +46,7 @@ public:
         , m_vs(other.m_vs)
         , m_fs(other.m_fs)
         , m_gs(other.m_gs)
+        , m_dataLayout(other.m_dataLayout)
     {
     }
 

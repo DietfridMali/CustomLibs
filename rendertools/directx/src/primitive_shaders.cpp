@@ -11,6 +11,11 @@
 // bool uniforms are represented as int (0 = false, non-zero = true) in cbuffers.
 // =================================================================================================
 
+static const ShaderDataAttributes kVtxTcAttrs[] = {
+    { "Vertex",   0, ShaderDataAttributes::Float3 },
+    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+};
+
 
 // -------------------------------------------------------------------------------------------------
 // SDF line segment with optional AA, round caps.
@@ -59,7 +64,8 @@ const ShaderSource& LineShader() {
                 }
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-        )"
+        )",
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return source;
 }
@@ -125,7 +131,8 @@ const ShaderSource& RingShader() {
                 }
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-        )"
+        )",
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return source;
 }
@@ -197,7 +204,8 @@ const ShaderSource& CircleShader() {
                                                         : float3(gray, gray, gray);
                 return float4(color, surfaceColor.a * alpha);
             }
-        )"
+        )",
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return source;
 }
@@ -248,7 +256,8 @@ const ShaderSource& CircleMaskShader() {
                 }
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
-        )"
+        )",
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return source;
 }
@@ -304,7 +313,8 @@ const ShaderSource& RectangleShader() {
                     return float4(surfaceColor.rgb, surfaceColor.a * alpha);
                 }
             }
-        )"
+        )",
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return source;
 }

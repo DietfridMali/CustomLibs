@@ -5,6 +5,11 @@
 
 // =================================================================================================
 // HLSL shader strings for the DirectX 12 backend — blur / AA post-process shaders.
+
+static const ShaderDataAttributes kVtxTcAttrs[] = {
+    { "Vertex",   0, ShaderDataAttributes::Float3 },
+    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+};
 //
 // All three shaders use Offset2DVS() for the VS (which declares b1 with 'float offset').
 // The PS b1 starts with 'float vsOffset' at the same slot to keep the combined cbuffer layout
@@ -39,7 +44,8 @@ const ShaderSource& BoxBlurShader() {
             float4 PSMain(PSInput i) : SV_Target {
                 return GaussBlur(i.fragCoord, 3, 1);
             }
-        )")
+        )"),
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return boxBlurShader;
 }
@@ -103,7 +109,8 @@ const ShaderSource& FxaaShader() {
                 float  a     = surface.Sample(s0, i.fragCoord).a;
                 return float4(color, a);
             }
-        )"
+        )",
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return fxaaShader;
 }
@@ -153,7 +160,8 @@ const ShaderSource& GaussBlurShader() {
                 }
                 return float4(sum.rgb, sum.a);
             }
-        )"
+        )",
+        ShaderDataLayout(kVtxTcAttrs, 2)
     );
     return gaussBlurShader;
 }

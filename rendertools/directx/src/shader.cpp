@@ -32,30 +32,49 @@
 // PSO cache: keyed by RenderState bitmask; created on first Enable() for that state.
 
 // -------------------------------------------------------------------------------------------------
-// Fixed input layout (must match the HLSL vertex shader input semantics)
+// Helpers to translate ShaderDataAttributes to D3D12_INPUT_ELEMENT_DESC.
 
-// Default input layout matching mesh.h UpdateData() stream order:
-//   slot 0: POSITION  float3  - vertex positions
-//   slot 1: TEXCOORD0 float2  - primary texcoord (texCoord[0])
-//   slot 2: TEXCOORD1 float2  - secondary texcoord (texCoord[1] / borderTexCoord)
-//   slot 3: COLOR0    float4  - colour / wallScale (use .xy for vec2)
-//   slot 4: NORMAL    float4  - normal / decalNormal  (float4 to cover both vec3+padding and vec4)
-//   slot 5: TANGENT   float4  - tangent (with handedness in .w)
-//   slot 6: TEXCOORD2 float4  - extra per-vertex data (morph-target offsets, etc.)
-//
-// NOTE: meshes that supply a float3 normal at slot 4 must pad to float4 (w = 0).
-// Sphere/smiley meshes that put normals at slot 1 (layout(location=1) in the old GLSL)
-// should instead write a dummy float2 at slot 1 and the normal at slot 4.
-static const D3D12_INPUT_ELEMENT_DESC kInputLayout[] = {
-    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-    { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-};
-static constexpr UINT kInputLayoutCount = UINT(std::size(kInputLayout));
+// Maps C++ buffer type + id to the DX12 input slot used by GfxDataLayout::FixedSlotForBuffer.
+static int SlotForAttr(const char* datatype, int id) noexcept
+{
+    if (strcmp(datatype, "Vertex") == 0)   return 0;
+    if (strcmp(datatype, "TexCoord") == 0) {
+        if (id == 0) return 1;
+        if (id == 1) return 2;
+        if (id == 2) return 6;
+        return -1;
+    }
+    if (strcmp(datatype, "Color") == 0)   return 3;
+    if (strcmp(datatype, "Normal") == 0)  return 4;
+    if (strcmp(datatype, "Tangent") == 0) return 5;
+    if (strcmp(datatype, "Offset") == 0)  return 5 + id;   // 0→5, 1→6, 2→7, 3→8
+    return -1;
+}
+
+// Maps C++ buffer type + id to an HLSL semantic name and index.
+// Offset/N uses TEXCOORD(N+3) to avoid collisions with TexCoord/0..2.
+static const char* SemanticForAttr(const char* datatype, int id, UINT& semanticIndex) noexcept
+{
+    if (strcmp(datatype, "Vertex") == 0)   { semanticIndex = 0;        return "POSITION"; }
+    if (strcmp(datatype, "TexCoord") == 0) { semanticIndex = UINT(id); return "TEXCOORD"; }
+    if (strcmp(datatype, "Color") == 0)    { semanticIndex = UINT(id); return "COLOR"; }
+    if (strcmp(datatype, "Normal") == 0)   { semanticIndex = UINT(id); return "NORMAL"; }
+    if (strcmp(datatype, "Tangent") == 0)  { semanticIndex = UINT(id); return "TANGENT"; }
+    if (strcmp(datatype, "Offset") == 0)   { semanticIndex = UINT(id + 3); return "TEXCOORD"; }
+    semanticIndex = 0;
+    return "TEXCOORD";
+}
+
+static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
+{
+    switch (fmt) {
+    case ShaderDataAttributes::Float1: return DXGI_FORMAT_R32_FLOAT;
+    case ShaderDataAttributes::Float2: return DXGI_FORMAT_R32G32_FLOAT;
+    case ShaderDataAttributes::Float3: return DXGI_FORMAT_R32G32B32_FLOAT;
+    case ShaderDataAttributes::Float4: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+    }
+    return DXGI_FORMAT_R32G32B32_FLOAT;
+}
 
 
 // =================================================================================================
@@ -208,10 +227,41 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (gsCode.Length() > 0)
         Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
 
-    // Reflect VS inputs → build a minimal per-shader input layout.
-    // Only include kInputLayout entries that the VS actually reads so that
-    // unused slots don't require bound vertex buffers at draw time.
-    {
+    // Build per-shader input layout from m_dataLayout.
+    // Each ShaderDataAttributes entry is translated directly to a D3D12_INPUT_ELEMENT_DESC.
+    // If no layout is set, fall back to VS reflection (for shaders not yet migrated).
+    if (m_dataLayout.m_count > 0) {
+        for (int i = 0; i < m_dataLayout.m_count; ++i) {
+            const ShaderDataAttributes& attr = m_dataLayout.m_attrs[i];
+            UINT semanticIndex = 0;
+            const char* semantic = SemanticForAttr(attr.datatype, attr.id, semanticIndex);
+            int slot = SlotForAttr(attr.datatype, attr.id);
+            if (slot < 0)
+                continue;
+            D3D12_INPUT_ELEMENT_DESC desc{};
+            desc.SemanticName = semantic;
+            desc.SemanticIndex = semanticIndex;
+            desc.Format = DxgiFormatForAttr(attr.format);
+            desc.InputSlot = UINT(slot);
+            desc.AlignedByteOffset = 0;
+            desc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+            desc.InstanceDataStepRate = 0;
+            m_vsInputLayout.push_back(desc);
+        }
+    }
+    else {
+        // Fallback: derive layout from VS reflection for shaders without an explicit layout.
+        // Uses a fixed set of known semantics covering the standard slot assignments.
+        static const D3D12_INPUT_ELEMENT_DESC kFallbackLayout[] = {
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,        1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,        2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT,  3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "NORMAL",   0, DXGI_FORMAT_R32G32B32A32_FLOAT,  4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT,  5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT,  6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        };
+        static constexpr UINT kFallbackCount = UINT(std::size(kFallbackLayout));
         ComPtr<ID3D12ShaderReflection> vsRefl;
         if (SUCCEEDED(D3DReflect(m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize(),
                                  IID_PPV_ARGS(&vsRefl)))) {
@@ -220,18 +270,18 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
             for (UINT i = 0; i < sd.InputParameters; ++i) {
                 D3D12_SIGNATURE_PARAMETER_DESC pd{};
                 vsRefl->GetInputParameterDesc(i, &pd);
-                if (pd.SystemValueType != D3D_NAME_UNDEFINED) continue; // skip SV_* semantics
-                for (UINT j = 0; j < kInputLayoutCount; ++j) {
-                    if (_stricmp(kInputLayout[j].SemanticName, pd.SemanticName) == 0 &&
-                        kInputLayout[j].SemanticIndex == pd.SemanticIndex) {
-                        m_vsInputLayout.push_back(kInputLayout[j]);
+                if (pd.SystemValueType != D3D_NAME_UNDEFINED) continue;
+                for (UINT j = 0; j < kFallbackCount; ++j) {
+                    if (_stricmp(kFallbackLayout[j].SemanticName, pd.SemanticName) == 0 &&
+                        kFallbackLayout[j].SemanticIndex == pd.SemanticIndex) {
+                        m_vsInputLayout.push_back(kFallbackLayout[j]);
                         break;
                     }
                 }
             }
         }
-        if (m_vsInputLayout.empty()) // fallback: reflection failed
-            m_vsInputLayout.assign(kInputLayout, kInputLayout + kInputLayoutCount);
+        if (m_vsInputLayout.empty())
+            m_vsInputLayout.assign(kFallbackLayout, kFallbackLayout + kFallbackCount);
     }
 
     // Reflect b1 fields from PS blob (look for cbuffer named "ShaderConstants")

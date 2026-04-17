@@ -12,6 +12,7 @@
 #include "string.hpp"
 #include "gfxdriverstates.h"
 #include "shaderdata.h"
+#include "shaderdatalayout.h"
 
 // =================================================================================================
 // DX12 Shader
@@ -95,9 +96,11 @@ public:
     // Field map (uniform name → b1 byte offset + size), filled from HLSL reflection
     AutoArray<std::pair<String, FieldInfo>> m_b1Fields;
 
-    // Per-shader input layout — only the elements the VS actually reads (from D3DReflect).
-    // Used instead of the global kInputLayout so unused slots don't require bound buffers.
+    // Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;
+
+    // Vertex data layout: describes which C++ buffers feed which shader inputs.
+    ShaderDataLayout m_dataLayout;
 
     // Location table (name → resolved b1 offset, same pattern as OGL for compat)
     AutoArray<UniformHandle*>  m_uniforms;
@@ -131,8 +134,8 @@ public:
     bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
                  ComPtr<ID3DBlob>& blobOut) noexcept;
 
-    // Link: build root signature, reflect b1 fields, allocate CBs.
-    // gsCode is optional; when non-empty a geometry shader stage is compiled and linked.
+    // Link: build root signature, build input layout from m_dataLayout (or reflection fallback),
+    // reflect b1 fields. gsCode is optional.
     bool Create(const String& vsCode, const String& fsCode, const String& gsCode = "");
 
     void Destroy(void) noexcept;
