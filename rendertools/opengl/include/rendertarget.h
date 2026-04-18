@@ -142,14 +142,14 @@ public:
 
     bool UpdateTransformation(const RTRenderParams& params);
 
-    bool RenderTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
+    bool RenderAsTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
 
-    inline bool RenderTexture(Texture* texture, const RTRenderParams& params, RGBAColor&& color) {
-        return RenderTexture(texture, params, static_cast<const RGBAColor&>(color));
+    inline bool RenderAsTexture(Texture* texture, const RTRenderParams& params, RGBAColor&& color) {
+        return RenderAsTexture(texture, params, static_cast<const RGBAColor&>(color));
     }
 
-    inline bool RenderTexture(Texture* texture, const RTRenderParams& params) {
-        return RenderTexture(texture, params, ColorData::White);
+    inline bool RenderAsTexture(Texture* texture, const RTRenderParams& params) {
+        return RenderAsTexture(texture, params, ColorData::White);
     }
 
     bool Render(const RTRenderParams& params, const RGBAColor& color);

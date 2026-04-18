@@ -270,8 +270,7 @@ void RenderTarget::Destroy(void)
 }
 
 
-void RenderTarget::TransitionColor(ID3D12GraphicsCommandList* list, int i,
-                           D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
+void RenderTarget::TransitionColor(ID3D12GraphicsCommandList* list, int i, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
 {
     if ((before == after) or not list or not m_colorResources[i])
         return;

@@ -219,7 +219,10 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
             m_activeBufferIndex = bufferIndex;
             m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
             AttachBuffer(bufferIndex);
-            for (int i = 1; i < l; ++i)
+            for (int i = 0; i < l; ++i)
+                if (i != bufferIndex)
+                    DetachBuffer(i);
+                for (int i = 1; i < l; ++i)
                 m_drawBuffers[i] = GL_NONE;
         }
     }
@@ -238,13 +241,17 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
                 AttachBuffer(i);
             }
-            for ( ; i < l; ++i)
+            for (; i < l; ++i) {
+                DetachBuffer(i);
                 m_drawBuffers[i] = GL_NONE;
+            }
         }
         else if (m_drawBufferGroup == dbExtra) {
             int i = 0;
-            for (; i < m_colorBufferCount; ++i) 
+            for (; i < m_colorBufferCount; ++i) {
+                DetachBuffer(i);
                 m_drawBuffers[i] = GL_NONE;
+            }
             for (; i < l; ++i) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
                 AttachBuffer(i);
@@ -411,7 +418,7 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params) {
 }
 
 
-bool RenderTarget::RenderTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color) {
+bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color) {
     if (params.destination < 0) // rendering to the current render target
         gfxDriverStates.SetBlending(1);
     else { // rendering to another RenderTarget (than the main buffer)
@@ -510,7 +517,7 @@ Texture* RenderTarget::GetDepthTexture(void) {
 bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color) {
     if (params.destination >= 0)
         m_lastDestination = params.destination;
-    return RenderTexture((params.source == params.destination) ? nullptr : GetRenderTexture(params), params, color);
+    return RenderAsTexture((params.source == params.destination) ? nullptr : GetRenderTexture(params), params, color);
 }
 
 
