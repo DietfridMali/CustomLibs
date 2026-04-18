@@ -17,6 +17,7 @@ const ShaderSource& CircleMaskShader();
 const ShaderSource& RectangleShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
+const ShaderSource& GlyphShader();
 const ShaderSource& MovingTextureShader();
 const ShaderSource& BlurTextureShader();
 const ShaderSource& GrayScaleShader();
@@ -42,6 +43,7 @@ BaseShaderCode::BaseShaderCode() {
         &RectangleShader(),
         &PlainColorShader(),
         &PlainTextureShader(),
+        &GlyphShader(),
         &MovingTextureShader(),
         &BlurTextureShader(),
         &GrayScaleShader(),

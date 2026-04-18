@@ -17,7 +17,6 @@ FILES := \
  blur_shader \
  cube \
  cubemap \
- drawbufferhandler \
  fbo \
  fonthandler \
  framecounter \

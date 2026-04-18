@@ -72,10 +72,15 @@ bool FontHandler::FreeGlyph(const String& key, GlyphInfo* info) {
 
 
 int FontHandler::BuildAtlas(void) {
+#if 0
+    m_atlas.GetRenderTarget()->SetClearColor(RGBAColor(0.5, 0, 0.5, 0));
+#endif
     if (not m_atlas.Enable())
         return -1;
-    gfxDriverStates.SetBlending(1);
+    gfxDriverStates.SetBlending(0);
     gfxDriverStates.SetFaceCulling(0);
+    gfxDriverStates.SetDepthTest(0);
+    gfxDriverStates.SetDepthWrite(0);
     baseRenderer.ResetTransformation();
     m_atlas.Initialize();
     baseRenderer.PushViewport();
@@ -143,7 +148,7 @@ bool FontHandler::CreateTexture(const char* szChar, String key, int index)
         info = GlyphInfo();
         return false;
         }
-    info.texture->Deploy();
+	info.texture->Deploy();
     if (not m_glyphDict.Insert(info.name, info))
         return false;
     info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());

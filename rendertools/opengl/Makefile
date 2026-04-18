@@ -19,7 +19,6 @@ OPENGL_FILES := \
  base_texture_shaders \
  blur_shader \
  cubemap \
- drawbufferhandler \
  gfxdatabuffer \
  gfxdatalayout \
  gfxstates \
@@ -39,6 +38,7 @@ OPENGL_FILES := \
 COMMON_FILES := \
  base_quad \
  base_shaderhandler \
+ drawbufferhandler \
  billboard \
  coplanar_rectangle \
  cube \

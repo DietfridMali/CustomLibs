@@ -129,16 +129,18 @@ public:
 
     inline bool EnableTextures(std::span<Texture* const> textures = {}) noexcept {
         int tmu = 0;
-        for (Texture* tex : textures) {
-            if (tex && !tex->Enable(tmu)) return false;
+        for (Texture* t : textures) {
+            if (t && not t->Enable(tmu)) 
+                return false;
             ++tmu;
         }
         return true;
     }
 
     inline void DisableTextures(std::span<Texture* const> textures = {}) noexcept {
-        for (Texture* tex : textures)
-            if (tex) tex->Disable();
+        for (Texture* t : textures)
+            if (t) 
+                t->Disable();
     }
 
     GfxDataBuffer* FindBuffer(const char* type, int id, int& index) noexcept;

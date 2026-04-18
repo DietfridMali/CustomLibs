@@ -284,7 +284,7 @@ static void CheckLayout(GLuint handle, const char* label = "") {
     }
 
     glBindVertexArray(0);
-    baseRenderer.ClearGLError();
+    baseRenderer.ClearGfxError();
 }
 
 #endif

@@ -31,6 +31,7 @@ void RenderTarget::Init(void) {
     m_pingPong = true;
     m_isAvailable = false;
     m_drawBufferGroup = dbNone;
+    m_clearColor = ColorData::Invisible;
     m_bufferInfo.Reset();
     m_drawBuffers.Reset();
 }
@@ -45,11 +46,11 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
     else
         bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
-    baseRenderer.ClearGLError();
+    baseRenderer.ClearGfxError();
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
-    baseRenderer.ClearGLError();
+    baseRenderer.ClearGfxError();
     gfxDriverStates.BindTexture2D(bufferInfo.m_handle, 0);
     if (bufferType == BufferInfo::btDepth) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -100,7 +101,7 @@ bool RenderTarget::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
         return true;
-    BaseRenderer::ClearGLError();
+    BaseRenderer::ClearGfxError();
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
     return true;
@@ -119,7 +120,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex) {
     gfxDriverStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
-    return bufferInfo.m_isAttached = BaseRenderer::CheckGLError();
+    return bufferInfo.m_isAttached = BaseRenderer::CheckGfxError();
 #else
     return bufferInfo.m_isAttached = true;
 #endif
@@ -129,7 +130,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex) {
 bool RenderTarget::AttachBuffers(bool hasMRTs) {
     if (not m_handle.Claim())
         return false;
-    BaseRenderer::ClearGLError();
+    BaseRenderer::ClearGfxError();
     glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
     bool bindColorBuffers = true;
     glDrawBuffer(GL_NONE);
@@ -151,7 +152,7 @@ bool RenderTarget::AttachBuffers(bool hasMRTs) {
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 #ifdef _DEBUG
     if (not m_isAvailable)
-        baseRenderer.CheckGLError();
+        baseRenderer.CheckGfxError();
 #endif
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return m_isAvailable;
@@ -261,14 +262,14 @@ void RenderTarget::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 }
 
 
-// select draw buffer works in conjunction with Renderer::SetDrawBuffers
+// select draw buffer works in conjunction with Renderer::TrackDrawBuffers
 // The renderer keeps track of draw buffers and render targets and stores those being temporarily overriden
 // by other render targets in a stack. Basically, the current OpenGL draw buffer is set using
-// Renderer::SetDrawBuffers. However, when disabling a temporary render target (RenderTarget), the 
+// Renderer::TrackDrawBuffers. However, when disabling a temporary render target (RenderTarget), the
 // previous render target is automatically restored, which means calling its SetDrawBuffers
-// function. To avoid RenderTarget::SetDrawBuffers and Renderer::SetDrawBuffers looping forever,
+// function. To avoid RenderTarget::SetDrawBuffers and Renderer::TrackDrawBuffers looping forever,
 // in that case, true is passed for reenable, causing SetDrawBuffers to directly call
-// glDrawBuffers. The effect of that construction is that you can transparently nest 
+// glDrawBuffers. The effect of that construction is that you can transparently nest
 // multiple RenderTarget draw buffers.
 bool RenderTarget::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
@@ -276,7 +277,7 @@ bool RenderTarget::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferG
     if (reenable)
         glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
     else {
-        baseRenderer.SetDrawBuffers(this, &m_drawBuffers);
+        baseRenderer.TrackDrawBuffers(this, &m_drawBuffers);
     }
     return true;
 }
@@ -295,6 +296,7 @@ void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, boo
     if (clear) {
         baseRenderer.PushViewport();
         glViewport(0, 0, m_width * m_scale, m_height * m_scale);
+		glClearColor(m_clearColor.r, m_clearColor.g, m_clearColor.b, m_clearColor.a);
         if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         else
@@ -318,7 +320,7 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
     gfxDriverStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
     Clear(bufferIndex, drawBufferGroup, clear);
 #ifdef _DEBUG
-    return baseRenderer.CheckGLError();
+    return baseRenderer.CheckGfxError();
 #else
     return true;
 #endif
@@ -328,11 +330,11 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
 bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     if (not m_isAvailable)
         return false;
-    //BaseRenderer::ClearGLError();
+    //BaseRenderer::ClearGfxError();
     if (not IsEnabled()) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
 #ifdef _DEBUG
-        if (not BaseRenderer::CheckGLError())
+        if (not BaseRenderer::CheckGfxError())
             return false;
         m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 #endif
@@ -358,7 +360,7 @@ void RenderTarget::Disable(bool flush) { // flush only required for compatibilit
 bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
     if (bufferIndex < 0)
         return false;
-    BaseRenderer::ClearGLError();
+    BaseRenderer::ClearGfxError();
     if (tmuIndex < 0)
         tmuIndex = bufferIndex;
     for (int i = 0; i < m_bufferCount; ++i)

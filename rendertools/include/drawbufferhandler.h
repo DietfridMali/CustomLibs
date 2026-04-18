@@ -14,9 +14,12 @@
 class DrawBufferInfo {
 public:
     RenderTarget*                    m_renderTarget;
+#ifdef OPENGL
     AutoArray<GLuint>*   m_drawBuffers;
+#endif
 
 public:
+#ifdef OPENGL
     DrawBufferInfo(RenderTarget* renderTarget = nullptr, AutoArray<GLuint>* drawBuffers = nullptr) {
         Update(renderTarget, drawBuffers);
     }
@@ -25,20 +28,24 @@ public:
         m_renderTarget = renderTarget;
         m_drawBuffers = drawBuffers;
     }
+#else
+    DrawBufferInfo(RenderTarget* renderTarget = nullptr) : m_renderTarget(renderTarget) {}
+#endif
 
-    bool operator==(const DrawBufferInfo& other) const {
+    bool operator==(const DrawBufferInfo& other) const noexcept {
         return other.m_renderTarget == m_renderTarget;
     }
 };
 
 // =================================================================================================
-// basic renderer class. Initializes display and OpenGL and sets up projections and view matrix
 
 class DrawBufferHandler
 {
     protected:
         RenderTarget*                    m_activeBuffer;
+#ifdef OPENGL
         AutoArray<GLuint>    m_defaultDrawBuffers;
+#endif
         DrawBufferInfo          m_drawBufferInfo;
         List<DrawBufferInfo>    m_drawBufferStack;
         int                     m_windowWidth;
@@ -55,17 +62,23 @@ class DrawBufferHandler
 
         bool SetActiveBuffer(RenderTarget* buffer, bool clearBuffer = false);
 
+#ifdef OPENGL
         inline AutoArray<GLuint>* ActiveDrawBuffers(void) {
             return m_drawBufferInfo.m_drawBuffers;
         }
+#endif
 
         void SetupDrawBuffers(void);
-            
+
         void SetActiveDrawBuffers(void);
 
         void SaveDrawBuffer();
 
-        void SetDrawBuffers(RenderTarget* renderTarget, AutoArray<GLuint>* drawBuffers);
+#ifdef OPENGL
+        void TrackDrawBuffers(RenderTarget* renderTarget, AutoArray<GLuint>* drawBuffers);
+#else
+        void TrackDrawBuffers(RenderTarget* renderTarget);
+#endif
 
         void RestoreDrawBuffer(void);
 

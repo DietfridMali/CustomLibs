@@ -90,7 +90,7 @@
     <ClInclude Include="..\..\include\colordata.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\drawbufferhandler.h">
+    <ClInclude Include="..\..\include\drawbufferhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\framecounter.h">
@@ -254,7 +254,7 @@
     <ClCompile Include="..\src\blur_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\drawbufferhandler.cpp">
+    <ClCompile Include="..\..\src\drawbufferhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\framecounter.cpp">

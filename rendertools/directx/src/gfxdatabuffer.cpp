@@ -122,7 +122,7 @@ bool GfxDataBuffer::Reset(void) {
         // Owner change: log if a previous owner existed, then claim new owner.
         // Do NOT reset chunkIndex — the old CL may still reference earlier chunks.
 #ifdef _DEBUG
-        if (GetOwnerName() != cl->GetName())
+        if (not GetOwnerName().IsEmpty() and (GetOwnerName() != cl->GetName()))
             fprintf(stderr, "GfxDataBuffer[%s/%d]: Update() called from command '%s', but buffer was last used by command list '%s'\n",
                     m_type, m_id, (const char*) cl->GetName(), (const char*)GetOwnerName());
 #endif

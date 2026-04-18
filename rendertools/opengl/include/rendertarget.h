@@ -74,13 +74,14 @@ public:
     DrawBufferList              m_drawBuffers; 
     Viewport                    m_viewport;
     Viewport*                   m_viewportSave;
-    RenderTargetTexture                  m_renderTexture;
-    RenderTargetTexture                  m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
+    RenderTargetTexture         m_renderTexture;
+    RenderTargetTexture         m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
     bool                        m_isAvailable;
     int                         m_lastDestination;
     BaseQuad                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
+	RGBAColor                   m_clearColor;
 
     static GLint                m_activeHandle;
 
@@ -185,6 +186,10 @@ public:
 
     inline bool IsAvailable(void) noexcept {
         return m_isAvailable;
+    }
+
+    inline void SetClearColor(RGBAColor color) noexcept {
+        m_clearColor = color;
     }
 
     inline Viewport& GetViewport(void) noexcept {

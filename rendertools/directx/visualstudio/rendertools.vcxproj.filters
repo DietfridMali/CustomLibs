@@ -137,8 +137,8 @@
     <ClInclude Include="..\include\descriptor_heap.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\drawbufferhandler.h">
-      <Filter>DirectX</Filter>
+    <ClInclude Include="..\..\include\drawbufferhandler.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dx12context.h">
       <Filter>DirectX</Filter>
@@ -291,8 +291,8 @@
     <ClCompile Include="..\src\descriptor_heap.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\drawbufferhandler.cpp">
-      <Filter>Source Files\DirectX</Filter>
+    <ClCompile Include="..\..\src\drawbufferhandler.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\dx12context.cpp">
       <Filter>Source Files\DirectX</Filter>

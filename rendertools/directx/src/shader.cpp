@@ -628,6 +628,10 @@ void Shader::Enable(void)
     if (not list) 
         return;
 
+#if 0//def _DEBUG
+    fprintf(stderr, "Shader::Enable '%s' on list %p (current: %p)\n", (const char*)m_name, (void*)list, (void*)commandListHandler.CurrentList());
+#endif
+
     // Get / create PSO for current render state
     const RenderState& state = gfxDriverStates.State();
     ID3D12PipelineState* pso = GetOrCreatePSO(state);
@@ -658,11 +662,11 @@ bool Shader::UpdateMatrices(void)
     if (not list)
         return false;
 
-    std::memcpy(m_b0Staging.mModelView,      baseRenderer.ModelView().AsArray(),              16 * sizeof(float));
-    std::memcpy(m_b0Staging.mProjection,     baseRenderer.Projection().AsArray(),             16 * sizeof(float));
-    std::memcpy(m_b0Staging.mViewport,       baseRenderer.ViewportTransformation().AsArray(), 16 * sizeof(float));
+    std::memcpy(m_b0Staging.mModelView, baseRenderer.ModelView().AsArray(), 16 * sizeof(float));
+    std::memcpy(m_b0Staging.mProjection, baseRenderer.Projection().AsArray(), 16 * sizeof(float));
+    std::memcpy(m_b0Staging.mViewport, baseRenderer.ViewportTransformation().AsArray(), 16 * sizeof(float));
     if (shadowMap.IsReady())
-        std::memcpy(m_b0Staging.mLightTransform, shadowMap.GetTransformation().AsArray(),     16 * sizeof(float));
+        std::memcpy(m_b0Staging.mLightTransform, shadowMap.GetTransformation().AsArray(), 16 * sizeof(float));
 
     CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
     if (not a.IsValid())

@@ -137,7 +137,9 @@ public:
 
     void SetDefaultStates(void) noexcept;
 
-    inline void SetRenderPass(RenderPassType renderPass) noexcept { m_renderPass = renderPass; }
+    inline void SetRenderPass(RenderPassType renderPass) noexcept { 
+        m_renderPass = renderPass; 
+    }
 
     void StartShadowPass(void) noexcept;
 
@@ -158,9 +160,12 @@ public:
     }
 
     inline void StartRenderPass(RenderPassType pass) noexcept {
-        if (pass == RenderPassType::rpShadows)      StartShadowPass();
-        else if (pass == RenderPassType::rpColor)   StartColorPass();
-        else                                         StartFullPass();
+        if (pass == RenderPassType::rpShadows)  
+            StartShadowPass();
+        else if (pass == RenderPassType::rpColor)
+            StartColorPass();
+        else                                         
+            StartFullPass();
     }
 
     RenderPassType RenderPass(void) noexcept { return m_renderPass; }
@@ -187,32 +192,65 @@ public:
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);
 
-    virtual bool EnableCamera(void)  { return false; }
-    virtual bool DisableCamera(void) { return false; }
+    virtual bool EnableCamera(void)  { 
+        return false; 
+    }
 
-    inline RenderTarget* ScreenBuffer(void) noexcept { return m_screenBuffer; }
+    virtual bool DisableCamera(void) { 
+        return false; 
+    }
 
-    inline int WindowWidth(void) noexcept { return m_windowWidth; }
+    inline RenderTarget* ScreenBuffer(void) noexcept { 
+        return m_screenBuffer; 
+    }
 
-    inline int WindowHeight(void) noexcept { return m_windowHeight; }
+    inline int WindowWidth(void) noexcept { 
+        return m_windowWidth; 
+    }
 
-    inline int SceneWidth(void) noexcept { return m_sceneWidth; }
+    inline int WindowHeight(void) noexcept { 
+        return m_windowHeight; 
+    }
 
-    inline int SceneHeight(void) noexcept { return m_sceneHeight; }
+    inline int SceneWidth(void) noexcept { 
+        return m_sceneWidth; 
+    }
 
-    inline int SceneLeft(void) noexcept { return m_sceneLeft; }
+    inline int SceneHeight(void) noexcept { 
+        return m_sceneHeight; 
+    }
 
-    inline int SceneTop(void) noexcept { return m_sceneTop; }
+    inline int SceneLeft(void) noexcept { 
+        return m_sceneLeft; 
+    }
 
-    inline float FOV(void) noexcept { return m_fov; }
+    inline int SceneTop(void) noexcept { 
+        return m_sceneTop; 
+    }
 
-    inline float AspectRatio(void) noexcept { return m_aspectRatio; }
+    inline float FOV(void) noexcept { 
+        return m_fov; 
+    }
 
-    inline Matrix4f& ViewportTransformation(void) noexcept { return m_viewport.Transformation(); }
+    inline float AspectRatio(void) noexcept { 
+        return m_aspectRatio; 
+    }
 
-    inline Vector2f& NDCScale(void) noexcept { return m_ndcScale; }
-    inline Vector2f& NDCBias(void)  noexcept { return m_ndcBias; }
-    inline MovingFrameCounter& FrameCounter(void) noexcept { return m_frameCounter; }
+    inline Matrix4f& ViewportTransformation(void) noexcept { 
+        return m_viewport.Transformation(); 
+    }
+
+    inline Vector2f& NDCScale(void) noexcept { 
+        return m_ndcScale; 
+    }
+    
+    inline Vector2f& NDCBias(void)  noexcept { 
+        return m_ndcBias; 
+    }
+    
+    inline MovingFrameCounter& FrameCounter(void) noexcept { 
+        return m_frameCounter; 
+    }
 
     template <typename T>
     inline void SetBackgroundColor(T&& backgroundColor) {
@@ -223,34 +261,42 @@ public:
     inline void SetClearColor(const RGBAColor& color) noexcept {
         gfxDriverStates.ClearColor(color);
     }
+
     inline void SetClearColor(RGBAColor&& color) noexcept {
         SetClearColor(static_cast<const RGBAColor&>(color));
     }
+    
     inline void ResetClearColor(void) noexcept {
         gfxDriverStates.ClearColor(RGBAColor{ 0.f, 0.f, 0.f, 0.f });
     }
 
-    inline BaseQuad& RenderQuad(void) noexcept { return m_renderQuad; }
-    inline ::Viewport& GetViewport(void) noexcept { return m_viewport; }
+    inline BaseQuad& RenderQuad(void) noexcept { 
+        return m_renderQuad; 
+    }
+
+    inline ::Viewport& GetViewport(void) noexcept { 
+        return m_viewport; 
+    }
 
     void SetViewport(bool flipVertically = false) noexcept;
-    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0,
-                     bool flipViewportVertically = false, bool flipWindowVertically = false) noexcept;
+
+    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipViewportVertically = false, bool flipWindowVertically = false) noexcept;
 
     void PushViewport(void);
+
     void PopViewport(void);
 
     inline TexCoord ViewportSize(void) noexcept {
         return TexCoord(float(m_viewport.Width()), float(m_viewport.Height()));
     }
+
     inline TexCoord TexelSize(void) noexcept {
         return TexCoord(1.0f / float(m_viewport.Width()), 1.0f / float(m_viewport.Height()));
     }
 
     void Render(Shader* shader, std::span<Texture* const> textures = {}, const RGBAColor& color = ColorData::White);
 
-    inline void Render(Shader* shader, std::initializer_list<Texture*> textures,
-                       const RGBAColor& color = ColorData::White) {
+    inline void Render(Shader* shader, std::initializer_list<Texture*> textures, const RGBAColor& color = ColorData::White) {
         Render(shader, std::span<Texture* const>(textures.begin(), textures.size()), color);
     }
     inline void Render(Shader* shader, Texture* texture, const RGBAColor& color) {
@@ -258,25 +304,44 @@ public:
     }
 
     void Fill(const RGBAColor& color, float scale = 1.0f);
+
     void Fill(RGBAColor&& color, float scale = 1.0f) {
         Fill(static_cast<const RGBAColor&>(color), scale);
     }
+    
     template <typename T>
     inline void Fill(T&& color, float alpha, float scale = 1.0f) {
         Fill(RGBAColor(std::forward<T>(color), alpha), scale);
     }
 
-    inline void ShowFps(bool showFps) noexcept { m_frameCounter.ShowFps(showFps); }
-    inline void ToggleFps(void) noexcept { m_frameCounter.Toggle(); }
-    inline float GetFps(void) noexcept { return m_frameCounter.GetFps(); }
+    
+    inline void ShowFps(bool showFps) noexcept { 
+        m_frameCounter.ShowFps(showFps); 
+    }
+    
+    inline void ToggleFps(void) noexcept { 
+        m_frameCounter.Toggle(); 
+    }
+    
+    inline float GetFps(void) noexcept { 
+        return m_frameCounter.GetFps(); 
+    }
 
     // Winding helpers — return GL enum values (defined in gfxdriverstates.h compat section).
-    inline GLenum GetWinding(bool reverse = false) noexcept { return reverse ? GLenum(GL_CCW) : GLenum(GL_CW); }
-    inline GLenum GetFrontFace(bool reverse = false) noexcept { return reverse ? GLenum(GL_FRONT) : GLenum(GL_BACK); }
+    inline GLenum GetWinding(bool reverse = false) noexcept { 
+        return reverse ? GLenum(GL_CCW) : GLenum(GL_CW); 
+    }
+
+    inline GLenum GetFrontFace(bool reverse = false) noexcept { 
+        return reverse ? GLenum(GL_FRONT) : GLenum(GL_BACK); 
+    }
 
     // DX12: no per-frame GL error checking. These are kept as no-ops for source compatibility.
-    static void ClearGLError(void)      noexcept {}
-    static bool CheckGLError(const char* = "") noexcept { return true; }
+    static void ClearGfxError(void)noexcept {}
+
+    static bool CheckGfxError(const char* = "") noexcept { 
+        return true; 
+    }
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

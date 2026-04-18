@@ -119,13 +119,23 @@ public:
         m_uniforms.SetDefaultValue(nullptr);
     }
 
-    Shader(const Shader& other)  { Copy(other); }
-    Shader(Shader&& other) noexcept { Move(other); }
+    Shader(const Shader& other)  { 
+        Copy(other); 
+    }
+
+    Shader(Shader&& other) noexcept { 
+        Move(other); 
+    }
+
     ~Shader() { Destroy(); }
 
-    Shader& operator=(Shader&& other) noexcept { return Move(other); }
+    Shader& operator=(Shader&& other) noexcept { 
+        return Move(other); 
+    }
 
-    String& GetKey(void) noexcept { return m_name; }
+    String& GetKey(void) noexcept { 
+        return m_name; 
+    }
 
     // -----------------------------------------------------------------------------------------
     // Creation / destruction
@@ -236,11 +246,13 @@ public:
 #endif
 
     // Source-compat stubs (no-ops in DX12)
-    static void ClearGLError() noexcept {}
-    static bool CheckGLError(const char* = "") noexcept { return true; }
+    static void ClearGfxError() noexcept {}
+
+    static bool CheckGfxError(const char* = "") noexcept { return true; }
 
     // GetFloatData — OGL-specific, kept as no-op stubs
     static inline float* GetFloatData(GLenum /*id*/, int32_t /*size*/, float* data) noexcept { return data; }
+
     static inline AutoArray<float>& GetFloatData(GLenum /*id*/, int32_t /*size*/, AutoArray<float>& d) noexcept { return d; }
 
     // -----------------------------------------------------------------------------------------

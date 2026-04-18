@@ -335,14 +335,23 @@ void Texture::SetWrapping(int wrapMode) noexcept
 }
 
 
-RenderOffsets Texture::ComputeOffsets(int w, int h,
-                                       int viewportWidth, int viewportHeight,
-                                       int renderAreaWidth, int renderAreaHeight) noexcept
+RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
+noexcept
 {
-    float scaleX = (renderAreaWidth  > 0) ? float(w) / float(renderAreaWidth)  : 1.0f;
-    float scaleY = (renderAreaHeight > 0) ? float(h) / float(renderAreaHeight) : 1.0f;
-    return { (viewportWidth  - renderAreaWidth)  * 0.5f * scaleX,
-             (viewportHeight - renderAreaHeight) * 0.5f * scaleY };
+    if (renderAreaWidth == 0)
+        renderAreaWidth = viewportWidth;
+    if (renderAreaHeight == 0)
+        renderAreaHeight = viewportHeight;
+    float xScale = float(renderAreaWidth) / float(viewportWidth);
+    float yScale = float(renderAreaHeight) / float(viewportHeight);
+    float wRatio = float(renderAreaWidth) / float(w);
+    float hRatio = float(renderAreaHeight) / float(h);
+    RenderOffsets offsets = { 0.5f * xScale, 0.5f * yScale };
+    if (wRatio > hRatio)
+        offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
+    else if (wRatio < hRatio)
+        offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
+    return offsets;
 }
 
 // =================================================================================================

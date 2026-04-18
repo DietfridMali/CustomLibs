@@ -290,9 +290,9 @@ public:
         return m_frameCounter.GetFps();
     }
 
-    static void ClearGLError(void) noexcept;
+    static void ClearGfxError(void) noexcept;
 
-    static bool CheckGLError(const char* operation = "") noexcept;
+    static bool CheckGfxError(const char* operation = "") noexcept;
 
     inline GLenum GetWinding(bool reverse = false) noexcept {
         return reverse ? GL_CCW : GL_CW;

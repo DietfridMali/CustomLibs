@@ -359,7 +359,7 @@ void BaseRenderer::PopViewport(void) {
 
 
 
-void BaseRenderer::ClearGLError(void) noexcept {
+void BaseRenderer::ClearGfxError(void) noexcept {
 #ifdef _DEBUG
     while (glGetError() != GL_NO_ERROR)
         ;
@@ -367,7 +367,7 @@ void BaseRenderer::ClearGLError(void) noexcept {
 }
 
 
-bool BaseRenderer::CheckGLError(const char* operation) noexcept {
+bool BaseRenderer::CheckGfxError(const char* operation) noexcept {
 #ifdef NDEBUG
     return true;
 #else
@@ -375,7 +375,7 @@ bool BaseRenderer::CheckGLError(const char* operation) noexcept {
     if (not glError)
         return true;
     fprintf(stderr, "Smiley-Battle: OpenGL Error %d (%s)\n", glError, operation);
-    ClearGLError();
+    ClearGfxError();
     return false;
 #endif
 }

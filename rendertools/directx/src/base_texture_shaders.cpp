@@ -15,11 +15,11 @@
 static const ShaderDataAttributes VtxAttrs[] = {
     { "Vertex", 0, ShaderDataAttributes::Float3 },
 };
+
 static const ShaderDataAttributes VtxTcAttrs[] = {
     { "Vertex",   0, ShaderDataAttributes::Float3 },
     { "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
-
 
 // -------------------------------------------------------------------------------------------------
 // Hardcoded-triangle test: no vertex buffer needed, just SV_VertexID.
@@ -243,7 +243,6 @@ const ShaderSource& GrayScaleShader() {
     return source;
 }
 
-
 // -------------------------------------------------------------------------------------------------
 // Textured quad with per-fragment tint colour; alpha zero → discard.
 const ShaderSource& PlainTextureShader() {
@@ -275,6 +274,40 @@ const ShaderSource& PlainTextureShader() {
     return source;
 }
 
+const ShaderSource& GlyphShader() {
+    static const ShaderSource source(
+        "glyph",
+        Standard2DVS(),
+        R"(
+            cbuffer ShaderConstants : register(b1) {
+                float4 surfaceColor;
+                float2 tcOffset;
+                float2 tcScale;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 texColor = surface.Sample(s0, tcOffset + tcScale * i.fragCoord);
+                float a = texColor.a * surfaceColor.a;
+                return float4(1.0, 0.5, 0.0, 1.0);
+                return float4(a, a, a, 1);
+                if (a == 0) //discard;
+                  return float4(0.0, 0.5, 1.0, 1.0);
+                float3 rgb = texColor.rgb * surfaceColor.rgb;
+                if (all(texColor.rgb == float3(0.0, 0.0, 0.0)))
+                  return float4(1.0, 0.5, 0.0, 1.0);
+                return float4(texColor.rgb * surfaceColor.rgb, a);
+            }
+        )",
+        ShaderDataLayout(VtxTcAttrs, 2)
+    );
+    return source;
+}
 
 // -------------------------------------------------------------------------------------------------
 // Scrolling / animated texture with SmoothBoost contrast enhancement.

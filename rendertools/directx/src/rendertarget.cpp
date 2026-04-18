@@ -198,6 +198,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     m_cmdList->Flush();
 
     m_viewport = Viewport(0, 0, w, h);
+    CreateRenderArea();
     m_isAvailable = true;
     return true;
 }
@@ -249,8 +250,12 @@ void RenderTarget::FreeSRVs(void) {
 
 void RenderTarget::Destroy(void)
 {
-    delete m_cmdList;
-    m_cmdList = nullptr;
+    if (m_cmdList) {
+        if (m_cmdList->IsRecording()) // should never occur and hints to a bug in CL handling
+            m_cmdList->Close();
+        delete m_cmdList;
+        m_cmdList = nullptr;
+    }
     FreeRTVs();
     FreeSRVs();
     for (int i = 0; i < m_colorBufferCount; ++i) {
@@ -324,13 +329,14 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
     BindRenderTargets(list);
 
     if (clear) {
-        const float zero[4] = { 0, 0, 0, 0 };
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (m_rtvHandles[i].IsValid())
-                list->ClearRenderTargetView(m_rtvHandles[i].cpu, zero, 0, nullptr);
+                list->ClearRenderTargetView(m_rtvHandles[i].cpu, m_clearColor.Data(), 0, nullptr);
         if (m_dsvHandle.IsValid())
             list->ClearDepthStencilView(m_dsvHandle.cpu, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     }
+    if (not reenable)
+        baseRenderer.TrackDrawBuffers(this);
     return true;
 }
 
@@ -343,7 +349,6 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
 
 void RenderTarget::Disable(bool flush)
 {
-    // Transition all color buffers back to PSR so they can be sampled in subsequent passes.
     auto* list = m_cmdList->List();
     for (int i = 0; i < m_colorBufferCount; ++i)
         TransitionColor(list, i, m_colorStates[i], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -353,6 +358,7 @@ void RenderTarget::Disable(bool flush)
     }
     else
         m_cmdList->Close();
+    baseRenderer.RestoreDrawBuffer();
 }
 
 
@@ -434,60 +440,108 @@ Texture* RenderTarget::GetDepthTexture(void)
 
 bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 {
-    int dst = params.destination;
-    if (dst < 0)
-        return false;
-    dst = dst % m_bufferCount;
-    m_lastDestination = dst;
-
-    baseRenderer.PushMatrix();
-    baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-    float scale = params.scale;
-    baseRenderer.Scale(scale, scale, 1.0f);
-    if (params.rotation != 0.0f)
-        baseRenderer.Rotate(params.rotation, 0.0f, 0.0f, 1.0f);
-    return true;
+    bool haveTransformation = false;
+    if (params.centerOrigin) {
+        haveTransformation = true;
+        baseRenderer.Translate(0.5, 0.5, 0);
+    }
+    if (params.rotation) {
+        haveTransformation = true;
+        baseRenderer.Rotate(params.rotation, 0, 0, 1);
+    }
+    if (params.flipVertically) {
+        haveTransformation = true;
+        baseRenderer.Scale(params.scale, params.scale * params.flipVertically, 1);
+    }
+    else if (params.source & 1) {
+        haveTransformation = true;
+        baseRenderer.Scale(params.scale, -params.scale, 1);
+    }
+    else if (params.scale != 1.0f) {
+        haveTransformation = true;
+        baseRenderer.Scale(params.scale, params.scale, 1);
+    }
+    return haveTransformation;
 }
 
 
-bool RenderTarget::RenderTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color)
+bool RenderTarget::RenderTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
-    if (not texture)
-        return false;
-    bool transformed = UpdateTransformation(params);
-    baseRenderer.RenderToViewport(texture, color, params.rotation != 0.0f, false);
-    if (transformed)
-        baseRenderer.PopMatrix();
+    if (params.destination < 0) {
+        gfxDriverStates.SetBlending(1);
+    }
+    else {
+        // Ping-pong: render from source buffer into destination buffer.
+        // The caller is responsible for having an open command list.
+        auto* list = m_cmdList->List();
+#ifdef _DEBUG
+        if (not m_cmdList->IsRecording()) {
+            OutputDebugStringA("RenderTarget::RenderTexture: no open command list for ping-pong\n");
+            return false;
+        }
+#endif
+        int src = params.source % m_bufferCount;
+        int dst = params.destination % m_bufferCount;
+        m_lastDestination = dst;
+        // Source must be in PSR to be sampled as a texture.
+        TransitionColor(list, src, m_colorStates[src], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        // Destination must be in RTV to be rendered into.
+        TransitionColor(list, dst, m_colorStates[dst], D3D12_RESOURCE_STATE_RENDER_TARGET);
+        const D3D12_CPU_DESCRIPTOR_HANDLE* pDSV = m_dsvHandle.IsValid() ? &m_dsvHandle.cpu : nullptr;
+        list->OMSetRenderTargets(1, &m_rtvHandles[dst].cpu, FALSE, pDSV);
+        if (params.clearBuffer)
+            list->ClearRenderTargetView(m_rtvHandles[dst].cpu, m_clearColor.Data(), 0, nullptr);
+        gfxDriverStates.SetBlending(0);
+    }
+    baseRenderer.PushMatrix();
+    bool applyTransformation = UpdateTransformation(params);
+    gfxDriverStates.SetDepthTest(0);
+    gfxDriverStates.SetDepthWrite(0);
+    gfxDriverStates.DepthFunc(GL_ALWAYS);
+    gfxDriverStates.SetFaceCulling(0);
+    if (params.shader) {
+        if (applyTransformation)
+            params.shader->UpdateMatrices();
+        m_viewportArea.Render(params.shader, source);
+    }
+    else {
+        if (params.premultiply)
+            m_viewportArea.Premultiply();
+        m_viewportArea.Render(nullptr, source, color);
+    }
+    baseRenderer.PopMatrix();
+    if (params.destination >= 0) {
+        // After ping-pong: transition dst to PSR so it can be sampled in the next pass.
+        // Restore OMSetRenderTargets to the remaining buffers still in RTV state.
+        auto* list = m_cmdList->List();
+        int dst = params.destination % m_bufferCount;
+        TransitionColor(list, dst, m_colorStates[dst], D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        D3D12_CPU_DESCRIPTOR_HANDLE rtvs[RT_MAX_COLOR_BUFFERS]{};
+        int count = 0;
+        for (int i = 0; i < m_colorBufferCount; ++i) {
+            if (m_colorStates[i] == D3D12_RESOURCE_STATE_RENDER_TARGET)
+                rtvs[count++] = m_rtvHandles[i].cpu;
+        }
+        if (count > 0) {
+            const D3D12_CPU_DESCRIPTOR_HANDLE* pDSV = m_dsvHandle.IsValid() ? &m_dsvHandle.cpu : nullptr;
+            list->OMSetRenderTargets(count, rtvs, FALSE, pDSV);
+        }
+    }
     return true;
 }
 
 
 bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
 {
-    Texture* tex = GetRenderTexture(params);
-    if (not tex)
-        return false;
-    int dst = params.destination;
-    if (dst >= 0) {
-        dst = dst % m_bufferCount;
-        auto* list = m_cmdList->List();
-        if (list) {
-            TransitionColor(list, dst, m_colorStates[dst], D3D12_RESOURCE_STATE_RENDER_TARGET);
-            list->OMSetRenderTargets(1, &m_rtvHandles[dst].cpu, FALSE,
-                m_dsvHandle.IsValid() ? &m_dsvHandle.cpu : nullptr);
-        }
-        if (params.clearBuffer and list) {
-            const float zero[4]{};
-            list->ClearRenderTargetView(m_rtvHandles[dst].cpu, zero, 0, nullptr);
-        }
-    }
-    RenderTexture(tex, params, color);
-    if (dst >= 0) {
-        auto* list = m_cmdList->List();
-        TransitionColor(list, dst, D3D12_RESOURCE_STATE_RENDER_TARGET,
-                        D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    }
-    return true;
+    if (params.destination >= 0)
+        m_lastDestination = params.destination;
+    return RenderTexture((params.source == params.destination) ? nullptr : GetRenderTexture(params), params, color);
+}
+
+
+void RenderTarget::CreateRenderArea(void)
+{
+    m_viewportArea.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter], BaseQuad::defaultTexCoords[BaseQuad::tcRegular]);
 }
 
 

@@ -126,7 +126,7 @@
     <ClInclude Include="..\..\include\cube.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
-    <ClInclude Include="..\include\drawbufferhandler.h" />
+    <ClInclude Include="..\..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
     <ClInclude Include="..\include\rendertarget.h" />
     <ClInclude Include="..\..\include\fonthandler.h" />
@@ -180,7 +180,7 @@
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />
-    <ClCompile Include="..\src\drawbufferhandler.cpp" />
+    <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\src\rendertarget.cpp" />
     <ClCompile Include="..\..\src\fonthandler.cpp" />
     <ClCompile Include="..\..\src\framecounter.cpp" />

@@ -225,7 +225,7 @@ bool GfxDataLayout::StartUpdate(void) noexcept {
     if (commandListHandler.GetCurrentCmdListObj())
         return true;  // no-op in DX12
 	if (m_updateList == nullptr) {
-		m_updateList = commandListHandler.CreateCmdList();
+		m_updateList = commandListHandler.CreateCmdList("GfxDataLayout::Update");
 		if (m_updateList == nullptr)
 			return false;
 	}
@@ -243,6 +243,12 @@ void GfxDataLayout::FinishUpdate(void) noexcept {
 
 void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 {
+#if 0 //def _DEBUG
+    fprintf(stderr, "GfxDataLayout::Render on list %p, indexCount=%u, vertCount=%u\n",
+        (void*)commandListHandler.CurrentList(),
+        m_indexBuffer.IsValid() ? UINT(m_indexBuffer.m_itemCount) : 0,
+        (m_dataBuffers.Length() > 0 && m_dataBuffers[0]) ? UINT(m_dataBuffers[0]->m_itemCount) : 0); 
+#endif
     if (not StartRender ()) 
         return;
 
@@ -250,8 +256,8 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
-    if (Shader* sh = baseShaderHandler.ActiveShader())
-        sh->UploadB1();
+    if (Shader* shader = baseShaderHandler.ActiveShader())
+        shader->UploadB1();
 
     if (commandListHandler.CurrentList()) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))

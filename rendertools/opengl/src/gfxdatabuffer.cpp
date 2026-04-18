@@ -96,7 +96,7 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
 #endif
 {
 #ifdef _DEBUG
-    baseRenderer.ClearGLError();
+    baseRenderer.ClearGfxError();
 #endif
     bool updateSubData;
 #if USE_SHARED_HANDLES

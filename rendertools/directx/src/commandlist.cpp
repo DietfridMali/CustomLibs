@@ -267,6 +267,10 @@ void CommandListHandler::PopCmdList(void) noexcept {
 void CommandListHandler::Register(CommandList* cl) noexcept {
     if (not cl)
         return;
+#ifdef _DEBUG
+	if (cl->m_name.IsEmpty())
+        fprintf(stderr, "CommandListHandler::Register: Unnamed command list\n");
+#endif
     for (auto l : m_pendingLists)
         if (cl == l)
             return;
@@ -280,15 +284,18 @@ void CommandListHandler::ExecuteAll(void) noexcept {
         return;
 	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
     int n = 0;
+    fprintf(stderr, "\nCommandListHandler::ExecuteAll: executing %u command lists.\n", (unsigned)m_pendingLists.Length());
     for (auto l : m_pendingLists) {
 #ifdef _DEBUG
         if (l->m_isRecording) {
-            fprintf(stderr, "CommandListHandler::ExecuteAll: CommandList %p still open — closing\n", static_cast<void*>(l));
+            fprintf(stderr, "   '%s' still open; closing it now.\n", (const char*)l->GetName());
             l->Close();
         }
+        fprintf(stderr, "   executing CommandList '%s'.\n", (const char*)l->GetName());
 #endif
         execList[n++] = l->m_list.Get();
     }
+    fprintf(stderr, "\n");
     if (n > 0)
         m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.Data());
 #ifdef _DEBUG

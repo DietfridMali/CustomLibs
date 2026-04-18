@@ -7,6 +7,7 @@
 #include "colordata.h"
 #include "descriptor_heap.h"
 #include "commandlist.h"
+#include "base_quad.h"
 
 // =================================================================================================
 // DX12 RenderTarget (Frame Buffer Object)
@@ -68,23 +69,25 @@ public:
 
     // -------------------------------------------------------------------------
 
-    String       m_name;
-    int          m_width{ 0 };
-    int          m_height{ 0 };
-    int          m_scale{ 1 };
-    int          m_bufferCount{ 0 };
-    int          m_colorBufferCount{ 0 };
-    int          m_activeBufferIndex{ 0 };
-    int          m_lastDestination{ -1 };
-    bool         m_pingPong{ false };
-    bool         m_isAvailable{ false };
-	bool         m_haveRTVs{ false };
+    String      m_name;
+    int         m_width{ 0 };
+    int         m_height{ 0 };
+    int         m_scale{ 1 };
+    int         m_bufferCount{ 0 };
+    int         m_colorBufferCount{ 0 };
+    int         m_activeBufferIndex{ 0 };
+    int         m_lastDestination{ -1 };
+    bool        m_pingPong{ false };
+    bool        m_isAvailable{ false };
+    bool        m_haveRTVs{ false };
+	RGBAColor   m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups m_drawBufferGroup{ dbAll };
 
     Viewport     m_viewport;
     Viewport*    m_viewportSave{ nullptr };
-    RenderTargetTexture   m_renderTexture;   // lightweight proxy used for RenderTarget→quad rendering
-    RenderTargetTexture   m_depthTexture;
+    RenderTargetTexture     m_renderTexture;   // lightweight proxy used for RenderTarget→quad rendering
+    RenderTargetTexture     m_depthTexture;
+    BaseQuad                m_viewportArea;
 
     // DX12 resources (one entry per color buffer slot)
     ComPtr<ID3D12Resource>  m_colorResources[RT_MAX_COLOR_BUFFERS];
@@ -145,6 +148,10 @@ public:
     inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
 
     void SetViewport(bool flipVertically = false) noexcept;
+
+    inline void SetClearColor(RGBAColor color) noexcept {
+        m_clearColor = color;
+    }
 
     void Fill(RGBAColor color);
 
@@ -227,7 +234,7 @@ public:
 
     // In DX12 there is no explicit framebuffer binding state — always report enabled.
     inline bool IsEnabled(void)  noexcept { 
-        return true; 
+        return m_cmdList and m_cmdList->IsRecording(); 
     }
 
     // Returns the SRV index for the given color buffer — used by base_renderer.cpp:

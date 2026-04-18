@@ -60,14 +60,14 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
 #if TEST_ATLAS
     baseRenderer.ResetTransformation();
     baseRenderer.SetViewport(::Viewport (0, 0, m_font->GetAtlas().GetWidth(), m_font->GetAtlas().GetHeight()));
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    baseRenderer.ClearGLError();
+    gfxDriverStates.SetBlending(0);
+    gfxDriverStates.SetFaceCulling(0);
+    gfxDriverStates.SetDepthTest(0);
+    gfxDriverStates.SetDepthWrite(0);
     RenderTarget* renderTarget = m_font->GetRenderTarget();
     if (renderTarget) {
         renderTarget->Render({}, ColorData::Yellow);
-        delete renderTarget;
+        //delete renderTarget;
     }
     return;
 #endif
@@ -104,6 +104,8 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateData(true);
+    gfxDriverStates.SetDepthTest(0);
+    gfxDriverStates.SetDepthWrite(0);
     m_mesh.Render(m_font->GetTexture());
 }
 
@@ -211,34 +213,41 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
 
         if (not renderTarget)
             RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
-        else if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
-            baseRenderer.PushViewport();
-            renderTarget->SetViewport();
-            if (outlineWidth > 0) {
-                offset.x -= outlineWidth / float(renderTarget->m_width);
-                offset.y -= outlineWidth / float(renderTarget->m_height);
-            }
-            renderTarget->m_lastDestination = 0;
-            RenderText(text, td.width, offset.x, offset.y, alignment);
-            uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
-#ifndef OPENGL
-            renderTarget->Disable(true);
-#else
-            renderTarget->Disable();
+        else {
+#if 0
+            renderTarget->SetClearColor(RGBAColor(1.0f, 0.8f, 0.0f, 1.0f));
 #endif
-            if (postProcess != 0) {
-#ifndef OPENGL
-                renderTarget->Enable(-1, RenderTarget::dbAll, true);
-#endif
-                if (postProcess == 1)
-                    RenderOutline(renderTarget, m_decoration);
-                else 
-                    AntiAlias(renderTarget, m_decoration.aaMethod);
+            if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
+                baseRenderer.PushViewport();
+                renderTarget->SetViewport();
+                if (outlineWidth > 0) {
+                    offset.x -= outlineWidth / float(renderTarget->m_width);
+                    offset.y -= outlineWidth / float(renderTarget->m_height);
+                }
+                renderTarget->m_lastDestination = 0;
+                RenderText(text, td.width, offset.x, offset.y, alignment);
+                uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
 #ifndef OPENGL
                 renderTarget->Disable(true);
+#else
+                renderTarget->Disable();
 #endif
+                postProcess = 0;
+                if (postProcess != 0) {
+#ifndef OPENGL
+                    renderTarget->Enable(-1, RenderTarget::dbAll, false);
+                    //renderTarget->SetViewport();
+#endif
+                    if (postProcess == 1)
+                        RenderOutline(renderTarget, m_decoration);
+                    else
+                        AntiAlias(renderTarget, m_decoration.aaMethod);
+#ifndef OPENGL
+                    renderTarget->Disable(true);
+#endif
+                }
+                baseRenderer.PopViewport();
             }
-            baseRenderer.PopViewport();
         }
     }
 }

@@ -18,7 +18,7 @@ void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resourc
 
 
 bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID3D12Resource* dstResource, UINT subresource, 
-                       const uint8_t* pixels, int width, int height, int channels, ComPtr<ID3D12Resource>& outUpload, bool addBarrier) noexcept
+                       const uint8_t* srcBuffer, int width, int height, int channels, ComPtr<ID3D12Resource>& outUpload, bool addBarrier) noexcept
 {
     D3D12_RESOURCE_DESC dstDesc = dstResource->GetDesc();
 
@@ -49,20 +49,22 @@ bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID
     outUpload->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
 #endif
 
-    uint8_t* mapped = nullptr;
+    uint8_t* destBuffer = nullptr;
     D3D12_RANGE mapRange{ 0, 0 };
-    if (FAILED(outUpload->Map(0, &mapRange, (void**)&mapped)))
+    if (FAILED(outUpload->Map(0, &mapRange, (void**)&destBuffer)))
         return false;
 
     UINT srcRowBytes = UINT(width) * UINT(channels);
     if (layout.Footprint.RowPitch == srcRowBytes) {
-        std::memcpy(mapped + layout.Offset, pixels, rowCount * srcRowBytes);
+        std::memcpy(destBuffer + layout.Offset, srcBuffer, rowCount * srcRowBytes);
     }
     else {
-        for (UINT r = 0; r < rowCount; ++r)
-            std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch,
-                        pixels + r * srcRowBytes,
-                        srcRowBytes);
+        destBuffer += layout.Offset;
+        for (UINT r = 0; r < rowCount; ++r) {
+            std::memcpy(destBuffer, srcBuffer, srcRowBytes);
+            destBuffer += layout.Footprint.RowPitch;
+            srcBuffer += srcRowBytes;
+        }
     }
     outUpload->Unmap(0, nullptr);
 

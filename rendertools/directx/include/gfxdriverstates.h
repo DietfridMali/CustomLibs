@@ -166,9 +166,12 @@ using GLenum = unsigned int;
 
 inline GLenum TextureTypeToGLenum(TextureType t) noexcept {
     switch (t) {
-        case TextureType::Texture3D: return GLenum(GL_TEXTURE_3D);
-        case TextureType::CubeMap:   return GLenum(GL_TEXTURE_CUBE_MAP);
-        default:                     return GLenum(GL_TEXTURE_2D);
+        case TextureType::Texture3D: 
+            return GLenum(GL_TEXTURE_3D);
+        case TextureType::CubeMap:   
+            return GLenum(GL_TEXTURE_CUBE_MAP);
+        default:                     
+            return GLenum(GL_TEXTURE_2D);
     }
 }
 

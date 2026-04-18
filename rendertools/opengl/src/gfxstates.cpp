@@ -103,7 +103,7 @@ int GfxDriverStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
 
 int GfxDriverStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 #if 0
-	baseRenderer.ClearGLError();
+	baseRenderer.ClearGfxError();
 	GLint tex = 0;
 	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
 #endif

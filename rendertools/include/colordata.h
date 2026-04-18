@@ -5,7 +5,8 @@
 
 class RGBAColor;
 
-class RGBColor : public Vector3f {
+class RGBColor 
+    : public Vector3f {
 public:
     RGBColor(float r = 1.0f, float g = 1.0f, float b = 1.0f)
         : Vector3f({ r, g, b })
@@ -26,7 +27,8 @@ public:
 };
 
 
-class RGBAColor : public Vector4f {
+class RGBAColor 
+    : public Vector4f {
 public:
     RGBAColor(float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f)
         : Vector4f({ r, g, b, a })

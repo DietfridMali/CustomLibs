@@ -63,7 +63,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
-    baseRenderer.ClearGLError();
+    baseRenderer.ClearGfxError();
     m_font->GetRenderTarget()->Render({}, ColorData::Yellow);
     return;
 #endif

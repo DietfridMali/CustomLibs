@@ -125,61 +125,52 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
         return false;
     if (not createVertexIndex)
         createVertexIndex = (m_shape == MeshTopology::Quads);
+
     m_gfxDataLayout->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_isDynamic);
-    m_gfxDataLayout->Enable();
     m_tangents.SetDirty((m_tangents.HaveData() and m_vertices.IsDirty()) or m_texCoords[0].IsDirty() or m_normals.IsDirty());
+
+    auto updateBuffer = [&forceUpdate, this](auto& buffer, auto&& updateFn) {
+        if (buffer.IsDirty(forceUpdate)) {
+            buffer.Setup();
+            updateFn( forceUpdate);
+        }
+    };
+
+    auto updateBufferGroup = [&forceUpdate, this](auto& buffers, auto&& updateFn) {
+        int i = 0;
+        for (auto& b : buffers) {
+            if (b.IsDirty(forceUpdate)) {
+                b.Setup();
+                updateFn(i, forceUpdate);
+            }
+            ++i;
+        }
+    };
+
+    m_gfxDataLayout->StartUpdate();
+
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = MeshTopology::Triangles;
         m_gfxDataLayout->m_indexBuffer.SetDynamic(true);
         UpdateIndexBuffer();
     }
-    else if (m_indices.IsDirty(forceUpdate)) {
-        m_indices.Setup();
-        UpdateIndexBuffer(forceUpdate);
+    else {
+        updateBuffer(m_indices, [this](bool f) { UpdateIndexBuffer(f); });
     }
-    if (m_vertices.IsDirty(forceUpdate)) {
-        m_vertices.Setup();
-        UpdateVertexBuffer(forceUpdate);
-        }
-    int i = 0;
-    for (auto& b : m_texCoords) {
-        if (b.HaveData() and b.IsDirty(forceUpdate)) {
-            b.Setup();
-            UpdateTexCoordBuffer(i, forceUpdate);
-        }
-        ++i;
-    }
-    if (m_vertexColors.IsDirty(forceUpdate)) {
-        m_vertexColors.Setup();
-        UpdateColorBuffer(forceUpdate);
-    }
-    if (m_normals.IsDirty(forceUpdate)) {
-        m_normals.Setup();
-        // in the case of an icosphere, the vertices also are the vertex normals
-        UpdateNormalBuffer(forceUpdate);
-    }
+
+    updateBuffer(m_vertices, [this](bool f) { UpdateVertexBuffer(f); });
+    updateBufferGroup(m_texCoords, [this](int i, bool f) { UpdateTexCoordBuffer(i, f); });
+    updateBuffer(m_vertexColors, [this](bool f) { UpdateColorBuffer(f); });
+    updateBuffer(m_normals, [this](bool f) { UpdateNormalBuffer(f); });
+
     if (createTangents and m_tangents.IsDirty())
         UpdateTangents();
-    i = 0;
-	for (auto& b : m_floatBuffers) {
-        if (b.IsDirty(forceUpdate)) {
-            b.Setup();
-            // in the case of an icosphere, the vertices also are the vertex normals
-            UpdateFloatDataBuffer(i, forceUpdate);
-        }
-        ++i;
-    }
-    i = 0;
-    for (auto& b : m_offsetBuffers) {
-        if (b.IsDirty(forceUpdate)) {
-            b.Setup();
-            // in the case of an icosphere, the vertices also are the vertex normals
-            UpdateOffsetBuffer(i, forceUpdate);
-        }
-        ++i;
-    }
-    m_gfxDataLayout->Disable();
+
+    updateBufferGroup(m_floatBuffers, [this](int i, bool f) { UpdateFloatDataBuffer(i, f); });
+    updateBufferGroup(m_offsetBuffers, [this](int i, bool f) { UpdateOffsetBuffer(i, f); });
+
+    m_gfxDataLayout->FinishUpdate();
     return true;
 }
 
