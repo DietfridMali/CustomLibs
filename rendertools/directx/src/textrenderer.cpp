@@ -232,7 +232,6 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
 #else
                 renderTarget->Disable();
 #endif
-                postProcess = 0;
                 if (postProcess != 0) {
 #ifndef OPENGL
                     renderTarget->Enable(-1, RenderTarget::dbAll, false);
