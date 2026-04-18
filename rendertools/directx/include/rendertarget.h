@@ -52,6 +52,10 @@ public:
     void Init(void);
 
     void SetState(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES targetState);
+
+    bool AllocRTV(void);
+
+    void Release(void);
 };
 
 // =================================================================================================

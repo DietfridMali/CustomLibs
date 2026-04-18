@@ -87,13 +87,13 @@ void BufferInfo::SetState(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES
 
 
 bool BufferInfo::AllocRTV(void) {
-    info.m_rtvHandle = descriptorHeaps.AllocRTV();
-    if (not info.m_rtvHandle.IsValid())
+    m_rtvHandle = descriptorHeaps.AllocRTV();
+    if (not m_rtvHandle.IsValid())
         return false;
     D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
     rtvd.Format = kColorFormat;
     rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    dx12Context.Device()->CreateRenderTargetView(info.m_resource.Get(), &rtvd, info.m_rtvHandle.cpu);
+    dx12Context.Device()->CreateRenderTargetView(m_resource.Get(), &rtvd, m_rtvHandle.cpu);
     return true;
 
 }
@@ -256,7 +256,6 @@ bool RenderTarget::AllocRTVs(void)
     for (int i = 0; i < m_colorBufferCount; ++i)
 		if (not m_bufferInfo[i].AllocRTV())
 			return false;
-    }
     return m_haveRTVs = true;
 }
 
