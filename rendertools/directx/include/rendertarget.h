@@ -32,6 +32,30 @@ static constexpr int RT_MAX_COLOR_BUFFERS = 4;
 
 // =================================================================================================
 
+class BufferInfo {
+public:
+    typedef enum {
+        btColor,
+        btDepth,
+        btStencil,
+        btVertex
+    } eBufferType;
+
+    ComPtr<ID3D12Resource>  m_resource;
+    DescriptorHandle        m_rtvHandle;
+    DescriptorHandle        m_srvHandle;
+    DescriptorHandle        m_dsvHandle;
+    uint32_t                m_srvIndex{ UINT32_MAX };
+    D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
+    eBufferType             m_type{ btColor };
+
+    void Init(void);
+
+    void SetState(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES targetState);
+};
+
+// =================================================================================================
+
 class RenderTarget
 {
 public:
@@ -75,6 +99,10 @@ public:
     int         m_scale{ 1 };
     int         m_bufferCount{ 0 };
     int         m_colorBufferCount{ 0 };
+    int         m_vertexBufferCount{ 0 };
+    int         m_vertexBufferIndex{ -1 };
+    int         m_depthBufferIndex{ -1 };
+    int         m_stencilBufferIndex{ -1 };
     int         m_activeBufferIndex{ 0 };
     int         m_lastDestination{ -1 };
     bool        m_pingPong{ false };
@@ -85,22 +113,11 @@ public:
 
     Viewport     m_viewport;
     Viewport*    m_viewportSave{ nullptr };
-    RenderTargetTexture     m_renderTexture;   // lightweight proxy used for RenderTarget→quad rendering
+    RenderTargetTexture     m_renderTexture;
     RenderTargetTexture     m_depthTexture;
     BaseQuad                m_viewportArea;
 
-    // DX12 resources (one entry per color buffer slot)
-    ComPtr<ID3D12Resource>  m_colorResources[RT_MAX_COLOR_BUFFERS];
-    DescriptorHandle        m_rtvHandles[RT_MAX_COLOR_BUFFERS];
-    DescriptorHandle        m_srvHandles[RT_MAX_COLOR_BUFFERS];
-    uint32_t                m_srvIndices[RT_MAX_COLOR_BUFFERS];  // mirrors m_srvHandles[i].index
-
-    // Depth/stencil
-    ComPtr<ID3D12Resource>  m_depthResource;
-    DescriptorHandle        m_dsvHandle;
-
-    // Current resource state for each color buffer (needed for barriers)
-    D3D12_RESOURCE_STATES   m_colorStates[RT_MAX_COLOR_BUFFERS]{};
+    AutoArray<BufferInfo>   m_bufferInfo;
 
     // Own command list — all rendering into this RenderTarget is recorded here.
     CommandList*            m_cmdList{ nullptr };
@@ -119,31 +136,29 @@ public:
 
     void Destroy(void);
 
-    bool AllocRTV(ID3D12Device* device, D3D12_RENDER_TARGET_VIEW_DESC& rtvd, int i);
-
     bool AllocRTVs(void);
 
     void FreeRTVs(void);
-
-    void FreeSRVs(void);
     
     void SetName(const String& name) noexcept {
 		m_name = name;
 	}
 
-    // Enable / disable — set this RenderTarget's RTVs as the active render target.
     bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
 
     bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
+
+    bool SelectDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll);
+
+    bool SetDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool reenable = false);
+
+    bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
     inline bool Reenable(bool clear = false, bool reenable = false) {
         return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, reenable);
     }
 
-    void Disable(bool flush = false);
-
-    // Called by DrawBufferHandler::SetActiveDrawBuffers().
-    void BindRenderTargets(ID3D12GraphicsCommandList* list);
+    void Disable(bool flush = false, bool restoreDrawBuffer = true);
 
     inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
 
@@ -166,14 +181,14 @@ public:
     
     bool UpdateTransformation(const RTRenderParams& params);
     
-    bool RenderTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
+    bool RenderAsTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
     
-    inline bool RenderTexture(Texture* tex, const RTRenderParams& p, RGBAColor&& c) { 
-        return RenderTexture(tex, p, static_cast<const RGBAColor&>(c)); 
+    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p, RGBAColor&& c) { 
+        return RenderAsTexture(tex, p, static_cast<const RGBAColor&>(c)); 
     }
     
-    inline bool RenderTexture(Texture* tex, const RTRenderParams& p) { 
-        return RenderTexture(tex, p, ColorData::White); 
+    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p) { 
+        return RenderAsTexture(tex, p, ColorData::White); 
     }
     
     bool Render(const RTRenderParams& params, const RGBAColor& color);
@@ -237,8 +252,6 @@ public:
         return m_cmdList and m_cmdList->IsRecording(); 
     }
 
-    // Returns the SRV index for the given color buffer — used by base_renderer.cpp:
-    //   m_renderTexture.m_handle = renderTarget->BufferHandle(0);
     uint32_t& BufferHandle(int bufferIndex);
 
     inline bool operator==(const RenderTarget& o) const noexcept { 
@@ -249,35 +262,25 @@ public:
         return this != &o;
     }
 
-    // Stubs kept for OGL-compat callers
-    inline bool AttachBuffer(int) { 
-        return true; 
-    }
-    
-    inline bool DetachBuffer(int) { 
-        return true; 
-    }
-    
+    bool AttachBuffer(int bufferIndex);
+
+    bool DetachBuffer(int bufferIndex);
+
     inline void ReleaseBuffers() {}
-    
-    inline int  DepthBufferIndex() noexcept {
-        return m_colorBufferCount; 
+
+    inline int DepthBufferIndex(void) noexcept {
+        return m_depthBufferIndex;
     }
 
-#pragma warning(push)
-#pragma warning(disable:4100)  // unreferenced formal parameter (VertexBufferIndex)
-    inline int  VertexBufferIndex(int i = 0) noexcept { 
-        return 0; 
+    inline int VertexBufferIndex(int i = 0) noexcept {
+        return m_vertexBufferIndex + i;
     }
-#pragma warning(pop)
 
 private:
 
-    bool CreateColorBuffer(int i, int width, int height);
+    void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
-    bool CreateDepthBuffer(int width, int height);
-
-    void TransitionColor(ID3D12GraphicsCommandList* list, int i, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
+    int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
 
     void CreateRenderArea(void);
 };

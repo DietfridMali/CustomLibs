@@ -72,7 +72,7 @@ void PrerenderedImage::Create(void) {
     PrerenderedItem::Create();
     m_viewport.SetViewport();
     m_viewport.Fill(static_cast<RGBColor>(m_backgroundColor), 1);
-    m_renderTarget.RenderTexture(&m_image, { .destination = 0, .clearBuffer = true });
+    m_renderTarget.RenderAsTexture(&m_image, { .destination = 0, .clearBuffer = true });
 }
 
 

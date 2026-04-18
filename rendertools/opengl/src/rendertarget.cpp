@@ -350,12 +350,13 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
 }
 
 
-void RenderTarget::Disable(bool flush) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+void RenderTarget::Disable(bool flush, bool restoreDrawBuffer) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
         if (IsEnabled()) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            baseRenderer.RestoreDrawBuffer();
+            if (restoreDrawBuffer)
+                baseRenderer.RestoreDrawBuffer();
         }
         else {
             baseRenderer.RemoveDrawBuffer(this);
@@ -422,7 +423,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     if (params.destination < 0) // rendering to the current render target
         gfxDriverStates.SetBlending(1);
     else { // rendering to another RenderTarget (than the main buffer)
-        if (not Enable(params.destination, RenderTarget::dbSingle, params.clearBuffer))
+        if (not Enable(params.destination, RenderTarget::dbSingle, params.clearBuffer, true))
             return false;
         m_lastDestination = params.destination;
         gfxDriverStates.SetBlending(0);
@@ -465,7 +466,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PopMatrix();
     if (params.destination > -1)
-        Disable();
+        Disable(false, false);
     return true;
 }
 
