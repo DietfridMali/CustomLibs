@@ -199,6 +199,26 @@ void CommandList::Flush(void) noexcept {
 }
 
 
+void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) {
+    if (not m_isRecording or not resource or (before == after))
+        return;
+    D3D12_RESOURCE_BARRIER b{};
+    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource = resource;
+    b.Transition.StateBefore = before;
+    b.Transition.StateAfter = after;
+    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    m_list->ResourceBarrier(1, &b);
+}
+
+
+void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
+    if (not m_isRecording or not barriers or (count <= 0))
+        return;
+    m_list->ResourceBarrier(UINT(count), barriers);
+}
+
+
 void CommandList::DisposeResources(void) noexcept {
     for (auto& fn : m_disposableResources)
         fn();

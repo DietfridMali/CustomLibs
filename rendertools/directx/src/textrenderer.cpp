@@ -214,7 +214,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
         if (not renderTarget)
             RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
         else {
-#if 0
+#if 0 // debug
             renderTarget->SetClearColor(RGBAColor(1.0f, 0.8f, 0.0f, 1.0f));
 #endif
             if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
@@ -227,24 +227,21 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                 renderTarget->m_lastDestination = 0;
                 RenderText(text, td.width, offset.x, offset.y, alignment);
                 uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
-#ifndef OPENGL
-                renderTarget->Disable(true);
-#else
+#ifdef OPENGL
                 renderTarget->Disable();
 #endif
-                if (postProcess != 0) {
-#ifndef OPENGL
-                    renderTarget->Enable(-1, RenderTarget::dbAll, false);
-                    //renderTarget->SetViewport();
+#if 0 // debug
+                postProcess = 0;
 #endif
+                if (postProcess != 0) {
                     if (postProcess == 1)
                         RenderOutline(renderTarget, m_decoration);
                     else
                         AntiAlias(renderTarget, m_decoration.aaMethod);
-#ifndef OPENGL
-                    renderTarget->Disable(true);
-#endif
                 }
+#ifndef OPENGL
+                renderTarget->Disable(true);
+#endif
                 baseRenderer.PopViewport();
             }
         }

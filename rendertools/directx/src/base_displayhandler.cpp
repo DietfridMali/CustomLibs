@@ -199,35 +199,23 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
 
 
 void BaseDisplayHandler::BeginBackBuffer(void) noexcept {
-    auto* list = commandListHandler.CurrentList();
-    if (not list) 
+    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_RENDER_TARGET)
         return;
-    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_RENDER_TARGET) 
+    auto* cl = commandListHandler.GetCurrentCmdListObj();
+    if (not cl)
         return;
-    D3D12_RESOURCE_BARRIER b{};
-    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource = m_backBuffers[m_backBufferIndex].Get();
-    b.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-    b.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    list->ResourceBarrier(1, &b);
+    cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_RENDER_TARGET;
 }
 
 
 void BaseDisplayHandler::EndBackBuffer(void) noexcept {
-    auto* list = commandListHandler.CurrentList();
-    if (not list) 
+    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT)
         return;
-    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT) 
+    auto* cl = commandListHandler.GetCurrentCmdListObj();
+    if (not cl)
         return;
-    D3D12_RESOURCE_BARRIER b{};
-    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource = m_backBuffers[m_backBufferIndex].Get();
-    b.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    b.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    list->ResourceBarrier(1, &b);
+    cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_PRESENT;
 }
 

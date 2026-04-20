@@ -290,7 +290,7 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 }
 
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
     if (windowWidth * windowHeight == 0) {
         if (m_drawBufferInfo.m_renderTarget) {
             windowWidth  = m_drawBufferInfo.m_renderTarget->GetWidth(true);
@@ -317,9 +317,9 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
     }
 
     m_viewport = viewport;
-    if (flipWindowVertically)
+    if (flipVertically)
         m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
-    m_viewport.BuildTransformation(windowWidth, windowHeight, flipViewportVertically);
+    m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
 }
 
 

@@ -18,12 +18,12 @@ static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
 {
     switch (type) {
-    case BufferInfo::btDepth:
-        return kDepthFormat;
-    case BufferInfo::btStencil:
-        return kDepthFormat;
-    default:
-        return kColorFormat;
+        case BufferInfo::btDepth:
+            return kDepthFormat;
+        case BufferInfo::btStencil:
+            return kDepthFormat;
+        default:
+            return kColorFormat;
     }
 }
 
@@ -71,11 +71,17 @@ void BufferInfo::Init(void)
 }
 
 
-void BufferInfo::SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState)
+void BufferInfo::SetState(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES targetState)
 {
-    if ((m_state == targetState) or not cmdList or not m_resource)
+    if ((m_state == targetState) or not list or not m_resource)
         return;
-    cmdList->SetBarrier(m_resource.Get(), m_state, targetState);
+    D3D12_RESOURCE_BARRIER b{};
+    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    b.Transition.pResource = m_resource.Get();
+    b.Transition.StateBefore = m_state;
+    b.Transition.StateAfter = targetState;
+    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    list->ResourceBarrier(1, &b);
     m_state = targetState;
 }
 
@@ -181,7 +187,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
 
         auto* list = m_cmdList->List();
         if (list)
-            info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            info.SetState(list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     }
     ++m_bufferCount;
 }
@@ -248,8 +254,8 @@ bool RenderTarget::AllocRTVs(void)
     if (not device)
         return false;
     for (int i = 0; i < m_colorBufferCount; ++i)
-        if (not m_bufferInfo[i].AllocRTV())
-            return false;
+		if (not m_bufferInfo[i].AllocRTV())
+			return false;
     return m_haveRTVs = true;
 }
 
@@ -271,7 +277,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
     auto* list = m_cmdList->List();
     if (not list)
         return false;
-    m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    m_bufferInfo[bufferIndex].SetState(list, D3D12_RESOURCE_STATE_RENDER_TARGET);
     return true;
 }
 
@@ -283,7 +289,7 @@ bool RenderTarget::DetachBuffer(int bufferIndex)
     auto* list = m_cmdList->List();
     if (not list)
         return false;
-    m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    m_bufferInfo[bufferIndex].SetState(list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     return true;
 }
 
@@ -318,19 +324,19 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
 
     if (drawBufferGroup == dbDepth) {
         for (int i = 0; i < m_colorBufferCount; ++i)
-            m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        pDSV = DepthBufferHandle();
+            m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            pDSV = DepthBufferHandle();
     }
     else if (drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
         if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
             return false;
         m_activeBufferIndex = bufferIndex;
-        m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        m_bufferInfo[bufferIndex].SetState(list, D3D12_RESOURCE_STATE_RENDER_TARGET);
         rtvs[count++] = m_bufferInfo[bufferIndex].m_rtvHandle.cpu;
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (i != bufferIndex)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         pDSV = DepthBufferHandle();
     }
     else {
@@ -338,25 +344,25 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
         m_drawBufferGroup = (drawBufferGroup == dbNone) ? dbAll : drawBufferGroup;
         if (m_drawBufferGroup == dbAll) {
             for (int i = 0; i < m_colorBufferCount; ++i) {
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+                m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_RENDER_TARGET);
                 rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
             }
             pDSV = DepthBufferHandle();
         }
         else if (m_drawBufferGroup == dbColor) {
             for (int i = 0; i < m_colorBufferCount; ++i) {
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+                m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_RENDER_TARGET);
                 rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
             }
             pDSV = DepthBufferHandle();
             for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
         else if (m_drawBufferGroup == dbExtra) {
             for (int i = 0; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             for (int i = m_colorBufferCount; i < m_bufferCount; ++i) {
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+                m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_RENDER_TARGET);
                 rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
             }
         }
@@ -410,11 +416,8 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
     m_activeBufferIndex = (bufferIndex < 0) ? 0 : (bufferIndex % m_bufferCount);
     m_drawBufferGroup = drawBufferGroup;
 
-    bool wasRecording = m_cmdList->IsRecording();
     if (not m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex()))
         return false;
-    if (not wasRecording)
-        SetViewport();
 
     return EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable);
 }
@@ -424,14 +427,14 @@ void RenderTarget::Disable(bool flush, bool restoreDrawBuffer)
 {
     auto* list = m_cmdList->List();
     for (int i = 0; i < m_colorBufferCount; ++i)
-        m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        m_bufferInfo[i].SetState(list, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     if (flush) {
         m_cmdList->Flush();
         FreeRTVs();
     }
     else
         m_cmdList->Close();
-    if (restoreDrawBuffer)
+	if (restoreDrawBuffer)
         baseRenderer.RestoreDrawBuffer();
 }
 
@@ -523,7 +526,6 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
         haveTransformation = true;
         baseRenderer.Rotate(params.rotation, 0, 0, 1);
     }
-#if 1
     if (params.flipVertically) {
         haveTransformation = true;
         baseRenderer.Scale(params.scale, params.scale * params.flipVertically, 1);
@@ -532,7 +534,6 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
         haveTransformation = true;
         baseRenderer.Scale(params.scale, -params.scale, 1);
     }
-#endif
     else if (params.scale != 1.0f) {
         haveTransformation = true;
         baseRenderer.Scale(params.scale, params.scale, 1);

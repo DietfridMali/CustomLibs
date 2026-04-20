@@ -203,6 +203,8 @@ void RenderTarget::Destroy(void) {
 
 
 bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
+    if (bufferIndex < 0)
+        return true;
     int l = m_drawBuffers.Length();
     if (drawBufferGroup == dbDepth) {
         for (int i = 0; i < l; ++i)
@@ -423,7 +425,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     if (params.destination < 0) // rendering to the current render target
         gfxDriverStates.SetBlending(1);
     else { // rendering to another RenderTarget (than the main buffer)
-        if (not Enable(params.destination, RenderTarget::dbSingle, params.clearBuffer, true))
+        if (not Enable(params.destination, RenderTarget::dbSingle, true, true))
             return false;
         m_lastDestination = params.destination;
         gfxDriverStates.SetBlending(0);

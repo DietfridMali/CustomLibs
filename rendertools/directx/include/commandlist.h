@@ -99,6 +99,10 @@ public:
 
     void DisposeResources(void) noexcept;
 
+    void SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after);
+
+    void SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count);
+
     inline ID3D12GraphicsCommandList* List(void) const noexcept {
         return m_isRecording ? m_list.Get() : nullptr;
     }

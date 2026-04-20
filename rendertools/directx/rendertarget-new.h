@@ -51,7 +51,7 @@ public:
 
     void Init(void);
 
-    void SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState);
+    void SetState(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES targetState);
 
     bool AllocRTV(void);
 
@@ -112,11 +112,11 @@ public:
     bool        m_pingPong{ false };
     bool        m_isAvailable{ false };
     bool        m_haveRTVs{ false };
-    RGBAColor   m_clearColor{ ColorData::Invisible };
+	RGBAColor   m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups m_drawBufferGroup{ dbAll };
 
     Viewport     m_viewport;
-    Viewport* m_viewportSave{ nullptr };
+    Viewport*    m_viewportSave{ nullptr };
     RenderTargetTexture     m_renderTexture;
     RenderTargetTexture     m_depthTexture;
     BaseQuad                m_viewportArea;
@@ -124,14 +124,14 @@ public:
     AutoArray<BufferInfo>   m_bufferInfo;
 
     // Own command list — all rendering into this RenderTarget is recorded here.
-    CommandList* m_cmdList{ nullptr };
+    CommandList*            m_cmdList{ nullptr };
 
     // -------------------------------------------------------------------------
 
     RenderTarget();
 
-    ~RenderTarget() {
-        Destroy();
+    ~RenderTarget() { 
+        Destroy(); 
     }
 
     void Init(void);
@@ -143,10 +143,10 @@ public:
     bool AllocRTVs(void);
 
     void FreeRTVs(void);
-
+    
     void SetName(const String& name) noexcept {
-        m_name = name;
-    }
+		m_name = name;
+	}
 
     bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
 
@@ -182,87 +182,87 @@ public:
     Texture* GetRenderTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthTexture(void);
-
+    
     bool UpdateTransformation(const RTRenderParams& params);
-
+    
     bool RenderAsTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
-
-    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p, RGBAColor&& c) {
-        return RenderAsTexture(tex, p, static_cast<const RGBAColor&>(c));
+    
+    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p, RGBAColor&& c) { 
+        return RenderAsTexture(tex, p, static_cast<const RGBAColor&>(c)); 
     }
-
-    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p) {
-        return RenderAsTexture(tex, p, ColorData::White);
+    
+    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p) { 
+        return RenderAsTexture(tex, p, ColorData::White); 
     }
-
+    
     bool Render(const RTRenderParams& params, const RGBAColor& color);
-
-    inline bool Render(const RTRenderParams& p, RGBAColor&& c) {
-        return Render(p, static_cast<const RGBAColor&>(c));
+    
+    inline bool Render(const RTRenderParams& p, RGBAColor&& c) { 
+        return Render(p, static_cast<const RGBAColor&>(c)); 
     }
-
-    inline bool  Render(const RTRenderParams& p) {
-        return Render(p, ColorData::White);
+    
+    inline bool  Render(const RTRenderParams& p) { 
+        return Render(p, ColorData::White); 
     }
-
+    
     bool AutoRender(const RTRenderParams& params, const RGBAColor& color);
-
-    inline bool  AutoRender(const RTRenderParams& p, RGBAColor&& c) {
-        return AutoRender(p, static_cast<const RGBAColor&>(c));
+    
+    inline bool  AutoRender(const RTRenderParams& p, RGBAColor&& c) { 
+        return AutoRender(p, static_cast<const RGBAColor&>(c)); 
+    }
+    
+    inline bool  AutoRender(const RTRenderParams& p) { 
+        return AutoRender(p, ColorData::White); 
     }
 
-    inline bool  AutoRender(const RTRenderParams& p) {
-        return AutoRender(p, ColorData::White);
+    inline int  GetWidth(bool scaled = false) noexcept { 
+        return scaled ? m_width * m_scale : m_width; 
     }
-
-    inline int  GetWidth(bool scaled = false) noexcept {
-        return scaled ? m_width * m_scale : m_width;
+    
+    inline int GetHeight(bool scaled = false) noexcept { 
+        return scaled ? m_height * m_scale : m_height; 
     }
-
-    inline int GetHeight(bool scaled = false) noexcept {
-        return scaled ? m_height * m_scale : m_height;
+    
+    inline int GetScale(void) noexcept { 
+        return m_scale; 
     }
-
-    inline int GetScale(void) noexcept {
-        return m_scale;
+    
+    inline bool IsAvailable(void) noexcept { 
+        return m_isAvailable; 
     }
-
-    inline bool IsAvailable(void) noexcept {
-        return m_isAvailable;
+    
+    inline Viewport& GetViewport(void) noexcept { 
+        return m_viewport; 
     }
-
-    inline Viewport& GetViewport(void) noexcept {
-        return m_viewport;
+    
+    inline int  GetLastDestination(void) noexcept { 
+        return m_lastDestination; 
     }
-
-    inline int  GetLastDestination(void) noexcept {
-        return m_lastDestination;
+    
+    inline void SetLastDestination(int i) noexcept { 
+        m_lastDestination = i; 
     }
-
-    inline void SetLastDestination(int i) noexcept {
-        m_lastDestination = i;
+    
+    inline int  NextBuffer(int i) noexcept { 
+        return (i + 1) % m_bufferCount; 
     }
-
-    inline int  NextBuffer(int i) noexcept {
-        return (i + 1) % m_bufferCount;
-    }
-
-    inline RenderTargetTexture* GetTexture(void) noexcept {
-        return &m_renderTexture;
+    
+    inline RenderTargetTexture* GetTexture(void) noexcept { 
+        return &m_renderTexture; 
     }
 
     // In DX12 there is no explicit framebuffer binding state — always report enabled.
-    inline bool IsEnabled(void)  noexcept {
-        return m_cmdList and m_cmdList->IsRecording();
+    inline bool IsEnabled(void)  noexcept { 
+        return m_cmdList and m_cmdList->IsRecording(); 
     }
 
     uint32_t& BufferHandle(int bufferIndex);
 
-    inline bool operator==(const RenderTarget& o) const noexcept {
-        return this == &o;
+    inline bool operator==(const RenderTarget& o) const noexcept { 
+        return this == &o; 
     }
-
-    inline bool operator!=(const RenderTarget& o) const noexcept {
+    
+    inline bool operator!=(const RenderTarget& o) const noexcept { 
         return this != &o;
     }
 
@@ -288,13 +288,13 @@ private:
 
     void CreateRenderArea(void);
 
-    inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
-        return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsvHandle.IsValid());
-    }
+	inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
+		return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsvHandle.IsValid());
+	}
 
-    inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
+	inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
         return HaveDepthBuffer(true) ? &m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu : nullptr;
-    }
+	}
 };
 
 // =================================================================================================

@@ -635,7 +635,8 @@ void Shader::Enable(void)
     // Get / create PSO for current render state
     const RenderState& state = gfxDriverStates.State();
     ID3D12PipelineState* pso = GetOrCreatePSO(state);
-    if (not pso) return;
+    if (not pso) 
+        return;
 
     // Set pipeline state and root signature.
     // Root CBVs (b0, b1) are bound per-draw in UpdateMatrices() and UploadB1().

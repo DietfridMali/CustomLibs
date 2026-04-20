@@ -144,16 +144,19 @@ const ShaderSource& GaussBlurShader() {
             };
             float GetCoeff(int i) {
                 float4 v = coeffs[i >> 2];
-                int    r = i & 3;
-                if (r == 0) return v.x;
-                if (r == 1) return v.y;
-                if (r == 2) return v.z;
+                int r = i & 3;
+                if (r == 0) 
+                    return v.x;
+                if (r == 1) 
+                    return v.y;
+                if (r == 2) 
+                    return v.z;
                 return v.w;
             }
             float4 PSMain(PSInput i) : SV_Target {
                 float2 scrollDir = float2(1.0 - direction, direction);
                 float4 sum = (float4)0;
-                int    n   = 2 * radius + 1;
+                int n = 2 * radius + 1;
                 for (int k = 0; k < n; ++k) {
                     float2 coord = i.fragCoord + scrollDir * float(k - radius) * texelSize;
                     sum += surface.Sample(s0, coord) * GetCoeff(k);
