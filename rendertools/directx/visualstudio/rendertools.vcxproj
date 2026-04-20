@@ -175,7 +175,7 @@
     <ClInclude Include="..\include\gfxdatabuffer.h" />
     <ClInclude Include="..\..\include\vertexdatabuffers.h" />
     <ClInclude Include="..\..\include\viewport.h" />
-    <ClInclude Include="..\include\framework.h" />
+    <ClInclude Include="..\include\dx12framework.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\base_shadercode.cpp" />

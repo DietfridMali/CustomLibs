@@ -422,17 +422,19 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
 
 void RenderTarget::Disable(bool flush, bool restoreDrawBuffer)
 {
-    auto* list = m_cmdList->List();
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    if (flush) {
-        m_cmdList->Flush();
-        FreeRTVs();
+    if (IsEnabled()) {
+        auto* list = m_cmdList->List();
+        for (int i = 0; i < m_colorBufferCount; ++i)
+            m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        if (flush) {
+            m_cmdList->Flush();
+            FreeRTVs();
+        }
+        else
+            m_cmdList->Close();
+        if (restoreDrawBuffer)
+            baseRenderer.RestoreDrawBuffer();
     }
-    else
-        m_cmdList->Close();
-    if (restoreDrawBuffer)
-        baseRenderer.RestoreDrawBuffer();
 }
 
 

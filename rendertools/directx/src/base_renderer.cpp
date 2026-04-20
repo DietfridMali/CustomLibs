@@ -183,6 +183,9 @@ bool BaseRenderer::Start2DScene(void) {
 
     gfxDriverStates.SetDepthWrite(0);
     gfxDriverStates.SetDepthTest(0);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxDriverStates.SetFaceCulling(0);
+
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) {
         // No screen RenderTarget: clear the swap chain back buffer directly.
         auto* list = commandListHandler.CurrentList();
@@ -271,6 +274,11 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
                 list->ClearRenderTargetView(rtv, black, 0, nullptr);
                 list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
             }
+            Timer t;
+            t.SetDuration(500);
+            t.Start();
+            while (not t.HasExpired())
+                ;
             // Set viewport after the list is open so RSSetViewports is actually recorded.
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 

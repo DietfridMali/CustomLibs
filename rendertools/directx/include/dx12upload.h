@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framework.h"
+#include "dx12framework.h"
 
 // =================================================================================================
 // Low-level: records CopyTextureRegion for one subresource into an already-open list.

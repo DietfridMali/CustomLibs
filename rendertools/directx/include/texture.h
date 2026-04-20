@@ -2,7 +2,7 @@
 
 #define _TEXTURE_H
 
-#include "framework.h"
+#include "dx12framework.h"
 #include "std_defines.h"
 #include "rendertypes.h"
 #include "array.hpp"

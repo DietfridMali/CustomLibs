@@ -5,7 +5,7 @@
 #include <ranges>
 #include <string_view>
 
-#include "framework.h"
+#include "dx12framework.h"
 #include <d3dcompiler.h>
 #include <d3d12shader.h>
 
@@ -393,12 +393,16 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 
 void Shader::Destroy(void) noexcept
 {
-    m_psoCache.Clear();
+    for (auto it = CommandList::GetPsoCache().begin(); it != CommandList::GetPsoCache().end(); ) {
+        if (it->first.shader == this)
+            it = CommandList::GetPsoCache().Erase(it);
+        else
+            ++it;
+    }
     m_b1Fields.Clear();
     m_b1Staging.clear();
     m_vsInputLayout.clear();
     m_b1Size = 0;
-    m_activePso = nullptr;
     m_rootSignature.Reset();
     m_vsBlob.Reset();
     m_psBlob.Reset();
@@ -429,174 +433,14 @@ Shader& Shader::Move(Shader& other) noexcept
         m_psBlob       = std::move(other.m_psBlob);
         m_gsBlob       = std::move(other.m_gsBlob);
         m_rootSignature = std::move(other.m_rootSignature);
-        m_psoCache     = std::move(other.m_psoCache);
         m_b0Staging    = other.m_b0Staging;
         m_b1Size       = other.m_b1Size;
         m_b1Staging    = std::move(other.m_b1Staging);
         m_b1Dirty      = other.m_b1Dirty;
         m_b1Fields     = std::move(other.m_b1Fields);
         m_vsInputLayout = std::move(other.m_vsInputLayout);
-        m_activePso    = other.m_activePso;
-        other.m_activePso = nullptr;
     }
     return *this;
-}
-
-// =================================================================================================
-// PSO creation helpers
-
-D3D12_BLEND Shader::ToD3DBlend(GfxOperations::BlendFactor factor) noexcept
-{
-    using enum GfxOperations::BlendFactor;
-    switch (factor) {
-        case Zero:        return D3D12_BLEND_ZERO;
-        case One:         return D3D12_BLEND_ONE;
-        case SrcColor:    return D3D12_BLEND_SRC_COLOR;
-        case InvSrcColor: return D3D12_BLEND_INV_SRC_COLOR;
-        case SrcAlpha:    return D3D12_BLEND_SRC_ALPHA;
-        case InvSrcAlpha: return D3D12_BLEND_INV_SRC_ALPHA;
-        case DstAlpha:    return D3D12_BLEND_DEST_ALPHA;
-        case InvDstAlpha: return D3D12_BLEND_INV_DEST_ALPHA;
-        case DstColor:    return D3D12_BLEND_DEST_COLOR;
-        case InvDstColor: return D3D12_BLEND_INV_DEST_COLOR;
-        default:          return D3D12_BLEND_ONE;
-    }
-}
-
-
-D3D12_BLEND_OP Shader::ToD3DBlendOp(GfxOperations::BlendOp op) noexcept
-{
-    using enum GfxOperations::BlendOp;
-    switch (op) {
-        case Add:         return D3D12_BLEND_OP_ADD;
-        case Subtract:    return D3D12_BLEND_OP_SUBTRACT;
-        case RevSubtract: return D3D12_BLEND_OP_REV_SUBTRACT;
-        case Min:         return D3D12_BLEND_OP_MIN;
-        case Max:         return D3D12_BLEND_OP_MAX;
-        default:          return D3D12_BLEND_OP_ADD;
-    }
-}
-
-
-D3D12_STENCIL_OP Shader::ToD3DStencilOp(GfxOperations::StencilOp op) noexcept
-{
-    using enum GfxOperations::StencilOp;
-    switch (op) {
-        case Zero:    return D3D12_STENCIL_OP_ZERO;
-        case Replace: return D3D12_STENCIL_OP_REPLACE;
-        case IncrSat: return D3D12_STENCIL_OP_INCR_SAT;
-        case DecrSat: return D3D12_STENCIL_OP_DECR_SAT;
-        case Incr:    return D3D12_STENCIL_OP_INCR;
-        case Decr:    return D3D12_STENCIL_OP_DECR;
-        default:      return D3D12_STENCIL_OP_KEEP;
-    }
-}
-
-
-D3D12_COMPARISON_FUNC Shader::ToD3DCompFunc(GfxOperations::CompareFunc func) noexcept
-{
-    using enum GfxOperations::CompareFunc;
-    switch (func) {
-        case Never:        return D3D12_COMPARISON_FUNC_NEVER;
-        case Less:         return D3D12_COMPARISON_FUNC_LESS;
-        case Equal:        return D3D12_COMPARISON_FUNC_EQUAL;
-        case LessEqual:    return D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        case Greater:      return D3D12_COMPARISON_FUNC_GREATER;
-        case NotEqual:     return D3D12_COMPARISON_FUNC_NOT_EQUAL;
-        case GreaterEqual: return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-        case Always:       return D3D12_COMPARISON_FUNC_ALWAYS;
-        default:           return D3D12_COMPARISON_FUNC_LESS_EQUAL;
-    }
-}
-
-
-ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
-{
-    // Search cache
-    for (auto& e : m_psoCache)
-        if (e.state == state) 
-            return e.pso.Get();
-
-    ID3D12Device* device = dx12Context.Device();
-    if (not device or not m_rootSignature or not m_vsBlob or not m_psBlob) 
-        return nullptr;
-
-    // Rasterizer
-    D3D12_RASTERIZER_DESC rast{};
-    rast.FillMode = D3D12_FILL_MODE_SOLID;
-    rast.CullMode = (state.cullMode == GfxOperations::FaceCull::Back)
-        ? D3D12_CULL_MODE_BACK
-        : (state.cullMode == GfxOperations::FaceCull::Front)
-            ? D3D12_CULL_MODE_FRONT
-            : D3D12_CULL_MODE_NONE;
-    rast.FrontCounterClockwise = (state.frontFace == GfxOperations::Winding::CCW) ? TRUE : FALSE;
-    rast.DepthClipEnable = TRUE;
-    rast.MultisampleEnable = FALSE;
-
-    // Blend
-    D3D12_BLEND_DESC blend{};
-    blend.RenderTarget[0].RenderTargetWriteMask = state.colorMask;
-    if (state.blendEnable) {
-        blend.RenderTarget[0].BlendEnable    = TRUE;
-        blend.RenderTarget[0].SrcBlend       = ToD3DBlend(state.blendSrcRGB);
-        blend.RenderTarget[0].DestBlend      = ToD3DBlend(state.blendDstRGB);
-        blend.RenderTarget[0].BlendOp        = ToD3DBlendOp(state.blendOpRGB);
-        blend.RenderTarget[0].SrcBlendAlpha  = ToD3DBlend(state.blendSrcAlpha);
-        blend.RenderTarget[0].DestBlendAlpha = ToD3DBlend(state.blendDstAlpha);
-        blend.RenderTarget[0].BlendOpAlpha   = ToD3DBlendOp(state.blendOpAlpha);
-    }
-
-    // Depth / stencil
-    D3D12_DEPTH_STENCIL_DESC ds{};
-    ds.DepthEnable = state.depthTest  ? TRUE  : FALSE;
-    ds.DepthWriteMask = state.depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
-    ds.DepthFunc = ToD3DCompFunc(state.depthFunc);
-    ds.StencilEnable = state.stencilTest ? TRUE : FALSE;
-    ds.StencilReadMask = state.stencilMask;
-    ds.StencilWriteMask = state.stencilMask;
-    ds.FrontFace = { ToD3DStencilOp(state.stencilSFail),
-                     ToD3DStencilOp(state.stencilDPFail),
-                     ToD3DStencilOp(state.stencilDPPass),
-                     ToD3DCompFunc(state.stencilFunc) };
-    ds.BackFace  = { ToD3DStencilOp(state.stencilBackSFail),
-                     ToD3DStencilOp(state.stencilBackDPFail),
-                     ToD3DStencilOp(state.stencilBackDPPass),
-                     ToD3DCompFunc(state.stencilFunc) };
-
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
-    psoDesc.pRootSignature     = m_rootSignature.Get();
-    psoDesc.VS                 = { m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize() };
-    psoDesc.PS                 = { m_psBlob->GetBufferPointer(), m_psBlob->GetBufferSize() };
-    if (m_gsBlob)
-        psoDesc.GS             = { m_gsBlob->GetBufferPointer(), m_gsBlob->GetBufferSize() };
-    psoDesc.InputLayout        = { m_vsInputLayout.data(), UINT(m_vsInputLayout.size()) };
-    psoDesc.RasterizerState    = rast;
-    psoDesc.BlendState         = blend;
-    psoDesc.DepthStencilState  = ds;
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets   = 1;
-    psoDesc.RTVFormats[0]      = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.DSVFormat          = (ds.DepthEnable or ds.StencilEnable)
-                               ? DXGI_FORMAT_D24_UNORM_S8_UINT
-                               : DXGI_FORMAT_UNKNOWN;
-    psoDesc.SampleMask         = UINT_MAX;
-    psoDesc.SampleDesc.Count   = 1;
-
-    ComPtr<ID3D12PipelineState> newPso;
-    HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&newPso));
-    if (FAILED(hr)) {
-#ifdef _DEBUG
-        fprintf(stderr, "Shader '%s': PSO creation failed (hr=0x%08X)\n",
-                (const char*)m_name, (unsigned)hr);
-#endif
-        return nullptr;
-    }
-    PsoEntry* entry = m_psoCache.Append();
-    if (not entry) 
-        return nullptr;
-    entry->state = state;
-    entry->pso = std::move(newPso);
-    return entry->pso.Get();
 }
 
 // =================================================================================================
@@ -625,39 +469,33 @@ bool Shader::UploadB1(void) noexcept
 
 void Shader::Enable(void)
 {
-    if (not IsValid()) 
+    if (not IsValid())
         return;
 
     auto* list = commandListHandler.CurrentList();
-    if (not list) 
+    if (not list)
         return;
 
-#if 0//def _DEBUG
-    fprintf(stderr, "Shader::Enable '%s' on list %p (current: %p)\n", (const char*)m_name, (void*)list, (void*)commandListHandler.CurrentList());
-#endif
-
-    // Get / create PSO for current render state
-    const RenderState& state = gfxDriverStates.State();
-    ID3D12PipelineState* pso = GetOrCreatePSO(state);
-    if (not pso) 
+    CommandList* cl = commandListHandler.GetCurrentCmdListObj();
+    if (not cl)
         return;
 
-    // Set pipeline state and root signature.
-    // Root CBVs (b0, b1) are bound per-draw in UpdateMatrices() and UploadB1().
-    list->SetPipelineState(pso);
-    list->SetGraphicsRootSignature(m_rootSignature.Get());
-    list->OMSetStencilRef(state.stencilRef);
+    ID3D12PipelineState* pso = cl->m_renderState.GetPSO(this);
+    if (not pso)
+        return;
 
-    // Root params 2..17: per-slot SRV descriptor tables — set in Texture::Bind(tmuIndex)
-    // via SetGraphicsRootDescriptorTable(2 + tmuIndex, heap.GpuHandle(m_handle)).
-    // Prime SetDescriptorHeaps here so it's done once per shader activation.
+    if (pso != cl->m_activePso) {
+        list->SetPipelineState(pso);
+        list->SetGraphicsRootSignature(m_rootSignature.Get());
+        cl->m_activePso = pso;
+    }
+    list->OMSetStencilRef(cl->m_renderState.stencilRef);
+
     auto& srvHeap = descriptorHeaps.m_srvHeap;
     if (srvHeap.m_heap) {
         ID3D12DescriptorHeap* heaps[] = { srvHeap.m_heap.Get() };
         list->SetDescriptorHeaps(1, heaps);
     }
-
-    m_activePso = pso;
 }
 
 

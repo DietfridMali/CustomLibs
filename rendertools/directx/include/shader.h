@@ -6,7 +6,7 @@
 #include <vector>
 #include <span>
 
-#include "framework.h"
+#include "dx12framework.h"
 #include "array.hpp"
 #include "vector.hpp"
 #include "string.hpp"
@@ -21,7 +21,7 @@
 //  - Compiled HLSL blobs (ID3DBlob via D3DCompile)
 //  - A fixed root signature: root CBV b0 (FrameConstants), root CBV b1 (ShaderConstants),
 //    SRV descriptor table t0..t15 (pixel shader)
-//  - PSO cache keyed on RenderState (created on demand in Enable())
+//  - PSO looked up via RenderState::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
 //  - b1: per-shader constants, layout from HLSL reflection on link
 //  - Same public API as OGL Shader (SetFloat, SetInt, SetVector2f, SetMatrix4f, UpdateMatrices …)
@@ -77,13 +77,6 @@ public:
     // Shared root signature (fixed layout, created once per shader)
     ComPtr<ID3D12RootSignature> m_rootSignature;
 
-    // PSO cache: one entry per unique RenderState
-    struct PsoEntry {
-        RenderState               state;
-        ComPtr<ID3D12PipelineState> pso;
-    };
-    AutoArray<PsoEntry>  m_psoCache;
-
     // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
     FrameConstants          m_b0Staging{};
 
@@ -105,9 +98,6 @@ public:
     // Location table (name → resolved b1 offset, same pattern as OGL for compat)
     AutoArray<UniformHandle*>  m_uniforms;
     ShaderLocationTable        m_locations;
-
-    // Cached PSO for current RenderState (reset in Enable when state changes)
-    ID3D12PipelineState* m_activePso{ nullptr };
 
     using KeyType = String;
 
@@ -173,16 +163,6 @@ public:
     // PSO helpers (internal)
 
     bool CreateRootSignature(void) noexcept;
-
-    ID3D12PipelineState* GetOrCreatePSO(const RenderState& state) noexcept;
-
-    static D3D12_BLEND ToD3DBlend(GfxOperations::BlendFactor factor) noexcept;
-
-    static D3D12_BLEND_OP ToD3DBlendOp(GfxOperations::BlendOp op) noexcept;
-
-    static D3D12_COMPARISON_FUNC ToD3DCompFunc(GfxOperations::CompareFunc func) noexcept;
-
-    static D3D12_STENCIL_OP ToD3DStencilOp(GfxOperations::StencilOp op) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as OGL, return int (was GLint)

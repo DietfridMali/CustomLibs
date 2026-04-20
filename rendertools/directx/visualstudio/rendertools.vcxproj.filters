@@ -146,7 +146,7 @@
     <ClInclude Include="..\include\rendertarget.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\framework.h">
+    <ClInclude Include="..\include\dx12framework.h">
       <Filter>DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxdriverstates.h">

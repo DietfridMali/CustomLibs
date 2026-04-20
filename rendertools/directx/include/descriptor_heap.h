@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framework.h"
+#include "dx12framework.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
 

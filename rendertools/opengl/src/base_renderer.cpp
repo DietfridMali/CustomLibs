@@ -185,6 +185,11 @@ bool BaseRenderer::Start2DScene(void) {
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     ResetClearColor();
+    SetViewport(m_sceneViewport, 0, 0, false);
+    gfxDriverStates.SetDepthWrite(0);
+    gfxDriverStates.SetDepthTest(0);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxDriverStates.SetFaceCulling(0);
     return true;
 }
 
@@ -199,9 +204,6 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
-        gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-        gfxDriverStates.SetFaceCulling(0);
-        SetViewport(m_sceneViewport, 0, 0, false);
 #if 0
         if (GetSceneBuffer()->Enable(true)) {
             RenderToViewport(testTexture, ColorData::White, false, false);

@@ -5,8 +5,10 @@
 #include <cstring>
 #include <cstdint>
 
+#include "dx12framework.h"
 #include "array.hpp"
 #include "list.hpp"
+#include "dictionary.hpp"
 #include "basesingleton.hpp"
 #include "colordata.h"
 
@@ -166,11 +168,11 @@ using GLenum = unsigned int;
 
 inline GLenum TextureTypeToGLenum(TextureType t) noexcept {
     switch (t) {
-        case TextureType::Texture3D: 
+        case TextureType::Texture3D:
             return GLenum(GL_TEXTURE_3D);
-        case TextureType::CubeMap:   
+        case TextureType::CubeMap:
             return GLenum(GL_TEXTURE_CUBE_MAP);
-        default:                     
+        default:
             return GLenum(GL_TEXTURE_2D);
     }
 }
@@ -199,6 +201,8 @@ public:
 
 // =================================================================================================
 // RenderState: all PSO-relevant pipeline state encoded in a compact, hashable struct.
+
+class Shader;
 
 struct RenderState {
     using CompareFunc = GfxOperations::CompareFunc;
@@ -248,6 +252,24 @@ struct RenderState {
     bool operator!=(const RenderState& o) const noexcept {
         return not (*this == o);
     }
+    bool operator<(const RenderState& o) const noexcept {
+        return std::memcmp(this, &o, sizeof(*this)) < 0;
+    }
+
+    ID3D12PipelineState* GetPSO(Shader* shader) noexcept;
+};
+
+// =================================================================================================
+// PSO cache key: {Shader*, RenderState} — used by CommandList's static PSO cache.
+
+struct PsoCacheKey {
+    Shader* shader;
+    RenderState state;
+    bool operator<(const PsoCacheKey& o) const noexcept {
+        if (shader != o.shader)
+            return shader < o.shader;
+        return state < o.state;
+    }
 };
 
 // =================================================================================================
@@ -256,9 +278,10 @@ class GfxDriverStates : public BaseSingleton<GfxDriverStates>
 {
 private:
     RenderState             m_state;
-    bool                    m_stateDirty{ true };
     List<TextureSlotInfo>   m_slotInfos;
     int                     m_maxTextureSize{ 4096 };
+
+    RenderState& ActiveState(void) noexcept;
 
 public:
     GfxDriverStates() = default;
@@ -267,20 +290,8 @@ public:
         m_maxTextureSize = maxTextureSize;
     }
 
-    inline const RenderState& State(void) const noexcept {
-        return m_state;
-    }
-
-    inline bool IsStateDirty(void) const noexcept {
-        return m_stateDirty;
-    }
-
-    inline void ClearStateDirty(void) noexcept {
-        m_stateDirty = false;
-    }
-
-    inline void MarkStateDirty(void) noexcept {
-        m_stateDirty = true;
+    inline const RenderState& State(void) noexcept {
+        return ActiveState();
     }
 
     inline bool HasExtension(const char*) const noexcept {
@@ -292,86 +303,80 @@ public:
     }
 
     inline int SetDepthTest(int state) {
-        int prev = int(m_state.depthTest);
-        if ((state >= 0) and (uint8_t(state) != m_state.depthTest)) {
-            m_state.depthTest = uint8_t(state);
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        int prev = int(s.depthTest);
+        if ((state >= 0) and (uint8_t(state) != s.depthTest))
+            s.depthTest = uint8_t(state);
         return prev;
     }
 
     inline int SetDepthWrite(int state) {
-        int prev = int(m_state.depthWrite);
-        if ((state >= 0) and (uint8_t(state) != m_state.depthWrite)) {
-            m_state.depthWrite = uint8_t(state);
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        int prev = int(s.depthWrite);
+        if ((state >= 0) and (uint8_t(state) != s.depthWrite))
+            s.depthWrite = uint8_t(state);
         return prev;
     }
 
     inline int SetBlending(int state) {
-        int prev = int(m_state.blendEnable);
-        if ((state >= 0) and (uint8_t(state) != m_state.blendEnable)) {
-            m_state.blendEnable = uint8_t(state);
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        int prev = int(s.blendEnable);
+        if ((state >= 0) and (uint8_t(state) != s.blendEnable))
+            s.blendEnable = uint8_t(state);
         return prev;
     }
 
     inline int SetFaceCulling(int state) {
-        int prev = (m_state.cullMode != GfxOperations::FaceCull::None) ? 1 : 0;
+        auto& s = ActiveState();
+        int prev = (s.cullMode != GfxOperations::FaceCull::None) ? 1 : 0;
         if (state >= 0) {
             auto newMode = state ? GfxOperations::FaceCull::Back : GfxOperations::FaceCull::None;
-            if (newMode != m_state.cullMode) {
-                m_state.cullMode = newMode;
-                m_stateDirty = true;
-            }
+            if (newMode != s.cullMode)
+                s.cullMode = newMode;
         }
         return prev;
     }
 
     inline int SetScissorTest(int state) {
-        int prev = int(m_state.scissorTest);
-        if ((state >= 0) and (uint8_t(state) != m_state.scissorTest)) {
-            m_state.scissorTest = uint8_t(state);
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        int prev = int(s.scissorTest);
+        if ((state >= 0) and (uint8_t(state) != s.scissorTest))
+            s.scissorTest = uint8_t(state);
         return prev;
     }
 
     inline int SetStencilTest(int state) {
-        int prev = int(m_state.stencilTest);
-        if ((state >= 0) and (uint8_t(state) != m_state.stencilTest)) {
-            m_state.stencilTest = uint8_t(state);
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        int prev = int(s.stencilTest);
+        if ((state >= 0) and (uint8_t(state) != s.stencilTest))
+            s.stencilTest = uint8_t(state);
         return prev;
     }
 
     inline void StencilFunc(GfxOperations::CompareFunc func, uint8_t ref, uint8_t mask) {
-        if ((func != m_state.stencilFunc) or (ref != m_state.stencilRef) or (mask != m_state.stencilMask)) {
-            m_state.stencilFunc = func;
-            m_state.stencilRef  = ref;
-            m_state.stencilMask = mask;
-            m_stateDirty = true;
+        auto& s = ActiveState();
+        if ((func != s.stencilFunc) or (ref != s.stencilRef) or (mask != s.stencilMask)) {
+            s.stencilFunc = func;
+            s.stencilRef  = ref;
+            s.stencilMask = mask;
         }
     }
 
     inline void StencilOp(GfxOperations::StencilOp sfail, GfxOperations::StencilOp dpfail, GfxOperations::StencilOp dppass) {
-        if ((sfail != m_state.stencilSFail) or (dpfail != m_state.stencilDPFail) or (dppass != m_state.stencilDPPass)) {
-            m_state.stencilSFail  = sfail;
-            m_state.stencilDPFail = dpfail;
-            m_state.stencilDPPass = dppass;
-            m_stateDirty = true;
+        auto& s = ActiveState();
+        if ((sfail != s.stencilSFail) or (dpfail != s.stencilDPFail) or (dppass != s.stencilDPPass)) {
+            s.stencilSFail  = sfail;
+            s.stencilDPFail = dpfail;
+            s.stencilDPPass = dppass;
         }
     }
 
     inline void StencilOpBack(GfxOperations::StencilOp sfail, GfxOperations::StencilOp dpfail, GfxOperations::StencilOp dppass) {
-        if ((sfail != m_state.stencilBackSFail) or (dpfail != m_state.stencilBackDPFail) or (dppass != m_state.stencilBackDPPass)) {
-            m_state.stencilBackSFail  = sfail;
-            m_state.stencilBackDPFail = dpfail;
-            m_state.stencilBackDPPass = dppass;
-            m_stateDirty = true;
+        auto& s = ActiveState();
+        if ((sfail != s.stencilBackSFail) or (dpfail != s.stencilBackDPFail) or (dppass != s.stencilBackDPPass)) {
+            s.stencilBackSFail  = sfail;
+            s.stencilBackDPFail = dpfail;
+            s.stencilBackDPPass = dppass;
         }
     }
 
@@ -388,62 +393,59 @@ public:
     }
 
     inline GfxOperations::CompareFunc DepthFunc(GfxOperations::CompareFunc state) {
-        auto prev = m_state.depthFunc;
-        if (state != prev) {
-            m_state.depthFunc = state;
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        auto prev = s.depthFunc;
+        if (state != prev)
+            s.depthFunc = state;
         return prev;
     }
 
     inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp state) {
-        auto prev = m_state.blendOpRGB;
+        auto& s = ActiveState();
+        auto prev = s.blendOpRGB;
         if (state != prev) {
-            m_state.blendOpRGB   = state;
-            m_state.blendOpAlpha = state;
-            m_stateDirty = true;
+            s.blendOpRGB   = state;
+            s.blendOpAlpha = state;
         }
         return prev;
     }
 
     inline GfxOperations::Winding FrontFace(GfxOperations::Winding state) {
-        auto prev = m_state.frontFace;
-        if (state != prev) {
-            m_state.frontFace = state;
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        auto prev = s.frontFace;
+        if (state != prev)
+            s.frontFace = state;
         return prev;
     }
 
     inline GfxOperations::FaceCull CullFace(GfxOperations::FaceCull state) {
-        auto prev = m_state.cullMode;
-        if (state != prev) {
-            m_state.cullMode = state;
-            m_stateDirty = true;
-        }
+        auto& s = ActiveState();
+        auto prev = s.cullMode;
+        if (state != prev)
+            s.cullMode = state;
         return prev;
     }
 
     inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
-        if ((src != m_state.blendSrcRGB) or (dst != m_state.blendDstRGB)
-            or (src != m_state.blendSrcAlpha) or (dst != m_state.blendDstAlpha)) {
-            m_state.blendSrcRGB   = src;
-            m_state.blendDstRGB   = dst;
-            m_state.blendSrcAlpha = src;
-            m_state.blendDstAlpha = dst;
-            m_stateDirty = true;
+        auto& s = ActiveState();
+        if ((src != s.blendSrcRGB) or (dst != s.blendDstRGB)
+            or (src != s.blendSrcAlpha) or (dst != s.blendDstAlpha)) {
+            s.blendSrcRGB   = src;
+            s.blendDstRGB   = dst;
+            s.blendSrcAlpha = src;
+            s.blendDstAlpha = dst;
         }
     }
 
     inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
                                    GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
-        if ((srcRGB != m_state.blendSrcRGB) or (dstRGB != m_state.blendDstRGB)
-            or (srcAlpha != m_state.blendSrcAlpha) or (dstAlpha != m_state.blendDstAlpha)) {
-            m_state.blendSrcRGB   = srcRGB;
-            m_state.blendDstRGB   = dstRGB;
-            m_state.blendSrcAlpha = srcAlpha;
-            m_state.blendDstAlpha = dstAlpha;
-            m_stateDirty = true;
+        auto& s = ActiveState();
+        if ((srcRGB != s.blendSrcRGB) or (dstRGB != s.blendDstRGB)
+            or (srcAlpha != s.blendSrcAlpha) or (dstAlpha != s.blendDstAlpha)) {
+            s.blendSrcRGB   = srcRGB;
+            s.blendDstRGB   = dstRGB;
+            s.blendSrcAlpha = srcAlpha;
+            s.blendDstAlpha = dstAlpha;
         }
     }
 
@@ -460,12 +462,11 @@ public:
     }
 
     inline std::tuple<bool, bool, bool, bool> ColorMask(bool r, bool g, bool b, bool a) {
-        uint8_t prev = m_state.colorMask;
+        auto& s = ActiveState();
+        uint8_t prev = s.colorMask;
         uint8_t next = uint8_t((r ? 1u : 0u) | (g ? 2u : 0u) | (b ? 4u : 0u) | (a ? 8u : 0u));
-        if (next != prev) {
-            m_state.colorMask = next;
-            m_stateDirty = true;
-        }
+        if (next != prev)
+            s.colorMask = next;
         return { bool(prev & 1u), bool(prev & 2u), bool(prev & 4u), bool(prev & 8u) };
     }
 

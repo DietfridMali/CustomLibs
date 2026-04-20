@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <functional>
 
-#include "framework.h"
+#include "dx12framework.h"
 #include "std_defines.h"
 #include "string.hpp"
 #include "basesingleton.hpp"
