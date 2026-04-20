@@ -101,7 +101,7 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 
 	gfxDriverStates.SetFaceCulling(0);
 	gfxDriverStates.SetDepthWrite(0);
-	gfxDriverStates.DepthFunc(GL_ALWAYS);
+	gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
 	for (int i = 0; i < 3; i++)
 		m_skyTextures[i]->Enable(i);
 	m_skybox->Render(nullptr);
@@ -109,7 +109,7 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 		m_skyTextures[i]->Disable();
 	gfxDriverStates.SetFaceCulling(1);
 	gfxDriverStates.SetDepthWrite(1);
-	gfxDriverStates.DepthFunc(GL_LEQUAL);
+	gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
 	return true;
 };
 

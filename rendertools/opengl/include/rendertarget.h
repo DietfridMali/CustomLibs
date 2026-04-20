@@ -122,8 +122,8 @@ public:
 
     bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
 
-    inline bool Reenable(bool clear = false, bool reenable = false) {
-        return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, reenable);
+    inline bool Reenable(bool clear = false) {
+        return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, true);
     }
 
 	void Disable(bool flush = false, bool restoreDrawBuffer = true); // only required for DX12 compatibility for calls from higher app layers that are gfx api agnostic
@@ -136,7 +136,7 @@ public:
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
     inline void ClearStencil(void) { glClear(GL_STENCIL_BUFFER_BIT); }
 
-    Texture* GetRenderTexture(const RTRenderParams& params, int tmuIndex = 0);
+    Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthTexture(void);
 

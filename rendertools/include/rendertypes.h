@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include <cstdint>
-#include "gfxdrivertypes.h"   // GfxDriverTypes::Int/Uint/Float/Enum/Handle — resolved per API via include path
+#include "gfxdrivertypes.h"   // GfxTypes::Int/Uint/Float/Enum/Handle — resolved per API via include path
 
 // =================================================================================================
 // API-neutral enumerations for mesh topology, component data types, and texture types.
@@ -35,5 +35,65 @@ enum class TextureType : uint8_t {
     Texture3D = 1,
     CubeMap   = 2
 };
+
+// =================================================================================================
+// API-neutral render state constants.
+
+namespace GfxOperations {
+
+    enum class CompareFunc : uint8_t {
+        Never,
+        Less,
+        Equal,
+        LessEqual,
+        Greater,
+        NotEqual,
+        GreaterEqual,
+        Always
+    };
+
+    enum class BlendFactor : uint8_t {
+        Zero,
+        One,
+        SrcColor,
+        InvSrcColor,
+        SrcAlpha,
+        InvSrcAlpha,
+        DstAlpha,
+        InvDstAlpha,
+        DstColor,
+        InvDstColor
+    };
+
+    enum class BlendOp : uint8_t {
+        Add,
+        Subtract,
+        RevSubtract,
+        Min,
+        Max
+    };
+
+    enum class FaceCull : uint8_t {
+        Front,
+        Back,
+        None
+    };
+
+    enum class Winding : uint8_t {
+        CW,
+        CCW
+    };
+
+    enum class StencilOp : uint8_t {
+        Keep,
+        Zero,
+        Replace,
+        IncrSat,
+        DecrSat,
+        Incr,
+        Decr
+    };
+
+}
 
 // =================================================================================================

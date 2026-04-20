@@ -50,7 +50,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	EnableCamera();
 	gfxDriverStates.SetDepthTest(1);
 	gfxDriverStates.SetDepthWrite(1);
-	gfxDriverStates.CullFace(GL_FRONT);
+	gfxDriverStates.CullFace(GfxOperations::FaceCull::Front);
 #if APPLY_POLYGON_OFFSET
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(2.0f, 4.0f);
@@ -64,7 +64,7 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-	gfxDriverStates.CullFace(GL_BACK);
+	gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
 #if APPLY_POLYGON_OFFSET
 	glDisable(GL_POLYGON_OFFSET_FILL);
 #endif

@@ -201,44 +201,53 @@ public:
 // RenderState: all PSO-relevant pipeline state encoded in a compact, hashable struct.
 
 struct RenderState {
+    using CompareFunc = GfxOperations::CompareFunc;
+    using BlendFactor = GfxOperations::BlendFactor;
+    using BlendOp     = GfxOperations::BlendOp;
+    using FaceCull    = GfxOperations::FaceCull;
+    using Winding     = GfxOperations::Winding;
+    using StencilOp   = GfxOperations::StencilOp;
+
     // Rasterizer
-    GLenum   cullMode   { GL_BACK };
-    GLenum   frontFace  { GL_CW };
+    FaceCull    cullMode   { FaceCull::Back };
+    Winding     frontFace  { Winding::CW };
     // Depth-stencil
-    uint8_t  depthTest  { 1 };
-    uint8_t  depthWrite { 1 };
-    GLenum   depthFunc  { GL_LEQUAL };
-    uint8_t  stencilTest{ 0 };
+    uint8_t     depthTest  { 1 };
+    uint8_t     depthWrite { 1 };
+    CompareFunc depthFunc  { CompareFunc::LessEqual };
+    uint8_t     stencilTest{ 0 };
     // Blend (RT0)
-    uint8_t  blendEnable    { 0 };
-    GLenum   blendSrcRGB    { GL_SRC_ALPHA };
-    GLenum   blendDstRGB    { GL_ONE_MINUS_SRC_ALPHA };
-    GLenum   blendSrcAlpha  { GL_SRC_ALPHA };
-    GLenum   blendDstAlpha  { GL_ONE_MINUS_SRC_ALPHA };
-    GLenum   blendOpRGB     { GL_FUNC_ADD };
-    GLenum   blendOpAlpha   { GL_FUNC_ADD };
+    uint8_t     blendEnable    { 0 };
+    BlendFactor blendSrcRGB    { BlendFactor::SrcAlpha };
+    BlendFactor blendDstRGB    { BlendFactor::InvSrcAlpha };
+    BlendFactor blendSrcAlpha  { BlendFactor::SrcAlpha };
+    BlendFactor blendDstAlpha  { BlendFactor::InvSrcAlpha };
+    BlendOp     blendOpRGB     { BlendOp::Add };
+    BlendOp     blendOpAlpha   { BlendOp::Add };
     // Color mask (bit0=R bit1=G bit2=B bit3=A)
-    uint8_t  colorMask  { 0x0F };
+    uint8_t     colorMask  { 0x0F };
     // Scissor
-    uint8_t  scissorTest{ 0 };
+    uint8_t     scissorTest{ 0 };
     // Stencil comparison (applied to both faces)
-    GLenum   stencilFunc      { GL_ALWAYS };
+    CompareFunc stencilFunc      { CompareFunc::Always };
     // Front-face stencil operations
-    GLenum   stencilSFail     { GL_KEEP };
-    GLenum   stencilDPFail    { GL_KEEP };
-    GLenum   stencilDPPass    { GL_KEEP };
+    StencilOp   stencilSFail     { StencilOp::Keep };
+    StencilOp   stencilDPFail    { StencilOp::Keep };
+    StencilOp   stencilDPPass    { StencilOp::Keep };
     // Back-face stencil operations (for single-pass two-sided algorithms)
-    GLenum   stencilBackSFail { GL_KEEP };
-    GLenum   stencilBackDPFail{ GL_KEEP };
-    GLenum   stencilBackDPPass{ GL_KEEP };
+    StencilOp   stencilBackSFail { StencilOp::Keep };
+    StencilOp   stencilBackDPFail{ StencilOp::Keep };
+    StencilOp   stencilBackDPPass{ StencilOp::Keep };
     // Stencil reference value and mask
-    uint8_t  stencilRef       { 0 };
-    uint8_t  stencilMask      { 0xFF };
+    uint8_t     stencilRef       { 0 };
+    uint8_t     stencilMask      { 0xFF };
 
     bool operator==(const RenderState& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;
     }
-    bool operator!=(const RenderState& o) const noexcept { return !(*this == o); }
+    bool operator!=(const RenderState& o) const noexcept {
+        return not (*this == o);
+    }
 };
 
 // =================================================================================================
@@ -254,19 +263,37 @@ private:
 public:
     GfxDriverStates() = default;
 
-    void Init(int maxTextureSize = 4096) noexcept { m_maxTextureSize = maxTextureSize; }
+    void Init(int maxTextureSize = 4096) noexcept {
+        m_maxTextureSize = maxTextureSize;
+    }
 
-    inline const RenderState& State(void) const noexcept { return m_state; }
-    inline bool  IsStateDirty(void)  const noexcept { return m_stateDirty; }
-    inline void  ClearStateDirty(void) noexcept { m_stateDirty = false; }
-    inline void  MarkStateDirty(void) noexcept { m_stateDirty = true; }
+    inline const RenderState& State(void) const noexcept {
+        return m_state;
+    }
 
-    inline bool HasExtension(const char*) const noexcept { return false; }
-    inline int  MaxTextureSize(void)      const noexcept { return m_maxTextureSize; }
+    inline bool IsStateDirty(void) const noexcept {
+        return m_stateDirty;
+    }
+
+    inline void ClearStateDirty(void) noexcept {
+        m_stateDirty = false;
+    }
+
+    inline void MarkStateDirty(void) noexcept {
+        m_stateDirty = true;
+    }
+
+    inline bool HasExtension(const char*) const noexcept {
+        return false;
+    }
+
+    inline int MaxTextureSize(void) const noexcept {
+        return m_maxTextureSize;
+    }
 
     inline int SetDepthTest(int state) {
         int prev = int(m_state.depthTest);
-        if (state >= 0 && uint8_t(state) != m_state.depthTest) {
+        if ((state >= 0) and (uint8_t(state) != m_state.depthTest)) {
             m_state.depthTest = uint8_t(state);
             m_stateDirty = true;
         }
@@ -275,7 +302,7 @@ public:
 
     inline int SetDepthWrite(int state) {
         int prev = int(m_state.depthWrite);
-        if (state >= 0 && uint8_t(state) != m_state.depthWrite) {
+        if ((state >= 0) and (uint8_t(state) != m_state.depthWrite)) {
             m_state.depthWrite = uint8_t(state);
             m_stateDirty = true;
         }
@@ -284,7 +311,7 @@ public:
 
     inline int SetBlending(int state) {
         int prev = int(m_state.blendEnable);
-        if (state >= 0 && uint8_t(state) != m_state.blendEnable) {
+        if ((state >= 0) and (uint8_t(state) != m_state.blendEnable)) {
             m_state.blendEnable = uint8_t(state);
             m_stateDirty = true;
         }
@@ -292,9 +319,9 @@ public:
     }
 
     inline int SetFaceCulling(int state) {
-        int prev = (m_state.cullMode != GL_FRONT_AND_BACK) ? 1 : 0;
+        int prev = (m_state.cullMode != GfxOperations::FaceCull::None) ? 1 : 0;
         if (state >= 0) {
-            GLenum newMode = state ? GLenum(GL_BACK) : GLenum(GL_FRONT_AND_BACK);
+            auto newMode = state ? GfxOperations::FaceCull::Back : GfxOperations::FaceCull::None;
             if (newMode != m_state.cullMode) {
                 m_state.cullMode = newMode;
                 m_stateDirty = true;
@@ -305,7 +332,7 @@ public:
 
     inline int SetScissorTest(int state) {
         int prev = int(m_state.scissorTest);
-        if (state >= 0 && uint8_t(state) != m_state.scissorTest) {
+        if ((state >= 0) and (uint8_t(state) != m_state.scissorTest)) {
             m_state.scissorTest = uint8_t(state);
             m_stateDirty = true;
         }
@@ -314,15 +341,15 @@ public:
 
     inline int SetStencilTest(int state) {
         int prev = int(m_state.stencilTest);
-        if (state >= 0 && uint8_t(state) != m_state.stencilTest) {
+        if ((state >= 0) and (uint8_t(state) != m_state.stencilTest)) {
             m_state.stencilTest = uint8_t(state);
             m_stateDirty = true;
         }
         return prev;
     }
 
-    inline void StencilFunc(GLenum func, uint8_t ref, uint8_t mask) {
-        if (func != m_state.stencilFunc || ref != m_state.stencilRef || mask != m_state.stencilMask) {
+    inline void StencilFunc(GfxOperations::CompareFunc func, uint8_t ref, uint8_t mask) {
+        if ((func != m_state.stencilFunc) or (ref != m_state.stencilRef) or (mask != m_state.stencilMask)) {
             m_state.stencilFunc = func;
             m_state.stencilRef  = ref;
             m_state.stencilMask = mask;
@@ -330,8 +357,8 @@ public:
         }
     }
 
-    inline void StencilOp(GLenum sfail, GLenum dpfail, GLenum dppass) {
-        if (sfail != m_state.stencilSFail || dpfail != m_state.stencilDPFail || dppass != m_state.stencilDPPass) {
+    inline void StencilOp(GfxOperations::StencilOp sfail, GfxOperations::StencilOp dpfail, GfxOperations::StencilOp dppass) {
+        if ((sfail != m_state.stencilSFail) or (dpfail != m_state.stencilDPFail) or (dppass != m_state.stencilDPPass)) {
             m_state.stencilSFail  = sfail;
             m_state.stencilDPFail = dpfail;
             m_state.stencilDPPass = dppass;
@@ -339,8 +366,8 @@ public:
         }
     }
 
-    inline void StencilOpBack(GLenum sfail, GLenum dpfail, GLenum dppass) {
-        if (sfail != m_state.stencilBackSFail || dpfail != m_state.stencilBackDPFail || dppass != m_state.stencilBackDPPass) {
+    inline void StencilOpBack(GfxOperations::StencilOp sfail, GfxOperations::StencilOp dpfail, GfxOperations::StencilOp dppass) {
+        if ((sfail != m_state.stencilBackSFail) or (dpfail != m_state.stencilBackDPFail) or (dppass != m_state.stencilBackDPPass)) {
             m_state.stencilBackSFail  = sfail;
             m_state.stencilBackDPFail = dpfail;
             m_state.stencilBackDPPass = dppass;
@@ -348,22 +375,30 @@ public:
         }
     }
 
-    inline int SetPolygonOffsetFill(int) noexcept { return 0; }
-    inline int SetDither(int) noexcept { return 0; }
-    inline int SetMultiSample(int) noexcept { return 0; }
+    inline int SetPolygonOffsetFill(int) noexcept {
+        return 0;
+    }
 
-    inline GLenum DepthFunc(GLenum state) {
-        GLenum prev = m_state.depthFunc;
-        if (state != GLenum(GL_NONE) && state != prev) {
+    inline int SetDither(int) noexcept {
+        return 0;
+    }
+
+    inline int SetMultiSample(int) noexcept {
+        return 0;
+    }
+
+    inline GfxOperations::CompareFunc DepthFunc(GfxOperations::CompareFunc state) {
+        auto prev = m_state.depthFunc;
+        if (state != prev) {
             m_state.depthFunc = state;
             m_stateDirty = true;
         }
         return prev;
     }
 
-    inline GLenum BlendEquation(GLenum state) {
-        GLenum prev = m_state.blendOpRGB;
-        if (state != GLenum(GL_NONE) && state != prev) {
+    inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp state) {
+        auto prev = m_state.blendOpRGB;
+        if (state != prev) {
             m_state.blendOpRGB   = state;
             m_state.blendOpAlpha = state;
             m_stateDirty = true;
@@ -371,52 +406,45 @@ public:
         return prev;
     }
 
-    inline GLenum FrontFace(GLenum state) {
-        GLenum prev = m_state.frontFace;
-        if (state != GLenum(GL_NONE) && state != prev) {
+    inline GfxOperations::Winding FrontFace(GfxOperations::Winding state) {
+        auto prev = m_state.frontFace;
+        if (state != prev) {
             m_state.frontFace = state;
             m_stateDirty = true;
         }
         return prev;
     }
 
-    inline GLenum CullFace(GLenum state) {
-        GLenum prev = m_state.cullMode;
-        if (state != GLenum(GL_NONE) && state != prev) {
+    inline GfxOperations::FaceCull CullFace(GfxOperations::FaceCull state) {
+        auto prev = m_state.cullMode;
+        if (state != prev) {
             m_state.cullMode = state;
             m_stateDirty = true;
         }
         return prev;
     }
 
-    inline GLenum ActiveTexture(GLenum) noexcept { return 0u; }
-
-    inline std::tuple<GLenum, GLenum> BlendFunc(GLenum sFactor, GLenum dFactor) {
-        auto prev = std::make_tuple(m_state.blendSrcRGB, m_state.blendDstRGB);
-        if (sFactor != m_state.blendSrcRGB || dFactor != m_state.blendDstRGB
-            || sFactor != m_state.blendSrcAlpha || dFactor != m_state.blendDstAlpha) {
-            m_state.blendSrcRGB   = sFactor;
-            m_state.blendDstRGB   = dFactor;
-            m_state.blendSrcAlpha = sFactor;
-            m_state.blendDstAlpha = dFactor;
+    inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
+        if ((src != m_state.blendSrcRGB) or (dst != m_state.blendDstRGB)
+            or (src != m_state.blendSrcAlpha) or (dst != m_state.blendDstAlpha)) {
+            m_state.blendSrcRGB   = src;
+            m_state.blendDstRGB   = dst;
+            m_state.blendSrcAlpha = src;
+            m_state.blendDstAlpha = dst;
             m_stateDirty = true;
         }
-        return prev;
     }
 
-    inline std::tuple<GLenum, GLenum, GLenum, GLenum>
-    BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha) {
-        auto prev = std::make_tuple(m_state.blendSrcRGB, m_state.blendDstRGB,
-                                    m_state.blendSrcAlpha, m_state.blendDstAlpha);
-        if (srcRGB != m_state.blendSrcRGB || dstRGB != m_state.blendDstRGB
-            || srcAlpha != m_state.blendSrcAlpha || dstAlpha != m_state.blendDstAlpha) {
+    inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
+                                   GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
+        if ((srcRGB != m_state.blendSrcRGB) or (dstRGB != m_state.blendDstRGB)
+            or (srcAlpha != m_state.blendSrcAlpha) or (dstAlpha != m_state.blendDstAlpha)) {
             m_state.blendSrcRGB   = srcRGB;
             m_state.blendDstRGB   = dstRGB;
             m_state.blendSrcAlpha = srcAlpha;
             m_state.blendDstAlpha = dstAlpha;
             m_stateDirty = true;
         }
-        return prev;
     }
 
     inline std::tuple<float, float, float, float> ClearColor(float r, float g, float b, float a) {
@@ -453,14 +481,23 @@ public:
     inline bool BindTexture(uint32_t srvIndex, int slotIndex) {
         return BindTexture(typeTag, srvIndex, slotIndex) >= 0;
     }
-    inline bool BindTexture2D(uint32_t srvIndex, int slotIndex)  { return BindTexture<GL_TEXTURE_2D>(srvIndex, slotIndex); }
-    inline bool BindCubemap(uint32_t srvIndex, int slotIndex)    { return BindTexture<GL_TEXTURE_CUBE_MAP>(srvIndex, slotIndex); }
+
+    inline bool BindTexture2D(uint32_t srvIndex, int slotIndex) {
+        return BindTexture<GL_TEXTURE_2D>(srvIndex, slotIndex);
+    }
+
+    inline bool BindCubemap(uint32_t srvIndex, int slotIndex) {
+        return BindTexture<GL_TEXTURE_CUBE_MAP>(srvIndex, slotIndex);
+    }
 
     void ReleaseBuffers(void) noexcept;
 
     // DX12: no GPU-readable viewport state; viewport is tracked by the application.
-    inline void GetViewport(GfxDriverTypes::Int* /*vp*/) noexcept {}
-    inline void SetViewport(const GfxDriverTypes::Int* /*vp*/) noexcept {}
+    inline void GetViewport(GfxTypes::Int* /*vp*/) noexcept {
+    }
+
+    inline void SetViewport(const GfxTypes::Int* /*vp*/) noexcept {
+    }
 };
 
 #define gfxDriverStates GfxDriverStates::Instance()

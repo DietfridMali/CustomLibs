@@ -236,7 +236,7 @@ public:
     void SetViewport(bool flipVertically = false)
         noexcept;
 
-    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipViewportVertically = false, bool flipWindowVertically = false) noexcept; // , bool isRenderTarget = false);
+    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept; // , bool isRenderTarget = false);
 
     void PushViewport(void) {
         m_viewport.GetGpuViewport();
@@ -294,12 +294,12 @@ public:
 
     static bool CheckGfxError(const char* operation = "") noexcept;
 
-    inline GLenum GetWinding(bool reverse = false) noexcept {
-        return reverse ? GL_CCW : GL_CW;
+    inline GfxOperations::Winding GetWinding(bool reverse = false) noexcept {
+        return reverse ? GfxOperations::Winding::CCW : GfxOperations::Winding::CW;
     }
 
-    inline GLenum GetFrontFace(bool reverse = false) noexcept {
-        return reverse ? GL_FRONT : GL_BACK;
+    inline GfxOperations::FaceCull GetFrontFace(bool reverse = false) noexcept {
+        return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
 };
 

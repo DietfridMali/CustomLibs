@@ -445,63 +445,67 @@ Shader& Shader::Move(Shader& other) noexcept
 // =================================================================================================
 // PSO creation helpers
 
-D3D12_BLEND Shader::ToD3DBlend(GLenum gl) noexcept
+D3D12_BLEND Shader::ToD3DBlend(GfxOperations::BlendFactor factor) noexcept
 {
-    switch (gl) {
-        case GL_ZERO:                return D3D12_BLEND_ZERO;
-        case GL_ONE:                 return D3D12_BLEND_ONE;
-        case GL_SRC_ALPHA:           return D3D12_BLEND_SRC_ALPHA;
-        case GL_ONE_MINUS_SRC_ALPHA: return D3D12_BLEND_INV_SRC_ALPHA;
-        case GL_SRC_COLOR:           return D3D12_BLEND_SRC_COLOR;
-        case GL_ONE_MINUS_SRC_COLOR: return D3D12_BLEND_INV_SRC_COLOR;
-        case GL_DST_ALPHA:           return D3D12_BLEND_DEST_ALPHA;
-        case GL_ONE_MINUS_DST_ALPHA: return D3D12_BLEND_INV_DEST_ALPHA;
-        case GL_DST_COLOR:           return D3D12_BLEND_DEST_COLOR;
-        case GL_ONE_MINUS_DST_COLOR: return D3D12_BLEND_INV_DEST_COLOR;
-        default:                     return D3D12_BLEND_ONE;
+    using enum GfxOperations::BlendFactor;
+    switch (factor) {
+        case Zero:        return D3D12_BLEND_ZERO;
+        case One:         return D3D12_BLEND_ONE;
+        case SrcColor:    return D3D12_BLEND_SRC_COLOR;
+        case InvSrcColor: return D3D12_BLEND_INV_SRC_COLOR;
+        case SrcAlpha:    return D3D12_BLEND_SRC_ALPHA;
+        case InvSrcAlpha: return D3D12_BLEND_INV_SRC_ALPHA;
+        case DstAlpha:    return D3D12_BLEND_DEST_ALPHA;
+        case InvDstAlpha: return D3D12_BLEND_INV_DEST_ALPHA;
+        case DstColor:    return D3D12_BLEND_DEST_COLOR;
+        case InvDstColor: return D3D12_BLEND_INV_DEST_COLOR;
+        default:          return D3D12_BLEND_ONE;
     }
 }
 
 
-D3D12_BLEND_OP Shader::ToD3DBlendOp(GLenum gl) noexcept
+D3D12_BLEND_OP Shader::ToD3DBlendOp(GfxOperations::BlendOp op) noexcept
 {
-    switch (gl) {
-        case GL_FUNC_ADD:              return D3D12_BLEND_OP_ADD;
-        case GL_FUNC_SUBTRACT:         return D3D12_BLEND_OP_SUBTRACT;
-        case GL_FUNC_REVERSE_SUBTRACT: return D3D12_BLEND_OP_REV_SUBTRACT;
-        case GL_MIN:                   return D3D12_BLEND_OP_MIN;
-        case GL_MAX:                   return D3D12_BLEND_OP_MAX;
-        default:                       return D3D12_BLEND_OP_ADD;
+    using enum GfxOperations::BlendOp;
+    switch (op) {
+        case Add:         return D3D12_BLEND_OP_ADD;
+        case Subtract:    return D3D12_BLEND_OP_SUBTRACT;
+        case RevSubtract: return D3D12_BLEND_OP_REV_SUBTRACT;
+        case Min:         return D3D12_BLEND_OP_MIN;
+        case Max:         return D3D12_BLEND_OP_MAX;
+        default:          return D3D12_BLEND_OP_ADD;
     }
 }
 
 
-D3D12_STENCIL_OP Shader::ToD3DStencilOp(GLenum gl) noexcept
+D3D12_STENCIL_OP Shader::ToD3DStencilOp(GfxOperations::StencilOp op) noexcept
 {
-    switch (gl) {
-        case GL_ZERO:      return D3D12_STENCIL_OP_ZERO;
-        case GL_REPLACE:   return D3D12_STENCIL_OP_REPLACE;
-        case GL_INCR:      return D3D12_STENCIL_OP_INCR_SAT;
-        case GL_DECR:      return D3D12_STENCIL_OP_DECR_SAT;
-        case GL_INCR_WRAP: return D3D12_STENCIL_OP_INCR;
-        case GL_DECR_WRAP: return D3D12_STENCIL_OP_DECR;
-        default:           return D3D12_STENCIL_OP_KEEP;
+    using enum GfxOperations::StencilOp;
+    switch (op) {
+        case Zero:    return D3D12_STENCIL_OP_ZERO;
+        case Replace: return D3D12_STENCIL_OP_REPLACE;
+        case IncrSat: return D3D12_STENCIL_OP_INCR_SAT;
+        case DecrSat: return D3D12_STENCIL_OP_DECR_SAT;
+        case Incr:    return D3D12_STENCIL_OP_INCR;
+        case Decr:    return D3D12_STENCIL_OP_DECR;
+        default:      return D3D12_STENCIL_OP_KEEP;
     }
 }
 
 
-D3D12_COMPARISON_FUNC Shader::ToD3DCompFunc(GLenum gl) noexcept
+D3D12_COMPARISON_FUNC Shader::ToD3DCompFunc(GfxOperations::CompareFunc func) noexcept
 {
-    switch (gl) {
-        case GL_NEVER:    return D3D12_COMPARISON_FUNC_NEVER;
-        case GL_LESS:     return D3D12_COMPARISON_FUNC_LESS;
-        case GL_EQUAL:    return D3D12_COMPARISON_FUNC_EQUAL;
-        case GL_LEQUAL:   return D3D12_COMPARISON_FUNC_LESS_EQUAL;
-        case GL_GREATER:  return D3D12_COMPARISON_FUNC_GREATER;
-        case GL_NOTEQUAL: return D3D12_COMPARISON_FUNC_NOT_EQUAL;
-        case GL_GEQUAL:   return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
-        case GL_ALWAYS:   return D3D12_COMPARISON_FUNC_ALWAYS;
-        default:          return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    using enum GfxOperations::CompareFunc;
+    switch (func) {
+        case Never:        return D3D12_COMPARISON_FUNC_NEVER;
+        case Less:         return D3D12_COMPARISON_FUNC_LESS;
+        case Equal:        return D3D12_COMPARISON_FUNC_EQUAL;
+        case LessEqual:    return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+        case Greater:      return D3D12_COMPARISON_FUNC_GREATER;
+        case NotEqual:     return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+        case GreaterEqual: return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+        case Always:       return D3D12_COMPARISON_FUNC_ALWAYS;
+        default:           return D3D12_COMPARISON_FUNC_LESS_EQUAL;
     }
 }
 
@@ -520,12 +524,12 @@ ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
     // Rasterizer
     D3D12_RASTERIZER_DESC rast{};
     rast.FillMode = D3D12_FILL_MODE_SOLID;
-    rast.CullMode = (state.cullMode == GL_BACK)
+    rast.CullMode = (state.cullMode == GfxOperations::FaceCull::Back)
         ? D3D12_CULL_MODE_BACK
-        : (state.cullMode == GL_FRONT) 
+        : (state.cullMode == GfxOperations::FaceCull::Front)
             ? D3D12_CULL_MODE_FRONT
             : D3D12_CULL_MODE_NONE;
-    rast.FrontCounterClockwise = (state.frontFace == GL_CCW) ? TRUE : FALSE;
+    rast.FrontCounterClockwise = (state.frontFace == GfxOperations::Winding::CCW) ? TRUE : FALSE;
     rast.DepthClipEnable = TRUE;
     rast.MultisampleEnable = FALSE;
 
@@ -572,7 +576,7 @@ ID3D12PipelineState* Shader::GetOrCreatePSO(const RenderState& state) noexcept
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets   = 1;
     psoDesc.RTVFormats[0]      = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psoDesc.DSVFormat          = (ds.DepthEnable || ds.StencilEnable)
+    psoDesc.DSVFormat          = (ds.DepthEnable or ds.StencilEnable)
                                ? DXGI_FORMAT_D24_UNORM_S8_UINT
                                : DXGI_FORMAT_UNKNOWN;
     psoDesc.SampleMask         = UINT_MAX;

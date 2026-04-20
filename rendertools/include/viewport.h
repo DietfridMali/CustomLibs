@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "gfxdrivertypes.h"   // GfxDriverTypes::Int — resolved to GL or DX12 definition via include path
+#include "gfxdrivertypes.h"   // GfxTypes::Int — resolved to GL or DX12 definition via include path
 #include "gfxdriverstates.h"  // GfxDriverStates singleton — GetViewport/SetViewport
 #include "rectangle.h"
 #include "vector.hpp"
@@ -24,7 +24,7 @@ public:
     int         m_windowHeight;
     Vector2f    m_center;
     bool        m_flipVertically;
-    GfxDriverTypes::Int   m_glViewport[4];
+    GfxTypes::Int   m_glViewport[4];
 
     Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
         : Rectangle(left, top, width, height) 

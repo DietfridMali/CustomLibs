@@ -86,12 +86,12 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 void BaseRenderer::SetDefaultStates(void) noexcept {
     gfxDriverStates.SetDepthWrite(IsColorPass() ? 0 : 1);
     gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.DepthFunc(GL_LEQUAL);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxDriverStates.SetBlending(0);
-    gfxDriverStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
     gfxDriverStates.FrontFace(GetWinding());
     gfxDriverStates.SetFaceCulling(1);
-    gfxDriverStates.CullFace(GL_BACK);
+    gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
 }
 
 void BaseRenderer::SetupGraphics(void) noexcept {
@@ -102,14 +102,14 @@ void BaseRenderer::SetupGraphics(void) noexcept {
     gfxDriverStates.ColorMask(1, 1, 1, 1);
 #if 1
 #   if 1
-    gfxDriverStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
 #   else
-    gfxDriverStates.BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
 #   endif
 #else
-    gfxDriverStates.BlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    gfxDriverStates.BlendFuncSeparate(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha, GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
 #endif
-    gfxDriverStates.BlendEquation(GL_FUNC_ADD);
+    gfxDriverStates.BlendEquation(GfxOperations::BlendOp::Add);
     gfxDriverStates.SetMultiSample(1);
     gfxDriverStates.SetPolygonOffsetFill(0);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -121,7 +121,7 @@ void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
     gfxDriverStates.SetDepthTest(1);
     gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GL_LESS);                  
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Less);
     gfxDriverStates.ColorMask(0, 0, 0, 0);
     //gfxDriverStates.ColorMask(1, 1, 1, 1);
     gfxDriverStates.SetBlending(0);
@@ -132,7 +132,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
     gfxDriverStates.SetDepthTest(1);
     gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.DepthFunc(GL_LEQUAL);                
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxDriverStates.ColorMask(1, 1, 1, 1);
     gfxDriverStates.SetBlending(0);
 }
@@ -142,7 +142,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpFull;
     gfxDriverStates.SetDepthTest(1);
     gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GL_LEQUAL);                
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxDriverStates.ColorMask(1, 1, 1, 1);
     gfxDriverStates.SetBlending(0);
 }
@@ -199,7 +199,7 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
-        gfxDriverStates.DepthFunc(GL_ALWAYS);
+        gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
         gfxDriverStates.SetFaceCulling(0);
         SetViewport(m_sceneViewport, 0, 0, false);
 #if 0
@@ -275,7 +275,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            gfxDriverStates.DepthFunc(GL_ALWAYS);
+            gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
             gfxDriverStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 #if 0
@@ -302,11 +302,15 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // Column-major Initializer-Reihenfolge (GLM!):
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipViewportVertically, bool flipWindowVertically) noexcept { //, bool isRenderTarget) {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isRenderTarget) {
     if (windowWidth * windowHeight == 0) {
         if (m_drawBufferInfo.m_renderTarget) {
             windowWidth = m_drawBufferInfo.m_renderTarget->GetWidth(true);
             windowHeight = m_drawBufferInfo.m_renderTarget->GetHeight(true);
+        }
+        else if (m_activeBuffer) {
+            windowWidth = m_activeBuffer->GetWidth(true);
+            windowHeight = m_activeBuffer->GetHeight(true);
         }
         else {
             windowWidth = m_windowWidth;
@@ -317,10 +321,10 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 
     m_viewport = viewport;
 #if 1
-    if (flipWindowVertically)
+    if (flipVertically)
         m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
 #endif
-    m_viewport.BuildTransformation(windowWidth, windowHeight, flipViewportVertically);
+    m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
     //glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
 }
 

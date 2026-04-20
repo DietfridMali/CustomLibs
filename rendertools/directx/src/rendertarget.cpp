@@ -483,7 +483,7 @@ void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups /*drawBufferGroup*/,
 }
 
 
-Texture* RenderTarget::GetRenderTexture(const RTRenderParams& params, int /*tmuIndex*/)
+Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex*/)
 {
     BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
     if (not info.m_resource)
@@ -556,7 +556,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool applyTransformation = UpdateTransformation(params);
     gfxDriverStates.SetDepthTest(0);
     gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.DepthFunc(GL_ALWAYS);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
     gfxDriverStates.SetFaceCulling(0);
     if (params.shader) {
         if (applyTransformation)
@@ -577,7 +577,7 @@ bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
 {
     if (params.destination >= 0)
         m_lastDestination = params.destination;
-    return RenderAsTexture((params.source == params.destination) ? nullptr : GetRenderTexture(params), params, color);
+    return RenderAsTexture((params.source == params.destination) ? nullptr : GetAsTexture(params), params, color);
 }
 
 

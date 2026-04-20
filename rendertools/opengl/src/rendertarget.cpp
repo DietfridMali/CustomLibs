@@ -189,6 +189,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     m_vertexBufferCount = params.vertexBufferCount;
     m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_vertexBufferCount);
     m_name = params.name;
+    Disable(false, false);
     return true;
 }
 
@@ -203,8 +204,6 @@ void RenderTarget::Destroy(void) {
 
 
 bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
-    if (bufferIndex < 0)
-        return true;
     int l = m_drawBuffers.Length();
     if (drawBufferGroup == dbDepth) {
         for (int i = 0; i < l; ++i)
@@ -222,10 +221,10 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
             m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
             AttachBuffer(bufferIndex);
             for (int i = 0; i < l; ++i)
-                if (i != bufferIndex)
+                if (i != bufferIndex) {
                     DetachBuffer(i);
-                for (int i = 1; i < l; ++i)
-                m_drawBuffers[i] = GL_NONE;
+                    m_drawBuffers[i] = GL_NONE;
+                }
         }
     }
     else if ((drawBufferGroup != dbCustom) and ((drawBufferGroup == dbNone) or (m_drawBufferGroup != drawBufferGroup))) {
@@ -310,6 +309,8 @@ void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, boo
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         else
             glClear(GL_COLOR_BUFFER_BIT);
+        baseRenderer.CheckGfxError();
+        glClearColor(0, 0, 0, 0);
         baseRenderer.PopViewport();
     }
 }
@@ -324,10 +325,21 @@ bool RenderTarget::ReattachBuffers(void) {
 
 
 bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
+    baseRenderer.CheckGfxError();
     if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
+    baseRenderer.CheckGfxError();
+#ifdef _DEBUG
+    if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
+        gfxDriverStates.SetDepthTest(true);
+    else
+        gfxDriverStates.SetDepthTest(false);
+#else
     gfxDriverStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
+#endif
+    baseRenderer.CheckGfxError();
     Clear(bufferIndex, drawBufferGroup, clear);
+    baseRenderer.CheckGfxError();
 #ifdef _DEBUG
     return baseRenderer.CheckGfxError();
 #else
@@ -345,10 +357,14 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
 #ifdef _DEBUG
         if (not BaseRenderer::CheckGfxError())
             return false;
-        m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 #endif
     }
-    return EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable);
+    if (not EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable))
+        return false;
+    m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    if (not m_isAvailable)
+        fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
+    return true;
 }
 
 
@@ -356,6 +372,16 @@ void RenderTarget::Disable(bool flush, bool restoreDrawBuffer) { // flush only r
     if (IsEnabled()) {
         ReleaseBuffers();
         if (IsEnabled()) {
+            baseRenderer.CheckGfxError();
+#if 1
+            for (int i = 0; i < m_colorBufferCount; ++i) {
+                m_drawBuffers[i] = GL_NONE;
+                DetachBuffer(i);
+            }
+#endif
+            m_activeBufferIndex = -1;
+            m_drawBufferGroup = dbNone;
+            baseRenderer.CheckGfxError();
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             if (restoreDrawBuffer)
                 baseRenderer.RestoreDrawBuffer();
@@ -422,9 +448,13 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params) {
 
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color) {
-    if (params.destination < 0) // rendering to the current render target
+    bool enableLocally = false;
+    bool isEnabled = IsEnabled();
+    if (params.destination < 0) {// rendering to the current render target
         gfxDriverStates.SetBlending(1);
+        }
     else { // rendering to another RenderTarget (than the main buffer)
+        enableLocally = not IsEnabled();
         if (not Enable(params.destination, RenderTarget::dbSingle, true, true))
             return false;
         m_lastDestination = params.destination;
@@ -432,7 +462,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
-    gfxDriverStates.DepthFunc(GL_ALWAYS);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
     gfxDriverStates.SetFaceCulling(0);
     if (params.shader) {
         if (applyTransformation)
@@ -467,7 +497,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         }
     }
     baseRenderer.PopMatrix();
-    if (params.destination > -1)
+    if (enableLocally)
         Disable(false, false);
     return true;
 }
@@ -480,13 +510,14 @@ void RenderTarget::Fill(RGBAColor color) {
 }
 
 
-Texture* RenderTarget::GetRenderTexture(const RTRenderParams& params, int tmuIndex) {
+Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) {
     if (params.source == params.destination)
         return nullptr;
     SharedTextureHandle handle = 
         (params.source < 0)
         ? SharedTextureHandle(GLuint(-params.source))
         : BufferHandle(params.source);
+    //DetachBuffer((params.source < 0) ? -params.source : params.source);
     m_renderTexture.HasBuffer() = true;
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
@@ -520,7 +551,7 @@ Texture* RenderTarget::GetDepthTexture(void) {
 bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color) {
     if (params.destination >= 0)
         m_lastDestination = params.destination;
-    return RenderAsTexture((params.source == params.destination) ? nullptr : GetRenderTexture(params), params, color);
+    return RenderAsTexture((params.source == params.destination) ? nullptr : GetAsTexture(params), params, color);
 }
 
 

@@ -327,13 +327,12 @@ public:
         return m_frameCounter.GetFps(); 
     }
 
-    // Winding helpers — return GL enum values (defined in gfxdriverstates.h compat section).
-    inline GLenum GetWinding(bool reverse = false) noexcept { 
-        return reverse ? GLenum(GL_CCW) : GLenum(GL_CW); 
+    inline GfxOperations::Winding GetWinding(bool reverse = false) noexcept {
+        return reverse ? GfxOperations::Winding::CW : GfxOperations::Winding::CCW;
     }
 
-    inline GLenum GetFrontFace(bool reverse = false) noexcept { 
-        return reverse ? GLenum(GL_FRONT) : GLenum(GL_BACK); 
+    inline GfxOperations::FaceCull GetFrontFace(bool reverse = false) noexcept {
+        return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
 
     // DX12: no per-frame GL error checking. These are kept as no-ops for source compatibility.

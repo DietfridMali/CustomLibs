@@ -54,7 +54,9 @@ void DrawBufferHandler::ResetDrawBuffers(RenderTarget* activeBuffer, bool clearB
         if (m_drawBufferInfo.m_renderTarget)
             m_drawBufferInfo.m_renderTarget->Disable();
     }
-    if (not SetActiveBuffer(activeBuffer, clearBuffer))
+    if (SetActiveBuffer(activeBuffer, clearBuffer))
+        ; // m_drawBufferInfo = DrawBufferInfo(activeBuffer);
+    else
         SetActiveDrawBuffers();
 }
 
@@ -87,7 +89,7 @@ void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
     gfxDriverStates.BindTexture2D(0, 0);
     if (m_drawBufferInfo.m_renderTarget != nullptr)
-        m_drawBufferInfo.m_renderTarget->Reenable(false, true);
+        m_drawBufferInfo.m_renderTarget->Reenable(false);
 #ifdef OPENGL
     else
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

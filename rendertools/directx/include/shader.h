@@ -176,13 +176,13 @@ public:
 
     ID3D12PipelineState* GetOrCreatePSO(const RenderState& state) noexcept;
 
-    static D3D12_BLEND ToD3DBlend(GLenum gl) noexcept;
+    static D3D12_BLEND ToD3DBlend(GfxOperations::BlendFactor factor) noexcept;
 
-    static D3D12_BLEND_OP ToD3DBlendOp(GLenum gl) noexcept;
+    static D3D12_BLEND_OP ToD3DBlendOp(GfxOperations::BlendOp op) noexcept;
 
-    static D3D12_COMPARISON_FUNC ToD3DCompFunc(GLenum gl) noexcept;
+    static D3D12_COMPARISON_FUNC ToD3DCompFunc(GfxOperations::CompareFunc func) noexcept;
 
-    static D3D12_STENCIL_OP ToD3DStencilOp(GLenum gl) noexcept;
+    static D3D12_STENCIL_OP ToD3DStencilOp(GfxOperations::StencilOp op) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as OGL, return int (was GLint)

@@ -557,7 +557,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool applyTransformation = UpdateTransformation(params);
     gfxDriverStates.SetDepthTest(0);
     gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.DepthFunc(GL_ALWAYS);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
     gfxDriverStates.SetFaceCulling(0);
     if (params.shader) {
         if (applyTransformation)

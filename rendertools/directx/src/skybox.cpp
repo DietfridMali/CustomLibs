@@ -67,8 +67,8 @@ bool Skybox::Setup(const String& textureFolder) {
 		v *= 2.0f;
 		m_skybox->AddVertex(v);
 	}
-	AutoArray<GfxDriverTypes::Uint> indices;
-	indices.Resize(sizeof(Cube::triangleIndices) / sizeof(GfxDriverTypes::Uint));
+	AutoArray<GfxTypes::Uint> indices;
+	indices.Resize(sizeof(Cube::triangleIndices) / sizeof(GfxTypes::Uint));
 	memcpy(indices.Data(), Cube::triangleIndices, sizeof(Cube::triangleIndices));
 	m_skybox->SetIndices(indices);
 	m_skybox->UpdateData();
@@ -102,7 +102,7 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 
 	gfxDriverStates.SetFaceCulling(0);
 	gfxDriverStates.SetDepthWrite(0);
-	gfxDriverStates.DepthFunc(GL_ALWAYS);
+	gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
 	for (int i = 0; i < 3; i++)
 		m_skyTextures[i]->Enable(i);
 	m_skybox->Render(nullptr);

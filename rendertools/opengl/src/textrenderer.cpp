@@ -156,7 +156,7 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
     baseRenderer.ResetTransformation();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
 #endif
-    gfxDriverStates.DepthFunc(GL_ALWAYS);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
     float letterScale = 2 * xOffset / float(textWidth);
     // reusing xOffset here
     if (alignment == taLeft)
@@ -207,23 +207,30 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
 
         if (not renderTarget)
             RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
-        else if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
-            baseRenderer.PushViewport();
-            renderTarget->SetViewport();
-            if (outlineWidth > 0) {
-                offset.x -= outlineWidth / float(renderTarget->m_width);
-                offset.y -= outlineWidth / float(renderTarget->m_height);
+        else {
+#if 0
+            renderTarget->SetClearColor(ColorData::MediumBlue);
+#endif
+            if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
+                baseRenderer.PushViewport();
+                renderTarget->SetViewport(true);
+                if (outlineWidth > 0) {
+                    offset.x -= outlineWidth / float(renderTarget->m_width);
+                    offset.y -= outlineWidth / float(renderTarget->m_height);
+                }
+                renderTarget->m_lastDestination = 0;
+                RenderText(text, td.width, offset.x, offset.y, alignment);
+#if 0
+                if (renderTarget->IsAvailable()) {
+                    if (HaveOutline())
+                        RenderOutline(renderTarget, m_decoration);
+                    else if (ApplyAA())
+                        AntiAlias(renderTarget, m_decoration.aaMethod);
+                }
+#endif
+                renderTarget->Disable();
+                baseRenderer.PopViewport();
             }
-            renderTarget->m_lastDestination = 0;
-            RenderText(text, td.width, offset.x, offset.y, alignment);
-            renderTarget->Disable();
-            if (renderTarget->IsAvailable()) {
-                if (HaveOutline())
-                    RenderOutline(renderTarget, m_decoration);
-                else if (ApplyAA())
-                    AntiAlias(renderTarget, m_decoration.aaMethod);
-            }
-            baseRenderer.PopViewport();
         }
     }
 }

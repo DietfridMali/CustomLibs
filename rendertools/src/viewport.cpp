@@ -68,21 +68,8 @@ void Viewport::SetResized(int deltaLeft, int deltaTop, int deltaWidth, int delta
 
 
 void Viewport::BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept {
-#if 0
-    float sy = flipVertically ? -1.0f : 1.0f;
-    m_transformation = Matrix4f({
-        1.0f, 0.0f, 0.0f, 0.0f, // col 0
-        0.0f,   sy, 0.0f, 0.0f, // col 1
-        0.0f, 0.0f, 1.0f, 0.0f, // col 2
-        0.0f, 0.0f, 0.0f, 1.0f  // col 3 (Translation in W-Spalte)
-        });
-#else
-#   if 0
-    float sx = 1.0f, sy = flipVertically ? -1.0f : 1.0f;
-#   else
     float sx = Widthf() / float(windowWidth);
     float sy = Heightf() / float(windowHeight);
-#   endif
     if (flipVertically) 
         sy = -sy; // Inhalte im Rect vertikal spiegeln
     float tx = 2.0f * (Leftf() + 0.5f * Widthf()) / float(windowWidth) - 1.0f;
@@ -94,7 +81,6 @@ void Viewport::BuildTransformation(int windowWidth, int windowHeight, bool flipV
         0.0f, 0.0f, 1.0f, 0.0f, // col 2
           tx,   ty, 0.0f, 1.0f  // col 3 (Translation in W-Spalte)
         });
-#endif
 }
 
 // =================================================================================================

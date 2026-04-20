@@ -129,7 +129,7 @@ const ShaderSource& GaussBlurShader() {
         //uniform float premultiply;
         void main() {
 #if 0
-            fragColor = vec4(1,1,1,1);
+            fragColor = vec4(0,1,0,1);
 #else
             vec2 texelSize = 1.0 / vec2(textureSize(surface, 0));
             vec2 offset = vec2 (1.0 - direction, direction);

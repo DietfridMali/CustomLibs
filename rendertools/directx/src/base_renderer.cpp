@@ -83,13 +83,13 @@ void BaseRenderer::SetupGraphics(void) noexcept {
     gfxDriverStates.ColorMask(true, true, true, true);
     gfxDriverStates.SetDepthWrite(1);
     gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.DepthFunc(GL_LEQUAL);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxDriverStates.SetBlending(0);
-    gfxDriverStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    gfxDriverStates.BlendEquation(GL_FUNC_ADD);
+    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxDriverStates.BlendEquation(GfxOperations::BlendOp::Add);
     gfxDriverStates.FrontFace(GetWinding());
     gfxDriverStates.SetFaceCulling(1);
-    gfxDriverStates.CullFace(GL_BACK);
+    gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
     // Set the initial viewport via the DX12 command list.
     auto* list = commandListHandler.CurrentList();
     if (list) {
@@ -110,12 +110,12 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 void BaseRenderer::SetDefaultStates(void) noexcept {
     gfxDriverStates.SetDepthWrite(IsColorPass() ? 0 : 1);
     gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.DepthFunc(GL_LEQUAL);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxDriverStates.SetBlending(0);
-    gfxDriverStates.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
     gfxDriverStates.FrontFace(GetWinding());
     gfxDriverStates.SetFaceCulling(1);
-    gfxDriverStates.CullFace(GL_BACK);
+    gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
 }
 
 
@@ -123,7 +123,7 @@ void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
     gfxDriverStates.SetDepthTest(1);
     gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GL_LESS);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Less);
     gfxDriverStates.ColorMask(false, false, false, false);
     gfxDriverStates.SetBlending(0);
 }
@@ -133,7 +133,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
     gfxDriverStates.SetDepthTest(1);
     gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.DepthFunc(GL_LEQUAL);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxDriverStates.ColorMask(true, true, true, true);
     gfxDriverStates.SetBlending(0);
 }
@@ -143,7 +143,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpFull;
     gfxDriverStates.SetDepthTest(1);
     gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GL_LEQUAL);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxDriverStates.ColorMask(true, true, true, true);
     gfxDriverStates.SetBlending(0);
 }
@@ -211,8 +211,8 @@ bool BaseRenderer::Stop2DScene(void) {
 
 
 void BaseRenderer::Draw3DScene(void) {
-    if (Stop3DScene() && Start2DScene()) {
-        gfxDriverStates.DepthFunc(GL_ALWAYS);
+    if (Stop3DScene() and Start2DScene()) {
+        gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
         gfxDriverStates.SetFaceCulling(0);
         SetViewport(m_sceneViewport, 0, 0, false);
 
@@ -254,7 +254,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         if (m_screenBuffer) {
             gfxDriverStates.SetDepthTest(0);
             gfxDriverStates.SetDepthWrite(0);
-            gfxDriverStates.DepthFunc(GL_ALWAYS);
+            gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
             gfxDriverStates.SetFaceCulling(0);
 
             m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex());

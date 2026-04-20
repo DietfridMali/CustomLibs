@@ -4,7 +4,7 @@
 #include "matrix.hpp"
 #include "shader.h"
 #include "projector.h"
-#include "gfxdrivertypes.h"   // GfxDriverTypes::Float — resolved to GL or DX12 definition via include path
+#include "gfxdrivertypes.h"   // GfxTypes::Float — resolved to GL or DX12 definition via include path
 
 // =================================================================================================
 
@@ -73,7 +73,7 @@ public:
     }
 
 
-    inline const GfxDriverTypes::Float* ProjectionMatrix(void) noexcept {
+    inline const GfxTypes::Float* ProjectionMatrix(void) noexcept {
         return m_transformations[int(mtProjection)].AsArray();
     }
 
@@ -203,7 +203,7 @@ public:
         return Matrices()->GetProjector();
     }
 
-    inline const GfxDriverTypes::Float* ProjectionMatrix(void) noexcept {
+    inline const GfxTypes::Float* ProjectionMatrix(void) noexcept {
         return Matrices()->GetProjection().AsArray();
     }
 

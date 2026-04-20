@@ -179,7 +179,7 @@ public:
     void ClearStencil(void);
 
     // Render helpers (same as OGL)
-    Texture* GetRenderTexture(const RTRenderParams& params, int tmuIndex = 0);
+    Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthTexture(void);
 

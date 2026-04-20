@@ -50,7 +50,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	EnableCamera();
 	gfxDriverStates.SetDepthTest(1);
 	gfxDriverStates.SetDepthWrite(1);
-	gfxDriverStates.CullFace(GL_FRONT);
+	gfxDriverStates.CullFace(GfxOperations::FaceCull::Front);
 #if APPLY_POLYGON_OFFSET
 	// DX12: polygon offset is configured via D3D12_RASTERIZER_DESC (DepthBias / SlopeScaledDepthBias)
 	// in the PSO — no per-draw API call needed here.
@@ -64,7 +64,7 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-	gfxDriverStates.CullFace(GL_BACK);
+	gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
 #if APPLY_POLYGON_OFFSET
 	// DX12: polygon offset lives in PSO rasterizer state — no per-draw disable call needed.
 #endif

@@ -162,7 +162,7 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
     baseRenderer.ResetTransformation();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
 #endif
-    gfxDriverStates.DepthFunc(GL_ALWAYS);
+    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
     float letterScale = 2 * xOffset / float(textWidth);
     // reusing xOffset here
     if (alignment == taLeft)

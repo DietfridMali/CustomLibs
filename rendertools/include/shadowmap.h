@@ -52,7 +52,7 @@ public:
 	}
 
 	inline Texture* RenderTexture(void) noexcept {
-		return m_map ? m_map->GetRenderTexture({}) : nullptr;
+		return m_map ? m_map->GetAsTexture({}) : nullptr;
 	}
 
 	inline Texture* ShadowTexture(void) noexcept {
