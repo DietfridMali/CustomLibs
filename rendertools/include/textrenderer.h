@@ -14,6 +14,7 @@
 #include "texteffects.h"
 #include "mesh.h"
 #include "fonthandler.h"
+#include "commandlist.h"
 #include "basesingleton.hpp"
 
 #define EXTERNAL_ATLAS 1
@@ -157,6 +158,7 @@ private:
     static inline int RenderTargetID(const RenderTarget* renderTarget) noexcept {
         return RenderTargetID (renderTarget->m_width, renderTarget->m_height);
     }
+
 };
 
 #define textRenderer TextRenderer::Instance()

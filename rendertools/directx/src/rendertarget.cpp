@@ -214,7 +214,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     m_pingPong = m_colorBufferCount > 1;
 
     delete m_cmdList;
-    m_cmdList = commandListHandler.CreateCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name);
+    m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name);
     if (not m_cmdList)
         return false;
     if (not m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex()))

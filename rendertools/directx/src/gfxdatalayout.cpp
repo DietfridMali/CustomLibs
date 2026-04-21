@@ -221,23 +221,13 @@ void GfxDataLayout::Disable(void) noexcept
 
 
 
-bool GfxDataLayout::StartUpdate(void) noexcept {
-    if (commandListHandler.GetCurrentCmdListObj())
-        return true;  // no-op in DX12
-	if (m_updateList == nullptr) {
-		m_updateList = commandListHandler.CreateCmdList("GfxDataLayout::Update");
-		if (m_updateList == nullptr)
-			return false;
-	}
-	if (not m_updateList->IsRecording())
-	    m_updateList->Open(commandListHandler.CmdQueue().FrameIndex());
-    return true;
+CommandList* GfxDataLayout::StartUpdate(void) noexcept {
+    return baseRenderer.StartOperation("GfxDataLayout::Update");
 }
 
 
-void GfxDataLayout::FinishUpdate(void) noexcept {
-	if (m_updateList and m_updateList->IsRecording())
-		m_updateList->Close();
+bool GfxDataLayout::FinishUpdate(void) noexcept {
+    return baseRenderer.FinishOperation("GfxDataLayout::Update");
 }
 
 

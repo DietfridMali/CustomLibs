@@ -165,10 +165,9 @@ bool Shader::CreateRootSignature(void) noexcept
     if (not device)
         return false;
 
-    // Params 2..17: one 1-entry descriptor table per texture slot (t0..t15).
+    // Params kSrvBase..kSrvBase+15: one 1-entry descriptor table per texture slot (t0..t15).
     // Each slot is bound independently in Texture::Bind(tmuIndex) via
-    // SetGraphicsRootDescriptorTable(2 + tmuIndex, ...), so textures can live
-    // at arbitrary (non-consecutive) heap slots.
+    // SetGraphicsRootDescriptorTable(kSrvBase + tmuIndex, ...).
     static constexpr int kSrvSlots = 16;
     D3D12_DESCRIPTOR_RANGE srvRanges[kSrvSlots]{};
     for (int i = 0; i < kSrvSlots; ++i) {
@@ -179,26 +178,38 @@ bool Shader::CreateRootSignature(void) noexcept
         srvRanges[i].OffsetInDescriptorsFromTableStart = 0;
     }
 
-    D3D12_ROOT_PARAMETER params[2 + kSrvSlots]{};
+    D3D12_ROOT_PARAMETER params[kSrvBase + kSrvSlots]{};
 
-    // Root CBV b0 — FrameConstants
+    // Root CBV b0 — FrameConstants (visible to all stages)
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[0].Descriptor.ShaderRegister = 0;
     params[0].Descriptor.RegisterSpace = 0;
     params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // Root CBV b1 — ShaderConstants
+    // Root CBV b1 — VS ShaderConstants (VERTEX only)
     params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     params[1].Descriptor.ShaderRegister = 1;
     params[1].Descriptor.RegisterSpace = 0;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+    // Root CBV b1 — PS ShaderConstants (PIXEL only)
+    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[2].Descriptor.ShaderRegister = 1;
+    params[2].Descriptor.RegisterSpace = 0;
+    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    // Root CBV b1 — GS ShaderConstants (GEOMETRY only)
+    params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[3].Descriptor.ShaderRegister = 1;
+    params[3].Descriptor.RegisterSpace = 0;
+    params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
 
     // One 1-entry descriptor table per SRV slot (t0..t15)
     for (int i = 0; i < kSrvSlots; ++i) {
-        params[2 + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[2 + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[2 + i].DescriptorTable.pDescriptorRanges = &srvRanges[i];
-        params[2 + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[kSrvBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[kSrvBase + i].DescriptorTable.NumDescriptorRanges = 1;
+        params[kSrvBase + i].DescriptorTable.pDescriptorRanges = &srvRanges[i];
+        params[kSrvBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     }
 
     // Static samplers: s0 = linear clamp, s1 = linear repeat
@@ -219,7 +230,7 @@ bool Shader::CreateRootSignature(void) noexcept
     }
 
     D3D12_ROOT_SIGNATURE_DESC rsd{};
-    rsd.NumParameters = 2 + kSrvSlots;
+    rsd.NumParameters = kSrvBase + kSrvSlots;
     rsd.pParameters = params;
     rsd.NumStaticSamplers = 2;
     rsd.pStaticSamplers = samplers;
@@ -314,29 +325,31 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 
     BuildInputLayout();
 
-    UpdateB1Fields(m_psBlob.Get());
-    UpdateB1Fields(m_vsBlob.Get());
+    UpdateStageFields(m_vsBlob.Get(), kStageVS);
+    UpdateStageFields(m_psBlob.Get(), kStagePS);
     if (m_gsBlob)
-        UpdateB1Fields(m_gsBlob.Get());
+        UpdateStageFields(m_gsBlob.Get(), kStageGS);
 
     if (not CreateRootSignature())
         return false;
 
-    if (m_b1Size > 0)
-        m_b1Staging.assign(m_b1Size, 0);
-
-    m_b1Dirty = true;
+    for (int s = 0; s < kStageCount; ++s) {
+        if (m_stages[s].size > 0)
+            m_stages[s].staging.assign(m_stages[s].size, 0);
+        m_stages[s].dirty = true;
+    }
     return true;
 }
 
 
-void Shader::UpdateB1Fields(ID3DBlob* blob) noexcept
+void Shader::UpdateStageFields(ID3DBlob* blob, int stage) noexcept
 {
     if (not blob)
         return;
     ComPtr<ID3D12ShaderReflection> refl;
     if (FAILED(D3DReflect(blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&refl))))
         return;
+    StageConstants& sc = m_stages[stage];
     D3D12_SHADER_DESC sd{};
     refl->GetDesc(&sd);
     for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
@@ -344,8 +357,8 @@ void Shader::UpdateB1Fields(ID3DBlob* blob) noexcept
         D3D12_SHADER_BUFFER_DESC cbd{};
         cb->GetDesc(&cbd);
         if (strcmp(cbd.Name, "ShaderConstants") == 0) {
-            if (cbd.Size > m_b1Size)
-                m_b1Size = cbd.Size;
+            if (cbd.Size > sc.size)
+                sc.size = cbd.Size;
             for (UINT j = 0; j < cbd.Variables; ++j) {
                 ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
                 D3D12_SHADER_VARIABLE_DESC vd{};
@@ -353,13 +366,13 @@ void Shader::UpdateB1Fields(ID3DBlob* blob) noexcept
                 if (not (vd.uFlags & D3D_SVF_USED))
                     continue;
                 bool found = false;
-                for (auto& kv : m_b1Fields)
+                for (auto& kv : sc.fields)
                     if (kv.first == String(vd.Name)) {
                         found = true;
                         break;
                     }
                 if (not found) {
-                    auto* entry = m_b1Fields.Append();
+                    auto* entry = sc.fields.Append();
                     if (entry)
                         *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
                 }
@@ -373,10 +386,13 @@ void Shader::UpdateB1Fields(ID3DBlob* blob) noexcept
 void Shader::Destroy(void) noexcept
 {
     PSO::RemovePSOs(this);
-    m_b1Fields.Clear();
-    m_b1Staging.clear();
+    for (int s = 0; s < kStageCount; ++s) {
+        m_stages[s].fields.Clear();
+        m_stages[s].staging.clear();
+        m_stages[s].size = 0;
+        m_stages[s].dirty = true;
+    }
     m_vsInputLayout.clear();
-    m_b1Size = 0;
     m_rootSignature.Reset();
     m_vsBlob.Reset();
     m_psBlob.Reset();
@@ -408,10 +424,12 @@ Shader& Shader::Move(Shader& other) noexcept
         m_gsBlob       = std::move(other.m_gsBlob);
         m_rootSignature = std::move(other.m_rootSignature);
         m_b0Staging    = other.m_b0Staging;
-        m_b1Size       = other.m_b1Size;
-        m_b1Staging    = std::move(other.m_b1Staging);
-        m_b1Dirty      = other.m_b1Dirty;
-        m_b1Fields     = std::move(other.m_b1Fields);
+        for (int s = 0; s < kStageCount; ++s) {
+            m_stages[s].size    = other.m_stages[s].size;
+            m_stages[s].staging = std::move(other.m_stages[s].staging);
+            m_stages[s].dirty   = other.m_stages[s].dirty;
+            m_stages[s].fields  = std::move(other.m_stages[s].fields);
+        }
         m_vsInputLayout = std::move(other.m_vsInputLayout);
     }
     return *this;
@@ -425,16 +443,17 @@ bool Shader::UploadB1(void) noexcept
     if (not list)
         return false;
 
-    const UINT size = (m_b1Size > 0) ? m_b1Size : 1u;  // minimum 1 byte → rounds to 256
-    CbAlloc a = cbvAllocator.Allocate(size);
-    if (not a.IsValid())
-        return false;
-
-    if (m_b1Size > 0)
-        std::memcpy(a.cpu, m_b1Staging.data(), m_b1Size);
-
-    list->SetGraphicsRootConstantBufferView(1, a.gpu);
-    m_b1Dirty = false;
+    for (int s = 0; s < kStageCount; ++s) {
+        StageConstants& sc = m_stages[s];
+        if (sc.size == 0)
+            continue;
+        CbAlloc a = cbvAllocator.Allocate(sc.size);
+        if (not a.IsValid())
+            return false;
+        std::memcpy(a.cpu, sc.staging.data(), sc.size);
+        list->SetGraphicsRootConstantBufferView(UINT(1 + s), a.gpu);
+        sc.dirty = false;
+    }
     return true;
 }
 
@@ -515,30 +534,33 @@ bool Shader::TrySetB0Field(const char* name, const float* data) noexcept
 
 int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
 {
-    int* pOffset = m_locations[name];
-    if (not pOffset) return -1;
-
-    if (*pOffset == std::numeric_limits<int>::min()) {
-        // First access: resolve from reflection table
-        int resolved = -1;
-        for (auto& kv : m_b1Fields) {
-            if (kv.first == String(name)) {
-                resolved = int(kv.second.offset);
+    int result = -1;
+    String sName(name);
+    for (int s = 0; s < kStageCount; ++s) {
+        StageConstants& sc = m_stages[s];
+        if (sc.size == 0)
+            continue;
+        for (auto& kv : sc.fields) {
+            if (kv.first == sName) {
+                uint32_t offset = kv.second.offset;
+                if (offset + size <= sc.staging.size()) {
+                    std::memcpy(sc.staging.data() + offset, data, size);
+                    sc.dirty = true;
+                    if (result < 0)
+                        result = int(offset);
+                }
                 break;
             }
         }
-        *pOffset = resolved;
-        if (resolved < 0)
-            fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
     }
-
-    if (*pOffset < 0) return -1;
-
-    uint32_t offset = uint32_t(*pOffset);
-    if (offset + size > m_b1Staging.size()) return -1;
-    std::memcpy(m_b1Staging.data() + offset, data, size);
-    m_b1Dirty = true;
-    return *pOffset;
+    if (result < 0) {
+        int* pOffset = m_locations[name];
+        if (pOffset and *pOffset == std::numeric_limits<int>::min()) {
+            *pOffset = -1;
+            fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+        }
+    }
+    return result;
 }
 
 

@@ -11,7 +11,7 @@
 #pragma warning(pop)
 
 #include "texture.h"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include "base_renderer.h"
 
 #define USE_TEXTURE_LUT 1
@@ -150,9 +150,9 @@ bool Texture::Bind(int tmuIndex)
         return false;
     m_tmuIndex = 
 #if USE_SHARED_HANDLES
-        gfxDriverStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
+        gfxStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
 #else
-        gfxDriverStates.BindTexture(m_type, m_handle, tmuIndex);
+        gfxStates.BindTexture(m_type, m_handle, tmuIndex);
 #endif
     return m_tmuIndex >= 0;
 }
@@ -161,9 +161,9 @@ bool Texture::Bind(int tmuIndex)
 void Texture::Release(void) {
     if (m_tmuIndex >= 0) {
 #if USE_SHARED_HANDLES
-        gfxDriverStates.ReleaseTexture(m_type, m_handle.Data(), m_tmuIndex);
+        gfxStates.ReleaseTexture(m_type, m_handle.Data(), m_tmuIndex);
 #else
-        gfxDriverStates.ReleaseTexture(m_type, m_handle, m_tmuIndex);
+        gfxStates.ReleaseTexture(m_type, m_handle, m_tmuIndex);
 #endif
         m_tmuIndex = -1;
     }

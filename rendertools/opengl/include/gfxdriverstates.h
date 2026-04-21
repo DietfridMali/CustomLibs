@@ -163,8 +163,8 @@ namespace GfxToGL {
 
 // =================================================================================================
 
-class GfxDriverStates
-	: public BaseSingleton<GfxDriverStates>
+class GfxStates
+	: public BaseSingleton<GfxStates>
 {
 private:
 	int m_maxTextureSize{ 0 };
@@ -174,7 +174,7 @@ private:
 	List<TextureSlotInfo> m_tmuBindings;
 
 public:
-	GfxDriverStates() {
+	GfxStates() {
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 		DetermineExtensions();
 	}
@@ -417,6 +417,6 @@ public:
 		}
 	};
 
-#define gfxDriverStates GfxDriverStates::Instance()
+#define gfxStates GfxStates::Instance()
 
 // =================================================================================================

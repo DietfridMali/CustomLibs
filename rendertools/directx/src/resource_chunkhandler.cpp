@@ -44,8 +44,10 @@ ComPtr<ID3D12Resource> GfxDataChunkList::Update(size_t dataSize, const char* own
         }
 #ifdef _DEBUG
         char name[128];
-        snprintf(name, sizeof(name), "GfxDataChunk[%s, %s, %llu]", name, type, execId);
+        snprintf(name, sizeof(name), "GfxDataChunk[%s, %s, %llu]", ownerName, type, execId);
         m_chunks[m_usedChunks]->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+        if (!strcmp((char*)type, "Vertex") and (execId > 500))
+            fprintf(stderr, "Bingo!\n");
 #endif
     }
     return m_chunks[m_usedChunks++];

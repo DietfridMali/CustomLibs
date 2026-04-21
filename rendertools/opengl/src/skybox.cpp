@@ -1,7 +1,7 @@
 ﻿
 #include "skybox.h"
 #include "cube.h"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 
 // =================================================================================================
 
@@ -30,7 +30,7 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& type, c
 
 
 int Skybox::MaxTextureSize(void) {
-	int maxSize = gfxDriverStates.MaxTextureSize();
+	int maxSize = gfxStates.MaxTextureSize();
 	if (maxSize >= 4096)
 		return 0;
 	if (maxSize >= 2048)
@@ -99,17 +99,17 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 	if (not shader)
 		return false;
 
-	gfxDriverStates.SetFaceCulling(0);
-	gfxDriverStates.SetDepthWrite(0);
-	gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
+	gfxStates.SetFaceCulling(0);
+	gfxStates.SetDepthWrite(0);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
 	for (int i = 0; i < 3; i++)
 		m_skyTextures[i]->Enable(i);
 	m_skybox->Render(nullptr);
 	for (int i = 0; i < 3; i++)
 		m_skyTextures[i]->Disable();
-	gfxDriverStates.SetFaceCulling(1);
-	gfxDriverStates.SetDepthWrite(1);
-	gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+	gfxStates.SetFaceCulling(1);
+	gfxStates.SetDepthWrite(1);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
 	return true;
 };
 

@@ -146,6 +146,8 @@ public:
 
     void SetName(const String& name) noexcept {
         m_name = name;
+        if (m_cmdList)
+            m_cmdList->SetName(name);
     }
 
     bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);

@@ -132,8 +132,6 @@
     <ClInclude Include="..\..\include\fonthandler.h" />
     <ClInclude Include="..\..\include\framecounter.h" />
     <ClInclude Include="..\..\include\glbloader.h" />
-    <ClInclude Include="..\include\gfxdriverstates.h" />
-    <ClInclude Include="..\include\gfxdrivertypes.h" />
     <ClInclude Include="..\include\gfxtypes.h" />
     <ClInclude Include="..\include\gputimer.h" />
     <ClInclude Include="..\..\include\skybox.h" />

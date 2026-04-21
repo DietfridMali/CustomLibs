@@ -211,8 +211,12 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
         td.width -= int(2 * outlineWidth + 0.5f);
         td.height -= int(2 * outlineWidth + 0.5f);
 
-        if (not renderTarget)
-            RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
+        if (not renderTarget) {
+            if (baseRenderer.StartOperation(text)) {
+                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
+                baseRenderer.FinishOperation(text);
+            }
+        }
         else {
 #if 0 // debug
             renderTarget->SetClearColor(RGBAColor(1.0f, 0.8f, 0.0f, 1.0f));

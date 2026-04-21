@@ -51,7 +51,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
     baseRenderer.ClearGfxError();
-    gfxDriverStates.BindTexture2D(bufferInfo.m_handle, 0);
+    gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
     if (bufferType == BufferInfo::btDepth) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
@@ -81,7 +81,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     }
-    gfxDriverStates.BindTexture2D(0, 0);
+    gfxStates.BindTexture2D(0, 0);
     ++m_bufferCount;
 }
 
@@ -117,7 +117,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex) {
 #endif
         return true;
     GLuint h = bufferInfo.m_handle;
-    gfxDriverStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
+    gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
     return bufferInfo.m_isAttached = BaseRenderer::CheckGfxError();
@@ -331,11 +331,11 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
     baseRenderer.CheckGfxError();
 #ifdef _DEBUG
     if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
-        gfxDriverStates.SetDepthTest(true);
+        gfxStates.SetDepthTest(true);
     else
-        gfxDriverStates.SetDepthTest(false);
+        gfxStates.SetDepthTest(false);
 #else
-    gfxDriverStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
+    gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
 #endif
     baseRenderer.CheckGfxError();
     Clear(bufferIndex, drawBufferGroup, clear);
@@ -402,7 +402,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
     for (int i = 0; i < m_bufferCount; ++i)
         if ((i != bufferIndex) and (m_bufferInfo[i].m_tmuIndex == tmuIndex))
             m_bufferInfo[i].m_tmuIndex = -1;
-    gfxDriverStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, tmuIndex);
+    gfxStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, tmuIndex);
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
     return true;
 }
@@ -410,7 +410,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
 
 void RenderTarget::ReleaseBuffers(void) {
     for (int i = 0; i < m_bufferCount; i++) {
-        gfxDriverStates.ReleaseTexture(GL_TEXTURE_2D, m_bufferInfo[i].m_handle);
+        gfxStates.ReleaseTexture(GL_TEXTURE_2D, m_bufferInfo[i].m_handle);
         m_bufferInfo[i].m_tmuIndex = -1;
     }
 }
@@ -451,19 +451,19 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool enableLocally = false;
     bool isEnabled = IsEnabled();
     if (params.destination < 0) {// rendering to the current render target
-        gfxDriverStates.SetBlending(1);
+        gfxStates.SetBlending(1);
         }
     else { // rendering to another RenderTarget (than the main buffer)
         enableLocally = not IsEnabled();
         if (not Enable(params.destination, RenderTarget::dbSingle, true, true))
             return false;
         m_lastDestination = params.destination;
-        gfxDriverStates.SetBlending(0);
+        gfxStates.SetBlending(0);
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxDriverStates.SetFaceCulling(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
     if (params.shader) {
         if (applyTransformation)
             params.shader->UpdateMatrices();
@@ -522,10 +522,10 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) 
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
         if (tmuIndex > -1) {
-			GLuint boundHandle = gfxDriverStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
+			GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
             m_renderTexture.Enable(tmuIndex);
             m_renderTexture.SetParams(true);
-            gfxDriverStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
+            gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
         }
     }
     return &m_renderTexture;

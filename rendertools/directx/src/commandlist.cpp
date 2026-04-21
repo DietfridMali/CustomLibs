@@ -114,7 +114,7 @@ ID3D12GraphicsCommandList* CommandQueue::List(void) const noexcept {
 
 // =================================================================================================
 
-bool CommandList::Create(ID3D12Device* device, const String& name) noexcept {
+bool CommandList::Create(ID3D12Device* device, const String& name, bool isOneShot) noexcept {
     for (UINT i = 0; i < FRAME_COUNT; ++i) {
         HRESULT hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
         if (FAILED(hr)) {
@@ -132,6 +132,7 @@ bool CommandList::Create(ID3D12Device* device, const String& name) noexcept {
     if (not name.IsEmpty())
         m_list->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
     m_name = name;
+    m_isOneShot = isOneShot;
     return true;
 }
 
@@ -292,14 +293,16 @@ bool CommandListHandler::s_logCalls = false;
 bool CommandListHandler::Create(ID3D12Device* device) noexcept {
     if (not m_cmdQueue.Create(device, "MainQueue"))
         return false;
-    if (not m_uploadCmdList.Create(device, "upload"))
-        return false;
     return true;
 }
 
 
 void CommandListHandler::Destroy(void) noexcept {
-    m_uploadCmdList.Destroy();
+    for (auto cl : m_recycledLists) {
+        cl->Destroy();
+        delete cl;
+    }
+    m_recycledLists.Clear();
     m_cmdQueue.Destroy();
 }
 
@@ -341,16 +344,18 @@ void CommandListHandler::Register(CommandList* cl) noexcept {
     m_pendingLists.Push(cl);
 }
 
-
+#define LOG_EXECUTION 1
 
 void CommandListHandler::ExecuteAll(void) noexcept {
     if (m_pendingLists.IsEmpty())
         return;
 	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
     int n = 0;
+#if LOG_EXECUTION//def _DEBUG
     fprintf(stderr, "\nCommandListHandler::ExecuteAll: executing %u command lists.\n", (unsigned)m_pendingLists.Length());
+#endif
     for (auto l : m_pendingLists) {
-#ifdef _DEBUG
+#if LOG_EXECUTION//def _DEBUG
         if (l->m_isRecording) {
             fprintf(stderr, "   '%s' still open; closing it now.\n", (const char*)l->GetName());
             l->Close();
@@ -359,7 +364,9 @@ void CommandListHandler::ExecuteAll(void) noexcept {
 #endif
         execList[n++] = l->m_list.Get();
     }
+#if LOG_EXECUTION//def _DEBUG
     fprintf(stderr, "\n");
+#endif
     if (n > 0)
         m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.Data());
 #ifdef _DEBUG
@@ -371,28 +378,30 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     }
     fflush(stderr);
 #endif
+    for (auto l : m_pendingLists) {
+        if (l->m_isOneShot)
+            m_recycledLists.Push(l);
+    }
     m_pendingLists.Clear();
     m_listStack.Clear();
 }
 
 
-CommandList* CommandListHandler::CreateCmdList(const String& name) noexcept {
+CommandList* CommandListHandler::GetCmdList(const String& name, bool isOneShot) noexcept {
+    if (isOneShot and not m_recycledLists.IsEmpty()) {
+        CommandList* cl = m_recycledLists.Pop();
+        cl->SetName(name);
+        return cl;
+    }
     ID3D12Device* device = dx12Context.Device();
     if (not device)
         return nullptr;
     CommandList* cl = new CommandList();
-    if (not cl->Create(device, name)) {
+    if (not cl->Create(device, name, isOneShot)) {
         delete cl;
         return nullptr;
     }
     return cl;
-}
-
-
-CommandList* CommandListHandler::GetOpenClean(void) noexcept {
-    if (m_uploadCmdList.m_isRecording)
-        m_uploadCmdList.Flush();
-    return m_uploadCmdList.Open(m_cmdQueue.FrameIndex()) ? &m_uploadCmdList : nullptr;
 }
 
 // =================================================================================================

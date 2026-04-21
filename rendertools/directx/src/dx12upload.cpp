@@ -1,5 +1,6 @@
 #include "dx12upload.h"
 #include "commandlist.h"
+#include "base_renderer.h"
 
 #include <cstring>
 
@@ -88,7 +89,7 @@ bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID
 
 bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces, int faceCount, int width, int height, int channels) noexcept
 {
-    auto* cl = commandListHandler.GetOpenClean();
+    CommandList* cl = baseRenderer.StartOperation("UploadTextureData");
     if (not cl)
         return false;
 
@@ -100,8 +101,7 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
             return false;
     }
     SubresourceBarrier(cl->List(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    cl->Flush();
-    return true;
+    return baseRenderer.FinishOperation("UploadTextureData", true);
 }
 
 
@@ -158,7 +158,7 @@ ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, i
         std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch, src + r * UINT(w) * pixelStride, UINT(w) * pixelStride);
     upload->Unmap(0, nullptr);
 
-    auto* cl = commandListHandler.GetOpenClean();
+    CommandList* cl = baseRenderer.StartOperation("UploadTexture3DData");
     if (not cl)
         return nullptr;
 
@@ -171,7 +171,7 @@ ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, i
     dstLoc.SubresourceIndex = 0;
     cl->List()->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     SubresourceBarrier(cl->List(), resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    cl->Flush();
+    baseRenderer.FinishOperation("UploadTexture3DData", true);
     return resource;
 }
 

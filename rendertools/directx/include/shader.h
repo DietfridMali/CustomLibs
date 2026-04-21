@@ -19,11 +19,12 @@
 //
 // Replaces the OGL Shader (glCreateProgram / glUniform*) with:
 //  - Compiled HLSL blobs (ID3DBlob via D3DCompile)
-//  - A fixed root signature: root CBV b0 (FrameConstants), root CBV b1 (ShaderConstants),
-//    SRV descriptor table t0..t15 (pixel shader)
+//  - A fixed root signature: root CBV b0 (FrameConstants, ALL),
+//    root CBV b1 (VS ShaderConstants, VERTEX), root CBV b1 (PS ShaderConstants, PIXEL),
+//    root CBV b1 (GS ShaderConstants, GEOMETRY), SRV descriptor table t0..t15 (pixel shader)
 //  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
-//  - b1: per-shader constants, layout from HLSL reflection on link
+//  - b1: per-stage shader constants, layout from per-stage HLSL reflection on link
 //  - Same public API as OGL Shader (SetFloat, SetInt, SetVector2f, SetMatrix4f, UpdateMatrices …)
 
 // Forward declaration
@@ -80,14 +81,23 @@ public:
     // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
     FrameConstants          m_b0Staging{};
 
-    // b1 — per-shader constants; written per-draw to a cbvAllocator sub-allocation
+    // Per-stage shader constants (VS/PS/GS), each uploaded to its own root CBV
     struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
-    uint32_t                     m_b1Size{ 0 };
-    std::vector<uint8_t>         m_b1Staging;
-    bool                         m_b1Dirty{ true };
 
-    // Field map (uniform name → b1 byte offset + size), filled from HLSL reflection
-    AutoArray<std::pair<String, FieldInfo>> m_b1Fields;
+    static constexpr int kStageVS = 0;
+    static constexpr int kStagePS = 1;
+    static constexpr int kStageGS = 2;
+    static constexpr int kStageCount = 3;
+    static constexpr int kSrvBase = 4;
+
+    struct StageConstants {
+        uint32_t size{ 0 };
+        std::vector<uint8_t> staging;
+        bool dirty{ true };
+        AutoArray<std::pair<String, FieldInfo>> fields;
+    };
+
+    StageConstants m_stages[kStageCount];
 
     // Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;
@@ -95,7 +105,7 @@ public:
     // Vertex data layout: describes which C++ buffers feed which shader inputs.
     ShaderDataLayout m_dataLayout;
 
-    // Location table (name → resolved b1 offset, same pattern as OGL for compat)
+    // Location table (used for "not found" warning suppression)
     AutoArray<UniformHandle*>  m_uniforms;
     ShaderLocationTable        m_locations;
 
@@ -155,7 +165,7 @@ public:
     // No-op in DX12 (PSO changes are driven by RenderStates changes in the next Enable call).
     inline void Disable(void) noexcept {}
 
-    // Allocate a b1 slot from cbvAllocator, write m_b1Staging, bind root param 1.
+    // Upload per-stage constant buffers to their root CBV slots (1=VS, 2=PS, 3=GS).
     // Called from GfxDataLayout::Render() just before each draw.
     bool UploadB1(void) noexcept;
 
@@ -170,15 +180,14 @@ public:
     
     void BuildInputLayout(void) noexcept;
 
-    void UpdateB1Fields(ID3DBlob* blob) noexcept;
+    void UpdateStageFields(ID3DBlob* blob, int stage) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as OGL, return int (was GLint)
 
 private:
-    // Write 'size' bytes at 'data' to the b1 staging buffer at the offset for 'name'.
-    // Resolves the offset on first call (via m_b1Fields), caches it in m_locations.
-    // Returns the b1 byte offset, or -1 if the name is not found.
+    // Write 'size' bytes to all stage buffers that contain the field 'name'.
+    // Returns the offset in the first matching stage, or -1 if not found in any stage.
     int SetB1Field(const char* name, const void* data, size_t size) noexcept;
 
     // Check if 'name' is a b0 field name and write directly to m_b0Staging.

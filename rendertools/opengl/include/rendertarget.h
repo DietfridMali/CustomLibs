@@ -128,6 +128,10 @@ public:
 
 	void Disable(bool flush = false, bool restoreDrawBuffer = true); // only required for DX12 compatibility for calls from higher app layers that are gfx api agnostic
 
+    inline void Flush(void) noexcept {
+        // no op
+    }
+
     void SetViewport(bool flipVertically = false)
         noexcept;
 

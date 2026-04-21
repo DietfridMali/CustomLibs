@@ -13,7 +13,7 @@
 #include "viewport.h"
 #include "rendertarget.h"
 #include "drawbufferhandler.h"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -307,6 +307,15 @@ public:
     inline GfxOperations::FaceCull GetFrontFace(bool reverse = false) noexcept {
         return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
+
+    inline bool StartRender(void) noexcept {
+        return true;
+    }
+
+    void FinishRender(void) noexcept {
+        return true;
+    }
+
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

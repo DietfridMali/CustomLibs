@@ -24,7 +24,7 @@ static Texture* testTexture = nullptr;
 // separate from DisplayHandler.
 
 void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
-    gfxDriverStates.ReleaseBuffers();
+    gfxStates.ReleaseBuffers();
     m_sceneWidth =
     m_windowWidth = width; // (width > height) ? width : height;
     m_sceneHeight =
@@ -84,34 +84,34 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 
 
 void BaseRenderer::SetDefaultStates(void) noexcept {
-    gfxDriverStates.SetDepthWrite(IsColorPass() ? 0 : 1);
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxDriverStates.SetBlending(0);
-    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
-    gfxDriverStates.FrontFace(GetWinding());
-    gfxDriverStates.SetFaceCulling(1);
-    gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
+    gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
+    gfxStates.SetDepthTest(1);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+    gfxStates.SetBlending(0);
+    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.FrontFace(GetWinding());
+    gfxStates.SetFaceCulling(1);
+    gfxStates.CullFace(GfxOperations::FaceCull::Back);
 }
 
 void BaseRenderer::SetupGraphics(void) noexcept {
     SetDefaultStates();
-    gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.ClearColor(ColorData::Invisible);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.ClearColor(ColorData::Invisible);
     glClearDepth(1.0);
-    gfxDriverStates.ColorMask(1, 1, 1, 1);
+    gfxStates.ColorMask(1, 1, 1, 1);
 #if 1
 #   if 1
-    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
 #   else
-    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.BlendFunc(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
 #   endif
 #else
-    gfxDriverStates.BlendFuncSeparate(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha, GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.BlendFuncSeparate(GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha, GfxOperations::BlendFactor::One, GfxOperations::BlendFactor::InvSrcAlpha);
 #endif
-    gfxDriverStates.BlendEquation(GfxOperations::BlendOp::Add);
-    gfxDriverStates.SetMultiSample(1);
-    gfxDriverStates.SetPolygonOffsetFill(0);
+    gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
+    gfxStates.SetMultiSample(1);
+    gfxStates.SetPolygonOffsetFill(0);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glViewport(0, 0, m_windowWidth, m_windowHeight);
 }
@@ -119,32 +119,32 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 
 void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Less);
-    gfxDriverStates.ColorMask(0, 0, 0, 0);
-    //gfxDriverStates.ColorMask(1, 1, 1, 1);
-    gfxDriverStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Less);
+    gfxStates.ColorMask(0, 0, 0, 0);
+    //gfxStates.ColorMask(1, 1, 1, 1);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxDriverStates.ColorMask(1, 1, 1, 1);
-    gfxDriverStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+    gfxStates.ColorMask(1, 1, 1, 1);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpFull;
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxDriverStates.ColorMask(1, 1, 1, 1);
-    gfxDriverStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+    gfxStates.ColorMask(1, 1, 1, 1);
+    gfxStates.SetBlending(0);
 }
 
 
@@ -187,10 +187,10 @@ bool BaseRenderer::Start2DScene(void) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     ResetClearColor();
     SetViewport(m_sceneViewport, 0, 0, false);
-    gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.SetDepthTest(0);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxDriverStates.SetFaceCulling(0);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.SetDepthTest(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
     return true;
 }
 
@@ -278,8 +278,8 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-            gfxDriverStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
+            gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+            gfxStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 #if 0
             if (m_screenBuffer->Enable(true)) {
@@ -381,7 +381,7 @@ bool BaseRenderer::CheckGfxError(const char* operation) noexcept {
     GLenum glError = glGetError();
     if (not glError)
         return true;
-    fprintf(stderr, "Smiley-Battle: OpenGL Error %d (%s)\n", glError, operation);
+    fprintf(stderr, "Smiley-Battle: Graphics Error %d (%s)\n", glError, operation);
     ClearGfxError();
     return false;
 #endif

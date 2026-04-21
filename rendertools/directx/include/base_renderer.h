@@ -41,7 +41,10 @@ protected:
     RenderTarget*           m_sceneBuffer;
     RenderTarget*           m_skyBuffer;
     Texture                 m_renderTexture;
-    CommandList*            m_cmdList{ nullptr };
+    CommandList*            m_renderList{ nullptr };
+    CommandList*            m_temporaryList{ nullptr };
+    AutoArray<CommandList*> m_temporaryListStack{ };
+
     bool                    m_screenIsAvailable;
 
     Viewport                m_viewport;
@@ -73,8 +76,8 @@ public:
 #endif
 
     virtual ~BaseRenderer() {
-        delete m_cmdList;
-        m_cmdList = nullptr;
+        delete m_renderList;
+        m_renderList = nullptr;
     }
 
     BaseRenderer()
@@ -102,7 +105,7 @@ public:
         return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance());
     }
 
-    inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
+    inline CommandList* GetCmdList(void) noexcept { return m_renderList; }
 
     // DX12 one-time init (no equivalent of glewInit).
     bool InitDirectX(void) noexcept;
@@ -350,6 +353,10 @@ public:
     inline ::RenderStates& RenderStates(void) noexcept {
         return m_renderStates;
     }
+
+    CommandList* StartOperation(String name) noexcept;
+
+    bool FinishOperation(String name, bool flush = false) noexcept;
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

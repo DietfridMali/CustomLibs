@@ -386,8 +386,9 @@ class Shader
             return glData;
         }
 
-        inline void Enable(void) {
+        inline bool Enable(void) {
             glUseProgram(m_handle);
+            return true;
         }
 
         inline void Disable(void) {

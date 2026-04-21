@@ -37,6 +37,7 @@ bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignmen
         return false;
     m_text = text;
     m_color = color;
+    m_renderTarget.SetName(text);
     textRenderer.SetColor(m_color);
     textRenderer.SetDecoration(decoration);
     textRenderer.SetScale(1.0f);

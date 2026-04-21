@@ -28,9 +28,9 @@ static Texture* testTexture = nullptr;
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
 bool BaseRenderer::InitDirectX(void) noexcept {
-    delete m_cmdList;
-    m_cmdList = commandListHandler.CreateCmdList("renderer");
-    return m_cmdList != nullptr;
+    delete m_renderList;
+    m_renderList = commandListHandler.GetCmdList("renderer");
+    return m_renderList != nullptr;
 }
 
 
@@ -175,7 +175,7 @@ bool BaseRenderer::Stop3DScene(void) {
 
 bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
-    m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex());
+    m_renderList->Open(commandListHandler.CmdQueue().FrameIndex());
     SetClearColor(m_backgroundColor);
     ResetDrawBuffers(m_screenBuffer, !m_screenIsAvailable);
     m_screenIsAvailable = true;
@@ -261,7 +261,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
             gfxStates.SetFaceCulling(0);
 
-            m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex());
+            m_renderList->Open(commandListHandler.CmdQueue().FrameIndex());
             // Ensure the screen RenderTarget color buffer is in PSR state.
             // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
             // in which case the RENDER_TARGET → PSR transition was never recorded.
@@ -367,6 +367,39 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     baseRenderer.Scale(scale, scale, 1);
     m_renderQuad.Fill(color);
     baseRenderer.PopMatrix();
+}
+
+
+CommandList* BaseRenderer::StartOperation(String name) noexcept {
+    if (name.IsEmpty())
+        return nullptr;
+    if (m_temporaryList)
+        m_temporaryListStack.Push(m_temporaryList);
+    m_temporaryList = commandListHandler.GetCmdList(name, true);
+    if (m_temporaryList) {
+        m_temporaryList->Open(commandListHandler.CmdQueue().FrameIndex());
+        return m_temporaryList;
+    }
+    if (not m_temporaryListStack.IsEmpty())
+        m_temporaryList = m_temporaryListStack.Pop();
+    return nullptr;
+}
+
+
+bool BaseRenderer::FinishOperation(String name, bool flush) noexcept {
+    if (not m_temporaryList)
+        return false;
+    if (m_temporaryList->GetName() != name)
+        return false;
+    if (m_temporaryList->IsRecording()) {
+        if (flush)
+            m_temporaryList->Flush();
+        else
+            m_temporaryList->Close();
+    }
+    if (not m_temporaryListStack.IsEmpty())
+        m_temporaryList = m_temporaryListStack.Pop();
+    return true;
 }
 
 // =================================================================================================

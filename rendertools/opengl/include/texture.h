@@ -12,7 +12,7 @@
 #include "sharedpointer.hpp"
 #include "sharedgfxhandle.hpp"
 #include "avltree.hpp"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include "texturebuffer.h"
 
 #pragma warning(push)
@@ -261,8 +261,8 @@ public:
         noexcept
     {
         if (tmuIndex >= 0)
-            gfxDriverStates.BindTexture<typeID>(0, tmuIndex);
-        gfxDriverStates.ActiveTexture(GL_TEXTURE0); // always reset!
+            gfxStates.BindTexture<typeID>(0, tmuIndex);
+        gfxStates.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 
     inline bool& HasBuffer(void)

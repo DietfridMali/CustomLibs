@@ -9,7 +9,7 @@
 #include "sharedpointer.hpp"
 #include "sharedgfxhandle.hpp"
 #include "avltree.hpp"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)

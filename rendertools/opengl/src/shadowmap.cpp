@@ -20,7 +20,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	if (not (m_map = new RenderTarget()))
 		return false;
 	int size;
-	for (size = gfxDriverStates.MaxTextureSize(); size >= 1024; size /= 2) {
+	for (size = gfxStates.MaxTextureSize(); size >= 1024; size /= 2) {
 		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
 			m_status = 1;
 			return true;
@@ -48,9 +48,9 @@ bool ShadowMap::StartRender(void) noexcept {
 	m_map->Enable(0, RenderTarget::dbDepth);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	EnableCamera();
-	gfxDriverStates.SetDepthTest(1);
-	gfxDriverStates.SetDepthWrite(1);
-	gfxDriverStates.CullFace(GfxOperations::FaceCull::Front);
+	gfxStates.SetDepthTest(1);
+	gfxStates.SetDepthWrite(1);
+	gfxStates.CullFace(GfxOperations::FaceCull::Front);
 #if APPLY_POLYGON_OFFSET
 	glEnable(GL_POLYGON_OFFSET_FILL);
 	glPolygonOffset(2.0f, 4.0f);
@@ -64,7 +64,7 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-	gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
+	gfxStates.CullFace(GfxOperations::FaceCull::Back);
 #if APPLY_POLYGON_OFFSET
 	glDisable(GL_POLYGON_OFFSET_FILL);
 #endif

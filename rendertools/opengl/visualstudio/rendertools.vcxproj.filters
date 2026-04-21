@@ -117,12 +117,6 @@
     <ClInclude Include="..\..\include\movement.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\gfxdriverstates.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\gfxdrivertypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\gfxstates.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -80,6 +80,7 @@ public:
     ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
     bool                                m_isRecording{ false };
     bool                                m_isFlushed{ false };
+    bool                                m_isOneShot{ false };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
@@ -91,7 +92,7 @@ public:
     static void PushRenderStates(void) noexcept;
     static void PopRenderStates(void) noexcept;
 
-    bool Create(ID3D12Device* device, const String& name = "") noexcept;
+    bool Create(ID3D12Device* device, const String& name = "", bool isOneShot = false) noexcept;
 
     void Destroy(void) noexcept;
 
@@ -125,12 +126,24 @@ public:
 		return m_name;
 	}
 
+    inline void SetName(String name) noexcept {
+        m_name = name;
+    }
+
     inline uint64_t GetExecutionCounter(void) const noexcept {
 		return m_executionCounter;
 	}
 
 	inline bool IsRecording(void) const noexcept {
 		return m_isRecording;
+	}
+
+	inline bool IsTemporary(void) const noexcept {
+		return m_isOneShot;
+	}
+
+	inline void SetOneShot(bool value) noexcept {
+		m_isOneShot = value;
 	}
 
     void SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept;
@@ -156,8 +169,8 @@ class CommandListHandler
 {
 public:
     CommandQueue                            m_cmdQueue;
-    CommandList                             m_uploadCmdList;   // dedicated list for one-shot uploads
     AutoArray<CommandList*>                 m_pendingLists;    // registered at Open(), cleared after ExecuteAll
+    AutoArray<CommandList*>                 m_recycledLists;    // pool of temporary CLs available for reuse
     AutoArray<ID3D12GraphicsCommandList*>   m_listStack;
     AutoArray<CommandList*>                 m_cmdListObjStack;
     ID3D12GraphicsCommandList*              m_currentList{ nullptr };
@@ -200,14 +213,10 @@ public:
     // Clears m_pendingLists afterwards.
     void ExecuteAll(void) noexcept;
 
-    // Allocates a new CommandList on the heap, assigns it a unique m_id, calls Create().
-    // Returns the pointer on success, nullptr on failure. Caller owns the memory.
-    CommandList* CreateCmdList(const String& name = "") noexcept;
-
-    // Returns an open, clean CommandList for one-shot uploads.
-    // If already recording (previous upload not flushed), flushes it first.
-    // The caller is responsible for calling Flush() on the returned list.
-    CommandList* GetOpenClean(void) noexcept;
+    // Returns a CommandList. If isOneShot is true, tries to reuse one from m_recycledLists
+    // before allocating a new one. One-shot CLs are recycled after ExecuteAll().
+    // Caller owns the memory for non-one-shot lists.
+    CommandList* GetCmdList(const String& name = "", bool isOneShot = false) noexcept;
 
 #ifdef _DEBUG
     // Set to true to print every logged GPU call (DrawInstanced etc.) with file/line to stderr.

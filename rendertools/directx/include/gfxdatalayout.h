@@ -115,9 +115,9 @@ public:
 
     void Disable(void) noexcept;
 
-    bool StartUpdate(void) noexcept;
+    CommandList* StartUpdate(void) noexcept;
 
-    void FinishUpdate(void) noexcept;
+    bool FinishUpdate(void) noexcept;
 
     inline bool StartRender(void) noexcept {
         return Enable(); 
