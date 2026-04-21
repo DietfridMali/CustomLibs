@@ -34,7 +34,11 @@ public:
         Vector2f                atlasSize;
 
         GlyphInfo(Texture* _texture = nullptr, String _name = "", int32_t _index = -1, Vector2f _position = Vector2f::ZERO, Vector2f _size = Vector2f::ZERO)
-            : texture(_texture), name(_name), index(_index), atlasPosition(_position), atlasSize(_size)
+            : texture(_texture)
+            , name(_name)
+            , index(_index)
+            , atlasPosition(_position)
+            , atlasSize(_size)
         { }
     };
 

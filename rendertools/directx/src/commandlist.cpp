@@ -2,8 +2,20 @@
 #include "dx12framework.h"
 #include "dx12context.h"
 #include "commandlist.h"
+#include "base_renderer.h"
 
 #include <cstdio>
+
+List<RenderStates> CommandList::m_renderStateStack;
+
+void CommandList::PushRenderStates(void) noexcept {
+    m_renderStateStack.Push(baseRenderer.RenderStates());
+}
+
+void CommandList::PopRenderStates(void) noexcept {
+    if (m_renderStateStack.Length() > 0)
+        baseRenderer.RenderStates() = m_renderStateStack.Pop();
+}
 
 // =================================================================================================
 // CommandQueue
@@ -148,12 +160,12 @@ bool CommandList::Open(UINT frameIndex) noexcept {
         return false;
     }
     m_isRecording = true;
-    m_pso = PSO{};
     m_activePSO = nullptr;
     ++m_executionCounter;
     commandListHandler.PushList(m_list.Get());
     commandListHandler.PushCmdList(this);
     commandListHandler.Register(this);
+    PushRenderStates();
     return true;
 }
 
@@ -167,6 +179,7 @@ void CommandList::Close(void) noexcept {
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
     commandListHandler.PopList();
     commandListHandler.PopCmdList();
+    PopRenderStates();
 }
 
 
@@ -182,6 +195,7 @@ void CommandList::Flush(void) noexcept {
     }
     commandListHandler.PopList();
     commandListHandler.PopCmdList();
+    PopRenderStates();
     ID3D12CommandList* lists[] = { m_list.Get() };
     commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
 #ifdef _DEBUG
@@ -235,16 +249,15 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
         m_list->SetGraphicsRootSignature(shader->GetRootSignature().Get());
         m_activePSO = pso;
     }
-
 }
 
+
 ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
-    ID3D12PipelineState* pso = m_pso.GetPSO(shader);
+    ID3D12PipelineState* pso = PSO::GetPSO(shader);
     if (pso)
         SetActivePSO(pso, shader);
     return pso;
 }
-
 
 
 #ifdef _DEBUG

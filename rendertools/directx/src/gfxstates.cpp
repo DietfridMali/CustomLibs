@@ -3,6 +3,7 @@
 #include "shader.h"
 #include "dx12context.h"
 #include "descriptor_heap.h"
+#include "base_renderer.h"
 
 #include <cstdio>
 
@@ -77,8 +78,7 @@ bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
 // GfxStates
 
 RenderStates& GfxStates::ActiveState(void) noexcept {
-    CommandList* cl = commandListHandler.GetCurrentCmdListObj();
-    return cl ? cl->RenderStates() : m_renderStates;
+    return baseRenderer.RenderStates();
 }
 
 

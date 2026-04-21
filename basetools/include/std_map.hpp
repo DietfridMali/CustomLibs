@@ -40,7 +40,14 @@ public:
 
     DATA_T* Find(const KEY_T& key) {
         auto it = m_map.find(key);
+#ifdef _DEBUG
+        bool found = it != m_map.end();
+        if (found)
+            return &it->second;
+        return nullptr;
+#else
         return (it != m_map.end()) ? &it->second : nullptr;
+#endif
     }
 
     const DATA_T* Find(const KEY_T& key) const {

@@ -4,7 +4,7 @@
 
 #include "dx12framework.h"
 #include "basesingleton.hpp"
-#include "dictionary.hpp"
+#include "avltree.hpp"
 #include "rendertypes.h"
 
 // =================================================================================================
@@ -12,6 +12,7 @@
 
 class Shader;
 
+#pragma pack(push, 1)
 struct RenderStates {
     using CompareFunc = GfxOperations::CompareFunc;
     using BlendFactor = GfxOperations::BlendFactor;
@@ -72,42 +73,51 @@ struct RenderStates {
 
     D3D12_DEPTH_STENCIL_DESC SetStencilDesc(D3D12_DEPTH_STENCIL_DESC& desc);
 };
+#pragma pack(pop)
 
 // =================================================================================================
 // PSO cache key: {Shader*, RenderStates} — used by CommandList's static PSO cache.
 
+#pragma pack(push, 1)
 struct PSOKey {
-    Shader* shader;
+    Shader* shader{ nullptr };
     RenderStates states;
+#if 0 // only required for StdMap, not for AVLTree
     bool operator<(const PSOKey& o) const noexcept {
         if (shader != o.shader)
             return shader < o.shader;
         return states < o.states;
     }
+#endif
 };
+#pragma pack(pop)
 
 // =================================================================================================
 
 class PSO
 {
-    using PSOCache = Dictionary<PSOKey, ComPtr<ID3D12PipelineState>>;
+    using PSOComPtr = ComPtr<ID3D12PipelineState>;
+    typedef ID3D12PipelineState* psoPtr_t;
+    using PSOCache = AVLTree<PSOKey, PSOComPtr>;
 
 private:
-    static PSOCache  m_psoCache;
+    static PSOCache& GetCache(PSOCache::Comparator comparator) noexcept {
+        static PSOCache cache;
+        cache.SetComparator(comparator);
+        return cache;
+    }
 
-    RenderStates m_states;
+    static int ComparePSOs(void* context, const PSOKey& key1, const PSOKey& key2);
+
+    static int CompareShaders(void* context, const PSOKey& key1, const PSOKey& key2);
 
 public:
-    ID3D12PipelineState* GetPSO(Shader* shader) noexcept;
+    static psoPtr_t GetPSO(Shader* shader) noexcept;
 
     static void RemovePSOs(Shader* shader) noexcept;
 
-    RenderStates& GetStates(void) noexcept {
-        return m_states;
-    }
-
 private:
-    ComPtr<ID3D12PipelineState> CreatePSO(Shader* shader) noexcept;
+    static PSOComPtr CreatePSO(Shader* shader) noexcept;
 };
 
 #define psoHandler PSOHandler::Instance()

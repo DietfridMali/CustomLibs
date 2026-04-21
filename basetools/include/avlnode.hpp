@@ -25,11 +25,11 @@ public:
         if constexpr (std::is_trivially_constructible<DATA_T>::value)
             memset(&data, 0, sizeof(DATA_T));
         else
-            new (&data) DATA_T();
+            data = DATA_T{};
         if constexpr (std::is_trivially_constructible<KEY_T>::value)
             memset(&key, 0, sizeof(KEY_T));
         else
-            new (&key) KEY_T();
+            key = KEY_T{};
 #endif
     }
 

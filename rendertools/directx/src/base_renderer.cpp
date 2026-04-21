@@ -274,11 +274,13 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
                 list->ClearRenderTargetView(rtv, black, 0, nullptr);
                 list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
             }
+#if 0
             Timer t;
             t.SetDuration(500);
             t.Start();
             while (not t.HasExpired())
                 ;
+#endif
             // Set viewport after the list is open so RSSetViewports is actually recorded.
             SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 

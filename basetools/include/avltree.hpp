@@ -15,6 +15,7 @@
 #pragma once
 
 #include <utility>
+#include <memory>
 #include <stdexcept>
 #include <functional>
 #include <type_traits>
@@ -133,7 +134,7 @@ public:
                 node = node->right;
             else {
                 m_info.workingNode = node;
-                return &node->data;
+                return std::addressof(node->data);
             }
         }
         return nullptr;
@@ -533,11 +534,11 @@ private:
             return next;
         }
 
-        // zwei Kinder: Vorgänger aus linkem Teilbaum herauslösen und relinken
+        // zwei Kinder: Vorgï¿½nger aus linkem Teilbaum herauslï¿½sen und relinken
         node = UnlinkNode(node->left, node);          // liefert neue Wurzel an dieser Stelle
         if (m_info.heightHasChanged) 
             node = BalanceLeftShrink(node);
-        DeleteNode(m_info.workingNode);               // ursprünglichen Knoten entfernen
+        DeleteNode(m_info.workingNode);               // ursprï¿½nglichen Knoten entfernen
         return node;
 #else
         if (not node->right) {
@@ -554,11 +555,11 @@ private:
             return next;
         }
 
-        // zwei Kinder: Schlüssel/Daten mit Vorgänger tauschen, dann Vorgänger löschen
+        // zwei Kinder: Schlï¿½ssel/Daten mit Vorgï¿½nger tauschen, dann Vorgï¿½nger lï¿½schen
         node->left = UnlinkNode(node->left);
         if (m_info.heightHasChanged) 
             node = BalanceLeftShrink(node);
-        DeleteNode(m_info.workingNode);               // der im Unlink gelöste Vorgänger
+        DeleteNode(m_info.workingNode);               // der im Unlink gelï¿½ste Vorgï¿½nger
         return node;
 #endif
     }
@@ -613,7 +614,7 @@ private:
             root->visited = m_info.visited;
             if (not WalkNodes(root->left))
                 return false;
-            if (not m_info.processNode(root->key, &root->data))
+            if (not m_info.processNode(root->key, std::addressof(root->data)))
                 return false;
             if (not WalkNodes(root->right))
                 return false;
@@ -642,7 +643,7 @@ public:
         AVLNode* p = m_info.root;
         for (; p->left; p = p->left)
             ;
-        return &p->data;
+        return std::addressof(p->data);
     }
 
     //-----------------------------------------------------------------------------
@@ -655,7 +656,7 @@ public:
         AVLNode* p = m_info.root;
         for (; p->right; p = p->right)
             ;
-        return &p->data;
+        return std::addressof(p->data);
     }
 
     //-----------------------------------------------------------------------------
@@ -767,8 +768,8 @@ public:
     //-----------------------------------------------------------------------------
 
 private:
-    static bool CopyData(void* context, const KEY_T& key, DATA_T* data) {
-        return static_cast<AVLTree*>(context)->Insert(key, *data);
+    bool CopyData(const KEY_T& key, DATA_T* data) {
+        return Insert(key, *data);
     }
 
     //-----------------------------------------------------------------------------
@@ -791,7 +792,7 @@ public:
 
     inline AVLTree& Copy(AVLTree& other)
     {
-        Walk(CopyData, this);
+        other.Walk(&AVLTree::CopyData, this);
         return *this;
     }
 };

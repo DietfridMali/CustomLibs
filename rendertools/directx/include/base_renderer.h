@@ -62,6 +62,7 @@ protected:
     RGBAColor               m_backgroundColor;
     RenderPassType          m_renderPass;
     MovingFrameCounter      m_frameCounter;
+    RenderStates            m_renderStates;
 
     static List<::Viewport> viewportStack;
 
@@ -340,6 +341,10 @@ public:
 
     static bool CheckGfxError(const char* = "") noexcept { 
         return true; 
+    }
+
+    inline ::RenderStates& RenderStates(void) noexcept {
+        return m_renderStates;
     }
 };
 

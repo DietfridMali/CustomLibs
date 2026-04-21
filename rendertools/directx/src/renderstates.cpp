@@ -2,8 +2,8 @@
 #include "gfxstates.h"
 #include "shader.h"
 #include "dx12context.h"
+#include "base_renderer.h"
 
-PSO::PSOCache PSO::m_psoCache;
 
 // =================================================================================================
 // RenderStates::GetPSO — PSO creation helpers
@@ -115,36 +115,51 @@ D3D12_DEPTH_STENCIL_DESC RenderStates::SetStencilDesc(D3D12_DEPTH_STENCIL_DESC& 
 
 // =================================================================================================
 
-ID3D12PipelineState* PSO::GetPSO(Shader* shader) noexcept
+int PSO::ComparePSOs(void* context, const PSOKey& key1, const PSOKey& key2) {
+    return memcmp(&key1, &key2, sizeof(PSOKey));
+}
+
+
+int PSO::CompareShaders(void* context, const PSOKey& key1, const PSOKey& key2) {
+    return memcmp(&key1.shader, &key2.shader, sizeof(Shader*));
+}
+
+
+PSO::psoPtr_t PSO::GetPSO(Shader* shader) noexcept
 {
     if (not (shader and shader->IsValid()))
         return nullptr;
 
-    PSOKey key{ shader, m_states };
-    if (auto psoComPtr = m_psoCache.Find(key))
+    PSOKey key{ shader, baseRenderer.RenderStates() };
+    if (auto psoComPtr = GetCache(ComparePSOs).Find(key)) {
+#ifdef _DEBUG
+        GetCache(ComparePSOs).Find(key);
+#endif
         return psoComPtr->Get();
-    ComPtr<ID3D12PipelineState> psoComPtr = CreatePSO(shader);
+    }
+    
+    PSO::PSOComPtr psoComPtr = CreatePSO(shader);
     if (psoComPtr) {
-        ID3D12PipelineState* psoPtr = psoComPtr.Get();
-        m_psoCache.Insert(key, std::move(psoComPtr));
-        return psoPtr;
+        psoPtr_t psoPtr = psoComPtr.Get();
+        String psoName = String("shader:") + shader->m_name;
+        psoComPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)psoName.Length(), (const char*)psoName);
+        if (GetCache(ComparePSOs).Insert(key, psoComPtr))
+            return psoPtr;
     }
     return nullptr;
 }
 
 
-void PSO::RemovePSOs(Shader* shader) noexcept {
-    for (auto it = m_psoCache.begin(); it != m_psoCache.end(); ) {
-        if (it->first.shader == shader)
-            it = m_psoCache.Erase(it);
-        else
-            ++it;
-    }
 
+void PSO::RemovePSOs(Shader* shader) noexcept {
+    PSOKey key{ shader };
+    PSOCache cache = GetCache(CompareShaders);
+    while (cache.Remove(key))
+        ;
 }
 
 
-ComPtr<ID3D12PipelineState> PSO::CreatePSO(Shader* shader) noexcept
+PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
 {
     ID3D12Device* device = dx12Context.Device();
     if (not (device and shader->m_rootSignature and shader->m_vsBlob and shader->m_psBlob))
@@ -159,9 +174,9 @@ ComPtr<ID3D12PipelineState> PSO::CreatePSO(Shader* shader) noexcept
     if (shader->m_gsBlob)
         psoDesc.GS = { shader->m_gsBlob->GetBufferPointer(), shader->m_gsBlob->GetBufferSize() };
     psoDesc.InputLayout = { shader->m_vsInputLayout.data(), UINT(shader->m_vsInputLayout.size()) };
-    m_states.SetRasterizerDesc(psoDesc.RasterizerState);
-    m_states.SetBlendDesc(psoDesc.BlendState);
-    m_states.SetStencilDesc(psoDesc.DepthStencilState);
+    baseRenderer.RenderStates().SetRasterizerDesc(psoDesc.RasterizerState);
+    baseRenderer.RenderStates().SetBlendDesc(psoDesc.BlendState);
+    baseRenderer.RenderStates().SetStencilDesc(psoDesc.DepthStencilState);
 
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psoDesc.NumRenderTargets = 1;
@@ -170,7 +185,7 @@ ComPtr<ID3D12PipelineState> PSO::CreatePSO(Shader* shader) noexcept
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.SampleDesc.Count = 1;
 
-    ComPtr<ID3D12PipelineState> psoComPtr;
+    PSOComPtr psoComPtr;
     HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&psoComPtr));
     if (FAILED(hr)) {
 #ifdef _DEBUG

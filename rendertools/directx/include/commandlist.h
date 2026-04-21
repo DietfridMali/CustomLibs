@@ -76,15 +76,19 @@ class CommandList
 public:
     static constexpr UINT FRAME_COUNT = 2;
 
-    ComPtr<ID3D12GraphicsCommandList>   m_list;
+    ComPtr<ID3D12GraphicsCommandList>   m_list{ nullptr };
     ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
     bool                                m_isRecording{ false };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
     String                              m_name{ "" };
-    PSO                                 m_pso{};
     ID3D12PipelineState*                m_activePSO{ nullptr };
+
+    static List<RenderStates>           m_renderStateStack;
+
+    static void PushRenderStates(void) noexcept;
+    static void PopRenderStates(void) noexcept;
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
 
@@ -127,10 +131,6 @@ public:
 	inline bool IsRecording(void) const noexcept {
 		return m_isRecording;
 	}
-
-    inline ::RenderStates& RenderStates(void) noexcept {
-        return m_pso.GetStates();
-    }
 
     void SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept;
 

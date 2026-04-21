@@ -245,20 +245,8 @@ bool Shader::CreateRootSignature(void) noexcept
 
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode)
+void Shader::BuildInputLayout(void) noexcept
 {
-    Destroy();
-
-    if (not Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob)) 
-        return false;
-    if (not Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob)) 
-        return false;
-    if (gsCode.Length() > 0)
-        Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
-
-    // Build per-shader input layout from m_dataLayout.
-    // Each ShaderDataAttributes entry is translated directly to a D3D12_INPUT_ELEMENT_DESC.
-    // If no layout is set, fall back to VS reflection (for shaders not yet migrated).
     if (m_dataLayout.m_count > 0) {
         for (int i = 0; i < m_dataLayout.m_count; ++i) {
             const ShaderDataAttributes& attr = m_dataLayout.m_attrs[i];
@@ -279,8 +267,6 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         }
     }
     else {
-        // Fallback: derive layout from VS reflection for shaders without an explicit layout.
-        // Uses a fixed set of known semantics covering the standard slot assignments.
         static const D3D12_INPUT_ELEMENT_DESC kFallbackLayout[] = {
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,     0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,        1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -298,7 +284,8 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
             for (UINT i = 0; i < sd.InputParameters; ++i) {
                 D3D12_SIGNATURE_PARAMETER_DESC pd{};
                 vsRefl->GetInputParameterDesc(i, &pd);
-                if (pd.SystemValueType != D3D_NAME_UNDEFINED) continue;
+                if (pd.SystemValueType != D3D_NAME_UNDEFINED)
+                    continue;
                 for (UINT j = 0; j < kFallbackCount; ++j) {
                     if ((_stricmp(kFallbackLayout[j].SemanticName, pd.SemanticName) == 0) and (kFallbackLayout[j].SemanticIndex == pd.SemanticIndex)) {
                         m_vsInputLayout.push_back(kFallbackLayout[j]);
@@ -310,6 +297,22 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         if (m_vsInputLayout.empty())
             m_vsInputLayout.assign(kFallbackLayout, kFallbackLayout + kFallbackCount);
     }
+}
+
+
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode)
+{
+    if (IsValid())
+        return true;
+
+    if (not Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob))
+        return false;
+    if (not Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob))
+        return false;
+    if (gsCode.Length() > 0)
+        Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
+
+    BuildInputLayout();
 
     UpdateB1Fields(m_psBlob.Get());
     UpdateB1Fields(m_vsBlob.Get());
@@ -453,7 +456,7 @@ bool Shader::Enable(void)
     if (not pso)
         return false;
 
-    list->OMSetStencilRef(cl->RenderStates().stencilRef);
+    list->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
 
     auto& srvHeap = descriptorHeaps.m_srvHeap;
     if (srvHeap.m_heap) {

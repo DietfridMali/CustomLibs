@@ -167,6 +167,9 @@ public:
     // PSO helpers (internal)
 
     bool CreateRootSignature(void) noexcept;
+    
+    void BuildInputLayout(void) noexcept;
+
     void UpdateB1Fields(ID3DBlob* blob) noexcept;
 
     // -----------------------------------------------------------------------------------------
