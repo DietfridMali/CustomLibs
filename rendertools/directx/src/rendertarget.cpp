@@ -5,7 +5,7 @@
 #include "base_shaderhandler.h"
 #include "commandlist.h"
 #include "dx12context.h"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 
 // =================================================================================================
 // DX12 RenderTarget implementation
@@ -395,7 +395,7 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
 {
     if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
-    gfxDriverStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
+    gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
     Clear(bufferIndex, drawBufferGroup, clear);
     return true;
 }
@@ -546,20 +546,20 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
     if (params.destination < 0) {
-        gfxDriverStates.SetBlending(1);
+        gfxStates.SetBlending(1);
     }
     else {
         if (not Enable(params.destination, RenderTarget::dbSingle, true, true))
             return false;
         m_lastDestination = params.destination;
-        gfxDriverStates.SetBlending(0);
+        gfxStates.SetBlending(0);
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
-    gfxDriverStates.SetDepthTest(0);
-    gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxDriverStates.SetFaceCulling(0);
+    gfxStates.SetDepthTest(0);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
     if (params.shader) {
         if (applyTransformation)
             params.shader->UpdateMatrices();

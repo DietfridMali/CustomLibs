@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <utility>
 
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include "drawbufferhandler.h"
 
 #ifdef OPENGL
@@ -87,7 +87,7 @@ void DrawBufferHandler::TrackDrawBuffers(RenderTarget* renderTarget) {
 
 void DrawBufferHandler::RestoreDrawBuffer(void) {
     m_drawBufferStack.Pop(m_drawBufferInfo);
-    gfxDriverStates.BindTexture2D(0, 0);
+    gfxStates.BindTexture2D(0, 0);
     if (m_drawBufferInfo.m_renderTarget != nullptr)
         m_drawBufferInfo.m_renderTarget->Reenable(false);
 #ifdef OPENGL

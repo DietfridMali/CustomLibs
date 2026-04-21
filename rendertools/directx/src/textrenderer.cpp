@@ -60,10 +60,10 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
 #if TEST_ATLAS
     baseRenderer.ResetTransformation();
     baseRenderer.SetViewport(::Viewport (0, 0, m_font->GetAtlas().GetWidth(), m_font->GetAtlas().GetHeight()));
-    gfxDriverStates.SetBlending(0);
-    gfxDriverStates.SetFaceCulling(0);
-    gfxDriverStates.SetDepthTest(0);
-    gfxDriverStates.SetDepthWrite(0);
+    gfxStates.SetBlending(0);
+    gfxStates.SetFaceCulling(0);
+    gfxStates.SetDepthTest(0);
+    gfxStates.SetDepthWrite(0);
     RenderTarget* renderTarget = m_font->GetRenderTarget();
     if (renderTarget) {
         renderTarget->Render({}, ColorData::Yellow);
@@ -104,8 +104,8 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateData(true);
-    gfxDriverStates.SetDepthTest(0);
-    gfxDriverStates.SetDepthWrite(0);
+    gfxStates.SetDepthTest(0);
+    gfxStates.SetDepthWrite(0);
     m_mesh.Render(m_font->GetTexture());
 }
 
@@ -162,7 +162,7 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
     baseRenderer.ResetTransformation();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
 #endif
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
     float letterScale = 2 * xOffset / float(textWidth);
     // reusing xOffset here
     if (alignment == taLeft)

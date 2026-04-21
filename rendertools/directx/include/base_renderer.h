@@ -14,7 +14,7 @@
 #include "viewport.h"
 #include "rendertarget.h"
 #include "drawbufferhandler.h"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -259,7 +259,7 @@ public:
 
     // Sets the clear color for the next frame; no immediate API call in DX12.
     inline void SetClearColor(const RGBAColor& color) noexcept {
-        gfxDriverStates.ClearColor(color);
+        gfxStates.ClearColor(color);
     }
 
     inline void SetClearColor(RGBAColor&& color) noexcept {
@@ -267,7 +267,7 @@ public:
     }
     
     inline void ResetClearColor(void) noexcept {
-        gfxDriverStates.ClearColor(RGBAColor{ 0.f, 0.f, 0.f, 0.f });
+        gfxStates.ClearColor(RGBAColor{ 0.f, 0.f, 0.f, 0.f });
     }
 
     inline BaseQuad& RenderQuad(void) noexcept { 

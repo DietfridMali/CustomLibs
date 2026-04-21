@@ -16,7 +16,7 @@
 #include "commandlist.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -393,12 +393,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 
 void Shader::Destroy(void) noexcept
 {
-    for (auto it = CommandList::GetPsoCache().begin(); it != CommandList::GetPsoCache().end(); ) {
-        if (it->first.shader == this)
-            it = CommandList::GetPsoCache().Erase(it);
-        else
-            ++it;
-    }
+    psoHandler.Remove(this);
     m_b1Fields.Clear();
     m_b1Staging.clear();
     m_vsInputLayout.clear();
@@ -480,14 +475,14 @@ void Shader::Enable(void)
     if (not cl)
         return;
 
-    ID3D12PipelineState* pso = cl->m_renderState.GetPSO(this);
+    ID3D12PipelineState* pso = renderStateHandler.GetPSO(this);
     if (not pso)
         return;
 
-    if (pso != cl->m_activePso) {
+    if (pso != cl->m_activePSO) {
         list->SetPipelineState(pso);
         list->SetGraphicsRootSignature(m_rootSignature.Get());
-        cl->m_activePso = pso;
+        cl->m_activePSO = pso;
     }
     list->OMSetStencilRef(cl->m_renderState.stencilRef);
 

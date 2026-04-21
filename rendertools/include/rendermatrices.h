@@ -4,7 +4,7 @@
 #include "matrix.hpp"
 #include "shader.h"
 #include "projector.h"
-#include "gfxdrivertypes.h"   // GfxTypes::Float — resolved to GL or DX12 definition via include path
+#include "gfxtypes.h"   // GfxTypes::Float — resolved to GL or DX12 definition via include path
 
 // =================================================================================================
 

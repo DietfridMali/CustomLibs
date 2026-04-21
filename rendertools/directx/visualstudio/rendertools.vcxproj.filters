@@ -149,12 +149,6 @@
     <ClInclude Include="..\include\dx12framework.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\gfxdriverstates.h">
-      <Filter>DirectX</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\gfxdrivertypes.h">
-      <Filter>DirectX</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\gfxstates.h">
       <Filter>DirectX</Filter>
     </ClInclude>
@@ -201,6 +195,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\resource_chunkhandler.h">
+      <Filter>DirectX</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\renderstates.h">
       <Filter>DirectX</Filter>
     </ClInclude>
   </ItemGroup>
@@ -349,6 +346,9 @@
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\resource_chunkhandler.cpp">
+      <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\renderstates.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
   </ItemGroup>

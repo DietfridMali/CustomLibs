@@ -4,7 +4,7 @@
 #include "basesingleton.hpp"
 #include "array.hpp"
 #include "string.hpp"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include <functional>
 
 #ifdef _DEBUG
@@ -71,13 +71,8 @@ public:
 
 class CommandList
 {
-    using PsoCache = Dictionary<PsoCacheKey, ComPtr<ID3D12PipelineState>>;
-    static PsoCache                     m_psoCache;
-
 public:
     static constexpr UINT FRAME_COUNT = 2;
-
-    static PsoCache& GetPsoCache(void) noexcept { return m_psoCache; }
 
     ComPtr<ID3D12GraphicsCommandList>   m_list;
     ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
@@ -87,7 +82,7 @@ public:
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
     String                              m_name{ "" };
     RenderState                         m_renderState{};
-    ID3D12PipelineState*                m_activePso{ nullptr };
+    ID3D12PipelineState*                m_activePSO{ nullptr };
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
 

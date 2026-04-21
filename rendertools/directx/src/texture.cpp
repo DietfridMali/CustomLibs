@@ -13,7 +13,7 @@
 #pragma warning(pop)
 
 #include "texture.h"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include "base_renderer.h"
 #include "descriptor_heap.h"
 #include "commandlist.h"
@@ -137,7 +137,7 @@ bool Texture::Bind(int tmuIndex)
     if (not IsAvailable()) 
         return false;
     m_tmuIndex = tmuIndex;
-    gfxDriverStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
+    gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
 
     // DX12: bind this texture to its slot in the root signature.
     // Root params 2..17 are individual 1-entry descriptor tables for t0..t15.
@@ -156,7 +156,7 @@ bool Texture::Bind(int tmuIndex)
 void Texture::Release(void)
 {
     if (m_tmuIndex >= 0) {
-        gfxDriverStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
+        gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
         m_tmuIndex = -1;
     }
 }

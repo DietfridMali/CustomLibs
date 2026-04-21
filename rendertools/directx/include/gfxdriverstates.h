@@ -200,97 +200,25 @@ public:
 };
 
 // =================================================================================================
-// RenderState: all PSO-relevant pipeline state encoded in a compact, hashable struct.
 
-class Shader;
-
-struct RenderState {
-    using CompareFunc = GfxOperations::CompareFunc;
-    using BlendFactor = GfxOperations::BlendFactor;
-    using BlendOp     = GfxOperations::BlendOp;
-    using FaceCull    = GfxOperations::FaceCull;
-    using Winding     = GfxOperations::Winding;
-    using StencilOp   = GfxOperations::StencilOp;
-
-    // Rasterizer
-    FaceCull    cullMode   { FaceCull::Back };
-    Winding     frontFace  { Winding::CW };
-    // Depth-stencil
-    uint8_t     depthTest  { 1 };
-    uint8_t     depthWrite { 1 };
-    CompareFunc depthFunc  { CompareFunc::LessEqual };
-    uint8_t     stencilTest{ 0 };
-    // Blend (RT0)
-    uint8_t     blendEnable    { 0 };
-    BlendFactor blendSrcRGB    { BlendFactor::SrcAlpha };
-    BlendFactor blendDstRGB    { BlendFactor::InvSrcAlpha };
-    BlendFactor blendSrcAlpha  { BlendFactor::SrcAlpha };
-    BlendFactor blendDstAlpha  { BlendFactor::InvSrcAlpha };
-    BlendOp     blendOpRGB     { BlendOp::Add };
-    BlendOp     blendOpAlpha   { BlendOp::Add };
-    // Color mask (bit0=R bit1=G bit2=B bit3=A)
-    uint8_t     colorMask  { 0x0F };
-    // Scissor
-    uint8_t     scissorTest{ 0 };
-    // Stencil comparison (applied to both faces)
-    CompareFunc stencilFunc      { CompareFunc::Always };
-    // Front-face stencil operations
-    StencilOp   stencilSFail     { StencilOp::Keep };
-    StencilOp   stencilDPFail    { StencilOp::Keep };
-    StencilOp   stencilDPPass    { StencilOp::Keep };
-    // Back-face stencil operations (for single-pass two-sided algorithms)
-    StencilOp   stencilBackSFail { StencilOp::Keep };
-    StencilOp   stencilBackDPFail{ StencilOp::Keep };
-    StencilOp   stencilBackDPPass{ StencilOp::Keep };
-    // Stencil reference value and mask
-    uint8_t     stencilRef       { 0 };
-    uint8_t     stencilMask      { 0xFF };
-
-    bool operator==(const RenderState& o) const noexcept {
-        return std::memcmp(this, &o, sizeof(*this)) == 0;
-    }
-    bool operator!=(const RenderState& o) const noexcept {
-        return not (*this == o);
-    }
-    bool operator<(const RenderState& o) const noexcept {
-        return std::memcmp(this, &o, sizeof(*this)) < 0;
-    }
-
-    ID3D12PipelineState* GetPSO(Shader* shader) noexcept;
-};
-
-// =================================================================================================
-// PSO cache key: {Shader*, RenderState} — used by CommandList's static PSO cache.
-
-struct PsoCacheKey {
-    Shader* shader;
-    RenderState state;
-    bool operator<(const PsoCacheKey& o) const noexcept {
-        if (shader != o.shader)
-            return shader < o.shader;
-        return state < o.state;
-    }
-};
-
-// =================================================================================================
-
-class GfxDriverStates : public BaseSingleton<GfxDriverStates>
+class GfxStates 
+    : public BaseSingleton<GfxStates>
 {
 private:
-    RenderState             m_state;
+    RenderStates            m_state;
     List<TextureSlotInfo>   m_slotInfos;
     int                     m_maxTextureSize{ 4096 };
 
-    RenderState& ActiveState(void) noexcept;
+    RenderStates& ActiveState(void) noexcept;
 
 public:
-    GfxDriverStates() = default;
+    GfxStates() = default;
 
     void Init(int maxTextureSize = 4096) noexcept {
         m_maxTextureSize = maxTextureSize;
     }
 
-    inline const RenderState& State(void) noexcept {
+    inline const RenderStates& State(void) noexcept {
         return ActiveState();
     }
 
@@ -430,8 +358,8 @@ public:
         auto& s = ActiveState();
         if ((src != s.blendSrcRGB) or (dst != s.blendDstRGB)
             or (src != s.blendSrcAlpha) or (dst != s.blendDstAlpha)) {
-            s.blendSrcRGB   = src;
-            s.blendDstRGB   = dst;
+            s.blendSrcRGB = src;
+            s.blendDstRGB = dst;
             s.blendSrcAlpha = src;
             s.blendDstAlpha = dst;
         }
@@ -442,8 +370,8 @@ public:
         auto& s = ActiveState();
         if ((srcRGB != s.blendSrcRGB) or (dstRGB != s.blendDstRGB)
             or (srcAlpha != s.blendSrcAlpha) or (dstAlpha != s.blendDstAlpha)) {
-            s.blendSrcRGB   = srcRGB;
-            s.blendDstRGB   = dstRGB;
+            s.blendSrcRGB = srcRGB;
+            s.blendDstRGB = dstRGB;
             s.blendSrcAlpha = srcAlpha;
             s.blendDstAlpha = dstAlpha;
         }
@@ -452,7 +380,10 @@ public:
     inline std::tuple<float, float, float, float> ClearColor(float r, float g, float b, float a) {
         static float cr = 0, cg = 0, cb = 0, ca = 0;
         auto prev = std::make_tuple(cr, cg, cb, ca);
-        cr = r; cg = g; cb = b; ca = a;
+        cr = r; 
+        cg = g; 
+        cb = b; 
+        ca = a;
         return prev;
     }
 
@@ -473,9 +404,13 @@ public:
     TextureSlotInfo* FindInfo(GLenum typeTag);
 
     int  BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex = -1);
+    
     int  BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex);
+    
     bool ReleaseTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex = -1);
+    
     int  GetBoundTexture(GLenum typeTag, int slotIndex);
+    
     int  SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex);
 
     template<GLenum typeTag>
@@ -501,6 +436,6 @@ public:
     }
 };
 
-#define gfxDriverStates GfxDriverStates::Instance()
+#define gfxStates GfxStates::Instance()
 
 // =================================================================================================

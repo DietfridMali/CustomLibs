@@ -20,7 +20,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	if (not (m_map = new RenderTarget()))
 		return false;
 	int size;
-	for (size = gfxDriverStates.MaxTextureSize(); size >= 1024; size /= 2) {
+	for (size = gfxStates.MaxTextureSize(); size >= 1024; size /= 2) {
 		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
 			m_status = 1;
 			return true;
@@ -48,9 +48,9 @@ bool ShadowMap::StartRender(void) noexcept {
 	m_map->Enable(0, RenderTarget::dbDepth);
 	// DX12: depth clear is handled by RenderTarget::Enable / OMSetRenderTargets + ClearDepthStencilView
 	EnableCamera();
-	gfxDriverStates.SetDepthTest(1);
-	gfxDriverStates.SetDepthWrite(1);
-	gfxDriverStates.CullFace(GfxOperations::FaceCull::Front);
+	gfxStates.SetDepthTest(1);
+	gfxStates.SetDepthWrite(1);
+	gfxStates.CullFace(GfxOperations::FaceCull::Front);
 #if APPLY_POLYGON_OFFSET
 	// DX12: polygon offset is configured via D3D12_RASTERIZER_DESC (DepthBias / SlopeScaledDepthBias)
 	// in the PSO — no per-draw API call needed here.
@@ -64,7 +64,7 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DisableCamera();
 	m_map->Disable();
-	gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
+	gfxStates.CullFace(GfxOperations::FaceCull::Back);
 #if APPLY_POLYGON_OFFSET
 	// DX12: polygon offset lives in PSO rasterizer state — no per-draw disable call needed.
 #endif

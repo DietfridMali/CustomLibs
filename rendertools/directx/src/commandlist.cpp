@@ -4,7 +4,7 @@
 
 #include <cstdio>
 
-CommandList::PsoCache CommandList::m_psoCache;
+CommandList::PSOCache CommandList::m_psoCache;
 
 // =================================================================================================
 // CommandQueue
@@ -150,7 +150,7 @@ bool CommandList::Open(UINT frameIndex) noexcept {
     }
     m_isRecording = true;
     m_renderState = RenderState{};
-    m_activePso = nullptr;
+    m_activePSO = nullptr;
     ++m_executionCounter;
     commandListHandler.PushList(m_list.Get());
     commandListHandler.PushCmdList(this);

@@ -134,6 +134,7 @@
     <ClInclude Include="..\..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
     <ClInclude Include="..\include\dx12upload.h" />
+    <ClInclude Include="..\include\renderstates.h" />
     <ClInclude Include="..\include\rendertarget.h" />
     <ClInclude Include="..\..\include\fonthandler.h" />
     <ClInclude Include="..\..\include\framecounter.h" />
@@ -146,8 +147,6 @@
     <ClInclude Include="..\..\include\mesh.h" />
     <ClInclude Include="..\..\include\movement.h" />
     <ClInclude Include="..\include\noisetexture.h" />
-    <ClInclude Include="..\include\gfxdriverstates.h" />
-    <ClInclude Include="..\include\gfxdrivertypes.h" />
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\noise.h" />
@@ -190,6 +189,7 @@
     <ClCompile Include="..\src\base_displayhandler.cpp" />
     <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\src\dx12upload.cpp" />
+    <ClCompile Include="..\src\renderstates.cpp" />
     <ClCompile Include="..\src\rendertarget.cpp" />
     <ClCompile Include="..\..\src\fonthandler.cpp" />
     <ClCompile Include="..\..\src\framecounter.cpp" />

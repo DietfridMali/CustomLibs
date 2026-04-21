@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "gfxdrivertypes.h"   // GfxTypes::Int — resolved to GL or DX12 definition via include path
-#include "gfxdriverstates.h"  // GfxDriverStates singleton — GetViewport/SetViewport
+#include "gfxtypes.h"   // GfxTypes::Int — resolved to GL or DX12 definition via include path
+#include "gfxstates.h"  // GfxDriverStates singleton — GetViewport/SetViewport
 #include "rectangle.h"
 #include "vector.hpp"
 #include "matrix.hpp"

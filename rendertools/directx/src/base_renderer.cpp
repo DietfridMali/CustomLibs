@@ -23,7 +23,7 @@ static Texture* testTexture = nullptr;
 // DX12 BaseRenderer
 //
 // GL-specific calls (glewInit, glClear, glViewport, glGetError …) are removed.
-// GfxDriverStates now tracks DX12 render state (see gfxdriverstates.h) instead of calling GL.
+// GfxStates now tracks DX12 render state (see gfxstates.h) instead of calling GL.
 // Viewport management: RSSetViewports is called where glViewport was.
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
@@ -35,7 +35,7 @@ bool BaseRenderer::InitDirectX(void) noexcept {
 
 
 void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
-    gfxDriverStates.ReleaseBuffers();
+    gfxStates.ReleaseBuffers();
     m_sceneWidth =
     m_windowWidth = width;
     m_sceneHeight =
@@ -77,19 +77,19 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
 
 
 void BaseRenderer::SetupGraphics(void) noexcept {
-    // Default DX12 render state — same values as the OGL version but stored in GfxDriverStates
+    // Default DX12 render state — same values as the OGL version but stored in GfxStates
     // (no immediate API calls here; state is applied to the PSO on demand).
-    gfxDriverStates.ClearColor(ColorData::Invisible);
-    gfxDriverStates.ColorMask(true, true, true, true);
-    gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxDriverStates.SetBlending(0);
-    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
-    gfxDriverStates.BlendEquation(GfxOperations::BlendOp::Add);
-    gfxDriverStates.FrontFace(GetWinding());
-    gfxDriverStates.SetFaceCulling(1);
-    gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
+    gfxStates.ClearColor(ColorData::Invisible);
+    gfxStates.ColorMask(true, true, true, true);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.SetDepthTest(1);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+    gfxStates.SetBlending(0);
+    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
+    gfxStates.FrontFace(GetWinding());
+    gfxStates.SetFaceCulling(1);
+    gfxStates.CullFace(GfxOperations::FaceCull::Back);
     // Set the initial viewport via the DX12 command list.
     auto* list = commandListHandler.CurrentList();
     if (list) {
@@ -108,44 +108,44 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 
 
 void BaseRenderer::SetDefaultStates(void) noexcept {
-    gfxDriverStates.SetDepthWrite(IsColorPass() ? 0 : 1);
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxDriverStates.SetBlending(0);
-    gfxDriverStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
-    gfxDriverStates.FrontFace(GetWinding());
-    gfxDriverStates.SetFaceCulling(1);
-    gfxDriverStates.CullFace(GfxOperations::FaceCull::Back);
+    gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
+    gfxStates.SetDepthTest(1);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+    gfxStates.SetBlending(0);
+    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.FrontFace(GetWinding());
+    gfxStates.SetFaceCulling(1);
+    gfxStates.CullFace(GfxOperations::FaceCull::Back);
 }
 
 
 void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Less);
-    gfxDriverStates.ColorMask(false, false, false, false);
-    gfxDriverStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Less);
+    gfxStates.ColorMask(false, false, false, false);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxDriverStates.ColorMask(true, true, true, true);
-    gfxDriverStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+    gfxStates.ColorMask(true, true, true, true);
+    gfxStates.SetBlending(0);
 }
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpFull;
-    gfxDriverStates.SetDepthTest(1);
-    gfxDriverStates.SetDepthWrite(1);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxDriverStates.ColorMask(true, true, true, true);
-    gfxDriverStates.SetBlending(0);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetDepthWrite(1);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+    gfxStates.ColorMask(true, true, true, true);
+    gfxStates.SetBlending(0);
 }
 
 
@@ -181,10 +181,10 @@ bool BaseRenderer::Start2DScene(void) {
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
-    gfxDriverStates.SetDepthWrite(0);
-    gfxDriverStates.SetDepthTest(0);
-    gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxDriverStates.SetFaceCulling(0);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.SetDepthTest(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
 
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) {
         // No screen RenderTarget: clear the swap chain back buffer directly.
@@ -215,8 +215,8 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
-        gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-        gfxDriverStates.SetFaceCulling(0);
+        gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+        gfxStates.SetFaceCulling(0);
         SetViewport(m_sceneViewport, 0, 0, false);
 
         Shader* shader;
@@ -255,10 +255,10 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            gfxDriverStates.SetDepthTest(0);
-            gfxDriverStates.SetDepthWrite(0);
-            gfxDriverStates.DepthFunc(GfxOperations::CompareFunc::Always);
-            gfxDriverStates.SetFaceCulling(0);
+            gfxStates.SetDepthTest(0);
+            gfxStates.SetDepthWrite(0);
+            gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+            gfxStates.SetFaceCulling(0);
 
             m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex());
             // Ensure the screen RenderTarget color buffer is in PSR state.

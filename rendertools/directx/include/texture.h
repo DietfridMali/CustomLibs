@@ -10,7 +10,7 @@
 #include "list.hpp"
 #include "conversions.hpp"
 #include "avltree.hpp"
-#include "gfxdriverstates.h"
+#include "gfxstates.h"
 #include "texturebuffer.h"
 
 #pragma warning(push)
@@ -26,7 +26,7 @@
 //   • ComPtr<ID3D12Resource> m_resource — default-heap texture resource.
 //   • uint32_t m_handle — SRV descriptor-heap index (UINT32_MAX = invalid).
 //     Named m_handle for source compatibility (RenderTarget::BufferHandle assignment, etc.).
-//   • Bind(slot)  → gfxDriverStates.BindTexture2D(m_handle, slot)
+//   • Bind(slot)  → gfxStates.BindTexture2D(m_handle, slot)
 //   • Deploy()    → uploads pixel data to GPU via a temporary upload resource.
 //
 // SharedTextureHandle / SharedGfxHandle are NOT used in DX12.
@@ -213,11 +213,11 @@ public:
         return m_type; 
     }
 
-    // Static release helpers — clear the slot in gfxDriverStates.
+    // Static release helpers — clear the slot in gfxStates.
     template<TextureType typeID>
     static inline void Release(int tmuIndex) noexcept {
         if (tmuIndex >= 0)
-            gfxDriverStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
+            gfxStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
     }
 
     inline bool& HasBuffer(void) noexcept { 

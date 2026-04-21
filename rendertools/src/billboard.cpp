@@ -32,8 +32,8 @@ void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float
 
 
 void  Billboard::Render(void) {
-	gfxDriverStates.SetFaceCulling(0);
-	gfxDriverStates.SetBlending(1);
+	gfxStates.SetFaceCulling(0);
+	gfxStates.SetBlending(1);
 	//SetTransformations({ .centerOrigin = true });
 	BaseQuad::Render(nullptr, m_icon);
 }

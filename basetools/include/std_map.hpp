@@ -17,7 +17,9 @@ public:
     ~StdMap() = default;
 
     using tComparator = int(*)(void* context, const KEY_T& k1, const KEY_T& k2);
+
     using iterator = typename std::map<KEY_T, DATA_T>::iterator;
+
     using const_iterator = typename std::map<KEY_T, DATA_T>::const_iterator;
 
     iterator begin() noexcept { return m_map.begin(); }

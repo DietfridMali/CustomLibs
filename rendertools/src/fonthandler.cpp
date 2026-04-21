@@ -77,10 +77,10 @@ int FontHandler::BuildAtlas(void) {
 #endif
     if (not m_atlas.Enable())
         return -1;
-    gfxDriverStates.SetBlending(0);
-    gfxDriverStates.SetFaceCulling(0);
-    gfxDriverStates.SetDepthTest(0);
-    gfxDriverStates.SetDepthWrite(0);
+    gfxStates.SetBlending(0);
+    gfxStates.SetFaceCulling(0);
+    gfxStates.SetDepthTest(0);
+    gfxStates.SetDepthWrite(0);
     baseRenderer.ResetTransformation();
     m_atlas.Initialize();
     baseRenderer.PushViewport();
