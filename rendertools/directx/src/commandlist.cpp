@@ -1,10 +1,9 @@
 #include "cbv_allocator.h"
+#include "dx12framework.h"
 #include "dx12context.h"
 #include "commandlist.h"
 
 #include <cstdio>
-
-CommandList::PSOCache CommandList::m_psoCache;
 
 // =================================================================================================
 // CommandQueue
@@ -149,7 +148,7 @@ bool CommandList::Open(UINT frameIndex) noexcept {
         return false;
     }
     m_isRecording = true;
-    m_renderState = RenderState{};
+    m_pso = PSO{};
     m_activePSO = nullptr;
     ++m_executionCounter;
     commandListHandler.PushList(m_list.Get());
@@ -228,6 +227,24 @@ void CommandList::DisposeResources(void) noexcept {
         fn();
     m_disposableResources.Clear();
 }
+
+
+void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept {
+    if (pso != m_activePSO) {
+        m_list->SetPipelineState(pso);
+        m_list->SetGraphicsRootSignature(shader->GetRootSignature().Get());
+        m_activePSO = pso;
+    }
+
+}
+
+ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
+    ID3D12PipelineState* pso = m_pso.GetPSO(shader);
+    if (pso)
+        SetActivePSO(pso, shader);
+    return pso;
+}
+
 
 
 #ifdef _DEBUG

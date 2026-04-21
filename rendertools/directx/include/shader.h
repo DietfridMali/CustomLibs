@@ -21,7 +21,7 @@
 //  - Compiled HLSL blobs (ID3DBlob via D3DCompile)
 //  - A fixed root signature: root CBV b0 (FrameConstants), root CBV b1 (ShaderConstants),
 //    SRV descriptor table t0..t15 (pixel shader)
-//  - PSO looked up via RenderState::GetPSO (global cache, created on demand in Enable())
+//  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
 //  - b1: per-shader constants, layout from HLSL reflection on link
 //  - Same public API as OGL Shader (SetFloat, SetInt, SetVector2f, SetMatrix4f, UpdateMatrices …)
@@ -127,6 +127,10 @@ public:
         return m_name; 
     }
 
+    inline ComPtr<ID3D12RootSignature> GetRootSignature(void) noexcept {
+        return m_rootSignature;
+    }
+
     // -----------------------------------------------------------------------------------------
     // Creation / destruction
 
@@ -146,9 +150,9 @@ public:
     // Runtime
 
     // Activate this shader: select / create PSO, bind root sig, upload CBs, bind descriptor table.
-    void Enable(void);
+    bool Enable(void);
 
-    // No-op in DX12 (PSO changes are driven by RenderState changes in the next Enable call).
+    // No-op in DX12 (PSO changes are driven by RenderStates changes in the next Enable call).
     inline void Disable(void) noexcept {}
 
     // Allocate a b1 slot from cbvAllocator, write m_b1Staging, bind root param 1.
@@ -163,6 +167,7 @@ public:
     // PSO helpers (internal)
 
     bool CreateRootSignature(void) noexcept;
+    void UpdateB1Fields(ID3DBlob* blob) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as OGL, return int (was GLint)

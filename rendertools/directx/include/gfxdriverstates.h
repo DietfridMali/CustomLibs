@@ -191,9 +191,13 @@ public:
     explicit TextureSlotInfo(GLenum typeTag = GL_TEXTURE_2D);
 
     int  Find(uint32_t srvIndex) const noexcept;
+
     int  Bind(uint32_t srvIndex, int slotIndex = -1) noexcept;
+
     bool Release(uint32_t srvIndex, int slotIndex = -1) noexcept;
+
     uint32_t Query(int slotIndex) const noexcept;
+
     bool Update(uint32_t srvIndex, int slotIndex) noexcept;
 
     inline GLenum GetTypeTag(void) const noexcept { return m_typeTag; }

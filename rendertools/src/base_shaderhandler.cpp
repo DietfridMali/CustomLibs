@@ -86,7 +86,8 @@ Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
         }
         m_activeShader = shader;
         m_activeShaderId = shaderId;
-        shader->Enable();
+        if (not shader->Enable())
+            return nullptr;
     }
     return shader->UpdateMatrices() ? shader : nullptr;
 }

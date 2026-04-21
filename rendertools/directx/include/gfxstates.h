@@ -206,11 +206,11 @@ class GfxStates
     : public BaseSingleton<GfxStates>
 {
 private:
-    RenderState            m_state;
+    RenderStates            m_renderStates;
     List<TextureSlotInfo>   m_slotInfos;
     int                     m_maxTextureSize{ 4096 };
 
-    RenderState& ActiveState(void) noexcept;
+    RenderStates& ActiveState(void) noexcept;
 
 public:
     GfxStates() = default;
@@ -219,7 +219,7 @@ public:
         m_maxTextureSize = maxTextureSize;
     }
 
-    inline const RenderState& State(void) noexcept {
+    inline const RenderStates& State(void) noexcept {
         return ActiveState();
     }
 

@@ -158,11 +158,11 @@ public:
     }
 
     inline void GetGpuViewport(void) noexcept {
-        gfxDriverStates.GetViewport(m_glViewport);
+        gfxStates.GetViewport(m_glViewport);
     }
 
     inline void SetGpuViewport(void) noexcept {
-        gfxDriverStates.SetViewport(m_glViewport);
+        gfxStates.SetViewport(m_glViewport);
     }
 
 };

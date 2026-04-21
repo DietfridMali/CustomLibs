@@ -5,6 +5,8 @@
 #include "array.hpp"
 #include "string.hpp"
 #include "gfxstates.h"
+#include "shader.h"
+#include "dx12framework.h"
 #include <functional>
 
 #ifdef _DEBUG
@@ -81,7 +83,7 @@ public:
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
     String                              m_name{ "" };
-    RenderState                         m_renderState{};
+    PSO                                 m_pso{};
     ID3D12PipelineState*                m_activePSO{ nullptr };
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
@@ -125,6 +127,14 @@ public:
 	inline bool IsRecording(void) const noexcept {
 		return m_isRecording;
 	}
+
+    inline ::RenderStates& RenderStates(void) noexcept {
+        return m_pso.GetStates();
+    }
+
+    void SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept;
+
+    ID3D12PipelineState* GetPSO(Shader* shader) noexcept;
 
 #ifdef _DEBUG
     void CheckDeviceRemoved(const char* context) noexcept;

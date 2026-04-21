@@ -76,9 +76,9 @@ bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
 // =================================================================================================
 // GfxStates
 
-RenderState& GfxStates::ActiveState(void) noexcept {
+RenderStates& GfxStates::ActiveState(void) noexcept {
     CommandList* cl = commandListHandler.GetCurrentCmdListObj();
-    return cl ? cl->m_renderState : m_state;
+    return cl ? cl->RenderStates() : m_renderStates;
 }
 
 
@@ -95,8 +95,7 @@ int GfxStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (not info)
         return -1;
-    return (slotIndex >= 0) ? (info->Query(slotIndex) == srvIndex ? slotIndex : -1)
-                             : info->Find(srvIndex);
+    return (slotIndex >= 0) ? (info->Query(slotIndex) == srvIndex ? slotIndex : -1) : info->Find(srvIndex);
 }
 
 
@@ -136,71 +135,6 @@ int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
 void GfxStates::ReleaseBuffers(void) noexcept {
     for (auto& info : m_slotInfos)
         info = TextureSlotInfo(info.GetTypeTag());
-}
-
-// =================================================================================================
-// RenderState::GetPSO — PSO creation helpers
-
-static D3D12_BLEND ToD3DBlend(GfxOperations::BlendFactor factor) noexcept
-{
-    static D3D12_BLEND lut[] = { 
-        D3D12_BLEND_ZERO, 
-        D3D12_BLEND_ONE, 
-        D3D12_BLEND_SRC_COLOR, 
-        D3D12_BLEND_INV_SRC_COLOR, 
-        D3D12_BLEND_SRC_ALPHA, 
-        D3D12_BLEND_INV_SRC_ALPHA, 
-        D3D12_BLEND_DEST_ALPHA, 
-        D3D12_BLEND_INV_DEST_ALPHA, 
-        D3D12_BLEND_DEST_COLOR, 
-        D3D12_BLEND_INV_DEST_COLOR, 
-        D3D12_BLEND_ONE 
-    };
-    return lut[int(factor)];
-}
-
-
-static D3D12_BLEND_OP ToD3DBlendOp(GfxOperations::BlendOp op) noexcept
-{
-    static D3D12_BLEND_OP lut[] = { 
-        D3D12_BLEND_OP_ADD, 
-        D3D12_BLEND_OP_SUBTRACT, 
-        D3D12_BLEND_OP_REV_SUBTRACT, 
-        D3D12_BLEND_OP_MIN, 
-        D3D12_BLEND_OP_MAX
-    };
-    return lut[int(op)];
-}
-
-
-static D3D12_STENCIL_OP ToD3DStencilOp(GfxOperations::StencilOp op) noexcept
-{
-    static D3D12_STENCIL_OP lut[] = { 
-        D3D12_STENCIL_OP_KEEP,
-        D3D12_STENCIL_OP_ZERO,
-        D3D12_STENCIL_OP_REPLACE, 
-        D3D12_STENCIL_OP_INCR_SAT, 
-        D3D12_STENCIL_OP_DECR_SAT, 
-        D3D12_STENCIL_OP_INCR, 
-        D3D12_STENCIL_OP_DECR 
-    };
-    return lut[int(op)];
-}
-
-
-static D3D12_COMPARISON_FUNC ToD3DCompFunc(GfxOperations::CompareFunc func) noexcept
-{
-    static D3D12_COMPARISON_FUNC lut[] = { 
-        D3D12_COMPARISON_FUNC_NEVER, 
-        D3D12_COMPARISON_FUNC_LESS, 
-        D3D12_COMPARISON_FUNC_EQUAL, 
-        D3D12_COMPARISON_FUNC_LESS_EQUAL, 
-        D3D12_COMPARISON_FUNC_GREATER, 
-        D3D12_COMPARISON_FUNC_NOT_EQUAL, 
-        D3D12_COMPARISON_FUNC_GREATER_EQUAL, 
-        D3D12_COMPARISON_FUNC_ALWAYS
-    };
-    return lut[int(func)];
 }
 
 // =================================================================================================

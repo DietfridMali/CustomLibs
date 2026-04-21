@@ -8,11 +8,11 @@
 #include "rendertypes.h"
 
 // =================================================================================================
-// RenderState: all PSO-relevant pipeline state encoded in a compact, hashable struct.
+// RenderStates: all PSO-relevant pipeline state encoded in a compact, hashable struct.
 
 class Shader;
 
-struct RenderState {
+struct RenderStates {
     using CompareFunc = GfxOperations::CompareFunc;
     using BlendFactor = GfxOperations::BlendFactor;
     using BlendOp = GfxOperations::BlendOp;
@@ -54,46 +54,57 @@ struct RenderState {
     uint8_t     stencilRef{ 0 };
     uint8_t     stencilMask{ 0xFF };
 
-    bool operator==(const RenderState& o) const noexcept {
+    bool operator==(const RenderStates& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;
     }
 
-    bool operator!=(const RenderState& o) const noexcept {
+    bool operator!=(const RenderStates& o) const noexcept {
         return not (*this == o);
     }
 
-    bool operator<(const RenderState& o) const noexcept {
+    bool operator<(const RenderStates& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) < 0;
     }
+
+    D3D12_RASTERIZER_DESC& SetRasterizerDesc(D3D12_RASTERIZER_DESC& desc) noexcept;
+
+    D3D12_BLEND_DESC SetBlendDesc(D3D12_BLEND_DESC& desc);
+
+    D3D12_DEPTH_STENCIL_DESC SetStencilDesc(D3D12_DEPTH_STENCIL_DESC& desc);
 };
 
 // =================================================================================================
-// PSO cache key: {Shader*, RenderState} — used by CommandList's static PSO cache.
+// PSO cache key: {Shader*, RenderStates} — used by CommandList's static PSO cache.
 
 struct PSOKey {
     Shader* shader;
-    RenderState state;
+    RenderStates states;
     bool operator<(const PSOKey& o) const noexcept {
         if (shader != o.shader)
             return shader < o.shader;
-        return state < o.state;
+        return states < o.states;
     }
 };
 
 // =================================================================================================
 
-class PSOHandler
-    : public BaseSingleton<PSOHandler>
+class PSO
 {
     using PSOCache = Dictionary<PSOKey, ComPtr<ID3D12PipelineState>>;
 
 private:
     static PSOCache  m_psoCache;
 
+    RenderStates m_states;
+
 public:
     ID3D12PipelineState* GetPSO(Shader* shader) noexcept;
 
-    static void RemovePSO(Shader* shader) noexcept;
+    static void RemovePSOs(Shader* shader) noexcept;
+
+    RenderStates& GetStates(void) noexcept {
+        return m_states;
+    }
 
 private:
     ComPtr<ID3D12PipelineState> CreatePSO(Shader* shader) noexcept;

@@ -29,7 +29,7 @@
 //   Param 2: Desc table — t0..t15 SRVs         (pixel)
 //   Static samplers: s0 = linear clamp, s1 = linear repeat (pixel)
 //
-// PSO cache: keyed by RenderState bitmask; created on first Enable() for that state.
+// PSO cache: keyed by RenderStates bitmask; created on first Enable() for that state.
 
 // -------------------------------------------------------------------------------------------------
 // Helpers to translate ShaderDataAttributes to D3D12_INPUT_ELEMENT_DESC.
@@ -37,17 +37,25 @@
 // Maps C++ buffer type + id to the DX12 input slot used by GfxDataLayout::FixedSlotForBuffer.
 static int SlotForAttr(const char* datatype, int id) noexcept
 {
-    if (strcmp(datatype, "Vertex") == 0)   return 0;
+    if (strcmp(datatype, "Vertex") == 0)   
+        return 0;
     if (strcmp(datatype, "TexCoord") == 0) {
-        if (id == 0) return 1;
-        if (id == 1) return 2;
-        if (id == 2) return 6;
+        if (id == 0) 
+            return 1;
+        if (id == 1) 
+            return 2;
+        if (id == 2) 
+            return 6;
         return -1;
     }
-    if (strcmp(datatype, "Color") == 0)   return 3;
-    if (strcmp(datatype, "Normal") == 0)  return 4;
-    if (strcmp(datatype, "Tangent") == 0) return 5;
-    if (strcmp(datatype, "Offset") == 0)  return 5 + id;   // 0→5, 1→6, 2→7, 3→8
+    if (strcmp(datatype, "Color") == 0)   
+        return 3;
+    if (strcmp(datatype, "Normal") == 0)  
+        return 4;
+    if (strcmp(datatype, "Tangent") == 0) 
+        return 5;
+    if (strcmp(datatype, "Offset") == 0)  
+        return 5 + id;   // 0→5, 1→6, 2→7, 3→8
     return -1;
 }
 
@@ -55,12 +63,30 @@ static int SlotForAttr(const char* datatype, int id) noexcept
 // Offset/N uses TEXCOORD(N+3) to avoid collisions with TexCoord/0..2.
 static const char* SemanticForAttr(const char* datatype, int id, UINT& semanticIndex) noexcept
 {
-    if (strcmp(datatype, "Vertex") == 0)   { semanticIndex = 0;        return "POSITION"; }
-    if (strcmp(datatype, "TexCoord") == 0) { semanticIndex = UINT(id); return "TEXCOORD"; }
-    if (strcmp(datatype, "Color") == 0)    { semanticIndex = UINT(id); return "COLOR"; }
-    if (strcmp(datatype, "Normal") == 0)   { semanticIndex = UINT(id); return "NORMAL"; }
-    if (strcmp(datatype, "Tangent") == 0)  { semanticIndex = UINT(id); return "TANGENT"; }
-    if (strcmp(datatype, "Offset") == 0)   { semanticIndex = UINT(id + 3); return "TEXCOORD"; }
+    if (strcmp(datatype, "Vertex") == 0)   { 
+        semanticIndex = 0;        
+        return "POSITION"; 
+    }
+    if (strcmp(datatype, "TexCoord") == 0) { 
+        semanticIndex = UINT(id); 
+        return "TEXCOORD"; 
+    }
+    if (strcmp(datatype, "Color") == 0)    { 
+        semanticIndex = UINT(id); 
+        return "COLOR"; 
+    }
+    if (strcmp(datatype, "Normal") == 0)   { 
+        semanticIndex = UINT(id); 
+        return "NORMAL"; 
+    }
+    if (strcmp(datatype, "Tangent") == 0)  { 
+        semanticIndex = UINT(id); 
+        return "TANGENT"; 
+    }
+    if (strcmp(datatype, "Offset") == 0)   { 
+        semanticIndex = UINT(id + 3); 
+        return "TEXCOORD"; 
+    }
     semanticIndex = 0;
     return "TEXCOORD";
 }
@@ -68,10 +94,14 @@ static const char* SemanticForAttr(const char* datatype, int id, UINT& semanticI
 static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
 {
     switch (fmt) {
-    case ShaderDataAttributes::Float1: return DXGI_FORMAT_R32_FLOAT;
-    case ShaderDataAttributes::Float2: return DXGI_FORMAT_R32G32_FLOAT;
-    case ShaderDataAttributes::Float3: return DXGI_FORMAT_R32G32B32_FLOAT;
-    case ShaderDataAttributes::Float4: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+    case ShaderDataAttributes::Float1: 
+        return DXGI_FORMAT_R32_FLOAT;
+    case ShaderDataAttributes::Float2: 
+        return DXGI_FORMAT_R32G32_FLOAT;
+    case ShaderDataAttributes::Float3: 
+        return DXGI_FORMAT_R32G32B32_FLOAT;
+    case ShaderDataAttributes::Float4: 
+        return DXGI_FORMAT_R32G32B32A32_FLOAT;
     }
     return DXGI_FORMAT_R32G32B32_FLOAT;
 }
@@ -92,10 +122,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 #endif
 
     ComPtr<ID3DBlob> errBlob;
-    HRESULT hr = D3DCompile(hlslCode, strlen(hlslCode), (const char*)m_name,
-                            nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-                            entryPoint, target, flags, 0,
-                            &blobOut, &errBlob);
+    HRESULT hr = D3DCompile(hlslCode, strlen(hlslCode), (const char*)m_name, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, flags, 0, &blobOut, &errBlob);
     if (FAILED(hr)) {
 #ifdef _DEBUG
         if (errBlob)
@@ -122,7 +149,7 @@ void Shader::PrintShaderSource(const char* hlslCode, const char* title) noexcept
     int lineNo = 0;
     for (auto&& chunk : src | std::views::split('\n')) {
         std::string_view line(chunk.begin(), chunk.end());
-        if (not line.empty() && line.back() == '\r')
+        if (not line.empty() and line.back() == '\r')
             line.remove_suffix(1);
         fprintf(stderr, "%*d: %.*s\n", width, ++lineNo,
                 static_cast<int>(line.size()), line.data());
@@ -222,8 +249,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 {
     Destroy();
 
-    if (not Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob)) return false;
-    if (not Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob)) return false;
+    if (not Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob)) 
+        return false;
+    if (not Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob)) 
+        return false;
     if (gsCode.Length() > 0)
         Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
 
@@ -253,7 +282,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         // Fallback: derive layout from VS reflection for shaders without an explicit layout.
         // Uses a fixed set of known semantics covering the standard slot assignments.
         static const D3D12_INPUT_ELEMENT_DESC kFallbackLayout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,     0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,        1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,        2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT,  3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -263,8 +292,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         };
         static constexpr UINT kFallbackCount = UINT(std::size(kFallbackLayout));
         ComPtr<ID3D12ShaderReflection> vsRefl;
-        if (SUCCEEDED(D3DReflect(m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize(),
-                                 IID_PPV_ARGS(&vsRefl)))) {
+        if (SUCCEEDED(D3DReflect(m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize(), IID_PPV_ARGS(&vsRefl)))) {
             D3D12_SHADER_DESC sd{};
             vsRefl->GetDesc(&sd);
             for (UINT i = 0; i < sd.InputParameters; ++i) {
@@ -272,8 +300,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
                 vsRefl->GetInputParameterDesc(i, &pd);
                 if (pd.SystemValueType != D3D_NAME_UNDEFINED) continue;
                 for (UINT j = 0; j < kFallbackCount; ++j) {
-                    if (_stricmp(kFallbackLayout[j].SemanticName, pd.SemanticName) == 0 &&
-                        kFallbackLayout[j].SemanticIndex == pd.SemanticIndex) {
+                    if ((_stricmp(kFallbackLayout[j].SemanticName, pd.SemanticName) == 0) and (kFallbackLayout[j].SemanticIndex == pd.SemanticIndex)) {
                         m_vsInputLayout.push_back(kFallbackLayout[j]);
                         break;
                     }
@@ -284,101 +311,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
             m_vsInputLayout.assign(kFallbackLayout, kFallbackLayout + kFallbackCount);
     }
 
-    // Reflect b1 fields from PS blob (look for cbuffer named "ShaderConstants")
-    {
-        ComPtr<ID3D12ShaderReflection> refl;
-        if (SUCCEEDED(D3DReflect(m_psBlob->GetBufferPointer(), m_psBlob->GetBufferSize(),
-                                 IID_PPV_ARGS(&refl)))) {
-            D3D12_SHADER_DESC sd{};
-            refl->GetDesc(&sd);
-            for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
-                ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
-                D3D12_SHADER_BUFFER_DESC cbd{};
-                cb->GetDesc(&cbd);
-                if (strcmp(cbd.Name, "ShaderConstants") == 0) {
-                    m_b1Size = cbd.Size;
-                    for (UINT j = 0; j < cbd.Variables; ++j) {
-                        ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
-                        D3D12_SHADER_VARIABLE_DESC vd{};
-                        var->GetDesc(&vd);
-                        if (vd.uFlags & D3D_SVF_USED) {
-                            auto* entry = m_b1Fields.Append();
-                            if (entry)
-                                *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
-    // Also check VS for additional b1 variables not in PS
-    {
-        ComPtr<ID3D12ShaderReflection> refl;
-        if (SUCCEEDED(D3DReflect(m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize(),
-                                 IID_PPV_ARGS(&refl)))) {
-            D3D12_SHADER_DESC sd{};
-            refl->GetDesc(&sd);
-            for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
-                ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
-                D3D12_SHADER_BUFFER_DESC cbd{};
-                cb->GetDesc(&cbd);
-                if (strcmp(cbd.Name, "ShaderConstants") == 0) {
-                    if (cbd.Size > m_b1Size) m_b1Size = cbd.Size;
-                    for (UINT j = 0; j < cbd.Variables; ++j) {
-                        ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
-                        D3D12_SHADER_VARIABLE_DESC vd{};
-                        var->GetDesc(&vd);
-                        if (not (vd.uFlags & D3D_SVF_USED)) continue;
-                        // only add if not already present
-                        bool found = false;
-                        for (auto& kv : m_b1Fields)
-                            if (kv.first == String(vd.Name)) { found = true; break; }
-                        if (not found) {
-                            auto* entry = m_b1Fields.Append();
-                            if (entry)
-                                *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
-    // Also check GS for additional b1 variables
-    if (m_gsBlob) {
-        ComPtr<ID3D12ShaderReflection> refl;
-        if (SUCCEEDED(D3DReflect(m_gsBlob->GetBufferPointer(), m_gsBlob->GetBufferSize(),
-                                 IID_PPV_ARGS(&refl)))) {
-            D3D12_SHADER_DESC sd{};
-            refl->GetDesc(&sd);
-            for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
-                ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
-                D3D12_SHADER_BUFFER_DESC cbd{};
-                cb->GetDesc(&cbd);
-                if (strcmp(cbd.Name, "ShaderConstants") == 0) {
-                    if (cbd.Size > m_b1Size) m_b1Size = cbd.Size;
-                    for (UINT j = 0; j < cbd.Variables; ++j) {
-                        ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
-                        D3D12_SHADER_VARIABLE_DESC vd{};
-                        var->GetDesc(&vd);
-                        if (not (vd.uFlags & D3D_SVF_USED)) continue;
-                        bool found = false;
-                        for (auto& kv : m_b1Fields)
-                            if (kv.first == String(vd.Name)) { found = true; break; }
-                        if (not found) {
-                            auto* entry = m_b1Fields.Append();
-                            if (entry)
-                                *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-    }
+    UpdateB1Fields(m_psBlob.Get());
+    UpdateB1Fields(m_vsBlob.Get());
+    if (m_gsBlob)
+        UpdateB1Fields(m_gsBlob.Get());
 
     if (not CreateRootSignature())
         return false;
@@ -391,9 +327,49 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 }
 
 
+void Shader::UpdateB1Fields(ID3DBlob* blob) noexcept
+{
+    if (not blob)
+        return;
+    ComPtr<ID3D12ShaderReflection> refl;
+    if (FAILED(D3DReflect(blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&refl))))
+        return;
+    D3D12_SHADER_DESC sd{};
+    refl->GetDesc(&sd);
+    for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
+        ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
+        D3D12_SHADER_BUFFER_DESC cbd{};
+        cb->GetDesc(&cbd);
+        if (strcmp(cbd.Name, "ShaderConstants") == 0) {
+            if (cbd.Size > m_b1Size)
+                m_b1Size = cbd.Size;
+            for (UINT j = 0; j < cbd.Variables; ++j) {
+                ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
+                D3D12_SHADER_VARIABLE_DESC vd{};
+                var->GetDesc(&vd);
+                if (not (vd.uFlags & D3D_SVF_USED))
+                    continue;
+                bool found = false;
+                for (auto& kv : m_b1Fields)
+                    if (kv.first == String(vd.Name)) {
+                        found = true;
+                        break;
+                    }
+                if (not found) {
+                    auto* entry = m_b1Fields.Append();
+                    if (entry)
+                        *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
+                }
+            }
+            break;
+        }
+    }
+}
+
+
 void Shader::Destroy(void) noexcept
 {
-    psoHandler.Remove(this);
+    PSO::RemovePSOs(this);
     m_b1Fields.Clear();
     m_b1Staging.clear();
     m_vsInputLayout.clear();
@@ -440,8 +416,6 @@ Shader& Shader::Move(Shader& other) noexcept
 
 // =================================================================================================
 
-
-
 bool Shader::UploadB1(void) noexcept
 {
     auto* list = commandListHandler.CurrentList();
@@ -462,35 +436,31 @@ bool Shader::UploadB1(void) noexcept
 }
 
 
-void Shader::Enable(void)
+bool Shader::Enable(void)
 {
     if (not IsValid())
-        return;
+        return false;
 
     auto* list = commandListHandler.CurrentList();
     if (not list)
-        return;
+        return false;
 
     CommandList* cl = commandListHandler.GetCurrentCmdListObj();
     if (not cl)
-        return;
+        return false;
 
-    ID3D12PipelineState* pso = renderStateHandler.GetPSO(this);
+    ID3D12PipelineState* pso = cl->GetPSO(this);
     if (not pso)
-        return;
+        return false;
 
-    if (pso != cl->m_activePSO) {
-        list->SetPipelineState(pso);
-        list->SetGraphicsRootSignature(m_rootSignature.Get());
-        cl->m_activePSO = pso;
-    }
-    list->OMSetStencilRef(cl->m_renderState.stencilRef);
+    list->OMSetStencilRef(cl->RenderStates().stencilRef);
 
     auto& srvHeap = descriptorHeaps.m_srvHeap;
     if (srvHeap.m_heap) {
         ID3D12DescriptorHeap* heaps[] = { srvHeap.m_heap.Get() };
         list->SetDescriptorHeaps(1, heaps);
     }
+    return true;
 }
 
 
