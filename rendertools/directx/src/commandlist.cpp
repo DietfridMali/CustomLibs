@@ -160,12 +160,16 @@ bool CommandList::Open(UINT frameIndex) noexcept {
         return false;
     }
     m_isRecording = true;
+    m_isFlushed = false;
     m_activePSO = nullptr;
     ++m_executionCounter;
     commandListHandler.PushList(m_list.Get());
     commandListHandler.PushCmdList(this);
     commandListHandler.Register(this);
     PushRenderStates();
+#ifdef _DEBUG
+    dx12Context.DrainMessages();
+#endif
     return true;
 }
 
@@ -177,6 +181,9 @@ void CommandList::Close(void) noexcept {
     HRESULT hr = m_list->Close();
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
+#ifdef _DEBUG
+    dx12Context.DrainMessages();
+#endif
     commandListHandler.PopList();
     commandListHandler.PopCmdList();
     PopRenderStates();
@@ -184,20 +191,14 @@ void CommandList::Close(void) noexcept {
 
 
 void CommandList::Flush(void) noexcept {
-    if (not m_isRecording)
+    if (m_isFlushed)
         return;
-    m_isRecording = false;
-    HRESULT hr = m_list->Close();
-    if (FAILED(hr)) {
-        fprintf(stderr, "CommandList::Flush: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
-        commandListHandler.PopList();
-        return;
-    }
-    commandListHandler.PopList();
-    commandListHandler.PopCmdList();
-    PopRenderStates();
+    m_isFlushed = true;
+    Close();
+
     ID3D12CommandList* lists[] = { m_list.Get() };
     commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
+
 #ifdef _DEBUG
     CheckDeviceRemoved("Flush");
 #endif
@@ -205,7 +206,7 @@ void CommandList::Flush(void) noexcept {
     DisposeResources();
     // Reset allocator + list so the debug layer releases resource refs; leave closed.
     UINT fi = commandListHandler.CmdQueue().FrameIndex();
-    hr = m_allocators[fi]->Reset();
+    HRESULT hr = m_allocators[fi]->Reset();
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Flush: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
     hr = m_list->Reset(m_allocators[fi].Get(), nullptr);
@@ -226,6 +227,9 @@ void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES bef
     b.Transition.StateAfter = after;
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     m_list->ResourceBarrier(1, &b);
+#ifdef _DEBUG
+    dx12Context.DrainMessages();
+#endif
 }
 
 
@@ -233,6 +237,9 @@ void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
     if (not m_isRecording or not barriers or (count <= 0))
         return;
     m_list->ResourceBarrier(UINT(count), barriers);
+#ifdef _DEBUG
+    dx12Context.DrainMessages();
+#endif
 }
 
 
@@ -248,6 +255,9 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
         m_list->SetPipelineState(pso);
         m_list->SetGraphicsRootSignature(shader->GetRootSignature().Get());
         m_activePSO = pso;
+#ifdef _DEBUG
+        dx12Context.DrainMessages();
+#endif
     }
 }
 

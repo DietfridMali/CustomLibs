@@ -1,4 +1,5 @@
 #include "dx12context.h"
+#include "commandlist.h"
 
 #include <cstdio>
 #include <memory>
@@ -121,10 +122,14 @@ void DX12Context::DrainMessages(void) noexcept {
         D3D12_MESSAGE* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.get());
         m_infoQueue->GetMessageW(i, msg, &len);
         const char* sev = "INFO";
-        if (msg->Severity == D3D12_MESSAGE_SEVERITY_CORRUPTION) sev = "CORRUPTION";
-        else if (msg->Severity == D3D12_MESSAGE_SEVERITY_ERROR)   sev = "ERROR";
-        else if (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING) sev = "WARNING";
-        fprintf(stderr, "D3D12 %s (id=%u): %s\n", sev, (unsigned)msg->ID, msg->pDescription);
+        if (msg->Severity == D3D12_MESSAGE_SEVERITY_CORRUPTION) 
+            sev = "CORRUPTION";
+        else if (msg->Severity == D3D12_MESSAGE_SEVERITY_ERROR)   
+            sev = "ERROR";
+        else if (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING) 
+            sev = "WARNING";
+        CommandList* cl = commandListHandler.GetCurrentCmdListObj();
+        fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
     }
     m_infoQueue->ClearStoredMessages();
     fflush(stderr);

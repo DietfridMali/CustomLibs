@@ -164,6 +164,11 @@ public:
 
     void Disable(bool flush = false, bool restoreDrawBuffer = true);
 
+    inline void Flush(void) noexcept {
+        if (m_cmdList)
+            m_cmdList->Flush();
+    }
+
     inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
 
     void SetViewport(bool flipVertically = false) noexcept;

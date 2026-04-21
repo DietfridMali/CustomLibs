@@ -37,9 +37,9 @@ public:
     };
 
 protected:
-    RenderTarget*                    m_screenBuffer;
-    RenderTarget*                    m_sceneBuffer;
-    RenderTarget*                    m_skyBuffer;
+    RenderTarget*           m_screenBuffer;
+    RenderTarget*           m_sceneBuffer;
+    RenderTarget*           m_skyBuffer;
     Texture                 m_renderTexture;
     bool                    m_screenIsAvailable;
 
@@ -64,7 +64,9 @@ protected:
 
     MovingFrameCounter      m_frameCounter;
 
-    static List<::Viewport> viewportStack;
+    static List<::Viewport> m_viewportStack;
+    List<RenderTarget*>     m_sceneBufferStack;
+
 
 public:
     GLVersion               m_glVersion;
@@ -105,20 +107,24 @@ public:
 
     bool CreateScreenBuffer(void);
 
-    virtual RenderTarget* GetSceneBuffer(void) noexcept {
-#ifdef _DEBUG
-        return m_xchgSkyAndSceneBuffer ? m_skyBuffer : m_sceneBuffer;
-#else
-        return m_sceneBuffer;
-#endif
+    virtual void SetSceneBuffer(RenderTarget* sceneBuffer) noexcept {
+        if (sceneBuffer == nullptr) {
+            if (not m_sceneBufferStack.IsEmpty())
+                m_sceneBuffer = m_sceneBufferStack.Pop();
+        }
+        else {
+            m_sceneBufferStack.Push(m_sceneBuffer);
+            m_sceneBuffer = sceneBuffer;
+        }
     }
 
+    virtual RenderTarget* GetSceneBuffer(void) noexcept {
+        return m_sceneBuffer;
+    }
+
+
     RenderTarget* GetSkyBuffer(void) noexcept {
-#ifdef _DEBUG
-        return m_xchgSkyAndSceneBuffer ? m_sceneBuffer : m_skyBuffer;
-#else
         return m_skyBuffer;
-#endif
     }
 
     virtual void ActivateSceneViewport(void) noexcept {
@@ -240,7 +246,7 @@ public:
 
     void PushViewport(void) {
         m_viewport.GetGpuViewport();
-        viewportStack.Append(m_viewport);
+        m_viewportStack.Append(m_viewport);
     }
 
     void PopViewport(void);

@@ -79,6 +79,7 @@ public:
     ComPtr<ID3D12GraphicsCommandList>   m_list{ nullptr };
     ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
     bool                                m_isRecording{ false };
+    bool                                m_isFlushed{ false };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()

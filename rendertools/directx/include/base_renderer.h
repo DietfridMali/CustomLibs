@@ -64,7 +64,8 @@ protected:
     MovingFrameCounter      m_frameCounter;
     RenderStates            m_renderStates;
 
-    static List<::Viewport> viewportStack;
+    static List<::Viewport> m_viewportStack;
+    List<RenderTarget*>     m_sceneBufferStack;
 
 public:
 #ifdef _DEBUG
@@ -112,20 +113,23 @@ public:
 
     bool CreateScreenBuffer(void);
 
+    virtual void SetSceneBuffer(RenderTarget* sceneBuffer) noexcept {
+        if (sceneBuffer == nullptr) {
+            if (not m_sceneBufferStack.IsEmpty())
+                m_sceneBuffer = m_sceneBufferStack.Pop();
+        }
+        else {
+            m_sceneBufferStack.Push(m_sceneBuffer);
+            m_sceneBuffer = sceneBuffer;
+        }
+    }
+
     virtual RenderTarget* GetSceneBuffer(void) noexcept {
-#ifdef _DEBUG
-        return m_xchgSkyAndSceneBuffer ? m_skyBuffer : m_sceneBuffer;
-#else
         return m_sceneBuffer;
-#endif
     }
 
     RenderTarget* GetSkyBuffer(void) noexcept {
-#ifdef _DEBUG
-        return m_xchgSkyAndSceneBuffer ? m_sceneBuffer : m_skyBuffer;
-#else
         return m_skyBuffer;
-#endif
     }
 
     virtual void ActivateSceneViewport(void) noexcept {

@@ -13,7 +13,7 @@
 #include "base_displayhandler.h"
 #include "dx12context.h"
 
-List<::Viewport> BaseRenderer::viewportStack;
+List<::Viewport> BaseRenderer::m_viewportStack;
 
 #ifdef _DEBUG
 static Texture* testTexture = nullptr;
@@ -166,6 +166,7 @@ bool BaseRenderer::Start3DScene(void) {
 bool BaseRenderer::Stop3DScene(void) {
     if (not GetSceneBuffer()->IsAvailable())
         return false;
+    GetSceneBuffer()->Disable();
     DisableCamera();
     ResetTransformation();
     return true;
@@ -335,15 +336,15 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 
 void BaseRenderer::PushViewport(void) {
     m_viewport.GetGpuViewport();
-    viewportStack.Append(m_viewport);
+    m_viewportStack.Append(m_viewport);
 }
 
 
 void BaseRenderer::PopViewport(void) {
-    if (viewportStack.IsEmpty())
+    if (m_viewportStack.IsEmpty())
         return;
     ::Viewport viewport;
-    viewportStack.Pop(viewport);
+    m_viewportStack.Pop(viewport);
     if ((viewport.Width() > WindowWidth()) || (viewport.Height() > WindowHeight()))
         return;
     SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());

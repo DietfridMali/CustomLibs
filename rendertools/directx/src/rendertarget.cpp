@@ -525,7 +525,7 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
         haveTransformation = true;
         baseRenderer.Rotate(params.rotation, 0, 0, 1);
     }
-#if 1
+#if 0
     if (params.flipVertically) {
         haveTransformation = true;
         baseRenderer.Scale(params.scale, params.scale * params.flipVertically, 1);

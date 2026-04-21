@@ -11,7 +11,7 @@
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
 
-List<::Viewport> BaseRenderer::viewportStack;
+List<::Viewport> BaseRenderer::m_viewportStack;
 
 #ifdef _DEBUG
 static Texture* testTexture = nullptr;
@@ -165,6 +165,7 @@ bool BaseRenderer::Start3DScene(void) {
 bool BaseRenderer::Stop3DScene(void) {
     if (not GetSceneBuffer()->IsAvailable())
         return false;
+    GetSceneBuffer()->Disable();
     DisableCamera();
     ResetTransformation();
     return true;
@@ -351,10 +352,10 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
 
 
 void BaseRenderer::PopViewport(void) {
-    if (viewportStack.IsEmpty())
+    if (m_viewportStack.IsEmpty())
         return;
     ::Viewport viewport;
-    viewportStack.Pop(viewport);
+    m_viewportStack.Pop(viewport);
     if ((viewport.Width() > WindowWidth()) or (viewport.Height() > WindowHeight()))
         return;
     SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
