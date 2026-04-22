@@ -2,6 +2,7 @@
 #include "dx12framework.h"
 #include "dx12context.h"
 #include "commandlist.h"
+#include "resource_handler.h"
 #include "base_renderer.h"
 
 #include <cstdio>
@@ -114,7 +115,7 @@ ID3D12GraphicsCommandList* CommandQueue::List(void) const noexcept {
 
 // =================================================================================================
 
-bool CommandList::Create(ID3D12Device* device, const String& name, bool isOneShot) noexcept {
+bool CommandList::Create(ID3D12Device* device, const String& name, bool isTemporary) noexcept {
     for (UINT i = 0; i < FRAME_COUNT; ++i) {
         HRESULT hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
         if (FAILED(hr)) {
@@ -132,7 +133,7 @@ bool CommandList::Create(ID3D12Device* device, const String& name, bool isOneSho
     if (not name.IsEmpty())
         m_list->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
     m_name = name;
-    m_isOneShot = isOneShot;
+    m_isTemporary = isTemporary;
     return true;
 }
 
@@ -347,6 +348,7 @@ void CommandListHandler::Register(CommandList* cl) noexcept {
 #define LOG_EXECUTION 1
 
 void CommandListHandler::ExecuteAll(void) noexcept {
+    gfxResourceHandler.Cleanup();
     if (m_pendingLists.IsEmpty())
         return;
 	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
@@ -360,7 +362,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
             fprintf(stderr, "   '%s' still open; closing it now.\n", (const char*)l->GetName());
             l->Close();
         }
-        fprintf(stderr, "   executing CommandList '%s'.\n", (const char*)l->GetName());
+        fprintf(stderr, "   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->m_list.Get());
 #endif
         execList[n++] = l->m_list.Get();
     }
@@ -379,7 +381,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     fflush(stderr);
 #endif
     for (auto l : m_pendingLists) {
-        if (l->m_isOneShot)
+        if (l->m_isTemporary)
             m_recycledLists.Push(l);
     }
     m_pendingLists.Clear();
@@ -387,8 +389,8 @@ void CommandListHandler::ExecuteAll(void) noexcept {
 }
 
 
-CommandList* CommandListHandler::GetCmdList(const String& name, bool isOneShot) noexcept {
-    if (isOneShot and not m_recycledLists.IsEmpty()) {
+CommandList* CommandListHandler::GetCmdList(const String& name, bool isTemporary) noexcept {
+    if (isTemporary and not m_recycledLists.IsEmpty()) {
         CommandList* cl = m_recycledLists.Pop();
         cl->SetName(name);
         return cl;
@@ -397,7 +399,7 @@ CommandList* CommandListHandler::GetCmdList(const String& name, bool isOneShot) 
     if (not device)
         return nullptr;
     CommandList* cl = new CommandList();
-    if (not cl->Create(device, name, isOneShot)) {
+    if (not cl->Create(device, name, isTemporary)) {
         delete cl;
         return nullptr;
     }

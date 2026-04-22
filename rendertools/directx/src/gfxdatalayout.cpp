@@ -222,12 +222,15 @@ void GfxDataLayout::Disable(void) noexcept
 
 
 CommandList* GfxDataLayout::StartUpdate(void) noexcept {
-    return baseRenderer.StartOperation("GfxDataLayout::Update");
+    m_updateList = baseRenderer.StartOperation("GfxDataLayout::Update");
+    return m_updateList;
 }
 
 
 bool GfxDataLayout::FinishUpdate(void) noexcept {
-    return baseRenderer.FinishOperation("GfxDataLayout::Update");
+    bool result = baseRenderer.FinishOperation(m_updateList);
+    m_updateList = nullptr;
+    return result;
 }
 
 

@@ -200,6 +200,9 @@
     <ClInclude Include="..\include\renderstates.h">
       <Filter>DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\resource_handler.h">
+      <Filter>DirectX</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->
@@ -349,6 +352,9 @@
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\renderstates.cpp">
+      <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\resource_handler.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
   </ItemGroup>

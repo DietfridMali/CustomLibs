@@ -19,6 +19,7 @@
 #include "commandlist.h"
 #include "dx12context.h"
 #include "dx12upload.h"
+#include "resource_handler.h"
 
 // =================================================================================================
 // DX12 Texture implementation
@@ -112,6 +113,8 @@ void Texture::Destroy(void)
 {
     if (m_isValid) {
         m_isValid = false;
+        if (m_isDisposable)
+            gfxResourceHandler.Track(m_resource);
         // Note: descriptor allocator doesn't support free in this implementation.
         // The handle index is not returned to the heap (acceptable for now).
         m_handle = UINT32_MAX;
@@ -185,11 +188,15 @@ bool Texture::Deploy(int bufferIndex)
     int w = tb->m_info.m_width;
     int h = tb->m_info.m_height;
     int channels = tb->m_info.m_componentCount;
-    if (w <= 0 or h <= 0) 
+    if (w <= 0 or h <= 0)
         return false;
 
-    // (Re-)create the default-heap texture resource
-    m_resource.Reset();
+    if (m_resource) {
+        D3D12_RESOURCE_DESC desc = m_resource->GetDesc();
+        if (desc.Width == UINT(w) and desc.Height == UINT(h))
+            return true;
+        m_resource.Reset();
+    }
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
     rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -244,8 +251,7 @@ bool Texture::Redeploy(void)
 }
 
 
-bool Texture::Load(String& folder, List<String>& fileNames,
-                   const TextureCreationParams& params)
+bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params)
 {
     return CreateFromFile(folder, fileNames, params);
 }
@@ -317,6 +323,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
 
+    m_isDisposable = params.isDisposable;
     m_isValid = true;
     return true;
 }

@@ -356,7 +356,7 @@ public:
 
     CommandList* StartOperation(String name) noexcept;
 
-    bool FinishOperation(String name, bool flush = false) noexcept;
+    bool FinishOperation(void* cl, bool flush = false) noexcept;
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

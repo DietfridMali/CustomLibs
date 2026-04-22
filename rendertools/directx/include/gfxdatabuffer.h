@@ -3,7 +3,6 @@
 #include "dx12framework.h"
 #include "rendertypes.h"
 #include "resource_descriptor.h"
-#include "resource_chunkhandler.h"
 #include <cstring>
 
 // =================================================================================================
@@ -33,15 +32,6 @@ public:
     D3D12_VERTEX_BUFFER_VIEW m_vbv{};          // valid when m_bufferType == GfxBufferTarget::Vertex
     D3D12_INDEX_BUFFER_VIEW  m_ibv{};          // valid when m_bufferType == GfxBufferTarget::Index
 
-    // Per-frame-slot chunk pool for dynamic multi-buffering.
-    // FRAME_COUNT slots (indexed by cmdQueue.FrameIndex()) each hold a growing list of
-    // upload-heap buffers. On each new recording session the slot's chunk index resets to 0,
-    // which is safe because BeginFrame has already waited for the fence that covers the
-    // previous use of this slot (2 frames ago with FRAME_COUNT=2).
-    static constexpr UINT    FRAME_COUNT = 2;
-
-	GfxDataChunkHandler     m_dataChunkHandler{FRAME_COUNT};
-
     uint32_t                 m_size;           // total buffer size in bytes
     size_t                   m_itemSize;       // bytes per vertex element (stride)
     uint32_t                 m_itemCount;
@@ -53,14 +43,11 @@ public:
 
     void Clear(void) {
         m_resource.Reset();
-        m_dataChunkHandler.Clear();
         m_vbv = {};
         m_ibv = {};
         m_id  = 0;
         m_isDynamic = true;
     }
-
-    bool Reset(void);
 
     GfxDataBuffer(GfxDataBuffer const& other) { 
         Copy(other); 
@@ -87,7 +74,7 @@ public:
     inline void DisableAttribs(void) noexcept {}
     inline void Describe(void) noexcept {}
 
-    bool Create(ID3D12Device* device, size_t dataSize);
+    bool Create(size_t dataSize);
 
 
     // Upload new data and (re-)create the GPU resource if needed.

@@ -212,10 +212,13 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
         td.height -= int(2 * outlineWidth + 0.5f);
 
         if (not renderTarget) {
+#if 1
+            void* cl = baseRenderer.StartOperation(text);
             if (baseRenderer.StartOperation(text)) {
                 RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
-                baseRenderer.FinishOperation(text);
+                baseRenderer.FinishOperation(cl);
             }
+#endif
         }
         else {
 #if 0 // debug

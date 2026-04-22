@@ -72,7 +72,7 @@ bool FontHandler::FreeGlyph(const String& key, GlyphInfo* info) {
 
 
 int FontHandler::BuildAtlas(void) {
-#if 0
+#if 1
     m_atlas.GetRenderTarget()->SetClearColor(RGBAColor(0.5, 0, 0.5, 0));
 #endif
     if (not m_atlas.Enable())
@@ -87,7 +87,7 @@ int FontHandler::BuildAtlas(void) {
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
     baseRenderer.PopViewport();
     m_atlas.Disable(true);
-    m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
+    //m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
     return m_glyphDict.Size();
 }
 
@@ -141,14 +141,13 @@ bool FontHandler::CreateTexture(const char* szChar, String key, int index)
     SDL_Surface* surface = (strlen(szChar) == 1)
         ? TTF_RenderText_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255))
         : TTF_RenderUTF8_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255));
-    if ((surface == nullptr) or not info.texture->CreateFromSurface(surface, {})) {
+    if ((surface == nullptr) or not info.texture->CreateFromSurface(surface, { .isDisposable = true })) {
         delete info.texture;
         if (surface)
 			SDL_FreeSurface(surface);
         info = GlyphInfo();
         return false;
         }
-	info.texture->Deploy();
     if (not m_glyphDict.Insert(info.name, info))
         return false;
     info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());
@@ -161,6 +160,7 @@ bool FontHandler::CreateTexture(const char* szChar, String key, int index)
 int FontHandler::CreateTextures(void) {
     char szChar[4] = " ";
     int32_t i = 0;
+    void* cl = baseRenderer.StartOperation("FontHandler::CreateTextures");
     for (char* info = m_glyphs.Data(); *info; info++) {
         szChar[0] = *info;
         if (CreateTexture(szChar, String(*info), i))
@@ -168,6 +168,7 @@ int FontHandler::CreateTextures(void) {
     }
     if (CreateTexture((const char*)m_euroChar, String(m_euroChar), i))
         ++i;
+    baseRenderer.FinishOperation(cl, true);
     return i;
 }
 

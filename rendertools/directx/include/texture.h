@@ -43,6 +43,7 @@ struct TextureCreationParams {
     bool     flipVertically{ false };
     bool     cartoonize{ false };
     bool     isRequired{ true };
+    bool     isDisposable{ false };
     uint16_t blur{ 4 };
     uint16_t gradients{ 7 };
     uint16_t outline{ 4 };
@@ -89,6 +90,7 @@ public:
     bool                        m_hasBuffer{ false };
     bool                        m_hasParams{ false };
     bool                        m_isValid{ false };
+    bool                        m_isDisposable{ false };
 
     static uint32_t             nullHandle;   // UINT32_MAX — matches OGL Texture::nullHandle usage
 

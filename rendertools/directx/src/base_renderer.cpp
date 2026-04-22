@@ -371,34 +371,41 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
 
 
 CommandList* BaseRenderer::StartOperation(String name) noexcept {
-    if (name.IsEmpty())
-        return nullptr;
-    if (m_temporaryList)
-        m_temporaryListStack.Push(m_temporaryList);
-    m_temporaryList = commandListHandler.GetCmdList(name, true);
-    if (m_temporaryList) {
-        m_temporaryList->Open(commandListHandler.CmdQueue().FrameIndex());
-        return m_temporaryList;
+    CommandList* cl = commandListHandler.GetCurrentCmdListObj();
+    if (cl) {
+        if (cl->IsTemporary())
+            ++(cl->m_refCounter);
+        return cl;
     }
-    if (not m_temporaryListStack.IsEmpty())
-        m_temporaryList = m_temporaryListStack.Pop();
-    return nullptr;
+    if (not m_temporaryList) {
+        fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
+        m_temporaryList = commandListHandler.GetCmdList(name, true);
+        if (not m_temporaryList)
+            return nullptr;
+        if (not m_temporaryList->Open(commandListHandler.CmdQueue().FrameIndex())) {
+            return m_temporaryList = nullptr;
+        }
+    }
+    ++(m_temporaryList->m_refCounter);
+    return m_temporaryList;
 }
 
 
-bool BaseRenderer::FinishOperation(String name, bool flush) noexcept {
-    if (not m_temporaryList)
+bool BaseRenderer::FinishOperation(void* cl, bool flush) noexcept {
+    CommandList* list = static_cast<CommandList*>(cl);
+    if (not list)
         return false;
-    if (m_temporaryList->GetName() != name)
-        return false;
-    if (m_temporaryList->IsRecording()) {
+    if (not list->IsTemporary())
+        return true;
+    if (--(list->m_refCounter) == 0) {
+        fprintf(stderr, "Closing temp. CL '%s'\n", (const char*)list->GetName());
         if (flush)
-            m_temporaryList->Flush();
+            list->Flush();
         else
-            m_temporaryList->Close();
+            list->Close();
+        if (list == m_temporaryList)
+            m_temporaryList = nullptr;
     }
-    if (not m_temporaryListStack.IsEmpty())
-        m_temporaryList = m_temporaryListStack.Pop();
     return true;
 }
 

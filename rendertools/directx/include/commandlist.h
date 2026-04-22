@@ -69,7 +69,7 @@ public:
 //            so cmdQueue.List() returns this list for the duration of recording.
 // Close() — close list, pop stack, register for frame-end submission via CommandListHandler.
 // Flush() — close list, pop stack, submit immediately + WaitIdle, no registration.
-//            Used for one-shot setup (RenderTarget::Create, resource uploads).
+//            Used for temporary setup (RenderTarget::Create, resource uploads).
 
 class CommandList
 {
@@ -80,10 +80,11 @@ public:
     ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
     bool                                m_isRecording{ false };
     bool                                m_isFlushed{ false };
-    bool                                m_isOneShot{ false };
+    bool                                m_isTemporary{ false };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
+    uint32_t                            m_refCounter{ 0 };
     String                              m_name{ "" };
     ID3D12PipelineState*                m_activePSO{ nullptr };
 
@@ -92,7 +93,7 @@ public:
     static void PushRenderStates(void) noexcept;
     static void PopRenderStates(void) noexcept;
 
-    bool Create(ID3D12Device* device, const String& name = "", bool isOneShot = false) noexcept;
+    bool Create(ID3D12Device* device, const String& name = "", bool isTemporary = false) noexcept;
 
     void Destroy(void) noexcept;
 
@@ -139,11 +140,11 @@ public:
 	}
 
 	inline bool IsTemporary(void) const noexcept {
-		return m_isOneShot;
+		return m_isTemporary;
 	}
 
-	inline void SetOneShot(bool value) noexcept {
-		m_isOneShot = value;
+	inline void SetTemporary(bool value) noexcept {
+		m_isTemporary = value;
 	}
 
     void SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept;
@@ -213,10 +214,10 @@ public:
     // Clears m_pendingLists afterwards.
     void ExecuteAll(void) noexcept;
 
-    // Returns a CommandList. If isOneShot is true, tries to reuse one from m_recycledLists
-    // before allocating a new one. One-shot CLs are recycled after ExecuteAll().
-    // Caller owns the memory for non-one-shot lists.
-    CommandList* GetCmdList(const String& name = "", bool isOneShot = false) noexcept;
+    // Returns a CommandList. If isTemporary is true, tries to reuse one from m_recycledLists
+    // before allocating a new one. Temporary CLs are recycled after ExecuteAll().
+    // Caller owns the memory for non-temporary lists.
+    CommandList* GetCmdList(const String& name = "", bool isTemporary = false) noexcept;
 
 #ifdef _DEBUG
     // Set to true to print every logged GPU call (DrawInstanced etc.) with file/line to stderr.

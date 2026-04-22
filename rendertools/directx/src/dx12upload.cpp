@@ -1,6 +1,7 @@
 #include "dx12upload.h"
 #include "commandlist.h"
 #include "base_renderer.h"
+#include "resource_handler.h"
 
 #include <cstring>
 
@@ -33,16 +34,8 @@ bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID
     // reset it so the map/copy and the placed-footprint source location are both at offset 0.
     layout.Offset = 0;
 
-    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-    D3D12_RESOURCE_DESC upDesc{};
-    upDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    upDesc.Width = UINT64(layout.Footprint.RowPitch) * rowCount;
-    upDesc.Height = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
-    upDesc.SampleDesc.Count = 1;
-    upDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &upDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&outUpload));
-    if (FAILED(hr))
+    outUpload = gfxResourceHandler.GetUploadResource(size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
+    if (not outUpload)
         return false;
 #ifdef _DEBUG
     char name[128];
@@ -97,11 +90,13 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
     if (faceCount > 6)
         faceCount = 6;
     for (int i = 0; i < faceCount; ++i) {
-        if (not UploadSubresource(device, cl->List(), dstResource, UINT(i), faces[i], width, height, channels, uploads[i], /*addBarrier=*/false))
+        if (not UploadSubresource(device, cl->List(), dstResource, UINT(i), faces[i], width, height, channels, uploads[i], /*addBarrier=*/false)) {
+            baseRenderer.FinishOperation(cl);
             return false;
+        }
     }
     SubresourceBarrier(cl->List(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    return baseRenderer.FinishOperation("UploadTextureData", true);
+    return baseRenderer.FinishOperation(cl);
 }
 
 
@@ -133,16 +128,8 @@ ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, i
     UINT64 rowSize = 0;
     device->GetCopyableFootprints(&rd, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
 
-    D3D12_HEAP_PROPERTIES uhp{ D3D12_HEAP_TYPE_UPLOAD };
-    D3D12_RESOURCE_DESC upDesc{};
-    upDesc.Dimension        = D3D12_RESOURCE_DIMENSION_BUFFER;
-    upDesc.Width            = uploadSize;
-    upDesc.Height           = upDesc.DepthOrArraySize = upDesc.MipLevels = 1;
-    upDesc.SampleDesc.Count = 1;
-    upDesc.Layout           = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-    ComPtr<ID3D12Resource> upload;
-    if (FAILED(device->CreateCommittedResource(&uhp, D3D12_HEAP_FLAG_NONE, &upDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
+    ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource(size_t(uploadSize));
+    if (not upload)
         return nullptr;
 #ifdef _DEBUG
     snprintf(name, sizeof(name), "Texture3D - upload[%d,%d]", w, h);
@@ -171,7 +158,11 @@ ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, i
     dstLoc.SubresourceIndex = 0;
     cl->List()->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     SubresourceBarrier(cl->List(), resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    baseRenderer.FinishOperation("UploadTexture3DData", true);
+    baseRenderer.FinishOperation(cl);
+#ifdef _DEBUG
+    if (not resource)
+        return nullptr;
+#endif
     return resource;
 }
 
