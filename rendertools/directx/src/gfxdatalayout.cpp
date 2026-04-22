@@ -25,30 +25,28 @@ static DXGI_FORMAT ToIndexFormat(ComponentType componentType) noexcept
 }
 
 // Fixed input-slot mapping matching kInputLayout in shader.cpp:
-//   slot 0: Vertex, slot 1: TexCoord/0, slot 2: TexCoord/1, slot 3: Color,
-//   slot 4: Normal, slot 5: Tangent,    slot 6: TexCoord/2
+//   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color,
+//   slot 5: Normal, slot 6: Tangent, slot 7+: Offset/Float
 // Returns -1 for unknown types (caller falls back to insertion order).
 static int FixedSlotForBuffer(const char* type, int id) noexcept
 {
     if (strcmp(type, "Vertex") == 0)
         return 0;
     if (strcmp(type, "TexCoord") == 0) {
-        if (id == 0)
-            return 1;
-        if (id == 1)
-            return 2;
-        if (id == 2)
-            return 6;
+        if (id >= 0 and id <= 2)
+            return 1 + id;
         return -1;
     }
     if (strcmp(type, "Color") == 0)
-        return 3;
-    if (strcmp(type, "Normal") == 0)
         return 4;
-    if (strcmp(type, "Tangent") == 0)
+    if (strcmp(type, "Normal") == 0)
         return 5;
+    if (strcmp(type, "Tangent") == 0)
+        return 6;
     if (strcmp(type, "Offset") == 0)
-        return 5 + id;  // id=0→slot 5 (TANGENT), id=1→slot 6 (TEXCOORD2), id=2→slot 7, id=3→slot 8
+        return 7 + id;
+    if (strcmp(type, "Float") == 0)
+        return 7 + id;
     return -1;
 }
 

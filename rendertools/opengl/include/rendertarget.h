@@ -120,13 +120,11 @@ public:
 
     bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
 
-    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
-
     inline bool Reenable(bool clear = false) {
         return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, true);
     }
 
-	void Disable(bool flush = false, bool restoreDrawBuffer = true); // only required for DX12 compatibility for calls from higher app layers that are gfx api agnostic
+	void Disable(bool flush = false); // only required for DX12 compatibility for calls from higher app layers that are gfx api agnostic
 
     inline void Flush(void) noexcept {
         // no op
@@ -138,7 +136,10 @@ public:
     void Fill(RGBAColor color);
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
-    inline void ClearStencil(void) { glClear(GL_STENCIL_BUFFER_BIT); }
+
+    inline void ClearStencil(void) { 
+        glClear(GL_STENCIL_BUFFER_BIT); 
+    }
 
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
@@ -235,9 +236,9 @@ public:
 
     void ReleaseBuffers(void);
 
-    bool SetDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool reenable = false);
+    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup , bool reenable);
 
-    bool SelectDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll);
+    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
 
     void SelectCustomDrawBuffers(DrawBufferList& drawBuffers);
 
@@ -270,7 +271,9 @@ public:
         return m_handle != other.m_handle;
     }
 
-
+    inline DrawBufferList& DrawBuffers(void) noexcept {
+        return m_drawBuffers;
+    }
 
 private:
     void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType, bool isMRT);

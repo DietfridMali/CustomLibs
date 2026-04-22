@@ -203,6 +203,15 @@ Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool pre
 }
 
 
+Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply) {
+    Shader* shader = SetupShader("colorMesh");
+    if (shader) {
+        shader->SetInt("premultiply", premultiply ? 1 : 0);
+    }
+    return shader;
+}
+
+
 Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
     Shader* shader = SetupShader("plainTexture");
     if (shader) {

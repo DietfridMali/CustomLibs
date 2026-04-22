@@ -33,11 +33,10 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
     m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
     m_fov = fov;
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight); // just for code clarity
-    SetupDrawBuffers();
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
     ResetTransformation();
-    int w = m_windowWidth / 15;
     DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
+    int w = m_windowWidth / 15;
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
 #if 0//def _DEBUG
     testTexture = textureHandler.GetStandardTexture();
@@ -150,11 +149,11 @@ void BaseRenderer::StartFullPass(void) noexcept {
 
 bool BaseRenderer::Start3DScene(void) {
     SetupGraphics();
+    ResetDrawBuffers();
     m_frameCounter.Start();
     RenderTarget* sceneBuffer = GetSceneBuffer();
-    if (not (sceneBuffer and sceneBuffer->IsAvailable()))
+    if (not (sceneBuffer and sceneBuffer->Enable()))
         return false;
-    ResetDrawBuffers(sceneBuffer);
     SetupTransformation();
     SetViewport(m_sceneViewport);
     EnableCamera();
@@ -179,11 +178,11 @@ bool BaseRenderer::Start2DScene(void) {
         return false;
 #endif
     SetClearColor(m_backgroundColor);
-    ResetDrawBuffers(m_screenBuffer, not m_screenIsAvailable);
+    ResetDrawBuffers();
     m_screenIsAvailable = true;
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
-    if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
+    if (not (m_screenBuffer and m_screenBuffer->Enable()))
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     ResetClearColor();
     SetViewport(m_sceneViewport, 0, 0, false);
@@ -198,7 +197,7 @@ bool BaseRenderer::Start2DScene(void) {
 bool BaseRenderer::Stop2DScene(void) {
     if (not m_screenIsAvailable)
         return false;
-    ResetDrawBuffers(nullptr);
+    ResetDrawBuffers();
     return true;
 }
 
@@ -307,9 +306,9 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isRenderTarget) {
     if (windowWidth * windowHeight == 0) {
-        if (m_drawBufferInfo.m_renderTarget) {
-            windowWidth = m_drawBufferInfo.m_renderTarget->GetWidth(true);
-            windowHeight = m_drawBufferInfo.m_renderTarget->GetHeight(true);
+        if (m_parentBuffer) {
+            windowWidth = m_parentBuffer->GetWidth(true);
+            windowHeight = m_parentBuffer->GetHeight(true);
         }
         else if (m_activeBuffer) {
             windowWidth = m_activeBuffer->GetWidth(true);

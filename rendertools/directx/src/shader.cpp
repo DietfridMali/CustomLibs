@@ -35,27 +35,27 @@
 // Helpers to translate ShaderDataAttributes to D3D12_INPUT_ELEMENT_DESC.
 
 // Maps C++ buffer type + id to the DX12 input slot used by GfxDataLayout::FixedSlotForBuffer.
+//   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color,
+//   slot 5: Normal, slot 6: Tangent, slot 7+: Offset/Float
 static int SlotForAttr(const char* datatype, int id) noexcept
 {
-    if (strcmp(datatype, "Vertex") == 0)   
+    if (strcmp(datatype, "Vertex") == 0)
         return 0;
     if (strcmp(datatype, "TexCoord") == 0) {
-        if (id == 0) 
-            return 1;
-        if (id == 1) 
-            return 2;
-        if (id == 2) 
-            return 6;
+        if (id >= 0 and id <= 2)
+            return 1 + id;
         return -1;
     }
-    if (strcmp(datatype, "Color") == 0)   
-        return 3;
-    if (strcmp(datatype, "Normal") == 0)  
+    if (strcmp(datatype, "Color") == 0)
         return 4;
-    if (strcmp(datatype, "Tangent") == 0) 
+    if (strcmp(datatype, "Normal") == 0)
         return 5;
-    if (strcmp(datatype, "Offset") == 0)  
-        return 5 + id;   // 0→5, 1→6, 2→7, 3→8
+    if (strcmp(datatype, "Tangent") == 0)
+        return 6;
+    if (strcmp(datatype, "Offset") == 0)
+        return 7 + id;
+    if (strcmp(datatype, "Float") == 0)
+        return 7 + id;
     return -1;
 }
 
@@ -83,9 +83,13 @@ static const char* SemanticForAttr(const char* datatype, int id, UINT& semanticI
         semanticIndex = UINT(id); 
         return "TANGENT"; 
     }
-    if (strcmp(datatype, "Offset") == 0)   { 
-        semanticIndex = UINT(id + 3); 
-        return "TEXCOORD"; 
+    if (strcmp(datatype, "Offset") == 0)   {
+        semanticIndex = UINT(id);
+        return "OFFSET";
+    }
+    if (strcmp(datatype, "Float") == 0)   {
+        semanticIndex = UINT(id);
+        return "FLOAT";
     }
     semanticIndex = 0;
     return "TEXCOORD";
@@ -282,10 +286,10 @@ void Shader::BuildInputLayout(void) noexcept
             { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,     0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,        1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
             { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,        2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT,  3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "NORMAL",   0, DXGI_FORMAT_R32G32B32A32_FLOAT,  4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT,  5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT,  6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT,  3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT,  4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "NORMAL",   0, DXGI_FORMAT_R32G32B32A32_FLOAT,  5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+            { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT,  6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
         };
         static constexpr UINT kFallbackCount = UINT(std::size(kFallbackLayout));
         ComPtr<ID3D12ShaderReflection> vsRefl;

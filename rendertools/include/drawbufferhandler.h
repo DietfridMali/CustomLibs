@@ -13,9 +13,9 @@
 
 class DrawBufferInfo {
 public:
-    RenderTarget*                    m_renderTarget;
+    RenderTarget*       m_renderTarget;
 #ifdef OPENGL
-    AutoArray<GLuint>*   m_drawBuffers;
+    AutoArray<GLuint>*  m_drawBuffers;
 #endif
 
 public:
@@ -42,49 +42,34 @@ public:
 class DrawBufferHandler
 {
     protected:
-        RenderTarget*                    m_activeBuffer;
+        RenderTarget*       m_activeBuffer;
+        RenderTarget*       m_parentBuffer;
 #ifdef OPENGL
-        AutoArray<GLuint>    m_defaultDrawBuffers;
+        AutoArray<GLuint>   m_defaultDrawBuffers;
 #endif
-        DrawBufferInfo          m_drawBufferInfo;
-        List<DrawBufferInfo>    m_drawBufferStack;
-        int                     m_windowWidth;
-        int                     m_windowHeight;
+        List<RenderTarget*> m_drawBufferStack;
+        int                 m_windowWidth;
+        int                 m_windowHeight;
+
     public:
         DrawBufferHandler()
-            : m_activeBuffer(nullptr), m_windowWidth(0), m_windowHeight(0)
+            : m_activeBuffer(nullptr)
+            , m_parentBuffer(nullptr)
         { }
 
-        void Setup(int windowWidth, int windowHeight) {
-            m_windowWidth = windowWidth;
-            m_windowHeight = windowHeight;
-        }
+        void Setup(int windowWidth, int windowHeight);
 
-        bool SetActiveBuffer(RenderTarget* buffer, bool clearBuffer = false);
+        void ActivateDrawBuffer(RenderTarget* buffer);
 
-#ifdef OPENGL
+        bool DeactivateDrawBuffer(RenderTarget* buffer);
+
         inline AutoArray<GLuint>* ActiveDrawBuffers(void) {
-            return m_drawBufferInfo.m_drawBuffers;
+            return m_activeBuffer ? &m_activeBuffer->DrawBuffers() : nullptr;
         }
-#endif
 
-        void SetupDrawBuffers(void);
+        void ResetDrawBuffers(void);
 
         void SetActiveDrawBuffers(void);
-
-        void SaveDrawBuffer();
-
-#ifdef OPENGL
-        void TrackDrawBuffers(RenderTarget* renderTarget, AutoArray<GLuint>* drawBuffers);
-#else
-        void TrackDrawBuffers(RenderTarget* renderTarget);
-#endif
-
-        void RestoreDrawBuffer(void);
-
-        void RemoveDrawBuffer(RenderTarget* buffer);
-
-        void ResetDrawBuffers(RenderTarget* activeBuffer, bool clearBuffer = true);
 };
 
 // =================================================================================================

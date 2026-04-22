@@ -168,6 +168,41 @@ const ShaderSource& PlainColorShader() {
 }
 
 
+const ShaderSource& ColorMeshShader() {
+    static const ShaderSource source(
+        "colorMesh",
+        R"(
+            //#version 140
+            //#extension GL_ARB_explicit_attrib_location : enable
+            #version 330
+            layout(location = 0) in vec3 position;
+            layout(location = 1) in vec4 color;
+            uniform mat4 mModelView;
+            uniform mat4 mProjection;
+            uniform mat4 mViewport;
+            out vec4 surfaceColor;
+            void main() {
+                vec4 viewPos = mModelView * vec4 (position, 1.0);
+                gl_Position = mViewport * mProjection * viewPos;
+                surfaceColor = color;
+                }
+        )",
+        R"(
+        //#version 140
+        //#extension GL_ARB_explicit_attrib_location : enable
+        #version 330
+        uniform bool premultiply;
+        in vec4 surfaceColor;
+        layout(location = 0) out vec4 fragColor;
+        void main() { 
+            fragColor = surfaceColor; 
+        }
+        )"
+    );
+    return source;
+}
+
+
 const ShaderSource& GrayScaleShader() {
     static const ShaderSource source(
         "grayScale",

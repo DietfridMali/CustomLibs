@@ -111,6 +111,8 @@ public:
 
     Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
 
+    Shader* LoadColorMeshShader(bool premultiply = false);
+
     Shader* LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);
 
     Shader* LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& params = {}, bool premultiply = false);

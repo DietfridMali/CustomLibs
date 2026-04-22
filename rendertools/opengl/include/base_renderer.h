@@ -66,6 +66,7 @@ protected:
 
     static List<::Viewport> m_viewportStack;
     List<RenderTarget*>     m_sceneBufferStack;
+    List<RenderTarget*>     m_drawBufferStack;
 
 
 public:

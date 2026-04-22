@@ -189,7 +189,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     m_vertexBufferCount = params.vertexBufferCount;
     m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_vertexBufferCount);
     m_name = params.name;
-    Disable(false, false);
+    Disable( false);
     return true;
 }
 
@@ -203,7 +203,7 @@ void RenderTarget::Destroy(void) {
 }
 
 
-bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
+bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     int l = m_drawBuffers.Length();
     if (drawBufferGroup == dbDepth) {
         for (int i = 0; i < l; ++i)
@@ -227,7 +227,7 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
                 }
         }
     }
-    else if ((drawBufferGroup != dbCustom) and ((drawBufferGroup == dbNone) or (m_drawBufferGroup != drawBufferGroup))) {
+    else if ((drawBufferGroup != dbCustom) and (reenable or (drawBufferGroup == dbNone) or (m_drawBufferGroup != drawBufferGroup))) {
         m_activeBufferIndex = -1;
         m_drawBufferGroup = (drawBufferGroup == dbNone) ? dbAll : drawBufferGroup;
         if (m_drawBufferGroup == dbAll) {
@@ -270,27 +270,6 @@ void RenderTarget::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 }
 
 
-// select draw buffer works in conjunction with Renderer::TrackDrawBuffers
-// The renderer keeps track of draw buffers and render targets and stores those being temporarily overriden
-// by other render targets in a stack. Basically, the current OpenGL draw buffer is set using
-// Renderer::TrackDrawBuffers. However, when disabling a temporary render target (RenderTarget), the
-// previous render target is automatically restored, which means calling its SetDrawBuffers
-// function. To avoid RenderTarget::SetDrawBuffers and Renderer::TrackDrawBuffers looping forever,
-// in that case, true is passed for reenable, causing SetDrawBuffers to directly call
-// glDrawBuffers. The effect of that construction is that you can transparently nest
-// multiple RenderTarget draw buffers.
-bool RenderTarget::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
-    if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
-        return false;
-    if (reenable)
-        glDrawBuffers(m_drawBuffers.Length(), m_drawBuffers.Data());
-    else {
-        baseRenderer.TrackDrawBuffers(this, &m_drawBuffers);
-    }
-    return true;
-}
-
-
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
     if (m_depthBufferIndex < 0)
         return false;
@@ -326,7 +305,7 @@ bool RenderTarget::ReattachBuffers(void) {
 
 bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
     baseRenderer.CheckGfxError();
-    if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
+    if (not SelectDrawBuffers(bufferIndex, drawBufferGroup, reenable))
         return false;
     baseRenderer.CheckGfxError();
 #ifdef _DEBUG
@@ -338,7 +317,6 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
     gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
 #endif
     baseRenderer.CheckGfxError();
-    Clear(bufferIndex, drawBufferGroup, clear);
     baseRenderer.CheckGfxError();
 #ifdef _DEBUG
     return baseRenderer.CheckGfxError();
@@ -364,11 +342,13 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     if (not m_isAvailable)
         fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
+    baseRenderer.ActivateDrawBuffer(this);
+    Clear(bufferIndex, drawBufferGroup, clear);
     return true;
 }
 
 
-void RenderTarget::Disable(bool flush, bool restoreDrawBuffer) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+void RenderTarget::Disable(bool flush) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
         if (IsEnabled()) {
@@ -383,11 +363,7 @@ void RenderTarget::Disable(bool flush, bool restoreDrawBuffer) { // flush only r
             m_drawBufferGroup = dbNone;
             baseRenderer.CheckGfxError();
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            if (restoreDrawBuffer)
-                baseRenderer.RestoreDrawBuffer();
-        }
-        else {
-            baseRenderer.RemoveDrawBuffer(this);
+            baseRenderer.DeactivateDrawBuffer(this);
         }
     }
 }
@@ -417,7 +393,7 @@ void RenderTarget::ReleaseBuffers(void) {
 
 
 void RenderTarget::SetViewport(bool flipVertically) noexcept {
-    baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically);
+    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
 }
 
 
@@ -498,7 +474,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PopMatrix();
     if (enableLocally)
-        Disable(false, false);
+        Disable( false);
     return true;
 }
 
