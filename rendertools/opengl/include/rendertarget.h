@@ -79,6 +79,7 @@ public:
     RenderTargetTexture         m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
     bool                        m_isAvailable;
+    bool                        m_isScreenBuffer;
     int                         m_lastDestination;
     BaseQuad                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
@@ -86,13 +87,14 @@ public:
 
     static GLint                m_activeHandle;
 
-    struct RTBufferParams {
+    struct RTCreationParams {
         String name{ "" };
         int colorBufferCount{ 1 };
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
         bool hasMRTs{ false };
+        bool isScreenBuffer{ false };
     };
 
     struct RTRenderParams {
@@ -115,7 +117,7 @@ public:
 
     void Init(void);
 
-    bool Create(int width, int height, int scale, const RTBufferParams& params);
+    bool Create(int width, int height, int scale, const RTCreationParams& params);
 
     void Destroy(void);
 

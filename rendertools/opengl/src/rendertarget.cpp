@@ -165,7 +165,7 @@ void RenderTarget::CreateRenderArea(void) {
 }
 
 
-bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams& params) {
+bool RenderTarget::Create(int width, int height, int scale, const RTCreationParams& params) {
     if (width * height == 0)
         return false;
     m_handle = SharedFramebufferHandle(0);
@@ -173,6 +173,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     m_height = height;
     m_scale = scale;
     m_bufferCount = 0;
+    m_isScreenBuffer = params.isScreenBuffer;
     m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
@@ -357,8 +358,10 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
         fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
     baseRenderer.ActivateDrawBuffer(this);
     Clear(bufferIndex, drawBufferGroup, clear);
+#if 0
     baseRenderer.PushViewport();
     SetViewport();
+#endif
     return true;
 }
 
@@ -378,7 +381,9 @@ void RenderTarget::Disable(bool flush) { // flush only required for compatibilit
         baseRenderer.CheckGfxError();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         baseRenderer.DeactivateDrawBuffer(this);
+#if 0
         baseRenderer.PopViewport();
+#endif
     }
 }
 
@@ -407,7 +412,7 @@ void RenderTarget::ReleaseBuffers(void) {
 
 
 void RenderTarget::SetViewport(bool flipVertically) noexcept {
-    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
+    baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically, m_isScreenBuffer);
 }
 
 
