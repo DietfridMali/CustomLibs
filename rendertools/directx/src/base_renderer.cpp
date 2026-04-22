@@ -44,9 +44,9 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
     m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
     m_fov = fov;
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight);
-    SetupDrawBuffers();
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
     ResetTransformation();
+    DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
     int w = m_windowWidth / 15;
     DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);

@@ -205,38 +205,44 @@ void RenderTarget::Destroy(void) {
 
 bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
     int l = m_drawBuffers.Length();
-    if (drawBufferGroup == dbDepth) {
+
+    switch (drawBufferGroup) {
+    case dbDepth:
+        m_drawBufferGroup = dbDepth;
         for (int i = 0; i < l; ++i)
             m_drawBuffers[i] = GL_NONE;
-    }
-    else if (drawBufferGroup == dbSingle) {
+        return true;
+    
+    case dbSingle:
         m_drawBufferGroup = dbSingle;
         if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
             return false;
-#ifdef NDEBUG
-        if (m_activeBufferIndex != bufferIndex) 
-#endif
-        {
-            m_activeBufferIndex = bufferIndex;
-            m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
-            AttachBuffer(bufferIndex);
-            for (int i = 0; i < l; ++i)
-                if (i != bufferIndex) {
-                    DetachBuffer(i);
-                    m_drawBuffers[i] = GL_NONE;
-                }
-        }
-    }
-    else if ((drawBufferGroup != dbCustom) and (reenable or (drawBufferGroup == dbNone) or (m_drawBufferGroup != drawBufferGroup))) {
-        m_activeBufferIndex = -1;
-        m_drawBufferGroup = (drawBufferGroup == dbNone) ? dbAll : drawBufferGroup;
-        if (m_drawBufferGroup == dbAll) {
-            for (int i = 0; i < l; ++i) {
-                m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
-                AttachBuffer(i);
+        m_activeBufferIndex = bufferIndex;
+        m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
+        AttachBuffer(bufferIndex);
+        for (int i = 0; i < l; ++i)
+            if (i != bufferIndex) {
+                DetachBuffer(i);
+                m_drawBuffers[i] = GL_NONE;
             }
+        return true;
+
+    case dbAll:
+        if ((m_drawBufferGroup == drawBufferGroup) and not reenable)
+            return true;
+        // fall through
+
+    case dbNone:
+        m_activeBufferIndex = -1;
+        m_drawBufferGroup = dbAll;
+        for (int i = 0; i < l; ++i) {
+            m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
+            AttachBuffer(i);
         }
-        else if (m_drawBufferGroup == dbColor) {
+        return true;
+
+    case dbColor:
+        if ((m_drawBufferGroup != drawBufferGroup) or reenable) {
             int i = 0;
             for ( ; i < m_colorBufferCount; ++i) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
@@ -247,7 +253,10 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
                 m_drawBuffers[i] = GL_NONE;
             }
         }
-        else if (m_drawBufferGroup == dbExtra) {
+        return true;
+
+    case dbExtra:
+        if ((m_drawBufferGroup != drawBufferGroup) or reenable) {
             int i = 0;
             for (; i < m_colorBufferCount; ++i) {
                 DetachBuffer(i);
@@ -258,8 +267,12 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
                 AttachBuffer(i);
             }
         }
-    }
+        return true;
+
+    case dbCustom:
+    default:
     return true;
+    }
 }
 
 

@@ -154,9 +154,7 @@ public:
 
     bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
 
-    bool SelectDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll);
-
-    bool SetDrawBuffers(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool reenable = false);
+    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable);
 
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
