@@ -6,6 +6,7 @@
 
 #include "gfxstates.h"
 #include "drawbufferhandler.h"
+#include "rendertarget.h"
 
 #ifdef OPENGL
 #include "glew.h"
@@ -15,7 +16,6 @@
 #endif
 
 // =================================================================================================
-
 
 void DrawBufferHandler::Setup(int windowWidth, int windowHeight) {
     m_parentBuffer = nullptr;
@@ -28,14 +28,6 @@ void DrawBufferHandler::Setup(int windowWidth, int windowHeight) {
 
 
 void DrawBufferHandler::SetActiveDrawBuffers(void) {
-    if (m_activeBuffer) {
-        glDrawBuffers(m_activeBuffer->DrawBuffers().Length(), m_activeBuffer->DrawBuffers().Data());
-        glViewport(0, 0, m_activeBuffer->GetWidth(true), m_activeBuffer->GetHeight(true));
-    }
-    else {
-        glDrawBuffers(m_defaultDrawBuffers.Length(), m_defaultDrawBuffers.Data());
-        glViewport(0, 0, m_windowWidth, m_windowHeight);
-    }
 }
 
 

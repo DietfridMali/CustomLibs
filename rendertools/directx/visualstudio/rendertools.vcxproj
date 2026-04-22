@@ -128,10 +128,10 @@
     <ClInclude Include="..\include\cbv_allocator.h" />
     <ClInclude Include="..\include\commandlist.h" />
     <ClInclude Include="..\include\descriptor_heap.h" />
+    <ClInclude Include="..\include\drawbufferhandler.h" />
     <ClInclude Include="..\include\dx12context.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
-    <ClInclude Include="..\..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
     <ClInclude Include="..\include\dx12upload.h" />
     <ClInclude Include="..\include\renderstates.h" />
@@ -185,10 +185,10 @@
     <ClCompile Include="..\src\cbv_allocator.cpp" />
     <ClCompile Include="..\src\commandlist.cpp" />
     <ClCompile Include="..\src\descriptor_heap.cpp" />
+    <ClCompile Include="..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\src\dx12context.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />
-    <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\src\dx12upload.cpp" />
     <ClCompile Include="..\src\renderstates.cpp" />
     <ClCompile Include="..\src\rendertarget.cpp" />

@@ -8,6 +8,7 @@
 #include "descriptor_heap.h"
 #include "commandlist.h"
 #include "base_quad.h"
+#include "drawbufferhandler.h"
 
 // =================================================================================================
 // DX12 RenderTarget (Frame Buffer Object)
@@ -63,6 +64,8 @@ public:
 class RenderTarget
 {
 public:
+    using DrawBufferList = DrawBufferHandler::DrawBufferList; // required for high level compatibility
+
     typedef enum {
         dbAll,
         dbColor,
@@ -97,29 +100,30 @@ public:
 
     // -------------------------------------------------------------------------
 
-    String      m_name;
-    int         m_width{ 0 };
-    int         m_height{ 0 };
-    int         m_scale{ 1 };
-    int         m_bufferCount{ 0 };
-    int         m_colorBufferCount{ 0 };
-    int         m_vertexBufferCount{ 0 };
-    int         m_vertexBufferIndex{ -1 };
-    int         m_depthBufferIndex{ -1 };
-    int         m_stencilBufferIndex{ -1 };
-    int         m_activeBufferIndex{ 0 };
-    int         m_lastDestination{ -1 };
-    bool        m_pingPong{ false };
-    bool        m_isAvailable{ false };
-    bool        m_haveRTVs{ false };
-    RGBAColor   m_clearColor{ ColorData::Invisible };
-    eDrawBufferGroups m_drawBufferGroup{ dbAll };
+    String              m_name;
+    int                 m_width{ 0 };
+    int                 m_height{ 0 };
+    int                 m_scale{ 1 };
+    int                 m_bufferCount{ 0 };
+    int                 m_colorBufferCount{ 0 };
+    int                 m_vertexBufferCount{ 0 };
+    int                 m_vertexBufferIndex{ -1 };
+    int                 m_depthBufferIndex{ -1 };
+    int                 m_stencilBufferIndex{ -1 };
+    int                 m_activeBufferIndex{ 0 };
+    int                 m_lastDestination{ -1 };
+    bool                m_pingPong{ false };
+    bool                m_isAvailable{ false };
+    bool                m_haveRTVs{ false };
+    RGBAColor           m_clearColor{ ColorData::Invisible };
+    eDrawBufferGroups   m_drawBufferGroup{ dbAll };
+    DrawBufferList      m_drawBuffers{};
 
-    Viewport     m_viewport;
-    Viewport* m_viewportSave{ nullptr };
-    RenderTargetTexture     m_renderTexture;
-    RenderTargetTexture     m_depthTexture;
-    BaseQuad                m_viewportArea;
+    Viewport            m_viewport;
+    Viewport*           m_viewportSave{ nullptr };
+    RenderTargetTexture m_renderTexture;
+    RenderTargetTexture m_depthTexture;
+    BaseQuad            m_viewportArea;
 
     AutoArray<BufferInfo>   m_bufferInfo;
 
@@ -152,9 +156,9 @@ public:
 
     bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
 
-    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
+    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
-    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable);
+    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
@@ -162,7 +166,7 @@ public:
         return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, reenable);
     }
 
-    void Disable(bool flush = false, bool restoreDrawBuffer = true);
+    void Disable(bool flush = false);
 
     inline void Flush(void) noexcept {
         if (m_cmdList)
@@ -285,8 +289,11 @@ public:
         return m_vertexBufferIndex + i;
     }
 
-private:
+    inline DrawBufferList& DrawBuffers(void) noexcept {
+        return m_drawBuffers;
+    }
 
+private:
     void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
     bool CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat);

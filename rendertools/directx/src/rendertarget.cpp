@@ -396,16 +396,6 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
 }
 
 
-bool RenderTarget::SetDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable)
-{
-    if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
-        return false;
-    if (not reenable)
-        baseRenderer.TrackDrawBuffers(this);
-    return true;
-}
-
-
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup)
 {
     if (m_depthBufferIndex < 0)
@@ -416,12 +406,11 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 }
 
 
-bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable)
+bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear)
 {
-    if (not SetDrawBuffers(bufferIndex, drawBufferGroup, reenable))
+    if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
         return false;
     gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
-    Clear(bufferIndex, drawBufferGroup, clear);
     return true;
 }
 
@@ -441,11 +430,15 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
     if (not wasRecording)
         SetViewport();
 
-    return EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable);
+    if (not EnableBuffers(bufferIndex, drawBufferGroup, clear))
+        return false;
+    baseRenderer.ActivateDrawBuffer(this);
+    Clear(bufferIndex, drawBufferGroup, clear);
+    return true;
 }
 
 
-void RenderTarget::Disable(bool flush, bool restoreDrawBuffer)
+void RenderTarget::Disable(bool flush)
 {
     if (IsEnabled()) {
         auto* list = m_cmdList->List();
@@ -457,8 +450,7 @@ void RenderTarget::Disable(bool flush, bool restoreDrawBuffer)
         }
         else
             m_cmdList->Close();
-        if (restoreDrawBuffer)
-            baseRenderer.RestoreDrawBuffer();
+        baseRenderer.DeactivateDrawBuffer(this);
     }
 }
 

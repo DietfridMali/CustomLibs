@@ -230,7 +230,7 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
     case dbAll:
         if ((m_drawBufferGroup == drawBufferGroup) and not reenable)
             return true;
-        // fall through
+        [[fallthrough]];
 
     case dbNone:
         m_activeBufferIndex = -1;
@@ -357,6 +357,8 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
         fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
     baseRenderer.ActivateDrawBuffer(this);
     Clear(bufferIndex, drawBufferGroup, clear);
+    baseRenderer.PushViewport();
+    SetViewport();
     return true;
 }
 
@@ -364,20 +366,19 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
 void RenderTarget::Disable(bool flush) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
-        if (IsEnabled()) {
-            baseRenderer.CheckGfxError();
+        baseRenderer.CheckGfxError();
 #if 1
-            for (int i = 0; i < m_colorBufferCount; ++i) {
-                m_drawBuffers[i] = GL_NONE;
-                DetachBuffer(i);
-            }
-#endif
-            m_activeBufferIndex = -1;
-            m_drawBufferGroup = dbNone;
-            baseRenderer.CheckGfxError();
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            baseRenderer.DeactivateDrawBuffer(this);
+        for (int i = 0; i < m_colorBufferCount; ++i) {
+            m_drawBuffers[i] = GL_NONE;
+            DetachBuffer(i);
         }
+#endif
+        m_activeBufferIndex = -1;
+        m_drawBufferGroup = dbNone;
+        baseRenderer.CheckGfxError();
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        baseRenderer.DeactivateDrawBuffer(this);
+        baseRenderer.PopViewport();
     }
 }
 

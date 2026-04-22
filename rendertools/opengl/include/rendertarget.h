@@ -7,6 +7,7 @@
 #include "viewport.h"
 #include "texture.h"
 #include "colordata.h"
+#include "drawbufferhandler.h"
 
 // =================================================================================================
 
@@ -45,7 +46,7 @@ public:
 
 class RenderTarget {
 public:
-    using DrawBufferList = AutoArray <GLuint>;
+    using DrawBufferList = DrawBufferHandler::DrawBufferList;
 
     typedef enum {
         dbAll,

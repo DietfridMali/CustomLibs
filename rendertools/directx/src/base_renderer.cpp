@@ -149,12 +149,12 @@ void BaseRenderer::StartFullPass(void) noexcept {
 
 
 bool BaseRenderer::Start3DScene(void) {
-    SetupGraphics();
     m_frameCounter.Start();
+    SetupGraphics();
+    ResetDrawBuffers();
     RenderTarget* sceneBuffer = GetSceneBuffer();
-    if (not (sceneBuffer and sceneBuffer->IsAvailable()))
+    if (not (sceneBuffer and sceneBuffer->Enable()))
         return false;
-    ResetDrawBuffers(sceneBuffer);
     SetupTransformation();
     SetViewport(m_sceneViewport);
     EnableCamera();
@@ -174,9 +174,9 @@ bool BaseRenderer::Stop3DScene(void) {
 
 bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
+    ResetDrawBuffers();
     m_renderList->Open(commandListHandler.CmdQueue().FrameIndex());
     SetClearColor(m_backgroundColor);
-    ResetDrawBuffers(m_screenBuffer, !m_screenIsAvailable);
     m_screenIsAvailable = true;
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
@@ -186,7 +186,7 @@ bool BaseRenderer::Start2DScene(void) {
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
     gfxStates.SetFaceCulling(0);
 
-    if (not (m_screenBuffer and m_screenBuffer->IsAvailable())) {
+    if (not (m_screenBuffer and m_screenBuffer->Enable())) {
         // No screen RenderTarget: clear the swap chain back buffer directly.
         auto* list = commandListHandler.CurrentList();
         if (list) {
