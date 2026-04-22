@@ -308,14 +308,16 @@ public:
         return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
 
-    inline bool StartRender(void) noexcept {
-        return true;
+#pragma warning(push)
+#pragma warning(disable:4100)
+    inline void* StartOperation(String /*name*/) noexcept {
+        return nullptr;
     }
 
-    void FinishRender(void) noexcept {
+    inline bool FinishOperation(void* cl = nullptr, bool flush = false) noexcept {
         return true;
     }
-
+#pragma warning(pop)
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

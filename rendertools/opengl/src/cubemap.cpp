@@ -13,9 +13,9 @@ void Cubemap::SetParams(void) {
 
 
 bool Cubemap::Deploy(int bufferIndex) {
-    if (not IsAvailable())
-        return false;
-    if (not Bind())
+    if (IsDeployed())
+        return true;
+    if (not Bind(0, true))
         return false;
     SetParams();
     int i = 0;
@@ -34,6 +34,7 @@ bool Cubemap::Deploy(int bufferIndex) {
             glTexImage2D(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, texBuf->m_data.Data());
     }
     Release ();
+    m_isDeployed = true;
     return true;
 }
 

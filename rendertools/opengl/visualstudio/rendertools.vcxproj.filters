@@ -182,9 +182,6 @@
     <ClCompile Include="..\..\src\cube.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\cubemap.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\base_displayhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -304,6 +301,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\tiny_gltf.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\cubemap.cpp">
+      <Filter>Source Files\Texture</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

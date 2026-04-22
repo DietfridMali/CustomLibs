@@ -78,9 +78,7 @@ bool NoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& params, 
         data += 4;
     }
 #endif
-    if (deploy)
-        Deploy();
-    return true;
+    return deploy ? Deploy() : true;
 }
 
 
@@ -149,13 +147,16 @@ void NoiseTexture3D::SetParams(bool enforce) {
 
 
 bool NoiseTexture3D::Deploy(int) {
-    if (not Bind())
+    if (IsDeployed())
+        return true;
+    if (not Bind(0, true))
         return false;
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, 0, GL_RGBA, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
     SetParams(false);
     glGenerateMipmap(GL_TEXTURE_3D);
     Release();
+    m_isDeployed = true;
     return true;
 }
 
@@ -257,8 +258,7 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
         *data = n * n;
     }
 #endif
-    Deploy();
-    return true;
+    return Deploy();
 }
 
 
@@ -340,7 +340,9 @@ void CloudNoiseTexture::SetParams(bool enforce) {
 
 
 bool CloudNoiseTexture::Deploy(int) {
-    if (not Bind())
+    if (IsDeployed())
+        return true;
+    if (not Bind(0, true))
         return false;
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R16F, m_gridSize, m_gridSize, m_gridSize, 0, GL_RED, GL_FLOAT, reinterpret_cast<const void*>(m_data.Data()));
@@ -388,8 +390,7 @@ bool BlueNoiseTexture::Create(String noiseFilename) {
         Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
     }
-    Deploy();
-    return true;
+    return Deploy();
 }
 
 
@@ -416,13 +417,16 @@ void BlueNoiseTexture::SetParams(bool enforce) {
 
 
 bool BlueNoiseTexture::Deploy(int) {
-    if (not Bind())
+    if (IsDeployed())
+        return true;
+    if (not Bind(0, true))
         return false;
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, 128, 128, 64, 0, GL_RED, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(m_data.Data()));
     SetParams(false);
     glGenerateMipmap(GL_TEXTURE_3D);
     Release();
+    m_isDeployed = true;
     return true;
 }
 

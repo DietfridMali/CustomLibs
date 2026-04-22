@@ -2,8 +2,6 @@
 
 #include <utility>
 #include <stdio.h>
-#include <stdexcept>
-#include <cstring>
 
 #include "std_defines.h"
 
@@ -113,10 +111,9 @@ void Texture::Destroy(void)
 {
     if (m_isValid) {
         m_isValid = false;
+        m_isDeployed = false;
         if (m_isDisposable)
             gfxResourceHandler.Track(m_resource);
-        // Note: descriptor allocator doesn't support free in this implementation.
-        // The handle index is not returned to the heap (acceptable for now).
         m_handle = UINT32_MAX;
         m_resource.Reset();
         for (auto* p : m_buffers) {
@@ -131,13 +128,14 @@ void Texture::Destroy(void)
 
 bool Texture::IsAvailable(void)
 {
-    return m_isValid && m_handle != UINT32_MAX;
+    return m_isValid && m_handle != UINT32_MAX
+        and (HasBuffer() or (not m_buffers.IsEmpty() and IsDeployed()));
 }
 
 
-bool Texture::Bind(int tmuIndex)
+bool Texture::Bind(int tmuIndex, bool isDeploying)
 {
-    if (not IsAvailable()) 
+    if (not isDeploying and not IsAvailable())
         return false;
     m_tmuIndex = tmuIndex;
     gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
@@ -173,80 +171,100 @@ void Texture::SetParams(bool /*forceUpdate*/)
 }
 
 
-bool Texture::Deploy(int bufferIndex)
+bool Texture::CreateTextureResource(int w, int h, int arraySize)
 {
-    if (bufferIndex >= m_buffers.Length()) 
-        return false;
-    TextureBuffer* tb = m_buffers[bufferIndex];
-    if (not tb) 
-        return false;
-
     ID3D12Device* device = dx12Context.Device();
-    if (not device) 
+    if (not device)
         return false;
 
-    int w = tb->m_info.m_width;
-    int h = tb->m_info.m_height;
-    int channels = tb->m_info.m_componentCount;
-    if (w <= 0 or h <= 0)
-        return false;
-
-    if (m_resource) {
-        D3D12_RESOURCE_DESC desc = m_resource->GetDesc();
-        if (desc.Width == UINT(w) and desc.Height == UINT(h))
-            return true;
-        m_resource.Reset();
-    }
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
     rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     rd.Width = UINT(w);
     rd.Height = UINT(h);
-    rd.DepthOrArraySize = (m_type == TextureType::CubeMap) ? 6 : 1;
+    rd.DepthOrArraySize = UINT16(arraySize);
     rd.MipLevels = 1;
     rd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     rd.SampleDesc.Count = 1;
     rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
     HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource));
-    if (FAILED(hr)) 
+    if (FAILED(hr))
         return false;
 #ifdef _DEBUG
     char name[128];
     snprintf(name, sizeof(name), "Texture[%s]", (const char*)m_name);
     m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
 #endif
+    return true;
+}
 
-    // Upload pixel data
-    const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-    if (not UploadTextureData(device, m_resource.Get(), pixels, w, h, channels))
+
+bool Texture::CreateSRV(void)
+{
+    ID3D12Device* device = dx12Context.Device();
+    if (not device)
         return false;
 
-    // Create / update SRV
     if (m_handle == UINT32_MAX) {
         DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-        if (not hdl.IsValid()) 
+        if (not hdl.IsValid())
             return false;
         m_handle = hdl.index;
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
     srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    srvDesc.ViewDimension = (m_type == TextureType::CubeMap) ? D3D12_SRV_DIMENSION_TEXTURECUBE : D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture2D.MipLevels = 1;
+    if (m_type == TextureType::CubeMap) {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+        srvDesc.TextureCube.MipLevels = 1;
+    }
+    else {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 1;
+    }
 
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
     device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
+    return true;
+}
 
-    m_isValid = true;
+
+bool Texture::Deploy(int bufferIndex)
+{
+    if (m_isDeployed)
+        return true;
+    if (not Bind(0, true))
+        return false;
+    if (bufferIndex >= m_buffers.Length())
+        return false;
+    TextureBuffer* tb = m_buffers[bufferIndex];
+    if (not tb)
+        return false;
+
+    int w = tb->m_info.m_width;
+    int h = tb->m_info.m_height;
+    if (w <= 0 or h <= 0)
+        return false;
+
+    if (not CreateTextureResource(w, h, 1))
+        return false;
+    const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
+    if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, tb->m_info.m_componentCount))
+        return false;
+    if (not CreateSRV())
+        return false;
+
     m_hasBuffer = true;
+    m_isDeployed = true;
     return true;
 }
 
 
 bool Texture::Redeploy(void)
 {
+    m_isDeployed = false;
     return Deploy(0);
 }
 
@@ -265,33 +283,17 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
         }
         else {
             String fullPath = folder + "/" + fileName;
-            SDL_Surface* surface = IMG_Load((const char*)fullPath);
-            if (not surface) {
+            SDL_Surface* image = IMG_Load((const char*)fullPath);
+            if (not image) {
                 if (params.isRequired)
                     fprintf(stderr, "Texture::Load: failed to load '%s'\n", (const char*)fullPath);
                 return false;
             }
-            SDL_Surface* converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-            SDL_FreeSurface(surface);
-            if (not converted)
-                return false;
-            texBuf = new (std::nothrow) TextureBuffer();
-            if (not texBuf) {
-                SDL_FreeSurface(converted);
-                return false;
-            }
-            SDL_LockSurface(converted);
-            texBuf->m_info.m_width = converted->w;
-            texBuf->m_info.m_height = converted->h;
-            texBuf->m_info.m_componentCount = 4;
-            texBuf->m_data.Resize(converted->w * converted->h * 4);
-            std::memcpy(texBuf->DataBuffer(), converted->pixels, converted->w * converted->h * 4);
-            SDL_UnlockSurface(converted);
-            SDL_FreeSurface(converted);
+            texBuf = new TextureBuffer();
+            texBuf->Create(image, params.premultiply, params.flipVertically);
             m_buffers.Append(texBuf);
         }
     }
-    m_hasBuffer = true;
     return true;
 }
 
@@ -306,66 +308,25 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         return false;
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
-    Deploy();
     m_isDisposable = params.isDisposable;
-    m_isValid = true;
-    return true;
+    return Deploy();
 }
 
 
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
 {
-    if (not surface) 
+    if (not Create())
         return false;
-
-    // Convert to RGBA if needed
-    SDL_Surface* converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-    if (not converted) 
-        return false;
-
-    int w = converted->w;
-    int h = converted->h;
-
-    // Store pixel data in a TextureBuffer
-    TextureBuffer* tb = new (std::nothrow) TextureBuffer();
-    if (not tb) { 
-        SDL_FreeSurface(converted); 
-        return false; 
-    }
-
-    SDL_LockSurface(converted);
-
-    tb->m_info.m_width = w;
-    tb->m_info.m_height = h;
-    tb->m_info.m_componentCount = 4;
-    tb->m_data.Resize(w * h * 4);
-    std::memcpy(tb->DataBuffer(), converted->pixels, w * h * 4);
-
-    SDL_UnlockSurface(converted);
-    SDL_FreeSurface(converted);
-
-    if (not m_buffers.IsEmpty())
-        m_buffers.Clear();
-    m_buffers.Append(tb);
-    m_hasBuffer = true;
-
-    if (not Create()) 
-        return false;
-    if (not Deploy(0)) 
-        return false;
-
-    if (params.cartoonize)
-        Cartoonize(params.blur, params.gradients, params.outline);
-
+    m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
     m_isDisposable = params.isDisposable;
-    m_isValid = true;
-    return true;
+    return Deploy();
 }
 
 
-void Texture::Cartoonize(uint16_t /*blurStrength*/, uint16_t /*gradients*/, uint16_t /*outlinePasses*/)
+void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses)
 {
-    // Post-process: not implemented for DX12 port yet.
+    for (auto& b : m_buffers)
+        b->Cartoonize(blurStrength, gradients, outlinePasses);
 }
 
 

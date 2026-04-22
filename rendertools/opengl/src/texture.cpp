@@ -132,21 +132,34 @@ noexcept
 }
 
 
-bool Texture::IsAvailable(void)
+bool Texture::IsAvailable(bool isDeploying)
 {
-    return
 #if USE_SHARED_HANDLES
-        m_handle.IsAvailable()
+    if (not m_handle.IsAvailable())
+        return false;
 #else
-        (m_handle != 0)
+    if (m_handle != 0)
+        return false;
 #endif
-        and (HasBuffer() or not m_buffers.IsEmpty());
+    if (HasBuffer())
+        return true;
+    if (isDeploying)
+        return true;
+    if (m_buffers.IsEmpty())
+        return false;
+#ifdef _DEBUG
+    if (IsDeployed())
+        return true;
+    return false;
+#else
+    return IsDeployed();
+#endif
 }
 
 
-bool Texture::Bind(int tmuIndex)
+bool Texture::Bind(int tmuIndex, bool isDeploying)
 {
-    if (not IsAvailable())
+    if (not IsAvailable(isDeploying))
         return false;
     m_tmuIndex = 
 #if USE_SHARED_HANDLES
@@ -210,7 +223,9 @@ void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t out
 
 bool Texture::Deploy(int bufferIndex)
 {
-    if (not Bind())
+    if (IsDeployed())
+        return true;
+    if (not Bind(0, true))
         return false;
     TextureBuffer* texBuf = m_buffers[bufferIndex];
     uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.Data());
@@ -220,6 +235,7 @@ bool Texture::Deploy(int bufferIndex)
     baseRenderer.CheckGfxError();
 #endif
     Release();
+    m_isDeployed = true;
     return true;
     
 }
@@ -240,8 +256,7 @@ bool Texture::Redeploy(void) {
         return false;
     m_tmuIndex = -1;
     m_hasParams = false;
-    Deploy(0);
-    return true;
+    return Deploy(0);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -344,8 +359,8 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         return false;
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
-    Deploy();
-    return true;
+    m_isDisposable = params.isDisposable;
+    return Deploy();
 }
 
 
@@ -353,7 +368,8 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     if (not Create())
         return false;
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
-    return true;
+    m_isDisposable = params.isDisposable;
+    return Deploy();
 }
 
 

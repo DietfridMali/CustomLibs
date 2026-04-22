@@ -57,7 +57,7 @@ public:
     virtual bool Create(void)   = 0;
     virtual void Destroy(void)  = 0;
     virtual bool IsAvailable(void) = 0;
-    virtual bool Bind(int tmuIndex) = 0;
+    virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
     virtual void Release(void)  = 0;
     virtual void SetParams(bool forceUpdate = false) = 0;
     virtual bool Deploy(int bufferIndex = 0) = 0;
@@ -90,6 +90,7 @@ public:
     bool                        m_hasBuffer{ false };
     bool                        m_hasParams{ false };
     bool                        m_isValid{ false };
+    bool                        m_isDeployed{ false };
     bool                        m_isDisposable{ false };
 
     static uint32_t             nullHandle;   // UINT32_MAX — matches OGL Texture::nullHandle usage
@@ -155,7 +156,7 @@ public:
     
     virtual bool IsAvailable(void) override;
     
-    virtual bool Bind(int tmuIndex = 0) override;
+    virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
     
     virtual void Release(void) override;
     
@@ -222,9 +223,17 @@ public:
             gfxStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
     }
 
-    inline bool& HasBuffer(void) noexcept { 
-        return m_hasBuffer; 
+    inline bool IsDeployed(void) const noexcept {
+        return m_isDeployed;
     }
+
+    inline bool& HasBuffer(void) noexcept {
+        return m_hasBuffer;
+    }
+
+    bool CreateTextureResource(int w, int h, int arraySize);
+
+    bool CreateSRV(void);
 
     static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight) noexcept;
 };

@@ -51,6 +51,8 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
         // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
         info->atlasSize = scale * m_atlas.GlyphScale();
         m_atlas.Add(info->texture, info->index, scale);
+        delete info->texture;
+        info->texture = nullptr;
     }
 #ifdef _DEBUG
     else
@@ -72,7 +74,7 @@ bool FontHandler::FreeGlyph(const String& key, GlyphInfo* info) {
 
 
 int FontHandler::BuildAtlas(void) {
-#if 1
+#if 0
     m_atlas.GetRenderTarget()->SetClearColor(RGBAColor(0.5, 0, 0.5, 0));
 #endif
     if (not m_atlas.Enable())
@@ -87,7 +89,6 @@ int FontHandler::BuildAtlas(void) {
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
     baseRenderer.PopViewport();
     m_atlas.Disable(true);
-    //m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
     return m_glyphDict.Size();
 }
 
@@ -148,6 +149,9 @@ bool FontHandler::CreateTexture(const char* szChar, String key, int index)
         info = GlyphInfo();
         return false;
         }
+#if 0 // macht jetzt Texture::CreateFromSurface
+    info.texture->Deploy();
+#endif
     if (not m_glyphDict.Insert(info.name, info))
         return false;
     info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());

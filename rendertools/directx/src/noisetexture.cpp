@@ -175,7 +175,7 @@ bool NoiseTexture3D::Deploy(int) {
     if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
         return false;
 
-    m_isValid   = true;
+    m_isDeployed = true;
     m_hasBuffer = true;
     return true;
 }
@@ -345,7 +345,7 @@ bool CloudNoiseTexture::Deploy(int) {
     if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
         return false;
 
-    m_isValid   = true;
+    m_isDeployed = true;
     m_hasBuffer = true;
     return true;
 }
@@ -428,7 +428,7 @@ bool BlueNoiseTexture::Deploy(int) {
     if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
         return false;
 
-    m_isValid   = true;
+    m_isDeployed = true;
     m_hasBuffer = true;
     return true;
 }

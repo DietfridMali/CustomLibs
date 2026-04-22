@@ -46,6 +46,7 @@ struct TextureCreationParams {
     bool        flipVertically{ false };
     bool        cartoonize{ false };
 	bool        isRequired{ true };
+    bool        isDisposable{ false };
     uint16_t    blur{ 4 };
     uint16_t    gradients{ 7 };
     uint16_t    outline{ 4 };
@@ -61,9 +62,9 @@ public:
 
     virtual void Destroy(void) = 0;
 
-    virtual bool IsAvailable(void) = 0;
+    virtual bool IsAvailable(bool isDeploying = false) = 0;
 
-    virtual bool Bind(int tmuIndex) = 0;
+    virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
 
     virtual void Release(void) = 0;
 
@@ -102,7 +103,9 @@ public:
     int                         m_useMipMaps{ false };
     bool                        m_hasBuffer{ false };
     bool                        m_hasParams{ false };
+    bool                        m_isDeployed{ false };
     bool                        m_isValid{ false };
+    bool                        m_isDisposable{ false };
 
     static SharedTextureHandle  nullHandle;
 
@@ -181,11 +184,15 @@ public:
 
     virtual void Destroy(void) override;
 
-    virtual bool IsAvailable(void) override;
+    virtual bool IsAvailable(bool isDeploying = false) override;
 
-    virtual bool Bind(int tmuIndex = 0) override;
+    virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
 
     virtual void Release(void) override;
+
+    inline bool IsDeployed(void) noexcept {
+        return m_isDeployed;
+    }
 
     inline bool Enable(int tmuIndex = 0) {
         return Bind(tmuIndex);
