@@ -532,7 +532,7 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) 
 }
 
 
-Texture* RenderTarget::GetDepthTexture(void) {
+Texture* RenderTarget::GetDepthAsTexture(void) {
     SharedTextureHandle handle = BufferHandle(m_depthBufferIndex);
     m_depthTexture.HasBuffer() = true;
     if (m_depthTexture.m_handle != handle) {

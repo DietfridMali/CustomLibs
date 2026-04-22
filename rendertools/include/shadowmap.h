@@ -56,7 +56,7 @@ public:
 	}
 
 	inline Texture* ShadowTexture(void) noexcept {
-		return m_map ? m_map->GetDepthTexture() : nullptr;
+		return m_map ? m_map->GetDepthAsTexture() : nullptr;
 	}
 
 	inline void EnableCamera(void) noexcept {

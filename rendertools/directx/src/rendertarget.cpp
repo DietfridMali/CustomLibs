@@ -11,7 +11,9 @@
 // DX12 RenderTarget implementation
 
 static constexpr DXGI_FORMAT kColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-static constexpr DXGI_FORMAT kDepthFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+static constexpr DXGI_FORMAT kDepthTypelessFormat = DXGI_FORMAT_R24G8_TYPELESS;
+static constexpr DXGI_FORMAT kDepthDSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+static constexpr DXGI_FORMAT kDepthSRVFormat = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -19,9 +21,8 @@ static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
 {
     switch (type) {
     case BufferInfo::btDepth:
-        return kDepthFormat;
     case BufferInfo::btStencil:
-        return kDepthFormat;
+        return kDepthTypelessFormat;
     default:
         return kColorFormat;
     }
@@ -125,65 +126,89 @@ void RenderTarget::Init(void)
 }
 
 
+bool RenderTarget::CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat)
+{
+    info.m_srvHandle = descriptorHeaps.AllocSRV();
+    if (not info.m_srvHandle.IsValid())
+        return false;
+    info.m_srvIndex = info.m_srvHandle.index;
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvd{};
+    srvd.Format = srvFormat;
+    srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvd.Texture2D.MipLevels = 1;
+    device->CreateShaderResourceView(info.m_resource.Get(), &srvd, info.m_srvHandle.cpu);
+    return true;
+}
+
+
+void RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+{
+    D3D12_CLEAR_VALUE cv{};
+    cv.Format = kDepthDSVFormat;
+    cv.DepthStencil.Depth = 1.0f;
+    cv.DepthStencil.Stencil = 0;
+    info.m_resource = CreateRTResource(device, w, h, kDepthTypelessFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
+    if (not info.m_resource)
+        return;
+    info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+
+    info.m_dsvHandle = descriptorHeaps.AllocDSV();
+    if (not info.m_dsvHandle.IsValid())
+        return;
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
+    dsvd.Format = kDepthDSVFormat;
+    dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    device->CreateDepthStencilView(info.m_resource.Get(), &dsvd, info.m_dsvHandle.cpu);
+
+    CreateSRV(device, info, kDepthSRVFormat);
+}
+
+
+void RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+{
+    DXGI_FORMAT fmt = kColorFormat;
+    D3D12_CLEAR_VALUE cv{};
+    cv.Format = fmt;
+    info.m_resource = CreateRTResource(device, w, h, fmt, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
+    if (not info.m_resource)
+        return;
+    info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+
+    info.m_rtvHandle = descriptorHeaps.AllocRTV();
+    if (not info.m_rtvHandle.IsValid())
+        return;
+    D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
+    rtvd.Format = fmt;
+    rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+    device->CreateRenderTargetView(info.m_resource.Get(), &rtvd, info.m_rtvHandle.cpu);
+
+    if (not CreateSRV(device, info, fmt))
+        return;
+
+    auto* list = m_cmdList->List();
+    if (list)
+        info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+}
+
+
 void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType)
 {
     ID3D12Device* device = dx12Context.Device();
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    info.Init();
-    info.m_type = bufferType;
+    if (device) {
+        BufferInfo& info = m_bufferInfo[bufferIndex];
+        info.Init();
+        info.m_type = bufferType;
 
-    DXGI_FORMAT fmt = FormatForType(bufferType);
-    D3D12_CLEAR_VALUE cv{};
-    cv.Format = fmt;
+        int w = m_width * m_scale;
+        int h = m_height * m_scale;
 
-    int w = m_width * m_scale;
-    int h = m_height * m_scale;
-
-    if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil)) {
-        cv.DepthStencil.Depth = 1.0f;
-        cv.DepthStencil.Stencil = 0;
-        info.m_resource = CreateRTResource(device, w, h, fmt, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(bufferType));
-        if (not info.m_resource)
-            return;
-        info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        info.m_dsvHandle = descriptorHeaps.AllocDSV();
-        if (not info.m_dsvHandle.IsValid())
-            return;
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-        dsvd.Format = fmt;
-        dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        device->CreateDepthStencilView(info.m_resource.Get(), &dsvd, info.m_dsvHandle.cpu);
+        if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil))
+            CreateDepthBuffer(device, info, w, h);
+        else
+            CreateColorBuffer(device, info, w, h);
+        ++m_bufferCount;
     }
-    else {
-        info.m_resource = CreateRTResource(device, w, h, fmt, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(bufferType));
-        if (not info.m_resource)
-            return;
-        info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-        info.m_rtvHandle = descriptorHeaps.AllocRTV();
-        if (not info.m_rtvHandle.IsValid())
-            return;
-        D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
-        rtvd.Format = fmt;
-        rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        device->CreateRenderTargetView(info.m_resource.Get(), &rtvd, info.m_rtvHandle.cpu);
-
-        info.m_srvHandle = descriptorHeaps.AllocSRV();
-        if (not info.m_srvHandle.IsValid())
-            return;
-        info.m_srvIndex = info.m_srvHandle.index;
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvd{};
-        srvd.Format = fmt;
-        srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvd.Texture2D.MipLevels = 1;
-        device->CreateShaderResourceView(info.m_resource.Get(), &srvd, info.m_srvHandle.cpu);
-
-        auto* list = m_cmdList->List();
-        if (list)
-            info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    }
-    ++m_bufferCount;
 }
 
 
@@ -508,9 +533,17 @@ void RenderTarget::ClearStencil(void)
 }
 
 
-Texture* RenderTarget::GetDepthTexture(void)
+Texture* RenderTarget::GetDepthAsTexture(void)
 {
-    return nullptr;
+    if (m_depthBufferIndex < 0)
+        return nullptr;
+    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
+    if (not info.m_resource)
+        return nullptr;
+    m_depthTexture.m_handle = info.m_srvIndex;
+    m_depthTexture.m_resource = info.m_resource;
+    m_depthTexture.m_isValid = true;
+    return &m_depthTexture;
 }
 
 

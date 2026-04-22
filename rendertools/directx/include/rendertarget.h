@@ -188,7 +188,7 @@ public:
     // Render helpers (same as OGL)
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
-    Texture* GetDepthTexture(void);
+    Texture* GetDepthAsTexture(void);
 
     bool UpdateTransformation(const RTRenderParams& params);
 
@@ -290,6 +290,12 @@ public:
 private:
 
     void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
+
+    bool CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat);
+
+    void CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+
+    void CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
     int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
 

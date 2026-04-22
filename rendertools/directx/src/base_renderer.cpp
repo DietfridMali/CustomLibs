@@ -113,7 +113,7 @@ void BaseRenderer::SetDefaultStates(void) noexcept {
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.SetBlending(0);
     gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
-    gfxStates.FrontFace(GetWinding());
+    gfxStates.FrontFace(GetWinding(true));
     gfxStates.SetFaceCulling(1);
     gfxStates.CullFace(GfxOperations::FaceCull::Back);
 }
@@ -231,7 +231,7 @@ void BaseRenderer::Draw3DScene(void) {
                 PopMatrix();
         }
         if (shader == nullptr)
-            m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
+            m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = false /*true*/, .rotation = 0.0f });
 
         static bool renderScene = true;
         if (renderScene) {
@@ -245,7 +245,7 @@ void BaseRenderer::Draw3DScene(void) {
 
 
 void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically) {
-    m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = bRotate ? 90.0f : 0.0f });
+    m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = false /*bFlipVertically*/, .rotation = bRotate ? 90.0f : 0.0f });
     m_renderQuad.Render(nullptr, texture, color);
 }
 
@@ -302,6 +302,9 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
+#ifdef _DEBUG
+    flipVertically = false;
+#endif
     if (windowWidth * windowHeight == 0) {
         if (m_drawBufferInfo.m_renderTarget) {
             windowWidth  = m_drawBufferInfo.m_renderTarget->GetWidth(true);

@@ -150,7 +150,6 @@ const ShaderSource& CircleShader() {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
                 column_major float4x4 mViewport;
-                column_major float4x4 mLightTransform;
             };
             struct VSInput { float3 pos : POSITION; float2 tc : TEXCOORD; };
             struct PSInput {

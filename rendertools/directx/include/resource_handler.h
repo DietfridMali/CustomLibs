@@ -19,10 +19,22 @@ private:
 	AutoArray<ComPtr<ID3D12Resource>>	m_frameResources[2];  // resources kept alive until after ExecuteAll
 
 public:
-	ComPtr<ID3D12Resource> GetUploadResource(size_t dataSize);
+	ComPtr<ID3D12Resource> GetUploadResource(const char* name, size_t dataSize);
 
 	inline void Cleanup(void) noexcept {
+		static uint64_t callCount = 0;
 		m_frameIndex = (m_frameIndex + 1) % 2;
+#ifdef _DEBUG
+		++callCount;
+		AutoArray<ComPtr<ID3D12Resource>>& a = m_frameResources[m_frameIndex];
+		for (int i = a.Length(); i > 0; ) {
+			char name[256] = {};
+			UINT size = sizeof(name);
+			--i;
+			a[i]->GetPrivateData(WKPDID_D3DDebugObjectName, &size, name);
+			a[i] = nullptr;
+		}
+#endif
 		m_frameResources[m_frameIndex].Clear();
 	}
 

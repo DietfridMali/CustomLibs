@@ -5,7 +5,7 @@
 
 // =================================================================================================
 
-ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(size_t dataSize) {
+ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(const char* name, size_t dataSize) {
 	ID3D12Device* device = dx12Context.Device();
 	if (not device or (dataSize == 0))
 		return nullptr;
@@ -21,6 +21,11 @@ ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(size_t dataSize) {
 	ComPtr<ID3D12Resource> resource;
 	if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&resource))))
 		return nullptr;
+	if (*name) {
+		if (!strcmp(name, "GfxDataBuffer[TexCoord/0] static"))
+			fprintf(stderr, "dubious resource found\n");
+		resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+	}
 
 	Track(resource);
 	return resource;

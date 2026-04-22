@@ -142,7 +142,7 @@ public:
 
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
-    Texture* GetDepthTexture(void);
+    Texture* GetDepthAsTexture(void);
 
     bool UpdateTransformation(const RTRenderParams& params);
 

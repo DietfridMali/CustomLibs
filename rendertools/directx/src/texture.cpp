@@ -253,29 +253,63 @@ bool Texture::Redeploy(void)
 
 bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params)
 {
-    return CreateFromFile(folder, fileNames, params);
+    m_filenames = fileNames;
+    m_name = fileNames.First();
+    TextureBuffer* texBuf = nullptr;
+    for (auto& fileName : fileNames) {
+        if (fileName.IsEmpty()) {
+            if (not texBuf)
+                return false;
+            ++(texBuf->m_refCount);
+            m_buffers.Append(texBuf);
+        }
+        else {
+            String fullPath = folder + "/" + fileName;
+            SDL_Surface* surface = IMG_Load((const char*)fullPath);
+            if (not surface) {
+                if (params.isRequired)
+                    fprintf(stderr, "Texture::Load: failed to load '%s'\n", (const char*)fullPath);
+                return false;
+            }
+            SDL_Surface* converted = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+            SDL_FreeSurface(surface);
+            if (not converted)
+                return false;
+            texBuf = new (std::nothrow) TextureBuffer();
+            if (not texBuf) {
+                SDL_FreeSurface(converted);
+                return false;
+            }
+            SDL_LockSurface(converted);
+            texBuf->m_info.m_width = converted->w;
+            texBuf->m_info.m_height = converted->h;
+            texBuf->m_info.m_componentCount = 4;
+            texBuf->m_data.Resize(converted->w * converted->h * 4);
+            std::memcpy(texBuf->DataBuffer(), converted->pixels, converted->w * converted->h * 4);
+            SDL_UnlockSurface(converted);
+            SDL_FreeSurface(converted);
+            m_buffers.Append(texBuf);
+        }
+    }
+    m_hasBuffer = true;
+    return true;
 }
 
 
 bool Texture::CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params)
 {
-    for (auto& fname : fileNames) {
-        String fullPath = folder + "/" + fname;
-        SDL_Surface* surface = IMG_Load((const char*)fullPath);
-        if (not surface) {
-            if (params.isRequired)
-                fprintf(stderr, "Texture::CreateFromFile: failed to load '%s'\n", (const char*)fullPath);
-            continue;
-        }
-        if (not CreateFromSurface(surface, params)) {
-            SDL_FreeSurface(surface);
-            return false;
-        }
-        SDL_FreeSurface(surface);
-        Register(fname);
+    if (not Create())
+        return false;
+    if (fileNames.IsEmpty())
         return true;
-    }
-    return false;
+    if (not Load(folder, fileNames, params))
+        return false;
+    if (params.cartoonize)
+        Cartoonize(params.blur, params.gradients, params.outline);
+    Deploy();
+    m_isDisposable = params.isDisposable;
+    m_isValid = true;
+    return true;
 }
 
 

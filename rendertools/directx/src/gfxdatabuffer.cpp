@@ -97,13 +97,12 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
 
 
 bool GfxDataBuffer::Create(size_t dataSize) {
-    m_resource = gfxResourceHandler.GetUploadResource(dataSize);
 #ifdef _DEBUG
-    if (m_resource) {
-        char name[128];
-        snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] static", m_type, m_id);
-        m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
-    }
+    char name[128];
+    snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] static", m_type, m_id); 
+    m_resource = gfxResourceHandler.GetUploadResource(name, dataSize);
+#else
+    m_resource = gfxResourceHandler.GetUploadResource("", dataSize);
 #endif
     return m_resource != nullptr;
 }

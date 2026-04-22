@@ -75,6 +75,7 @@ bool CommandQueue::BeginFrame(void) noexcept {
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
     cbvAllocator.Reset(m_frameIndex);
+    gfxResourceHandler.Cleanup();
     return true;
 }
 
@@ -348,7 +349,6 @@ void CommandListHandler::Register(CommandList* cl) noexcept {
 #define LOG_EXECUTION 1
 
 void CommandListHandler::ExecuteAll(void) noexcept {
-    gfxResourceHandler.Cleanup();
     if (m_pendingLists.IsEmpty())
         return;
 	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
