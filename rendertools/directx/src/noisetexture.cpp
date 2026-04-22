@@ -58,7 +58,7 @@ bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
     m_data.Resize(GridSize() * 4);
     // Store dimensions; format tags unused in DX12 (0 = unused)
     texBuf->m_info = TextureBuffer::BufferInfo(gridDimensions.x, gridDimensions.y * gridDimensions.z, 1, 0, 0);
-    HasBuffer() = true;
+    Validate();
     return true;
 }
 
@@ -176,7 +176,6 @@ bool NoiseTexture3D::Deploy(int) {
         return false;
 
     m_isDeployed = true;
-    m_hasBuffer = true;
     return true;
 }
 
@@ -246,7 +245,7 @@ bool CloudNoiseTexture::Allocate(int gridSize) {
     m_gridSize = gridSize;
     m_data.Resize(size_t(gridSize) * gridSize * gridSize);
     texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, 0, 0);
-    HasBuffer() = true;
+    Validate();
     return true;
 }
 
@@ -346,7 +345,6 @@ bool CloudNoiseTexture::Deploy(int) {
         return false;
 
     m_isDeployed = true;
-    m_hasBuffer = true;
     return true;
 }
 
@@ -372,7 +370,7 @@ bool BlueNoiseTexture::Allocate(void) {
     }
     m_data.Resize(BufferSize());
     texBuf->m_info = TextureBuffer::BufferInfo(m_gridSize.x, m_gridSize.y * 64, 1, 0, 0);
-    HasBuffer() = true;
+    Validate();
     return true;
 }
 
@@ -429,7 +427,6 @@ bool BlueNoiseTexture::Deploy(int) {
         return false;
 
     m_isDeployed = true;
-    m_hasBuffer = true;
     return true;
 }
 

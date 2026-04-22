@@ -93,9 +93,7 @@ public:
             return false; 
         }
         texBuf->m_info = TextureBuffer::BufferInfo(length, 1, GLTexTraits<DATA_T>::align, GLTexTraits<DATA_T>::internalFormat, GLTexTraits<DATA_T>::format);
-        HasBuffer() = true;
-        Deploy(0);
-        return true;
+        return Deploy(0);
     }
 
 

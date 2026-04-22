@@ -101,7 +101,6 @@ public:
     int                         m_tmuIndex{ -1 };
     int                         m_wrapMode{ GL_REPEAT };
     int                         m_useMipMaps{ false };
-    bool                        m_hasBuffer{ false };
     bool                        m_hasParams{ false };
     bool                        m_isDeployed{ false };
     bool                        m_isValid{ false };
@@ -202,6 +201,16 @@ public:
         Release();
     }
 
+    inline void Validate(void) noexcept {
+        m_isValid = true;
+        m_isDeployed = true;
+    }
+
+    inline void Invalidate(void) noexcept {
+        m_isValid = false;
+        m_isDeployed = false;
+    }
+
     virtual void SetParams(bool forceUpdate = false) override;
 
     void SetWrapping(int wrapMode = -1)
@@ -270,12 +279,6 @@ public:
         if (tmuIndex >= 0)
             gfxStates.BindTexture<typeID>(0, tmuIndex);
         gfxStates.ActiveTexture(GL_TEXTURE0); // always reset!
-    }
-
-    inline bool& HasBuffer(void)
-        noexcept
-    {
-        return m_hasBuffer;
     }
 
     static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)

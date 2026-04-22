@@ -16,9 +16,9 @@ RenderTarget::RenderTarget() {
 void RenderTarget::Init(void) {
     m_handle = SharedFramebufferHandle(0);
     m_renderTexture.m_handle = SharedTextureHandle(0);
-    m_renderTexture.HasBuffer() = false;
+    m_renderTexture.Invalidate();
     m_depthTexture.m_handle = SharedTextureHandle(0);
-    m_depthTexture.HasBuffer() = false;
+    m_depthTexture.Invalidate();
     m_width = 0;
     m_height = 0;
     m_scale = 1;
@@ -518,7 +518,7 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) 
         ? SharedTextureHandle(GLuint(-params.source))
         : BufferHandle(params.source);
     //DetachBuffer((params.source < 0) ? -params.source : params.source);
-    m_renderTexture.HasBuffer() = true;
+    m_renderTexture.Validate();
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
         if (tmuIndex > -1) {
@@ -534,7 +534,7 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) 
 
 Texture* RenderTarget::GetDepthAsTexture(void) {
     SharedTextureHandle handle = BufferHandle(m_depthBufferIndex);
-    m_depthTexture.HasBuffer() = true;
+    m_depthTexture.Validate();
     if (m_depthTexture.m_handle != handle) {
         m_depthTexture.m_handle = handle;
 #if 1

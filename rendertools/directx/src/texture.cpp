@@ -66,7 +66,7 @@ Texture& Texture::Copy(const Texture& other)
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer = other.m_hasBuffer;
+        m_isDeployed = other.m_isDeployed;
         m_hasParams = other.m_hasParams;
         m_isValid = other.m_isValid;
     }
@@ -86,7 +86,7 @@ Texture& Texture::Move(Texture& other) noexcept
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer = other.m_hasBuffer;
+        m_isDeployed = other.m_isDeployed;
         m_hasParams = other.m_hasParams;
         m_isValid = std::exchange(other.m_isValid, false);
     }
@@ -121,29 +121,27 @@ void Texture::Destroy(void)
             else delete p;
         }
         m_buffers.Clear();
-        m_hasBuffer = false;
     }
 }
 
 
 bool Texture::IsAvailable(void)
 {
-    return m_isValid && m_handle != UINT32_MAX
-        and (HasBuffer() or (not m_buffers.IsEmpty() and IsDeployed()));
+    if (not m_isValid)
+        return false;
+    if (m_isDeployed)
+        return true;
+    return false;
 }
 
 
-bool Texture::Bind(int tmuIndex, bool isDeploying)
+bool Texture::Bind(int tmuIndex)
 {
-    if (not isDeploying and not IsAvailable())
+    if (not IsAvailable())
         return false;
     m_tmuIndex = tmuIndex;
     gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
 
-    // DX12: bind this texture to its slot in the root signature.
-    // Root params kSrvBase..kSrvBase+15 are individual 1-entry descriptor tables for t0..t15.
-    // SetDescriptorHeaps is called once in Shader::Enable(); here we only
-    // update the per-slot root parameter.
     auto* list = commandListHandler.CurrentList();
     if (list and (m_handle != UINT32_MAX)) {
         auto& heap = descriptorHeaps.m_srvHeap;
@@ -235,8 +233,6 @@ bool Texture::Deploy(int bufferIndex)
 {
     if (m_isDeployed)
         return true;
-    if (not Bind(0, true))
-        return false;
     if (bufferIndex >= m_buffers.Length())
         return false;
     TextureBuffer* tb = m_buffers[bufferIndex];
@@ -256,7 +252,6 @@ bool Texture::Deploy(int bufferIndex)
     if (not CreateSRV())
         return false;
 
-    m_hasBuffer = true;
     m_isDeployed = true;
     return true;
 }

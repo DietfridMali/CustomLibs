@@ -269,41 +269,20 @@ template<> struct NoiseTraits<BlueNoiseR8> {
 template<class Tag>
 class NoiseTexture 
     : public Texture {
-public:
-    bool Create(int gridSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
-        if (not Texture::Create()) 
-            return false;
-        if (not Allocate(gridSize)) 
-            return false;
-        Compute(gridSize, yPeriod, xPeriod, octaves, seed);
-        Deploy();
-        return true;
-    }
-
-    void SetParams(bool enforce) {
-        if (enforce || not m_hasParams) {
-            m_hasParams = true;
-            NoiseTraits<Tag>::SetParams(GL_TEXTURE_2D);
-        }
-    }
-
-    const std::vector<typename NoiseTraits<Tag>::PixelT>& Data() const { return m_data; }
-
-    inline bool IsAvailable(void) noexcept {
-        return HasBuffer() and (m_data.Length() != 0);
-    }
-
 private:
     AutoArray<typename NoiseTraits<Tag>::PixelT> m_data;
 
     bool Allocate(int gridSize) {
         auto* texBuf = new TextureBuffer();
-        if (not texBuf) return false;
-        if (not m_buffers.Append(texBuf)) { delete texBuf; return false; }
+        if (not texBuf) 
+            return false;
+        if (not m_buffers.Append(texBuf)) { 
+            delete texBuf; 
+            return false; 
+        }
         const GLenum IF = NoiseTraits<Tag>::IFmt;
         const GLenum EF = NoiseTraits<Tag>::EFmt;
         texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, IF, EF);
-        HasBuffer() = true;
         return true;
     }
 
@@ -324,9 +303,28 @@ private:
             reinterpret_cast<const void*>(m_data.Data()));
         SetParams(false);
         Release();
+        m_isDeployed = true;
         return true;
     }
 
+public:
+    bool Create(int gridSize, int yPeriod = 1, int xPeriod = 1, int octaves = 1, uint32_t seed = 1) {
+        if (not Texture::Create())
+            return false;
+        if (not Allocate(gridSize))
+            return false;
+        Compute(gridSize, yPeriod, xPeriod, octaves, seed);
+        return Deploy();
+    }
+
+    void SetParams(bool enforce) {
+        if (enforce || not m_hasParams) {
+            m_hasParams = true;
+            NoiseTraits<Tag>::SetParams(GL_TEXTURE_2D);
+        }
+    }
+
+    const std::vector<typename NoiseTraits<Tag>::PixelT>& Data() const { return m_data; }
 };
 
 // -------------------------------------------------------------------------------------------------

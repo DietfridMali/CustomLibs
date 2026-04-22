@@ -65,7 +65,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
     SetupGraphics();
     m_drawBufferStack.Clear();
-    m_renderTexture.HasBuffer() = true;
+    m_renderTexture.Validate();
     m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
     return true;
 }

@@ -69,8 +69,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
     InitDirectX();
     SetupGraphics();
     m_drawBufferStack.Clear();
-    m_renderTexture.HasBuffer() = true;
-    m_renderTexture.m_isValid = true;  // wrapper — handle set per-frame in Draw3DScene / DrawScreen
+    m_renderTexture.Validate();
     m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
     return true;
 }

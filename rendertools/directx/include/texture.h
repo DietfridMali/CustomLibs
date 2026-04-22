@@ -54,11 +54,11 @@ struct TextureCreationParams {
 
 class AbstractTexture {
 public:
-    virtual bool Create(void)   = 0;
-    virtual void Destroy(void)  = 0;
+    virtual bool Create(void) = 0;
+    virtual void Destroy(void) = 0;
     virtual bool IsAvailable(void) = 0;
-    virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
-    virtual void Release(void)  = 0;
+    virtual bool Bind(int tmuIndex) = 0;
+    virtual void Release(void) = 0;
     virtual void SetParams(bool forceUpdate = false) = 0;
     virtual bool Deploy(int bufferIndex = 0) = 0;
     virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
@@ -87,7 +87,6 @@ public:
     int                         m_tmuIndex{ -1 };
     GfxWrapMode                 m_wrapMode{ GfxWrapMode::Repeat };
     int                         m_useMipMaps{ false };
-    bool                        m_hasBuffer{ false };
     bool                        m_hasParams{ false };
     bool                        m_isValid{ false };
     bool                        m_isDeployed{ false };
@@ -151,12 +150,11 @@ public:
 
     virtual bool Create(void) override;
 
-    
     virtual void Destroy(void) override;
     
     virtual bool IsAvailable(void) override;
     
-    virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
+    virtual bool Bind(int tmuIndex = 0) override;
     
     virtual void Release(void) override;
     
@@ -172,6 +170,10 @@ public:
 
     inline void Disable(void) {
         Release();
+    }
+
+    inline void Validate(bool isValid) noexcept {
+        m_isValid = isValid;
     }
 
     void SetWrapping(int wrapMode = -1) noexcept;
@@ -227,8 +229,14 @@ public:
         return m_isDeployed;
     }
 
-    inline bool& HasBuffer(void) noexcept {
-        return m_hasBuffer;
+    inline void Validate(void) noexcept {
+        m_isValid = true;
+        m_isDeployed = true;
+    }
+
+    inline void Invalidate(void) noexcept {
+        m_isValid = false;
+        m_isDeployed = false;
     }
 
     bool CreateTextureResource(int w, int h, int arraySize);

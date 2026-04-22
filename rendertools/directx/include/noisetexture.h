@@ -162,8 +162,7 @@ public:
         if (not Allocate(gridSize))
             return false;
         Compute(gridSize, yPeriod, xPeriod, octaves, seed);
-        Deploy();
-        return true;
+        return Deploy();
     }
 
     void SetParams(bool /*enforce*/) override {
@@ -192,7 +191,6 @@ private:
             gridSize, gridSize,
             NoiseTraits<Tag>::Components,
             0, 0);  // internalFormat/format unused in DX12
-        HasBuffer() = true;
         return true;
     }
 
@@ -258,8 +256,8 @@ private:
         device->CreateShaderResourceView(m_resource.Get(),
             &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_handle));
 
-        m_isValid   = true;
-        m_hasBuffer = true;
+        m_isValid = true;
+        m_isDeployed = true;
         return true;
     }
 };

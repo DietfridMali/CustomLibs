@@ -84,7 +84,7 @@ void Texture::Destroy(void)
                 delete p;
         }
         m_buffers.Clear();
-        m_hasBuffer = false; // BUGFIX: Status zur�cksetzen
+        m_isDeployed = false; // BUGFIX: Status zur�cksetzen
     }
 }
 
@@ -99,7 +99,7 @@ Texture& Texture::Copy(const Texture& other) {
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer = other.m_hasBuffer; 
+        m_isDeployed = other.m_isDeployed;
         m_hasParams = other.m_hasParams;
         m_isValid = other.m_isValid;     
     }
@@ -122,7 +122,7 @@ noexcept
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_hasBuffer = other.m_hasBuffer; 
+        m_isDeployed = other.m_isDeployed; 
         m_hasParams = other.m_hasParams;
         m_isValid = other.m_isValid;     
         textureLUT.Remove(m_name);
@@ -134,26 +134,13 @@ noexcept
 
 bool Texture::IsAvailable(bool isDeploying)
 {
-#if USE_SHARED_HANDLES
-    if (not m_handle.IsAvailable())
+    if (not m_isValid)
         return false;
-#else
-    if (m_handle != 0)
-        return false;
-#endif
-    if (HasBuffer())
+    if (m_isDeployed)
         return true;
     if (isDeploying)
         return true;
-    if (m_buffers.IsEmpty())
-        return false;
-#ifdef _DEBUG
-    if (IsDeployed())
-        return true;
     return false;
-#else
-    return IsDeployed();
-#endif
 }
 
 

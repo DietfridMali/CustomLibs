@@ -99,8 +99,7 @@ public:
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
         device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
 
-        m_isValid   = true;
-        m_hasBuffer = true;
+        m_isDeployed = true;
         return true;
     }
 
@@ -129,9 +128,7 @@ public:
             int(GfxTexTraits<DATA_T>::channels),
             0, 0);  // internalFormat/format not used in DX12
         tb->m_data.Resize(length * int(GfxTexTraits<DATA_T>::pixelSize));
-        HasBuffer() = true;
-        Deploy(0);
-        return true;
+        return Deploy(0);
     }
 
 

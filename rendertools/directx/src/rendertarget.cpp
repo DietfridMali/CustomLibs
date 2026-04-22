@@ -517,7 +517,7 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
         return nullptr;
     m_renderTexture.m_handle = info.m_srvIndex;
     m_renderTexture.m_resource = info.m_resource;
-    m_renderTexture.m_isValid = true;
+    m_renderTexture.Validate();
     return &m_renderTexture;
 }
 
@@ -542,7 +542,7 @@ Texture* RenderTarget::GetDepthAsTexture(void)
         return nullptr;
     m_depthTexture.m_handle = info.m_srvIndex;
     m_depthTexture.m_resource = info.m_resource;
-    m_depthTexture.m_isValid = true;
+    m_depthTexture.Validate();
     return &m_depthTexture;
 }
 

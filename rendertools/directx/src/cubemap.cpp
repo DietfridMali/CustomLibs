@@ -19,9 +19,13 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
 {
     if (m_isDeployed)
         return true;
-    if (not Bind(0, true))
-        return false;
     if (m_buffers.IsEmpty())
+        return false;
+
+    TextureBuffer* first = m_buffers[0];
+    int w = first->m_info.m_width;
+    int h = first->m_info.m_height;
+    if (w <= 0 or h <= 0)
         return false;
 
     if (not CreateTextureResource(w, h, 6))
@@ -37,7 +41,6 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
     if (not CreateSRV())
         return false;
 
-    m_hasBuffer = true;
     m_isDeployed = true;
     return true;
 }
