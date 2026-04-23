@@ -388,9 +388,14 @@ public:
 		TextureSlotInfo* FindInfo(GLenum type);
 
 		int BoundTMU(GLenum type, GLuint handle, int tmuIndex = -1);
+
+		
 		int BindTexture(GLenum type, GLuint handle, int tmuIndex);
+		
 		bool ReleaseTexture(GLenum type, GLuint handle, int tmuIndex = -1);
+		
 		int GetBoundTexture(GLenum type, int tmuIndex);
+		
 		int SetBoundTexture(GLenum type, GLuint handle, int tmuIndex);
 
 		template <GLenum typeID>

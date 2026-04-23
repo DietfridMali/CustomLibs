@@ -285,7 +285,7 @@ void RenderTarget::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 
 
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
-    if (m_depthBufferIndex < 0)
+    if (not HaveDepthBuffer(true))
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
@@ -300,9 +300,8 @@ void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, boo
         gfxStates.PushClearColor();
         gfxStates.SetClearColor(m_clearColor);
         if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
-            gfxStates.ClearDepthBuffer();
-        gfxStates.ClearColorBuffers();
-        baseRenderer.CheckGfxError();
+            ClearDepthBuffer();
+        ClearColorBuffers();
         gfxStates.PopClearColor();
         baseRenderer.PopViewport();
     }

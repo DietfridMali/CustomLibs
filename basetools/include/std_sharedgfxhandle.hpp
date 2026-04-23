@@ -86,9 +86,7 @@ public:
         return m_info->handle == other.m_info->handle;
     }
 
-    inline bool operator!=(const SharedHandle& other) const
- noexcept
-    {
+    inline bool operator!=(const SharedHandle& other) const noexcept {
         return not operator==(other);
     }
 
@@ -98,47 +96,33 @@ public:
         return m_info ? m_info->handle == handle : false;
     }
 
-    inline HANDLE_T Data() const
- noexcept
-    {
+    inline HANDLE_T Data() const noexcept {
         return m_info ? m_info->handle : HANDLE_T{};
     }
 
-    inline operator HANDLE_T() const
- noexcept
-    {
+    inline operator HANDLE_T() const noexcept {
         return Data();
     }
 
-    inline bool IsAvailable(void) const
- noexcept
-    {
+    inline bool IsAvailable(void) const noexcept {
         return Data() != HANDLE_T{};
     }
 
-    inline operator bool() const
- noexcept
-    {
+    inline operator bool() const noexcept {
         return this->IsAvailable();
     }
 
-    inline bool operator!() const
- noexcept
-    {
+    inline bool operator!() const noexcept {
         return not this->IsAvailable();
     }
 
-    inline void Release()
- noexcept
-    {
+    inline void Release() noexcept {
         if (m_info and m_info->handle and m_releaser)
             m_info.reset(); // custom deleter ruft releaser automatisch
     }
 
     // Claim: gibt alten frei, legt neuen an (wenn allocator gesetzt)
-    HANDLE_T Claim()
- noexcept
-    {
+    HANDLE_T Claim() noexcept {
         Release();
         if (!m_allocator)
             return HANDLE_T{};
@@ -149,9 +133,7 @@ public:
         return newHandle;
     }
 
-    inline std::size_t RefCount() const
- noexcept
-    {
+    inline std::size_t RefCount() const noexcept {
         return m_info ? m_info.use_count() : 0;
     }
 };

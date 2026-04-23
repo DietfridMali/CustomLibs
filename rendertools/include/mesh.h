@@ -286,8 +286,7 @@ public:
     }
 
     inline bool IsEmpty(void)
- noexcept(noexcept(m_vertices.IsEmpty()))
-    {
+        noexcept(noexcept(m_vertices.IsEmpty())) {
         return m_vertices.IsEmpty();
     }
 

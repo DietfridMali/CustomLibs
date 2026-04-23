@@ -125,7 +125,7 @@ public:
 
     inline void FinishRender(void) noexcept {
         Disable();
-    }
+    } 
 
     inline bool EnableTextures(std::span<Texture* const> textures = {}) noexcept {
         int tmu = 0;

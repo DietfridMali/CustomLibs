@@ -2,7 +2,7 @@
 #include "skybox.h"
 #include "cube.h"
 #include "gfxstates.h"
-#include "tristate.h"
+#include "base_renderer.h"
 
 // =================================================================================================
 
@@ -96,19 +96,26 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 	if (not m_skybox)
 		return false;
 
-	Shader* shader = LoadShader(view, lightDirection, brightness);
-	if (not shader)
+	void* cl = baseRenderer.StartOperation("skybox");
+	if (not cl)
 		return false;
-
 	gfxStates.SetFaceCulling(0);
 	gfxStates.SetDepthWrite(0);
 	gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-	for (int i = 0; i < 3; i++)
-		m_skyTextures[i]->Enable(i);
-	m_skybox->Render(nullptr);
-	for (int i = 0; i < 3; i++)
-		m_skyTextures[i]->Disable();
-	return true;
+	Shader* shader = LoadShader(view, lightDirection, brightness);
+	if (shader) {
+#if 1
+		for (int i = 0; i < 3; i++)
+			m_skyTextures[i]->Enable(i);
+#endif
+		m_skybox->Render({}); // m_skyTextures);
+#if 1
+		for (int i = 0; i < 3; i++)
+			m_skyTextures[i]->Disable();
+#endif
+	}
+	baseRenderer.FinishOperation(cl);
+	return shader != nullptr;;
 };
 
 // =================================================================================================

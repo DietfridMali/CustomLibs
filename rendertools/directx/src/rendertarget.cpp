@@ -514,14 +514,25 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 }
 
 
-void RenderTarget::ClearStencil(void)
+void RenderTarget::ClearColorBuffers(void)
 {
-    if ((m_depthBufferIndex < 0) or not m_bufferInfo[m_depthBufferIndex].m_dsvHandle.IsValid())
-        return;
-    auto* list = m_cmdList->List();
-    if (not list)
-        return;
-    list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu, D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+    for (int i = 0; i < m_colorBufferCount; ++i)
+        if (m_bufferInfo[i].m_rtvHandle.IsValid())
+            gfxStates.ClearColorBuffers(m_bufferInfo[i].m_rtvHandle.cpu);
+}
+
+
+void RenderTarget::ClearDepthBuffer(float clearValue)
+{
+    if (HaveDepthBuffer(true))
+        gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu, clearValue);
+}
+
+
+void RenderTarget::ClearStencilBuffer(void)
+{
+    if (HaveDepthBuffer(true))
+        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu);
 }
 
 

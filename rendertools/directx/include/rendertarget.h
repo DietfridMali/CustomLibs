@@ -187,7 +187,9 @@ public:
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
-    void ClearStencil(void);
+    void ClearColorBuffers(void);
+    void ClearDepthBuffer(float clearValue = 1.0f);
+    void ClearStencilBuffer(void);
 
     // Render helpers (same as OGL)
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);

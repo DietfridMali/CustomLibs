@@ -39,18 +39,18 @@ int TextureSlotInfo::Bind(uint32_t srvIndex, int slotIndex) noexcept {
     if (slotIndex >= MAX_SLOTS)
         return -1;
     m_srvIndices[slotIndex] = srvIndex;
-    if (slotIndex >= m_maxUsed) m_maxUsed = slotIndex + 1;
+    if (slotIndex >= m_maxUsed) 
+        m_maxUsed = slotIndex + 1;
     return slotIndex;
 }
 
 
 bool TextureSlotInfo::Release(uint32_t srvIndex, int slotIndex) noexcept {
     if (slotIndex >= 0) {
-        if (slotIndex < MAX_SLOTS && m_srvIndices[slotIndex] == srvIndex) {
-            m_srvIndices[slotIndex] = 0u;
-            return true;
-        }
-        return false;
+        if (slotIndex < MAX_SLOTS && m_srvIndices[slotIndex] != srvIndex) 
+            return false;
+        m_srvIndices[slotIndex] = 0u;
+        return true;
     }
     bool released = false;
     for (int i = 0; i < m_maxUsed; ++i) {
@@ -130,6 +130,27 @@ int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
         return -1;
     info->Update(srvIndex, slotIndex);
     return slotIndex;
+}
+
+
+void GfxStates::ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept {
+    auto* list = commandListHandler.CurrentList();
+    if (list)
+        list->ClearRenderTargetView(rtv, m_clearColor.Data(), 0, nullptr);
+}
+
+
+void GfxStates::ClearDepthBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float clearValue) noexcept {
+    auto* list = commandListHandler.CurrentList();
+    if (list)
+        list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, clearValue, 0, 0, nullptr);
+}
+
+
+void GfxStates::ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue) noexcept {
+    auto* list = commandListHandler.CurrentList();
+    if (list)
+        list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.0f, uint8_t(clearValue), 0, nullptr);
 }
 
 

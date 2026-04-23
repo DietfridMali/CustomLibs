@@ -274,6 +274,23 @@ public:
         return m_drawBuffers;
     }
 
+    inline void ClearColorBuffers(void) noexcept {
+        return gfxStates.ClearColorBuffers();
+    }
+
+    inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
+        return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_handle);
+    }
+
+    inline void ClearDepthBuffer(float clearValue = 1.0f) noexcept {
+        if (HaveDepthBuffer(true))
+            gfxStates.ClearDepthBuffer(clearValue);
+    }
+
+    inline void ClearStencilBuffer(int clearValue = 0) noexcept {
+        gfxStates.ClearStencilBuffer(clearValue);
+    }
+
 private:
     void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType, bool isMRT);
 

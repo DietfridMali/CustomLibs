@@ -312,10 +312,7 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // her.In OpenGL ist das ein bleibender Status und beeinflusst die 2D - Projektion.
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isRenderTarget) {
-    if (windowWidth * windowHeight > 0) 
-        gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
-#if 1
-    else {
+    if (windowWidth * windowHeight == 0) {
 #if 0
         if (m_parentBuffer) {
             windowWidth = m_parentBuffer->GetWidth(true);
@@ -331,8 +328,8 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
             windowWidth = m_windowWidth;
             windowHeight = m_windowHeight;
         }
-        glViewport(0, 0, windowWidth, windowHeight);
     }
+    gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
 #endif
     m_viewport = viewport;
 #if 1

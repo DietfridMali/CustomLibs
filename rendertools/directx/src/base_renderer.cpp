@@ -304,10 +304,24 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 #ifdef _DEBUG
     flipVertically = false;
 #endif
-    if (windowWidth * windowHeight > 0)
-        gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
-    else
-        gfxStates.SetViewport();
+    if (windowWidth * windowHeight == 0) {
+#if 0
+        if (m_parentBuffer) {
+            windowWidth = m_parentBuffer->GetWidth(true);
+            windowHeight = m_parentBuffer->GetHeight(true);
+        }
+        else
+#endif
+            if (m_activeBuffer) {
+                windowWidth = m_activeBuffer->GetWidth(true);
+                windowHeight = m_activeBuffer->GetHeight(true);
+            }
+            else {
+                windowWidth = m_windowWidth;
+                windowHeight = m_windowHeight;
+            }
+    }
+    gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
 
     m_viewport = viewport;
     if (flipVertically)

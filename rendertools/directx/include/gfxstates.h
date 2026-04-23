@@ -420,6 +420,12 @@ public:
         return BindTexture<GL_TEXTURE_CUBE_MAP>(srvIndex, slotIndex);
     }
 
+    void ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept;
+
+    void ClearDepthBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float clearValue = 1.0f) noexcept;
+
+    void ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue = 0) noexcept;
+
     void ReleaseBuffers(void) noexcept;
 
     // DX12: no GPU-readable viewport state; viewport is tracked by the application.
