@@ -304,15 +304,27 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // Column-major Initializer-Reihenfolge (GLM!):
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
 
+// Generelles zum Viewport - Handling.Dieses ist zweiteilig : Setzen des gfx - Viewports(OpenGL / DX) für korrekte Projektion und setzen
+// aktueller Renderbereiche(app - eigene Viewportmatrix, die in die Shader geht).Jede Aktivierung eines render targets muss auch den
+// gfx - Viewport setzen.Das macht inzwischen RenderTarget::Enable, das den vorigen Viewport speichert(BaseRenderer::PushViewport -
+// speichert auch den gfx - Viewport).BaseRenderer::SetViewport erhält deshalb bei jedem RT - Enable dessen Pufferdimensionen als windowWidth
+// und windowHeight, dann wird der gfx - Viewport entspr.gesetzt.Um innerhalb eines RTs einen Viewport zu setzen, werden für windowWidth
+// und windowHeight 0 übergeben, dann wird der gfx - Viewport nicht verändert.Disable stellt den vorhergehenden Viewport(app + gfx) wieder
+// her.In OpenGL ist das ein bleibender Status und beeinflusst die 2D - Projektion.
+
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isRenderTarget) {
     if (windowWidth * windowHeight > 0) 
-        glViewport(0, 0, windowWidth, windowHeight);
+        gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
+#if 0
     else {
+#if 0
         if (m_parentBuffer) {
             windowWidth = m_parentBuffer->GetWidth(true);
             windowHeight = m_parentBuffer->GetHeight(true);
         }
-        else if (m_activeBuffer) {
+        else 
+#endif
+        if (m_activeBuffer) {
             windowWidth = m_activeBuffer->GetWidth(true);
             windowHeight = m_activeBuffer->GetHeight(true);
         }
@@ -322,7 +334,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
         }
         glViewport(0, 0, windowWidth, windowHeight);
     }
-
+#endif
     m_viewport = viewport;
 #if 1
     if (flipVertically)
@@ -361,7 +373,7 @@ void BaseRenderer::PopViewport(void) {
         return;
     SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
 #if 1
-    m_viewport.SetGpuViewport();
+    m_viewport.SetGfxViewport();
 #endif
 }
 

@@ -208,6 +208,7 @@ class GfxStates
 private:
     RenderStates            m_renderStates;
     List<TextureSlotInfo>   m_slotInfos;
+    GfxTypes::Int           m_viewport[4];
     int                     m_maxTextureSize{ 4096 };
 
     RenderStates& ActiveState(void) noexcept;
@@ -403,9 +404,20 @@ public:
     void ReleaseBuffers(void) noexcept;
 
     // DX12: no GPU-readable viewport state; viewport is tracked by the application.
-    inline void GetViewport(GfxTypes::Int* /*vp*/) noexcept {}
+    void GetViewport(GfxTypes::Int* viewport) noexcept {
+        std::memcpy(viewport, m_viewport, sizeof(m_viewport));
+    }
 
-    inline void SetViewport(const GfxTypes::Int* /*vp*/) noexcept {}
+    inline void SetViewport(const GfxTypes::Int* vp) noexcept {
+        SetViewport(vp[0], vp[1], vp[2], vp[3]);
+    }
+
+    inline void SetViewport(void) noexcept {
+        SetViewport(m_viewport);
+    }
+
+    void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept;
+
 };
 
 #define gfxStates GfxStates::Instance()

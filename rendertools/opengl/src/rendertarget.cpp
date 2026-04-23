@@ -412,10 +412,7 @@ void RenderTarget::ReleaseBuffers(void) {
 
 
 void RenderTarget::SetViewport(bool flipVertically) noexcept {
-    if (m_isScreenBuffer) // define system viewport, too
-        baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
-    else
-        baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically);
+    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
 }
 
 

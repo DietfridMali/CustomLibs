@@ -288,7 +288,7 @@ public:
 
     void SetViewport(bool flipVertically = false) noexcept;
 
-    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false, bool isFullScreen = false) noexcept;
+    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept;
 
     void PushViewport(void);
 

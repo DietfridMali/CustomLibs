@@ -208,7 +208,7 @@ bool BaseRenderer::Start2DScene(void) {
 bool BaseRenderer::Stop2DScene(void) {
     if (not m_screenIsAvailable)
         return false;
-    ResetDrawBuffers(nullptr);
+    ResetDrawBuffers();
     return true;
 }
 
@@ -300,38 +300,14 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 }
 
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically, bool isFullScreen) noexcept {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
 #ifdef _DEBUG
     flipVertically = false;
 #endif
-    if (windowWidth * windowHeight == 0) {
-        if (not isFullScreen and m_parentBuffer) {
-            windowWidth  = m_parentBuffer->GetWidth(true);
-            windowHeight = m_parentBuffer->GetHeight(true);
-        }
-        if (m_activeBuffer) {
-            windowWidth = m_activeBuffer->GetWidth(true);
-            windowHeight = m_activeBuffer->GetHeight(true);
-        }
-        else {
-            windowWidth  = m_windowWidth;
-            windowHeight = m_windowHeight;
-        }
-        // Set the full-surface DX12 viewport.
-        auto* list = commandListHandler.CurrentList();
-        if (list) {
-            D3D12_VIEWPORT vp{};
-            vp.TopLeftX = 0.0f;
-            vp.TopLeftY = 0.0f;
-            vp.Width    = float(windowWidth);
-            vp.Height   = float(windowHeight);
-            vp.MinDepth = 0.0f;
-            vp.MaxDepth = 1.0f;
-            list->RSSetViewports(1, &vp);
-            D3D12_RECT scissor{ 0, 0, windowWidth, windowHeight };
-            list->RSSetScissorRects(1, &scissor);
-        }
-    }
+    if (windowWidth * windowHeight > 0)
+        gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
+    else
+        gfxStates.SetViewport();
 
     m_viewport = viewport;
     if (flipVertically)
@@ -341,7 +317,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 
 
 void BaseRenderer::PushViewport(void) {
-    m_viewport.GetGpuViewport();
+    m_viewport.GetGfxViewport();
     m_viewportStack.Append(m_viewport);
 }
 

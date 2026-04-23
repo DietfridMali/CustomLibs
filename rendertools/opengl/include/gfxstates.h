@@ -415,6 +415,10 @@ public:
 	inline void SetViewport(const GfxTypes::Int* vp) noexcept {
 		glViewport(vp[0], vp[1], vp[2], vp[3]);
 	}
+
+	inline void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept {
+		glViewport(left, top, right, bottom);
+	}
 };
 
 #define gfxStates GfxStates::Instance()

@@ -246,7 +246,7 @@ public:
     void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept; // , bool isRenderTarget = false);
 
     void PushViewport(void) {
-        m_viewport.GetGpuViewport();
+        m_viewport.GetGfxViewport();
         m_viewportStack.Append(m_viewport);
     }
 

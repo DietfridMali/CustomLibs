@@ -465,9 +465,8 @@ uint32_t& RenderTarget::BufferHandle(int bufferIndex)
 }
 
 
-void RenderTarget::SetViewport(bool flipVertically) noexcept
-{
-    baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically, m_isScreenBuffer);
+void RenderTarget::SetViewport(bool flipVertically) noexcept {
+    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
 }
 
 

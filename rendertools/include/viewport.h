@@ -19,12 +19,12 @@ class Viewport
     : public Rectangle
 {
 public:
-    Matrix4f    m_transformation;
-    int         m_windowWidth;
-    int         m_windowHeight;
-    Vector2f    m_center;
-    bool        m_flipVertically;
-    GfxTypes::Int   m_glViewport[4];
+    Matrix4f        m_transformation;
+    int             m_windowWidth;
+    int             m_windowHeight;
+    Vector2f        m_center;
+    bool            m_flipVertically;
+    GfxTypes::Int   m_gfxViewport[4];
 
     Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
         : Rectangle(left, top, width, height) 
@@ -33,7 +33,7 @@ public:
         , m_center({ float(left) + float (width) * 0.5f, float(top) + float(height) * 0.5f })
         , m_flipVertically(false)
     { 
-        m_glViewport[0] = m_glViewport[1] = m_glViewport[2] = m_glViewport[3] = 0;
+        m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
     }
 
     Viewport(Vector2i center, int width = 0, int height = 0)
@@ -43,7 +43,7 @@ public:
         , m_center({ float(center.x), float(center.y) })
         , m_flipVertically(false)
     { 
-        m_glViewport[0] = m_glViewport[1] = m_glViewport[2] = m_glViewport[3] = 0;
+        m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
     }
 
     Viewport(Rectangle& r)
@@ -53,7 +53,7 @@ public:
         , m_center({ float(r.m_left) + float(r.m_width) * 0.5f, float(r.m_top) + float(r.m_height) * 0.5f })
         , m_flipVertically(false)
     { 
-        m_glViewport[0] = m_glViewport[1] = m_glViewport[2] = m_glViewport[3] = 0;
+        m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
     }
 
     void Fill(const RGBColor& color, float alpha = 1.0f, float scale = 1.0f);
@@ -157,12 +157,12 @@ public:
         return Viewport (int(round(m_center.X() - w * 0.5f)), int(round(m_center.Y() - h * 0.5f)), int(round(w)), int(round(h)));
     }
 
-    inline void GetGpuViewport(void) noexcept {
-        gfxStates.GetViewport(m_glViewport);
+    inline void GetGfxViewport(void) noexcept {
+        gfxStates.GetViewport(m_gfxViewport);
     }
 
-    inline void SetGpuViewport(void) noexcept {
-        gfxStates.SetViewport(m_glViewport);
+    inline void SetGfxViewport(void) noexcept {
+        gfxStates.SetViewport(m_gfxViewport);
     }
 
 };

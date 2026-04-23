@@ -4,6 +4,7 @@
 #include "dx12context.h"
 #include "descriptor_heap.h"
 #include "base_renderer.h"
+#include "commandlist.h"
 
 #include <cstdio>
 
@@ -135,6 +136,28 @@ int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
 void GfxStates::ReleaseBuffers(void) noexcept {
     for (auto& info : m_slotInfos)
         info = TextureSlotInfo(info.GetTypeTag());
+}
+
+void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept {
+    auto* list = commandListHandler.CurrentList();
+    if (list) {
+        D3D12_VIEWPORT vp{};
+        vp.TopLeftX = float(left);
+        vp.TopLeftY = float(top);
+        GfxTypes::Int windowWidth = right - left + 1;
+        GfxTypes::Int windowHeight = bottom - top + 1;
+        vp.Width = float(windowWidth);
+        vp.Height = float(windowHeight);
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        list->RSSetViewports(1, &vp);
+        D3D12_RECT scissorArea{ 0, 0, windowWidth, windowHeight };
+        list->RSSetScissorRects(1, &scissorArea);
+        m_viewport[0] = left;
+        m_viewport[1] = top;
+        m_viewport[2] = right;
+        m_viewport[3] = bottom;
+    }
 }
 
 // =================================================================================================
