@@ -304,9 +304,11 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 // Column-major Initializer-Reihenfolge (GLM!):
 // [ sx  0  0  cx ;  0  sy  0  cy ;  0  0  1   0 ;  0  0  0  1 ]
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically, bool isFullScreen) noexcept { //, bool isRenderTarget) {
-    if (windowWidth * windowHeight == 0) {
-        if (not isFullScreen and m_parentBuffer) {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isRenderTarget) {
+    if (windowWidth * windowHeight > 0) 
+        glViewport(0, 0, windowWidth, windowHeight);
+    else {
+        if (m_parentBuffer) {
             windowWidth = m_parentBuffer->GetWidth(true);
             windowHeight = m_parentBuffer->GetHeight(true);
         }

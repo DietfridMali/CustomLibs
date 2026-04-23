@@ -29,12 +29,6 @@ void DrawBufferHandler::Setup(int windowWidth, int windowHeight) {
 
 void DrawBufferHandler::SetActiveDrawBuffers(void) {
     DrawBufferList& drawBuffers = m_activeBuffer ? m_activeBuffer->DrawBuffers() : m_defaultDrawBuffers;
-#if 0
-    if (m_activeBuffer)
-        glViewport(0, 0, m_activeBuffer->GetWidth(true), m_activeBuffer->GetHeight(true));
-    else
-        glViewport(0, 0, m_windowWidth, m_windowHeight);
-#endif
     if (not drawBuffers.IsEmpty())
         glDrawBuffers(drawBuffers.Length(), drawBuffers.Data());
 }

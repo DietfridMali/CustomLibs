@@ -212,8 +212,10 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
             renderTarget->SetClearColor(ColorData::MediumBlue);
 #endif
             if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
+#if 0
                 baseRenderer.PushViewport();
-                renderTarget->SetViewport(true);
+                renderTarget->SetViewport(true); // flip the viewport upside down
+#endif
                 if (outlineWidth > 0) {
                     offset.x -= outlineWidth / float(renderTarget->m_width);
                     offset.y -= outlineWidth / float(renderTarget->m_height);
@@ -229,7 +231,9 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                 }
 #endif
                 renderTarget->Disable();
+#if 0
                 baseRenderer.PopViewport();
+#endif
             }
         }
     }

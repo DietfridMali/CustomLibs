@@ -358,9 +358,9 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
         fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
     baseRenderer.ActivateDrawBuffer(this);
     Clear(bufferIndex, drawBufferGroup, clear);
-#if 0
+#if 1
     baseRenderer.PushViewport();
-    SetViewport();
+    SetViewport(true);
 #endif
     return true;
 }
@@ -381,7 +381,7 @@ void RenderTarget::Disable(bool flush) { // flush only required for compatibilit
         baseRenderer.CheckGfxError();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         baseRenderer.DeactivateDrawBuffer(this);
-#if 0
+#if 1
         baseRenderer.PopViewport();
 #endif
     }
@@ -412,7 +412,10 @@ void RenderTarget::ReleaseBuffers(void) {
 
 
 void RenderTarget::SetViewport(bool flipVertically) noexcept {
-    baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically, m_isScreenBuffer);
+    if (m_isScreenBuffer) // define system viewport, too
+        baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
+    else
+        baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically);
 }
 
 
