@@ -300,14 +300,18 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 }
 
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically, bool isFullScreen) noexcept {
 #ifdef _DEBUG
     flipVertically = false;
 #endif
     if (windowWidth * windowHeight == 0) {
-        if (m_drawBufferInfo.m_renderTarget) {
-            windowWidth  = m_drawBufferInfo.m_renderTarget->GetWidth(true);
-            windowHeight = m_drawBufferInfo.m_renderTarget->GetHeight(true);
+        if (not isFullScreen and m_parentBuffer) {
+            windowWidth  = m_parentBuffer->GetWidth(true);
+            windowHeight = m_parentBuffer->GetHeight(true);
+        }
+        if (m_activeBuffer) {
+            windowWidth = m_activeBuffer->GetWidth(true);
+            windowHeight = m_activeBuffer->GetHeight(true);
         }
         else {
             windowWidth  = m_windowWidth;

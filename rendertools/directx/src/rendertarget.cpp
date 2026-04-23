@@ -237,6 +237,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
     m_pingPong = m_colorBufferCount > 1;
+    m_isScreenBuffer = params.isScreenBuffer;
 
     delete m_cmdList;
     m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name);
@@ -466,7 +467,7 @@ uint32_t& RenderTarget::BufferHandle(int bufferIndex)
 
 void RenderTarget::SetViewport(bool flipVertically) noexcept
 {
-    baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically);
+    baseRenderer.SetViewport(m_viewport, 0, 0, flipVertically, m_isScreenBuffer);
 }
 
 

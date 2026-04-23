@@ -84,6 +84,7 @@ public:
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
         bool hasMRTs{ false };
+        bool isScreenBuffer{ false };
     };
 
     struct RTRenderParams {
@@ -115,6 +116,7 @@ public:
     bool                m_pingPong{ false };
     bool                m_isAvailable{ false };
     bool                m_haveRTVs{ false };
+    bool                m_isScreenBuffer{ false };
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
     DrawBufferList      m_drawBuffers{};
