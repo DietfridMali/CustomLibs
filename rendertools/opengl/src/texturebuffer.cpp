@@ -132,7 +132,7 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount, void* da
 
 
 TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool flipVertically) {
-    if (source->pitch / source->w < 3) {
+    if (source->pitch / source->w < 4) {
         SDL_Surface* h = source;
         source = SDL_ConvertSurfaceFormat(source, SDL_PIXELFORMAT_RGBA32, 0);
         SDL_FreeSurface(h);
