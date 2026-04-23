@@ -46,7 +46,7 @@ bool ShadowMap::StartRender(void) noexcept {
 		return false;
 	baseRenderer.StartShadowPass();
 	m_map->Enable(0, RenderTarget::dbDepth);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	gfxStates.ClearDepthBuffer();
 	EnableCamera();
 	gfxStates.SetDepthTest(1);
 	gfxStates.SetDepthWrite(1);

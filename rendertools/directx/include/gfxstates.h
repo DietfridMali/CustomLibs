@@ -210,6 +210,8 @@ private:
     List<TextureSlotInfo>   m_slotInfos;
     GfxTypes::Int           m_viewport[4];
     int                     m_maxTextureSize{ 4096 };
+    RGBAColor               m_clearColor{ ColorData::Invisible };
+    List<RGBAColor>         m_clearColorStack;
 
     RenderStates& ActiveState(void) noexcept;
 
@@ -354,19 +356,36 @@ public:
         s.blendDstAlpha = dstAlpha;
     }
 
-    inline std::tuple<float, float, float, float> ClearColor(float r, float g, float b, float a) {
-        static float cr = 0, cg = 0, cb = 0, ca = 0;
-        auto prevState = std::make_tuple(cr, cg, cb, ca);
-        cr = r;
-        cg = g;
-        cb = b;
-        ca = a;
-        return prevState;
+    inline RGBAColor ClearColor(RGBAColor color) {
+        RGBAColor prev = m_clearColor;
+        m_clearColor = color;
+        return prev;
     }
 
-    inline RGBAColor ClearColor(RGBAColor color) {
-        auto t = ClearColor(color.R(), color.G(), color.B(), color.A());
-        return RGBAColor{ std::get<0>(t), std::get<1>(t), std::get<2>(t), std::get<3>(t) };
+    template <typename T>
+    inline void SetClearColor(T&& color) noexcept {
+        m_clearColor = std::forward<T>(color);
+    }
+
+    inline void SetClearColor(float r, float g, float b, float a) {
+        m_clearColor = RGBAColor(r, g, b, a);
+    }
+
+    inline RGBAColor GetClearColor(void) noexcept {
+        return m_clearColor;
+    }
+
+    inline void ResetClearColor(void) noexcept {
+        m_clearColor = ColorData::Invisible;
+    }
+
+    inline void PushClearColor(void) noexcept {
+        m_clearColorStack.Push(m_clearColor);
+    }
+
+    inline void PopClearColor(void) noexcept {
+        if (not m_clearColorStack.IsEmpty())
+            m_clearColor = m_clearColorStack.Pop();
     }
 
     inline std::tuple<bool, bool, bool, bool> ColorMask(bool r, bool g, bool b, bool a) {

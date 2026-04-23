@@ -17,11 +17,12 @@
 #endif
 
 namespace GfxTypes {
-    using Int    = GLint;    // signed integer parameter (e.g. viewport coords, query results)
-    using Uint   = GLuint;   // unsigned integer / object name (textures, buffers, VAOs, …)
-    using Float  = GLfloat;  // floating-point parameter (matrices, colors)
-    using Enum   = GLenum;   // enumeration token passed to GL driver
+    using Int = GLint;    // signed integer parameter (e.g. viewport coords, query results)
+    using Uint = GLuint;   // unsigned integer / object name (textures, buffers, VAOs, …)
+    using Float = GLfloat;  // floating-point parameter (matrices, colors)
+    using Enum = GLenum;   // enumeration token passed to GL driver
     using Handle = GLuint;   // GPU resource name / handle
+    using Bitfield = GLbitfield;
 }
 
 // =================================================================================================

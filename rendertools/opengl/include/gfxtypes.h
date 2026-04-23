@@ -22,6 +22,7 @@ namespace GfxTypes {
     using Float = GLfloat;  // floating-point parameter (matrices, colors)
     using Enum = GLenum;   // enumeration token passed to GL driver
     using Handle = GLuint;   // GPU resource name / handle
+	using Bitfield = GLbitfield;
 }
 
 // =================================================================================================

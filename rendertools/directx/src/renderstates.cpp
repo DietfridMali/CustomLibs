@@ -70,15 +70,22 @@ static D3D12_COMPARISON_FUNC ToD3DCompFunc(GfxOperations::CompareFunc func) noex
     return lut[int(func)];
 }
 
+
+static D3D12_CULL_MODE ToD3DCullMode(GfxOperations::FaceCull mode) noexcept
+{
+    static D3D12_CULL_MODE lut[] = {
+        D3D12_CULL_MODE_FRONT,
+        D3D12_CULL_MODE_BACK,
+        D3D12_CULL_MODE_NONE
+    };
+    return lut[int(mode)];
+}
+
 // =================================================================================================
 
 D3D12_RASTERIZER_DESC& RenderStates::SetRasterizerDesc(D3D12_RASTERIZER_DESC& desc) noexcept {
     desc.FillMode = D3D12_FILL_MODE_SOLID;
-    desc.CullMode = (cullMode == GfxOperations::FaceCull::Back)
-        ? D3D12_CULL_MODE_BACK
-        : (cullMode == GfxOperations::FaceCull::Front)
-        ? D3D12_CULL_MODE_FRONT
-        : D3D12_CULL_MODE_NONE;
+    desc.CullMode = ToD3DCullMode(cullMode);
     desc.FrontCounterClockwise = (frontFace == GfxOperations::Winding::CCW) ? TRUE : FALSE;
     desc.DepthClipEnable = TRUE;
     desc.MultisampleEnable = FALSE;

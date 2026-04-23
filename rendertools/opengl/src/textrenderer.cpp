@@ -60,7 +60,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
 #if TEST_ATLAS
     baseRenderer.ResetTransformation();
     baseRenderer.SetViewport(::Viewport (0, 0, m_font->GetAtlas().GetWidth(), m_font->GetAtlas().GetHeight()));
-    glClear(GL_COLOR_BUFFER_BIT);
+    gfxStates.ClearColorBuffers();
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     baseRenderer.ClearGfxError();

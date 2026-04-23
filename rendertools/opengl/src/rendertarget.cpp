@@ -296,14 +296,14 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) { // clear color has been set in Renderer.SetupGraphics()
     if (clear) {
         baseRenderer.PushViewport();
-        glViewport(0, 0, m_width * m_scale, m_height * m_scale);
-		glClearColor(m_clearColor.r, m_clearColor.g, m_clearColor.b, m_clearColor.a);
+        gfxStates.SetViewport(0, 0, m_width * m_scale, m_height * m_scale);
+        gfxStates.PushClearColor();
+        gfxStates.SetClearColor(m_clearColor);
         if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        else
-            glClear(GL_COLOR_BUFFER_BIT);
+            gfxStates.ClearDepthBuffer();
+        gfxStates.ClearColorBuffers();
         baseRenderer.CheckGfxError();
-        glClearColor(0, 0, 0, 0);
+        gfxStates.PopClearColor();
         baseRenderer.PopViewport();
     }
 }
@@ -330,8 +330,6 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
 #else
     gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
 #endif
-    baseRenderer.CheckGfxError();
-    baseRenderer.CheckGfxError();
 #ifdef _DEBUG
     return baseRenderer.CheckGfxError();
 #else
@@ -357,10 +355,10 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
     if (not m_isAvailable)
         fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
     baseRenderer.ActivateDrawBuffer(this);
-    Clear(bufferIndex, drawBufferGroup, clear);
 #if 1
     baseRenderer.PushViewport();
     SetViewport(true);
+    Clear(bufferIndex, drawBufferGroup, clear);
 #endif
     return true;
 }

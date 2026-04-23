@@ -265,17 +265,13 @@ public:
         m_backgroundColor = std::forward<T>(backgroundColor);
     }
 
-    // Sets the clear color for the next frame; no immediate API call in DX12.
-    inline void SetClearColor(const RGBAColor& color) noexcept {
-        gfxStates.ClearColor(color);
+    template <typename T>
+    inline void SetClearColor(T&& color) noexcept {
+        gfxStates.SetClearColor(std::forward<T>(color));
     }
 
-    inline void SetClearColor(RGBAColor&& color) noexcept {
-        SetClearColor(static_cast<const RGBAColor&>(color));
-    }
-    
     inline void ResetClearColor(void) noexcept {
-        gfxStates.ClearColor(RGBAColor{ 0.f, 0.f, 0.f, 0.f });
+        gfxStates.ResetClearColor();
     }
 
     inline BaseQuad& RenderQuad(void) noexcept { 

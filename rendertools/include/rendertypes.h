@@ -94,6 +94,12 @@ namespace GfxOperations {
         Decr
     };
 
+    enum class BufferFlag : GfxTypes::Bitfield {
+        Color = 1,
+        Depth = 2,
+		Stencil = 4
+    };
+
 }
 
 // =================================================================================================

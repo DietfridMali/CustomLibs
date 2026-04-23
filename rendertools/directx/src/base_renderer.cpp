@@ -176,7 +176,7 @@ bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
     ResetDrawBuffers();
     m_renderList->Open(commandListHandler.CmdQueue().FrameIndex());
-    SetClearColor(m_backgroundColor);
+    gfxStates.SetClearColor(m_backgroundColor);
     m_screenIsAvailable = true;
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
@@ -200,7 +200,7 @@ bool BaseRenderer::Start2DScene(void) {
             list->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
         }
     }
-    ResetClearColor();
+    gfxStates.ResetClearColor();
     return true;
 }
 

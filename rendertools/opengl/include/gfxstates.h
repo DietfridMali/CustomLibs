@@ -56,83 +56,23 @@ namespace GfxToGL {
 	using namespace GfxOperations;
 
 	inline GLenum ToGLenum(CompareFunc f) noexcept {
-		switch (f) {
-		case CompareFunc::Never:
-			return GL_NEVER;
-		case CompareFunc::Less:
-			return GL_LESS;
-		case CompareFunc::Equal:
-			return GL_EQUAL;
-		case CompareFunc::LessEqual:
-			return GL_LEQUAL;
-		case CompareFunc::Greater:
-			return GL_GREATER;
-		case CompareFunc::NotEqual:
-			return GL_NOTEQUAL;
-		case CompareFunc::GreaterEqual:
-			return GL_GEQUAL;
-		case CompareFunc::Always:
-			return GL_ALWAYS;
-		default:
-			return GL_LEQUAL;
-		}
+		GLenum lut[] = { GL_NEVER, GL_LESS, GL_EQUAL, GL_LEQUAL, GL_GREATER, GL_NOTEQUAL, GL_GEQUAL, GL_ALWAYS, GL_LEQUAL };
+		return lut[int(f)];
 	}
 
 	inline GLenum ToGLenum(BlendFactor f) noexcept {
-		switch (f) {
-		case BlendFactor::Zero:
-			return GL_ZERO;
-		case BlendFactor::One:
-			return GL_ONE;
-		case BlendFactor::SrcColor:
-			return GL_SRC_COLOR;
-		case BlendFactor::InvSrcColor:
-			return GL_ONE_MINUS_SRC_COLOR;
-		case BlendFactor::SrcAlpha:
-			return GL_SRC_ALPHA;
-		case BlendFactor::InvSrcAlpha:
-			return GL_ONE_MINUS_SRC_ALPHA;
-		case BlendFactor::DstAlpha:
-			return GL_DST_ALPHA;
-		case BlendFactor::InvDstAlpha:
-			return GL_ONE_MINUS_DST_ALPHA;
-		case BlendFactor::DstColor:
-			return GL_DST_COLOR;
-		case BlendFactor::InvDstColor:
-			return GL_ONE_MINUS_DST_COLOR;
-		default:
-			return GL_ONE;
-		}
+		GLenum lut[] = { GL_ZERO, GL_ONE, GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR };
+		return lut[int(f)];
 	}
 
 	inline GLenum ToGLenum(BlendOp op) noexcept {
-		switch (op) {
-		case BlendOp::Add:
-			return GL_FUNC_ADD;
-		case BlendOp::Subtract:
-			return GL_FUNC_SUBTRACT;
-		case BlendOp::RevSubtract:
-			return GL_FUNC_REVERSE_SUBTRACT;
-		case BlendOp::Min:
-			return GL_MIN;
-		case BlendOp::Max:
-			return GL_MAX;
-		default:
-			return GL_FUNC_ADD;
-		}
+		GLenum lut[] = { GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT, GL_MIN, GL_MAX };
+		return lut[int(op)];
 	}
 
 	inline GLenum ToGLenum(FaceCull c) noexcept {
-		switch (c) {
-		case FaceCull::Front:
-			return GL_FRONT;
-		case FaceCull::Back:
-			return GL_BACK;
-		case FaceCull::None:
-			return GL_FRONT_AND_BACK;
-		default:
-			return GL_BACK;
-		}
+		GLenum lut[] = { GL_FRONT, GL_BACK, GL_FRONT_AND_BACK };
+		return lut[int(c)];
 	}
 
 	inline GLenum ToGLenum(Winding w) noexcept {
@@ -140,24 +80,18 @@ namespace GfxToGL {
 	}
 
 	inline GLenum ToGLenum(StencilOp op) noexcept {
-		switch (op) {
-		case StencilOp::Keep:
-			return GL_KEEP;
-		case StencilOp::Zero:
-			return GL_ZERO;
-		case StencilOp::Replace:
-			return GL_REPLACE;
-		case StencilOp::IncrSat:
-			return GL_INCR;
-		case StencilOp::DecrSat:
-			return GL_DECR;
-		case StencilOp::Incr:
-			return GL_INCR_WRAP;
-		case StencilOp::Decr:
-			return GL_DECR_WRAP;
-		default:
-			return GL_KEEP;
-		}
+		GLenum lut[] = { GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_DECR, GL_INCR_WRAP, GL_DECR_WRAP };
+		return lut[int(op)];
+	}
+
+	inline GLbitfield ToBufferMask(GLbitfield mask) noexcept {
+		GLbitfield lut[] = { GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_STENCIL_BUFFER_BIT };
+		GLbitfield m = 0;
+		GLbitfield f = GLbitfield(mask);
+		for (int i = 0; f != 0; f <<= 1, ++i)
+			if (f & 1)
+				m |= lut[i];
+		return m;
 	}
 }
 
@@ -170,8 +104,12 @@ private:
 	int m_maxTextureSize{ 0 };
 	std::unordered_set<std::string> m_extensions;
 	bool m_haveExtensions{ false };
+	RGBAColor m_clearColor{ ColorData::Invisible };
+	float m_depthClearValue{ 1.0f };
+	int m_stencilClearValue{ 0 };
 
 	List<TextureSlotInfo> m_tmuBindings;
+	List<RGBAColor> m_clearColorStack;
 
 public:
 	GfxStates() {
@@ -388,9 +326,13 @@ public:
 	TextureSlotInfo* FindInfo(GLenum type);
 
 	int BoundTMU(GLenum type, GLuint handle, int tmuIndex = -1);
+	
 	int BindTexture(GLenum type, GLuint handle, int tmuIndex);
+	
 	bool ReleaseTexture(GLenum type, GLuint handle, int tmuIndex = -1);
+	
 	int GetBoundTexture(GLenum type, int tmuIndex);
+	
 	int SetBoundTexture(GLenum type, GLuint handle, int tmuIndex);
 
 	template <GLenum typeID>
@@ -418,6 +360,54 @@ public:
 
 	inline void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept {
 		glViewport(left, top, right, bottom);
+	}
+
+	template <typename T>
+	inline void SetClearColor(T&& color)  noexcept {
+		m_clearColor = std::forward<T>(color);
+		glClearColor(m_clearColor.R(), m_clearColor.G(), m_clearColor.B(), m_clearColor.A());
+	}
+
+	inline void SetClearColor(float r, float g, float b, float a) {
+		SetClearColor(RGBAColor(r, g, b, a));
+	}
+
+	inline RGBAColor GetClearColor(void) noexcept {
+		return m_clearColor;
+	}
+
+	inline void ResetClearColor(void) noexcept {
+		SetClearColor(ColorData::Invisible);
+	}
+
+	inline void ClearColorBuffers(void) noexcept {
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
+
+	inline void ClearDepthBuffer(GfxTypes::Float clearValue = 1.0f) {
+		if (m_depthClearValue != clearValue) {
+			m_depthClearValue = clearValue;
+			glClearDepth(clearValue);
+		}
+		glClear(GL_DEPTH_BUFFER_BIT);
+	}
+
+	inline void ClearStencilBuffer(GfxTypes::Int clearValue = 0) {
+		if (m_stencilClearValue != clearValue) {
+			m_stencilClearValue = clearValue;
+			glClearStencil(clearValue);
+		}
+		glClear(GL_STENCIL_BUFFER_BIT);
+	}
+
+	inline void PushClearColor(void) noexcept {
+		m_clearColorStack.Push(m_clearColor);
+	}
+
+
+	inline void PopClearColor(void) noexcept {
+		if (not m_clearColorStack.IsEmpty())
+			m_clearColor = m_clearColorStack.Pop();
 	}
 };
 

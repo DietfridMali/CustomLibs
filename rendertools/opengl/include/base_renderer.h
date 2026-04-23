@@ -224,18 +224,6 @@ public:
         m_backgroundColor = std::forward<T>(backgroundColor);
     }
 
-    inline void SetClearColor(const RGBAColor& color) const noexcept {
-        glClearColor(color.R(), color.G(), color.B(), color.A());
-    }
-
-    inline void SetClearColor(RGBAColor&& color)  noexcept {
-        SetClearColor(static_cast<const RGBAColor&>(color));
-    }
-
-    inline void ResetClearColor(void) noexcept {
-        glClearColor(0, 0, 0, 0);
-    }
-
     inline BaseQuad& RenderQuad(void)  noexcept { return m_renderQuad; }
 
     inline ::Viewport& GetViewport(void)  noexcept { return m_viewport; }

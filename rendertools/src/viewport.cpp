@@ -68,6 +68,8 @@ void Viewport::SetResized(int deltaLeft, int deltaTop, int deltaWidth, int delta
 
 
 void Viewport::BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept {
+    m_windowWidth = windowWidth;
+    m_windowHeight = windowHeight;
     float sx = Widthf() / float(windowWidth);
     float sy = Heightf() / float(windowHeight);
     if (flipVertically) 

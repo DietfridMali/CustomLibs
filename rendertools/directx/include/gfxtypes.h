@@ -16,6 +16,7 @@ namespace GfxTypes {
     using Float = float;     // floating-point parameter (matrices, colors)
     using Enum = uint32_t;  // enumeration token (mapped from GL compat values or DX12 enums)
     using Handle = uint32_t;  // GPU resource handle (SRV/RTV/DSV descriptor-heap index)
+    using Bitfield = uint32_t;
 }
 
 // =================================================================================================

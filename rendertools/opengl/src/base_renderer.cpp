@@ -39,9 +39,9 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
     int w = m_windowWidth / 15;
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
 #if 0//def _DEBUG
-    testTexture = textureHandler.GetStandardTexture();
-    List<String> fileName = { "assets/textures/connect.png" };
-    if (not testTexture->CreateFromFile(fileName, true)) {
+    List<String> fileName = { "connect.png" };
+    testTexture = textureHandler.GetStandardTexture(fileName[0]);
+    if (not testTexture->CreateFromFile(String("assets/textures/"), fileName, {})) {
         delete testTexture;
         testTexture = nullptr;
     }
@@ -177,15 +177,15 @@ bool BaseRenderer::Start2DScene(void) {
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
         return false;
 #endif
-    SetClearColor(m_backgroundColor);
+    gfxStates.SetClearColor(m_backgroundColor);
     ResetDrawBuffers();
     m_screenIsAvailable = true;
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
-    if (not (m_screenBuffer and m_screenBuffer->Enable()))
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    ResetClearColor();
-    SetViewport(m_sceneViewport, 0, 0, false);
+    if (not (m_screenBuffer and m_screenBuffer->Enable())) {
+        gfxStates.ClearColorBuffers();
+        gfxStates.ClearDepthBuffer();
+    }
     gfxStates.SetDepthWrite(0);
     gfxStates.SetDepthTest(0);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
@@ -279,16 +279,15 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         if (m_screenBuffer) {
             gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
             gfxStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
-            SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+            //SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 #if 0
-            if (m_screenBuffer->Enable(true)) {
+            if (m_screenBuffer->Enable()) {
                 RenderToViewport(testTexture, ColorData::White, false, false);
                 m_screenBuffer->Disable();
             }
 #endif
-            glClear(GL_COLOR_BUFFER_BIT);
-            m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
-            RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
+            gfxStates.ClearColorBuffers();
+            RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
         }
     }
 }
@@ -315,7 +314,7 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isRenderTarget) {
     if (windowWidth * windowHeight > 0) 
         gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
-#if 0
+#if 1
     else {
 #if 0
         if (m_parentBuffer) {

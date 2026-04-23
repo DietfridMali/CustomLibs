@@ -140,10 +140,6 @@ public:
 
     void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
 
-    inline void ClearStencil(void) { 
-        glClear(GL_STENCIL_BUFFER_BIT); 
-    }
-
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthAsTexture(void);
