@@ -330,7 +330,6 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
         }
     }
     gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
-#endif
     m_viewport = viewport;
 #if 1
     if (flipVertically)

@@ -153,7 +153,7 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_
     int foundIndex = -1;
     GfxDataBuffer* buffer = FindBuffer(type, id, foundIndex);
     if (not buffer) {
-        buffer = new (std::nothrow) GfxDataBuffer();
+        buffer = new (std::nothrow) GfxDataBuffer(type, id);
         if (not buffer)
             return false;
         m_dataBuffers.Append(buffer);
@@ -201,10 +201,20 @@ bool GfxDataLayout::Enable(void) noexcept
             }
         }
         list->IASetVertexBuffers(0, maxSlot, views);
+#ifdef _DEBUG
+        fprintf(stderr, "GfxDataLayout::Enable — %d buffers, maxSlot=%d\n", vbCount, maxSlot);
+        for (int s = 0; s < maxSlot; ++s) {
+            if (views[s].BufferLocation)
+                fprintf(stderr, "  slot %d: addr=0x%llx stride=%u size=%u\n",
+                    s, views[s].BufferLocation, views[s].StrideInBytes, views[s].SizeInBytes);
+            else
+                fprintf(stderr, "  slot %d: <empty>\n", s);
+        }
+#endif
     }
 
     // Bind index buffer if present
-    if (m_indexBuffer.IsValid()) 
+    if (m_indexBuffer.IsValid())
         list->IASetIndexBuffer(&m_indexBuffer.m_ibv);
     list->IASetPrimitiveTopology(ToD3DTopology(m_shape));
     return true;

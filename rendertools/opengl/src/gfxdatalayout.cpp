@@ -153,7 +153,7 @@ noexcept
 
     int index;
     GfxDataBuffer* buffer = FindBuffer(type, id, index);
-    if (not buffer and (buffer = new GfxDataBuffer())) { // otherwise index has been initialized by FindBuffer()
+    if (not buffer and (buffer = new GfxDataBuffer(type, id))) { // otherwise index has been initialized by FindBuffer()
         m_dataBuffers.Append(buffer);
         buffer->SetDynamic(m_isDynamic);
         index = m_dataBuffers.Length() - 1;
