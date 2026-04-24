@@ -107,8 +107,8 @@ public:
     int                 m_scale{ 1 };
     int                 m_bufferCount{ 0 };
     int                 m_colorBufferCount{ 0 };
-    int                 m_vertexBufferCount{ 0 };
-    int                 m_vertexBufferIndex{ -1 };
+    int                 m_extraBufferCount{ 0 };
+    int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
     int                 m_stencilBufferIndex{ -1 };
     int                 m_activeBufferIndex{ 0 };
@@ -289,8 +289,8 @@ public:
         return m_depthBufferIndex;
     }
 
-    inline int VertexBufferIndex(int i = 0) noexcept {
-        return m_vertexBufferIndex + i;
+    inline int ExtraBufferIndex(int i = 0) noexcept {
+        return m_extraBufferIndex + i;
     }
 
     inline DrawBufferList& DrawBuffers(void) noexcept {

@@ -82,8 +82,8 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 }
 
 
-void BaseRenderer::Set3DRenderStates(void) noexcept {
-    gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
+void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
+    gfxStates.SetDepthWrite((depthWrite < 0) ? IsColorPass() ? 0 : 1 : depthWrite);
     gfxStates.SetDepthTest(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.SetBlending(0);

@@ -29,6 +29,6 @@ inline bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource,
 }
 
 // Create + upload a Texture3D resource. Returns nullptr on failure.
-ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept;
+ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept;
 
 // =================================================================================================

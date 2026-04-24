@@ -143,7 +143,7 @@ public:
     // Mirrors SetupOpenGL from the OGL version — same call sites, DX12 internals.
     void SetupGraphics(void) noexcept;
 
-    void Set3DRenderStates(void) noexcept;
+    void Set3DRenderStates(int depthWrite = -1) noexcept;
 
     void Set2DRenderStates(int blending = 0) noexcept;
 
@@ -178,7 +178,9 @@ public:
             StartFullPass();
     }
 
-    RenderPassType RenderPass(void) noexcept { return m_renderPass; }
+    RenderPassType RenderPass(void) noexcept { 
+        return m_renderPass; 
+    }
 
     virtual bool Start3DScene(void);
 

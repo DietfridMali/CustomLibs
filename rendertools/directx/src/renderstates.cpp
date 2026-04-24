@@ -8,6 +8,25 @@
 // =================================================================================================
 // RenderStates::GetPSO — PSO creation helpers
 
+static DXGI_FORMAT ToDXGIFormat(TextureFormat fmt) noexcept
+{
+    static DXGI_FORMAT lut[] = {
+        DXGI_FORMAT_UNKNOWN,
+        DXGI_FORMAT_R8_UNORM,
+        DXGI_FORMAT_R8G8_UNORM,
+        DXGI_FORMAT_R8G8B8A8_UNORM,
+        DXGI_FORMAT_R16_FLOAT,
+        DXGI_FORMAT_R16G16_FLOAT,
+        DXGI_FORMAT_R16G16B16A16_FLOAT,
+        DXGI_FORMAT_R32_FLOAT,
+        DXGI_FORMAT_R32G32_FLOAT,
+        DXGI_FORMAT_R32G32B32A32_FLOAT,
+        DXGI_FORMAT_D24_UNORM_S8_UINT
+    };
+    return lut[int(fmt)];
+}
+
+
 static D3D12_BLEND ToD3DBlend(GfxOperations::BlendFactor factor) noexcept
 {
     static D3D12_BLEND lut[] = {
@@ -186,8 +205,10 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
     baseRenderer.RenderStates().SetStencilDesc(psoDesc.DepthStencilState);
 
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    psoDesc.NumRenderTargets = 1;
-    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+    int nrt = shader->m_dataLayout.m_numRenderTargets;
+    psoDesc.NumRenderTargets = UINT(nrt);
+    for (int i = 0; i < nrt; ++i)
+        psoDesc.RTVFormats[i] = ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
     psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable) ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_UNKNOWN;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.SampleDesc.Count = 1;

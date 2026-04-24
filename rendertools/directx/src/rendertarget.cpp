@@ -11,6 +11,7 @@
 // DX12 RenderTarget implementation
 
 static constexpr DXGI_FORMAT kColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+static constexpr DXGI_FORMAT kVertexFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 static constexpr DXGI_FORMAT kDepthTypelessFormat = DXGI_FORMAT_R24G8_TYPELESS;
 static constexpr DXGI_FORMAT kDepthDSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 static constexpr DXGI_FORMAT kDepthSRVFormat = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
@@ -23,6 +24,8 @@ static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
     case BufferInfo::btDepth:
     case BufferInfo::btStencil:
         return kDepthTypelessFormat;
+    case BufferInfo::btVertex:
+        return kVertexFormat;
     default:
         return kColorFormat;
     }
@@ -112,8 +115,8 @@ void RenderTarget::Init(void)
 {
     m_width = m_height = 0;
     m_scale = 1;
-    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
-    m_vertexBufferIndex = -1;
+    m_bufferCount = m_colorBufferCount = m_extraBufferCount = 0;
+    m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
     m_activeBufferIndex = 0;
@@ -167,7 +170,7 @@ void RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 
 void RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
-    DXGI_FORMAT fmt = kColorFormat;
+    DXGI_FORMAT fmt = FormatForType(info.m_type);
     D3D12_CLEAR_VALUE cv{};
     cv.Format = fmt;
     info.m_resource = CreateRTResource(device, w, h, fmt, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
@@ -251,7 +254,9 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor);
     m_haveRTVs = true;
 
-    m_vertexBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
+    m_extraBufferCount = params.vertexBufferCount;
+    // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
+    m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
 
@@ -326,8 +331,8 @@ void RenderTarget::Destroy(void)
         m_bufferInfo[i].Release();
     m_isAvailable = false;
     m_haveRTVs = false;
-    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
-    m_depthBufferIndex = m_stencilBufferIndex = m_vertexBufferIndex = -1;
+    m_bufferCount = m_colorBufferCount = m_extraBufferCount = 0;
+    m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
     m_bufferInfo.Reset();
 }
 
@@ -363,7 +368,9 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
         m_activeBufferIndex = -1;
         m_drawBufferGroup = (drawBufferGroup == dbNone) ? dbAll : drawBufferGroup;
         if (m_drawBufferGroup == dbAll) {
-            for (int i = 0; i < m_colorBufferCount; ++i) {
+            for (int i = 0; i < m_bufferCount; ++i) {
+                if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
+                    continue;
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
                 rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
             }
@@ -379,12 +386,14 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
         else if (m_drawBufferGroup == dbExtra) {
-            for (int i = 0; i < m_colorBufferCount; ++i)
+            int i = 0;
+            for (; i < m_colorBufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            for (int i = m_colorBufferCount; i < m_bufferCount; ++i) {
+            for (int j = 0; j < m_extraBufferCount; ++j, ++i) {
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
                 rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
             }
+            pDSV = DepthBufferHandle();
         }
     }
 

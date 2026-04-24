@@ -191,10 +191,14 @@ public:
     }
 
     // Returns the currently recording list (top of stack), or nullptr if none is open.
-    inline ID3D12GraphicsCommandList* CurrentList(void) const noexcept { return m_currentList; }
+    inline ID3D12GraphicsCommandList* CurrentList(void) const noexcept { 
+        return m_currentList; 
+    }
 
     // Returns the currently recording CommandList object (top of obj-stack), or nullptr.
-    inline CommandList* GetCurrentCmdListObj(void) const noexcept { return m_currentCmdList; }
+    inline CommandList* GetCurrentCmdListObj(void) const noexcept { 
+        return m_currentCmdList; 
+    }
 
     // Stack management — called by CommandList::Open / Close / Flush.
     void PushList(ID3D12GraphicsCommandList* list) noexcept;

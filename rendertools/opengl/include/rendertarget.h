@@ -66,8 +66,8 @@ public:
     int                         m_scale;
     int                         m_bufferCount;
     int                         m_colorBufferCount;
-    int                         m_vertexBufferCount;
-    int                         m_vertexBufferIndex;
+    int                         m_extraBufferCount;
+    int                         m_extraBufferIndex;
     int                         m_depthBufferIndex;
     int                         m_stencilBufferIndex;
     int                         m_activeBufferIndex;
@@ -252,7 +252,7 @@ public:
     }
 
     inline int VertexBufferIndex(int i = 0) noexcept {
-        return m_vertexBufferIndex + i;
+        return m_extraBufferCount ? m_extraBufferIndex + i : -1;
     }
 
 

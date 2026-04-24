@@ -19,6 +19,8 @@ List<::Viewport> BaseRenderer::m_viewportStack;
 static Texture* testTexture = nullptr;
 #endif
 
+#define LOG_OPERATIONS 0
+
 // =================================================================================================
 // DX12 BaseRenderer
 //
@@ -80,6 +82,9 @@ void BaseRenderer::SetupGraphics(void) noexcept {
     // (no immediate API calls here; state is applied to the PSO on demand).
     gfxStates.ClearColor(ColorData::Invisible);
     gfxStates.ColorMask(true, true, true, true);
+#if 1
+    Set3DRenderStates(1);
+#else
     gfxStates.SetDepthWrite(1);
     gfxStates.SetDepthTest(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
@@ -89,6 +94,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
     gfxStates.FrontFace(GetWinding());
     gfxStates.SetFaceCulling(1);
     gfxStates.CullFace(GfxOperations::FaceCull::Back);
+#endif
     // Set the initial viewport via the DX12 command list.
 #if 1
     gfxStates.SetViewport(0, 0, m_windowWidth, m_windowHeight);
@@ -110,13 +116,14 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 }
 
 
-void BaseRenderer::Set3DRenderStates(void) noexcept {
-    gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
+void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
+    gfxStates.SetDepthWrite((depthWrite < 0) ? IsColorPass() ? 0 : 1 : depthWrite);
     gfxStates.SetDepthTest(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.SetBlending(0);
     gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
-    gfxStates.FrontFace(GetWinding(true));
+    gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
+    gfxStates.FrontFace(GetWinding());
     gfxStates.SetFaceCulling(1);
     gfxStates.CullFace(GfxOperations::FaceCull::Back);
 }
@@ -364,7 +371,9 @@ CommandList* BaseRenderer::StartOperation(String name) noexcept {
         return cl;
     }
     if (not m_temporaryList) {
+#if LOG_OPERATIONS
         fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
+#endif
         m_temporaryList = commandListHandler.GetCmdList(name, true);
         if (not m_temporaryList)
             return nullptr;
@@ -384,7 +393,9 @@ bool BaseRenderer::FinishOperation(void* cl, bool flush) noexcept {
     if (not list->IsTemporary())
         return true;
     if (--(list->m_refCounter) == 0) {
+#if LOG_OPERATIONS
         fprintf(stderr, "Closing temp. CL '%s'\n", (const char*)list->GetName());
+#endif
         if (flush)
             list->Flush();
         else

@@ -24,7 +24,7 @@ void RenderTarget::Init(void) {
     m_scale = 1;
     m_bufferCount = 0;
     m_colorBufferCount = -1;
-    m_vertexBufferIndex = -1;
+    m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_lastDestination = -1;
     m_activeBufferIndex = -1;
@@ -179,7 +179,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
     }
-    m_vertexBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
+
+    m_extraBufferCount = params.vertexBufferCount;
+    // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
+    m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     // depth buffer must be created last or draw buffer management will fail as it relies on all draw buffers being stored in bufferInfo contiguously, starting at index 0
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
@@ -187,8 +190,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     if (not AttachBuffers(params.hasMRTs))
         return false;
     m_colorBufferCount = params.hasMRTs ? params.colorBufferCount : 1;
-    m_vertexBufferCount = params.vertexBufferCount;
-    m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_vertexBufferCount);
+    m_extraBufferCount = params.vertexBufferCount;
+    m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_extraBufferCount);
     m_name = params.name;
     Disable( false);
     return true;
@@ -263,7 +266,7 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
                 DetachBuffer(i);
                 m_drawBuffers[i] = GL_NONE;
             }
-            for (; i < l; ++i) {
+            for (int j = 0; j < m_extraBufferCount; ++i, ++j) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
                 AttachBuffer(i);
             }

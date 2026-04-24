@@ -134,7 +134,7 @@ public:
 
     void SetupGraphics(void) noexcept;
 
-    void Set3DRenderStates(void) noexcept;
+    void Set3DRenderStates(int depthWrite = -1) noexcept;
 
     void Set2DRenderStates(int blending = 0) noexcept;
 

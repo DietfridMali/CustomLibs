@@ -58,7 +58,6 @@ bool NoiseTexture3D::Allocate(Vector3i gridDimensions) {
     m_data.Resize(GridSize() * 4);
     // Store dimensions; format tags unused in DX12 (0 = unused)
     texBuf->m_info = TextureBuffer::BufferInfo(gridDimensions.x, gridDimensions.y * gridDimensions.z, 1, 0, 0);
-    Validate();
     return true;
 }
 
@@ -164,7 +163,7 @@ bool NoiseTexture3D::Deploy(int) {
     constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32G32B32A32_FLOAT;
     constexpr uint32_t    stride = 16;  // 4 × float32
 
-    m_resource = UploadTexture3DData(device, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, fmt, stride, m_data.Data());
+    m_resource = Upload3DTextureData(device, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, fmt, stride, m_data.Data());
     if (not m_resource)
         return false;
 #ifdef _DEBUG
@@ -245,7 +244,6 @@ bool CloudNoiseTexture::Allocate(int gridSize) {
     m_gridSize = gridSize;
     m_data.Resize(size_t(gridSize) * gridSize * gridSize);
     texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, 0, 0);
-    Validate();
     return true;
 }
 
@@ -262,6 +260,7 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
         Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
     }
+#if 0
     float* data = m_data.Data();
     float minVal = 1e6f, maxVal = 0.0f;
     for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
@@ -269,6 +268,7 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
         if (minVal > n) minVal = n;
         if (maxVal < n) maxVal = n;
     }
+#endif
     Deploy();
     return true;
 }
@@ -338,7 +338,7 @@ bool CloudNoiseTexture::Deploy(int) {
     constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32_FLOAT;
     constexpr uint32_t    stride = 4;
 
-    m_resource = UploadTexture3DData(device, m_gridSize, m_gridSize, m_gridSize, fmt, stride, m_data.Data());
+    m_resource = Upload3DTextureData(device, m_gridSize, m_gridSize, m_gridSize, fmt, stride, m_data.Data());
     if (not m_resource)
         return false;
     if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
@@ -420,7 +420,7 @@ bool BlueNoiseTexture::Deploy(int) {
     constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R8_UNORM;
     constexpr uint32_t    stride = 1;
 
-    m_resource = UploadTexture3DData(device, 128, 128, 64, fmt, stride, m_data.Data());
+    m_resource = Upload3DTextureData(device, 128, 128, 64, fmt, stride, m_data.Data());
     if (not m_resource)
         return false;
     if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))

@@ -101,7 +101,7 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
 }
 
 
-ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept
+ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept
 {
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
@@ -143,11 +143,16 @@ ComPtr<ID3D12Resource> UploadTexture3DData(ID3D12Device* device, int w, int h, i
     D3D12_RANGE mapRange{ 0, 0 };
     if (FAILED(upload->Map(0, &mapRange, (void**)&mapped)))
         return nullptr;
-    for (UINT r = 0; r < rowCount; ++r)
-        std::memcpy(mapped + layout.Offset + r * layout.Footprint.RowPitch, src + r * UINT(w) * pixelStride, UINT(w) * pixelStride);
+    UINT srcRowBytes = UINT(w) * pixelStride;
+    UINT slicePitch  = layout.Footprint.RowPitch * rowCount;
+    for (UINT z = 0; z < UINT(d); ++z)
+        for (UINT r = 0; r < rowCount; ++r)
+            std::memcpy(mapped + layout.Offset + z * slicePitch + r * layout.Footprint.RowPitch,
+                        src + (z * rowCount + r) * srcRowBytes,
+                        srcRowBytes);
     upload->Unmap(0, nullptr);
 
-    CommandList* cl = baseRenderer.StartOperation("UploadTexture3DData");
+    CommandList* cl = baseRenderer.StartOperation("Upload3DTextureData");
     if (not cl)
         return nullptr;
 
