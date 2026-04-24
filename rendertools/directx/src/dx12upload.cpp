@@ -133,7 +133,7 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
     snprintf(name, sizeof(name), "Texture3D - upload[%d,%d]", w, h);
     ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource(name, size_t(uploadSize));
 #else
-    ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource(size_t("", uploadSize));
+    ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource("", size_t(uploadSize));
 #endif
     if (not upload)
         return nullptr;

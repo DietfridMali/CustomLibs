@@ -299,6 +299,10 @@ public:
         return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
 
+    inline void SetGeometryFrontFace(void) noexcept {
+        gfxStates.FrontFace(GetWinding());
+    }
+
 #pragma warning(push)
 #pragma warning(disable:4100)
     inline void* StartOperation(String /*name*/) noexcept {

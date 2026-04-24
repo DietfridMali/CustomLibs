@@ -186,6 +186,49 @@ const ShaderSource& DepthRenderer() {
 
 // -------------------------------------------------------------------------------------------------
 // Solid colour fill (no texture).
+static const ShaderDataAttributes VtxColorAttrs[] = {
+    { "Vertex", 0, ShaderDataAttributes::Float3 },
+    { "Color",  0, ShaderDataAttributes::Float4 },
+};
+
+const ShaderSource& ColorMeshShader() {
+    static const ShaderSource source(
+        "colorMesh",
+        R"(
+            cbuffer FrameConstants : register(b0) {
+                column_major float4x4 mModelView;
+                column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+            };
+            struct VSInput { float3 pos : POSITION; float4 color : COLOR; };
+            struct PSInput {
+                float4 pos          : SV_Position;
+                float4 surfaceColor : COLOR;
+            };
+            PSInput VSMain(VSInput i) {
+                PSInput o;
+                float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
+                o.pos          = mul(mViewport, mul(mProjection, viewPos));
+                o.surfaceColor = i.color;
+                return o;
+            }
+        )",
+        R"(
+            cbuffer ShaderConstants : register(b1) { int premultiply; };
+            struct PSInput {
+                float4 pos          : SV_Position;
+                float4 surfaceColor : COLOR;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                return i.surfaceColor;
+            }
+        )",
+        ShaderDataLayout(VtxColorAttrs, 2)
+    );
+    return source;
+}
+
+
 const ShaderSource& PlainColorShader() {
     static const ShaderSource source(
         "plainColor",
