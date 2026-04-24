@@ -82,7 +82,7 @@ bool BaseRenderer::InitOpenGL(void) noexcept {
 }
 
 
-void BaseRenderer::SetDefaultStates(void) noexcept {
+void BaseRenderer::Set3DRenderStates(void) noexcept {
     gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
     gfxStates.SetDepthTest(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
@@ -93,8 +93,18 @@ void BaseRenderer::SetDefaultStates(void) noexcept {
     gfxStates.CullFace(GfxOperations::FaceCull::Back);
 }
 
+
+void BaseRenderer::Set2DRenderStates(int blending) noexcept {
+    gfxStates.SetDepthTest(0);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
+    gfxStates.SetBlending(blending);
+}
+
+
 void BaseRenderer::SetupGraphics(void) noexcept {
-    SetDefaultStates();
+    Set3DRenderStates();
     gfxStates.SetDepthWrite(1);
     gfxStates.ClearColor(ColorData::Invisible);
     glClearDepth(1.0);

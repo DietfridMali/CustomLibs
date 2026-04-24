@@ -110,7 +110,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 }
 
 
-void BaseRenderer::SetDefaultStates(void) noexcept {
+void BaseRenderer::Set3DRenderStates(void) noexcept {
     gfxStates.SetDepthWrite(IsColorPass() ? 0 : 1);
     gfxStates.SetDepthTest(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
@@ -122,7 +122,7 @@ void BaseRenderer::SetDefaultStates(void) noexcept {
 }
 
 
-void BaseRenderer::Set2DRenderStates(int blending) {
+void BaseRenderer::Set2DRenderStates(int blending) noexcept {
     gfxStates.SetDepthTest(0);
     gfxStates.SetDepthWrite(0);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);

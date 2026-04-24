@@ -143,9 +143,9 @@ public:
     // Mirrors SetupOpenGL from the OGL version — same call sites, DX12 internals.
     void SetupGraphics(void) noexcept;
 
-    void SetDefaultStates(void) noexcept;
+    void Set3DRenderStates(void) noexcept;
 
-    void Set2DRenderStates(int blending = 0);
+    void Set2DRenderStates(int blending = 0) noexcept;
 
     inline void SetRenderPass(RenderPassType renderPass) noexcept { 
         m_renderPass = renderPass; 
