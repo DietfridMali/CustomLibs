@@ -52,6 +52,7 @@ Shader* TextRenderer::LoadShader(void) {
 void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, bool flipVertically) {
     if (not m_font)
         return;
+    baseRenderer.Set2DRenderStates();
     Shader* shader = LoadShader();
     if (not shader)
         return;
@@ -60,10 +61,6 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
 #if TEST_ATLAS
     baseRenderer.ResetTransformation();
     baseRenderer.SetViewport(::Viewport (0, 0, m_font->GetAtlas().GetWidth(), m_font->GetAtlas().GetHeight()));
-    gfxStates.SetBlending(0);
-    gfxStates.SetFaceCulling(0);
-    gfxStates.SetDepthTest(0);
-    gfxStates.SetDepthWrite(0);
     RenderTarget* renderTarget = m_font->GetRenderTarget();
     if (renderTarget) {
         renderTarget->Render({}, ColorData::Yellow);
@@ -104,8 +101,6 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateData(true);
-    gfxStates.SetDepthTest(0);
-    gfxStates.SetDepthWrite(0);
     m_mesh.Render(m_font->GetTexture());
 }
 

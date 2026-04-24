@@ -87,11 +87,11 @@ public:
     // Present the current back buffer, advance to the next one.
     virtual void Update(void);
 
-    // Transition current back buffer PRESENT → RENDER_TARGET. Call before rendering.
-    void BeginBackBuffer(void) noexcept;
+    // Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
+    void EnableBackBuffer(void) noexcept;
 
     // Transition current back buffer RENDER_TARGET → PRESENT. Call before Present().
-    void EndBackBuffer(void) noexcept;
+    void DisableBackBuffer(void) noexcept;
 
     // Returns the current back buffer resource (set as render target before drawing).
     inline ID3D12Resource* CurrentBackBuffer(void) const noexcept {
@@ -103,11 +103,16 @@ public:
         return m_rtvHandles[m_backBufferIndex].cpu;
     }
 
-    inline int    GetWidth(void) noexcept { return m_width; }
-    inline int    GetHeight(void) noexcept { return m_height; }
-    inline float  GetAspectRatio(void) noexcept { return m_aspectRatio; }
-    inline SDL_Window*    GetWindow(void) noexcept { return m_window; }
-    inline HWND           GetHwnd(void) noexcept { return m_hwnd; }
+    inline int GetWidth(void) noexcept { return m_width; }
+    
+    inline int GetHeight(void) noexcept { return m_height; }
+    
+    inline float GetAspectRatio(void) noexcept { return m_aspectRatio; }
+    
+    inline SDL_Window* GetWindow(void) noexcept { return m_window; }
+    
+    inline HWND GetHwnd(void) noexcept { return m_hwnd; }
+
     inline IDXGISwapChain3* SwapChain(void) noexcept { return m_swapChain.Get(); }
 
     inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
@@ -119,11 +124,13 @@ public:
     }
 
     inline int  SelectedDisplayMode(void) noexcept { return m_activeDisplayMode; }
+    
     inline void SelectDisplayMode(int displayMode) noexcept { m_activeDisplayMode = displayMode; }
 
     bool ChangeDisplayMode(int displayMode, bool useFullscreen);
 
     inline bool IsFullScreen(void) noexcept { return m_isFullscreen; }
+    
     inline void SetFullScreen(bool useFullscreen) noexcept { m_isFullscreen = useFullscreen; }
 
     bool SwitchDisplayMode(int direction);

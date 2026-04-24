@@ -145,6 +145,8 @@ public:
 
     void SetDefaultStates(void) noexcept;
 
+    void Set2DRenderStates(int blending = 0);
+
     inline void SetRenderPass(RenderPassType renderPass) noexcept { 
         m_renderPass = renderPass; 
     }

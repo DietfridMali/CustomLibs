@@ -422,6 +422,8 @@ public:
 
     void ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept;
 
+    void ClearBackBuffer(const RGBAColor& color = ColorData::Invisible) noexcept;
+
     void ClearDepthBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float clearValue = 1.0f) noexcept;
 
     void ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue = 0) noexcept;

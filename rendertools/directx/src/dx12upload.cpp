@@ -97,7 +97,7 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
         }
     }
     SubresourceBarrier(cl->List(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    return baseRenderer.FinishOperation(cl);
+    return baseRenderer.FinishOperation(cl, true);
 }
 
 

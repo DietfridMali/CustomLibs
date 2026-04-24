@@ -90,6 +90,9 @@ void BaseRenderer::SetupGraphics(void) noexcept {
     gfxStates.SetFaceCulling(1);
     gfxStates.CullFace(GfxOperations::FaceCull::Back);
     // Set the initial viewport via the DX12 command list.
+#if 1
+    gfxStates.SetViewport(0, 0, m_windowWidth, m_windowHeight);
+#else
     auto* list = commandListHandler.CurrentList();
     if (list) {
         D3D12_VIEWPORT vp{};
@@ -103,6 +106,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
         D3D12_RECT scissor{ 0, 0, m_windowWidth, m_windowHeight };
         list->RSSetScissorRects(1, &scissor);
     }
+#endif
 }
 
 
@@ -115,6 +119,15 @@ void BaseRenderer::SetDefaultStates(void) noexcept {
     gfxStates.FrontFace(GetWinding(true));
     gfxStates.SetFaceCulling(1);
     gfxStates.CullFace(GfxOperations::FaceCull::Back);
+}
+
+
+void BaseRenderer::Set2DRenderStates(int blending) {
+    gfxStates.SetDepthTest(0);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
+    gfxStates.SetBlending(blending);
 }
 
 
@@ -181,24 +194,11 @@ bool BaseRenderer::Start2DScene(void) {
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
-    gfxStates.SetDepthWrite(0);
-    gfxStates.SetDepthTest(0);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxStates.SetFaceCulling(0);
+    Set2DRenderStates();
 
     if (not (m_screenBuffer and m_screenBuffer->Enable())) {
-        // No screen RenderTarget: clear the swap chain back buffer directly.
-        auto* list = commandListHandler.CurrentList();
-        if (list) {
-            baseDisplayHandler.BeginBackBuffer();  // PRESENT → RENDER_TARGET
-            D3D12_CPU_DESCRIPTOR_HANDLE rtv = baseDisplayHandler.CurrentRTV();
-            list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
-            float clearColor[4] = {
-                m_backgroundColor.R(), m_backgroundColor.G(),
-                m_backgroundColor.B(), m_backgroundColor.A()
-            };
-            list->ClearRenderTargetView(rtv, clearColor, 0, nullptr);
-        }
+        baseDisplayHandler.EnableBackBuffer();
+        gfxStates.ClearBackBuffer();
     }
     gfxStates.ResetClearColor();
     return true;
@@ -215,8 +215,7 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
-        gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-        gfxStates.SetFaceCulling(0);
+        Set2DRenderStates();
         SetViewport(m_sceneViewport, 0, 0, false);
 
         Shader* shader;
@@ -255,24 +254,16 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            gfxStates.SetDepthTest(0);
-            gfxStates.SetDepthWrite(0);
-            gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-            gfxStates.SetFaceCulling(0);
+            Set2DRenderStates();
 
             m_renderList->Open(commandListHandler.CmdQueue().FrameIndex());
             // Ensure the screen RenderTarget color buffer is in PSR state.
             // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
             // in which case the RENDER_TARGET → PSR transition was never recorded.
             m_screenBuffer->Disable();
-            auto* list = commandListHandler.CurrentList();
-            if (list && baseDisplayHandler.CurrentBackBuffer()) {
-                // Transition back buffer PRESENT → RENDER_TARGET, clear it, blit screen RenderTarget.
-                baseDisplayHandler.BeginBackBuffer();
-                D3D12_CPU_DESCRIPTOR_HANDLE rtv = baseDisplayHandler.CurrentRTV();
-                constexpr float black[4] = { 0.f, 0.f, 0.f, 0.f };
-                list->ClearRenderTargetView(rtv, black, 0, nullptr);
-                list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+            if (baseDisplayHandler.CurrentBackBuffer()) {
+                baseDisplayHandler.EnableBackBuffer();
+                gfxStates.ClearBackBuffer();
             }
 #if 0
             Timer t;
@@ -287,9 +278,8 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
             RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
 
-            // Transition back buffer RENDER_TARGET → PRESENT before Present().
-            if (list and baseDisplayHandler.CurrentBackBuffer())
-                baseDisplayHandler.EndBackBuffer();
+            if (baseDisplayHandler.CurrentBackBuffer())
+                baseDisplayHandler.DisableBackBuffer();
         }
     }
 }

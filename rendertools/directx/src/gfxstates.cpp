@@ -4,6 +4,7 @@
 #include "dx12context.h"
 #include "descriptor_heap.h"
 #include "base_renderer.h"
+#include "base_displayhandler.h"
 #include "commandlist.h"
 
 #include <cstdio>
@@ -137,6 +138,13 @@ void GfxStates::ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept {
     auto* list = commandListHandler.CurrentList();
     if (list)
         list->ClearRenderTargetView(rtv, m_clearColor.Data(), 0, nullptr);
+}
+
+
+void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
+    auto* list = commandListHandler.CurrentList();
+    if (list)
+        list->ClearRenderTargetView(baseDisplayHandler.CurrentRTV(), color.Data(), 0, nullptr);
 }
 
 

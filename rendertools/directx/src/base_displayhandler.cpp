@@ -198,18 +198,23 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
 }
 
 
-void BaseDisplayHandler::BeginBackBuffer(void) noexcept {
-    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_RENDER_TARGET)
+void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
+    auto* list = commandListHandler.CurrentList();
+    if (not list)
         return;
-    auto* cl = commandListHandler.GetCurrentCmdListObj();
-    if (not cl)
-        return;
-    cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    if (m_backBufferStates[m_backBufferIndex] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
+        auto* cl = commandListHandler.GetCurrentCmdListObj();
+        if (not cl)
+            return;
+        cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    }
+    D3D12_CPU_DESCRIPTOR_HANDLE rtv = CurrentRTV();
+    list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 }
 
 
-void BaseDisplayHandler::EndBackBuffer(void) noexcept {
+void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
     if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT)
         return;
     auto* cl = commandListHandler.GetCurrentCmdListObj();
@@ -232,7 +237,7 @@ void BaseDisplayHandler::Update(void) {
     // Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
     // No-op in the normal game loop where DrawScreen() was already called explicitly.
     // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
-    EndBackBuffer();
+    DisableBackBuffer();
     // Close the main renderer list — registers it for submission.
     baseRenderer.GetCmdList()->Close();
     // Submit all registered lists (RenderTarget lists first, main list last — registration order).

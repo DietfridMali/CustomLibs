@@ -581,10 +581,7 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
-    if (params.destination < 0) {
-        gfxStates.SetBlending(1);
-    }
-    else {
+    if (params.destination >= 0) {
         if (not Enable(params.destination, RenderTarget::dbSingle, true, true))
             return false;
         m_lastDestination = params.destination;
@@ -592,10 +589,9 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
-    gfxStates.SetDepthTest(0);
-    gfxStates.SetDepthWrite(0);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxStates.SetFaceCulling(0);
+#if 0 // must be called before shader load in DirectX!
+    baseRenderer.Set2DRenderStates(params.destination < 0);
+#endif
     if (params.shader) {
         if (applyTransformation)
             params.shader->UpdateMatrices();
@@ -604,6 +600,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     else {
         if (params.premultiply)
             m_viewportArea.Premultiply();
+        baseRenderer.Set2DRenderStates(params.destination < 0);
         m_viewportArea.Render(nullptr, source, color);
     }
     baseRenderer.PopMatrix();
