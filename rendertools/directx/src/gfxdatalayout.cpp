@@ -201,7 +201,7 @@ bool GfxDataLayout::Enable(void) noexcept
             }
         }
         list->IASetVertexBuffers(0, maxSlot, views);
-#ifdef _DEBUG
+#if 0//def _DEBUG
         fprintf(stderr, "GfxDataLayout::Enable — %d buffers, maxSlot=%d\n", vbCount, maxSlot);
         for (int s = 0; s < maxSlot; ++s) {
             if (views[s].BufferLocation)

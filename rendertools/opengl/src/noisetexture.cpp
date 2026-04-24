@@ -224,7 +224,6 @@ bool CloudNoiseTexture::Allocate(int gridSize) {
     m_gridSize = gridSize;
     m_data.Resize(size_t(gridSize) * gridSize * gridSize);
     texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, GL_R16F, GL_RED);
-    Validate();
     return true;
 }
 
@@ -242,6 +241,7 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
         SaveToFile(noiseFilename);
     }
     float* data = m_data.Data();
+#if 0
     float minVal = 1e6f, maxVal = 0.0f;
     for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
         float n = *data;
@@ -250,7 +250,6 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
         if (maxVal < n)
             maxVal = n;
     }
-#if 0
     data = m_data.Data();
     for (uint32_t i = m_gridSize * m_gridSize * m_gridSize; i; --i, ++data) {
         float n = Conversions::Normalize(*data, minVal, maxVal);
@@ -348,6 +347,7 @@ bool CloudNoiseTexture::Deploy(int) {
     SetParams(false);
     glGenerateMipmap(GL_TEXTURE_3D);
     Release();
+    m_isDeployed = true;
     return true;
 }
 
@@ -373,7 +373,6 @@ bool BlueNoiseTexture::Allocate(void) {
     }
     m_data.Resize(BufferSize());
     texBuf->m_info = TextureBuffer::BufferInfo(m_gridSize.x, m_gridSize.y * 64, 1, GL_R8, GL_RED);
-    Validate();
     return true;
 }
 

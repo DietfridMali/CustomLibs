@@ -335,6 +335,9 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
     if (flipVertically)
         m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
 #endif
+#ifdef _DEBUG
+    m_viewport.GetGfxViewport();
+#endif
     m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
     //glViewport(m_viewport.m_left, m_viewport.m_top, m_viewport.m_width, m_viewport.m_height);
 }

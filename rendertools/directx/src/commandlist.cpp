@@ -346,7 +346,7 @@ void CommandListHandler::Register(CommandList* cl) noexcept {
     m_pendingLists.Push(cl);
 }
 
-#define LOG_EXECUTION 1
+#define LOG_EXECUTION 0
 
 void CommandListHandler::ExecuteAll(void) noexcept {
     if (m_pendingLists.IsEmpty())
