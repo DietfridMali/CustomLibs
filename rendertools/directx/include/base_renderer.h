@@ -339,6 +339,10 @@ public:
         return reverse ? GfxOperations::Winding::CW : GfxOperations::Winding::CCW;
     }
 
+    inline void SetGeometryFrontFace(void) noexcept {
+        gfxStates.FrontFace(GetWinding(true));
+    }
+
     inline GfxOperations::FaceCull GetFrontFace(bool reverse = false) noexcept {
         return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
