@@ -408,4 +408,10 @@ bool BaseRenderer::CheckGfxError(const char* operation) noexcept {
 #endif
 }
 
+#include "gfxapitype.inl"
+
+bool IsGfxApi(GfxApiType::ApiType value) noexcept {
+    return value == gfxApiType;
+}
+
 // =================================================================================================

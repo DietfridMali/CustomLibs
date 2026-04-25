@@ -14,7 +14,7 @@
 #include "viewport.h"
 #include "rendertarget.h"
 #include "drawbufferhandler.h"
-#include "gfxstates.h"
+#include "gfxapitype.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -69,6 +69,8 @@ protected:
 
     static List<::Viewport> m_viewportStack;
     List<RenderTarget*>     m_sceneBufferStack;
+
+    GfxApiType              m_gfxApiType;
 
 public:
 #ifdef _DEBUG
@@ -361,6 +363,9 @@ public:
     CommandList* StartOperation(String name) noexcept;
 
     bool FinishOperation(void* cl, bool flush = false) noexcept;
+
+#include "gfxstates.h"
+
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

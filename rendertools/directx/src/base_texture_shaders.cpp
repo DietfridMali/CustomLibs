@@ -120,7 +120,7 @@ const ShaderSource& DepthShader() {
                 return (float4)0;
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
+        ShaderDataLayout(VtxTcAttrs, 2, 0)
     );
     return source;
 }
@@ -152,7 +152,7 @@ const ShaderSource& SphereDepthShader() {
                 return (float4)0;
             }
         )",
-        ShaderDataLayout(VtxAttrs, 1)
+        ShaderDataLayout(VtxAttrs, 1, 0)
     );
     return source;
 }

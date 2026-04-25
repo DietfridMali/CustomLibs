@@ -13,7 +13,6 @@
 #include "viewport.h"
 #include "rendertarget.h"
 #include "drawbufferhandler.h"
-#include "gfxstates.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -313,6 +312,9 @@ public:
         return true;
     }
 #pragma warning(pop)
+
+#include "gfxstates.h"
+
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

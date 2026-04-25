@@ -12,6 +12,7 @@
 #include "commandlist.h"
 #include "base_displayhandler.h"
 #include "dx12context.h"
+#include "gfxapitype.h"
 
 List<::Viewport> BaseRenderer::m_viewportStack;
 
@@ -405,5 +406,7 @@ bool BaseRenderer::FinishOperation(void* cl, bool flush) noexcept {
     }
     return true;
 }
+
+#include "gfxapitype.inl"
 
 // =================================================================================================

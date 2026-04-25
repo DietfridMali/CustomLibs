@@ -203,6 +203,9 @@
     <ClInclude Include="..\include\drawbufferhandler.h">
       <Filter>DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\gfxapitype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->
@@ -357,5 +360,10 @@
     <ClCompile Include="..\src\drawbufferhandler.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\gfxapitype.inl">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
