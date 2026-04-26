@@ -19,26 +19,29 @@ class ShaderSource {
 public:
     using KeyType = String;
 
-    String           m_name{ "" };
-    String           m_vs{ "" };
-    String           m_fs{ "" };
-    String           m_gs{ "" };
-    ShaderDataLayout m_dataLayout;
+    String              m_name{ "" };
+    String              m_vs{ "" };
+    String              m_fs{ "" };
+    String              m_gs{ "" };
+    int                 m_featureLevel{ 0 };
+    ShaderDataLayout    m_dataLayout;
 
     ShaderSource() = default;
 
-    explicit ShaderSource(String name, String vs, String fs, String gs = "")
+    explicit ShaderSource(String name, String vs, String fs, String gs = "", int featureLevel = 0)
         : m_name(name)
         , m_vs(vs)
         , m_fs(fs)
         , m_gs(gs)
+        , m_featureLevel(featureLevel)
     { }
 
-    explicit ShaderSource(String name, String vs, String fs, ShaderDataLayout layout)
+    explicit ShaderSource(String name, String vs, String fs, ShaderDataLayout layout, int featureLevel = 0)
         : m_name(name)
         , m_vs(vs)
         , m_fs(fs)
         , m_dataLayout(layout)
+        , m_featureLevel(featureLevel)
     { }
 
     ShaderSource(const ShaderSource& other)

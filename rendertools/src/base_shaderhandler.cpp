@@ -61,10 +61,8 @@ Shader* BaseShaderHandler::SelectShader(Texture* texture) {
 }
 
 
-Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId, int featureLevel) {
+Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
     Shader* shader;
-    if (not gfxStates.HaveFeatureLevel(featureLevel))
-        return nullptr;
     if (baseRenderer.IsShadowPass())
         shaderId = depthShaderId; // override all shaders with simplest possible shader during depth pass
 #ifdef OPENGL
