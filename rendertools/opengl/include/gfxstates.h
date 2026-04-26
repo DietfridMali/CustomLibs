@@ -10,6 +10,7 @@
 #include "rendertypes.h"
 
 #include "array.hpp"
+#include "string.hpp"
 #include "list.hpp"
 #include "basesingleton.hpp"
 #include "colordata.h"
@@ -107,11 +108,15 @@ private:
 	RGBAColor m_clearColor{ ColorData::Invisible };
 	float m_depthClearValue{ 1.0f };
 	int m_stencilClearValue{ 0 };
+	int m_featureLevel{ 0 };
 
 	List<TextureSlotInfo> m_tmuBindings;
 	List<RGBAColor> m_clearColorStack;
 
 public:
+	static constexpr int MinFeatureLevel = 330;
+	static constexpr int SSBOFeatureLevel = 430;
+
 	GfxStates() {
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 		DetermineExtensions();
@@ -121,6 +126,16 @@ public:
 
 	inline bool HasExtension(const char* extension) {
 		return m_extensions.find(extension) != m_extensions.end();
+	}
+
+	inline int FeatureLevel(void) noexcept {
+		if (m_featureLevel == 0)
+			m_featureLevel = int(String((const char*)glGetString(GL_SHADING_LANGUAGE_VERSION)));
+		return m_featureLevel;
+	}
+
+	inline bool HaveFeatureLevel(int level) noexcept {
+		return FeatureLevel() >= (level ? level : MinFeatureLevel);
 	}
 
 	inline int MaxTextureSize(void) noexcept {

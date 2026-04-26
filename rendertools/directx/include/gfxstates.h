@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "dx12framework.h"
+#include "dx12context.h"
 #include "array.hpp"
 #include "list.hpp"
 #include "dictionary.hpp"
@@ -212,14 +213,28 @@ private:
     int                     m_maxTextureSize{ 4096 };
     RGBAColor               m_clearColor{ ColorData::Invisible };
     List<RGBAColor>         m_clearColorStack;
+    int                     m_featureLevel{ 0 };
 
     RenderStates& ActiveState(void) noexcept;
 
 public:
+    static constexpr int MinFeatureLevel = (int)D3D_FEATURE_LEVEL_11_0;
+    static constexpr int SSBOFeatureLevel = (int)D3D_FEATURE_LEVEL_11_0;
+
     GfxStates() = default;
 
     void Init(int maxTextureSize = 4096) noexcept {
         m_maxTextureSize = maxTextureSize;
+    }
+
+    inline int FeatureLevel(void) noexcept {
+        if (m_featureLevel == 0)
+            m_featureLevel = (int)dx12Context.FeatureLevel();
+        return m_featureLevel;
+    }
+
+    inline bool HaveFeatureLevel(int minLevel) noexcept {
+        return FeatureLevel() >= minLevel;
     }
 
     inline const RenderStates& State(void) noexcept {

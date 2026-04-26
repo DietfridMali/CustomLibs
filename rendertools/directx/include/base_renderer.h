@@ -69,8 +69,6 @@ protected:
     static List<::Viewport> m_viewportStack;
     List<RenderTarget*>     m_sceneBufferStack;
 
-    GfxApiType              m_gfxApiType;
-
 public:
 #ifdef _DEBUG
     bool                    m_xchgSkyAndSceneBuffer{ false };

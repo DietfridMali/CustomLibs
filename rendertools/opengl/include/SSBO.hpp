@@ -3,6 +3,7 @@
 
 #include "glew.h"
 #include "array.hpp"
+#include "gfxstates.h"
 #include "sharedgfxhandle.hpp"
 
 class BaseSSBO {
@@ -19,7 +20,7 @@ class SSBO
 	: public BaseSSBO
 {
 public:
-	SharedGfxHandle			m_handle;
+	SharedGfxHandle		m_handle;
 	AutoArray<DATA_T>	m_data;
 
 	SSBO()
@@ -40,6 +41,8 @@ public:
 
 	bool Create(int size = 0) {
 		if (not IsAvailable)
+			return false;
+		if (not gfxStates.HaveFeatureLevel(GfxStates::SSBOFeatureLevel))
 			return false;
 		if (m_handle.Claim() == 0)
 			return false;

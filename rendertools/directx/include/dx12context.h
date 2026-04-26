@@ -33,6 +33,10 @@ public:
     void DumpDRED(void) noexcept;
 #endif
 
+    inline D3D_FEATURE_LEVEL FeatureLevel(void) noexcept {
+        return m_featureLevel;
+    }
+
 private:
     bool SelectAdapter(void) noexcept;
 };
