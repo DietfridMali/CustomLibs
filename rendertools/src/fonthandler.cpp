@@ -25,11 +25,14 @@ int FontHandler::CompareTextures(void* context, const char& key1, const char& ke
 FontHandler::FontHandler()
     : m_font(nullptr), m_fontName(""), m_fontSize(0), m_glyphs(""), m_isAvailable(false)
 {
+    m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
+#if 0
 #ifdef _WIN32
     m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
 #else
     //std::locale::global(std::locale("de_DE.UTF-8"));
     m_euroChar = "\u20AC";
+#endif
 #endif
     m_glyphDict.SetComparator(String::Compare); //FontHandler::CompareTextures);
 }
@@ -181,8 +184,20 @@ bool FontHandler::CreateAtlas(void) {
     int i = CreateTextures();
     m_maxGlyphSize.Update();
     int glyphCount = m_glyphs.Length() + 1;
-    m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2);
+    if (not m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2)) {
+#ifdef _DEBUG
+        fprintf(stderr, "FontHandler: Failed to create atlas.\n");
+#endif
+        return false;
+    }
+#ifdef _DEBUG
+    if (BuildAtlas() == int(glyphCount))
+        return true;
+    fprintf(stderr, "FontHandler: Failed to create all glyphs.\n");
+    return false;
+#else
     return BuildAtlas() == int(glyphCount);
+#endif
 }
 
 
