@@ -60,6 +60,6 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	>$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
->rm -rf $(OBJDIR) $(LIB) 
+	>rm -rf $(OBJDIR) $(LIB) 
 
 -include $(OBJECTS:.o=.d)

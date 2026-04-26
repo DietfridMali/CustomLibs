@@ -1,15 +1,16 @@
 
 // =================================================================================================
 
+BaseRenderer::GfxApiType BaseRenderer::gfxApiType =
 #if defined(DIRECTX)
-static GfxApiType gfxApiType = GfxApiType::DirectX;
+	BaseRenderer::GfxApiType::DirectX;
 #elif defined(VULKAN)
-static GfxApiType gfxApiType = GfxApiType::Vulkan;
+	BaseRenderer::GfxApiType::Vulkan;
 #else
-static GfxApiType gfxApiType = GfxApiType::OpenGL;
+	BaseRenderer::GfxApiType::OpenGL;
 #endif
 
-bool IsGfxApi(GfxApiType value) noexcept {
+bool BaseRenderer::IsGfxApi(GfxApiType value) noexcept {
 	return value == gfxApiType;
 }
 
