@@ -38,7 +38,7 @@ TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, fl
 RenderTarget* TextRenderer::GetRenderTarget(int scale) {
 	if (m_renderTarget)
 		delete m_renderTarget;
-    if (m_renderTarget = new RenderTarget())
+    if ((m_renderTarget = new RenderTarget()))
         m_renderTarget->Create(baseRenderer.GetViewport().m_width, baseRenderer.GetViewport().m_height, 2, {.name = "text", .colorBufferCount = 2});
     return m_renderTarget;
 }
