@@ -117,7 +117,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
 
     String fontFile = fontFolder + fontName;
     if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
-        fprintf(stderr, "Smiley-Battle: Cannot load font '%s'.\n", (char*) fontName);
+        fprintf(stderr, "Smiley-Battle: Cannot load font '%s'(%s).\n", (char*) fontName, TTF_GetError());
         return false;
     }
     //SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
