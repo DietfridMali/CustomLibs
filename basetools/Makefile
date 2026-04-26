@@ -53,13 +53,13 @@ RELEASE: all
 all: $(LIB)
 
 $(LIB): $(OBJECTS)
-	>$(AR) rcs $@ $^
+>$(AR) rcs $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
-	>@mkdir -p $(OBJDIR)
-	>$(CXX) $(CXXFLAGS) -c $< -o $@
+>@mkdir -p $(OBJDIR)
+>$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	>rm -rf $(OBJDIR) $(LIB) 
+>rm -rf $(OBJDIR) $(LIB) 
 
 -include $(OBJECTS:.o=.d)
