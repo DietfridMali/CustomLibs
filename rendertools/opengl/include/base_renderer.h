@@ -313,7 +313,7 @@ public:
     }
 #pragma warning(pop)
 
-#include "gfxstates.h"
+#include "gfxapitype.h"
 
 };
 

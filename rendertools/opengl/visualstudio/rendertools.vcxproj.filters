@@ -177,6 +177,9 @@
     <ClInclude Include="..\include\drawbufferhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\gfxapitype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\cube.cpp">
@@ -305,5 +308,10 @@
     <ClCompile Include="..\src\drawbufferhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\gfxapitype.inl">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
