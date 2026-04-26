@@ -57,7 +57,7 @@ COMMON_FILES := \
  tiny_gltf \
  viewport
 
-INCDIRS := ./include ../include ../src ../../basetools/include ../../../ExternalLibs/glew/include/GL /usr/include/SDL2 /opt/homebrew/include
+INCDIRS := ./include ../include ../src ../../basetools/include ../../ExternalLibs/glew/include/GL ../../../ExternalLibs/glew/include/GL /usr/include/SDL2 /opt/homebrew/include
 
 .PHONY: all clean DEBUG RELEASE
 
