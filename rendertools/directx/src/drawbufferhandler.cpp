@@ -22,8 +22,6 @@ void DrawBufferHandler::Setup(int windowWidth, int windowHeight) {
     m_activeBuffer = nullptr;
     m_windowWidth = windowWidth;
     m_windowHeight = windowHeight;
-    m_defaultDrawBuffers.Resize(1);
-    m_defaultDrawBuffers[0] = GL_BACK;
 }
 
 
