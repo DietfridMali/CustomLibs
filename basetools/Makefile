@@ -7,7 +7,7 @@ AR  := ar
 
 FILES := std_string glm_matrix format
 
-INCDIRS := ./include ../CustomLibs/apptools/include ../ExternalLibs/glew/include/GL include/GL /usr/include/SDL2
+INCDIRS := ./include ../CustomLibs/apptools/include ../ExternalLibs/glew/include/GL include/GL /usr/include/SDL2 /opt/homebrew/include
 
 .PHONY: all clean DEBUG RELEASE
 
