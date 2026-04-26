@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cstring>
 #include <iostream>
+#include <type_traits>
 #include "array.hpp"
 #include <fmt/format.h>
 
@@ -44,9 +45,7 @@ public:
     explicit String(int64_t n) : m_str(std::to_string(n)) {}
 
     explicit String(uint64_t n) : m_str(std::to_string(n)) {}
-#if 0
-    explicit String(size_t n) : m_str(std::to_string(n)) {}
-#endif
+    explicit String(size_t n) requires (!std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) : m_str(std::to_string(n)) {}
     explicit String(float f) : m_str(std::to_string(f)) {}
 
     void LogError(std::string caller) const;
@@ -89,7 +88,7 @@ public:
     bool operator>=(const String& other) const noexcept;
     bool operator==(const char* s) const noexcept;
     bool operator!=(const char* s) const noexcept;
-    // --- In class String (public) ergänzen ---
+    // --- In class String (public) ergï¿½nzen ---
 
     // Typecasts
     operator const char* () const noexcept;
@@ -100,9 +99,7 @@ public:
     explicit operator uint32_t() const;
     explicit operator int64_t() const;
     explicit operator uint64_t() const;
-#if 0
-    explicit operator size_t() const;
-#endif
+    explicit operator size_t() const requires (!std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>);
     explicit operator float() const;
     explicit operator bool() const noexcept;
 
@@ -345,11 +342,9 @@ inline T String::ToNumber(std::string caller) const {
 inline String::operator int() const {
     return ToNumber<int>("int");
 }
-#if 0
-inline String::operator size_t() const {
+inline String::operator size_t() const requires (!std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) {
     return ToNumber<size_t>("size_t");
 }
-#endif
 inline String::operator uint8_t() const {
     return ToNumber<uint8_t>("uint8_t");
 }
@@ -399,7 +394,7 @@ inline String String::Concat(std::initializer_list<String> values) {
     std::ostringstream oss;
     for (const auto& v : values)
         oss << static_cast<const char*>(v);
-    return String(oss.str());   // BUGFIX: eine überflüssige Klammer entfernt
+    return String(oss.str());   // BUGFIX: eine ï¿½berflï¿½ssige Klammer entfernt
 }
 
 // --- Inline-Implementierungen ---
