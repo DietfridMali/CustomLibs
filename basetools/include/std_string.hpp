@@ -45,7 +45,8 @@ public:
     explicit String(int64_t n) : m_str(std::to_string(n)) {}
 
     explicit String(uint64_t n) : m_str(std::to_string(n)) {}
-    explicit String(size_t n) requires (!std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) : m_str(std::to_string(n)) {}
+    template <typename T = size_t>
+    explicit String(T n) requires (std::is_same_v<T, size_t> && !std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) : m_str(std::to_string(n)) {}
     explicit String(float f) : m_str(std::to_string(f)) {}
 
     void LogError(std::string caller) const;
@@ -99,7 +100,10 @@ public:
     explicit operator uint32_t() const;
     explicit operator int64_t() const;
     explicit operator uint64_t() const;
-    explicit operator size_t() const requires (!std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>);
+    template <typename T = size_t>
+    explicit operator T() const requires (std::is_same_v<T, size_t> && !std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) {
+        return ToNumber<size_t>("size_t");
+    }
     explicit operator float() const;
     explicit operator bool() const noexcept;
 
@@ -217,7 +221,7 @@ public:
     }
 
     template <typename T>
-    T ToNumber(std::string caller) const;
+    T ToNumber(std::string caller) const noexcept;
 
     inline static void SetErrorLogging(bool logErrors) {
         m_logErrors = logErrors;
@@ -318,32 +322,35 @@ inline void String::LogError(std::string caller) const {
 }
 
 template <typename T>
-inline T String::ToNumber(std::string caller) const {
+inline T String::ToNumber(std::string caller) const noexcept {
     if (IsEmpty())
         return 0;
-    if constexpr (std::is_signed_v<T>) {
-        long long n = std::stoll(m_str, nullptr, 10);
-        if ((n < static_cast<long long>(std::numeric_limits<T>::min())) or (n > static_cast<long long>(std::numeric_limits<T>::max()))) {
-            LogError(caller);
-            return 0;
+    try {
+        if constexpr (std::is_signed_v<T>) {
+            long long n = std::stoll(m_str, nullptr, 10);
+            if ((n < static_cast<long long>(std::numeric_limits<T>::min())) or (n > static_cast<long long>(std::numeric_limits<T>::max()))) {
+                LogError(caller);
+                return 0;
+            }
+            return static_cast<T>(n);
         }
-        return static_cast<T>(n);
+        else {
+            unsigned long long n = std::stoull(m_str, nullptr, 10);
+            if (n > static_cast<unsigned long long>(std::numeric_limits<T>::max())) {
+                LogError(caller);
+                return 0;
+            }
+            return static_cast<T>(n);
+        }
     }
-    else {
-        unsigned long long n = std::stoull(m_str, nullptr, 10);
-        if (n > static_cast<unsigned long long>(std::numeric_limits<T>::max())) {
-            LogError(caller);
-            return 0;
-        }
-        return static_cast<T>(n);
+    catch (...) {
+        try { LogError(caller); } catch (...) {}
+        return 0;
     }
 }
 
 inline String::operator int() const {
     return ToNumber<int>("int");
-}
-inline String::operator size_t() const requires (!std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) {
-    return ToNumber<size_t>("size_t");
 }
 inline String::operator uint8_t() const {
     return ToNumber<uint8_t>("uint8_t");
