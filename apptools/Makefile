@@ -16,7 +16,7 @@ FILES := \
  textfileloader \
  udp
 
-INCDIRS := ./include ../basetools/include ../rendertools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2
+INCDIRS := ./include ../basetools/include ../rendertools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2 /opt/homebrew/include
 
 .PHONY: all clean DEBUG RELEASE
 
