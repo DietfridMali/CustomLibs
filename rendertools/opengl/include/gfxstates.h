@@ -119,6 +119,9 @@ public:
 
 	GfxStates() {
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
+#ifdef _DEBUG
+		fprintf(stderr, "Max. texture size: %d\n", m_maxTextureSize);
+#endif
 		DetermineExtensions();
 	}
 
