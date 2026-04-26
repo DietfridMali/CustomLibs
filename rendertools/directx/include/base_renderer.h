@@ -14,7 +14,6 @@
 #include "viewport.h"
 #include "rendertarget.h"
 #include "drawbufferhandler.h"
-#include "gfxapitype.h"
 #include "framecounter.h"
 
 // =================================================================================================
@@ -364,7 +363,7 @@ public:
 
     bool FinishOperation(void* cl, bool flush = false) noexcept;
 
-#include "gfxstates.h"
+#include "gfxapitype.h"
 
 };
 
