@@ -443,7 +443,7 @@ Shader& Shader::Move(Shader& other) noexcept
 
 bool Shader::UploadB1(void) noexcept
 {
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
 
@@ -466,11 +466,11 @@ bool Shader::Activate(void) {
     if (not IsValid())
         return false;
 
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
 
-    CommandList* cl = commandListHandler.GetCurrentCmdListObj();
+    CommandList* cl = commandListHandler.CurrentCmdList();
     if (not cl)
         return false;
 
@@ -491,7 +491,7 @@ bool Shader::Activate(void) {
 
 bool Shader::UpdateMatrices(void)
 {
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
 

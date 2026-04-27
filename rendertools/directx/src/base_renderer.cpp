@@ -121,7 +121,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 #if 1
     gfxStates.SetViewport(0, 0, m_windowWidth, m_windowHeight);
 #else
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (list) {
         D3D12_VIEWPORT vp{};
         vp.TopLeftX = 0.0f;
@@ -285,15 +285,16 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     m_screenIsAvailable = false;
     if (not m_screenBuffer)
         return;
-    m_screenBuffer->Deactivate();
+    //m_screenBuffer->Deactivate();
 
     Set2DRenderStates();
 
-    CommandList* cmdList = commandListHandler.GetCmdList("DrawScreen", true);
+    CommandList* cmdList = commandListHandler.CreateCmdList("DrawScreen", true);
     if (not cmdList)
         return;
 
-    cmdList->Open();
+    if (not cmdList->Open())
+        return;
     // Ensure the screen RenderTarget color buffer is in PSR state.
     // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
     // in which case the RENDER_TARGET → PSR transition was never recorded.
@@ -395,24 +396,25 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
 
 
 CommandList* BaseRenderer::StartOperation(String name) noexcept {
-    CommandList* cl = commandListHandler.GetCurrentCmdListObj();
+    CommandList* cl = commandListHandler.CurrentCmdList();
     if (cl) {
         if (cl->IsTemporary())
             ++(cl->m_refCounter);
         return cl;
     }
-    if (not m_temporaryList) {
+    if (m_temporaryList) 
+        ++(m_temporaryList->m_refCounter);
+    else {
 #if LOG_OPERATIONS
         fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
 #endif
-        m_temporaryList = commandListHandler.GetCmdList(name, true);
+        m_temporaryList = commandListHandler.CreateCmdList(name, true);
         if (not m_temporaryList)
             return nullptr;
         if (not m_temporaryList->Open()) {
             return m_temporaryList = nullptr;
         }
     }
-    ++(m_temporaryList->m_refCounter);
     return m_temporaryList;
 }
 

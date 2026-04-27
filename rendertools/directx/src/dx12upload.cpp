@@ -91,12 +91,12 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
     if (faceCount > 6)
         faceCount = 6;
     for (int i = 0; i < faceCount; ++i) {
-        if (not UploadSubresource(device, cl->List(), dstResource, UINT(i), faces[i], width, height, channels, uploads[i], /*addBarrier=*/false)) {
+        if (not UploadSubresource(device, cl->GfxList(), dstResource, UINT(i), faces[i], width, height, channels, uploads[i], /*addBarrier=*/false)) {
             baseRenderer.FinishOperation(cl);
             return false;
         }
     }
-    SubresourceBarrier(cl->List(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
     return baseRenderer.FinishOperation(cl, true);
 }
 
@@ -166,8 +166,8 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
     dstLoc.pResource        = resource.Get();
     dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
     dstLoc.SubresourceIndex = 0;
-    cl->List()->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-    SubresourceBarrier(cl->List(), resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    cl->GfxList()->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+    SubresourceBarrier(cl->GfxList(), resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
     baseRenderer.FinishOperation(cl);
 #ifdef _DEBUG
     if (not resource)

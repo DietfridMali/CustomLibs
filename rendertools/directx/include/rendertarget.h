@@ -180,6 +180,8 @@ public:
 
     void Deactivate(void) noexcept;
 
+    bool Enable(const RTActivationParams& params);
+
     void Disable(void) noexcept;
 
     inline void Flush(void) noexcept {
@@ -187,7 +189,7 @@ public:
             m_cmdList->Flush();
     }
 
-    inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
+    inline CommandList* CreateCmdList(void) noexcept { return m_cmdList; }
 
     void SetViewport(bool flipVertically = false) noexcept;
 

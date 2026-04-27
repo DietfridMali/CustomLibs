@@ -242,7 +242,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_pingPong = m_colorBufferCount > 1;
     m_isScreenBuffer = params.isScreenBuffer;
 
-    m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
+    m_cmdList = commandListHandler.CreateCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
     if (not m_cmdList)
         return false;
     if (not m_cmdList->Open())
@@ -422,8 +422,7 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params)
 }
 
 
-bool RenderTarget::Activate(const RTActivationParams& params)
-{
+bool RenderTarget::Enable(const RTActivationParams& params) {
     if (not m_isAvailable)
         return false;
     if (not AllocRTVs())
@@ -431,15 +430,23 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
     m_drawBufferGroup = params.drawBufferGroup;
 
-	m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
+    m_cmdList = commandListHandler.CreateCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
     if (not m_cmdList)
-		return false;
+        return false;
     if (not m_cmdList->Open())
         return false;
-	m_flushOnDisable = params.flush;
+    m_flushOnDisable = params.flush;
     SetViewport();
 
     if (not EnableBuffers(params))
+        return false;
+    return true;
+}
+
+
+bool RenderTarget::Activate(const RTActivationParams& params)
+{
+    if (not Enable(params))
         return false;
     baseRenderer.ActivateDrawBuffer(this);
     Clear(params);
@@ -490,7 +497,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (info.m_srvIndex == UINT32_MAX)
         return false;
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
     auto& heap = descriptorHeaps.m_srvHeap;

@@ -5,7 +5,7 @@
 #include "array.hpp"
 #include "string.hpp"
 #include "gfxstates.h"
-#include "shader.h"
+//#include "shader.h"
 #include "dx12framework.h"
 #include <functional>
 
@@ -71,12 +71,14 @@ public:
 // Flush() — close list, pop stack, submit immediately + WaitIdle, no registration.
 //            Used for temporary setup (RenderTarget::Create, resource uploads).
 
+class BaseRenderer;
+
 class CommandList
 {
 public:
     static constexpr UINT FRAME_COUNT = 2;
 
-    ComPtr<ID3D12GraphicsCommandList>   m_list{ nullptr };
+    ComPtr<ID3D12GraphicsCommandList>   m_gfxListPtr{ nullptr };
     ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
     bool                                m_isRecording{ false };
     bool                                m_isFlushed{ false };
@@ -84,13 +86,14 @@ public:
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
-    uint32_t                            m_refCounter{ 0 };
+    uint32_t                            m_refCounter{ 1 };
     String                              m_name{ "" };
     ID3D12PipelineState*                m_activePSO{ nullptr };
 
     static List<RenderStates>           m_renderStateStack;
 
     static void PushRenderStates(void) noexcept;
+
     static void PopRenderStates(void) noexcept;
 
     bool Create(ID3D12Device* device, const String& name = "", bool isTemporary = false) noexcept;
@@ -115,8 +118,8 @@ public:
 
     void SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count);
 
-    inline ID3D12GraphicsCommandList* List(void) const noexcept {
-        return m_isRecording ? m_list.Get() : nullptr;
+    inline ID3D12GraphicsCommandList* GfxList(void) const noexcept {
+        return m_isRecording ? m_gfxListPtr.Get() : nullptr;
     }
 
 	inline uint64_t GetId(void) const noexcept {
@@ -165,17 +168,21 @@ public:
 // ExecuteAll — submits all registered lists in registration order, then clears the queue.
 //   Call this once per frame before CommandQueue::EndFrame().
 
+struct CommandListData {
+    CommandList*                cmdList{ nullptr };
+    ID3D12GraphicsCommandList*  gfxList{ nullptr };
+};
+
 class CommandListHandler
     : public BaseSingleton<CommandListHandler>
 {
+    friend class BaseRenderer;
 public:
     CommandQueue                            m_cmdQueue;
-    AutoArray<CommandList*>                 m_pendingLists;    // registered at Open(), cleared after ExecuteAll
+    AutoArray<CommandList*>                 m_pendingLists;     // registered at Open(), cleared after ExecuteAll
     AutoArray<CommandList*>                 m_recycledLists;    // pool of temporary CLs available for reuse
-    AutoArray<ID3D12GraphicsCommandList*>   m_listStack;
-    AutoArray<CommandList*>                 m_cmdListObjStack;
-    ID3D12GraphicsCommandList*              m_currentList{ nullptr };
-    CommandList*                            m_currentCmdList{ nullptr };
+    AutoArray<CommandListData>              m_cmdListStack;
+    CommandListData                         m_currentListData;
     uint64_t                                m_cmdListId{ 1 };
 
     bool Create(ID3D12Device* device) noexcept;
@@ -191,19 +198,14 @@ public:
     }
 
     // Returns the currently recording list (top of stack), or nullptr if none is open.
-    inline ID3D12GraphicsCommandList* CurrentList(void) const noexcept { 
-        return m_currentList; 
+    inline ID3D12GraphicsCommandList* CurrentGfxList(void) const noexcept { 
+        return m_currentListData.gfxList; 
     }
 
     // Returns the currently recording CommandList object (top of obj-stack), or nullptr.
-    inline CommandList* GetCurrentCmdListObj(void) const noexcept { 
-        return m_currentCmdList; 
+    inline CommandList* CurrentCmdList(void) const noexcept { 
+        return m_currentListData.cmdList; 
     }
-
-    // Stack management — called by CommandList::Open / Close / Flush.
-    void PushList(ID3D12GraphicsCommandList* list) noexcept;
-
-    void PopList(void) noexcept;
 
     void PushCmdList(CommandList* cl) noexcept;
 
@@ -221,7 +223,7 @@ public:
     // Returns a CommandList. If isTemporary is true, tries to reuse one from m_recycledLists
     // before allocating a new one. Temporary CLs are recycled after ExecuteAll().
     // Caller owns the memory for non-temporary lists.
-    CommandList* GetCmdList(const String& name = "", bool isTemporary = false) noexcept;
+    CommandList* CreateCmdList(const String& name = "", bool isTemporary = false) noexcept;
 
 #ifdef _DEBUG
     // Set to true to print every logged GPU call (DrawInstanced etc.) with file/line to stderr.
@@ -231,31 +233,29 @@ public:
     inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), loc.line());
-        if (m_currentList)
-            m_currentList->DrawInstanced(vtxCount, instCount, startVtx, startInst);
+        if (CurrentGfxList())
+            CurrentGfxList()->DrawInstanced(vtxCount, instCount, startVtx, startInst);
     }
 
     inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), loc.line());
-        if (m_currentList)
-            m_currentList->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVtx, startInst);
+        if (CurrentGfxList())
+            CurrentGfxList()->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVtx, startInst);
     }
 
-    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION* dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION* src, const D3D12_BOX* srcBox,
-                                   std::source_location loc = std::source_location::current()) noexcept {
+    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION* dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION* src, const D3D12_BOX* srcBox, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[CTR] %s:%u\n", loc.file_name(), loc.line());
-        if (m_currentList)
-            m_currentList->CopyTextureRegion(dst, dstX, dstY, dstZ, src, srcBox);
+        if (CurrentGfxList())
+            CurrentGfxList()->CopyTextureRegion(dst, dstX, dstY, dstZ, src, srcBox);
     }
 
-    inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER* barriers,
-                                 std::source_location loc = std::source_location::current()) noexcept {
+    inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER* barriers, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[RB]  n=%u  %s:%u\n", numBarriers, loc.file_name(), loc.line());
-        if (m_currentList)
-            m_currentList->ResourceBarrier(numBarriers, barriers);
+        if (CurrentGfxList())
+            CurrentGfxList()->ResourceBarrier(numBarriers, barriers);
     }
 #endif
 };

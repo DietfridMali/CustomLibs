@@ -202,13 +202,13 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
 
 
 void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
-    auto* list = commandListHandler.CurrentList();
+    auto* cl = commandListHandler.CurrentCmdList();
+    if (not cl)
+        return;
+    auto* list = cl->GfxList();
     if (not list)
         return;
     if (m_backBufferStates[m_backBufferIndex] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-        auto* cl = commandListHandler.GetCurrentCmdListObj();
-        if (not cl)
-            return;
         cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
         m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_RENDER_TARGET;
     }
@@ -220,7 +220,7 @@ void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
 void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
     if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT)
         return;
-    auto* cl = commandListHandler.GetCurrentCmdListObj();
+    auto* cl = commandListHandler.CurrentCmdList();
     if (not cl)
         return;
     cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);

@@ -179,7 +179,7 @@ bool GfxDataLayout::Enable(void) noexcept
     Activate();
     m_isBound = true;
 
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (not list) 
         return true;
 
@@ -246,7 +246,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 {
 #if 0 //def _DEBUG
     fprintf(stderr, "GfxDataLayout::Render on list %p, indexCount=%u, vertCount=%u\n",
-        (void*)commandListHandler.CurrentList(),
+        (void*)commandListHandler.CurrentGfxList(),
         m_indexBuffer.IsValid() ? UINT(m_indexBuffer.m_itemCount) : 0,
         (m_dataBuffers.Length() > 0 && m_dataBuffers[0]) ? UINT(m_dataBuffers[0]->m_itemCount) : 0); 
 #endif
@@ -260,7 +260,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
     if (Shader* shader = baseShaderHandler.ActiveShader())
         shader->UploadB1();
 
-    if (commandListHandler.CurrentList()) {
+    if (commandListHandler.CurrentGfxList()) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
             commandListHandler.DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
         else {

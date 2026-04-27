@@ -135,28 +135,28 @@ int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
 
 
 void GfxStates::ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept {
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (list)
         list->ClearRenderTargetView(rtv, m_clearColor.Data(), 0, nullptr);
 }
 
 
 void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (list)
         list->ClearRenderTargetView(baseDisplayHandler.CurrentRTV(), color.Data(), 0, nullptr);
 }
 
 
 void GfxStates::ClearDepthBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float clearValue) noexcept {
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (list)
         list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, clearValue, 0, 0, nullptr);
 }
 
 
 void GfxStates::ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue) noexcept {
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (list)
         list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.0f, uint8_t(clearValue), 0, nullptr);
 }
@@ -168,7 +168,7 @@ void GfxStates::ReleaseBuffers(void) noexcept {
 }
 
 void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept {
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (list) {
         D3D12_VIEWPORT vp{};
         vp.TopLeftX = float(left);

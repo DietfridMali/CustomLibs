@@ -142,7 +142,7 @@ bool Texture::Bind(int tmuIndex)
     m_tmuIndex = tmuIndex;
     gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
 
-    auto* list = commandListHandler.CurrentList();
+    auto* list = commandListHandler.CurrentGfxList();
     if (list and (m_handle != UINT32_MAX)) {
         auto& heap = descriptorHeaps.m_srvHeap;
         if (heap.m_heap)

@@ -111,7 +111,7 @@ void CommandQueue::WaitIdle(void) noexcept {
 
 
 ID3D12GraphicsCommandList* CommandQueue::List(void) const noexcept {
-    return commandListHandler.CurrentList();
+    return commandListHandler.CurrentGfxList();
 }
 
 // =================================================================================================
@@ -124,15 +124,15 @@ bool CommandList::Create(ID3D12Device* device, const String& name, bool isTempor
             return false;
         }
     }
-    HRESULT hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_list));
+    HRESULT hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_gfxListPtr));
     if (FAILED(hr)) {
         fprintf(stderr, "CommandList::Create: CreateCommandList failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
-    m_list->Close();
+    m_gfxListPtr->Close();
     m_id = commandListHandler.m_cmdListId++;
     if (not name.IsEmpty())
-        m_list->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
+        m_gfxListPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
     m_name = name;
     m_isTemporary = isTemporary;
     return true;
@@ -141,7 +141,7 @@ bool CommandList::Create(ID3D12Device* device, const String& name, bool isTempor
 
 void CommandList::Destroy(void) noexcept {
     m_isRecording = false;
-    m_list.Reset();
+    m_gfxListPtr.Reset();
     for (UINT i = 0; i < FRAME_COUNT; ++i)
         m_allocators[i].Reset();
 }
@@ -152,14 +152,14 @@ bool CommandList::Open(UINT frameIndex) noexcept {
         return true;
     if (frameIndex == 0)
         frameIndex = commandListHandler.CmdQueue().FrameIndex();
-    if (not m_list or not m_allocators[frameIndex])
+    if (not m_gfxListPtr or not m_allocators[frameIndex])
         return false;
     HRESULT hr = m_allocators[frameIndex]->Reset();
     if (FAILED(hr)) {
         fprintf(stderr, "CommandList::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
-    hr = m_list->Reset(m_allocators[frameIndex].Get(), nullptr);
+    hr = m_gfxListPtr->Reset(m_allocators[frameIndex].Get(), nullptr);
     if (FAILED(hr)) {
         fprintf(stderr, "CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
@@ -168,7 +168,6 @@ bool CommandList::Open(UINT frameIndex) noexcept {
     m_isFlushed = false;
     m_activePSO = nullptr;
     ++m_executionCounter;
-    commandListHandler.PushList(m_list.Get());
     commandListHandler.PushCmdList(this);
     commandListHandler.Register(this);
     PushRenderStates();
@@ -183,13 +182,12 @@ void CommandList::Close(void) noexcept {
     if (not m_isRecording)
         return;
     m_isRecording = false;
-    HRESULT hr = m_list->Close();
+    HRESULT hr = m_gfxListPtr->Close();
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
 #ifdef _DEBUG
     dx12Context.DrainMessages();
 #endif
-    commandListHandler.PopList();
     commandListHandler.PopCmdList();
     PopRenderStates();
 }
@@ -201,7 +199,7 @@ void CommandList::Flush(void) noexcept {
     m_isFlushed = true;
     Close();
 
-    ID3D12CommandList* lists[] = { m_list.Get() };
+    ID3D12CommandList* lists[] = { GfxList() };
     commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
 
 #ifdef _DEBUG
@@ -214,11 +212,11 @@ void CommandList::Flush(void) noexcept {
     HRESULT hr = m_allocators[fi]->Reset();
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Flush: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
-    hr = m_list->Reset(m_allocators[fi].Get(), nullptr);
+    hr = m_gfxListPtr->Reset(m_allocators[fi].Get(), nullptr);
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Flush: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
     else
-        m_list->Close();
+        m_gfxListPtr->Close();
 }
 
 
@@ -231,7 +229,7 @@ void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES bef
     b.Transition.StateBefore = before;
     b.Transition.StateAfter = after;
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    m_list->ResourceBarrier(1, &b);
+    m_gfxListPtr->ResourceBarrier(1, &b);
 #ifdef _DEBUG
     dx12Context.DrainMessages();
 #endif
@@ -241,7 +239,7 @@ void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES bef
 void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
     if (not m_isRecording or not barriers or (count <= 0))
         return;
-    m_list->ResourceBarrier(UINT(count), barriers);
+    m_gfxListPtr->ResourceBarrier(UINT(count), barriers);
 #ifdef _DEBUG
     dx12Context.DrainMessages();
 #endif
@@ -257,8 +255,8 @@ void CommandList::DisposeResources(void) noexcept {
 
 void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept {
     if (pso != m_activePSO) {
-        m_list->SetPipelineState(pso);
-        m_list->SetGraphicsRootSignature(shader->GetRootSignature().Get());
+        m_gfxListPtr->SetPipelineState(pso);
+        m_gfxListPtr->SetGraphicsRootSignature(shader->GetRootSignature().Get());
         m_activePSO = pso;
 #ifdef _DEBUG
         dx12Context.DrainMessages();
@@ -311,27 +309,15 @@ void CommandListHandler::Destroy(void) noexcept {
 }
 
 
-void CommandListHandler::PushList(ID3D12GraphicsCommandList* list) noexcept {
-    if (m_currentList)
-        m_listStack.Push(m_currentList);
-    m_currentList = list;
-}
-
-
-void CommandListHandler::PopList(void) noexcept {
-    m_currentList = (m_listStack.Length() > 0) ? m_listStack.Pop() : nullptr;
-}
-
-
 void CommandListHandler::PushCmdList(CommandList* cl) noexcept {
-    if (m_currentCmdList)
-        m_cmdListObjStack.Push(m_currentCmdList);
-    m_currentCmdList = cl;
+    if (m_currentListData.cmdList)
+        m_cmdListStack.Push(m_currentListData);
+    m_currentListData = CommandListData{ cl, cl->GfxList() };
 }
 
 
 void CommandListHandler::PopCmdList(void) noexcept {
-    m_currentCmdList = (m_cmdListObjStack.Length() > 0) ? m_cmdListObjStack.Pop() : nullptr;
+    m_currentListData = (m_cmdListStack.Length() > 0) ? m_cmdListStack.Pop() : CommandListData();
 }
 
 
@@ -364,9 +350,9 @@ void CommandListHandler::ExecuteAll(void) noexcept {
             fprintf(stderr, "   '%s' still open; closing it now.\n", (const char*)l->GetName());
             l->Close();
         }
-        fprintf(stderr, "   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->m_list.Get());
+        fprintf(stderr, "   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
 #endif
-        execList[n++] = l->m_list.Get();
+        execList[n++] = l->GfxList();
     }
 #if LOG_EXECUTION//def _DEBUG
     fprintf(stderr, "\n");
@@ -387,11 +373,11 @@ void CommandListHandler::ExecuteAll(void) noexcept {
             m_recycledLists.Push(l);
     }
     m_pendingLists.Clear();
-    m_listStack.Clear();
+    m_cmdListStack.Clear();
 }
 
 
-CommandList* CommandListHandler::GetCmdList(const String& name, bool isTemporary) noexcept {
+CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary) noexcept {
     if (isTemporary and not m_recycledLists.IsEmpty()) {
         CommandList* cl = m_recycledLists.Pop();
         cl->SetName(name);

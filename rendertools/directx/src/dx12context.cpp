@@ -128,7 +128,7 @@ void DX12Context::DrainMessages(void) noexcept {
             sev = "ERROR";
         else if (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING) 
             sev = "WARNING";
-        CommandList* cl = commandListHandler.GetCurrentCmdListObj();
+        CommandList* cl = commandListHandler.CurrentCmdList();
         // split to make debugging real errors easier
 #if 1
         if ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING))
