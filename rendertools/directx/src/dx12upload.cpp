@@ -145,11 +145,14 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
         return nullptr;
     UINT srcRowBytes = UINT(w) * pixelStride;
     UINT slicePitch  = layout.Footprint.RowPitch * rowCount;
-    for (UINT z = 0; z < UINT(d); ++z)
-        for (UINT r = 0; r < rowCount; ++r)
-            std::memcpy(mapped + layout.Offset + z * slicePitch + r * layout.Footprint.RowPitch,
-                        src + (z * rowCount + r) * srcRowBytes,
-                        srcRowBytes);
+    if (srcRowBytes == layout.Footprint.RowPitch)
+        std::memcpy(mapped + layout.Offset, src, size_t(slicePitch) * UINT(d));
+    else
+        for (UINT z = 0; z < UINT(d); ++z)
+            for (UINT r = 0; r < rowCount; ++r)
+                std::memcpy(mapped + layout.Offset + z * slicePitch + r * layout.Footprint.RowPitch,
+                            src + (z * rowCount + r) * srcRowBytes,
+                            srcRowBytes);
     upload->Unmap(0, nullptr);
 
     CommandList* cl = baseRenderer.StartOperation("Upload3DTextureData");
