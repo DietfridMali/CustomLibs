@@ -289,7 +289,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
 
     Set2DRenderStates();
 
-    CommandList* cmdList = commandListHandler.CreateCmdList("DrawScreen", true);
+    CommandList* cmdList = StartOperation("DrawScreen");
     if (not cmdList)
         return;
 
@@ -320,7 +320,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
     if (baseDisplayHandler.CurrentBackBuffer())
         baseDisplayHandler.DisableBackBuffer();
-	cmdList->Close();
+	FinishOperation(cmdList);
 }
 
 

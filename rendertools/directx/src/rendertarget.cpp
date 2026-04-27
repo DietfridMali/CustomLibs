@@ -189,7 +189,7 @@ void RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
     if (not CreateSRV(device, info, fmt))
         return;
 
-    auto* list = m_cmdList->List();
+    auto* list = m_cmdList->GfxList();
     if (list)
         info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
@@ -242,10 +242,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_pingPong = m_colorBufferCount > 1;
     m_isScreenBuffer = params.isScreenBuffer;
 
-    m_cmdList = commandListHandler.CreateCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
+    m_cmdList = baseRenderer.StartOperation(m_name.IsEmpty() ? String("RenderTarget") : m_name);
     if (not m_cmdList)
-        return false;
-    if (not m_cmdList->Open())
         return false;
 
     int attachmentIndex = 0;
@@ -298,7 +296,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
 {
     if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
         return false;
-    auto* list = m_cmdList->List();
+    auto* list = m_cmdList->GfxList();
     if (not list)
         return false;
     m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -310,7 +308,7 @@ bool RenderTarget::DetachBuffer(int bufferIndex)
 {
     if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
         return false;
-    auto* list = m_cmdList->List();
+    auto* list = m_cmdList->GfxList();
     if (not list)
         return false;
     m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -336,7 +334,7 @@ void RenderTarget::Destroy(void)
 
 bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 {
-    auto* list = m_cmdList->List();
+    auto* list = m_cmdList->GfxList();
     if (not list)
         return false;
 
@@ -430,10 +428,8 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
     m_drawBufferGroup = params.drawBufferGroup;
 
-    m_cmdList = commandListHandler.CreateCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
+    m_cmdList = baseRenderer.StartOperation(m_name.IsEmpty() ? String("RenderTarget") : m_name);
     if (not m_cmdList)
-        return false;
-    if (not m_cmdList->Open())
         return false;
     m_flushOnDisable = params.flush;
     SetViewport();
@@ -456,18 +452,18 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 
 void RenderTarget::Disable(void) noexcept {
     if (IsEnabled()) {
-        auto* list = m_cmdList->List();
+        auto* list = m_cmdList->GfxList();
 		if (list) {
 			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
             for (int i = 0; i < m_colorBufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
         if (m_flushOnDisable) {
-            m_cmdList->Flush();
+            baseRenderer.FinishOperation(m_cmdList, true);
             FreeRTVs();
         }
         else {
-            m_cmdList->Close();
+            baseRenderer.FinishOperation(m_cmdList, false);
         }
         m_cmdList = nullptr;
     }
@@ -515,7 +511,7 @@ void RenderTarget::SetViewport(bool flipVertically) noexcept {
 
 void RenderTarget::Fill(RGBAColor color)
 {
-    auto* list = m_cmdList->List();
+    auto* list = m_cmdList->GfxList();
     if (not list)
         return;
     float c[4] = { color.R(), color.G(), color.B(), color.A() };
@@ -529,7 +525,7 @@ void RenderTarget::Clear(const RTActivationParams& params)
 {
     if (not params.clear)
         return;
-    auto* list = m_cmdList->List();
+    auto* list = m_cmdList->GfxList();
     if (not list)
         return;
     if (params.bufferIndex < 0) {

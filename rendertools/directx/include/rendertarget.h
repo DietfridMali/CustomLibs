@@ -189,7 +189,7 @@ public:
             m_cmdList->Flush();
     }
 
-    inline CommandList* CreateCmdList(void) noexcept { return m_cmdList; }
+    inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
 
     void SetViewport(bool flipVertically = false) noexcept;
 

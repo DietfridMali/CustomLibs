@@ -223,8 +223,6 @@ public:
     // Returns a CommandList. If isTemporary is true, tries to reuse one from m_recycledLists
     // before allocating a new one. Temporary CLs are recycled after ExecuteAll().
     // Caller owns the memory for non-temporary lists.
-    CommandList* CreateCmdList(const String& name = "", bool isTemporary = false) noexcept;
-
 #ifdef _DEBUG
     // Set to true to print every logged GPU call (DrawInstanced etc.) with file/line to stderr.
     // Defaults to false to avoid flooding the output in normal operation.
@@ -258,6 +256,8 @@ public:
             CurrentGfxList()->ResourceBarrier(numBarriers, barriers);
     }
 #endif
+protected:
+    CommandList* CreateCmdList(const String& name = "", bool isTemporary = false) noexcept;
 };
 
 #define commandListHandler CommandListHandler::Instance()
