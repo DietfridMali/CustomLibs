@@ -33,6 +33,7 @@ void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
     if (buffer != m_activeBuffer) {
         if (m_activeBuffer) {
             m_parentBuffer = m_activeBuffer;
+            m_activeBuffer->Disable();
             m_drawBufferStack.Push(m_activeBuffer);
         }
         m_activeBuffer = buffer;

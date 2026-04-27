@@ -242,7 +242,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_pingPong = m_colorBufferCount > 1;
     m_isScreenBuffer = params.isScreenBuffer;
 
-    m_cmdList = baseRenderer.StartOperation(m_name.IsEmpty() ? String("RenderTarget") : m_name);
+    m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
     if (not m_cmdList)
         return false;
 
@@ -257,7 +257,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
 
-    baseRenderer.FinishOperation(m_cmdList, true);
+    m_cmdList->Flush();
+    m_cmdList = nullptr;
 
     int w = width * scale;
     int h = height * scale;
@@ -421,8 +422,6 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params)
 
 
 bool RenderTarget::Enable(const RTActivationParams& params) {
-    if (IsEnabled())
-        return true;
     if (not m_isAvailable)
         return false;
     if (not AllocRTVs())
@@ -430,10 +429,12 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
     m_drawBufferGroup = params.drawBufferGroup;
 
-    m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
-    if (not m_cmdList)
-        return false;
-    m_cmdList->Open();
+    if (m_cmdList == nullptr) {
+        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
+        if (not m_cmdList)
+            return false;
+        m_cmdList->Open();
+    }
     m_flushOnDisable = params.flush;
     SetViewport();
 

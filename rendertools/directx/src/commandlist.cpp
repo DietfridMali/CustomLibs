@@ -352,7 +352,8 @@ void CommandListHandler::ExecuteAll(void) noexcept {
         }
         fprintf(stderr, "   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
 #endif
-        execList[n++] = l->GfxList(true);
+        if (not l->IsFlushed())
+            execList[n++] = l->GfxList(true);
     }
 #if LOG_EXECUTION//def _DEBUG
     fprintf(stderr, "\n");

@@ -140,6 +140,10 @@ public:
 		return m_isRecording;
 	}
 
+    inline bool IsFlushed(void) const noexcept {
+        return m_isFlushed;
+    }
+
 	inline bool IsTemporary(void) const noexcept {
 		return m_isTemporary;
 	}

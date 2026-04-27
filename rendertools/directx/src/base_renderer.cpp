@@ -190,12 +190,12 @@ void BaseRenderer::StartFullPass(void) noexcept {
 }
 
 
-bool BaseRenderer::Start3DScene(void) {
+bool BaseRenderer::Start3DScene(bool flushBuffer) {
     m_frameCounter.Start();
     SetupGraphics();
     ResetDrawBuffers();
     RenderTarget* sceneBuffer = GetSceneBuffer();
-    if (not (sceneBuffer and sceneBuffer->Activate({})))
+    if (not (sceneBuffer and sceneBuffer->Activate({ .flush = flushBuffer })))
         return false;
     SetupTransformation();
     SetViewport(m_sceneViewport);
