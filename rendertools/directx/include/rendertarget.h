@@ -283,6 +283,8 @@ public:
 
     bool DetachBuffer(int bufferIndex);
 
+    bool BindBuffer(int bufferIndex, int tmuIndex = -1);
+
     inline void ReleaseBuffers() {}
 
     inline int DepthBufferIndex(void) noexcept {

@@ -210,7 +210,9 @@ public:
 
     inline float AspectRatio(void) noexcept { return m_aspectRatio; }
 
-    inline Matrix4f& ViewportTransformation(void) noexcept { return m_viewport.Transformation(); }
+    inline Matrix4f& ViewportTransformation(void) noexcept { 
+        return m_viewport.Transformation(); 
+    }
 
     inline Vector2f& NDCScale(void) noexcept { return m_ndcScale; }
 

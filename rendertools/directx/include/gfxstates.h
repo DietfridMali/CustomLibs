@@ -443,6 +443,10 @@ public:
 
     void ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue = 0) noexcept;
 
+    inline void SetMemoryBarrier(GLbitfield barriers) noexcept {
+		// currently no-op; DX12 handles resource barriers at the command-list level
+    }
+
     void ReleaseBuffers(void) noexcept;
 
     // DX12: no GPU-readable viewport state; viewport is tracked by the application.

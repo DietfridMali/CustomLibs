@@ -474,6 +474,26 @@ uint32_t& RenderTarget::BufferHandle(int bufferIndex)
 }
 
 
+bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
+{
+    if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
+        return false;
+    if (tmuIndex < 0)
+        tmuIndex = bufferIndex;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    if (info.m_srvIndex == UINT32_MAX)
+        return false;
+    auto* list = commandListHandler.CurrentList();
+    if (not list)
+        return false;
+    auto& heap = descriptorHeaps.m_srvHeap;
+    if (not heap.m_heap)
+        return false;
+    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), heap.GpuHandle(info.m_srvIndex));
+    return true;
+}
+
+
 void RenderTarget::SetViewport(bool flipVertically) noexcept {
     baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
 }

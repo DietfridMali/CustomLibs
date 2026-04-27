@@ -196,6 +196,7 @@ bool BaseRenderer::Start2DScene(void) {
         gfxStates.ClearColorBuffers();
         gfxStates.ClearDepthBuffer();
     }
+    SetViewport(m_sceneViewport, 0, 0, false);
     gfxStates.SetDepthWrite(0);
     gfxStates.SetDepthTest(0);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);

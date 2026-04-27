@@ -132,8 +132,10 @@ public:
 	}
 
 	inline int FeatureLevel(void) noexcept {
-		if (m_featureLevel == 0)
-			m_featureLevel = int(String((const char*)glGetString(GL_SHADING_LANGUAGE_VERSION)));
+		if (m_featureLevel == 0) {
+			const char* s = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
+			m_featureLevel = int(float(String(s)) * 100);
+		}
 		return m_featureLevel;
 	}
 
@@ -426,6 +428,10 @@ public:
 	inline void PopClearColor(void) noexcept {
 		if (not m_clearColorStack.IsEmpty())
 			m_clearColor = m_clearColorStack.Pop();
+	}
+
+	inline void SetMemoryBarrier(/*GLbitfield barriers*/) noexcept {
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 	}
 };
 

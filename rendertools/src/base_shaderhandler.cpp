@@ -65,14 +65,12 @@ Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
     Shader* shader;
     if (baseRenderer.IsShadowPass())
         shaderId = depthShaderId; // override all shaders with simplest possible shader during depth pass
-#ifdef OPENGL
     // In OpenGL the program binding persists across draw calls, so skip re-enabling
     // if the same shader is already active.
-    if ((m_activeShaderId == shaderId) and (m_activeShader != nullptr)) {
+    if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL) and (m_activeShaderId == shaderId) and (m_activeShader != nullptr)) {
         shader = m_activeShader;
-    } else
-#endif
-    {
+    }
+    else {
         // In DX12 / Vulkan the command list is reset each frame, so pipeline state
         // (root signature, PSO, descriptor heaps) must be re-established on every use.
         shader = GetShader(shaderId);
@@ -177,9 +175,8 @@ Shader* BaseShaderHandler::LoadRectangleShader(const RGBAColor& color, const Vec
 Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, float radius, float maskScale, bool antialias) {
     Shader* shader = SetupShader("circleMaskShader");
     if (shader) {
-#ifdef OPENGL
-        shader->SetInt("surface", 0);
-#endif
+        if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+            shader->SetInt("surface", 0);
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
@@ -215,9 +212,8 @@ Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply) {
 Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
     Shader* shader = SetupShader("plainTexture");
     if (shader) {
-#ifdef OPENGL
-        shader->SetInt("surface", 0);
-#endif
+        if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+            shader->SetInt("surface", 0);
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("tcOffset", tcOffset);
@@ -231,9 +227,8 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
 Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
     Shader* shader = SetupShader("blurTexture");
     if (shader) {
-#ifdef OPENGL
-        shader->SetInt("surface", 0);
-#endif
+        if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+            shader->SetInt("surface", 0);
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             SetGaussBlurParams(shader, blur);
@@ -250,9 +245,8 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, bool invert, co
         if (baseRenderer.IsShadowPass())
             shader->SetVector4f("surfaceColor", ColorData::White);
         else {
-#ifdef OPENGL
-            shader->SetInt("surface", 0);
-#endif
+            if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+                shader->SetInt("surface", 0);
             shader->SetInt("invert", invert ? 1 : 0);
             shader->SetVector2f("tcOffset", tcOffset);
             shader->SetVector2f("tcScale", tcScale);
