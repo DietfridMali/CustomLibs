@@ -462,8 +462,7 @@ bool Shader::UploadB1(void) noexcept
 }
 
 
-bool Shader::Enable(void)
-{
+bool Shader::Activate(void) {
     if (not IsValid())
         return false;
 

@@ -60,15 +60,13 @@ void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& de
         baseRenderer.Set2DRenderStates();
         Shader* shader = baseShaderHandler.SetupShader("outline");
         if (shader and not baseRenderer.IsShadowPass()) {
-#ifdef OPENGL
-            shader->SetInt("surface", 0);
-#else
-            {
+            if (baseRenderer.HasOpenGL())
+                shader->SetInt("surface", 0);
+            else {
                 int nextBuf = renderTarget->NextBuffer(renderTarget->GetLastDestination());
-                renderTarget->Enable(nextBuf, RenderTarget::dbAll, false);
+                renderTarget->Activate({ .bufferIndex = nextBuf, .drawBufferGroup = RenderTarget::dbAll, .flush = false });
                 renderTarget->SetLastDestination(nextBuf);
             }
-#endif
             shader->SetFloat("outlineWidth", decoration.outlineWidth);
             shader->SetVector4f("outlineColor", decoration.outlineColor);
             shader->SetFloat("offset", 0.0f); // 0.5f);

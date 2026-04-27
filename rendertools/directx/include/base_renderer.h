@@ -198,11 +198,11 @@ public:
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);
 
-    virtual bool EnableCamera(void)  { 
+    virtual bool ActivateCamera(void)  { 
         return false; 
     }
 
-    virtual bool DisableCamera(void) { 
+    virtual bool DeactivateCamera(void) { 
         return false; 
     }
 

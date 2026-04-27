@@ -217,7 +217,7 @@ noexcept
     Texture* texture = GetTexture();
     if (not texture)
         return false;
-    texture->Enable();
+    texture->Activate({});
     return true;
 }
 
@@ -226,7 +226,7 @@ noexcept
 {
     Texture* texture = GetTexture();
     if (texture)
-        texture->Disable();
+        texture->Deactivate();
 }
 
 bool Mesh::Render(std::span<Texture* const> textures, float alpha) {

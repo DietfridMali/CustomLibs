@@ -225,7 +225,7 @@ int RenderTarget::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& 
 }
 
 
-bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams& params)
+bool RenderTarget::Create(int width, int height, int scale, const RTCreationParams& params)
 {
     Destroy();
 
@@ -334,7 +334,7 @@ void RenderTarget::Destroy(void)
 }
 
 
-bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup)
+bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 {
     auto* list = m_cmdList->List();
     if (not list)
@@ -344,26 +344,26 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[RT_MAX_COLOR_BUFFERS]{};
     int count = 0;
 
-    if (drawBufferGroup == dbDepth) {
+    if (params.drawBufferGroup == dbDepth) {
         for (int i = 0; i < m_colorBufferCount; ++i)
             m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         pDSV = DepthBufferHandle();
     }
-    else if (drawBufferGroup == dbSingle) {
+    else if (params.drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
-        if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
+        if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
             return false;
-        m_activeBufferIndex = bufferIndex;
-        m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        rtvs[count++] = m_bufferInfo[bufferIndex].m_rtvHandle.cpu;
+        m_activeBufferIndex = params.bufferIndex;
+        m_bufferInfo[params.bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        rtvs[count++] = m_bufferInfo[params.bufferIndex].m_rtvHandle.cpu;
         for (int i = 0; i < m_colorBufferCount; ++i)
-            if (i != bufferIndex)
+            if (i != params.bufferIndex)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         pDSV = DepthBufferHandle();
     }
     else {
         m_activeBufferIndex = -1;
-        m_drawBufferGroup = (drawBufferGroup == dbNone) ? dbAll : drawBufferGroup;
+        m_drawBufferGroup = (params.drawBufferGroup == dbNone) ? dbAll : params.drawBufferGroup;
         if (m_drawBufferGroup == dbAll) {
             for (int i = 0; i < m_bufferCount; ++i) {
                 if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
@@ -413,57 +413,62 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 }
 
 
-bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear)
+bool RenderTarget::EnableBuffers(const RTActivationParams& params)
 {
-    if (not SelectDrawBuffers(bufferIndex, drawBufferGroup))
+    if (not SelectDrawBuffers(params))
         return false;
-    gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
+    gfxStates.SetDepthTest(DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup));
     return true;
 }
 
 
-bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable)
+bool RenderTarget::Activate(const RTActivationParams& params)
 {
     if (not m_isAvailable)
         return false;
     if (not AllocRTVs())
         return false;
-    m_activeBufferIndex = (bufferIndex < 0) ? 0 : (bufferIndex % m_bufferCount);
-    m_drawBufferGroup = drawBufferGroup;
+    m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
+    m_drawBufferGroup = params.drawBufferGroup;
 
 	m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
     if (not m_cmdList)
 		return false;
     if (not m_cmdList->Open())
         return false;
+	m_flushOnDisable = params.flush;
     SetViewport();
 
-    if (not EnableBuffers(bufferIndex, drawBufferGroup, clear))
+    if (not EnableBuffers(params))
         return false;
     baseRenderer.ActivateDrawBuffer(this);
-    Clear(bufferIndex, drawBufferGroup, clear);
+    Clear(params);
     return true;
 }
 
 
-void RenderTarget::Disable(bool flush)
-{
+void RenderTarget::Disable(void) noexcept {
     if (IsEnabled()) {
         auto* list = m_cmdList->List();
 		if (list) {
 			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
             for (int i = 0; i < m_colorBufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            if (flush) {
-                m_cmdList->Flush();
-                FreeRTVs();
-            }
+        }
+        if (m_flushOnDisable) {
+            m_cmdList->Flush();
+            FreeRTVs();
         }
         else {
             m_cmdList->Close();
         }
-        baseRenderer.DeactivateDrawBuffer(this);
+        m_cmdList = nullptr;
     }
+}
+
+
+void RenderTarget::Deactivate(void) noexcept {
+    baseRenderer.DeactivateDrawBuffer(this);
 }
 
 
@@ -513,20 +518,20 @@ void RenderTarget::Fill(RGBAColor color)
 }
 
 
-void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups /*drawBufferGroup*/, bool clear)
+void RenderTarget::Clear(const RTActivationParams& params)
 {
-    if (not clear)
+    if (not params.clear)
         return;
     auto* list = m_cmdList->List();
     if (not list)
         return;
-    if (bufferIndex < 0) {
+    if (params.bufferIndex < 0) {
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (m_bufferInfo[i].m_rtvHandle.IsValid())
                 list->ClearRenderTargetView(m_bufferInfo[i].m_rtvHandle.cpu, m_clearColor.Data(), 0, nullptr);
     }
-    else if ((bufferIndex < m_colorBufferCount) and m_bufferInfo[bufferIndex].m_rtvHandle.IsValid()) {
-        list->ClearRenderTargetView(m_bufferInfo[bufferIndex].m_rtvHandle.cpu, m_clearColor.Data(), 0, nullptr);
+    else if ((params.bufferIndex < m_colorBufferCount) and m_bufferInfo[params.bufferIndex].m_rtvHandle.IsValid()) {
+        list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].m_rtvHandle.cpu, m_clearColor.Data(), 0, nullptr);
     }
     if (HaveDepthBuffer(true))
         list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
@@ -613,7 +618,7 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
     if (params.destination >= 0) {
-        if (not Enable(params.destination, RenderTarget::dbSingle, true, true))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
             return false;
         m_lastDestination = params.destination;
         gfxStates.SetBlending(0);

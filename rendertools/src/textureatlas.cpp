@@ -70,14 +70,14 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	bool enableLocally = not m_atlas->IsEnabled();
 	if (enableLocally) {
 		baseRenderer.PushViewport();
-		m_atlas->Enable();
+		m_atlas->Activate({});
 	}
 #if 0
 	else {
 #ifndef OPENGL
 		// The command list may have been reset (e.g. after Texture::Deploy/Flush) even though
-		// the RenderTarget is still logically enabled. Reenable re-opens the list and rebinds render targets.
-		if (not m_atlas->Reenable())
+		// the RenderTarget is still logically enabled. Reactivate re-opens the list and rebinds render targets.
+		if (not m_atlas->Reactivate())
 			return false;
 #endif
 	}
@@ -112,7 +112,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	}
 
 	if (enableLocally) {
-		m_atlas->Disable(true);
+		m_atlas->Deactivate();
 		baseRenderer.PopViewport();
 	}
 	return shader != nullptr;

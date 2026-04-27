@@ -45,9 +45,9 @@ bool ShadowMap::StartRender(void) noexcept {
 	if (not IsReady())
 		return false;
 	baseRenderer.StartShadowPass();
-	m_map->Enable(0, RenderTarget::dbDepth);
+	m_map->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth });
 	// DX12: depth clear is handled by RenderTarget::Enable / OMSetRenderTargets + ClearDepthStencilView
-	EnableCamera();
+	ActivateCamera();
 	gfxStates.SetDepthTest(1);
 	gfxStates.SetDepthWrite(1);
 	gfxStates.CullFace(GfxOperations::FaceCull::Front);
@@ -62,8 +62,8 @@ bool ShadowMap::StartRender(void) noexcept {
 bool ShadowMap::StopRender(void) noexcept {
 	if (not IsReady())
 		return false;
-	DisableCamera();
-	m_map->Disable();
+	DeactivateCamera();
+	m_map->Deactivate();
 	gfxStates.CullFace(GfxOperations::FaceCull::Back);
 #if APPLY_POLYGON_OFFSET
 	// DX12: polygon offset lives in PSO rasterizer state — no per-draw disable call needed.

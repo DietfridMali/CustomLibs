@@ -84,7 +84,7 @@ Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
         }
         m_activeShader = shader;
         m_activeShaderId = shaderId;
-        if (not shader->Enable())
+        if (not shader->Activate())
             return nullptr;
     }
     return shader->UpdateMatrices() ? shader : nullptr;
@@ -93,7 +93,7 @@ Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
 
 void BaseShaderHandler::StopShader(bool needLegacyMatrices) {
     if (ShaderIsActive()) {
-        m_activeShader->Disable();
+        m_activeShader->Deactivate();
         m_activeShader = nullptr;
         m_activeShaderId = "";
 #if 1

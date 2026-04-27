@@ -80,13 +80,13 @@ public:
 		return m_atlas ? m_atlas->GetAsTexture({}) : nullptr;
 	}
 
-	inline bool Enable(void) {
-		return m_atlas ? m_atlas->Enable() : false;
+	inline bool Activate(void) {
+		return m_atlas ? m_atlas->Activate({ .flush = true}) : false;
 	}
 
-	inline void Disable(bool flush = false) {
+	inline void Deactivate(void) {
 		if (m_atlas)
-			m_atlas->Disable(flush);
+			m_atlas->Deactivate();
 	}
 
 	inline void SetViewport(void) {

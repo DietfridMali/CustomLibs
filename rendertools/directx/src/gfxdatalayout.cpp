@@ -253,7 +253,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
     if (not StartRender ()) 
         return;
 
-    EnableTextures(textures);
+    ActivateTextures(textures);
 
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
@@ -273,7 +273,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
         }
     }
 
-    DisableTextures(textures);
+    DeactivateTextures(textures);
     FinishRender();
 }
 

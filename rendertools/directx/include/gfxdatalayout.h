@@ -106,7 +106,7 @@ public:
         if (IsActive()) {
             activeLayout = PopGfxDataLayout();
             if (activeLayout && activeLayout->IsBound())
-                activeLayout->Enable();
+                activeLayout->Activate();
         }
     }
 
@@ -127,20 +127,20 @@ public:
         Disable();
     } 
 
-    inline bool EnableTextures(std::span<Texture* const> textures = {}) noexcept {
+    inline bool ActivateTextures(std::span<Texture* const> textures = {}) noexcept {
         int tmu = 0;
         for (Texture* t : textures) {
-            if (t && not t->Enable(tmu)) 
+            if (t && not t->Activate(tmu)) 
                 return false;
             ++tmu;
         }
         return true;
     }
 
-    inline void DisableTextures(std::span<Texture* const> textures = {}) noexcept {
+    inline void DeactivateTextures(std::span<Texture* const> textures = {}) noexcept {
         for (Texture* t : textures)
             if (t) 
-                t->Disable();
+                t->Deactivate();
     }
 
     GfxDataBuffer* FindBuffer(const char* type, int id, int& index) noexcept;

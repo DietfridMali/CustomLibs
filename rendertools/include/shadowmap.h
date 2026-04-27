@@ -59,12 +59,12 @@ public:
 		return m_map ? m_map->GetDepthAsTexture() : nullptr;
 	}
 
-	inline void EnableCamera(void) noexcept {
+	inline void ActivateCamera(void) noexcept {
 		baseRenderer.PushViewport();
 		m_map->SetViewport();
 	}
 
-	inline void DisableCamera(void) noexcept {
+	inline void DeactivateCamera(void) noexcept {
 		baseRenderer.PopViewport();
 	}
 

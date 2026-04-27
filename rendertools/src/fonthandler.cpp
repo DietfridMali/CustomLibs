@@ -80,7 +80,7 @@ int FontHandler::BuildAtlas(void) {
 #if 0
     m_atlas.GetRenderTarget()->SetClearColor(RGBAColor(0.5, 0, 0.5, 0));
 #endif
-    if (not m_atlas.Enable())
+    if (not m_atlas.Activate())
         return -1;
     gfxStates.SetBlending(0);
     gfxStates.SetFaceCulling(0);
@@ -91,7 +91,7 @@ int FontHandler::BuildAtlas(void) {
     baseRenderer.PushViewport();
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
     baseRenderer.PopViewport();
-    m_atlas.Disable(true);
+    m_atlas.Deactivate();
     return m_glyphDict.Size();
 }
 

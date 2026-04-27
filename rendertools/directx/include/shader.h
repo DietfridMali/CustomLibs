@@ -160,10 +160,10 @@ public:
     // Runtime
 
     // Activate this shader: select / create PSO, bind root sig, upload CBs, bind descriptor table.
-    bool Enable(void);
+    bool Activate(void);
 
     // No-op in DX12 (PSO changes are driven by RenderStates changes in the next Enable call).
-    inline void Disable(void) noexcept {}
+    inline void Deactivate(void) noexcept {}
 
     // Upload per-stage constant buffers to their root CBV slots (1=VS, 2=PS, 3=GS).
     // Called from GfxDataLayout::Render() just before each draw.

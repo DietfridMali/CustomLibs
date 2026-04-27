@@ -188,9 +188,9 @@ public:
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);
 
-    virtual bool EnableCamera(void) { return false; }
+    virtual bool ActivateCamera(void) { return false; }
 
-    virtual bool DisableCamera(void) { return false; }
+    virtual bool DeactivateCamera(void) { return false; }
 
     inline RenderTarget* ScreenBuffer(void) noexcept { return m_screenBuffer; }
 

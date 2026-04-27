@@ -25,7 +25,7 @@
 //   • Ping-pong: destination >= 0 issues a Resource Barrier SRV→RTV and back after render.
 //   • destination == -1: bind current RenderTarget's RTVs without resource barriers.
 //
-// RTBufferParams and RTRenderParams are kept identical to the OGL version for source compat.
+// RTCreationParams and RTRenderParams are kept identical to the OGL version for source compat.
 
 static constexpr int RT_MAX_COLOR_BUFFERS = 4;
 
@@ -77,7 +77,7 @@ public:
         dbNone = -1
     } eDrawBufferGroups;
 
-    struct RTBufferParams {
+    struct RTCreationParams {
         String name{ "" };
         int colorBufferCount{ 1 };
         int depthBufferCount{ 0 };
@@ -99,6 +99,14 @@ public:
         Shader* shader{ nullptr };
     };
 
+	struct RTActivationParams {
+		int bufferIndex{ -1 };
+		eDrawBufferGroups drawBufferGroup{ dbAll };
+        bool clear{ false };
+		bool flush{ false };
+		bool reenable{ false };
+	};
+
     // -------------------------------------------------------------------------
 
     String              m_name;
@@ -117,6 +125,7 @@ public:
     bool                m_isAvailable{ false };
     bool                m_haveRTVs{ false };
     bool                m_isScreenBuffer{ false };
+	bool                m_flushOnDisable{ false };
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
     DrawBufferList      m_drawBuffers{};
@@ -142,7 +151,7 @@ public:
 
     void Init(void);
 
-    bool Create(int width, int height, int scale, const RTBufferParams& params);
+    bool Create(int width, int height, int scale, const RTCreationParams& params);
 
     void Destroy(void);
 
@@ -156,19 +165,22 @@ public:
             m_cmdList->SetName(name);
     }
 
-    bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
+    bool Activate(const RTActivationParams& params);
 
-    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
+    bool EnableBuffers(const RTActivationParams& params);
 
-    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup);
+    bool SelectDrawBuffers(const RTActivationParams& params);
 
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
-    inline bool Reenable(bool clear = false, bool reenable = false) {
-        return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, reenable);
+    inline bool Reactivate(bool clear = false, bool reenable = false) {
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reenable = reenable };
+        return Activate(params);
     }
 
-    void Disable(bool flush = false);
+    void Deactivate(void) noexcept;
+
+    void Disable(void) noexcept;
 
     inline void Flush(void) noexcept {
         if (m_cmdList)
@@ -185,10 +197,12 @@ public:
 
     void Fill(RGBAColor color);
 
-    void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
+    void Clear(const RTActivationParams& params);
 
     void ClearColorBuffers(void);
+
     void ClearDepthBuffer(float clearValue = 1.0f);
+
     void ClearStencilBuffer(void);
 
     // Render helpers (same as OGL)

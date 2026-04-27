@@ -195,11 +195,11 @@ bool BaseRenderer::Start3DScene(void) {
     SetupGraphics();
     ResetDrawBuffers();
     RenderTarget* sceneBuffer = GetSceneBuffer();
-    if (not (sceneBuffer and sceneBuffer->Enable()))
+    if (not (sceneBuffer and sceneBuffer->Activate({})))
         return false;
     SetupTransformation();
     SetViewport(m_sceneViewport);
-    EnableCamera();
+    ActivateCamera();
     return true;
 }
 
@@ -207,8 +207,8 @@ bool BaseRenderer::Start3DScene(void) {
 bool BaseRenderer::Stop3DScene(void) {
     if (not GetSceneBuffer()->IsAvailable())
         return false;
-    GetSceneBuffer()->Disable();
-    DisableCamera();
+    GetSceneBuffer()->Deactivate();
+    DeactivateCamera();
     ResetTransformation();
     return true;
 }
@@ -224,7 +224,7 @@ bool BaseRenderer::Start2DScene(void) {
 
     Set2DRenderStates();
 
-    if (not (m_screenBuffer and m_screenBuffer->Enable())) {
+    if (not (m_screenBuffer and m_screenBuffer->Activate({}))) {
         baseDisplayHandler.EnableBackBuffer();
         gfxStates.ClearBackBuffer();
     }
@@ -285,7 +285,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     m_screenIsAvailable = false;
     if (not m_screenBuffer)
         return;
-    m_screenBuffer->Disable();
+    m_screenBuffer->Deactivate();
 
     Set2DRenderStates();
 

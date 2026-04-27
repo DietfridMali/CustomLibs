@@ -162,12 +162,12 @@ bool BaseRenderer::Start3DScene(void) {
     ResetDrawBuffers();
     m_frameCounter.Start();
     RenderTarget* sceneBuffer = GetSceneBuffer();
-    if (not (sceneBuffer and sceneBuffer->Enable()))
+    if (not (sceneBuffer and sceneBuffer->Activate({})))
         return false;
     SetupTransformation();
 	//3D render is always full window; to put it in a window, render the scene buffer in a window in Draw3DScene()
     //SetViewport(m_sceneViewport);
-    EnableCamera();
+    ActivateCamera();
     return true;
 }
 
@@ -175,8 +175,8 @@ bool BaseRenderer::Start3DScene(void) {
 bool BaseRenderer::Stop3DScene(void) {
     if (not GetSceneBuffer()->IsAvailable())
         return false;
-    GetSceneBuffer()->Disable();
-    DisableCamera();
+    GetSceneBuffer()->Deactivate();
+    DeactivateCamera();
     ResetTransformation();
     return true;
 }
@@ -193,7 +193,7 @@ bool BaseRenderer::Start2DScene(void) {
     m_screenIsAvailable = true;
     ResetTransformation();
     SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
-    if (not (m_screenBuffer and m_screenBuffer->Enable())) {
+    if (not (m_screenBuffer and m_screenBuffer->Activate({}))) {
         gfxStates.ClearColorBuffers();
         gfxStates.ClearDepthBuffer();
     }
@@ -217,9 +217,9 @@ bool BaseRenderer::Stop2DScene(void) {
 void BaseRenderer::Draw3DScene(void) {
     if (Stop3DScene() and Start2DScene()) {
 #if 0
-        if (GetSceneBuffer()->Enable(true)) {
+        if (GetSceneBuffer()->Activate(true)) {
             RenderToViewport(testTexture, ColorData::White, false, false);
-            GetSceneBuffer()->Disable();
+            GetSceneBuffer()->Deactivate();
         }
 #endif
         Shader* shader;
@@ -293,9 +293,9 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
             gfxStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
             //SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 #if 0
-            if (m_screenBuffer->Enable()) {
+            if (m_screenBuffer->Activate({})) {
                 RenderToViewport(testTexture, ColorData::White, false, false);
-                m_screenBuffer->Disable();
+                m_screenBuffer->Deactivate();
             }
 #endif
             gfxStates.ClearColorBuffers();
