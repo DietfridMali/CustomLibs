@@ -84,7 +84,7 @@ public:
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
-    uint32_t                            m_refCounter{ 0 };
+    uint32_t                            m_refCounter{ 1 };
     String                              m_name{ "" };
     ID3D12PipelineState*                m_activePSO{ nullptr };
 
@@ -187,6 +187,7 @@ public:
     AutoArray<CommandListData>              m_cmdListStack;
     CommandListData                         m_currentListData;
     uint64_t                                m_cmdListId{ 1 };
+    uint64_t                                m_cmdListCount{ 0 };
 
     bool Create(ID3D12Device* device) noexcept;
 

@@ -40,6 +40,7 @@ protected:
     RenderTarget*           m_sceneBuffer;
     RenderTarget*           m_skyBuffer;
     Texture                 m_renderTexture;
+    CommandList*            m_cmdList{ nullptr };
     CommandList*            m_temporaryList{ nullptr };
     AutoArray<CommandList*> m_temporaryListStack{ };
 

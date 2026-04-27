@@ -290,9 +290,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     Set2DRenderStates();
 
     CommandList* cmdList = commandListHandler.CreateCmdList("DrawScreen", true);
-    if (not cmdList)
-        return;
-    if (not cmdList->Open())
+    if (not cmdList or not cmdList->Open())
         return;
 
     // Ensure the screen RenderTarget color buffer is in PSR state.
@@ -402,7 +400,9 @@ CommandList* BaseRenderer::StartOperation(String name) noexcept {
             ++(cl->m_refCounter);
         return cl;
     }
-    if (not m_temporaryList) {
+    if (m_temporaryList) 
+        ++(m_temporaryList->m_refCounter);
+    else {
 #if LOG_OPERATIONS
         fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
 #endif
@@ -413,7 +413,6 @@ CommandList* BaseRenderer::StartOperation(String name) noexcept {
             return m_temporaryList = nullptr;
         }
     }
-    ++(m_temporaryList->m_refCounter);
     return m_temporaryList;
 }
 

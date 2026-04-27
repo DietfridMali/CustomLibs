@@ -148,7 +148,7 @@ void CommandList::Destroy(void) noexcept {
 
 
 void CommandList::Reset(void) noexcept {
-    m_refCounter = 0;
+    m_refCounter = 1;
     m_isFlushed = false;
     m_isRecording = false;
 }
@@ -213,6 +213,7 @@ void CommandList::Flush(void) noexcept {
 #endif
     commandListHandler.CmdQueue().WaitIdle();
     DisposeResources();
+#if 0
     // Reset allocator + list so the debug layer releases resource refs; leave closed.
     UINT fi = commandListHandler.CmdQueue().FrameIndex();
     HRESULT hr = m_allocators[fi]->Reset();
@@ -223,6 +224,7 @@ void CommandList::Flush(void) noexcept {
         fprintf(stderr, "CommandList::Flush: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
     else
         m_gfxListPtr->Close();
+#endif
 }
 
 
@@ -394,11 +396,14 @@ CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTempor
     ID3D12Device* device = dx12Context.Device();
     if (not device)
         return nullptr;
+
     CommandList* cl = new CommandList();
     if (not cl->Create(device, name, isTemporary)) {
         delete cl;
         return nullptr;
     }
+    cl->Reset();
+    ++m_cmdListCount;
     return cl;
 }
 

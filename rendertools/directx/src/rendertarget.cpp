@@ -243,7 +243,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_isScreenBuffer = params.isScreenBuffer;
 
     m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
-    if (not m_cmdList)
+    if (not m_cmdList or not m_cmdList->Open())
         return false;
 
     int attachmentIndex = 0;
@@ -430,10 +430,9 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     m_drawBufferGroup = params.drawBufferGroup;
 
     if (m_cmdList == nullptr) {
-        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
-        if (not m_cmdList)
+        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
+        if (not m_cmdList or not m_cmdList->Open())
             return false;
-        m_cmdList->Open();
     }
     m_flushOnDisable = params.flush;
     SetViewport();
