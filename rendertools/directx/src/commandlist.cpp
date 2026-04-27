@@ -147,6 +147,12 @@ void CommandList::Destroy(void) noexcept {
 }
 
 
+void CommandList::Reset(void) noexcept {
+    m_refCounter = 0;
+    m_isFlushed = false;
+    m_isRecording = false;
+}
+
 bool CommandList::Open(UINT frameIndex) noexcept {
     if (m_isRecording)
         return true;
@@ -382,6 +388,7 @@ CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTempor
     if (isTemporary and not m_recycledLists.IsEmpty()) {
         CommandList* cl = m_recycledLists.Pop();
         cl->SetName(name);
+        cl->Reset();
         return cl;
     }
     ID3D12Device* device = dx12Context.Device();

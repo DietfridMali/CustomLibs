@@ -102,7 +102,7 @@ public:
 	struct RTActivationParams {
 		int bufferIndex{ -1 };
 		eDrawBufferGroups drawBufferGroup{ dbAll };
-        bool clear{ false };
+        bool clear{ true };
 		bool flush{ false };
 		bool reenable{ false };
 	};

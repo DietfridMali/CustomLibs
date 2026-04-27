@@ -98,6 +98,8 @@ public:
 
     void Destroy(void) noexcept;
 
+    void Reset(void) noexcept;
+
     bool Open(UINT frameIndex = 0) noexcept;
 
     void Close(void) noexcept;
@@ -257,7 +259,7 @@ public:
             CurrentGfxList()->ResourceBarrier(numBarriers, barriers);
     }
 #endif
-    CommandList* CreateCmdList(const String& name = "", bool isTemporary = false) noexcept;
+    CommandList* CreateCmdList(const String& name = "", bool isTemporary = true) noexcept;
 };
 
 #define commandListHandler CommandListHandler::Instance()

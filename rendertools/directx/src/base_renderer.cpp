@@ -289,7 +289,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
 
     Set2DRenderStates();
 
-    CommandList* cmdList = commandListHandler.CreateCmdList("DrawScreen");
+    CommandList* cmdList = commandListHandler.CreateCmdList("DrawScreen", true);
     if (not cmdList)
         return;
     if (not cmdList->Open())

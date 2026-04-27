@@ -242,7 +242,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_pingPong = m_colorBufferCount > 1;
     m_isScreenBuffer = params.isScreenBuffer;
 
-    m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
+    m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
     if (not m_cmdList)
         return false;
 
@@ -430,7 +430,7 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     m_drawBufferGroup = params.drawBufferGroup;
 
     if (m_cmdList == nullptr) {
-        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
+        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
         if (not m_cmdList)
             return false;
         m_cmdList->Open();
