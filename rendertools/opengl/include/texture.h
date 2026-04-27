@@ -193,11 +193,11 @@ public:
         return m_isDeployed;
     }
 
-    inline bool Enable(int tmuIndex = 0) {
+    inline bool Activate(int tmuIndex = 0) {
         return Bind(tmuIndex);
     }
 
-    inline void Disable(void) {
+    inline void Deactivate(void) {
         Release();
     }
 

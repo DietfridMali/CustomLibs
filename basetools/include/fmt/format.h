@@ -1527,7 +1527,7 @@ inline auto umul192_upper128(uint64_t x, uint128 y) noexcept -> uint128 {
 FMT_API auto get_cached_power(int k) noexcept -> uint128;
 
 // Type-specific information that Dragonbox uses.
-template <typename T, typename Enable = void> struct float_info;
+template <typename T, typename Activate = void> struct float_info;
 
 template <> struct float_info<float> {
   using carrier_uint = uint32_t;
@@ -2694,7 +2694,7 @@ template <typename T> constexpr auto isnan(T value) -> bool {
   return value != value;  // std::isnan doesn't support __float128.
 }
 
-template <typename T, typename Enable = void>
+template <typename T, typename Activate = void>
 struct has_isfinite : std::false_type {};
 
 template <typename T>

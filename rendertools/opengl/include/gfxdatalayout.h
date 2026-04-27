@@ -134,7 +134,7 @@ public:
         if (IsActive()) {
             activeLayout = PopGfxDataLayout();
             if (activeLayout and activeLayout->IsBound())
-                activeLayout->Enable();
+                activeLayout->Activate();
         }
     }
 
@@ -167,7 +167,7 @@ public:
     {
         int tmu = 0;
 		for (Texture* texture : textures) {
-             if ((texture != nullptr) and not texture->Enable(tmu))
+             if ((texture != nullptr) and not texture->Activate(tmu))
                 return false;
              ++tmu;
         }
@@ -179,7 +179,7 @@ public:
     {
         for (Texture* texture : textures) {
             if (texture != nullptr)
-                texture->Disable();
+                texture->Deactivate();
         }
     }
 

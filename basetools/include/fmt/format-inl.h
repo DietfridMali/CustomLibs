@@ -1493,7 +1493,7 @@ template <typename F> auto getc_unlocked(F* f) -> decltype(_fgetc_nolock(f)) {
 #  define FMT_USE_FLOCKFILE 1
 #endif
 
-template <typename F = FILE, typename Enable = void>
+template <typename F = FILE, typename Activate = void>
 struct has_flockfile : std::false_type {};
 
 template <typename F>
@@ -1671,7 +1671,7 @@ inline auto get_file(FILE* f, ...) -> fallback_file<FILE> { return f; }
 
 using file_ref = decltype(get_file(static_cast<FILE*>(nullptr), 0));
 
-template <typename F = FILE, typename Enable = void>
+template <typename F = FILE, typename Activate = void>
 class file_print_buffer : public buffer<char> {
  public:
   explicit file_print_buffer(F*) : buffer(nullptr, size_t()) {}

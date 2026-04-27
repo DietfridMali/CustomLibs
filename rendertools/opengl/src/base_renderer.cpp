@@ -317,10 +317,10 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 
 // Generelles zum Viewport - Handling.Dieses ist zweiteilig : Setzen des gfx - Viewports(OpenGL / DX) für korrekte Projektion und setzen
 // aktueller Renderbereiche(app - eigene Viewportmatrix, die in die Shader geht).Jede Aktivierung eines render targets muss auch den
-// gfx - Viewport setzen.Das macht inzwischen RenderTarget::Enable, das den vorigen Viewport speichert(BaseRenderer::PushViewport -
-// speichert auch den gfx - Viewport).BaseRenderer::SetViewport erhält deshalb bei jedem RT - Enable dessen Pufferdimensionen als windowWidth
+// gfx - Viewport setzen.Das macht inzwischen RenderTarget::Activate, das den vorigen Viewport speichert(BaseRenderer::PushViewport -
+// speichert auch den gfx - Viewport).BaseRenderer::SetViewport erhält deshalb bei jedem RT - Activate dessen Pufferdimensionen als windowWidth
 // und windowHeight, dann wird der gfx - Viewport entspr.gesetzt.Um innerhalb eines RTs einen Viewport zu setzen, werden für windowWidth
-// und windowHeight 0 übergeben, dann wird der gfx - Viewport nicht verändert.Disable stellt den vorhergehenden Viewport(app + gfx) wieder
+// und windowHeight 0 übergeben, dann wird der gfx - Viewport nicht verändert.Deactivate stellt den vorhergehenden Viewport(app + gfx) wieder
 // her.In OpenGL ist das ein bleibender Status und beeinflusst die 2D - Projektion.
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept { //, bool isRenderTarget) {

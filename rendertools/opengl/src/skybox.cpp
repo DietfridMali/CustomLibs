@@ -81,7 +81,7 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 		static String uSkyNames[3] = { "sky1", "sky2", "sky3" };
         shader->SetMatrix4f("mView", view.AsArray(), false);
 		for (int i = 0; i < 3; i++) {
-			m_skyTextures[i]->Enable(i);
+			m_skyTextures[i]->Activate(i);
 			shader->SetInt(uSkyNames[i], i);
 			}
 		shader->SetVector3f("lightDirection", lightDirection);
@@ -103,10 +103,10 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 	gfxStates.SetDepthWrite(0);
 	gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
 	for (int i = 0; i < 3; i++)
-		m_skyTextures[i]->Enable(i);
+		m_skyTextures[i]->Activate(i);
 	m_skybox->Render(nullptr);
 	for (int i = 0; i < 3; i++)
-		m_skyTextures[i]->Disable();
+		m_skyTextures[i]->Deactivate();
 	gfxStates.SetFaceCulling(1);
 	gfxStates.SetDepthWrite(1);
 	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);

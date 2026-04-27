@@ -171,8 +171,6 @@ public:
 
     bool SelectDrawBuffers(const RTActivationParams& params);
 
-    bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
-
     inline bool Reactivate(bool clear = false, bool reenable = false) {
         RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reenable = reenable };
         return Activate(params);
@@ -183,6 +181,8 @@ public:
     bool Enable(const RTActivationParams& params);
 
     void Disable(void) noexcept;
+
+    bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
     inline void Flush(void) noexcept {
         if (m_cmdList)

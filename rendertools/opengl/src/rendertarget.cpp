@@ -30,6 +30,7 @@ void RenderTarget::Init(void) {
     m_activeBufferIndex = -1;
     m_pingPong = true;
     m_isAvailable = false;
+    m_flushOnDisable = false;
     m_drawBufferGroup = dbNone;
     m_clearColor = ColorData::Invisible;
     m_bufferInfo.Reset();
@@ -70,7 +71,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     }
     else {
-        if (bufferType == BufferInfo::btColor) 
+        if (bufferType == BufferInfo::btColor)
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         else
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_FLOAT, nullptr);
@@ -193,7 +194,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_extraBufferCount = params.vertexBufferCount;
     m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_extraBufferCount);
     m_name = params.name;
-    Disable( false);
+    Disable();
     return true;
 }
 
@@ -207,32 +208,32 @@ void RenderTarget::Destroy(void) {
 }
 
 
-bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable) {
+bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
     int l = m_drawBuffers.Length();
 
-    switch (drawBufferGroup) {
+    switch (params.drawBufferGroup) {
     case dbDepth:
         m_drawBufferGroup = dbDepth;
         for (int i = 0; i < l; ++i)
             m_drawBuffers[i] = GL_NONE;
         return true;
-    
+
     case dbSingle:
         m_drawBufferGroup = dbSingle;
-        if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
+        if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
             return false;
-        m_activeBufferIndex = bufferIndex;
-        m_drawBuffers[0] = m_bufferInfo[bufferIndex].m_attachment;
-        AttachBuffer(bufferIndex);
+        m_activeBufferIndex = params.bufferIndex;
+        m_drawBuffers[0] = m_bufferInfo[params.bufferIndex].m_attachment;
+        AttachBuffer(params.bufferIndex);
         for (int i = 0; i < l; ++i)
-            if (i != bufferIndex) {
+            if (i != params.bufferIndex) {
                 DetachBuffer(i);
                 m_drawBuffers[i] = GL_NONE;
             }
         return true;
 
     case dbAll:
-        if ((m_drawBufferGroup == drawBufferGroup) and not reenable)
+        if ((m_drawBufferGroup == params.drawBufferGroup) and not params.reenable)
             return true;
         [[fallthrough]];
 
@@ -246,9 +247,9 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
         return true;
 
     case dbColor:
-        if ((m_drawBufferGroup != drawBufferGroup) or reenable) {
+        if ((m_drawBufferGroup != params.drawBufferGroup) or params.reenable) {
             int i = 0;
-            for ( ; i < m_colorBufferCount; ++i) {
+            for (; i < m_colorBufferCount; ++i) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
                 AttachBuffer(i);
             }
@@ -260,7 +261,7 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
         return true;
 
     case dbExtra:
-        if ((m_drawBufferGroup != drawBufferGroup) or reenable) {
+        if ((m_drawBufferGroup != params.drawBufferGroup) or params.reenable) {
             int i = 0;
             for (; i < m_colorBufferCount; ++i) {
                 DetachBuffer(i);
@@ -275,7 +276,7 @@ bool RenderTarget::SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBuff
 
     case dbCustom:
     default:
-    return true;
+        return true;
     }
 }
 
@@ -296,13 +297,13 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 }
 
 
-void RenderTarget::Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear) { // clear color has been set in Renderer.SetupGraphics()
-    if (clear) {
+void RenderTarget::Clear(const RTActivationParams& params) { // clear color has been set in Renderer.SetupGraphics()
+    if (params.clear) {
         baseRenderer.PushViewport();
         gfxStates.SetViewport(0, 0, m_width * m_scale, m_height * m_scale);
         gfxStates.PushClearColor();
         gfxStates.SetClearColor(m_clearColor);
-        if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
+        if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup))
             ClearDepthBuffer();
         ClearColorBuffers();
         gfxStates.PopClearColor();
@@ -319,13 +320,13 @@ bool RenderTarget::ReattachBuffers(void) {
 }
 
 
-bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
+bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
     baseRenderer.CheckGfxError();
-    if (not SelectDrawBuffers(bufferIndex, drawBufferGroup, reenable))
+    if (not SelectDrawBuffers(params))
         return false;
     baseRenderer.CheckGfxError();
 #ifdef _DEBUG
-    if (DepthBufferIsActive(bufferIndex, drawBufferGroup))
+    if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup))
         gfxStates.SetDepthTest(true);
     else
         gfxStates.SetDepthTest(false);
@@ -340,7 +341,7 @@ bool RenderTarget::EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGr
 }
 
 
-bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable) {
+bool RenderTarget::Enable(const RTActivationParams& params) {
     if (not m_isAvailable)
         return false;
     //BaseRenderer::ClearGfxError();
@@ -351,22 +352,28 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
             return false;
 #endif
     }
-    if (not EnableBuffers(bufferIndex, drawBufferGroup, clear, reenable))
+    if (not EnableBuffers(params))
         return false;
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     if (not m_isAvailable)
         fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
-    baseRenderer.ActivateDrawBuffer(this);
-#if 1
-    baseRenderer.PushViewport();
-    SetViewport(true);
-    Clear(bufferIndex, drawBufferGroup, clear);
-#endif
     return true;
 }
 
 
-void RenderTarget::Disable(bool flush) { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+bool RenderTarget::Activate(const RTActivationParams& params)
+{
+    if (not Enable(params))
+        return false;
+    baseRenderer.ActivateDrawBuffer(this);
+    baseRenderer.PushViewport();
+    SetViewport(true);
+    Clear(params);
+    return true;
+}
+
+
+void RenderTarget::Disable(void) noexcept { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
         baseRenderer.CheckGfxError();
@@ -380,11 +387,13 @@ void RenderTarget::Disable(bool flush) { // flush only required for compatibilit
         m_drawBufferGroup = dbNone;
         baseRenderer.CheckGfxError();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        baseRenderer.DeactivateDrawBuffer(this);
-#if 1
-        baseRenderer.PopViewport();
-#endif
     }
+}
+
+
+void RenderTarget::Deactivate(void) noexcept {
+    baseRenderer.DeactivateDrawBuffer(this);
+    baseRenderer.PopViewport();
 }
 
 
@@ -447,10 +456,10 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool isEnabled = IsEnabled();
     if (params.destination < 0) {// rendering to the current render target
         gfxStates.SetBlending(1);
-        }
+    }
     else { // rendering to another RenderTarget (than the main buffer)
         enableLocally = not IsEnabled();
-        if (not Enable(params.destination, RenderTarget::dbSingle, true, true))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
             return false;
         m_lastDestination = params.destination;
         gfxStates.SetBlending(0);
@@ -493,7 +502,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PopMatrix();
     if (enableLocally)
-        Disable( false);
+        Disable();
     return true;
 }
 
@@ -508,7 +517,7 @@ void RenderTarget::Fill(RGBAColor color) {
 Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) {
     if (params.source == params.destination)
         return nullptr;
-    SharedTextureHandle handle = 
+    SharedTextureHandle handle =
         (params.source < 0)
         ? SharedTextureHandle(GLuint(-params.source))
         : BufferHandle(params.source);
@@ -517,8 +526,8 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) 
     if (m_renderTexture.m_handle != handle) {
         m_renderTexture.m_handle = handle;
         if (tmuIndex > -1) {
-			GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
-            m_renderTexture.Enable(tmuIndex);
+            GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
+            m_renderTexture.Activate(tmuIndex);
             m_renderTexture.SetParams(true);
             gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
         }

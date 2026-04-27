@@ -31,7 +31,7 @@ public:
 
     BufferInfo(GLuint handle = 0, int attachment = 0)
         : m_handle(handle), m_attachment(attachment), m_tmuIndex(-1), m_type(btColor), m_isAttached(false)
-    { }
+    {}
 
     void Init(void) {
         m_handle = SharedTextureHandle(0);
@@ -72,18 +72,19 @@ public:
     int                         m_stencilBufferIndex;
     int                         m_activeBufferIndex;
     AutoArray<BufferInfo>       m_bufferInfo;
-    DrawBufferList              m_drawBuffers; 
+    DrawBufferList              m_drawBuffers;
     Viewport                    m_viewport;
-    Viewport*                   m_viewportSave;
+    Viewport* m_viewportSave;
     RenderTargetTexture         m_renderTexture;
     RenderTargetTexture         m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
     bool                        m_isAvailable;
     bool                        m_isScreenBuffer;
+    bool                        m_flushOnDisable;
     int                         m_lastDestination;
     BaseQuad                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
-	RGBAColor                   m_clearColor;
+    RGBAColor                   m_clearColor;
 
     static GLint                m_activeHandle;
 
@@ -109,6 +110,14 @@ public:
         Shader* shader{ nullptr };
     };
 
+    struct RTActivationParams {
+        int bufferIndex{ -1 };
+        eDrawBufferGroups drawBufferGroup{ dbAll };
+        bool clear{ true };
+        bool flush{ false };
+        bool reenable{ false };
+    };
+
     RenderTarget();
 
     ~RenderTarget() {
@@ -121,13 +130,22 @@ public:
 
     void Destroy(void);
 
-    bool Enable(int bufferIndex = -1, eDrawBufferGroups drawBufferGroup = dbAll, bool clear = true, bool reenable = false);
+    bool Activate(const RTActivationParams& params);
 
-    inline bool Reenable(bool clear = false) {
-        return Enable(m_activeBufferIndex, m_drawBufferGroup, clear, true);
+    bool EnableBuffers(const RTActivationParams& params);
+
+    bool SelectDrawBuffers(const RTActivationParams& params);
+
+    inline bool Reactivate(bool clear = false, bool reenable = false) {
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reenable = reenable };
+        return Activate(params);
     }
 
-	void Disable(bool flush = false); // only required for DX12 compatibility for calls from higher app layers that are gfx api agnostic
+    void Deactivate(void) noexcept;
+
+    bool Enable(const RTActivationParams& params);
+
+    void Disable(void) noexcept;
 
     inline void Flush(void) noexcept {
         // no op
@@ -138,7 +156,7 @@ public:
 
     void Fill(RGBAColor color);
 
-    void Clear(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear);
+    void Clear(const RTActivationParams& params);
 
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
@@ -235,7 +253,7 @@ public:
 
     void ReleaseBuffers(void);
 
-    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup , bool reenable);
+    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable);
 
     bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
 
@@ -301,7 +319,7 @@ private:
     bool ReattachBuffers();
 
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
-        
+
     void CreateRenderArea(void);
 };
 

@@ -57,7 +57,7 @@ public:
 
     void StopShader(bool needLegacyMatrices = false);
 
-    // Reset active-shader tracking so the next SetupShader() call forces a full Enable().
+    // Reset active-shader tracking so the next SetupShader() call forces a full Activate().
     // Must be called after a DX12 BeginFrame() (new command list clears all pipeline state).
     inline void InvalidateActiveShader(void) noexcept {
         m_activeShader = nullptr;

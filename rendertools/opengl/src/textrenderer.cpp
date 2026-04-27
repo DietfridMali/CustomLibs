@@ -211,7 +211,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
 #if 0
             renderTarget->SetClearColor(ColorData::MediumBlue);
 #endif
-            if (renderTarget->Enable(-1, RenderTarget::dbAll, true)) {
+            if (renderTarget->Activate({})) {
 #if 0
                 baseRenderer.PushViewport();
                 renderTarget->SetViewport(true); // flip the viewport upside down
@@ -230,7 +230,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                         AntiAlias(renderTarget, m_decoration.aaMethod);
                 }
 #endif
-                renderTarget->Disable();
+                renderTarget->Deactivate();
 #if 0
                 baseRenderer.PopViewport();
 #endif

@@ -38,6 +38,7 @@ void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
     if (buffer != m_activeBuffer) {
         if (m_activeBuffer) {
             m_parentBuffer = m_activeBuffer;
+            m_activeBuffer->Disable();
             m_drawBufferStack.Push(m_activeBuffer);
         }
         m_activeBuffer = buffer;
@@ -49,12 +50,13 @@ void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
 bool DrawBufferHandler::DeactivateDrawBuffer(RenderTarget* buffer) {
     if (buffer != m_activeBuffer)
         return false;
+    m_activeBuffer->Disable();
     if (m_drawBufferStack.IsEmpty())
         m_activeBuffer = nullptr;
     else {
         m_activeBuffer = m_drawBufferStack.Pop();
         m_parentBuffer = m_drawBufferStack.IsEmpty() ? nullptr : m_drawBufferStack.Last();
-        m_activeBuffer->Reenable();
+        m_activeBuffer->Reactivate();
     }
     SetActiveDrawBuffers();
     return true;
@@ -63,7 +65,7 @@ bool DrawBufferHandler::DeactivateDrawBuffer(RenderTarget* buffer) {
 
 void DrawBufferHandler::ResetDrawBuffers(void) {
     while (m_activeBuffer)
-        m_activeBuffer->Disable();
+        m_activeBuffer->Deactivate();
 }
 
 // =================================================================================================

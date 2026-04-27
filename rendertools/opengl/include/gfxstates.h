@@ -430,7 +430,7 @@ public:
 			m_clearColor = m_clearColorStack.Pop();
 	}
 
-	inline void SetMemoryBarrier(/*GLbitfield barriers*/) noexcept {
+	inline void SetMemoryBarrier(GLbitfield /*barriers*/) noexcept {
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 	}
 };

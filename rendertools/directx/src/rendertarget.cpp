@@ -448,6 +448,8 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     if (not Enable(params))
         return false;
     baseRenderer.ActivateDrawBuffer(this);
+    baseRenderer.PushViewport();
+    SetViewport(true);
     Clear(params);
     return true;
 }
@@ -475,6 +477,7 @@ void RenderTarget::Disable(void) noexcept {
 
 void RenderTarget::Deactivate(void) noexcept {
     baseRenderer.DeactivateDrawBuffer(this);
+    baseRenderer.PopViewport();
 }
 
 
