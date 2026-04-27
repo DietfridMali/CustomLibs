@@ -165,7 +165,8 @@ bool BaseRenderer::Start3DScene(void) {
     if (not (sceneBuffer and sceneBuffer->Enable()))
         return false;
     SetupTransformation();
-    SetViewport(m_sceneViewport);
+	//3D render is always full window; to put it in a window, render the scene buffer in a window in Draw3DScene()
+    //SetViewport(m_sceneViewport);
     EnableCamera();
     return true;
 }
