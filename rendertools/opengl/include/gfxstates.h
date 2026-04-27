@@ -115,7 +115,7 @@ private:
 
 public:
 	static constexpr int MinFeatureLevel = 330;
-	static constexpr int SSBOFeatureLevel = 430;
+	static constexpr int SSBOFeatureLevel = 330; // actually 430; but NVidia 3.30 drivers support SSBOs, so we rely on querying GL_ARB_shader_storage_buffer_object
 
 	GfxStates() {
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
