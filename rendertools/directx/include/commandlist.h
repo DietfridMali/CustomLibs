@@ -71,8 +71,6 @@ public:
 // Flush() — close list, pop stack, submit immediately + WaitIdle, no registration.
 //            Used for temporary setup (RenderTarget::Create, resource uploads).
 
-class BaseRenderer;
-
 class CommandList
 {
 public:
@@ -86,7 +84,7 @@ public:
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
-    uint32_t                            m_refCounter{ 1 };
+    uint32_t                            m_refCounter{ 0 };
     String                              m_name{ "" };
     ID3D12PipelineState*                m_activePSO{ nullptr };
 
@@ -118,8 +116,8 @@ public:
 
     void SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count);
 
-    inline ID3D12GraphicsCommandList* GfxList(void) const noexcept {
-        return m_isRecording ? m_gfxListPtr.Get() : nullptr;
+    inline ID3D12GraphicsCommandList* GfxList(bool ignoreState = false) const noexcept {
+        return (ignoreState or m_isRecording) ? m_gfxListPtr.Get() : nullptr;
     }
 
 	inline uint64_t GetId(void) const noexcept {
@@ -176,7 +174,6 @@ struct CommandListData {
 class CommandListHandler
     : public BaseSingleton<CommandListHandler>
 {
-    friend class BaseRenderer;
 public:
     CommandQueue                            m_cmdQueue;
     AutoArray<CommandList*>                 m_pendingLists;     // registered at Open(), cleared after ExecuteAll
@@ -256,7 +253,6 @@ public:
             CurrentGfxList()->ResourceBarrier(numBarriers, barriers);
     }
 #endif
-protected:
     CommandList* CreateCmdList(const String& name = "", bool isTemporary = false) noexcept;
 };
 

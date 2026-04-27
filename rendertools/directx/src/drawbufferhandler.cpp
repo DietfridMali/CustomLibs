@@ -44,10 +44,10 @@ void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
 bool DrawBufferHandler::DeactivateDrawBuffer(RenderTarget* buffer) {
     if (buffer != m_activeBuffer)
         return false;
+    m_activeBuffer->Disable(); // close command list
     if (m_drawBufferStack.IsEmpty())
         m_activeBuffer = nullptr;
     else {
-		m_activeBuffer->Disable(); // close command list
         m_activeBuffer = m_drawBufferStack.Pop();
         m_parentBuffer = m_drawBufferStack.IsEmpty() ? nullptr : m_drawBufferStack.Last();
         m_activeBuffer->Reactivate();

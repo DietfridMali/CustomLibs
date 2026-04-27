@@ -224,7 +224,7 @@ bool BaseRenderer::Start2DScene(void) {
 
     Set2DRenderStates();
 
-    if (not (m_screenBuffer and m_screenBuffer->Activate({}))) {
+    if (not (m_screenBuffer and m_screenBuffer->Activate({ .clear = true }))) {
         baseDisplayHandler.EnableBackBuffer();
         gfxStates.ClearBackBuffer();
     }
@@ -289,12 +289,12 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
 
     Set2DRenderStates();
 
-    CommandList* cmdList = StartOperation("DrawScreen");
+    CommandList* cmdList = commandListHandler.CreateCmdList("DrawScreen");
     if (not cmdList)
         return;
-
     if (not cmdList->Open())
         return;
+
     // Ensure the screen RenderTarget color buffer is in PSR state.
     // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
     // in which case the RENDER_TARGET → PSR transition was never recorded.
@@ -320,7 +320,7 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
     if (baseDisplayHandler.CurrentBackBuffer())
         baseDisplayHandler.DisableBackBuffer();
-	FinishOperation(cmdList);
+	cmdList->Close();
 }
 
 
@@ -402,9 +402,7 @@ CommandList* BaseRenderer::StartOperation(String name) noexcept {
             ++(cl->m_refCounter);
         return cl;
     }
-    if (m_temporaryList) 
-        ++(m_temporaryList->m_refCounter);
-    else {
+    if (not m_temporaryList) {
 #if LOG_OPERATIONS
         fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
 #endif
@@ -415,6 +413,7 @@ CommandList* BaseRenderer::StartOperation(String name) noexcept {
             return m_temporaryList = nullptr;
         }
     }
+    ++(m_temporaryList->m_refCounter);
     return m_temporaryList;
 }
 
@@ -425,6 +424,10 @@ bool BaseRenderer::FinishOperation(void* cl, bool flush) noexcept {
         return false;
     if (not list->IsTemporary())
         return true;
+#ifdef _DEBUG
+    if (list->m_refCounter == 0)
+        fprintf(stderr, "Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
+#endif
     if (--(list->m_refCounter) == 0) {
 #if LOG_OPERATIONS
         fprintf(stderr, "Closing temp. CL '%s'\n", (const char*)list->GetName());

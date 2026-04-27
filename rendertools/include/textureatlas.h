@@ -77,11 +77,11 @@ public:
 	bool Add(Texture* glyph, int glyphIndex, Vector2f& scale);
 
 	Texture* GetTexture(void) noexcept {
-		return m_atlas ? m_atlas->GetAsTexture({}) : nullptr;
+		return m_atlas ? m_atlas->GetAsTexture({}) :  nullptr;
 	}
 
 	inline bool Activate(void) {
-		return m_atlas ? m_atlas->Activate({ .flush = true}) : false;
+		return m_atlas ? m_atlas->Activate({ .clear = true, .flush = true}) : false;
 	}
 
 	inline void Deactivate(void) {

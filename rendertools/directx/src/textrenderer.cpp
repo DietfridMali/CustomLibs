@@ -229,9 +229,9 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                 renderTarget->m_lastDestination = 0;
                 RenderText(text, td.width, offset.x, offset.y, alignment);
                 uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
-#ifdef OPENGL
-                renderTarget->Deactivate();
-#endif
+
+                if (baseRenderer.HasOpenGL())
+                    renderTarget->Deactivate();
 #if 0 // debug
                 postProcess = 0;
 #endif
@@ -241,9 +241,8 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                     else
                         AntiAlias(renderTarget, m_decoration.aaMethod);
                 }
-#ifndef OPENGL
-                renderTarget->Deactivate();
-#endif
+                if (not baseRenderer.HasOpenGL())
+                    renderTarget->Deactivate();
                 baseRenderer.PopViewport();
             }
         }

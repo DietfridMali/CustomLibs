@@ -199,7 +199,7 @@ void CommandList::Flush(void) noexcept {
     m_isFlushed = true;
     Close();
 
-    ID3D12CommandList* lists[] = { GfxList() };
+    ID3D12CommandList* lists[] = { GfxList(true) };
     commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
 
 #ifdef _DEBUG
@@ -352,7 +352,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
         }
         fprintf(stderr, "   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
 #endif
-        execList[n++] = l->GfxList();
+        execList[n++] = l->GfxList(true);
     }
 #if LOG_EXECUTION//def _DEBUG
     fprintf(stderr, "\n");

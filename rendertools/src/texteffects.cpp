@@ -26,9 +26,8 @@ void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod
         params.shader = baseShaderHandler.SetupShader(aaMethod.method);
         if (params.shader == nullptr)
             return;
-#ifdef OPENGL
-        params.shader->SetInt("surface", 0);
-#endif
+        if (baseRenderer.HasOpenGL())
+            params.shader->SetInt("surface", 0);
         params.shader->SetFloat("offset", 0.0f);
         //params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
         if (aaMethod.method != "gaussblur") {
