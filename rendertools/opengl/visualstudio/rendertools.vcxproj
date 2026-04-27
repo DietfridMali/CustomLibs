@@ -107,7 +107,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(ExternalLibs)glew-2.2.0\include\GL;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(ExternalLibs)glew-2.2.0\include\GL;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>None</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>

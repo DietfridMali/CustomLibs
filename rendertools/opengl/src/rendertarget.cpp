@@ -331,7 +331,7 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
     else
         gfxStates.SetDepthTest(false);
 #else
-    gfxStates.SetDepthTest(DepthBufferIsActive(bufferIndex, drawBufferGroup));
+    gfxStates.SetDepthTest(DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup));
 #endif
 #ifdef _DEBUG
     return baseRenderer.CheckGfxError();
