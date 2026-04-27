@@ -108,50 +108,27 @@ void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullsc
 }
 
 
-void BaseDisplayHandler::SetupDisplay(String windowTitle) {
-    // ---- Create SDL window (no OpenGL flag) ----
-    Uint32 windowFlags = SDL_WINDOW_SHOWN;
-    if (m_isFullscreen)
-        windowFlags |= SDL_WINDOW_FULLSCREEN;
-
-    m_window = SDL_CreateWindow(windowTitle,
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        m_width, m_height, windowFlags);
-    if (not m_window) {
-        fprintf(stderr, "BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
-        exit(1);
-    }
-
-    // ---- Extract the Win32 HWND from the SDL window ----
-    SDL_SysWMinfo wmInfo{};
-    SDL_VERSION(&wmInfo.version);
-    if (not SDL_GetWindowWMInfo(m_window, &wmInfo)) {
-        fprintf(stderr, "BaseDisplayHandler: SDL_GetWindowWMInfo failed (%s)\n", SDL_GetError());
-        exit(1);
-    }
-    m_hwnd = wmInfo.info.win.window;
-
+bool BaseDisplayHandler::CreateSwapChain(void) {
     // ---- Create the DXGI swap chain ----
     DXGI_SWAP_CHAIN_DESC1 scDesc{};
-    scDesc.Width              = UINT(m_width);
-    scDesc.Height             = UINT(m_height);
-    scDesc.Format             = BACK_BUFFER_FORMAT;
-    scDesc.Stereo             = FALSE;
-    scDesc.SampleDesc.Count   = 1;
+    scDesc.Width = UINT(m_width);
+    scDesc.Height = UINT(m_height);
+    scDesc.Format = BACK_BUFFER_FORMAT;
+    scDesc.Stereo = FALSE;
+    scDesc.SampleDesc.Count = 1;
     scDesc.SampleDesc.Quality = 0;
-    scDesc.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    scDesc.BufferCount        = BACK_BUFFER_COUNT;
-    scDesc.Scaling            = DXGI_SCALING_STRETCH;
-    scDesc.SwapEffect         = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    scDesc.AlphaMode          = DXGI_ALPHA_MODE_IGNORE;
-    scDesc.Flags              = m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+    scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    scDesc.BufferCount = BACK_BUFFER_COUNT;
+    scDesc.Scaling = DXGI_SCALING_STRETCH;
+    scDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    scDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+    scDesc.Flags = m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     ComPtr<IDXGISwapChain1> swapChain1;
     IDXGIFactory4* factory = dx12Context.m_factory.Get();
     ID3D12CommandQueue* queue = commandListHandler.GetQueue();
 
-    HRESULT hr = factory->CreateSwapChainForHwnd(queue, m_hwnd, &scDesc,
-        nullptr, nullptr, &swapChain1);
+    HRESULT hr = factory->CreateSwapChainForHwnd(queue, m_hwnd, &scDesc, nullptr, nullptr, &swapChain1);
     if (FAILED(hr)) {
         fprintf(stderr, "BaseDisplayHandler: CreateSwapChainForHwnd failed (hr=0x%08X)\n", (unsigned)hr);
         exit(1);
@@ -171,6 +148,32 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         exit(1);
     }
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+    return true;
+}
+
+
+void BaseDisplayHandler::SetupDisplay(String windowTitle) {
+    // ---- Create SDL window (no OpenGL flag) ----
+    Uint32 windowFlags = SDL_WINDOW_SHOWN;
+    if (m_isFullscreen)
+        windowFlags |= SDL_WINDOW_FULLSCREEN;
+
+    m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, windowFlags);
+    if (not m_window) {
+        fprintf(stderr, "BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
+        exit(1);
+    }
+
+    // ---- Extract the Win32 HWND from the SDL window ----
+    SDL_SysWMinfo wmInfo{};
+    SDL_VERSION(&wmInfo.version);
+    if (not SDL_GetWindowWMInfo(m_window, &wmInfo)) {
+        fprintf(stderr, "BaseDisplayHandler: SDL_GetWindowWMInfo failed (%s)\n", SDL_GetError());
+        exit(1);
+    }
+    m_hwnd = wmInfo.info.win.window;
+    if (not CreateSwapChain())
+        exit(1);
 }
 
 
@@ -234,10 +237,6 @@ void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
 void BaseDisplayHandler::Update(void) {
     if (not m_swapChain) 
         return;
-    // Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
-    // No-op in the normal game loop where DrawScreen() was already called explicitly.
-    // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
-    DisableBackBuffer();
     // Close the main renderer list — registers it for submission.
     // Submit all registered lists (RenderTarget lists first, main list last — registration order).
     commandListHandler.ExecuteAll();

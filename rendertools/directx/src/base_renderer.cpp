@@ -314,6 +314,9 @@ void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
     RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
 
+    // Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
+    // No-op in the normal game loop where DrawScreen() was already called explicitly.
+    // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
     if (baseDisplayHandler.CurrentBackBuffer())
         baseDisplayHandler.DisableBackBuffer();
 	cmdList->Close();

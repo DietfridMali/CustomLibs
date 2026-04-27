@@ -146,6 +146,8 @@ public:
     virtual void OnResize(void) {}
 
 private:
+    bool CreateSwapChain(void);
+
     // Acquires back buffer resources from the swap chain and creates RTVs.
     bool AcquireBackBuffers(void) noexcept;
 
