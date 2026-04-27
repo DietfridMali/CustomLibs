@@ -70,7 +70,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
 }
 
 
-bool BaseRenderer::InitOpenGL(void) noexcept {
+bool BaseRenderer::InitGraphics(void) noexcept {
     GLint i = glewInit();
     if (i != GLEW_OK) {
         fprintf(stderr, "Smiley-Battle: Cannot initialize GLEW.\n");

@@ -99,7 +99,7 @@ public:
         return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance()); 
     }
 
-    bool InitOpenGL(void) noexcept;
+    bool InitGraphics(void) noexcept;
 
     virtual void Init(int width, int height, float fov, float zNear, float zFar);
 

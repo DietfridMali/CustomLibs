@@ -443,7 +443,7 @@ public:
 
     void ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue = 0) noexcept;
 
-    inline void SetMemoryBarrier(GLbitfield barriers) noexcept {
+    inline void SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
 		// currently no-op; DX12 handles resource barriers at the command-list level
     }
 

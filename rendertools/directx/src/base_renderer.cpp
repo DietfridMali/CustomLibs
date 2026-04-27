@@ -30,13 +30,6 @@ static Texture* testTexture = nullptr;
 // Viewport management: RSSetViewports is called where glViewport was.
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
-bool BaseRenderer::InitDirectX(void) noexcept {
-    delete m_renderList;
-    m_renderList = commandListHandler.GetCmdList("renderer");
-    return m_renderList != nullptr;
-}
-
-
 void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
     gfxStates.ReleaseBuffers();
     m_sceneWidth =
@@ -56,6 +49,35 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
 }
 
 
+bool BaseRenderer::InitGraphics(void) {
+#   ifdef _DEBUG
+    constexpr bool enableDebugLayer = true;
+#   else
+    constexpr bool enableDebugLayer = false;
+#   endif
+    if (not dx12Context.Create(enableDebugLayer)) {
+        fprintf(stderr, "Smiley-Battle: Cannot create DX12 device.\n");
+        return false;
+    }
+    if (not commandListHandler.Create(dx12Context.Device())) {
+        fprintf(stderr, "Smiley-Battle: Cannot create DX12 command queue.\n");
+        return false;
+    }
+    if (not DescriptorHeapHandler::Instance().Create(dx12Context.Device())) {
+        fprintf(stderr, "Smiley-Battle: Cannot create DX12 descriptor heaps.\n");
+        return false;
+    }
+    // Open the command list so displayHandler.Create() and renderer.Create()
+    // can record initial state (viewport/scissor, resource barriers).
+    if (not commandListHandler.CmdQueue().BeginFrame()) {
+        fprintf(stderr, "Smiley-Battle: Cannot begin first DX12 frame.\n");
+        return false;
+    }
+    return true;
+}
+
+
+
 bool BaseRenderer::CreateScreenBuffer(void) {
     if (m_screenBuffer)
         delete m_screenBuffer;
@@ -69,7 +91,6 @@ bool BaseRenderer::CreateScreenBuffer(void) {
 bool BaseRenderer::Create(int width, int height, float fov, float zNear, float zFar) {
     Init(width, height, fov, zNear, zFar);
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
-    InitDirectX();
     SetupGraphics();
     m_drawBufferStack.Clear();
     m_renderTexture.Validate();
@@ -196,7 +217,6 @@ bool BaseRenderer::Stop3DScene(void) {
 bool BaseRenderer::Start2DScene(void) {
     m_frameCounter.Start();
     ResetDrawBuffers();
-    m_renderList->Open(commandListHandler.CmdQueue().FrameIndex());
     gfxStates.SetClearColor(m_backgroundColor);
     m_screenIsAvailable = true;
     ResetTransformation();
@@ -257,39 +277,46 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
 
 
 void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
-    if (m_screenIsAvailable) {
-        m_frameCounter.Draw(true);
-        Stop2DScene();
-        m_screenIsAvailable = false;
-        if (m_screenBuffer) {
-            Set2DRenderStates();
+    if (not m_screenIsAvailable)
+        return;
 
-            m_renderList->Open(commandListHandler.CmdQueue().FrameIndex());
-            // Ensure the screen RenderTarget color buffer is in PSR state.
-            // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
-            // in which case the RENDER_TARGET → PSR transition was never recorded.
-            m_screenBuffer->Disable();
-            if (baseDisplayHandler.CurrentBackBuffer()) {
-                baseDisplayHandler.EnableBackBuffer();
-                gfxStates.ClearBackBuffer();
-            }
-#if 0
-            Timer t;
-            t.SetDuration(500);
-            t.Start();
-            while (not t.HasExpired())
-                ;
-#endif
-            // Set viewport after the list is open so RSSetViewports is actually recorded.
-            SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+    m_frameCounter.Draw(true);
+    Stop2DScene();
+    m_screenIsAvailable = false;
+    if (not m_screenBuffer)
+        return;
+    m_screenBuffer->Disable();
 
-            m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
-            RenderToViewport(&m_renderTexture, ColorData::White, bRotate, bFlipVertically);
+    Set2DRenderStates();
 
-            if (baseDisplayHandler.CurrentBackBuffer())
-                baseDisplayHandler.DisableBackBuffer();
-        }
+    CommandList* cmdList = commandListHandler.GetCmdList("DrawScreen", true);
+    if (not cmdList)
+        return;
+
+    cmdList->Open();
+    // Ensure the screen RenderTarget color buffer is in PSR state.
+    // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
+    // in which case the RENDER_TARGET → PSR transition was never recorded.
+    if (baseDisplayHandler.CurrentBackBuffer()) {
+        baseDisplayHandler.EnableBackBuffer();
+        gfxStates.ClearBackBuffer();
     }
+#if 0
+    Timer t;
+    t.SetDuration(500);
+    t.Start();
+    while (not t.HasExpired())
+        ;
+#endif
+    // Set viewport after the list is open so RSSetViewports is actually recorded.
+    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+
+    m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
+    RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
+
+    if (baseDisplayHandler.CurrentBackBuffer())
+        baseDisplayHandler.DisableBackBuffer();
+	cmdList->Close();
 }
 
 
@@ -378,7 +405,7 @@ CommandList* BaseRenderer::StartOperation(String name) noexcept {
         m_temporaryList = commandListHandler.GetCmdList(name, true);
         if (not m_temporaryList)
             return nullptr;
-        if (not m_temporaryList->Open(commandListHandler.CmdQueue().FrameIndex())) {
+        if (not m_temporaryList->Open()) {
             return m_temporaryList = nullptr;
         }
     }

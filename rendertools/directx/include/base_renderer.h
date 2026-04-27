@@ -40,7 +40,6 @@ protected:
     RenderTarget*           m_sceneBuffer;
     RenderTarget*           m_skyBuffer;
     Texture                 m_renderTexture;
-    CommandList*            m_renderList{ nullptr };
     CommandList*            m_temporaryList{ nullptr };
     AutoArray<CommandList*> m_temporaryListStack{ };
 
@@ -75,8 +74,6 @@ public:
 #endif
 
     virtual ~BaseRenderer() {
-        delete m_renderList;
-        m_renderList = nullptr;
     }
 
     BaseRenderer()
@@ -104,14 +101,12 @@ public:
         return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance());
     }
 
-    inline CommandList* GetCmdList(void) noexcept { return m_renderList; }
-
     // DX12 one-time init (no equivalent of glewInit).
-    bool InitDirectX(void) noexcept;
-
     virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
     virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
+
+    bool InitGraphics(void);
 
     bool CreateScreenBuffer(void);
 

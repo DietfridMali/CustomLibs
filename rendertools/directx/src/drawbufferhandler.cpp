@@ -47,6 +47,7 @@ bool DrawBufferHandler::DeactivateDrawBuffer(RenderTarget* buffer) {
     if (m_drawBufferStack.IsEmpty())
         m_activeBuffer = nullptr;
     else {
+		m_activeBuffer->Disable();
         m_activeBuffer = m_drawBufferStack.Pop();
         m_parentBuffer = m_drawBufferStack.IsEmpty() ? nullptr : m_drawBufferStack.Last();
         m_activeBuffer->Reenable();

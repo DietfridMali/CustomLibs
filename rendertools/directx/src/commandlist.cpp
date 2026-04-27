@@ -150,6 +150,8 @@ void CommandList::Destroy(void) noexcept {
 bool CommandList::Open(UINT frameIndex) noexcept {
     if (m_isRecording)
         return true;
+    if (frameIndex == 0)
+        frameIndex = commandListHandler.CmdQueue().FrameIndex();
     if (not m_list or not m_allocators[frameIndex])
         return false;
     HRESULT hr = m_allocators[frameIndex]->Reset();

@@ -97,7 +97,7 @@ public:
 
     void Destroy(void) noexcept;
 
-    bool Open(UINT frameIndex) noexcept;
+    bool Open(UINT frameIndex = 0) noexcept;
 
     void Close(void) noexcept;
 

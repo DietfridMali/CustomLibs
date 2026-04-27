@@ -242,11 +242,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTBufferParams
     m_pingPong = m_colorBufferCount > 1;
     m_isScreenBuffer = params.isScreenBuffer;
 
-    delete m_cmdList;
-    m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name);
+    m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
     if (not m_cmdList)
         return false;
-    if (not m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex()))
+    if (not m_cmdList->Open())
         return false;
 
     int attachmentIndex = 0;
@@ -322,9 +321,7 @@ bool RenderTarget::DetachBuffer(int bufferIndex)
 void RenderTarget::Destroy(void)
 {
     if (m_cmdList) {
-        if (m_cmdList->IsRecording())
-            m_cmdList->Close();
-        delete m_cmdList;
+        m_cmdList->Close();
         m_cmdList = nullptr;
     }
     for (int i = 0; i < m_bufferCount; ++i)
@@ -434,11 +431,12 @@ bool RenderTarget::Enable(int bufferIndex, eDrawBufferGroups drawBufferGroup, bo
     m_activeBufferIndex = (bufferIndex < 0) ? 0 : (bufferIndex % m_bufferCount);
     m_drawBufferGroup = drawBufferGroup;
 
-    bool wasRecording = m_cmdList->IsRecording();
-    if (not m_cmdList->Open(commandListHandler.CmdQueue().FrameIndex()))
+	m_cmdList = commandListHandler.GetCmdList(m_name.IsEmpty() ? String("RenderTarget") : m_name, true);
+    if (not m_cmdList)
+		return false;
+    if (not m_cmdList->Open())
         return false;
-    if (not wasRecording)
-        SetViewport();
+    SetViewport();
 
     if (not EnableBuffers(bufferIndex, drawBufferGroup, clear))
         return false;
@@ -452,14 +450,18 @@ void RenderTarget::Disable(bool flush)
 {
     if (IsEnabled()) {
         auto* list = m_cmdList->List();
-        for (int i = 0; i < m_colorBufferCount; ++i)
-            m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        if (flush) {
-            m_cmdList->Flush();
-            FreeRTVs();
+		if (list) {
+			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
+            for (int i = 0; i < m_colorBufferCount; ++i)
+                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            if (flush) {
+                m_cmdList->Flush();
+                FreeRTVs();
+            }
         }
-        else
+        else {
             m_cmdList->Close();
+        }
         baseRenderer.DeactivateDrawBuffer(this);
     }
 }

@@ -130,7 +130,7 @@ public:
     AutoArray<BufferInfo>   m_bufferInfo;
 
     // Own command list — all rendering into this RenderTarget is recorded here.
-    CommandList* m_cmdList{ nullptr };
+    CommandList*        m_cmdList{ nullptr };
 
     // -------------------------------------------------------------------------
 
@@ -293,6 +293,10 @@ public:
 
     inline int ExtraBufferIndex(int i = 0) noexcept {
         return m_extraBufferIndex + i;
+    }
+
+    inline int VertexBufferIndex(int i = 0) noexcept {
+        return ExtraBufferIndex(i);
     }
 
     inline DrawBufferList& DrawBuffers(void) noexcept {

@@ -239,7 +239,6 @@ void BaseDisplayHandler::Update(void) {
     // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
     DisableBackBuffer();
     // Close the main renderer list — registers it for submission.
-    baseRenderer.GetCmdList()->Close();
     // Submit all registered lists (RenderTarget lists first, main list last — registration order).
     commandListHandler.ExecuteAll();
     commandListHandler.CmdQueue().EndFrame();
