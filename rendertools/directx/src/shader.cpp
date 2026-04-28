@@ -459,6 +459,21 @@ Shader& Shader::Move(Shader& other) noexcept
 
 // =================================================================================================
 
+bool Shader::UploadB0(void) noexcept {
+    auto* list = commandListHandler.CurrentGfxList();
+    if (not list)
+        return false;
+
+    CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
+    if (not a.IsValid())
+        return false;
+
+    std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
+    list->SetGraphicsRootConstantBufferView(0, a.gpu);
+    return true;
+}
+
+
 bool Shader::UploadB1(void) noexcept
 {
     auto* list = commandListHandler.CurrentGfxList();
@@ -513,23 +528,18 @@ bool Shader::Activate(void) {
 
 bool Shader::UpdateMatrices(void)
 {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
-
     std::memcpy(m_b0Staging.mModelView, baseRenderer.ModelView().AsArray(), 16 * sizeof(float));
     std::memcpy(m_b0Staging.mProjection, baseRenderer.Projection().AsArray(), 16 * sizeof(float));
     std::memcpy(m_b0Staging.mViewport, baseRenderer.ViewportTransformation().AsArray(), 16 * sizeof(float));
     if (shadowMap.IsReady())
         std::memcpy(m_b0Staging.mLightTransform, shadowMap.GetTransformation().AsArray(), 16 * sizeof(float));
-
-    CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
-    if (not a.IsValid())
-        return false;
-
-    std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
-    list->SetGraphicsRootConstantBufferView(0, a.gpu);
     return true;
+}
+
+
+// place all shader variables in CL; to be called right before the actual shader call
+bool Shader::UpdateVariables(void) noexcept {
+    return UploadB0() and UploadB1();
 }
 
 // =================================================================================================
@@ -634,7 +644,8 @@ int Shader::SetVector4i(const char* name, const Vector4i& data) noexcept
 
 int Shader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/) noexcept
 {
-    if (TrySetB0Field(name, data)) return 0; // b0 field — offset 0 is valid and non-error
+    if (TrySetB0Field(name, data)) 
+        return 0; // b0 field — offset 0 is valid and non-error
     return SetB1Field(name, data, 16 * sizeof(float));
 }
 

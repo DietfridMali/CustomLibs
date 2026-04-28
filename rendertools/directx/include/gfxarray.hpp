@@ -10,13 +10,13 @@
 
 // =================================================================================================
 
-class BaseSSBO {
+class BaseGfxArray {
 public:
     static inline bool IsAvailable{ true };
 };
 
 template <typename DATA_T>
-class SSBO : public BaseSSBO
+class GfxArray : public BaseGfxArray
 {
 public:
     AutoArray<DATA_T>                   m_data;
@@ -28,9 +28,9 @@ public:
     D3D12_CPU_DESCRIPTOR_HANDLE         m_cpuUavHandle{};
     D3D12_RESOURCE_STATES               m_state{ D3D12_RESOURCE_STATE_COMMON };
 
-    SSBO() = default;
+    GfxArray() = default;
 
-    ~SSBO() { Destroy(); }
+    ~GfxArray() { Destroy(); }
 
     inline DATA_T* Data(void) { return m_data.Data(); }
     inline int DataSize(void) { return m_data.DataSize(); }

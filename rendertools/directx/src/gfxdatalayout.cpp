@@ -258,7 +258,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
     if (Shader* shader = baseShaderHandler.ActiveShader())
-        shader->UploadB1();
+        shader->UpdateVariables();
 
     if (commandListHandler.CurrentGfxList()) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))

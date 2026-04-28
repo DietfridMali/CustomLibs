@@ -106,7 +106,7 @@ D3D12_RASTERIZER_DESC& RenderStates::SetRasterizerDesc(D3D12_RASTERIZER_DESC& de
     desc.FillMode = D3D12_FILL_MODE_SOLID;
     desc.CullMode = ToD3DCullMode(cullMode);
     desc.FrontCounterClockwise = (frontFace == GfxOperations::Winding::CCW) ? TRUE : FALSE;
-    desc.DepthClipEnable = TRUE;
+    desc.DepthClipEnable = depthClip ? TRUE : FALSE;
     desc.MultisampleEnable = FALSE;
     return desc;
 }

@@ -167,6 +167,8 @@ public:
     // No-op in DX12 (PSO changes are driven by RenderStates changes in the next Enable call).
     inline void Deactivate(void) noexcept {}
 
+    bool UploadB0(void) noexcept;
+
     // Upload per-stage constant buffers to their root CBV slots (1=VS, 2=PS, 3=GS).
     // Called from GfxDataLayout::Render() just before each draw.
     bool UploadB1(void) noexcept;
@@ -174,6 +176,8 @@ public:
     // Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).
     // Reads from baseRenderer / shadowMap, same as OGL.
     bool UpdateMatrices(void);
+
+    bool UpdateVariables(void) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // PSO helpers (internal)

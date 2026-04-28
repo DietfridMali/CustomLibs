@@ -6,24 +6,24 @@
 #include "gfxstates.h"
 #include "sharedgfxhandle.hpp"
 
-class BaseSSBO {
+class BaseGfxArray {
 public:
 	static inline bool IsAvailable;
 	
-	BaseSSBO() {
+	BaseGfxArray() {
 		IsAvailable = gfxStates.HasExtension("GL_ARB_shader_storage_buffer_object");
 	}
 };
 
 template <typename DATA_T>
-class SSBO
-	: public BaseSSBO
+class GfxArray
+	: public BaseGfxArray
 {
 public:
 	SharedGfxHandle		m_handle;
 	AutoArray<DATA_T>	m_data;
 
-	SSBO()
+	GfxArray()
 	{
 		m_handle = SharedGfxHandle(0, glGenBuffers, glDeleteBuffers);
 	}

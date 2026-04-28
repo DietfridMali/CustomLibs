@@ -271,6 +271,13 @@ public:
         return prevState;
     }
 
+    inline int SetDepthClip(int state) {
+        auto& s = ActiveState();
+        int prevState = int(s.depthClip);
+        s.depthClip = uint8_t(state);
+        return prevState;
+    }
+
     inline int SetFaceCulling(int state) {
         auto& s = ActiveState();
         int prevState = (s.cullMode != GfxOperations::FaceCull::None) ? 1 : 0;

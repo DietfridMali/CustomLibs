@@ -206,6 +206,9 @@
     <ClInclude Include="..\..\include\gfxapitype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\gfxarray.hpp">
+      <Filter>DirectX</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->

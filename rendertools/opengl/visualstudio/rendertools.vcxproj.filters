@@ -69,7 +69,7 @@
     <ClInclude Include="..\..\include\rendermatrices.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\SSBO.hpp">
+    <ClInclude Include="..\include\gfxarray.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\texcoord.h">

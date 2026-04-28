@@ -56,6 +56,8 @@ struct RenderStates {
     uint8_t     stencilMask{ 0xFF };
     // Render target count override (-1 = use shader's m_dataLayout)
     int8_t      numRenderTargets{ -1 };
+    // Rasterizer depth clipping
+    uint8_t     depthClip{ 1 };
 
     bool operator==(const RenderStates& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;

@@ -168,6 +168,7 @@
     <ClInclude Include="..\..\include\shadowmap.h" />
     <ClInclude Include="..\..\include\texcoord.h" />
     <ClInclude Include="..\..\include\textrenderer.h" />
+    <ClInclude Include="..\include\gfxarray.hpp" />
     <ClInclude Include="..\include\texture.h" />
     <ClInclude Include="..\..\include\textureatlas.h" />
     <ClInclude Include="..\include\texturebuffer.h" />
