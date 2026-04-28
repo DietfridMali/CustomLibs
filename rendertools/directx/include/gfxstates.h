@@ -443,15 +443,7 @@ public:
 
     void ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue = 0) noexcept;
 
-    inline void SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
-        auto* list = commandListHandler.CurrentGfxList();
-        if (list) {
-            D3D12_RESOURCE_BARRIER b{};
-            b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-            b.UAV.pResource = nullptr;
-            list->ResourceBarrier(1, &b);
-        }
-    }
+    void SetMemoryBarrier(GfxTypes::Bitfield barriers = 0) noexcept;
 
     void ReleaseBuffers(void) noexcept;
 

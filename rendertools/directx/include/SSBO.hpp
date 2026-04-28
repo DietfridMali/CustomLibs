@@ -19,12 +19,14 @@ template <typename DATA_T>
 class SSBO : public BaseSSBO
 {
 public:
-    AutoArray<DATA_T>       m_data;
-    ComPtr<ID3D12Resource>  m_resource;
-    ComPtr<ID3D12Resource>  m_upload;
-    ComPtr<ID3D12Resource>  m_readback;
-    DescriptorHandle        m_uavHandle;
-    D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_COMMON };
+    AutoArray<DATA_T>                   m_data;
+    ComPtr<ID3D12Resource>              m_resource;
+    ComPtr<ID3D12Resource>              m_upload;
+    ComPtr<ID3D12Resource>              m_readback;
+    DescriptorHandle                    m_uavHandle;
+    ComPtr<ID3D12DescriptorHeap>        m_cpuHeap;
+    D3D12_CPU_DESCRIPTOR_HANDLE         m_cpuUavHandle{};
+    D3D12_RESOURCE_STATES               m_state{ D3D12_RESOURCE_STATE_COMMON };
 
     SSBO() = default;
 
@@ -63,10 +65,23 @@ public:
 
         D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
         uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+        uavDesc.Format = DXGI_FORMAT_R32_UINT;
         uavDesc.Buffer.NumElements = UINT(size);
-        uavDesc.Buffer.StructureByteStride = sizeof(DATA_T);
+        uavDesc.Buffer.StructureByteStride = 0;
         device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_uavHandle.cpu);
+
+        D3D12_DESCRIPTOR_HEAP_DESC cpuHeapDesc{};
+        cpuHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        cpuHeapDesc.NumDescriptors = 1;
+        cpuHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        if (FAILED(device->CreateDescriptorHeap(&cpuHeapDesc, IID_PPV_ARGS(&m_cpuHeap)))) {
+            descriptorHeaps.FreeSRV(m_uavHandle);
+            m_uavHandle = {};
+            m_resource.Reset();
+            return false;
+        }
+        m_cpuUavHandle = m_cpuHeap->GetCPUDescriptorHandleForHeapStart();
+        device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_cpuUavHandle);
         return true;
     }
 
@@ -74,11 +89,13 @@ public:
         if (m_resource) {
             descriptorHeaps.FreeSRV(m_uavHandle);
             m_uavHandle = {};
+            m_cpuHeap.Reset();
+            m_cpuUavHandle = {};
             m_resource.Reset();
             m_upload.Reset();
             m_readback.Reset();
         }
-        m_data.Destroy();
+        m_data.Reset();
     }
 
     void SetBarrier(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES after) {
@@ -116,7 +133,7 @@ public:
             return;
         UINT clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
         auto& heap = descriptorHeaps.m_srvHeap;
-        list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_uavHandle.cpu, m_resource.Get(), clearValues, 0, nullptr);
+        list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
     }
 
     bool Upload(void) {
