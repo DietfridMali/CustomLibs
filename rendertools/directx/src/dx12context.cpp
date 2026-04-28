@@ -131,8 +131,10 @@ void DX12Context::DrainMessages(void) noexcept {
         CommandList* cl = commandListHandler.CurrentCmdList();
         // split to make debugging real errors easier
 #if 1
-        if ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING))
-            ; // fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
+        if ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING)) {
+            if ((unsigned)msg->ID != 820)
+                fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
+        }
         else
 #endif
             fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);

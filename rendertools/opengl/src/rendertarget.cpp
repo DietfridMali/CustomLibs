@@ -190,7 +190,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     CreateRenderArea();
     if (not AttachBuffers(params.hasMRTs))
         return false;
-    m_colorBufferCount = params.hasMRTs ? params.colorBufferCount : 1;
+    m_colorBufferCount = params.colorBufferCount;
     m_extraBufferCount = params.vertexBufferCount;
     m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_extraBufferCount);
     m_name = params.name;
@@ -305,7 +305,8 @@ void RenderTarget::Clear(const RTActivationParams& params) { // clear color has 
         gfxStates.SetClearColor(m_clearColor);
         if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup))
             ClearDepthBuffer();
-        ClearColorBuffers();
+        if (m_colorBufferCount)
+            ClearColorBuffers();
         gfxStates.PopClearColor();
         baseRenderer.PopViewport();
     }

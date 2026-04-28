@@ -127,6 +127,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 
 
 void BaseRenderer::StartShadowPass(void) noexcept {
+    baseRenderer.CheckGfxError();
     m_renderPass = RenderPassType::rpShadows;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
@@ -134,30 +135,36 @@ void BaseRenderer::StartShadowPass(void) noexcept {
     gfxStates.ColorMask(0, 0, 0, 0);
     //gfxStates.ColorMask(1, 1, 1, 1);
     gfxStates.SetBlending(0);
+    baseRenderer.CheckGfxError();
 }
 
 
 void BaseRenderer::StartColorPass(void) noexcept {
+    baseRenderer.CheckGfxError();
     m_renderPass = RenderPassType::rpColor;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(0);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.ColorMask(1, 1, 1, 1);
     gfxStates.SetBlending(0);
+    baseRenderer.CheckGfxError();
 }
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
+    baseRenderer.CheckGfxError();
     m_renderPass = RenderPassType::rpFull;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.ColorMask(1, 1, 1, 1);
     gfxStates.SetBlending(0);
+    baseRenderer.CheckGfxError();
 }
 
 
 bool BaseRenderer::Start3DScene(void) {
+    baseRenderer.CheckGfxError();
     SetupGraphics();
     ResetDrawBuffers();
     m_frameCounter.Start();
@@ -168,6 +175,7 @@ bool BaseRenderer::Start3DScene(void) {
 	//3D render is always full window; to put it in a window, render the scene buffer in a window in Draw3DScene()
     //SetViewport(m_sceneViewport);
     ActivateCamera();
+    baseRenderer.CheckGfxError();
     return true;
 }
 
@@ -183,6 +191,7 @@ bool BaseRenderer::Stop3DScene(void) {
 
 
 bool BaseRenderer::Start2DScene(void) {
+    baseRenderer.CheckGfxError();
     m_frameCounter.Start();
 #if 0
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
@@ -203,13 +212,16 @@ bool BaseRenderer::Start2DScene(void) {
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
     gfxStates.SetFaceCulling(0);
     return true;
+    baseRenderer.CheckGfxError();
 }
 
 
 bool BaseRenderer::Stop2DScene(void) {
+    baseRenderer.CheckGfxError();
     if (not m_screenIsAvailable)
         return false;
     ResetDrawBuffers();
+    baseRenderer.CheckGfxError();
     return true;
 }
 

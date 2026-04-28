@@ -53,7 +53,7 @@ public:
         rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-        m_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        m_state = D3D12_RESOURCE_STATE_COMMON;
         if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, m_state, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
 

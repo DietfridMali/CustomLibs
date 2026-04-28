@@ -162,6 +162,7 @@ void BaseRenderer::Set2DRenderStates(int blending) noexcept {
 
 void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
+    m_renderStates.numRenderTargets = 0;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Less);
@@ -172,6 +173,7 @@ void BaseRenderer::StartShadowPass(void) noexcept {
 
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
+    m_renderStates.numRenderTargets = -1;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(0);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
@@ -182,6 +184,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
 
 void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpFull;
+    m_renderStates.numRenderTargets = -1;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
