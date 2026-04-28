@@ -223,7 +223,7 @@ const ShaderSource& CircleMaskShader() {
                 float2 viewportSize;
                 float2 center;
                 float4 surfaceColor;
-                float4 maskColor;
+                //float4 maskColor;
                 float  radius;
                 float  maskScale;
                 int    antialias;

@@ -180,7 +180,7 @@ Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RG
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            shader->SetVector4f("maskColor", maskColor);
+            //shader->SetVector4f("maskColor", maskColor);
             shader->SetVector2f("center", center);
             shader->SetFloat("radius", radius);
             shader->SetFloat("maskScale", maskScale);

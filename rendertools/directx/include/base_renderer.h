@@ -177,7 +177,7 @@ public:
         return m_renderPass; 
     }
 
-    virtual bool Start3DScene(bool flushBuffer = false);
+    virtual bool Start3DScene(void);
 
     virtual bool Stop3DScene(void);
 

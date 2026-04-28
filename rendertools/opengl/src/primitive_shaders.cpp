@@ -215,7 +215,7 @@ const ShaderSource& CircleMaskShader() {
             uniform sampler2D surface;
             uniform vec2 viewportSize;   // Pixel
             uniform vec4 surfaceColor;
-            uniform vec4 maskColor;
+            //uniform vec4 maskColor;
             uniform vec2 center;
             uniform float radius;      // [0..1] in UV
             uniform float maskScale;
