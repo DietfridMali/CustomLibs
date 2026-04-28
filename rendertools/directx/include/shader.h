@@ -89,6 +89,8 @@ public:
     static constexpr int kStageGS = 2;
     static constexpr int kStageCount = 3;
     static constexpr int kSrvBase = 4;
+    static constexpr int kSrvSlots = 16;
+    static constexpr int kUavBase = kSrvBase + kSrvSlots;
 
     struct StageConstants {
         uint32_t size{ 0 };

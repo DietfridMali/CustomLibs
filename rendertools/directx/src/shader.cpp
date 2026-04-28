@@ -172,7 +172,6 @@ bool Shader::CreateRootSignature(void) noexcept
     // Params kSrvBase..kSrvBase+15: one 1-entry descriptor table per texture slot (t0..t15).
     // Each slot is bound independently in Texture::Bind(tmuIndex) via
     // SetGraphicsRootDescriptorTable(kSrvBase + tmuIndex, ...).
-    static constexpr int kSrvSlots = 16;
     D3D12_DESCRIPTOR_RANGE srvRanges[kSrvSlots]{};
     for (int i = 0; i < kSrvSlots; ++i) {
         srvRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -182,7 +181,18 @@ bool Shader::CreateRootSignature(void) noexcept
         srvRanges[i].OffsetInDescriptorsFromTableStart = 0;
     }
 
-    D3D12_ROOT_PARAMETER params[kSrvBase + kSrvSlots]{};
+    // Params kUavBase..kUavBase+3: one 1-entry descriptor table per UAV slot (u0..u3).
+    static constexpr int kUavSlots = 4;
+    D3D12_DESCRIPTOR_RANGE uavRanges[kUavSlots]{};
+    for (int i = 0; i < kUavSlots; ++i) {
+        uavRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+        uavRanges[i].NumDescriptors = 1;
+        uavRanges[i].BaseShaderRegister = UINT(i); // u0, u1, ...
+        uavRanges[i].RegisterSpace = 0;
+        uavRanges[i].OffsetInDescriptorsFromTableStart = 0;
+    }
+
+    D3D12_ROOT_PARAMETER params[kUavBase + kUavSlots]{};
 
     // Root CBV b0 — FrameConstants (visible to all stages)
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -216,6 +226,14 @@ bool Shader::CreateRootSignature(void) noexcept
         params[kSrvBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     }
 
+    // One 1-entry descriptor table per UAV slot (u0..u3)
+    for (int i = 0; i < kUavSlots; ++i) {
+        params[kUavBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[kUavBase + i].DescriptorTable.NumDescriptorRanges = 1;
+        params[kUavBase + i].DescriptorTable.pDescriptorRanges = &uavRanges[i];
+        params[kUavBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    }
+
     // Static samplers: s0 = linear clamp, s1 = linear repeat
     D3D12_STATIC_SAMPLER_DESC samplers[2]{};
     for (int i = 0; i < 2; ++i) {
@@ -234,7 +252,7 @@ bool Shader::CreateRootSignature(void) noexcept
     }
 
     D3D12_ROOT_SIGNATURE_DESC rsd{};
-    rsd.NumParameters = kSrvBase + kSrvSlots;
+    rsd.NumParameters = kUavBase + kUavSlots;
     rsd.pParameters = params;
     rsd.NumStaticSamplers = 2;
     rsd.pStaticSamplers = samplers;
@@ -475,8 +493,12 @@ bool Shader::Activate(void) {
         return false;
 
     ID3D12PipelineState* pso = cl->GetPSO(this);
-    if (not pso)
+    if (not pso) {
+#ifdef _DEBUG
+        pso = cl->GetPSO(this);
+#endif
         return false;
+    }
 
     list->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
 

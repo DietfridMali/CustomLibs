@@ -338,6 +338,10 @@ public:
         gfxStates.FrontFace(GetWinding(true));
     }
 
+    inline void SetShadowFrontFace(void) noexcept {
+        gfxStates.FrontFace(GetWinding());
+    }
+
     inline GfxOperations::FaceCull GetFrontFace(bool reverse = false) noexcept {
         return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }

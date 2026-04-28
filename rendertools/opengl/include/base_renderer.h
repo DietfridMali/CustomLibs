@@ -304,6 +304,10 @@ public:
         gfxStates.FrontFace(GetWinding());
     }
 
+    inline void SetShadowFrontFace(void) noexcept {
+        gfxStates.FrontFace(GetWinding());
+    }
+
 #pragma warning(push)
 #pragma warning(disable:4100)
     inline void* StartOperation(String /*name*/) noexcept {

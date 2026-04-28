@@ -102,6 +102,7 @@ const ShaderSource& DepthShader() {
             PSInput VSMain(VSInput i) {
                 PSInput o;
                 o.pos       = mul(mLightTransform, mul(mModelView, float4(i.pos, 1.0)));
+                o.pos.z     = o.pos.z * 0.5 + 0.5 * o.pos.w;
                 o.fragCoord = i.tc;
                 return o;
             }
@@ -142,7 +143,8 @@ const ShaderSource& SphereDepthShader() {
             struct PSInput { float4 pos : SV_Position; };
             PSInput VSMain(VSInput i) {
                 PSInput o;
-                o.pos = mul(mLightTransform, mul(mModelView, float4(i.pos, 1.0)));
+                o.pos   = mul(mLightTransform, mul(mModelView, float4(i.pos, 1.0)));
+                o.pos.z = o.pos.z * 0.5 + 0.5 * o.pos.w;
                 return o;
             }
         )",
