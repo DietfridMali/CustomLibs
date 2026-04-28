@@ -115,7 +115,7 @@ public:
     int                 m_scale{ 1 };
     int                 m_bufferCount{ 0 };
     int                 m_colorBufferCount{ 0 };
-    int                 m_extraBufferCount{ 0 };
+    int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
     int                 m_stencilBufferIndex{ -1 };

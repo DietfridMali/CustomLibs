@@ -115,7 +115,7 @@ void RenderTarget::Init(void)
 {
     m_width = m_height = 0;
     m_scale = 1;
-    m_bufferCount = m_colorBufferCount = m_extraBufferCount = 0;
+    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
@@ -251,7 +251,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor);
     m_haveRTVs = true;
 
-    m_extraBufferCount = params.vertexBufferCount;
+    m_vertexBufferCount = params.vertexBufferCount;
     // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
@@ -327,7 +327,7 @@ void RenderTarget::Destroy(void)
         m_bufferInfo[i].Release();
     m_isAvailable = false;
     m_haveRTVs = false;
-    m_bufferCount = m_colorBufferCount = m_extraBufferCount = 0;
+    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
     m_bufferInfo.Reset();
 }
@@ -385,7 +385,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             int i = 0;
             for (; i < m_colorBufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            for (int j = 0; j < m_extraBufferCount; ++j, ++i) {
+            for (int j = 0; j < m_vertexBufferCount; ++j, ++i) {
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
                 rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
             }
@@ -467,6 +467,8 @@ void RenderTarget::Disable(void) noexcept {
 			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
             for (int i = 0; i < m_colorBufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
+                m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
         if (m_flushOnDisable) {
             m_cmdList->Flush();
