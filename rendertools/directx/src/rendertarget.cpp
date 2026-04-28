@@ -453,12 +453,15 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     baseRenderer.PushViewport();
     SetViewport(true);
     Clear(params);
+    if (params.reactivate)
+        baseRenderer.RenderStates() = m_renderStates;
     return true;
 }
 
 
 void RenderTarget::Disable(void) noexcept {
     if (IsEnabled()) {
+        m_renderStates = baseRenderer.RenderStates();
         auto* list = m_cmdList->GfxList();
 		if (list) {
 			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);

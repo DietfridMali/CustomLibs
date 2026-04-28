@@ -13,6 +13,7 @@
 #include "conversions.hpp"
 #else
 #include "base_displayhandler.h"
+#include "base_renderer.h"
 #endif
 
 // =================================================================================================
@@ -33,7 +34,12 @@ void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
     if (buffer != m_activeBuffer) {
         if (m_activeBuffer) {
             m_parentBuffer = m_activeBuffer;
-            m_activeBuffer->Disable();
+            // m_activeBuffer->Disable() restores the render states of the RT that was active before m_activeBuffer.
+            // However, we are tracking render states globally, and the code activating the new RT depends on these.
+            // So the current render target's render states need to be saved and restored after Disable() for the new active RT.
+            RenderStates rs = baseRenderer.RenderStates();
+            m_activeBuffer->Disable(); 
+            baseRenderer.RenderStates() = rs;
             m_drawBufferStack.Push(m_activeBuffer);
         }
         m_activeBuffer = buffer;

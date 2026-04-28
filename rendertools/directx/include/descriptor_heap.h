@@ -36,10 +36,19 @@ public:
     DescriptorHandle Allocate(void) noexcept;
     // Returns a slot to the free list so it can be reused by a future Allocate().
     void Free(UINT index) noexcept;
-    inline void Free(const DescriptorHandle& h) noexcept { if (h.IsValid()) Free(h.index); }
+    
+    inline void Free(const DescriptorHandle& h) noexcept { 
+        if (h.IsValid()) 
+            Free(h.index); 
+    }
 
-    inline bool     IsFull(void)    const noexcept { return m_freeList.Length() == 0 && m_count >= m_capacity; }
-    inline UINT     Remaining(void) const noexcept { return (m_capacity - m_count) + UINT(m_freeList.Length()); }
+    inline bool IsFull(void) const noexcept { 
+        return m_freeList.Length() == 0 && m_count >= m_capacity; 
+    }
+    
+    inline UINT Remaining(void) const noexcept { 
+        return (m_capacity - m_count) + UINT(m_freeList.Length()); 
+    }
 
     D3D12_CPU_DESCRIPTOR_HANDLE CpuHandle(UINT index) const noexcept;
     D3D12_GPU_DESCRIPTOR_HANDLE GpuHandle(UINT index) const noexcept;
@@ -51,7 +60,8 @@ public:
 // DescriptorHeapHandler: singleton owning one heap per descriptor type.
 // Capacity constants are intentionally generous; adjust if a project requires more.
 
-class DescriptorHeapHandler : public BaseSingleton<DescriptorHeapHandler>
+class DescriptorHeapHandler 
+    : public BaseSingleton<DescriptorHeapHandler>
 {
 public:
     static constexpr UINT RTV_CAPACITY = 64;
@@ -64,16 +74,34 @@ public:
 
     bool Create(ID3D12Device* device) noexcept;
 
-    inline DescriptorHandle AllocRTV(void) noexcept { return m_rtvHeap.Allocate(); }
-    inline DescriptorHandle AllocDSV(void) noexcept { return m_dsvHeap.Allocate(); }
-    inline DescriptorHandle AllocSRV(void) noexcept { return m_srvHeap.Allocate(); }
+    inline DescriptorHandle AllocRTV(void) noexcept { 
+        return m_rtvHeap.Allocate(); 
+    }
+    
+    inline DescriptorHandle AllocDSV(void) noexcept { 
+        return m_dsvHeap.Allocate(); 
+    }
+    
+    inline DescriptorHandle AllocSRV(void) noexcept { 
+        return m_srvHeap.Allocate(); 
+    }
 
-    inline void FreeRTV(const DescriptorHandle& h) noexcept { m_rtvHeap.Free(h); }
-    inline void FreeDSV(const DescriptorHandle& h) noexcept { m_dsvHeap.Free(h); }
-    inline void FreeSRV(const DescriptorHandle& h) noexcept { m_srvHeap.Free(h); }
+    inline void FreeRTV(const DescriptorHandle& h) noexcept { 
+        m_rtvHeap.Free(h); 
+    }
+    
+    inline void FreeDSV(const DescriptorHandle& h) noexcept { 
+        m_dsvHeap.Free(h); 
+    }
+    
+    inline void FreeSRV(const DescriptorHandle& h) noexcept { 
+        m_srvHeap.Free(h); 
+    }
 
     // The GPU-visible SRV heap must be bound before any draw call.
-    inline ID3D12DescriptorHeap* SrvHeapPtr(void) const noexcept { return m_srvHeap.Ptr(); }
+    inline ID3D12DescriptorHeap* SrvHeapPtr(void) const noexcept { 
+        return m_srvHeap.Ptr(); 
+    }
 };
 
 #define descriptorHeaps DescriptorHeapHandler::Instance()

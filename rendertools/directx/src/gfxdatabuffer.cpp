@@ -159,7 +159,8 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
 
 void GfxDataBuffer::Destroy(void) noexcept
 {
-    m_resource.Reset();
+    if (m_resource)
+        m_resource.Reset();
     m_vbv = {};
     m_ibv = {};
     m_size = 0;

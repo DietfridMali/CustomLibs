@@ -104,7 +104,7 @@ public:
 		eDrawBufferGroups drawBufferGroup{ dbAll };
         bool clear{ true };
 		bool flush{ false };
-		bool reenable{ false };
+		bool reactivate{ false };
 	};
 
     // -------------------------------------------------------------------------
@@ -130,6 +130,7 @@ public:
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
     DrawBufferList      m_drawBuffers{};
 
+    RenderStates        m_renderStates{};
     Viewport            m_viewport;
     Viewport*           m_viewportSave{ nullptr };
     RenderTargetTexture m_renderTexture;
@@ -171,8 +172,8 @@ public:
 
     bool SelectDrawBuffers(const RTActivationParams& params);
 
-    inline bool Reactivate(bool clear = false, bool reenable = false) {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reenable = reenable };
+    inline bool Reactivate(bool clear = false) noexcept {
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reactivate = true };
         return Activate(params);
     }
 

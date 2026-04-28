@@ -4,18 +4,16 @@
 
 // =================================================================================================
 
-bool DescriptorHeap::Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type,
-                             UINT capacity, bool gpuVisible) noexcept {
-    m_type       = type;
-    m_capacity   = capacity;
-    m_count      = 0;
+bool DescriptorHeap::Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT capacity, bool gpuVisible) noexcept {
+    m_type = type;
+    m_capacity = capacity;
+    m_count = 0;
     m_gpuVisible = gpuVisible;
 
     D3D12_DESCRIPTOR_HEAP_DESC desc{};
-    desc.Type           = type;
+    desc.Type = type;
     desc.NumDescriptors = capacity;
-    desc.Flags          = gpuVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE
-                                     : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    desc.Flags = gpuVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     desc.NodeMask = 0;
 
     HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap));
@@ -57,7 +55,7 @@ DescriptorHandle DescriptorHeap::Allocate(void) noexcept {
     }
     DescriptorHandle h;
     h.index = idx;
-    h.cpu   = CpuHandle(idx);
+    h.cpu = CpuHandle(idx);
     if (m_gpuVisible)
         h.gpu = GpuHandle(idx);
     return h;
@@ -65,7 +63,7 @@ DescriptorHandle DescriptorHeap::Allocate(void) noexcept {
 
 
 void DescriptorHeap::Free(UINT index) noexcept {
-    if (index < m_count)
+    if (m_heap and (index < m_count))
         m_freeList.Append(index);
 }
 
