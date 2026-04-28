@@ -115,10 +115,9 @@ const ShaderSource& DepthShader() {
                 float4 pos       : SV_Position;
                 float2 fragCoord : TEXCOORD0;
             };
-            float4 PSMain(PSInput i) : SV_Target {
+            void PSMain(PSInput i) {
                 if (surface.Sample(s0, i.fragCoord).a * surfaceColor.a < 0.9)
                     discard;
-                return (float4)0;
             }
         )",
         ShaderDataLayout(VtxTcAttrs, 2, 0)
@@ -150,8 +149,7 @@ const ShaderSource& SphereDepthShader() {
         )",
         R"(
             struct PSInput { float4 pos : SV_Position; };
-            float4 PSMain(PSInput i) : SV_Target {
-                return (float4)0;
+            void PSMain(PSInput i) {
             }
         )",
         ShaderDataLayout(VtxAttrs, 1, 0)

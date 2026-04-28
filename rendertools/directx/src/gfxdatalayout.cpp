@@ -250,7 +250,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
         m_indexBuffer.IsValid() ? UINT(m_indexBuffer.m_itemCount) : 0,
         (m_dataBuffers.Length() > 0 && m_dataBuffers[0]) ? UINT(m_dataBuffers[0]->m_itemCount) : 0); 
 #endif
-    if (not StartRender ()) 
+    if (not StartRender()) 
         return;
 
     ActivateTextures(textures);
