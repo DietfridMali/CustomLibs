@@ -305,7 +305,7 @@ public:
     }
 
     inline void SetShadowFrontFace(void) noexcept {
-        gfxStates.FrontFace(GetWinding());
+        gfxStates.FrontFace(GetWinding(true));
     }
 
 #pragma warning(push)

@@ -173,6 +173,11 @@ void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
 }
 
 
+void GfxStates::Finish(void) noexcept {
+    commandListHandler.CmdQueue().WaitIdle();
+}
+
+
 void GfxStates::ReleaseBuffers(void) noexcept {
     for (auto& info : m_slotInfos)
         info = TextureSlotInfo(info.GetTypeTag());

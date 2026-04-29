@@ -452,6 +452,8 @@ public:
 
     void SetMemoryBarrier(GfxTypes::Bitfield barriers = 0) noexcept;
 
+    void Finish(void) noexcept;
+
     void ReleaseBuffers(void) noexcept;
 
     // DX12: no GPU-readable viewport state; viewport is tracked by the application.
