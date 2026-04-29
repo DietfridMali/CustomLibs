@@ -63,8 +63,8 @@ bool ShadowMap::StopRender(void) noexcept {
 	if (not IsReady())
 		return false;
 	DeactivateCamera();
-	m_map->Deactivate();
 	gfxStates.CullFace(GfxOperations::FaceCull::Back);
+	m_map->Deactivate();
 #if APPLY_POLYGON_OFFSET
 	glDisable(GL_POLYGON_OFFSET_FILL);
 #endif
