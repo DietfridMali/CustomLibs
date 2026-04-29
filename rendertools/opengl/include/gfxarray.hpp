@@ -39,13 +39,14 @@ public:
 	}
 
 
-	bool Create(int size = 0) {
+	bool Create(int width, int height = 1) {
 		if (not IsAvailable)
 			return false;
 		if (not gfxStates.HaveFeatureLevel(GfxStates::SSBOFeatureLevel))
 			return false;
 		if (m_handle.Claim() == 0)
 			return false;
+		int size = width * height;
 		m_data.Resize(size);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, DataSize(), Data(), GL_DYNAMIC_DRAW);

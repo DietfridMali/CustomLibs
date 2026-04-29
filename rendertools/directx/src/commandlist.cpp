@@ -153,6 +153,7 @@ void CommandList::Reset(void) noexcept {
     m_isRecording = false;
 }
 
+
 bool CommandList::Open(UINT frameIndex) noexcept {
     if (m_isRecording)
         return true;
