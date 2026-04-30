@@ -39,7 +39,7 @@
     <ClInclude Include="..\include\filelist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\platform.h">
+    <ClInclude Include="..\include\platformhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -71,7 +71,7 @@
     <ClCompile Include="..\src\ntpclient.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\platform.cpp">
+    <ClCompile Include="..\src\platformhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

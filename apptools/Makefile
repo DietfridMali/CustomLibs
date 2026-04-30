@@ -13,6 +13,7 @@ FILES := \
  networkendpoint \
  networkmessage \
  ntpclient \
+ platformhandler \
  textfileloader \
  udp
 
