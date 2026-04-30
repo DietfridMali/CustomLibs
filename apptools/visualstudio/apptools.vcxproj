@@ -27,6 +27,7 @@
     <ClInclude Include="..\include\internetservices.h" />
     <ClInclude Include="..\include\textfileloader.h" />
     <ClInclude Include="..\include\udp.h" />
+    <ClInclude Include="..\include\platform.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\arghandler.cpp" />
@@ -38,6 +39,7 @@
     <ClCompile Include="..\src\ntpclient.cpp" />
     <ClCompile Include="..\src\textfileloader.cpp" />
     <ClCompile Include="..\src\udp.cpp" />
+    <ClCompile Include="..\src\platform.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -105,7 +107,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.1\include;$(ProjectDir)..\..\..\external\SDL2_net-2.0.1\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.1\include;$(ProjectDir)..\..\..\external\SDL2_net-2.0.1\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;$(ProjectDir)..\..\..\external\steam\sdk\public\steam;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\GameKit\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.Party.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.PartyXboxLive.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include\xsapi-c</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -126,7 +128,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.1\include;$(ProjectDir)..\..\..\external\SDL2_net-2.0.1\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.1\include;$(ProjectDir)..\..\..\external\SDL2_net-2.0.1\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;$(ProjectDir)..\..\..\external\steam\sdk\public\steam;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\GameKit\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.Party.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.PartyXboxLive.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include\xsapi-c</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>None</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>

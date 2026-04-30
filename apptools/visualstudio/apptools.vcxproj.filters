@@ -39,6 +39,9 @@
     <ClInclude Include="..\include\filelist.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\platform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\arghandler.cpp">
@@ -66,6 +69,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\ntpclient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\platform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

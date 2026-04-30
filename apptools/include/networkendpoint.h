@@ -25,7 +25,8 @@ union NetworkID {
 
 typedef enum {
 	ntIPv4,
-    ntSteam
+    ntSteam,
+    ntXBox
 } eNetworkType;
 
 class NetworkEndpoint {
