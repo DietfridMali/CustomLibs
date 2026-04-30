@@ -14,6 +14,9 @@
 // RenderTargets haben fixe CLs, diverse Detail - Tasks(i.d.R.Daten - Uploads) holen sich bei Bedarf eine temporäre CL.
 // Temporäre CLs wandern nach Ausführung in einen Pool und werden bei Anforderung von temp.CLs bevorzugt verwendet.
 // CLs verwalten auch Ressourcen, die im CL - Scope liegen, insb.PSOs für Shader.
+// Temporäre CLs sind für den Fall in-Frame wiederholter Render Tasks für dasselbe Renderobjekt (i.d.R. Mesh-Datenpuffer) gedacht
+// und nehmen der Objekt-Instanz die Aufgabe ab, hier eine eigene CL-Verwaltung zu implementieren, damit für jede solche Task
+// auch eine CL verfügbar ist.
 
 List<RenderStates> CommandList::m_renderStateStack;
 
