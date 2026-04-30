@@ -11,7 +11,7 @@
 // Render Tasks liegen immer zwischen open und close einer CL.Es gibt in dem Sinne keine verschachtelten Render-Tasks.
 // Auch bei geschachteltem open - close von CLs wird die zuerst ausgeführt, die zuerst geschlossen wird - das liegt daran,
 // dass diese zuerst in die pending-CL-Liste des CL-Handlers eingetragen wird. Dadurch wird der Vulkan-Port erleichtert.
-// RenderTargets haben fixe CLs, diverse Detail-Tasks(i.d.R.Daten - Uploads) holen sich bei Bedarf eine temporäre CL.
+// RenderTargets haben fixe CLs, diverse Detail-Tasks (i.d.R. Daten-Uploads) holen sich bei Bedarf eine temporäre CL.
 // Temporäre CLs wandern nach Ausführung in einen Pool und werden bei Anforderung von temp.CLs bevorzugt verwendet.
 // CLs verwalten auch Ressourcen, die im CL-Scope liegen, insb.PSOs für Shader.
 // Temporäre CLs sind für den Fall in-Frame wiederholter Render Tasks für dasselbe Renderobjekt (i.d.R. Mesh-Datenpuffer) gedacht
