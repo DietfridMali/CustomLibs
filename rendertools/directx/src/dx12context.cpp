@@ -109,7 +109,7 @@ void DX12Context::DumpDRED(void) noexcept {
 
 int DX12Context::DrainMessages(void) noexcept {
     if (not m_infoQueue)
-        return;
+        return 0;
     UINT64 count = m_infoQueue->GetNumStoredMessages();
     int errorCount = 0;
     for (UINT64 i = 0; i < count; ++i) {

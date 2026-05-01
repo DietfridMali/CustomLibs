@@ -52,17 +52,15 @@ public:
 
     virtual bool InitGraphics(void) override;
 
-    virtual void StartShadowPass(void) noexcept override;
-
-    virtual void StartColorPass(void) noexcept override;
-
-    virtual void StartFullPass(void) noexcept override;
-
     virtual void* StartOperation(String name, bool piggyback = true) noexcept override;
 
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
+
+    inline void Draw3DScene(void) noexcept {
+        return BaseRenderer::Draw3DScene(false);
+    }
 
     inline ::RenderStates& RenderStates(void) noexcept {
         return m_renderStates;

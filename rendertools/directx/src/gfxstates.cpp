@@ -184,25 +184,23 @@ void GfxStates::ReleaseBuffers(void) noexcept {
 }
 
 
-void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept {
+void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
     auto* list = commandListHandler.CurrentGfxList();
     if (list) {
         D3D12_VIEWPORT vp{};
         vp.TopLeftX = float(left);
         vp.TopLeftY = float(top);
-        GfxTypes::Int windowWidth = right - left + 1;
-        GfxTypes::Int windowHeight = bottom - top + 1;
-        vp.Width = float(windowWidth);
-        vp.Height = float(windowHeight);
+        vp.Width = float(width);
+        vp.Height = float(height);
         vp.MinDepth = 0.0f;
         vp.MaxDepth = 1.0f;
         list->RSSetViewports(1, &vp);
-        D3D12_RECT scissorArea{ 0, 0, windowWidth, windowHeight };
+        D3D12_RECT scissorArea{ 0, 0, left + width, top + height };
         list->RSSetScissorRects(1, &scissorArea);
         m_viewport[0] = left;
         m_viewport[1] = top;
-        m_viewport[2] = right;
-        m_viewport[3] = bottom;
+        m_viewport[2] = width;
+        m_viewport[3] = height;
     }
 }
 

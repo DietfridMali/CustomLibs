@@ -52,24 +52,6 @@ bool GfxRenderer::InitGraphics(void) {
 }
 
 
-void GfxRenderer::StartShadowPass(void) noexcept {
-    m_renderStates.numRenderTargets = 0;
-    BaseRenderer::StartShadowPass();
-}
-
-
-void GfxRenderer::StartColorPass(void) noexcept {
-    m_renderStates.numRenderTargets = -1;
-    BaseRenderer::StartColorPass();
-}
-
-
-void GfxRenderer::StartFullPass(void) noexcept {
-    m_renderStates.numRenderTargets = -1;
-    BaseRenderer::StartFullPass();
-}
-
-
 void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
     CommandList* cl = commandListHandler.CurrentCmdList();
     if (cl) {
@@ -84,7 +66,7 @@ void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
         fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
 #endif
         cl = commandListHandler.CreateCmdList(name, true);
-        if (not m_temporaryList)
+        if (not cl)
             return nullptr;
         if (not cl->Open()) {
             return nullptr;
@@ -120,6 +102,44 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
     return true;
 }
 
-#include "gfxapitype.inl"
+
+void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
+    if (not m_screenIsAvailable)
+        return;
+
+    m_frameCounter.Draw(true);
+    Stop2DScene();
+    m_screenIsAvailable = false;
+    if (not m_screenBuffer)
+        return;
+    //m_screenBuffer->Deactivate();
+
+    Set2DRenderStates();
+
+    void* cl = StartOperation("DrawScreen", false);
+
+    // Ensure the screen RenderTarget color buffer is in PSR state.
+    // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
+    // in which case the RENDER_TARGET → PSR transition was never recorded.
+    if (baseDisplayHandler.CurrentBackBuffer()) {
+        baseDisplayHandler.EnableBackBuffer();
+        gfxStates.ClearBackBuffer();
+    }
+    // Set viewport after the list is open so RSSetViewports is actually recorded.
+    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+
+    m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
+    RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
+
+    // Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
+    // No-op in the normal game loop where DrawScreen() was already called explicitly.
+    // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
+    if (baseDisplayHandler.CurrentBackBuffer())
+        baseDisplayHandler.DisableBackBuffer();
+    FinishOperation(cl);
+}
+
+
+
 
 // =================================================================================================

@@ -32,7 +32,7 @@ void DrawBufferHandler::SetActiveDrawBuffers(void) {
 void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
     if (buffer != m_activeBuffer) {
         if (m_activeBuffer) {
-            m_activeBuffer->Disable();
+            m_activeBuffer->Disable(false); // not a full, just a temporary deactivation
             m_drawBufferStack.Push(m_activeBuffer);
         }
         m_activeBuffer = buffer;

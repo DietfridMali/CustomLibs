@@ -205,8 +205,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
     baseRenderer.RenderStates().SetStencilDesc(psoDesc.DepthStencilState);
 
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    int8_t nrtOverride = baseRenderer.RenderStates().numRenderTargets;
-    int nrt = (nrtOverride >= 0) ? nrtOverride : shader->m_dataLayout.m_numRenderTargets;
+    int nrt = shader->m_dataLayout.m_numRenderTargets;
     psoDesc.NumRenderTargets = UINT(nrt);
     for (int i = 0; i < nrt; ++i)
         psoDesc.RTVFormats[i] = ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);

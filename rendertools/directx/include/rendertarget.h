@@ -181,7 +181,7 @@ public:
 
     bool Enable(const RTActivationParams& params);
 
-    void Disable(void) noexcept;
+    void Disable(bool deactivate = true) noexcept;
 
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 

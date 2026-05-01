@@ -55,7 +55,9 @@ public:
 
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
 
-    void Draw3DScene(void) noexcept;
+    inline void Draw3DScene(void) noexcept {
+        return BaseRenderer::Draw3DScene(true);
+    }
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 };

@@ -47,11 +47,6 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
 }
     
 
-void GfxRenderer::Draw3DScene(void) noexcept {
-    BaseRenderer::Draw3DScene(true);
-}
-
-
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     if (m_screenIsAvailable) {
         m_frameCounter.Draw(true);

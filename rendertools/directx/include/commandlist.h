@@ -100,9 +100,9 @@ public:
 
     void Reset(void) noexcept;
 
-    bool Open(UINT frameIndex = 0) noexcept;
+    bool Open(bool saveRenderStates = true) noexcept;
 
-    void Close(void) noexcept;
+    void Close(bool restoreRenderStates = true) noexcept;
 
     void Flush(void) noexcept;
 

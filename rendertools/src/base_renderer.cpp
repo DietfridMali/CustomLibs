@@ -234,7 +234,7 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
-#ifdef _DEBUG
+#if 0//def _DEBUG
     flipVertically = false;
 #endif
     if (windowWidth * windowHeight == 0) {

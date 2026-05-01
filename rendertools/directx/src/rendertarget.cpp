@@ -431,7 +431,7 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 
     if (m_cmdList == nullptr) {
         m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
-        if (not m_cmdList or not m_cmdList->Open())
+        if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
             return false;
     }
     m_flushOnDisable = params.flush;
@@ -459,7 +459,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 }
 
 
-void RenderTarget::Disable(void) noexcept {
+void RenderTarget::Disable(bool deactivate) noexcept {
     if (IsEnabled()) {
         m_renderStates = baseRenderer.RenderStates();
         auto* list = m_cmdList->GfxList();
@@ -475,7 +475,7 @@ void RenderTarget::Disable(void) noexcept {
             FreeRTVs();
         }
         else {
-            m_cmdList->Close();
+            m_cmdList->Close(deactivate);
         }
         m_cmdList = nullptr;
     }

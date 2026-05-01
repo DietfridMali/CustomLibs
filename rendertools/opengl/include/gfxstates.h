@@ -378,8 +378,8 @@ public:
 		glViewport(vp[0], vp[1], vp[2], vp[3]);
 	}
 
-	inline void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept {
-		glViewport(left, top, right, bottom);
+	inline void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
+		glViewport(left, top, width, height);
 	}
 
 	template <typename T>

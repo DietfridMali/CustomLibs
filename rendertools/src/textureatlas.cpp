@@ -99,7 +99,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	l = x * w;
 	t = y * h;
 #endif
-	baseRenderer.SetViewport(Viewport(l, t, int(roundf(scale.X() * w)), int(roundf(scale.Y() * h))), 0, 0, baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL));
+	baseRenderer.SetViewport(Viewport(l, t, int(roundf(scale.X() * w)), int(roundf(scale.Y() * h))), 0, 0, baseRenderer.HasOpenGL());
 	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White); // , GlyphOffset(glyphIndex), m_scale);
 	if (shader) {
 		float c = float(glyphIndex) / float(m_size.GetSize());

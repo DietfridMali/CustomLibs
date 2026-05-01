@@ -165,11 +165,10 @@ void CommandList::Reset(void) noexcept {
 }
 
 
-bool CommandList::Open(UINT frameIndex) noexcept {
+bool CommandList::Open(bool saveRenderStates) noexcept {
     if (m_isRecording)
         return true;
-    if (frameIndex == 0)
-        frameIndex = commandListHandler.CmdQueue().FrameIndex();
+    UINT frameIndex = commandListHandler.CmdQueue().FrameIndex();
     if (not m_gfxListPtr or not m_allocators[frameIndex])
         return false;
     HRESULT hr = m_allocators[frameIndex]->Reset();
@@ -188,7 +187,8 @@ bool CommandList::Open(UINT frameIndex) noexcept {
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
     commandListHandler.Register(this);
-    PushRenderStates();
+    if (saveRenderStates)
+        PushRenderStates();
 #ifdef _DEBUG
     dx12Context.DrainMessages();
 #endif
@@ -196,7 +196,7 @@ bool CommandList::Open(UINT frameIndex) noexcept {
 }
 
 
-void CommandList::Close(void) noexcept {
+void CommandList::Close(bool restoreRenderStates) noexcept {
     if (not m_isRecording)
         return;
     m_isRecording = false;
@@ -207,7 +207,8 @@ void CommandList::Close(void) noexcept {
     dx12Context.DrainMessages();
 #endif
     commandListHandler.PopCmdList();
-    PopRenderStates();
+    if (restoreRenderStates)
+        PopRenderStates();
 }
 
 

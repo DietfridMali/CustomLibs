@@ -67,7 +67,7 @@ Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
         shaderId = depthShaderId; // override all shaders with simplest possible shader during depth pass
     // In OpenGL the program binding persists across draw calls, so skip re-enabling
     // if the same shader is already active.
-    if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL) and (m_activeShaderId == shaderId) and (m_activeShader != nullptr)) {
+    if (baseRenderer.HasOpenGL() and (m_activeShaderId == shaderId) and (m_activeShader != nullptr)) {
         shader = m_activeShader;
     }
     else {

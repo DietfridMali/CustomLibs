@@ -15,7 +15,6 @@
 
 #define USE_TEXT_RTS    1
 #define USE_ATLAS       1
-#define TEST_ATLAS      0
 
 using GlyphSize = TextureAtlas::GlyphSize;
 using TextDimensions = TextureAtlas::GlyphSize;
@@ -57,16 +56,6 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         return;
 
     // test code: display entire atlas on screen
-#if TEST_ATLAS
-    baseRenderer.ResetTransformation();
-    baseRenderer.SetViewport(::Viewport (0, 0, m_font->GetAtlas().GetWidth(), m_font->GetAtlas().GetHeight()));
-    gfxStates.ClearColorBuffers();
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    gfxStates.ClearError();
-    m_font->GetRenderTarget()->Render({}, ColorData::Yellow);
-    return;
-#endif
 
     if (flipVertically)
         y = -y;
@@ -152,10 +141,8 @@ float TextRenderer::XOffset(float xOffset, int textWidth, eTextAlignments alignm
 
 void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment, int flipVertically) {
     baseRenderer.PushMatrix();
-#if !TEST_ATLAS
     baseRenderer.ResetTransformation();
     baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-#endif
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
     float letterScale = 2 * xOffset / float(textWidth);
     // reusing xOffset here

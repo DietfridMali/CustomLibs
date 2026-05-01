@@ -54,8 +54,6 @@ struct RenderStates {
     // Stencil reference value and mask
     uint8_t     stencilRef{ 0 };
     uint8_t     stencilMask{ 0xFF };
-    // Render target count override (-1 = use shader's m_dataLayout)
-    int8_t      numRenderTargets{ -1 };
     // Rasterizer depth clipping
     uint8_t     depthClip{ 1 };
 

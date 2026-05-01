@@ -71,12 +71,11 @@ const ShaderSource& StencilShader() {
         )",
         R"(
             struct PSInput { float4 pos : SV_Position; };
-            float4 PSMain(PSInput i) : SV_Target {
+            void PSMain(PSInput i) {
                 discard;
-                return (float4)0;
             }
         )",
-        ShaderDataLayout(VtxAttrs, 1)
+        ShaderDataLayout(VtxAttrs, 1, 0)
     );
     return source;
 }
