@@ -69,11 +69,11 @@ public:
     }
 
     inline void SetGeometryFrontFace(void) noexcept {
-        gfxStates.FrontFace(GfxOperations::CullFace::Back);
+        gfxStates.FrontFace(GfxOperations::Winding::Regular);
     }
 
     inline void SetShadowFrontFace(void) noexcept {
-        gfxStates.FrontFace(GfxOperations::CullFace::Front);
+        gfxStates.FrontFace(GfxOperations::Winding::Reverse);
     }
 };
 

@@ -205,8 +205,7 @@ void BaseRenderer::Draw3DScene(bool flipVertically) {
 
         static bool renderScene = true;
         if (renderScene) {
-            m_renderTexture.m_handle = GetSceneBuffer()->BufferHandle(0);
-            m_renderQuad.Render(shader, { &m_renderTexture });
+            m_renderQuad.Render(shader, { GetSceneBuffer()->GetAsTexture({})});
         }
         if (shader != nullptr)
             PopMatrix();
@@ -215,8 +214,13 @@ void BaseRenderer::Draw3DScene(bool flipVertically) {
 
 
 void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically) {
+#if 1
     m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = bRotate ? 90.0f : 0.0f });
     m_renderQuad.Render(nullptr, texture, color);
+#else
+    baseRenderer.Translate(0.5f, 0.5f, 0.0f);
+    m_renderQuad.Render(baseShaderHandler.LoadPlainTextureShader(color, false), texture, color);
+#endif
 }
 
 

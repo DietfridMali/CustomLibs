@@ -104,6 +104,7 @@ public:
     bool                        m_hasParams{ false };
     bool                        m_isDeployed{ false };
     bool                        m_isValid{ false };
+    bool                        m_isRenderTarget{ false };
     bool                        m_isDisposable{ false };
 
     static SharedTextureHandle  nullHandle;
@@ -188,6 +189,10 @@ public:
     virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
 
     virtual void Release(void) override;
+
+    inline bool IsRenderTarget(void) noexcept {
+        return m_isRenderTarget;
+    }
 
     inline bool IsDeployed(void) noexcept {
         return m_isDeployed;
@@ -306,7 +311,9 @@ class RenderTargetTexture
     : public Texture
 {
 public:
-    RenderTargetTexture() = default;
+    RenderTargetTexture() {
+        m_isRenderTarget = true;
+    }
 
     ~RenderTargetTexture() = default;
 

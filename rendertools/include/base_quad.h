@@ -121,7 +121,7 @@ public:
     float ComputeAspectRatio(void)
  noexcept;
 
-    Shader* LoadShader(bool useTexture, const RGBAColor& color = ColorData::White);
+    Shader* LoadShader(std::span<Texture* const> textures, const RGBAColor& color = ColorData::White);
 
     bool Render(Shader* shader, std::span<Texture* const> textures = {}, const RGBAColor& color = ColorData::White);
 

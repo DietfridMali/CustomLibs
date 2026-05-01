@@ -136,13 +136,15 @@ noexcept
 }
 
 
-Shader* BaseQuad::LoadShader(bool useTexture, const RGBAColor& color) {
+Shader* BaseQuad::LoadShader(std::span<Texture* const> textures, const RGBAColor& color) {
     UpdateTransformation();
-    return
-        useTexture 
-        ? baseShaderHandler.LoadPlainTextureShader(color, Vector2f::ZERO, Vector2f::ONE, m_premultiply) 
-        : baseShaderHandler.LoadPlainColorShader(color, m_premultiply);
+    if (textures.size() == 0)
+        return baseShaderHandler.LoadPlainColorShader(color, m_premultiply);
+    if (textures.size() > 1)
+        return baseShaderHandler.LoadPlainTextureShader(color, false, Vector2f::ZERO, Vector2f::ONE, m_premultiply);
+    return baseShaderHandler.LoadPlainTextureShader(color, textures[0]->IsRenderTarget(), Vector2f::ZERO, Vector2f::ONE, m_premultiply);
 }
+        
 
 
 void BaseQuad::UpdateTransformation(void) {
@@ -152,8 +154,10 @@ void BaseQuad::UpdateTransformation(void) {
             baseRenderer.Translate(0.5f, 0.5f, 0.0f);
         if (m_transformations.rotation != 0.0f)
             baseRenderer.Rotate(m_transformations.rotation, 0, 0, 1);
+#if 1
         if (m_transformations.flipVertically)
             baseRenderer.Scale(1.0f, -1.0f, 1.0f);
+#endif
     }
 }
 
@@ -168,7 +172,7 @@ void BaseQuad::ResetTransformation(void) {
 
 
 bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
-    if (not (shader or (shader = LoadShader(textures.size() != 0, color))))
+    if (not (shader or (shader = LoadShader(textures, color))))
         return false;
     if (UpdateData()) {
         m_gfxDataLayout->Render(textures);

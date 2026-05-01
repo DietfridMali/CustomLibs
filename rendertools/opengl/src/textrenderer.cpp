@@ -44,7 +44,7 @@ RenderTarget* TextRenderer::GetRenderTarget(int scale) {
 
 
 Shader* TextRenderer::LoadShader(void) {
-    return baseShaderHandler.LoadPlainTextureShader(m_color);
+    return baseShaderHandler.LoadPlainTextureShader(m_color, true);
 }
 
 

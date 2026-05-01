@@ -175,7 +175,7 @@ Shader* BaseShaderHandler::LoadRectangleShader(const RGBAColor& color, const Vec
 Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, float radius, float maskScale, bool antialias) {
     Shader* shader = SetupShader("circleMaskShader");
     if (shader) {
-        if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+        if (baseRenderer.HasOpenGL())
             shader->SetInt("surface", 0);
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
@@ -209,11 +209,13 @@ Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply) {
 }
 
 
-Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
+Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool flipVertically, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
     Shader* shader = SetupShader("plainTexture");
     if (shader) {
-        if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+        if (baseRenderer.HasOpenGL()) {
             shader->SetInt("surface", 0);
+            shader->SetInt("flipVertically", flipVertically ? 1 : 0);
+        }
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("tcOffset", tcOffset);
@@ -227,7 +229,7 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, const 
 Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
     Shader* shader = SetupShader("blurTexture");
     if (shader) {
-        if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+        if (baseRenderer.HasOpenGL())
             shader->SetInt("surface", 0);
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
@@ -245,7 +247,7 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, bool invert, co
         if (baseRenderer.IsShadowPass())
             shader->SetVector4f("surfaceColor", ColorData::White);
         else {
-            if (baseRenderer.IsGfxApi(BaseRenderer::GfxApiType::OpenGL))
+            if (baseRenderer.HasOpenGL())
                 shader->SetInt("surface", 0);
             shader->SetInt("invert", invert ? 1 : 0);
             shader->SetVector2f("tcOffset", tcOffset);

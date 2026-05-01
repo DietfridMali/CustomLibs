@@ -243,6 +243,7 @@ const ShaderSource& PlainTextureShader() {
         #version 330
         uniform sampler2D surface;
         uniform vec4 surfaceColor;
+        uniform bool flipVertically;
         uniform vec2 tcOffset;
         uniform vec2 tcScale;
         //uniform float premultiply;
@@ -252,7 +253,7 @@ const ShaderSource& PlainTextureShader() {
         layout(location = 0) out vec4 fragColor;
         
         void main() {
-            vec4 texColor = texture(surface, tcOffset + tcScale * /*fract*/(fragCoord));
+            vec4 texColor = /*flipVertically ? texture(surface, tcOffset + tcScale * vec2(fragCoord.x, 1.0 - fragCoord.y)) :*/ texture(surface, tcOffset + tcScale * fragCoord);
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
