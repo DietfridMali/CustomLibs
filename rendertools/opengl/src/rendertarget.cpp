@@ -1,7 +1,7 @@
 ﻿#include "glew.h"
 #include "conversions.hpp"
 #include "rendertarget.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 
 GLint RenderTarget::m_activeHandle = GL_NONE;
@@ -47,11 +47,11 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
     else
         bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
-    baseRenderer.ClearGfxError();
+    gfxStates.ClearError();
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
-    baseRenderer.ClearGfxError();
+    gfxStates.ClearError();
     gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
     if (bufferType == BufferInfo::btDepth) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -102,7 +102,7 @@ bool RenderTarget::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
         return true;
-    BaseRenderer::ClearGfxError();
+    gfxStates.ClearError();
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
     return true;
@@ -121,7 +121,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex) {
     gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
 #ifdef _DEBUG
-    return bufferInfo.m_isAttached = BaseRenderer::CheckGfxError();
+    return bufferInfo.m_isAttached = gfxStates.CheckError();
 #else
     return bufferInfo.m_isAttached = true;
 #endif
@@ -131,7 +131,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex) {
 bool RenderTarget::AttachBuffers(bool hasMRTs) {
     if (not m_handle.Claim())
         return false;
-    BaseRenderer::ClearGfxError();
+    gfxStates.ClearError();
     glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
     bool bindColorBuffers = true;
     glDrawBuffer(GL_NONE);
@@ -153,7 +153,7 @@ bool RenderTarget::AttachBuffers(bool hasMRTs) {
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 #ifdef _DEBUG
     if (not m_isAvailable)
-        baseRenderer.CheckGfxError();
+        gfxStates.CheckError();
 #endif
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return m_isAvailable;
@@ -322,10 +322,10 @@ bool RenderTarget::ReattachBuffers(void) {
 
 
 bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     if (not SelectDrawBuffers(params))
         return false;
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
 #ifdef _DEBUG
     if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup))
         gfxStates.SetDepthTest(true);
@@ -335,7 +335,7 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
     gfxStates.SetDepthTest(DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup));
 #endif
 #ifdef _DEBUG
-    return baseRenderer.CheckGfxError();
+    return gfxStates.CheckError();
 #else
     return true;
 #endif
@@ -345,11 +345,11 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
 bool RenderTarget::Enable(const RTActivationParams& params) {
     if (not m_isAvailable)
         return false;
-    //BaseRenderer::ClearGfxError();
+    //gfxStates.ClearError();
     if (not IsEnabled()) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
 #ifdef _DEBUG
-        if (not BaseRenderer::CheckGfxError())
+        if (not gfxStates.CheckError())
             return false;
 #endif
     }
@@ -377,7 +377,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 void RenderTarget::Disable(void) noexcept { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
         ReleaseBuffers();
-        baseRenderer.CheckGfxError();
+        gfxStates.CheckError();
 #if 1
         for (int i = 0; i < m_colorBufferCount; ++i) {
             m_drawBuffers[i] = GL_NONE;
@@ -386,7 +386,7 @@ void RenderTarget::Disable(void) noexcept { // flush only required for compatibi
 #endif
         m_activeBufferIndex = -1;
         m_drawBufferGroup = dbNone;
-        baseRenderer.CheckGfxError();
+        gfxStates.CheckError();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 }
@@ -401,7 +401,7 @@ void RenderTarget::Deactivate(void) noexcept {
 bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
     if (bufferIndex < 0)
         return false;
-    BaseRenderer::ClearGfxError();
+    gfxStates.ClearError();
     if (tmuIndex < 0)
         tmuIndex = bufferIndex;
     for (int i = 0; i < m_bufferCount; ++i)

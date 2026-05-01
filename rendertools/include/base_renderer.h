@@ -4,7 +4,6 @@
 #include <utility>
 #include <stdlib.h>
 
-#include "dx12framework.h"
 #include "std_defines.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
@@ -25,6 +24,7 @@
 
 class BaseRenderer
     : public RenderMatrices
+    , public DrawBufferHandler
     , public PolymorphSingleton<BaseRenderer>
 {
 public:
@@ -39,9 +39,6 @@ protected:
     RenderTarget*           m_sceneBuffer;
     RenderTarget*           m_skyBuffer;
     Texture                 m_renderTexture;
-    CommandList*            m_cmdList{ nullptr };
-    CommandList*            m_temporaryList{ nullptr };
-    AutoArray<CommandList*> m_temporaryListStack{ };
 
     bool                    m_screenIsAvailable;
 
@@ -63,7 +60,6 @@ protected:
     RGBAColor               m_backgroundColor;
     RenderPassType          m_renderPass;
     MovingFrameCounter      m_frameCounter;
-    RenderStates            m_renderStates;
 
     static List<::Viewport> m_viewportStack;
     List<RenderTarget*>     m_sceneBufferStack;
@@ -139,11 +135,11 @@ public:
         m_renderPass = renderPass; 
     }
 
-    void StartShadowPass(void) noexcept;
+    virtual void StartShadowPass(void) noexcept;
 
-    void StartColorPass(void) noexcept;
+    virtual void StartColorPass(void) noexcept;
 
-    void StartFullPass(void) noexcept;
+    virtual void StartFullPass(void) noexcept;
 
     inline bool IsShadowPass(void) noexcept { 
         return RenderPass() == RenderPassType::rpShadows; 
@@ -186,11 +182,16 @@ public:
 
     inline ::Viewport GetSceneViewport(void) noexcept { return m_sceneViewport; }
 
-    virtual void Draw3DScene(void);
+    void Draw3DScene(bool flipVertically);
 
     virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically);
 
-    virtual void DrawScreen(bool bRotate, bool bFlipVertically);
+#pragma warning(push)
+#pragma warning(disable:4100)
+    virtual void DrawScreen(bool bRotate, bool bFlipVertically) {
+        //no op
+    }
+#pragma warning(pop)
 
     virtual bool ActivateCamera(void)  { 
         return false; 
@@ -339,17 +340,6 @@ public:
         return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
 
-    // DX12: no per-frame GL error checking. These are kept as no-ops for source compatibility.
-    static void ClearGfxError(void)noexcept {}
-
-    static bool CheckGfxError(const char* = "") noexcept { 
-        return true; 
-    }
-
-    inline ::RenderStates& RenderStates(void) noexcept {
-        return m_renderStates;
-    }
-
     virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
     virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
@@ -358,13 +348,9 @@ public:
         return false;
     }
 
-    virtual RenderTarget* GetActiveBuffer(void) noexcept { return nullptr; }
-
-    virtual void ResetDrawBuffers(void) noexcept {}
-
 #pragma warning(push)
 #pragma warning(disable:4100)
-    virtual void* StartOperation(String name) noexcept {
+    virtual void* StartOperation(String name, bool piggyback = true) noexcept {
         return nullptr; 
     }
 

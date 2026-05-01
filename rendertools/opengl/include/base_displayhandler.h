@@ -122,6 +122,11 @@ public:
         return true;
     }
 
+    void EnableBackBuffer(void);
+
+    void DisableBackBuffer(void);
+
+
     virtual void OnResize(void) {}
 };
 

@@ -4,7 +4,7 @@
 #include <utility>
 #include <stdlib.h>
 
-#include "dx12framework.h"
+#include "glew.h"
 #include "std_defines.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
@@ -27,14 +27,14 @@
 class GfxRenderer
     : public BaseRenderer
 {
-private:
-    CommandList*    m_cmdList{ nullptr };
-    CommandList*    m_temporaryList{ nullptr };
-
-protected:
-    RenderStates    m_renderStates;
-
 public:
+    struct GLVersion {
+        GLint major{ 0 };
+        GLint minor{ 0 };
+    };
+
+    GLVersion   m_glVersion;
+
     virtual ~GfxRenderer() {
     }
 
@@ -42,8 +42,7 @@ public:
         : BaseRenderer()
     {
         _instance = this;
-        gfxApiType = BaseRenderer::GfxApiType::DirectX;
-
+        gfxApiType = BaseRenderer::GfxApiType::OpenGL;
     }
 
     static GfxRenderer& Instance(void) {
@@ -52,21 +51,13 @@ public:
 
     virtual bool InitGraphics(void) override;
 
-    virtual void StartShadowPass(void) noexcept override;
-
-    virtual void StartColorPass(void) noexcept override;
-
-    virtual void StartFullPass(void) noexcept override;
-
     virtual void* StartOperation(String name, bool piggyback = true) noexcept override;
 
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
 
-    virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
+    void Draw3DScene(void) noexcept;
 
-    inline ::RenderStates& RenderStates(void) noexcept {
-        return m_renderStates;
-    }
+    virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 };
 
 #define baseRenderer GfxRenderer::Instance()

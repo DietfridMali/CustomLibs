@@ -9,14 +9,22 @@ enum class GfxApiType {
 	Unknown
 };
 
-static GfxApiType gfxApiType;
+inline static GfxApiType gfxApiType = GfxApiType::Unknown;
 
-bool IsGfxApi(GfxApiType value) noexcept;
+inline bool IsGfxApi(GfxApiType value) noexcept {
+	return value == gfxApiType;
+}
 
-bool HasOpenGL(void) noexcept;
+inline bool HasOpenGL(void) noexcept {
+	return IsGfxApi(GfxApiType::OpenGL);
+}
 
-bool HasDirectX(void) noexcept;
+inline bool HasDirectX(void) noexcept {
+	return IsGfxApi(GfxApiType::DirectX);
+}
 
-bool HasVulkan(void) noexcept;
+inline bool HasVulkan(void) noexcept {
+	return IsGfxApi(GfxApiType::Vulkan);
+}
 
 // =================================================================================================

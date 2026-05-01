@@ -12,7 +12,7 @@
 
 #include "texture.h"
 #include "gfxstates.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 #define USE_TEXTURE_LUT 1
 
@@ -219,7 +219,7 @@ bool Texture::Deploy(int bufferIndex)
     glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
     SetParams();
 #ifdef _DEBUG
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
 #endif
     Release();
     m_isDeployed = true;

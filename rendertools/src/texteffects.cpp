@@ -21,7 +21,7 @@
 void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply) {
     if (aaMethod.ApplyAA()) {
         RenderTarget::RTRenderParams params = { .clearBuffer = true, .scale = 1.0f };
-        BaseRenderer::ClearGfxError();
+        gfxStates.ClearError();
         baseRenderer.Set2DRenderStates(0);
         params.shader = baseShaderHandler.SetupShader(aaMethod.method);
         if (params.shader == nullptr)

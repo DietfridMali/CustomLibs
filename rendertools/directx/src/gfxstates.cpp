@@ -183,6 +183,7 @@ void GfxStates::ReleaseBuffers(void) noexcept {
         info = TextureSlotInfo(info.GetTypeTag());
 }
 
+
 void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept {
     auto* list = commandListHandler.CurrentGfxList();
     if (list) {
@@ -203,6 +204,26 @@ void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, c
         m_viewport[2] = right;
         m_viewport[3] = bottom;
     }
+}
+
+
+void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) { 
+    //no op
+}
+
+void GfxStates::ClearError(void) noexcept {
+    // no op
+}
+
+
+bool GfxStates::CheckError(const char* operation) noexcept {
+#ifdef NDEBUG
+    return true;
+#else
+    if (dx12Context.DrainMessages() > 0)
+        return false;
+    return true;
+#endif
 }
 
 // =================================================================================================

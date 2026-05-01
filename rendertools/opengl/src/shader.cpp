@@ -5,7 +5,7 @@
 
 #include "shader.h"
 #include "shadowmap.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 #define PASSTHROUGH_MODE 0
 

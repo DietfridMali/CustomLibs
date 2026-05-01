@@ -125,12 +125,12 @@
     <ClInclude Include="..\..\include\billboard.h" />
     <ClInclude Include="..\..\include\colordata.h" />
     <ClInclude Include="..\..\include\cube.h" />
+    <ClInclude Include="..\..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\gfxapitype.h" />
     <ClInclude Include="..\..\include\resource_descriptor.h" />
     <ClInclude Include="..\include\cbv_allocator.h" />
     <ClInclude Include="..\include\commandlist.h" />
     <ClInclude Include="..\include\descriptor_heap.h" />
-    <ClInclude Include="..\include\drawbufferhandler.h" />
     <ClInclude Include="..\include\dx12context.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
@@ -182,6 +182,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\base_renderer.cpp" />
+    <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
@@ -190,7 +191,6 @@
     <ClCompile Include="..\src\cbv_allocator.cpp" />
     <ClCompile Include="..\src\commandlist.cpp" />
     <ClCompile Include="..\src\descriptor_heap.cpp" />
-    <ClCompile Include="..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\src\dx12context.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />

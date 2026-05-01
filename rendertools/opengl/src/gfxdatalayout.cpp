@@ -1,7 +1,7 @@
 
 #include "gfxdatalayout.h"
 #include "base_shaderhandler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 
@@ -284,7 +284,7 @@ static void CheckLayout(GLuint handle, const char* label = "") {
     }
 
     glBindVertexArray(0);
-    baseRenderer.ClearGfxError();
+    gfxStates.ClearError();
 }
 
 #endif

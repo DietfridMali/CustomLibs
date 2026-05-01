@@ -7,7 +7,7 @@
 #include "conversions.hpp"
 #include "glew.h"
 //#include "quad.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
 
@@ -127,7 +127,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
 
 
 void BaseRenderer::StartShadowPass(void) noexcept {
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     m_renderPass = RenderPassType::rpShadows;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
@@ -135,36 +135,36 @@ void BaseRenderer::StartShadowPass(void) noexcept {
     gfxStates.ColorMask(0, 0, 0, 0);
     //gfxStates.ColorMask(1, 1, 1, 1);
     gfxStates.SetBlending(0);
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
 }
 
 
 void BaseRenderer::StartColorPass(void) noexcept {
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     m_renderPass = RenderPassType::rpColor;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(0);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.ColorMask(1, 1, 1, 1);
     gfxStates.SetBlending(0);
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
 }
 
 
 void BaseRenderer::StartFullPass(void) noexcept {
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     m_renderPass = RenderPassType::rpFull;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.ColorMask(1, 1, 1, 1);
     gfxStates.SetBlending(0);
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
 }
 
 
 bool BaseRenderer::Start3DScene(void) {
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     SetupGraphics();
     ResetDrawBuffers();
     m_frameCounter.Start();
@@ -175,7 +175,7 @@ bool BaseRenderer::Start3DScene(void) {
 	//3D render is always full window; to put it in a window, render the scene buffer in a window in Draw3DScene()
     //SetViewport(m_sceneViewport);
     ActivateCamera();
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     return true;
 }
 
@@ -191,7 +191,7 @@ bool BaseRenderer::Stop3DScene(void) {
 
 
 bool BaseRenderer::Start2DScene(void) {
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     m_frameCounter.Start();
 #if 0
     if (not (m_screenBuffer and m_screenBuffer->IsAvailable()))
@@ -212,16 +212,16 @@ bool BaseRenderer::Start2DScene(void) {
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
     gfxStates.SetFaceCulling(0);
     return true;
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
 }
 
 
 bool BaseRenderer::Stop2DScene(void) {
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     if (not m_screenIsAvailable)
         return false;
     ResetDrawBuffers();
-    baseRenderer.CheckGfxError();
+    gfxStates.CheckError();
     return true;
 }
 
@@ -292,28 +292,6 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
 #else
     m_renderQuad.Fill(color); // bFlipVertically);
 #endif
-}
-
-
-void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
-    if (m_screenIsAvailable) {
-        m_frameCounter.Draw(true);
-        Stop2DScene();
-        m_screenIsAvailable = false;
-        if (m_screenBuffer) {
-            gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-            gfxStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
-            //SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
-#if 0
-            if (m_screenBuffer->Activate({})) {
-                RenderToViewport(testTexture, ColorData::White, false, false);
-                m_screenBuffer->Deactivate();
-            }
-#endif
-            gfxStates.ClearColorBuffers();
-            RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
-        }
-    }
 }
 
 
@@ -396,29 +374,6 @@ void BaseRenderer::PopViewport(void) {
     SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
 #if 1
     m_viewport.SetGfxViewport();
-#endif
-}
-
-
-
-void BaseRenderer::ClearGfxError(void) noexcept {
-#ifdef _DEBUG
-    while (glGetError() != GL_NO_ERROR)
-        ;
-#endif
-}
-
-
-bool BaseRenderer::CheckGfxError(const char* operation) noexcept {
-#ifdef NDEBUG
-    return true;
-#else
-    GLenum glError = glGetError();
-    if (not glError)
-        return true;
-    fprintf(stderr, "Smiley-Battle: Graphics Error %d (%s)\n", glError, operation);
-    ClearGfxError();
-    return false;
 #endif
 }
 

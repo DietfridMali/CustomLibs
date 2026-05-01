@@ -471,6 +471,14 @@ public:
 
     void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept;
 
+    using DrawBufferList = AutoArray <GfxTypes::Uint>;
+
+    void SetDrawBuffers(const DrawBufferList& drawBuffers);
+
+
+    void ClearError(void) noexcept;
+
+    bool CheckError(const char* operation = "") noexcept;
 };
 
 #define gfxStates GfxStates::Instance()

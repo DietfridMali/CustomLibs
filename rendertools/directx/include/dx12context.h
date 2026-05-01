@@ -28,7 +28,7 @@ public:
 
 #ifdef _DEBUG
     // Drains all pending D3D12 InfoQueue messages to stderr.
-    void DrainMessages(void) noexcept;
+    int DrainMessages(void) noexcept;
     // Dumps DRED auto-breadcrumbs to stderr after device removal.
     void DumpDRED(void) noexcept;
 #endif

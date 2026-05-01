@@ -8,11 +8,9 @@
 #include "tristate.h"
 #include "base_renderer.h"
 #include "base_shaderhandler.h"
-#include "shadowmap.h"
-#include "commandlist.h"
 #include "base_displayhandler.h"
-#include "dx12context.h"
 #include "gfxapitype.h"
+#include "shadowmap.h"
 
 List<::Viewport> BaseRenderer::m_viewportStack;
 
@@ -42,6 +40,8 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight);
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
     ResetTransformation();
+    DrawBufferHandler::Setup(WindowWidth(), WindowHeight());
+    m_drawBufferStack.Clear();
     int w = m_windowWidth / 15;
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
 }
@@ -114,7 +114,6 @@ void BaseRenderer::Set2DRenderStates(int blending) noexcept {
 
 void BaseRenderer::StartShadowPass(void) noexcept {
     m_renderPass = RenderPassType::rpShadows;
-    m_renderStates.numRenderTargets = 0;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Less);
@@ -125,7 +124,6 @@ void BaseRenderer::StartShadowPass(void) noexcept {
 
 void BaseRenderer::StartColorPass(void) noexcept {
     m_renderPass = RenderPassType::rpColor;
-    m_renderStates.numRenderTargets = -1;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(0);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
@@ -136,7 +134,6 @@ void BaseRenderer::StartColorPass(void) noexcept {
 
 void BaseRenderer::StartFullPass(void) noexcept {
     m_renderPass = RenderPassType::rpFull;
-    m_renderStates.numRenderTargets = -1;
     gfxStates.SetDepthTest(1);
     gfxStates.SetDepthWrite(1);
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
@@ -196,7 +193,7 @@ bool BaseRenderer::Stop2DScene(void) {
 }
 
 
-void BaseRenderer::Draw3DScene(void) {
+void BaseRenderer::Draw3DScene(bool flipVertically) {
     if (Stop3DScene() and Start2DScene()) {
         Set2DRenderStates();
         SetViewport(m_sceneViewport, 0, 0, false);
@@ -212,7 +209,7 @@ void BaseRenderer::Draw3DScene(void) {
                 PopMatrix();
         }
         if (shader == nullptr)
-            m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = false /*true*/, .rotation = 0.0f });
+            m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = flipVertically, .rotation = 0.0f });
 
         static bool renderScene = true;
         if (renderScene) {
@@ -226,54 +223,8 @@ void BaseRenderer::Draw3DScene(void) {
 
 
 void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically) {
-    m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = false /*bFlipVertically*/, .rotation = bRotate ? 90.0f : 0.0f });
+    m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = bRotate ? 90.0f : 0.0f });
     m_renderQuad.Render(nullptr, texture, color);
-}
-
-
-void BaseRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
-    if (not m_screenIsAvailable)
-        return;
-
-    m_frameCounter.Draw(true);
-    Stop2DScene();
-    m_screenIsAvailable = false;
-    if (not m_screenBuffer)
-        return;
-    //m_screenBuffer->Deactivate();
-
-    Set2DRenderStates();
-
-    CommandList* cmdList = commandListHandler.CreateCmdList("DrawScreen", true);
-    if (not cmdList or not cmdList->Open())
-        return;
-
-    // Ensure the screen RenderTarget color buffer is in PSR state.
-    // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
-    // in which case the RENDER_TARGET → PSR transition was never recorded.
-    if (baseDisplayHandler.CurrentBackBuffer()) {
-        baseDisplayHandler.EnableBackBuffer();
-        gfxStates.ClearBackBuffer();
-    }
-#if 0
-    Timer t;
-    t.SetDuration(500);
-    t.Start();
-    while (not t.HasExpired())
-        ;
-#endif
-    // Set viewport after the list is open so RSSetViewports is actually recorded.
-    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
-
-    m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
-    RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
-
-    // Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
-    // No-op in the normal game loop where DrawScreen() was already called explicitly.
-    // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
-    if (baseDisplayHandler.CurrentBackBuffer())
-        baseDisplayHandler.DisableBackBuffer();
-	cmdList->Close();
 }
 
 
@@ -287,22 +238,15 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
     flipVertically = false;
 #endif
     if (windowWidth * windowHeight == 0) {
-#if 0
-        if (m_parentBuffer) {
-            windowWidth = m_parentBuffer->GetWidth(true);
-            windowHeight = m_parentBuffer->GetHeight(true);
+        RenderTarget* activeBuffer = GetActiveBuffer();
+        if (activeBuffer) {
+            windowWidth = activeBuffer->GetWidth(true);
+            windowHeight = activeBuffer->GetHeight(true);
         }
-        else
-#endif
-            RenderTarget* activeBuffer = GetActiveBuffer();
-            if (activeBuffer) {
-                windowWidth = activeBuffer->GetWidth(true);
-                windowHeight = activeBuffer->GetHeight(true);
-            }
-            else {
-                windowWidth = m_windowWidth;
-                windowHeight = m_windowHeight;
-            }
+        else {
+            windowWidth = m_windowWidth;
+            windowHeight = m_windowHeight;
+        }
     }
     gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
 

@@ -2,7 +2,7 @@
 #include "gfxstates.h"
 #include "array.hpp"
 
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 #define TRACK_TMU_USAGE 1
 
@@ -103,7 +103,7 @@ int GfxStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
 
 int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 #if 0
-	baseRenderer.ClearGfxError();
+	gfxStates.ClearError();
 	GLint tex = 0;
 	glGetIntegeri_v(GL_TEXTURE_BINDING_2D, 0, &tex);
 #endif
@@ -156,5 +156,42 @@ void GfxStates::ReleaseBuffers(void) noexcept {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glActiveTexture(GL_TEXTURE0);
 }
+
+
+void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) {
+	if (drawBuffers.IsEmpty())
+		glDrawBuffer(GL_BACK);
+	else
+		glDrawBuffers(drawBuffers.Length(), drawBuffers.Data());
+}
+
+
+void GfxStates::ClearBackBuffer(void) {
+	SetDrawBuffers({});
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+
+void GfxStates::ClearError(void) noexcept {
+#ifdef _DEBUG
+	while (glGetError() != GL_NO_ERROR)
+		;
+#endif
+}
+
+
+bool GfxStates::CheckError(const char* operation) noexcept {
+#ifdef NDEBUG
+	return true;
+#else
+	GLenum glError = glGetError();
+	if (not glError)
+		return true;
+	fprintf(stderr, "Graphics Error %d (%s)\n", glError, operation);
+	ClearError();
+	return false;
+#endif
+}
+
 
 // =================================================================================================

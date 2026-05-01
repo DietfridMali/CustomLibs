@@ -107,10 +107,11 @@ void DX12Context::DumpDRED(void) noexcept {
 }
 
 
-void DX12Context::DrainMessages(void) noexcept {
+int DX12Context::DrainMessages(void) noexcept {
     if (not m_infoQueue)
         return;
     UINT64 count = m_infoQueue->GetNumStoredMessages();
+    int errorCount = 0;
     for (UINT64 i = 0; i < count; ++i) {
         // In Unicode builds the preprocessor expands GetMessage → GetMessageW
         // when d3d12sdklayers.h is parsed, so the vtable entry is named GetMessageW.
@@ -122,25 +123,30 @@ void DX12Context::DrainMessages(void) noexcept {
         D3D12_MESSAGE* msg = reinterpret_cast<D3D12_MESSAGE*>(buf.get());
         m_infoQueue->GetMessageW(i, msg, &len);
         const char* sev = "INFO";
-        if (msg->Severity == D3D12_MESSAGE_SEVERITY_CORRUPTION) 
+        if (msg->Severity == D3D12_MESSAGE_SEVERITY_CORRUPTION) {
+            ++errorCount;
             sev = "CORRUPTION";
-        else if (msg->Severity == D3D12_MESSAGE_SEVERITY_ERROR)   
+        }
+        else if (msg->Severity == D3D12_MESSAGE_SEVERITY_ERROR) {
+            ++errorCount;
             sev = "ERROR";
+        }
         else if (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING) 
             sev = "WARNING";
         CommandList* cl = commandListHandler.CurrentCmdList();
         // split to make debugging real errors easier
-#if 1
+#ifdef _DEBUG
         if ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING)) {
             if ((unsigned)msg->ID != 820)
                 fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
         }
         else
-#endif
             fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
+#endif
     }
     m_infoQueue->ClearStoredMessages();
     fflush(stderr);
+    return errorCount;
 }
 #endif
 

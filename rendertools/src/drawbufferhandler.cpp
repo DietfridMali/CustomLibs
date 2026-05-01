@@ -18,26 +18,20 @@
 // =================================================================================================
 
 void DrawBufferHandler::Setup(int windowWidth, int windowHeight) {
-    m_parentBuffer = nullptr;
     m_activeBuffer = nullptr;
     m_windowWidth = windowWidth;
     m_windowHeight = windowHeight;
-    m_defaultDrawBuffers.Resize(1);
-    m_defaultDrawBuffers[0] = GL_BACK;
 }
 
 
 void DrawBufferHandler::SetActiveDrawBuffers(void) {
-    DrawBufferList& drawBuffers = m_activeBuffer ? m_activeBuffer->DrawBuffers() : m_defaultDrawBuffers;
-    if (not drawBuffers.IsEmpty())
-        glDrawBuffers(drawBuffers.Length(), drawBuffers.Data());
+    gfxStates.SetDrawBuffers(m_activeBuffer ? m_activeBuffer->DrawBuffers() : DrawBufferList{});
 }
 
 
 void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
     if (buffer != m_activeBuffer) {
         if (m_activeBuffer) {
-            m_parentBuffer = m_activeBuffer;
             m_activeBuffer->Disable();
             m_drawBufferStack.Push(m_activeBuffer);
         }
@@ -55,7 +49,6 @@ bool DrawBufferHandler::DeactivateDrawBuffer(RenderTarget* buffer) {
         m_activeBuffer = nullptr;
     else {
         m_activeBuffer = m_drawBufferStack.Pop();
-        m_parentBuffer = m_drawBufferStack.IsEmpty() ? nullptr : m_drawBufferStack.Last();
         m_activeBuffer->Reactivate();
     }
     SetActiveDrawBuffers();

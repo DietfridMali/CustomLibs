@@ -63,9 +63,6 @@
     <ClInclude Include="..\..\include\rendertypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\base_renderer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\rendermatrices.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -174,10 +171,16 @@
     <ClInclude Include="..\include\gfxtypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\drawbufferhandler.h">
+    <ClInclude Include="..\..\include\gfxapitype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\gfxapitype.h">
+    <ClInclude Include="..\..\include\base_renderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\drawbufferhandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\gfxrenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -201,9 +204,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\base_quad.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\base_renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\rendermatrices.cpp">
@@ -305,7 +305,13 @@
     <ClCompile Include="..\src\cubemap.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\drawbufferhandler.cpp">
+    <ClCompile Include="..\..\src\base_renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\drawbufferhandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\gfxrenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

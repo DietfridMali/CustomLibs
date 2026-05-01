@@ -434,9 +434,19 @@ public:
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 	}
 
+	using DrawBufferList = AutoArray<GfxTypes::Uint>;
+
+	void SetDrawBuffers(const DrawBufferList& drawBuffers);
+
+	void ClearBackBuffer(void);
+
 	inline void Finish(void) noexcept {
 		glFinish();
 	}
+
+	void ClearError(void) noexcept;
+
+	bool CheckError(const char* operation = "") noexcept;
 };
 
 #define gfxStates GfxStates::Instance()

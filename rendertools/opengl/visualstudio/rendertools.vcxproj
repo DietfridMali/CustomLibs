@@ -120,15 +120,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\base_renderer.h" />
     <ClInclude Include="..\..\include\base_shadercode.h" />
     <ClInclude Include="..\..\include\billboard.h" />
     <ClInclude Include="..\..\include\colordata.h" />
     <ClInclude Include="..\..\include\cube.h" />
+    <ClInclude Include="..\..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\gfxapitype.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
-    <ClInclude Include="..\include\drawbufferhandler.h" />
+    <ClInclude Include="..\include\gfxrenderer.h" />
     <ClInclude Include="..\include\rendertarget.h" />
     <ClInclude Include="..\..\include\fonthandler.h" />
     <ClInclude Include="..\..\include\framecounter.h" />
@@ -151,7 +153,6 @@
     <ClInclude Include="..\..\include\base_quad.h" />
     <ClInclude Include="..\..\include\rectangle.h" />
     <ClInclude Include="..\..\include\rendertypes.h" />
-    <ClInclude Include="..\include\base_renderer.h" />
     <ClInclude Include="..\..\include\rendermatrices.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
@@ -173,13 +174,15 @@
     <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\base_renderer.cpp" />
+    <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />
-    <ClCompile Include="..\src\drawbufferhandler.cpp" />
+    <ClCompile Include="..\src\gfxrenderer.cpp" />
     <ClCompile Include="..\src\rendertarget.cpp" />
     <ClCompile Include="..\..\src\fonthandler.cpp" />
     <ClCompile Include="..\..\src\framecounter.cpp" />
@@ -196,7 +199,6 @@
     <ClCompile Include="..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\..\src\projector.cpp" />
     <ClCompile Include="..\..\src\base_quad.cpp" />
-    <ClCompile Include="..\src\base_renderer.cpp" />
     <ClCompile Include="..\..\src\rendermatrices.cpp" />
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />

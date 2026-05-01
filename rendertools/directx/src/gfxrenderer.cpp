@@ -52,34 +52,47 @@ bool GfxRenderer::InitGraphics(void) {
 }
 
 
-void GfxRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
-    BaseRenderer::Init(width, height, fov, zNear, zFar);
-    DrawBufferHandler::Setup(WindowWidth(), WindowHeight());
-    m_drawBufferStack.Clear();
+void GfxRenderer::StartShadowPass(void) noexcept {
+    m_renderStates.numRenderTargets = 0;
+    BaseRenderer::StartShadowPass();
 }
 
 
-void* GfxRenderer::StartOperation(String name) noexcept {
+void GfxRenderer::StartColorPass(void) noexcept {
+    m_renderStates.numRenderTargets = -1;
+    BaseRenderer::StartColorPass();
+}
+
+
+void GfxRenderer::StartFullPass(void) noexcept {
+    m_renderStates.numRenderTargets = -1;
+    BaseRenderer::StartFullPass();
+}
+
+
+void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
     CommandList* cl = commandListHandler.CurrentCmdList();
     if (cl) {
         if (cl->IsTemporary())
             ++(cl->m_refCounter);
         return cl;
     }
-    if (m_temporaryList) 
+    if (piggyback and m_temporaryList)
         ++(m_temporaryList->m_refCounter);
     else {
 #if LOG_OPERATIONS
         fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
 #endif
-        m_temporaryList = commandListHandler.CreateCmdList(name, true);
+        cl = commandListHandler.CreateCmdList(name, true);
         if (not m_temporaryList)
             return nullptr;
-        if (not m_temporaryList->Open()) {
-            return m_temporaryList = nullptr;
+        if (not cl->Open()) {
+            return nullptr;
         }
     }
-    return m_temporaryList;
+    if (piggyback)
+        m_temporaryList = cl;
+    return cl;
 }
 
 

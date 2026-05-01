@@ -25,11 +25,11 @@
     <Filter Include="Source Files\Texture">
       <UniqueIdentifier>{54eb8f54-6403-41e0-8741-cd4de1184f57}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DirectX">
-      <UniqueIdentifier>{57695415-0826-4b85-9047-67c8a687f7bc}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\DirectX">
       <UniqueIdentifier>{00593e2c-22b4-4ba5-a4b5-32dca4ded3c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\DirectX">
+      <UniqueIdentifier>{57695415-0826-4b85-9047-67c8a687f7bc}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -123,93 +123,93 @@
     </ClInclude>
     <!-- DX12-specific headers (directx/include/) -->
     <ClInclude Include="..\include\base_displayhandler.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxrenderer.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\commandlist.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cubemap.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\descriptor_heap.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dx12context.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rendertarget.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dx12framework.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxstates.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gputimer.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\lineartexture.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\noisetexture.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\prerenderedtexture.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\sdlhandler.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\shader.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\shaderdata.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\texture.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\texturebuffer.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxdatalayout.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxdatabuffer.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cbv_allocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\dx12upload.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\resource_descriptor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\resource_chunkhandler.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\renderstates.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\resource_handler.h">
-      <Filter>DirectX</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\drawbufferhandler.h">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gfxapitype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxarray.hpp">
-      <Filter>DirectX</Filter>
+      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\base_renderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\drawbufferhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -360,13 +360,13 @@
     <ClCompile Include="..\src\resource_handler.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\drawbufferhandler.cpp">
-      <Filter>Source Files\DirectX</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\textrenderer.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\base_renderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\drawbufferhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -3,11 +3,11 @@
 #include <algorithm>
 #include "glew.h"
 #include "conversions.hpp"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "colordata.h"
 #include "textrenderer.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 #ifndef _WIN32
 #   include <locale>
@@ -63,7 +63,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     gfxStates.ClearColorBuffers();
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
-    baseRenderer.ClearGfxError();
+    gfxStates.ClearError();
     m_font->GetRenderTarget()->Render({}, ColorData::Yellow);
     return;
 #endif

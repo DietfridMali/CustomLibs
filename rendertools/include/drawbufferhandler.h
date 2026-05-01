@@ -19,8 +19,6 @@ public:
 
 protected:
     RenderTarget*       m_activeBuffer{ nullptr };
-    RenderTarget*       m_parentBuffer{ nullptr };
-    DrawBufferList      m_defaultDrawBuffers{};
     List<RenderTarget*> m_drawBufferStack{};
     int                 m_windowWidth{ 0 };
     int                 m_windowHeight{ 0 };
@@ -39,6 +37,10 @@ public:
     void ResetDrawBuffers(void);
 
     void SetActiveDrawBuffers(void);
+
+    inline RenderTarget* GetActiveBuffer(void) noexcept {
+        return m_activeBuffer;
+    }
 };
 
 // =================================================================================================

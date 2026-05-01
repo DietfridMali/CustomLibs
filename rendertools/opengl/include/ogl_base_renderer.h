@@ -182,8 +182,6 @@ public:
         return m_sceneViewport;
     }
 
-    virtual void Draw3DScene(void);
-
     virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically);
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);

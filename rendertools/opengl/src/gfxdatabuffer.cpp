@@ -1,5 +1,5 @@
 #include "gfxdatabuffer.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 // OpenGL vertex buffer handling: Creation, sending attributes to OpenGL, binding for rendering
@@ -96,7 +96,7 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
 #endif
 {
 #ifdef _DEBUG
-    baseRenderer.ClearGfxError();
+    gfxStates.ClearError();
 #endif
     bool updateSubData;
 #if USE_SHARED_HANDLES

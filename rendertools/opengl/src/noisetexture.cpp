@@ -8,7 +8,7 @@
 #include <filesystem>
 
 #include "noisetexture.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "conversions.hpp"
 
 #include "noise.h"

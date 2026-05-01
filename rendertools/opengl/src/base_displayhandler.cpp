@@ -8,6 +8,7 @@
 #pragma warning(pop)
 
 #include "base_displayhandler.h"
+#include "gfxstates.h"
 
 // =================================================================================================
 
@@ -213,6 +214,16 @@ bool BaseDisplayHandler::ToggleFullscreen(void) {
     fprintf(stderr, "Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
     return ChangeDisplayMode(-1, not m_isFullscreen);
+}
+
+
+void BaseDisplayHandler::EnableBackBuffer(void) {
+    gfxStates.SetDrawBuffers({});
+}
+
+
+void BaseDisplayHandler::DisableBackBuffer(void) {
+    // no op
 }
 
 
