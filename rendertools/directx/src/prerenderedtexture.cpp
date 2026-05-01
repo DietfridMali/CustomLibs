@@ -4,7 +4,7 @@
 #include "texture.h"
 #include "viewport.h"
 #include "rendertarget.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "textrenderer.h"
 #include "prerenderedtexture.h"
 

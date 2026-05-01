@@ -1,6 +1,6 @@
 #include "dx12upload.h"
 #include "commandlist.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "resource_handler.h"
 
 #include <cstring>
@@ -83,7 +83,7 @@ bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID
 
 bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces, int faceCount, int width, int height, int channels) noexcept
 {
-    CommandList* cl = baseRenderer.StartOperation("UploadTextureData");
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureData"));
     if (not cl)
         return false;
 
@@ -155,7 +155,7 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
                             srcRowBytes);
     upload->Unmap(0, nullptr);
 
-    CommandList* cl = baseRenderer.StartOperation("Upload3DTextureData");
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("Upload3DTextureData"));
     if (not cl)
         return nullptr;
 

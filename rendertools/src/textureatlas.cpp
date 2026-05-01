@@ -1,7 +1,7 @@
 
 #include "textureatlas.h"
 #include "base_shaderhandler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 

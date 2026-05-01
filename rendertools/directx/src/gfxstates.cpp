@@ -3,7 +3,7 @@
 #include "shader.h"
 #include "dx12context.h"
 #include "descriptor_heap.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "base_displayhandler.h"
 #include "commandlist.h"
 

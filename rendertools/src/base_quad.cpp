@@ -7,7 +7,7 @@
 #include "base_quad.h"
 #include "base_shaderhandler.h"
 #include "type_helper.hpp"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "conversions.hpp"
 #include "tristate.h"
 

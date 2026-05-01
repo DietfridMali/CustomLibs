@@ -1,7 +1,7 @@
 #define NOMINMAX
 
 #include "rendertarget.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "commandlist.h"
 #include "dx12context.h"

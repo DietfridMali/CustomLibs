@@ -12,7 +12,7 @@
 
 #include "texture.h"
 #include "gfxstates.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "descriptor_heap.h"
 #include "commandlist.h"
 #include "dx12context.h"

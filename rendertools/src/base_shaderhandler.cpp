@@ -4,7 +4,7 @@
 #include "std_defines.h"
 #include "matrix.hpp"
 #include "base_shaderhandler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "conversions.hpp"
 
 // =================================================================================================

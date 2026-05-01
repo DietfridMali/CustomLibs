@@ -1,7 +1,7 @@
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "texteffects.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 // the(text) outline renderer works as follows :

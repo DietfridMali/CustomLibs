@@ -3,7 +3,7 @@
 #include "framecounter.h"
 #include "colordata.h"
 #include "textrenderer.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 

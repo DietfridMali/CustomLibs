@@ -13,7 +13,7 @@
 #include "conversions.hpp"
 #else
 #include "base_displayhandler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #endif
 
 // =================================================================================================

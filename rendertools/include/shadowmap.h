@@ -3,7 +3,7 @@
 #include "array.hpp"
 #include "matrix.hpp"
 #include "basesingleton.hpp"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 
@@ -17,7 +17,7 @@ private:
 	};
 	Matrix4f					m_lightTransform;
 	Matrix4f					m_modelViewTransform;
-	RenderTarget*						m_map{ nullptr };
+	RenderTarget*				m_map{ nullptr };
 	float						m_maxLightRadius{ 15.0f };
 	int							m_status{ 0 };
 	bool						m_renderShadows{ true };

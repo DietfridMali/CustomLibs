@@ -125,7 +125,7 @@
     <ClInclude Include="..\include\base_displayhandler.h">
       <Filter>DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\base_renderer.h">
+    <ClInclude Include="..\include\gfxrenderer.h">
       <Filter>DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\commandlist.h">
@@ -209,6 +209,9 @@
     <ClInclude Include="..\include\gfxarray.hpp">
       <Filter>DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\base_renderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->
@@ -273,7 +276,7 @@
     <ClCompile Include="..\src\base_displayhandler.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\base_renderer.cpp">
+    <ClCompile Include="..\src\gfxrenderer.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_shader_funcs.cpp">
@@ -330,9 +333,6 @@
     <ClCompile Include="..\src\texture.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\textrenderer.cpp">
-      <Filter>Source Files\DirectX</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\texturehandler.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
@@ -362,6 +362,12 @@
     </ClCompile>
     <ClCompile Include="..\src\drawbufferhandler.cpp">
       <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\textrenderer.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\base_renderer.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

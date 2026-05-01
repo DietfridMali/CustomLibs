@@ -24,8 +24,7 @@
 // (SetupOpenGL → SetupDX12 internally, but callers still see SetupOpenGL for now).
 
 class BaseRenderer
-    : public DrawBufferHandler
-    , public RenderMatrices
+    : public RenderMatrices
     , public PolymorphSingleton<BaseRenderer>
 {
 public:
@@ -103,12 +102,6 @@ public:
     }
 
     // DX12 one-time init (no equivalent of glewInit).
-    virtual void Init(int width, int height, float fov, float zNear, float zFar);
-
-    virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
-
-    bool InitGraphics(void);
-
     bool CreateScreenBuffer(void);
 
     virtual void SetSceneBuffer(RenderTarget* sceneBuffer) noexcept {
@@ -357,16 +350,33 @@ public:
         return m_renderStates;
     }
 
-    CommandList* StartOperation(String name) noexcept;
+    virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
-    bool FinishOperation(void* cl, bool flush = false) noexcept;
+    virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
+
+    virtual bool InitGraphics(void) {
+        return false;
+    }
+
+    virtual RenderTarget* GetActiveBuffer(void) noexcept { return nullptr; }
+
+    virtual void ResetDrawBuffers(void) noexcept {}
+
+#pragma warning(push)
+#pragma warning(disable:4100)
+    virtual void* StartOperation(String name) noexcept {
+        return nullptr; 
+    }
+
+    virtual bool FinishOperation(void* cl, bool flush = false) noexcept {
+        return false;
+    }
+#pragma warning(push)
 
 #include "gfxapitype.h"
 
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;
-
-#define baseRenderer BaseRenderer::Instance()
 
 // =================================================================================================

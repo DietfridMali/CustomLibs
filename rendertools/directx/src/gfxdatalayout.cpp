@@ -2,7 +2,7 @@
 
 #include "gfxdatalayout.h"
 #include "base_shaderhandler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "commandlist.h"
 
 // =================================================================================================
@@ -230,7 +230,7 @@ void GfxDataLayout::Disable(void) noexcept
 
 
 CommandList* GfxDataLayout::StartUpdate(void) noexcept {
-    m_updateList = baseRenderer.StartOperation("GfxDataLayout::Update");
+    m_updateList = static_cast<CommandList*>(baseRenderer.StartOperation("GfxDataLayout::Update"));
     return m_updateList;
 }
 

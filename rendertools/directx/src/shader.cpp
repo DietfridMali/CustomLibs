@@ -12,7 +12,7 @@
 #include "shader.h"
 #include "cbv_allocator.h"
 #include "shadowmap.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "commandlist.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"

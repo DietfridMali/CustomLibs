@@ -1,6 +1,6 @@
 #include "std_defines.h"
 #include "base_displayhandler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "commandlist.h"
 #include "dx12context.h"

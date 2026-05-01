@@ -2,7 +2,7 @@
 #include "skybox.h"
 #include "cube.h"
 #include "gfxstates.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 

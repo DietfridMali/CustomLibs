@@ -2,7 +2,7 @@
 #include "gfxstates.h"
 #include "shader.h"
 #include "dx12context.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 
 // =================================================================================================

@@ -5,7 +5,7 @@
 #include "colordata.h"
 #include "fonthandler.h"
 #include "base_shaderhandler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 #ifndef _WIN32
 #   include <locale>

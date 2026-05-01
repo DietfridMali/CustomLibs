@@ -42,40 +42,9 @@ void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFa
     m_aspectRatio = float(m_windowWidth) / float(m_windowHeight);
     CreateMatrices(m_windowWidth, m_windowHeight, float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
     ResetTransformation();
-    DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
     int w = m_windowWidth / 15;
-    DrawBufferHandler::Setup(m_windowWidth, m_windowHeight);
     m_frameCounter.Setup(::Viewport(m_windowWidth - w, 0, w, int(w * 0.5f / m_aspectRatio)), ColorData::White);
 }
-
-
-bool BaseRenderer::InitGraphics(void) {
-#   ifdef _DEBUG
-    constexpr bool enableDebugLayer = true;
-#   else
-    constexpr bool enableDebugLayer = false;
-#   endif
-    if (not dx12Context.Create(enableDebugLayer)) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 device.\n");
-        return false;
-    }
-    if (not commandListHandler.Create(dx12Context.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 command queue.\n");
-        return false;
-    }
-    if (not DescriptorHeapHandler::Instance().Create(dx12Context.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 descriptor heaps.\n");
-        return false;
-    }
-    // Open the command list so displayHandler.Create() and renderer.Create()
-    // can record initial state (viewport/scissor, resource barriers).
-    if (not commandListHandler.CmdQueue().BeginFrame()) {
-        fprintf(stderr, "Smiley-Battle: Cannot begin first DX12 frame.\n");
-        return false;
-    }
-    return true;
-}
-
 
 
 bool BaseRenderer::CreateScreenBuffer(void) {
@@ -92,7 +61,6 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
     Init(width, height, fov, zNear, zFar);
     m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
     SetupGraphics();
-    m_drawBufferStack.Clear();
     m_renderTexture.Validate();
     m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
     return true;
@@ -118,23 +86,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
     gfxStates.CullFace(GfxOperations::FaceCull::Back);
 #endif
     // Set the initial viewport via the DX12 command list.
-#if 1
     gfxStates.SetViewport(0, 0, m_windowWidth, m_windowHeight);
-#else
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list) {
-        D3D12_VIEWPORT vp{};
-        vp.TopLeftX = 0.0f;
-        vp.TopLeftY = 0.0f;
-        vp.Width    = float(m_windowWidth);
-        vp.Height   = float(m_windowHeight);
-        vp.MinDepth = 0.0f;
-        vp.MaxDepth = 1.0f;
-        list->RSSetViewports(1, &vp);
-        D3D12_RECT scissor{ 0, 0, m_windowWidth, m_windowHeight };
-        list->RSSetScissorRects(1, &scissor);
-    }
-#endif
 }
 
 
@@ -342,9 +294,10 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
         }
         else
 #endif
-            if (m_activeBuffer) {
-                windowWidth = m_activeBuffer->GetWidth(true);
-                windowHeight = m_activeBuffer->GetHeight(true);
+            RenderTarget* activeBuffer = GetActiveBuffer();
+            if (activeBuffer) {
+                windowWidth = activeBuffer->GetWidth(true);
+                windowHeight = activeBuffer->GetHeight(true);
             }
             else {
                 windowWidth = m_windowWidth;
@@ -394,56 +347,5 @@ void BaseRenderer::Fill(const RGBAColor& color, float scale) {
     m_renderQuad.Fill(color);
     baseRenderer.PopMatrix();
 }
-
-
-CommandList* BaseRenderer::StartOperation(String name) noexcept {
-    CommandList* cl = commandListHandler.CurrentCmdList();
-    if (cl) {
-        if (cl->IsTemporary())
-            ++(cl->m_refCounter);
-        return cl;
-    }
-    if (m_temporaryList) 
-        ++(m_temporaryList->m_refCounter);
-    else {
-#if LOG_OPERATIONS
-        fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
-#endif
-        m_temporaryList = commandListHandler.CreateCmdList(name, true);
-        if (not m_temporaryList)
-            return nullptr;
-        if (not m_temporaryList->Open()) {
-            return m_temporaryList = nullptr;
-        }
-    }
-    return m_temporaryList;
-}
-
-
-bool BaseRenderer::FinishOperation(void* cl, bool flush) noexcept {
-    CommandList* list = static_cast<CommandList*>(cl);
-    if (not list)
-        return false;
-    if (not list->IsTemporary())
-        return true;
-#ifdef _DEBUG
-    if (list->m_refCounter == 0)
-        fprintf(stderr, "Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
-#endif
-    if (--(list->m_refCounter) == 0) {
-#if LOG_OPERATIONS
-        fprintf(stderr, "Closing temp. CL '%s'\n", (const char*)list->GetName());
-#endif
-        if (flush)
-            list->Flush();
-        else
-            list->Close();
-        if (list == m_temporaryList)
-            m_temporaryList = nullptr;
-    }
-    return true;
-}
-
-#include "gfxapitype.inl"
 
 // =================================================================================================

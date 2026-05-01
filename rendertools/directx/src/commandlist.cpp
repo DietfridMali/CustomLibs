@@ -3,7 +3,7 @@
 #include "dx12context.h"
 #include "commandlist.h"
 #include "resource_handler.h"
-#include "base_renderer.h"
+#include "gfxrenderer.h"
 
 #include <cstdio>
 
