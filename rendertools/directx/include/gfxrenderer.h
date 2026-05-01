@@ -58,10 +58,6 @@ public:
         DrawBufferHandler::ResetDrawBuffers();
     }
 
-
-
-
-
 #include "gfxapitype.h"
 
 };
