@@ -13,15 +13,16 @@ SRCDIR := ../src
 
 OPENGL_FILES := \
  base_displayhandler \
- base_renderer \
  base_shader_funcs \
  base_shadercode \
  base_texture_shaders \
  blur_shader \
  cubemap \
+ drawbufferhandler \
  gfxdatabuffer \
  gfxdatalayout \
  gfxstates \
+ gfxrenderer \
  noisetexture \
  outline_shader \
  prerenderedtexture \
@@ -30,15 +31,14 @@ OPENGL_FILES := \
  shader \
  shadowmap \
  skybox \
- textrenderer \
  texture \
  texturebuffer \
  texturehandler
 
 COMMON_FILES := \
  base_quad \
+ base_renderer \
  base_shaderhandler \
- drawbufferhandler \
  billboard \
  coplanar_rectangle \
  cube \
@@ -52,6 +52,7 @@ COMMON_FILES := \
  projector \
  rendermatrices \
  texteffects \
+ textrenderer \
  textureatlas \
  textureprocessing \
  tiny_gltf \
