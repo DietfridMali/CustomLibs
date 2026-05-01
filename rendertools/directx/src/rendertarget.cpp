@@ -451,7 +451,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
         return false;
     }
     baseRenderer.PushViewport();
-    SetViewport(true);
+    SetViewport();
     Clear(params);
     if (params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;

@@ -139,7 +139,4 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     FinishOperation(cl);
 }
 
-
-
-
 // =================================================================================================

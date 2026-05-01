@@ -107,7 +107,7 @@ void DX12Context::DumpDRED(void) noexcept {
 }
 
 
-int DX12Context::DrainMessages(void) noexcept {
+int DX12Context::DrainMessages(bool onlyErrors) noexcept {
     if (not m_infoQueue)
         return 0;
     UINT64 count = m_infoQueue->GetNumStoredMessages();
@@ -136,7 +136,7 @@ int DX12Context::DrainMessages(void) noexcept {
         CommandList* cl = commandListHandler.CurrentCmdList();
         // split to make debugging real errors easier
 #ifdef _DEBUG
-        if ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING)) {
+        if (not onlyErrors and ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING))) {
             if ((unsigned)msg->ID != 820)
                 fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
         }

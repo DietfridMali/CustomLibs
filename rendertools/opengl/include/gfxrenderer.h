@@ -60,6 +60,14 @@ public:
     }
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
+
+    inline void SetGeometryFrontFace(void) noexcept {
+        gfxStates.FrontFace(GfxOperations::Winding::Reverse);
+    }
+
+    inline void SetShadowFrontFace(void) noexcept {
+        gfxStates.FrontFace(GfxOperations::Winding::Regular);
+    }
 };
 
 #define baseRenderer GfxRenderer::Instance()

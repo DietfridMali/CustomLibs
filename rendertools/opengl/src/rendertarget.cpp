@@ -374,8 +374,9 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 }
 
 
-void RenderTarget::Disable(void) noexcept { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+void RenderTarget::Disable(bool /*deactivate*/) noexcept { // flush only required for compatibility of gfx api agnostic high level code with DirectX
     if (IsEnabled()) {
+        gfxStates.CheckError();
         ReleaseBuffers();
         gfxStates.CheckError();
 #if 1

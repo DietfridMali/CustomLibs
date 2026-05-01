@@ -63,6 +63,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
     SetupGraphics();
     m_renderTexture.Validate();
     m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
+    gfxStates.CheckError();
     return true;
 }
 
@@ -72,19 +73,7 @@ void BaseRenderer::SetupGraphics(void) noexcept {
     // (no immediate API calls here; state is applied to the PSO on demand).
     gfxStates.ClearColor(ColorData::Invisible);
     gfxStates.ColorMask(true, true, true, true);
-#if 1
     Set3DRenderStates(1);
-#else
-    gfxStates.SetDepthWrite(1);
-    gfxStates.SetDepthTest(1);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxStates.SetBlending(0);
-    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
-    gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
-    gfxStates.FrontFace(GetWinding());
-    gfxStates.SetFaceCulling(1);
-    gfxStates.CullFace(GfxOperations::FaceCull::Back);
-#endif
     // Set the initial viewport via the DX12 command list.
     gfxStates.SetViewport(0, 0, m_windowWidth, m_windowHeight);
 }
@@ -97,9 +86,12 @@ void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
     gfxStates.SetBlending(0);
     gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
     gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
-    gfxStates.FrontFace(GetWinding());
+    gfxStates.FrontFace(GfxOperations::Winding::Reverse);
+    gfxStates.CheckError();
     gfxStates.SetFaceCulling(1);
-    gfxStates.CullFace(GfxOperations::FaceCull::Back);
+    gfxStates.CheckError();
+    gfxStates.CullFace(GfxOperations::CullFace::Back);
+    gfxStates.CheckError();
 }
 
 
@@ -234,8 +226,9 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
-#if 0//def _DEBUG
-    flipVertically = false;
+#if 1 //def _DEBUG
+    if (not HasOpenGL())
+        flipVertically = false;
 #endif
     if (windowWidth * windowHeight == 0) {
         RenderTarget* activeBuffer = GetActiveBuffer();

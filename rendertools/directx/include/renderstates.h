@@ -17,13 +17,13 @@ struct RenderStates {
     using CompareFunc = GfxOperations::CompareFunc;
     using BlendFactor = GfxOperations::BlendFactor;
     using BlendOp = GfxOperations::BlendOp;
-    using FaceCull = GfxOperations::FaceCull;
+    using CullFace = GfxOperations::CullFace;
     using Winding = GfxOperations::Winding;
     using StencilOp = GfxOperations::StencilOp;
 
     // Rasterizer
-    FaceCull    cullMode{ FaceCull::Back };
-    Winding     frontFace{ Winding::CW };
+    CullFace    cullMode{ CullFace::Back };
+    Winding     frontFace{ Winding::Regular };
     // Depth-stencil
     uint8_t     depthTest{ 1 };
     uint8_t     depthWrite{ 1 };

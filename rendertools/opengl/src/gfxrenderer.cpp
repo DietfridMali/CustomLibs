@@ -45,7 +45,9 @@ void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
 bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
     return true;
 }
-    
+
+#pragma warning(pop)
+
 
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     if (m_screenIsAvailable) {
@@ -67,7 +69,5 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         }
     }
 }
-
-#pragma warning(pop)
 
 // =================================================================================================

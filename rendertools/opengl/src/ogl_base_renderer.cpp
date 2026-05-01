@@ -90,7 +90,7 @@ void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
     gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
     gfxStates.FrontFace(GetWinding());
     gfxStates.SetFaceCulling(1);
-    gfxStates.CullFace(GfxOperations::FaceCull::Back);
+    gfxStates.CullFace(GfxOperations::CullFace::Back);
 }
 
 

@@ -294,16 +294,8 @@ public:
         return reverse ? GfxOperations::Winding::CCW : GfxOperations::Winding::CW;
     }
 
-    inline GfxOperations::FaceCull GetFrontFace(bool reverse = false) noexcept {
-        return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
-    }
-
-    inline void SetGeometryFrontFace(void) noexcept {
-        gfxStates.FrontFace(GetWinding());
-    }
-
-    inline void SetShadowFrontFace(void) noexcept {
-        gfxStates.FrontFace(GetWinding(true));
+    inline GfxOperations::CullFace GetFrontFace(bool reverse = false) noexcept {
+        return reverse ? GfxOperations::CullFace::Front : GfxOperations::CullFace::Back;
     }
 
 #pragma warning(push)

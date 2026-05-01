@@ -145,7 +145,7 @@ public:
 
     bool Enable(const RTActivationParams& params);
 
-    void Disable(void) noexcept;
+    void Disable(bool deactivate = true) noexcept;
 
     inline void Flush(void) noexcept {
         // no op

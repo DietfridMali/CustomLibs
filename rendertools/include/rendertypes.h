@@ -73,15 +73,15 @@ namespace GfxOperations {
         Max
     };
 
-    enum class FaceCull : uint8_t {
+    enum class CullFace : uint8_t {
         Front,
         Back,
         None
     };
 
     enum class Winding : uint8_t {
-        CW,
-        CCW
+        Regular,
+        Reverse
     };
 
     enum class StencilOp : uint8_t {

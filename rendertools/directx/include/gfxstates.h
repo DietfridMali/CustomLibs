@@ -280,8 +280,8 @@ public:
 
     inline int SetFaceCulling(int state) {
         auto& s = ActiveState();
-        int prevState = (s.cullMode != GfxOperations::FaceCull::None) ? 1 : 0;
-        s.cullMode = state ? GfxOperations::FaceCull::Back : GfxOperations::FaceCull::None;
+        int prevState = (s.cullMode != GfxOperations::CullFace::None) ? 1 : 0;
+        s.cullMode = state ? GfxOperations::CullFace::Back : GfxOperations::CullFace::None;
         return prevState;
     }
 
@@ -354,7 +354,7 @@ public:
         return prevState;
     }
 
-    inline GfxOperations::FaceCull CullFace(GfxOperations::FaceCull state) {
+    inline GfxOperations::CullFace CullFace(GfxOperations::CullFace state) {
         auto& s = ActiveState();
         auto prevState = s.cullMode;
         s.cullMode = state;

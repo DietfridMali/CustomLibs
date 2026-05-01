@@ -3,7 +3,7 @@
 
 // =================================================================================================
 
-uint32_t Mesh::quadTriangleIndices[6] = { 0, 1, 2, 0, 2, 3 };
+uint32_t Mesh::quadTriangleIndices[6] = { 0, 2, 1, 0, 3, 2 };
 
 void Mesh::Init(MeshTopology shape, int32_t listSegmentSize) {
     m_shape = shape;

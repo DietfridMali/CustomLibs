@@ -71,13 +71,13 @@ namespace GfxToGL {
 		return lut[int(op)];
 	}
 
-	inline GLenum ToGLenum(FaceCull c) noexcept {
+	inline GLenum ToGLenum(CullFace c) noexcept {
 		GLenum lut[] = { GL_FRONT, GL_BACK, GL_FRONT_AND_BACK };
 		return lut[int(c)];
 	}
 
 	inline GLenum ToGLenum(Winding w) noexcept {
-		return (w == Winding::CCW) ? GL_CCW : GL_CW;
+		return (w == Winding::Regular) ? GL_CW : GL_CCW;
 	}
 
 	inline GLenum ToGLenum(StencilOp op) noexcept {
@@ -306,14 +306,14 @@ public:
 		return func;
 	}
 
-	inline GfxOperations::FaceCull CullFace(GfxOperations::FaceCull mode) {
+	inline GfxOperations::CullFace CullFace(GfxOperations::CullFace mode) {
 		CullFace(GfxToGL::ToGLenum(mode));
 		return mode;
 	}
 
-	inline GfxOperations::Winding FrontFace(GfxOperations::Winding winding) {
-		FrontFace(GfxToGL::ToGLenum(winding));
-		return winding;
+	inline GfxOperations::Winding FrontFace(GfxOperations::Winding mode) {
+		FrontFace(GfxToGL::ToGLenum(mode));
+		return mode;
 	}
 
 	inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp op) {

@@ -42,6 +42,8 @@ public:
         : BaseRenderer()
     {
         _instance = this;
+        m_frontFace = GfxOperations::CullFace::Front;
+        m_backFace = GfxOperations::CullFace::Back;
         gfxApiType = BaseRenderer::GfxApiType::DirectX;
 
     }
@@ -64,6 +66,14 @@ public:
 
     inline ::RenderStates& RenderStates(void) noexcept {
         return m_renderStates;
+    }
+
+    inline void SetGeometryFrontFace(void) noexcept {
+        gfxStates.FrontFace(GfxOperations::CullFace::Back);
+    }
+
+    inline void SetShadowFrontFace(void) noexcept {
+        gfxStates.FrontFace(GfxOperations::CullFace::Front);
     }
 };
 

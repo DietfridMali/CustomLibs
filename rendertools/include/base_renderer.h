@@ -64,6 +64,9 @@ protected:
     static List<::Viewport> m_viewportStack;
     List<RenderTarget*>     m_sceneBufferStack;
 
+    GfxOperations::CullFace m_frontFace{ GfxOperations::CullFace::None };
+    GfxOperations::CullFace m_backFace{ GfxOperations::CullFace::None };
+
 public:
 #ifdef _DEBUG
     bool                    m_xchgSkyAndSceneBuffer{ false };
@@ -322,22 +325,6 @@ public:
     
     inline float GetFps(void) noexcept { 
         return m_frameCounter.GetFps(); 
-    }
-
-    inline GfxOperations::Winding GetWinding(bool reverse = false) noexcept {
-        return reverse ? GfxOperations::Winding::CW : GfxOperations::Winding::CCW;
-    }
-
-    inline void SetGeometryFrontFace(void) noexcept {
-        gfxStates.FrontFace(GetWinding(true));
-    }
-
-    inline void SetShadowFrontFace(void) noexcept {
-        gfxStates.FrontFace(GetWinding());
-    }
-
-    inline GfxOperations::FaceCull GetFrontFace(bool reverse = false) noexcept {
-        return reverse ? GfxOperations::FaceCull::Front : GfxOperations::FaceCull::Back;
     }
 
     virtual void Init(int width, int height, float fov, float zNear, float zFar);

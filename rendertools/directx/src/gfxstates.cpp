@@ -218,7 +218,7 @@ bool GfxStates::CheckError(const char* operation) noexcept {
 #ifdef NDEBUG
     return true;
 #else
-    if (dx12Context.DrainMessages() > 0)
+    if (dx12Context.DrainMessages(true) > 0)
         return false;
     return true;
 #endif
