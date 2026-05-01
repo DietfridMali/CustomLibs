@@ -90,6 +90,7 @@ public:
     bool                        m_hasParams{ false };
     bool                        m_isValid{ false };
     bool                        m_isDeployed{ false };
+    bool                        m_isRenderTarget{ false };
     bool                        m_isDisposable{ false };
 
     static uint32_t             nullHandle;   // UINT32_MAX — matches OGL Texture::nullHandle usage
@@ -223,6 +224,10 @@ public:
     static inline void Release(int tmuIndex) noexcept {
         if (tmuIndex >= 0)
             gfxStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
+    }
+
+    inline bool IsRenderTarget(void) noexcept {
+        return m_isRenderTarget;
     }
 
     inline bool IsDeployed(void) const noexcept {

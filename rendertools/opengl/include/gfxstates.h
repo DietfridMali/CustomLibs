@@ -190,11 +190,20 @@ public:
 			[](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
 	}
 
-	inline int SetPolygonOffsetFill(int state) { return SetState<GL_POLYGON_OFFSET_FILL>(state); }
+	inline int SetPolygonOffsetFill(GfxTypes::Float factor = 0.0f, GfxTypes::Float units = 0.0f) { 
+		if (not SetState<GL_POLYGON_OFFSET_FILL>((factor * units == 0.0f) ? 0 : 1))
+			return 0;
+		glPolygonOffset(factor, units);
+		return 1;
+	}
 
-	inline int SetDither(int state) { return SetState<GL_DITHER>(state); }
+	inline int SetDither(int state) { 
+		return SetState<GL_DITHER>(state); 
+	}
 
-	inline int SetMultiSample(int state) { return SetState<GL_MULTISAMPLE>(state); }
+	inline int SetMultiSample(int state) { 
+		return SetState<GL_MULTISAMPLE>(state); 
+	}
 
 	template <class T>
 	struct StateRegistry {

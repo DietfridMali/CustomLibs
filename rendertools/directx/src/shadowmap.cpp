@@ -52,8 +52,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	gfxStates.SetDepthWrite(1);
 	gfxStates.CullFace(GfxOperations::CullFace::Front);
 #if APPLY_POLYGON_OFFSET
-	// DX12: polygon offset is configured via D3D12_RASTERIZER_DESC (DepthBias / SlopeScaledDepthBias)
-	// in the PSO — no per-draw API call needed here.
+	gfxStates.SetPolygonOffset(2.0f, 4.0f);
 #endif
 	return true;
 }
@@ -64,10 +63,10 @@ bool ShadowMap::StopRender(void) noexcept {
 		return false;
 	DeactivateCamera();
 	gfxStates.CullFace(GfxOperations::CullFace::Back);
-	m_map->Deactivate();
 #if APPLY_POLYGON_OFFSET
-	// DX12: polygon offset lives in PSO rasterizer state — no per-draw disable call needed.
+	gfxStates.SetPolygonOffset(0.0f, 0.0f);
 #endif
+	m_map->Deactivate();
 	return true;
 }
 

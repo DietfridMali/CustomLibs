@@ -105,9 +105,12 @@ static D3D12_CULL_MODE ToD3DCullMode(GfxOperations::CullFace mode) noexcept
 D3D12_RASTERIZER_DESC& RenderStates::SetRasterizerDesc(D3D12_RASTERIZER_DESC& desc) noexcept {
     desc.FillMode = D3D12_FILL_MODE_SOLID;
     desc.CullMode = ToD3DCullMode(cullMode);
-    desc.FrontCounterClockwise = (frontFace == GfxOperations::Winding::Reverse) ? TRUE : FALSE;
+    desc.FrontCounterClockwise = (winding == GfxOperations::Winding::Reverse) ? TRUE : FALSE;
     desc.DepthClipEnable = depthClip ? TRUE : FALSE;
     desc.MultisampleEnable = FALSE;
+    desc.DepthBias = depthBias;
+    desc.SlopeScaledDepthBias = slopeScaledDepthBias;
+    desc.DepthBiasClamp = 0.0f;
     return desc;
 }
 

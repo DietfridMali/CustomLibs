@@ -349,8 +349,8 @@ public:
 
     inline GfxOperations::Winding FrontFace(GfxOperations::Winding state) {
         auto& s = ActiveState();
-        auto prevState = s.frontFace;
-        s.frontFace = state;
+        auto prevState = s.winding;
+        s.winding = state;
         return prevState;
     }
 
@@ -359,6 +359,13 @@ public:
         auto prevState = s.cullMode;
         s.cullMode = state;
         return prevState;
+    }
+
+    // OGL glPolygonOffset equivalent: factor -> SlopeScaledDepthBias, units -> DepthBias.
+    inline void SetPolygonOffset(float factor, float units) {
+        auto& s = ActiveState();
+        s.slopeScaledDepthBias = factor;
+        s.depthBias = int32_t(units);
     }
 
     inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {

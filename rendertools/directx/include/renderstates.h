@@ -23,7 +23,7 @@ struct RenderStates {
 
     // Rasterizer
     CullFace    cullMode{ CullFace::Back };
-    Winding     frontFace{ Winding::Regular };
+    Winding     winding{ Winding::Regular };
     // Depth-stencil
     uint8_t     depthTest{ 1 };
     uint8_t     depthWrite{ 1 };
@@ -56,6 +56,9 @@ struct RenderStates {
     uint8_t     stencilMask{ 0xFF };
     // Rasterizer depth clipping
     uint8_t     depthClip{ 1 };
+    // Polygon offset (OGL glPolygonOffset equivalent: factor -> slopeScaledDepthBias, units -> depthBias)
+    int32_t     depthBias{ 0 };
+    float       slopeScaledDepthBias{ 0.0f };
 
     bool operator==(const RenderStates& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;
