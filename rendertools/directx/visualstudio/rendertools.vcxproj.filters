@@ -324,9 +324,6 @@
     <ClCompile Include="..\src\shader.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\shadowmap.cpp">
-      <Filter>Source Files\DirectX</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\skybox.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
@@ -367,6 +364,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\drawbufferhandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shadowmap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
