@@ -21,7 +21,10 @@
 //  - Compiled HLSL blobs (ID3DBlob via D3DCompile)
 //  - A fixed root signature: root CBV b0 (FrameConstants, ALL),
 //    root CBV b1 (VS ShaderConstants, VERTEX), root CBV b1 (PS ShaderConstants, PIXEL),
-//    root CBV b1 (GS ShaderConstants, GEOMETRY), SRV descriptor table t0..t15 (pixel shader)
+//    root CBV b1 (GS ShaderConstants, GEOMETRY), one SRV descriptor table per slot
+//    t0..t15 (pixel shader), one sampler descriptor table per slot s0..s15
+//    (pixel shader, fed from SamplerCache via TextureSampling at bind time),
+//    one UAV descriptor table per slot u0..u3 (all stages).
 //  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
 //  - b1: per-stage shader constants, layout from per-stage HLSL reflection on link
@@ -84,13 +87,15 @@ public:
     // Per-stage shader constants (VS/PS/GS), each uploaded to its own root CBV
     struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
 
-    static constexpr int kStageVS = 0;
-    static constexpr int kStagePS = 1;
-    static constexpr int kStageGS = 2;
-    static constexpr int kStageCount = 3;
-    static constexpr int kSrvBase = 4;
-    static constexpr int kSrvSlots = 16;
-    static constexpr int kUavBase = kSrvBase + kSrvSlots;
+    static constexpr int kStageVS       = 0;
+    static constexpr int kStagePS       = 1;
+    static constexpr int kStageGS       = 2;
+    static constexpr int kStageCount    = 3;
+    static constexpr int kSrvBase       = 4;
+    static constexpr int kSrvSlots      = 16;
+    static constexpr int kSamplerBase   = kSrvBase + kSrvSlots;
+    static constexpr int kSamplerSlots  = 16;
+    static constexpr int kUavBase       = kSamplerBase + kSamplerSlots;
 
     struct StageConstants {
         uint32_t size{ 0 };

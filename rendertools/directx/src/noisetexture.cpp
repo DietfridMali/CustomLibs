@@ -145,8 +145,15 @@ void NoiseTexture3D::ComputeNoise(void) {
 
 
 void NoiseTexture3D::SetParams(bool /*enforce*/) {
-    // Static samplers in root signature handle filtering and wrapping.
     m_hasParams = true;
+    m_sampling.minFilter     = GfxFilterMode::Linear;
+    m_sampling.magFilter     = GfxFilterMode::Linear;
+    m_sampling.mipMode       = GfxMipMode::None;
+    m_sampling.wrapU         = GfxWrapMode::Repeat;
+    m_sampling.wrapV         = GfxWrapMode::Repeat;
+    m_sampling.wrapW         = GfxWrapMode::Repeat;
+    m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = 1.0f;
 }
 
 
@@ -323,6 +330,14 @@ void CloudNoiseTexture::Compute(String textureFolder) {
 
 void CloudNoiseTexture::SetParams(bool /*enforce*/) {
     m_hasParams = true;
+    m_sampling.minFilter     = GfxFilterMode::Linear;
+    m_sampling.magFilter     = GfxFilterMode::Linear;
+    m_sampling.mipMode       = GfxMipMode::None;
+    m_sampling.wrapU         = GfxWrapMode::Repeat;
+    m_sampling.wrapV         = GfxWrapMode::Repeat;
+    m_sampling.wrapW         = GfxWrapMode::Repeat;
+    m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = 1.0f;
 }
 
 
@@ -406,6 +421,14 @@ void BlueNoiseTexture::Compute(String textureFolder) {
 
 void BlueNoiseTexture::SetParams(bool /*enforce*/) {
     m_hasParams = true;
+    m_sampling.minFilter     = GfxFilterMode::Nearest;
+    m_sampling.magFilter     = GfxFilterMode::Nearest;
+    m_sampling.mipMode       = GfxMipMode::None;
+    m_sampling.wrapU         = GfxWrapMode::Repeat;
+    m_sampling.wrapV         = GfxWrapMode::Repeat;
+    m_sampling.wrapW         = GfxWrapMode::Repeat;
+    m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = 1.0f;
 }
 
 

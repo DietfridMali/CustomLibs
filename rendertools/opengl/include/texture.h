@@ -218,7 +218,7 @@ public:
 
     virtual void SetParams(bool forceUpdate = false) override;
 
-    void SetWrapping(int wrapMode = -1)
+    void SetWrapping(GfxWrapMode wrapMode)
         noexcept;
 
     virtual bool Deploy(int bufferIndex = 0) override;

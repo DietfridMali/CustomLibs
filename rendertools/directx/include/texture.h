@@ -5,6 +5,7 @@
 #include "dx12framework.h"
 #include "std_defines.h"
 #include "rendertypes.h"
+#include "texturesampling.h"
 #include "array.hpp"
 #include "string.hpp"
 #include "list.hpp"
@@ -92,6 +93,7 @@ public:
     bool                        m_isDeployed{ false };
     bool                        m_isRenderTarget{ false };
     bool                        m_isDisposable{ false };
+    TextureSampling             m_sampling;
 
     static uint32_t             nullHandle;   // UINT32_MAX — matches OGL Texture::nullHandle usage
 
@@ -177,7 +179,7 @@ public:
         m_isValid = isValid;
     }
 
-    void SetWrapping(int wrapMode = -1) noexcept;
+    void SetWrapping(GfxWrapMode wrapMode) noexcept;
 
     bool Redeploy(void);
 

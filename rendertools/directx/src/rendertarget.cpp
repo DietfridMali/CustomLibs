@@ -6,6 +6,7 @@
 #include "commandlist.h"
 #include "dx12context.h"
 #include "gfxstates.h"
+#include "sampler_cache.h"
 
 // =================================================================================================
 // DX12 RenderTarget implementation
@@ -509,10 +510,22 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
-    auto& heap = descriptorHeaps.m_srvHeap;
-    if (not heap.m_heap)
+    auto& srvHeap = descriptorHeaps.m_srvHeap;
+    if (not srvHeap.m_heap)
         return false;
-    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), heap.GpuHandle(info.m_srvIndex));
+    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.m_srvIndex));
+
+    // Bind the matching sampler from m_renderTexture's sampling configuration.
+    // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets
+    // LINEAR/CLAMP_TO_EDGE/COMPARE_NONE — the canonical RT-source sampler).
+    if (not m_renderTexture.m_hasParams)
+        m_renderTexture.SetParams(false);
+    auto& samplerHeap = descriptorHeaps.m_samplerHeap;
+    if (samplerHeap.m_heap) {
+        uint32_t slot = samplerCache.GetSlot(m_renderTexture.m_sampling);
+        if (slot != UINT32_MAX)
+            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase + tmuIndex), samplerHeap.GpuHandle(slot));
+    }
     return true;
 }
 

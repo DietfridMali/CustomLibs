@@ -183,18 +183,18 @@ void Texture::SetParams(bool forceUpdate) {
             glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
         }
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_REPEAT);
     }
 }
 
 
-void Texture::SetWrapping(int wrapMode)
+void Texture::SetWrapping(GfxWrapMode wrapMode)
 noexcept
 {
     if (Bind()) {
-        if (wrapMode >= 0)
-            m_wrapMode = wrapMode;
+        const int glMode = (wrapMode == GfxWrapMode::Repeat) ? int(GL_REPEAT) : int(GL_CLAMP_TO_EDGE);
+        m_wrapMode = glMode;
         glTexParameteri(m_type, GL_TEXTURE_WRAP_S, m_wrapMode);
         glTexParameteri(m_type, GL_TEXTURE_WRAP_T, m_wrapMode);
         Release();

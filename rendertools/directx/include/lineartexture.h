@@ -41,8 +41,20 @@ public:
     LinearTexture() = default;
     ~LinearTexture() = default;
 
-    // No per-texture sampler state in DX12 — handled by static samplers in the root signature.
-    void SetParams(bool /*enforce*/) override { m_hasParams = true; }
+    // OGL LinearTexture::SetParams: NEAREST filter, WRAP_S = REPEAT (if m_isRepeating)
+    // else CLAMP_TO_EDGE; WRAP_T = CLAMP_TO_EDGE.
+    void SetParams(bool /*enforce*/) override
+    {
+        m_hasParams = true;
+        m_sampling.minFilter     = GfxFilterMode::Nearest;
+        m_sampling.magFilter     = GfxFilterMode::Nearest;
+        m_sampling.mipMode       = GfxMipMode::None;
+        m_sampling.wrapU         = m_isRepeating ? GfxWrapMode::Repeat : GfxWrapMode::ClampToEdge;
+        m_sampling.wrapV         = GfxWrapMode::ClampToEdge;
+        m_sampling.wrapW         = GfxWrapMode::ClampToEdge;
+        m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+        m_sampling.maxAnisotropy = 1.0f;
+    }
 
 
     virtual bool Deploy(int /*bufferIndex*/) override {

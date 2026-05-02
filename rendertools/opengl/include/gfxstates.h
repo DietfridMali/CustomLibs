@@ -186,8 +186,7 @@ public:
 
 	inline void StencilOpBack(GLenum sfail, GLenum dpfail, GLenum dppass) {
 		static int32_t stateID = -1;
-		FuncState(stateID, std::make_tuple(sfail, dpfail, dppass),
-			[](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
+		FuncState(stateID, std::make_tuple(sfail, dpfail, dppass), [](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
 	}
 
 	inline int SetPolygonOffset(GfxTypes::Float factor = 0.0f, GfxTypes::Float units = 0.0f) { 
