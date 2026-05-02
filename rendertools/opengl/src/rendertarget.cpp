@@ -555,6 +555,21 @@ Texture* RenderTarget::GetDepthAsTexture(void) {
 }
 
 
+Texture* RenderTarget::GetDepthAsShadowTexture(void) {
+    SharedTextureHandle handle = BufferHandle(m_depthBufferIndex);
+    m_shadowTexture.Validate();
+    if (m_shadowTexture.m_handle != handle) {
+        m_shadowTexture.m_handle = handle;
+#if 1
+        m_shadowTexture.Bind(0);
+        m_shadowTexture.SetParams(true);
+        //m_depthTexture.Release();
+#endif
+    }
+    return &m_shadowTexture;
+}
+
+
 // source < 0 means source contains a texture handle from some texture external to the RenderTarget
 bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color) {
     if (params.destination >= 0)

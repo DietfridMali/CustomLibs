@@ -76,7 +76,8 @@ public:
     Viewport                    m_viewport;
     Viewport* m_viewportSave;
     RenderTargetTexture         m_renderTexture;
-    RenderTargetTexture         m_depthTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
+    RenderTargetTexture         m_depthTexture;
+    ShadowTexture               m_shadowTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
     bool                        m_isAvailable;
     bool                        m_isScreenBuffer;
@@ -161,6 +162,8 @@ public:
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthAsTexture(void);
+
+    Texture* GetDepthAsShadowTexture(void);
 
     bool UpdateTransformation(const RTRenderParams& params);
 

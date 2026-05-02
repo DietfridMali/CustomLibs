@@ -90,7 +90,7 @@ void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
     gfxStates.CheckError();
     gfxStates.SetFaceCulling(1);
     gfxStates.CheckError();
-    gfxStates.CullFace(GfxOperations::CullFace::Back);
+    gfxStates.CullFace(IsShadowPass() ? GfxOperations::CullFace::Front : GfxOperations::CullFace::Back);
     gfxStates.CheckError();
 }
 

@@ -78,7 +78,7 @@ const ShaderSource& DepthShader() {
         in vec2 fragCoord;
         void main() { 
 #if 1
-            if (texture(surface, /*fract*/(fragCoord)).a * surfaceColor.a < 0.9)
+            if (texture(surface, fract(fragCoord)).a * surfaceColor.a < 0.9)
                 discard;
 #endif
             }
