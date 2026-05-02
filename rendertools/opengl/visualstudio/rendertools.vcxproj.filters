@@ -290,9 +290,6 @@
     <ClCompile Include="..\..\src\noise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\shadowmap.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\skybox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -312,6 +309,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\gfxrenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\shadowmap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

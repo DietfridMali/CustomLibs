@@ -190,7 +190,7 @@ public:
 			[](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
 	}
 
-	inline int SetPolygonOffsetFill(GfxTypes::Float factor = 0.0f, GfxTypes::Float units = 0.0f) { 
+	inline int SetPolygonOffset(GfxTypes::Float factor = 0.0f, GfxTypes::Float units = 0.0f) { 
 		if (not SetState<GL_POLYGON_OFFSET_FILL>((factor * units == 0.0f) ? 0 : 1))
 			return 0;
 		glPolygonOffset(factor, units);

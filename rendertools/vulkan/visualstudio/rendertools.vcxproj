@@ -80,11 +80,11 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>OPENGL;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(ExternalLibs)glew-2.2.0\include\GL;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
@@ -102,12 +102,12 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>OPENGL;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(ExternalLibs)glew-2.2.0\include\GL;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>None</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>
@@ -127,15 +127,20 @@
     <ClInclude Include="..\..\include\cube.h" />
     <ClInclude Include="..\..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\gfxapitype.h" />
+    <ClInclude Include="..\..\include\resource_descriptor.h" />
+    <ClInclude Include="..\include\cbv_allocator.h" />
+    <ClInclude Include="..\include\commandlist.h" />
+    <ClInclude Include="..\include\descriptor_heap.h" />
+    <ClInclude Include="..\include\dx12context.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
-    <ClInclude Include="..\include\gfxrenderer.h" />
+    <ClInclude Include="..\include\dx12upload.h" />
+    <ClInclude Include="..\include\renderstates.h" />
     <ClInclude Include="..\include\rendertarget.h" />
     <ClInclude Include="..\..\include\fonthandler.h" />
     <ClInclude Include="..\..\include\framecounter.h" />
     <ClInclude Include="..\..\include\glbloader.h" />
-    <ClInclude Include="..\include\gfxtypes.h" />
     <ClInclude Include="..\include\gputimer.h" />
     <ClInclude Include="..\..\include\skybox.h" />
     <ClInclude Include="..\..\include\icosphere.h" />
@@ -153,37 +158,44 @@
     <ClInclude Include="..\..\include\base_quad.h" />
     <ClInclude Include="..\..\include\rectangle.h" />
     <ClInclude Include="..\..\include\rendertypes.h" />
+    <ClInclude Include="..\include\gfxrenderer.h" />
     <ClInclude Include="..\..\include\rendermatrices.h" />
+    <ClInclude Include="..\include\resource_chunkhandler.h" />
+    <ClInclude Include="..\include\resource_handler.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
     <ClInclude Include="..\..\include\shadowmap.h" />
-    <ClInclude Include="..\include\gfxarray.hpp" />
     <ClInclude Include="..\..\include\texcoord.h" />
     <ClInclude Include="..\..\include\textrenderer.h" />
+    <ClInclude Include="..\include\gfxarray.hpp" />
     <ClInclude Include="..\include\texture.h" />
     <ClInclude Include="..\..\include\textureatlas.h" />
     <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\..\include\texturehandler.h" />
-    <ClInclude Include="..\include\EnableTe.h" />
     <ClInclude Include="..\include\gfxdatalayout.h" />
     <ClInclude Include="..\include\gfxdatabuffer.h" />
     <ClInclude Include="..\..\include\vertexdatabuffers.h" />
     <ClInclude Include="..\..\include\viewport.h" />
-    <ClInclude Include="framework.h" />
+    <ClInclude Include="..\include\dx12framework.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\base_renderer.cpp" />
     <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
-    <ClCompile Include="..\..\src\shadowmap.cpp" />
+    <ClCompile Include="..\..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />
     <ClCompile Include="..\..\src\cube.cpp" />
+    <ClCompile Include="..\src\cbv_allocator.cpp" />
+    <ClCompile Include="..\src\commandlist.cpp" />
+    <ClCompile Include="..\src\descriptor_heap.cpp" />
+    <ClCompile Include="..\src\dx12context.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />
-    <ClCompile Include="..\src\gfxrenderer.cpp" />
+    <ClCompile Include="..\src\dx12upload.cpp" />
+    <ClCompile Include="..\src\renderstates.cpp" />
     <ClCompile Include="..\src\rendertarget.cpp" />
     <ClCompile Include="..\..\src\fonthandler.cpp" />
     <ClCompile Include="..\..\src\framecounter.cpp" />
@@ -200,13 +212,16 @@
     <ClCompile Include="..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\..\src\projector.cpp" />
     <ClCompile Include="..\..\src\base_quad.cpp" />
+    <ClCompile Include="..\src\gfxrenderer.cpp" />
     <ClCompile Include="..\..\src\rendermatrices.cpp" />
+    <ClCompile Include="..\src\resource_chunkhandler.cpp" />
+    <ClCompile Include="..\src\resource_handler.cpp" />
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />
+    <ClCompile Include="..\src\shadowmap.cpp" />
     <ClCompile Include="..\src\skybox.cpp" />
-    <ClCompile Include="..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\..\src\textureatlas.cpp" />
     <ClCompile Include="..\src\texturebuffer.cpp" />
