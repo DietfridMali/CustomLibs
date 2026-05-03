@@ -119,7 +119,7 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuf
 {
     if (forceUpdate or buffer.IsDirty()) {
         if (not UpdateDataBuffer(type, id,
-                              buffer.GLDataBuffer(), buffer.GLDataSize(),
+                              buffer.GfxDataBuffer(), buffer.GfxDataSize(),
                               size_t(componentType),
                               size_t(buffer.ComponentCount()), forceUpdate))
             return false;
@@ -132,7 +132,7 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuf
 void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
-        if (UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate))
+        if (UpdateIndexBuffer(buffer.GfxDataBuffer(), buffer.GfxDataSize(), size_t(componentType), forceUpdate))
             buffer.SetDirty(false);
     }
 }

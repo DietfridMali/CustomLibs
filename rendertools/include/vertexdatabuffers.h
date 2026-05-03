@@ -25,11 +25,11 @@ public:
 
     ~BaseVertexDataBuffer() = default;
 
-    virtual void* GLDataBuffer(void) noexcept { return nullptr; }
+    virtual void* GfxDataBuffer(void) noexcept { return nullptr; }
 
-    virtual uint32_t GLDataLength(void) const noexcept { return 0; }
+    virtual uint32_t GfxDataLength(void) const noexcept { return 0; }
 
-    virtual uint32_t GLDataSize(void) const noexcept { return 0; }
+    virtual uint32_t GfxDataSize(void) const noexcept { return 0; }
 
     inline uint32_t ComponentCount(void) const noexcept {
         return m_componentCount;
@@ -54,7 +54,7 @@ class VertexDataBuffer
 {
     protected:
         SegmentedList<APP_DATA_T>   m_appData;
-        AutoArray<GL_DATA_T>     m_glData;
+        AutoArray<GL_DATA_T>     m_gfxData;
 
 #pragma warning(push)
 #pragma warning(disable:4100)
@@ -80,15 +80,15 @@ class VertexDataBuffer
         }
 
 public:
-        inline void SetGLData(AutoArray<GL_DATA_T>& glData) { // directly set m_glData without going over m_appData
-            m_glData = glData;
+        inline void SetGLData(AutoArray<GL_DATA_T>& glData) { // directly set m_gfxData without going over m_appData
+            m_gfxData = glData;
             m_isDirty = true;
         }
 
 
-		inline void CopyGLData(AutoArray<APP_DATA_T>& appData) { // directly set m_glData without going over m_appData
-			m_glData.Resize(appData.Length() * m_componentCount);
-			GL_DATA_T* glData = m_glData.Data();
+		inline void CopyGLData(AutoArray<APP_DATA_T>& appData) { // directly set m_gfxData without going over m_appData
+			m_gfxData.Resize(appData.Length() * m_componentCount);
+			GL_DATA_T* glData = m_gfxData.Data();
             for (auto data : appData) {
                 memcpy(glData, data.Data(), m_componentCount * sizeof(GL_DATA_T));
 				glData += m_componentCount;
@@ -102,33 +102,33 @@ public:
 
         inline void Reset(void) {
             m_appData.Clear();
-            m_glData.Reset();
+            m_gfxData.Reset();
             m_isDirty = false;
         }
 
 
         inline operator void*() {
-            return (void*)m_glData.data();
+            return (void*)m_gfxData.data();
         }
 
         inline SegmentedList<APP_DATA_T>& AppData(void) noexcept {
             return m_appData;
         }
 
-        inline AutoArray<GL_DATA_T>& GLData(void) noexcept {
-            return m_glData;
+        inline AutoArray<GL_DATA_T>& GfxData(void) noexcept {
+            return m_gfxData;
         }
 
-        virtual void* GLDataBuffer(void) noexcept override {
-            return reinterpret_cast<void*>(m_glData.Data());
+        virtual void* GfxDataBuffer(void) noexcept override {
+            return reinterpret_cast<void*>(m_gfxData.Data());
         }
 
-        virtual uint32_t GLDataLength(void) const noexcept override {
-            return m_glData.Length();
+        virtual uint32_t GfxDataLength(void) const noexcept override {
+            return m_gfxData.Length();
         }
 
-        virtual uint32_t GLDataSize(void) const noexcept override {
-            return m_glData.Length() * sizeof(GL_DATA_T);
+        virtual uint32_t GfxDataSize(void) const noexcept override {
+            return m_gfxData.Length() * sizeof(GL_DATA_T);
         }
 
         inline uint32_t AppDataLength(void) const noexcept {
@@ -160,12 +160,12 @@ public:
             return !m_appData.IsEmpty();
         }
 
-        inline bool HaveGLData(void) const {
-            return m_glData.Length() > 0;
+        inline bool HaveGfxData(void) const {
+            return m_gfxData.Length() > 0;
         }
 
         inline bool HaveData(void) const {
-            return HaveAppData() or HaveGLData();
+            return HaveAppData() or HaveGfxData();
         }
 
 		inline bool IsEmpty(void) {
@@ -185,7 +185,7 @@ protected:
         if ((this != &other) and other.HaveData() and (other.m_componentCount > 0)) {
             Reset();
             m_appData = other.m_appData;
-            m_glData = other.m_glData;
+            m_gfxData = other.m_gfxData;
 			m_isDirty = other.m_isDirty;
             m_componentCount = other.m_componentCount;
         }
@@ -196,7 +196,7 @@ protected:
         if ((this != &other) and other.HaveData() and (other.m_componentCount > 0)) {
             Reset();
             m_appData = std::move(other.m_appData);
-            m_glData = std::move(other.m_glData);
+            m_gfxData = std::move(other.m_gfxData);
             m_isDirty = other.m_isDirty;
             m_componentCount = other.m_componentCount;
             other.m_componentCount = 0;
@@ -232,14 +232,14 @@ class VertexBuffer
         // Create a densely packed numpy array from the vertex data
         virtual AutoArray<float>& Setup(void) {
             if (HaveAppData()) {
-                m_glData.Resize(m_appData.Length() * 3);
-                float* glData = m_glData.Data();
+                m_gfxData.Resize(m_appData.Length() * 3);
+                float* glData = m_gfxData.Data();
                 for (auto& v : m_appData) {
                     memcpy(glData, v.Data(), v.DataSize());
                     glData += 3;
                 }
             }
-            return m_glData;
+            return m_gfxData;
         }
 };
 
@@ -257,13 +257,13 @@ public:
         // Create a densely packed numpy array from the vertex data
         virtual AutoArray<float>& Setup(void) {
             if (HaveAppData()) {
-                float* glData = m_glData.Resize(m_appData.Length() * 2);
+                float* glData = m_gfxData.Resize(m_appData.Length() * 2);
                 for (auto& v : m_appData) {
                     memcpy(glData, v.Data(), v.DataSize());
                     glData += 2;
                 }
             }
-            return m_glData;
+            return m_gfxData;
         }
 };
 
@@ -282,14 +282,14 @@ public:
     // Create a densely packed numpy array from the vertex data
     virtual AutoArray<float>& Setup(void) {
         if (HaveAppData()) {
-            m_glData.Resize(m_appData.Length() * 4);
-            float* glData = m_glData.Data();
+            m_gfxData.Resize(m_appData.Length() * 4);
+            float* glData = m_gfxData.Data();
             for (auto& v : m_appData) {
                 memcpy(glData, v.Data(), v.DataSize());
                 glData += 4;
             }
         }
-        return m_glData;
+        return m_gfxData;
     }
 };
 
@@ -307,13 +307,13 @@ public:
     // Create a densely packed numpy array from the vertex data
     virtual AutoArray<float>& Setup(void) {
         if (HaveAppData()) {
-            float* glData = m_glData.Resize(m_appData.Length() * 4);
+            float* glData = m_gfxData.Resize(m_appData.Length() * 4);
             for (auto& v : m_appData) {
                 memcpy(glData, v.Data(), v.DataSize());
                 glData += 4;
             }
         }
-        return m_glData;
+        return m_gfxData;
     }
 };
 
@@ -332,13 +332,13 @@ class IndexBuffer
     // Create a densely packed array from the vertex data
     virtual AutoArray<uint32_t>& Setup(void) {
         if (HaveAppData()) {
-            uint32_t* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
+            uint32_t* glData = m_gfxData.Resize(m_appData.Length() * m_componentCount);
             for (auto& v : m_appData) {
                 memcpy(glData, v.Data(), v.DataSize());
                 glData += v.Length();
             }
         }
-        return m_glData;
+        return m_gfxData;
     }
 
     IndexBuffer& operator= (IndexBuffer const& other) {
@@ -363,12 +363,12 @@ public:
     // Create a densely packed numpy array from the vertex data
     virtual AutoArray<float>& Setup(void) {
         if (HaveAppData()) {
-            float* glData = m_glData.Resize(m_appData.Length() * m_componentCount);
+            float* glData = m_gfxData.Resize(m_appData.Length() * m_componentCount);
             for (auto& v : m_appData) {
                 *glData++ = v;
             }
         }
-        return m_glData;
+        return m_gfxData;
     }
 
     FloatDataBuffer& operator= (FloatDataBuffer const& other) {

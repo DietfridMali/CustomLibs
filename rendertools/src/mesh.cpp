@@ -31,7 +31,7 @@ bool Mesh::CreateLayout(void) {
 // This only works for linearly increasing quad vertex indices starting at 0!
 void Mesh::CreateVertexIndices(void) {
     uint32_t l = m_vertices.AppDataLength(); // number of vertices
-    uint32_t* pi = m_indices.GLData().Resize((l / 2) * 3); // 6 indices for 4 vertices
+    uint32_t* pi = m_indices.GfxData().Resize((l / 2) * 3); // 6 indices for 4 vertices
     l /= 4; // quad count
     for (uint32_t i = 0, j = 0; i < l; i++, j += 4) {
         for (uint32_t k = 0; k < 6; k++)
@@ -66,7 +66,7 @@ void Mesh::UpdateTangents(void) {
     AutoArray<Vector3f> bitangents;
     bitangents.Resize(m_vertices.AppDataLength());
 
-    AutoArray<uint32_t>& indices = m_indices.GLData();
+    AutoArray<uint32_t>& indices = m_indices.GfxData();
     m_tangents.AppData().Reset();
 
     for (int i = 0, l = indices.Length(); i < l;) {
