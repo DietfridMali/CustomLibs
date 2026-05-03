@@ -64,13 +64,15 @@ class DescriptorHeapHandler
     : public BaseSingleton<DescriptorHeapHandler>
 {
 public:
-    static constexpr UINT RTV_CAPACITY = 64;
-    static constexpr UINT DSV_CAPACITY = 16;
-    static constexpr UINT SRV_CAPACITY = 1024; // CBV/SRV/UAV, GPU-visible
+    static constexpr UINT RTV_CAPACITY     = 64;
+    static constexpr UINT DSV_CAPACITY     = 16;
+    static constexpr UINT SRV_CAPACITY     = 1024; // CBV/SRV/UAV, GPU-visible
+    static constexpr UINT SAMPLER_CAPACITY = 32;   // GPU-visible sampler heap; small — only unique configurations
 
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;
     DescriptorHeap m_srvHeap;
+    DescriptorHeap m_samplerHeap;
 
     bool Create(ID3D12Device* device) noexcept;
 
@@ -82,25 +84,39 @@ public:
         return m_dsvHeap.Allocate(); 
     }
     
-    inline DescriptorHandle AllocSRV(void) noexcept { 
-        return m_srvHeap.Allocate(); 
+    inline DescriptorHandle AllocSRV(void) noexcept {
+        return m_srvHeap.Allocate();
     }
 
-    inline void FreeRTV(const DescriptorHandle& h) noexcept { 
-        m_rtvHeap.Free(h); 
+    inline DescriptorHandle AllocSampler(void) noexcept {
+        return m_samplerHeap.Allocate();
     }
-    
-    inline void FreeDSV(const DescriptorHandle& h) noexcept { 
-        m_dsvHeap.Free(h); 
+
+    inline void FreeRTV(const DescriptorHandle& h) noexcept {
+        m_rtvHeap.Free(h);
     }
-    
-    inline void FreeSRV(const DescriptorHandle& h) noexcept { 
-        m_srvHeap.Free(h); 
+
+    inline void FreeDSV(const DescriptorHandle& h) noexcept {
+        m_dsvHeap.Free(h);
+    }
+
+    inline void FreeSRV(const DescriptorHandle& h) noexcept {
+        m_srvHeap.Free(h);
+    }
+
+    inline void FreeSampler(const DescriptorHandle& h) noexcept {
+        m_samplerHeap.Free(h);
     }
 
     // The GPU-visible SRV heap must be bound before any draw call.
-    inline ID3D12DescriptorHeap* SrvHeapPtr(void) const noexcept { 
-        return m_srvHeap.Ptr(); 
+    inline ID3D12DescriptorHeap* SrvHeapPtr(void) const noexcept {
+        return m_srvHeap.Ptr();
+    }
+
+    // Sampler heap must also be bound (alongside the SRV heap) before any draw call
+    // that issues a SetGraphicsRootDescriptorTable for a sampler slot.
+    inline ID3D12DescriptorHeap* SamplerHeapPtr(void) const noexcept {
+        return m_samplerHeap.Ptr();
     }
 };
 

@@ -6,6 +6,7 @@
 #include "commandlist.h"
 #include "dx12context.h"
 #include "gfxstates.h"
+#include "sampler_cache.h"
 
 // =================================================================================================
 // DX12 RenderTarget implementation
@@ -509,10 +510,22 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
-    auto& heap = descriptorHeaps.m_srvHeap;
-    if (not heap.m_heap)
+    auto& srvHeap = descriptorHeaps.m_srvHeap;
+    if (not srvHeap.m_heap)
         return false;
-    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), heap.GpuHandle(info.m_srvIndex));
+    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.m_srvIndex));
+
+    // Bind the matching sampler from m_renderTexture's sampling configuration.
+    // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets
+    // LINEAR/CLAMP_TO_EDGE/COMPARE_NONE — the canonical RT-source sampler).
+    if (not m_renderTexture.m_hasParams)
+        m_renderTexture.SetParams(false);
+    auto& samplerHeap = descriptorHeaps.m_samplerHeap;
+    if (samplerHeap.m_heap) {
+        uint32_t slot = samplerCache.GetSlot(m_renderTexture.m_sampling);
+        if (slot != UINT32_MAX)
+            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase + tmuIndex), samplerHeap.GpuHandle(slot));
+    }
     return true;
 }
 
@@ -599,6 +612,24 @@ Texture* RenderTarget::GetDepthAsTexture(void)
     m_depthTexture.m_resource = info.m_resource;
     m_depthTexture.Validate();
     return &m_depthTexture;
+}
+
+
+// Liefert den Depth-Buffer als Compare-Sampler-Textur fuer HW-PCF.
+// ShadowTexture::SetParams konfiguriert m_sampling.compareFunc = Less,
+// SamplerCache erzeugt daraus einen Compare-Sampler (D3D12_FILTER_COMPARISON_*).
+// Der Shader sampelt dann mit SampleCmpLevelZero(depth, uv, ndc.z - bias).
+Texture* RenderTarget::GetDepthAsShadowTexture(void)
+{
+    if (m_depthBufferIndex < 0)
+        return nullptr;
+    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
+    if (not info.m_resource)
+        return nullptr;
+    m_shadowTexture.m_handle = info.m_srvIndex;
+    m_shadowTexture.m_resource = info.m_resource;
+    m_shadowTexture.Validate();
+    return &m_shadowTexture;
 }
 
 

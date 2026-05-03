@@ -47,6 +47,17 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
     static constexpr uint32_t    pixelStride = 4;   // sizeof(float)
     static constexpr int         Components  = 1;
 
+    // OGL: GL_LINEAR_MIPMAP_LINEAR / GL_LINEAR / GL_REPEAT, glGenerateMipmap.
+    static void ConfigureSampling(TextureSampling& s) noexcept {
+        s.minFilter = GfxFilterMode::Linear;
+        s.magFilter = GfxFilterMode::Linear;
+        s.mipMode   = GfxMipMode::Linear;
+        s.wrapU = s.wrapV = s.wrapW = GfxWrapMode::Repeat;
+        s.compareFunc = GfxOperations::CompareFunc::Always;
+        s.maxAnisotropy = 1.0f;
+    }
+
+
     static void Compute(AutoArray<float>& data, int gridSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t /*seed*/) {
         data.Resize(gridSize * gridSize);
         float* dataPtr = data.Data();
@@ -64,6 +75,17 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
     static constexpr uint32_t    pixelStride = 4;
     static constexpr int         Components  = 1;
 
+    // OGL: GL_LINEAR_MIPMAP_LINEAR / GL_LINEAR / GL_REPEAT, glGenerateMipmap.
+    static void ConfigureSampling(TextureSampling& s) noexcept {
+        s.minFilter = GfxFilterMode::Linear;
+        s.magFilter = GfxFilterMode::Linear;
+        s.mipMode   = GfxMipMode::Linear;
+        s.wrapU = s.wrapV = s.wrapW = GfxWrapMode::Repeat;
+        s.compareFunc = GfxOperations::CompareFunc::Always;
+        s.maxAnisotropy = 1.0f;
+    }
+
+
 #pragma warning(push)
 #pragma warning(disable:4100)
     static void Compute(AutoArray<float>& data, int gridSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
@@ -80,6 +102,17 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
     static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8G8B8A8_UNORM;
     static constexpr uint32_t    pixelStride = 4;
     static constexpr int         Components  = 4;
+
+    // OGL: GL_LINEAR / GL_LINEAR / GL_REPEAT, base/max=0 (no mipmaps).
+    static void ConfigureSampling(TextureSampling& s) noexcept {
+        s.minFilter = GfxFilterMode::Linear;
+        s.magFilter = GfxFilterMode::Linear;
+        s.mipMode   = GfxMipMode::None;
+        s.wrapU = s.wrapV = s.wrapW = GfxWrapMode::Repeat;
+        s.compareFunc = GfxOperations::CompareFunc::Always;
+        s.maxAnisotropy = 1.0f;
+    }
+
 
 #pragma warning(push)
 #pragma warning(disable:4100)
@@ -100,6 +133,17 @@ struct NoiseTraits<WeatherNoiseRG8> {
     static constexpr uint32_t    pixelStride = 2;
     static constexpr int         Components  = 2;
 
+    // OGL: GL_LINEAR / GL_LINEAR / GL_REPEAT.
+    static void ConfigureSampling(TextureSampling& s) noexcept {
+        s.minFilter = GfxFilterMode::Linear;
+        s.magFilter = GfxFilterMode::Linear;
+        s.mipMode   = GfxMipMode::None;
+        s.wrapU = s.wrapV = s.wrapW = GfxWrapMode::Repeat;
+        s.compareFunc = GfxOperations::CompareFunc::Always;
+        s.maxAnisotropy = 1.0f;
+    }
+
+
 #pragma warning(push)
 #pragma warning(disable:4100)
     static void Compute(AutoArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves)
@@ -116,6 +160,17 @@ template<> struct NoiseTraits<BlueNoiseR8> {
     static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8_UNORM;
     static constexpr uint32_t    pixelStride = 1;
     static constexpr int         Components  = 1;
+
+    // OGL: GL_NEAREST / GL_NEAREST / GL_REPEAT.
+    static void ConfigureSampling(TextureSampling& s) noexcept {
+        s.minFilter = GfxFilterMode::Nearest;
+        s.magFilter = GfxFilterMode::Nearest;
+        s.mipMode   = GfxMipMode::None;
+        s.wrapU = s.wrapV = s.wrapW = GfxWrapMode::Repeat;
+        s.compareFunc = GfxOperations::CompareFunc::Always;
+        s.maxAnisotropy = 1.0f;
+    }
+
 
     static void Compute(AutoArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/) {
         const int N = gridSize;
@@ -166,8 +221,8 @@ public:
     }
 
     void SetParams(bool /*enforce*/) override {
-        // Static samplers in the root signature handle filtering and wrapping — no per-texture state.
         m_hasParams = true;
+        NoiseTraits<Tag>::ConfigureSampling(m_sampling);
     }
 
     inline bool IsAvailable(void) noexcept {

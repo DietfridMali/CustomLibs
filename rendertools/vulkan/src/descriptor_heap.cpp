@@ -69,9 +69,14 @@ void DescriptorHeap::Free(UINT index) noexcept {
 
 
 bool DescriptorHeapHandler::Create(ID3D12Device* device) noexcept {
-    if (not m_rtvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTV_CAPACITY, false))  return false;
-    if (not m_dsvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DSV_CAPACITY, false))  return false;
-    if (not m_srvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, SRV_CAPACITY, true)) return false;
+    if (not m_rtvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTV_CAPACITY, false))
+        return false;
+    if (not m_dsvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DSV_CAPACITY, false))
+        return false;
+    if (not m_srvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, SRV_CAPACITY, true))
+        return false;
+    if (not m_samplerHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SAMPLER_CAPACITY, true))
+        return false;
     return true;
 }
 

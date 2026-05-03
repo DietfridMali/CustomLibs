@@ -10,8 +10,15 @@
 // DX12 Cubemap implementation
 
 void Cubemap::SetParams(void) {
-    // Sampling parameters are baked into the root-signature static samplers.
     m_hasParams = true;
+    m_sampling.minFilter     = GfxFilterMode::Linear;
+    m_sampling.magFilter     = GfxFilterMode::Linear;
+    m_sampling.mipMode       = GfxMipMode::None;
+    m_sampling.wrapU         = GfxWrapMode::ClampToEdge;
+    m_sampling.wrapV         = GfxWrapMode::ClampToEdge;
+    m_sampling.wrapW         = GfxWrapMode::ClampToEdge;
+    m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = 1.0f;
 }
 
 

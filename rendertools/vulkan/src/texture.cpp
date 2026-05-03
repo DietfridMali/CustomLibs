@@ -11,9 +11,11 @@
 #pragma warning(pop)
 
 #include "texture.h"
+#include "shader.h"
 #include "gfxstates.h"
 #include "gfxrenderer.h"
 #include "descriptor_heap.h"
+#include "sampler_cache.h"
 #include "commandlist.h"
 #include "dx12context.h"
 #include "dx12upload.h"
@@ -142,11 +144,24 @@ bool Texture::Bind(int tmuIndex)
     m_tmuIndex = tmuIndex;
     gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
 
+    // Lazily populate the per-texture sampler configuration on first bind.
+    // Virtual dispatch picks up the most-derived SetParams (Cubemap, Tiled,
+    // RenderTarget, Shadow, Noise* etc.); after this call m_sampling is valid.
+    if (not m_hasParams)
+        SetParams(false);
+
     auto* list = commandListHandler.CurrentGfxList();
     if (list and (m_handle != UINT32_MAX)) {
-        auto& heap = descriptorHeaps.m_srvHeap;
-        if (heap.m_heap)
-            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), heap.GpuHandle(m_handle));
+        auto& srvHeap = descriptorHeaps.m_srvHeap;
+        if (srvHeap.m_heap)
+            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(m_handle));
+
+        auto& samplerHeap = descriptorHeaps.m_samplerHeap;
+        if (samplerHeap.m_heap) {
+            uint32_t slot = samplerCache.GetSlot(m_sampling);
+            if (slot != UINT32_MAX)
+                list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase + tmuIndex), samplerHeap.GpuHandle(slot));
+        }
     }
     return true;
 }
@@ -161,11 +176,23 @@ void Texture::Release(void)
 }
 
 
-void Texture::SetParams(bool /*forceUpdate*/)
+void Texture::SetParams(bool forceUpdate)
 {
-    // Sampling params are configured via static samplers in the root signature.
-    // No per-texture sampler state in DX12 (static samplers cover the standard cases).
+    if (not (forceUpdate or not m_hasParams))
+        return;
     m_hasParams = true;
+
+    // Default: linear filter, repeat wrap (most textures in this app are tile/wrap-style).
+    // Subclasses that need clamp (RenderTargetTexture, ShadowTexture, Cubemap) override this.
+    // With mipmaps: linear mip filter; without: mip filter disabled and LOD clamped to base level.
+    m_sampling.minFilter = GfxFilterMode::Linear;
+    m_sampling.magFilter = GfxFilterMode::Linear;
+    m_sampling.mipMode   = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
+    m_sampling.wrapU     = GfxWrapMode::Repeat;
+    m_sampling.wrapV     = GfxWrapMode::Repeat;
+    m_sampling.wrapW     = GfxWrapMode::Repeat;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = 1.0f;
 }
 
 
@@ -325,10 +352,12 @@ void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t out
 }
 
 
-void Texture::SetWrapping(int wrapMode) noexcept
+void Texture::SetWrapping(GfxWrapMode wrapMode) noexcept
 {
-    if (wrapMode >= 0) m_wrapMode = GfxWrapMode(wrapMode);
-    // Wrapping is configured via static samplers / PSO; no per-texture state in DX12.
+    m_wrapMode = wrapMode;
+    m_sampling.wrapU = wrapMode;
+    m_sampling.wrapV = wrapMode;
+    m_sampling.wrapW = wrapMode;
 }
 
 
@@ -353,8 +382,52 @@ noexcept
 
 // =================================================================================================
 
-void TiledTexture::SetParams(bool /*forceUpdate*/) { m_hasParams = true; }
-void RenderTargetTexture::SetParams(bool /*forceUpdate*/)   { m_hasParams = true; }
-void ShadowTexture::SetParams(bool /*forceUpdate*/) { m_hasParams = true; }
+void TiledTexture::SetParams(bool forceUpdate)
+{
+    if (not (forceUpdate or not m_hasParams))
+        return;
+    Texture::SetParams(forceUpdate);
+    m_sampling.wrapU = GfxWrapMode::Repeat;
+    m_sampling.wrapV = GfxWrapMode::Repeat;
+    m_sampling.wrapW = GfxWrapMode::Repeat;
+    // Mip-mapped, max anisotropy (matches OGL TiledTexture::SetParams which queries
+    // GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT and applies it; we use the spec's maximum).
+    m_sampling.mipMode       = GfxMipMode::Linear;
+    m_sampling.maxAnisotropy = 16.0f;
+}
+
+
+void RenderTargetTexture::SetParams(bool forceUpdate)
+{
+    if (not (forceUpdate or not m_hasParams))
+        return;
+    m_hasParams = true;
+    m_sampling.minFilter   = GfxFilterMode::Linear;
+    m_sampling.magFilter   = GfxFilterMode::Linear;
+    m_sampling.mipMode     = GfxMipMode::None;
+    m_sampling.wrapU       = GfxWrapMode::ClampToEdge;
+    m_sampling.wrapV       = GfxWrapMode::ClampToEdge;
+    m_sampling.wrapW       = GfxWrapMode::ClampToEdge;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;  // explicit: no compare sampler
+    m_sampling.maxAnisotropy = 1.0f;
+}
+
+
+void ShadowTexture::SetParams(bool forceUpdate)
+{
+    if (not (forceUpdate or not m_hasParams))
+        return;
+    m_hasParams = true;
+    // OGL: GL_TEXTURE_COMPARE_MODE = GL_COMPARE_REF_TO_TEXTURE,
+    //      GL_TEXTURE_COMPARE_FUNC = GL_LESS — i.e. HW PCF compare sampler.
+    m_sampling.minFilter   = GfxFilterMode::Linear;
+    m_sampling.magFilter   = GfxFilterMode::Linear;
+    m_sampling.mipMode     = GfxMipMode::None;
+    m_sampling.wrapU       = GfxWrapMode::ClampToEdge;
+    m_sampling.wrapV       = GfxWrapMode::ClampToEdge;
+    m_sampling.wrapW       = GfxWrapMode::ClampToEdge;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Less;
+    m_sampling.maxAnisotropy = 1.0f;
+}
 
 // =================================================================================================

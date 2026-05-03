@@ -181,6 +181,18 @@ bool Shader::CreateRootSignature(void) noexcept
         srvRanges[i].OffsetInDescriptorsFromTableStart = 0;
     }
 
+    // Params kSamplerBase..kSamplerBase+15: one 1-entry descriptor table per sampler
+    // slot (s0..s15), parallel to the SRV slots. The bound sampler is fed by
+    // SamplerCache from the texture's TextureSampling at Texture::Bind() time.
+    D3D12_DESCRIPTOR_RANGE samplerRanges[kSamplerSlots]{};
+    for (int i = 0; i < kSamplerSlots; ++i) {
+        samplerRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+        samplerRanges[i].NumDescriptors = 1;
+        samplerRanges[i].BaseShaderRegister = UINT(i); // s0, s1, ...
+        samplerRanges[i].RegisterSpace = 0;
+        samplerRanges[i].OffsetInDescriptorsFromTableStart = 0;
+    }
+
     // Params kUavBase..kUavBase+3: one 1-entry descriptor table per UAV slot (u0..u3).
     static constexpr int kUavSlots = 4;
     D3D12_DESCRIPTOR_RANGE uavRanges[kUavSlots]{};
@@ -226,6 +238,14 @@ bool Shader::CreateRootSignature(void) noexcept
         params[kSrvBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
     }
 
+    // One 1-entry descriptor table per sampler slot (s0..s15)
+    for (int i = 0; i < kSamplerSlots; ++i) {
+        params[kSamplerBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[kSamplerBase + i].DescriptorTable.NumDescriptorRanges = 1;
+        params[kSamplerBase + i].DescriptorTable.pDescriptorRanges = &samplerRanges[i];
+        params[kSamplerBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    }
+
     // One 1-entry descriptor table per UAV slot (u0..u3)
     for (int i = 0; i < kUavSlots; ++i) {
         params[kUavBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -234,28 +254,14 @@ bool Shader::CreateRootSignature(void) noexcept
         params[kUavBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
-    // Static samplers: s0 = linear clamp, s1 = linear repeat
-    D3D12_STATIC_SAMPLER_DESC samplers[2]{};
-    for (int i = 0; i < 2; ++i) {
-        samplers[i].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-        samplers[i].AddressU =
-        samplers[i].AddressV =
-        samplers[i].AddressW = (i == 0) ? D3D12_TEXTURE_ADDRESS_MODE_CLAMP
-                                        : D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        samplers[i].MaxAnisotropy = 1;
-        samplers[i].ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-        samplers[i].MinLOD = 0.0f;
-        samplers[i].MaxLOD = D3D12_FLOAT32_MAX;
-        samplers[i].ShaderRegister = UINT(i);
-        samplers[i].RegisterSpace = 0;
-        samplers[i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    }
-
+    // Samplers are no longer baked into the root signature — each Texture carries
+    // its own TextureSampling, resolved through SamplerCache and bound at draw
+    // time via the per-slot sampler tables defined above.
     D3D12_ROOT_SIGNATURE_DESC rsd{};
-    rsd.NumParameters = kUavBase + kUavSlots;
-    rsd.pParameters = params;
-    rsd.NumStaticSamplers = 2;
-    rsd.pStaticSamplers = samplers;
+    rsd.NumParameters     = kUavBase + kUavSlots;
+    rsd.pParameters       = params;
+    rsd.NumStaticSamplers = 0;
+    rsd.pStaticSamplers   = nullptr;
     rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
               | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS
               | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
@@ -517,8 +523,13 @@ bool Shader::Activate(void) {
 
     list->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
 
-    auto& srvHeap = descriptorHeaps.m_srvHeap;
-    if (srvHeap.m_heap) {
+    auto& srvHeap     = descriptorHeaps.m_srvHeap;
+    auto& samplerHeap = descriptorHeaps.m_samplerHeap;
+    if (srvHeap.m_heap and samplerHeap.m_heap) {
+        ID3D12DescriptorHeap* heaps[] = { srvHeap.m_heap.Get(), samplerHeap.m_heap.Get() };
+        list->SetDescriptorHeaps(2, heaps);
+    }
+    else if (srvHeap.m_heap) {
         ID3D12DescriptorHeap* heaps[] = { srvHeap.m_heap.Get() };
         list->SetDescriptorHeaps(1, heaps);
     }

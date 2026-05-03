@@ -113,7 +113,7 @@ void CommandQueue::WaitIdle(void) noexcept {
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
         fprintf(stderr, "CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
-        dx12Context.DrainMessages();
+        gfxStates.CheckError();
         dx12Context.DumpDRED();
         fflush(stderr);
     }
@@ -190,7 +190,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     if (saveRenderStates)
         PushRenderStates();
 #ifdef _DEBUG
-    dx12Context.DrainMessages();
+    gfxStates.CheckError();
 #endif
     return true;
 }
@@ -204,7 +204,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
 #ifdef _DEBUG
-    dx12Context.DrainMessages();
+    gfxStates.CheckError();
 #endif
     commandListHandler.PopCmdList();
     if (restoreRenderStates)
@@ -252,7 +252,7 @@ void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES bef
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     m_gfxListPtr->ResourceBarrier(1, &b);
 #ifdef _DEBUG
-    dx12Context.DrainMessages();
+    gfxStates.CheckError();
 #endif
 }
 
@@ -262,7 +262,7 @@ void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
         return;
     m_gfxListPtr->ResourceBarrier(UINT(count), barriers);
 #ifdef _DEBUG
-    dx12Context.DrainMessages();
+    gfxStates.CheckError();
 #endif
 }
 
@@ -280,7 +280,7 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
         m_gfxListPtr->SetGraphicsRootSignature(shader->GetRootSignature().Get());
         m_activePSO = pso;
 #ifdef _DEBUG
-        dx12Context.DrainMessages();
+        gfxStates.CheckError();
 #endif
     }
 }
@@ -296,7 +296,7 @@ ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
 
 #ifdef _DEBUG
 void CommandList::CheckDeviceRemoved(const char* context) noexcept {
-    dx12Context.DrainMessages();
+    gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
         fprintf(stderr, "CommandList::%s: device removed (0x%08X)\n", context, (unsigned)removed);
@@ -382,7 +382,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     if (n > 0)
         m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.Data());
 #ifdef _DEBUG
-    dx12Context.DrainMessages();
+    gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
         fprintf(stderr, "CommandListHandler::ExecuteAll: device removed (0x%08X)\n", (unsigned)removed);

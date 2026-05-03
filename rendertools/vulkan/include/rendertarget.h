@@ -135,6 +135,7 @@ public:
     Viewport*           m_viewportSave{ nullptr };
     RenderTargetTexture m_renderTexture;
     RenderTargetTexture m_depthTexture;
+    ShadowTexture       m_shadowTexture; // ShadowTexture mit Compare-Sampler fuer HW-PCF (sampler2DShadow-Aequivalent)
     BaseQuad            m_viewportArea;
 
     AutoArray<BufferInfo>   m_bufferInfo;
@@ -212,6 +213,8 @@ public:
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthAsTexture(void);
+
+    Texture* GetDepthAsShadowTexture(void);
 
     bool UpdateTransformation(const RTRenderParams& params);
 

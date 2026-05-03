@@ -119,7 +119,7 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuf
 {
     if (forceUpdate or buffer.IsDirty()) {
         if (not UpdateDataBuffer(type, id,
-                              buffer.GLDataBuffer(), buffer.GLDataSize(),
+                              buffer.GfxDataBuffer(), buffer.GfxDataSize(),
                               size_t(componentType),
                               size_t(buffer.ComponentCount()), forceUpdate))
             return false;
@@ -132,7 +132,7 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuf
 void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
 {
     if (forceUpdate or buffer.IsDirty()) {
-        if (UpdateIndexBuffer(buffer.GLDataBuffer(), buffer.GLDataSize(), size_t(componentType), forceUpdate))
+        if (UpdateIndexBuffer(buffer.GfxDataBuffer(), buffer.GfxDataSize(), size_t(componentType), forceUpdate))
             buffer.SetDirty(false);
     }
 }
@@ -250,14 +250,14 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
         m_indexBuffer.IsValid() ? UINT(m_indexBuffer.m_itemCount) : 0,
         (m_dataBuffers.Length() > 0 && m_dataBuffers[0]) ? UINT(m_dataBuffers[0]->m_itemCount) : 0); 
 #endif
-    if (not StartRender()) 
+    if (not StartRender())
         return;
-
     ActivateTextures(textures);
 
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
-    if (Shader* shader = baseShaderHandler.ActiveShader())
+    Shader* shader = baseShaderHandler.ActiveShader();
+    if (shader)
         shader->UpdateVariables();
 
     if (commandListHandler.CurrentGfxList()) {
@@ -272,9 +272,9 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
                 commandListHandler.DrawInstanced(vertCount, 1, 0, 0);
         }
     }
-
     DeactivateTextures(textures);
     FinishRender();
+    gfxStates.CheckError();
 }
 
 // =================================================================================================
