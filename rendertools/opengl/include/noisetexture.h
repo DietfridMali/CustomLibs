@@ -382,8 +382,8 @@ public:
     bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "");
 
 private:
-    int                 m_gridSize{ 0 };
-    NoiseParams         m_params;
+    int              m_gridSize{ 0 };
+    NoiseParams      m_params;
     AutoArray<float> m_data;
 
     bool Allocate(int gridSize);

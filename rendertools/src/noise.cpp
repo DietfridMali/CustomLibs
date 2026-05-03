@@ -42,9 +42,9 @@ namespace Noise {
 
         inline uint32_t Hash(int x, int y, int z, uint32_t seed = 0xA341316Cu) {
             uint32_t h =
-                x * 374761393u ^
-                y * 668265263u ^
-                z * 2147483647u ^
+                x * 374761393u  ^   // xxHash PRIME5
+                y * 668265263u  ^   // xxHash PRIME4
+                z * 0xC2B2AE3Du ^   // xxHash PRIME3
                 (seed * 0x9E3779B9u);
             h ^= h >> 13;
             h *= 1274126177u;

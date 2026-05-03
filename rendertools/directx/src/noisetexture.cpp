@@ -116,9 +116,9 @@ void NoiseTexture3D::ComputeNoise(void) {
     int i = 0;
     Vector3f p;
     for (int z = 0; z < m_gridDimensions.z; ++z) {
-        p.y = (float(z) + 0.5f) / float(m_gridDimensions.z);
+        p.z = (float(z) + 0.5f) / float(m_gridDimensions.z);
         for (int y = 0; y < m_gridDimensions.y; ++y) {
-            p.z = (float(y) + 0.5f) / float(m_gridDimensions.y);
+            p.y = (float(y) + 0.5f) / float(m_gridDimensions.y);
             for (int x = 0; x < m_gridDimensions.x; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridDimensions.x);
                 Vector4f noise = generator.Compute(p);
@@ -311,9 +311,9 @@ void CloudNoiseTexture::Compute(String textureFolder) {
 #else
     Vector3f p;
     for (int z = 0; z < m_gridSize; ++z) {
-        p.y = (float(z) + 0.5f) / float(m_gridSize);
+        p.z = (float(z) + 0.5f) / float(m_gridSize);
         for (int y = 0; y < m_gridSize; ++y) {
-            p.z = (float(y) + 0.5f) / float(m_gridSize);
+            p.y = (float(y) + 0.5f) / float(m_gridSize);
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridSize);
                 Vector4f noise = generator.Compute(p);
