@@ -40,10 +40,14 @@ public:
             delete m_shaderCode;
     }
 
-    static BaseShaderHandler& Instance(void) { return dynamic_cast<BaseShaderHandler&>(PolymorphSingleton::Instance()); }
+    static BaseShaderHandler& Instance(void) { 
+        return dynamic_cast<BaseShaderHandler&>(PolymorphSingleton::Instance()); 
+    }
 
 protected:
-    virtual void CreateShaderCode(void) { m_shaderCode = new BaseShaderCode(); } // allokiert -> nicht noexcept
+    virtual void CreateShaderCode(void) { 
+        m_shaderCode = new BaseShaderCode(); 
+    } // allokiert -> nicht noexcept
 
 public:
     void CreateShaders(void) {
