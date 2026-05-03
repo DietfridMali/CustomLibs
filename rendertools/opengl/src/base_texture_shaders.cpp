@@ -112,9 +112,9 @@ const ShaderSource& SphereDepthShader() {
         R"(
         #version 330 core
 
-        uniform vec3 lightDir;
 #define CULL_FACES 0
 #if CULL_FACES
+        uniform vec3 lightDir;
         in vec3 worldNormal;
 #endif
         void main() { 

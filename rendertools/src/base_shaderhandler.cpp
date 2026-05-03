@@ -84,8 +84,10 @@ Shader* BaseShaderHandler::SetupShader(String shaderId, String depthShaderId) {
         }
         m_activeShader = shader;
         m_activeShaderId = shaderId;
-        if (not shader->Activate())
+        if (not shader->Activate()) {
+            gfxStates.CheckError();
             return nullptr;
+        }
     }
     return shader->UpdateMatrices() ? shader : nullptr;
 }

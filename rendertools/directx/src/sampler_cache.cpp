@@ -13,7 +13,7 @@ SamplerCache::SamplerCache(void) noexcept {
 
 
 void SamplerCache::Destroy(void) noexcept {
-    m_cache.Destroy();
+    m_cache.Clear();
 }
 
 
@@ -106,7 +106,9 @@ D3D12_SAMPLER_DESC SamplerCache::ToD3D12Desc(const TextureSampling& s) noexcept 
         }
         return D3D12_COMPARISON_FUNC_ALWAYS;
     };
-    d.ComparisonFunc = cmpFunc(s.compareFunc);
+    // D3D12 warnt, wenn ComparisonFunc != NEVER bei Nicht-Compare-Filter gesetzt ist.
+    // Bei Compare-Sampler den eigentlichen Vergleich nehmen, sonst NEVER (= ignored).
+    d.ComparisonFunc = useCompare ? cmpFunc(s.compareFunc) : D3D12_COMPARISON_FUNC_NEVER;
 
     d.BorderColor[0] = s.borderColor[0];
     d.BorderColor[1] = s.borderColor[1];

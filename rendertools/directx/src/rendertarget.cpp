@@ -615,6 +615,24 @@ Texture* RenderTarget::GetDepthAsTexture(void)
 }
 
 
+// Liefert den Depth-Buffer als Compare-Sampler-Textur fuer HW-PCF.
+// ShadowTexture::SetParams konfiguriert m_sampling.compareFunc = Less,
+// SamplerCache erzeugt daraus einen Compare-Sampler (D3D12_FILTER_COMPARISON_*).
+// Der Shader sampelt dann mit SampleCmpLevelZero(depth, uv, ndc.z - bias).
+Texture* RenderTarget::GetDepthAsShadowTexture(void)
+{
+    if (m_depthBufferIndex < 0)
+        return nullptr;
+    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
+    if (not info.m_resource)
+        return nullptr;
+    m_shadowTexture.m_handle = info.m_srvIndex;
+    m_shadowTexture.m_resource = info.m_resource;
+    m_shadowTexture.Validate();
+    return &m_shadowTexture;
+}
+
+
 bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 {
     bool haveTransformation = false;

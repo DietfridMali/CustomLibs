@@ -87,11 +87,8 @@ void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
     gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
     gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
     gfxStates.FrontFace(GfxOperations::Winding::Reverse);
-    gfxStates.CheckError();
     gfxStates.SetFaceCulling(1);
-    gfxStates.CheckError();
     gfxStates.CullFace(IsShadowPass() ? GfxOperations::CullFace::Front : GfxOperations::CullFace::Back);
-    gfxStates.CheckError();
 }
 
 

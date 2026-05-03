@@ -111,10 +111,8 @@ bool BaseQuad::Setup(std::initializer_list<Vector3f> vertices, std::initializer_
     }
     UpdateTexCoords();
 
-    gfxStates.CheckError();
     if (not CreateLayout())
         return false;
-    gfxStates.CheckError();
     //SetShape(GL_TRIANGLES); // trigger building of triangle index everytime new vertices are loaded
     UpdateData();
     //SetShape(GL_QUADS); // trigger building of triangle index everytime new vertices are loaded
