@@ -17,9 +17,9 @@ FILES := \
  textfileloader \
  udp
 
-CUSTOM_LIBS_DIR = ../CustomLibs/
+CUSTOM_LIBS_DIR = ../../CustomLibs/
 
-EXTERNAL_LIBS_DIR = ../ExternalLibs/
+EXTERNAL_LIBS_DIR = ../../ExternalLibs/
 
 STEAM_SDK = $(EXTERNAL_LIBS_DIR)steamworks_sdk_164/sdk
 
