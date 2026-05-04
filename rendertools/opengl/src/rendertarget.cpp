@@ -51,7 +51,6 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
-    gfxStates.ClearError();
     gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
     if (bufferType == BufferInfo::btDepth) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -83,6 +82,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     }
     gfxStates.BindTexture2D(0, 0);
+    gfxStates.CheckError();
     ++m_bufferCount;
 }
 
@@ -102,7 +102,6 @@ bool RenderTarget::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
         return true;
-    gfxStates.ClearError();
     glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
     return true;
@@ -195,6 +194,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_extraBufferCount);
     m_name = params.name;
     Disable();
+    gfxStates.CheckError();
     return true;
 }
 
@@ -345,7 +345,7 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
 bool RenderTarget::Enable(const RTActivationParams& params) {
     if (not m_isAvailable)
         return false;
-    //gfxStates.ClearError();
+    gfxStates.ClearError();
     if (not IsEnabled()) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
 #ifdef _DEBUG
