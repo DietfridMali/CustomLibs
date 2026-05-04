@@ -48,7 +48,6 @@ COMMON_FILES := \
  linesegment \
  mesh \
  noise \
- noisetexture3d \
  projector \
  rendermatrices \
  shadowmap \
