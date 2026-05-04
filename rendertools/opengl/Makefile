@@ -48,6 +48,7 @@ COMMON_FILES := \
  linesegment \
  mesh \
  noise \
+ noisetexture3d \
  projector \
  rendermatrices \
  shadowmap \
@@ -56,6 +57,7 @@ COMMON_FILES := \
  textureatlas \
  textureprocessing \
  tiny_gltf \
+ vertexdatabuffers \
  viewport
 
 INCDIRS := \
