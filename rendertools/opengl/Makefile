@@ -18,7 +18,6 @@ OPENGL_FILES := \
  base_texture_shaders \
  blur_shader \
  cubemap \
- drawbufferhandler \
  gfxdatabuffer \
  gfxdatalayout \
  gfxstates \
@@ -42,6 +41,7 @@ COMMON_FILES := \
  billboard \
  coplanar_rectangle \
  cube \
+ drawbufferhandler \
  fonthandler \
  framecounter \
  glbloader \
