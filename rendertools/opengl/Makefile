@@ -6,7 +6,7 @@ endif
 AR  := ar
 
 # OpenGL-spezifische Quelldateien (src/ relativ zu diesem Makefile)
-OPENGL_SRCDIR := src
+OPENGL_SRCDIR := ./src
 
 # API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
 SRCDIR := ../src
@@ -112,11 +112,11 @@ all: $(LIB)
 $(LIB): $(OBJECTS)
 >$(AR) rcs $@ $^
 
-$(OBJDIR)/%.o: $(OPENGL_SRCDIR)/%.cpp
+$(OPENGL_OBJECTS): $(OBJDIR)/%.o: $(OPENGL_SRCDIR)/%.cpp
 >@mkdir -p $(OBJDIR)
 >$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+$(COMMON_OBJECTS): $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 >@mkdir -p $(OBJDIR)
 >$(CXX) $(CXXFLAGS) -c $< -o $@
 
