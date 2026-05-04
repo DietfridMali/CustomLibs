@@ -56,7 +56,6 @@ COMMON_FILES := \
  textureatlas \
  textureprocessing \
  tiny_gltf \
- vertexdatabuffers \
  viewport
 
 INCDIRS := \
