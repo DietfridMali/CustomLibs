@@ -295,6 +295,10 @@ public:
     inline bool Render(Texture* texture = nullptr, float alpha = 1.0) {
         return Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{}, alpha);
     }
+
+    inline bool Render(std::initializer_list<Texture*> textures, float alpha = 1.0) {
+        return Render(std::span<Texture* const>(textures.begin(), textures.size()), alpha);
+    }
 };
 
 // =================================================================================================
