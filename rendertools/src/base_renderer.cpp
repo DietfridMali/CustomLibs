@@ -178,6 +178,7 @@ bool BaseRenderer::Stop2DScene(void) {
     if (not m_screenIsAvailable)
         return false;
     ResetDrawBuffers();
+    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
     return true;
 }
 
