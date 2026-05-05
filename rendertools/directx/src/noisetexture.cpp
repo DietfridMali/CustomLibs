@@ -262,7 +262,7 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
     if (not Allocate(gridSize))
         return false;
     m_params = params;
-    if (LoadFromFile(noiseFilename)) {
+    if (not LoadFromFile(noiseFilename)) {
         if (not compute)
             return true;
         std::filesystem::path _p{ noiseFilename.GetStr() };
@@ -429,7 +429,7 @@ void CloudNoiseTexture::ToMaxMip(CloudNoiseTexture* mipTex) {
 }
 
 
-CloudNoiseTexture* CloudNoiseTexture::ToMaxMip(int mipSize, String noiseFilename) {
+CloudNoiseTexture* CloudNoiseTexture::CreateMaxMip(int mipSize, String noiseFilename) {
     if (not IsPowerOfTwo(m_gridSize))
         return nullptr;
     if (not IsPowerOfTwo(mipSize))
@@ -445,6 +445,9 @@ CloudNoiseTexture* CloudNoiseTexture::ToMaxMip(int mipSize, String noiseFilename
         delete mipTex;
         return nullptr;
     }
+
+    if (mipTex->IsDeployed())
+        return mipTex;
 
     ToMaxMip(mipTex);
     if (not mipTex->Deploy()) {

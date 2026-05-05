@@ -373,7 +373,7 @@ public:
 
     void ToMaxMip(CloudNoiseTexture* mipTex);
 
-    CloudNoiseTexture* ToMaxMip(int destSize, String noiseFilename = "");
+    CloudNoiseTexture* CreateMaxMip(int destSize, String noiseFilename = "");
 
     static void DownSample(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
 
