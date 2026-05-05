@@ -35,10 +35,10 @@ static bool CreateSRV3D(uint32_t& handleOut, ID3D12Resource* resource, DXGI_FORM
         handleOut = hdl.index;
     }
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format                     = fmt;
-    srvDesc.ViewDimension              = D3D12_SRV_DIMENSION_TEXTURE3D;
-    srvDesc.Shader4ComponentMapping    = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture3D.MipLevels        = 1;
+    srvDesc.Format = fmt;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture3D.MipLevels = 1;
     dx12Context.Device()->CreateShaderResourceView(
         resource, &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(handleOut));
     return true;
@@ -146,13 +146,13 @@ void NoiseTexture3D::ComputeNoise(void) {
 
 void NoiseTexture3D::SetParams(bool /*enforce*/) {
     m_hasParams = true;
-    m_sampling.minFilter     = GfxFilterMode::Linear;
-    m_sampling.magFilter     = GfxFilterMode::Linear;
-    m_sampling.mipMode       = GfxMipMode::None;
-    m_sampling.wrapU         = GfxWrapMode::Repeat;
-    m_sampling.wrapV         = GfxWrapMode::Repeat;
-    m_sampling.wrapW         = GfxWrapMode::Repeat;
-    m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+    m_sampling.minFilter = GfxFilterMode::Linear;
+    m_sampling.magFilter = GfxFilterMode::Linear;
+    m_sampling.mipMode = GfxMipMode::None;
+    m_sampling.wrapU = GfxWrapMode::Repeat;
+    m_sampling.wrapV = GfxWrapMode::Repeat;
+    m_sampling.wrapW = GfxWrapMode::Repeat;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
     m_sampling.maxAnisotropy = 1.0f;
 }
 
@@ -167,7 +167,7 @@ bool NoiseTexture3D::Deploy(int) {
 
     // RGBA16F — 4 channels × float16 per voxel
     // We store as float32; upload as RGBA32F.
-    constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    constexpr DXGI_FORMAT fmt = DXGI_FORMAT_R32G32B32A32_FLOAT;
     constexpr uint32_t    stride = 16;  // 4 × float32
 
     m_resource = Upload3DTextureData(device, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, fmt, stride, m_data.Data());
@@ -193,7 +193,7 @@ bool NoiseTexture3D::LoadFromFile(const String& filename) {
     if (not f)
         return false;
 
-    uint32_t voxelCount    = GridSize() * 4;
+    uint32_t voxelCount = GridSize() * 4;
     uint32_t expectedBytes = voxelCount * sizeof(float);
 
     f.seekg(0, std::ios::end);
@@ -219,7 +219,7 @@ bool NoiseTexture3D::SaveToFile(const String& filename) const {
         return false;
 
     uint32_t voxelCount = GridSize() * 4u;
-    uint32_t bytes      = voxelCount * sizeof(float);
+    uint32_t bytes = voxelCount * sizeof(float);
 
     if (m_data.Length() != voxelCount)
         return false;
@@ -255,14 +255,16 @@ bool CloudNoiseTexture::Allocate(int gridSize) {
 }
 
 
-bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String noiseFilename) {
+bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String noiseFilename, bool compute) {
     if (not Texture::Create())
         return false;
     m_type = TextureType::Texture3D;
     if (not Allocate(gridSize))
         return false;
     m_params = params;
-    if (not LoadFromFile(noiseFilename)) {
+    if (LoadFromFile(noiseFilename)) {
+        if (not compute)
+            return true;
         std::filesystem::path _p{ noiseFilename.GetStr() };
         Compute(_p.parent_path().string());
         SaveToFile(noiseFilename);
@@ -290,7 +292,7 @@ void CloudNoiseTexture::Compute(String textureFolder) {
     rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, textureFolder + "/cloudnoise-rgba.bin", false);
 
     float* rgbaData = rgbaNoise.GetData().Data();
-    float* data     = m_data.Data();
+    float* data = m_data.Data();
     uint32_t dataSize = m_gridSize * m_gridSize * m_gridSize;
 
     for (int i = dataSize; i; --i) {
@@ -317,9 +319,9 @@ void CloudNoiseTexture::Compute(String textureFolder) {
             for (int x = 0; x < m_gridSize; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridSize);
                 Vector4f noise = generator.Compute(p);
-                float perlin   = Amp(noise.x);
+                float perlin = Amp(noise.x);
                 perlin *= perlin;
-                float worley   = Amp2(noise.y) * 0.625f + Amp2(noise.z) * 0.125f + Amp2(noise.w) * 0.25f;
+                float worley = Amp2(noise.y) * 0.625f + Amp2(noise.z) * 0.125f + Amp2(noise.w) * 0.25f;
                 *m_data.Data()++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
             }
         }
@@ -330,13 +332,13 @@ void CloudNoiseTexture::Compute(String textureFolder) {
 
 void CloudNoiseTexture::SetParams(bool /*enforce*/) {
     m_hasParams = true;
-    m_sampling.minFilter     = GfxFilterMode::Linear;
-    m_sampling.magFilter     = GfxFilterMode::Linear;
-    m_sampling.mipMode       = GfxMipMode::None;
-    m_sampling.wrapU         = GfxWrapMode::Repeat;
-    m_sampling.wrapV         = GfxWrapMode::Repeat;
-    m_sampling.wrapW         = GfxWrapMode::Repeat;
-    m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+    m_sampling.minFilter = GfxFilterMode::Linear;
+    m_sampling.magFilter = GfxFilterMode::Linear;
+    m_sampling.mipMode = GfxMipMode::None;
+    m_sampling.wrapU = GfxWrapMode::Repeat;
+    m_sampling.wrapV = GfxWrapMode::Repeat;
+    m_sampling.wrapW = GfxWrapMode::Repeat;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
     m_sampling.maxAnisotropy = 1.0f;
 }
 
@@ -350,7 +352,7 @@ bool CloudNoiseTexture::Deploy(int) {
         return false;
 
     // Single-channel float32 → R32_FLOAT
-    constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R32_FLOAT;
+    constexpr DXGI_FORMAT fmt = DXGI_FORMAT_R32_FLOAT;
     constexpr uint32_t    stride = 4;
 
     m_resource = Upload3DTextureData(device, m_gridSize, m_gridSize, m_gridSize, fmt, stride, m_data.Data());
@@ -371,6 +373,86 @@ bool CloudNoiseTexture::LoadFromFile(const String& filename) {
 
 bool CloudNoiseTexture::SaveToFile(const String& filename) const {
     return m_data.SaveToFile(filename);
+}
+
+
+static bool IsPowerOfTwo(int n) {
+    return (n > 0) and ((n & (n - 1)) == 0);
+}
+
+
+void CloudNoiseTexture::DownSample(float* src, int srcEdgeLen, float* dest, int destEdgeLen) {
+    if ((src == nullptr) or (dest == nullptr))
+        return;
+    if (not IsPowerOfTwo(srcEdgeLen))
+        return;
+    if (not IsPowerOfTwo(destEdgeLen))
+        return;
+    if (destEdgeLen >= srcEdgeLen)
+        return;
+
+    const int ratio = srcEdgeLen / destEdgeLen;
+    const size_t srcRow = size_t(srcEdgeLen);
+    const size_t srcSlice = srcRow * srcRow;
+    const size_t destRow = size_t(destEdgeLen);
+    const size_t destSlice = destRow * destRow;
+
+    for (int zd = 0; zd < destEdgeLen; ++zd) {
+        const int sz0 = zd * ratio;
+        for (int yd = 0; yd < destEdgeLen; ++yd) {
+            const int sy0 = yd * ratio;
+            for (int xd = 0; xd < destEdgeLen; ++xd) {
+                const int sx0 = xd * ratio;
+                float maxVal = src[size_t(sz0) * srcSlice + size_t(sy0) * srcRow + size_t(sx0)];
+                for (int iz = 0; iz < ratio; ++iz) {
+                    const size_t zOff = size_t(sz0 + iz) * srcSlice;
+                    for (int iy = 0; iy < ratio; ++iy) {
+                        const size_t yOff = size_t(sy0 + iy) * srcRow;
+                        for (int ix = 0; ix < ratio; ++ix) {
+                            const float v = src[zOff + yOff + size_t(sx0 + ix)];
+                            if (maxVal < v)
+                                maxVal = v;
+                        }
+                    }
+                }
+                dest[size_t(zd) * destSlice + size_t(yd) * destRow + size_t(xd)] = maxVal;
+            }
+        }
+    }
+}
+
+
+void CloudNoiseTexture::ToMaxMip(CloudNoiseTexture* mipTex) {
+    if (mipTex == nullptr)
+        return;
+    DownSample(m_data.Data(), m_gridSize, mipTex->m_data.Data(), mipTex->m_gridSize);
+}
+
+
+CloudNoiseTexture* CloudNoiseTexture::ToMaxMip(int mipSize, String noiseFilename) {
+    if (not IsPowerOfTwo(m_gridSize))
+        return nullptr;
+    if (not IsPowerOfTwo(mipSize))
+        return nullptr;
+    if (mipSize >= m_gridSize)
+        return nullptr;
+
+    CloudNoiseTexture* mipTex = new CloudNoiseTexture();
+    if (mipTex == nullptr)
+        return nullptr;
+
+    if (not mipTex->Create(mipSize, m_params, noiseFilename, false)) {
+        delete mipTex;
+        return nullptr;
+    }
+
+    ToMaxMip(mipTex);
+    if (not mipTex->Deploy()) {
+        delete mipTex;
+        return nullptr;
+    }
+    mipTex->SaveToFile(noiseFilename);
+    return mipTex;
 }
 
 // =================================================================================================
@@ -421,13 +503,13 @@ void BlueNoiseTexture::Compute(String textureFolder) {
 
 void BlueNoiseTexture::SetParams(bool /*enforce*/) {
     m_hasParams = true;
-    m_sampling.minFilter     = GfxFilterMode::Nearest;
-    m_sampling.magFilter     = GfxFilterMode::Nearest;
-    m_sampling.mipMode       = GfxMipMode::None;
-    m_sampling.wrapU         = GfxWrapMode::Repeat;
-    m_sampling.wrapV         = GfxWrapMode::Repeat;
-    m_sampling.wrapW         = GfxWrapMode::Repeat;
-    m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+    m_sampling.minFilter = GfxFilterMode::Nearest;
+    m_sampling.magFilter = GfxFilterMode::Nearest;
+    m_sampling.mipMode = GfxMipMode::None;
+    m_sampling.wrapU = GfxWrapMode::Repeat;
+    m_sampling.wrapV = GfxWrapMode::Repeat;
+    m_sampling.wrapW = GfxWrapMode::Repeat;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
     m_sampling.maxAnisotropy = 1.0f;
 }
 
@@ -440,7 +522,7 @@ bool BlueNoiseTexture::Deploy(int) {
     if (not device)
         return false;
 
-    constexpr DXGI_FORMAT fmt    = DXGI_FORMAT_R8_UNORM;
+    constexpr DXGI_FORMAT fmt = DXGI_FORMAT_R8_UNORM;
     constexpr uint32_t    stride = 1;
 
     m_resource = Upload3DTextureData(device, 128, 128, 64, fmt, stride, m_data.Data());

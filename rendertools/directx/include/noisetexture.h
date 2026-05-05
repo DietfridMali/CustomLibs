@@ -369,7 +369,13 @@ public:
 
     virtual void SetParams(bool enforce = false) override;
 
-    bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "");
+    bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "", bool compute = true);
+
+    void ToMaxMip(CloudNoiseTexture* mipTex);
+
+    CloudNoiseTexture* ToMaxMip(int destSize, String noiseFilename = "");
+
+    static void DownSample(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
 
 private:
     int                 m_gridSize{ 0 };
