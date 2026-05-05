@@ -48,6 +48,8 @@ protected:
     Vector2f                m_ndcBias;
     BaseQuad                m_renderQuad;
 
+    int                     m_frameIndex;
+
     int                     m_windowWidth;
     int                     m_windowHeight;
     int                     m_sceneLeft;
@@ -79,6 +81,7 @@ public:
         : m_screenBuffer(nullptr)
         , m_sceneBuffer(nullptr)
         , m_skyBuffer(nullptr)
+        , m_frameIndex(0)
         , m_windowWidth(0)
         , m_windowHeight(0)
         , m_sceneWidth(0)
@@ -180,6 +183,10 @@ public:
     virtual bool UsePostEffectShader(void) { return false; }
 
     virtual Shader* LoadPostEffectShader(void){ return nullptr; }
+
+    inline int FrameIndex(void) noexcept {
+        return m_frameIndex;
+    }
 
     inline void SetSceneViewport(Viewport viewport) noexcept { m_sceneViewport = viewport; }
 
