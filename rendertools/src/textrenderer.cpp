@@ -57,18 +57,6 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     if (not shader)
         return;
 
-    // test code: display entire atlas on screen
-#if TEST_ATLAS
-    baseRenderer.ResetTransformation();
-    baseRenderer.SetViewport(::Viewport (0, 0, m_font->GetAtlas().GetWidth(), m_font->GetAtlas().GetHeight()));
-    RenderTarget* renderTarget = m_font->GetRenderTarget();
-    if (renderTarget) {
-        renderTarget->Render({}, ColorData::Yellow);
-        //delete renderTarget;
-    }
-    return;
-#endif
-
     if (flipVertically)
         y = -y;
 
@@ -209,7 +197,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
         if (not renderTarget) {
 #if 1
             void* cl = baseRenderer.StartOperation(text);
-            if (baseRenderer.StartOperation(text)) {
+            if (cl) {
                 RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
                 baseRenderer.FinishOperation(cl);
             }

@@ -6,11 +6,18 @@
 
 // =================================================================================================
 
+enum class NoiseWarp {
+    Infinite,
+    Periodic,
+    None
+};
+
 struct NoiseParams {
     uint32_t    seed{ 0x1234567u };
     int         cellsPerAxis{ 8 };
     int         normalize{ 1 };
     FBMParams   fbmParams;
+    NoiseWarp   warping{ NoiseWarp::None };
 };
 
 // -------------------------------------------------------------------------------------------------

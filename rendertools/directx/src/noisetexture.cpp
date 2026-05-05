@@ -240,6 +240,60 @@ static float Amp2(float v) {
 }
 
 
+// Trilinear sample with [0,1) wrap (matches GL_REPEAT / D3D12_TEXTURE_ADDRESS_WRAP).
+static float TrilinearSampleWrap(const float* data, int size, float u, float v, float w) {
+    u = u - std::floor(u);
+    v = v - std::floor(v);
+    w = w - std::floor(w);
+
+    float fx = u * float(size) - 0.5f;
+    float fy = v * float(size) - 0.5f;
+    float fz = w * float(size) - 0.5f;
+
+    int x0 = (int)std::floor(fx);
+    int y0 = (int)std::floor(fy);
+    int z0 = (int)std::floor(fz);
+    int x1 = x0 + 1;
+    int y1 = y0 + 1;
+    int z1 = z0 + 1;
+
+    float tx = fx - float(x0);
+    float ty = fy - float(y0);
+    float tz = fz - float(z0);
+
+    auto wrap = [size](int i) { return ((i % size) + size) % size; };
+    x0 = wrap(x0);
+    x1 = wrap(x1);
+    y0 = wrap(y0);
+    y1 = wrap(y1);
+    z0 = wrap(z0);
+    z1 = wrap(z1);
+
+    auto idx = [size](int x, int y, int z) {
+        return (z * size + y) * size + x;
+    };
+
+    float c000 = data[idx(x0, y0, z0)];
+    float c100 = data[idx(x1, y0, z0)];
+    float c010 = data[idx(x0, y1, z0)];
+    float c110 = data[idx(x1, y1, z0)];
+    float c001 = data[idx(x0, y0, z1)];
+    float c101 = data[idx(x1, y0, z1)];
+    float c011 = data[idx(x0, y1, z1)];
+    float c111 = data[idx(x1, y1, z1)];
+
+    float c00 = c000 + tx * (c100 - c000);
+    float c10 = c010 + tx * (c110 - c010);
+    float c01 = c001 + tx * (c101 - c001);
+    float c11 = c011 + tx * (c111 - c011);
+
+    float c0 = c00 + ty * (c10 - c00);
+    float c1 = c01 + ty * (c11 - c01);
+
+    return c0 + tz * (c1 - c0);
+}
+
+
 bool CloudNoiseTexture::Allocate(int gridSize) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf)
@@ -267,6 +321,7 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
             return true;
         std::filesystem::path _p{ noiseFilename.GetStr() };
         Compute(_p.parent_path().string());
+        ApplyWarp();
         SaveToFile(noiseFilename);
     }
 #if 0
@@ -327,6 +382,113 @@ void CloudNoiseTexture::Compute(String textureFolder) {
         }
     }
 #endif
+}
+
+
+// Bake a warp transform into the noise texture: for every voxel p in [0,1)^3,
+// store raw[Warped(p)] at p. Drift in the shader becomes a clean translation of a
+// static warp-distorted field; the shader's Warped() can be a no-op (applyWarp=0).
+//
+// Variant is selected via m_params.warping:
+//   Infinite — linear cross-axis warp (0.37*p.z, 0.41*p.x). Not periodic in p, so
+//              final[] is not periodic either; usable only when the entire visible
+//              world fits in one texture tile (small cloudScale, no GL_REPEAT wrap
+//              during sampling). Tile-seam visible otherwise.
+//   Periodic — sin(2*pi*p)/(2*pi) replaces the linear cross-axis term. final[] is
+//              periodic; tile-seam disappears, slight tile-repetition possible.
+//   None     — no pre-warp; raw noise stored as-is. Shader can still apply runtime
+//              warp via applyWarp uniform.
+void CloudNoiseTexture::ApplyWarp(void) {
+    switch (m_params.warping) {
+        case NoiseWarp::Infinite:
+            ApplyInfiniteWarp();
+            break;
+        case NoiseWarp::Periodic:
+            ApplyPeriodicWarp();
+            break;
+        case NoiseWarp::None:
+        default:
+            break;
+    }
+}
+
+
+// Linear cross-axis warp (matches the shader's original Warped() before pre-warp).
+// Not periodic in p — see warning in ApplyWarp().
+void CloudNoiseTexture::ApplyInfiniteWarp(void) {
+    static const float warpStrength = 0.25f;
+
+    uint32_t totalVoxels = uint32_t(m_gridSize) * uint32_t(m_gridSize) * uint32_t(m_gridSize);
+
+    AutoArray<float> raw;
+    raw.Resize(totalVoxels);
+    std::memcpy(raw.Data(), m_data.Data(), size_t(totalVoxels) * sizeof(float));
+
+    const float* src = raw.Data();
+    float* dst = m_data.Data();
+    const float invSize = 1.0f / float(m_gridSize);
+
+    for (int z = 0; z < m_gridSize; ++z) {
+        float pz = (float(z) + 0.5f) * invSize;
+        for (int y = 0; y < m_gridSize; ++y) {
+            float py = (float(y) + 0.5f) * invSize;
+            for (int x = 0; x < m_gridSize; ++x) {
+                float px = (float(x) + 0.5f) * invSize;
+
+                float n = TrilinearSampleWrap(src, m_gridSize, px * 0.3f, py * 0.3f, pz * 0.3f);
+                float localWarp = warpStrength * (0.5f + n);
+
+                float wx = px + 0.37f * pz;
+                float wz = pz + 0.41f * px;
+                float warpedX = px + localWarp * (wx - px);
+                float warpedY = py;
+                float warpedZ = pz + localWarp * (wz - pz);
+
+                *dst++ = TrilinearSampleWrap(src, m_gridSize, warpedX, warpedY, warpedZ);
+            }
+        }
+    }
+}
+
+
+// Periodic cross-axis warp — sin(2*pi*p)/(2*pi) is 1-periodic in p so final[] stays
+// seamless across tile boundaries. Amplitude factor 1/(2*pi) keeps max displacement
+// comparable to the linear form (peak ~0.059 vs 0.37 at p.z=1).
+void CloudNoiseTexture::ApplyPeriodicWarp(void) {
+    static const float warpStrength = 0.25f;
+    static const float kTwoPi = 6.28318530717958647692f;
+    static const float kInvTwoPi = 1.0f / kTwoPi;
+
+    uint32_t totalVoxels = uint32_t(m_gridSize) * uint32_t(m_gridSize) * uint32_t(m_gridSize);
+
+    AutoArray<float> raw;
+    raw.Resize(totalVoxels);
+    std::memcpy(raw.Data(), m_data.Data(), size_t(totalVoxels) * sizeof(float));
+
+    const float* src = raw.Data();
+    float* dst = m_data.Data();
+    const float invSize = 1.0f / float(m_gridSize);
+
+    for (int z = 0; z < m_gridSize; ++z) {
+        float pz = (float(z) + 0.5f) * invSize;
+        for (int y = 0; y < m_gridSize; ++y) {
+            float py = (float(y) + 0.5f) * invSize;
+            for (int x = 0; x < m_gridSize; ++x) {
+                float px = (float(x) + 0.5f) * invSize;
+
+                float n = TrilinearSampleWrap(src, m_gridSize, px * 0.3f, py * 0.3f, pz * 0.3f);
+                float localWarp = warpStrength * (0.5f + n);
+
+                float wx = px + 0.37f * std::sin(kTwoPi * pz) * kInvTwoPi;
+                float wz = pz + 0.41f * std::sin(kTwoPi * px) * kInvTwoPi;
+                float warpedX = px + localWarp * (wx - px);
+                float warpedY = py;
+                float warpedZ = pz + localWarp * (wz - pz);
+
+                *dst++ = TrilinearSampleWrap(src, m_gridSize, warpedX, warpedY, warpedZ);
+            }
+        }
+    }
 }
 
 
@@ -437,7 +599,7 @@ CloudNoiseTexture* CloudNoiseTexture::CreateMaxMip(int mipSize, String noiseFile
     if (mipSize >= m_gridSize)
         return nullptr;
 
-    CloudNoiseTexture* mipTex = new CloudNoiseTexture();
+    CloudNoiseTexture* mipTex = new NoiseMaxMipTexture();
     if (mipTex == nullptr)
         return nullptr;
 
@@ -456,6 +618,20 @@ CloudNoiseTexture* CloudNoiseTexture::CreateMaxMip(int mipSize, String noiseFile
     }
     mipTex->SaveToFile(noiseFilename);
     return mipTex;
+}
+
+// =================================================================================================
+
+void NoiseMaxMipTexture::SetParams(bool /*enforce*/) {
+    m_hasParams = true;
+    m_sampling.minFilter = GfxFilterMode::Linear;
+    m_sampling.magFilter = GfxFilterMode::Linear;
+    m_sampling.mipMode = GfxMipMode::None;
+    m_sampling.wrapU = GfxWrapMode::Repeat;
+    m_sampling.wrapV = GfxWrapMode::Repeat;
+    m_sampling.wrapW = GfxWrapMode::Repeat;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = 1.0f;
 }
 
 // =================================================================================================

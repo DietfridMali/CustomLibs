@@ -386,9 +386,24 @@ private:
 
     void Compute(String textureFolder = "");
 
+    void ApplyWarp(void);
+
+    void ApplyInfiniteWarp(void);
+
+    void ApplyPeriodicWarp(void);
+
     bool LoadFromFile(const String& filename);
 
     bool SaveToFile(const String& filename) const;
+};
+
+// =================================================================================================
+
+class NoiseMaxMipTexture
+    : public CloudNoiseTexture
+{
+public:
+    virtual void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================

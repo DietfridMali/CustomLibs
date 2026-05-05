@@ -59,11 +59,23 @@ BaseShaderCode::BaseShaderCode() {
 }
 
 
+static String FormatCompilerArgs(const AutoArray<ShaderMacro>& macros) {
+    String out;
+    for (const ShaderMacro& m : macros)
+        out = out + String("#define ") + m.m_name + String(" ") + m.m_value + String("\n");
+    return out;
+}
+
+
 void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
     for (const ShaderSource* source : shaderSource) {
-        Shader* shader = new Shader(source->m_name, source->m_vs, source->m_fs, source->m_gs);
+        String prefix = FormatCompilerArgs(source->m_compilerArgs);
+        String vs = prefix + source->m_vs;
+        String fs = prefix + source->m_fs;
+        String gs = source->m_gs.IsEmpty() ? String() : (prefix + source->m_gs);
+        Shader* shader = new Shader(source->m_name, vs, fs, gs);
         shader->m_dataLayout = source->m_dataLayout;
-        if (shader->Create(source->m_vs, source->m_fs, source->m_gs))
+        if (shader->Create(vs, fs, gs))
             m_shaders[source->m_name] = shader;
 #ifdef _DEBUG
         else
