@@ -162,6 +162,7 @@
     <ClInclude Include="..\..\include\rendermatrices.h" />
     <ClInclude Include="..\include\resource_chunkhandler.h" />
     <ClInclude Include="..\include\resource_handler.h" />
+    <ClInclude Include="..\include\sampler_cache.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
@@ -183,6 +184,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\base_renderer.cpp" />
     <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
+    <ClCompile Include="..\..\src\shadowmap.cpp" />
     <ClCompile Include="..\..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
@@ -216,11 +218,11 @@
     <ClCompile Include="..\..\src\rendermatrices.cpp" />
     <ClCompile Include="..\src\resource_chunkhandler.cpp" />
     <ClCompile Include="..\src\resource_handler.cpp" />
+    <ClCompile Include="..\src\sampler_cache.cpp" />
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />
-    <ClCompile Include="..\src\shadowmap.cpp" />
     <ClCompile Include="..\src\skybox.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\..\src\textureatlas.cpp" />
