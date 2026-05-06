@@ -48,8 +48,8 @@ protected:
     Vector2f                m_ndcBias;
     BaseQuad                m_renderQuad;
 
+    int                     m_renderQuality;
     int                     m_frameIndex;
-
     int                     m_windowWidth;
     int                     m_windowHeight;
     int                     m_sceneLeft;
@@ -81,6 +81,7 @@ public:
         : m_screenBuffer(nullptr)
         , m_sceneBuffer(nullptr)
         , m_skyBuffer(nullptr)
+        , m_renderQuality(0)
         , m_frameIndex(0)
         , m_windowWidth(0)
         , m_windowHeight(0)
@@ -139,6 +140,18 @@ public:
 
     inline void SetRenderPass(RenderPassType renderPass) noexcept { 
         m_renderPass = renderPass; 
+    }
+
+    inline int GetRenderQuality(void) noexcept {
+        return m_renderQuality;
+    }
+
+    inline void SetRenderQuality(int quality) noexcept {
+        m_renderQuality = quality;
+    }
+
+    inline bool HasRenderQuality(int quality) noexcept {
+        return m_renderQuality == quality;
     }
 
     virtual void StartShadowPass(void) noexcept;
