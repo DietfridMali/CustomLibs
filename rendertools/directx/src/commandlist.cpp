@@ -57,10 +57,10 @@ bool CommandQueue::Create(ID3D12Device* device, const String& name) noexcept {
 
     if (not cbvAllocator.Create(device))
         return false;
-
+#ifdef _DEBUG
     if (not name.IsEmpty())
         m_queue->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
-
+#endif
     return true;
 }
 
@@ -142,8 +142,10 @@ bool CommandList::Create(ID3D12Device* device, const String& name, bool isTempor
     }
     m_gfxListPtr->Close();
     m_id = commandListHandler.m_cmdListId++;
+#ifdef _DEBUG
     if (not name.IsEmpty())
         m_gfxListPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
+#endif
     m_name = name;
     m_isTemporary = isTemporary;
     return true;

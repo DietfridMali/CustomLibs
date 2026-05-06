@@ -39,7 +39,7 @@ bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID
     snprintf(name, sizeof(name), "Texture Subresource[%d,%d]", width, height);
     outUpload = gfxResourceHandler.GetUploadResource("", size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
 #else
-    outUpload = gfxResourceHandler.GetUploadResource(name, size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
+    outUpload = gfxResourceHandler.GetUploadResource("", size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
 #endif
     if (not outUpload)
         return false;

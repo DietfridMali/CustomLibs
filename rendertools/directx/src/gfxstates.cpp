@@ -215,13 +215,11 @@ void GfxStates::ClearError(void) noexcept {
 
 
 bool GfxStates::CheckError(const char* operation) noexcept {
-#ifdef NDEBUG
-    return true;
-#else
+#ifdef _DEBUG
     if (dx12Context.DrainMessages(false) > 0)
         return false;
-    return true;
 #endif
+    return true;
 }
 
 // =================================================================================================
