@@ -25,6 +25,7 @@ using namespace Noise;
 #define NORMALIZE_NOISE 0
 
 #define CLOUD_STRUCTURE 2
+#define SPREAD_NOISE    1
 
 // Helper: allocate a SRV for a 3D texture resource
 static bool CreateSRV3D(uint32_t& handleOut, ID3D12Resource* resource, DXGI_FORMAT fmt) {
@@ -349,7 +350,7 @@ void CloudNoiseTexture::Compute(String textureFolder) {
     float* rgbaData = rgbaNoise.GetData().Data();
     float* data = m_data.Data();
     uint32_t dataSize = m_gridSize * m_gridSize * m_gridSize;
-
+#if SPREAD_NOISE
     for (int i = dataSize; i; --i) {
         float perlin = Amp(rgbaData[0]);
         perlin *= perlin;
@@ -363,7 +364,20 @@ void CloudNoiseTexture::Compute(String textureFolder) {
         *data++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
         rgbaData += 4;
     }
-
+#else
+    for (int i = dataSize; i; --i) {
+        float perlin = Amp(rgbaData[0]);
+#if CLOUD_STRUCTURE == 0
+        float worley = rgbaData[1] * 0.625f + rgbaData[2] * 0.25f + rgbaData[3] * 0.125f;
+#elif CLOUD_STRUCTURE == 1
+        float worley = rgbaData[1] * 0.5f + rgbaData[2] * 0.3f + rgbaData[3] * 0.2f;
+#else
+        float worley = rgbaData[1] * 0.65f + rgbaData[2] * 0.25f + rgbaData[3] * 0.1f;
+#endif
+        *data++ = generator.Remap(perlin, worley - 1.0f, 1.0f, 0.0f, 1.0f);
+        rgbaData += 4;
+    }
+#endif
     rgbaNoise.GetData().Reset();
 #else
     Vector3f p;
@@ -624,8 +638,8 @@ CloudNoiseTexture* CloudNoiseTexture::CreateMaxMip(int mipSize, String noiseFile
 
 void NoiseMaxMipTexture::SetParams(bool /*enforce*/) {
     m_hasParams = true;
-    m_sampling.minFilter = GfxFilterMode::Linear;
-    m_sampling.magFilter = GfxFilterMode::Linear;
+    m_sampling.minFilter = GfxFilterMode::Nearest;
+    m_sampling.magFilter = GfxFilterMode::Nearest;
     m_sampling.mipMode = GfxMipMode::None;
     m_sampling.wrapU = GfxWrapMode::Repeat;
     m_sampling.wrapV = GfxWrapMode::Repeat;
