@@ -63,7 +63,7 @@ void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
             m_shaders[source->m_name] = nullptr; // enter the shader so the dictionary search doesn't simply fail, but returns a nullptr
         else {
             Shader* shader = new Shader(source->m_name);
-#ifdef _DEBUG
+#if 0//def _DEBUG
             fprintf(stderr, "creating shader '%s'\n", (const char*)source->m_name);
 #endif
             if (shader->Create(source->m_vs, source->m_fs, source->m_gs))
