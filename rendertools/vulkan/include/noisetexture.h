@@ -369,7 +369,13 @@ public:
 
     virtual void SetParams(bool enforce = false) override;
 
-    bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "");
+    bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "", bool compute = true);
+
+    void ToMaxMip(CloudNoiseTexture* mipTex);
+
+    CloudNoiseTexture* CreateMaxMip(int destSize, String noiseFilename = "");
+
+    static void DownSample(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
 
 private:
     int                 m_gridSize{ 0 };
@@ -380,9 +386,24 @@ private:
 
     void Compute(String textureFolder = "");
 
+    void ApplyWarp(void);
+
+    void ApplyInfiniteWarp(void);
+
+    void ApplyPeriodicWarp(void);
+
     bool LoadFromFile(const String& filename);
 
     bool SaveToFile(const String& filename) const;
+};
+
+// =================================================================================================
+
+class NoiseMaxMipTexture
+    : public CloudNoiseTexture
+{
+public:
+    virtual void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================

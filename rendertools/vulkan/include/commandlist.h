@@ -227,39 +227,55 @@ public:
     // Returns a CommandList. If isTemporary is true, tries to reuse one from m_recycledLists
     // before allocating a new one. Temporary CLs are recycled after ExecuteAll().
     // Caller owns the memory for non-temporary lists.
-#ifdef _DEBUG
     // Set to true to print every logged GPU call (DrawInstanced etc.) with file/line to stderr.
     // Defaults to false to avoid flooding the output in normal operation.
+#ifdef _DEBUG
     static bool s_logCalls;
-
+#endif
+#ifdef _DEBUG
     inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), loc.line());
+#else
+    inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst) noexcept {
+#endif
         if (CurrentGfxList())
             CurrentGfxList()->DrawInstanced(vtxCount, instCount, startVtx, startInst);
     }
 
+#ifdef _DEBUG
     inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), loc.line());
+#else
+    inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst) noexcept {
+#endif
         if (CurrentGfxList())
             CurrentGfxList()->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVtx, startInst);
     }
 
-    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION* dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION* src, const D3D12_BOX* srcBox, std::source_location loc = std::source_location::current()) noexcept {
+#ifdef _DEBUG
+    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION * dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION * src, const D3D12_BOX * srcBox, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[CTR] %s:%u\n", loc.file_name(), loc.line());
+#else
+    inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION * dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION * src, const D3D12_BOX * srcBox) noexcept {
+#endif
         if (CurrentGfxList())
             CurrentGfxList()->CopyTextureRegion(dst, dstX, dstY, dstZ, src, srcBox);
     }
 
+#ifdef _DEBUG
     inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER* barriers, std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
             fprintf(stderr, "[RB]  n=%u  %s:%u\n", numBarriers, loc.file_name(), loc.line());
+#else
+    inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER * barriers) noexcept {
+#endif
         if (CurrentGfxList())
             CurrentGfxList()->ResourceBarrier(numBarriers, barriers);
     }
-#endif
+
     CommandList* CreateCmdList(const String& name = "", bool isTemporary = true) noexcept;
 };
 
