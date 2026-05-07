@@ -175,7 +175,7 @@ void BaseDisplayHandler::Update(void) {
 }
 
 
-bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) {
+bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) {
     if (displayMode >= m_displayModes.Length())
         return false;
 
@@ -200,30 +200,28 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
         m_width = mode.w;
         m_height = mode.h;
         m_aspectRatio = float(m_width) / float(m_height);
-        OnResize();
     }
 #if 0
     else if (m_isFullscreen != useFullscreen) {
         m_isFullscreen = useFullscreen;
         SDL_SetWindowFullscreen(m_window, m_isFullscreen ? SDL_WINDOW_FULLSCREEN : 0);
         SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-        OnResize();
     }
 #endif
     return true;
 }
 
 
-bool BaseDisplayHandler::SwitchDisplayMode(int direction) {
-    return ChangeDisplayMode(m_activeDisplayMode + direction, m_isFullscreen);
+void BaseDisplayHandler::SwitchDisplayMode(int direction) {
+    RequestDisplayChange(m_activeDisplayMode + direction, m_isFullscreen);
 }
 
 
-bool BaseDisplayHandler::ToggleFullscreen(void) {
+void BaseDisplayHandler::ToggleFullscreen(void) {
 #ifdef _DEBUG
     fprintf(stderr, "Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
-    return ChangeDisplayMode(-1, not m_isFullscreen);
+    RequestDisplayChange(-1, not m_isFullscreen);
 }
 
 

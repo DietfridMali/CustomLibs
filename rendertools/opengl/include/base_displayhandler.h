@@ -104,7 +104,7 @@ public:
         m_activeDisplayMode = displayMode;
     }
 
-    bool ChangeDisplayMode(int displayMode, bool useFullscreen);
+    bool UpdateDisplayMode(int displayMode, bool useFullscreen);
 
     inline bool IsFullScreen(void) noexcept {
         return m_isFullscreen;
@@ -114,9 +114,9 @@ public:
         m_isFullscreen = useFullscreen;
     }
 
-    bool SwitchDisplayMode(int direction);
+    void SwitchDisplayMode(int direction);
 
-    bool ToggleFullscreen(void);
+    void ToggleFullscreen(void);
 
     inline bool DisplayModeHasChanged(int& lastDisplayMode) noexcept {
         if (lastDisplayMode == m_activeDisplayMode)
@@ -129,8 +129,7 @@ public:
 
     void DisableBackBuffer(void);
 
-
-    virtual void OnResize(void) {}
+    virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()
