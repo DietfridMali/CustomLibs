@@ -228,10 +228,6 @@ void BaseRenderer::SetViewport(bool flipVertically) noexcept {
 
 
 void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
-#if 1 //def _DEBUG
-    if (not HasOpenGL())
-        flipVertically = false;
-#endif
     if (windowWidth * windowHeight == 0) {
         RenderTarget* activeBuffer = GetActiveBuffer();
         if (activeBuffer) {
@@ -248,7 +244,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
     m_viewport = viewport;
     if (flipVertically)
         m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
-    m_viewport.BuildTransformation(windowWidth, windowHeight, flipVertically);
+    m_viewport.BuildTransformation(windowWidth, windowHeight, HasOpenGL() and flipVertically);
 }
 
 
