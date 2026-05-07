@@ -127,6 +127,7 @@
     <ClInclude Include="..\..\include\cube.h" />
     <ClInclude Include="..\..\include\drawbufferhandler.h" />
     <ClInclude Include="..\..\include\gfxapitype.h" />
+    <ClInclude Include="..\..\include\prerenderedtexture.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
@@ -148,7 +149,6 @@
     <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\noise.h" />
     <ClInclude Include="..\..\include\coplanar_rectangle.h" />
-    <ClInclude Include="..\include\prerenderedtexture.h" />
     <ClInclude Include="..\..\include\projector.h" />
     <ClInclude Include="..\..\include\base_quad.h" />
     <ClInclude Include="..\..\include\rectangle.h" />
@@ -176,6 +176,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\base_renderer.cpp" />
     <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
+    <ClCompile Include="..\..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\..\src\shadowmap.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
@@ -197,7 +198,6 @@
     <ClCompile Include="..\..\src\texteffects.cpp" />
     <ClCompile Include="..\src\outline_shader.cpp" />
     <ClCompile Include="..\..\src\coplanar_rectangle.cpp" />
-    <ClCompile Include="..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\..\src\projector.cpp" />
     <ClCompile Include="..\..\src\base_quad.cpp" />
     <ClCompile Include="..\..\src\rendermatrices.cpp" />

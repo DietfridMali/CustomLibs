@@ -24,7 +24,6 @@ OPENGL_FILES := \
  gfxrenderer \
  noisetexture \
  outline_shader \
- prerenderedtexture \
  primitive_shaders \
  rendertarget \
  shader \
@@ -48,6 +47,7 @@ COMMON_FILES := \
  linesegment \
  mesh \
  noise \
+ prerenderedtexture \
  projector \
  rendermatrices \
  shadowmap \
