@@ -178,6 +178,7 @@
     <ClCompile Include="..\..\src\drawbufferhandler.cpp" />
     <ClCompile Include="..\..\src\prerenderedtexture.cpp" />
     <ClCompile Include="..\..\src\shadowmap.cpp" />
+    <ClCompile Include="..\..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />
@@ -206,7 +207,6 @@
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />
     <ClCompile Include="..\src\skybox.cpp" />
-    <ClCompile Include="..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\..\src\textureatlas.cpp" />
     <ClCompile Include="..\src\texturebuffer.cpp" />

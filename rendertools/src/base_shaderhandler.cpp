@@ -214,10 +214,6 @@ Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply) {
 Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool flipVertically, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
     Shader* shader = SetupShader("plainTexture");
     if (shader) {
-        if (baseRenderer.HasOpenGL()) {
-            shader->SetInt("surface", 0);
-            shader->SetInt("flipVertically", flipVertically ? 1 : 0);
-        }
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("tcOffset", tcOffset);
