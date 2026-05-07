@@ -208,7 +208,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                     offset.y -= outlineWidth / float(renderTarget->m_height);
                 }
                 renderTarget->m_lastDestination = 0;
-                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically ? -1 : 1);
+                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
 #if 0
                 if (renderTarget->IsAvailable()) {
                     if (HaveOutline())
