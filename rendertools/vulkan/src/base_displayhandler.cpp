@@ -234,8 +234,8 @@ void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
 }
 
 
-void BaseDisplayHandler::Update(void) {
-    if (not m_swapChain) 
+void BaseDisplayHandler::EndFrame(void) {
+    if (not m_swapChain)
         return;
     // Close the main renderer list — registers it for submission.
     // Submit all registered lists (RenderTarget lists first, main list last — registration order).
@@ -245,12 +245,24 @@ void BaseDisplayHandler::Update(void) {
     UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
     HRESULT hr = m_swapChain->Present(syncInterval, presentFlags);
     if (FAILED(hr))
-        fprintf(stderr, "BaseDisplayHandler::Update: Present failed (hr=0x%08X)\n", (unsigned)hr);
+        fprintf(stderr, "BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+}
+
+
+void BaseDisplayHandler::BeginFrame(void) {
+    if (not m_swapChain)
+        return;
     // Wait for the next frame slot to be free, reset CBV allocator.
     // Active-shader tracking is invalidated because BeginFrame resets all DX12 command-list state.
     commandListHandler.CmdQueue().BeginFrame();
     baseShaderHandler.InvalidateActiveShader();
+}
+
+
+void BaseDisplayHandler::Update(void) {
+    EndFrame();
+    BeginFrame();
 }
 
 
@@ -264,7 +276,7 @@ BaseDisplayHandler::~BaseDisplayHandler() {
 }
 
 
-bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) {
+bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) {
     if (displayMode >= m_displayModes.Length())
         return false;
     if (displayMode < 0)
@@ -283,8 +295,8 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
         SDL_SetWindowSize(m_window, mode.w, mode.h);
         SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     }
-    m_width       = mode.w;
-    m_height      = mode.h;
+    m_width = mode.w;
+    m_height = mode.h;
     m_aspectRatio = float(m_width) / float(m_height);
 
     // Resize the swap chain back buffers
@@ -292,31 +304,28 @@ bool BaseDisplayHandler::ChangeDisplayMode(int displayMode, bool useFullscreen) 
         // GPU must be idle before resize
         commandListHandler.CmdQueue().WaitIdle();
         ReleaseBackBuffers();
-        HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT,
-            UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, 0);
+        HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT, UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
         if (FAILED(hr)) {
-            fprintf(stderr, "BaseDisplayHandler::ChangeDisplayMode: ResizeBuffers failed (hr=0x%08X)\n",
-                    (unsigned)hr);
+            fprintf(stderr, "BaseDisplayHandler::RequestDisplayChange: ResizeBuffers failed (hr=0x%08X)\n", (unsigned)hr);
             return false;
         }
         AcquireBackBuffers();
         m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
     }
-    OnResize();
     return true;
 }
 
 
-bool BaseDisplayHandler::SwitchDisplayMode(int direction) {
-    return ChangeDisplayMode(m_activeDisplayMode + direction, m_isFullscreen);
+void BaseDisplayHandler::SwitchDisplayMode(int direction) {
+    RequestDisplayChange(m_activeDisplayMode + direction, m_isFullscreen);
 }
 
 
-bool BaseDisplayHandler::ToggleFullscreen(void) {
+void BaseDisplayHandler::ToggleFullscreen(void) {
 #ifdef _DEBUG
     fprintf(stderr, "Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
-    return ChangeDisplayMode(-1, !m_isFullscreen);
+    RequestDisplayChange(-1, !m_isFullscreen);
 }
 
 // =================================================================================================
