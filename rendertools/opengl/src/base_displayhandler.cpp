@@ -160,8 +160,18 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
 }
 
 
-void BaseDisplayHandler::Update(void) {
+void BaseDisplayHandler::EndFrame(void) {
     SDL_GL_SwapWindow(m_window);
+}
+
+
+void BaseDisplayHandler::BeginFrame(void) {
+}
+
+
+void BaseDisplayHandler::Update(void) {
+    EndFrame();
+    BeginFrame();
 }
 
 

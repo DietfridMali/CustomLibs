@@ -209,13 +209,13 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
 #endif
             if (renderTarget->Activate({ .clear = true, .flush = true })) {
                 baseRenderer.PushViewport();
-                renderTarget->SetViewport();
+                renderTarget->SetViewport(true);
                 if (outlineWidth > 0) {
                     offset.x -= outlineWidth / float(renderTarget->m_width);
                     offset.y -= outlineWidth / float(renderTarget->m_height);
                 }
                 renderTarget->m_lastDestination = 0;
-                RenderText(text, td.width, offset.x, offset.y, alignment);
+                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically ? -1 : 1);
                 uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
 
                 if (baseRenderer.HasOpenGL())

@@ -41,7 +41,7 @@ bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignmen
     textRenderer.SetColor(m_color);
     textRenderer.SetDecoration(decoration);
     textRenderer.SetScale(1.0f);
-    textRenderer.RenderToBuffer(m_text, alignment, &m_renderTarget, m_renderTarget.m_viewport, 0, 0, baseRenderer.HasOpenGL()); // m_outlineWidth == 0);
+    textRenderer.RenderToBuffer(m_text, alignment, &m_renderTarget, m_renderTarget.m_viewport, 0, 0); // m_outlineWidth == 0);
     /*textRenderer.SetColor();*/
     return true;
 }

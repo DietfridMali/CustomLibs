@@ -65,6 +65,9 @@ public:
 
     virtual void Update(void);
 
+    void EndFrame(void);
+    void BeginFrame(void);
+
     inline int GetWidth(void) noexcept {
         return m_width;
     }

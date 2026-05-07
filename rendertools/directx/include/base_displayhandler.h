@@ -87,6 +87,9 @@ public:
     // Present the current back buffer, advance to the next one.
     virtual void Update(void);
 
+    void EndFrame(void);
+    void BeginFrame(void);
+
     // Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
     void EnableBackBuffer(void) noexcept;
 
@@ -113,7 +116,9 @@ public:
     
     inline HWND GetHwnd(void) noexcept { return m_hwnd; }
 
-    inline IDXGISwapChain3* SwapChain(void) noexcept { return m_swapChain.Get(); }
+    inline IDXGISwapChain3* SwapChain(void) noexcept { 
+        return m_swapChain.Get(); 
+    }
 
     inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
         return m_displayModes;
@@ -123,27 +128,36 @@ public:
         return m_displayModes[((i < 0) || (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
     }
 
-    inline int  SelectedDisplayMode(void) noexcept { return m_activeDisplayMode; }
+    inline int  SelectedDisplayMode(void) noexcept { 
+        return m_activeDisplayMode; 
+    }
     
-    inline void SelectDisplayMode(int displayMode) noexcept { m_activeDisplayMode = displayMode; }
+    inline void SelectDisplayMode(int displayMode) noexcept { 
+        m_activeDisplayMode = displayMode; 
+    }
 
-    bool ChangeDisplayMode(int displayMode, bool useFullscreen);
-
-    inline bool IsFullScreen(void) noexcept { return m_isFullscreen; }
+    inline bool IsFullScreen(void) noexcept { 
+        return m_isFullscreen; 
+    }
     
-    inline void SetFullScreen(bool useFullscreen) noexcept { m_isFullscreen = useFullscreen; }
+    inline void SetFullScreen(bool useFullscreen) noexcept { 
+        m_isFullscreen = useFullscreen; 
+    }
 
-    bool SwitchDisplayMode(int direction);
+    void SwitchDisplayMode(int direction);
 
-    bool ToggleFullscreen(void);
+    void ToggleFullscreen(void);
 
     inline bool DisplayModeHasChanged(int& lastDisplayMode) noexcept {
-        if (lastDisplayMode == m_activeDisplayMode) return false;
+        if (lastDisplayMode == m_activeDisplayMode) 
+            return false;
         lastDisplayMode = m_activeDisplayMode;
         return true;
     }
 
-    virtual void OnResize(void) {}
+    bool UpdateDisplayMode(int displayMode, bool useFullscreen);
+
+    virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
 
 private:
     bool CreateSwapChain(void);
