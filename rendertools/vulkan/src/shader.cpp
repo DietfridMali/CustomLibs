@@ -465,8 +465,8 @@ bool Shader::UploadB1(void) noexcept
 {
     // Per stage: sub-allocate sc.size bytes from cbvAllocator, memcpy sc.staging.data(),
     // store the dynamic offset at the matching m_dynamicOffsets slot. Stages with size == 0
-    // are skipped (mirror DX12 behaviour) and keep offset 0 — Phase C must omit the binding
-    // for empty stages or use a zero-size sub-allocation depending on validation policy.
+    // are skipped (mirror DX12 behaviour); UpdateVariables writes a 1-byte placeholder range
+    // for those bindings so the descriptor-set update stays valid.
     for (int s = 0; s < kStageCount; ++s) {
         StageConstants& sc = m_stages[s];
         if (sc.size == 0)

@@ -18,12 +18,11 @@
 // Storage image lives in VK_IMAGE_LAYOUT_GENERAL between operations (the layout that allows
 // shader storage-image read/write). Clear / Upload / Download briefly transition to
 // TRANSFER_DST / TRANSFER_SRC and back. They run on a one-shot CommandBuffer (blocking submit),
-// not on the active per-frame CommandList — Phase B doesn't yet expose a recording CB to high-
-// level callers, and the DX12 path's frame-level batching can be revisited once Phase C lands.
+// matching the DX12 path's "submit + wait" semantics for these out-of-frame operations.
 //
-// Bind() is currently a tracking-only stub: it records (binding, image-view) so a later
-// vkCmdBindDescriptorSets call (Phase C) can materialize the storage-image into the active
-// VkDescriptorSet at slot u(bindingPoint).
+// Bind() writes (m_imageView, VK_IMAGE_LAYOUT_GENERAL) into the CommandListHandler bind table at
+// the requested u-slot. Shader::UpdateVariables materializes the table into a VkDescriptorSet
+// (vkUpdateDescriptorSets + vkCmdBindDescriptorSets) right before each draw.
 
 class BaseGfxArray {
 public:
@@ -150,15 +149,14 @@ public:
         if (m_image == VK_NULL_HANDLE)
             return false;
         m_bindingPoint = bindingPoint;
-        // Phase C: write (m_imageView, VK_IMAGE_LAYOUT_GENERAL) into the per-frame
-        // CommandListHandler bind table at u-slot bindingPoint; mark dirty so the next Draw
-        // materializes a VkDescriptorSet write (VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) and
-        // vkCmdBindDescriptorSets. The DX12 SetGraphicsRootDescriptorTable equivalent.
+        if (bindingPoint < CommandListHandler::kUavSlots)
+            commandListHandler.BindStorageImage(bindingPoint, m_imageView);
         return true;
     }
 
-    void Release(uint32_t /*bindingPoint*/) {
-        // Phase C: clear storage-image entry at u-slot bindingPoint in the bind table.
+    void Release(uint32_t bindingPoint) {
+        if (bindingPoint < CommandListHandler::kUavSlots)
+            commandListHandler.BindStorageImage(bindingPoint, VK_NULL_HANDLE);
     }
 
     void Clear(DATA_T value) {

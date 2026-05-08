@@ -20,13 +20,13 @@
 // =================================================================================================
 // Vulkan Texture implementation
 //
-// Phase B status:
-//   • Header members ported (VkImage / VkImageView / VmaAllocation / ImageLayoutTracker).
-//   • Create / Destroy / CreateTextureResource / CreateSRV functional with VMA + vkCreateImageView.
-//   • Bind / Deploy / Release are stubs — the actual binding writes into a per-frame descriptor-set
-//     bind table (Phase C, with CommandList port) and Deploy uses vkupload helpers (next step).
-//   • Common-logic methods (Load, CreateFromFile, CreateFromSurface, Cartoonize, ComputeOffsets,
-//     SetParams, SetWrapping) are API-neutral and unchanged from the DX12 version.
+// Members: VkImage / VkImageView / VmaAllocation / ImageLayoutTracker.
+// Create / Destroy / CreateTextureResource / CreateSRV use VMA + vkCreateImageView; Deploy
+// routes through vkupload helpers. Bind / Release stage (image-view, sampler) into the
+// CommandListHandler bind table; Shader::UpdateVariables materializes the table into a
+// VkDescriptorSet (vkUpdateDescriptorSets + vkCmdBindDescriptorSets) right before each draw.
+// Common-logic methods (Load, CreateFromFile, CreateFromSurface, Cartoonize, ComputeOffsets,
+// SetParams, SetWrapping) are API-neutral and unchanged from the DX12 version.
 
 uint32_t Texture::nullHandle = UINT32_MAX;
 

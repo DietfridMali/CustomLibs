@@ -15,9 +15,9 @@
 // SetShape / Activate / Deactivate / IsValid / IsBound / IsActive / static stack helpers /
 // ActivateTextures / DeactivateTextures) are unchanged from the DX12 version.
 //
-// Phase C deferred: Enable / Disable / Render / StartUpdate / FinishUpdate need a live
-// VkCommandBuffer (vkCmdBindVertexBuffers / vkCmdBindIndexBuffer / vkCmdDrawIndexed) plus
-// CommandList integration. Stubbed below with TODOs.
+// Enable / Disable / Render / StartUpdate / FinishUpdate drive the active VkCommandBuffer:
+// vkCmdBindVertexBuffers / vkCmdBindIndexBuffer / vkCmdDrawIndexed via the CommandListHandler
+// wrappers, with the temp-CL routing through baseRenderer.StartOperation / FinishOperation.
 
 // Fixed input-slot mapping matching shader.h kSrvBase / kBindingB0 etc. — slot 0..N corresponds
 // to VkVertexInputBindingDescription.binding 0..N (and HLSL register-layout positions after

@@ -128,8 +128,8 @@ public:
     StageConstants m_stages[kStageCount];
 
     // Dynamic UBO offsets, filled by UploadB0 / UploadB1 from cbvAllocator allocations.
-    // Order matches descriptor-set bindings 0..3 (b0, b1-VS, b1-PS, b1-GS). Read by Activate
-    // (Phase C) and forwarded to vkCmdBindDescriptorSets via pDynamicOffsets.
+    // Order matches descriptor-set bindings 0..3 (b0, b1-VS, b1-PS, b1-GS). Forwarded to
+    // vkCmdBindDescriptorSets via pDynamicOffsets in Shader::UpdateVariables.
     static constexpr uint32_t kDynamicOffsetCount = 4;
     uint32_t  m_dynamicOffsets[kDynamicOffsetCount] { };
 
@@ -201,14 +201,15 @@ public:
     // -----------------------------------------------------------------------------------------
     // Runtime
 
-    // Activate this shader: vkCmdBindPipeline (Phase C) — pipeline lookup via RenderStates cache.
+    // Activate this shader: vkCmdBindPipeline via the active CommandList. Pipeline lookup
+    // through PipelineCache keyed on {Shader, RenderStates, active RT formats}.
     bool Activate(void);
 
     // No-op (pipeline changes are driven by RenderStates changes in the next bind).
     inline void Deactivate(void) noexcept {}
 
     // Upload the b0 / b1 buffers to UBO ring-buffer sub-allocations and stash dynamic offsets
-    // into the bind table — Phase C.
+    // for the next vkCmdBindDescriptorSets in UpdateVariables.
     bool UploadB0(void) noexcept;
     bool UploadB1(void) noexcept;
 

@@ -18,15 +18,12 @@
 //   • CreateRenderArea (BaseQuad setup, API-neutral).
 //   • BufferHandle (logical id accessor, API-neutral).
 //
-// What is deferred to Phase C (needs VkCommandBuffer / CommandList port):
-//   • Activate / Enable / Disable / Deactivate (vkCmdBeginRendering / vkCmdEndRendering).
-//   • Render / RenderAsTexture / AutoRender (descriptor-set bind pipeline).
-//   • Clear / Fill (vkCmdClearColorImage or LoadOp=CLEAR via VkRenderingAttachmentInfo).
-//   • AttachBuffer / DetachBuffer / BindBuffer (image-layout transitions on a live cmd buffer).
-//   • SetViewport / DepthBufferIsActive / SelectDrawBuffers / EnableBuffers / UpdateTransformation.
-//
-// The DX12 1:1 carry-over for the deferred methods is preserved in the #if 0 block below
-// as reference and will be ported when the CL/RT lifecycle moves to VkCommandBuffer.
+// Rendering / activation / clearing / binding methods (Activate / Enable / Disable / Deactivate /
+// Render / RenderAsTexture / AutoRender / Fill / Clear / ClearColorBuffers / ClearDepthBuffer /
+// ClearStencilBuffer / AttachBuffer / DetachBuffer / BindBuffer / SetViewport /
+// DepthBufferIsActive / SelectDrawBuffers / EnableBuffers / UpdateTransformation) are below,
+// implemented on top of the CommandList port (vkCmdBeginRendering / vkCmdEndRendering /
+// VkRenderingAttachmentInfo).
 
 static constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
 static constexpr VkFormat kVertexFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -258,8 +255,8 @@ void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 
     if (not CreateSRV(info, fmt, VK_IMAGE_ASPECT_COLOR_BIT))
         return;
-    // Initial layout transition (UNDEFINED -> SHADER_READ_ONLY) deferred until first
-    // Activate — needs a live VkCommandBuffer, which Phase C provides.
+    // Initial layout transition (UNDEFINED -> SHADER_READ_ONLY / COLOR_ATTACHMENT) is performed
+    // on the first Activate via BufferInfo::SetState on the live VkCommandBuffer.
 }
 
 
@@ -306,9 +303,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
     m_pingPong = m_colorBufferCount > 1;
     m_isScreenBuffer = params.isScreenBuffer;
-
-    // Phase C: m_cmdList = commandListHandler.CreateCmdList(...); m_cmdList->Open();
-    m_cmdList = nullptr;
+    m_cmdList = nullptr;  // attached lazily on first Activate via commandListHandler.CreateCmdList
 
     int attachmentIndex = 0;
     for (int i = 0; i < m_colorBufferCount; ++i)
@@ -319,8 +314,6 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
-
-    // Phase C: m_cmdList->Flush(); m_cmdList = nullptr;
 
     int w = width * scale;
     int h = height * scale;
@@ -333,7 +326,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 
 void RenderTarget::Destroy(void)
 {
-    // Phase C: if (m_cmdList) m_cmdList->Close();
+    if (m_cmdList)
+        m_cmdList->Close();
     m_cmdList = nullptr;
 
     for (int i = 0; i < m_bufferCount; ++i)

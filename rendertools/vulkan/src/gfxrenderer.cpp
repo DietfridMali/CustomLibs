@@ -65,44 +65,89 @@ bool GfxRenderer::InitGraphics(void) {
         fprintf(stderr, "Smiley-Battle: Cannot create Vulkan swapchain.\n");
         return false;
     }
-    // TODO Phase C: commandListHandler.CmdQueue().BeginFrame() arms the first frame; needs
-    // the per-frame command buffer pool from the full CommandList port.
-
+    // Arm the first frame slot so subsequent BeginFrame paths have a valid sync state.
+    if (not commandListHandler.CmdQueue().BeginFrame()) {
+        fprintf(stderr, "Smiley-Battle: Cannot begin first Vulkan frame.\n");
+        return false;
+    }
     return true;
 }
 
 
 void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
-    // TODO Phase C: temp CommandList from commandListHandler — currently a no-op so that
-    // upload paths (vkupload, gfxdatabuffer) which call StartOperation/FinishOperation as a
-    // wrapper compile and run. vkupload uses its own one-shot CommandBuffer in Phase B.
-    (void)name;
-    (void)piggyback;
-    return nullptr;
+    CommandList* cl = commandListHandler.CurrentCmdList();
+    if (cl) {
+        if (cl->IsTemporary())
+            ++(cl->m_refCounter);
+        return cl;
+    }
+    if (piggyback and m_temporaryList) {
+        ++(m_temporaryList->m_refCounter);
+        cl = m_temporaryList;
+    }
+    else {
+        cl = commandListHandler.CreateCmdList(name, true);
+        if (not cl)
+            return nullptr;
+        if (not cl->Open())
+            return nullptr;
+    }
+    if (piggyback)
+        m_temporaryList = cl;
+    return cl;
 }
 
 
 bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
-    // TODO Phase C: commit the temporary CommandList (Close + register, or Flush).
-    (void)cl;
-    (void)flush;
+    CommandList* list = static_cast<CommandList*>(cl);
+    if (not list)
+        return false;
+    if (not list->IsTemporary())
+        return true;
+#ifdef _DEBUG
+    if (list->m_refCounter == 0)
+        fprintf(stderr, "Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
+#endif
+    if (--(list->m_refCounter) == 0) {
+        if (flush)
+            list->Flush();
+        else
+            list->Close();
+        if (list == m_temporaryList)
+            m_temporaryList = nullptr;
+    }
     return true;
 }
 
 
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
-    // TODO Phase C: full screen-buffer blit path.
-    //   Stop2DScene; SetViewport(window-rect); EnableBackBuffer (UNDEFINED→COLOR via tracker);
-    //   render m_screenBuffer→backbuffer via RenderToViewport; DisableBackBuffer (→PRESENT);
-    //   then BaseDisplayHandler::Update presents.
-    (void)bRotate;
-    (void)bFlipVertically;
     if (not m_screenIsAvailable)
         return;
     ++m_frameIndex;
     m_frameCounter.Draw(true);
     Stop2DScene();
     m_screenIsAvailable = false;
+    if (not m_screenBuffer)
+        return;
+
+    Set2DRenderStates();
+
+    void* cl = StartOperation("DrawScreen", false);
+
+    // Bring the swapchain back buffer to COLOR_ATTACHMENT and clear it before blitting.
+    if (baseDisplayHandler.CurrentBackBuffer()) {
+        baseDisplayHandler.EnableBackBuffer();
+        gfxStates.ClearBackBuffer();
+    }
+    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+
+    m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
+    RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
+
+    // Transition back to PRESENT_SRC_KHR for vkQueuePresentKHR.
+    if (baseDisplayHandler.CurrentBackBuffer())
+        baseDisplayHandler.DisableBackBuffer();
+    FinishOperation(cl);
 }
 
 // =================================================================================================

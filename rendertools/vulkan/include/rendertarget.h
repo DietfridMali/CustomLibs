@@ -152,7 +152,7 @@ public:
 
     AutoArray<BufferInfo>   m_bufferInfo;
 
-    // Own command list — Phase C will route rendering recorded for this RT through here.
+    // Own command list — rendering recorded for this RT goes through it.
     CommandList*        m_cmdList{ nullptr };
 
     // -------------------------------------------------------------------------
@@ -175,9 +175,8 @@ public:
 
     void SetName(const String& name) noexcept {
         m_name = name;
-        // Phase C: m_cmdList->SetName(name); — propagates name to the wrapped CommandList /
-        // VkCommandBuffer for debug-marker labelling. CommandList class is in the Phase-C
-        // #if 0 block in commandlist.h.
+        if (m_cmdList)
+            m_cmdList->SetName(name);
     }
 
     bool Activate(const RTActivationParams& params);
@@ -200,8 +199,8 @@ public:
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
     inline void Flush(void) noexcept {
-        // Phase C: m_cmdList->Flush(); — close + immediate submit + WaitIdle the recording
-        // CommandList. CommandList class is in the Phase-C #if 0 block in commandlist.h.
+        if (m_cmdList)
+            m_cmdList->Flush();
     }
 
     inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
@@ -365,7 +364,7 @@ private:
     // DepthBufferHandle in DX12 returned a CPU descriptor handle pointer. In Vulkan there is no
     // such thing — depth attachment is described inline in the VkRenderingAttachmentInfo built
     // from m_bufferInfo[m_depthBufferIndex].m_imageView. The accessor is removed; callers
-    // (Phase C) should consult m_bufferInfo[m_depthBufferIndex] directly.
+    // consult m_bufferInfo[m_depthBufferIndex] directly.
 };
 
 // =================================================================================================
