@@ -98,4 +98,14 @@ void ImageLayoutTracker::ToPresent(VkCommandBuffer cb) noexcept
                  VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, VK_ACCESS_2_NONE);
 }
 
+
+void ImageLayoutTracker::ToGeneral(VkCommandBuffer cb) noexcept
+{
+    // Storage image: read + write from any shader stage. Cover all shader stages plus
+    // SHADER_STORAGE access (read & write) so subsequent vertex/fragment/compute uses are safe.
+    TransitionTo(cb, VK_IMAGE_LAYOUT_GENERAL,
+                 VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                 VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+}
+
 // =================================================================================================

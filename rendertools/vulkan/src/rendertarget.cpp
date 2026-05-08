@@ -389,28 +389,600 @@ uint32_t& RenderTarget::BufferHandle(int bufferIndex)
     return invalid;
 }
 
-// =================================================================================================
-// Phase C: rendering / activation / clearing / binding methods.
-// The DX12 1:1 carry-over below is preserved as reference and will be ported when the CL/RT
-// lifecycle moves to VkCommandBuffer + vkCmdBeginRendering / vkCmdEndRendering.
 
-#if 0
+// =================================================================================================
+// Phase-C rendering / activation / clearing / binding methods.
+// 1:1 port of the DX12 RenderTarget bodies (rendertools/directx/src/rendertarget.cpp), with
+// all DX12 API calls replaced by their Vulkan dynamic-rendering equivalents:
+//   D3D12_RESOURCE_STATE_*  -> ImageLayoutTracker.TransitionTo via BufferInfo::SetState
+//   OMSetRenderTargets      -> vkCmdBeginRendering / vkCmdEndRendering
+//   ClearRenderTargetView   -> VkRenderingAttachmentInfo loadOp = CLEAR + clearValue
+//   ClearDepthStencilView   -> VkRenderingAttachmentInfo loadOp = CLEAR + clearValue (depth)
+//   vkCmdClearAttachments   -> mid-pass clears (Fill / Clear / ClearStencilBuffer)
+//   SetGraphicsRootDescriptorTable -> Texture::Bind on m_renderTexture (bind table tracking)
 
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "commandlist.h"
-#include "dx12context.h"
+#include "vkcontext.h"
 #include "gfxstates.h"
 #include "sampler_cache.h"
+#include "descriptor_pool_handler.h"
+#include "shader.h"
+#include "pipeline_cache.h"
 
-// (DX12 original bodies for Activate / Enable / Disable / Render / Clear / Fill / AttachBuffer /
-// DetachBuffer / BindBuffer / SelectDrawBuffers / EnableBuffers / Deactivate / SetViewport /
-// DepthBufferIsActive / GetAsTexture / GetDepthAsTexture / GetDepthAsShadowTexture /
-// UpdateTransformation / RenderAsTexture / AutoRender are intentionally NOT carried into the
-// Vulkan tree by-line. They will be reimplemented from scratch in Phase C on top of the
-// dynamic-rendering API. The corresponding DX12 sources remain in
-// rendertools/directx/src/rendertarget.cpp as the porting reference.)
+namespace {
 
-#endif
+VkClearValue MakeClearColor(const RGBAColor& c) {
+    VkClearValue v{};
+    const float* d = c.Data();
+    v.color.float32[0] = d[0];
+    v.color.float32[1] = d[1];
+    v.color.float32[2] = d[2];
+    v.color.float32[3] = d[3];
+    return v;
+}
+
+VkClearValue MakeClearDepth(float depth) {
+    VkClearValue v{};
+    v.depthStencil.depth = depth;
+    v.depthStencil.stencil = 0;
+    return v;
+}
+
+}  // anonymous
+
+// -------------------------------------------------------------------------------------------------
+// BeginRendering / EndRendering — manage the vkCmdBeginRendering scope for this RT.
+
+void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
+{
+    if (m_isInRendering)
+        EndRendering();
+    if (not m_cmdList or not m_cmdList->IsRecording())
+        return;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE)
+        return;
+
+    VkRenderingAttachmentInfo colors[RT_MAX_COLOR_BUFFERS]{};
+    int colorCount = 0;
+    bool wantDepth = HaveDepthBuffer(true);
+
+    auto ConfigColor = [&](int i) {
+        BufferInfo& bi = m_bufferInfo[i];
+        if (bi.m_imageView == VK_NULL_HANDLE)
+            return;
+        VkRenderingAttachmentInfo a{};
+        a.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        a.imageView   = bi.m_imageView;
+        a.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        a.loadOp      = clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+        a.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+        a.clearValue  = MakeClearColor(m_clearColor);
+        colors[colorCount++] = a;
+    };
+
+    if (m_drawBufferGroup == dbDepth) {
+        // depth-only: no colour writes
+    }
+    else if (m_drawBufferGroup == dbSingle) {
+        if ((m_activeBufferIndex >= 0) and (m_activeBufferIndex < m_colorBufferCount))
+            ConfigColor(m_activeBufferIndex);
+    }
+    else if (m_drawBufferGroup == dbExtra) {
+        for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount and colorCount < RT_MAX_COLOR_BUFFERS; ++j, ++i)
+            ConfigColor(i);
+    }
+    else {
+        for (int i = 0; i < m_colorBufferCount and colorCount < RT_MAX_COLOR_BUFFERS; ++i)
+            ConfigColor(i);
+    }
+
+    VkRenderingAttachmentInfo depth{};
+    if (wantDepth) {
+        BufferInfo& di = m_bufferInfo[m_depthBufferIndex];
+        depth.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        depth.imageView   = di.m_imageView;
+        depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depth.loadOp      = clearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+        depth.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+        depth.clearValue  = MakeClearDepth(1.0f);
+    }
+
+    VkRenderingInfo info{};
+    info.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    info.renderArea.offset    = { 0, 0 };
+    info.renderArea.extent    = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    info.layerCount           = 1;
+    info.colorAttachmentCount = uint32_t(colorCount);
+    info.pColorAttachments    = (colorCount > 0) ? colors : nullptr;
+    info.pDepthAttachment     = wantDepth ? &depth : nullptr;
+
+    vkCmdBeginRendering(cb, &info);
+    m_isInRendering = true;
+}
+
+
+void RenderTarget::EndRendering(void)
+{
+    if (not m_isInRendering)
+        return;
+    if (m_cmdList and m_cmdList->IsRecording()) {
+        VkCommandBuffer cb = m_cmdList->GfxList();
+        if (cb != VK_NULL_HANDLE)
+            vkCmdEndRendering(cb);
+    }
+    m_isInRendering = false;
+}
+
+// -------------------------------------------------------------------------------------------------
+// AttachBuffer / DetachBuffer
+
+bool RenderTarget::AttachBuffer(int bufferIndex)
+{
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not m_cmdList)
+        return false;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE)
+        return false;
+    BufferInfo::eBufferType usage = m_bufferInfo[bufferIndex].m_type;
+    m_bufferInfo[bufferIndex].SetState(cb, usage, false);
+    return true;
+}
+
+
+bool RenderTarget::DetachBuffer(int bufferIndex)
+{
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not m_cmdList)
+        return false;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE)
+        return false;
+    BufferInfo::eBufferType usage = m_bufferInfo[bufferIndex].m_type;
+    m_bufferInfo[bufferIndex].SetState(cb, usage, true);
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+// SelectDrawBuffers / DepthBufferIsActive / EnableBuffers / Enable / Activate
+
+bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
+{
+    if (not m_cmdList)
+        return false;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE)
+        return false;
+
+    if (params.drawBufferGroup == dbDepth) {
+        for (int i = 0; i < m_colorBufferCount; ++i)
+            m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+    }
+    else if (params.drawBufferGroup == dbSingle) {
+        m_drawBufferGroup = dbSingle;
+        if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
+            return false;
+        m_activeBufferIndex = params.bufferIndex;
+        m_bufferInfo[params.bufferIndex].SetState(cb, BufferInfo::btColor, false);
+        for (int i = 0; i < m_colorBufferCount; ++i)
+            if (i != params.bufferIndex)
+                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+    }
+    else {
+        m_activeBufferIndex = -1;
+        m_drawBufferGroup = (params.drawBufferGroup == dbNone) ? dbAll : params.drawBufferGroup;
+        if (m_drawBufferGroup == dbAll) {
+            for (int i = 0; i < m_bufferCount; ++i) {
+                if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
+                    continue;
+                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, false);
+            }
+        }
+        else if (m_drawBufferGroup == dbColor) {
+            for (int i = 0; i < m_colorBufferCount; ++i)
+                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, false);
+            for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
+                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+        }
+        else if (m_drawBufferGroup == dbExtra) {
+            for (int i = 0; i < m_colorBufferCount; ++i)
+                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+            for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
+                m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, false);
+        }
+    }
+    if (HaveDepthBuffer(true))
+        m_bufferInfo[m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, false);
+    return true;
+}
+
+
+bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups /*drawBufferGroup*/)
+{
+    if (m_depthBufferIndex < 0)
+        return false;
+    if (bufferIndex >= 0)
+        return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
+    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth);
+}
+
+
+bool RenderTarget::EnableBuffers(const RTActivationParams& params)
+{
+    if (not SelectDrawBuffers(params))
+        return false;
+    gfxStates.SetDepthTest(DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup));
+    return true;
+}
+
+
+bool RenderTarget::Enable(const RTActivationParams& params)
+{
+    if (not m_isAvailable)
+        return false;
+    if (not AllocRTVs())
+        return false;
+    m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
+    m_drawBufferGroup = params.drawBufferGroup;
+
+    if (m_cmdList == nullptr) {
+        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
+        if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
+            return false;
+    }
+    m_flushOnDisable = params.flush;
+    SetViewport();
+
+    if (not EnableBuffers(params))
+        return false;
+    BeginRendering(params.clear, params.clear);
+    return true;
+}
+
+
+bool RenderTarget::Activate(const RTActivationParams& params)
+{
+    baseRenderer.ActivateDrawBuffer(this);
+    if (not Enable(params)) {
+        baseRenderer.DeactivateDrawBuffer(this);
+        return false;
+    }
+    baseRenderer.PushViewport();
+    SetViewport();
+    if (params.reactivate)
+        baseRenderer.RenderStates() = m_renderStates;
+    return true;
+}
+
+
+void RenderTarget::Disable(bool deactivate) noexcept
+{
+    if (not IsEnabled())
+        return;
+    m_renderStates = baseRenderer.RenderStates();
+    EndRendering();
+    VkCommandBuffer cb = m_cmdList ? m_cmdList->GfxList() : VK_NULL_HANDLE;
+    if (cb != VK_NULL_HANDLE) {
+        for (int i = 0; i < m_colorBufferCount; ++i)
+            m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+        for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
+            m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, true);
+    }
+    if (m_flushOnDisable) {
+        m_cmdList->Flush();
+        FreeRTVs();
+    }
+    else {
+        m_cmdList->Close(deactivate);
+    }
+    m_cmdList = nullptr;
+}
+
+
+void RenderTarget::Deactivate(void) noexcept
+{
+    baseRenderer.DeactivateDrawBuffer(this);
+    baseRenderer.PopViewport();
+}
+
+// -------------------------------------------------------------------------------------------------
+// Viewport / Fill / Clear*
+
+void RenderTarget::SetViewport(bool flipVertically) noexcept
+{
+    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
+}
+
+
+void RenderTarget::Fill(RGBAColor color)
+{
+    if (not m_cmdList or not m_isInRendering)
+        return;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE or m_colorBufferCount == 0)
+        return;
+
+    AutoArray<VkClearAttachment> attachments(m_colorBufferCount);
+    int n = 0;
+    VkClearValue clearVal = MakeClearColor(color);
+    for (int i = 0; i < m_colorBufferCount; ++i) {
+        VkClearAttachment a{};
+        a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+        a.colorAttachment = uint32_t(i);
+        a.clearValue      = clearVal;
+        attachments[n++] = a;
+    }
+    VkClearRect rect{};
+    rect.rect.offset = { 0, 0 };
+    rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    rect.layerCount  = 1;
+    vkCmdClearAttachments(cb, uint32_t(n), attachments.Data(), 1, &rect);
+}
+
+
+void RenderTarget::Clear(const RTActivationParams& params)
+{
+    // Vulkan: BeginRendering already folds the initial clear via LoadOp_CLEAR. This entry exists
+    // for mid-pass re-clears via vkCmdClearAttachments inside the active render scope.
+    if (not params.clear or not m_cmdList or not m_isInRendering)
+        return;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE)
+        return;
+
+    AutoArray<VkClearAttachment> atts(m_colorBufferCount + 1);
+    int n = 0;
+    VkClearValue cv = MakeClearColor(m_clearColor);
+    if (params.bufferIndex < 0) {
+        for (int i = 0; i < m_colorBufferCount; ++i) {
+            VkClearAttachment a{};
+            a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+            a.colorAttachment = uint32_t(i);
+            a.clearValue      = cv;
+            atts[n++] = a;
+        }
+    }
+    else if (params.bufferIndex < m_colorBufferCount) {
+        VkClearAttachment a{};
+        a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+        a.colorAttachment = uint32_t(params.bufferIndex);
+        a.clearValue      = cv;
+        atts[n++] = a;
+    }
+    if (HaveDepthBuffer(true)) {
+        VkClearAttachment a{};
+        a.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+        a.clearValue = MakeClearDepth(1.0f);
+        atts[n++] = a;
+    }
+    if (n == 0)
+        return;
+    VkClearRect rect{};
+    rect.rect.offset = { 0, 0 };
+    rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    rect.layerCount  = 1;
+    vkCmdClearAttachments(cb, uint32_t(n), atts.Data(), 1, &rect);
+}
+
+
+void RenderTarget::ClearColorBuffers(void)
+{
+    if (not m_cmdList or not m_isInRendering)
+        return;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE or m_colorBufferCount == 0)
+        return;
+    AutoArray<VkClearAttachment> atts(m_colorBufferCount);
+    int n = 0;
+    VkClearValue cv = MakeClearColor(m_clearColor);
+    for (int i = 0; i < m_colorBufferCount; ++i) {
+        VkClearAttachment a{};
+        a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+        a.colorAttachment = uint32_t(i);
+        a.clearValue      = cv;
+        atts[n++] = a;
+    }
+    VkClearRect rect{};
+    rect.rect.offset = { 0, 0 };
+    rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    rect.layerCount  = 1;
+    vkCmdClearAttachments(cb, uint32_t(n), atts.Data(), 1, &rect);
+}
+
+
+void RenderTarget::ClearDepthBuffer(float clearValue)
+{
+    if (not HaveDepthBuffer(true) or not m_cmdList or not m_isInRendering)
+        return;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE)
+        return;
+    VkClearAttachment a{};
+    a.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    a.clearValue = MakeClearDepth(clearValue);
+    VkClearRect rect{};
+    rect.rect.offset = { 0, 0 };
+    rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    rect.layerCount  = 1;
+    vkCmdClearAttachments(cb, 1, &a, 1, &rect);
+}
+
+
+void RenderTarget::ClearStencilBuffer(void)
+{
+    if (not HaveDepthBuffer(true) or not m_cmdList or not m_isInRendering)
+        return;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if (cb == VK_NULL_HANDLE)
+        return;
+    VkClearAttachment a{};
+    a.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+    a.clearValue.depthStencil.stencil = 0;
+    VkClearRect rect{};
+    rect.rect.offset = { 0, 0 };
+    rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    rect.layerCount  = 1;
+    vkCmdClearAttachments(cb, 1, &a, 1, &rect);
+}
+
+// -------------------------------------------------------------------------------------------------
+// BindBuffer — bind RT color buffer as shader sampling source.
+
+bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
+{
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
+        return false;
+    if (tmuIndex < 0)
+        tmuIndex = bufferIndex;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    if (info.m_imageView == VK_NULL_HANDLE)
+        return false;
+    if (not m_renderTexture.m_hasParams)
+        m_renderTexture.SetParams(false);
+    m_renderTexture.m_image      = info.m_image;
+    m_renderTexture.m_imageView  = info.m_imageView;
+    m_renderTexture.m_handle     = info.m_srvIndex;
+    m_renderTexture.m_isValid    = true;
+    m_renderTexture.m_isDeployed = true;
+    return m_renderTexture.Bind(tmuIndex);
+}
+
+// -------------------------------------------------------------------------------------------------
+// GetAsTexture / GetDepthAsTexture / GetDepthAsShadowTexture
+
+Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex*/)
+{
+    BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
+    if (info.m_image == VK_NULL_HANDLE)
+        return nullptr;
+    m_renderTexture.m_image      = info.m_image;
+    m_renderTexture.m_imageView  = info.m_imageView;
+    m_renderTexture.m_handle     = info.m_srvIndex;
+    m_renderTexture.m_isValid    = true;
+    m_renderTexture.m_isDeployed = true;
+    return &m_renderTexture;
+}
+
+
+Texture* RenderTarget::GetDepthAsTexture(void)
+{
+    if (m_depthBufferIndex < 0)
+        return nullptr;
+    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
+    if (info.m_image == VK_NULL_HANDLE)
+        return nullptr;
+    m_depthTexture.m_image      = info.m_image;
+    m_depthTexture.m_imageView  = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+    m_depthTexture.m_handle     = info.m_srvIndex;
+    m_depthTexture.m_isValid    = true;
+    m_depthTexture.m_isDeployed = true;
+    return &m_depthTexture;
+}
+
+
+Texture* RenderTarget::GetDepthAsShadowTexture(void)
+{
+    if (m_depthBufferIndex < 0)
+        return nullptr;
+    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
+    if (info.m_image == VK_NULL_HANDLE)
+        return nullptr;
+    m_shadowTexture.m_image      = info.m_image;
+    m_shadowTexture.m_imageView  = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+    m_shadowTexture.m_handle     = info.m_srvIndex;
+    m_shadowTexture.m_isValid    = true;
+    m_shadowTexture.m_isDeployed = true;
+    return &m_shadowTexture;
+}
+
+// -------------------------------------------------------------------------------------------------
+// UpdateTransformation / RenderAsTexture / Render / AutoRender — API-neutral, 1:1 from DX12.
+
+bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
+{
+    bool haveTransformation = false;
+    if (params.centerOrigin) {
+        haveTransformation = true;
+        baseRenderer.Translate(0.5, 0.5, 0);
+    }
+    if (params.rotation) {
+        haveTransformation = true;
+        baseRenderer.Rotate(params.rotation, 0, 0, 1);
+    }
+    else if (params.scale != 1.0f) {
+        haveTransformation = true;
+        baseRenderer.Scale(params.scale, params.scale, 1);
+    }
+    return haveTransformation;
+}
+
+
+bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
+{
+    if (params.destination >= 0) {
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
+            return false;
+        m_lastDestination = params.destination;
+        gfxStates.SetBlending(0);
+    }
+    baseRenderer.PushMatrix();
+    bool applyTransformation = UpdateTransformation(params);
+    if (params.shader) {
+        if (applyTransformation)
+            params.shader->UpdateMatrices();
+        m_viewportArea.Render(params.shader, source);
+    }
+    else {
+        if (params.premultiply)
+            m_viewportArea.Premultiply();
+        baseRenderer.Set2DRenderStates(params.destination < 0);
+        m_viewportArea.Render(nullptr, source, color);
+    }
+    baseRenderer.PopMatrix();
+    return true;
+}
+
+
+bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
+{
+    if (params.destination >= 0)
+        m_lastDestination = params.destination;
+    return RenderAsTexture((params.source == params.destination) ? nullptr : GetAsTexture(params), params, color);
+}
+
+
+bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color)
+{
+    return Render(params, color);
+}
+
+
+void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
+{
+    key.colorFormatCount = 0;
+    for (auto& f : key.colorFormats)
+        f = VK_FORMAT_UNDEFINED;
+    key.depthFormat = VK_FORMAT_UNDEFINED;
+
+    switch (m_drawBufferGroup) {
+        case dbDepth:
+            break;
+        case dbSingle:
+            if ((m_activeBufferIndex >= 0) and (m_activeBufferIndex < m_colorBufferCount))
+                key.colorFormats[key.colorFormatCount++] = kColorFormat;
+            break;
+        case dbExtra:
+            for (int j = 0; j < m_vertexBufferCount and key.colorFormatCount < 8; ++j)
+                key.colorFormats[key.colorFormatCount++] = kVertexFormat;
+            break;
+        default: // dbAll, dbColor, dbCustom
+            for (int i = 0; i < m_colorBufferCount and key.colorFormatCount < 8; ++i)
+                key.colorFormats[key.colorFormatCount++] = kColorFormat;
+            break;
+    }
+    if (HaveDepthBuffer(true))
+        key.depthFormat = kDepthFormat;
+}
 
 // =================================================================================================

@@ -1,263 +1,306 @@
 #pragma once
 
-#include "dx12framework.h"
-#include "dx12context.h"
-#include "descriptor_heap.h"
+#include "vkframework.h"
+#include "vkcontext.h"
+#include "vkupload.h"
+#include "image_layout_tracker.h"
 #include "commandlist.h"
-#include "resource_handler.h"
 #include "shader.h"
 #include "array.hpp"
 
+#include <cstdio>
+#include <cstring>
+
 // =================================================================================================
+// Vulkan GfxArray — 2D R32_UINT storage image (analogue of the DX12 UAV-style Texture2D used by
+// decalhandler::m_decalDepths).
+//
+// Storage image lives in VK_IMAGE_LAYOUT_GENERAL between operations (the layout that allows
+// shader storage-image read/write). Clear / Upload / Download briefly transition to
+// TRANSFER_DST / TRANSFER_SRC and back. They run on a one-shot CommandBuffer (blocking submit),
+// not on the active per-frame CommandList — Phase B doesn't yet expose a recording CB to high-
+// level callers, and the DX12 path's frame-level batching can be revisited once Phase C lands.
+//
+// Bind() is currently a tracking-only stub: it records (binding, image-view) so a later
+// vkCmdBindDescriptorSets call (Phase C) can materialize the storage-image into the active
+// VkDescriptorSet at slot u(bindingPoint).
 
 class BaseGfxArray {
 public:
     static inline bool IsAvailable{ true };
 };
 
+
 template <typename DATA_T>
 class GfxArray : public BaseGfxArray
 {
 public:
-    AutoArray<DATA_T>                   m_data;
-    ComPtr<ID3D12Resource>              m_resource;
-    ComPtr<ID3D12Resource>              m_upload;
-    ComPtr<ID3D12Resource>              m_readback;
-    DescriptorHandle                    m_uavHandle;
-    ComPtr<ID3D12DescriptorHeap>        m_cpuHeap;
-    D3D12_CPU_DESCRIPTOR_HANDLE         m_cpuUavHandle{};
-    D3D12_RESOURCE_STATES               m_state{ D3D12_RESOURCE_STATE_COMMON };
-    UINT                                m_width{0};
-    UINT                                m_height{0};
+    AutoArray<DATA_T>      m_data;
+
+    VkImage                m_image          { VK_NULL_HANDLE };
+    VkImageView            m_imageView      { VK_NULL_HANDLE };
+    VmaAllocation          m_allocation     { VK_NULL_HANDLE };
+    ImageLayoutTracker     m_layoutTracker;
+
+    // Lazy-allocated host-visible staging buffers, kept across calls so repeat Upload/Download
+    // doesn't churn allocations.
+    VkBuffer               m_uploadBuffer   { VK_NULL_HANDLE };
+    VmaAllocation          m_uploadAlloc    { VK_NULL_HANDLE };
+    VkBuffer               m_readbackBuffer { VK_NULL_HANDLE };
+    VmaAllocation          m_readbackAlloc  { VK_NULL_HANDLE };
+
+    uint32_t               m_width          { 0 };
+    uint32_t               m_height         { 0 };
+    uint32_t               m_bindingPoint   { 0 };
 
     GfxArray() = default;
 
     ~GfxArray() { Destroy(); }
 
     inline DATA_T* Data(void) { return m_data.Data(); }
-    inline int DataSize(void) { return m_data.DataSize(); }
+    inline int     DataSize(void) { return m_data.DataSize(); }
 
     bool Create(int width, int height = 1) {
         Destroy();
-        m_width = UINT(width);
-        m_height = UINT(height);
-        int size = width * height;
+        m_width  = uint32_t(width);
+        m_height = uint32_t(height);
+        const int size = width * height;
         m_data.Resize(size);
-        ID3D12Device* device = dx12Context.Device();
-        if (not device or (size == 0))
+
+        VmaAllocator allocator = vkContext.Allocator();
+        VkDevice     device    = vkContext.Device();
+        if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE) or (size == 0))
             return false;
 
-        D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
-        D3D12_RESOURCE_DESC rd{};
-        rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        rd.Width = m_width;
-        rd.Height = m_height;
-        rd.DepthOrArraySize = 1;
-        rd.MipLevels = 1;
-        rd.Format = DXGI_FORMAT_R32_UINT;
-        rd.SampleDesc.Count = 1;
-        rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        VkImageCreateInfo info{};
+        info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        info.imageType     = VK_IMAGE_TYPE_2D;
+        info.format        = VK_FORMAT_R32_UINT;
+        info.extent.width  = m_width;
+        info.extent.height = m_height;
+        info.extent.depth  = 1;
+        info.mipLevels     = 1;
+        info.arrayLayers   = 1;
+        info.samples       = VK_SAMPLE_COUNT_1_BIT;
+        info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+        info.usage         = VK_IMAGE_USAGE_STORAGE_BIT
+                           | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+                           | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        m_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, m_state, nullptr, IID_PPV_ARGS(&m_resource))))
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        if (vmaCreateImage(allocator, &info, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS)
             return false;
 
-        m_uavHandle = descriptorHeaps.AllocSRV();
-        if (not m_uavHandle.IsValid()) {
-            m_resource.Reset();
+        m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        VkImageViewCreateInfo vci{};
+        vci.sType                       = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vci.image                       = m_image;
+        vci.viewType                    = VK_IMAGE_VIEW_TYPE_2D;
+        vci.format                      = VK_FORMAT_R32_UINT;
+        vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        vci.subresourceRange.levelCount = 1;
+        vci.subresourceRange.layerCount = 1;
+        if (vkCreateImageView(device, &vci, nullptr, &m_imageView) != VK_SUCCESS)
             return false;
+
+        // Bring the image to GENERAL on a one-shot CB so the first Bind/Clear has a stable
+        // baseline layout; subsequent Clear/Upload/Download will transition as needed.
+        OneShotCommandBuffer once;
+        if (BeginSingleTimeCommands(once)) {
+            m_layoutTracker.ToGeneral(once.cb);
+            EndSingleTimeCommands(once);
         }
 
-        D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
-        uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-        uavDesc.Format = DXGI_FORMAT_R32_UINT;
-        uavDesc.Texture2D.MipSlice = 0;
-        uavDesc.Texture2D.PlaneSlice = 0;
-        device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_uavHandle.cpu);
-
-        D3D12_DESCRIPTOR_HEAP_DESC cpuHeapDesc{};
-        cpuHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        cpuHeapDesc.NumDescriptors = 1;
-        cpuHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-        if (FAILED(device->CreateDescriptorHeap(&cpuHeapDesc, IID_PPV_ARGS(&m_cpuHeap)))) {
-            descriptorHeaps.FreeSRV(m_uavHandle);
-            m_uavHandle = {};
-            m_resource.Reset();
-            return false;
-        }
-        m_cpuUavHandle = m_cpuHeap->GetCPUDescriptorHandleForHeapStart();
-        device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_cpuUavHandle);
         return true;
     }
 
     void Destroy(void) {
-        if (m_resource) {
-            descriptorHeaps.FreeSRV(m_uavHandle);
-            m_uavHandle = {};
-            m_cpuHeap.Reset();
-            m_cpuUavHandle = {};
-            m_resource.Reset();
-            m_upload.Reset();
-            m_readback.Reset();
+        VmaAllocator allocator = vkContext.Allocator();
+        VkDevice     device    = vkContext.Device();
+        if (device != VK_NULL_HANDLE and m_imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, m_imageView, nullptr);
+            m_imageView = VK_NULL_HANDLE;
+        }
+        if (allocator != VK_NULL_HANDLE) {
+            if (m_image != VK_NULL_HANDLE) {
+                vmaDestroyImage(allocator, m_image, m_allocation);
+                m_image = VK_NULL_HANDLE;
+                m_allocation = VK_NULL_HANDLE;
+            }
+            if (m_uploadBuffer != VK_NULL_HANDLE) {
+                vmaDestroyBuffer(allocator, m_uploadBuffer, m_uploadAlloc);
+                m_uploadBuffer = VK_NULL_HANDLE;
+                m_uploadAlloc = VK_NULL_HANDLE;
+            }
+            if (m_readbackBuffer != VK_NULL_HANDLE) {
+                vmaDestroyBuffer(allocator, m_readbackBuffer, m_readbackAlloc);
+                m_readbackBuffer = VK_NULL_HANDLE;
+                m_readbackAlloc = VK_NULL_HANDLE;
+            }
         }
         m_data.Reset();
         m_width = m_height = 0;
     }
 
-    void SetBarrier(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES after) {
-        if (list and m_resource and (m_state != after)) {
-            D3D12_RESOURCE_BARRIER b{};
-            b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            b.Transition.pResource = m_resource.Get();
-            b.Transition.StateBefore = m_state;
-            b.Transition.StateAfter = after;
-            b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            list->ResourceBarrier(1, &b);
-            m_state = after;
-        }
-    }
-
     bool Bind(uint32_t bindingPoint) {
-        if (not m_resource or not m_uavHandle.IsValid())
+        if (m_image == VK_NULL_HANDLE)
             return false;
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
-            return false;
-        auto& heap = descriptorHeaps.m_srvHeap;
-        if (heap.m_heap)
-            list->SetGraphicsRootDescriptorTable(UINT(Shader::kUavBase + bindingPoint), heap.GpuHandle(m_uavHandle.index));
+        m_bindingPoint = bindingPoint;
+        // Phase C: write (m_imageView, VK_IMAGE_LAYOUT_GENERAL) into the per-frame
+        // CommandListHandler bind table at u-slot bindingPoint; mark dirty so the next Draw
+        // materializes a VkDescriptorSet write (VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) and
+        // vkCmdBindDescriptorSets. The DX12 SetGraphicsRootDescriptorTable equivalent.
         return true;
     }
 
-    void Release(uint32_t /*bindingPoint*/) {}
+    void Release(uint32_t /*bindingPoint*/) {
+        // Phase C: clear storage-image entry at u-slot bindingPoint in the bind table.
+    }
 
     void Clear(DATA_T value) {
-        if (not m_resource or not m_uavHandle.IsValid())
+        if (m_image == VK_NULL_HANDLE)
             return;
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
+
+        OneShotCommandBuffer once;
+        if (not BeginSingleTimeCommands(once))
             return;
-        UINT clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
-        auto& heap = descriptorHeaps.m_srvHeap;
-        list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
+
+        m_layoutTracker.ToTransferDst(once.cb);
+
+        VkClearColorValue cv{};
+        // R32_UINT is treated as the .uint32 channel; populate all 4 entries even though only
+        // .uint32[0] is read for single-channel formats — Vulkan validation expects the union to
+        // be initialized.
+        cv.uint32[0] = uint32_t(value);
+        cv.uint32[1] = uint32_t(value);
+        cv.uint32[2] = uint32_t(value);
+        cv.uint32[3] = uint32_t(value);
+
+        VkImageSubresourceRange range{};
+        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        range.levelCount = 1;
+        range.layerCount = 1;
+        vkCmdClearColorImage(once.cb, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cv, 1, &range);
+
+        m_layoutTracker.ToGeneral(once.cb);
+        EndSingleTimeCommands(once);
     }
 
     bool Upload(void) {
-        if (not m_resource or m_data.IsEmpty())
-            return false;
-        ID3D12Device* device = dx12Context.Device();
-        if (not device)
+        if (m_image == VK_NULL_HANDLE or m_data.IsEmpty())
             return false;
 
-        D3D12_RESOURCE_DESC resDesc = m_resource->GetDesc();
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
-        UINT numRows;
-        UINT64 rowSizeInBytes, totalBytes;
-        device->GetCopyableFootprints(&resDesc, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalBytes);
+        VmaAllocator allocator = vkContext.Allocator();
+        if (allocator == VK_NULL_HANDLE)
+            return false;
 
-        if (not m_upload) {
-            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-            D3D12_RESOURCE_DESC rd{};
-            rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            rd.Width = totalBytes;
-            rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
-            rd.SampleDesc.Count = 1;
-            rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_upload))))
-                return false;
-        }
+        const VkDeviceSize bytes = VkDeviceSize(m_width) * VkDeviceSize(m_height) * VkDeviceSize(sizeof(DATA_T));
+        if (not EnsureStagingBuffer(m_uploadBuffer, m_uploadAlloc, bytes,
+                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
+            return false;
 
+        // Map + copy + unmap (persistent mapping not requested for upload — we only access on Upload).
         void* mapped = nullptr;
-        D3D12_RANGE readRange{ 0, 0 };
-        if (FAILED(m_upload->Map(0, &readRange, &mapped)))
+        if (vmaMapMemory(allocator, m_uploadAlloc, &mapped) != VK_SUCCESS)
+            return false;
+        std::memcpy(mapped, m_data.Data(), size_t(bytes));
+        vmaUnmapMemory(allocator, m_uploadAlloc);
+
+        OneShotCommandBuffer once;
+        if (not BeginSingleTimeCommands(once))
             return false;
 
-        UINT srcRowPitch = m_width * sizeof(DATA_T);
-        uint8_t* dst = static_cast<uint8_t*>(mapped) + footprint.Offset;
-        const uint8_t* src = reinterpret_cast<const uint8_t*>(m_data.Data());
-        for (UINT row = 0; row < numRows; ++row)
-            std::memcpy(dst + row * footprint.Footprint.RowPitch, src + row * srcRowPitch, srcRowPitch);
-        m_upload->Unmap(0, nullptr);
+        m_layoutTracker.ToTransferDst(once.cb);
 
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
-            return false;
-        SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
+        VkBufferImageCopy region{};
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.layerCount = 1;
+        region.imageExtent.width  = m_width;
+        region.imageExtent.height = m_height;
+        region.imageExtent.depth  = 1;
+        vkCmdCopyBufferToImage(once.cb, m_uploadBuffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        D3D12_TEXTURE_COPY_LOCATION dstLoc{};
-        dstLoc.pResource = m_resource.Get();
-        dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        dstLoc.SubresourceIndex = 0;
-
-        D3D12_TEXTURE_COPY_LOCATION srcLoc{};
-        srcLoc.pResource = m_upload.Get();
-        srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        srcLoc.PlacedFootprint = footprint;
-
-        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-        SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        m_layoutTracker.ToGeneral(once.cb);
+        EndSingleTimeCommands(once);
         return true;
     }
 
     bool Download(void) {
-        if (not m_resource or m_data.IsEmpty())
-            return false;
-        ID3D12Device* device = dx12Context.Device();
-        if (not device)
+        if (m_image == VK_NULL_HANDLE or m_data.IsEmpty())
             return false;
 
-        D3D12_RESOURCE_DESC resDesc = m_resource->GetDesc();
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint;
-        UINT numRows;
-        UINT64 rowSizeInBytes, totalBytes;
-        device->GetCopyableFootprints(&resDesc, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalBytes);
-
-        if (not m_readback) {
-            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_READBACK };
-            D3D12_RESOURCE_DESC rd{};
-            rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            rd.Width = totalBytes;
-            rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
-            rd.SampleDesc.Count = 1;
-            rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_readback))))
-                return false;
-        }
-
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
+        VmaAllocator allocator = vkContext.Allocator();
+        if (allocator == VK_NULL_HANDLE)
             return false;
 
-        SetBarrier(list, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        const VkDeviceSize bytes = VkDeviceSize(m_width) * VkDeviceSize(m_height) * VkDeviceSize(sizeof(DATA_T));
+        if (not EnsureStagingBuffer(m_readbackBuffer, m_readbackAlloc, bytes,
+                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                    VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT))
+            return false;
 
-        D3D12_TEXTURE_COPY_LOCATION srcLoc{};
-        srcLoc.pResource = m_resource.Get();
-        srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        srcLoc.SubresourceIndex = 0;
+        OneShotCommandBuffer once;
+        if (not BeginSingleTimeCommands(once))
+            return false;
 
-        D3D12_TEXTURE_COPY_LOCATION dstLoc{};
-        dstLoc.pResource = m_readback.Get();
-        dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        dstLoc.PlacedFootprint = footprint;
+        m_layoutTracker.ToTransferSrc(once.cb);
 
-        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-        SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        VkBufferImageCopy region{};
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.layerCount = 1;
+        region.imageExtent.width  = m_width;
+        region.imageExtent.height = m_height;
+        region.imageExtent.depth  = 1;
+        vkCmdCopyImageToBuffer(once.cb, m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_readbackBuffer, 1, &region);
+
+        m_layoutTracker.ToGeneral(once.cb);
+        if (not EndSingleTimeCommands(once))
+            return false;
 
         void* mapped = nullptr;
-        D3D12_RANGE readRange{ 0, SIZE_T(totalBytes) };
-        if (FAILED(m_readback->Map(0, &readRange, &mapped)))
+        if (vmaMapMemory(allocator, m_readbackAlloc, &mapped) != VK_SUCCESS)
+            return false;
+        std::memcpy(m_data.Data(), mapped, size_t(bytes));
+        vmaUnmapMemory(allocator, m_readbackAlloc);
+        return true;
+    }
+
+private:
+    bool EnsureStagingBuffer(VkBuffer& outBuffer, VmaAllocation& outAlloc, VkDeviceSize bytes,
+                             VkBufferUsageFlags usage, VmaAllocationCreateFlags hostFlags) noexcept
+    {
+        VmaAllocator allocator = vkContext.Allocator();
+        if (allocator == VK_NULL_HANDLE)
             return false;
 
-        UINT dstRowPitch = m_width * sizeof(DATA_T);
-        const uint8_t* src = static_cast<const uint8_t*>(mapped) + footprint.Offset;
-        uint8_t* dst = reinterpret_cast<uint8_t*>(m_data.Data());
-        for (UINT row = 0; row < numRows; ++row)
-            std::memcpy(dst + row * dstRowPitch, src + row * footprint.Footprint.RowPitch, dstRowPitch);
+        // Re-allocate if a previous buffer was sized for a smaller image (size change between
+        // calls would otherwise cause out-of-bounds copies).
+        if (outBuffer != VK_NULL_HANDLE) {
+            VmaAllocationInfo info{};
+            vmaGetAllocationInfo(allocator, outAlloc, &info);
+            if (info.size >= bytes)
+                return true;
+            vmaDestroyBuffer(allocator, outBuffer, outAlloc);
+            outBuffer = VK_NULL_HANDLE;
+            outAlloc  = VK_NULL_HANDLE;
+        }
 
-        D3D12_RANGE writeRange{ 0, 0 };
-        m_readback->Unmap(0, &writeRange);
-        return true;
+        VkBufferCreateInfo bi{};
+        bi.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bi.size        = bytes;
+        bi.usage       = usage;
+        bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo ai{};
+        ai.usage = VMA_MEMORY_USAGE_AUTO;
+        ai.flags = hostFlags;
+
+        return vmaCreateBuffer(allocator, &bi, &ai, &outBuffer, &outAlloc, nullptr) == VK_SUCCESS;
     }
 };
 

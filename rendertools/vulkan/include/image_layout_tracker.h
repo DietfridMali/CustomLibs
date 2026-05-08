@@ -46,6 +46,9 @@ public:
     void ToTransferSrc(VkCommandBuffer cb) noexcept;
     void ToPresent(VkCommandBuffer cb) noexcept;
 
+    // Storage-image layout (read+write from compute / fragment shaders). Used by GfxArray.
+    void ToGeneral(VkCommandBuffer cb) noexcept;
+
     inline VkImageLayout Layout(void) const noexcept { return m_layout; }
     inline VkPipelineStageFlags2 Stage(void) const noexcept { return m_stage; }
     inline VkAccessFlags2 Access(void) const noexcept { return m_access; }

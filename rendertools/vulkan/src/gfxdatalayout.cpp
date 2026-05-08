@@ -4,6 +4,7 @@
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "commandlist.h"
+#include "gfxstates.h"
 
 #include <cstring>
 
@@ -169,20 +170,44 @@ bool GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t compon
 }
 
 // =================================================================================================
-// Phase C: Enable / Disable / Render / StartUpdate / FinishUpdate.
-// Need a live VkCommandBuffer (current cmd buffer from CommandListHandler — Phase C).
+// Enable / Disable / Render / StartUpdate / FinishUpdate — Vulkan implementation.
+//
+// 1:1 port of the DX12 path. IASetVertexBuffers -> vkCmdBindVertexBuffers,
+// IASetIndexBuffer -> vkCmdBindIndexBuffer, IASetPrimitiveTopology -> baked into the pipeline.
+// DrawInstanced / DrawIndexedInstanced go through the matching commandListHandler wrappers.
 
 bool GfxDataLayout::Enable(void) noexcept
 {
     Activate();
     m_isBound = true;
-    // TODO Phase C: bind vertex buffers and index buffer to the active VkCommandBuffer.
-    //   VkBuffer    buffers[12];
-    //   VkDeviceSize offsets[12] { };
-    //   for each m_dataBuffers entry with bufferType==Vertex and IsValid: pack buffers[slot] / offsets[slot]
-    //   vkCmdBindVertexBuffers(cb, 0, maxSlot, buffers, offsets);
-    //   if m_indexBuffer.IsValid(): vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
-    //   Topology is baked into the VkPipeline (no IASetPrimitiveTopology equivalent).
+
+    VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+    if (cb == VK_NULL_HANDLE)
+        return true;
+
+    constexpr int kMaxStreams = 12;
+    VkBuffer     buffers[kMaxStreams] { };
+    VkDeviceSize offsets[kMaxStreams] { };
+    int maxSlot = 0;
+    for (auto* gdb : m_dataBuffers) {
+        if (not gdb or not gdb->IsValid() or (gdb->m_bufferType != GfxBufferTarget::Vertex))
+            continue;
+        int slot = (gdb->m_index >= 0) ? gdb->m_index : maxSlot;
+        if (slot >= kMaxStreams)
+            continue;
+        buffers[slot] = gdb->Buffer();
+        offsets[slot] = 0;
+        if (slot >= maxSlot)
+            maxSlot = slot + 1;
+    }
+    if (maxSlot > 0)
+        vkCmdBindVertexBuffers(cb, 0, uint32_t(maxSlot), buffers, offsets);
+
+    if (m_indexBuffer.IsValid())
+        vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
+
+    // Primitive topology is baked into the VkPipeline (no IASetPrimitiveTopology equivalent
+    // in dynamic rendering). m_shape feeds the PipelineKey via baseRenderer.RenderStates().
     return true;
 }
 
@@ -196,18 +221,16 @@ void GfxDataLayout::Disable(void) noexcept
 
 CommandList* GfxDataLayout::StartUpdate(void) noexcept
 {
-    // TODO Phase C: temp command list for buffer-update operations.
-    // m_updateList = static_cast<CommandList*>(baseRenderer.StartOperation("GfxDataLayout::Update"));
-    m_updateList = nullptr;
+    m_updateList = static_cast<CommandList*>(baseRenderer.StartOperation("GfxDataLayout::Update"));
     return m_updateList;
 }
 
 
 bool GfxDataLayout::FinishUpdate(void) noexcept
 {
-    // TODO Phase C: baseRenderer.FinishOperation(m_updateList);
+    bool result = baseRenderer.FinishOperation(m_updateList);
     m_updateList = nullptr;
-    return true;
+    return result;
 }
 
 
@@ -217,18 +240,26 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
         return;
     ActivateTextures(textures);
 
-    // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
+    // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU and
+    // materialize the bind table into a VkDescriptorSet for this draw.
     Shader* shader = baseShaderHandler.ActiveShader();
     if (shader)
         shader->UpdateVariables();
 
-    // TODO Phase C: vkCmdDrawIndexed / vkCmdDraw via commandListHandler.DrawIndexedInstanced /
-    //   DrawInstanced (which currently sit inside the #if 0 Phase-C block in commandlist.h).
-    //   Indexed draw count == m_indexBuffer.m_itemCount (uint16/uint32 via VkIndexType).
-    //   Non-indexed: sum of m_dataBuffers[0]->m_itemCount.
-
+    if (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE) {
+        if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
+            commandListHandler.DrawIndexedInstanced(uint32_t(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
+        else {
+            uint32_t vertCount = 0;
+            if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
+                vertCount = uint32_t(m_dataBuffers[0]->m_itemCount);
+            if (vertCount > 0)
+                commandListHandler.DrawInstanced(vertCount, 1, 0, 0);
+        }
+    }
     DeactivateTextures(textures);
     FinishRender();
+    gfxStates.CheckError();
 }
 
 // =================================================================================================

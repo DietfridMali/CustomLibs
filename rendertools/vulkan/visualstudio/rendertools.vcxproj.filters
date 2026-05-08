@@ -25,11 +25,11 @@
     <Filter Include="Source Files\Texture">
       <UniqueIdentifier>{54eb8f54-6403-41e0-8741-cd4de1184f57}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\DirectX">
-      <UniqueIdentifier>{00593e2c-22b4-4ba5-a4b5-32dca4ded3c7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\DirectX">
+    <Filter Include="Header Files\Vulkan">
       <UniqueIdentifier>{57695415-0826-4b85-9047-67c8a687f7bc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Vulkan">
+      <UniqueIdentifier>{00593e2c-22b4-4ba5-a4b5-32dca4ded3c7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -123,85 +123,73 @@
     </ClInclude>
     <!-- DX12-specific headers (directx/include/) -->
     <ClInclude Include="..\include\base_displayhandler.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxrenderer.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\commandlist.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cubemap.h">
-      <Filter>Header Files\DirectX</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\descriptor_heap.h">
-      <Filter>Header Files\DirectX</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\dx12context.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rendertarget.h">
-      <Filter>Header Files\DirectX</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\dx12framework.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxstates.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gputimer.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\lineartexture.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\noisetexture.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\sdlhandler.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\shader.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\shaderdata.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\texture.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\texturebuffer.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxdatalayout.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxdatabuffer.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cbv_allocator.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\dx12upload.h">
-      <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\resource_descriptor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\resource_chunkhandler.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\renderstates.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\resource_handler.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\gfxapitype.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gfxarray.hpp">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\base_renderer.h">
       <Filter>Header Files</Filter>
@@ -210,10 +198,37 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\sampler_cache.h">
-      <Filter>Header Files\DirectX</Filter>
+      <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\prerenderedtexture.h">
       <Filter>Header Files\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vkcontext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vkframework.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\image_layout_tracker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\descriptor_pool_handler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vkupload.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\shader_compiler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\gfx_buffer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\pipeline_cache.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\swapchain.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -277,85 +292,76 @@
     </ClCompile>
     <!-- DX12-specific sources (directx/src/) -->
     <ClCompile Include="..\src\base_displayhandler.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\gfxrenderer.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_shader_funcs.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_shadercode.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\base_texture_shaders.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\blur_shader.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\commandlist.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cubemap.cpp">
-      <Filter>Source Files\DirectX</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\descriptor_heap.cpp">
-      <Filter>Source Files\DirectX</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\dx12context.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\rendertarget.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\gfxstates.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\noisetexture.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\outline_shader.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\primitive_shaders.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\shader.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\skybox.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texture.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texturehandler.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texturebuffer.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\gfxdatalayout.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\gfxdatabuffer.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cbv_allocator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\dx12upload.cpp">
-      <Filter>Source Files\DirectX</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\resource_chunkhandler.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\renderstates.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\resource_handler.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\textrenderer.cpp">
       <Filter>Source Files\Texture</Filter>
@@ -370,10 +376,34 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\sampler_cache.cpp">
-      <Filter>Source Files\DirectX</Filter>
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\prerenderedtexture.cpp">
       <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\vkcontext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\image_layout_tracker.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\descriptor_pool_handler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\vkupload.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\shader_compiler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\gfx_buffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\pipeline_cache.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\swapchain.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

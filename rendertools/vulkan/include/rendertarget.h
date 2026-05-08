@@ -137,6 +137,7 @@ public:
     bool                m_haveRTVs{ false };
     bool                m_isScreenBuffer{ false };
 	bool                m_flushOnDisable{ false };
+    bool                m_isInRendering{ false };  // active vkCmdBeginRendering scope
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
     DrawBufferList      m_drawBuffers{};
@@ -296,10 +297,8 @@ public:
         return &m_renderTexture;
     }
 
-    // Phase C: in DX12 IsEnabled checks the recording state of the RT's command list. Same in Vulkan.
-    inline bool IsEnabled(void)  noexcept {
-        // Phase C: return m_cmdList and m_cmdList->IsRecording();
-        return false;
+    inline bool IsEnabled(void) noexcept {
+        return m_cmdList and m_cmdList->IsRecording();
     }
 
     uint32_t& BufferHandle(int bufferIndex);
@@ -336,6 +335,11 @@ public:
         return m_drawBuffers;
     }
 
+    // Populates a PipelineKey with the colour/depth attachment formats currently active for
+    // this RT (selected by m_drawBufferGroup + m_activeBufferIndex). Used by CommandList::
+    // GetPipeline to feed pipelineCache.GetOrCreate. Caller fills key.shader / key.states.
+    void FillPipelineKey(struct PipelineKey& key) noexcept;
+
 private:
     void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
@@ -348,6 +352,10 @@ private:
     int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
 
     void CreateRenderArea(void);
+
+    // Manage the active vkCmdBeginRendering scope for this RT.
+    void BeginRendering(bool clearColor, bool clearDepth);
+    void EndRendering(void);
 
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0)

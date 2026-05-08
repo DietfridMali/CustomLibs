@@ -12,6 +12,10 @@
 #include "vkcontext.h"
 #include "shadowmap.h"
 #include "gfxstates.h"
+#include "commandlist.h"
+#include "descriptor_pool_handler.h"
+#include "gfxrenderer.h"
+#include <spirv_reflect.h>
 
 // =================================================================================================
 // Vulkan Shader implementation
@@ -245,13 +249,62 @@ void Shader::BuildVertexInput(void) noexcept
 }
 
 
-void Shader::UpdateStageFields(const std::vector<uint8_t>& /*spirv*/, int /*stage*/) noexcept
+void Shader::UpdateStageFields(const std::vector<uint8_t>& spirv, int stage) noexcept
 {
-    // TODO step 7e: SPIR-V reflection for per-stage b1 fields. DX12 used D3DReflect on the
-    // bytecode. Vulkan options: IDxcUtils::CreateReflection on the DXC blob, or spirv-cross /
-    // spirv-reflect on the SPIR-V bytes. Until this lands, sc.size stays 0 and UploadB1
-    // short-circuits per stage (mirrors DX12's "size == 0 → skip" path). UpdateMatrices keeps
-    // b0 functional via direct memcpy into m_b0Staging.
+    // SPIR-V reflection of the per-stage ShaderConstants UBO (binding kBindingB1VS/PS/GS).
+    // 1:1 functional equivalent of the DX12 ID3D12ShaderReflection path: enumerate descriptor
+    // bindings, locate the dynamic UBO at the binding for this stage, walk its struct members
+    // and append (name, {offset, size}) into m_stages[stage].fields.
+    if (spirv.empty())
+        return;
+
+    SpvReflectShaderModule module{};
+    if (spvReflectCreateShaderModule(spirv.size(), spirv.data(), &module) != SPV_REFLECT_RESULT_SUCCESS)
+        return;
+
+    StageConstants& sc = m_stages[stage];
+    const uint32_t targetBinding = (stage == kStageVS) ? kBindingB1VS
+                                 : (stage == kStagePS) ? kBindingB1PS
+                                                       : kBindingB1GS;
+
+    uint32_t count = 0;
+    spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
+    std::vector<SpvReflectDescriptorBinding*> bindings(count);
+    spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
+
+    for (auto* b : bindings) {
+        if (not b)
+            continue;
+        if (b->set != 0 or b->binding != targetBinding)
+            continue;
+        const SpvReflectDescriptorType t = b->descriptor_type;
+        if (t != SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+            and t != SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC) {
+            continue;
+        }
+        if (b->block.size > sc.size)
+            sc.size = b->block.size;
+        for (uint32_t j = 0; j < b->block.member_count; ++j) {
+            const SpvReflectBlockVariable& m = b->block.members[j];
+            if (not m.name)
+                continue;
+            String name(m.name);
+            bool found = false;
+            for (auto& kv : sc.fields)
+                if (kv.first == name) {
+                    found = true;
+                    break;
+                }
+            if (not found) {
+                auto* entry = sc.fields.Append();
+                if (entry)
+                    *entry = { name, { m.offset, m.size } };
+            }
+        }
+        break;
+    }
+
+    spvReflectDestroyShaderModule(&module);
 }
 
 
@@ -287,6 +340,13 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     UpdateStageFields(m_fsSpirv, kStagePS);
     if (not m_gsSpirv.empty())
         UpdateStageFields(m_gsSpirv, kStageGS);
+
+    // Allocate per-stage staging buffers sized to the reflected b1 size.
+    for (int s = 0; s < kStageCount; ++s) {
+        if (m_stages[s].size > 0)
+            m_stages[s].staging.assign(m_stages[s].size, 0);
+        m_stages[s].dirty = true;
+    }
 
     m_vs = vsCode;
     m_fs = fsCode;
@@ -373,14 +433,20 @@ Shader& Shader::Move(Shader& other) noexcept
 }
 
 // =================================================================================================
-// Activate / Upload — Phase C (vkCmdBindPipeline + bind table) and Phase B step 10 (UBO ring).
+// Activate / Upload — Vulkan implementation.
+//
+// Activate                — vkCmdBindPipeline of the matching cached VkPipeline.
+// UploadB0 / UploadB1     — sub-allocate from cbvAllocator and memcpy the staging buffers.
+// UpdateVariables         — UploadB0 + UploadB1 + materialize the bind table into a
+//                           VkDescriptorSet, then vkCmdBindDescriptorSets with dynamic offsets.
 
 bool Shader::Activate(void)
 {
-    // TODO Phase C: pipeline lookup via VkPipeline cache (RenderStates → VkGraphicsPipelineCreateInfo).
-    // vkCmdBindPipeline(currentCB, GRAPHICS, pipeline). Mark bind-table dirty so the next Draw
-    // materializes a VkDescriptorSet from descriptorPoolHandler + writes b0/b1/textures/samplers.
-    return false;
+    CommandList* cl = commandListHandler.CurrentCmdList();
+    if (cl == nullptr)
+        return false;
+    VkPipeline pipeline = cl->GetPipeline(this);
+    return pipeline != VK_NULL_HANDLE;
 }
 
 
@@ -429,9 +495,112 @@ bool Shader::UpdateMatrices(void)
 }
 
 
-// place all shader variables in CL; to be called right before the actual shader call
+// place all shader variables in CL; to be called right before the actual shader call.
+// Vulkan: also materialize the staged bind table into a VkDescriptorSet and bind it on the
+// active CB with the dynamic offsets just produced by UploadB0 / UploadB1.
 bool Shader::UpdateVariables(void) noexcept {
-    return UploadB0() and UploadB1();
+    if (not UploadB0())
+        return false;
+    if (not UploadB1())
+        return false;
+
+    VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+    if (cb == VK_NULL_HANDLE or m_pipelineLayout == VK_NULL_HANDLE or m_setLayout == VK_NULL_HANDLE)
+        return false;
+
+    VkDescriptorSet set = descriptorPoolHandler.Allocate(m_setLayout);
+    if (set == VK_NULL_HANDLE)
+        return false;
+
+    VkBuffer ubo = cbvAllocator.CurrentBuffer();
+    if (ubo == VK_NULL_HANDLE)
+        return false;
+
+    // Worst-case write count: 4 dynamic UBOs + kSrvSlots images + kSamplerSlots samplers
+    // + kUavSlots storage images.
+    constexpr uint32_t kMaxWrites = 4 + 16 + 16 + 4;
+    VkWriteDescriptorSet writes[kMaxWrites] { };
+    VkDescriptorBufferInfo bufInfos[4]                              { };
+    VkDescriptorImageInfo  imgInfos[CommandListHandler::kSrvSlots]  { };
+    VkDescriptorImageInfo  smpInfos[CommandListHandler::kSamplerSlots] { };
+    VkDescriptorImageInfo  stoInfos[CommandListHandler::kUavSlots]  { };
+    uint32_t writeCount = 0;
+
+    auto AddDynamicUbo = [&](uint32_t binding, uint32_t bytes, uint32_t bufSlot) {
+        bufInfos[bufSlot].buffer = ubo;
+        bufInfos[bufSlot].offset = 0;
+        bufInfos[bufSlot].range  = (bytes > 0) ? bytes : 1;
+        VkWriteDescriptorSet& w = writes[writeCount++];
+        w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        w.dstSet          = set;
+        w.dstBinding      = binding;
+        w.dstArrayElement = 0;
+        w.descriptorCount = 1;
+        w.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        w.pBufferInfo     = &bufInfos[bufSlot];
+    };
+
+    AddDynamicUbo(kBindingB0,    uint32_t(sizeof(FrameConstants)),    0);
+    AddDynamicUbo(kBindingB1VS,  m_stages[kStageVS].size,             1);
+    AddDynamicUbo(kBindingB1PS,  m_stages[kStagePS].size,             2);
+    AddDynamicUbo(kBindingB1GS,  m_stages[kStageGS].size,             3);
+
+    // Sampled images (t-slots). Only slots with a non-null view are written; unbound slots
+    // keep whatever the descriptor pool initialized (validation will warn if a shader actually
+    // samples an unbound slot).
+    for (uint32_t i = 0; i < CommandListHandler::kSrvSlots; ++i) {
+        VkImageView v = commandListHandler.m_boundSrvViews[i];
+        if (v == VK_NULL_HANDLE)
+            continue;
+        imgInfos[i].imageView   = v;
+        imgInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imgInfos[i].sampler     = VK_NULL_HANDLE;
+        VkWriteDescriptorSet& w = writes[writeCount++];
+        w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        w.dstSet          = set;
+        w.dstBinding      = kSrvBase + i;
+        w.dstArrayElement = 0;
+        w.descriptorCount = 1;
+        w.descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        w.pImageInfo      = &imgInfos[i];
+    }
+    for (uint32_t i = 0; i < CommandListHandler::kSamplerSlots; ++i) {
+        VkSampler s = commandListHandler.m_boundSamplers[i];
+        if (s == VK_NULL_HANDLE)
+            continue;
+        smpInfos[i].sampler = s;
+        VkWriteDescriptorSet& w = writes[writeCount++];
+        w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        w.dstSet          = set;
+        w.dstBinding      = kSamplerBase + i;
+        w.dstArrayElement = 0;
+        w.descriptorCount = 1;
+        w.descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER;
+        w.pImageInfo      = &smpInfos[i];
+    }
+    for (uint32_t i = 0; i < CommandListHandler::kUavSlots; ++i) {
+        VkImageView v = commandListHandler.m_boundStorageViews[i];
+        if (v == VK_NULL_HANDLE)
+            continue;
+        stoInfos[i].imageView   = v;
+        stoInfos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        VkWriteDescriptorSet& w = writes[writeCount++];
+        w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        w.dstSet          = set;
+        w.dstBinding      = kUavBase + i;
+        w.dstArrayElement = 0;
+        w.descriptorCount = 1;
+        w.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        w.pImageInfo      = &stoInfos[i];
+    }
+
+    if (writeCount > 0)
+        vkUpdateDescriptorSets(vkContext.Device(), writeCount, writes, 0, nullptr);
+
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
+                            0, 1, &set,
+                            kDynamicOffsetCount, m_dynamicOffsets);
+    return true;
 }
 
 // =================================================================================================

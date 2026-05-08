@@ -20,16 +20,10 @@ void VkStagingBuffer::Destroy(void) noexcept
 }
 
 // =================================================================================================
-// Internal: one-shot CommandBuffer setup. Allocates an ad-hoc CommandPool with TRANSIENT flag
-// (driver hint: short-lived, simpler internal allocator), then one CommandBuffer.
+// One-shot CommandBuffer setup. Allocates an ad-hoc CommandPool with TRANSIENT flag (driver hint:
+// short-lived, simpler internal allocator), then one CommandBuffer. Public so other Vulkan code
+// (GfxArray Clear/Upload/Download) can reuse the same blocking-submit pattern.
 
-namespace {
-
-struct OneShotCommandBuffer
-{
-    VkCommandPool pool { VK_NULL_HANDLE };
-    VkCommandBuffer cb { VK_NULL_HANDLE };
-};
 
 
 bool BeginSingleTimeCommands(OneShotCommandBuffer& out) noexcept
@@ -150,8 +144,6 @@ bool CreateStagingBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) noe
     outStaging.size = byteSize;
     return true;
 }
-
-}  // namespace
 
 // =================================================================================================
 // UploadSubresource

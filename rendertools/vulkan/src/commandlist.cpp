@@ -116,8 +116,7 @@ void CommandQueue::WaitIdle(void) noexcept
 
 VkCommandBuffer CommandQueue::CmdBuffer(void) const noexcept
 {
-    // Phase C: route through CommandListHandler::CurrentCmdBuffer().
-    return VK_NULL_HANDLE;
+    return commandListHandler.CurrentGfxList();
 }
 
 // =================================================================================================
@@ -202,186 +201,125 @@ void CommandQueue::Present(void) noexcept
 }
 
 // =================================================================================================
-// CommandList / CommandListHandler — Phase C.
-// The 1:1 DX12 carry-over below is preserved as reference and will be ported when
-// the CL/RT lifecycle moves to Vulkan VkCommandBuffer + VkCommandPool semantics.
 
-#if 0
+// =================================================================================================
+// CommandList - Vulkan implementation.
+//
+// 1:1 port of the DX12 CommandList: each CL owns FRAME_COUNT VkCommandPools and one CB per pool.
+// Open() switches to the active frame's pool/CB, vkResetCommandPool then vkBeginCommandBuffer.
+// Close() ends recording. Flush() submits + waits idle for one-shot (temp) lists.
 
-#include "cbv_allocator.h"
-#include "dx12framework.h"
-#include "dx12context.h"
-#include "resource_handler.h"
+#include "shader.h"
+#include "vkcontext.h"
+#include "gfxstates.h"
 #include "gfxrenderer.h"
+#include "pipeline_cache.h"
+#include "rendertarget.h"
 
 List<RenderStates> CommandList::m_renderStateStack;
 
-void CommandList::PushRenderStates(void) noexcept {
+
+uint32_t CommandList::ActiveFrameIndex(void) noexcept
+{
+    return commandListHandler.CmdQueue().FrameIndex();
+}
+
+
+void CommandList::PushRenderStates(void) noexcept
+{
     m_renderStateStack.Push(baseRenderer.RenderStates());
 }
 
-void CommandList::PopRenderStates(void) noexcept {
+
+void CommandList::PopRenderStates(void) noexcept
+{
     if (m_renderStateStack.Length() > 0)
         baseRenderer.RenderStates() = m_renderStateStack.Pop();
 }
 
-// =================================================================================================
-// CommandQueue (DX12 1:1 carry-over)
 
-bool CommandQueue::Create(ID3D12Device* device, const String& name) noexcept {
-    D3D12_COMMAND_QUEUE_DESC queueDesc{};
-    queueDesc.Type  = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-
-    HRESULT hr = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
-    if (FAILED(hr)) {
-        fprintf(stderr, "CommandQueue: CreateCommandQueue failed (hr=0x%08X)\n", (unsigned)hr);
+bool CommandList::Create(const String& name, bool isTemporary) noexcept
+{
+    VkDevice device = vkContext.Device();
+    if (device == VK_NULL_HANDLE)
         return false;
-    }
 
-    hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
-    if (FAILED(hr)) {
-        fprintf(stderr, "CommandQueue: CreateFence failed (hr=0x%08X)\n", (unsigned)hr);
-        return false;
-    }
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.queueFamilyIndex = vkContext.GraphicsFamily();
+    poolInfo.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
-    m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-    if (not m_fenceEvent) {
-        fprintf(stderr, "CommandQueue: CreateEvent failed\n");
-        return false;
-    }
-
-    if (not cbvAllocator.Create(device))
-        return false;
-#ifdef _DEBUG
-    if (not name.IsEmpty())
-        m_queue->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
-#endif
-    return true;
-}
-
-
-void CommandQueue::Destroy(void) noexcept {
-    WaitIdle();
-    cbvAllocator.Destroy();
-    if (m_fenceEvent) {
-        CloseHandle(m_fenceEvent);
-        m_fenceEvent = nullptr;
-    }
-}
-
-
-bool CommandQueue::BeginFrame(void) noexcept {
-    // Wait until the GPU has finished using this frame's slot.
-    if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex]) {
-        HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent);
-        if (FAILED(hr)) {
-            fprintf(stderr, "CommandQueue::BeginFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
+    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+        VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &m_pools[i]);
+        if (res != VK_SUCCESS) {
+            fprintf(stderr, "CommandList::Create: vkCreateCommandPool[%u] failed (%d)\n", i, (int)res);
             return false;
         }
-        WaitForSingleObject(m_fenceEvent, INFINITE);
-    }
-    cbvAllocator.Reset(m_frameIndex);
-    gfxResourceHandler.Cleanup();
-    return true;
-}
-
-
-void CommandQueue::EndFrame(void) noexcept {
-    const UINT64 fenceValue = ++m_fenceCounter;
-    m_fenceValues[m_frameIndex] = fenceValue;
-    m_queue->Signal(m_fence.Get(), fenceValue);
-    m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
-}
-
-
-void CommandQueue::WaitIdle(void) noexcept {
-    if (not m_queue or not m_fence or not m_fenceEvent)
-        return;
-    const UINT64 value = ++m_fenceCounter;
-    m_fenceValues[m_frameIndex] = value;
-    m_queue->Signal(m_fence.Get(), value);
-    if (m_fence->GetCompletedValue() < value) {
-        m_fence->SetEventOnCompletion(value, m_fenceEvent);
-        WaitForSingleObject(m_fenceEvent, INFINITE);
-    }
-#ifdef _DEBUG
-    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
-    if (FAILED(removed)) {
-        fprintf(stderr, "CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
-        gfxStates.CheckError();
-        dx12Context.DumpDRED();
-        fflush(stderr);
-    }
-#endif
-}
-
-
-ID3D12GraphicsCommandList* CommandQueue::List(void) const noexcept {
-    return commandListHandler.CurrentGfxList();
-}
-
-// =================================================================================================
-
-bool CommandList::Create(ID3D12Device* device, const String& name, bool isTemporary) noexcept {
-    for (UINT i = 0; i < FRAME_COUNT; ++i) {
-        HRESULT hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
-        if (FAILED(hr)) {
-            fprintf(stderr, "CommandList::Create: CreateCommandAllocator[%u] failed (hr=0x%08X)\n", i, (unsigned)hr);
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool        = m_pools[i];
+        allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+        res = vkAllocateCommandBuffers(device, &allocInfo, &m_cmdBuffers[i]);
+        if (res != VK_SUCCESS) {
+            fprintf(stderr, "CommandList::Create: vkAllocateCommandBuffers[%u] failed (%d)\n", i, (int)res);
             return false;
         }
     }
-    HRESULT hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_gfxListPtr));
-    if (FAILED(hr)) {
-        fprintf(stderr, "CommandList::Create: CreateCommandList failed (hr=0x%08X)\n", (unsigned)hr);
-        return false;
-    }
-    m_gfxListPtr->Close();
     m_id = commandListHandler.m_cmdListId++;
-#ifdef _DEBUG
-    if (not name.IsEmpty())
-        m_gfxListPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
-#endif
     m_name = name;
     m_isTemporary = isTemporary;
     return true;
 }
 
 
-void CommandList::Destroy(void) noexcept {
+void CommandList::Destroy(void) noexcept
+{
     m_isRecording = false;
-    m_gfxListPtr.Reset();
-    for (UINT i = 0; i < FRAME_COUNT; ++i)
-        m_allocators[i].Reset();
+    VkDevice device = vkContext.Device();
+    if (device == VK_NULL_HANDLE)
+        return;
+    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+        if (m_pools[i] != VK_NULL_HANDLE) {
+            vkDestroyCommandPool(device, m_pools[i], nullptr);
+            m_pools[i] = VK_NULL_HANDLE;
+            m_cmdBuffers[i] = VK_NULL_HANDLE;
+        }
+    }
 }
 
 
-void CommandList::Reset(void) noexcept {
+void CommandList::Reset(void) noexcept
+{
     m_refCounter = 1;
     m_isFlushed = false;
     m_isRecording = false;
 }
 
 
-bool CommandList::Open(bool saveRenderStates) noexcept {
+bool CommandList::Open(bool saveRenderStates) noexcept
+{
     if (m_isRecording)
         return true;
-    UINT frameIndex = commandListHandler.CmdQueue().FrameIndex();
-    if (not m_gfxListPtr or not m_allocators[frameIndex])
+    uint32_t fi = ActiveFrameIndex();
+    if ((m_pools[fi] == VK_NULL_HANDLE) or (m_cmdBuffers[fi] == VK_NULL_HANDLE))
         return false;
-    HRESULT hr = m_allocators[frameIndex]->Reset();
-    if (FAILED(hr)) {
-        fprintf(stderr, "CommandList::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
+    VkResult res = vkResetCommandPool(vkContext.Device(), m_pools[fi], 0);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "CommandList::Open: vkResetCommandPool failed (%d)\n", (int)res);
         return false;
     }
-    hr = m_gfxListPtr->Reset(m_allocators[frameIndex].Get(), nullptr);
-    if (FAILED(hr)) {
-        fprintf(stderr, "CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
+    VkCommandBufferBeginInfo bi{};
+    bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    res = vkBeginCommandBuffer(m_cmdBuffers[fi], &bi);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "CommandList::Open: vkBeginCommandBuffer failed (%d)\n", (int)res);
         return false;
     }
     m_isRecording = true;
     m_isFlushed = false;
-    m_activePSO = nullptr;
+    m_activePipeline = VK_NULL_HANDLE;
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
     commandListHandler.Register(this);
@@ -394,13 +332,15 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
 }
 
 
-void CommandList::Close(bool restoreRenderStates) noexcept {
+void CommandList::Close(bool restoreRenderStates) noexcept
+{
     if (not m_isRecording)
         return;
     m_isRecording = false;
-    HRESULT hr = m_gfxListPtr->Close();
-    if (FAILED(hr))
-        fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
+    uint32_t fi = ActiveFrameIndex();
+    VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
+    if (res != VK_SUCCESS)
+        fprintf(stderr, "CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
 #ifdef _DEBUG
     gfxStates.CheckError();
 #endif
@@ -410,73 +350,75 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
 }
 
 
-void CommandList::Flush(void) noexcept {
+void CommandList::Flush(void) noexcept
+{
     if (m_isFlushed)
         return;
     m_isFlushed = true;
     Close();
 
-    ID3D12CommandList* lists[] = { GfxList(true) };
-    commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
+    uint32_t fi = ActiveFrameIndex();
+    VkCommandBufferSubmitInfo cbInfo{};
+    cbInfo.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    cbInfo.commandBuffer = m_cmdBuffers[fi];
 
+    VkSubmitInfo2 submit{};
+    submit.sType                  = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.commandBufferInfoCount = 1;
+    submit.pCommandBufferInfos    = &cbInfo;
+
+    VkResult res = vkQueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
+    if (res != VK_SUCCESS)
+        fprintf(stderr, "CommandList::Flush: vkQueueSubmit2 failed (%d)\n", (int)res);
 #ifdef _DEBUG
     CheckDeviceRemoved("Flush");
 #endif
     commandListHandler.CmdQueue().WaitIdle();
     DisposeResources();
-#if 0
-    // Reset allocator + list so the debug layer releases resource refs; leave closed.
-    UINT fi = commandListHandler.CmdQueue().FrameIndex();
-    HRESULT hr = m_allocators[fi]->Reset();
-    if (FAILED(hr))
-        fprintf(stderr, "CommandList::Flush: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
-    hr = m_gfxListPtr->Reset(m_allocators[fi].Get(), nullptr);
-    if (FAILED(hr))
-        fprintf(stderr, "CommandList::Flush: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
-    else
-        m_gfxListPtr->Close();
-#endif
 }
 
 
-void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) {
-    if (not m_isRecording or not resource or (before == after))
+void CommandList::SetBarrier(VkImage image, ImageLayoutTracker& tracker, VkImageLayout newLayout,
+                             VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
+{
+    if (not m_isRecording or (image == VK_NULL_HANDLE))
         return;
-    D3D12_RESOURCE_BARRIER b{};
-    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource = resource;
-    b.Transition.StateBefore = before;
-    b.Transition.StateAfter = after;
-    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    m_gfxListPtr->ResourceBarrier(1, &b);
+    tracker.TransitionTo(GfxList(), newLayout, dstStage, dstAccess);
 #ifdef _DEBUG
     gfxStates.CheckError();
 #endif
 }
 
 
-void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
+void CommandList::SetBarrier(const VkImageMemoryBarrier2* barriers, int count)
+{
     if (not m_isRecording or not barriers or (count <= 0))
         return;
-    m_gfxListPtr->ResourceBarrier(UINT(count), barriers);
+    VkDependencyInfo dep{};
+    dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dep.imageMemoryBarrierCount = uint32_t(count);
+    dep.pImageMemoryBarriers    = barriers;
+    vkCmdPipelineBarrier2(GfxList(), &dep);
 #ifdef _DEBUG
     gfxStates.CheckError();
 #endif
 }
 
 
-void CommandList::DisposeResources(void) noexcept {
+void CommandList::DisposeResources(void) noexcept
+{
     for (auto& fn : m_disposableResources)
         fn();
     m_disposableResources.Clear();
 }
 
 
-void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept {
-    if (pso != m_activePSO) {
-        m_gfxListPtr->SetPipelineState(pso);
-        m_gfxListPtr->SetGraphicsRootSignature(shader->GetRootSignature().Get());
-        m_activePSO = pso;
+void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/) noexcept
+{
+    if (pipeline != m_activePipeline) {
+        if (m_isRecording and pipeline != VK_NULL_HANDLE)
+            vkCmdBindPipeline(GfxList(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        m_activePipeline = pipeline;
 #ifdef _DEBUG
         gfxStates.CheckError();
 #endif
@@ -484,21 +426,28 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
 }
 
 
-ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
-    ID3D12PipelineState* pso = PSO::GetPSO(shader);
-    if (pso)
-        SetActivePSO(pso, shader);
-    return pso;
+VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
+{
+    // PipelineKey {shader, RenderStates, colour/depth formats} — formats come from the active
+    // RT's FillPipelineKey (set by RenderTarget::Activate via baseRenderer.ActivateDrawBuffer).
+    PipelineKey key{};
+    key.shader = shader;
+    key.states = baseRenderer.RenderStates();
+    if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
+        rt->FillPipelineKey(key);
+    VkPipeline p = pipelineCache.GetOrCreate(key);
+    if (p != VK_NULL_HANDLE)
+        SetActivePipeline(p, shader);
+    return p;
 }
 
 
 #ifdef _DEBUG
-void CommandList::CheckDeviceRemoved(const char* context) noexcept {
-    gfxStates.CheckError();
-    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
-    if (FAILED(removed)) {
-        fprintf(stderr, "CommandList::%s: device removed (0x%08X)\n", context, (unsigned)removed);
-        dx12Context.DumpDRED();
+void CommandList::CheckDeviceRemoved(const char* context) noexcept
+{
+    int errors = vkContext.DrainMessages(false);
+    if (errors > 0) {
+        fprintf(stderr, "CommandList::%s: %d Vulkan validation error(s)\n", context, errors);
         fflush(stderr);
     }
 }
@@ -511,14 +460,17 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept {
 bool CommandListHandler::s_logCalls = false;
 #endif
 
-bool CommandListHandler::Create(ID3D12Device* device) noexcept {
-    if (not m_cmdQueue.Create(device, "MainQueue"))
-        return false;
-    return true;
+
+bool CommandListHandler::Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
+                                uint32_t graphicsFamily, uint32_t presentFamily,
+                                const String& name) noexcept
+{
+    return m_cmdQueue.Create(device, graphicsQueue, presentQueue, graphicsFamily, presentFamily, name);
 }
 
 
-void CommandListHandler::Destroy(void) noexcept {
+void CommandListHandler::Destroy(void) noexcept
+{
     for (auto cl : m_recycledLists) {
         cl->Destroy();
         delete cl;
@@ -528,23 +480,26 @@ void CommandListHandler::Destroy(void) noexcept {
 }
 
 
-void CommandListHandler::PushCmdList(CommandList* cl) noexcept {
+void CommandListHandler::PushCmdList(CommandList* cl) noexcept
+{
     if (m_currentListData.cmdList)
         m_cmdListStack.Push(m_currentListData);
     m_currentListData = CommandListData{ cl, cl->GfxList() };
 }
 
 
-void CommandListHandler::PopCmdList(void) noexcept {
+void CommandListHandler::PopCmdList(void) noexcept
+{
     m_currentListData = (m_cmdListStack.Length() > 0) ? m_cmdListStack.Pop() : CommandListData();
 }
 
 
-void CommandListHandler::Register(CommandList* cl) noexcept {
+void CommandListHandler::Register(CommandList* cl) noexcept
+{
     if (not cl)
         return;
 #ifdef _DEBUG
-	if (cl->m_name.IsEmpty())
+    if (cl->m_name.IsEmpty())
         fprintf(stderr, "CommandListHandler::Register: Unnamed command list\n");
 #endif
     for (auto l : m_pendingLists)
@@ -553,43 +508,53 @@ void CommandListHandler::Register(CommandList* cl) noexcept {
     m_pendingLists.Push(cl);
 }
 
-#define LOG_EXECUTION 0
 
-void CommandListHandler::ExecuteAll(void) noexcept {
+void CommandListHandler::ExecuteAll(void) noexcept
+{
     if (m_pendingLists.IsEmpty())
         return;
-	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
+
+    AutoArray<VkCommandBufferSubmitInfo> cbInfos(m_pendingLists.Length());
     int n = 0;
-#if LOG_EXECUTION//def _DEBUG
-    fprintf(stderr, "\nCommandListHandler::ExecuteAll: executing %u command lists.\n", (unsigned)m_pendingLists.Length());
-#endif
     for (auto l : m_pendingLists) {
-#if LOG_EXECUTION//def _DEBUG
-        if (l->m_isRecording) {
-            fprintf(stderr, "   '%s' still open; closing it now.\n", (const char*)l->GetName());
+        if (l->IsFlushed())
+            continue;
+        if (l->IsRecording())
             l->Close();
-        }
-        fprintf(stderr, "   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
-#endif
-        if (not l->IsFlushed())
-            execList[n++] = l->GfxList(true);
+        VkCommandBufferSubmitInfo info{};
+        info.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        info.commandBuffer = l->GfxList(true);
+        cbInfos[n++] = info;
     }
-#if LOG_EXECUTION//def _DEBUG
-    fprintf(stderr, "\n");
-#endif
-    if (n > 0)
-        m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.Data());
+    if (n > 0) {
+        VkSemaphoreSubmitInfo waitInfo{};
+        waitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        waitInfo.semaphore = m_cmdQueue.SubmitWaitSemaphore();
+        waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+        VkSemaphoreSubmitInfo signalInfo{};
+        signalInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+        signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
+        signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+        VkSubmitInfo2 submit{};
+        submit.sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit.waitSemaphoreInfoCount   = 1;
+        submit.pWaitSemaphoreInfos      = &waitInfo;
+        submit.signalSemaphoreInfoCount = 1;
+        submit.pSignalSemaphoreInfos    = &signalInfo;
+        submit.commandBufferInfoCount   = uint32_t(n);
+        submit.pCommandBufferInfos      = cbInfos.Data();
+
+        VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, m_cmdQueue.SubmitSignalFence());
+        if (res != VK_SUCCESS)
+            fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
+    }
 #ifdef _DEBUG
     gfxStates.CheckError();
-    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
-    if (FAILED(removed)) {
-        fprintf(stderr, "CommandListHandler::ExecuteAll: device removed (0x%08X)\n", (unsigned)removed);
-        dx12Context.DumpDRED();
-    }
-    fflush(stderr);
 #endif
     for (auto l : m_pendingLists) {
-        if (l->m_isTemporary)
+        if (l->IsTemporary())
             m_recycledLists.Push(l);
     }
     m_pendingLists.Clear();
@@ -597,19 +562,16 @@ void CommandListHandler::ExecuteAll(void) noexcept {
 }
 
 
-CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary) noexcept {
+CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary) noexcept
+{
     if (isTemporary and not m_recycledLists.IsEmpty()) {
         CommandList* cl = m_recycledLists.Pop();
         cl->SetName(name);
         cl->Reset();
         return cl;
     }
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return nullptr;
-
     CommandList* cl = new CommandList();
-    if (not cl->Create(device, name, isTemporary)) {
+    if (not cl->Create(name, isTemporary)) {
         delete cl;
         return nullptr;
     }
@@ -618,6 +580,39 @@ CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTempor
     return cl;
 }
 
-#endif // Phase C
+// =================================================================================================
+// =================================================================================================
+// Bind-table state (CPU-side staging of per-draw shader resource bindings).
+
+void CommandListHandler::ResetBindings(void) noexcept
+{
+    for (uint32_t i = 0; i < kSrvSlots; ++i)
+        m_boundSrvViews[i] = VK_NULL_HANDLE;
+    for (uint32_t i = 0; i < kSamplerSlots; ++i)
+        m_boundSamplers[i] = VK_NULL_HANDLE;
+    for (uint32_t i = 0; i < kUavSlots; ++i)
+        m_boundStorageViews[i] = VK_NULL_HANDLE;
+}
+
+
+void CommandListHandler::BindSampledImage(uint32_t slot, VkImageView view) noexcept
+{
+    if (slot < kSrvSlots)
+        m_boundSrvViews[slot] = view;
+}
+
+
+void CommandListHandler::BindSampler(uint32_t slot, VkSampler sampler) noexcept
+{
+    if (slot < kSamplerSlots)
+        m_boundSamplers[slot] = sampler;
+}
+
+
+void CommandListHandler::BindStorageImage(uint32_t slot, VkImageView view) noexcept
+{
+    if (slot < kUavSlots)
+        m_boundStorageViews[slot] = view;
+}
 
 // =================================================================================================

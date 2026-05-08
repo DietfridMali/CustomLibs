@@ -1,17 +1,8 @@
 #pragma once
 
-// =================================================================================================
-// TODO Vulkan-Port: NoiseTexture<Tag> / NoiseTexture3D / CloudNoiseTexture / NoiseMaxMipTexture /
-// BlueNoiseTexture still carry DX12 bodies (CreateCommittedResource + descriptor-heap SRV).
-// Mechanical port: replace dxgiFormat -> vkFormat in NoiseTraits, swap Deploy() bodies to use
-// vmaCreateImage / vkCreateImageView + UploadTextureData / Upload3DTextureData (already in
-// vkupload). Wrapped in #if 0 for now so the rendertools translation unit compiles.
-#if 0
-
 #include "texture.h"
-#include "dx12context.h"
-#include "descriptor_heap.h"
-#include "dx12upload.h"
+#include "vkcontext.h"
+#include "vkupload.h"
 #include "noise.h"
 #include "FBM.h"
 
@@ -51,7 +42,7 @@ template<class Tag> struct NoiseTraits;
 // 2D value noise (float32, 1 channel)
 template<> struct NoiseTraits<ValueNoiseR32F> {
     using PixelT = float;
-    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R32_FLOAT;
+    static constexpr VkFormat    vkFormat    = VK_FORMAT_R32_SFLOAT;
     static constexpr uint32_t    pixelStride = 4;   // sizeof(float)
     static constexpr int         Components  = 1;
 
@@ -79,7 +70,7 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
 // 2D fbm (float32, 1 channel)
 template<> struct NoiseTraits<FbmNoiseR32F> {
     using PixelT = float;
-    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R32_FLOAT;
+    static constexpr VkFormat    vkFormat    = VK_FORMAT_R32_SFLOAT;
     static constexpr uint32_t    pixelStride = 4;
     static constexpr int         Components  = 1;
 
@@ -107,7 +98,7 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
 // RGBA8: R = Perlin × (1−Worley), G/B/A = Worley-fBm, doubled base frequency per channel
 template<> struct NoiseTraits<HashNoiseRGBA8> {
     using PixelT = uint8_t;
-    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8G8B8A8_UNORM;
+    static constexpr VkFormat    vkFormat    = VK_FORMAT_R8G8B8A8_UNORM;
     static constexpr uint32_t    pixelStride = 4;
     static constexpr int         Components  = 4;
 
@@ -137,7 +128,7 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
 template<>
 struct NoiseTraits<WeatherNoiseRG8> {
     using PixelT = uint8_t;
-    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8G8_UNORM;
+    static constexpr VkFormat    vkFormat    = VK_FORMAT_R8G8_UNORM;
     static constexpr uint32_t    pixelStride = 2;
     static constexpr int         Components  = 2;
 
@@ -165,7 +156,7 @@ struct NoiseTraits<WeatherNoiseRG8> {
 
 template<> struct NoiseTraits<BlueNoiseR8> {
     using PixelT = uint8_t;
-    static constexpr DXGI_FORMAT dxgiFormat  = DXGI_FORMAT_R8_UNORM;
+    static constexpr VkFormat    vkFormat    = VK_FORMAT_R8_UNORM;
     static constexpr uint32_t    pixelStride = 1;
     static constexpr int         Components  = 1;
 
@@ -270,54 +261,61 @@ private:
         if (w <= 0 or h <= 0)
             return false;
 
-        ID3D12Device* device = dx12Context.Device();
-        if (not device)
+        VmaAllocator allocator = vkContext.Allocator();
+        VkDevice     device    = vkContext.Device();
+        if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
             return false;
 
-        constexpr DXGI_FORMAT fmt = NoiseTraits<Tag>::dxgiFormat;
+        constexpr VkFormat fmt    = NoiseTraits<Tag>::vkFormat;
         constexpr uint32_t stride = NoiseTraits<Tag>::pixelStride;
 
-        // (Re-)create Texture2D resource
-        m_resource.Reset();
-        D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
-        D3D12_RESOURCE_DESC rd{};
-        rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        rd.Width            = UINT(w);
-        rd.Height           = UINT(h);
-        rd.DepthOrArraySize = 1;
-        rd.MipLevels        = 1;
-        rd.Format           = fmt;
-        rd.SampleDesc.Count = 1;
-        rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-
-        if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource))))
-            return false;
-#ifdef _DEBUG
-        char name[128];
-        snprintf(name, sizeof(name), "NoiseTexture[%s]", (const char*) m_name   );
-        m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
-#endif
-
-        const uint8_t* src = reinterpret_cast<const uint8_t*>(m_data.Data());
-        if (not UploadTextureData(device, m_resource.Get(), src, w, h, int(stride)))
-            return false;
-
-        // Create / update SRV
-        if (m_handle == UINT32_MAX) {
-            DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-            if (not hdl.IsValid())
-                return false;
-            m_handle = hdl.index;
+        // (Re-)create Texture2D image (drop any previous one)
+        if (m_imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, m_imageView, nullptr);
+            m_imageView = VK_NULL_HANDLE;
+        }
+        if (m_image != VK_NULL_HANDLE) {
+            vmaDestroyImage(allocator, m_image, m_allocation);
+            m_image = VK_NULL_HANDLE;
+            m_allocation = VK_NULL_HANDLE;
         }
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Format                  = fmt;
-        srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels     = 1;
+        VkImageCreateInfo info{};
+        info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        info.imageType     = VK_IMAGE_TYPE_2D;
+        info.format        = fmt;
+        info.extent.width  = uint32_t(w);
+        info.extent.height = uint32_t(h);
+        info.extent.depth  = 1;
+        info.mipLevels     = 1;
+        info.arrayLayers   = 1;
+        info.samples       = VK_SAMPLE_COUNT_1_BIT;
+        info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+        info.usage         = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        device->CreateShaderResourceView(m_resource.Get(),
-            &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_handle));
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        if (vmaCreateImage(allocator, &info, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS)
+            return false;
+
+        m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        const uint8_t* src = reinterpret_cast<const uint8_t*>(m_data.Data());
+        if (not UploadTextureData(m_image, m_layoutTracker, src, w, h, int(stride)))
+            return false;
+
+        VkImageViewCreateInfo vci{};
+        vci.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vci.image                           = m_image;
+        vci.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+        vci.format                          = fmt;
+        vci.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        vci.subresourceRange.levelCount     = 1;
+        vci.subresourceRange.layerCount     = 1;
+        if (vkCreateImageView(device, &vci, nullptr, &m_imageView) != VK_SUCCESS)
+            return false;
 
         m_isValid = true;
         m_isDeployed = true;
@@ -442,7 +440,5 @@ private:
         return uint32_t(m_gridSize.x * m_gridSize.y * m_gridSize.z);
     }
 };
-
-#endif // TODO Vulkan-Port noise textures
 
 // =================================================================================================

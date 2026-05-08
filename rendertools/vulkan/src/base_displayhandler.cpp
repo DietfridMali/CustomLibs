@@ -4,6 +4,9 @@
 #include "base_shaderhandler.h"
 #include "commandlist.h"
 #include "vkcontext.h"
+#include "descriptor_pool_handler.h"
+#include "cbv_allocator.h"
+#include "resource_handler.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -143,26 +146,38 @@ bool BaseDisplayHandler::SetupSwapchain(void) {
 }
 
 
+// EnableBackBuffer / DisableBackBuffer drive the swapchain image's layout transitions for the
+// presentable color attachment. Both run on the currently active CommandList's command buffer
+// (top of the CommandListHandler stack).
+//
+// EnableBackBuffer is called at the start of each frame's main render pass to bring the
+// acquired swapchain image from PRESENT_SRC_KHR (or UNDEFINED on first use) to
+// COLOR_ATTACHMENT_OPTIMAL.
+//
+// DisableBackBuffer is called right before EndFrame's vkQueuePresentKHR; it transitions back
+// to PRESENT_SRC_KHR.
+
 void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
-    // TODO Phase C: needs the active VkCommandBuffer (currently nullptr — CommandList port).
-    //   VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    //   m_swapchain.LayoutTracker(m_backBufferIndex).ToColorAttachment(cb);
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE)
+        return;
+    m_swapchain.LayoutTracker(m_backBufferIndex).ToColorAttachment(cb);
 }
 
 
 void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
-    // TODO Phase C:
-    //   VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    //   m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE)
+        return;
+    m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
 }
 
 
 void BaseDisplayHandler::EndFrame(void) {
     if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
-    // Phase C: commandListHandler.ExecuteAll() submits all registered command buffers with the
-    // CommandQueue's wait/signal semaphores. CmdQueue::EndFrame then issues vkQueuePresentKHR
-    // and advances the frame slot (already implemented in Phase A).
+    // Submit all registered command buffers, then present + advance frame slot.
+    commandListHandler.ExecuteAll();
     commandListHandler.CmdQueue().EndFrame();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
 }
@@ -171,11 +186,16 @@ void BaseDisplayHandler::EndFrame(void) {
 void BaseDisplayHandler::BeginFrame(void) {
     if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
-    // CmdQueue::BeginFrame waits for the slot's in-flight fence, calls vkResetFences,
-    // resets the frame's descriptor pool / cbv allocator / resource handler, and acquires
-    // the next swapchain image (m_imageIndex updated).
+    // CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, and
+    // vkAcquireNextImageKHR. We follow up with the per-frame resource resets that the DX12
+    // path runs implicitly inside CommandQueue::BeginFrame.
     commandListHandler.CmdQueue().BeginFrame();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
+    const uint32_t slot = commandListHandler.CmdQueue().FrameIndex();
+    descriptorPoolHandler.BeginFrame(slot);
+    cbvAllocator.Reset(slot);
+    gfxResourceHandler.Cleanup(slot);
+    commandListHandler.ResetBindings();
     baseShaderHandler.InvalidateActiveShader();
 }
 

@@ -1,11 +1,5 @@
 #define NOMINMAX
 
-// =================================================================================================
-// TODO Vulkan-Port: bodies still call ID3D12Device / CreateCommittedResource / descriptor-heap
-// SRV. Mechanical replacement with vmaCreateImage / vkCreateImageView / Upload3DTextureData
-// pending. Wrapped in #if 0 so the file compiles in the rendertools Vulkan translation unit.
-#if 0
-
 // --- tileable fBM noise (periodisch in X/Y) ---------------------------------
 #include <vector>
 #include <cstdint>
@@ -17,7 +11,7 @@
 
 #include "noisetexture.h"
 #include "conversions.hpp"
-#include "dx12upload.h"
+#include "vkupload.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -32,24 +26,6 @@ using namespace Noise;
 
 #define CLOUD_STRUCTURE 2
 #define SPREAD_NOISE    1
-
-// Helper: allocate a SRV for a 3D texture resource
-static bool CreateSRV3D(uint32_t& handleOut, ID3D12Resource* resource, DXGI_FORMAT fmt) {
-    if (handleOut == UINT32_MAX) {
-        DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-        if (not hdl.IsValid())
-            return false;
-        handleOut = hdl.index;
-    }
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = fmt;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture3D.MipLevels = 1;
-    dx12Context.Device()->CreateShaderResourceView(
-        resource, &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(handleOut));
-    return true;
-}
 
 // =================================================================================================
 
@@ -164,30 +140,57 @@ void NoiseTexture3D::SetParams(bool /*enforce*/) {
 }
 
 
+// Helper: create a TYPE_3D image view for the resource owned by `tex`.
+// Used by NoiseTexture3D / CloudNoiseTexture / BlueNoiseTexture below — Upload3DTextureData
+// builds the VkImage + VmaAllocation and transitions the layout to SHADER_READ_ONLY, but does
+// not create the view. The view binds m_image as the t-slot source on Activate.
+static bool CreateView3D(Texture& tex, VkFormat fmt) noexcept
+{
+    VkDevice device = vkContext.Device();
+    if (device == VK_NULL_HANDLE or tex.m_image == VK_NULL_HANDLE)
+        return false;
+    if (tex.m_imageView != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, tex.m_imageView, nullptr);
+        tex.m_imageView = VK_NULL_HANDLE;
+    }
+    VkImageViewCreateInfo vci{};
+    vci.sType                       = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vci.image                       = tex.m_image;
+    vci.viewType                    = VK_IMAGE_VIEW_TYPE_3D;
+    vci.format                      = fmt;
+    vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    vci.subresourceRange.levelCount = 1;
+    vci.subresourceRange.layerCount = 1;
+    return vkCreateImageView(device, &vci, nullptr, &tex.m_imageView) == VK_SUCCESS;
+}
+
+
 bool NoiseTexture3D::Deploy(int) {
     if (m_data.IsEmpty())
         return false;
 
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
+    // Cloud-shape noise: RGBA32F — 4 channels x float32 per voxel.
+    constexpr VkFormat fmt    = VK_FORMAT_R32G32B32A32_SFLOAT;
+    constexpr uint32_t stride = 16;  // 4 × float32
+
+    if (m_image != VK_NULL_HANDLE) {
+        if (m_imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(vkContext.Device(), m_imageView, nullptr);
+            m_imageView = VK_NULL_HANDLE;
+        }
+        vmaDestroyImage(vkContext.Allocator(), m_image, m_allocation);
+        m_image = VK_NULL_HANDLE;
+        m_allocation = VK_NULL_HANDLE;
+    }
+
+    if (not Upload3DTextureData(m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z,
+                                fmt, stride, m_data.Data(),
+                                m_image, m_allocation, m_layoutTracker))
+        return false;
+    if (not CreateView3D(*this, fmt))
         return false;
 
-    // RGBA16F — 4 channels × float16 per voxel
-    // We store as float32; upload as RGBA32F.
-    constexpr DXGI_FORMAT fmt = DXGI_FORMAT_R32G32B32A32_FLOAT;
-    constexpr uint32_t    stride = 16;  // 4 × float32
-
-    m_resource = Upload3DTextureData(device, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, fmt, stride, m_data.Data());
-    if (not m_resource)
-        return false;
-#ifdef _DEBUG
-    char name[128];
-    snprintf(name, sizeof(name), "NoiseTexture3D[%s]", (const char*)m_name);
-    m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
-#endif
-    if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
-        return false;
-
+    m_isValid = true;
     m_isDeployed = true;
     return true;
 }
@@ -529,20 +532,28 @@ bool CloudNoiseTexture::Deploy(int) {
     if (m_data.IsEmpty())
         return false;
 
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
+    // Single-channel float32 → R32_SFLOAT
+    constexpr VkFormat fmt    = VK_FORMAT_R32_SFLOAT;
+    constexpr uint32_t stride = 4;
+
+    if (m_image != VK_NULL_HANDLE) {
+        if (m_imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(vkContext.Device(), m_imageView, nullptr);
+            m_imageView = VK_NULL_HANDLE;
+        }
+        vmaDestroyImage(vkContext.Allocator(), m_image, m_allocation);
+        m_image = VK_NULL_HANDLE;
+        m_allocation = VK_NULL_HANDLE;
+    }
+
+    if (not Upload3DTextureData(m_gridSize, m_gridSize, m_gridSize,
+                                fmt, stride, m_data.Data(),
+                                m_image, m_allocation, m_layoutTracker))
+        return false;
+    if (not CreateView3D(*this, fmt))
         return false;
 
-    // Single-channel float32 → R32_FLOAT
-    constexpr DXGI_FORMAT fmt = DXGI_FORMAT_R32_FLOAT;
-    constexpr uint32_t    stride = 4;
-
-    m_resource = Upload3DTextureData(device, m_gridSize, m_gridSize, m_gridSize, fmt, stride, m_data.Data());
-    if (not m_resource)
-        return false;
-    if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
-        return false;
-
+    m_isValid = true;
     m_isDeployed = true;
     return true;
 }
@@ -717,19 +728,26 @@ bool BlueNoiseTexture::Deploy(int) {
     if (m_data.IsEmpty())
         return false;
 
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
+    constexpr VkFormat fmt    = VK_FORMAT_R8_UNORM;
+    constexpr uint32_t stride = 1;
+
+    if (m_image != VK_NULL_HANDLE) {
+        if (m_imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(vkContext.Device(), m_imageView, nullptr);
+            m_imageView = VK_NULL_HANDLE;
+        }
+        vmaDestroyImage(vkContext.Allocator(), m_image, m_allocation);
+        m_image = VK_NULL_HANDLE;
+        m_allocation = VK_NULL_HANDLE;
+    }
+
+    if (not Upload3DTextureData(128, 128, 64, fmt, stride, m_data.Data(),
+                                m_image, m_allocation, m_layoutTracker))
+        return false;
+    if (not CreateView3D(*this, fmt))
         return false;
 
-    constexpr DXGI_FORMAT fmt = DXGI_FORMAT_R8_UNORM;
-    constexpr uint32_t    stride = 1;
-
-    m_resource = Upload3DTextureData(device, 128, 128, 64, fmt, stride, m_data.Data());
-    if (not m_resource)
-        return false;
-    if (not CreateSRV3D(m_handle, m_resource.Get(), fmt))
-        return false;
-
+    m_isValid = true;
     m_isDeployed = true;
     return true;
 }
@@ -743,7 +761,5 @@ bool BlueNoiseTexture::LoadFromFile(const String& filename) {
 bool BlueNoiseTexture::SaveToFile(const String& filename) {
     return m_data.SaveToFile(filename);
 }
-
-#endif // TODO Vulkan-Port noise textures
 
 // =================================================================================================

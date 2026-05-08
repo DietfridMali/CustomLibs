@@ -13,6 +13,8 @@
 #include "texture.h"
 #include "vkcontext.h"
 #include "vkupload.h"
+#include "commandlist.h"
+#include "sampler_cache.h"
 #include "gfxstates.h"
 
 // =================================================================================================
@@ -167,18 +169,25 @@ bool Texture::Bind(int tmuIndex)
     if (not m_hasParams)
         SetParams(false);
 
-    // TODO Phase C: write (m_imageView, samplerCache.GetSampler(m_sampling)) into the
-    // CommandListHandler bind table at slot tmuIndex; mark dirty so the next Draw materializes
-    // a VkDescriptorSet (descriptorPoolHandler.Allocate + vkUpdateDescriptorSets +
-    // vkCmdBindDescriptorSets). The DX12 GfxStates slot-tracking via BindTexture is obsolete
-    // in Vulkan — the bind table replaces it.
+    // Stage the (image-view, sampler) pair in the CommandListHandler bind table at slot
+    // tmuIndex. Materialized into a VkDescriptorSet by Shader::UpdateVariables right before the
+    // next draw (descriptorPoolHandler.Allocate + vkUpdateDescriptorSets + vkCmdBindDescriptorSets).
+    // The DX12 SetGraphicsRootDescriptorTable equivalent.
+    if (tmuIndex >= 0 and uint32_t(tmuIndex) < CommandListHandler::kSrvSlots) {
+        commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_imageView);
+        VkSampler sampler = samplerCache.GetSampler(m_sampling);
+        commandListHandler.BindSampler(uint32_t(tmuIndex), sampler);
+    }
     return true;
 }
 
 
 void Texture::Release(void)
 {
-    // Phase C: clear slot tmuIndex in the CommandListHandler bind table.
+    if (m_tmuIndex >= 0 and uint32_t(m_tmuIndex) < CommandListHandler::kSrvSlots) {
+        commandListHandler.BindSampledImage(uint32_t(m_tmuIndex), VK_NULL_HANDLE);
+        commandListHandler.BindSampler(uint32_t(m_tmuIndex), VK_NULL_HANDLE);
+    }
     m_tmuIndex = -1;
 }
 

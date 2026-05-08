@@ -28,6 +28,21 @@ struct VkStagingBuffer
 };
 
 // =================================================================================================
+// One-shot CommandBuffer helpers — used by upload paths and GfxArray operations that need an
+// immediate, blocking command-buffer submission outside the per-frame CommandList lifecycle.
+// Pattern: BeginSingleTimeCommands creates a transient VkCommandPool + VkCommandBuffer in
+// recording state; the caller fills it; EndSingleTimeCommands submits + waits + frees.
+
+struct OneShotCommandBuffer
+{
+    VkCommandPool   pool { VK_NULL_HANDLE };
+    VkCommandBuffer cb   { VK_NULL_HANDLE };
+};
+
+bool BeginSingleTimeCommands(OneShotCommandBuffer& out) noexcept;
+bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept;
+
+// =================================================================================================
 // Low-level: into an already-open command buffer, transition the image to TRANSFER_DST, record a
 // vkCmdCopyBufferToImage from a freshly-allocated staging buffer, optionally transition to
 // SHADER_READ_ONLY when addBarrier is true. outStaging is allocated by this call; caller must
