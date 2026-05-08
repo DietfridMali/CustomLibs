@@ -4,29 +4,28 @@
 #   include "texture.h"
 #endif
 
-#include "dx12context.h"
-#include "dx12upload.h"
-#include "descriptor_heap.h"
+#include "vkcontext.h"
+#include "vkupload.h"
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
 
 // =================================================================================================
-// DX12 LinearTexture — 1D data stored as a Texture2D with height=1.
+// Vulkan LinearTexture — 1D data stored as a Texture2D with height=1.
 // Replaces the OGL version (glTexImage2D / glTexSubImage2D).
 
 template<typename T> struct GfxTexTraits;
 
 template<> struct GfxTexTraits<uint8_t> {
-    static constexpr DXGI_FORMAT format    = DXGI_FORMAT_R8_UNORM;
-    static constexpr uint32_t    pixelSize = 1;   // bytes per texel
-    static constexpr uint32_t    channels  = 1;
+    static constexpr VkFormat format    = VK_FORMAT_R8_UNORM;
+    static constexpr uint32_t pixelSize = 1;
+    static constexpr uint32_t channels  = 1;
 };
 
 template<> struct GfxTexTraits<Vector4f> {
-    static constexpr DXGI_FORMAT format    = DXGI_FORMAT_R32G32B32A32_FLOAT;
-    static constexpr uint32_t    pixelSize = 16;  // bytes per texel
-    static constexpr uint32_t    channels  = 4;
+    static constexpr VkFormat format    = VK_FORMAT_R32G32B32A32_SFLOAT;
+    static constexpr uint32_t pixelSize = 16;
+    static constexpr uint32_t channels  = 4;
 };
 
 // =================================================================================================
@@ -41,18 +40,16 @@ public:
     LinearTexture() = default;
     ~LinearTexture() = default;
 
-    // OGL LinearTexture::SetParams: NEAREST filter, WRAP_S = REPEAT (if m_isRepeating)
-    // else CLAMP_TO_EDGE; WRAP_T = CLAMP_TO_EDGE.
     void SetParams(bool /*enforce*/) override
     {
         m_hasParams = true;
-        m_sampling.minFilter     = GfxFilterMode::Nearest;
-        m_sampling.magFilter     = GfxFilterMode::Nearest;
-        m_sampling.mipMode       = GfxMipMode::None;
-        m_sampling.wrapU         = m_isRepeating ? GfxWrapMode::Repeat : GfxWrapMode::ClampToEdge;
-        m_sampling.wrapV         = GfxWrapMode::ClampToEdge;
-        m_sampling.wrapW         = GfxWrapMode::ClampToEdge;
-        m_sampling.compareFunc   = GfxOperations::CompareFunc::Always;
+        m_sampling.minFilter = GfxFilterMode::Nearest;
+        m_sampling.magFilter = GfxFilterMode::Nearest;
+        m_sampling.mipMode = GfxMipMode::None;
+        m_sampling.wrapU = m_isRepeating ? GfxWrapMode::Repeat : GfxWrapMode::ClampToEdge;
+        m_sampling.wrapV = GfxWrapMode::ClampToEdge;
+        m_sampling.wrapW = GfxWrapMode::ClampToEdge;
+        m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
         m_sampling.maxAnisotropy = 1.0f;
     }
 
@@ -65,51 +62,58 @@ public:
         if (width <= 0)
             return false;
 
-        ID3D12Device* device = dx12Context.Device();
-        if (not device)
+        VmaAllocator allocator = vkContext.Allocator();
+        VkDevice device = vkContext.Device();
+        if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
             return false;
 
-        // (Re-)create a Texture2D with height=1
-        m_resource.Reset();
-        D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
-        D3D12_RESOURCE_DESC rd{};
-        rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        rd.Width            = UINT(width);
-        rd.Height           = 1;
-        rd.DepthOrArraySize = 1;
-        rd.MipLevels        = 1;
-        rd.Format           = GfxTexTraits<DATA_T>::format;
-        rd.SampleDesc.Count = 1;
-        rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-
-        if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource))))
-            return false;
-#ifdef _DEBUG
-        char name[128];
-        snprintf(name, sizeof(name), "LinearTexture[%s]", (const char*)m_name);
-        m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
-#endif
-
-        const uint8_t* src = static_cast<const uint8_t*>(tb->DataBuffer());
-        if (not UploadTextureData(device, m_resource.Get(), src, width, 1, int(GfxTexTraits<DATA_T>::pixelSize)))
-            return false;
-
-        // Create / update SRV
-        if (m_handle == UINT32_MAX) {
-            DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-            if (not hdl.IsValid())
-                return false;
-            m_handle = hdl.index;
+        // (Re-)create a 2D image with height=1 and the trait-specific format.
+        if (m_imageView != VK_NULL_HANDLE) {
+            vkDestroyImageView(device, m_imageView, nullptr);
+            m_imageView = VK_NULL_HANDLE;
+        }
+        if (m_image != VK_NULL_HANDLE) {
+            vmaDestroyImage(allocator, m_image, m_allocation);
+            m_image = VK_NULL_HANDLE;
+            m_allocation = VK_NULL_HANDLE;
         }
 
-        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-        srvDesc.Format                    = GfxTexTraits<DATA_T>::format;
-        srvDesc.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Shader4ComponentMapping   = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        srvDesc.Texture2D.MipLevels       = 1;
+        VkImageCreateInfo info { };
+        info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        info.imageType = VK_IMAGE_TYPE_2D;
+        info.format = GfxTexTraits<DATA_T>::format;
+        info.extent.width = uint32_t(width);
+        info.extent.height = 1;
+        info.extent.depth = 1;
+        info.mipLevels = 1;
+        info.arrayLayers = 1;
+        info.samples = VK_SAMPLE_COUNT_1_BIT;
+        info.tiling = VK_IMAGE_TILING_OPTIMAL;
+        info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-        D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
-        device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
+        VmaAllocationCreateInfo allocInfo { };
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+        if (vmaCreateImage(allocator, &info, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS)
+            return false;
+
+        m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+        const uint8_t* src = static_cast<const uint8_t*>(tb->DataBuffer());
+        if (not UploadTextureData(m_image, m_layoutTracker, src, width, 1, int(GfxTexTraits<DATA_T>::pixelSize)))
+            return false;
+
+        VkImageViewCreateInfo vci { };
+        vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vci.image = m_image;
+        vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        vci.format = GfxTexTraits<DATA_T>::format;
+        vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        vci.subresourceRange.levelCount = 1;
+        vci.subresourceRange.layerCount = 1;
+        if (vkCreateImageView(device, &vci, nullptr, &m_imageView) != VK_SUCCESS)
+            return false;
 
         m_isDeployed = true;
         return true;
@@ -138,7 +142,7 @@ public:
         tb->m_info = TextureBuffer::BufferInfo(
             length, 1,
             int(GfxTexTraits<DATA_T>::channels),
-            0, 0);  // internalFormat/format not used in DX12
+            0, 0);
         tb->m_data.Resize(length * int(GfxTexTraits<DATA_T>::pixelSize));
         return Deploy(0);
     }
@@ -150,10 +154,8 @@ public:
         const int l = std::min(GetWidth(), int(data.Length()));
         if (l <= 0) return 0;
 
-        // Update system-memory copy
         std::memcpy(tb->DataBuffer(), data.Data(), l * int(GfxTexTraits<DATA_T>::pixelSize));
 
-        // Re-upload to GPU
         Deploy(0);
         return l;
     }

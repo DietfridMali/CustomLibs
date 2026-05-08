@@ -1,5 +1,13 @@
 #pragma once
 
+// =================================================================================================
+// TODO Vulkan-Port: NoiseTexture<Tag> / NoiseTexture3D / CloudNoiseTexture / NoiseMaxMipTexture /
+// BlueNoiseTexture still carry DX12 bodies (CreateCommittedResource + descriptor-heap SRV).
+// Mechanical port: replace dxgiFormat -> vkFormat in NoiseTraits, swap Deploy() bodies to use
+// vmaCreateImage / vkCreateImageView + UploadTextureData / Upload3DTextureData (already in
+// vkupload). Wrapped in #if 0 for now so the rendertools translation unit compiles.
+#if 0
+
 #include "texture.h"
 #include "dx12context.h"
 #include "descriptor_heap.h"
@@ -434,5 +442,7 @@ private:
         return uint32_t(m_gridSize.x * m_gridSize.y * m_gridSize.z);
     }
 };
+
+#endif // TODO Vulkan-Port noise textures
 
 // =================================================================================================

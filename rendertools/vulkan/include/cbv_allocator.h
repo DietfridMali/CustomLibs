@@ -1,59 +1,71 @@
 #pragma once
 
-#include "dx12framework.h"
+#include "vkframework.h"
 #include "basesingleton.hpp"
+#include "gfx_buffer.h"
 
 // =================================================================================================
-// CbvLinearAllocator — per-frame linear allocator for constant buffer sub-allocations.
+// CbvLinearAllocator — per-frame linear allocator for uniform-buffer sub-allocations.
 //
-// Solves the upload-heap aliasing problem: a single ID3D12Resource per Shader was overwritten
-// by later draws in the same frame, causing all draws of the same shader to read the last
-// CPU-written value rather than the value at record time.
+// Vulkan equivalent of the DX12 cbv_allocator. Each frame slot owns one persistent-mapped
+// host-visible UBO buffer (via GfxBuffer + VMA); Allocate() hands out a {cpu, dynamicOffset}
+// pair that the caller copies its UBO data into and feeds into vkCmdBindDescriptorSets via
+// pDynamicOffsets[]. Reset() at frame start rewinds the cursor; if the previous frame
+// overshot the capacity, the buffer is reallocated up to kMaxCap.
 //
 // Usage:
-//   BeginFrame / Open  →  cbvAllocator.Reset(frameIndex)   (resets the offset to 0)
-//   UpdateMatrices()   →  auto a = cbvAllocator.Allocate(sizeof(FrameConstants))
-//                         memcpy(a.cpu, staging, size)
-//                         list->SetGraphicsRootConstantBufferView(0, a.gpu)
-//   UploadB1()         →  same pattern with root slot 1
+//   App init        →  cbvAllocator.Create()              (allocates two frame buffers)
+//   BeginFrame      →  cbvAllocator.Reset(frameIndex)
+//   UpdateMatrices  →  auto a = cbvAllocator.Allocate(sizeof(FrameConstants))
+//                      memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants))
+//                      // a.offset later goes into vkCmdBindDescriptorSets pDynamicOffsets
 
 struct CbAlloc {
-    uint8_t*                  cpu{ nullptr };
-    D3D12_GPU_VIRTUAL_ADDRESS gpu{ 0 };
+    uint8_t*  cpu     { nullptr };
+    uint32_t  offset  { 0 };          // dynamic offset into the current frame buffer
 
     bool IsValid(void) const noexcept { return cpu != nullptr; }
 };
 
+
 class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
 {
-    static constexpr UINT kAlign       = 256;
-    static constexpr UINT kInitCap     = 512u * 1024u;   // 64 KB = 256 slots per frame
-    static constexpr UINT kMaxCap      = 1024u * 1024u; // 1 MB hard ceiling
+    static constexpr uint32_t kInitCap = 512u * 1024u;     // 512 KB per frame slot
+    static constexpr uint32_t kMaxCap  = 4u * 1024u * 1024u;  // 4 MB hard ceiling
 
     struct FrameData {
-        ComPtr<ID3D12Resource>    resource;
-        uint8_t*                  cpuBase    = nullptr;
-        D3D12_GPU_VIRTUAL_ADDRESS gpuBase    = 0;
-        UINT                      offset     = 0;
-        UINT                      capacity   = 0;
-        UINT                      peakOffset = 0;
+        GfxBuffer  buffer;
+        uint32_t   offset      { 0 };
+        uint32_t   capacity    { 0 };
+        uint32_t   peakOffset  { 0 };
     };
 
     FrameData  m_frames[2];   // FRAME_COUNT = 2
-    UINT       m_frameIndex{ 0 };
+    uint32_t   m_frameIndex   { 0 };
+    uint32_t   m_align        { 256 };  // queried from device limits at Create
 
-    bool AllocFrame(ID3D12Device* device, UINT frameIdx, UINT capacity) noexcept;
+    bool AllocFrame(uint32_t frameIdx, uint32_t capacity) noexcept;
 
 public:
-    bool Create(ID3D12Device* device) noexcept;
+    // Allocates the per-frame UBO buffers. Reads minUniformBufferOffsetAlignment from
+    // VKContext::DeviceProps to set the alignment.
+    bool Create(void) noexcept;
     void Destroy(void) noexcept;
 
-    // Reset at the start of a frame (call after fence wait so GPU is done with this frame's data).
-    void Reset(UINT frameIndex) noexcept;
+    // Reset at frame start (after fence wait so the GPU is done with this frame's data).
+    // Grows the buffer if the previous frame overshot capacity.
+    void Reset(uint32_t frameIndex) noexcept;
 
-    // Allocate 'bytes' (rounded up to 256) from the current frame's buffer.
-    // Returns {nullptr, 0} on overflow (logged to stderr).
-    CbAlloc Allocate(UINT bytes) noexcept;
+    // Allocate 'bytes' (rounded up to m_align) from the current frame's buffer.
+    // Returns {nullptr, 0} on overflow (logged to stderr; growth deferred to next Reset).
+    CbAlloc Allocate(uint32_t bytes) noexcept;
+
+    inline VkBuffer CurrentBuffer(void) const noexcept {
+        return m_frames[m_frameIndex].buffer.Buffer();
+    }
+
+    inline uint32_t CurrentFrame(void) const noexcept { return m_frameIndex; }
+    inline uint32_t Alignment(void) const noexcept { return m_align; }
 };
 
 #define cbvAllocator CbvLinearAllocator::Instance()

@@ -1,5 +1,11 @@
 #define NOMINMAX
 
+// =================================================================================================
+// TODO Vulkan-Port: bodies still call ID3D12Device / CreateCommittedResource / descriptor-heap
+// SRV. Mechanical replacement with vmaCreateImage / vkCreateImageView / Upload3DTextureData
+// pending. Wrapped in #if 0 so the file compiles in the rendertools Vulkan translation unit.
+#if 0
+
 // --- tileable fBM noise (periodisch in X/Y) ---------------------------------
 #include <vector>
 #include <cstdint>
@@ -737,5 +743,7 @@ bool BlueNoiseTexture::LoadFromFile(const String& filename) {
 bool BlueNoiseTexture::SaveToFile(const String& filename) {
     return m_data.SaveToFile(filename);
 }
+
+#endif // TODO Vulkan-Port noise textures
 
 // =================================================================================================

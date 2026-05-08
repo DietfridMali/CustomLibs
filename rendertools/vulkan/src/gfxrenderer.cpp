@@ -1,4 +1,4 @@
-﻿#define NOMINMAX
+#define NOMINMAX
 
 #include <stdlib.h>
 #include <algorithm>
@@ -11,132 +11,98 @@
 #include "shadowmap.h"
 #include "commandlist.h"
 #include "base_displayhandler.h"
-#include "dx12context.h"
+#include "vkcontext.h"
+#include "shader_compiler.h"
+#include "pipeline_cache.h"
+#include "descriptor_pool_handler.h"
+#include "cbv_allocator.h"
 #include "gfxapitype.h"
-#include "gfxrenderer.h"
-
-#ifdef _DEBUG
-static Texture* testTexture = nullptr;
-#endif
-
-#define LOG_OPERATIONS 0
 
 // =================================================================================================
-// DX12 Renderer
+// Vulkan Renderer
 
 bool GfxRenderer::InitGraphics(void) {
 #   ifdef _DEBUG
-    constexpr bool enableDebugLayer = true;
+    constexpr bool enableValidation = true;
 #   else
-    constexpr bool enableDebugLayer = false;
+    constexpr bool enableValidation = false;
 #   endif
-    if (not dx12Context.Create(enableDebugLayer)) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 device.\n");
+
+    SDL_Window* window = baseDisplayHandler.GetWindow();
+    if (not window) {
+        fprintf(stderr, "GfxRenderer::InitGraphics: SDL window not yet created — Vulkan path expects window-first init order\n");
         return false;
     }
-    if (not commandListHandler.Create(dx12Context.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 command queue.\n");
+
+    if (not vkContext.Create(window, enableValidation)) {
+        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan context.\n");
         return false;
     }
-    if (not DescriptorHeapHandler::Instance().Create(dx12Context.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 descriptor heaps.\n");
+    if (not ShaderCompiler::Initialize()) {
+        fprintf(stderr, "Smiley-Battle: Cannot initialize DXC shader compiler.\n");
         return false;
     }
-    // Open the command list so displayHandler.Create() and renderer.Create()
-    // can record initial state (viewport/scissor, resource barriers).
-    if (not commandListHandler.CmdQueue().BeginFrame()) {
-        fprintf(stderr, "Smiley-Battle: Cannot begin first DX12 frame.\n");
+    if (not pipelineCache.Create(vkContext.Device())) {
+        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan pipeline cache.\n");
         return false;
     }
+    if (not descriptorPoolHandler.Create(vkContext.Device())) {
+        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan descriptor pools.\n");
+        return false;
+    }
+    if (not cbvAllocator.Create()) {
+        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan UBO ring allocator.\n");
+        return false;
+    }
+    if (not commandListHandler.Create(vkContext.Device(),
+                                      vkContext.GraphicsQueue(), vkContext.PresentQueue(),
+                                      vkContext.GraphicsFamily(), vkContext.PresentFamily(),
+                                      "MainQueue")) {
+        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan CommandQueue.\n");
+        return false;
+    }
+    if (not baseDisplayHandler.SetupSwapchain()) {
+        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan swapchain.\n");
+        return false;
+    }
+    // TODO Phase C: commandListHandler.CmdQueue().BeginFrame() arms the first frame; needs
+    // the per-frame command buffer pool from the full CommandList port.
+
     return true;
 }
 
 
 void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
-    CommandList* cl = commandListHandler.CurrentCmdList();
-    if (cl) {
-        if (cl->IsTemporary())
-            ++(cl->m_refCounter);
-        return cl;
-    }
-    if (piggyback and m_temporaryList)
-        ++(m_temporaryList->m_refCounter);
-    else {
-#if LOG_OPERATIONS
-        fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
-#endif
-        cl = commandListHandler.CreateCmdList(name, true);
-        if (not cl)
-            return nullptr;
-        if (not cl->Open()) {
-            return nullptr;
-        }
-    }
-    if (piggyback)
-        m_temporaryList = cl;
-    return cl;
+    // TODO Phase C: temp CommandList from commandListHandler — currently a no-op so that
+    // upload paths (vkupload, gfxdatabuffer) which call StartOperation/FinishOperation as a
+    // wrapper compile and run. vkupload uses its own one-shot CommandBuffer in Phase B.
+    (void)name;
+    (void)piggyback;
+    return nullptr;
 }
 
 
 bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
-    CommandList* list = static_cast<CommandList*>(cl);
-    if (not list)
-        return false;
-    if (not list->IsTemporary())
-        return true;
-#ifdef _DEBUG
-    if (list->m_refCounter == 0)
-        fprintf(stderr, "Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
-#endif
-    if (--(list->m_refCounter) == 0) {
-#if LOG_OPERATIONS
-        fprintf(stderr, "Closing temp. CL '%s'\n", (const char*)list->GetName());
-#endif
-        if (flush)
-            list->Flush();
-        else
-            list->Close();
-        if (list == m_temporaryList)
-            m_temporaryList = nullptr;
-    }
+    // TODO Phase C: commit the temporary CommandList (Close + register, or Flush).
+    (void)cl;
+    (void)flush;
     return true;
 }
 
 
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
+    // TODO Phase C: full screen-buffer blit path.
+    //   Stop2DScene; SetViewport(window-rect); EnableBackBuffer (UNDEFINED→COLOR via tracker);
+    //   render m_screenBuffer→backbuffer via RenderToViewport; DisableBackBuffer (→PRESENT);
+    //   then BaseDisplayHandler::Update presents.
+    (void)bRotate;
+    (void)bFlipVertically;
     if (not m_screenIsAvailable)
         return;
     ++m_frameIndex;
     m_frameCounter.Draw(true);
     Stop2DScene();
     m_screenIsAvailable = false;
-    if (not m_screenBuffer)
-        return;
-    //m_screenBuffer->Deactivate();
-
-    Set2DRenderStates();
-
-    void* cl = StartOperation("DrawScreen", false);
-
-    // Ensure the screen RenderTarget color buffer is in PSR state.
-    // Stop2DScene() may have run with the list closed (first frame before BeginFrame),
-    // in which case the RENDER_TARGET → PSR transition was never recorded.
-    if (baseDisplayHandler.CurrentBackBuffer()) {
-        baseDisplayHandler.EnableBackBuffer();
-        gfxStates.ClearBackBuffer();
-    }
-    // Set viewport after the list is open so RSSetViewports is actually recorded.
-    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
-
-    m_renderTexture.m_handle = m_screenBuffer->BufferHandle(0);
-    RenderToViewport(m_screenBuffer->GetAsTexture({}), ColorData::White, bRotate, bFlipVertically);
-
-    // Blit screen RenderTarget to back buffer if not already done (e.g. ProgressIndicator skips DrawScreen).
-    // No-op in the normal game loop where DrawScreen() was already called explicitly.
-    // Safety: ensure back buffer is in PRESENT state (no-op if DrawScreen already did it).
-    if (baseDisplayHandler.CurrentBackBuffer())
-        baseDisplayHandler.DisableBackBuffer();
-    FinishOperation(cl);
 }
 
 // =================================================================================================

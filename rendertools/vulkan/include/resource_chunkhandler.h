@@ -1,36 +1,55 @@
 #pragma once
 
-#include "dx12context.h"
+#include "vkframework.h"
+#include "gfx_buffer.h"
 #include "array.hpp"
 
-// =================================================================================================
+#include <cstdint>
 
-struct GfxDataChunkList {
+// =================================================================================================
+// GfxDataChunkHandler / GfxDataChunkList — Vulkan port of the DX12 chunk pool.
+//
+// Per-frame pool of host-visible GfxBuffer chunks. Within a frame, callers (mesh upload paths,
+// staging streams) request a chunk of at least N bytes via Update; the list hands out the next
+// unused chunk and grows / reallocates as needed. Reset(frameIndex) at frame start rewinds the
+// usage counter so the pool can be reused in subsequent frames.
+//
+// Owned chunks are GfxBuffer* (not GfxBuffer values) because GfxBuffer is non-copyable —
+// AutoArray<GfxBuffer*> keeps lifetime explicit.
+
+class GfxDataChunkList
+{
 public:
-    AutoArray<ComPtr<ID3D12Resource>> m_chunks;
-    int32_t                           m_usedChunks{0};
+    AutoArray<GfxBuffer*> m_chunks;
+    int32_t               m_usedChunks { 0 };
 
     void Reset(void) {
         m_usedChunks = 0;
     }
 
     void Clear(void) {
+        for (auto& c : m_chunks) {
+            if (c) {
+                c->Destroy();
+                delete c;
+            }
+        }
         m_chunks.Clear();
         m_usedChunks = 0;
     }
 
-    ComPtr<ID3D12Resource> Update(size_t dataSize, const char* ownerName, const char* type, uint64_t execId);
+    // Returns a chunk of at least dataSize bytes. Grows or reallocates the slot as needed.
+    // Returns nullptr on allocation failure.
+    GfxBuffer* Update(size_t dataSize, const char* ownerName, const char* type, uint64_t execId);
 
-    inline ComPtr<ID3D12Resource> GetResource(void) {
+    inline GfxBuffer* GetResource(void) {
         return (m_usedChunks > 0) ? m_chunks[m_usedChunks - 1] : nullptr;
     }
-
-private:
-    void PrepareResourceDesc(D3D12_RESOURCE_DESC& rd, size_t dataSize);
 };
 
 
-class GfxDataChunkHandler {
+class GfxDataChunkHandler
+{
 private:
     AutoArray<GfxDataChunkList> m_chunkLists;
     uint32_t                    m_frameCount;
@@ -40,6 +59,10 @@ public:
         : m_frameCount(frameCount)
     {
         m_chunkLists.Resize(m_frameCount);
+    }
+
+    ~GfxDataChunkHandler() {
+        Clear();
     }
 
     GfxDataChunkList* GetList(uint32_t frameIndex) {
@@ -56,7 +79,7 @@ public:
             m_chunkLists[i].Clear();
     }
 
-    ComPtr<ID3D12Resource> Update(uint32_t fi, size_t dataSize, const char* ownerName, const char* type, uint64_t execId) {
+    GfxBuffer* Update(uint32_t fi, size_t dataSize, const char* ownerName, const char* type, uint64_t execId) {
         return (fi >= m_frameCount) ? nullptr : m_chunkLists[fi].Update(dataSize, ownerName, type, execId);
     }
 };

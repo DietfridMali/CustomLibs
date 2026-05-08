@@ -5,8 +5,9 @@
 #include <cstring>
 #include <cstdint>
 
-#include "dx12framework.h"
-#include "dx12context.h"
+#include "vkframework.h"
+#include "vkcontext.h"
+#include "image_layout_tracker.h"
 #include "array.hpp"
 #include "list.hpp"
 #include "dictionary.hpp"
@@ -218,8 +219,12 @@ private:
     RenderStates& ActiveState(void) noexcept;
 
 public:
-    static constexpr int MinFeatureLevel = (int)D3D_FEATURE_LEVEL_11_0;
-    static constexpr int SSBOFeatureLevel = (int)D3D_FEATURE_LEVEL_11_0;
+    // FeatureLevel maps onto Vulkan's encoded API version (VK_MAKE_API_VERSION).
+    // MinFeatureLevel = 1.3 because the port targets dynamic rendering + synchronization2 as core.
+    // SSBOFeatureLevel stays at 1.0 — storage buffers have been core since 1.0; the call site
+    // only checks "is the platform new enough at all".
+    static constexpr int MinFeatureLevel = (int)VK_API_VERSION_1_3;
+    static constexpr int SSBOFeatureLevel = (int)VK_API_VERSION_1_0;
 
     GfxStates() = default;
 
@@ -229,7 +234,7 @@ public:
 
     inline int FeatureLevel(void) noexcept {
         if (m_featureLevel == 0)
-            m_featureLevel = (int)dx12Context.FeatureLevel();
+            m_featureLevel = (int)vkContext.ApiVersion();
         return m_featureLevel;
     }
 
@@ -449,13 +454,18 @@ public:
         return BindTexture<GL_TEXTURE_CUBE_MAP>(srvIndex, slotIndex);
     }
 
-    void ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept;
+    // Vulkan signature: VkImage + ImageLayoutTracker replace the DX12 descriptor handle. The caller
+    // (RenderTarget / Swapchain) owns the tracker. The clear runs outside any RenderPass via
+    // vkCmdClearColorImage / vkCmdClearDepthStencilImage; the tracker is transitioned to
+    // TRANSFER_DST_OPTIMAL and left there (caller transitions to COLOR_ATTACHMENT/DEPTH_ATTACHMENT
+    // before the next draw).
+    void ClearColorBuffers(VkImage image, ImageLayoutTracker& tracker) noexcept;
 
     void ClearBackBuffer(const RGBAColor& color = ColorData::Invisible) noexcept;
 
-    void ClearDepthBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float clearValue = 1.0f) noexcept;
+    void ClearDepthBuffer(VkImage image, ImageLayoutTracker& tracker, float clearValue = 1.0f) noexcept;
 
-    void ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue = 0) noexcept;
+    void ClearStencilBuffer(VkImage image, ImageLayoutTracker& tracker, int clearValue = 0) noexcept;
 
     void SetMemoryBarrier(GfxTypes::Bitfield barriers = 0) noexcept;
 

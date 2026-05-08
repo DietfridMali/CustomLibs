@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 
 #define _TEXTURE_H
 
-#include "dx12framework.h"
+#include "vkframework.h"
+#include "image_layout_tracker.h"
 #include "std_defines.h"
 #include "rendertypes.h"
 #include "texturesampling.h"
@@ -21,16 +22,19 @@
 #pragma warning(pop)
 
 // =================================================================================================
-// DX12 Texture
+// Vulkan Texture
 //
-// Replaces the OGL Texture (GLuint / SharedTextureHandle) with:
-//   • ComPtr<ID3D12Resource> m_resource — default-heap texture resource.
-//   • uint32_t m_handle — SRV descriptor-heap index (UINT32_MAX = invalid).
-//     Named m_handle for source compatibility (RenderTarget::BufferHandle assignment, etc.).
-//   • Bind(slot)  → gfxStates.BindTexture2D(m_handle, slot)
-//   • Deploy()    → uploads pixel data to GPU via a temporary upload resource.
+// Replaces the DX12 Texture (ComPtr<ID3D12Resource> + uint32_t SRV index) with:
+//   • VkImage m_image          — the texture image, allocated via VMA.
+//   • VkImageView m_imageView  — image view used as the t-slot binding source (combined image
+//     sampler descriptor). Vulkan's analogue to the DX12 SRV.
+//   • VmaAllocation m_allocation — VMA backing allocation, freed in Destroy.
+//   • ImageLayoutTracker m_layoutTracker — current VkImageLayout / stage / access of the image.
 //
-// SharedTextureHandle / SharedGfxHandle are NOT used in DX12.
+// m_handle (uint32_t) is kept for source-level compatibility with existing assignment sites
+// (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)). It is a logical id only —
+// no GPU descriptor-heap index in Vulkan; the Bind path writes m_imageView + m_sampling-derived
+// VkSampler into the per-frame descriptor-set bind table (Phase C).
 
 class Texture;
 
@@ -71,16 +75,19 @@ struct RenderOffsets { float x, y; };
 
 // =================================================================================================
 
-class Texture 
+class Texture
     : public AbstractTexture
 {
 public:
-    // m_handle stores the SRV descriptor-heap index (UINT32_MAX = invalid).
-    // Named m_handle for source-level compatibility with existing assignment sites
-    // (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)).
+    // m_handle is a logical id only (no GPU-side meaning in Vulkan). Kept for source
+    // compatibility with sites that assign from RenderTarget::BufferHandle etc.
     uint32_t                    m_handle{ UINT32_MAX };
 
-    ComPtr<ID3D12Resource>      m_resource;   // default-heap resource (D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+    VkImage                     m_image{ VK_NULL_HANDLE };
+    VkImageView                 m_imageView{ VK_NULL_HANDLE };
+    VmaAllocation               m_allocation{ VK_NULL_HANDLE };
+    ImageLayoutTracker          m_layoutTracker;
+
     String                      m_name;
     List<TextureBuffer*>        m_buffers;
     List<String>                m_filenames;
@@ -124,51 +131,51 @@ public:
         textureLUT.Insert(m_name, this);
     }
 
-    Texture(const Texture& other) { 
-        Copy(other); 
+    Texture(const Texture& other) {
+        Copy(other);
     }
 
-    Texture(Texture&& other) noexcept { 
-        Move(other); 
+    Texture(Texture&& other) noexcept {
+        Move(other);
     }
 
-    Texture& operator=(const Texture& other) { 
-        return Copy(other); 
+    Texture& operator=(const Texture& other) {
+        return Copy(other);
     }
-    Texture& operator=(Texture&& other) noexcept { 
-        return Move(other); 
+    Texture& operator=(Texture&& other) noexcept {
+        return Move(other);
     }
 
     Texture& Copy(const Texture& other);
 
     Texture& Move(Texture& other) noexcept;
 
-    inline bool operator==(const Texture& o) const noexcept { 
-        return m_handle == o.m_handle; 
+    inline bool operator==(const Texture& o) const noexcept {
+        return m_handle == o.m_handle;
     }
 
-    inline bool operator!=(const Texture& o) const noexcept { 
-        return m_handle != o.m_handle; 
+    inline bool operator!=(const Texture& o) const noexcept {
+        return m_handle != o.m_handle;
     }
 
     virtual bool Create(void) override;
 
     virtual void Destroy(void) override;
-    
+
     virtual bool IsAvailable(void) override;
-    
+
     virtual bool Bind(int tmuIndex = 0) override;
-    
+
     virtual void Release(void) override;
-    
+
     virtual void SetParams(bool forceUpdate = false) override;
-    
+
     virtual bool Deploy(int bufferIndex = 0) override;
-    
+
     virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
 
-    inline bool Activate(int tmuIndex = 0) { 
-        return Bind(tmuIndex); 
+    inline bool Activate(int tmuIndex = 0) {
+        return Bind(tmuIndex);
     }
 
     inline void Deactivate(void) {
@@ -186,39 +193,39 @@ public:
     bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
 
     bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
-    
+
     void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
 
-    inline size_t TextureCount(void) noexcept { 
-        return m_buffers.Length(); 
-    }
-    
-    inline int GetWidth(int i = 0) noexcept { 
-        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width  : 0; 
-    }
-    
-    inline int GetHeight(int i = 0) noexcept { 
-        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0; 
-    }
-    
-    inline uint8_t* GetData(int i = 0) { 
-        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr; 
-    }
-    
-    inline TextureType Type(void) noexcept { 
-        return m_type; 
-    }
-    
-    inline GfxWrapMode  WrapMode(void) noexcept { 
-        return m_wrapMode; 
-    }
-    
-    inline String GetName(void) { 
-        return m_name; 
+    inline size_t TextureCount(void) noexcept {
+        return m_buffers.Length();
     }
 
-    inline TextureType GetTextureType(void) const noexcept { 
-        return m_type; 
+    inline int GetWidth(int i = 0) noexcept {
+        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width  : 0;
+    }
+
+    inline int GetHeight(int i = 0) noexcept {
+        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0;
+    }
+
+    inline uint8_t* GetData(int i = 0) {
+        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr;
+    }
+
+    inline TextureType Type(void) noexcept {
+        return m_type;
+    }
+
+    inline GfxWrapMode  WrapMode(void) noexcept {
+        return m_wrapMode;
+    }
+
+    inline String GetName(void) {
+        return m_name;
+    }
+
+    inline TextureType GetTextureType(void) const noexcept {
+        return m_type;
     }
 
     // Static release helpers — clear the slot in gfxStates.
@@ -255,21 +262,21 @@ public:
 
 // =================================================================================================
 
-class TiledTexture 
+class TiledTexture
     : public Texture
 {
 public:
-    TiledTexture() 
-        : Texture(UINT32_MAX, TextureType::Texture2D, GfxWrapMode::Repeat) 
+    TiledTexture()
+        : Texture(UINT32_MAX, TextureType::Texture2D, GfxWrapMode::Repeat)
     {}
     ~TiledTexture() = default;
-    
+
     virtual void SetParams(bool forceUpdate = false) override;
 };
 
 // =================================================================================================
 
-class RenderTargetTexture 
+class RenderTargetTexture
     : public Texture
 {
 public:

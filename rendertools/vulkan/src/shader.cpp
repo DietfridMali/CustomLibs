@@ -1,40 +1,161 @@
-﻿#define NOMINMAX
+#define NOMINMAX
 
 #include <utility>
 #include <cstring>
-#include <ranges>
-#include <string_view>
+#include <limits>
 
-#include "dx12framework.h"
-#include <d3dcompiler.h>
-#include <d3d12shader.h>
-
+#include "vkframework.h"
 #include "shader.h"
+#include "shader_compiler.h"
+#include "pipeline_cache.h"
 #include "cbv_allocator.h"
+#include "vkcontext.h"
 #include "shadowmap.h"
-#include "gfxrenderer.h"
-#include "commandlist.h"
-#include "descriptor_heap.h"
-#include "dx12context.h"
 #include "gfxstates.h"
 
-#pragma comment(lib, "d3dcompiler.lib")
+// =================================================================================================
+// Vulkan Shader implementation
+//
+// Descriptor-set layout (single set, all bindings — see shader.h for the full table).
+// DXC compile uses register shift flags so HLSL register(t0..u3) lands at the matching
+// Vulkan bindings. b1 is mapped per-stage via -fvk-bind-register so the three stages can
+// share the same set with distinct b1 bindings (1/2/3).
 
 // =================================================================================================
-// DX12 Shader implementation
-//
-// Root signature layout (fixed for all shaders):
-//   Param 0: Root CBV  — b0 FrameConstants     (vertex + pixel)
-//   Param 1: Root CBV  — b1 ShaderConstants    (vertex + pixel)
-//   Param 2: Desc table — t0..t15 SRVs         (pixel)
-//   Static samplers: s0 = linear clamp, s1 = linear repeat (pixel)
-//
-// PSO cache: keyed by RenderStates bitmask; created on first Enable() for that state.
+// Compile (HLSL -> SPIR-V via DXC)
 
-// -------------------------------------------------------------------------------------------------
-// Helpers to translate ShaderDataAttributes to D3D12_INPUT_ELEMENT_DESC.
+namespace {
 
-// Maps C++ buffer type + id to the DX12 input slot used by GfxDataLayout::FixedSlotForBuffer.
+// Common args for all stages: t/s/u register shifts.
+static const wchar_t* const kCommonArgs[] = {
+    L"-fvk-t-shift", L"4",  L"0",
+    L"-fvk-s-shift", L"20", L"0",
+    L"-fvk-u-shift", L"36", L"0",
+};
+static constexpr uint32_t kCommonArgCount = uint32_t(sizeof(kCommonArgs) / sizeof(kCommonArgs[0]));
+
+// Per-stage explicit b-register bindings (b0 -> 0 / b1 -> stage-specific).
+static const wchar_t* const kArgsVS[] = {
+    L"-fvk-bind-register", L"b0", L"0", L"0", L"0",
+    L"-fvk-bind-register", L"b1", L"0", L"1", L"0",
+};
+static const wchar_t* const kArgsPS[] = {
+    L"-fvk-bind-register", L"b0", L"0", L"0", L"0",
+    L"-fvk-bind-register", L"b1", L"0", L"2", L"0",
+};
+static const wchar_t* const kArgsGS[] = {
+    L"-fvk-bind-register", L"b0", L"0", L"0", L"0",
+    L"-fvk-bind-register", L"b1", L"0", L"3", L"0",
+};
+
+static std::vector<const wchar_t*> StageArgs(int stage)
+{
+    std::vector<const wchar_t*> args;
+    args.reserve(kCommonArgCount + 10);
+    for (uint32_t i = 0; i < kCommonArgCount; ++i)
+        args.push_back(kCommonArgs[i]);
+
+    const wchar_t* const* extra = nullptr;
+    uint32_t count = 0;
+    switch (stage) {
+        case Shader::kStageVS: extra = kArgsVS; count = uint32_t(sizeof(kArgsVS) / sizeof(kArgsVS[0])); break;
+        case Shader::kStagePS: extra = kArgsPS; count = uint32_t(sizeof(kArgsPS) / sizeof(kArgsPS[0])); break;
+        case Shader::kStageGS: extra = kArgsGS; count = uint32_t(sizeof(kArgsGS) / sizeof(kArgsGS[0])); break;
+    }
+    for (uint32_t i = 0; i < count; ++i)
+        args.push_back(extra[i]);
+    return args;
+}
+
+}  // namespace
+
+
+bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target,
+                     std::vector<uint8_t>& spirvOut) noexcept
+{
+    if ((not hlslCode) or (not *hlslCode))
+        return false;
+
+    int stage = kStageVS;
+    if (std::strncmp(target, "ps_", 3) == 0)
+        stage = kStagePS;
+    else if (std::strncmp(target, "gs_", 3) == 0)
+        stage = kStageGS;
+
+    auto args = StageArgs(stage);
+    String error;
+    if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target,
+                                               args.data(), uint32_t(args.size()),
+                                               spirvOut, error)) {
+        fprintf(stderr, "Shader '%s': compile failed (entry=%s, target=%s):\n%s\n",
+                (const char*)m_name, entryPoint, target, (const char*)error);
+        return false;
+    }
+    return true;
+}
+
+// =================================================================================================
+// CreatePipelineLayout — descriptor set layout (40 bindings: see shader.h table) + pipeline layout
+
+bool Shader::CreatePipelineLayout(void) noexcept
+{
+    VkDevice device = vkContext.Device();
+    if (device == VK_NULL_HANDLE)
+        return false;
+
+    std::vector<VkDescriptorSetLayoutBinding> bindings;
+    bindings.reserve(kBindingCount);
+
+    auto addBinding = [&](uint32_t binding, VkDescriptorType type, uint32_t count, VkShaderStageFlags stages) {
+        VkDescriptorSetLayoutBinding b { };
+        b.binding = binding;
+        b.descriptorType = type;
+        b.descriptorCount = count;
+        b.stageFlags = stages;
+        b.pImmutableSamplers = nullptr;
+        bindings.push_back(b);
+    };
+
+    addBinding(kBindingB0,   VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
+    addBinding(kBindingB1VS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT);
+    addBinding(kBindingB1PS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+    addBinding(kBindingB1GS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_GEOMETRY_BIT);
+
+    for (uint32_t i = 0; i < kSrvSlots; ++i)
+        addBinding(kSrvBase + i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    for (uint32_t i = 0; i < kSamplerSlots; ++i)
+        addBinding(kSamplerBase + i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    for (uint32_t i = 0; i < kUavSlots; ++i)
+        addBinding(kUavBase + i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
+
+    VkDescriptorSetLayoutCreateInfo setInfo { };
+    setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    setInfo.bindingCount = uint32_t(bindings.size());
+    setInfo.pBindings = bindings.data();
+
+    VkResult res = vkCreateDescriptorSetLayout(device, &setInfo, nullptr, &m_setLayout);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Shader '%s': vkCreateDescriptorSetLayout failed (%d)\n", (const char*)m_name, (int)res);
+        return false;
+    }
+
+    VkPipelineLayoutCreateInfo plInfo { };
+    plInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    plInfo.setLayoutCount = 1;
+    plInfo.pSetLayouts = &m_setLayout;
+
+    res = vkCreatePipelineLayout(device, &plInfo, nullptr, &m_pipelineLayout);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Shader '%s': vkCreatePipelineLayout failed (%d)\n", (const char*)m_name, (int)res);
+        return false;
+    }
+    return true;
+}
+
+
+// Slot mapping matches GfxDataLayout::FixedSlotForBuffer exactly — must stay in sync.
 //   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color,
 //   slot 5: Normal, slot 6: Tangent, slot 7+: Offset/Float
 static int SlotForAttr(const char* datatype, int id) noexcept
@@ -42,7 +163,7 @@ static int SlotForAttr(const char* datatype, int id) noexcept
     if (strcmp(datatype, "Vertex") == 0)
         return 0;
     if (strcmp(datatype, "TexCoord") == 0) {
-        if (id >= 0 and id <= 2)
+        if ((id >= 0) and (id <= 2))
             return 1 + id;
         return -1;
     }
@@ -59,283 +180,78 @@ static int SlotForAttr(const char* datatype, int id) noexcept
     return -1;
 }
 
-// Maps C++ buffer type + id to an HLSL semantic name and index.
-// Offset/N uses TEXCOORD(N+3) to avoid collisions with TexCoord/0..2.
-static const char* SemanticForAttr(const char* datatype, int id, UINT& semanticIndex) noexcept
-{
-    if (strcmp(datatype, "Vertex") == 0)   { 
-        semanticIndex = 0;        
-        return "POSITION"; 
-    }
-    if (strcmp(datatype, "TexCoord") == 0) { 
-        semanticIndex = UINT(id); 
-        return "TEXCOORD"; 
-    }
-    if (strcmp(datatype, "Color") == 0)    { 
-        semanticIndex = UINT(id); 
-        return "COLOR"; 
-    }
-    if (strcmp(datatype, "Normal") == 0)   { 
-        semanticIndex = UINT(id); 
-        return "NORMAL"; 
-    }
-    if (strcmp(datatype, "Tangent") == 0)  { 
-        semanticIndex = UINT(id); 
-        return "TANGENT"; 
-    }
-    if (strcmp(datatype, "Offset") == 0)   {
-        semanticIndex = UINT(id);
-        return "OFFSET";
-    }
-    if (strcmp(datatype, "Float") == 0)   {
-        semanticIndex = UINT(id);
-        return "FLOAT";
-    }
-    semanticIndex = 0;
-    return "TEXCOORD";
-}
 
-static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
+static VkFormat VkFormatForAttr(ShaderDataAttributes::Format f) noexcept
 {
-    switch (fmt) {
-    case ShaderDataAttributes::Float1: 
-        return DXGI_FORMAT_R32_FLOAT;
-    case ShaderDataAttributes::Float2: 
-        return DXGI_FORMAT_R32G32_FLOAT;
-    case ShaderDataAttributes::Float3: 
-        return DXGI_FORMAT_R32G32B32_FLOAT;
-    case ShaderDataAttributes::Float4: 
-        return DXGI_FORMAT_R32G32B32A32_FLOAT;
+    switch (f) {
+        case ShaderDataAttributes::Float1: return VK_FORMAT_R32_SFLOAT;
+        case ShaderDataAttributes::Float2: return VK_FORMAT_R32G32_SFLOAT;
+        case ShaderDataAttributes::Float3: return VK_FORMAT_R32G32B32_SFLOAT;
+        case ShaderDataAttributes::Float4: return VK_FORMAT_R32G32B32A32_SFLOAT;
     }
-    return DXGI_FORMAT_R32G32B32_FLOAT;
+    return VK_FORMAT_UNDEFINED;
 }
 
 
-// =================================================================================================
-
-bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut) noexcept
+static uint32_t StrideForFormat(ShaderDataAttributes::Format f) noexcept
 {
-    if (not hlslCode or not *hlslCode) 
-        return false;
-
-    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
-#ifdef _DEBUG
-    flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-    flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
-#endif
-
-    ComPtr<ID3DBlob> errBlob;
-    HRESULT hr = D3DCompile(hlslCode, strlen(hlslCode), (const char*)m_name, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, flags, 0, &blobOut, &errBlob);
-    if (FAILED(hr)) {
-#ifdef _DEBUG
-        if (errBlob)
-            fprintf(stderr, "Shader '%s' (%s) compile error:\n%s\n",
-                    (const char*)m_name, target,
-                    static_cast<const char*>(errBlob->GetBufferPointer()));
-        PrintShaderSource(hlslCode, target);
-#endif
-        return false;
+    switch (f) {
+        case ShaderDataAttributes::Float1: return 4;
+        case ShaderDataAttributes::Float2: return 8;
+        case ShaderDataAttributes::Float3: return 12;
+        case ShaderDataAttributes::Float4: return 16;
     }
-    return true;
+    return 0;
 }
 
 
-#ifdef _DEBUG
-void Shader::PrintShaderSource(const char* hlslCode, const char* title) noexcept
+void Shader::BuildVertexInput(void) noexcept
 {
-    if (not hlslCode or not *hlslCode) 
+    m_vsInputAttributes.clear();
+    m_vsInputBindings.clear();
+
+    if (m_dataLayout.m_count <= 0)
         return;
-    const std::string_view src(hlslCode);
-    const size_t lineCount = std::ranges::count(src, '\n') + 1;
-    const int width = static_cast<int>(std::to_string(lineCount).size());
-    fprintf(stderr, "\n%s\n", title);
-    int lineNo = 0;
-    for (auto&& chunk : src | std::views::split('\n')) {
-        std::string_view line(chunk.begin(), chunk.end());
-        if (not line.empty() and line.back() == '\r')
-            line.remove_suffix(1);
-        fprintf(stderr, "%*d: %.*s\n", width, ++lineNo,
-                static_cast<int>(line.size()), line.data());
+
+    // One VkVertexInputBindingDescription per slot, one VkVertexInputAttributeDescription
+    // per declared attribute. Each slot reads one C++ buffer with offset 0 (the GfxDataBuffer
+    // model — separate buffers, no interleaving). Stride is the per-vertex size of that slot's
+    // format. SPIR-V locations follow the slot numbering (HLSL semantic order is preserved by
+    // DXC in the order POSITION → TEXCOORD0..2 → COLOR → NORMAL → TANGENT → OFFSET0..3, which
+    // matches SlotForAttr); explicit [[vk::location(N)]] would tighten this, but is not strictly
+    // required as long as the HLSL declarations are kept in the same canonical order.
+    m_vsInputAttributes.reserve(size_t(m_dataLayout.m_count));
+    m_vsInputBindings.reserve(size_t(m_dataLayout.m_count));
+
+    for (int i = 0; i < m_dataLayout.m_count; ++i) {
+        const ShaderDataAttributes& attr = m_dataLayout.m_attrs[i];
+        int slot = SlotForAttr(attr.datatype, attr.id);
+        if (slot < 0)
+            continue;
+
+        VkVertexInputAttributeDescription a { };
+        a.location = uint32_t(slot);
+        a.binding = uint32_t(slot);
+        a.format = VkFormatForAttr(attr.format);
+        a.offset = 0;
+        m_vsInputAttributes.push_back(a);
+
+        VkVertexInputBindingDescription b { };
+        b.binding = uint32_t(slot);
+        b.stride = StrideForFormat(attr.format);
+        b.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        m_vsInputBindings.push_back(b);
     }
-    fprintf(stderr, "\n");
-}
-#endif
-
-
-bool Shader::CreateRootSignature(void) noexcept
-{
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return false;
-
-    // Params kSrvBase..kSrvBase+15: one 1-entry descriptor table per texture slot (t0..t15).
-    // Each slot is bound independently in Texture::Bind(tmuIndex) via
-    // SetGraphicsRootDescriptorTable(kSrvBase + tmuIndex, ...).
-    D3D12_DESCRIPTOR_RANGE srvRanges[kSrvSlots]{};
-    for (int i = 0; i < kSrvSlots; ++i) {
-        srvRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        srvRanges[i].NumDescriptors = 1;
-        srvRanges[i].BaseShaderRegister = UINT(i); // t0, t1, ...
-        srvRanges[i].RegisterSpace = 0;
-        srvRanges[i].OffsetInDescriptorsFromTableStart = 0;
-    }
-
-    // Params kSamplerBase..kSamplerBase+15: one 1-entry descriptor table per sampler
-    // slot (s0..s15), parallel to the SRV slots. The bound sampler is fed by
-    // SamplerCache from the texture's TextureSampling at Texture::Bind() time.
-    D3D12_DESCRIPTOR_RANGE samplerRanges[kSamplerSlots]{};
-    for (int i = 0; i < kSamplerSlots; ++i) {
-        samplerRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-        samplerRanges[i].NumDescriptors = 1;
-        samplerRanges[i].BaseShaderRegister = UINT(i); // s0, s1, ...
-        samplerRanges[i].RegisterSpace = 0;
-        samplerRanges[i].OffsetInDescriptorsFromTableStart = 0;
-    }
-
-    // Params kUavBase..kUavBase+3: one 1-entry descriptor table per UAV slot (u0..u3).
-    static constexpr int kUavSlots = 4;
-    D3D12_DESCRIPTOR_RANGE uavRanges[kUavSlots]{};
-    for (int i = 0; i < kUavSlots; ++i) {
-        uavRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        uavRanges[i].NumDescriptors = 1;
-        uavRanges[i].BaseShaderRegister = UINT(i); // u0, u1, ...
-        uavRanges[i].RegisterSpace = 0;
-        uavRanges[i].OffsetInDescriptorsFromTableStart = 0;
-    }
-
-    D3D12_ROOT_PARAMETER params[kUavBase + kUavSlots]{};
-
-    // Root CBV b0 — FrameConstants (visible to all stages)
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[0].Descriptor.RegisterSpace = 0;
-    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-    // Root CBV b1 — VS ShaderConstants (VERTEX only)
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[1].Descriptor.ShaderRegister = 1;
-    params[1].Descriptor.RegisterSpace = 0;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
-    // Root CBV b1 — PS ShaderConstants (PIXEL only)
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[2].Descriptor.ShaderRegister = 1;
-    params[2].Descriptor.RegisterSpace = 0;
-    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-    // Root CBV b1 — GS ShaderConstants (GEOMETRY only)
-    params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[3].Descriptor.ShaderRegister = 1;
-    params[3].Descriptor.RegisterSpace = 0;
-    params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
-
-    // One 1-entry descriptor table per SRV slot (t0..t15)
-    for (int i = 0; i < kSrvSlots; ++i) {
-        params[kSrvBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[kSrvBase + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[kSrvBase + i].DescriptorTable.pDescriptorRanges = &srvRanges[i];
-        params[kSrvBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    }
-
-    // One 1-entry descriptor table per sampler slot (s0..s15)
-    for (int i = 0; i < kSamplerSlots; ++i) {
-        params[kSamplerBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[kSamplerBase + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[kSamplerBase + i].DescriptorTable.pDescriptorRanges = &samplerRanges[i];
-        params[kSamplerBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-    }
-
-    // One 1-entry descriptor table per UAV slot (u0..u3)
-    for (int i = 0; i < kUavSlots; ++i) {
-        params[kUavBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[kUavBase + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[kUavBase + i].DescriptorTable.pDescriptorRanges = &uavRanges[i];
-        params[kUavBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    }
-
-    // Samplers are no longer baked into the root signature — each Texture carries
-    // its own TextureSampling, resolved through SamplerCache and bound at draw
-    // time via the per-slot sampler tables defined above.
-    D3D12_ROOT_SIGNATURE_DESC rsd{};
-    rsd.NumParameters     = kUavBase + kUavSlots;
-    rsd.pParameters       = params;
-    rsd.NumStaticSamplers = 0;
-    rsd.pStaticSamplers   = nullptr;
-    rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
-              | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS
-              | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
-
-    ComPtr<ID3DBlob> sig, err;
-    if (FAILED(D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
-#ifdef _DEBUG
-        if (err)
-            fprintf(stderr, "Shader '%s': root signature serialization error:\n%s\n",
-                    (const char*)m_name,
-                    static_cast<const char*>(err->GetBufferPointer()));
-#endif
-        return false;
-    }
-    return SUCCEEDED(device->CreateRootSignature(0,
-        sig->GetBufferPointer(), sig->GetBufferSize(),
-        IID_PPV_ARGS(&m_rootSignature)));
 }
 
 
-
-
-void Shader::BuildInputLayout(void) noexcept
+void Shader::UpdateStageFields(const std::vector<uint8_t>& /*spirv*/, int /*stage*/) noexcept
 {
-    if (m_dataLayout.m_count > 0) {
-        for (int i = 0; i < m_dataLayout.m_count; ++i) {
-            const ShaderDataAttributes& attr = m_dataLayout.m_attrs[i];
-            UINT semanticIndex = 0;
-            const char* semantic = SemanticForAttr(attr.datatype, attr.id, semanticIndex);
-            int slot = SlotForAttr(attr.datatype, attr.id);
-            if (slot < 0)
-                continue;
-            D3D12_INPUT_ELEMENT_DESC desc{};
-            desc.SemanticName = semantic;
-            desc.SemanticIndex = semanticIndex;
-            desc.Format = DxgiFormatForAttr(attr.format);
-            desc.InputSlot = UINT(slot);
-            desc.AlignedByteOffset = 0;
-            desc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-            desc.InstanceDataStepRate = 0;
-            m_vsInputLayout.push_back(desc);
-        }
-    }
-    else {
-        static const D3D12_INPUT_ELEMENT_DESC kFallbackLayout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,     0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,        1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,        2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT,  3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT,  4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "NORMAL",   0, DXGI_FORMAT_R32G32B32A32_FLOAT,  5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT,  6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        };
-        static constexpr UINT kFallbackCount = UINT(std::size(kFallbackLayout));
-        ComPtr<ID3D12ShaderReflection> vsRefl;
-        if (SUCCEEDED(D3DReflect(m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize(), IID_PPV_ARGS(&vsRefl)))) {
-            D3D12_SHADER_DESC sd{};
-            vsRefl->GetDesc(&sd);
-            for (UINT i = 0; i < sd.InputParameters; ++i) {
-                D3D12_SIGNATURE_PARAMETER_DESC pd{};
-                vsRefl->GetInputParameterDesc(i, &pd);
-                if (pd.SystemValueType != D3D_NAME_UNDEFINED)
-                    continue;
-                for (UINT j = 0; j < kFallbackCount; ++j) {
-                    if ((_stricmp(kFallbackLayout[j].SemanticName, pd.SemanticName) == 0) and (kFallbackLayout[j].SemanticIndex == pd.SemanticIndex)) {
-                        m_vsInputLayout.push_back(kFallbackLayout[j]);
-                        break;
-                    }
-                }
-            }
-        }
-        if (m_vsInputLayout.empty())
-            m_vsInputLayout.assign(kFallbackLayout, kFallbackLayout + kFallbackCount);
-    }
+    // TODO step 7e: SPIR-V reflection for per-stage b1 fields. DX12 used D3DReflect on the
+    // bytecode. Vulkan options: IDxcUtils::CreateReflection on the DXC blob, or spirv-cross /
+    // spirv-reflect on the SPIR-V bytes. Until this lands, sc.size stays 0 and UploadB1
+    // short-circuits per stage (mirrors DX12's "size == 0 → skip" path). UpdateMatrices keeps
+    // b0 functional via direct memcpy into m_b0Staging.
 }
 
 
@@ -344,97 +260,85 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (IsValid())
         return true;
 
-    if (not Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob))
+    if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsSpirv))
         return false;
-    if (not Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob))
+    if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_fsSpirv))
         return false;
-    if (gsCode.Length() > 0)
-        Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
-
-    BuildInputLayout();
-
-    UpdateStageFields(m_vsBlob.Get(), kStageVS);
-    UpdateStageFields(m_psBlob.Get(), kStagePS);
-    if (m_gsBlob)
-        UpdateStageFields(m_gsBlob.Get(), kStageGS);
-
-    if (not CreateRootSignature())
-        return false;
-
-    for (int s = 0; s < kStageCount; ++s) {
-        if (m_stages[s].size > 0)
-            m_stages[s].staging.assign(m_stages[s].size, 0);
-        m_stages[s].dirty = true;
+    if (not gsCode.IsEmpty()) {
+        if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsSpirv))
+            return false;
     }
+
+    m_vsModule = ShaderCompiler::CreateShaderModule(m_vsSpirv);
+    m_fsModule = ShaderCompiler::CreateShaderModule(m_fsSpirv);
+    if ((m_vsModule == VK_NULL_HANDLE) or (m_fsModule == VK_NULL_HANDLE))
+        return false;
+    if (not m_gsSpirv.empty()) {
+        m_gsModule = ShaderCompiler::CreateShaderModule(m_gsSpirv);
+        if (m_gsModule == VK_NULL_HANDLE)
+            return false;
+    }
+
+    if (not CreatePipelineLayout())
+        return false;
+
+    BuildVertexInput();
+    UpdateStageFields(m_vsSpirv, kStageVS);
+    UpdateStageFields(m_fsSpirv, kStagePS);
+    if (not m_gsSpirv.empty())
+        UpdateStageFields(m_gsSpirv, kStageGS);
+
+    m_vs = vsCode;
+    m_fs = fsCode;
+    m_gs = gsCode;
     return true;
-}
-
-
-void Shader::UpdateStageFields(ID3DBlob* blob, int stage) noexcept
-{
-    if (not blob)
-        return;
-    ComPtr<ID3D12ShaderReflection> refl;
-    if (FAILED(D3DReflect(blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&refl))))
-        return;
-    StageConstants& sc = m_stages[stage];
-    D3D12_SHADER_DESC sd{};
-    refl->GetDesc(&sd);
-    for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
-        ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
-        D3D12_SHADER_BUFFER_DESC cbd{};
-        cb->GetDesc(&cbd);
-        if (strcmp(cbd.Name, "ShaderConstants") == 0) {
-            if (cbd.Size > sc.size)
-                sc.size = cbd.Size;
-            for (UINT j = 0; j < cbd.Variables; ++j) {
-                ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
-                D3D12_SHADER_VARIABLE_DESC vd{};
-                var->GetDesc(&vd);
-                if (not (vd.uFlags & D3D_SVF_USED))
-                    continue;
-                bool found = false;
-                for (auto& kv : sc.fields)
-                    if (kv.first == String(vd.Name)) {
-                        found = true;
-                        break;
-                    }
-                if (not found) {
-                    auto* entry = sc.fields.Append();
-                    if (entry)
-                        *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
-                }
-            }
-            break;
-        }
-    }
 }
 
 
 void Shader::Destroy(void) noexcept
 {
-    PSO::RemovePSOs(this);
+    VkDevice device = vkContext.Device();
+
+    pipelineCache.RemoveShader(this);
+
     for (int s = 0; s < kStageCount; ++s) {
         m_stages[s].fields.Clear();
         m_stages[s].staging.clear();
         m_stages[s].size = 0;
         m_stages[s].dirty = true;
     }
-    m_vsInputLayout.clear();
-    m_rootSignature.Reset();
-    m_vsBlob.Reset();
-    m_psBlob.Reset();
-    m_gsBlob.Reset();
+    m_vsInputAttributes.clear();
+    m_vsInputBindings.clear();
+
+    if (device != VK_NULL_HANDLE) {
+        if (m_pipelineLayout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device, m_pipelineLayout, nullptr);
+            m_pipelineLayout = VK_NULL_HANDLE;
+        }
+        if (m_setLayout != VK_NULL_HANDLE) {
+            vkDestroyDescriptorSetLayout(device, m_setLayout, nullptr);
+            m_setLayout = VK_NULL_HANDLE;
+        }
+        ShaderCompiler::DestroyShaderModule(m_vsModule);
+        ShaderCompiler::DestroyShaderModule(m_fsModule);
+        ShaderCompiler::DestroyShaderModule(m_gsModule);
+    }
+    m_vsModule = VK_NULL_HANDLE;
+    m_fsModule = VK_NULL_HANDLE;
+    m_gsModule = VK_NULL_HANDLE;
+    m_vsSpirv.clear();
+    m_fsSpirv.clear();
+    m_gsSpirv.clear();
 }
 
 
 Shader& Shader::Copy(const Shader& other)
 {
-    // Shaders are not copyable in DX12 (GPU resources), just copy metadata
+    // Shaders are not copyable (GPU resources), just copy metadata.
     m_name = other.m_name;
-    m_vs   = other.m_vs;
-    m_fs   = other.m_fs;
-    m_gs   = other.m_gs;
+    m_vs = other.m_vs;
+    m_fs = other.m_fs;
+    m_gs = other.m_gs;
     return *this;
 }
 
@@ -443,49 +347,60 @@ Shader& Shader::Move(Shader& other) noexcept
 {
     if (this != &other) {
         Destroy();
-        m_name         = std::move(other.m_name);
-        m_vs           = std::move(other.m_vs);
-        m_fs           = std::move(other.m_fs);
-        m_gs           = std::move(other.m_gs);
-        m_vsBlob       = std::move(other.m_vsBlob);
-        m_psBlob       = std::move(other.m_psBlob);
-        m_gsBlob       = std::move(other.m_gsBlob);
-        m_rootSignature = std::move(other.m_rootSignature);
-        m_b0Staging    = other.m_b0Staging;
+        m_name = std::move(other.m_name);
+        m_vs = std::move(other.m_vs);
+        m_fs = std::move(other.m_fs);
+        m_gs = std::move(other.m_gs);
+        m_vsSpirv = std::move(other.m_vsSpirv);
+        m_fsSpirv = std::move(other.m_fsSpirv);
+        m_gsSpirv = std::move(other.m_gsSpirv);
+        m_vsModule = std::exchange(other.m_vsModule, VkShaderModule(VK_NULL_HANDLE));
+        m_fsModule = std::exchange(other.m_fsModule, VkShaderModule(VK_NULL_HANDLE));
+        m_gsModule = std::exchange(other.m_gsModule, VkShaderModule(VK_NULL_HANDLE));
+        m_pipelineLayout = std::exchange(other.m_pipelineLayout, VkPipelineLayout(VK_NULL_HANDLE));
+        m_setLayout = std::exchange(other.m_setLayout, VkDescriptorSetLayout(VK_NULL_HANDLE));
+        m_b0Staging = other.m_b0Staging;
         for (int s = 0; s < kStageCount; ++s) {
-            m_stages[s].size    = other.m_stages[s].size;
+            m_stages[s].size = other.m_stages[s].size;
             m_stages[s].staging = std::move(other.m_stages[s].staging);
-            m_stages[s].dirty   = other.m_stages[s].dirty;
-            m_stages[s].fields  = std::move(other.m_stages[s].fields);
+            m_stages[s].dirty = other.m_stages[s].dirty;
+            m_stages[s].fields = std::move(other.m_stages[s].fields);
         }
-        m_vsInputLayout = std::move(other.m_vsInputLayout);
+        m_vsInputAttributes = std::move(other.m_vsInputAttributes);
+        m_vsInputBindings = std::move(other.m_vsInputBindings);
     }
     return *this;
 }
 
 // =================================================================================================
+// Activate / Upload — Phase C (vkCmdBindPipeline + bind table) and Phase B step 10 (UBO ring).
 
-bool Shader::UploadB0(void) noexcept {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
+bool Shader::Activate(void)
+{
+    // TODO Phase C: pipeline lookup via VkPipeline cache (RenderStates → VkGraphicsPipelineCreateInfo).
+    // vkCmdBindPipeline(currentCB, GRAPHICS, pipeline). Mark bind-table dirty so the next Draw
+    // materializes a VkDescriptorSet from descriptorPoolHandler + writes b0/b1/textures/samplers.
+    return false;
+}
 
-    CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
+
+bool Shader::UploadB0(void) noexcept
+{
+    CbAlloc a = cbvAllocator.Allocate(uint32_t(sizeof(FrameConstants)));
     if (not a.IsValid())
         return false;
-
     std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
-    list->SetGraphicsRootConstantBufferView(0, a.gpu);
+    m_dynamicOffsets[0] = a.offset;  // binding 0 (b0)
     return true;
 }
 
 
 bool Shader::UploadB1(void) noexcept
 {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
-
+    // Per stage: sub-allocate sc.size bytes from cbvAllocator, memcpy sc.staging.data(),
+    // store the dynamic offset at the matching m_dynamicOffsets slot. Stages with size == 0
+    // are skipped (mirror DX12 behaviour) and keep offset 0 — Phase C must omit the binding
+    // for empty stages or use a zero-size sub-allocation depending on validation policy.
     for (int s = 0; s < kStageCount; ++s) {
         StageConstants& sc = m_stages[s];
         if (sc.size == 0)
@@ -494,48 +409,14 @@ bool Shader::UploadB1(void) noexcept
         if (not a.IsValid())
             return false;
         std::memcpy(a.cpu, sc.staging.data(), sc.size);
-        list->SetGraphicsRootConstantBufferView(UINT(1 + s), a.gpu);
+        m_dynamicOffsets[1 + s] = a.offset;  // bindings 1 (VS), 2 (PS), 3 (GS)
         sc.dirty = false;
     }
     return true;
 }
 
-
-bool Shader::Activate(void) {
-    if (not IsValid())
-        return false;
-
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
-
-    CommandList* cl = commandListHandler.CurrentCmdList();
-    if (not cl)
-        return false;
-
-    ID3D12PipelineState* pso = cl->GetPSO(this);
-    if (not pso) {
-#ifdef _DEBUG
-        pso = cl->GetPSO(this);
-#endif
-        return false;
-    }
-
-    list->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
-
-    auto& srvHeap     = descriptorHeaps.m_srvHeap;
-    auto& samplerHeap = descriptorHeaps.m_samplerHeap;
-    if (srvHeap.m_heap and samplerHeap.m_heap) {
-        ID3D12DescriptorHeap* heaps[] = { srvHeap.m_heap.Get(), samplerHeap.m_heap.Get() };
-        list->SetDescriptorHeaps(2, heaps);
-    }
-    else if (srvHeap.m_heap) {
-        ID3D12DescriptorHeap* heaps[] = { srvHeap.m_heap.Get() };
-        list->SetDescriptorHeaps(1, heaps);
-    }
-    return true;
-}
-
+// =================================================================================================
+// API-neutral helpers (1:1 from DX12)
 
 bool Shader::UpdateMatrices(void)
 {
@@ -554,7 +435,7 @@ bool Shader::UpdateVariables(void) noexcept {
 }
 
 // =================================================================================================
-// Uniform setters
+// Uniform setters (1:1 from DX12 — operate purely on the CPU staging buffers)
 
 bool Shader::TrySetB0Field(const char* name, const float* data) noexcept
 {
@@ -655,8 +536,8 @@ int Shader::SetVector4i(const char* name, const Vector4i& data) noexcept
 
 int Shader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/) noexcept
 {
-    if (TrySetB0Field(name, data)) 
-        return 0; // b0 field — offset 0 is valid and non-error
+    if (TrySetB0Field(name, data))
+        return 0;
     return SetB1Field(name, data, 16 * sizeof(float));
 }
 

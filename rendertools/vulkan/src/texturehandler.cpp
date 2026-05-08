@@ -88,8 +88,10 @@ TextureList TextureHandler::CreateByType(String textureFolder, List<String>& tex
             getter = [&](String& name) { return GetCubemap(name); }; 
             break;
 
-        case TextureType::Texture3D: 
-            getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); }; 
+        case TextureType::Texture3D:
+            // TODO Vulkan-Port: NoiseTexture3D body still DX12 — re-enable once noisetexture.h
+            // is ported (currently #if 0). Active call sites are only in archive/ trees.
+            getter = [&](String& /*name*/) -> Texture* { return nullptr; };
             break;
 
         default:                     

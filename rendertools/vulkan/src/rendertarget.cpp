@@ -1,30 +1,45 @@
 #define NOMINMAX
 
 #include "rendertarget.h"
-#include "gfxrenderer.h"
-#include "base_shaderhandler.h"
-#include "commandlist.h"
-#include "dx12context.h"
-#include "gfxstates.h"
-#include "sampler_cache.h"
+#include "vkcontext.h"
+#include "image_layout_tracker.h"
+
+#include <algorithm>
+#include <cstdio>
 
 // =================================================================================================
-// DX12 RenderTarget implementation
+// Vulkan RenderTarget implementation — Phase B (resource setup)
+//
+// What is functional in this Phase B pass:
+//   • BufferInfo (Init / SetState / AllocRTV / Release) ported to VkImage + VkImageView +
+//     VmaAllocation + ImageLayoutTracker.
+//   • RenderTarget::Init / Destroy / Create / AllocRTVs / FreeRTVs.
+//   • CreateBuffer / CreateColorBuffer / CreateDepthBuffer / CreateSRV (= vkCreateImageView).
+//   • CreateRenderArea (BaseQuad setup, API-neutral).
+//   • BufferHandle (logical id accessor, API-neutral).
+//
+// What is deferred to Phase C (needs VkCommandBuffer / CommandList port):
+//   • Activate / Enable / Disable / Deactivate (vkCmdBeginRendering / vkCmdEndRendering).
+//   • Render / RenderAsTexture / AutoRender (descriptor-set bind pipeline).
+//   • Clear / Fill (vkCmdClearColorImage or LoadOp=CLEAR via VkRenderingAttachmentInfo).
+//   • AttachBuffer / DetachBuffer / BindBuffer (image-layout transitions on a live cmd buffer).
+//   • SetViewport / DepthBufferIsActive / SelectDrawBuffers / EnableBuffers / UpdateTransformation.
+//
+// The DX12 1:1 carry-over for the deferred methods is preserved in the #if 0 block below
+// as reference and will be ported when the CL/RT lifecycle moves to VkCommandBuffer.
 
-static constexpr DXGI_FORMAT kColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-static constexpr DXGI_FORMAT kVertexFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
-static constexpr DXGI_FORMAT kDepthTypelessFormat = DXGI_FORMAT_R24G8_TYPELESS;
-static constexpr DXGI_FORMAT kDepthDSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-static constexpr DXGI_FORMAT kDepthSRVFormat = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+static constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+static constexpr VkFormat kVertexFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+static constexpr VkFormat kDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 
 // -------------------------------------------------------------------------------------------------
 
-static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
+static VkFormat FormatForType(BufferInfo::eBufferType type)
 {
     switch (type) {
     case BufferInfo::btDepth:
     case BufferInfo::btStencil:
-        return kDepthTypelessFormat;
+        return kDepthFormat;
     case BufferInfo::btVertex:
         return kVertexFormat;
     default:
@@ -33,78 +48,123 @@ static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
 }
 
 
-static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
+static VkImageUsageFlags UsageForType(BufferInfo::eBufferType type)
 {
     if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
-        return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-    return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT
+         | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+         | VK_IMAGE_USAGE_STORAGE_BIT;
 }
 
 
-static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt, D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal, D3D12_RESOURCE_FLAGS flags) noexcept
+static VkImageAspectFlags AspectForType(BufferInfo::eBufferType type)
 {
-    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
-    D3D12_RESOURCE_DESC rd{};
-    rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    rd.Width = UINT(w);
-    rd.Height = UINT(h);
-    rd.DepthOrArraySize = 1;
-    rd.MipLevels = 1;
-    rd.Format = fmt;
-    rd.SampleDesc.Count = 1;
-    rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    rd.Flags = flags;
-
-    ComPtr<ID3D12Resource> resource;
-    device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, initState, clearVal, IID_PPV_ARGS(&resource));
-    return resource;
+    if (type == BufferInfo::btDepth)
+        return VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (type == BufferInfo::btStencil)
+        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+    return VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
+
+static bool CreateRTImage(int w, int h, VkFormat format, VkImageUsageFlags usage,
+                          VkImage& outImage, VmaAllocation& outAllocation) noexcept
+{
+    VmaAllocator allocator = vkContext.Allocator();
+    if (allocator == VK_NULL_HANDLE)
+        return false;
+
+    VkImageCreateInfo info { };
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.imageType = VK_IMAGE_TYPE_2D;
+    info.format = format;
+    info.extent.width = uint32_t(w);
+    info.extent.height = uint32_t(h);
+    info.extent.depth = 1;
+    info.mipLevels = 1;
+    info.arrayLayers = 1;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = usage;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocInfo { };
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+
+    VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &outImage, &outAllocation, nullptr);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "RenderTarget::CreateRTImage: vmaCreateImage failed (%d)\n", (int)res);
+        return false;
+    }
+    return true;
+}
 
 // =================================================================================================
 // BufferInfo
 
 void BufferInfo::Init(void)
 {
-    m_resource.Reset();
-    m_rtvHandle = {};
-    m_srvHandle = {};
-    m_dsvHandle = {};
+    m_image = VK_NULL_HANDLE;
+    m_allocation = VK_NULL_HANDLE;
+    m_imageView = VK_NULL_HANDLE;
+    m_depthSampleView = VK_NULL_HANDLE;
+    m_layoutTracker = ImageLayoutTracker { };
     m_srvIndex = UINT32_MAX;
-    m_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_type = btColor;
 }
 
 
-void BufferInfo::SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState)
+void BufferInfo::SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShaderRead)
 {
-    if ((m_state == targetState) or not cmdList or not m_resource)
+    if (m_image == VK_NULL_HANDLE)
         return;
-    cmdList->SetBarrier(m_resource.Get(), m_state, targetState);
-    m_state = targetState;
+    if (cb == VK_NULL_HANDLE)
+        return;
+
+    if (asShaderRead) {
+        m_layoutTracker.ToShaderRead(cb);
+        return;
+    }
+    if ((usageHint == btDepth) or (usageHint == btStencil))
+        m_layoutTracker.ToDepthAttachment(cb);
+    else
+        m_layoutTracker.ToColorAttachment(cb);
 }
 
 
-bool BufferInfo::AllocRTV(void) {
-    m_rtvHandle = descriptorHeaps.AllocRTV();
-    if (not m_rtvHandle.IsValid())
-        return false;
-    D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
-    rtvd.Format = kColorFormat;
-    rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    dx12Context.Device()->CreateRenderTargetView(m_resource.Get(), &rtvd, m_rtvHandle.cpu);
-    return true;
-
+bool BufferInfo::AllocRTV(void)
+{
+    // In DX12 this allocated a CPU descriptor handle for the render-target view. In Vulkan
+    // the image view created in RenderTarget::CreateColorBuffer (or CreateDepthBuffer) already
+    // serves as the attachment view; nothing extra to allocate. Returns whether the view exists.
+    return m_imageView != VK_NULL_HANDLE;
 }
 
-void BufferInfo::Release(void) {
-    descriptorHeaps.FreeRTV(m_rtvHandle);
-    descriptorHeaps.FreeSRV(m_srvHandle);
-    descriptorHeaps.FreeDSV(m_dsvHandle);
+
+void BufferInfo::Release(void)
+{
+    VkDevice device = vkContext.Device();
+    VmaAllocator allocator = vkContext.Allocator();
+    if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+        vkDestroyImageView(device, m_imageView, nullptr);
+        m_imageView = VK_NULL_HANDLE;
+    }
+    if ((m_depthSampleView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+        vkDestroyImageView(device, m_depthSampleView, nullptr);
+        m_depthSampleView = VK_NULL_HANDLE;
+    }
+    if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+        vmaDestroyImage(allocator, m_image, m_allocation);
+        m_image = VK_NULL_HANDLE;
+        m_allocation = VK_NULL_HANDLE;
+    }
     Init();
 }
 
 // =================================================================================================
+// RenderTarget setup
 
 RenderTarget::RenderTarget()
 {
@@ -130,89 +190,94 @@ void RenderTarget::Init(void)
 }
 
 
-bool RenderTarget::CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat)
+bool RenderTarget::CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspectFlags aspect)
 {
-    info.m_srvHandle = descriptorHeaps.AllocSRV();
-    if (not info.m_srvHandle.IsValid())
+    VkDevice device = vkContext.Device();
+    if ((device == VK_NULL_HANDLE) or (info.m_image == VK_NULL_HANDLE))
         return false;
-    info.m_srvIndex = info.m_srvHandle.index;
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvd{};
-    srvd.Format = srvFormat;
-    srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvd.Texture2D.MipLevels = 1;
-    device->CreateShaderResourceView(info.m_resource.Get(), &srvd, info.m_srvHandle.cpu);
+
+    VkImageViewCreateInfo vci { };
+    vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vci.image = info.m_image;
+    vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    vci.format = viewFormat;
+    vci.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    vci.subresourceRange.aspectMask = aspect;
+    vci.subresourceRange.baseMipLevel = 0;
+    vci.subresourceRange.levelCount = 1;
+    vci.subresourceRange.baseArrayLayer = 0;
+    vci.subresourceRange.layerCount = 1;
+
+    VkResult res = vkCreateImageView(device, &vci, nullptr, &info.m_imageView);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "RenderTarget::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
+        return false;
+    }
+    info.m_srvIndex = uint32_t(uintptr_t(info.m_imageView) & 0xFFFFFFFFu);  // logical id (low 32 bits of handle)
     return true;
 }
 
 
-void RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 {
-    D3D12_CLEAR_VALUE cv{};
-    cv.Format = kDepthDSVFormat;
-    cv.DepthStencil.Depth = 1.0f;
-    cv.DepthStencil.Stencil = 0;
-    info.m_resource = CreateRTResource(device, w, h, kDepthTypelessFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
-    if (not info.m_resource)
+    if (not CreateRTImage(w, h, kDepthFormat, UsageForType(info.m_type),
+                          info.m_image, info.m_allocation))
         return;
-    info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
 
-    info.m_dsvHandle = descriptorHeaps.AllocDSV();
-    if (not info.m_dsvHandle.IsValid())
+    // Attachment view: depth + stencil aspect (used as DSV in Dynamic Rendering).
+    if (not CreateSRV(info, kDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
         return;
-    D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-    dsvd.Format = kDepthDSVFormat;
-    dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    device->CreateDepthStencilView(info.m_resource.Get(), &dsvd, info.m_dsvHandle.cpu);
 
-    CreateSRV(device, info, kDepthSRVFormat);
+    // Sampling view: depth aspect only — for use as a sampled texture (sampler2DShadow / shadow map).
+    VkDevice device = vkContext.Device();
+    VkImageViewCreateInfo vci { };
+    vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vci.image = info.m_image;
+    vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    vci.format = kDepthFormat;
+    vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    vci.subresourceRange.levelCount = 1;
+    vci.subresourceRange.layerCount = 1;
+    if (vkCreateImageView(device, &vci, nullptr, &info.m_depthSampleView) != VK_SUCCESS)
+        fprintf(stderr, "RenderTarget::CreateDepthBuffer: depth-sample view creation failed\n");
 }
 
 
-void RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 {
-    DXGI_FORMAT fmt = FormatForType(info.m_type);
-    D3D12_CLEAR_VALUE cv{};
-    cv.Format = fmt;
-    info.m_resource = CreateRTResource(device, w, h, fmt, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
-    if (not info.m_resource)
+    VkFormat fmt = FormatForType(info.m_type);
+    if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
+                          info.m_image, info.m_allocation))
         return;
-    info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 
-    info.m_rtvHandle = descriptorHeaps.AllocRTV();
-    if (not info.m_rtvHandle.IsValid())
+    if (not CreateSRV(info, fmt, VK_IMAGE_ASPECT_COLOR_BIT))
         return;
-    D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
-    rtvd.Format = fmt;
-    rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    device->CreateRenderTargetView(info.m_resource.Get(), &rtvd, info.m_rtvHandle.cpu);
-
-    if (not CreateSRV(device, info, fmt))
-        return;
-
-    auto* list = m_cmdList->GfxList();
-    if (list)
-        info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    // Initial layout transition (UNDEFINED -> SHADER_READ_ONLY) deferred until first
+    // Activate — needs a live VkCommandBuffer, which Phase C provides.
 }
 
 
 void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType)
 {
-    ID3D12Device* device = dx12Context.Device();
-    if (device) {
-        BufferInfo& info = m_bufferInfo[bufferIndex];
-        info.Init();
-        info.m_type = bufferType;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    info.Init();
+    info.m_type = bufferType;
 
-        int w = m_width * m_scale;
-        int h = m_height * m_scale;
+    int w = m_width * m_scale;
+    int h = m_height * m_scale;
 
-        if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil))
-            CreateDepthBuffer(device, info, w, h);
-        else
-            CreateColorBuffer(device, info, w, h);
-        ++m_bufferCount;
-    }
+    if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil))
+        CreateDepthBuffer(info, w, h);
+    else
+        CreateColorBuffer(info, w, h);
+    ++m_bufferCount;
+    (void)attachmentIndex;
 }
 
 
@@ -230,8 +295,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 {
     Destroy();
 
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
+    if (vkContext.Device() == VK_NULL_HANDLE)
         return false;
 
     m_name = params.name;
@@ -243,9 +307,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_pingPong = m_colorBufferCount > 1;
     m_isScreenBuffer = params.isScreenBuffer;
 
-    m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
-    if (not m_cmdList or not m_cmdList->Open())
-        return false;
+    // Phase C: m_cmdList = commandListHandler.CreateCmdList(...); m_cmdList->Open();
+    m_cmdList = nullptr;
 
     int attachmentIndex = 0;
     for (int i = 0; i < m_colorBufferCount; ++i)
@@ -253,13 +316,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_haveRTVs = true;
 
     m_vertexBufferCount = params.vertexBufferCount;
-    // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
 
-    m_cmdList->Flush();
-    m_cmdList = nullptr;
+    // Phase C: m_cmdList->Flush(); m_cmdList = nullptr;
 
     int w = width * scale;
     int h = height * scale;
@@ -270,60 +331,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 }
 
 
-bool RenderTarget::AllocRTVs(void)
-{
-    if (m_haveRTVs)
-        return true;
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return false;
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        if (not m_bufferInfo[i].AllocRTV())
-            return false;
-    return m_haveRTVs = true;
-}
-
-
-void RenderTarget::FreeRTVs(void)
-{
-    for (int i = 0; i < m_colorBufferCount; ++i) {
-        descriptorHeaps.FreeRTV(m_bufferInfo[i].m_rtvHandle);
-        m_bufferInfo[i].m_rtvHandle = {};
-    }
-    m_haveRTVs = false;
-}
-
-
-bool RenderTarget::AttachBuffer(int bufferIndex)
-{
-    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
-        return false;
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return false;
-    m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    return true;
-}
-
-
-bool RenderTarget::DetachBuffer(int bufferIndex)
-{
-    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
-        return false;
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return false;
-    m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    return true;
-}
-
-
 void RenderTarget::Destroy(void)
 {
-    if (m_cmdList) {
-        m_cmdList->Close();
-        m_cmdList = nullptr;
-    }
+    // Phase C: if (m_cmdList) m_cmdList->Close();
+    m_cmdList = nullptr;
+
     for (int i = 0; i < m_bufferCount; ++i)
         m_bufferInfo[i].Release();
     m_isAvailable = false;
@@ -334,368 +346,32 @@ void RenderTarget::Destroy(void)
 }
 
 
-bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
+bool RenderTarget::AllocRTVs(void)
 {
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return false;
-
-    const D3D12_CPU_DESCRIPTOR_HANDLE* pDSV = nullptr;
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[RT_MAX_COLOR_BUFFERS]{};
-    int count = 0;
-
-    if (params.drawBufferGroup == dbDepth) {
-        for (int i = 0; i < m_colorBufferCount; ++i)
-            m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        pDSV = DepthBufferHandle();
-    }
-    else if (params.drawBufferGroup == dbSingle) {
-        m_drawBufferGroup = dbSingle;
-        if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
-            return false;
-        m_activeBufferIndex = params.bufferIndex;
-        m_bufferInfo[params.bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        rtvs[count++] = m_bufferInfo[params.bufferIndex].m_rtvHandle.cpu;
-        for (int i = 0; i < m_colorBufferCount; ++i)
-            if (i != params.bufferIndex)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        pDSV = DepthBufferHandle();
-    }
-    else {
-        m_activeBufferIndex = -1;
-        m_drawBufferGroup = (params.drawBufferGroup == dbNone) ? dbAll : params.drawBufferGroup;
-        if (m_drawBufferGroup == dbAll) {
-            for (int i = 0; i < m_bufferCount; ++i) {
-                if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
-                    continue;
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
-            }
-            pDSV = DepthBufferHandle();
-        }
-        else if (m_drawBufferGroup == dbColor) {
-            for (int i = 0; i < m_colorBufferCount; ++i) {
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
-            }
-            pDSV = DepthBufferHandle();
-            for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        }
-        else if (m_drawBufferGroup == dbExtra) {
-            int i = 0;
-            for (; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            for (int j = 0; j < m_vertexBufferCount; ++j, ++i) {
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
-            }
-            pDSV = DepthBufferHandle();
-        }
-    }
-
-    if (count > 0)
-        list->OMSetRenderTargets(count, rtvs, FALSE, pDSV);
-    else if (pDSV)
-        list->OMSetRenderTargets(0, nullptr, FALSE, pDSV);
-
-    return true;
-}
-
-
-bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup)
-{
-    if (m_depthBufferIndex < 0)
-        return false;
-    if (bufferIndex >= 0)
-        return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
-    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth);
-}
-
-
-bool RenderTarget::EnableBuffers(const RTActivationParams& params)
-{
-    if (not SelectDrawBuffers(params))
-        return false;
-    gfxStates.SetDepthTest(DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup));
-    return true;
-}
-
-
-bool RenderTarget::Enable(const RTActivationParams& params) {
-    if (not m_isAvailable)
-        return false;
-    if (not AllocRTVs())
-        return false;
-    m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
-    m_drawBufferGroup = params.drawBufferGroup;
-
-    if (m_cmdList == nullptr) {
-        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
-        if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
-            return false;
-    }
-    m_flushOnDisable = params.flush;
-    SetViewport();
-
-    if (not EnableBuffers(params))
-        return false;
-    return true;
-}
-
-
-bool RenderTarget::Activate(const RTActivationParams& params)
-{
-    baseRenderer.ActivateDrawBuffer(this);
-    if (not Enable(params)) {
-        baseRenderer.DeactivateDrawBuffer(this);
-        return false;
-    }
-    baseRenderer.PushViewport();
-    SetViewport();
-    Clear(params);
-    if (params.reactivate)
-        baseRenderer.RenderStates() = m_renderStates;
-    return true;
-}
-
-
-void RenderTarget::Disable(bool deactivate) noexcept {
-    if (IsEnabled()) {
-        m_renderStates = baseRenderer.RenderStates();
-        auto* list = m_cmdList->GfxList();
-		if (list) {
-			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
-            for (int i = 0; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
-                m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        }
-        if (m_flushOnDisable) {
-            m_cmdList->Flush();
-            FreeRTVs();
-        }
-        else {
-            m_cmdList->Close(deactivate);
-        }
-        m_cmdList = nullptr;
-    }
-}
-
-
-void RenderTarget::Deactivate(void) noexcept {
-    baseRenderer.DeactivateDrawBuffer(this);
-    baseRenderer.PopViewport();
-}
-
-
-uint32_t& RenderTarget::BufferHandle(int bufferIndex)
-{
-    if (bufferIndex >= 0 and bufferIndex < m_colorBufferCount)
-        return m_bufferInfo[bufferIndex].m_srvIndex;
-    static uint32_t invalid = UINT32_MAX;
-    return invalid;
-}
-
-
-bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
-{
-    if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
-        return false;
-    if (tmuIndex < 0)
-        tmuIndex = bufferIndex;
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    if (info.m_srvIndex == UINT32_MAX)
-        return false;
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
-    auto& srvHeap = descriptorHeaps.m_srvHeap;
-    if (not srvHeap.m_heap)
-        return false;
-    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.m_srvIndex));
-
-    // Bind the matching sampler from m_renderTexture's sampling configuration.
-    // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets
-    // LINEAR/CLAMP_TO_EDGE/COMPARE_NONE — the canonical RT-source sampler).
-    if (not m_renderTexture.m_hasParams)
-        m_renderTexture.SetParams(false);
-    auto& samplerHeap = descriptorHeaps.m_samplerHeap;
-    if (samplerHeap.m_heap) {
-        uint32_t slot = samplerCache.GetSlot(m_renderTexture.m_sampling);
-        if (slot != UINT32_MAX)
-            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase + tmuIndex), samplerHeap.GpuHandle(slot));
-    }
-    return true;
-}
-
-
-void RenderTarget::SetViewport(bool flipVertically) noexcept {
-    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
-}
-
-
-void RenderTarget::Fill(RGBAColor color)
-{
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return;
-    float c[4] = { color.R(), color.G(), color.B(), color.A() };
+    // In Vulkan the image views created in CreateColorBuffer already serve as RTV equivalents.
+    // Mark as available; AllocRTV per buffer is a no-op that just confirms the view exists.
+    if (m_haveRTVs)
+        return true;
     for (int i = 0; i < m_colorBufferCount; ++i)
-        if (m_bufferInfo[i].m_rtvHandle.IsValid())
-            list->ClearRenderTargetView(m_bufferInfo[i].m_rtvHandle.cpu, c, 0, nullptr);
-}
-
-
-void RenderTarget::Clear(const RTActivationParams& params)
-{
-    if (not params.clear)
-        return;
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return;
-    if (params.bufferIndex < 0) {
-        for (int i = 0; i < m_colorBufferCount; ++i)
-            if (m_bufferInfo[i].m_rtvHandle.IsValid())
-                list->ClearRenderTargetView(m_bufferInfo[i].m_rtvHandle.cpu, m_clearColor.Data(), 0, nullptr);
-    }
-    else if ((params.bufferIndex < m_colorBufferCount) and m_bufferInfo[params.bufferIndex].m_rtvHandle.IsValid()) {
-        list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].m_rtvHandle.cpu, m_clearColor.Data(), 0, nullptr);
-    }
-    if (HaveDepthBuffer(true))
-        list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-}
-
-
-Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex*/)
-{
-    BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
-    if (not info.m_resource)
-        return nullptr;
-    m_renderTexture.m_handle = info.m_srvIndex;
-    m_renderTexture.m_resource = info.m_resource;
-    m_renderTexture.Validate();
-    return &m_renderTexture;
-}
-
-
-void RenderTarget::ClearColorBuffers(void)
-{
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        if (m_bufferInfo[i].m_rtvHandle.IsValid())
-            gfxStates.ClearColorBuffers(m_bufferInfo[i].m_rtvHandle.cpu);
-}
-
-
-void RenderTarget::ClearDepthBuffer(float clearValue)
-{
-    if (HaveDepthBuffer(true))
-        gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu, clearValue);
-}
-
-
-void RenderTarget::ClearStencilBuffer(void)
-{
-    if (HaveDepthBuffer(true))
-        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu);
-}
-
-
-Texture* RenderTarget::GetDepthAsTexture(void)
-{
-    if (m_depthBufferIndex < 0)
-        return nullptr;
-    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
-    if (not info.m_resource)
-        return nullptr;
-    m_depthTexture.m_handle = info.m_srvIndex;
-    m_depthTexture.m_resource = info.m_resource;
-    m_depthTexture.Validate();
-    return &m_depthTexture;
-}
-
-
-// Liefert den Depth-Buffer als Compare-Sampler-Textur fuer HW-PCF.
-// ShadowTexture::SetParams konfiguriert m_sampling.compareFunc = Less,
-// SamplerCache erzeugt daraus einen Compare-Sampler (D3D12_FILTER_COMPARISON_*).
-// Der Shader sampelt dann mit SampleCmpLevelZero(depth, uv, ndc.z - bias).
-Texture* RenderTarget::GetDepthAsShadowTexture(void)
-{
-    if (m_depthBufferIndex < 0)
-        return nullptr;
-    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
-    if (not info.m_resource)
-        return nullptr;
-    m_shadowTexture.m_handle = info.m_srvIndex;
-    m_shadowTexture.m_resource = info.m_resource;
-    m_shadowTexture.Validate();
-    return &m_shadowTexture;
-}
-
-
-bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
-{
-    bool haveTransformation = false;
-    if (params.centerOrigin) {
-        haveTransformation = true;
-        baseRenderer.Translate(0.5, 0.5, 0);
-    }
-    if (params.rotation) {
-        haveTransformation = true;
-        baseRenderer.Rotate(params.rotation, 0, 0, 1);
-    }
-#if 0
-    if (params.flipVertically) {
-        haveTransformation = true;
-        baseRenderer.Scale(params.scale, params.scale * params.flipVertically, 1);
-    }
-    else if (params.source & 1) {
-        haveTransformation = true;
-        baseRenderer.Scale(params.scale, -params.scale, 1);
-    }
-#endif
-    else if (params.scale != 1.0f) {
-        haveTransformation = true;
-        baseRenderer.Scale(params.scale, params.scale, 1);
-    }
-    return haveTransformation;
-}
-
-
-bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
-{
-    if (params.destination >= 0) {
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
+        if (not m_bufferInfo[i].AllocRTV())
             return false;
-        m_lastDestination = params.destination;
-        gfxStates.SetBlending(0);
-    }
-    baseRenderer.PushMatrix();
-    bool applyTransformation = UpdateTransformation(params);
-#if 0 // must be called before shader load in DirectX!
-    baseRenderer.Set2DRenderStates(params.destination < 0);
-#endif
-    if (params.shader) {
-        if (applyTransformation)
-            params.shader->UpdateMatrices();
-        m_viewportArea.Render(params.shader, source);
-    }
-    else {
-        if (params.premultiply)
-            m_viewportArea.Premultiply();
-        baseRenderer.Set2DRenderStates(params.destination < 0);
-        m_viewportArea.Render(nullptr, source, color);
-    }
-    baseRenderer.PopMatrix();
-    return true;
+    return m_haveRTVs = true;
 }
 
 
-bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
+void RenderTarget::FreeRTVs(void)
 {
-    if (params.destination >= 0)
-        m_lastDestination = params.destination;
-    return RenderAsTexture((params.source == params.destination) ? nullptr : GetAsTexture(params), params, color);
+    // Free attachment image views (Vulkan equivalent of releasing the DX12 RTV descriptor slot).
+    // The underlying VkImage and VmaAllocation remain — only the view is destroyed.
+    VkDevice device = vkContext.Device();
+    for (int i = 0; i < m_colorBufferCount; ++i) {
+        BufferInfo& info = m_bufferInfo[i];
+        if ((info.m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+            vkDestroyImageView(device, info.m_imageView, nullptr);
+            info.m_imageView = VK_NULL_HANDLE;
+        }
+    }
+    m_haveRTVs = false;
 }
 
 
@@ -705,9 +381,36 @@ void RenderTarget::CreateRenderArea(void)
 }
 
 
-bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color)
+uint32_t& RenderTarget::BufferHandle(int bufferIndex)
 {
-    return Render(params, color);
+    if ((bufferIndex >= 0) and (bufferIndex < m_colorBufferCount))
+        return m_bufferInfo[bufferIndex].m_srvIndex;
+    static uint32_t invalid = UINT32_MAX;
+    return invalid;
 }
+
+// =================================================================================================
+// Phase C: rendering / activation / clearing / binding methods.
+// The DX12 1:1 carry-over below is preserved as reference and will be ported when the CL/RT
+// lifecycle moves to VkCommandBuffer + vkCmdBeginRendering / vkCmdEndRendering.
+
+#if 0
+
+#include "gfxrenderer.h"
+#include "base_shaderhandler.h"
+#include "commandlist.h"
+#include "dx12context.h"
+#include "gfxstates.h"
+#include "sampler_cache.h"
+
+// (DX12 original bodies for Activate / Enable / Disable / Render / Clear / Fill / AttachBuffer /
+// DetachBuffer / BindBuffer / SelectDrawBuffers / EnableBuffers / Deactivate / SetViewport /
+// DepthBufferIsActive / GetAsTexture / GetDepthAsTexture / GetDepthAsShadowTexture /
+// UpdateTransformation / RenderAsTexture / AutoRender are intentionally NOT carried into the
+// Vulkan tree by-line. They will be reimplemented from scratch in Phase C on top of the
+// dynamic-rendering API. The corresponding DX12 sources remain in
+// rendertools/directx/src/rendertarget.cpp as the porting reference.)
+
+#endif
 
 // =================================================================================================

@@ -1,16 +1,14 @@
 #include "gfxstates.h"
+#include "vkframework.h"
+#include "vkcontext.h"
 #include "commandlist.h"
-#include "shader.h"
-#include "dx12context.h"
-#include "descriptor_heap.h"
 #include "gfxrenderer.h"
 #include "base_displayhandler.h"
-#include "commandlist.h"
 
 #include <cstdio>
 
 // =================================================================================================
-// TextureSlotInfo
+// TextureSlotInfo — API-neutral (slot bookkeeping only, no GPU calls).
 
 TextureSlotInfo::TextureSlotInfo(GLenum typeTag)
     : m_typeTag(typeTag)
@@ -40,7 +38,7 @@ int TextureSlotInfo::Bind(uint32_t srvIndex, int slotIndex) noexcept {
     if (slotIndex >= MAX_SLOTS)
         return -1;
     m_srvIndices[slotIndex] = srvIndex;
-    if (slotIndex >= m_maxUsed) 
+    if (slotIndex >= m_maxUsed)
         m_maxUsed = slotIndex + 1;
     return slotIndex;
 }
@@ -48,7 +46,7 @@ int TextureSlotInfo::Bind(uint32_t srvIndex, int slotIndex) noexcept {
 
 bool TextureSlotInfo::Release(uint32_t srvIndex, int slotIndex) noexcept {
     if (slotIndex >= 0) {
-        if (slotIndex < MAX_SLOTS && m_srvIndices[slotIndex] != srvIndex) 
+        if (slotIndex < MAX_SLOTS && m_srvIndices[slotIndex] != srvIndex)
             return false;
         m_srvIndices[slotIndex] = 0u;
         return true;
@@ -77,7 +75,23 @@ bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
 }
 
 // =================================================================================================
-// GfxStates
+// GfxStates::Finish — Vulkan implementation.
+//
+// vkDeviceWaitIdle is a stronger barrier than CommandQueue::WaitIdle (vkQueueWaitIdle): it
+// waits for ALL queues, not just the graphics queue. With separated graphics/present queues
+// (see VKContext::SelectQueueFamilies) this matters when the caller is about to do something
+// that needs all in-flight work done — Resize, Shutdown, RenderTarget::Create.
+//
+// CommandList::Flush keeps using CommandQueue::WaitIdle (queue-local).
+
+void GfxStates::Finish(void) noexcept {
+    if (vkContext.Device() != VK_NULL_HANDLE)
+        vkDeviceWaitIdle(vkContext.Device());
+}
+
+// =================================================================================================
+// API-neutral GfxStates methods (slot bookkeeping, ActiveState pass-through, ReleaseBuffers,
+// ClearError, SetDrawBuffers). Bodies identical to the DX12 / OGL counterpart — no GPU calls.
 
 RenderStates& GfxStates::ActiveState(void) noexcept {
     return baseRenderer.RenderStates();
@@ -134,90 +148,215 @@ int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
 }
 
 
-void GfxStates::ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list)
-        list->ClearRenderTargetView(rtv, m_clearColor.Data(), 0, nullptr);
-}
-
-
-void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list)
-        list->ClearRenderTargetView(baseDisplayHandler.CurrentRTV(), color.Data(), 0, nullptr);
-}
-
-
-void GfxStates::ClearDepthBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float clearValue) noexcept {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list)
-        list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, clearValue, 0, 0, nullptr);
-}
-
-
-void GfxStates::ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue) noexcept {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list)
-        list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.0f, uint8_t(clearValue), 0, nullptr);
-}
-
-
-void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list) {
-        D3D12_RESOURCE_BARRIER b{};
-        b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-        b.UAV.pResource = nullptr;
-        list->ResourceBarrier(1, &b);
-    }
-}
-
-
-void GfxStates::Finish(void) noexcept {
-    commandListHandler.CmdQueue().WaitIdle();
-}
-
-
 void GfxStates::ReleaseBuffers(void) noexcept {
     for (auto& info : m_slotInfos)
         info = TextureSlotInfo(info.GetTypeTag());
 }
 
 
-void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list) {
-        D3D12_VIEWPORT vp{};
-        vp.TopLeftX = float(left);
-        vp.TopLeftY = float(top);
-        vp.Width = float(width);
-        vp.Height = float(height);
-        vp.MinDepth = 0.0f;
-        vp.MaxDepth = 1.0f;
-        list->RSSetViewports(1, &vp);
-        D3D12_RECT scissorArea{ 0, 0, left + width, top + height };
-        list->RSSetScissorRects(1, &scissorArea);
-        m_viewport[0] = left;
-        m_viewport[1] = top;
-        m_viewport[2] = width;
-        m_viewport[3] = height;
-    }
+void GfxStates::SetDrawBuffers(const DrawBufferList& /*drawBuffers*/) {
+    // no op — Vulkan binds attachments via vkCmdBeginRendering, not via per-draw mask.
 }
 
-
-void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) { 
-    //no op
-}
 
 void GfxStates::ClearError(void) noexcept {
-    // no op
+    // no op — Vulkan has no equivalent of glGetError to drain. Validation messages are buffered
+    // by the debug callback and cleared inside CheckError -> VKContext::DrainMessages.
 }
 
+// =================================================================================================
+// Vulkan clear helpers. The clear runs outside any RenderPass via vkCmdClearColorImage /
+// vkCmdClearDepthStencilImage — semantically identical to DX12 ClearRenderTargetView /
+// ClearDepthStencilView at the call site (immediate clear of the supplied image).
+// The image is transitioned to TRANSFER_DST_OPTIMAL via the ImageLayoutTracker; the caller
+// is responsible for transitioning back to COLOR_ATTACHMENT / DEPTH_ATTACHMENT before the
+// next draw (RenderTarget::Activate / Swapchain owners do this).
+
+static VkImageSubresourceRange MakeColorRange(void) noexcept {
+    VkImageSubresourceRange range{};
+    range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    range.baseMipLevel = 0;
+    range.levelCount = VK_REMAINING_MIP_LEVELS;
+    range.baseArrayLayer = 0;
+    range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    return range;
+}
+
+
+static VkImageSubresourceRange MakeDepthRange(void) noexcept {
+    VkImageSubresourceRange range{};
+    range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    range.baseMipLevel = 0;
+    range.levelCount = VK_REMAINING_MIP_LEVELS;
+    range.baseArrayLayer = 0;
+    range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    return range;
+}
+
+
+static VkImageSubresourceRange MakeStencilRange(void) noexcept {
+    VkImageSubresourceRange range{};
+    range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+    range.baseMipLevel = 0;
+    range.levelCount = VK_REMAINING_MIP_LEVELS;
+    range.baseArrayLayer = 0;
+    range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    return range;
+}
+
+
+void GfxStates::ClearColorBuffers(VkImage image, ImageLayoutTracker& tracker) noexcept {
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
+        return;
+
+    tracker.ToTransferDst(cb);
+
+    const float* src = m_clearColor.Data();
+    VkClearColorValue value{};
+    value.float32[0] = src[0];
+    value.float32[1] = src[1];
+    value.float32[2] = src[2];
+    value.float32[3] = src[3];
+
+    VkImageSubresourceRange range = MakeColorRange();
+    vkCmdClearColorImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+}
+
+
+void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE)
+        return;
+
+    VkImage image = baseDisplayHandler.CurrentBackBuffer();
+    if (image == VK_NULL_HANDLE)
+        return;
+
+    ImageLayoutTracker& tracker = baseDisplayHandler.CurrentBackBufferTracker();
+    tracker.ToTransferDst(cb);
+
+    const float* src = color.Data();
+    VkClearColorValue value{};
+    value.float32[0] = src[0];
+    value.float32[1] = src[1];
+    value.float32[2] = src[2];
+    value.float32[3] = src[3];
+
+    VkImageSubresourceRange range = MakeColorRange();
+    vkCmdClearColorImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+}
+
+
+void GfxStates::ClearDepthBuffer(VkImage image, ImageLayoutTracker& tracker, float clearValue) noexcept {
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
+        return;
+
+    tracker.ToTransferDst(cb);
+
+    VkClearDepthStencilValue value{};
+    value.depth = clearValue;
+    value.stencil = 0;
+
+    VkImageSubresourceRange range = MakeDepthRange();
+    vkCmdClearDepthStencilImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+}
+
+
+void GfxStates::ClearStencilBuffer(VkImage image, ImageLayoutTracker& tracker, int clearValue) noexcept {
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
+        return;
+
+    tracker.ToTransferDst(cb);
+
+    VkClearDepthStencilValue value{};
+    value.depth = 0.0f;
+    value.stencil = uint32_t(clearValue);
+
+    VkImageSubresourceRange range = MakeStencilRange();
+    vkCmdClearDepthStencilImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+}
+
+// =================================================================================================
+// SetMemoryBarrier — synchronization2 all-stages memory barrier. 1:1 to DX12's
+// D3D12_RESOURCE_BARRIER_TYPE_UAV with pResource=nullptr ("flush all UAV writes").
+// The Bitfield parameter is currently ignored (DX12 also ignores it — the call sites pass 0).
+
+void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE)
+        return;
+
+    VkMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
+    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+
+    VkDependencyInfo dep{};
+    dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dep.memoryBarrierCount = 1;
+    dep.pMemoryBarriers = &barrier;
+
+    vkCmdPipelineBarrier2(cb, &dep);
+}
+
+// =================================================================================================
+// SetViewport — Y-flip via negative viewport.height (Vulkan 1.1 core / KHR_maintenance1).
+// HLSL/DX12 expects clip-space Y pointing up; Vulkan's native NDC has Y pointing down.
+// Setting viewport.y = top + height and viewport.height = -height pins the bottom-left corner
+// to (left, top + height) and inverts the Y axis, so HLSL shaders ported to SPIR-V via DXC
+// produce the same on-screen result as the DX12 path. Scissor stays in window-pixel coordinates
+// (top-left origin, no flip).
+
+void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
+    m_viewport[0] = left;
+    m_viewport[1] = top;
+    m_viewport[2] = width;
+    m_viewport[3] = height;
+
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE)
+        return;
+
+    VkViewport vp{};
+    vp.x = float(left);
+    vp.y = float(top + height);
+    vp.width = float(width);
+    vp.height = -float(height);
+    vp.minDepth = 0.0f;
+    vp.maxDepth = 1.0f;
+    vkCmdSetViewport(cb, 0, 1, &vp);
+
+    VkRect2D scissor{};
+    scissor.offset.x = (left < 0) ? 0 : left;
+    scissor.offset.y = (top < 0) ? 0 : top;
+    scissor.extent.width = (width < 0) ? 0u : uint32_t(width);
+    scissor.extent.height = (height < 0) ? 0u : uint32_t(height);
+    vkCmdSetScissor(cb, 0, 1, &scissor);
+}
+
+// =================================================================================================
+// CheckError — central error sink. Drains the validation-layer log (filled by
+// VkContextDebugCallback in vkcontext.cpp) and returns false if any error-severity entries
+// were collected since the last call. 1:1 to DX12Context::DrainMessages-based CheckError.
 
 bool GfxStates::CheckError(const char* operation) noexcept {
 #ifdef _DEBUG
-    if (dx12Context.DrainMessages(false) > 0)
+    int errors = vkContext.DrainMessages(false);
+    if (errors > 0) {
+        if (operation and *operation)
+            fprintf(stderr, "GfxStates::CheckError: %d Vulkan validation error(s) at '%s'\n", errors, operation);
+        else
+            fprintf(stderr, "GfxStates::CheckError: %d Vulkan validation error(s)\n", errors);
+        fflush(stderr);
         return false;
+    }
+#else
+    (void)operation;
 #endif
     return true;
 }

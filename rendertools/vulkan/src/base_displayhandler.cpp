@@ -3,12 +3,12 @@
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "commandlist.h"
-#include "dx12context.h"
+#include "vkcontext.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
 #include "SDL.h"
-#include "SDL_syswm.h"
+#include "SDL_vulkan.h"
 #pragma warning(pop)
 
 #include <algorithm>
@@ -16,6 +16,7 @@
 #include <cstdlib>
 
 // =================================================================================================
+// Vulkan BaseDisplayHandler
 
 bool BaseDisplayHandler::Init(void) {
     if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
@@ -34,11 +35,11 @@ int BaseDisplayHandler::GetDisplayModes(void) {
         [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
             int64_t areaA = int64_t(a.w) * int64_t(a.h);
             int64_t areaB = int64_t(b.w) * int64_t(b.h);
-            if (areaA != areaB) 
+            if (areaA != areaB)
                 return areaA > areaB;
-            if (a.w != b.w) 
+            if (a.w != b.w)
                 return a.w > b.w;
-            if (a.refresh_rate != b.refresh_rate) 
+            if (a.refresh_rate != b.refresh_rate)
                 return a.refresh_rate > b.refresh_rate;
             return a.format > b.format;
         });
@@ -80,11 +81,11 @@ int BaseDisplayHandler::FindDisplayMode(int width, int height) {
 
 void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync) {
     m_activeDisplayMode = FindDisplayMode(width, height);
-    width  = m_displayModes[m_activeDisplayMode].w;
+    width = m_displayModes[m_activeDisplayMode].w;
     height = m_displayModes[m_activeDisplayMode].h;
     SDL_Rect rect;
     SDL_GetDisplayBounds(0, &rect);
-    m_maxWidth  = rect.w;
+    m_maxWidth = rect.w;
     m_maxHeight = rect.h;
     ComputeDimensions(width, height, useFullscreen);
     m_aspectRatio = float(m_width) / float(m_height);
@@ -101,60 +102,15 @@ void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullsc
         m_isFullscreen = true;
     }
     else {
-        m_width = std::min(width,  m_maxWidth);
+        m_width = std::min(width, m_maxWidth);
         m_height = std::min(height, m_maxHeight);
         m_isFullscreen = useFullscreen;
     }
 }
 
 
-bool BaseDisplayHandler::CreateSwapChain(void) {
-    // ---- Create the DXGI swap chain ----
-    DXGI_SWAP_CHAIN_DESC1 scDesc{};
-    scDesc.Width = UINT(m_width);
-    scDesc.Height = UINT(m_height);
-    scDesc.Format = BACK_BUFFER_FORMAT;
-    scDesc.Stereo = FALSE;
-    scDesc.SampleDesc.Count = 1;
-    scDesc.SampleDesc.Quality = 0;
-    scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    scDesc.BufferCount = BACK_BUFFER_COUNT;
-    scDesc.Scaling = DXGI_SCALING_STRETCH;
-    scDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    scDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
-    scDesc.Flags = m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-
-    ComPtr<IDXGISwapChain1> swapChain1;
-    IDXGIFactory4* factory = dx12Context.m_factory.Get();
-    ID3D12CommandQueue* queue = commandListHandler.GetQueue();
-
-    HRESULT hr = factory->CreateSwapChainForHwnd(queue, m_hwnd, &scDesc, nullptr, nullptr, &swapChain1);
-    if (FAILED(hr)) {
-        fprintf(stderr, "BaseDisplayHandler: CreateSwapChainForHwnd failed (hr=0x%08X)\n", (unsigned)hr);
-        exit(1);
-    }
-
-    // Disable Alt+Enter fullscreen switch (we handle it ourselves via SDL).
-    factory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER);
-
-    hr = swapChain1.As(&m_swapChain);
-    if (FAILED(hr)) {
-        fprintf(stderr, "BaseDisplayHandler: IDXGISwapChain1 -> IDXGISwapChain3 failed (hr=0x%08X)\n", (unsigned)hr);
-        exit(1);
-    }
-
-    if (not AcquireBackBuffers()) {
-        fprintf(stderr, "BaseDisplayHandler: AcquireBackBuffers failed\n");
-        exit(1);
-    }
-    m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
-    return true;
-}
-
-
 void BaseDisplayHandler::SetupDisplay(String windowTitle) {
-    // ---- Create SDL window (no OpenGL flag) ----
-    Uint32 windowFlags = SDL_WINDOW_SHOWN;
+    Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN;
     if (m_isFullscreen)
         windowFlags |= SDL_WINDOW_FULLSCREEN;
 
@@ -163,99 +119,63 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         fprintf(stderr, "BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
         exit(1);
     }
-
-    // ---- Extract the Win32 HWND from the SDL window ----
-    SDL_SysWMinfo wmInfo{};
-    SDL_VERSION(&wmInfo.version);
-    if (not SDL_GetWindowWMInfo(m_window, &wmInfo)) {
-        fprintf(stderr, "BaseDisplayHandler: SDL_GetWindowWMInfo failed (%s)\n", SDL_GetError());
-        exit(1);
-    }
-    m_hwnd = wmInfo.info.win.window;
-    if (not CreateSwapChain())
-        exit(1);
+    // Swapchain creation is deferred to SetupSwapchain (called from gfxRenderer::InitGraphics
+    // after VKContext + Device + Surface are up).
 }
 
 
-bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
-    ID3D12Device* device = dx12Context.Device();
-    for (UINT i = 0; i < BACK_BUFFER_COUNT; ++i) {
-        HRESULT hr = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]));
-        if (FAILED(hr)) {
-            fprintf(stderr, "BaseDisplayHandler: GetBuffer(%u) failed (hr=0x%08X)\n", i, (unsigned)hr);
-            return false;
-        }
-        // Allocate or reuse RTV descriptor slot
-        if (not m_rtvHandles[i].IsValid())
-            m_rtvHandles[i] = descriptorHeaps.AllocRTV();
-        if (not m_rtvHandles[i].IsValid())
-            return false;
-
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-        rtvDesc.Format        = BACK_BUFFER_FORMAT;
-        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        device->CreateRenderTargetView(m_backBuffers[i].Get(), &rtvDesc, m_rtvHandles[i].cpu);
-        m_backBufferStates[i] = D3D12_RESOURCE_STATE_PRESENT;
+bool BaseDisplayHandler::SetupSwapchain(void) {
+    VkSurfaceKHR surface = vkContext.Surface();
+    if (surface == VK_NULL_HANDLE) {
+        fprintf(stderr, "BaseDisplayHandler::SetupSwapchain: VKContext has no surface\n");
+        return false;
     }
+    if (not m_swapchain.Create(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
+        fprintf(stderr, "BaseDisplayHandler::SetupSwapchain: Swapchain::Create failed\n");
+        return false;
+    }
+    if (not commandListHandler.CmdQueue().InitSyncObjects(m_swapchain.Handle())) {
+        fprintf(stderr, "BaseDisplayHandler::SetupSwapchain: InitSyncObjects failed\n");
+        return false;
+    }
+    m_backBufferIndex = 0;
     return true;
 }
 
 
 void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
-    auto* cl = commandListHandler.CurrentCmdList();
-    if (not cl)
-        return;
-    auto* list = cl->GfxList();
-    if (not list)
-        return;
-    if (m_backBufferStates[m_backBufferIndex] != D3D12_RESOURCE_STATE_RENDER_TARGET) {
-        cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    }
-    D3D12_CPU_DESCRIPTOR_HANDLE rtv = CurrentRTV();
-    list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+    // TODO Phase C: needs the active VkCommandBuffer (currently nullptr — CommandList port).
+    //   VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    //   m_swapchain.LayoutTracker(m_backBufferIndex).ToColorAttachment(cb);
 }
 
 
 void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
-    if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT)
-        return;
-    auto* cl = commandListHandler.CurrentCmdList();
-    if (not cl)
-        return;
-    cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-    m_backBufferStates[m_backBufferIndex] = D3D12_RESOURCE_STATE_PRESENT;
-}
-
-
-void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
-    for (UINT i = 0; i < BACK_BUFFER_COUNT; ++i)
-        m_backBuffers[i].Reset();
+    // TODO Phase C:
+    //   VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    //   m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
 }
 
 
 void BaseDisplayHandler::EndFrame(void) {
-    if (not m_swapChain)
+    if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
-    // Close the main renderer list — registers it for submission.
-    // Submit all registered lists (RenderTarget lists first, main list last — registration order).
-    commandListHandler.ExecuteAll();
+    // Phase C: commandListHandler.ExecuteAll() submits all registered command buffers with the
+    // CommandQueue's wait/signal semaphores. CmdQueue::EndFrame then issues vkQueuePresentKHR
+    // and advances the frame slot (already implemented in Phase A).
     commandListHandler.CmdQueue().EndFrame();
-    UINT syncInterval = m_vSync ? 1 : 0;
-    UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
-    HRESULT hr = m_swapChain->Present(syncInterval, presentFlags);
-    if (FAILED(hr))
-        fprintf(stderr, "BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
-    m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+    m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
 }
 
 
 void BaseDisplayHandler::BeginFrame(void) {
-    if (not m_swapChain)
+    if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
-    // Wait for the next frame slot to be free, reset CBV allocator.
-    // Active-shader tracking is invalidated because BeginFrame resets all DX12 command-list state.
+    // CmdQueue::BeginFrame waits for the slot's in-flight fence, calls vkResetFences,
+    // resets the frame's descriptor pool / cbv allocator / resource handler, and acquires
+    // the next swapchain image (m_imageIndex updated).
     commandListHandler.CmdQueue().BeginFrame();
+    m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
     baseShaderHandler.InvalidateActiveShader();
 }
 
@@ -267,8 +187,7 @@ void BaseDisplayHandler::Update(void) {
 
 
 BaseDisplayHandler::~BaseDisplayHandler() {
-    ReleaseBackBuffers();
-    m_swapChain.Reset();
+    m_swapchain.Destroy();
     if (m_window) {
         SDL_DestroyWindow(m_window);
         m_window = nullptr;
@@ -299,18 +218,17 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) 
     m_height = mode.h;
     m_aspectRatio = float(m_width) / float(m_height);
 
-    // Resize the swap chain back buffers
-    if (m_swapChain) {
-        // GPU must be idle before resize
-        commandListHandler.CmdQueue().WaitIdle();
-        ReleaseBackBuffers();
-        HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT, UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
-        if (FAILED(hr)) {
-            fprintf(stderr, "BaseDisplayHandler::RequestDisplayChange: ResizeBuffers failed (hr=0x%08X)\n", (unsigned)hr);
+    // Resize the swapchain on dimension change.
+    if (m_swapchain.Handle() != VK_NULL_HANDLE) {
+        VkSurfaceKHR surface = vkContext.Surface();
+        if (not m_swapchain.Recreate(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
+            fprintf(stderr, "BaseDisplayHandler::UpdateDisplayMode: Swapchain::Recreate failed\n");
             return false;
         }
-        AcquireBackBuffers();
-        m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+        m_backBufferIndex = 0;
+        // The semaphores in CommandQueue are still valid (per-slot, swapchain-independent),
+        // but the cached m_swapchain handle inside CommandQueue is stale — refresh it.
+        commandListHandler.CmdQueue().m_swapchain = m_swapchain.Handle();
     }
     return true;
 }

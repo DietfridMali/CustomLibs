@@ -80,11 +80,11 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VULKAN;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
@@ -102,12 +102,12 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>VULKAN;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
       <DebugInformationFormat>None</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>
@@ -131,12 +131,10 @@
     <ClInclude Include="..\..\include\resource_descriptor.h" />
     <ClInclude Include="..\include\cbv_allocator.h" />
     <ClInclude Include="..\include\commandlist.h" />
-    <ClInclude Include="..\include\descriptor_heap.h" />
-    <ClInclude Include="..\include\dx12context.h" />
+    <ClInclude Include="..\include\vkcontext.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
-    <ClInclude Include="..\include\dx12upload.h" />
     <ClInclude Include="..\include\renderstates.h" />
     <ClInclude Include="..\include\rendertarget.h" />
     <ClInclude Include="..\..\include\fonthandler.h" />
@@ -179,7 +177,14 @@
     <ClInclude Include="..\include\gfxdatabuffer.h" />
     <ClInclude Include="..\..\include\vertexdatabuffers.h" />
     <ClInclude Include="..\..\include\viewport.h" />
-    <ClInclude Include="..\include\dx12framework.h" />
+    <ClInclude Include="..\include\vkframework.h" />
+    <ClInclude Include="..\include\image_layout_tracker.h" />
+    <ClInclude Include="..\include\descriptor_pool_handler.h" />
+    <ClInclude Include="..\include\vkupload.h" />
+    <ClInclude Include="..\include\shader_compiler.h" />
+    <ClInclude Include="..\include\gfx_buffer.h" />
+    <ClInclude Include="..\include\pipeline_cache.h" />
+    <ClInclude Include="..\include\swapchain.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\base_renderer.cpp" />
@@ -193,11 +198,16 @@
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cbv_allocator.cpp" />
     <ClCompile Include="..\src\commandlist.cpp" />
-    <ClCompile Include="..\src\descriptor_heap.cpp" />
-    <ClCompile Include="..\src\dx12context.cpp" />
+    <ClCompile Include="..\src\vkcontext.cpp" />
+    <ClCompile Include="..\src\image_layout_tracker.cpp" />
+    <ClCompile Include="..\src\descriptor_pool_handler.cpp" />
+    <ClCompile Include="..\src\vkupload.cpp" />
+    <ClCompile Include="..\src\shader_compiler.cpp" />
+    <ClCompile Include="..\src\gfx_buffer.cpp" />
+    <ClCompile Include="..\src\pipeline_cache.cpp" />
+    <ClCompile Include="..\src\swapchain.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />
-    <ClCompile Include="..\src\dx12upload.cpp" />
     <ClCompile Include="..\src\renderstates.cpp" />
     <ClCompile Include="..\src\rendertarget.cpp" />
     <ClCompile Include="..\..\src\fonthandler.cpp" />

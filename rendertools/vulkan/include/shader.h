@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <type_traits>
 #include <cstring>
@@ -6,7 +6,7 @@
 #include <vector>
 #include <span>
 
-#include "dx12framework.h"
+#include "vkframework.h"
 #include "array.hpp"
 #include "vector.hpp"
 #include "string.hpp"
@@ -15,26 +15,32 @@
 #include "shaderdatalayout.h"
 
 // =================================================================================================
-// DX12 Shader
+// Vulkan Shader
 //
-// Replaces the OGL Shader (glCreateProgram / glUniform*) with:
-//  - Compiled HLSL blobs (ID3DBlob via D3DCompile)
-//  - A fixed root signature: root CBV b0 (FrameConstants, ALL),
-//    root CBV b1 (VS ShaderConstants, VERTEX), root CBV b1 (PS ShaderConstants, PIXEL),
-//    root CBV b1 (GS ShaderConstants, GEOMETRY), one SRV descriptor table per slot
-//    t0..t15 (pixel shader), one sampler descriptor table per slot s0..s15
-//    (pixel shader, fed from SamplerCache via TextureSampling at bind time),
-//    one UAV descriptor table per slot u0..u3 (all stages).
-//  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
-//  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
-//  - b1: per-stage shader constants, layout from per-stage HLSL reflection on link
-//  - Same public API as OGL Shader (SetFloat, SetInt, SetVector2f, SetMatrix4f, UpdateMatrices …)
+// Replaces the DX12 Shader (D3D12 root signature, ID3DBlob bytecode, root CBVs / descriptor
+// tables) with:
+//  - SPIR-V bytecode per stage (compiled from HLSL via DXC, see shader_compiler.h)
+//  - VkShaderModule per stage (m_vsModule / m_fsModule / m_gsModule)
+//  - A fixed VkDescriptorSetLayout with bindings:
+//      0          UNIFORM_BUFFER_DYNAMIC, ALL_GRAPHICS    (b0  — FrameConstants)
+//      1          UNIFORM_BUFFER_DYNAMIC, VERTEX          (b1-VS — ShaderConstants)
+//      2          UNIFORM_BUFFER_DYNAMIC, FRAGMENT        (b1-PS — ShaderConstants)
+//      3          UNIFORM_BUFFER_DYNAMIC, GEOMETRY        (b1-GS — ShaderConstants)
+//      4..19      SAMPLED_IMAGE,         FRAGMENT         (t0..t15)
+//      20..35     SAMPLER,               FRAGMENT         (s0..s15) — paired 1:1 with t-slots
+//      36..39     STORAGE_IMAGE,         ALL_GRAPHICS     (u0..u3)
+//  - VkPipelineLayout from the set layout above (one pipeline layout per shader; cached
+//    pipelines built per RenderStates are looked up via the PSO-cache pendant in step 7d).
+//  - b0 — FrameConstants written per-draw to a UBO ring-buffer sub-allocation (cbv-allocator
+//    pendant, step 10).
+//  - b1 — per-stage shader constants, layout reflected from SPIR-V on link.
+//  - Same public API as OGL/DX12 Shader (SetFloat, SetInt, SetVector2f, SetMatrix4f,
+//    UpdateMatrices…). API-neutral setters write into the existing CPU-side staging buffers.
 
-// Forward declaration
 class Texture;
 
 // -------------------------------------------------------------------------------------------------
-// FrameConstants — layout of the b0 constant buffer (256 bytes, register b0)
+// FrameConstants — layout of the b0 constant buffer (256 bytes, register b0 / set 0 binding 0)
 
 #pragma pack(push, 4)
 struct FrameConstants {
@@ -69,45 +75,67 @@ class Shader
 {
 public:
     String  m_name;
-    String  m_vs;     // VS source (for reference / reload)
-    String  m_fs;     // PS source (for reference / reload)
-    String  m_gs;     // GS source (optional)
+    String  m_vs;     // VS HLSL source (for reference / reload)
+    String  m_fs;     // PS HLSL source
+    String  m_gs;     // GS HLSL source (optional)
 
-    // HLSL bytecodes
-    ComPtr<ID3DBlob>  m_vsBlob;
-    ComPtr<ID3DBlob>  m_psBlob;
-    ComPtr<ID3DBlob>  m_gsBlob;  // optional
+    // SPIR-V bytecode per stage (raw bytes; stays alive for VkShaderModule lifetime is not
+    // required, but we keep it for reload / debug).
+    std::vector<uint8_t> m_vsSpirv;
+    std::vector<uint8_t> m_fsSpirv;
+    std::vector<uint8_t> m_gsSpirv;
 
-    // Shared root signature (fixed layout, created once per shader)
-    ComPtr<ID3D12RootSignature> m_rootSignature;
+    // Vulkan shader modules (one per stage).
+    VkShaderModule  m_vsModule { VK_NULL_HANDLE };
+    VkShaderModule  m_fsModule { VK_NULL_HANDLE };
+    VkShaderModule  m_gsModule { VK_NULL_HANDLE };
 
-    // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
-    FrameConstants          m_b0Staging{};
+    // Pipeline layout + descriptor set layout (fixed layout per shader).
+    VkPipelineLayout       m_pipelineLayout { VK_NULL_HANDLE };
+    VkDescriptorSetLayout  m_setLayout      { VK_NULL_HANDLE };
 
-    // Per-stage shader constants (VS/PS/GS), each uploaded to its own root CBV
-    struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
+    // b0 — FrameConstants (matrices); written per-draw to a UBO ring-buffer sub-allocation
+    FrameConstants  m_b0Staging { };
 
-    static constexpr int kStageVS       = 0;
-    static constexpr int kStagePS       = 1;
-    static constexpr int kStageGS       = 2;
-    static constexpr int kStageCount    = 3;
-    static constexpr int kSrvBase       = 4;
-    static constexpr int kSrvSlots      = 16;
-    static constexpr int kSamplerBase   = kSrvBase + kSrvSlots;
-    static constexpr int kSamplerSlots  = 16;
-    static constexpr int kUavBase       = kSamplerBase + kSamplerSlots;
+    // Per-stage shader constants (VS/PS/GS), each uploaded to its own UBO binding (1/2/3)
+    struct FieldInfo { uint32_t offset { 0 }; uint32_t size { 0 }; };
+
+    static constexpr int kStageVS = 0;
+    static constexpr int kStagePS = 1;
+    static constexpr int kStageGS = 2;
+    static constexpr int kStageCount = 3;
+
+    // Descriptor-set bindings (Vulkan numeric layout — see header comment above).
+    static constexpr uint32_t kBindingB0 = 0;
+    static constexpr uint32_t kBindingB1VS = 1;
+    static constexpr uint32_t kBindingB1PS = 2;
+    static constexpr uint32_t kBindingB1GS = 3;
+    static constexpr uint32_t kSrvBase = 4;     // t0..t15 -> bindings 4..19
+    static constexpr uint32_t kSrvSlots = 16;
+    static constexpr uint32_t kSamplerBase = kSrvBase + kSrvSlots;   // s0..s15 -> bindings 20..35
+    static constexpr uint32_t kSamplerSlots = 16;
+    static constexpr uint32_t kUavBase = kSamplerBase + kSamplerSlots;  // u0..u3 -> bindings 36..39
+    static constexpr uint32_t kUavSlots = 4;
+    static constexpr uint32_t kBindingCount = kUavBase + kUavSlots;
 
     struct StageConstants {
-        uint32_t size{ 0 };
+        uint32_t size { 0 };
         std::vector<uint8_t> staging;
-        bool dirty{ true };
+        bool dirty { true };
         AutoArray<std::pair<String, FieldInfo>> fields;
     };
 
     StageConstants m_stages[kStageCount];
 
-    // Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
-    std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;
+    // Dynamic UBO offsets, filled by UploadB0 / UploadB1 from cbvAllocator allocations.
+    // Order matches descriptor-set bindings 0..3 (b0, b1-VS, b1-PS, b1-GS). Read by Activate
+    // (Phase C) and forwarded to vkCmdBindDescriptorSets via pDynamicOffsets.
+    static constexpr uint32_t kDynamicOffsetCount = 4;
+    uint32_t  m_dynamicOffsets[kDynamicOffsetCount] { };
+
+    // Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
+    std::vector<VkVertexInputAttributeDescription> m_vsInputAttributes;
+    std::vector<VkVertexInputBindingDescription>   m_vsInputBindings;
 
     // Vertex data layout: describes which C++ buffers feed which shader inputs.
     ShaderDataLayout m_dataLayout;
@@ -126,56 +154,62 @@ public:
         m_uniforms.SetDefaultValue(nullptr);
     }
 
-    Shader(const Shader& other)  { 
-        Copy(other); 
+    Shader(const Shader& other) {
+        Copy(other);
     }
 
-    Shader(Shader&& other) noexcept { 
-        Move(other); 
+    Shader(Shader&& other) noexcept {
+        Move(other);
     }
 
     ~Shader() { Destroy(); }
 
-    Shader& operator=(Shader&& other) noexcept { 
-        return Move(other); 
+    Shader& operator=(Shader&& other) noexcept {
+        return Move(other);
     }
 
-    String& GetKey(void) noexcept { 
-        return m_name; 
+    String& GetKey(void) noexcept {
+        return m_name;
     }
 
-    inline ComPtr<ID3D12RootSignature> GetRootSignature(void) noexcept {
-        return m_rootSignature;
+    inline VkPipelineLayout GetPipelineLayout(void) const noexcept {
+        return m_pipelineLayout;
+    }
+
+    inline VkDescriptorSetLayout GetDescriptorSetLayout(void) const noexcept {
+        return m_setLayout;
     }
 
     // -----------------------------------------------------------------------------------------
     // Creation / destruction
 
-    // Compile a single HLSL stage.  entryPoint: "VSMain" or "PSMain"; target: "vs_5_1"/"ps_5_1"
+    // Compile a single HLSL stage to SPIR-V via DXC. entryPoint: "VSMain" / "PSMain" / "GSMain";
+    // target: "vs_6_0" / "ps_6_0" / "gs_6_0".
     bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
-                 ComPtr<ID3DBlob>& blobOut) noexcept;
+                 std::vector<uint8_t>& spirvOut) noexcept;
 
-    // Link: build root signature, build input layout from m_dataLayout (or reflection fallback),
-    // reflect b1 fields. gsCode is optional.
+    // Link: build pipeline layout + descriptor-set layout, build vertex input description from
+    // m_dataLayout, reflect b1 fields. gsCode is optional.
     bool Create(const String& vsCode, const String& fsCode, const String& gsCode = "");
 
     void Destroy(void) noexcept;
 
-    inline bool IsValid(void) const noexcept { return m_vsBlob && m_psBlob; }  // GS is optional
+    inline bool IsValid(void) const noexcept {
+        return (m_vsModule != VK_NULL_HANDLE) and (m_fsModule != VK_NULL_HANDLE);  // GS optional
+    }
 
     // -----------------------------------------------------------------------------------------
     // Runtime
 
-    // Activate this shader: select / create PSO, bind root sig, upload CBs, bind descriptor table.
+    // Activate this shader: vkCmdBindPipeline (Phase C) — pipeline lookup via RenderStates cache.
     bool Activate(void);
 
-    // No-op in DX12 (PSO changes are driven by RenderStates changes in the next Enable call).
+    // No-op (pipeline changes are driven by RenderStates changes in the next bind).
     inline void Deactivate(void) noexcept {}
 
+    // Upload the b0 / b1 buffers to UBO ring-buffer sub-allocations and stash dynamic offsets
+    // into the bind table — Phase C.
     bool UploadB0(void) noexcept;
-
-    // Upload per-stage constant buffers to their root CBV slots (1=VS, 2=PS, 3=GS).
-    // Called from GfxDataLayout::Render() just before each draw.
     bool UploadB1(void) noexcept;
 
     // Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).
@@ -185,16 +219,17 @@ public:
     bool UpdateVariables(void) noexcept;
 
     // -----------------------------------------------------------------------------------------
-    // PSO helpers (internal)
+    // Pipeline-layout helpers (internal)
 
-    bool CreateRootSignature(void) noexcept;
-    
-    void BuildInputLayout(void) noexcept;
+    // Build VkDescriptorSetLayout (24 bindings as documented above) and VkPipelineLayout from it.
+    bool CreatePipelineLayout(void) noexcept;
 
-    void UpdateStageFields(ID3DBlob* blob, int stage) noexcept;
+    void BuildVertexInput(void) noexcept;
+
+    void UpdateStageFields(const std::vector<uint8_t>& spirv, int stage) noexcept;
 
     // -----------------------------------------------------------------------------------------
-    // Uniform setters — same signatures as OGL, return int (was GLint)
+    // Uniform setters — same signatures as DX12 / OGL, return int (was GLint)
 
 private:
     // Write 'size' bytes to all stage buffers that contain the field 'name'.
@@ -253,7 +288,7 @@ public:
     static void PrintShaderSource(const char* hlslCode, const char* title) noexcept;
 #endif
 
-    // Source-compat stubs (no-ops in DX12)
+    // Source-compat stubs (no-ops in Vulkan)
     static void ClearGfxError() noexcept {}
 
     static bool CheckGfxError(const char* = "") noexcept { return true; }

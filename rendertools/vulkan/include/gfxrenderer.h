@@ -1,10 +1,10 @@
-﻿#pragma once
+#pragma once
 
 #include <math.h>
 #include <utility>
 #include <stdlib.h>
 
-#include "dx12framework.h"
+#include "vkframework.h"
 #include "std_defines.h"
 #include "basesingleton.hpp"
 #include "array.hpp"
@@ -18,11 +18,11 @@
 #include "base_renderer.h"
 
 // =================================================================================================
-// DX12 Renderer
+// Vulkan Renderer
 //
 // Manages the 3D scene render targets, coordinate transforms, viewports, and the render loop.
-// "OpenGL" terminology is preserved in function names for source compatibility with the game layer
-// (SetupOpenGL → SetupDX12 internally, but callers still see SetupOpenGL for now).
+// "OpenGL" terminology is preserved in some function names for source compatibility with the
+// game layer (SetupOpenGL etc.) — under the hood we drive Vulkan.
 
 class GfxRenderer
     : public BaseRenderer
@@ -38,14 +38,13 @@ public:
     virtual ~GfxRenderer() {
     }
 
-    GfxRenderer() 
+    GfxRenderer()
         : BaseRenderer()
     {
         _instance = this;
         m_frontFace = GfxOperations::CullFace::Front;
         m_backFace = GfxOperations::CullFace::Back;
-        gfxApiType = BaseRenderer::GfxApiType::DirectX;
-
+        gfxApiType = BaseRenderer::GfxApiType::Vulkan;
     }
 
     static GfxRenderer& Instance(void) {

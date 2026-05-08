@@ -1,31 +1,36 @@
 #pragma once
 
-#include "dx12framework.h"
+#include "vkframework.h"
+#include "image_layout_tracker.h"
 #include "array.hpp"
 #include "viewport.h"
 #include "texture.h"
 #include "colordata.h"
-#include "descriptor_heap.h"
 #include "commandlist.h"
 #include "base_quad.h"
 #include "drawbufferhandler.h"
 
 // =================================================================================================
-// DX12 RenderTarget (Frame Buffer Object)
+// Vulkan RenderTarget (Frame Buffer Object)
 //
-// In OpenGL an RenderTarget bound a set of texture attachments as render targets.  In DX12 render targets
-// are set with OMSetRenderTargets and must be backed by RTV descriptors.
+// In OpenGL a RenderTarget bound a set of texture attachments as render targets. In DX12 render
+// targets are set with OMSetRenderTargets and need RTV descriptors. In Vulkan 1.3 with
+// dynamic_rendering (Core in 1.3) we describe the attachments via VkRenderingAttachmentInfo
+// and call vkCmdBeginRendering / vkCmdEndRendering on the command buffer — no preallocated
+// RTV/DSV descriptor objects required.
 //
 // This class manages:
-//   • Up to RT_MAX_COLOR_BUFFERS color render targets (default-heap Texture2D resources + RTV).
-//   • One depth/stencil target (default-heap Texture2D with D32_FLOAT format + DSV).
-//   • SRV descriptors for each color buffer so they can be sampled in subsequent passes.
-//   • BufferHandle(i) returns a uint32_t& (SRV index) compatible with Texture::m_handle.
-//   • BindRenderTargets(list) → OMSetRenderTargets, called by DrawBufferHandler.
-//   • Ping-pong: destination >= 0 issues a Resource Barrier SRV→RTV and back after render.
-//   • destination == -1: bind current RenderTarget's RTVs without resource barriers.
+//   • Up to RT_MAX_COLOR_BUFFERS color attachments (VkImage + VmaAllocation + VkImageView).
+//   • One depth/stencil attachment (VkImage with VK_FORMAT_D24_UNORM_S8_UINT + depth ImageView).
+//   • An image view per attachment used both as render-target attachment (color/depth) and
+//     as shader-read source (combined image sampler bind in subsequent passes).
+//   • BufferHandle(i) returns a uint32_t& (logical id, kept for source compatibility with
+//     m_renderTexture.m_handle assignments).
+//   • Image-layout transitions through ImageLayoutTracker (per-buffer member).
+//   • Ping-pong: destination >= 0 issues a SHADER_READ → COLOR_ATTACHMENT transition before
+//     and back after render.
 //
-// RTCreationParams and RTRenderParams are kept identical to the OGL version for source compat.
+// RTCreationParams and RTRenderParams are kept identical to the OGL/DX12 version.
 
 static constexpr int RT_MAX_COLOR_BUFFERS = 4;
 
@@ -42,18 +47,24 @@ public:
         btVertex
     } eBufferType;
 
-    ComPtr<ID3D12Resource>  m_resource;
-    DescriptorHandle        m_rtvHandle;
-    DescriptorHandle        m_srvHandle;
-    DescriptorHandle        m_dsvHandle;
-    uint32_t                m_srvIndex{ UINT32_MAX };
-    D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
-    eBufferType             m_type{ btColor };
+    VkImage             m_image       { VK_NULL_HANDLE };
+    VmaAllocation       m_allocation  { VK_NULL_HANDLE };
+    VkImageView         m_imageView   { VK_NULL_HANDLE };  // attachment view + sampling source
+    VkImageView         m_depthSampleView { VK_NULL_HANDLE };  // depth-only sampling view (set for btDepth)
+    ImageLayoutTracker  m_layoutTracker;
+    uint32_t            m_srvIndex    { UINT32_MAX };  // logical id for source-compat
+    eBufferType         m_type        { btColor };
 
     void Init(void);
 
-    void SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState);
+    // Replaces the DX12 SetState(cmdList, D3D12_RESOURCE_STATES). Maps a coarse "what is this for"
+    // hint to the right Vulkan layout/stage/access via the tracker.
+    void SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShaderRead);
 
+    // RTV-allocation in DX12 produced a CPU descriptor handle. In Vulkan there is no "RTV"
+    // object — the image view created in CreateColorBuffer already serves that role.
+    // Kept for source-level compatibility; in Vulkan it is a no-op that returns whether the
+    // image view exists.
     bool AllocRTV(void);
 
     void Release(void);
@@ -140,7 +151,7 @@ public:
 
     AutoArray<BufferInfo>   m_bufferInfo;
 
-    // Own command list — all rendering into this RenderTarget is recorded here.
+    // Own command list — Phase C will route rendering recorded for this RT through here.
     CommandList*        m_cmdList{ nullptr };
 
     // -------------------------------------------------------------------------
@@ -163,8 +174,9 @@ public:
 
     void SetName(const String& name) noexcept {
         m_name = name;
-        if (m_cmdList)
-            m_cmdList->SetName(name);
+        // Phase C: m_cmdList->SetName(name); — propagates name to the wrapped CommandList /
+        // VkCommandBuffer for debug-marker labelling. CommandList class is in the Phase-C
+        // #if 0 block in commandlist.h.
     }
 
     bool Activate(const RTActivationParams& params);
@@ -187,8 +199,8 @@ public:
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
     inline void Flush(void) noexcept {
-        if (m_cmdList)
-            m_cmdList->Flush();
+        // Phase C: m_cmdList->Flush(); — close + immediate submit + WaitIdle the recording
+        // CommandList. CommandList class is in the Phase-C #if 0 block in commandlist.h.
     }
 
     inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
@@ -284,9 +296,10 @@ public:
         return &m_renderTexture;
     }
 
-    // In DX12 there is no explicit framebuffer binding state — always report enabled.
+    // Phase C: in DX12 IsEnabled checks the recording state of the RT's command list. Same in Vulkan.
     inline bool IsEnabled(void)  noexcept {
-        return m_cmdList and m_cmdList->IsRecording();
+        // Phase C: return m_cmdList and m_cmdList->IsRecording();
+        return false;
     }
 
     uint32_t& BufferHandle(int bufferIndex);
@@ -326,23 +339,25 @@ public:
 private:
     void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
-    bool CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat);
+    bool CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspectFlags aspect);
 
-    void CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+    void CreateColorBuffer(BufferInfo& info, int w, int h);
 
-    void CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+    void CreateDepthBuffer(BufferInfo& info, int w, int h);
 
     int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
 
     void CreateRenderArea(void);
 
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
-        return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsvHandle.IsValid());
+        return (m_depthBufferIndex >= 0)
+            and (not checkHandle or (m_bufferInfo[m_depthBufferIndex].m_imageView != VK_NULL_HANDLE));
     }
 
-    inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
-        return HaveDepthBuffer(true) ? &m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu : nullptr;
-    }
+    // DepthBufferHandle in DX12 returned a CPU descriptor handle pointer. In Vulkan there is no
+    // such thing — depth attachment is described inline in the VkRenderingAttachmentInfo built
+    // from m_bufferInfo[m_depthBufferIndex].m_imageView. The accessor is removed; callers
+    // (Phase C) should consult m_bufferInfo[m_depthBufferIndex] directly.
 };
 
 // =================================================================================================

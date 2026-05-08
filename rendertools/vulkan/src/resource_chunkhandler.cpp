@@ -1,54 +1,54 @@
-
 #include "resource_chunkhandler.h"
+
 #include <cstdio>
-#include <cstring>
 
 // =================================================================================================
+// GfxDataChunkList — Vulkan implementation
 
-void GfxDataChunkList::PrepareResourceDesc(D3D12_RESOURCE_DESC& rd, size_t dataSize) {
-    rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    rd.Width = dataSize;
-    rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
-    rd.SampleDesc.Count = 1;
-    rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-}
+GfxBuffer* GfxDataChunkList::Update(size_t dataSize, const char* ownerName, const char* type, uint64_t execId)
+{
+    if (dataSize == 0)
+        return nullptr;
 
-
-ComPtr<ID3D12Resource> GfxDataChunkList::Update(size_t dataSize, const char* ownerName, const char* type, uint64_t execId) {
-    uint32_t updateResource = 0;
+    bool needAlloc = false;
 
     if (m_usedChunks >= m_chunks.Length()) {
-        // grow pool: allocate new chunk
-        updateResource = 1;
-        m_chunks.Append();
+        // Grow pool: append new empty slot.
+        GfxBuffer* fresh = new (std::nothrow) GfxBuffer();
+        if (not fresh)
+            return nullptr;
+        m_chunks.Append(fresh);
+        needAlloc = true;
     }
-    else if (m_chunks[m_usedChunks]->GetDesc().Width < dataSize) {
-        updateResource = 2;
+    else if (m_chunks[m_usedChunks]->Size() < VkDeviceSize(dataSize)) {
+        // Existing chunk too small — destroy and reallocate in place.
 #ifdef _DEBUG
-		fprintf(stderr, "GfxDataChunkList::Update: chunk %d for command '%s' (execId=%llu) is too small (%llu bytes), reallocating\n",
-			m_usedChunks, ownerName, execId, (unsigned long long)m_chunks[m_usedChunks]->GetDesc().Width);
+        fprintf(stderr, "GfxDataChunkList::Update: chunk %d for command '%s' (execId=%llu) too small (%llu bytes), reallocating to %zu\n",
+                m_usedChunks, ownerName ? ownerName : "?", (unsigned long long)execId,
+                (unsigned long long)m_chunks[m_usedChunks]->Size(), dataSize);
 #endif
-        // existing chunk too small — reallocate in place
-        m_chunks[m_usedChunks].Reset();
+        m_chunks[m_usedChunks]->Destroy();
+        needAlloc = true;
     }
 
-    if (updateResource) {
-        D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-        D3D12_RESOURCE_DESC rd{};
-        PrepareResourceDesc(rd, dataSize);
-        HRESULT hr = dx12Context.Device()->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_chunks[m_usedChunks]));
-        if (FAILED(hr)) {
-            if (updateResource == 1)
-                m_chunks.Pop();
+    GfxBuffer* chunk = m_chunks[m_usedChunks];
+    if (needAlloc) {
+        // Buffer usage matches the DX12 upload-heap behaviour: writable from CPU + readable
+        // by GPU. We tag it as a uniform / vertex / index source so any of the data-buffer
+        // call sites can use the same pool. TRANSFER_SRC enables staging-style copies.
+        const VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT
+                                       | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+                                       | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+                                       | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+                                       | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        if (not chunk->Create(VkDeviceSize(dataSize), usage,
+                              VMA_MEMORY_USAGE_AUTO,
+                              VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                            | VMA_ALLOCATION_CREATE_MAPPED_BIT)) {
+            fprintf(stderr, "GfxDataChunkList::Update: GfxBuffer::Create failed (size=%zu)\n", dataSize);
             return nullptr;
         }
-#ifdef _DEBUG
-        char name[128];
-        snprintf(name, sizeof(name), "GfxDataChunk[%s, %s, %llu]", ownerName, type, execId);
-        m_chunks[m_usedChunks]->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
-        if (!strcmp((char*)type, "Vertex") and (execId > 500))
-            fprintf(stderr, "Bingo!\n");
-#endif
+        (void)ownerName; (void)type; (void)execId;  // names are debug-only on Vulkan path
     }
     return m_chunks[m_usedChunks++];
 }

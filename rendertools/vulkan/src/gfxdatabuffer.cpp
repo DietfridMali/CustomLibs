@@ -1,24 +1,17 @@
 #define NOMINMAX
 
 #include "gfxdatabuffer.h"
-#include "commandlist.h"
-#include "dx12context.h"
-#include "resource_handler.h"
+#include "vkcontext.h"
+
 #include <cstdio>
 #include <cstring>
 
 // =================================================================================================
-// DX12 GfxDataBuffer implementation
+// Vulkan GfxDataBuffer implementation
 //
-// Data is kept on an upload-heap committed resource (CPU-writable, GPU-readable).
-// For the DX12 port this is fine for both dynamic and static meshes; a future optimisation
-// would copy static buffers into a default-heap resource.
-
-static DXGI_FORMAT IndexFormatFromComponentType(ComponentType componentType) noexcept
-{
-    return (componentType == ComponentType::UInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
-}
-
+// Backing: GfxBuffer (VkBuffer + VmaAllocation) with HOST_ACCESS_SEQUENTIAL_WRITE + MAPPED.
+// Both vertex and index buffers are host-visible — fine for dynamic mesh streaming. Static
+// meshes could later be promoted to device-local + staged upload (Phase B step 12 territory).
 
 GfxDataBuffer::GfxDataBuffer(const char* type, int id, GfxBufferTarget bufferType, bool isDynamic) noexcept
     : m_index(-1)
@@ -38,11 +31,11 @@ GfxDataBuffer::GfxDataBuffer(const char* type, int id, GfxBufferTarget bufferTyp
 size_t GfxDataBuffer::ComponentSize(size_t componentType) noexcept
 {
     switch (ComponentType(componentType)) {
-        case ComponentType::UInt16: 
+        case ComponentType::UInt16:
             return 2;
         case ComponentType::Float:
         case ComponentType::UInt32:
-        default:                    
+        default:
             return 4;
     }
 }
@@ -57,12 +50,12 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
         m_id = other.m_id;
         m_bufferType = other.m_bufferType;
         m_data = other.m_data;
-        m_resource = other.m_resource;    // shared ref-count via ComPtr
-        m_vbv = other.m_vbv;
-        m_ibv = other.m_ibv;
-        m_size = other.m_size;
+        // VkBuffer / VmaAllocation are not refcounted — Copy creates an empty buffer; caller
+        // must repopulate via Update.
+        m_buffer = GfxBuffer { };
+        m_size = 0;
         m_itemSize = other.m_itemSize;
-        m_itemCount = other.m_itemCount;
+        m_itemCount = 0;
         m_componentCount = other.m_componentCount;
         m_componentType = other.m_componentType;
         m_isDynamic = other.m_isDynamic;
@@ -80,11 +73,13 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
         m_id = other.m_id;
         m_bufferType = other.m_bufferType;
         m_data = other.m_data;
-        m_resource = std::move(other.m_resource);
-        m_vbv = other.m_vbv;
-        m_ibv = other.m_ibv;
-        other.m_vbv = {};
-        other.m_ibv = {};
+
+        // Move the GfxBuffer by swapping fields (no copy semantics required).
+        m_buffer.m_buffer = std::exchange(other.m_buffer.m_buffer, VkBuffer(VK_NULL_HANDLE));
+        m_buffer.m_allocation = std::exchange(other.m_buffer.m_allocation, VmaAllocation(VK_NULL_HANDLE));
+        m_buffer.m_size = std::exchange(other.m_buffer.m_size, VkDeviceSize(0));
+        m_buffer.m_mapped = std::exchange(other.m_buffer.m_mapped, nullptr);
+
         m_size = other.m_size;
         m_itemSize = other.m_itemSize;
         m_itemCount = other.m_itemCount;
@@ -96,25 +91,33 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
 }
 
 
-bool GfxDataBuffer::Create(size_t dataSize) {
-#ifdef _DEBUG
-    char name[128];
-    snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] static", m_type, m_id); 
-    m_resource = gfxResourceHandler.GetUploadResource(name, dataSize);
-#else
-    m_resource = gfxResourceHandler.GetUploadResource("", dataSize);
-#endif
-    return m_resource != nullptr;
+bool GfxDataBuffer::Create(size_t dataSize)
+{
+    VkBufferUsageFlags usage = (m_bufferType == GfxBufferTarget::Index)
+                             ? VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+                             : VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    if (not m_buffer.Create(VkDeviceSize(dataSize), usage,
+                            VMA_MEMORY_USAGE_AUTO,
+                            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                          | VMA_ALLOCATION_CREATE_MAPPED_BIT)) {
+        fprintf(stderr, "GfxDataBuffer::Create: GfxBuffer::Create failed (size=%zu, type=%s/%d)\n",
+                dataSize, m_type ? m_type : "?", m_id);
+        return false;
+    }
+    return true;
 }
 
 
-bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int index, void* data, size_t dataSize, ComponentType componentType, size_t componentCount, bool /*forceUpdate*/) noexcept
+bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int index,
+                           void* data, size_t dataSize,
+                           ComponentType componentType, size_t componentCount,
+                           bool /*forceUpdate*/) noexcept
 {
-    if (not data or (dataSize == 0))
+    if ((not data) or (dataSize == 0))
         return false;
-
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
+    if (vkContext.Device() == VK_NULL_HANDLE)
         return false;
 
     m_type = type;
@@ -127,42 +130,18 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     m_itemCount = uint32_t(dataSize / ((m_itemSize > 0) ? m_itemSize : 1));
     m_size = uint32_t(dataSize);
 
-    if (m_isDynamic or not m_resource or (m_resource->GetDesc().Width < dataSize)) {
+    if (m_isDynamic or (not m_buffer.IsValid()) or (m_buffer.Size() < dataSize)) {
         if (not Create(dataSize))
             return false;
     }
 
-    // Upload data
-    void* mapped = nullptr;
-    D3D12_RANGE range{ 0, 0 };
-    if (FAILED(m_resource->Map(0, &range, &mapped)))
-        return false;
-    std::memcpy(mapped, data, dataSize);
-    m_resource->Unmap(0, nullptr);
-
-    D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = m_resource->GetGPUVirtualAddress();
-
-    if (bufferType == GfxBufferTarget::Index) {
-        m_ibv.BufferLocation = gpuAddr;
-        m_ibv.SizeInBytes    = UINT(dataSize);
-        m_ibv.Format         = IndexFormatFromComponentType(componentType);
-    }
-    else {
-        m_vbv.BufferLocation  = gpuAddr;
-        m_vbv.SizeInBytes     = UINT(dataSize);
-        m_vbv.StrideInBytes   = UINT(m_itemSize);
-    }
-
-    return true;
+    return m_buffer.Upload(data, VkDeviceSize(dataSize), 0);
 }
 
 
 void GfxDataBuffer::Destroy(void) noexcept
-{   
-    if (m_resource)
-        m_resource.Reset();
-    m_vbv = {};
-    m_ibv = {};
+{
+    m_buffer.Destroy();
     m_size = 0;
     m_itemCount = 0;
     m_itemSize = 0;

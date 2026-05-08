@@ -1,22 +1,218 @@
-#include "cbv_allocator.h"
-#include "dx12framework.h"
-#include "dx12context.h"
+#include "vkframework.h"
 #include "commandlist.h"
+#include "descriptor_pool_handler.h"
+#include "cbv_allocator.h"
 #include "resource_handler.h"
-#include "gfxrenderer.h"
 
 #include <cstdio>
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
-// Render Tasks liegen immer zwischen open und close einer CL.Es gibt in dem Sinne keine verschachtelten Render-Tasks.
+// Render Tasks liegen immer zwischen open und close einer CL. Es gibt in dem Sinne keine verschachtelten Render-Tasks.
 // Auch bei geschachteltem open - close von CLs wird die zuerst ausgeführt, die zuerst geschlossen wird - das liegt daran,
 // dass diese zuerst in die pending-CL-Liste des CL-Handlers eingetragen wird. Dadurch wird der Vulkan-Port erleichtert.
 // RenderTargets haben fixe CLs, diverse Detail-Tasks (i.d.R. Daten-Uploads) holen sich bei Bedarf eine temporäre CL.
 // Temporäre CLs wandern nach Ausführung in einen Pool und werden bei Anforderung von temp.CLs bevorzugt verwendet.
-// CLs verwalten auch Ressourcen, die im CL-Scope liegen, insb.PSOs für Shader.
+// CLs verwalten auch Ressourcen, die im CL-Scope liegen, insb. PSOs für Shader.
 // Temporäre CLs sind für den Fall in-Frame wiederholter Render Tasks für dasselbe Renderobjekt (i.d.R. Mesh-Datenpuffer) gedacht
 // und nehmen der Objekt-Instanz die Aufgabe ab, hier eine eigene CL-Verwaltung zu implementieren, damit für jede solche Task
 // auch eine CL verfügbar ist.
+
+// =================================================================================================
+// CommandQueue — Vulkan FrameSync wrapper.
+//
+// Holds the graphics + present queue handles, per-slot swapchain sync objects
+// (imageAvailable, renderFinished, inFlight), and the round-robin frame slot index.
+//
+// Lifecycle:
+//   Create            — record device + queue handles + family indices (no GPU work)
+//   InitSyncObjects   — allocate per-slot semaphores + fences (after swapchain exists)
+//   BeginFrame        — wait for slot fence, acquire next swapchain image
+//   EndFrame          — present, advance frame slot
+//   WaitIdle          — vkQueueWaitIdle on graphics queue (local; DX12-equivalent)
+//   Destroy           — WaitIdle + destroy sync objects
+
+bool CommandQueue::Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
+                          uint32_t graphicsFamily, uint32_t presentFamily,
+                          const String& name) noexcept
+{
+    if ((device == VK_NULL_HANDLE) or (graphicsQueue == VK_NULL_HANDLE) or (presentQueue == VK_NULL_HANDLE)) {
+        fprintf(stderr, "CommandQueue::Create: null device or queue handle\n");
+        return false;
+    }
+    m_device = device;
+    m_graphicsQueue = graphicsQueue;
+    m_presentQueue = presentQueue;
+    m_graphicsFamily = graphicsFamily;
+    m_presentFamily = presentFamily;
+    (void)name;  // TODO: VK_EXT_debug_utils — vkSetDebugUtilsObjectNameEXT for queue handles
+    return true;
+}
+
+
+bool CommandQueue::InitSyncObjects(VkSwapchainKHR swapchain) noexcept
+{
+    if (m_device == VK_NULL_HANDLE) {
+        fprintf(stderr, "CommandQueue::InitSyncObjects: device not set, call Create first\n");
+        return false;
+    }
+    if (swapchain == VK_NULL_HANDLE) {
+        fprintf(stderr, "CommandQueue::InitSyncObjects: null swapchain\n");
+        return false;
+    }
+    m_swapchain = swapchain;
+    return CreateSyncObjects();
+}
+
+
+void CommandQueue::Destroy(void) noexcept
+{
+    WaitIdle();
+    DestroySyncObjects();
+    m_swapchain = VK_NULL_HANDLE;
+    m_graphicsQueue = VK_NULL_HANDLE;
+    m_presentQueue = VK_NULL_HANDLE;
+    m_device = VK_NULL_HANDLE;
+}
+
+
+bool CommandQueue::BeginFrame(void) noexcept
+{
+    // Wait until the GPU has finished using this frame slot.
+    VkResult res = vkWaitForFences(m_device, 1, &m_inFlight[m_frameIndex], VK_TRUE, UINT64_MAX);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
+        return false;
+    }
+    res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
+        return false;
+    }
+    if (not AcquireNextImage())
+        return false;
+    gfxResourceHandler.Cleanup(m_frameIndex);
+    descriptorPoolHandler.BeginFrame(m_frameIndex);
+    cbvAllocator.Reset(m_frameIndex);
+    return true;
+}
+
+
+void CommandQueue::EndFrame(void) noexcept
+{
+    Present();
+    m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
+}
+
+
+void CommandQueue::WaitIdle(void) noexcept
+{
+    if (m_graphicsQueue == VK_NULL_HANDLE)
+        return;
+    VkResult res = vkQueueWaitIdle(m_graphicsQueue);
+    if (res != VK_SUCCESS)
+        fprintf(stderr, "CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
+}
+
+
+VkCommandBuffer CommandQueue::CmdBuffer(void) const noexcept
+{
+    // Phase C: route through CommandListHandler::CurrentCmdBuffer().
+    return VK_NULL_HANDLE;
+}
+
+// =================================================================================================
+// CommandQueue — private helpers
+
+bool CommandQueue::CreateSyncObjects(void) noexcept
+{
+    VkSemaphoreCreateInfo semInfo{ };
+    semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{ };
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  // first BeginFrame must not deadlock on the wait
+
+    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+        VkResult r1 = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_imageAvailable[i]);
+        VkResult r2 = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_renderFinished[i]);
+        VkResult r3 = vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlight[i]);
+        if ((r1 != VK_SUCCESS) or (r2 != VK_SUCCESS) or (r3 != VK_SUCCESS)) {
+            fprintf(stderr, "CommandQueue::CreateSyncObjects: failed at slot %u (sem=%d,%d fence=%d)\n",
+                    i, (int)r1, (int)r2, (int)r3);
+            return false;
+        }
+    }
+    return true;
+}
+
+
+void CommandQueue::DestroySyncObjects(void) noexcept
+{
+    if (m_device == VK_NULL_HANDLE)
+        return;
+    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+        if (m_imageAvailable[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(m_device, m_imageAvailable[i], nullptr);
+            m_imageAvailable[i] = VK_NULL_HANDLE;
+        }
+        if (m_renderFinished[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(m_device, m_renderFinished[i], nullptr);
+            m_renderFinished[i] = VK_NULL_HANDLE;
+        }
+        if (m_inFlight[i] != VK_NULL_HANDLE) {
+            vkDestroyFence(m_device, m_inFlight[i], nullptr);
+            m_inFlight[i] = VK_NULL_HANDLE;
+        }
+    }
+}
+
+
+bool CommandQueue::AcquireNextImage(void) noexcept
+{
+    VkResult res = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX,
+                                         m_imageAvailable[m_frameIndex], VK_NULL_HANDLE,
+                                         &m_imageIndex);
+    if (res == VK_ERROR_OUT_OF_DATE_KHR) {
+        // Swapchain is stale (e.g. window resized). Caller is BaseDisplayHandler;
+        // it owns the swapchain and is expected to recreate it. Phase B.
+        fprintf(stderr, "CommandQueue::AcquireNextImage: VK_ERROR_OUT_OF_DATE_KHR\n");
+        return false;
+    }
+    if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR)) {
+        fprintf(stderr, "CommandQueue::AcquireNextImage: vkAcquireNextImageKHR failed (%d)\n", (int)res);
+        return false;
+    }
+    return true;
+}
+
+
+void CommandQueue::Present(void) noexcept
+{
+    VkPresentInfoKHR present { };
+    present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &m_renderFinished[m_frameIndex];
+    present.swapchainCount = 1;
+    present.pSwapchains = &m_swapchain;
+    present.pImageIndices = &m_imageIndex;
+
+    VkResult res = vkQueuePresentKHR(m_presentQueue, &present);
+    if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR))
+        fprintf(stderr, "CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
+}
+
+// =================================================================================================
+// CommandList / CommandListHandler — Phase C.
+// The 1:1 DX12 carry-over below is preserved as reference and will be ported when
+// the CL/RT lifecycle moves to Vulkan VkCommandBuffer + VkCommandPool semantics.
+
+#if 0
+
+#include "cbv_allocator.h"
+#include "dx12framework.h"
+#include "dx12context.h"
+#include "resource_handler.h"
+#include "gfxrenderer.h"
 
 List<RenderStates> CommandList::m_renderStateStack;
 
@@ -30,7 +226,7 @@ void CommandList::PopRenderStates(void) noexcept {
 }
 
 // =================================================================================================
-// CommandQueue
+// CommandQueue (DX12 1:1 carry-over)
 
 bool CommandQueue::Create(ID3D12Device* device, const String& name) noexcept {
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
@@ -421,5 +617,7 @@ CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTempor
     ++m_cmdListCount;
     return cl;
 }
+
+#endif // Phase C
 
 // =================================================================================================

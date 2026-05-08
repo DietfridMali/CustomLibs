@@ -1,12 +1,146 @@
 #pragma once
 
-#include "dx12framework.h"
-#include "basesingleton.hpp"
-#include "array.hpp"
+#include "vkframework.h"
 #include "string.hpp"
+
+// =================================================================================================
+// Frame protocol (Vulkan):
+//   CommandListHandler::ExecuteAll()  — submit all registered lists via vkQueueSubmit2 (Phase C)
+//   CommandQueue::EndFrame()          — vkQueuePresentKHR + advance frame index
+//   CommandQueue::BeginFrame()        — wait inFlight[slot] + vkAcquireNextImageKHR
+//
+// CommandQueue is the FrameSync wrapper. It carries:
+//   - the graphics + present queue handles (separate; can point to the same VkQueue),
+//   - per-slot swapchain sync objects (imageAvailable, renderFinished, inFlight),
+//   - the current sync slot (m_frameIndex, round-robin) and the current swapchain image
+//     index (m_imageIndex, returned by AcquireNext, arbitrary).
+//
+// Sync slot vs swapchain image: callers that key per-frame resources (allocators, descriptor
+// pools, ring buffers) use FrameIndex() — the round-robin slot. ImageIndex() is internal,
+// used by BaseDisplayHandler to address the right backbuffer for blit/present.
+
+class CommandQueue
+{
+public:
+    static constexpr uint32_t FRAME_COUNT = 2;
+
+    VkQueue        m_graphicsQueue    { VK_NULL_HANDLE };
+    VkQueue        m_presentQueue     { VK_NULL_HANDLE };
+    uint32_t       m_graphicsFamily   { 0 };
+    uint32_t       m_presentFamily    { 0 };
+
+    // Per-slot sync objects, allocated by InitSyncObjects after the swapchain exists.
+    VkSemaphore    m_imageAvailable[FRAME_COUNT] { };  // signaled by vkAcquireNextImageKHR
+    VkSemaphore    m_renderFinished[FRAME_COUNT] { };  // signaled by vkQueueSubmit2
+    VkFence        m_inFlight       [FRAME_COUNT] { };  // signaled by vkQueueSubmit2, waited in BeginFrame
+
+    // Cached for use in BeginFrame / EndFrame. Set by Create / InitSyncObjects.
+    VkDevice       m_device      { VK_NULL_HANDLE };
+    VkSwapchainKHR m_swapchain   { VK_NULL_HANDLE };
+
+    uint32_t       m_frameIndex  { 0 };  // sync slot, round-robin 0..FRAME_COUNT-1
+    uint32_t       m_imageIndex  { 0 };  // swapchain image returned by AcquireNext
+
+    // Records device + queue handles + family indices. No GPU work — sync objects are
+    // created later by InitSyncObjects, after the swapchain is known.
+    bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
+                uint32_t graphicsFamily, uint32_t presentFamily,
+                const String& name = "") noexcept;
+
+    // Allocates per-slot semaphores + fences. Caller passes the swapchain that
+    // BeginFrame's vkAcquireNextImageKHR will target.
+    bool InitSyncObjects(VkSwapchainKHR swapchain) noexcept;
+
+    void Destroy(void) noexcept;
+
+    // Wait inFlight[m_frameIndex] -> reset -> AcquireNextImage -> writes m_imageIndex.
+    bool BeginFrame(void) noexcept;
+
+    // Present (waits on renderFinished[m_frameIndex]) -> advance m_frameIndex.
+    void EndFrame(void) noexcept;
+
+    // Local: vkQueueWaitIdle on the graphics queue. 1:1 to DX12 CommandQueue::WaitIdle.
+    // GfxStates::Finish uses vkDeviceWaitIdle instead, for full-device synchronization.
+    void WaitIdle(void) noexcept;
+
+    inline VkSemaphore SubmitWaitSemaphore(void) const noexcept { return m_imageAvailable[m_frameIndex]; }
+    inline VkSemaphore SubmitSignalSemaphore(void) const noexcept { return m_renderFinished[m_frameIndex]; }
+    inline VkFence SubmitSignalFence(void) const noexcept { return m_inFlight[m_frameIndex]; }
+
+    inline VkQueue GraphicsQueue(void) const noexcept { return m_graphicsQueue; }
+    inline VkQueue PresentQueue(void) const noexcept { return m_presentQueue; }
+    inline uint32_t GraphicsFamily(void) const noexcept { return m_graphicsFamily; }
+    inline uint32_t PresentFamily(void) const noexcept { return m_presentFamily; }
+    inline uint32_t FrameIndex(void) const noexcept { return m_frameIndex; }
+    inline uint32_t ImageIndex(void) const noexcept { return m_imageIndex; }
+
+    // Returns the currently active VkCommandBuffer (set by CommandList::Open via PushList).
+    // Phase C: routes through CommandListHandler. Phase A stub: VK_NULL_HANDLE.
+    VkCommandBuffer CmdBuffer(void) const noexcept;
+
+private:
+    bool CreateSyncObjects(void) noexcept;
+    void DestroySyncObjects(void) noexcept;
+    bool AcquireNextImage(void) noexcept;
+    void Present(void) noexcept;
+};
+
+// Forward-declare CommandList so headers (rendertarget.h, gfxdatalayout.h) that hold
+// CommandList* members can compile in Phase B — the full class lives in the #if 0 block below.
+class CommandList;
+
+// =================================================================================================
+// CommandListHandler — minimal Phase-B skeleton.
+//
+// Owns the CommandQueue (FrameSync wrapper). The full CommandList / Pending-list / ExecuteAll /
+// per-frame command-buffer pool come in Phase C — those parts stay in the #if 0 block below.
+// What is exposed here is what GfxRenderer / BaseDisplayHandler need right now: Create the
+// queue, hand the queue out, Destroy on shutdown.
+
+#include "basesingleton.hpp"
+
+class CommandListHandler
+    : public BaseSingleton<CommandListHandler>
+{
+public:
+    CommandQueue m_cmdQueue;
+
+    inline CommandQueue& CmdQueue(void) noexcept {
+        return m_cmdQueue;
+    }
+
+    inline VkQueue GraphicsQueue(void) const noexcept {
+        return m_cmdQueue.GraphicsQueue();
+    }
+
+    // Records device + queue handles + family indices in the CommandQueue. Sync objects are
+    // allocated later by InitSyncObjects (after the swapchain exists).
+    bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
+                uint32_t graphicsFamily, uint32_t presentFamily,
+                const String& name = "MainQueue") noexcept {
+        return m_cmdQueue.Create(device, graphicsQueue, presentQueue,
+                                 graphicsFamily, presentFamily, name);
+    }
+
+    void Destroy(void) noexcept {
+        m_cmdQueue.Destroy();
+    }
+
+    // Phase C: CurrentCmdBuffer / CurrentCmdList / Register / ExecuteAll / Draw* wrappers etc.
+};
+
+#define commandListHandler CommandListHandler::Instance()
+
+// =================================================================================================
+// CommandList / CommandListData / full CommandListHandler API — Phase C.
+// The 1:1 DX12 carry-over below is preserved as reference and will be ported when
+// the CL/RT lifecycle moves to Vulkan VkCommandBuffer + VkCommandPool semantics.
+
+#if 0
+
+#include "array.hpp"
 #include "gfxstates.h"
 //#include "shader.h"
-#include "dx12framework.h"
 #include <functional>
 
 #ifdef _DEBUG
@@ -14,52 +148,6 @@
 #include <cstdio>
 #endif
 
-// =================================================================================================
-// Frame protocol:
-//   CommandListHandler::ExecuteAll()  — submit all registered lists
-//   CommandQueue::EndFrame()          — signal fence, advance frame index
-//   CommandQueue::BeginFrame()        — wait for frame slot to be free, reset CBV allocator
-
-class CommandQueue
-{
-public:
-    static constexpr UINT FRAME_COUNT = 2;
-
-    ComPtr<ID3D12CommandQueue>  m_queue;
-    ComPtr<ID3D12Fence>         m_fence;
-    UINT64                      m_fenceValues[FRAME_COUNT]{};
-    UINT64                      m_fenceCounter{ 0 };
-    HANDLE                      m_fenceEvent{ nullptr };
-    UINT                        m_frameIndex{ 0 };
-
-    bool Create(ID3D12Device* device, const String& name = "") noexcept;
-
-    void Destroy(void) noexcept;
-
-    // Waits for the GPU to finish with the current frame slot, then resets the CBV allocator.
-    bool BeginFrame(void) noexcept;
-
-    // Signals the fence with the next value and advances the frame index.
-    // Call after CommandListHandler::ExecuteAll().
-    void EndFrame(void) noexcept;
-
-    // Signals a new fence value and waits until the GPU has passed it.
-    void WaitIdle(void) noexcept;
-
-    inline ID3D12CommandQueue* Queue(void) const noexcept { 
-        return m_queue.Get(); 
-    }
-    
-    inline UINT FrameIndex(void) const noexcept { 
-        return m_frameIndex; 
-    }
-
-    // Returns the currently active command list (set by CommandList::Open via PushList).
-    // All rendering code calls this to get the right list regardless of which object owns it.
-    ID3D12GraphicsCommandList* List(void) const noexcept;
-};
-
-// =================================================================================================
 // CommandList: wraps a DX12 command list and its per-frame allocators.
 //
 // Tracks recording state. List() returns nullptr when not recording, which makes all
@@ -194,7 +282,7 @@ public:
     void Destroy(void) noexcept;
 
     inline ID3D12CommandQueue* GetQueue(void) noexcept {
-        return m_cmdQueue.Queue(); 
+        return m_cmdQueue.Queue();
     }
 
     inline CommandQueue& CmdQueue(void) noexcept {
@@ -202,13 +290,13 @@ public:
     }
 
     // Returns the currently recording list (top of stack), or nullptr if none is open.
-    inline ID3D12GraphicsCommandList* CurrentGfxList(void) const noexcept { 
-        return m_currentListData.gfxList; 
+    inline ID3D12GraphicsCommandList* CurrentGfxList(void) const noexcept {
+        return m_currentListData.gfxList;
     }
 
     // Returns the currently recording CommandList object (top of obj-stack), or nullptr.
-    inline CommandList* CurrentCmdList(void) const noexcept { 
-        return m_currentListData.cmdList; 
+    inline CommandList* CurrentCmdList(void) const noexcept {
+        return m_currentListData.cmdList;
     }
 
     void PushCmdList(CommandList* cl) noexcept;
@@ -280,5 +368,7 @@ public:
 };
 
 #define commandListHandler CommandListHandler::Instance()
+
+#endif // Phase C
 
 // =================================================================================================

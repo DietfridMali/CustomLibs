@@ -4,30 +4,36 @@
 #include <stdlib.h>
 #include <functional>
 
-#include "dx12framework.h"
+#include "vkframework.h"
+#include "swapchain.h"
 #include "std_defines.h"
 #include "string.hpp"
 #include "basesingleton.hpp"
 #include "sdlhandler.h"
-#include "descriptor_heap.h"
 
 // =================================================================================================
-// DX12 DisplayHandler: manages the SDL window, extracts the Win32 HWND, creates the DXGI swap chain
-// with double-buffered back buffers, and provides the RTV descriptors for each back buffer.
+// Vulkan DisplayHandler: manages the SDL window, the VkSwapchainKHR (via the Swapchain wrapper)
+// and the per-back-buffer ImageLayoutTracker. Provides the same external API as the DX12 version
+// (Init / Create / Update / EnableBackBuffer / DisableBackBuffer / etc.).
 //
-// Startup order (caller's responsibility):
-//   1. DX12Context::Create()
-//   2. CommandListHandler::Create(device)
-//   3. DescriptorHeapHandler::Create(device)
-//   4. BaseDisplayHandler::Create()
+// Init order on the Vulkan path differs from DX12 because the Vulkan device needs the surface
+// (carried by VKContext) before it can be created, and the swapchain in turn needs the device.
+// See gfxRenderer::InitGraphics: SDL window comes first, then VKContext::Create reads it for
+// the surface, then DisplayHandler::SetupSwapchain finalizes the swapchain. The legacy
+// CreateSwapChain step inside SetupDisplay (DX12) is replaced by an explicit SetupSwapchain
+// call after the renderer has the device up.
+//
+// Startup order (Vulkan caller's responsibility):
+//   1. baseDisplayHandler.Init()             — SDL video init, enumerate display modes
+//   2. baseDisplayHandler.Create()           — create SDL window (SDL_WINDOW_VULKAN flag)
+//   3. gfxRenderer.InitGraphics()            — VkInstance + VkSurfaceKHR (from window) + VkDevice
+//                                               + VMA + descriptor pool + cbv allocator
+//   4. baseDisplayHandler.SetupSwapchain()   — swapchain.Create + cmdQueue.InitSyncObjects
 
 class BaseDisplayHandler
     : public PolymorphSingleton<BaseDisplayHandler>
 {
 public:
-    static constexpr UINT BACK_BUFFER_COUNT = 2;
-    static constexpr DXGI_FORMAT BACK_BUFFER_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
-
     int             m_width;
     int             m_height;
     int             m_maxWidth;
@@ -37,13 +43,10 @@ public:
     bool            m_isLandscape;
     float           m_aspectRatio;
 
-    SDL_Window*                     m_window;
-    HWND                            m_hwnd;
-    ComPtr<IDXGISwapChain3>         m_swapChain;
-    ComPtr<ID3D12Resource>          m_backBuffers[BACK_BUFFER_COUNT];
-    DescriptorHandle                m_rtvHandles[BACK_BUFFER_COUNT];
-    D3D12_RESOURCE_STATES           m_backBufferStates[BACK_BUFFER_COUNT]{};
-    UINT                            m_backBufferIndex{ 0 };
+    SDL_Window*     m_window;
+
+    Swapchain       m_swapchain;
+    uint32_t        m_backBufferIndex { 0 };
 
     AutoArray<SDL_DisplayMode>      m_displayModes;
     int                             m_activeDisplayMode{ 0 };
@@ -58,8 +61,6 @@ public:
         , m_isLandscape(false)
         , m_aspectRatio(1.0f)
         , m_window(nullptr)
-        , m_hwnd(nullptr)
-        , m_backBufferIndex(0)
         , m_activeDisplayMode(0)
     {
         _instance = this;
@@ -73,6 +74,10 @@ public:
 
     void Create(String windowTitle = "", int width = 1920, int height = 1080,
                 bool useFullscreen = true, bool vSync = false);
+
+    // Vulkan-only: creates the swapchain after VKContext is up. Called from
+    // gfxRenderer::InitGraphics once the device + surface exist.
+    bool SetupSwapchain(void);
 
     static BaseDisplayHandler& Instance(void) {
         return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance());
@@ -90,34 +95,34 @@ public:
     void EndFrame(void);
     void BeginFrame(void);
 
-    // Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
+    // Transition current back buffer PRESENT/UNDEFINED → COLOR_ATTACHMENT.
     void EnableBackBuffer(void) noexcept;
 
-    // Transition current back buffer RENDER_TARGET → PRESENT. Call before Present().
+    // Transition current back buffer COLOR_ATTACHMENT → PRESENT_SRC_KHR. Call before Present.
     void DisableBackBuffer(void) noexcept;
 
-    // Returns the current back buffer resource (set as render target before drawing).
-    inline ID3D12Resource* CurrentBackBuffer(void) const noexcept {
-        return m_backBuffers[m_backBufferIndex].Get();
+    inline VkImage CurrentBackBuffer(void) const noexcept {
+        return m_swapchain.Image(m_backBufferIndex);
     }
 
-    // Returns the CPU-side RTV handle for the current back buffer.
-    inline D3D12_CPU_DESCRIPTOR_HANDLE CurrentRTV(void) const noexcept {
-        return m_rtvHandles[m_backBufferIndex].cpu;
+    inline VkImageView CurrentBackBufferView(void) const noexcept {
+        return m_swapchain.ImageView(m_backBufferIndex);
+    }
+
+    inline ImageLayoutTracker& CurrentBackBufferTracker(void) noexcept {
+        return m_swapchain.LayoutTracker(m_backBufferIndex);
     }
 
     inline int GetWidth(void) noexcept { return m_width; }
-    
-    inline int GetHeight(void) noexcept { return m_height; }
-    
-    inline float GetAspectRatio(void) noexcept { return m_aspectRatio; }
-    
-    inline SDL_Window* GetWindow(void) noexcept { return m_window; }
-    
-    inline HWND GetHwnd(void) noexcept { return m_hwnd; }
 
-    inline IDXGISwapChain3* SwapChain(void) noexcept { 
-        return m_swapChain.Get(); 
+    inline int GetHeight(void) noexcept { return m_height; }
+
+    inline float GetAspectRatio(void) noexcept { return m_aspectRatio; }
+
+    inline SDL_Window* GetWindow(void) noexcept { return m_window; }
+
+    inline VkSwapchainKHR SwapChain(void) noexcept {
+        return m_swapchain.Handle();
     }
 
     inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
@@ -128,20 +133,20 @@ public:
         return m_displayModes[((i < 0) || (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
     }
 
-    inline int  SelectedDisplayMode(void) noexcept { 
-        return m_activeDisplayMode; 
-    }
-    
-    inline void SelectDisplayMode(int displayMode) noexcept { 
-        m_activeDisplayMode = displayMode; 
+    inline int  SelectedDisplayMode(void) noexcept {
+        return m_activeDisplayMode;
     }
 
-    inline bool IsFullScreen(void) noexcept { 
-        return m_isFullscreen; 
+    inline void SelectDisplayMode(int displayMode) noexcept {
+        m_activeDisplayMode = displayMode;
     }
-    
-    inline void SetFullScreen(bool useFullscreen) noexcept { 
-        m_isFullscreen = useFullscreen; 
+
+    inline bool IsFullScreen(void) noexcept {
+        return m_isFullscreen;
+    }
+
+    inline void SetFullScreen(bool useFullscreen) noexcept {
+        m_isFullscreen = useFullscreen;
     }
 
     void SwitchDisplayMode(int direction);
@@ -149,7 +154,7 @@ public:
     void ToggleFullscreen(void);
 
     inline bool DisplayModeHasChanged(int& lastDisplayMode) noexcept {
-        if (lastDisplayMode == m_activeDisplayMode) 
+        if (lastDisplayMode == m_activeDisplayMode)
             return false;
         lastDisplayMode = m_activeDisplayMode;
         return true;
@@ -158,15 +163,6 @@ public:
     bool UpdateDisplayMode(int displayMode, bool useFullscreen);
 
     virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
-
-private:
-    bool CreateSwapChain(void);
-
-    // Acquires back buffer resources from the swap chain and creates RTVs.
-    bool AcquireBackBuffers(void) noexcept;
-
-    // Releases back buffer references (required before ResizeBuffers).
-    void ReleaseBackBuffers(void) noexcept;
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()

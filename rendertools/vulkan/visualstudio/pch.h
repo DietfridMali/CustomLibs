@@ -8,6 +8,6 @@
 #define PCH_H
 
 // add headers that you want to pre-compile here
-#include "dx12framework.h"
+#include "vkframework.h"
 
 #endif //PCH_H
