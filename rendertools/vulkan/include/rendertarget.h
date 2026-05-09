@@ -61,12 +61,6 @@ public:
     // hint to the right Vulkan layout/stage/access via the tracker.
     void SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShaderRead);
 
-    // RTV-allocation in DX12 produced a CPU descriptor handle. In Vulkan there is no "RTV"
-    // object — the image view created in CreateColorBuffer already serves that role.
-    // Kept for source-level compatibility; in Vulkan it is a no-op that returns whether the
-    // image view exists.
-    bool AllocRTV(void);
-
     void Release(void);
 };
 
@@ -134,7 +128,6 @@ public:
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };
     bool                m_isAvailable{ false };
-    bool                m_haveRTVs{ false };
     bool                m_isScreenBuffer{ false };
 	bool                m_flushOnDisable{ false };
     bool                m_isInRendering{ false };  // active vkCmdBeginRendering scope
@@ -168,10 +161,6 @@ public:
     bool Create(int width, int height, int scale, const RTCreationParams& params);
 
     void Destroy(void);
-
-    bool AllocRTVs(void);
-
-    void FreeRTVs(void);
 
     void SetName(const String& name) noexcept {
         m_name = name;
@@ -292,9 +281,12 @@ public:
         return (i + 1) % m_bufferCount;
     }
 
-    inline RenderTargetTexture* GetTexture(void) noexcept {
-        return &m_renderTexture;
-    }
+    // Returns the wrapping RenderTargetTexture for color buffer 0, with its m_imageView /
+    // m_image fields populated from BufferInfo so it can be used as a shader sampling source
+    // (e.g. TextureAtlas exposing the atlas RT, PrerenderedText reading its own RT).
+    // In DX12 a logical handle assignment was enough because m_handle indexed the SRV heap;
+    // in Vulkan we must hand the wrapper the actual view/image to bind.
+    RenderTargetTexture* GetTexture(void) noexcept;
 
     inline bool IsEnabled(void) noexcept {
         return m_cmdList and m_cmdList->IsRecording();

@@ -21,43 +21,76 @@
 // Vulkan Shader implementation
 //
 // Descriptor-set layout (single set, all bindings — see shader.h for the full table).
-// DXC compile uses register shift flags so HLSL register(t0..u3) lands at the matching
-// Vulkan bindings. b1 is mapped per-stage via -fvk-bind-register so the three stages can
-// share the same set with distinct b1 bindings (1/2/3).
+// DXC compile uses -fvk-bind-register for every resource class, because b1 needs a
+// stage-specific Vulkan binding (1/2/3 for VS/PS/GS) and DXC rejects mixing
+// -fvk-bind-register with the -fvk-{b,t,s,u}-shift options. Bindings match the layout
+// in CreatePipelineLayout: b0=0, b1=1/2/3, t0..t15=4..19, s0..s15=20..35, u0..u3=36..39.
 
 // =================================================================================================
 // Compile (HLSL -> SPIR-V via DXC)
 
 namespace {
 
-// Common args for all stages: t/s/u register shifts.
-static const wchar_t* const kCommonArgs[] = {
-    L"-fvk-t-shift", L"4",  L"0",
-    L"-fvk-s-shift", L"20", L"0",
-    L"-fvk-u-shift", L"36", L"0",
-};
-static constexpr uint32_t kCommonArgCount = uint32_t(sizeof(kCommonArgs) / sizeof(kCommonArgs[0]));
-
-// Per-stage explicit b-register bindings (b0 -> 0 / b1 -> stage-specific).
-static const wchar_t* const kArgsVS[] = {
+// Stage-independent bindings: b0, t0..t15, s0..s15, u0..u3.
+// b1 is stage-specific and appended in StageArgs().
+static const wchar_t* const kCommonBindArgs[] = {
     L"-fvk-bind-register", L"b0", L"0", L"0", L"0",
+    L"-fvk-bind-register", L"t0", L"0", L"4", L"0",
+    L"-fvk-bind-register", L"t1", L"0", L"5", L"0",
+    L"-fvk-bind-register", L"t2", L"0", L"6", L"0",
+    L"-fvk-bind-register", L"t3", L"0", L"7", L"0",
+    L"-fvk-bind-register", L"t4", L"0", L"8", L"0",
+    L"-fvk-bind-register", L"t5", L"0", L"9", L"0",
+    L"-fvk-bind-register", L"t6", L"0", L"10", L"0",
+    L"-fvk-bind-register", L"t7", L"0", L"11", L"0",
+    L"-fvk-bind-register", L"t8", L"0", L"12", L"0",
+    L"-fvk-bind-register", L"t9", L"0", L"13", L"0",
+    L"-fvk-bind-register", L"t10", L"0", L"14", L"0",
+    L"-fvk-bind-register", L"t11", L"0", L"15", L"0",
+    L"-fvk-bind-register", L"t12", L"0", L"16", L"0",
+    L"-fvk-bind-register", L"t13", L"0", L"17", L"0",
+    L"-fvk-bind-register", L"t14", L"0", L"18", L"0",
+    L"-fvk-bind-register", L"t15", L"0", L"19", L"0",
+    L"-fvk-bind-register", L"s0", L"0", L"20", L"0",
+    L"-fvk-bind-register", L"s1", L"0", L"21", L"0",
+    L"-fvk-bind-register", L"s2", L"0", L"22", L"0",
+    L"-fvk-bind-register", L"s3", L"0", L"23", L"0",
+    L"-fvk-bind-register", L"s4", L"0", L"24", L"0",
+    L"-fvk-bind-register", L"s5", L"0", L"25", L"0",
+    L"-fvk-bind-register", L"s6", L"0", L"26", L"0",
+    L"-fvk-bind-register", L"s7", L"0", L"27", L"0",
+    L"-fvk-bind-register", L"s8", L"0", L"28", L"0",
+    L"-fvk-bind-register", L"s9", L"0", L"29", L"0",
+    L"-fvk-bind-register", L"s10", L"0", L"30", L"0",
+    L"-fvk-bind-register", L"s11", L"0", L"31", L"0",
+    L"-fvk-bind-register", L"s12", L"0", L"32", L"0",
+    L"-fvk-bind-register", L"s13", L"0", L"33", L"0",
+    L"-fvk-bind-register", L"s14", L"0", L"34", L"0",
+    L"-fvk-bind-register", L"s15", L"0", L"35", L"0",
+    L"-fvk-bind-register", L"u0", L"0", L"36", L"0",
+    L"-fvk-bind-register", L"u1", L"0", L"37", L"0",
+    L"-fvk-bind-register", L"u2", L"0", L"38", L"0",
+    L"-fvk-bind-register", L"u3", L"0", L"39", L"0",
+};
+static constexpr uint32_t kCommonBindArgCount = uint32_t(sizeof(kCommonBindArgs) / sizeof(kCommonBindArgs[0]));
+
+// Per-stage b1 binding (binding 1 for VS, 2 for PS, 3 for GS).
+static const wchar_t* const kArgsVS[] = {
     L"-fvk-bind-register", L"b1", L"0", L"1", L"0",
 };
 static const wchar_t* const kArgsPS[] = {
-    L"-fvk-bind-register", L"b0", L"0", L"0", L"0",
     L"-fvk-bind-register", L"b1", L"0", L"2", L"0",
 };
 static const wchar_t* const kArgsGS[] = {
-    L"-fvk-bind-register", L"b0", L"0", L"0", L"0",
     L"-fvk-bind-register", L"b1", L"0", L"3", L"0",
 };
 
 static std::vector<const wchar_t*> StageArgs(int stage)
 {
     std::vector<const wchar_t*> args;
-    args.reserve(kCommonArgCount + 10);
-    for (uint32_t i = 0; i < kCommonArgCount; ++i)
-        args.push_back(kCommonArgs[i]);
+    args.reserve(kCommonBindArgCount + 5);
+    for (uint32_t i = 0; i < kCommonBindArgCount; ++i)
+        args.push_back(kCommonBindArgs[i]);
 
     const wchar_t* const* extra = nullptr;
     uint32_t count = 0;

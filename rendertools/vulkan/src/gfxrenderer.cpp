@@ -30,7 +30,7 @@ bool GfxRenderer::InitGraphics(void) {
 
     SDL_Window* window = baseDisplayHandler.GetWindow();
     if (not window) {
-        fprintf(stderr, "GfxRenderer::InitGraphics: SDL window not yet created — Vulkan path expects window-first init order\n");
+        fprintf(stderr, "GfxRenderer::InitGraphics: SDL window not yet created. Vulkan path expects window-first init order\n");
         return false;
     }
 

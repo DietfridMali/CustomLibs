@@ -147,21 +147,46 @@ bool BaseDisplayHandler::SetupSwapchain(void) {
 
 
 // EnableBackBuffer / DisableBackBuffer drive the swapchain image's layout transitions for the
-// presentable color attachment. Both run on the currently active CommandList's command buffer
-// (top of the CommandListHandler stack).
+// presentable color attachment AND the matching vkCmdBeginRendering / vkCmdEndRendering scope.
+// Both run on the currently active CommandList's command buffer (top of the CommandListHandler
+// stack).
 //
 // EnableBackBuffer is called at the start of each frame's main render pass to bring the
 // acquired swapchain image from PRESENT_SRC_KHR (or UNDEFINED on first use) to
-// COLOR_ATTACHMENT_OPTIMAL.
+// COLOR_ATTACHMENT_OPTIMAL and open a dynamic-rendering scope with loadOp = DONT_CARE — the
+// common path overwrites the back buffer with the screen-buffer blit, so a load is wasted.
+// Callers that need a real clear (e.g. the screen-buffer-less fallback in Start2DScene) issue
+// gfxStates.ClearBackBuffer() inside the scope; that path uses vkCmdClearAttachments.
 //
-// DisableBackBuffer is called right before EndFrame's vkQueuePresentKHR; it transitions back
-// to PRESENT_SRC_KHR.
+// DisableBackBuffer closes the scope and transitions back to PRESENT_SRC_KHR before
+// vkQueuePresentKHR.
 
 void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
     VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
     if (cb == VK_NULL_HANDLE)
         return;
     m_swapchain.LayoutTracker(m_backBufferIndex).ToColorAttachment(cb);
+
+    if (m_isInRendering)
+        return;
+
+    VkRenderingAttachmentInfo color{};
+    color.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    color.imageView = m_swapchain.ImageView(m_backBufferIndex);
+    color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+    VkRenderingInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    info.renderArea.offset = { 0, 0 };
+    info.renderArea.extent = m_swapchain.Extent();
+    info.layerCount = 1;
+    info.colorAttachmentCount = 1;
+    info.pColorAttachments = &color;
+
+    vkCmdBeginRendering(cb, &info);
+    m_isInRendering = true;
 }
 
 
@@ -169,6 +194,10 @@ void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
     VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
     if (cb == VK_NULL_HANDLE)
         return;
+    if (m_isInRendering) {
+        vkCmdEndRendering(cb);
+        m_isInRendering = false;
+    }
     m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
 }
 

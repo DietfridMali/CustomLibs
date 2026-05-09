@@ -47,6 +47,7 @@ public:
 
     Swapchain       m_swapchain;
     uint32_t        m_backBufferIndex { 0 };
+    bool            m_isInRendering { false };  // active vkCmdBeginRendering scope on the back buffer
 
     AutoArray<SDL_DisplayMode>      m_displayModes;
     int                             m_activeDisplayMode{ 0 };
@@ -95,11 +96,15 @@ public:
     void EndFrame(void);
     void BeginFrame(void);
 
-    // Transition current back buffer PRESENT/UNDEFINED → COLOR_ATTACHMENT.
+    // Transition current back buffer PRESENT/UNDEFINED → COLOR_ATTACHMENT and open a
+    // vkCmdBeginRendering scope (loadOp = DONT_CARE; clears go through ClearBackBuffer).
     void EnableBackBuffer(void) noexcept;
 
-    // Transition current back buffer COLOR_ATTACHMENT → PRESENT_SRC_KHR. Call before Present.
+    // Close the vkCmdBeginRendering scope and transition COLOR_ATTACHMENT → PRESENT_SRC_KHR.
+    // Call before Present.
     void DisableBackBuffer(void) noexcept;
+
+    inline bool IsInRendering(void) const noexcept { return m_isInRendering; }
 
     inline VkImage CurrentBackBuffer(void) const noexcept {
         return m_swapchain.Image(m_backBufferIndex);

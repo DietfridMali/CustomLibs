@@ -54,8 +54,10 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
         // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
         info->atlasSize = scale * m_atlas.GlyphScale();
         m_atlas.Add(info->texture, info->index, scale);
+#if 1
         delete info->texture;
         info->texture = nullptr;
+#endif
     }
 #ifdef _DEBUG
     else
@@ -92,6 +94,9 @@ int FontHandler::BuildAtlas(void) {
     m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
     baseRenderer.PopViewport();
     m_atlas.Deactivate();
+#if 0
+    m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
+#endif
     return m_glyphDict.Size();
 }
 

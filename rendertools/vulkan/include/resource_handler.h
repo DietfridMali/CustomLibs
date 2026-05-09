@@ -19,7 +19,6 @@
 //
 // Used by:
 //   • Texture::Destroy when m_isDisposable is set (one frame of safety after detach).
-//   • RenderTarget::FreeRTVs when ImageViews are recycled.
 //   • Anywhere a Vulkan handle outlives its owner by one frame.
 
 class GfxResourceHandler

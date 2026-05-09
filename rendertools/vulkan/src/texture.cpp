@@ -16,6 +16,7 @@
 #include "commandlist.h"
 #include "sampler_cache.h"
 #include "gfxstates.h"
+#include "resource_handler.h"
 
 // =================================================================================================
 // Vulkan Texture implementation
@@ -129,14 +130,46 @@ void Texture::Destroy(void)
     VkDevice device = vkContext.Device();
     VmaAllocator allocator = vkContext.Allocator();
 
-    if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
-        vkDestroyImageView(device, m_imageView, nullptr);
-        m_imageView = VK_NULL_HANDLE;
+    // 1:1 to the DX12 path (directx/src/texture.cpp): if the texture is marked disposable
+    // (set via TextureCreationParams::isDisposable, e.g. one-shot glyph render sources), defer
+    // the GPU-resource teardown into the next cycle of the current frame slot. The CPU-side
+    // Texture object is invalidated immediately; the VkImageView / VkImage live on for one
+    // full frame-slot cycle, until in-flight command buffers that bound them have signalled
+    // their fence. Without this, a single-use texture destroyed mid-frame invalidates any
+    // command buffer that still has its ImageView bound (typical case: TextureAtlas::Add
+    // re-uses the atlas command list across many glyphs, each glyph deallocated after its
+    // own draw).
+    //
+    // Non-disposable textures (long-lived assets) destroy synchronously — the only time
+    // Destroy runs for them is at app shutdown after WaitIdle, where deferring would leak.
+    if (m_isDisposable) {
+        if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+            VkImageView view = m_imageView;
+            gfxResourceHandler.TrackCleanup([device, view]() {
+                vkDestroyImageView(device, view, nullptr);
+            });
+            m_imageView = VK_NULL_HANDLE;
+        }
+        if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+            VkImage image = m_image;
+            VmaAllocation alloc = m_allocation;
+            gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
+                vmaDestroyImage(allocator, image, alloc);
+            });
+            m_image = VK_NULL_HANDLE;
+            m_allocation = VK_NULL_HANDLE;
+        }
     }
-    if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
-        vmaDestroyImage(allocator, m_image, m_allocation);
-        m_image = VK_NULL_HANDLE;
-        m_allocation = VK_NULL_HANDLE;
+    else {
+        if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+            vkDestroyImageView(device, m_imageView, nullptr);
+            m_imageView = VK_NULL_HANDLE;
+        }
+        if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+            vmaDestroyImage(allocator, m_image, m_allocation);
+            m_image = VK_NULL_HANDLE;
+            m_allocation = VK_NULL_HANDLE;
+        }
     }
     m_layoutTracker = ImageLayoutTracker { };
     m_handle = UINT32_MAX;
@@ -446,6 +479,30 @@ void ShadowTexture::SetParams(bool forceUpdate)
     m_sampling.wrapW = GfxWrapMode::ClampToEdge;
     m_sampling.compareFunc = GfxOperations::CompareFunc::Less;
     m_sampling.maxAnisotropy = 1.0f;
+}
+
+
+// RenderTargetTexture / ShadowTexture wrap a VkImageView + VkImage owned by the source
+// RenderTarget's BufferInfo. The wrapper does NOT own those handles — the lifetime is
+// controlled by the RenderTarget. Override Destroy to null out the borrowed handles
+// before delegating to Texture::Destroy, so the base path's vkDestroyImageView /
+// vmaDestroyImage skip them. Sampler / state cleanup inherited unchanged.
+
+void RenderTargetTexture::Destroy(void)
+{
+    m_imageView = VK_NULL_HANDLE;
+    m_image = VK_NULL_HANDLE;
+    m_allocation = VK_NULL_HANDLE;
+    Texture::Destroy();
+}
+
+
+void ShadowTexture::Destroy(void)
+{
+    m_imageView = VK_NULL_HANDLE;
+    m_image = VK_NULL_HANDLE;
+    m_allocation = VK_NULL_HANDLE;
+    Texture::Destroy();
 }
 
 // =================================================================================================

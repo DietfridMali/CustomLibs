@@ -350,8 +350,8 @@ bool VKContext::SelectQueueFamilies(void) noexcept
 
 // =================================================================================================
 // CreateDevice: requires VK_KHR_swapchain (device extension), enables Vulkan 1.3 features
-// (dynamicRendering, synchronization2). One queue per distinct family — collapse to a single
-// queueCreateInfo when graphicsFamily == presentFamily.
+// (dynamicRendering, synchronization2, shaderDemoteToHelperInvocation). One queue per distinct
+// family — collapse to a single queueCreateInfo when graphicsFamily == presentFamily.
 
 bool VKContext::CreateDevice(void) noexcept
 {
@@ -378,12 +378,26 @@ bool VKContext::CreateDevice(void) noexcept
     feats13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     feats13.dynamicRendering = VK_TRUE;
     feats13.synchronization2 = VK_TRUE;
+    // Required by SPIR-V emitted from HLSL `discard` (DXC uses OpDemoteToHelperInvocation).
+    feats13.shaderDemoteToHelperInvocation = VK_TRUE;
+
+    // VK_EXT_dynamic_rendering_unused_attachments — relax the Vulkan strictness that
+    // pipeline colorAttachmentCount must equal the active render-pass colorAttachmentCount.
+    // We need this for the DX12-style pattern: the same RT scope (e.g. SceneBuffer with 3
+    // color attachments) hosts shaders that write fewer SV_Targets (e.g. DecalShader with 1).
+    VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT featsUnusedAtt { };
+    featsUnusedAtt.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_FEATURES_EXT;
+    featsUnusedAtt.dynamicRenderingUnusedAttachments = VK_TRUE;
+    feats13.pNext = &featsUnusedAtt;
 
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).
     VkPhysicalDeviceFeatures features { };
     features.samplerAnisotropy = VK_TRUE;
 
-    const char* deviceExtensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    const char* deviceExtensions[] = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME,
+    };
 
     VkDeviceCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

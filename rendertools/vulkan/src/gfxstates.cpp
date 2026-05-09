@@ -229,6 +229,32 @@ void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
     if (cb == VK_NULL_HANDLE)
         return;
 
+    const float* src = color.Data();
+
+    if (baseDisplayHandler.IsInRendering()) {
+        // Common path: EnableBackBuffer opened a dynamic-rendering scope. Clear via
+        // vkCmdClearAttachments, which is the in-pass clear and keeps the image in
+        // COLOR_ATTACHMENT_OPTIMAL for the subsequent draws.
+        VkClearAttachment clear{};
+        clear.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        clear.colorAttachment = 0;
+        clear.clearValue.color.float32[0] = src[0];
+        clear.clearValue.color.float32[1] = src[1];
+        clear.clearValue.color.float32[2] = src[2];
+        clear.clearValue.color.float32[3] = src[3];
+
+        VkClearRect rect{};
+        rect.rect.offset = { 0, 0 };
+        rect.rect.extent = baseDisplayHandler.m_swapchain.Extent();
+        rect.baseArrayLayer = 0;
+        rect.layerCount = 1;
+
+        vkCmdClearAttachments(cb, 1, &clear, 1, &rect);
+        return;
+    }
+
+    // Fallback: no render-pass scope active — clear the image directly. Used only when a
+    // caller bypasses EnableBackBuffer.
     VkImage image = baseDisplayHandler.CurrentBackBuffer();
     if (image == VK_NULL_HANDLE)
         return;
@@ -236,7 +262,6 @@ void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
     ImageLayoutTracker& tracker = baseDisplayHandler.CurrentBackBufferTracker();
     tracker.ToTransferDst(cb);
 
-    const float* src = color.Data();
     VkClearColorValue value{};
     value.float32[0] = src[0];
     value.float32[1] = src[1];

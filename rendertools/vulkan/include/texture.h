@@ -283,6 +283,11 @@ public:
     RenderTargetTexture() = default;
     ~RenderTargetTexture() = default;
     virtual void SetParams(bool forceUpdate = false) override;
+
+    // The image view + image are owned by the wrapped RenderTarget's BufferInfo,
+    // not by the texture wrapper. Destroy must NOT call vkDestroyImageView /
+    // vmaDestroyImage on them — that would yank them from under the RT.
+    virtual void Destroy(void) override;
 };
 
 // =================================================================================================
@@ -293,6 +298,10 @@ public:
     ShadowTexture() = default;
     ~ShadowTexture() = default;
     virtual void SetParams(bool forceUpdate = false) override;
+
+    // Same lifetime semantics as RenderTargetTexture: the shadow image view is owned by
+    // the source RenderTarget (depth / sample view), not by this wrapper.
+    virtual void Destroy(void) override;
 };
 
 // =================================================================================================

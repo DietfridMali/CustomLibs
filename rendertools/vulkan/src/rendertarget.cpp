@@ -3,6 +3,7 @@
 #include "rendertarget.h"
 #include "vkcontext.h"
 #include "image_layout_tracker.h"
+#include "resource_handler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -11,9 +12,9 @@
 // Vulkan RenderTarget implementation — Phase B (resource setup)
 //
 // What is functional in this Phase B pass:
-//   • BufferInfo (Init / SetState / AllocRTV / Release) ported to VkImage + VkImageView +
+//   • BufferInfo (Init / SetState / Release) ported to VkImage + VkImageView +
 //     VmaAllocation + ImageLayoutTracker.
-//   • RenderTarget::Init / Destroy / Create / AllocRTVs / FreeRTVs.
+//   • RenderTarget::Init / Destroy / Create.
 //   • CreateBuffer / CreateColorBuffer / CreateDepthBuffer / CreateSRV (= vkCreateImageView).
 //   • CreateRenderArea (BaseQuad setup, API-neutral).
 //   • BufferHandle (logical id accessor, API-neutral).
@@ -128,15 +129,6 @@ void BufferInfo::SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShad
         m_layoutTracker.ToDepthAttachment(cb);
     else
         m_layoutTracker.ToColorAttachment(cb);
-}
-
-
-bool BufferInfo::AllocRTV(void)
-{
-    // In DX12 this allocated a CPU descriptor handle for the render-target view. In Vulkan
-    // the image view created in RenderTarget::CreateColorBuffer (or CreateDepthBuffer) already
-    // serves as the attachment view; nothing extra to allocate. Returns whether the view exists.
-    return m_imageView != VK_NULL_HANDLE;
 }
 
 
@@ -308,7 +300,6 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     int attachmentIndex = 0;
     for (int i = 0; i < m_colorBufferCount; ++i)
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor);
-    m_haveRTVs = true;
 
     m_vertexBufferCount = params.vertexBufferCount;
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
@@ -333,39 +324,9 @@ void RenderTarget::Destroy(void)
     for (int i = 0; i < m_bufferCount; ++i)
         m_bufferInfo[i].Release();
     m_isAvailable = false;
-    m_haveRTVs = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
     m_bufferInfo.Reset();
-}
-
-
-bool RenderTarget::AllocRTVs(void)
-{
-    // In Vulkan the image views created in CreateColorBuffer already serve as RTV equivalents.
-    // Mark as available; AllocRTV per buffer is a no-op that just confirms the view exists.
-    if (m_haveRTVs)
-        return true;
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        if (not m_bufferInfo[i].AllocRTV())
-            return false;
-    return m_haveRTVs = true;
-}
-
-
-void RenderTarget::FreeRTVs(void)
-{
-    // Free attachment image views (Vulkan equivalent of releasing the DX12 RTV descriptor slot).
-    // The underlying VkImage and VmaAllocation remain — only the view is destroyed.
-    VkDevice device = vkContext.Device();
-    for (int i = 0; i < m_colorBufferCount; ++i) {
-        BufferInfo& info = m_bufferInfo[i];
-        if ((info.m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
-            vkDestroyImageView(device, info.m_imageView, nullptr);
-            info.m_imageView = VK_NULL_HANDLE;
-        }
-    }
-    m_haveRTVs = false;
 }
 
 
@@ -615,8 +576,6 @@ bool RenderTarget::Enable(const RTActivationParams& params)
 {
     if (not m_isAvailable)
         return false;
-    if (not AllocRTVs())
-        return false;
     m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
     m_drawBufferGroup = params.drawBufferGroup;
 
@@ -663,13 +622,10 @@ void RenderTarget::Disable(bool deactivate) noexcept
         for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, true);
     }
-    if (m_flushOnDisable) {
+    if (m_flushOnDisable)
         m_cmdList->Flush();
-        FreeRTVs();
-    }
-    else {
+    else
         m_cmdList->Close(deactivate);
-    }
     m_cmdList = nullptr;
 }
 
@@ -850,11 +806,29 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
     BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
     if (info.m_image == VK_NULL_HANDLE)
         return nullptr;
-    m_renderTexture.m_image      = info.m_image;
-    m_renderTexture.m_imageView  = info.m_imageView;
-    m_renderTexture.m_handle     = info.m_srvIndex;
-    m_renderTexture.m_isValid    = true;
-    m_renderTexture.m_isDeployed = true;
+    m_renderTexture.m_image = info.m_image;
+    m_renderTexture.m_imageView = info.m_imageView;
+    m_renderTexture.m_handle = info.m_srvIndex;
+    m_renderTexture.Validate();
+    return &m_renderTexture;
+}
+
+
+RenderTargetTexture* RenderTarget::GetTexture(void) noexcept
+{
+    // Populate the wrapper from color buffer 0 so callers (TextureAtlas etc.) get a fully
+    // bind-ready texture. Idempotent — safe to call repeatedly. If the buffer is not yet
+    // allocated, return the wrapper anyway so existing assignment patterns
+    // (`m_renderTexture.m_handle = ...; Validate();`) don't crash on a null pointer.
+    if (m_bufferCount > 0) {
+        BufferInfo& info = m_bufferInfo[0];
+        if (info.m_image != VK_NULL_HANDLE) {
+            m_renderTexture.m_image = info.m_image;
+            m_renderTexture.m_imageView = info.m_imageView;
+            m_renderTexture.m_handle = info.m_srvIndex;
+            m_renderTexture.Validate();
+        }
+    }
     return &m_renderTexture;
 }
 

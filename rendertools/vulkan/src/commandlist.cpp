@@ -215,6 +215,7 @@ void CommandQueue::Present(void) noexcept
 #include "gfxrenderer.h"
 #include "pipeline_cache.h"
 #include "rendertarget.h"
+#include "base_displayhandler.h"
 
 List<RenderStates> CommandList::m_renderStateStack;
 
@@ -428,13 +429,36 @@ void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/) noe
 
 VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
 {
-    // PipelineKey {shader, RenderStates, colour/depth formats} — formats come from the active
-    // RT's FillPipelineKey (set by RenderTarget::Activate via baseRenderer.ActivateDrawBuffer).
+    // PipelineKey {shader, RenderStates, colour/depth formats}.
+    //
+    // Source of truth for colorAttachmentCount is shader->m_dataLayout.m_numRenderTargets
+    // (= number of SV_Target outputs the pixel shader writes), matching DX12 PSO behaviour.
+    // The render-pass scope may have more color attachments than the shader writes; the
+    // VK_EXT_dynamic_rendering_unused_attachments feature (enabled in VKContext::CreateDevice)
+    // makes that mismatch legal.
+    //
+    // Color formats come from the active render surface — the active RenderTarget when one is
+    // bound (RT::FillPipelineKey), or the swapchain back buffer in DrawScreen-style passes.
+    // Whichever it is, we then truncate the format list to numRenderTargets so the pipeline
+    // is built with exactly the slots the shader actually writes.
     PipelineKey key{};
     key.shader = shader;
     key.states = baseRenderer.RenderStates();
     if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
         rt->FillPipelineKey(key);
+    else if (baseDisplayHandler.IsInRendering()) {
+        key.colorFormats[0] = baseDisplayHandler.m_swapchain.Format();
+        key.colorFormatCount = 1;
+        key.depthFormat = VK_FORMAT_UNDEFINED;
+    }
+
+    const uint32_t numRT = uint32_t(shader->m_dataLayout.m_numRenderTargets);
+    if (numRT < key.colorFormatCount) {
+        for (uint32_t i = numRT; i < key.colorFormatCount; ++i)
+            key.colorFormats[i] = VK_FORMAT_UNDEFINED;
+        key.colorFormatCount = numRT;
+    }
+
     VkPipeline p = pipelineCache.GetOrCreate(key);
     if (p != VK_NULL_HANDLE)
         SetActivePipeline(p, shader);
