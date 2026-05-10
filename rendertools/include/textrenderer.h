@@ -61,7 +61,7 @@ public:
     inline FontHandler* SetFont(FontHandler * font) noexcept {
         FontHandler* currentFont = m_font;
         if ((m_font = font))
-            m_mesh.SetupTexture(m_font->GetTexture());
+            m_mesh.SetupTexture(m_font->GetAsTexture());
         return currentFont;
     }
 
