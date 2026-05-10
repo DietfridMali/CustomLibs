@@ -57,7 +57,7 @@ public:
 
     Shader* SelectShader(Texture* texture);
 
-    Shader* SetupShader(String shaderId, String depthShaderId = "depthShader");
+    Shader* SetupShader(String shaderId, String depthShaderId = "shadowShader");
 
     void StopShader(bool needLegacyMatrices = false);
 

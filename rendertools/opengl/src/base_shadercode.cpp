@@ -7,8 +7,8 @@
 
 const ShaderSource& TestShader();
 const ShaderSource& StencilShader();
-const ShaderSource& DepthShader();
-const ShaderSource& SphereDepthShader();
+const ShaderSource& ShadowShader();
+const ShaderSource& SphereShadowShader();
 const ShaderSource& DepthRenderer();
 const ShaderSource& LineShader();
 const ShaderSource& RingShader();
@@ -33,8 +33,8 @@ BaseShaderCode::BaseShaderCode() {
     AutoArray<const ShaderSource*> shaderSource = {
         &TestShader(),
         &StencilShader(),
-        &DepthShader(),
-        &SphereDepthShader(),
+        &ShadowShader(),
+        &SphereShadowShader(),
         &DepthRenderer(),
         &LineShader(),
         &RingShader(),

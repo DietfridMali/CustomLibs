@@ -53,7 +53,7 @@ bool ShadowMap::StartRender(void) noexcept {
 	gfxStates.SetFaceCulling(1);
 	gfxStates.CullFace(GfxOperations::CullFace::Front);
 #if APPLY_POLYGON_OFFSET
-	gfxStates.SetPolygonOffset(2.0f, 4.0f);
+	gfxStates.SetPolygonOffset(1.0f, 1.0f);
 #endif
 	return true;
 }

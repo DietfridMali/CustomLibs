@@ -52,9 +52,9 @@ const ShaderSource& StencilShader() {
 }
 
 
-const ShaderSource& DepthShader() {
+const ShaderSource& ShadowShader() {
     static const ShaderSource source(
-        "depthShader",
+        "shadowShader",
         R"(
         #version 330
         layout(location = 0) in vec3 vertex;
@@ -88,9 +88,9 @@ const ShaderSource& DepthShader() {
 }
 
 
-const ShaderSource& SphereDepthShader() {
+const ShaderSource& SphereShadowShader() {
     static const ShaderSource source(
-        "sphereDepthShader",
+        "sphereShadowShader",
         R"(
         #version 330
         layout(location = 0) in vec3 vertex;
