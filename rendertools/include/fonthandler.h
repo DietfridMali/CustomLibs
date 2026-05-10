@@ -83,8 +83,8 @@ public:
         return m_atlas.GetRenderTarget();
     }
 
-    inline Texture* GetTexture(void) noexcept {
-        return m_atlas.GetTexture();
+    inline Texture* GetAsTexture(void) noexcept {
+        return m_atlas.GetAsTexture();
     }
 
     inline const String& GetGlyphs(void) const noexcept {

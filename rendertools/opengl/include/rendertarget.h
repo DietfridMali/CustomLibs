@@ -244,7 +244,7 @@ public:
         return m_bufferInfo[bufferIndex].m_handle;
     }
 
-    RenderTargetTexture* GetTexture(void) noexcept {
+    RenderTargetTexture* GetRenderTexture(void) noexcept {
         return &m_renderTexture;
     }
 

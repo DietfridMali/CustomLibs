@@ -29,8 +29,6 @@
 // Common-logic methods (Load, CreateFromFile, CreateFromSurface, Cartoonize, ComputeOffsets,
 // SetParams, SetWrapping) are API-neutral and unchanged from the DX12 version.
 
-uint32_t Texture::nullHandle = UINT32_MAX;
-
 int Texture::CompareTextures(void* context, const String& k1, const String& k2) {
     int i = String::Compare(nullptr, k1, k2);
     return (i < 0) ? -1 : (i > 0) ? 1 : 0;
@@ -217,11 +215,10 @@ bool Texture::Bind(int tmuIndex)
 
 void Texture::Release(void)
 {
-    if (m_tmuIndex >= 0 and uint32_t(m_tmuIndex) < CommandListHandler::kSrvSlots) {
-        commandListHandler.BindSampledImage(uint32_t(m_tmuIndex), VK_NULL_HANDLE);
-        commandListHandler.BindSampler(uint32_t(m_tmuIndex), VK_NULL_HANDLE);
-    }
-    m_tmuIndex = -1;
+    // No-op. Tracking which texture sits in which TMU was an OpenGL state-machine pattern;
+    // already pointless in DX12, equally pointless in Vulkan (descriptor sets are written
+    // per-draw from the bind table by Shader::UpdateVariables — the next draw simply writes
+    // the slots it needs, no clearing required).
 }
 
 

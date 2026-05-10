@@ -76,7 +76,7 @@ public:
 
 	bool Add(Texture* glyph, int glyphIndex, Vector2f& scale);
 
-	Texture* GetTexture(void) noexcept {
+	Texture* GetAsTexture(void) noexcept {
 		return m_atlas ? m_atlas->GetAsTexture({}) :  nullptr;
 	}
 

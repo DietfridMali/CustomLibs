@@ -790,11 +790,10 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
         return false;
     if (not m_renderTexture.m_hasParams)
         m_renderTexture.SetParams(false);
-    m_renderTexture.m_image      = info.m_image;
-    m_renderTexture.m_imageView  = info.m_imageView;
-    m_renderTexture.m_handle     = info.m_srvIndex;
-    m_renderTexture.m_isValid    = true;
-    m_renderTexture.m_isDeployed = true;
+    m_renderTexture.m_image = info.m_image;
+    m_renderTexture.m_imageView = info.m_imageView;
+    m_renderTexture.m_handle = info.m_srvIndex;
+    m_renderTexture.Validate();
     return m_renderTexture.Bind(tmuIndex);
 }
 
@@ -814,25 +813,6 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 }
 
 
-RenderTargetTexture* RenderTarget::GetTexture(void) noexcept
-{
-    // Populate the wrapper from color buffer 0 so callers (TextureAtlas etc.) get a fully
-    // bind-ready texture. Idempotent — safe to call repeatedly. If the buffer is not yet
-    // allocated, return the wrapper anyway so existing assignment patterns
-    // (`m_renderTexture.m_handle = ...; Validate();`) don't crash on a null pointer.
-    if (m_bufferCount > 0) {
-        BufferInfo& info = m_bufferInfo[0];
-        if (info.m_image != VK_NULL_HANDLE) {
-            m_renderTexture.m_image = info.m_image;
-            m_renderTexture.m_imageView = info.m_imageView;
-            m_renderTexture.m_handle = info.m_srvIndex;
-            m_renderTexture.Validate();
-        }
-    }
-    return &m_renderTexture;
-}
-
-
 Texture* RenderTarget::GetDepthAsTexture(void)
 {
     if (m_depthBufferIndex < 0)
@@ -840,11 +820,10 @@ Texture* RenderTarget::GetDepthAsTexture(void)
     BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
     if (info.m_image == VK_NULL_HANDLE)
         return nullptr;
-    m_depthTexture.m_image      = info.m_image;
-    m_depthTexture.m_imageView  = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
-    m_depthTexture.m_handle     = info.m_srvIndex;
-    m_depthTexture.m_isValid    = true;
-    m_depthTexture.m_isDeployed = true;
+    m_depthTexture.m_image = info.m_image;
+    m_depthTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+    m_depthTexture.m_handle = info.m_srvIndex;
+    m_depthTexture.Validate();
     return &m_depthTexture;
 }
 
@@ -856,11 +835,10 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
     BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
     if (info.m_image == VK_NULL_HANDLE)
         return nullptr;
-    m_shadowTexture.m_image      = info.m_image;
-    m_shadowTexture.m_imageView  = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
-    m_shadowTexture.m_handle     = info.m_srvIndex;
-    m_shadowTexture.m_isValid    = true;
-    m_shadowTexture.m_isDeployed = true;
+    m_shadowTexture.m_image = info.m_image;
+    m_shadowTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+    m_shadowTexture.m_handle = info.m_srvIndex;
+    m_shadowTexture.Validate();
     return &m_shadowTexture;
 }
 

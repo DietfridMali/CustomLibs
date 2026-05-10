@@ -280,7 +280,7 @@ public:
         return (i + 1) % m_bufferCount;
     }
 
-    inline RenderTargetTexture* GetTexture(void) noexcept {
+    inline RenderTargetTexture* GetRenderTexture(void) noexcept {
         return &m_renderTexture;
     }
 

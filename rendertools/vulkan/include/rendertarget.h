@@ -281,12 +281,9 @@ public:
         return (i + 1) % m_bufferCount;
     }
 
-    // Returns the wrapping RenderTargetTexture for color buffer 0, with its m_imageView /
-    // m_image fields populated from BufferInfo so it can be used as a shader sampling source
-    // (e.g. TextureAtlas exposing the atlas RT, PrerenderedText reading its own RT).
-    // In DX12 a logical handle assignment was enough because m_handle indexed the SRV heap;
-    // in Vulkan we must hand the wrapper the actual view/image to bind.
-    RenderTargetTexture* GetTexture(void) noexcept;
+    inline RenderTargetTexture* GetRenderTexture(void) noexcept {
+        return &m_renderTexture;
+    }
 
     inline bool IsEnabled(void) noexcept {
         return m_cmdList and m_cmdList->IsRecording();

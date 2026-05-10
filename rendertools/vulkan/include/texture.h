@@ -102,8 +102,6 @@ public:
     bool                        m_isDisposable{ false };
     TextureSampling             m_sampling;
 
-    static uint32_t             nullHandle;   // UINT32_MAX — matches OGL Texture::nullHandle usage
-
     static inline AVLTree<String, Texture*> textureLUT;
 
     static inline size_t CreateID(void) noexcept {
@@ -149,14 +147,6 @@ public:
     Texture& Copy(const Texture& other);
 
     Texture& Move(Texture& other) noexcept;
-
-    inline bool operator==(const Texture& o) const noexcept {
-        return m_handle == o.m_handle;
-    }
-
-    inline bool operator!=(const Texture& o) const noexcept {
-        return m_handle != o.m_handle;
-    }
 
     virtual bool Create(void) override;
 

@@ -89,7 +89,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         }
     }
     m_mesh.UpdateData(true);
-    m_mesh.Render(m_font->GetTexture());
+    m_mesh.Render(m_font->GetAsTexture());
 }
 
 
