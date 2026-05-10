@@ -83,9 +83,9 @@ const ShaderSource& StencilShader() {
 
 // -------------------------------------------------------------------------------------------------
 // Shadow/depth pass: projects through light transform, PS does alpha-cutout test.
-const ShaderSource& DepthShader() {
+const ShaderSource& ShadowShader() {
     static const ShaderSource source(
-        "depthShader",
+        "shadowShader",
         R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
@@ -127,9 +127,9 @@ const ShaderSource& DepthShader() {
 
 // -------------------------------------------------------------------------------------------------
 // Sphere shadow pass: projects sphere vertex through light transform (no face culling active).
-const ShaderSource& SphereDepthShader() {
+const ShaderSource& SphereShadowShader() {
     static const ShaderSource source(
-        "sphereDepthShader",
+        "sphereShadowShader",
         R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
