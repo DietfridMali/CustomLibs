@@ -58,7 +58,7 @@ public:
 
     void FreeRTV(void);
 
-    bool AllocSRV(DXGI_FORMAT format);
+    bool AllocSRV(void);
 
     void FreeSRV(void);
 
@@ -87,6 +87,8 @@ public:
     inline uint32_t SRVIndex(void) noexcept {
         return m_srv.GetIndex();
     }
+
+    DXGI_FORMAT ViewFormat(void);
 };
 
 // =================================================================================================

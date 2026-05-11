@@ -12,20 +12,6 @@
 // =================================================================================================
 // DX12 RenderTarget implementation
 
-static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
-{
-    switch (type) {
-    case BufferInfo::btDepth:
-    case BufferInfo::btStencil:
-        return dxTypelessDepthFormat;
-    case BufferInfo::btVertex:
-        return dxVertexFormat;
-    default:
-        return dxColorFormat;
-    }
-}
-
-
 static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 {
     if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
@@ -68,6 +54,20 @@ void BufferInfo::Init(void)
 }
 
 
+DXGI_FORMAT BufferInfo::ViewFormat(void)
+{
+    switch (m_type) {
+        case BufferInfo::btDepth:
+        case BufferInfo::btStencil:
+            return dxDepthSRVFormat;
+        case BufferInfo::btVertex:
+            return dxVertexFormat;
+        default:
+            return dxColorFormat;
+    }
+}
+
+
 void BufferInfo::SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState)
 {
     if ((m_state == targetState) or not cmdList or not m_resource)
@@ -78,7 +78,7 @@ void BufferInfo::SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetStat
 
 
 bool BufferInfo::AllocRTV(void) {
-    return m_rtv.Create(m_resource, dxColorFormat);
+    return m_rtv.Create(m_resource, ViewFormat());
 }
 
 
@@ -87,8 +87,8 @@ void BufferInfo::FreeRTV(void) {
 }
 
 
-bool BufferInfo::AllocSRV(DXGI_FORMAT format) {
-    return m_srv.Create(m_resource, format);
+bool BufferInfo::AllocSRV(void) {
+    return m_srv.Create(m_resource, ViewFormat());
 }
 
 
@@ -153,7 +153,7 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 
     if (not info.AllocDSV())
         return false;
-    if (not info.AllocSRV(dxDepthDSVFormat))
+    if (not info.AllocSRV())
         return false;
     return true;
 }
@@ -161,10 +161,9 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 
 bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
-    DXGI_FORMAT fmt = FormatForType(info.m_type);
     D3D12_CLEAR_VALUE cv{};
-    cv.Format = fmt;
-    info.m_resource = CreateRTResource(device, w, h, fmt, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
+    cv.Format = info.ViewFormat();
+    info.m_resource = CreateRTResource(device, w, h, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
     if (not info.m_resource)
         return false;
     info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
@@ -172,7 +171,7 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
     if (not info.AllocRTV())
         return false;
 
-    if (not info.AllocSRV(fmt))
+    if (not info.AllocSRV())
         return false;
 
     auto* list = m_cmdList->GfxList();
