@@ -13,6 +13,7 @@
 #include "base_displayhandler.h"
 #include "dx12context.h"
 #include "gfxapitype.h"
+#include "resource_handler.h"
 #include "gfxrenderer.h"
 
 #ifdef _DEBUG
@@ -44,7 +45,9 @@ bool GfxRenderer::InitGraphics(void) {
     }
     // Open the command list so displayHandler.Create() and renderer.Create()
     // can record initial state (viewport/scissor, resource barriers).
-    if (not commandListHandler.CmdQueue().BeginFrame()) {
+    // Init runs in slot 0 — all deferred RTV / resource pushes during setup land here and are
+    // drained by the explicit Flush() calls between setup phases.
+    if (not commandListHandler.BeginFrame(0)) {
         fprintf(stderr, "Smiley-Battle: Cannot begin first DX12 frame.\n");
         return false;
     }
@@ -100,6 +103,11 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
             m_temporaryList = nullptr;
     }
     return true;
+}
+
+
+void GfxRenderer::FlushResources(void) noexcept {
+    commandListHandler.Flush();
 }
 
 

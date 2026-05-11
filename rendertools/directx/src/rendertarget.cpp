@@ -7,6 +7,7 @@
 #include "dx12context.h"
 #include "gfxstates.h"
 #include "sampler_cache.h"
+#include "resource_handler.h"
 
 // =================================================================================================
 // DX12 RenderTarget implementation
@@ -473,7 +474,15 @@ void RenderTarget::Disable(bool deactivate) noexcept {
         }
         if (m_flushOnDisable) {
             m_cmdList->Flush();
-            FreeRTVs();
+            // Hand RTV slots over to GfxResourceHandler — freed once the slot's GPU work is fenced
+            // complete (at BeginFrame for the same slot, or via Flush() during init).
+            for (int i = 0; i < m_colorBufferCount; ++i) {
+                if (m_bufferInfo[i].m_rtvHandle.IsValid()) {
+                    gfxResourceHandler.Track(m_bufferInfo[i].m_rtvHandle);
+                    m_bufferInfo[i].m_rtvHandle = {};
+                }
+            }
+            m_haveRTVs = false;
         }
         else {
             m_cmdList->Close(deactivate);

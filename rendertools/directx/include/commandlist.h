@@ -15,10 +15,11 @@
 #endif
 
 // =================================================================================================
-// Frame protocol:
-//   CommandListHandler::ExecuteAll()  — submit all registered lists
-//   CommandQueue::EndFrame()          — signal fence, advance frame index
-//   CommandQueue::BeginFrame()        — wait for frame slot to be free, reset CBV allocator
+// Frame protocol (driven by CommandListHandler — single owner of m_frameIndex/m_frameCount):
+//   CommandListHandler::BeginFrame(frameIndex) — set or advance index, wait fence, drain slot
+//   CommandListHandler::ExecuteAll()           — submit all registered lists
+//   CommandListHandler::EndFrame()             — signal fence for current slot
+//   CommandListHandler::Flush()                — WaitIdle + drain current slot (init / no-frame path)
 
 class CommandQueue
 {
@@ -30,28 +31,22 @@ public:
     UINT64                      m_fenceValues[FRAME_COUNT]{};
     UINT64                      m_fenceCounter{ 0 };
     HANDLE                      m_fenceEvent{ nullptr };
-    UINT                        m_frameIndex{ 0 };
 
     bool Create(ID3D12Device* device, const String& name = "") noexcept;
 
     void Destroy(void) noexcept;
 
-    // Waits for the GPU to finish with the current frame slot, then resets the CBV allocator.
-    bool BeginFrame(void) noexcept;
-
-    // Signals the fence with the next value and advances the frame index.
-    // Call after CommandListHandler::ExecuteAll().
-    void EndFrame(void) noexcept;
-
-    // Signals a new fence value and waits until the GPU has passed it.
+    // Signals a new fence value and waits until the GPU has passed it. Full CPU/GPU sync.
     void WaitIdle(void) noexcept;
 
-    inline ID3D12CommandQueue* Queue(void) const noexcept { 
-        return m_queue.Get(); 
-    }
-    
-    inline UINT FrameIndex(void) const noexcept { 
-        return m_frameIndex; 
+    // Signals the fence for the given slot with the next counter value.
+    void Signal(int frameIndex) noexcept;
+
+    // Blocks until the GPU has passed the fence value previously signalled for the given slot.
+    void WaitForFrame(int frameIndex) noexcept;
+
+    inline ID3D12CommandQueue* Queue(void) const noexcept {
+        return m_queue.Get();
     }
 
     // Returns the currently active command list (set by CommandList::Open via PushList).
@@ -188,18 +183,47 @@ public:
     CommandListData                         m_currentListData;
     uint64_t                                m_cmdListId{ 1 };
     uint64_t                                m_cmdListCount{ 0 };
+    int                                     m_frameIndex{ 0 };
+    int                                     m_frameCount{ CommandQueue::FRAME_COUNT };
 
     bool Create(ID3D12Device* device) noexcept;
 
     void Destroy(void) noexcept;
 
     inline ID3D12CommandQueue* GetQueue(void) noexcept {
-        return m_cmdQueue.Queue(); 
+        return m_cmdQueue.Queue();
     }
 
     inline CommandQueue& CmdQueue(void) noexcept {
         return m_cmdQueue;
     }
+
+    inline int FrameIndex(void) const noexcept {
+        return m_frameIndex;
+    }
+
+    inline int FrameCount(void) const noexcept {
+        return m_frameCount;
+    }
+
+    inline void SetFrameIndex(int frameIndex) noexcept {
+        if ((frameIndex >= 0) and (frameIndex < m_frameCount))
+            m_frameIndex = frameIndex;
+    }
+
+    inline void NextFrame(void) noexcept {
+        m_frameIndex = (m_frameIndex + 1) % m_frameCount;
+    }
+
+    // Advances to (frameIndex >= 0) or next slot (frameIndex < 0), waits for that slot's GPU work
+    // to complete, then drains its tracked resources / RTVs. Call once per frame before recording.
+    bool BeginFrame(int frameIndex = -1) noexcept;
+
+    // Signals the fence for the current slot. Call once per frame after ExecuteAll().
+    void EndFrame(void) noexcept;
+
+    // Init / no-frame path: WaitIdle + drain the current slot. Reuses Cleanup with waitIdle=true.
+    void Flush(void) noexcept;
 
     // Returns the currently recording list (top of stack), or nullptr if none is open.
     inline ID3D12GraphicsCommandList* CurrentGfxList(void) const noexcept { 

@@ -3,11 +3,16 @@
 #include <utility>
 #include <cstring>
 #include <ranges>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "dx12framework.h"
 #include <d3dcompiler.h>
 #include <d3d12shader.h>
+
+#include <dxc/dxcapi.h>
+#include <wrl/client.h>
 
 #include "shader.h"
 #include "cbv_allocator.h"
@@ -19,6 +24,50 @@
 #include "gfxstates.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "dxcompiler.lib")
+
+// =================================================================================================
+// DXC singleton — modern HLSL compiler (SM 6.0+). Lazy-initialized on first Compile.
+// Replaces FXC (D3DCompile) for noticeably better generated code on NVIDIA hardware.
+
+namespace {
+    Microsoft::WRL::ComPtr<IDxcUtils>     g_dxcUtils;
+    Microsoft::WRL::ComPtr<IDxcCompiler3> g_dxcCompiler;
+    bool                                  g_dxcInitialized = false;
+
+    bool InitDxc(void) noexcept {
+        if (g_dxcInitialized)
+            return true;
+        if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(g_dxcUtils.GetAddressOf()))))
+            return false;
+        if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(g_dxcCompiler.GetAddressOf())))) {
+            g_dxcUtils.Reset();
+            return false;
+        }
+        g_dxcInitialized = true;
+        return true;
+    }
+
+    std::wstring ToWide(const char* utf8) noexcept {
+        std::wstring s;
+        if (utf8)
+            while (*utf8)
+                s.push_back(wchar_t(uint8_t(*utf8++)));
+        return s;
+    }
+
+    // DXC-based reflection that returns the same ID3D12ShaderReflection* as D3DReflect.
+    // Required for DXIL — D3DReflect from d3dcompiler.lib does not always handle DXIL blobs.
+    bool ReflectShader(ID3DBlob* blob, Microsoft::WRL::ComPtr<ID3D12ShaderReflection>& refl) noexcept {
+        if (not blob or not InitDxc())
+            return false;
+        DxcBuffer reflBuf{};
+        reflBuf.Ptr = blob->GetBufferPointer();
+        reflBuf.Size = blob->GetBufferSize();
+        reflBuf.Encoding = DXC_CP_ACP;
+        return SUCCEEDED(g_dxcUtils->CreateReflection(&reflBuf, IID_PPV_ARGS(refl.GetAddressOf())));
+    }
+}
 
 // =================================================================================================
 // DX12 Shader implementation
@@ -115,28 +164,79 @@ static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
 
 bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut) noexcept
 {
-    if (not hlslCode or not *hlslCode) 
+    if (not hlslCode or not *hlslCode)
         return false;
-
-    UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+    if (not InitDxc()) {
 #ifdef _DEBUG
-    flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+        fprintf(stderr, "Shader '%s' (%s): DXC initialization failed\n", (const char*)m_name, target);
+#endif
+        return false;
+    }
+
+    DxcBuffer source{};
+    source.Ptr = hlslCode;
+    source.Size = std::strlen(hlslCode);
+    source.Encoding = DXC_CP_UTF8;
+
+    std::wstring entryWide = ToWide(entryPoint);
+    std::wstring targetWide = ToWide(target);
+
+    std::vector<const wchar_t*> args;
+    args.push_back(L"-E");
+    args.push_back(entryWide.c_str());
+    args.push_back(L"-T");
+    args.push_back(targetWide.c_str());
+#ifdef _DEBUG
+    args.push_back(L"-Zi");
+    args.push_back(L"-Od");
 #else
-    flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+    args.push_back(L"-O3");
 #endif
 
-    ComPtr<ID3DBlob> errBlob;
-    HRESULT hr = D3DCompile(hlslCode, strlen(hlslCode), (const char*)m_name, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint, target, flags, 0, &blobOut, &errBlob);
+    ComPtr<IDxcResult> result;
+    HRESULT hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
     if (FAILED(hr)) {
 #ifdef _DEBUG
-        if (errBlob)
-            fprintf(stderr, "Shader '%s' (%s) compile error:\n%s\n",
+        fprintf(stderr, "Shader '%s' (%s): DXC Compile call failed (0x%08X)\n", (const char*)m_name, target, (unsigned)hr);
+#endif
+        return false;
+    }
+
+    HRESULT compileStatus = E_FAIL;
+    result->GetStatus(&compileStatus);
+
+#ifdef _DEBUG
+    ComPtr<IDxcBlobUtf8> errors;
+    if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
+        if (errors and (errors->GetStringLength() > 0)) {
+            fprintf(stderr, "Shader '%s' (%s) compile output:\n%s\n",
                     (const char*)m_name, target,
-                    static_cast<const char*>(errBlob->GetBufferPointer()));
+                    errors->GetStringPointer());
+        }
+    }
+#endif
+
+    if (FAILED(compileStatus)) {
+#ifdef _DEBUG
         PrintShaderSource(hlslCode, target);
 #endif
         return false;
     }
+
+    ComPtr<IDxcBlob> dxilBlob;
+    if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(dxilBlob.GetAddressOf()), nullptr))
+        or (not dxilBlob) or (dxilBlob->GetBufferSize() == 0)) {
+#ifdef _DEBUG
+        fprintf(stderr, "Shader '%s' (%s): no DXIL output\n", (const char*)m_name, target);
+#endif
+        return false;
+    }
+
+    // Wrap DXIL bytes in an ID3DBlob so the rest of the engine (PSO setup, reflection
+    // via blob->GetBufferPointer/GetBufferSize) sees an unchanged interface.
+    if (FAILED(D3DCreateBlob(dxilBlob->GetBufferSize(), &blobOut)))
+        return false;
+    std::memcpy(blobOut->GetBufferPointer(), dxilBlob->GetBufferPointer(), dxilBlob->GetBufferSize());
     return true;
 }
 
@@ -317,7 +417,7 @@ void Shader::BuildInputLayout(void) noexcept
         };
         static constexpr UINT kFallbackCount = UINT(std::size(kFallbackLayout));
         ComPtr<ID3D12ShaderReflection> vsRefl;
-        if (SUCCEEDED(D3DReflect(m_vsBlob->GetBufferPointer(), m_vsBlob->GetBufferSize(), IID_PPV_ARGS(&vsRefl)))) {
+        if (ReflectShader(m_vsBlob.Get(), vsRefl)) {
             D3D12_SHADER_DESC sd{};
             vsRefl->GetDesc(&sd);
             for (UINT i = 0; i < sd.InputParameters; ++i) {
@@ -344,12 +444,12 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (IsValid())
         return true;
 
-    if (not Compile((const char*)vsCode, "VSMain", "vs_5_1", m_vsBlob))
+    if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsBlob))
         return false;
-    if (not Compile((const char*)fsCode, "PSMain", "ps_5_1", m_psBlob))
+    if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_psBlob))
         return false;
     if (gsCode.Length() > 0)
-        Compile((const char*)gsCode, "GSMain", "gs_5_1", m_gsBlob);  // optional — failure is non-fatal
+        Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob);  // optional — failure is non-fatal
 
     BuildInputLayout();
 
@@ -375,7 +475,7 @@ void Shader::UpdateStageFields(ID3DBlob* blob, int stage) noexcept
     if (not blob)
         return;
     ComPtr<ID3D12ShaderReflection> refl;
-    if (FAILED(D3DReflect(blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&refl))))
+    if (not ReflectShader(blob, refl))
         return;
     StageConstants& sc = m_stages[stage];
     D3D12_SHADER_DESC sd{};

@@ -240,7 +240,7 @@ void BaseDisplayHandler::EndFrame(void) {
     // Close the main renderer list — registers it for submission.
     // Submit all registered lists (RenderTarget lists first, main list last — registration order).
     commandListHandler.ExecuteAll();
-    commandListHandler.CmdQueue().EndFrame();
+    commandListHandler.EndFrame();
     UINT syncInterval = m_vSync ? 1 : 0;
     UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
     HRESULT hr = m_swapChain->Present(syncInterval, presentFlags);
@@ -253,9 +253,9 @@ void BaseDisplayHandler::EndFrame(void) {
 void BaseDisplayHandler::BeginFrame(void) {
     if (not m_swapChain)
         return;
-    // Wait for the next frame slot to be free, reset CBV allocator.
+    // Advance frame slot, wait fence, drain that slot's deferred resources, reset CBV allocator.
     // Active-shader tracking is invalidated because BeginFrame resets all DX12 command-list state.
-    commandListHandler.CmdQueue().BeginFrame();
+    commandListHandler.BeginFrame();
     baseShaderHandler.InvalidateActiveShader();
 }
 

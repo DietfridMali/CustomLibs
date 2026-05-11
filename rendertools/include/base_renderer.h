@@ -364,6 +364,11 @@ public:
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept {
         return false;
     }
+
+    // Forces all deferred GPU resource cleanup queues to drain immediately (single GPU sync
+    // + free all queued descriptors / resources). Used during init phases that lack frame
+    // fences. Default no-op for APIs without an explicit resource queue (OpenGL).
+    virtual void FlushResources(void) noexcept {}
 #pragma warning(push)
 
 #include "gfxapitype.h"

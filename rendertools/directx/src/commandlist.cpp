@@ -75,27 +75,30 @@ void CommandQueue::Destroy(void) noexcept {
 }
 
 
-bool CommandQueue::BeginFrame(void) noexcept {
-    // Wait until the GPU has finished using this frame's slot.
-    if (m_fence->GetCompletedValue() < m_fenceValues[m_frameIndex]) {
-        HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[m_frameIndex], m_fenceEvent);
-        if (FAILED(hr)) {
-            fprintf(stderr, "CommandQueue::BeginFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
-            return false;
-        }
-        WaitForSingleObject(m_fenceEvent, INFINITE);
-    }
-    cbvAllocator.Reset(m_frameIndex);
-    gfxResourceHandler.Cleanup();
-    return true;
+void CommandQueue::Signal(int frameIndex) noexcept {
+    if (not m_queue or not m_fence)
+        return;
+    if ((frameIndex < 0) or (frameIndex >= int(FRAME_COUNT)))
+        return;
+    const UINT64 fenceValue = ++m_fenceCounter;
+    m_fenceValues[frameIndex] = fenceValue;
+    m_queue->Signal(m_fence.Get(), fenceValue);
 }
 
 
-void CommandQueue::EndFrame(void) noexcept {
-    const UINT64 fenceValue = ++m_fenceCounter;
-    m_fenceValues[m_frameIndex] = fenceValue;
-    m_queue->Signal(m_fence.Get(), fenceValue);
-    m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
+void CommandQueue::WaitForFrame(int frameIndex) noexcept {
+    if (not m_fence or not m_fenceEvent)
+        return;
+    if ((frameIndex < 0) or (frameIndex >= int(FRAME_COUNT)))
+        return;
+    if (m_fence->GetCompletedValue() < m_fenceValues[frameIndex]) {
+        HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvent);
+        if (FAILED(hr)) {
+            fprintf(stderr, "CommandQueue::WaitForFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
+            return;
+        }
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
 }
 
 
@@ -103,7 +106,6 @@ void CommandQueue::WaitIdle(void) noexcept {
     if (not m_queue or not m_fence or not m_fenceEvent)
         return;
     const UINT64 value = ++m_fenceCounter;
-    m_fenceValues[m_frameIndex] = value;
     m_queue->Signal(m_fence.Get(), value);
     if (m_fence->GetCompletedValue() < value) {
         m_fence->SetEventOnCompletion(value, m_fenceEvent);
@@ -170,7 +172,7 @@ void CommandList::Reset(void) noexcept {
 bool CommandList::Open(bool saveRenderStates) noexcept {
     if (m_isRecording)
         return true;
-    UINT frameIndex = commandListHandler.CmdQueue().FrameIndex();
+    UINT frameIndex = UINT(commandListHandler.FrameIndex());
     if (not m_gfxListPtr or not m_allocators[frameIndex])
         return false;
     HRESULT hr = m_allocators[frameIndex]->Reset();
@@ -188,7 +190,6 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     m_activePSO = nullptr;
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
-    commandListHandler.Register(this);
     if (saveRenderStates)
         PushRenderStates();
 #ifdef _DEBUG
@@ -209,6 +210,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
     gfxStates.CheckError();
 #endif
     commandListHandler.PopCmdList();
+    commandListHandler.Register(this);
     if (restoreRenderStates)
         PopRenderStates();
 }
@@ -226,11 +228,13 @@ void CommandList::Flush(void) noexcept {
 #ifdef _DEBUG
     CheckDeviceRemoved("Flush");
 #endif
-    commandListHandler.CmdQueue().WaitIdle();
+    // No synchronous WaitIdle: descriptor slots that depend on this list's completion are
+    // queued via gfxResourceHandler.Track() and freed automatically at the next BeginFrame for
+    // the same slot (after the matching frame fence has signalled).
     DisposeResources();
 #if 0
     // Reset allocator + list so the debug layer releases resource refs; leave closed.
-    UINT fi = commandListHandler.CmdQueue().FrameIndex();
+    UINT fi = UINT(commandListHandler.FrameIndex());
     HRESULT hr = m_allocators[fi]->Reset();
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Flush: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
@@ -318,7 +322,30 @@ bool CommandListHandler::s_logCalls = false;
 bool CommandListHandler::Create(ID3D12Device* device) noexcept {
     if (not m_cmdQueue.Create(device, "MainQueue"))
         return false;
+    gfxResourceHandler.Init(m_frameCount);
     return true;
+}
+
+
+bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
+    if (frameIndex >= 0)
+        SetFrameIndex(frameIndex);
+    else
+        NextFrame();
+    m_cmdQueue.WaitForFrame(m_frameIndex);
+    cbvAllocator.Reset(UINT(m_frameIndex));
+    gfxResourceHandler.Cleanup(m_frameIndex);
+    return true;
+}
+
+
+void CommandListHandler::EndFrame(void) noexcept {
+    m_cmdQueue.Signal(m_frameIndex);
+}
+
+
+void CommandListHandler::Flush(void) noexcept {
+    gfxResourceHandler.Cleanup(m_frameIndex, true);
 }
 
 
