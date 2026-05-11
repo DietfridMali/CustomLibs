@@ -22,6 +22,7 @@
 #include "descriptor_heap.h"
 #include "dx12context.h"
 #include "gfxstates.h"
+#include "tracy_wrapper.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -602,6 +603,7 @@ bool Shader::UploadB1(void) noexcept
 
 
 bool Shader::Activate(void) {
+    ZoneScoped;
     if (not IsValid())
         return false;
 

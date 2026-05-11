@@ -10,6 +10,7 @@
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
+#include "tracy_wrapper.h"
 
 List<::Viewport> BaseRenderer::m_viewportStack;
 
@@ -164,6 +165,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
 
 
 bool BaseRenderer::Start3DScene(void) {
+    ZoneScoped;
     gfxStates.CheckError();
     SetupGraphics();
     ResetDrawBuffers();
@@ -181,6 +183,7 @@ bool BaseRenderer::Start3DScene(void) {
 
 
 bool BaseRenderer::Stop3DScene(void) {
+    ZoneScoped;
     if (not GetSceneBuffer()->IsAvailable())
         return false;
     GetSceneBuffer()->Deactivate();
@@ -191,6 +194,7 @@ bool BaseRenderer::Stop3DScene(void) {
 
 
 bool BaseRenderer::Start2DScene(void) {
+    ZoneScoped;
     gfxStates.CheckError();
     m_frameCounter.Start();
 #if 0
@@ -217,6 +221,7 @@ bool BaseRenderer::Start2DScene(void) {
 
 
 bool BaseRenderer::Stop2DScene(void) {
+    ZoneScoped;
     gfxStates.CheckError();
     if (not m_screenIsAvailable)
         return false;
@@ -227,6 +232,7 @@ bool BaseRenderer::Stop2DScene(void) {
 
 
 void BaseRenderer::Draw3DScene(void) {
+    ZoneScoped;
     if (Stop3DScene() and Start2DScene()) {
 #if 0
         if (GetSceneBuffer()->Activate(true)) {

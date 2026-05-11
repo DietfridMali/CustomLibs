@@ -29,7 +29,7 @@ ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(const char* name, s
     rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     ComPtr<ID3D12Resource> resource;
-    if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&resource))))
+    if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource))))
         return nullptr;
     Track(resource);
     return resource;

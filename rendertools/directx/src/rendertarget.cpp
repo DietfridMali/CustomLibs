@@ -8,6 +8,7 @@
 #include "gfxstates.h"
 #include "sampler_cache.h"
 #include "resource_handler.h"
+#include "tracy_wrapper.h"
 
 // =================================================================================================
 // DX12 RenderTarget implementation
@@ -388,6 +389,7 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params)
 
 
 bool RenderTarget::Enable(const RTActivationParams& params) {
+    ZoneScoped;
     if (not m_isAvailable)
         return false;
     m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
@@ -408,6 +410,7 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
+    ZoneScoped;
     baseRenderer.ActivateDrawBuffer(this);
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
@@ -423,6 +426,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 
 
 void RenderTarget::Disable(bool deactivate) noexcept {
+    ZoneScoped;
     if (IsEnabled()) {
         m_renderStates = baseRenderer.RenderStates();
         auto* list = m_cmdList->GfxList();
@@ -628,6 +632,7 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
+    ZoneScoped;
     if (params.destination >= 0) {
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
             return false;

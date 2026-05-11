@@ -4,6 +4,7 @@
 #include "base_shaderhandler.h"
 #include "commandlist.h"
 #include "dx12context.h"
+#include "tracy_wrapper.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -229,6 +230,7 @@ void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
 
 
 void BaseDisplayHandler::EndFrame(void) {
+    ZoneScoped;
     if (not m_swapChain)
         return;
     // Close the main renderer list — registers it for submission.
@@ -241,10 +243,12 @@ void BaseDisplayHandler::EndFrame(void) {
     if (FAILED(hr))
         fprintf(stderr, "BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+    FrameMark;
 }
 
 
 void BaseDisplayHandler::BeginFrame(void) {
+    ZoneScoped;
     if (not m_swapChain)
         return;
     // Advance frame slot, wait fence, drain that slot's deferred resources, reset CBV allocator.

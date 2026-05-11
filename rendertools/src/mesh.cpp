@@ -1,5 +1,6 @@
 #include "mesh.h"
 #include "texturehandler.h"
+#include "tracy_wrapper.h"
 
 // =================================================================================================
 
@@ -230,6 +231,7 @@ noexcept
 }
 
 bool Mesh::Render(std::span<Texture* const> textures, float alpha) {
+    ZoneScoped;
     if (not m_gfxDataLayout->IsValid())
         return false;
     m_gfxDataLayout->Render(textures);

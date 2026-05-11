@@ -3,6 +3,7 @@
 #include "rendertarget.h"
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
+#include "tracy_wrapper.h"
 
 GLint RenderTarget::m_activeHandle = GL_NONE;
 
@@ -343,6 +344,7 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
 
 
 bool RenderTarget::Enable(const RTActivationParams& params) {
+    ZoneScoped;
     if (not m_isAvailable)
         return false;
     gfxStates.ClearError();
@@ -364,6 +366,7 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
+    ZoneScoped;
     if (not Enable(params))
         return false;
     baseRenderer.ActivateDrawBuffer(this);
@@ -375,6 +378,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 
 
 void RenderTarget::Disable(bool /*deactivate*/) noexcept { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+    ZoneScoped;
     if (IsEnabled()) {
         gfxStates.CheckError();
         ReleaseBuffers();
@@ -572,6 +576,7 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void) {
 
 // source < 0 means source contains a texture handle from some texture external to the RenderTarget
 bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color) {
+    ZoneScoped;
     if (params.destination >= 0)
         m_lastDestination = params.destination;
     return RenderAsTexture((params.source == params.destination) ? nullptr : GetAsTexture(params), params, color);

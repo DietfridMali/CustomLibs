@@ -9,6 +9,7 @@
 #include "tristate.h"
 #include "gfxrenderer.h"
 #include "shadowmap.h"
+#include "tracy_wrapper.h"
 #include "base_shaderhandler.h"
 #include "base_displayhandler.h"
 #include "gfxrenderer.h"
@@ -50,6 +51,7 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
 
 
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
+    ZoneScoped;
     if (m_screenIsAvailable) {
         m_frameCounter.Draw(true);
         Stop2DScene();

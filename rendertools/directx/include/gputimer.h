@@ -16,7 +16,7 @@ struct GpuTimer {
         if (slots[frame].empty() || slots[frame].back().q != 0) {
             slots[frame].push_back({});
         }
-        Slot s;
+        Slot s;-----
         glGenQueries(1, &s.q);
         s.label = label;
         glBeginQuery(GL_TIME_ELAPSED, s.q);

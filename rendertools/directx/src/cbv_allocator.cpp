@@ -24,7 +24,7 @@ bool CbvLinearAllocator::AllocFrame(ID3D12Device* device, UINT frameIdx, UINT ca
     rd.SampleDesc.Count   = 1;
     rd.Layout             = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&f.resource));
+    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&f.resource));
     if (FAILED(hr)) {
         fprintf(stderr, "CbvLinearAllocator: CreateCommittedResource[%u] failed (hr=0x%08X)\n", frameIdx, (unsigned)hr);
         return false;

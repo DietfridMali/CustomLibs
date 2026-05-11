@@ -6,6 +6,7 @@
 #include "gfxrenderer.h"
 
 #include <cstdio>
+#include "tracy_wrapper.h"
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL.Es gibt in dem Sinne keine verschachtelten Render-Tasks.
@@ -217,6 +218,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
 
 
 void CommandList::Flush(void) noexcept {
+    ZoneScoped;
     if (m_isFlushed)
         return;
     m_isFlushed = true;
@@ -328,6 +330,7 @@ bool CommandListHandler::Create(ID3D12Device* device) noexcept {
 
 
 bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
+    ZoneScoped;
     if (frameIndex >= 0)
         SetFrameIndex(frameIndex);
     else
@@ -340,11 +343,13 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
 
 
 void CommandListHandler::EndFrame(void) noexcept {
+    ZoneScoped;
     m_cmdQueue.Signal(m_frameIndex);
 }
 
 
 void CommandListHandler::Flush(void) noexcept {
+    ZoneScoped;
     ExecuteAll();
     gfxResourceHandler.Cleanup(m_frameIndex, true);
 }
@@ -388,6 +393,7 @@ void CommandListHandler::Register(CommandList* cl) noexcept {
 #define LOG_EXECUTION 0
 
 void CommandListHandler::ExecuteAll(void) noexcept {
+    ZoneScoped;
     if (m_pendingLists.IsEmpty())
         return;
 	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());

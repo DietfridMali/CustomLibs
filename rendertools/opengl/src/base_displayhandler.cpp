@@ -1,6 +1,7 @@
 
 #include "std_defines.h"
 #include "glew.h"
+#include "tracy_wrapper.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -161,11 +162,14 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
 
 
 void BaseDisplayHandler::EndFrame(void) {
+    ZoneScoped;
     SDL_GL_SwapWindow(m_window);
+    FrameMark;
 }
 
 
 void BaseDisplayHandler::BeginFrame(void) {
+    ZoneScoped;
 }
 
 

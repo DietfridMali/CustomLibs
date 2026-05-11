@@ -13,6 +13,7 @@
 #include "base_displayhandler.h"
 #include "dx12context.h"
 #include "gfxapitype.h"
+#include "tracy_wrapper.h"
 #include "resource_handler.h"
 #include "gfxrenderer.h"
 
@@ -112,6 +113,7 @@ void GfxRenderer::FlushResources(void) noexcept {
 
 
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
+    ZoneScoped;
     if (not m_screenIsAvailable)
         return;
     ++m_frameIndex;

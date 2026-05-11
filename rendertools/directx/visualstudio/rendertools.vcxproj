@@ -80,11 +80,11 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;USE_TRACY=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;D:\projects\tools\tracy\public</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
@@ -102,12 +102,12 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;USE_TRACY=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;D:\projects\tools\tracy\public</AdditionalIncludeDirectories>
       <DebugInformationFormat>None</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>

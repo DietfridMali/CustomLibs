@@ -10,6 +10,7 @@
 #include "gfxrenderer.h"
 #include "conversions.hpp"
 #include "tristate.h"
+#include "tracy_wrapper.h"
 
 // caution: the GfxDataLayout shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this gfxDataLayout is initialized.
 // GfxDataLayout::Init takes care of that by first assigning a handle-less shared gl handle 
@@ -170,6 +171,7 @@ void BaseQuad::ResetTransformation(void) {
 
 
 bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
+    ZoneScoped;
     if (not (shader or (shader = LoadShader(textures, color))))
         return false;
     if (UpdateData()) {

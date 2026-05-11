@@ -36,7 +36,7 @@ ComPtr<ID3D12Resource> GfxDataChunkList::Update(size_t dataSize, const char* own
         D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
         D3D12_RESOURCE_DESC rd{};
         PrepareResourceDesc(rd, dataSize);
-        HRESULT hr = dx12Context.Device()->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&m_chunks[m_usedChunks]));
+        HRESULT hr = dx12Context.Device()->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_chunks[m_usedChunks]));
         if (FAILED(hr)) {
             if (updateResource == 1)
                 m_chunks.Pop();
