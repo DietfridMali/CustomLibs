@@ -345,6 +345,7 @@ void CommandListHandler::EndFrame(void) noexcept {
 
 
 void CommandListHandler::Flush(void) noexcept {
+    ExecuteAll();
     gfxResourceHandler.Cleanup(m_frameIndex, true);
 }
 

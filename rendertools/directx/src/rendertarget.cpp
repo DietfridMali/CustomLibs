@@ -168,9 +168,6 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
         return false;
     info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    if (not info.AllocRTV())
-        return false;
-
     if (not info.AllocSRV())
         return false;
 
@@ -240,7 +237,6 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     int attachmentIndex = 0;
     for (int i = 0; i < m_colorBufferCount; ++i)
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor);
-    m_haveRTVs = true;
 
     m_vertexBufferCount = params.vertexBufferCount;
     // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
@@ -260,28 +256,6 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 }
 
 
-bool RenderTarget::AllocRTVs(void)
-{
-    if (m_haveRTVs)
-        return true;
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return false;
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        if (not m_bufferInfo[i].AllocRTV())
-            return false;
-    return m_haveRTVs = true;
-}
-
-
-void RenderTarget::FreeRTVs(void)
-{
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        m_bufferInfo[i].FreeRTV();
-    m_haveRTVs = false;
-}
-
-
 bool RenderTarget::AttachBuffer(int bufferIndex)
 {
     if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
@@ -289,7 +263,11 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
     auto* list = m_cmdList->GfxList();
     if (not list)
         return false;
-    m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    if (not info.RTV().IsValid())
+        if (not info.AllocRTV())
+            return false;
+    info.SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
     return true;
 }
 
@@ -315,7 +293,6 @@ void RenderTarget::Destroy(void)
     for (int i = 0; i < m_bufferCount; ++i)
         m_bufferInfo[i].Release();
     m_isAvailable = false;
-    m_haveRTVs = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
     m_bufferInfo.Reset();
@@ -342,8 +319,8 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
         if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
             return false;
         m_activeBufferIndex = params.bufferIndex;
-        m_bufferInfo[params.bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        rtvs[count++] = m_bufferInfo[params.bufferIndex].RTV().CPUHandle();
+        if (AttachBuffer(params.bufferIndex))
+            rtvs[count++] = m_bufferInfo[params.bufferIndex].RTV().CPUHandle();
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (i != params.bufferIndex)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -356,15 +333,15 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             for (int i = 0; i < m_bufferCount; ++i) {
                 if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
                     continue;
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
+                if (AttachBuffer(i))
+                    rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
             pDSV = DepthBufferHandle();
         }
         else if (m_drawBufferGroup == dbColor) {
             for (int i = 0; i < m_colorBufferCount; ++i) {
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
+                if (AttachBuffer(i))
+                    rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
             pDSV = DepthBufferHandle();
             for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
@@ -375,8 +352,8 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             for (; i < m_colorBufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             for (int j = 0; j < m_vertexBufferCount; ++j, ++i) {
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
+                if (AttachBuffer(i))
+                    rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
             pDSV = DepthBufferHandle();
         }
@@ -413,8 +390,6 @@ bool RenderTarget::EnableBuffers(const RTActivationParams& params)
 bool RenderTarget::Enable(const RTActivationParams& params) {
     if (not m_isAvailable)
         return false;
-    if (not AllocRTVs())
-        return false;
     m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
     m_drawBufferGroup = params.drawBufferGroup;
 
@@ -423,7 +398,6 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
         if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
             return false;
     }
-    m_flushOnDisable = params.flush;
     SetViewport();
 
     if (not EnableBuffers(params))
@@ -452,28 +426,22 @@ void RenderTarget::Disable(bool deactivate) noexcept {
     if (IsEnabled()) {
         m_renderStates = baseRenderer.RenderStates();
         auto* list = m_cmdList->GfxList();
-		if (list) {
-			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
+        if (list) {
+            list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
             for (int i = 0; i < m_colorBufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
                 m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
-        if (m_flushOnDisable) {
-            m_cmdList->Flush();
-            // Hand RTV slots over to GfxResourceHandler — freed once the slot's GPU work is fenced
-            // complete (at BeginFrame for the same slot, or via Flush() during init).
-            for (int i = 0; i < m_colorBufferCount; ++i) {
-                if (m_bufferInfo[i].IsValid()) {
-                    gfxResourceHandler.Track(m_bufferInfo[i].RTV().Handle());
-                    m_bufferInfo[i].RTV().Handle() = {};
-                }
+        // Hand all allocated RTV slots over to GfxResourceHandler — freed once the slot's GPU
+        // work is fenced complete (at next BeginFrame for the same frame slot, or via Flush()).
+        for (int i = 0; i < m_bufferCount; ++i) {
+            if (m_bufferInfo[i].RTV().IsValid()) {
+                gfxResourceHandler.Track(m_bufferInfo[i].RTV().Handle());
+                m_bufferInfo[i].RTV().Handle() = {};
             }
-            m_haveRTVs = false;
         }
-        else {
-            m_cmdList->Close(deactivate);
-        }
+        m_cmdList->Close(deactivate);
         m_cmdList = nullptr;
     }
 }

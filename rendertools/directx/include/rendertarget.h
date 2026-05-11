@@ -72,15 +72,15 @@ public:
         return m_rtv.IsValid();
     }
 
-    inline ::RTV RTV(void) noexcept {
+    inline ::RTV& RTV(void) noexcept {
         return m_rtv;
     }
 
-    inline ::SRV SRV(void) noexcept {
+    inline ::SRV& SRV(void) noexcept {
         return m_srv;
     }
 
-    inline ::DSV DSV(void) noexcept {
+    inline ::DSV& DSV(void) noexcept {
         return m_dsv;
     }
 
@@ -155,9 +155,7 @@ public:
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };
     bool                m_isAvailable{ false };
-    bool                m_haveRTVs{ false };
     bool                m_isScreenBuffer{ false };
-	bool                m_flushOnDisable{ false };
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
     DrawBufferList      m_drawBuffers{};
@@ -189,10 +187,6 @@ public:
 
     void Destroy(void);
 
-    bool AllocRTVs(void);
-
-    void FreeRTVs(void);
-
     void SetName(const String& name) noexcept {
         m_name = name;
         if (m_cmdList)
@@ -206,7 +200,7 @@ public:
     bool SelectDrawBuffers(const RTActivationParams& params);
 
     inline bool Reactivate(bool clear = false) noexcept {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reactivate = true };
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = true };
         return Activate(params);
     }
 

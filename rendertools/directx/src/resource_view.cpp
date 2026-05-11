@@ -3,6 +3,8 @@
 
 // =================================================================================================
 
+static uint32_t rtvCount = 0;
+
 bool RTV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format) {
     Handle() = descriptorHeaps.AllocRTV();
     if (not IsValid())
@@ -11,6 +13,7 @@ bool RTV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format) {
     rtvd.Format = format;
     rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
     dx12Context.Device()->CreateRenderTargetView(resource.Get(), &rtvd, CPUHandle());
+    ++rtvCount;
     return true;
 }
 
