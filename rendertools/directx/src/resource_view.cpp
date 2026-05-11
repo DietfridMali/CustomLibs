@@ -41,4 +41,22 @@ void SRV::Free(void) {
     *this = {};
 }
 
+
+bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
+{
+    Handle()  = descriptorHeaps.AllocDSV();
+    if (not IsValid())
+        return false;
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
+    dsvd.Format = format;
+    dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    dx12Context.Device()->CreateDepthStencilView(resource.Get(), &dsvd, CPUHandle());
+    return true;
+}
+
+void DSV::Free(void) {
+    descriptorHeaps.FreeDSV(*this);
+    *this = {};
+}
+
 // =================================================================================================

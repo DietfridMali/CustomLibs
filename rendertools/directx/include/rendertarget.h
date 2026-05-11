@@ -45,9 +45,8 @@ public:
 
     ComPtr<ID3D12Resource>  m_resource;
     RTV                     m_rtv;
-    DescriptorHandle        m_srvHandle;
-    DescriptorHandle        m_dsvHandle;
-    uint32_t                m_srvIndex{ UINT32_MAX };
+    SRV                     m_srv;
+    DSV                     m_dsv;
     D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
     eBufferType             m_type{ btColor };
 
@@ -59,6 +58,14 @@ public:
 
     void FreeRTV(void);
 
+    bool AllocSRV(DXGI_FORMAT format);
+
+    void FreeSRV(void);
+
+    bool AllocDSV(void);
+
+    void FreeDSV(void);
+
     void Release(void);
 
     inline bool IsValid(void) noexcept {
@@ -67,6 +74,18 @@ public:
 
     inline ::RTV RTV(void) noexcept {
         return m_rtv;
+    }
+
+    inline ::SRV SRV(void) noexcept {
+        return m_srv;
+    }
+
+    inline ::DSV DSV(void) noexcept {
+        return m_dsv;
+    }
+
+    inline uint32_t SRVIndex(void) noexcept {
+        return m_srv.GetIndex();
     }
 };
 
@@ -335,9 +354,7 @@ public:
     }
 
 private:
-    void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
-
-    bool CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat);
+    bool CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
     bool CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
@@ -348,11 +365,11 @@ private:
     void CreateRenderArea(void);
 
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
-        return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsvHandle.IsValid());
+        return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsv.IsValid());
     }
 
     inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
-        return HaveDepthBuffer(true) ? &m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle : nullptr;
+        return HaveDepthBuffer(true) ? m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandleAddress() : nullptr;
     }
 };
 

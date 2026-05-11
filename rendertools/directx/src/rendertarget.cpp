@@ -12,14 +12,6 @@
 // =================================================================================================
 // DX12 RenderTarget implementation
 
-static constexpr DXGI_FORMAT dxColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-static constexpr DXGI_FORMAT dxVertexFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
-static constexpr DXGI_FORMAT dxTypelessDepthFormat = DXGI_FORMAT_R24G8_TYPELESS;
-static constexpr DXGI_FORMAT dxDepthDSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-static constexpr DXGI_FORMAT dxDepthSRVFormat = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
-
-// -------------------------------------------------------------------------------------------------
-
 static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
 {
     switch (type) {
@@ -69,9 +61,8 @@ void BufferInfo::Init(void)
 {
     m_resource.Reset();
     RTV().Handle() = {};
-    m_srvHandle = {};
-    m_dsvHandle = {};
-    m_srvIndex = UINT32_MAX;
+    SRV().Handle() = {};
+    DSV().Handle() = {};
     m_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_type = btColor;
 }
@@ -96,10 +87,30 @@ void BufferInfo::FreeRTV(void) {
 }
 
 
+bool BufferInfo::AllocSRV(DXGI_FORMAT format) {
+    return m_srv.Create(m_resource, format);
+}
+
+
+void BufferInfo::FreeSRV(void) {
+    m_srv.Free();
+}
+
+
+bool BufferInfo::AllocDSV(void) {
+    return m_dsv.Create(m_resource, dxDepthDSVFormat);
+}
+
+
+void BufferInfo::FreeDSV(void) {
+    m_dsv.Free();
+}
+
+
 void BufferInfo::Release(void) {
-    descriptorHeaps.FreeRTV(RTV().Handle());
-    descriptorHeaps.FreeSRV(m_srvHandle);
-    descriptorHeaps.FreeDSV(m_dsvHandle);
+    descriptorHeaps.FreeRTV(m_rtv.Handle());
+    descriptorHeaps.FreeSRV(m_srv.Handle());
+    descriptorHeaps.FreeDSV(m_dsv.Handle());
     Init();
 }
 
@@ -129,22 +140,6 @@ void RenderTarget::Init(void)
 }
 
 
-bool RenderTarget::CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat)
-{
-    info.m_srvHandle = descriptorHeaps.AllocSRV();
-    if (not info.m_srvHandle.IsValid())
-        return false;
-    info.m_srvIndex = info.m_srvHandle.index;
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvd{};
-    srvd.Format = srvFormat;
-    srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvd.Texture2D.MipLevels = 1;
-    device->CreateShaderResourceView(info.m_resource.Get(), &srvd, info.m_srvHandle.cpuHandle);
-    return true;
-}
-
-
 bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
     D3D12_CLEAR_VALUE cv{};
@@ -156,15 +151,10 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
         return false;
     info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
-    info.m_dsvHandle = descriptorHeaps.AllocDSV();
-    if (not info.m_dsvHandle.IsValid())
+    if (not info.AllocDSV())
         return false;
-    D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-    dsvd.Format = dxDepthDSVFormat;
-    dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    device->CreateDepthStencilView(info.m_resource.Get(), &dsvd, info.m_dsvHandle.cpuHandle);
-
-    CreateSRV(device, info, dxDepthSRVFormat);
+    if (not info.AllocSRV(dxDepthDSVFormat))
+        return false;
     return true;
 }
 
@@ -182,7 +172,7 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
     if (not info.AllocRTV())
         return false;
 
-    if (not CreateSRV(device, info, fmt))
+    if (not info.AllocSRV(fmt))
         return false;
 
     auto* list = m_cmdList->GfxList();
@@ -192,7 +182,7 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 }
 
 
-void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType)
+bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType)
 {
     ID3D12Device* device = dx12Context.Device();
     if (device) {
@@ -203,12 +193,17 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         int w = m_width * m_scale;
         int h = m_height * m_scale;
 
-        if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil))
-            CreateDepthBuffer(device, info, w, h);
-        else
-            CreateColorBuffer(device, info, w, h);
+        if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil)) {
+            if (not CreateDepthBuffer(device, info, w, h))
+                return false;
+        }
+        else {
+            if (not CreateColorBuffer(device, info, w, h))
+                return false;
+        }
         ++m_bufferCount;
     }
+    return true;
 }
 
 
@@ -493,8 +488,8 @@ void RenderTarget::Deactivate(void) noexcept {
 
 uint32_t& RenderTarget::BufferHandle(int bufferIndex)
 {
-    if (bufferIndex >= 0 and bufferIndex < m_colorBufferCount)
-        return m_bufferInfo[bufferIndex].m_srvIndex;
+    if ((bufferIndex >= 0) and (bufferIndex < m_colorBufferCount))
+        return m_bufferInfo[bufferIndex].SRV().Index();
     static uint32_t invalid = UINT32_MAX;
     return invalid;
 }
@@ -507,7 +502,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     if (tmuIndex < 0)
         tmuIndex = bufferIndex;
     BufferInfo& info = m_bufferInfo[bufferIndex];
-    if (info.m_srvIndex == UINT32_MAX)
+    if (info.SRVIndex() == UINT32_MAX)
         return false;
     auto* list = commandListHandler.CurrentGfxList();
     if (not list)
@@ -515,7 +510,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     auto& srvHeap = descriptorHeaps.m_srvHeap;
     if (not srvHeap.m_heap)
         return false;
-    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.m_srvIndex));
+    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.SRVIndex()));
 
     // Bind the matching sampler from m_renderTexture's sampling configuration.
     // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets
@@ -565,7 +560,7 @@ void RenderTarget::Clear(const RTActivationParams& params)
         list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
     }
     if (HaveDepthBuffer(true))
-        list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 }
 
 
@@ -574,7 +569,7 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
     BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
     if (not info.m_resource)
         return nullptr;
-    m_renderTexture.m_handle = info.m_srvIndex;
+    m_renderTexture.m_handle = info.SRVIndex();
     m_renderTexture.m_resource = info.m_resource;
     m_renderTexture.Validate();
     return &m_renderTexture;
@@ -592,14 +587,14 @@ void RenderTarget::ClearColorBuffers(void)
 void RenderTarget::ClearDepthBuffer(float clearValue)
 {
     if (HaveDepthBuffer(true))
-        gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle, clearValue);
+        gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
 }
 
 
 void RenderTarget::ClearStencilBuffer(void)
 {
     if (HaveDepthBuffer(true))
-        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle);
+        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle());
 }
 
 
@@ -610,7 +605,7 @@ Texture* RenderTarget::GetDepthAsTexture(void)
     BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
     if (not info.m_resource)
         return nullptr;
-    m_depthTexture.m_handle = info.m_srvIndex;
+    m_depthTexture.m_handle = info.SRVIndex();
     m_depthTexture.m_resource = info.m_resource;
     m_depthTexture.Validate();
     return &m_depthTexture;
@@ -628,7 +623,7 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
     BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
     if (not info.m_resource)
         return nullptr;
-    m_shadowTexture.m_handle = info.m_srvIndex;
+    m_shadowTexture.m_handle = info.SRVIndex();
     m_shadowTexture.m_resource = info.m_resource;
     m_shadowTexture.Validate();
     return &m_shadowTexture;
