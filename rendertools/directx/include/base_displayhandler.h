@@ -9,7 +9,7 @@
 #include "string.hpp"
 #include "basesingleton.hpp"
 #include "sdlhandler.h"
-#include "descriptor_heap.h"
+#include "resource_view.h"
 
 // =================================================================================================
 // DX12 DisplayHandler: manages the SDL window, extracts the Win32 HWND, creates the DXGI swap chain
@@ -41,7 +41,7 @@ public:
     HWND                            m_hwnd;
     ComPtr<IDXGISwapChain3>         m_swapChain;
     ComPtr<ID3D12Resource>          m_backBuffers[BACK_BUFFER_COUNT];
-    DescriptorHandle                m_rtvHandles[BACK_BUFFER_COUNT];
+    RTV                             m_rtvs[BACK_BUFFER_COUNT];
     D3D12_RESOURCE_STATES           m_backBufferStates[BACK_BUFFER_COUNT]{};
     UINT                            m_backBufferIndex{ 0 };
 
@@ -103,7 +103,7 @@ public:
 
     // Returns the CPU-side RTV handle for the current back buffer.
     inline D3D12_CPU_DESCRIPTOR_HANDLE CurrentRTV(void) const noexcept {
-        return m_rtvHandles[m_backBufferIndex].cpu;
+        return m_rtvs[m_backBufferIndex].CPUHandle();
     }
 
     inline int GetWidth(void) noexcept { return m_width; }

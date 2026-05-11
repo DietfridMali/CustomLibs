@@ -32,7 +32,7 @@ uint32_t SamplerCache::GetSlot(const TextureSampling& s) noexcept {
     }
 
     D3D12_SAMPLER_DESC desc = ToD3D12Desc(s);
-    device->CreateSampler(&desc, h.cpu);
+    device->CreateSampler(&desc, h.cpuHandle);
 
     m_cache.Insert(TextureSampling(s), uint32_t(h.index));
     return h.index;

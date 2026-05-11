@@ -9,6 +9,7 @@
 #include "commandlist.h"
 #include "base_quad.h"
 #include "drawbufferhandler.h"
+#include "resource_view.h"
 
 // =================================================================================================
 // DX12 RenderTarget (Frame Buffer Object)
@@ -43,7 +44,7 @@ public:
     } eBufferType;
 
     ComPtr<ID3D12Resource>  m_resource;
-    DescriptorHandle        m_rtvHandle;
+    RTV                     m_rtv;
     DescriptorHandle        m_srvHandle;
     DescriptorHandle        m_dsvHandle;
     uint32_t                m_srvIndex{ UINT32_MAX };
@@ -56,7 +57,17 @@ public:
 
     bool AllocRTV(void);
 
+    void FreeRTV(void);
+
     void Release(void);
+
+    inline bool IsValid(void) noexcept {
+        return m_rtv.IsValid();
+    }
+
+    inline ::RTV RTV(void) noexcept {
+        return m_rtv;
+    }
 };
 
 // =================================================================================================
@@ -328,9 +339,9 @@ private:
 
     bool CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT srvFormat);
 
-    void CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+    bool CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
-    void CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+    bool CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
     int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
 
@@ -341,7 +352,7 @@ private:
     }
 
     inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
-        return HaveDepthBuffer(true) ? &m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu : nullptr;
+        return HaveDepthBuffer(true) ? &m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle : nullptr;
     }
 };
 

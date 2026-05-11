@@ -8,8 +8,8 @@
 // DescriptorHandle: a combined CPU+GPU handle plus the linear slot index.
 
 struct DescriptorHandle {
-    D3D12_CPU_DESCRIPTOR_HANDLE cpu{ 0 };
-    D3D12_GPU_DESCRIPTOR_HANDLE gpu{ 0 };
+    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle{ 0 };
+    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle{ 0 };
     UINT                        index{ UINT_MAX };
 
     inline bool IsValid(void) const noexcept { return index != UINT_MAX; }

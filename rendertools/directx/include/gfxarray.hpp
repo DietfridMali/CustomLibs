@@ -74,7 +74,7 @@ public:
         uavDesc.Format = DXGI_FORMAT_R32_UINT;
         uavDesc.Texture2D.MipSlice = 0;
         uavDesc.Texture2D.PlaneSlice = 0;
-        device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_uavHandle.cpu);
+        device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_uavHandle.cpuHandle);
 
         D3D12_DESCRIPTOR_HEAP_DESC cpuHeapDesc{};
         cpuHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;

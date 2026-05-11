@@ -316,7 +316,7 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept {
 // CommandListHandler
 
 #ifdef _DEBUG
-bool CommandListHandler::s_logCalls = false;
+bool CommandListHandler::m_logCalls = false;
 #endif
 
 bool CommandListHandler::Create(ID3D12Device* device) noexcept {

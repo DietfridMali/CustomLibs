@@ -185,16 +185,10 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
             fprintf(stderr, "BaseDisplayHandler: GetBuffer(%u) failed (hr=0x%08X)\n", i, (unsigned)hr);
             return false;
         }
+        RTV& rtv = m_rtvs[i];
         // Allocate or reuse RTV descriptor slot
-        if (not m_rtvHandles[i].IsValid())
-            m_rtvHandles[i] = descriptorHeaps.AllocRTV();
-        if (not m_rtvHandles[i].IsValid())
+        if (not (rtv.IsValid() or rtv.Create(m_backBuffers[i].Get(), BACK_BUFFER_FORMAT), D3D12_RTV_DIMENSION_TEXTURE2D))
             return false;
-
-        D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
-        rtvDesc.Format        = BACK_BUFFER_FORMAT;
-        rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        device->CreateRenderTargetView(m_backBuffers[i].Get(), &rtvDesc, m_rtvHandles[i].cpu);
         m_backBufferStates[i] = D3D12_RESOURCE_STATE_PRESENT;
     }
     return true;

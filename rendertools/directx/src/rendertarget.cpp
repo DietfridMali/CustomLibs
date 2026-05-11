@@ -12,11 +12,11 @@
 // =================================================================================================
 // DX12 RenderTarget implementation
 
-static constexpr DXGI_FORMAT kColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-static constexpr DXGI_FORMAT kVertexFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
-static constexpr DXGI_FORMAT kDepthTypelessFormat = DXGI_FORMAT_R24G8_TYPELESS;
-static constexpr DXGI_FORMAT kDepthDSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-static constexpr DXGI_FORMAT kDepthSRVFormat = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+static constexpr DXGI_FORMAT dxColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+static constexpr DXGI_FORMAT dxVertexFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+static constexpr DXGI_FORMAT dxTypelessDepthFormat = DXGI_FORMAT_R24G8_TYPELESS;
+static constexpr DXGI_FORMAT dxDepthDSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+static constexpr DXGI_FORMAT dxDepthSRVFormat = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -25,11 +25,11 @@ static DXGI_FORMAT FormatForType(BufferInfo::eBufferType type)
     switch (type) {
     case BufferInfo::btDepth:
     case BufferInfo::btStencil:
-        return kDepthTypelessFormat;
+        return dxTypelessDepthFormat;
     case BufferInfo::btVertex:
-        return kVertexFormat;
+        return dxVertexFormat;
     default:
-        return kColorFormat;
+        return dxColorFormat;
     }
 }
 
@@ -68,7 +68,7 @@ static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int 
 void BufferInfo::Init(void)
 {
     m_resource.Reset();
-    m_rtvHandle = {};
+    RTV().Handle() = {};
     m_srvHandle = {};
     m_dsvHandle = {};
     m_srvIndex = UINT32_MAX;
@@ -87,19 +87,17 @@ void BufferInfo::SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetStat
 
 
 bool BufferInfo::AllocRTV(void) {
-    m_rtvHandle = descriptorHeaps.AllocRTV();
-    if (not m_rtvHandle.IsValid())
-        return false;
-    D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
-    rtvd.Format = kColorFormat;
-    rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    dx12Context.Device()->CreateRenderTargetView(m_resource.Get(), &rtvd, m_rtvHandle.cpu);
-    return true;
-
+    return m_rtv.Create(m_resource, dxColorFormat);
 }
 
+
+void BufferInfo::FreeRTV(void) {
+    m_rtv.Free();
+}
+
+
 void BufferInfo::Release(void) {
-    descriptorHeaps.FreeRTV(m_rtvHandle);
+    descriptorHeaps.FreeRTV(RTV().Handle());
     descriptorHeaps.FreeSRV(m_srvHandle);
     descriptorHeaps.FreeDSV(m_dsvHandle);
     Init();
@@ -142,58 +140,55 @@ bool RenderTarget::CreateSRV(ID3D12Device* device, BufferInfo& info, DXGI_FORMAT
     srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvd.Texture2D.MipLevels = 1;
-    device->CreateShaderResourceView(info.m_resource.Get(), &srvd, info.m_srvHandle.cpu);
+    device->CreateShaderResourceView(info.m_resource.Get(), &srvd, info.m_srvHandle.cpuHandle);
     return true;
 }
 
 
-void RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
     D3D12_CLEAR_VALUE cv{};
-    cv.Format = kDepthDSVFormat;
+    cv.Format = dxDepthDSVFormat;
     cv.DepthStencil.Depth = 1.0f;
     cv.DepthStencil.Stencil = 0;
-    info.m_resource = CreateRTResource(device, w, h, kDepthTypelessFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
+    info.m_resource = CreateRTResource(device, w, h, dxTypelessDepthFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
     if (not info.m_resource)
-        return;
+        return false;
     info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     info.m_dsvHandle = descriptorHeaps.AllocDSV();
     if (not info.m_dsvHandle.IsValid())
-        return;
+        return false;
     D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
-    dsvd.Format = kDepthDSVFormat;
+    dsvd.Format = dxDepthDSVFormat;
     dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    device->CreateDepthStencilView(info.m_resource.Get(), &dsvd, info.m_dsvHandle.cpu);
+    device->CreateDepthStencilView(info.m_resource.Get(), &dsvd, info.m_dsvHandle.cpuHandle);
 
-    CreateSRV(device, info, kDepthSRVFormat);
+    CreateSRV(device, info, dxDepthSRVFormat);
+    return true;
 }
 
 
-void RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
     DXGI_FORMAT fmt = FormatForType(info.m_type);
     D3D12_CLEAR_VALUE cv{};
     cv.Format = fmt;
     info.m_resource = CreateRTResource(device, w, h, fmt, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
     if (not info.m_resource)
-        return;
+        return false;
     info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    info.m_rtvHandle = descriptorHeaps.AllocRTV();
-    if (not info.m_rtvHandle.IsValid())
-        return;
-    D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
-    rtvd.Format = fmt;
-    rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-    device->CreateRenderTargetView(info.m_resource.Get(), &rtvd, info.m_rtvHandle.cpu);
+    if (not info.AllocRTV())
+        return false;
 
     if (not CreateSRV(device, info, fmt))
-        return;
+        return false;
 
     auto* list = m_cmdList->GfxList();
     if (list)
         info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    return true;
 }
 
 
@@ -287,10 +282,8 @@ bool RenderTarget::AllocRTVs(void)
 
 void RenderTarget::FreeRTVs(void)
 {
-    for (int i = 0; i < m_colorBufferCount; ++i) {
-        descriptorHeaps.FreeRTV(m_bufferInfo[i].m_rtvHandle);
-        m_bufferInfo[i].m_rtvHandle = {};
-    }
+    for (int i = 0; i < m_colorBufferCount; ++i)
+        m_bufferInfo[i].FreeRTV();
     m_haveRTVs = false;
 }
 
@@ -356,7 +349,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             return false;
         m_activeBufferIndex = params.bufferIndex;
         m_bufferInfo[params.bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        rtvs[count++] = m_bufferInfo[params.bufferIndex].m_rtvHandle.cpu;
+        rtvs[count++] = m_bufferInfo[params.bufferIndex].RTV().CPUHandle();
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (i != params.bufferIndex)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -370,14 +363,14 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
                 if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
                     continue;
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
+                rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
             pDSV = DepthBufferHandle();
         }
         else if (m_drawBufferGroup == dbColor) {
             for (int i = 0; i < m_colorBufferCount; ++i) {
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
+                rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
             pDSV = DepthBufferHandle();
             for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
@@ -389,7 +382,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             for (int j = 0; j < m_vertexBufferCount; ++j, ++i) {
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-                rtvs[count++] = m_bufferInfo[i].m_rtvHandle.cpu;
+                rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
             pDSV = DepthBufferHandle();
         }
@@ -477,9 +470,9 @@ void RenderTarget::Disable(bool deactivate) noexcept {
             // Hand RTV slots over to GfxResourceHandler — freed once the slot's GPU work is fenced
             // complete (at BeginFrame for the same slot, or via Flush() during init).
             for (int i = 0; i < m_colorBufferCount; ++i) {
-                if (m_bufferInfo[i].m_rtvHandle.IsValid()) {
-                    gfxResourceHandler.Track(m_bufferInfo[i].m_rtvHandle);
-                    m_bufferInfo[i].m_rtvHandle = {};
+                if (m_bufferInfo[i].IsValid()) {
+                    gfxResourceHandler.Track(m_bufferInfo[i].RTV().Handle());
+                    m_bufferInfo[i].RTV().Handle() = {};
                 }
             }
             m_haveRTVs = false;
@@ -551,8 +544,8 @@ void RenderTarget::Fill(RGBAColor color)
         return;
     float c[4] = { color.R(), color.G(), color.B(), color.A() };
     for (int i = 0; i < m_colorBufferCount; ++i)
-        if (m_bufferInfo[i].m_rtvHandle.IsValid())
-            list->ClearRenderTargetView(m_bufferInfo[i].m_rtvHandle.cpu, c, 0, nullptr);
+        if (m_bufferInfo[i].RTV().Handle().IsValid())
+            list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), c, 0, nullptr);
 }
 
 
@@ -565,14 +558,14 @@ void RenderTarget::Clear(const RTActivationParams& params)
         return;
     if (params.bufferIndex < 0) {
         for (int i = 0; i < m_colorBufferCount; ++i)
-            if (m_bufferInfo[i].m_rtvHandle.IsValid())
-                list->ClearRenderTargetView(m_bufferInfo[i].m_rtvHandle.cpu, m_clearColor.Data(), 0, nullptr);
+            if (m_bufferInfo[i].RTV().Handle().IsValid())
+                list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
     }
-    else if ((params.bufferIndex < m_colorBufferCount) and m_bufferInfo[params.bufferIndex].m_rtvHandle.IsValid()) {
-        list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].m_rtvHandle.cpu, m_clearColor.Data(), 0, nullptr);
+    else if ((params.bufferIndex < m_colorBufferCount) and m_bufferInfo[params.bufferIndex].RTV().Handle().IsValid()) {
+        list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
     }
     if (HaveDepthBuffer(true))
-        list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 }
 
 
@@ -591,22 +584,22 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 void RenderTarget::ClearColorBuffers(void)
 {
     for (int i = 0; i < m_colorBufferCount; ++i)
-        if (m_bufferInfo[i].m_rtvHandle.IsValid())
-            gfxStates.ClearColorBuffers(m_bufferInfo[i].m_rtvHandle.cpu);
+        if (m_bufferInfo[i].RTV().Handle().IsValid())
+            gfxStates.ClearColorBuffers(m_bufferInfo[i].RTV().CPUHandle());
 }
 
 
 void RenderTarget::ClearDepthBuffer(float clearValue)
 {
     if (HaveDepthBuffer(true))
-        gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu, clearValue);
+        gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle, clearValue);
 }
 
 
 void RenderTarget::ClearStencilBuffer(void)
 {
     if (HaveDepthBuffer(true))
-        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpu);
+        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsvHandle.cpuHandle);
 }
 
 
