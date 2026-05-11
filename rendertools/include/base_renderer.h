@@ -81,7 +81,11 @@ public:
         : m_screenBuffer(nullptr)
         , m_sceneBuffer(nullptr)
         , m_skyBuffer(nullptr)
+#ifdef DEMO
         , m_renderQuality(0)
+#else
+        , m_renderQuality(1)
+#endif
         , m_frameIndex(0)
         , m_windowWidth(0)
         , m_windowHeight(0)

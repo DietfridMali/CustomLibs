@@ -584,7 +584,6 @@ bool RenderTarget::Enable(const RTActivationParams& params)
         if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
             return false;
     }
-    m_flushOnDisable = params.flush;
     SetViewport();
 
     if (not EnableBuffers(params))
@@ -622,10 +621,7 @@ void RenderTarget::Disable(bool deactivate) noexcept
         for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, true);
     }
-    if (m_flushOnDisable)
-        m_cmdList->Flush();
-    else
-        m_cmdList->Close(deactivate);
+    m_cmdList->Close(deactivate);
     m_cmdList = nullptr;
 }
 

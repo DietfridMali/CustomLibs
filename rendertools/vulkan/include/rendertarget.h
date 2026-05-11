@@ -129,7 +129,6 @@ public:
     bool                m_pingPong{ false };
     bool                m_isAvailable{ false };
     bool                m_isScreenBuffer{ false };
-	bool                m_flushOnDisable{ false };
     bool                m_isInRendering{ false };  // active vkCmdBeginRendering scope
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
@@ -175,7 +174,7 @@ public:
     bool SelectDrawBuffers(const RTActivationParams& params);
 
     inline bool Reactivate(bool clear = false) noexcept {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reactivate = true };
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = true };
         return Activate(params);
     }
 
