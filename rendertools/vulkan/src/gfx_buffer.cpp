@@ -1,5 +1,6 @@
 #include "gfx_buffer.h"
 #include "vkcontext.h"
+#include "resource_handler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -44,9 +45,19 @@ bool GfxBuffer::Create(VkDeviceSize size, VkBufferUsageFlags usage,
 
 void GfxBuffer::Destroy(void) noexcept
 {
+    // Defer the VkBuffer / VmaAllocation teardown by one frame-slot cycle. Pending CommandLists
+    // may still reference this buffer (e.g. dynamic mesh data buffers rebuilt mid-setup before
+    // the prior CLs have been submitted) — TrackCleanup keeps the handle alive until the next
+    // gfxResourceHandler.Cleanup sweep, which runs after the slot's in-flight fence has signalled
+    // (BeginFrame) or after WaitIdle (GfxRenderer::FlushResources / Cleanup).
     VmaAllocator allocator = vkContext.Allocator();
-    if ((m_buffer != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE))
-        vmaDestroyBuffer(allocator, m_buffer, m_allocation);
+    if ((m_buffer != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+        VkBuffer buf = m_buffer;
+        VmaAllocation alloc = m_allocation;
+        gfxResourceHandler.TrackCleanup([allocator, buf, alloc]() {
+            vmaDestroyBuffer(allocator, buf, alloc);
+        });
+    }
     m_buffer = VK_NULL_HANDLE;
     m_allocation = VK_NULL_HANDLE;
     m_size = 0;

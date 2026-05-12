@@ -57,6 +57,8 @@ public:
 
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
 
+    virtual void FlushResources(void) noexcept override;
+
     virtual void Cleanup(void) noexcept override;
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;

@@ -27,7 +27,7 @@ const String& Standard2DVS() {
             column_major float4x4 mProjection;
             column_major float4x4 mViewport;
         };
-        struct VSInput { float3 pos : POSITION; float2 tc : TEXCOORD; };
+        struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
         struct PSInput {
             float4 pos       : SV_Position;
             float3 fragPos   : TEXCOORD0;
@@ -54,7 +54,7 @@ const String& Standard3DVS() {
             column_major float4x4 mModelView;
             column_major float4x4 mProjection;
         };
-        struct VSInput { float3 pos : POSITION; float2 tc : TEXCOORD; };
+        struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
         struct PSInput {
             float4 pos       : SV_Position;
             float3 fragPos   : TEXCOORD0;
@@ -84,7 +84,7 @@ const String& Offset2DVS() {
             column_major float4x4 mViewport;
         };
         cbuffer ShaderConstants : register(b1) { float offset; };
-        struct VSInput { float3 pos : POSITION; float2 tc : TEXCOORD; };
+        struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
         struct PSInput {
             float4 pos       : SV_Position;
             float3 fragPos   : TEXCOORD0;

@@ -188,6 +188,7 @@ bool GfxDataLayout::Enable(void) noexcept
     constexpr int kMaxStreams = 12;
     VkBuffer     buffers[kMaxStreams] { };
     VkDeviceSize offsets[kMaxStreams] { };
+    bool         filled[kMaxStreams]  { };
     int maxSlot = 0;
     for (auto* gdb : m_dataBuffers) {
         if (not gdb or not gdb->IsValid() or (gdb->m_bufferType != GfxBufferTarget::Vertex))
@@ -197,11 +198,25 @@ bool GfxDataLayout::Enable(void) noexcept
             continue;
         buffers[slot] = gdb->Buffer();
         offsets[slot] = 0;
+        filled[slot] = true;
         if (slot >= maxSlot)
             maxSlot = slot + 1;
     }
-    if (maxSlot > 0)
-        vkCmdBindVertexBuffers(cb, 0, uint32_t(maxSlot), buffers, offsets);
+    // Bind contiguous ranges only — vkCmdBindVertexBuffers does not accept VK_NULL_HANDLE
+    // elements without the nullDescriptor feature. The fixed slot layout has semantic gaps
+    // (e.g. ColorMeshShader uses slots 0 + 4; SmileyModelShader uses 0 + 4..10, skipping 1..3).
+    int i = 0;
+    while (i < maxSlot) {
+        if (not filled[i]) {
+            ++i;
+            continue;
+        }
+        int j = i;
+        while ((j < maxSlot) and filled[j])
+            ++j;
+        vkCmdBindVertexBuffers(cb, uint32_t(i), uint32_t(j - i), buffers + i, offsets + i);
+        i = j;
+    }
 
     if (m_indexBuffer.IsValid())
         vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());

@@ -239,7 +239,7 @@ public:
 
     void Register(CommandList* cl) noexcept;
 
-    void ExecuteAll(void) noexcept;
+    void ExecuteAll(bool intermediate = false) noexcept;
 
     CommandList* CreateCmdList(const String& name = "", bool isTemporary = true) noexcept;
 

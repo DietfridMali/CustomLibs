@@ -533,8 +533,15 @@ void CommandListHandler::Register(CommandList* cl) noexcept
 }
 
 
-void CommandListHandler::ExecuteAll(void) noexcept
+void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 {
+    // intermediate=false (default): frame-end submit — binds the swapchain frame-sync triplet
+    //   (imageAvailable wait, renderFinished signal, inFlight fence). Must be called between a
+    //   prior BeginFrame (which signaled imageAvailable via vkAcquireNextImageKHR and reset the
+    //   inFlight fence) and a subsequent Present (which waits on renderFinished).
+    // intermediate=true: setup-phase or mid-init drain — plain submit with no frame-sync objects,
+    //   followed by vkQueueWaitIdle. Lets setup-phase CommandLists go to the GPU and finish
+    //   before the first BeginFrame resets cbvAllocator / drains gfxResourceHandler.
     if (m_pendingLists.IsEmpty())
         return;
 
@@ -546,31 +553,36 @@ void CommandListHandler::ExecuteAll(void) noexcept
         if (l->IsRecording())
             l->Close();
         VkCommandBufferSubmitInfo info{};
-        info.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
         info.commandBuffer = l->GfxList(true);
         cbInfos[n++] = info;
     }
     if (n > 0) {
-        VkSemaphoreSubmitInfo waitInfo{};
-        waitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        waitInfo.semaphore = m_cmdQueue.SubmitWaitSemaphore();
-        waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-
-        VkSemaphoreSubmitInfo signalInfo{};
-        signalInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-        signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
-        signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-
         VkSubmitInfo2 submit{};
-        submit.sType                    = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submit.waitSemaphoreInfoCount   = 1;
-        submit.pWaitSemaphoreInfos      = &waitInfo;
-        submit.signalSemaphoreInfoCount = 1;
-        submit.pSignalSemaphoreInfos    = &signalInfo;
-        submit.commandBufferInfoCount   = uint32_t(n);
-        submit.pCommandBufferInfos      = cbInfos.Data();
+        submit.sType                  = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit.commandBufferInfoCount = uint32_t(n);
+        submit.pCommandBufferInfos    = cbInfos.Data();
 
-        VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, m_cmdQueue.SubmitSignalFence());
+        VkSemaphoreSubmitInfo waitInfo{};
+        VkSemaphoreSubmitInfo signalInfo{};
+        VkFence fence = VK_NULL_HANDLE;
+        if (not intermediate) {
+            waitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            waitInfo.semaphore = m_cmdQueue.SubmitWaitSemaphore();
+            waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+            signalInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
+            signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+
+            submit.waitSemaphoreInfoCount   = 1;
+            submit.pWaitSemaphoreInfos      = &waitInfo;
+            submit.signalSemaphoreInfoCount = 1;
+            submit.pSignalSemaphoreInfos    = &signalInfo;
+            fence = m_cmdQueue.SubmitSignalFence();
+        }
+
+        VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
         if (res != VK_SUCCESS)
             fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
     }
@@ -583,6 +595,9 @@ void CommandListHandler::ExecuteAll(void) noexcept
     }
     m_pendingLists.Clear();
     m_cmdListStack.Clear();
+
+    if (intermediate)
+        m_cmdQueue.WaitIdle();
 }
 
 

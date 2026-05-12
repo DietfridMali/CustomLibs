@@ -152,6 +152,24 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
 }
 
 
+void GfxRenderer::FlushResources(void) noexcept {
+    // Drains all pending setup-phase CommandLists and any deferred resource teardowns so that
+    // the first BeginFrame can safely reset cbvAllocator and run gfxResourceHandler.Cleanup
+    // without invalidating still-pending CommandBuffers. Called between Application::Setup
+    // steps (analog to DX12 GfxRenderer::FlushResources → CommandListHandler::Flush).
+    //
+    // ExecuteAll(true) does the plain-submit-plus-WaitIdle variant (no frame-sync semaphores
+    // or fence). Drain the deferred-cleanup lambdas for both frame slots, then clear the
+    // CPU-side bind table: setup-phase Texture::Bind calls left stale VkImageView handles in
+    // m_boundSrvViews / m_boundSamplers / m_boundStorageViews; after Cleanup those handles
+    // point at destroyed views, and the next render's vkUpdateDescriptorSets would reject them.
+    commandListHandler.ExecuteAll(true);
+    gfxResourceHandler.Cleanup(0);
+    gfxResourceHandler.Cleanup(1);
+    commandListHandler.ResetBindings();
+}
+
+
 void GfxRenderer::Cleanup(void) noexcept {
     // WaitIdle ensures the GPU is no longer using any resources. Draining both frame-slot
     // cleanup queues afterwards executes callbacks deferred via gfxResourceHandler.TrackCleanup

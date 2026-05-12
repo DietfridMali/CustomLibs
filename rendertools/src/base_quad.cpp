@@ -172,14 +172,21 @@ void BaseQuad::ResetTransformation(void) {
 
 bool BaseQuad::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
     ZoneScoped;
-    if (not (shader or (shader = LoadShader(textures, color))))
+    gfxStates.CheckError();
+    if (not (shader or (shader = LoadShader(textures, color)))) {
+        gfxStates.CheckError();
         return false;
-    if (UpdateData()) {
-        m_gfxDataLayout->Render(textures);
-        ResetTransformation();
-        return true;
     }
-    return false;
+    gfxStates.CheckError();
+    if (not UpdateData()) {
+        gfxStates.CheckError();
+        return false;
+    }
+    gfxStates.CheckError();
+    m_gfxDataLayout->Render(textures);
+    gfxStates.CheckError();
+    ResetTransformation();
+    return true;
 }
 
 

@@ -61,7 +61,7 @@ const ShaderSource& StencilShader() {
                 column_major float4x4 mProjection;
                 column_major float4x4 mViewport;
             };
-            struct VSInput { float3 pos : POSITION; };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; };
             struct PSInput { float4 pos : SV_Position; };
             PSInput VSMain(VSInput i) {
                 PSInput o;
@@ -93,7 +93,7 @@ const ShaderSource& ShadowShader() {
                 column_major float4x4 mViewport;
                 column_major float4x4 mLightTransform;
             };
-            struct VSInput { float3 pos : POSITION; float2 tc : TEXCOORD; };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; };
             struct PSInput {
                 float4 pos       : SV_Position;
                 float2 fragCoord : TEXCOORD0;
@@ -137,7 +137,7 @@ const ShaderSource& SphereShadowShader() {
                 column_major float4x4 mViewport;
                 column_major float4x4 mLightTransform;
             };
-            struct VSInput { float3 pos : POSITION; };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; };
             struct PSInput { float4 pos : SV_Position; };
             PSInput VSMain(VSInput i) {
                 PSInput o;
@@ -199,7 +199,7 @@ const ShaderSource& ColorMeshShader() {
                 column_major float4x4 mProjection;
                 column_major float4x4 mViewport;
             };
-            struct VSInput { float3 pos : POSITION; float4 color : COLOR; };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(4)]] float4 color : COLOR; };
             struct PSInput {
                 float4 pos          : SV_Position;
                 float4 surfaceColor : COLOR;

@@ -527,17 +527,17 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 
     if (params.drawBufferGroup == dbDepth) {
         for (int i = 0; i < m_colorBufferCount; ++i)
-            m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+            DetachBuffer(i);
     }
     else if (params.drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
         if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
             return false;
         m_activeBufferIndex = params.bufferIndex;
-        m_bufferInfo[params.bufferIndex].SetState(cb, BufferInfo::btColor, false);
+        AttachBuffer(params.bufferIndex);
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (i != params.bufferIndex)
-                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+                DetachBuffer(i);
     }
     else {
         m_activeBufferIndex = -1;
@@ -546,24 +546,24 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             for (int i = 0; i < m_bufferCount; ++i) {
                 if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
                     continue;
-                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, false);
+                AttachBuffer(i);
             }
         }
         else if (m_drawBufferGroup == dbColor) {
             for (int i = 0; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, false);
+                AttachBuffer(i);
             for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
-                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+                DetachBuffer(i);
         }
         else if (m_drawBufferGroup == dbExtra) {
             for (int i = 0; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
+                DetachBuffer(i);
             for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
-                m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, false);
+                AttachBuffer(i);
         }
     }
     if (HaveDepthBuffer(true))
-        m_bufferInfo[m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, false);
+        AttachBuffer(m_depthBufferIndex);
     return true;
 }
 
@@ -600,6 +600,14 @@ bool RenderTarget::Enable(const RTActivationParams& params)
             return false;
     }
     SetViewport();
+
+    // Layout transitions in EnableBuffers must happen outside any active vkCmdBeginRendering
+    // scope (Vulkan forbids vkCmdPipelineBarrier2 with image-memory barriers inside a render
+    // pass instance). On re-activate of an already-active RT (e.g. ping-pong in
+    // TextEffects::AntiAlias) m_isInRendering is still true from the previous BeginRendering —
+    // close it first, run the transitions, then re-open with the new attachment layout.
+    if (m_isInRendering)
+        EndRendering();
 
     if (not EnableBuffers(params))
         return false;
