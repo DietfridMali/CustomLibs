@@ -108,7 +108,6 @@ public:
 		int bufferIndex{ -1 };
 		eDrawBufferGroups drawBufferGroup{ dbAll };
         bool clear{ true };
-		bool flush{ false };
 		bool reactivate{ false };
 	};
 

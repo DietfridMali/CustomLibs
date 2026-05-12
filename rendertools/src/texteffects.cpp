@@ -63,7 +63,7 @@ void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& de
                 shader->SetInt("surface", 0);
             else {
                 int nextBuf = renderTarget->NextBuffer(renderTarget->GetLastDestination());
-                renderTarget->Activate({ .bufferIndex = nextBuf, .drawBufferGroup = RenderTarget::dbAll, .flush = false });
+                renderTarget->Activate({ .bufferIndex = nextBuf, .drawBufferGroup = RenderTarget::dbAll });
                 renderTarget->SetLastDestination(nextBuf);
             }
             shader->SetFloat("outlineWidth", decoration.outlineWidth);

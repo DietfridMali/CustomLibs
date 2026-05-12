@@ -136,16 +136,31 @@ void BufferInfo::Release(void)
 {
     VkDevice device = vkContext.Device();
     VmaAllocator allocator = vkContext.Allocator();
+
+    // Defer GPU-resource teardown by one frame slot — in-flight command buffers may still
+    // reference the image/view. Same pattern as Texture::Destroy(m_isDisposable). Safe in the
+    // app-shutdown path as long as gfxResourceHandler.Cleanup() processes both frame slots
+    // before the handler itself is torn down.
     if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
-        vkDestroyImageView(device, m_imageView, nullptr);
+        VkImageView view = m_imageView;
+        gfxResourceHandler.TrackCleanup([device, view]() {
+            vkDestroyImageView(device, view, nullptr);
+        });
         m_imageView = VK_NULL_HANDLE;
     }
     if ((m_depthSampleView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
-        vkDestroyImageView(device, m_depthSampleView, nullptr);
+        VkImageView view = m_depthSampleView;
+        gfxResourceHandler.TrackCleanup([device, view]() {
+            vkDestroyImageView(device, view, nullptr);
+        });
         m_depthSampleView = VK_NULL_HANDLE;
     }
     if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
-        vmaDestroyImage(allocator, m_image, m_allocation);
+        VkImage image = m_image;
+        VmaAllocation alloc = m_allocation;
+        gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
+            vmaDestroyImage(allocator, image, alloc);
+        });
         m_image = VK_NULL_HANDLE;
         m_allocation = VK_NULL_HANDLE;
     }
@@ -863,7 +878,7 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
     if (params.destination >= 0) {
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
         gfxStates.SetBlending(0);

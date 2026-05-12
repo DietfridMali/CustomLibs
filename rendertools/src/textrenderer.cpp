@@ -211,7 +211,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
 #if 0 // debug
             renderTarget->SetClearColor(RGBAColor(1.0f, 0.8f, 0.0f, 1.0f));
 #endif
-            if (renderTarget->Activate({ .clear = true, .flush = true })) {
+            if (renderTarget->Activate({ .clear = true })) {
                 baseRenderer.PushViewport();
                 renderTarget->SetViewport(true);
                 if (outlineWidth > 0) {

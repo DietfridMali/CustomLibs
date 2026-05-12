@@ -16,6 +16,7 @@
 #include "pipeline_cache.h"
 #include "descriptor_pool_handler.h"
 #include "cbv_allocator.h"
+#include "resource_handler.h"
 #include "gfxapitype.h"
 
 // =================================================================================================
@@ -148,6 +149,17 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     if (baseDisplayHandler.CurrentBackBuffer())
         baseDisplayHandler.DisableBackBuffer();
     FinishOperation(cl);
+}
+
+
+void GfxRenderer::Cleanup(void) noexcept {
+    // WaitIdle ensures the GPU is no longer using any resources. Draining both frame-slot
+    // cleanup queues afterwards executes callbacks deferred via gfxResourceHandler.TrackCleanup
+    // (RT BufferInfo::Release, disposable textures, ...), so the underlying VkImage / VkImageView
+    // / VmaAllocation handles are destroyed before gfxResourceHandler / vkContext are torn down.
+    commandListHandler.CmdQueue().WaitIdle();
+    gfxResourceHandler.Cleanup(0);
+    gfxResourceHandler.Cleanup(1);
 }
 
 // =================================================================================================

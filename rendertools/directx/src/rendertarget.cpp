@@ -634,7 +634,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
 {
     ZoneScoped;
     if (params.destination >= 0) {
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
         gfxStates.SetBlending(0);

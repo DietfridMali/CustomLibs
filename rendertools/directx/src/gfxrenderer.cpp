@@ -112,6 +112,14 @@ void GfxRenderer::FlushResources(void) noexcept {
 }
 
 
+void GfxRenderer::Cleanup(void) noexcept {
+    // Flush all in-flight GPU work before releasing any resources, then tear down the
+    // command-list handler (releases pools, fence, all tracked resources).
+    commandListHandler.CmdQueue().WaitIdle();
+    commandListHandler.Destroy();
+}
+
+
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     ZoneScoped;
     if (not m_screenIsAvailable)

@@ -81,7 +81,7 @@ public:
 	}
 
 	inline bool Activate(void) {
-		return m_atlas ? m_atlas->Activate({ .clear = true, .flush = true}) : false;
+		return m_atlas ? m_atlas->Activate({ .clear = true }) : false;
 	}
 
 	inline void Deactivate(void) {

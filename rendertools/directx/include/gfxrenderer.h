@@ -60,6 +60,8 @@ public:
 
     virtual void FlushResources(void) noexcept override;
 
+    virtual void Cleanup(void) noexcept override;
+
     virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 
     inline void Draw3DScene(void) noexcept {

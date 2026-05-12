@@ -81,7 +81,6 @@ public:
     bool                        m_pingPong;
     bool                        m_isAvailable;
     bool                        m_isScreenBuffer;
-    bool                        m_flushOnDisable;
     int                         m_lastDestination;
     BaseQuad                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
@@ -115,7 +114,6 @@ public:
         int bufferIndex{ -1 };
         eDrawBufferGroups drawBufferGroup{ dbAll };
         bool clear{ true };
-        bool flush{ false };
         bool reenable{ false };
     };
 
@@ -138,7 +136,7 @@ public:
     bool SelectDrawBuffers(const RTActivationParams& params);
 
     inline bool Reactivate(bool clear = false, bool reenable = false) {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .flush = m_flushOnDisable, .reenable = reenable };
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reenable = reenable };
         return Activate(params);
     }
 

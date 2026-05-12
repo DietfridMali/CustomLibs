@@ -373,6 +373,12 @@ public:
     // + free all queued descriptors / resources). Used during init phases that lack frame
     // fences. Default no-op for APIs without an explicit resource queue (OpenGL).
     virtual void FlushResources(void) noexcept {}
+
+    // App-shutdown teardown of API-specific GPU resources: WaitIdle + drain of deferred
+    // cleanup queues + destruction of the command-list infrastructure. Called from
+    // Application::Destroy before the general resource handlers (textureHandler etc.) tear
+    // down. Default no-op for APIs without an explicit GPU resource queue (OpenGL).
+    virtual void Cleanup(void) noexcept {}
 #pragma warning(push)
 
 #include "gfxapitype.h"

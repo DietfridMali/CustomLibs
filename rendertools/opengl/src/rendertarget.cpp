@@ -31,7 +31,6 @@ void RenderTarget::Init(void) {
     m_activeBufferIndex = -1;
     m_pingPong = true;
     m_isAvailable = false;
-    m_flushOnDisable = false;
     m_drawBufferGroup = dbNone;
     m_clearColor = ColorData::Invisible;
     m_bufferInfo.Reset();
@@ -377,7 +376,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 }
 
 
-void RenderTarget::Disable(bool /*deactivate*/) noexcept { // flush only required for compatibility of gfx api agnostic high level code with DirectX
+void RenderTarget::Disable(bool /*deactivate*/) noexcept {
     ZoneScoped;
     if (IsEnabled()) {
         gfxStates.CheckError();
@@ -467,7 +466,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     else { // rendering to another RenderTarget (than the main buffer)
         enableLocally = not IsEnabled();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .flush = true }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
         gfxStates.SetBlending(0);
