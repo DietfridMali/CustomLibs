@@ -180,7 +180,7 @@ bool UploadSubresource(VkCommandBuffer cb, VkImage dstImage, ImageLayoutTracker&
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
     if (addBarrier)
-        tracker.ToShaderRead(cb);
+        tracker.ToShaderInput(cb);
 
     return true;
 }
@@ -213,7 +213,7 @@ bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
     }
 
     if (ok)
-        tracker.ToShaderRead(cmd.cb);
+        tracker.ToShaderInput(cmd.cb);
 
     if (not EndSingleTimeCommands(cmd))
         ok = false;
@@ -295,7 +295,7 @@ bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStr
     vkCmdCopyBufferToImage(cmd.cb, staging.buffer, outImage,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
-    outTracker.ToShaderRead(cmd.cb);
+    outTracker.ToShaderInput(cmd.cb);
 
     bool ok = EndSingleTimeCommands(cmd);
     staging.Destroy();

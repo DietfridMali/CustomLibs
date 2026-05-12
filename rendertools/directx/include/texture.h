@@ -269,13 +269,20 @@ public:
 
 // =================================================================================================
 
-class RenderTargetTexture 
+class RenderTargetTexture
     : public Texture
 {
 public:
     RenderTargetTexture() = default;
-    ~RenderTargetTexture() = default;
+    ~RenderTargetTexture();
     virtual void SetParams(bool forceUpdate = false) override;
+
+    // The resource and SRV index are owned by the wrapped RenderTarget's BufferInfo.
+    // Drop our shared reference / borrowed index here so the implicit ~Texture path's
+    // Texture::Destroy() sees null handles and is a no-op. ComPtr-RAII makes this
+    // functionally redundant in DX12 (refcount-shared resource is released safely
+    // either way), but the pattern is kept symmetric to the Vulkan / OpenGL paths.
+    virtual void Destroy(void) override;
 };
 
 // =================================================================================================
@@ -284,8 +291,11 @@ class ShadowTexture : public Texture
 {
 public:
     ShadowTexture() = default;
-    ~ShadowTexture() = default;
+    ~ShadowTexture();
     virtual void SetParams(bool forceUpdate = false) override;
+
+    // Same lifetime semantics as RenderTargetTexture.
+    virtual void Destroy(void) override;
 };
 
 // =================================================================================================

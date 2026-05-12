@@ -494,12 +494,32 @@ void RenderTargetTexture::Destroy(void)
 }
 
 
+// Null the borrowed handles before ~Texture runs. C++ destructor virtual dispatch is static:
+// ~Texture() calls Destroy() and that resolves to Texture::Destroy() (not the override), so
+// the wrapper's null-handles-first guard would not be applied. Doing it here in the wrapper's
+// own destructor preserves the same invariant for the implicit member-destruction path.
+RenderTargetTexture::~RenderTargetTexture()
+{
+    m_imageView = VK_NULL_HANDLE;
+    m_image = VK_NULL_HANDLE;
+    m_allocation = VK_NULL_HANDLE;
+}
+
+
 void ShadowTexture::Destroy(void)
 {
     m_imageView = VK_NULL_HANDLE;
     m_image = VK_NULL_HANDLE;
     m_allocation = VK_NULL_HANDLE;
     Texture::Destroy();
+}
+
+
+ShadowTexture::~ShadowTexture()
+{
+    m_imageView = VK_NULL_HANDLE;
+    m_image = VK_NULL_HANDLE;
+    m_allocation = VK_NULL_HANDLE;
 }
 
 // =================================================================================================

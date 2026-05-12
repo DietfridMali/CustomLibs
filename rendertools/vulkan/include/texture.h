@@ -271,7 +271,7 @@ class RenderTargetTexture
 {
 public:
     RenderTargetTexture() = default;
-    ~RenderTargetTexture() = default;
+    ~RenderTargetTexture();
     virtual void SetParams(bool forceUpdate = false) override;
 
     // The image view + image are owned by the wrapped RenderTarget's BufferInfo,
@@ -286,7 +286,7 @@ class ShadowTexture : public Texture
 {
 public:
     ShadowTexture() = default;
-    ~ShadowTexture() = default;
+    ~ShadowTexture();
     virtual void SetParams(bool forceUpdate = false) override;
 
     // Same lifetime semantics as RenderTargetTexture: the shadow image view is owned by

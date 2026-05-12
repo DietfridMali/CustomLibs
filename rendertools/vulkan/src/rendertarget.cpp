@@ -122,7 +122,7 @@ void BufferInfo::SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShad
         return;
 
     if (asShaderRead) {
-        m_layoutTracker.ToShaderRead(cb);
+        m_layoutTracker.ToShaderInput(cb);
         return;
     }
     if ((usageHint == btDepth) or (usageHint == btStencil))
@@ -807,6 +807,15 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (info.m_imageView == VK_NULL_HANDLE)
         return false;
+    // Transition only on our own CL and only when no render-pass scope is open on it.
+    // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
+    // pingpong path the next Activate's DetachBuffer will issue the transition outside
+    // the pass, and on a disabled RT Disable has already transitioned all buffers.
+    if (m_cmdList and not m_isInRendering) {
+        VkCommandBuffer cb = m_cmdList->GfxList();
+        if (cb != VK_NULL_HANDLE)
+            info.m_layoutTracker.ToShaderInput(cb);
+    }
     if (not m_renderTexture.m_hasParams)
         m_renderTexture.SetParams(false);
     m_renderTexture.m_image = info.m_image;
@@ -819,11 +828,27 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
 // -------------------------------------------------------------------------------------------------
 // GetAsTexture / GetDepthAsTexture / GetDepthAsShadowTexture
 
+// GetAsTexture* hand a RenderTarget's color / depth buffer over to the shader-input side
+// of the pipeline. The buffer was last written as a color or depth attachment, so the image
+// is in COLOR_ATTACHMENT_OPTIMAL / DEPTH_STENCIL_ATTACHMENT_OPTIMAL. Vulkan requires a layout
+// transition to SHADER_READ_ONLY_OPTIMAL before the image can be sampled — emit it here on
+// the active CommandBuffer so the caller (Texture::Bind + vkCmdDraw) sees a sample-ready
+// image. ToShaderInput is a no-op when the tracker already records SHADER_READ_ONLY_OPTIMAL.
+
 Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex*/)
 {
     BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
     if (info.m_image == VK_NULL_HANDLE)
         return nullptr;
+    // Transition only on our own CL and only when no render-pass scope is open on it.
+    // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
+    // pingpong path the next Activate's DetachBuffer will issue the transition outside
+    // the pass, and on a disabled RT Disable has already transitioned all buffers.
+    if (m_cmdList and not m_isInRendering) {
+        VkCommandBuffer cb = m_cmdList->GfxList();
+        if (cb != VK_NULL_HANDLE)
+            info.m_layoutTracker.ToShaderInput(cb);
+    }
     m_renderTexture.m_image = info.m_image;
     m_renderTexture.m_imageView = info.m_imageView;
     m_renderTexture.m_handle = info.m_srvIndex;
@@ -839,6 +864,15 @@ Texture* RenderTarget::GetDepthAsTexture(void)
     BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
     if (info.m_image == VK_NULL_HANDLE)
         return nullptr;
+    // Transition only on our own CL and only when no render-pass scope is open on it.
+    // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
+    // pingpong path the next Activate's DetachBuffer will issue the transition outside
+    // the pass, and on a disabled RT Disable has already transitioned all buffers.
+    if (m_cmdList and not m_isInRendering) {
+        VkCommandBuffer cb = m_cmdList->GfxList();
+        if (cb != VK_NULL_HANDLE)
+            info.m_layoutTracker.ToShaderInput(cb);
+    }
     m_depthTexture.m_image = info.m_image;
     m_depthTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
     m_depthTexture.m_handle = info.m_srvIndex;
@@ -854,6 +888,15 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
     BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
     if (info.m_image == VK_NULL_HANDLE)
         return nullptr;
+    // Transition only on our own CL and only when no render-pass scope is open on it.
+    // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
+    // pingpong path the next Activate's DetachBuffer will issue the transition outside
+    // the pass, and on a disabled RT Disable has already transitioned all buffers.
+    if (m_cmdList and not m_isInRendering) {
+        VkCommandBuffer cb = m_cmdList->GfxList();
+        if (cb != VK_NULL_HANDLE)
+            info.m_layoutTracker.ToShaderInput(cb);
+    }
     m_shadowTexture.m_image = info.m_image;
     m_shadowTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
     m_shadowTexture.m_handle = info.m_srvIndex;

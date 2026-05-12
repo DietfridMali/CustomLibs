@@ -315,9 +315,16 @@ public:
         m_isRenderTarget = true;
     }
 
-    ~RenderTargetTexture() = default;
+    ~RenderTargetTexture();
 
     virtual void SetParams(bool forceUpdate = false) override;
+
+    // The GL texture name is owned by the wrapped RenderTarget's BufferInfo. Drop our
+    // borrowed handle here so the implicit ~Texture path's Texture::Destroy() sees a
+    // zero handle and glDeleteTextures(0) is silently ignored per spec. Functionally
+    // redundant in OpenGL (glDeleteTextures tolerates already-deleted names), but the
+    // pattern is kept symmetric to the Vulkan / DX12 paths.
+    virtual void Destroy(void) override;
 };
 
 // =================================================================================================
@@ -328,9 +335,12 @@ class ShadowTexture
 public:
     ShadowTexture() = default;
 
-    ~ShadowTexture() = default;
+    ~ShadowTexture();
 
     virtual void SetParams(bool forceUpdate = false) override;
+
+    // Same lifetime semantics as RenderTargetTexture.
+    virtual void Destroy(void) override;
 };
 
 // =================================================================================================

@@ -430,4 +430,39 @@ void ShadowTexture::SetParams(bool forceUpdate)
     m_sampling.maxAnisotropy = 1.0f;
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// Wrapper teardown: null the borrowed BufferInfo handles before delegating to Texture::Destroy.
+// The same applies in the implicit ~Texture destructor path (C++ destructor virtual dispatch is
+// static, so ~Texture would otherwise call Texture::Destroy() which expects to own the handles).
+
+void RenderTargetTexture::Destroy(void)
+{
+    m_handle = UINT32_MAX;
+    m_resource.Reset();
+    Texture::Destroy();
+}
+
+
+RenderTargetTexture::~RenderTargetTexture()
+{
+    m_handle = UINT32_MAX;
+    m_resource.Reset();
+}
+
+
+void ShadowTexture::Destroy(void)
+{
+    m_handle = UINT32_MAX;
+    m_resource.Reset();
+    Texture::Destroy();
+}
+
+
+ShadowTexture::~ShadowTexture()
+{
+    m_handle = UINT32_MAX;
+    m_resource.Reset();
+}
+
 // =================================================================================================

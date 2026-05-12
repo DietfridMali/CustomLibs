@@ -437,4 +437,51 @@ void ShadowTexture::SetParams(bool forceUpdate) {
     }
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// Wrapper teardown: null the borrowed BufferInfo handle before delegating to Texture::Destroy.
+// The same applies in the implicit ~Texture destructor path (C++ destructor virtual dispatch is
+// static, so ~Texture would otherwise call Texture::Destroy() which expects to own the handle).
+
+void RenderTargetTexture::Destroy(void)
+{
+#if USE_SHARED_HANDLES
+    m_handle = SharedTextureHandle(0);
+#else
+    m_handle = 0;
+#endif
+    Texture::Destroy();
+}
+
+
+RenderTargetTexture::~RenderTargetTexture()
+{
+#if USE_SHARED_HANDLES
+    m_handle = SharedTextureHandle(0);
+#else
+    m_handle = 0;
+#endif
+}
+
+
+void ShadowTexture::Destroy(void)
+{
+#if USE_SHARED_HANDLES
+    m_handle = SharedTextureHandle(0);
+#else
+    m_handle = 0;
+#endif
+    Texture::Destroy();
+}
+
+
+ShadowTexture::~ShadowTexture()
+{
+#if USE_SHARED_HANDLES
+    m_handle = SharedTextureHandle(0);
+#else
+    m_handle = 0;
+#endif
+}
+
 // =================================================================================================

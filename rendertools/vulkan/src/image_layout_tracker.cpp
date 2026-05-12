@@ -51,7 +51,7 @@ void ImageLayoutTracker::TransitionTo(VkCommandBuffer cb, VkImageLayout newLayou
 }
 
 
-void ImageLayoutTracker::ToShaderRead(VkCommandBuffer cb) noexcept
+void ImageLayoutTracker::ToShaderInput(VkCommandBuffer cb) noexcept
 {
     TransitionTo(cb, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                  VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);

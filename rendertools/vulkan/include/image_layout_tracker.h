@@ -39,7 +39,7 @@ public:
                       VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) noexcept;
 
     // Convenience wrappers for the common targets — encode the standard stage/access pairs.
-    void ToShaderRead(VkCommandBuffer cb) noexcept;
+    void ToShaderInput(VkCommandBuffer cb) noexcept;
     void ToColorAttachment(VkCommandBuffer cb) noexcept;
     void ToDepthAttachment(VkCommandBuffer cb) noexcept;
     void ToTransferDst(VkCommandBuffer cb) noexcept;
