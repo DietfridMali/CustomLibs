@@ -3,6 +3,7 @@
 #include "descriptor_pool_handler.h"
 #include "cbv_allocator.h"
 #include "resource_handler.h"
+#include "gfxstates.h"
 
 #include <cstdio>
 
@@ -323,7 +324,10 @@ bool CommandList::Open(bool saveRenderStates) noexcept
     m_activePipeline = VK_NULL_HANDLE;
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
-    commandListHandler.Register(this);
+    // Track as open. Close() will register the CL in m_pendingLists at close-order,
+    // which is what the submit sequence uses. ExecuteAll forces a Close on anything
+    // still in m_openLists at frame end.
+    commandListHandler.m_openLists.Push(this);
     if (saveRenderStates)
         PushRenderStates();
 #ifdef _DEBUG
@@ -346,6 +350,9 @@ void CommandList::Close(bool restoreRenderStates) noexcept
     gfxStates.CheckError();
 #endif
     commandListHandler.PopCmdList();
+    // Register in pendingLists in close-order. ExecuteAll iterates pendingLists in
+    // this order, so the CL whose Close() ran first is submitted first.
+    commandListHandler.Register(this);
     if (restoreRenderStates)
         PopRenderStates();
 }
@@ -469,11 +476,7 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
 #ifdef _DEBUG
 void CommandList::CheckDeviceRemoved(const char* context) noexcept
 {
-    int errors = vkContext.DrainMessages(false);
-    if (errors > 0) {
-        fprintf(stderr, "CommandList::%s: %d Vulkan validation error(s)\n", context, errors);
-        fflush(stderr);
-    }
+    gfxStates.CheckError();
 }
 #endif
 
@@ -542,6 +545,16 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
     // intermediate=true: setup-phase or mid-init drain — plain submit with no frame-sync objects,
     //   followed by vkQueueWaitIdle. Lets setup-phase CommandLists go to the GPU and finish
     //   before the first BeginFrame resets cbvAllocator / drains gfxResourceHandler.
+    // Force-close any CLs still recording. Their Close() registers them at the end of
+    // m_pendingLists, so they get submitted last — which matches the architectural
+    // contract that the outermost (last-to-close) CL runs after all the inner ones
+    // whose Close() already happened during frame rendering.
+    while (m_openLists.Length() > 0) {
+        CommandList* l = m_openLists.Pop();
+        if (l->IsRecording())
+            l->Close();
+    }
+
     if (m_pendingLists.IsEmpty())
         return;
 
@@ -550,8 +563,6 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
     for (auto l : m_pendingLists) {
         if (l->IsFlushed())
             continue;
-        if (l->IsRecording())
-            l->Close();
         VkCommandBufferSubmitInfo info{};
         info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
         info.commandBuffer = l->GfxList(true);

@@ -441,11 +441,17 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
             ConfigColor(m_activeBufferIndex);
     }
     else if (m_drawBufferGroup == dbExtra) {
-        for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount and colorCount < RT_MAX_COLOR_BUFFERS; ++j, ++i)
+        for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             ConfigColor(i);
     }
-    else {
-        for (int i = 0; i < m_colorBufferCount and colorCount < RT_MAX_COLOR_BUFFERS; ++i)
+    else if (m_drawBufferGroup == dbAll) {
+        for (int i = 0; i < m_colorBufferCount; ++i)
+            ConfigColor(i);
+        for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
+            ConfigColor(i);
+    }
+    else {  // dbColor, dbCustom — color only
+        for (int i = 0; i < m_colorBufferCount; ++i)
             ConfigColor(i);
     }
 
@@ -981,11 +987,17 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
                 key.colorFormats[key.colorFormatCount++] = kColorFormat;
             break;
         case dbExtra:
-            for (int j = 0; j < m_vertexBufferCount and key.colorFormatCount < 8; ++j)
+            for (int j = 0; j < m_vertexBufferCount; ++j)
                 key.colorFormats[key.colorFormatCount++] = kVertexFormat;
             break;
-        default: // dbAll, dbColor, dbCustom
-            for (int i = 0; i < m_colorBufferCount and key.colorFormatCount < 8; ++i)
+        case dbAll:
+            for (int i = 0; i < m_colorBufferCount; ++i)
+                key.colorFormats[key.colorFormatCount++] = kColorFormat;
+            for (int j = 0; j < m_vertexBufferCount; ++j)
+                key.colorFormats[key.colorFormatCount++] = kVertexFormat;
+            break;
+        default: // dbColor, dbCustom — color only
+            for (int i = 0; i < m_colorBufferCount; ++i)
                 key.colorFormats[key.colorFormatCount++] = kColorFormat;
             break;
     }

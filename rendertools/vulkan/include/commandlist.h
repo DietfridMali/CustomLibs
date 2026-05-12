@@ -172,6 +172,13 @@ class CommandListHandler
 {
 public:
     CommandQueue                        m_cmdQueue;
+    // m_openLists: CLs that have been Open()ed but not yet Close()d. Tracked for
+    // the frame-end submit pass which forces a Close on anything still recording.
+    // m_pendingLists: CLs that have been Close()d, in close order. ExecuteAll submits
+    // them in this order, so a CL whose Close() ran first (innermost render-pass scope)
+    // is submitted first — matching the "CL == one render pass, close-order = submit-order"
+    // architecture.
+    AutoArray<CommandList*>             m_openLists;
     AutoArray<CommandList*>             m_pendingLists;
     AutoArray<CommandList*>             m_recycledLists;
     AutoArray<CommandListData>          m_cmdListStack;

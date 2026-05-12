@@ -127,15 +127,7 @@ public:
         Disable();
     } 
 
-    inline bool ActivateTextures(std::span<Texture* const> textures = {}) noexcept {
-        int tmu = 0;
-        for (Texture* t : textures) {
-            if (t && not t->Activate(tmu)) 
-                return false;
-            ++tmu;
-        }
-        return true;
-    }
+    bool ActivateTextures(std::span<Texture* const> textures = {}) noexcept;
 
     inline void DeactivateTextures(std::span<Texture* const> textures = {}) noexcept {
         for (Texture* t : textures)

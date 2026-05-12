@@ -249,6 +249,26 @@ bool GfxDataLayout::FinishUpdate(void) noexcept
 }
 
 
+bool GfxDataLayout::ActivateTextures(std::span<Texture* const> textures) noexcept {
+    int tmu = 0;
+    for (Texture* t : textures) {
+        if (t) {
+            if (not t->Activate(tmu))
+                return false;
+        }
+        else {
+            // Texture-array slot is null (e.g. shadowMap when no shadows are cast).
+            // Clear the bind-table entry so a previous pass' image (e.g. CloudRenderer's
+            // 3D blueNoise) doesn't leak into this draw's DescriptorSet.
+            commandListHandler.BindSampledImage(uint32_t(tmu), VK_NULL_HANDLE);
+            commandListHandler.BindSampler(uint32_t(tmu), VK_NULL_HANDLE);
+        }
+        ++tmu;
+    }
+    return true;
+}
+
+
 void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 {
     if (not StartRender())
