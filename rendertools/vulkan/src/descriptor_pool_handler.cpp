@@ -85,7 +85,7 @@ bool DescriptorPoolHandler::CreatePool(uint32_t slot) noexcept
     sizes[1].descriptorCount = kMaxSampledImagesPerPool;
     sizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLER;
     sizes[2].descriptorCount = kMaxSamplersPerPool;
-    sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     sizes[3].descriptorCount = kMaxStoragePerPool;
 
     VkDescriptorPoolCreateInfo info { };

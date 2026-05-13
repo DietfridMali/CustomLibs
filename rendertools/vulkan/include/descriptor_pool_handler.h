@@ -18,7 +18,7 @@
 //   kMaxSetsPerPool      — how many distinct VkDescriptorSet objects per frame
 //   kMaxUbosPerPool      — UNIFORM_BUFFER_DYNAMIC slot count (b0/b1 per stage)
 //   kMaxImagesPerPool    — COMBINED_IMAGE_SAMPLER slot count (t0..t15 per draw)
-//   kMaxStoragePerPool   — STORAGE_IMAGE slot count (u0..u3 per draw)
+//   kMaxStoragePerPool   — STORAGE_BUFFER slot count (u0..u3 per draw)
 //
 // Singleton, created from Application::InitGraphics() after VKContext is up, before BeginFrame.
 

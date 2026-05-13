@@ -20,7 +20,7 @@ static constexpr uint32_t kMaxQueueFamilies = 16;
 // (1:1 mirror of DX12Context::DrainMessages). The validation layer may invoke this callback from
 // a background thread, hence the mutex.
 
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
 static VKAPI_ATTR VkBool32 VKAPI_CALL VkContextDebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     VkDebugUtilsMessageTypeFlagsEXT type,
@@ -73,7 +73,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VkContextDebugCallback(
 
 int VKContext::DrainMessages(bool onlyErrors) noexcept
 {
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
     std::vector<ValidationMessage> drained;
     int errors = 0;
     {
@@ -108,7 +108,7 @@ bool VKContext::Create(SDL_Window* window, bool enableValidationLayers) noexcept
     }
     if (not CreateInstance(window, enableValidationLayers))
         return false;
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
     if (not RegisterDebugMessenger(enableValidationLayers))
         return false;
 #endif
@@ -140,7 +140,7 @@ void VKContext::Destroy(void) noexcept
         vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
         m_surface = VK_NULL_HANDLE;
     }
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
     UnregisterDebugMessenger();
 #endif
     if (m_instance != VK_NULL_HANDLE) {
@@ -174,7 +174,7 @@ bool VKContext::CreateInstance(SDL_Window* window, bool enableValidationLayers) 
         return false;
     }
     uint32_t extCount = sdlExtCount;
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
     if (enableValidationLayers)
         extensions[extCount++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 #endif
@@ -182,7 +182,7 @@ bool VKContext::CreateInstance(SDL_Window* window, bool enableValidationLayers) 
     // Optional validation layer — enabled only if both requested AND available on this driver.
     const char* layerName = "VK_LAYER_KHRONOS_validation";
     bool useValidation = false;
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
     if (enableValidationLayers and LayerAvailable(layerName))
         useValidation = true;
 #else
@@ -452,10 +452,10 @@ bool VKContext::CreateAllocator(void) noexcept
 }
 
 // =================================================================================================
-// Validation-layer registration (debug-only). VK_EXT_debug_utils functions are not in the
-// Vulkan core — we must look them up via vkGetInstanceProcAddr.
+// Validation-layer registration (gated by ENABLE_VK_LOGGING). VK_EXT_debug_utils functions are
+// not in the Vulkan core — we must look them up via vkGetInstanceProcAddr.
 
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
 
 bool VKContext::RegisterDebugMessenger(bool enableValidationLayers) noexcept
 {

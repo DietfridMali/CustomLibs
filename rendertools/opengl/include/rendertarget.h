@@ -142,6 +142,13 @@ public:
 
     void Deactivate(void) noexcept;
 
+    // No-op on OGL: render-pass scope pause/resume is a Vulkan-only concept (vkCmdBeginRendering /
+    // vkCmdEndRendering). In OGL the framebuffer binding is global state and does not need to be
+    // suspended around UAV clears or copy ops. Present for source-level compatibility with the
+    // Vulkan path; common-code callers (e.g. DecalHandler::Render) use it unconditionally.
+    inline void BeginRendering(bool /*clearColor*/ = false, bool /*clearDepth*/ = false) noexcept {}
+    inline void EndRendering(void) noexcept {}
+
     bool Enable(const RTActivationParams& params);
 
     void Disable(bool deactivate = true) noexcept;

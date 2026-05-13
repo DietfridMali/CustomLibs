@@ -28,7 +28,7 @@
 //      3          UNIFORM_BUFFER_DYNAMIC, GEOMETRY        (b1-GS — ShaderConstants)
 //      4..19      SAMPLED_IMAGE,         FRAGMENT         (t0..t15)
 //      20..35     SAMPLER,               FRAGMENT         (s0..s15) — paired 1:1 with t-slots
-//      36..39     STORAGE_IMAGE,         ALL_GRAPHICS     (u0..u3)
+//      36..39     STORAGE_BUFFER,        ALL_GRAPHICS     (u0..u3)
 //  - VkPipelineLayout from the set layout above (one pipeline layout per shader; cached
 //    pipelines built per RenderStates are looked up via the PSO-cache pendant in step 7d).
 //  - b0 — FrameConstants written per-draw to a UBO ring-buffer sub-allocation (cbv-allocator

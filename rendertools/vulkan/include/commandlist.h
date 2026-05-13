@@ -7,6 +7,7 @@
 #include "basesingleton.hpp"
 #include "renderstates.h"
 #include "image_layout_tracker.h"
+#include "swapchain.h"
 
 #include <functional>
 
@@ -33,8 +34,16 @@ public:
     uint32_t       m_graphicsFamily   { 0 };
     uint32_t       m_presentFamily    { 0 };
 
+    // imageAvailable is the acquire-wait semaphore: signaled by vkAcquireNextImageKHR before the
+    // image index is known, so it must be indexed by frame slot. inFlight is the CPU-throttle
+    // fence, also per frame slot.
+    // renderFinished follows the swapchain image: it is signaled by the submit and waited on by
+    // vkQueuePresentKHR for a given image. Because the driver is free to return acquired image
+    // indices in any order, indexing renderFinished by frame slot can re-signal a semaphore
+    // whose previously-presented image has not yet been re-acquired (VUID-vkQueueSubmit2-
+    // semaphore-03868). Index by m_imageIndex instead — one renderFinished per swapchain image.
     VkSemaphore    m_imageAvailable[FRAME_COUNT] { };
-    VkSemaphore    m_renderFinished[FRAME_COUNT] { };
+    VkSemaphore    m_renderFinished[Swapchain::MAX_BACK_BUFFERS] { };
     VkFence        m_inFlight       [FRAME_COUNT] { };
 
     VkDevice       m_device      { VK_NULL_HANDLE };
@@ -54,10 +63,16 @@ public:
     bool BeginFrame(void) noexcept;
     void EndFrame(void) noexcept;
 
+    // Destroy + re-create the per-slot binary semaphores and the in-flight fences.
+    // Called from BaseDisplayHandler::UpdateDisplayMode after Swapchain::Recreate, so the
+    // present-pending semaphores of the destroyed swapchain images do not leak into the
+    // next frame's submit (VUID-vkQueueSubmit2-semaphore-03868).
+    bool RecreateSyncObjects(void) noexcept;
+
     void WaitIdle(void) noexcept;
 
     inline VkSemaphore SubmitWaitSemaphore(void) const noexcept { return m_imageAvailable[m_frameIndex]; }
-    inline VkSemaphore SubmitSignalSemaphore(void) const noexcept { return m_renderFinished[m_frameIndex]; }
+    inline VkSemaphore SubmitSignalSemaphore(void) const noexcept { return m_renderFinished[m_imageIndex]; }
     inline VkFence SubmitSignalFence(void) const noexcept { return m_inFlight[m_frameIndex]; }
 
     inline VkQueue GraphicsQueue(void) const noexcept { return m_graphicsQueue; }
@@ -206,14 +221,15 @@ public:
     static constexpr uint32_t kSamplerSlots = 16;  // matches Shader::kSamplerSlots
     static constexpr uint32_t kUavSlots     = 4;   // matches Shader::kUavSlots
 
-    VkImageView m_boundSrvViews    [kSrvSlots]     { };
-    VkSampler   m_boundSamplers    [kSamplerSlots] { };
-    VkImageView m_boundStorageViews[kUavSlots]     { };
+    VkImageView  m_boundSrvViews         [kSrvSlots]     { };
+    VkSampler    m_boundSamplers         [kSamplerSlots] { };
+    VkBuffer     m_boundStorageBuffers   [kUavSlots]     { };
+    VkDeviceSize m_boundStorageBufferSize[kUavSlots]     { };
 
     void ResetBindings(void) noexcept;
     void BindSampledImage(uint32_t slot, VkImageView view) noexcept;
     void BindSampler(uint32_t slot, VkSampler sampler) noexcept;
-    void BindStorageImage(uint32_t slot, VkImageView view) noexcept;
+    void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
 
     bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
                 uint32_t graphicsFamily, uint32_t presentFamily,

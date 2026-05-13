@@ -326,6 +326,11 @@ public:
     // GetPipeline to feed pipelineCache.GetOrCreate. Caller fills key.shader / key.states.
     void FillPipelineKey(struct PipelineKey& key) noexcept;
 
+    // Manage the active vkCmdBeginRendering scope for this RT. Parameterless call (defaults
+    // false/false) gives LOAD_OP_LOAD on both — used to resume a previously suspended scope.
+    void BeginRendering(bool clearColor = false, bool clearDepth = false);
+    void EndRendering(void);
+
 private:
     void CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
@@ -338,10 +343,6 @@ private:
     int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
 
     void CreateRenderArea(void);
-
-    // Manage the active vkCmdBeginRendering scope for this RT.
-    void BeginRendering(bool clearColor, bool clearDepth);
-    void EndRendering(void);
 
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0)

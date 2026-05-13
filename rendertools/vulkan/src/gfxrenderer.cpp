@@ -161,9 +161,10 @@ void GfxRenderer::FlushResources(void) noexcept {
     //
     // ExecuteAll(true) does the plain-submit-plus-WaitIdle variant (no frame-sync semaphores
     // or fence). Drain the deferred-cleanup lambdas for both frame slots, then clear the
-    // CPU-side bind table: setup-phase Texture::Bind calls left stale VkImageView handles in
-    // m_boundSrvViews / m_boundSamplers / m_boundStorageViews; after Cleanup those handles
-    // point at destroyed views, and the next render's vkUpdateDescriptorSets would reject them.
+    // CPU-side bind table: setup-phase Texture::Bind calls left stale handles in
+    // m_boundSrvViews / m_boundSamplers / m_boundStorageBuffers; after Cleanup those handles
+    // point at destroyed views/buffers, and the next render's vkUpdateDescriptorSets would
+    // reject them.
     commandListHandler.ExecuteAll(true);
     gfxResourceHandler.Cleanup(0);
     gfxResourceHandler.Cleanup(1);

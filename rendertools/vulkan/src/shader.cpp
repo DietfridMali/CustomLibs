@@ -165,7 +165,7 @@ bool Shader::CreatePipelineLayout(void) noexcept
         addBinding(kSamplerBase + i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
 
     for (uint32_t i = 0; i < kUavSlots; ++i)
-        addBinding(kUavBase + i, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
+        addBinding(kUavBase + i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
 
     VkDescriptorSetLayoutCreateInfo setInfo { };
     setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -556,7 +556,7 @@ bool Shader::UpdateVariables(void) noexcept {
     VkDescriptorBufferInfo bufInfos[4]                              { };
     VkDescriptorImageInfo  imgInfos[CommandListHandler::kSrvSlots]  { };
     VkDescriptorImageInfo  smpInfos[CommandListHandler::kSamplerSlots] { };
-    VkDescriptorImageInfo  stoInfos[CommandListHandler::kUavSlots]  { };
+    VkDescriptorBufferInfo stoInfos[CommandListHandler::kUavSlots]  { };
     uint32_t writeCount = 0;
 
     auto AddDynamicUbo = [&](uint32_t binding, uint32_t bytes, uint32_t bufSlot) {
@@ -612,19 +612,20 @@ bool Shader::UpdateVariables(void) noexcept {
         w.pImageInfo      = &smpInfos[i];
     }
     for (uint32_t i = 0; i < CommandListHandler::kUavSlots; ++i) {
-        VkImageView v = commandListHandler.m_boundStorageViews[i];
-        if (v == VK_NULL_HANDLE)
+        VkBuffer b = commandListHandler.m_boundStorageBuffers[i];
+        if (b == VK_NULL_HANDLE)
             continue;
-        stoInfos[i].imageView   = v;
-        stoInfos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        stoInfos[i].buffer = b;
+        stoInfos[i].offset = 0;
+        stoInfos[i].range  = commandListHandler.m_boundStorageBufferSize[i];
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w.dstSet          = set;
         w.dstBinding      = kUavBase + i;
         w.dstArrayElement = 0;
         w.descriptorCount = 1;
-        w.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        w.pImageInfo      = &stoInfos[i];
+        w.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        w.pBufferInfo     = &stoInfos[i];
     }
 
     if (writeCount > 0)

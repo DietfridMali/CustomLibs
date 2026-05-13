@@ -1,5 +1,13 @@
 #pragma once
 
+// Toggle Vulkan validation-layer logging independently of _DEBUG. Set to 1 to register the
+// VK_EXT_debug_utils messenger and route validation/performance messages through DrainMessages,
+// 0 to compile the logging path out entirely. Useful for diagnosing release-build crashes
+// without flipping the whole _DEBUG flag.
+#ifndef ENABLE_VK_LOGGING
+#define ENABLE_VK_LOGGING 1
+#endif
+
 #include "vkframework.h"
 #include "basesingleton.hpp"
 
@@ -9,7 +17,7 @@
 #include "SDL_vulkan.h"
 #pragma warning(pop)
 
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
 #include <mutex>
 #include <string>
 #include <vector>
@@ -41,7 +49,7 @@ public:
     VkPhysicalDeviceProperties m_deviceProps  { };
     uint32_t                   m_apiVersion   { VK_API_VERSION_1_3 };
 
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
     VkDebugUtilsMessengerEXT             m_debugMessenger           { VK_NULL_HANDLE };
     PFN_vkCreateDebugUtilsMessengerEXT   m_pfnCreateDebugMessenger  { nullptr };
     PFN_vkDestroyDebugUtilsMessengerEXT  m_pfnDestroyDebugMessenger { nullptr };
@@ -82,7 +90,7 @@ public:
 
     // Flush the validation-layer log to stderr and return the number of error-severity entries
     // since the last call. onlyErrors=true suppresses warnings/info from the printout (counters
-    // are reset either way). In a non-_DEBUG build this is a no-op returning 0.
+    // are reset either way). When ENABLE_VK_LOGGING=0 this compiles to a no-op returning 0.
     int DrainMessages(bool onlyErrors = false) noexcept;
 
 private:
@@ -93,7 +101,7 @@ private:
     bool CreateDevice(void) noexcept;
     bool CreateAllocator(void) noexcept;
 
-#ifdef _DEBUG
+#if ENABLE_VK_LOGGING
     bool RegisterDebugMessenger(bool enableValidationLayers) noexcept;
     void UnregisterDebugMessenger(void) noexcept;
 #endif

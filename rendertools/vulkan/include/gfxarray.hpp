@@ -3,7 +3,6 @@
 #include "vkframework.h"
 #include "vkcontext.h"
 #include "vkupload.h"
-#include "image_layout_tracker.h"
 #include "commandlist.h"
 #include "shader.h"
 #include "array.hpp"
@@ -12,17 +11,24 @@
 #include <cstring>
 
 // =================================================================================================
-// Vulkan GfxArray — 2D R32_UINT storage image (analogue of the DX12 UAV-style Texture2D used by
-// decalhandler::m_decalDepths).
+// Vulkan GfxArray — flat R32_UINT storage buffer (analogue of the DX12 UAV-style Texture2D used by
+// decalhandler::m_decalDepths). 2D indexing is folded into the shader as `y * width + x`.
 //
-// Storage image lives in VK_IMAGE_LAYOUT_GENERAL between operations (the layout that allows
-// shader storage-image read/write). Clear / Upload / Download briefly transition to
-// TRANSFER_DST / TRANSFER_SRC and back. They run on a one-shot CommandBuffer (blocking submit),
-// matching the DX12 path's "submit + wait" semantics for these out-of-frame operations.
+// Storage-buffer was chosen over storage-image to:
+//   • avoid the image-layout transitions GENERAL <-> TRANSFER_DST around every Clear (two
+//     vkCmdPipelineBarrier2 per call),
+//   • use vkCmdFillBuffer for the clear (much faster than vkCmdClearColorImage on most GPUs —
+//     no layout decoding, no 2D tiling),
+//   • keep the descriptor type consistent for atomic ops; SPIR-V InterlockedMin works on
+//     RWStructuredBuffer<uint> just as on RWTexture2D<uint>.
 //
-// Bind() writes (m_imageView, VK_IMAGE_LAYOUT_GENERAL) into the CommandListHandler bind table at
-// the requested u-slot. Shader::UpdateVariables materializes the table into a VkDescriptorSet
-// (vkUpdateDescriptorSets + vkCmdBindDescriptorSets) right before each draw.
+// The clear path still needs the active render-pass scope paused (vkCmdFillBuffer is forbidden
+// inside vkCmdBeginRendering exactly like vkCmdClearColorImage); the caller is responsible for
+// that — see DecalHandler::Render's EndRendering/BeginRendering bracketing.
+//
+// Bind() writes (m_buffer, range) into the CommandListHandler bind table at the requested u-slot.
+// Shader::UpdateVariables materializes the table into a VkDescriptorSet (vkUpdateDescriptorSets
+// + vkCmdBindDescriptorSets) right before each draw.
 
 class BaseGfxArray {
 public:
@@ -36,10 +42,9 @@ class GfxArray : public BaseGfxArray
 public:
     AutoArray<DATA_T>      m_data;
 
-    VkImage                m_image          { VK_NULL_HANDLE };
-    VkImageView            m_imageView      { VK_NULL_HANDLE };
+    VkBuffer               m_buffer         { VK_NULL_HANDLE };
     VmaAllocation          m_allocation     { VK_NULL_HANDLE };
-    ImageLayoutTracker     m_layoutTracker;
+    VkDeviceSize           m_bufferSize     { 0 };
 
     // Lazy-allocated host-visible staging buffers, kept across calls so repeat Upload/Download
     // doesn't churn allocations.
@@ -71,63 +76,30 @@ public:
         if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE) or (size == 0))
             return false;
 
-        VkImageCreateInfo info{};
-        info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-        info.imageType     = VK_IMAGE_TYPE_2D;
-        info.format        = VK_FORMAT_R32_UINT;
-        info.extent.width  = m_width;
-        info.extent.height = m_height;
-        info.extent.depth  = 1;
-        info.mipLevels     = 1;
-        info.arrayLayers   = 1;
-        info.samples       = VK_SAMPLE_COUNT_1_BIT;
-        info.tiling        = VK_IMAGE_TILING_OPTIMAL;
-        info.usage         = VK_IMAGE_USAGE_STORAGE_BIT
-                           | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-                           | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
-        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        m_bufferSize = VkDeviceSize(size) * VkDeviceSize(sizeof(DATA_T));
 
-        VmaAllocationCreateInfo allocInfo{};
-        allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
-        if (vmaCreateImage(allocator, &info, &allocInfo, &m_image, &m_allocation, nullptr) != VK_SUCCESS)
+        VkBufferCreateInfo bi{};
+        bi.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bi.size        = m_bufferSize;
+        bi.usage       = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                       | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+                       | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VmaAllocationCreateInfo ai{};
+        ai.usage = VMA_MEMORY_USAGE_AUTO;
+        if (vmaCreateBuffer(allocator, &bi, &ai, &m_buffer, &m_allocation, nullptr) != VK_SUCCESS)
             return false;
-
-        m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
-
-        VkImageViewCreateInfo vci{};
-        vci.sType                       = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        vci.image                       = m_image;
-        vci.viewType                    = VK_IMAGE_VIEW_TYPE_2D;
-        vci.format                      = VK_FORMAT_R32_UINT;
-        vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        vci.subresourceRange.levelCount = 1;
-        vci.subresourceRange.layerCount = 1;
-        if (vkCreateImageView(device, &vci, nullptr, &m_imageView) != VK_SUCCESS)
-            return false;
-
-        // Bring the image to GENERAL on a one-shot CB so the first Bind/Clear has a stable
-        // baseline layout; subsequent Clear/Upload/Download will transition as needed.
-        OneShotCommandBuffer once;
-        if (BeginSingleTimeCommands(once)) {
-            m_layoutTracker.ToGeneral(once.cb);
-            EndSingleTimeCommands(once);
-        }
 
         return true;
     }
 
     void Destroy(void) {
         VmaAllocator allocator = vkContext.Allocator();
-        VkDevice     device    = vkContext.Device();
-        if (device != VK_NULL_HANDLE and m_imageView != VK_NULL_HANDLE) {
-            vkDestroyImageView(device, m_imageView, nullptr);
-            m_imageView = VK_NULL_HANDLE;
-        }
         if (allocator != VK_NULL_HANDLE) {
-            if (m_image != VK_NULL_HANDLE) {
-                vmaDestroyImage(allocator, m_image, m_allocation);
-                m_image = VK_NULL_HANDLE;
+            if (m_buffer != VK_NULL_HANDLE) {
+                vmaDestroyBuffer(allocator, m_buffer, m_allocation);
+                m_buffer = VK_NULL_HANDLE;
                 m_allocation = VK_NULL_HANDLE;
             }
             if (m_uploadBuffer != VK_NULL_HANDLE) {
@@ -143,101 +115,80 @@ public:
         }
         m_data.Reset();
         m_width = m_height = 0;
+        m_bufferSize = 0;
     }
 
     bool Bind(uint32_t bindingPoint) {
-        if (m_image == VK_NULL_HANDLE)
+        if (m_buffer == VK_NULL_HANDLE)
             return false;
         m_bindingPoint = bindingPoint;
         if (bindingPoint < CommandListHandler::kUavSlots)
-            commandListHandler.BindStorageImage(bindingPoint, m_imageView);
+            commandListHandler.BindStorageBuffer(bindingPoint, m_buffer, m_bufferSize);
         return true;
     }
 
     void Release(uint32_t bindingPoint) {
         if (bindingPoint < CommandListHandler::kUavSlots)
-            commandListHandler.BindStorageImage(bindingPoint, VK_NULL_HANDLE);
+            commandListHandler.BindStorageBuffer(bindingPoint, VK_NULL_HANDLE, 0);
     }
 
+    // Writes vkCmdFillBuffer onto the currently active CommandList's CB. Contract: caller ensures
+    // no vkCmdBeginRendering scope is open at call time — render-pass scopes forbid both buffer
+    // fills and image clears. DecalHandler::Render handles that by calling EndRendering before
+    // and BeginRendering after the clear.
     void Clear(DATA_T value) {
-        if (m_image == VK_NULL_HANDLE)
+        if (m_buffer == VK_NULL_HANDLE)
             return;
 
-        OneShotCommandBuffer once;
-        if (not BeginSingleTimeCommands(once))
-            return;
-
-        m_layoutTracker.ToTransferDst(once.cb);
-
-        VkClearColorValue cv{};
-        // R32_UINT is treated as the .uint32 channel; populate all 4 entries even though only
-        // .uint32[0] is read for single-channel formats — Vulkan validation expects the union to
-        // be initialized.
-        cv.uint32[0] = uint32_t(value);
-        cv.uint32[1] = uint32_t(value);
-        cv.uint32[2] = uint32_t(value);
-        cv.uint32[3] = uint32_t(value);
-
-        VkImageSubresourceRange range{};
-        range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        range.levelCount = 1;
-        range.layerCount = 1;
-        vkCmdClearColorImage(once.cb, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &cv, 1, &range);
-
-        m_layoutTracker.ToGeneral(once.cb);
-        EndSingleTimeCommands(once);
+        VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+        // vkCmdFillBuffer fills with a uint32 pattern repeated across the range. For DATA_T larger
+        // than 4 bytes the caller would need a different fill primitive; for the decal-depths
+        // case (R32_UINT, value = 0xFFFFFFFF) the pattern matches the element layout exactly.
+        static_assert(sizeof(DATA_T) == sizeof(uint32_t),
+                      "GfxArray::Clear assumes 32-bit elements; widen the fill path for other sizes.");
+        vkCmdFillBuffer(cb, m_buffer, 0, m_bufferSize, uint32_t(value));
     }
 
     bool Upload(void) {
-        if (m_image == VK_NULL_HANDLE or m_data.IsEmpty())
+        if (m_buffer == VK_NULL_HANDLE or m_data.IsEmpty())
             return false;
 
         VmaAllocator allocator = vkContext.Allocator();
         if (allocator == VK_NULL_HANDLE)
             return false;
 
-        const VkDeviceSize bytes = VkDeviceSize(m_width) * VkDeviceSize(m_height) * VkDeviceSize(sizeof(DATA_T));
-        if (not EnsureStagingBuffer(m_uploadBuffer, m_uploadAlloc, bytes,
+        if (not EnsureStagingBuffer(m_uploadBuffer, m_uploadAlloc, m_bufferSize,
                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
             return false;
 
-        // Map + copy + unmap (persistent mapping not requested for upload — we only access on Upload).
         void* mapped = nullptr;
         if (vmaMapMemory(allocator, m_uploadAlloc, &mapped) != VK_SUCCESS)
             return false;
-        std::memcpy(mapped, m_data.Data(), size_t(bytes));
+        std::memcpy(mapped, m_data.Data(), size_t(m_bufferSize));
         vmaUnmapMemory(allocator, m_uploadAlloc);
 
         OneShotCommandBuffer once;
         if (not BeginSingleTimeCommands(once))
             return false;
 
-        m_layoutTracker.ToTransferDst(once.cb);
+        VkBufferCopy region{};
+        region.size = m_bufferSize;
+        vkCmdCopyBuffer(once.cb, m_uploadBuffer, m_buffer, 1, &region);
 
-        VkBufferImageCopy region{};
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.layerCount = 1;
-        region.imageExtent.width  = m_width;
-        region.imageExtent.height = m_height;
-        region.imageExtent.depth  = 1;
-        vkCmdCopyBufferToImage(once.cb, m_uploadBuffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-        m_layoutTracker.ToGeneral(once.cb);
         EndSingleTimeCommands(once);
         return true;
     }
 
     bool Download(void) {
-        if (m_image == VK_NULL_HANDLE or m_data.IsEmpty())
+        if (m_buffer == VK_NULL_HANDLE or m_data.IsEmpty())
             return false;
 
         VmaAllocator allocator = vkContext.Allocator();
         if (allocator == VK_NULL_HANDLE)
             return false;
 
-        const VkDeviceSize bytes = VkDeviceSize(m_width) * VkDeviceSize(m_height) * VkDeviceSize(sizeof(DATA_T));
-        if (not EnsureStagingBuffer(m_readbackBuffer, m_readbackAlloc, bytes,
+        if (not EnsureStagingBuffer(m_readbackBuffer, m_readbackAlloc, m_bufferSize,
                                     VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                     VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT))
             return false;
@@ -246,24 +197,17 @@ public:
         if (not BeginSingleTimeCommands(once))
             return false;
 
-        m_layoutTracker.ToTransferSrc(once.cb);
+        VkBufferCopy region{};
+        region.size = m_bufferSize;
+        vkCmdCopyBuffer(once.cb, m_buffer, m_readbackBuffer, 1, &region);
 
-        VkBufferImageCopy region{};
-        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        region.imageSubresource.layerCount = 1;
-        region.imageExtent.width  = m_width;
-        region.imageExtent.height = m_height;
-        region.imageExtent.depth  = 1;
-        vkCmdCopyImageToBuffer(once.cb, m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_readbackBuffer, 1, &region);
-
-        m_layoutTracker.ToGeneral(once.cb);
         if (not EndSingleTimeCommands(once))
             return false;
 
         void* mapped = nullptr;
         if (vmaMapMemory(allocator, m_readbackAlloc, &mapped) != VK_SUCCESS)
             return false;
-        std::memcpy(m_data.Data(), mapped, size_t(bytes));
+        std::memcpy(m_data.Data(), mapped, size_t(m_bufferSize));
         vmaUnmapMemory(allocator, m_readbackAlloc);
         return true;
     }
@@ -276,8 +220,6 @@ private:
         if (allocator == VK_NULL_HANDLE)
             return false;
 
-        // Re-allocate if a previous buffer was sized for a smaller image (size change between
-        // calls would otherwise cause out-of-bounds copies).
         if (outBuffer != VK_NULL_HANDLE) {
             VmaAllocationInfo info{};
             vmaGetAllocationInfo(allocator, outAlloc, &info);

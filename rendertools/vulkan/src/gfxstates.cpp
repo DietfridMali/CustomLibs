@@ -378,7 +378,7 @@ void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, c
 // were collected since the last call. 1:1 to DX12Context::DrainMessages-based CheckError.
 
 bool GfxStates::CheckError(const char* operation) noexcept {
-#ifdef _DEBUG
+#if 1//def _DEBUG
     int errors = vkContext.DrainMessages(false);
     if (errors > 0) {
         if (operation and *operation)

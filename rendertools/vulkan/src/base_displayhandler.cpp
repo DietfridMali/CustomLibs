@@ -275,7 +275,8 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) 
     m_height = mode.h;
     m_aspectRatio = float(m_width) / float(m_height);
 
-    // Resize the swapchain on dimension change.
+    // Resize the swapchain on dimension change. Called between EndFrame and BeginFrame
+    // (see DisplayHandler::Update) — no submit is mid-flight at this point.
     if (m_swapchain.Handle() != VK_NULL_HANDLE) {
         VkSurfaceKHR surface = vkContext.Surface();
         if (not m_swapchain.Recreate(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
@@ -283,9 +284,16 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) 
             return false;
         }
         m_backBufferIndex = 0;
-        // The semaphores in CommandQueue are still valid (per-slot, swapchain-independent),
-        // but the cached m_swapchain handle inside CommandQueue is stale — refresh it.
+        // The cached swapchain handle inside CommandQueue is stale — refresh it.
         commandListHandler.CmdQueue().m_swapchain = m_swapchain.Handle();
+        // The per-slot binary semaphores were last used as present-wait for images of the
+        // destroyed swapchain. Those images can never be re-acquired, so the semaphores stay
+        // "in use by VkSwapchainKHR" from the validator's point of view — re-signaling them
+        // would trip VUID-vkQueueSubmit2-semaphore-03868. Destroy and re-create them.
+        if (not commandListHandler.CmdQueue().RecreateSyncObjects()) {
+            fprintf(stderr, "BaseDisplayHandler::UpdateDisplayMode: RecreateSyncObjects failed\n");
+            return false;
+        }
     }
     return true;
 }

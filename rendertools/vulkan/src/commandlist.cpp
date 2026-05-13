@@ -134,11 +134,21 @@ bool CommandQueue::CreateSyncObjects(void) noexcept
 
     for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
         VkResult r1 = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_imageAvailable[i]);
-        VkResult r2 = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_renderFinished[i]);
-        VkResult r3 = vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlight[i]);
-        if ((r1 != VK_SUCCESS) or (r2 != VK_SUCCESS) or (r3 != VK_SUCCESS)) {
-            fprintf(stderr, "CommandQueue::CreateSyncObjects: failed at slot %u (sem=%d,%d fence=%d)\n",
-                    i, (int)r1, (int)r2, (int)r3);
+        VkResult r2 = vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlight[i]);
+        if ((r1 != VK_SUCCESS) or (r2 != VK_SUCCESS)) {
+            fprintf(stderr, "CommandQueue::CreateSyncObjects: failed at slot %u (sem=%d fence=%d)\n",
+                    i, (int)r1, (int)r2);
+            return false;
+        }
+    }
+    // renderFinished is per swapchain image, not per frame slot. Allocate up to the static
+    // upper bound MAX_BACK_BUFFERS — extra slots beyond the swapchain's actual ImageCount are
+    // harmless since the present/submit paths only ever index by m_imageIndex < ImageCount.
+    for (uint32_t i = 0; i < Swapchain::MAX_BACK_BUFFERS; ++i) {
+        VkResult r = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_renderFinished[i]);
+        if (r != VK_SUCCESS) {
+            fprintf(stderr, "CommandQueue::CreateSyncObjects: vkCreateSemaphore(renderFinished[%u]) failed (%d)\n",
+                    i, (int)r);
             return false;
         }
     }
@@ -155,15 +165,26 @@ void CommandQueue::DestroySyncObjects(void) noexcept
             vkDestroySemaphore(m_device, m_imageAvailable[i], nullptr);
             m_imageAvailable[i] = VK_NULL_HANDLE;
         }
-        if (m_renderFinished[i] != VK_NULL_HANDLE) {
-            vkDestroySemaphore(m_device, m_renderFinished[i], nullptr);
-            m_renderFinished[i] = VK_NULL_HANDLE;
-        }
         if (m_inFlight[i] != VK_NULL_HANDLE) {
             vkDestroyFence(m_device, m_inFlight[i], nullptr);
             m_inFlight[i] = VK_NULL_HANDLE;
         }
     }
+    for (uint32_t i = 0; i < Swapchain::MAX_BACK_BUFFERS; ++i) {
+        if (m_renderFinished[i] != VK_NULL_HANDLE) {
+            vkDestroySemaphore(m_device, m_renderFinished[i], nullptr);
+            m_renderFinished[i] = VK_NULL_HANDLE;
+        }
+    }
+}
+
+
+bool CommandQueue::RecreateSyncObjects(void) noexcept
+{
+    if (m_device == VK_NULL_HANDLE)
+        return false;
+    DestroySyncObjects();
+    return CreateSyncObjects();
 }
 
 
@@ -191,7 +212,7 @@ void CommandQueue::Present(void) noexcept
     VkPresentInfoKHR present { };
     present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &m_renderFinished[m_frameIndex];
+    present.pWaitSemaphores = &m_renderFinished[m_imageIndex];
     present.swapchainCount = 1;
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &m_imageIndex;
@@ -640,8 +661,10 @@ void CommandListHandler::ResetBindings(void) noexcept
         m_boundSrvViews[i] = VK_NULL_HANDLE;
     for (uint32_t i = 0; i < kSamplerSlots; ++i)
         m_boundSamplers[i] = VK_NULL_HANDLE;
-    for (uint32_t i = 0; i < kUavSlots; ++i)
-        m_boundStorageViews[i] = VK_NULL_HANDLE;
+    for (uint32_t i = 0; i < kUavSlots; ++i) {
+        m_boundStorageBuffers[i]    = VK_NULL_HANDLE;
+        m_boundStorageBufferSize[i] = 0;
+    }
 }
 
 
@@ -659,10 +682,12 @@ void CommandListHandler::BindSampler(uint32_t slot, VkSampler sampler) noexcept
 }
 
 
-void CommandListHandler::BindStorageImage(uint32_t slot, VkImageView view) noexcept
+void CommandListHandler::BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept
 {
-    if (slot < kUavSlots)
-        m_boundStorageViews[slot] = view;
+    if (slot < kUavSlots) {
+        m_boundStorageBuffers[slot]    = buffer;
+        m_boundStorageBufferSize[slot] = range;
+    }
 }
 
 // =================================================================================================
