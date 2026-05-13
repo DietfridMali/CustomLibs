@@ -26,15 +26,35 @@ class GfxResourceHandler
 {
 public:
     static constexpr uint32_t FRAME_COUNT = 2;
+    // Tracks whether the singleton is still constructed. PrerenderedText / RenderTarget
+    // destructors can run after the handler itself has been torn down by the static-
+    // destruction chain — in that case TrackCleanup must fall back to inline execution
+    // instead of touching m_cleanupCallbacks (dead vector → crash).
+    static inline bool               s_isAlive { false };
 
     AutoArray<std::function<void()>> m_cleanupCallbacks[FRAME_COUNT];
     uint32_t                         m_frameIndex { 0 };
 
+    GfxResourceHandler() noexcept { s_isAlive = true; }
+    ~GfxResourceHandler() noexcept {
+        // Flush both slots so deferred lambdas don't leak when the handler dies.
+        Cleanup(0);
+        Cleanup(1);
+        s_isAlive = false;
+    }
+
     // Register a destructor lambda for the currently active frame slot. Fires next time this
-    // slot becomes active again (one full frame later).
+    // slot becomes active again (one full frame later). After the handler has been destroyed
+    // (s_isAlive=false), the callback runs inline — the GPU is idle by then so direct release
+    // is safe.
     inline void TrackCleanup(std::function<void()> cleanup) noexcept {
-        if (cleanup)
-            m_cleanupCallbacks[m_frameIndex].Append(std::move(cleanup));
+        if (not cleanup)
+            return;
+        if (not s_isAlive) {
+            cleanup();
+            return;
+        }
+        m_cleanupCallbacks[m_frameIndex].Append(std::move(cleanup));
     }
 
     // Execute all pending callbacks for the given slot, then clear the list. Called from
