@@ -326,7 +326,7 @@ private:
     }
 
     void Compute(int gridSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
-        NoiseTraits<Tag>::Compute(m_data, gridSize, yPeriod, xPeriod, octaves);
+        NoiseTraits<Tag>::Compute(m_data, gridSize, yPeriod, xPeriod, octaves, seed);
     }
 
     bool Deploy(int bufferIndex = 0) {
