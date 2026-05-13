@@ -649,6 +649,8 @@ void RenderTarget::Disable(bool deactivate) noexcept
             m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
         for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, true);
+        if (m_depthBufferIndex >= 0)
+            m_bufferInfo[m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, true);
     }
     m_cmdList->Close(deactivate);
     m_cmdList = nullptr;

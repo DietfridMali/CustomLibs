@@ -47,6 +47,11 @@ public:
 
 	bool StopRender(void) noexcept;
 
+	inline void MakeReadable(void) noexcept {
+		if (m_map and m_map->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth }))
+			m_map->Deactivate();
+	}
+
 	inline RenderTarget* GetMap(void) noexcept {
 		return m_map;
 	}

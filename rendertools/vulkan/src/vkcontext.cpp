@@ -390,13 +390,25 @@ bool VKContext::CreateDevice(void) noexcept
     featsUnusedAtt.dynamicRenderingUnusedAttachments = VK_TRUE;
     feats13.pNext = &featsUnusedAtt;
 
+    // Allows vkCmdPipelineBarrier2 inside an active dynamic-rendering instance.
+    // Required by DecalHandler::Render's intra-renderpass SetMemoryBarrier between
+    // the two-pass mask/draw sequence.
+    VkPhysicalDeviceDynamicRenderingLocalReadFeaturesKHR featsLocalRead { };
+    featsLocalRead.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES_KHR;
+    featsLocalRead.dynamicRenderingLocalRead = VK_TRUE;
+    featsUnusedAtt.pNext = &featsLocalRead;
+
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).
+    // fragmentStoresAndAtomics enables RWTexture2D + InterlockedMin in the fragment
+    // stage (used by DecalShader's two-pass depth mask).
     VkPhysicalDeviceFeatures features { };
     features.samplerAnisotropy = VK_TRUE;
+    features.fragmentStoresAndAtomics = VK_TRUE;
 
     const char* deviceExtensions[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME,
+        VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
     };
 
     VkDeviceCreateInfo info { };
