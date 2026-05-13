@@ -314,15 +314,23 @@ void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
     if (cb == VK_NULL_HANDLE)
         return;
 
+    // Framebuffer-space stages only — legal inside an active dynamic-rendering instance
+    // (Vulkan spec VUID-vkCmdPipelineBarrier2-srcStageMask-09556). Scoped to fragment-shader
+    // storage access; matches DecalHandler::Render's UAV pass-0-write -> pass-1-read sync
+    // on RWTexture2D<uint> depths.
     VkMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    barrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-    barrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-    barrier.dstAccessMask = VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+    barrier.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+    barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
 
     VkDependencyInfo dep{};
     dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    // BY_REGION_BIT required for intra-renderpass barriers with framebuffer-space stages
+    // (VUID-vkCmdPipelineBarrier2-dependencyFlags-07891). Per-fragment scope is sufficient
+    // for the UAV write/read pattern.
+    dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
     dep.memoryBarrierCount = 1;
     dep.pMemoryBarriers = &barrier;
 
@@ -387,4 +395,3 @@ bool GfxStates::CheckError(const char* operation) noexcept {
 }
 
 // =================================================================================================
-%
