@@ -28,7 +28,9 @@
 
 static constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
 static constexpr VkFormat kVertexFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
-static constexpr VkFormat kDepthFormat = VK_FORMAT_D24_UNORM_S8_UINT;
+// D32_SFLOAT: 4 Byte/Pixel, single-channel, kein Stencil. ShadowMap braucht keinen Stencil und
+// kein Treiber-Padding (D24S8 wird auf NVIDIA als D32+S8-Plane = 5 Byte/Pixel allokiert).
+static constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -58,10 +60,10 @@ static VkImageUsageFlags UsageForType(BufferInfo::eBufferType type)
 
 static VkImageAspectFlags AspectForType(BufferInfo::eBufferType type)
 {
-    if (type == BufferInfo::btDepth)
+    // kDepthFormat = D32_SFLOAT enthaelt kein Stencil-Plane mehr. btStencil sollte hier nicht
+    // mehr aufkommen, ist aber als Fallback weiter im selben Aspekt-Schema.
+    if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
         return VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (type == BufferInfo::btStencil)
-        return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     return VK_IMAGE_ASPECT_COLOR_BIT;
 }
 
@@ -231,10 +233,10 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
                           info.m_image, info.m_allocation))
         return;
     info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT);
+                              VK_IMAGE_ASPECT_DEPTH_BIT);
 
-    // Attachment view: depth + stencil aspect (used as DSV in Dynamic Rendering).
-    if (not CreateSRV(info, kDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT))
+    // Attachment view: depth aspect only (D32_SFLOAT, kein Stencil).
+    if (not CreateSRV(info, kDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT))
         return;
 
     // Sampling view: depth aspect only — for use as a sampled texture (sampler2DShadow / shadow map).

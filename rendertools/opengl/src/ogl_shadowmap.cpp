@@ -19,8 +19,13 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 #if !DEMO
 	if (not (m_map = new RenderTarget()))
 		return false;
-	int size;
-	for (size = gfxStates.MaxTextureSize(); size >= 1024; size /= 2) {
+	// ShadowMap-Format ist GL_DEPTH_COMPONENT32F (4 Byte/Pixel). Start bei 8K, halbieren bei
+	// Fehlschlag bis 1024. Cap zusaetzlich gegen die Hardware-Allocation-Grenze fuer 4-Byte-
+	// Pixel-Formate.
+	constexpr int kShadowDepthBytesPerPixel = 4;
+	const int hwCap = gfxStates.MaxTextureSize(kShadowDepthBytesPerPixel);
+	int startSize = (hwCap < 8192) ? hwCap : 8192;
+	for (int size = startSize; size >= 1024; size /= 2) {
 		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
 			m_status = 1;
 			return true;

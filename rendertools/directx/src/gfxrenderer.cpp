@@ -36,6 +36,7 @@ bool GfxRenderer::InitGraphics(void) {
         fprintf(stderr, "Smiley-Battle: Cannot create DX12 device.\n");
         return false;
     }
+    gfxStates.Init();
     if (not commandListHandler.Create(dx12Context.Device())) {
         fprintf(stderr, "Smiley-Battle: Cannot create DX12 command queue.\n");
         return false;

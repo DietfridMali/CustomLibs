@@ -4,6 +4,9 @@
 #include <tuple>
 #include <utility>
 #include <unordered_set>
+#include <bit>
+#include <cmath>
+#include <cstdint>
 
 #include "glew.h"
 #include "gfxdrivertypes.h"
@@ -103,6 +106,7 @@ class GfxStates
 {
 private:
 	int m_maxTextureSize{ 0 };
+	uint64_t m_maxAllocSize{ 0 };
 	std::unordered_set<std::string> m_extensions;
 	bool m_haveExtensions{ false };
 	RGBAColor m_clearColor{ ColorData::Invisible };
@@ -122,6 +126,9 @@ public:
 #if 0//def _DEBUG
 		fprintf(stderr, "Max. texture size: %d\n", m_maxTextureSize);
 #endif
+		// OGL hat keine dynamische "max single resource allocation"-Abfrage. Konservative
+		// 4-GB-Konstante, damit MaxTextureSize(bytesPerPixel) konsistent zu Vulkan/DX12 rechnet.
+		m_maxAllocSize = uint64_t(4ULL) << 30;
 		DetermineExtensions();
 	}
 
@@ -145,6 +152,16 @@ public:
 
 	inline int MaxTextureSize(void) noexcept {
 		return m_maxTextureSize;
+	}
+
+	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
+	inline int MaxTextureSize(int bytesPerPixel) noexcept {
+		if (bytesPerPixel <= 1)
+			return m_maxTextureSize;
+		const uint64_t bytes = m_maxAllocSize / uint64_t(bytesPerPixel);
+		const uint64_t sqrtAlloc = uint64_t(std::sqrt(double(bytes)));
+		const uint64_t allocCap = std::bit_floor(sqrtAlloc);
+		return int((uint64_t(m_maxTextureSize) < allocCap) ? uint64_t(m_maxTextureSize) : allocCap);
 	}
 
 	template<GLenum stateID>

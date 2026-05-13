@@ -39,6 +39,7 @@ bool GfxRenderer::InitGraphics(void) {
         fprintf(stderr, "Smiley-Battle: Cannot create Vulkan context.\n");
         return false;
     }
+    gfxStates.Init();
     if (not ShaderCompiler::Initialize()) {
         fprintf(stderr, "Smiley-Battle: Cannot initialize DXC shader compiler.\n");
         return false;

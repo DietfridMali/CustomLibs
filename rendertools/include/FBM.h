@@ -17,7 +17,10 @@ struct FBMParams {
 template<typename NoiseFn>
 class FBM {
 private:
-    NoiseFn     m_noiseFn;
+    // mutable: NoiseFn-Funktoren (z.B. PerlinFunctor) haben i.d.R. internes Working-Memory
+    // (Position-Speicher fuer Gradient-Dot-Produkte). Das ist semantisch nicht Teil des FBM-
+    // Zustands, also darf Compute trotzdem const sein.
+    mutable NoiseFn     m_noiseFn;
     FBMParams   m_params;
     float       m_normal;
 

@@ -4,6 +4,8 @@
 #include <tuple>
 #include <cstring>
 #include <cstdint>
+#include <bit>
+#include <cmath>
 
 #include "dx12framework.h"
 #include "dx12context.h"
@@ -210,7 +212,8 @@ private:
     RenderStates            m_renderStates;
     List<TextureSlotInfo>   m_slotInfos;
     GfxTypes::Int           m_viewport[4];
-    int                     m_maxTextureSize{ 4096 };
+    int                     m_maxTextureSize{ 0 };
+    uint64_t                m_maxAllocSize{ 0 };
     RGBAColor               m_clearColor{ ColorData::Invisible };
     List<RGBAColor>         m_clearColorStack;
     int                     m_featureLevel{ 0 };
@@ -223,8 +226,22 @@ public:
 
     GfxStates() = default;
 
-    void Init(int maxTextureSize = 4096) noexcept {
-        m_maxTextureSize = maxTextureSize;
+    void Init(void) noexcept {
+        // maxImageDimension2D analog: Feature-Level definiert die Achsen-Grenze.
+        // 11.0+: 16384, 10.x: 8192, 9.3: 4096, sonst 2048.
+        const int fl = (int)dx12Context.FeatureLevel();
+        if (fl >= (int)D3D_FEATURE_LEVEL_11_0)
+            m_maxTextureSize = D3D12_REQ_TEXTURE2D_U_OR_V_DIMENSION; // 16384
+        else if (fl >= (int)D3D_FEATURE_LEVEL_10_0)
+            m_maxTextureSize = 8192;
+        else if (fl >= (int)D3D_FEATURE_LEVEL_9_3)
+            m_maxTextureSize = 4096;
+        else
+            m_maxTextureSize = 2048;
+        // D3D12 hat kein dynamisch abfragbares "max single resource allocation"-Limit. Die
+        // dokumentierte Tier-1-Heap-Granularitaet liegt bei 4 GB pro Resource. Konservativ als
+        // konstante einfuehren, damit MaxTextureSize(bytesPerPixel) konsistent rechnet.
+        m_maxAllocSize = uint64_t(4ULL) << 30;
     }
 
     inline int FeatureLevel(void) noexcept {
@@ -247,6 +264,16 @@ public:
 
     inline int MaxTextureSize(void) const noexcept {
         return m_maxTextureSize;
+    }
+
+    // Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
+    inline int MaxTextureSize(int bytesPerPixel) const noexcept {
+        if (bytesPerPixel <= 1)
+            return m_maxTextureSize;
+        const uint64_t bytes = m_maxAllocSize / uint64_t(bytesPerPixel);
+        const uint64_t sqrtAlloc = uint64_t(std::sqrt(double(bytes)));
+        const uint64_t allocCap = std::bit_floor(sqrtAlloc);
+        return int((uint64_t(m_maxTextureSize) < allocCap) ? uint64_t(m_maxTextureSize) : allocCap);
     }
 
     inline int SetDepthTest(int state) {

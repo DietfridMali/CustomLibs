@@ -9,7 +9,8 @@
 // Tags
 
 struct ValueNoiseR32F {};     // dein aktueller #if 1 Pfad (Hash2i, 1 Kanal)
-struct FbmNoiseR32F {};   // dein #else Pfad (fbmPeriodic, 1 Kanal)
+struct PerlinNoiseR32F {};    // Noise::PerlinNoise, 1 channel, float32, tileable wenn period >= 2
+struct FbmNoiseR32F {};       // FBM<Noise::PerlinFunctor>, 1 channel, float32
 struct HashNoiseRGBA8 {};         // neu: 4 Kanäle uint8, weißes Tile-Noise
 
 // -------------------------------------------------------------------------------------------------
@@ -60,7 +61,43 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
 };
 
 // -------------------------------------------------------------------------------------------------
-// 2D fbm (unverändert)
+// 2D Perlin noise (float32, 1 channel). Tilebar wenn xPeriod >= 2 und yPeriod >= 2.
+template<> struct NoiseTraits<PerlinNoiseR32F> {
+    using PixelT = float;
+    static constexpr GLenum IFmt = GL_R32F;
+    static constexpr GLenum EFmt = GL_RED;
+    static constexpr GLenum Type = GL_FLOAT;
+    static constexpr int    Components = 1;
+
+    static void SetParams(GLenum target) {
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glGenerateMipmap(target);
+    }
+
+    static void Compute(AutoArray<float>& data, int gridSize, int yPeriod, int xPeriod, int /*octave*/, uint32_t seed) {
+        data.Resize(gridSize * gridSize);
+        Noise::PerlinNoise perlin;
+        const int period = (xPeriod > yPeriod) ? xPeriod : yPeriod;
+        perlin.Setup((period < 2) ? 2 : period, seed);
+        float* dataPtr = data.Data();
+        const float invGrid = 1.0f / float(gridSize);
+        for (int y = 0; y < gridSize; ++y) {
+            for (int x = 0; x < gridSize; ++x) {
+                Vector3f p(float(x) * invGrid * float(xPeriod),
+                           float(y) * invGrid * float(yPeriod),
+                           0.0f);
+                const float n = perlin.Compute(p);
+                *dataPtr++ = n * 0.5f + 0.5f; // [-1,1] -> [0,1]
+            }
+        }
+    }
+};
+
+// -------------------------------------------------------------------------------------------------
+// 2D fbm (float32, 1 channel). Multi-Oktav Perlin via FBM<PerlinFunctor>.
 template<> struct NoiseTraits<FbmNoiseR32F> {
     using PixelT = float;
     static constexpr GLenum IFmt = GL_R32F;
@@ -76,22 +113,24 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
         glGenerateMipmap(target);
     }
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-    static void Compute(AutoArray<float>& data, int gridSize, int yPeriod = 1, int xPeriod = 1, int octave = 1) {
-#pragma warning(pop)
-#if 0
+    static void Compute(AutoArray<float>& data, int gridSize, int yPeriod, int xPeriod, int octaves, uint32_t seed) {
         data.Resize(gridSize * gridSize);
+        const int period = (xPeriod > yPeriod) ? xPeriod : yPeriod;
+        Noise::PerlinFunctor functor;
+        functor.generator.Setup((period < 2) ? 2 : period, seed);
+        FBMParams params;
+        params.octaves = (octaves < 1) ? 1 : octaves;
+        FBM<Noise::PerlinFunctor> fbm(functor, params);
         float* dataPtr = data.Data();
+        const float invGrid = 1.0f / float(gridSize);
         for (int y = 0; y < gridSize; ++y) {
             for (int x = 0; x < gridSize; ++x) {
-                float sx = (x + 0.5f) / gridSize * float(yPeriod);
-                float sy = (y + 0.5f) / gridSize * float(xPeriod);
-                float n = fbmPeriodic(sx, sy, yPeriod, xPeriod, octave, 2.0f, 0.5f);
-                *dataPtr++ = std::clamp(n, 0.0f, 1.0f);
+                Vector3f p(float(x) * invGrid * float(xPeriod),
+                           float(y) * invGrid * float(yPeriod),
+                           0.0f);
+                *dataPtr++ = fbm.Value(p); // [0,1]
             }
         }
-#endif
     }
 };
 
@@ -330,6 +369,7 @@ public:
 // -------------------------------------------------------------------------------------------------
 
 using ValueNoiseTexture = NoiseTexture<ValueNoiseR32F>;
+using PerlinNoiseTexture = NoiseTexture<PerlinNoiseR32F>;
 using FbmNoiseTexture = NoiseTexture<FbmNoiseR32F>;
 using HashNoiseTexture = NoiseTexture<HashNoiseRGBA8>;
 using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;

@@ -83,7 +83,7 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
         shader->SetMatrix4f("mView", view.AsArray(), false);
 		for (int i = 0; i < 3; i++) {
 			m_skyTextures[i]->Activate(i);
-			if (renderer.HasOpenGL())
+			if (baseRenderer.HasOpenGL())
 				shader->SetInt(uSkyNames[i], i);
 			}
 		shader->SetVector3f("lightDirection", lightDirection);

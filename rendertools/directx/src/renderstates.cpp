@@ -3,6 +3,7 @@
 #include "shader.h"
 #include "dx12context.h"
 #include "gfxrenderer.h"
+#include "resource_view.h"
 
 
 // =================================================================================================
@@ -21,7 +22,7 @@ static DXGI_FORMAT ToDXGIFormat(TextureFormat fmt) noexcept
         DXGI_FORMAT_R32_FLOAT,
         DXGI_FORMAT_R32G32_FLOAT,
         DXGI_FORMAT_R32G32B32A32_FLOAT,
-        DXGI_FORMAT_D24_UNORM_S8_UINT
+        DXGI_FORMAT_D32_FLOAT
     };
     return lut[int(fmt)];
 }
@@ -214,7 +215,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
     psoDesc.NumRenderTargets = UINT(nrt);
     for (int i = 0; i < nrt; ++i)
         psoDesc.RTVFormats[i] = ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
-    psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable) ? DXGI_FORMAT_D24_UNORM_S8_UINT : DXGI_FORMAT_UNKNOWN;
+    psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable) ? dxDepthDSVFormat : DXGI_FORMAT_UNKNOWN;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.SampleDesc.Count = 1;
 

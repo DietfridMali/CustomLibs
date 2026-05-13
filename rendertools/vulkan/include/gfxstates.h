@@ -4,6 +4,8 @@
 #include <tuple>
 #include <cstring>
 #include <cstdint>
+#include <bit>
+#include <cmath>
 
 #include "vkframework.h"
 #include "vkcontext.h"
@@ -211,7 +213,8 @@ private:
     RenderStates            m_renderStates;
     List<TextureSlotInfo>   m_slotInfos;
     GfxTypes::Int           m_viewport[4];
-    int                     m_maxTextureSize{ 4096 };
+    int                     m_maxTextureSize{ 0 };
+    uint64_t                m_maxAllocSize{ 0 };
     RGBAColor               m_clearColor{ ColorData::Invisible };
     List<RGBAColor>         m_clearColorStack;
     int                     m_featureLevel{ 0 };
@@ -228,8 +231,24 @@ public:
 
     GfxStates() = default;
 
-    void Init(int maxTextureSize = 4096) noexcept {
-        m_maxTextureSize = maxTextureSize;
+    void Init(void) noexcept {
+        // maxImageDimension2D = Achsen-Grenze einer 2D-Textur (Treiber-Wert, oft 32K auf NVIDIA RTX).
+        // maxMemoryAllocationSize = max einzelne vkAllocateMemory-Groesse (Vulkan 1.1 properties).
+        // Format-unabhaengiges m_maxTextureSize wird konservativ als min(maxAxis, bit_floor(sqrt(maxAlloc)))
+        // gespeichert (impliziert 1 Byte/Pixel). Caller mit groesseren Pixel-Formaten nutzen
+        // MaxTextureSize(bytesPerPixel) fuer den korrekten Cap.
+        VkPhysicalDeviceVulkan11Properties props11{};
+        props11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
+        VkPhysicalDeviceProperties2 props2{};
+        props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+        props2.pNext = &props11;
+        vkGetPhysicalDeviceProperties2(vkContext.PhysicalDevice(), &props2);
+
+        const uint32_t maxTex = vkContext.DeviceProps().limits.maxImageDimension2D;
+        m_maxAllocSize = props11.maxMemoryAllocationSize;
+        const uint64_t sqrtAlloc = uint64_t(std::sqrt(double(m_maxAllocSize)));
+        const uint64_t allocCap = std::bit_floor(sqrtAlloc);
+        m_maxTextureSize = int((uint64_t(maxTex) < allocCap) ? uint64_t(maxTex) : allocCap);
     }
 
     inline int FeatureLevel(void) noexcept {
@@ -252,6 +271,18 @@ public:
 
     inline int MaxTextureSize(void) const noexcept {
         return m_maxTextureSize;
+    }
+
+    // Format-spezifischer Cap. Cap = min(maxImageDimension2D, bit_floor(sqrt(maxAlloc / bpp))).
+    // Beispiel: RGBA32F = 16 Byte/Pixel, D32_SFLOAT = 4 Byte/Pixel, R8 = 1 Byte/Pixel.
+    inline int MaxTextureSize(int bytesPerPixel) const noexcept {
+        if (bytesPerPixel <= 1)
+            return m_maxTextureSize;
+        const uint64_t bytes = m_maxAllocSize / uint64_t(bytesPerPixel);
+        const uint64_t sqrtAlloc = uint64_t(std::sqrt(double(bytes)));
+        const uint64_t allocCap = std::bit_floor(sqrtAlloc);
+        const uint64_t maxAxis = uint64_t(vkContext.DeviceProps().limits.maxImageDimension2D);
+        return int((maxAxis < allocCap) ? maxAxis : allocCap);
     }
 
     inline int SetDepthTest(int state) {
