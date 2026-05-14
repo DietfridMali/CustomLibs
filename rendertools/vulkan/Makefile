@@ -20,7 +20,6 @@ VULKAN_INC_DIR := $(VULKAN_SDK_DIR)/include
 # API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
 SRCDIR := ../src
 
-# SPIRV-Reflect-Quelle (aus dem Vulkan SDK), wird als C in die Lib mitkompiliert
 VULKAN_FILES := \
  base_displayhandler \
  base_shader_funcs \
@@ -149,7 +148,7 @@ $(COMMON_OBJECTS): $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 >@mkdir -p $(OBJDIR)
 >$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(SPIRV_REFLECT_OBJECT): $(SPIRV_REFLECT_DIR)/spirv_reflect.c
+$(SPIRV_REFLECT_OBJECT): $(VULKAN_INC_DIR)/SPIRV-Reflect/spirv_reflect.c
 >@mkdir -p $(OBJDIR)
 >$(CC) $(CFLAGS) -c $< -o $@
 
