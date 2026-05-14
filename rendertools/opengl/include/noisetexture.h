@@ -330,7 +330,9 @@ private:
     }
 
     bool Deploy(int bufferIndex = 0) {
-        if (not Bind())
+        if (IsDeployed())
+            return true;
+        if (not Bind(0, true))
             return false;
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         TextureBuffer* texBuf = m_buffers[bufferIndex];
@@ -469,7 +471,7 @@ public:
     bool Create(String noiseFilename = "");
 
 private:
-    Vector3i                m_gridSize{ 128, 128, 64 }; // fixed; using NVidia STBN data
+    Vector3i             m_gridSize{ 128, 128, 64 }; // fixed; using NVidia STBN data
     AutoArray<uint8_t>   m_data;
 
     bool Allocate();
