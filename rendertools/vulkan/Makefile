@@ -2,6 +2,9 @@
 ifeq ($(strip $(CXX)),)
   CXX := g++
 endif
+ifeq ($(strip $(CC)),)
+  CC := gcc
+endif
 #CXX := clang++
 AR  := ar
 
@@ -10,6 +13,9 @@ VULKAN_SRCDIR := ./src
 
 # API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
 SRCDIR := ../src
+
+# SPIRV-Reflect-Quelle (aus dem Vulkan SDK), wird als C in die Lib mitkompiliert
+SPIRV_REFLECT_DIR := ../../../ExternalLibs/VulkanSDK/include/SPIRV_Reflect
 
 VULKAN_FILES := \
  base_displayhandler \
@@ -74,7 +80,9 @@ COMMON_FILES := \
 
 INCDIRS := \
 	./include ../include ../src ../../basetools/include \
-	../../../ExternalLibs/VMA \
+	../../../ExternalLibs/VulkanSDK/include \
+	../../../ExternalLibs/VulkanSDK/include/vma \
+	../../../ExternalLibs/VulkanSDK/include/cross \
 	../../../ExternalLibs/DXC/include \
 	/usr/include/ /usr/include/SDL2 \
 	/opt/homebrew/include /opt/homebrew/include/SDL2
@@ -100,10 +108,12 @@ DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIO
 
 ifeq ($(TARGET),DEBUG)
   CXXFLAGS := -std=c++20 $(DBGFLAGS) $(DEFINES) -D_DEBUG $(INCLUDES) -MMD -MP -fPIE
+  CFLAGS := $(DBGFLAGS) -D_DEBUG $(INCLUDES) -MMD -MP -fPIE
   OBJDIR := obj/debug
   LIB_SUFFIX := d
 else ifeq ($(TARGET),RELEASE)
   CXXFLAGS := -std=c++20 $(OPTFLAGS) $(DEFINES) -DNDEBUG $(INCLUDES) -MMD -MP -fPIE
+  CFLAGS := $(OPTFLAGS) -DNDEBUG $(INCLUDES) -MMD -MP -fPIE
   OBJDIR := obj/release
   LIB_SUFFIX :=
 else
@@ -114,7 +124,8 @@ VULKAN_SOURCES := $(addprefix $(VULKAN_SRCDIR)/,$(addsuffix .cpp,$(VULKAN_FILES)
 COMMON_SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(COMMON_FILES)))
 VULKAN_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(VULKAN_FILES)))
 COMMON_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(COMMON_FILES)))
-OBJECTS := $(VULKAN_OBJECTS) $(COMMON_OBJECTS)
+SPIRV_REFLECT_OBJECT := $(OBJDIR)/spirv_reflect.o
+OBJECTS := $(VULKAN_OBJECTS) $(COMMON_OBJECTS) $(SPIRV_REFLECT_OBJECT)
 
 LIB := librendertools$(LIB_SUFFIX).a
 
@@ -133,6 +144,10 @@ $(VULKAN_OBJECTS): $(OBJDIR)/%.o: $(VULKAN_SRCDIR)/%.cpp
 $(COMMON_OBJECTS): $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 >@mkdir -p $(OBJDIR)
 >$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(SPIRV_REFLECT_OBJECT): $(SPIRV_REFLECT_DIR)/spirv_reflect.c
+>@mkdir -p $(OBJDIR)
+>$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 >rm -rf $(OBJDIR) $(LIB)
