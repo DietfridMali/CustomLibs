@@ -82,7 +82,7 @@ INCDIRS := \
 	./include ../include ../src ../../basetools/include \
 	../../../ExternalLibs/VulkanSDK/include \
 	../../../ExternalLibs/VulkanSDK/include/vma \
-	../../../ExternalLibs/VulkanSDK/include/cross \
+	../../../ExternalLibs/VulkanSDK/include/spirv_cross \
 	../../../ExternalLibs/DXC/include \
 	/usr/include/ /usr/include/SDL2 \
 	/opt/homebrew/include /opt/homebrew/include/SDL2
