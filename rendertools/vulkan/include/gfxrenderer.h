@@ -32,7 +32,7 @@ private:
     CommandList*    m_temporaryList{ nullptr };
 
 protected:
-    RenderStates    m_renderStates;
+    ::RenderStates  m_renderStates;
 
 public:
     virtual ~GfxRenderer() {
