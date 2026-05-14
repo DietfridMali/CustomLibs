@@ -21,8 +21,6 @@ VULKAN_INC_DIR := $(VULKAN_SDK_DIR)/include
 SRCDIR := ../src
 
 # SPIRV-Reflect-Quelle (aus dem Vulkan SDK), wird als C in die Lib mitkompiliert
-SPIRV_REFLECT_DIR := $(VULKAN_INC_DIR)/SPIRV_Reflect
-
 VULKAN_FILES := \
  base_displayhandler \
  base_shader_funcs \
@@ -88,7 +86,7 @@ INCDIRS := \
 	./include ../include ../src ../../basetools/include \
 	$(VULKAN_INC_DIR) \
 	$(VULKAN_INC_DIR)/vma \
-	$(VULKAN_INC_DIR)/SPIRV_reflect \
+	$(VULKAN_INC_DIR)/SPIRV_Reflect \
 	$(EXTERNAL_LIBS_DIR)/DXC/include \
 	/usr/include/ /usr/include/SDL2 \
 	/opt/homebrew/include /opt/homebrew/include/SDL2
