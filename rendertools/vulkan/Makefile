@@ -89,7 +89,7 @@ INCDIRS := \
 	$(VULKAN_INC_DIR) \
 	$(VULKAN_INC_DIR)/vma \
 	$(VULKAN_INC_DIR)/SPIRV_reflect \
-	$(EXTERNAL_LIB_DIR)/DXC/include \
+	$(EXTERNAL_LIBS_DIR)/DXC/include \
 	/usr/include/ /usr/include/SDL2 \
 	/opt/homebrew/include /opt/homebrew/include/SDL2
 
