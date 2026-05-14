@@ -86,7 +86,7 @@ INCDIRS := \
 	./include ../include ../src ../../basetools/include \
 	$(VULKAN_INC_DIR) \
 	$(VULKAN_INC_DIR)/vma \
-	$(VULKAN_INC_DIR)/SPIRV_Reflect \
+	$(VULKAN_INC_DIR)/SPIRV-Reflect \
 	$(EXTERNAL_LIBS_DIR)/DXC/include \
 	/usr/include/ /usr/include/SDL2 \
 	/opt/homebrew/include /opt/homebrew/include/SDL2
