@@ -1,3 +1,11 @@
+#ifdef LINUX
+
+// On Linux DXC ships its own COM shim via <dxc/WinAdapter.h>: BSTR / IUnknown / IStream /
+// HRESULT plus the CComPtr smart pointer. <windows.h> does not exist here.
+#include <dxc/WinAdapter.h>
+
+#else
+
 // NOMINMAX must precede <windows.h> — otherwise min/max macros collide with std::array's
 // member functions (and any other STL header that uses ::min / ::max).
 #define NOMINMAX
@@ -11,23 +19,47 @@
 #include <oaidl.h>
 #include <objidl.h>
 
+#endif
+
 #include "shader_compiler.h"
 #include "vkcontext.h"
 
-// dxc/dxcapi.h pulls in BSTR / IStream / IUnknown â€” Windows COM types that live in windows.h.
+#ifndef LINUX
+// dxc/dxcapi.h pulls in BSTR / IStream / IUnknown - Windows COM types that live in windows.h.
 // Must be included before <dxc/dxcapi.h>.
 // WIN32_LEAN_AND_MEAN MUST NOT be set: it strips OLE/COM headers where BSTR/IStream live.
 #include <windows.h>
+#endif
 
 #include <dxc/dxcapi.h>
+
+#ifndef LINUX
 #include <wrl/client.h>
+#endif
 
 #include <cstdio>
 #include <cstring>
 
+#ifndef LINUX
+// On Linux dxcompiler is linked via the Makefile (-ldxcompiler).
 #pragma comment(lib, "dxcompiler.lib")
+#endif
 
+// DXC's COM-pointer type differs per platform: Microsoft::WRL::ComPtr on Windows,
+// CComPtr (from WinAdapter.h) on Linux. The Linux ComPtr below is a thin CComPtr
+// subclass that re-exposes the two WRL method names this file uses (GetAddressOf,
+// Reset), so the compiler code below stays identical on both platforms.
+#ifdef LINUX
+template <typename T>
+struct ComPtr : public CComPtr<T>
+{
+    using CComPtr<T>::CComPtr;
+    T** GetAddressOf(void) noexcept { return &this->p; }
+    void Reset(void) noexcept { this->Release(); }
+};
+#else
 using Microsoft::WRL::ComPtr;
+#endif
 
 // =================================================================================================
 // shader_compiler implementation

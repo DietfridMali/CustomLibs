@@ -1,23 +1,59 @@
-﻿.RECIPEPREFIX := >
+.RECIPEPREFIX := >
 ifeq ($(strip $(CXX)),)
   CXX := g++
 endif
 #CXX := clang++
 AR  := ar
 
-FILES := \
+# Vulkan-spezifische Quelldateien (src/ relativ zu diesem Makefile)
+VULKAN_SRCDIR := ./src
+
+# API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
+SRCDIR := ../src
+
+VULKAN_FILES := \
  base_displayhandler \
- base_quad \
- base_renderer \
  base_shader_funcs \
  base_shadercode \
- base_shaderhandler \
  base_texture_shaders \
- billboard \
  blur_shader \
- cube \
+ cbv_allocator \
+ commandlist \
  cubemap \
- fbo \
+ descriptor_pool_handler \
+ gfx_buffer \
+ gfxdatabuffer \
+ gfxdatalayout \
+ gfxrenderer \
+ gfxstates \
+ image_layout_tracker \
+ noisetexture \
+ outline_shader \
+ pipeline_cache \
+ primitive_shaders \
+ renderstates \
+ rendertarget \
+ resource_chunkhandler \
+ resource_handler \
+ sampler_cache \
+ shader \
+ shader_compiler \
+ skybox \
+ swapchain \
+ texture \
+ texturebuffer \
+ texturehandler \
+ vkcontext \
+ vkupload
+
+COMMON_FILES := \
+ base_quad \
+ base_renderer \
+ base_shaderhandler \
+ billboard \
+ coplanar_rectangle \
+ cube \
+ drawbufferhandler \
  fonthandler \
  framecounter \
  glbloader \
@@ -25,30 +61,23 @@ FILES := \
  linesegment \
  mesh \
  noise \
- noisetexture \
- gfxstates \
- outlinerenderer \
- outline_shader \
- coplanar_rectangle \
  prerenderedtexture \
- primitive_shaders \
  projector \
  rendermatrices \
- shader \
  shadowmap \
- skybox \
- SSBO \
+ texteffects \
  textrenderer \
  textureatlas \
- texture \
- texturebuffer \
- texturehandler \
+ textureprocessing \
  tiny_gltf \
- vao \
- vbo \
  viewport
 
-INCDIRS := ./include ../basetools/include ../../ExternalLibs/glew/include/GL /usr/include/SDL2
+INCDIRS := \
+	./include ../include ../src ../../basetools/include \
+	../../../ExternalLibs/VMA \
+	../../../ExternalLibs/DXC/include \
+	/usr/include/ /usr/include/SDL2 \
+	/opt/homebrew/include /opt/homebrew/include/SDL2
 
 .PHONY: all clean DEBUG RELEASE
 
@@ -61,13 +90,11 @@ else ifneq (,$(filter RELEASE,$(MAKECMDGOALS)))
   TARGET := RELEASE
 endif
 
-SRCDIR := src
-
 INCLUDES := $(addprefix -I,$(INCDIRS))
 
-DEFINES := -DUSE_STD=1 -DUSE_GLM=1 -DLINUX -DFMT_UNICODE=0
+DEFINES := -DVULKAN -DUSE_STD=1 -DUSE_GLM=1 -DLINUX -DFMT_UNICODE=0
 #SANITIZEFLAGS := -fsanitize=address,undefined
-SANITIZEFLAGS := 
+SANITIZEFLAGS :=
 OPTFLAGS := -O3
 DBGFLAGS := -g3 -O0 -fno-omit-frame-pointer $(SANITIZEFLAGS) -D_GLIBCXX_ASSERTIONS
 
@@ -83,8 +110,11 @@ else
   $(error TARGET must be DEBUG or RELEASE)
 endif
 
-SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(FILES)))
-OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(FILES)))
+VULKAN_SOURCES := $(addprefix $(VULKAN_SRCDIR)/,$(addsuffix .cpp,$(VULKAN_FILES)))
+COMMON_SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(COMMON_FILES)))
+VULKAN_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(VULKAN_FILES)))
+COMMON_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(COMMON_FILES)))
+OBJECTS := $(VULKAN_OBJECTS) $(COMMON_OBJECTS)
 
 LIB := librendertools$(LIB_SUFFIX).a
 
@@ -96,7 +126,11 @@ all: $(LIB)
 $(LIB): $(OBJECTS)
 >$(AR) rcs $@ $^
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
+$(VULKAN_OBJECTS): $(OBJDIR)/%.o: $(VULKAN_SRCDIR)/%.cpp
+>@mkdir -p $(OBJDIR)
+>$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(COMMON_OBJECTS): $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 >@mkdir -p $(OBJDIR)
 >$(CXX) $(CXXFLAGS) -c $< -o $@
 
