@@ -11,11 +11,17 @@ AR  := ar
 # Vulkan-spezifische Quelldateien (src/ relativ zu diesem Makefile)
 VULKAN_SRCDIR := ./src
 
+EXTERNAL_LIBS_DIR := ../../../ExternalLibs
+
+VULKAN_SDK_DIR := $(EXTERNAL_LIBS_DIR)VulkanSDK
+
+VULKAN_INC_DIR := $(VULKAN_SDK_DIR)/include
+
 # API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
 SRCDIR := ../src
 
 # SPIRV-Reflect-Quelle (aus dem Vulkan SDK), wird als C in die Lib mitkompiliert
-SPIRV_REFLECT_DIR := ../../../ExternalLibs/VulkanSDK/include/SPIRV_Reflect
+SPIRV_REFLECT_DIR := $(VULKAN_INC_DIR)/SPIRV_Reflect
 
 VULKAN_FILES := \
  base_displayhandler \
@@ -80,10 +86,10 @@ COMMON_FILES := \
 
 INCDIRS := \
 	./include ../include ../src ../../basetools/include \
-	../../../ExternalLibs/VulkanSDK/include \
-	../../../ExternalLibs/VulkanSDK/include/vma \
-	../../../ExternalLibs/VulkanSDK/include/spirv_cross \
-	../../../ExternalLibs/DXC/include \
+	$(VULKAN_INC_DIR) \
+	$(VULKAN_INC_DIR)/vma \
+	$(VULKAN_INC_DIR)/SPIRV_reflect \
+	$(EXTERNAL_LIB_DIR)/DXC/include \
 	/usr/include/ /usr/include/SDL2 \
 	/opt/homebrew/include /opt/homebrew/include/SDL2
 
