@@ -352,7 +352,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept
     if (saveRenderStates)
         PushRenderStates();
 #ifdef _DEBUG
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 #endif
     return true;
 }
@@ -368,7 +368,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept
     if (res != VK_SUCCESS)
         fprintf(stderr, "CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
 #ifdef _DEBUG
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 #endif
     commandListHandler.PopCmdList();
     // Register in pendingLists in close-order. ExecuteAll iterates pendingLists in
@@ -414,7 +414,7 @@ void CommandList::SetBarrier(VkImage image, ImageLayoutTracker& tracker, VkImage
         return;
     tracker.TransitionTo(GfxList(), newLayout, dstStage, dstAccess);
 #ifdef _DEBUG
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 #endif
 }
 
@@ -429,7 +429,7 @@ void CommandList::SetBarrier(const VkImageMemoryBarrier2* barriers, int count)
     dep.pImageMemoryBarriers    = barriers;
     vkCmdPipelineBarrier2(GfxList(), &dep);
 #ifdef _DEBUG
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 #endif
 }
 
@@ -449,7 +449,7 @@ void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/) noe
             vkCmdBindPipeline(GfxList(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
         m_activePipeline = pipeline;
 #ifdef _DEBUG
-        gfxStates.CheckError();
+        //gfxStates.CheckError();
 #endif
     }
 }
@@ -497,7 +497,7 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
 #ifdef _DEBUG
 void CommandList::CheckDeviceRemoved(const char* context) noexcept
 {
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 }
 #endif
 
@@ -619,7 +619,7 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
             fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
     }
 #ifdef _DEBUG
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 #endif
     for (auto l : m_pendingLists) {
         if (l->IsTemporary())

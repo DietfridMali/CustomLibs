@@ -274,14 +274,14 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
     if (not StartRender())
         return;
     ActivateTextures(textures);
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU and
     // materialize the bind table into a VkDescriptorSet for this draw.
     Shader* shader = baseShaderHandler.ActiveShader();
     if (shader)
         shader->UpdateVariables();
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     if (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
             commandListHandler.DrawIndexedInstanced(uint32_t(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
@@ -293,11 +293,11 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
                 commandListHandler.DrawInstanced(vertCount, 1, 0, 0);
         }
     }
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     DeactivateTextures(textures);
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     FinishRender();
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 }
 
 // =================================================================================================

@@ -218,22 +218,22 @@ void BaseDisplayHandler::BeginFrame(void) {
     // CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, and
     // vkAcquireNextImageKHR. We follow up with the per-frame resource resets that the DX12
     // path runs implicitly inside CommandQueue::BeginFrame.
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     commandListHandler.CmdQueue().BeginFrame();
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
     const uint32_t slot = commandListHandler.CmdQueue().FrameIndex();
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     descriptorPoolHandler.BeginFrame(slot);
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     cbvAllocator.Reset(slot);
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     gfxResourceHandler.Cleanup(slot);
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     commandListHandler.ResetBindings();
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     baseShaderHandler.InvalidateActiveShader();
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 }
 
 

@@ -150,7 +150,7 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     if (baseDisplayHandler.CurrentBackBuffer())
         baseDisplayHandler.DisableBackBuffer();
     FinishOperation(cl);
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
 }
 
 

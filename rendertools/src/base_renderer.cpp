@@ -64,7 +64,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
     SetupGraphics();
     m_renderTexture.Validate();
     m_renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter]);
-    gfxStates.CheckError();
+    //gfxStates.CheckError();
     return true;
 }
 
