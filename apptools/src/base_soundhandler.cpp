@@ -1,5 +1,5 @@
 
-#include "timer.h"
+#include "timer.hpp"
 #include "arghandler.h"
 #include "base_soundhandler.h"
 

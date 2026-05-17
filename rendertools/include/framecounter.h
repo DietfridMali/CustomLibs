@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "timer.h"
+#include "timer.hpp"
 #include "viewport.h"
 #include "colordata.h"
 

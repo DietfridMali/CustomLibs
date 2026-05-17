@@ -1,6 +1,7 @@
 #pragma once
 
 #define _USE_MATH_DEFINES // for C++
+#define NOMINMAX
 
 #include <concepts>   // std::integral, std::signed_integral
 #include <utility>    // std::pair
@@ -12,8 +13,14 @@
 #include <memory>
 #include <new>    // std::nothrow
 
+#ifdef PI
+#   undef PI
+#endif
 constexpr float PI = 3.14159265358979323846f;
-constexpr float TWO_PI = 6.28318530717958647692f; 
+#ifdef TWO_PI
+#   undef TWO_PI
+#endif
+constexpr float TWO_PI = 6.28318530717958647692f;
 
 // =================================================================================================
 
@@ -97,7 +104,7 @@ namespace Conversions
     template<typename T>
     struct Interval {
         T min = std::numeric_limits<T>::lowest();
-        T max = std::numeric_limits<T>::max();
+        T max = (std::numeric_limits<T>::max)();
         bool Contains(T v) const
  noexcept
         {

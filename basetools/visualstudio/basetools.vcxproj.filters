@@ -147,7 +147,7 @@
     <ClInclude Include="..\include\std_defines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\timer.h">
+    <ClInclude Include="..\include\timer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\sharedgfxhandle.hpp">
