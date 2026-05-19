@@ -116,6 +116,11 @@ public:
     AutoArray<UniformHandle*>  m_uniforms;
     ShaderLocationTable        m_locations;
 
+    // CL-ID that currently "owns" this shader's bind state. Set by Activate(); compared against
+    // the current CL's ID on next Activate() — match means PSO + RootSig + descriptor heap are
+    // still bound on that CL, no rebind necessary. A different (or zero) CL ID forces full bind.
+    uint64_t                   m_owner{ 0 };
+
     using KeyType = String;
 
     Shader(String name = "", String vs = "", String fs = "", String gs = "")
