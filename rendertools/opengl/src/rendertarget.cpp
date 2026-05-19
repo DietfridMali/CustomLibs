@@ -45,6 +45,8 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
     else if (bufferType == BufferInfo::btStencil)
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
+    else if (bufferType == BufferInfo::btSkyMap)
+        bufferInfo.m_attachment = GL_NONE; // compute-write target, not framebuffer-attached
     else
         bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
     gfxStates.ClearError();
@@ -52,6 +54,22 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
     gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
+    if (bufferType == BufferInfo::btSkyMap) {
+        // RGBA16F image for compute output. Linear sampling so the composit-PS can read it
+        // without nearest-neighbor artifacts; clamp-to-edge to avoid wraparound at the seam of
+        // the hemi-octahedral parameterization.
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_HALF_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        gfxStates.BindTexture2D(0, 0);
+        gfxStates.CheckError();
+        ++m_bufferCount;
+        return;
+    }
     if (bufferType == BufferInfo::btDepth) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
@@ -174,7 +192,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_bufferCount = 0;
     m_isScreenBuffer = params.isScreenBuffer;
-    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount + params.skyMaps);
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
@@ -186,6 +204,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // depth buffer must be created last or draw buffer management will fail as it relies on all draw buffers being stored in bufferInfo contiguously, starting at index 0
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
+    // Sky-map buffers come last so the existing color/vertex/depth-buffer iterations
+    // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
+    // buffers) remain valid. Caller addresses sky-maps via m_skyMapIndex + slot.
+    m_skyMapIndex = (params.skyMaps > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMaps) : -1;
+    m_skyMapCount = params.skyMaps;
     CreateRenderArea();
     if (not AttachBuffers(params.hasMRTs))
         return false;

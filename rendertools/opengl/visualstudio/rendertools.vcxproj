@@ -156,6 +156,7 @@
     <ClInclude Include="..\..\include\rendermatrices.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
+    <ClInclude Include="..\include\compute_shader.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
     <ClInclude Include="..\..\include\shadowmap.h" />
@@ -180,6 +181,7 @@
     <ClCompile Include="..\..\src\shadowmap.cpp" />
     <ClCompile Include="..\..\src\textrenderer.cpp" />
     <ClCompile Include="..\src\base_shadercode.cpp" />
+    <ClCompile Include="..\src\compute_shader.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />
     <ClCompile Include="..\..\src\cube.cpp" />

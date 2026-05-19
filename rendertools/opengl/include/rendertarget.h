@@ -19,7 +19,8 @@ public:
         btColor,
         btDepth,
         btStencil,
-        btVertex
+        btVertex,
+        btSkyMap     // RGBA16F texture for compute write (image2D); not attached to FBO
     } eBufferType;
 
 
@@ -70,6 +71,8 @@ public:
     int                         m_extraBufferIndex;
     int                         m_depthBufferIndex;
     int                         m_stencilBufferIndex;
+    int                         m_skyMapIndex{ -1 };   // start of sky-map slot range in m_bufferInfo (TSP cloud renderer)
+    int                         m_skyMapCount{ 0 };
     int                         m_activeBufferIndex;
     AutoArray<BufferInfo>       m_bufferInfo;
     DrawBufferList              m_drawBuffers;

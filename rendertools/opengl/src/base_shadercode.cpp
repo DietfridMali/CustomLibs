@@ -2,6 +2,7 @@
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
+#include "compute_shader.h"
 
 // =================================================================================================
 
@@ -59,25 +60,36 @@ BaseShaderCode::BaseShaderCode() {
 
 void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
     for (const ShaderSource* source : shaderSource) {
-        if (source->IsCompute()) {
-#ifdef _DEBUG
-            fprintf(stderr, "skipping compute shader '%s' — OGL compute path not implemented\n", (const char*)source->m_name);
-#endif
+        if (not gfxStates.HaveFeatureLevel(source->m_featureLevel)) {
+            if (source->IsCompute())
+                m_computeShaders[source->m_name] = nullptr;
+            else
+                m_shaders[source->m_name] = nullptr;
             continue;
         }
-        if (not gfxStates.HaveFeatureLevel(source->m_featureLevel))
-            m_shaders[source->m_name] = nullptr; // enter the shader so the dictionary search doesn't simply fail, but returns a nullptr
+        if (source->IsCompute()) {
+            ComputeShader* shader = new ComputeShader(source->m_name);
+            if (shader->Create(source->m_cs, source->m_computeBindings))
+                m_computeShaders[source->m_name] = shader;
+            else {
+                m_computeShaders[source->m_name] = nullptr;
+                delete shader;
+#ifdef _DEBUG
+                fprintf(stderr, "creating compute shader '%s' failed\n", (const char*)source->m_name);
+#endif
+            }
+        }
         else {
             Shader* shader = new Shader(source->m_name);
-#if 0//def _DEBUG
-            fprintf(stderr, "creating shader '%s'\n", (const char*)source->m_name);
-#endif
             if (shader->Create(source->m_vs, source->m_fs, source->m_gs))
                 m_shaders[source->m_name] = shader;
+            else {
+                m_shaders[source->m_name] = nullptr;
+                delete shader;
 #ifdef _DEBUG
-            else
                 fprintf(stderr, "creating shader '%s' failed\n", (const char*)source->m_name);
 #endif
+            }
         }
     }
 }
