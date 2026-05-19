@@ -20,7 +20,7 @@ public:
         btDepth,
         btStencil,
         btVertex,
-        btSkyMap     // RGBA16F texture for compute write (image2D); not attached to FBO
+        btCompute  // RGBA16F texture for compute write (image2D); not attached to FBO
     } eBufferType;
 
 
@@ -71,8 +71,8 @@ public:
     int                         m_extraBufferIndex;
     int                         m_depthBufferIndex;
     int                         m_stencilBufferIndex;
-    int                         m_skyMapIndex{ -1 };   // start of sky-map slot range in m_bufferInfo (TSP cloud renderer)
-    int                         m_skyMapCount{ 0 };
+    int                         m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
+    int                         m_computeBufferCount{ 0 };
     int                         m_activeBufferIndex;
     AutoArray<BufferInfo>       m_bufferInfo;
     DrawBufferList              m_drawBuffers;
@@ -97,7 +97,7 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
-        int skyMaps{ 0 };             // Cross-API; honored only by Vulkan (TSP). DX12/OGL ignore.
+        int computeBufferCount{ 0 };  // Compute-only storage textures (RGBA16F image2D), no FBO attachment.
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
         bool storageImage{ false };   // Cross-API; honored only by Vulkan today.

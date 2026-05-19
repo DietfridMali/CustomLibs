@@ -45,7 +45,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
     else if (bufferType == BufferInfo::btStencil)
         bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
-    else if (bufferType == BufferInfo::btSkyMap)
+    else if (bufferType == BufferInfo::btCompute)
         bufferInfo.m_attachment = GL_NONE; // compute-write target, not framebuffer-attached
     else
         bufferInfo.m_attachment = GL_COLOR_ATTACHMENT0 + attachmentIndex++;
@@ -54,7 +54,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
     gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
-    if (bufferType == BufferInfo::btSkyMap) {
+    if (bufferType == BufferInfo::btCompute) {
         // RGBA16F image for compute output. Linear sampling so the composit-PS can read it
         // without nearest-neighbor artifacts; clamp-to-edge to avoid wraparound at the seam of
         // the hemi-octahedral parameterization.
@@ -192,7 +192,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_bufferCount = 0;
     m_isScreenBuffer = params.isScreenBuffer;
-    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount + params.skyMaps);
+    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount + params.computeBufferCount);
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
@@ -204,11 +204,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // depth buffer must be created last or draw buffer management will fail as it relies on all draw buffers being stored in bufferInfo contiguously, starting at index 0
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
-    // Sky-map buffers come last so the existing color/vertex/depth-buffer iterations
+    // Compute buffers come last so the existing color/vertex/depth-buffer iterations
     // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
-    // buffers) remain valid. Caller addresses sky-maps via m_skyMapIndex + slot.
-    m_skyMapIndex = (params.skyMaps > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMaps) : -1;
-    m_skyMapCount = params.skyMaps;
+    // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
+    m_computeBufferIndex = (params.computeBufferCount > 0) ? CreateSpecialBuffers(BufferInfo::btCompute, attachmentIndex, params.computeBufferCount) : -1;
+    m_computeBufferCount = params.computeBufferCount;
     CreateRenderArea();
     // Sky-map-only RTs (compute write target, no FBO attachments) skip AttachBuffers because
     // glCheckFramebufferStatus would return INCOMPLETE_MISSING_ATTACHMENT — the FBO is unused.

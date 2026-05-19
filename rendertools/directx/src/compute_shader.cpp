@@ -13,6 +13,7 @@
 
 #include "compute_shader.h"
 #include "dx12context.h"
+#include "cbv_allocator.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -248,8 +249,60 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
         return false;
     if (not CreatePipeline())
         return false;
+    ReflectB1Fields();
+    if (m_b1Size > 0) {
+        m_b1Staging.assign(m_b1Size, 0);
+        m_b1Dirty = true;
+    }
     m_cs = csCode;
     return true;
+}
+
+
+void ComputeShader::ReflectB1Fields(void) noexcept
+{
+    if (not m_csBytecode or not InitDxc())
+        return;
+    ComPtr<ID3D12ShaderReflection> refl;
+    {
+        DxcBuffer rb{};
+        rb.Ptr = m_csBytecode->GetBufferPointer();
+        rb.Size = m_csBytecode->GetBufferSize();
+        rb.Encoding = DXC_CP_ACP;
+        if (FAILED(g_dxcUtils->CreateReflection(&rb, IID_PPV_ARGS(refl.GetAddressOf()))))
+            return;
+    }
+
+    D3D12_SHADER_DESC sd{};
+    refl->GetDesc(&sd);
+    for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
+        ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
+        D3D12_SHADER_BUFFER_DESC cbd{};
+        cb->GetDesc(&cbd);
+        if (strcmp(cbd.Name, "ShaderConstants") != 0)
+            continue;
+        if (cbd.Size > m_b1Size)
+            m_b1Size = cbd.Size;
+        for (UINT j = 0; j < cbd.Variables; ++j) {
+            ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
+            D3D12_SHADER_VARIABLE_DESC vd{};
+            var->GetDesc(&vd);
+            if (not (vd.uFlags & D3D_SVF_USED))
+                continue;
+            bool found = false;
+            for (auto& kv : m_b1Fields)
+                if (kv.first == String(vd.Name)) {
+                    found = true;
+                    break;
+                }
+            if (not found) {
+                auto* entry = m_b1Fields.Append();
+                if (entry)
+                    *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
+            }
+        }
+        break;
+    }
 }
 
 
@@ -259,7 +312,10 @@ void ComputeShader::Destroy(void) noexcept
     m_rootSignature.Reset();
     m_csBytecode.Reset();
     m_b1Staging.clear();
+    m_b1Fields.Reset();
+    m_b1Size = 0;
     m_b1Dirty = true;
+    m_b1GpuVA = 0;
     for (int i = 0; i < 2; ++i) m_cbvRootIndex[i] = -1;
     for (int i = 0; i < 16; ++i) { m_srvRootIndex[i] = -1; m_samplerRootIndex[i] = -1; }
     for (int i = 0; i < 4; ++i) m_uavRootIndex[i] = -1;
@@ -288,6 +344,53 @@ int ComputeShader::SetB1(uint32_t offset, const void* data, size_t size) noexcep
     std::memcpy(m_b1Staging.data() + offset, data, size);
     m_b1Dirty = true;
     return int(offset);
+}
+
+
+int ComputeShader::SetB1Field(const char* name, const void* data, size_t size) noexcept
+{
+    String sName(name);
+    for (auto& kv : m_b1Fields) {
+        if (kv.first == sName) {
+            uint32_t offset = kv.second.offset;
+            if (offset + size <= m_b1Staging.size()) {
+                std::memcpy(m_b1Staging.data() + offset, data, size);
+                m_b1Dirty = true;
+                return int(offset);
+            }
+            return -1;
+        }
+    }
+#ifdef _DEBUG
+    fprintf(stderr, "ComputeShader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+#endif
+    return -1;
+}
+
+
+int ComputeShader::SetFloat   (const char* name, float data)            noexcept { return SetB1Field(name, &data, sizeof(float)); }
+int ComputeShader::SetInt     (const char* name, int data)              noexcept { return SetB1Field(name, &data, sizeof(int)); }
+int ComputeShader::SetVector2f(const char* name, const Vector2f& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector2f)); }
+int ComputeShader::SetVector3f(const char* name, const Vector3f& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector3f)); }
+int ComputeShader::SetVector4f(const char* name, const Vector4f& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector4f)); }
+int ComputeShader::SetVector2i(const char* name, const Vector2i& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector2i)); }
+int ComputeShader::SetVector3i(const char* name, const Vector3i& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector3i)); }
+int ComputeShader::SetVector4i(const char* name, const Vector4i& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector4i)); }
+int ComputeShader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/) noexcept { return SetB1Field(name, data, 16 * sizeof(float)); }
+int ComputeShader::SetMatrix3f(const char* name, const float* data, bool /*transpose*/) noexcept { return SetB1Field(name, data, 9 * sizeof(float)); }
+
+
+bool ComputeShader::UploadB1(void) noexcept
+{
+    if (m_b1Size == 0)
+        return true;
+    CbAlloc a = cbvAllocator.Allocate(UINT(m_b1Size));
+    if (not a.IsValid())
+        return false;
+    std::memcpy(a.cpu, m_b1Staging.data(), m_b1Size);
+    m_b1GpuVA = a.gpu;
+    m_b1Dirty = false;
+    return true;
 }
 
 // =================================================================================================

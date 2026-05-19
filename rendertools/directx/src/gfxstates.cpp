@@ -5,6 +5,8 @@
 #include "descriptor_heap.h"
 #include "gfxrenderer.h"
 #include "base_displayhandler.h"
+#include "rendertarget.h"
+#include "base_renderer.h"
 #include "commandlist.h"
 
 #include <cstdio>
@@ -159,6 +161,39 @@ void GfxStates::ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearVal
     auto* list = commandListHandler.CurrentGfxList();
     if (list)
         list->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_STENCIL, 0.0f, uint8_t(clearValue), 0, nullptr);
+}
+
+
+void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
+    if (rt == nullptr or (rt->m_computeBufferCount <= 0))
+        return;
+
+    // Open a temporary CL if none is active. ClearRenderTargetView + ResourceBarrier require a
+    // recording command list.
+    void* opHandle = nullptr;
+    CommandList* cmdList = commandListHandler.CurrentCmdList();
+    if (cmdList == nullptr) {
+        opHandle = baseRenderer.StartOperation("GfxStates::ClearComputeBuffers", false);
+        if (opHandle == nullptr)
+            return;
+        cmdList = commandListHandler.CurrentCmdList();
+        if (cmdList == nullptr) {
+            baseRenderer.FinishOperation(opHandle);
+            return;
+        }
+    }
+
+    const FLOAT zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    auto* list = cmdList->GfxList();
+    for (int i = 0; i < rt->m_computeBufferCount; ++i) {
+        BufferInfo& bi = rt->m_bufferInfo[rt->m_computeBufferIndex + i];
+        bi.SetState(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        list->ClearRenderTargetView(bi.m_rtv.CPUHandle(), zero, 0, nullptr);
+        bi.SetState(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    }
+
+    if (opHandle != nullptr)
+        baseRenderer.FinishOperation(opHandle);
 }
 
 

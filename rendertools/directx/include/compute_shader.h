@@ -26,6 +26,7 @@
 #include "dx12framework.h"
 #include "string.hpp"
 #include "array.hpp"
+#include "vector.hpp"
 #include "base_shadercode.h"   // ComputeBindingDesc
 
 #include <d3d12.h>
@@ -46,9 +47,18 @@ public:
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipeline;
     AutoArray<ComputeBindingDesc>       m_bindings;
 
-    // Per-shader b1 staging buffer for per-pass uniforms (mirrors Vulkan).
+    // Reflected b1 cbuffer layout — { fieldName -> {offset, size} } populated from DXIL reflection
+    // on Create. Backed by m_b1Staging (sized to the reflected block size). SetB1Field looks up
+    // the name and writes into the staging buffer. UploadB1 flushes to a CBV sub-allocation.
+    struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
+    uint32_t                            m_b1Size{ 0 };
+    AutoArray<std::pair<String, FieldInfo>> m_b1Fields;
     std::vector<uint8_t>                m_b1Staging;
     bool                                m_b1Dirty{ true };
+
+    // After UploadB1 the per-frame CBV GPU virtual address lives here. Caller passes it to
+    // SetComputeRootConstantBufferView(m_cbvRootIndex[1], m_b1GpuVA).
+    D3D12_GPU_VIRTUAL_ADDRESS           m_b1GpuVA{ 0 };
 
     // Slot maps populated by CreateRootSignature, indexed by HLSL register number.
     // Root parameter index for each binding kind, or -1 if not in the layout.
@@ -85,11 +95,29 @@ public:
     bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
     bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
 
+    // b1 — per-pass constants. Name-based setters resolve to reflected offsets in the cbuffer.
+    int SetB1Field(const char* name, const void* data, size_t size) noexcept;
     int SetB1(uint32_t offset, const void* data, size_t size) noexcept;
+
+    int SetFloat   (const char* name, float data)            noexcept;
+    int SetInt     (const char* name, int data)              noexcept;
+    int SetVector2f(const char* name, const Vector2f& data)  noexcept;
+    int SetVector3f(const char* name, const Vector3f& data)  noexcept;
+    int SetVector4f(const char* name, const Vector4f& data)  noexcept;
+    int SetVector2i(const char* name, const Vector2i& data)  noexcept;
+    int SetVector3i(const char* name, const Vector3i& data)  noexcept;
+    int SetVector4i(const char* name, const Vector4i& data)  noexcept;
+    int SetMatrix4f(const char* name, const float* data, bool transpose = false) noexcept;
+    int SetMatrix3f(const char* name, const float* data, bool transpose = false) noexcept;
+
+    // Sub-allocate m_b1Size bytes from cbvAllocator, memcpy m_b1Staging into it, stash the GPU
+    // virtual address in m_b1GpuVA for the next SetComputeRootConstantBufferView call.
+    bool UploadB1(void) noexcept;
 
 private:
     bool CreateRootSignature(const AutoArray<ComputeBindingDesc>& bindings) noexcept;
     bool CreatePipeline(void) noexcept;
+    void ReflectB1Fields(void) noexcept;
 };
 
 // =================================================================================================

@@ -2,12 +2,15 @@
 
 #include <utility>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 #include "vkframework.h"
 #include "compute_shader.h"
 #include "shader_compiler.h"
 #include "vkcontext.h"
+#include "cbv_allocator.h"
+#include <spirv_reflect.h>
 
 // =================================================================================================
 // Vulkan ComputeShader implementation (2026-05-18)
@@ -198,8 +201,63 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
     if (not CreatePipeline())
         return false;
 
+    ReflectB1Fields();
+    if (m_b1Size > 0) {
+        m_b1Staging.assign(m_b1Size, 0);
+        m_b1Dirty = true;
+    }
+
     m_cs = csCode;
     return true;
+}
+
+
+void ComputeShader::ReflectB1Fields(void) noexcept
+{
+    // SPIR-V reflection of the b1 cbuffer (set 0, binding 1 per kComputeBindArgs).
+    if (m_csSpirv.empty())
+        return;
+
+    SpvReflectShaderModule mod{};
+    if (spvReflectCreateShaderModule(m_csSpirv.size(), m_csSpirv.data(), &mod) != SPV_REFLECT_RESULT_SUCCESS)
+        return;
+
+    uint32_t count = 0;
+    spvReflectEnumerateDescriptorBindings(&mod, &count, nullptr);
+    std::vector<SpvReflectDescriptorBinding*> bs(count);
+    spvReflectEnumerateDescriptorBindings(&mod, &count, bs.data());
+
+    for (auto* b : bs) {
+        if (not b)
+            continue;
+        if (b->set != 0 or b->binding != 1u)
+            continue;
+        const SpvReflectDescriptorType t = b->descriptor_type;
+        if (t != SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+            and t != SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+            continue;
+        if (b->block.size > m_b1Size)
+            m_b1Size = b->block.size;
+        for (uint32_t j = 0; j < b->block.member_count; ++j) {
+            const SpvReflectBlockVariable& m = b->block.members[j];
+            if (not m.name)
+                continue;
+            String name(m.name);
+            bool found = false;
+            for (auto& kv : m_b1Fields)
+                if (kv.first == name) {
+                    found = true;
+                    break;
+                }
+            if (not found) {
+                auto* entry = m_b1Fields.Append();
+                if (entry)
+                    *entry = { name, { m.offset, m.size } };
+            }
+        }
+        break;
+    }
+    spvReflectDestroyShaderModule(&mod);
 }
 
 
@@ -224,6 +282,8 @@ void ComputeShader::Destroy(void) noexcept
     m_csModule = VK_NULL_HANDLE;
     m_csSpirv.clear();
     m_b1Staging.clear();
+    m_b1Fields.Reset();
+    m_b1Size = 0;
     m_b1Dirty = true;
 }
 
@@ -304,11 +364,49 @@ int ComputeShader::SetB1(uint32_t offset, const void* data, size_t size) noexcep
 }
 
 
+int ComputeShader::SetB1Field(const char* name, const void* data, size_t size) noexcept
+{
+    String sName(name);
+    for (auto& kv : m_b1Fields) {
+        if (kv.first == sName) {
+            uint32_t offset = kv.second.offset;
+            if (offset + size <= m_b1Staging.size()) {
+                std::memcpy(m_b1Staging.data() + offset, data, size);
+                m_b1Dirty = true;
+                return int(offset);
+            }
+            return -1;
+        }
+    }
+#ifdef _DEBUG
+    fprintf(stderr, "ComputeShader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+#endif
+    return -1;
+}
+
+
+int ComputeShader::SetFloat   (const char* name, float data)            noexcept { return SetB1Field(name, &data, sizeof(float)); }
+int ComputeShader::SetInt     (const char* name, int data)              noexcept { return SetB1Field(name, &data, sizeof(int)); }
+int ComputeShader::SetVector2f(const char* name, const Vector2f& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector2f)); }
+int ComputeShader::SetVector3f(const char* name, const Vector3f& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector3f)); }
+int ComputeShader::SetVector4f(const char* name, const Vector4f& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector4f)); }
+int ComputeShader::SetVector2i(const char* name, const Vector2i& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector2i)); }
+int ComputeShader::SetVector3i(const char* name, const Vector3i& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector3i)); }
+int ComputeShader::SetVector4i(const char* name, const Vector4i& data)  noexcept { return SetB1Field(name, &data, sizeof(Vector4i)); }
+int ComputeShader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/) noexcept { return SetB1Field(name, data, 16 * sizeof(float)); }
+int ComputeShader::SetMatrix3f(const char* name, const float* data, bool /*transpose*/) noexcept { return SetB1Field(name, data, 9 * sizeof(float)); }
+
+
 bool ComputeShader::UploadB1(void) noexcept
 {
-    // Caller mirrors Shader::UploadB1: write m_b1Staging into a UBO ring-buffer allocation via
-    // cbv_allocator, stash the dynamic offset for vkCmdBindDescriptorSets. Left to the caller
-    // until a compute-side equivalent of the cbv-allocator path is wired (TSP integration).
+    if (m_b1Size == 0)
+        return true;
+    CbAlloc a = cbvAllocator.Allocate(m_b1Size);
+    if (not a.IsValid())
+        return false;
+    std::memcpy(a.cpu, m_b1Staging.data(), m_b1Size);
+    m_b1DynamicOffset = a.offset;
+    m_b1Dirty = false;
     return true;
 }
 

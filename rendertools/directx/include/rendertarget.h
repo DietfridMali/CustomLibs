@@ -41,7 +41,7 @@ public:
         btDepth,
         btStencil,
         btVertex,
-        btSkyMap   // TSP sky-map (R16G16B16A16_FLOAT, UAV+SRV, no RTV/DSV)
+        btCompute  // Compute-only storage texture (R16G16B16A16_FLOAT, UAV+SRV+RTV-for-clear, no DSV)
     } eBufferType;
 
     ComPtr<ID3D12Resource>  m_resource;
@@ -121,7 +121,7 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
-        int skyMaps{ 0 };             // Cross-API; honored only by Vulkan (TSP). DX12/OGL ignore.
+        int computeBufferCount{ 0 };  // Compute-only storage textures (R16G16B16A16_FLOAT), UAV+SRV+RTV.
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
         bool storageImage{ false };   // Cross-API; honored only by Vulkan today.
@@ -158,6 +158,8 @@ public:
     int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
     int                 m_stencilBufferIndex{ -1 };
+    int                 m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
+    int                 m_computeBufferCount{ 0 };
     int                 m_activeBufferIndex{ 0 };
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };
@@ -369,7 +371,7 @@ private:
 
     bool CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
-    bool CreateSkyMapBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+    bool CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
     bool CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 

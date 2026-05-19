@@ -3,6 +3,7 @@
 #include "array.hpp"
 
 #include "gfxrenderer.h"
+#include "rendertarget.h"
 
 #define TRACK_TMU_USAGE 1
 
@@ -191,6 +192,18 @@ bool GfxStates::CheckError(const char* operation) noexcept {
 	ClearError();
 	return false;
 #endif
+}
+
+
+void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
+    if (rt == nullptr or (rt->m_computeBufferCount <= 0))
+        return;
+    const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    for (int i = 0; i < rt->m_computeBufferCount; ++i) {
+        GLuint h = rt->GetHandle(rt->m_computeBufferIndex + i);
+        if (h)
+            glClearTexImage(h, 0, GL_RGBA, GL_FLOAT, zero);
+    }
 }
 
 

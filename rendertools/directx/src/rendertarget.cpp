@@ -17,8 +17,8 @@ static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 {
     if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
         return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-    if (type == BufferInfo::btSkyMap)
-        return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    if (type == BufferInfo::btCompute)
+        return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 }
 
@@ -70,7 +70,7 @@ DXGI_FORMAT BufferInfo::ViewFormat(void)
             return dxDepthSRVFormat;
         case BufferInfo::btVertex:
             return dxVertexFormat;
-        case BufferInfo::btSkyMap:
+        case BufferInfo::btCompute:
             return dxSkyMapFormat;
         default:
             return dxColorFormat;
@@ -202,7 +202,7 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 // Sky-map buffer: R16G16B16A16_FLOAT, UAV+SRV, no RTV. Initial state COMMON so the first
 // transition to UNORDERED_ACCESS (compute write) or PIXEL_SHADER_RESOURCE (composit sample)
 // is a regular state transition.
-bool RenderTarget::CreateSkyMapBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+bool RenderTarget::CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
     info.m_resource = CreateRTResource(device, w, h, dxSkyMapFormat, D3D12_RESOURCE_STATE_COMMON, nullptr, ResourceFlagsForType(info.m_type));
     if (not info.m_resource)
@@ -211,6 +211,10 @@ bool RenderTarget::CreateSkyMapBuffer(ID3D12Device* device, BufferInfo& info, in
     if (not info.AllocSRV())
         return false;
     if (not info.AllocUAV())
+        return false;
+    // RTV for GfxStates::ClearComputeBuffers via ClearRenderTargetView (cleaner than ClearUAV —
+    // the RTV-heap is non-shader-visible by design, no auxiliary heap quirks).
+    if (not info.AllocRTV())
         return false;
     return true;
 }
@@ -231,8 +235,8 @@ bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
             if (not CreateDepthBuffer(device, info, w, h))
                 return false;
         }
-        else if (bufferType == BufferInfo::btSkyMap) {
-            if (not CreateSkyMapBuffer(device, info, w, h))
+        else if (bufferType == BufferInfo::btCompute) {
+            if (not CreateComputeBuffer(device, info, w, h))
                 return false;
         }
         else {
@@ -268,8 +272,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
-    m_bufferInfo.Resize(params.skyMaps + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
-    m_pingPong = (m_colorBufferCount > 1) or (params.skyMaps > 1);
+    m_bufferInfo.Resize(params.computeBufferCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    m_pingPong = (m_colorBufferCount > 1) or (params.computeBufferCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
 
     m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
@@ -277,8 +281,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
         return false;
 
     int attachmentIndex = 0;
-    // SkyMaps first → caller can address them at m_bufferInfo[0..skyMaps-1] directly.
-    CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMaps);
+    // Compute buffers first → caller can address them at m_bufferInfo[m_computeBufferIndex..]
+    // (currently 0..count-1 since they precede everything else).
+    m_computeBufferIndex = (params.computeBufferCount > 0) ? CreateSpecialBuffers(BufferInfo::btCompute, attachmentIndex, params.computeBufferCount) : -1;
+    m_computeBufferCount = params.computeBufferCount;
     for (int i = 0; i < m_colorBufferCount; ++i)
         CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
 

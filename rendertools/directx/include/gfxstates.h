@@ -484,6 +484,10 @@ public:
 
     void ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearValue = 0) noexcept;
 
+    // Clear every btCompute buffer of the given RT to (0,0,0,0) via ClearRenderTargetView. If no
+    // CL is active, opens a temporary one via baseRenderer.StartOperation / FinishOperation.
+    void ClearComputeBuffers(class RenderTarget* rt) noexcept;
+
     void SetMemoryBarrier(GfxTypes::Bitfield barriers = 0) noexcept;
 
     void Finish(void) noexcept;
