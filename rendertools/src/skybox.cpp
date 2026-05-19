@@ -3,6 +3,7 @@
 #include "cube.h"
 #include "gfxstates.h"
 #include "gfxrenderer.h"
+#include "base_renderer.h"
 
 // =================================================================================================
 
@@ -79,11 +80,12 @@ bool Skybox::Setup(const String& textureFolder) {
 Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness) {
     Shader* shader = baseShaderHandler.SetupShader("skybox");
     if (shader) {
-		static String uSkyNames[3] = { "sky1", "sky2", "sky3" };
         shader->SetMatrix4f("mView", view.AsArray(), false);
+		StaticArray<String, 3> skyNames = { "sky1", "sky2", "sky3" };
 		for (int i = 0; i < 3; i++) {
 			m_skyTextures[i]->Activate(i);
-			shader->SetInt(uSkyNames[i], i);
+			if (baseRenderer.HasOpenGL())
+			shader->SetInt(skyNames[i], i);
 			}
 		shader->SetVector3f("lightDirection", lightDirection);
 		shader->SetFloat("brightness", brightness);
@@ -97,7 +99,7 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 		return false;
 
 	void* cl = baseRenderer.StartOperation("skybox");
-	if (not cl)
+	if (not baseRenderer.HasOpenGL() and not cl)
 		return false;
 	gfxStates.SetFaceCulling(0);
 	gfxStates.SetDepthWrite(0);
@@ -115,7 +117,7 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 #endif
 	}
 	baseRenderer.FinishOperation(cl);
-	return shader != nullptr;;
+	return shader != nullptr;
 };
 
 // =================================================================================================

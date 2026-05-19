@@ -290,9 +290,6 @@
     <ClCompile Include="..\..\src\noise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\skybox.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\glbloader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -321,6 +318,9 @@
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\compute_shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\skybox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

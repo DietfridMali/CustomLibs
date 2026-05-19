@@ -218,6 +218,9 @@
     <ClInclude Include="..\include\resource_view.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\compute_shader.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->
@@ -327,9 +330,6 @@
     <ClCompile Include="..\src\shader.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\skybox.cpp">
-      <Filter>Source Files\DirectX</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\texture.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
@@ -380,6 +380,12 @@
     </ClCompile>
     <ClCompile Include="..\src\resource_view.cpp">
       <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\compute_shader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\skybox.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
