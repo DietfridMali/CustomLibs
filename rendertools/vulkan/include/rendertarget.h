@@ -45,7 +45,7 @@ public:
         btDepth,
         btStencil,
         btVertex,
-        btSkyMap    // R16G16B16A16_SFLOAT, color+sampled+storage usage — for TSP sky-map ping-pong
+        btCompute   // R16G16B16A16_SFLOAT, color+sampled+storage usage — compute-only target
     } eBufferType;
 
     VkImage             m_image       { VK_NULL_HANDLE };
@@ -89,13 +89,12 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
-        // Number of sky-map ping-pong buffers (R16G16B16A16_SFLOAT, COLOR+SAMPLED+STORAGE usage).
-        // Used by the Temporal Sky Probe. SkyMap buffers occupy m_bufferInfo[0..skyMaps-1]
-        // (before colorBuffers), so caller can address them by direct index. DX12/OGL ignore.
-        int skyMaps{ 0 };
+        // Compute-only storage textures (R16G16B16A16_SFLOAT, COLOR+SAMPLED+STORAGE usage).
+        // Occupy m_bufferInfo[m_computeBufferIndex..] — caller addresses them via that offset.
+        int computeBufferCount{ 0 };
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
-        bool storageImage{ false };  // legacy; superseded by skyMaps for sky-map RTs
+        bool storageImage{ false };  // legacy; superseded by computeBufferCount
     };
 
     struct RTRenderParams {
@@ -129,6 +128,8 @@ public:
     int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
     int                 m_stencilBufferIndex{ -1 };
+    int                 m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
+    int                 m_computeBufferCount{ 0 };
     int                 m_activeBufferIndex{ 0 };
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };

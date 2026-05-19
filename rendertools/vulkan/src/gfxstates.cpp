@@ -4,6 +4,8 @@
 #include "commandlist.h"
 #include "gfxrenderer.h"
 #include "base_displayhandler.h"
+#include "rendertarget.h"
+#include "base_renderer.h"
 
 #include <cstdio>
 
@@ -221,6 +223,39 @@ void GfxStates::ClearColorBuffers(VkImage image, ImageLayoutTracker& tracker) no
 
     VkImageSubresourceRange range = MakeColorRange();
     vkCmdClearColorImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+}
+
+
+void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
+    if (rt == nullptr or (rt->m_computeBufferCount <= 0))
+        return;
+
+    // Open a temporary CL if none is active. vkCmdClearColorImage + layout transitions need a
+    // recording command buffer outside any render-pass scope.
+    void* opHandle = nullptr;
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE) {
+        opHandle = baseRenderer.StartOperation("GfxStates::ClearComputeBuffers", false);
+        if (opHandle == nullptr)
+            return;
+        cb = commandListHandler.CmdQueue().CmdBuffer();
+        if (cb == VK_NULL_HANDLE) {
+            baseRenderer.FinishOperation(opHandle);
+            return;
+        }
+    }
+
+    VkClearColorValue zero{ .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } };
+    VkImageSubresourceRange range = MakeColorRange();
+    for (int i = 0; i < rt->m_computeBufferCount; ++i) {
+        BufferInfo& bi = rt->m_bufferInfo[rt->m_computeBufferIndex + i];
+        bi.m_layoutTracker.ToTransferDst(cb);
+        vkCmdClearColorImage(cb, bi.m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
+        bi.m_layoutTracker.ToShaderInput(cb);
+    }
+
+    if (opHandle != nullptr)
+        baseRenderer.FinishOperation(opHandle);
 }
 
 

@@ -45,7 +45,7 @@ static VkFormat FormatForType(BufferInfo::eBufferType type)
         return kDepthFormat;
     case BufferInfo::btVertex:
         return kVertexFormat;
-    case BufferInfo::btSkyMap:
+    case BufferInfo::btCompute:
         return kSkyMapFormat;
     default:
         return kColorFormat;
@@ -314,16 +314,19 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
-    m_bufferInfo.Resize(params.skyMaps + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
-    // sky-map ping-pong (>=2 sky-maps) qualifies for the pingPong flag as well.
-    m_pingPong = (m_colorBufferCount > 1) or (params.skyMaps > 1);
+    m_bufferInfo.Resize(params.computeBufferCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    // Compute ping-pong (>=2 compute buffers) qualifies for the pingPong flag as well.
+    m_pingPong = (m_colorBufferCount > 1) or (params.computeBufferCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
     m_cmdList = nullptr;  // attached lazily on first Activate via commandListHandler.CreateCmdList
 
     int attachmentIndex = 0;
 
-    // SkyMaps first → caller can address them at m_bufferInfo[0..skyMaps-1] directly.
-    CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMaps);
+    // Compute buffers first → caller addresses them at m_bufferInfo[m_computeBufferIndex..].
+    m_computeBufferIndex = (params.computeBufferCount > 0)
+        ? CreateSpecialBuffers(BufferInfo::btCompute, attachmentIndex, params.computeBufferCount)
+        : -1;
+    m_computeBufferCount = params.computeBufferCount;
 
     // Color buffers next, using m_bufferCount as the next free slot (no longer hard-coded i).
     for (int i = 0; i < m_colorBufferCount; ++i)

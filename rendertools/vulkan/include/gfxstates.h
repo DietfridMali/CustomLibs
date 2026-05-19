@@ -498,6 +498,11 @@ public:
 
     void ClearStencilBuffer(VkImage image, ImageLayoutTracker& tracker, int clearValue = 0) noexcept;
 
+    // Clear every btCompute buffer of the given RT to (0,0,0,0). Uses vkCmdClearColorImage with
+    // TRANSFER_DST_OPTIMAL layout. If no CL is active, opens a temporary one via
+    // baseRenderer.StartOperation / FinishOperation. Leaves buffers in SHADER_READ_ONLY_OPTIMAL.
+    void ClearComputeBuffers(class RenderTarget* rt) noexcept;
+
     void SetMemoryBarrier(GfxTypes::Bitfield barriers = 0) noexcept;
 
     void Finish(void) noexcept;
