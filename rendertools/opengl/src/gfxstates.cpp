@@ -195,7 +195,7 @@ bool GfxStates::CheckError(const char* operation) noexcept {
 }
 
 
-void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
+void GfxStates::ClearSkyMaps(RenderTarget* rt) noexcept {
     if (rt == nullptr or (rt->m_computeBufferCount <= 0))
         return;
     const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };

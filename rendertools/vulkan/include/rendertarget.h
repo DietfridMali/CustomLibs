@@ -45,7 +45,7 @@ public:
         btDepth,
         btStencil,
         btVertex,
-        btCompute   // R16G16B16A16_SFLOAT, color+sampled+storage usage — compute-only target
+        btSkyMap   // R16G16B16A16_SFLOAT, color+sampled+storage usage — compute-only target
     } eBufferType;
 
     VkImage             m_image       { VK_NULL_HANDLE };
@@ -91,10 +91,10 @@ public:
         int vertexBufferCount{ 0 };
         // Compute-only storage textures (R16G16B16A16_SFLOAT, COLOR+SAMPLED+STORAGE usage).
         // Occupy m_bufferInfo[m_computeBufferIndex..] — caller addresses them via that offset.
-        int computeBufferCount{ 0 };
+        int skyMapCount{ 0 };
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
-        bool storageImage{ false };  // legacy; superseded by computeBufferCount
+        bool storageImage{ false };  // legacy; superseded by skyMapCount
     };
 
     struct RTRenderParams {

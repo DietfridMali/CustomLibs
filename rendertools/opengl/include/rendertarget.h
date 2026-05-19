@@ -20,7 +20,7 @@ public:
         btDepth,
         btStencil,
         btVertex,
-        btCompute  // RGBA16F texture for compute write (image2D); not attached to FBO
+        btSkyMap  // RGBA16F texture for compute write (image2D); not attached to FBO
     } eBufferType;
 
 
@@ -97,7 +97,7 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
-        int computeBufferCount{ 0 };  // Compute-only storage textures (RGBA16F image2D), no FBO attachment.
+        int skyMapCount{ 0 };  // Compute-only storage textures (RGBA16F image2D), no FBO attachment.
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
         bool storageImage{ false };   // Cross-API; honored only by Vulkan today.

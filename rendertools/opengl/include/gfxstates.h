@@ -429,9 +429,9 @@ public:
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
-	// Clear every btCompute of the given RT to (0,0,0,0). OGL: glClearTexImage works on
+	// Clear every btSkyMap of the given RT to (0,0,0,0). OGL: glClearTexImage works on
 	// any texture regardless of FBO attachment — no temporary CL needed (GL is immediate-mode).
-	void ClearComputeBuffers(class RenderTarget* rt) noexcept;
+	void ClearSkyMaps(class RenderTarget* rt) noexcept;
 
 	inline void ClearDepthBuffer(GfxTypes::Float clearValue = 1.0f) {
 		if (m_depthClearValue != clearValue) {

@@ -17,7 +17,7 @@ static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 {
     if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
         return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-    if (type == BufferInfo::btCompute)
+    if (type == BufferInfo::btSkyMap)
         return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 }
@@ -70,7 +70,7 @@ DXGI_FORMAT BufferInfo::ViewFormat(void)
             return dxDepthSRVFormat;
         case BufferInfo::btVertex:
             return dxVertexFormat;
-        case BufferInfo::btCompute:
+        case BufferInfo::btSkyMap:
             return dxSkyMapFormat;
         default:
             return dxColorFormat;
@@ -212,7 +212,7 @@ bool RenderTarget::CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, i
         return false;
     if (not info.AllocUAV())
         return false;
-    // RTV for GfxStates::ClearComputeBuffers via ClearRenderTargetView (cleaner than ClearUAV —
+    // RTV for GfxStates::ClearSkyMaps via ClearRenderTargetView (cleaner than ClearUAV —
     // the RTV-heap is non-shader-visible by design, no auxiliary heap quirks).
     if (not info.AllocRTV())
         return false;
@@ -235,7 +235,7 @@ bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
             if (not CreateDepthBuffer(device, info, w, h))
                 return false;
         }
-        else if (bufferType == BufferInfo::btCompute) {
+        else if (bufferType == BufferInfo::btSkyMap) {
             if (not CreateComputeBuffer(device, info, w, h))
                 return false;
         }
@@ -272,8 +272,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
-    m_bufferInfo.Resize(params.computeBufferCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
-    m_pingPong = (m_colorBufferCount > 1) or (params.computeBufferCount > 1);
+    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
 
     m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
@@ -283,8 +283,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     int attachmentIndex = 0;
     // Compute buffers first → caller can address them at m_bufferInfo[m_computeBufferIndex..]
     // (currently 0..count-1 since they precede everything else).
-    m_computeBufferIndex = (params.computeBufferCount > 0) ? CreateSpecialBuffers(BufferInfo::btCompute, attachmentIndex, params.computeBufferCount) : -1;
-    m_computeBufferCount = params.computeBufferCount;
+    m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
+    m_computeBufferCount = params.skyMapCount;
     for (int i = 0; i < m_colorBufferCount; ++i)
         CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
 

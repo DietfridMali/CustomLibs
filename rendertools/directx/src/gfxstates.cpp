@@ -164,7 +164,7 @@ void GfxStates::ClearStencilBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, int clearVal
 }
 
 
-void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
+void GfxStates::ClearSkyMaps(RenderTarget* rt) noexcept {
     if (rt == nullptr or (rt->m_computeBufferCount <= 0))
         return;
 
@@ -173,7 +173,7 @@ void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
     void* opHandle = nullptr;
     CommandList* cmdList = commandListHandler.CurrentCmdList();
     if (cmdList == nullptr) {
-        opHandle = baseRenderer.StartOperation("GfxStates::ClearComputeBuffers", false);
+        opHandle = baseRenderer.StartOperation("GfxStates::ClearSkyMaps", false);
         if (opHandle == nullptr)
             return;
         cmdList = commandListHandler.CurrentCmdList();
