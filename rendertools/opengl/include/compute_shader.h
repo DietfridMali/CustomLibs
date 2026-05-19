@@ -21,6 +21,9 @@
 // glMemoryBarrier(...) between dispatches and subsequent reads when needed.
 // =================================================================================================
 
+#include <span>
+#include <initializer_list>
+
 #include "shader.h"
 #include "base_shadercode.h"   // ComputeBindingDesc
 
@@ -53,6 +56,17 @@ public:
 
     // glDispatchCompute(x, y, z). Caller-supplied workgroup counts (already divided by local_size).
     bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+
+    // Bind a list of textures to sampler units 0..N-1 (analog Mesh::Render(textures)), then
+    // dispatch. nullptr entries skip the corresponding unit.
+    bool Dispatch(std::span<Texture* const> textures,
+                  uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+
+    inline bool Dispatch(std::initializer_list<Texture*> textures,
+                         uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+        return Dispatch(std::span<Texture* const>(textures.begin(), textures.size()),
+                        groupCountX, groupCountY, groupCountZ);
+    }
 
     // Convenience: dispatch over a 2D region with a chosen workgroup tile size. Rounds up.
     bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);

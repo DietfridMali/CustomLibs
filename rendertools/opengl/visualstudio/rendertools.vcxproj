@@ -120,6 +120,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\..\..\Smiley-Battle\include\basecloudrenderer.h" />
     <ClInclude Include="..\..\include\base_renderer.h" />
     <ClInclude Include="..\..\include\base_shadercode.h" />
     <ClInclude Include="..\..\include\billboard.h" />

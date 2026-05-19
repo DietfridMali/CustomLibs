@@ -210,8 +210,17 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_skyMapIndex = (params.skyMaps > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMaps) : -1;
     m_skyMapCount = params.skyMaps;
     CreateRenderArea();
-    if (not AttachBuffers(params.hasMRTs))
-        return false;
+    // Sky-map-only RTs (compute write target, no FBO attachments) skip AttachBuffers because
+    // glCheckFramebufferStatus would return INCOMPLETE_MISSING_ATTACHMENT — the FBO is unused.
+    bool hasFboAttachments = (params.colorBufferCount > 0) || (params.depthBufferCount > 0)
+                          || (params.stencilBufferCount > 0) || (params.vertexBufferCount > 0);
+    if (hasFboAttachments) {
+        if (not AttachBuffers(params.hasMRTs))
+            return false;
+    }
+    else {
+        m_isAvailable = true;
+    }
     m_colorBufferCount = params.colorBufferCount;
     m_extraBufferCount = params.vertexBufferCount;
     m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_extraBufferCount);

@@ -28,7 +28,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
     if (linked != GL_TRUE) {
 #ifdef _DEBUG
         String infoLog = GetInfoLog(program, true);
-        fprintf(stderr, "\n***** GLSL linker error in compute shader '%s': *****\n\n", (const char*)m_name);
+        fprintf(stderr, "\n***** GLSL linker error in %s compute shader: *****\n\n", (char*)m_name);
         PrintShaderSource(csHandle, String("Compute shader:"));
 #endif
         glDeleteShader(csHandle);
@@ -53,6 +53,21 @@ bool ComputeShader::Activate(void) {
 bool ComputeShader::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
     if (not IsValid())
         return false;
+    glDispatchCompute(groupCountX, groupCountY, groupCountZ);
+    return true;
+}
+
+
+bool ComputeShader::Dispatch(std::span<Texture* const> textures,
+                             uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+    if (not IsValid())
+        return false;
+    int unit = 0;
+    for (Texture* tex : textures) {
+        if (tex != nullptr)
+            tex->Bind(unit);
+        ++unit;
+    }
     glDispatchCompute(groupCountX, groupCountY, groupCountZ);
     return true;
 }
