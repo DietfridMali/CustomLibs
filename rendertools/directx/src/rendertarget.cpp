@@ -17,8 +17,14 @@ static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 {
     if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
         return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+    if (type == BufferInfo::btSkyMap)
+        return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 }
+
+
+// Format for TSP sky-map ping-pong buffers (mirrors vulkan/rendertarget.cpp kSkyMapFormat).
+static constexpr DXGI_FORMAT dxSkyMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 
 static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt, D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal, D3D12_RESOURCE_FLAGS flags) noexcept
@@ -50,6 +56,7 @@ void BufferInfo::Init(void)
     RTV().Handle() = {};
     SRV().Handle() = {};
     DSV().Handle() = {};
+    m_uav.Handle() = {};
     m_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_type = btColor;
 }
@@ -63,6 +70,8 @@ DXGI_FORMAT BufferInfo::ViewFormat(void)
             return dxDepthSRVFormat;
         case BufferInfo::btVertex:
             return dxVertexFormat;
+        case BufferInfo::btSkyMap:
+            return dxSkyMapFormat;
         default:
             return dxColorFormat;
     }
@@ -108,10 +117,21 @@ void BufferInfo::FreeDSV(void) {
 }
 
 
+bool BufferInfo::AllocUAV(void) {
+    return m_uav.Create(m_resource, ViewFormat());
+}
+
+
+void BufferInfo::FreeUAV(void) {
+    m_uav.Free();
+}
+
+
 void BufferInfo::Release(void) {
     descriptorHeaps.FreeRTV(m_rtv.Handle());
     descriptorHeaps.FreeSRV(m_srv.Handle());
     descriptorHeaps.FreeDSV(m_dsv.Handle());
+    descriptorHeaps.FreeSRV(m_uav.Handle());
     Init();
 }
 
@@ -179,6 +199,23 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 }
 
 
+// Sky-map buffer: R16G16B16A16_FLOAT, UAV+SRV, no RTV. Initial state COMMON so the first
+// transition to UNORDERED_ACCESS (compute write) or PIXEL_SHADER_RESOURCE (composit sample)
+// is a regular state transition.
+bool RenderTarget::CreateSkyMapBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
+{
+    info.m_resource = CreateRTResource(device, w, h, dxSkyMapFormat, D3D12_RESOURCE_STATE_COMMON, nullptr, ResourceFlagsForType(info.m_type));
+    if (not info.m_resource)
+        return false;
+    info.m_state = D3D12_RESOURCE_STATE_COMMON;
+    if (not info.AllocSRV())
+        return false;
+    if (not info.AllocUAV())
+        return false;
+    return true;
+}
+
+
 bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType)
 {
     ID3D12Device* device = dx12Context.Device();
@@ -192,6 +229,10 @@ bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
 
         if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil)) {
             if (not CreateDepthBuffer(device, info, w, h))
+                return false;
+        }
+        else if (bufferType == BufferInfo::btSkyMap) {
+            if (not CreateSkyMapBuffer(device, info, w, h))
                 return false;
         }
         else {
@@ -227,8 +268,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
-    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
-    m_pingPong = m_colorBufferCount > 1;
+    m_bufferInfo.Resize(params.skyMaps + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    m_pingPong = (m_colorBufferCount > 1) or (params.skyMaps > 1);
     m_isScreenBuffer = params.isScreenBuffer;
 
     m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
@@ -236,8 +277,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
         return false;
 
     int attachmentIndex = 0;
+    // SkyMaps first → caller can address them at m_bufferInfo[0..skyMaps-1] directly.
+    CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMaps);
     for (int i = 0; i < m_colorBufferCount; ++i)
-        CreateBuffer(i, attachmentIndex, BufferInfo::btColor);
+        CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
 
     m_vertexBufferCount = params.vertexBufferCount;
     // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra

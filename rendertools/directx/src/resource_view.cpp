@@ -62,4 +62,26 @@ void DSV::Free(void) {
     *this = {};
 }
 
+
+// UAV uses the CBV_SRV_UAV heap (descriptorHeaps.AllocSRV) — the heap type is shared.
+bool UAV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
+{
+    Handle() = descriptorHeaps.AllocSRV();
+    if (not IsValid())
+        return false;
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uavd{};
+    uavd.Format = format;
+    uavd.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+    uavd.Texture2D.MipSlice = 0;
+    uavd.Texture2D.PlaneSlice = 0;
+    dx12Context.Device()->CreateUnorderedAccessView(resource.Get(), nullptr, &uavd, CPUHandle());
+    return true;
+}
+
+
+void UAV::Free(void) {
+    descriptorHeaps.FreeSRV(*this);
+    *this = {};
+}
+
 // =================================================================================================

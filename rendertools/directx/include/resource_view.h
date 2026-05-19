@@ -87,4 +87,14 @@ public:
 	virtual void Free(void) override;
 };
 
+
+class UAV
+	: public ResourceView
+{
+public:
+	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
+
+	virtual void Free(void) override;
+};
+
 // =================================================================================================

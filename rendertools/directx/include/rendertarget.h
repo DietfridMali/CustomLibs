@@ -40,13 +40,15 @@ public:
         btColor,
         btDepth,
         btStencil,
-        btVertex
+        btVertex,
+        btSkyMap   // TSP sky-map (R16G16B16A16_FLOAT, UAV+SRV, no RTV/DSV)
     } eBufferType;
 
     ComPtr<ID3D12Resource>  m_resource;
     RTV                     m_rtv;
     SRV                     m_srv;
     DSV                     m_dsv;
+    UAV                     m_uav;
     D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
     eBufferType             m_type{ btColor };
 
@@ -65,6 +67,10 @@ public:
     bool AllocDSV(void);
 
     void FreeDSV(void);
+
+    bool AllocUAV(void);
+
+    void FreeUAV(void);
 
     void Release(void);
 
@@ -362,6 +368,8 @@ private:
     bool CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
     bool CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+
+    bool CreateSkyMapBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
     bool CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 

@@ -166,6 +166,7 @@
     <ClInclude Include="..\include\sampler_cache.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
+    <ClInclude Include="..\include\compute_shader.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
     <ClInclude Include="..\..\include\shadowmap.h" />
@@ -222,6 +223,7 @@
     <ClCompile Include="..\src\resource_view.cpp" />
     <ClCompile Include="..\src\sampler_cache.cpp" />
     <ClCompile Include="..\src\shader.cpp" />
+    <ClCompile Include="..\src\compute_shader.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />
