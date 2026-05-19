@@ -44,7 +44,8 @@ public:
         btColor,
         btDepth,
         btStencil,
-        btVertex
+        btVertex,
+        btSkyMap    // R16G16B16A16_SFLOAT, color+sampled+storage usage — for TSP sky-map ping-pong
     } eBufferType;
 
     VkImage             m_image       { VK_NULL_HANDLE };
@@ -88,8 +89,13 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
+        // Number of sky-map ping-pong buffers (R16G16B16A16_SFLOAT, COLOR+SAMPLED+STORAGE usage).
+        // Used by the Temporal Sky Probe. SkyMap buffers occupy m_bufferInfo[0..skyMaps-1]
+        // (before colorBuffers), so caller can address them by direct index. DX12/OGL ignore.
+        int skyMaps{ 0 };
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
+        bool storageImage{ false };  // legacy; superseded by skyMaps for sky-map RTs
     };
 
     struct RTRenderParams {

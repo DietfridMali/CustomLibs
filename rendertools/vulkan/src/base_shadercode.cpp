@@ -2,6 +2,7 @@
 #include "array.hpp"
 #include "string.hpp"
 #include "base_shadercode.h"
+#include "compute_shader.h"
 
 // =================================================================================================
 
@@ -70,6 +71,21 @@ static String FormatCompilerArgs(const AutoArray<ShaderMacro>& macros) {
 void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
     for (const ShaderSource* source : shaderSource) {
         String prefix = FormatCompilerArgs(source->m_compilerArgs);
+        if (source->IsCompute()) {
+            String cs = prefix + source->m_cs;
+            ComputeShader* shader = new ComputeShader(source->m_name);
+            shader->m_cs = cs;
+            if (shader->Create(cs, source->m_computeBindings)) {
+                m_computeShaders[source->m_name] = shader;
+            }
+            else {
+#ifdef _DEBUG
+                fprintf(stderr, "creating compute shader '%s' failed\n", (const char*)source->m_name);
+#endif
+                delete shader;
+            }
+            continue;
+        }
         String vs = prefix + source->m_vs;
         String fs = prefix + source->m_fs;
         String gs = source->m_gs.IsEmpty() ? String() : (prefix + source->m_gs);

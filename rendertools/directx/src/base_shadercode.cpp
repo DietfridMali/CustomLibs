@@ -69,6 +69,12 @@ static String FormatCompilerArgs(const AutoArray<ShaderMacro>& macros) {
 
 void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
     for (const ShaderSource* source : shaderSource) {
+        if (source->IsCompute()) {
+#ifdef _DEBUG
+            fprintf(stderr, "skipping compute shader '%s' — DX12 compute path not implemented yet\n", (const char*)source->m_name);
+#endif
+            continue;
+        }
         String prefix = FormatCompilerArgs(source->m_compilerArgs);
         String vs = prefix + source->m_vs;
         String fs = prefix + source->m_fs;

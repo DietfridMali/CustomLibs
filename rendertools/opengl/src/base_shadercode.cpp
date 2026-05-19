@@ -59,7 +59,13 @@ BaseShaderCode::BaseShaderCode() {
 
 void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
     for (const ShaderSource* source : shaderSource) {
-        if (not gfxStates.HaveFeatureLevel(source->m_featureLevel)) 
+        if (source->IsCompute()) {
+#ifdef _DEBUG
+            fprintf(stderr, "skipping compute shader '%s' — OGL compute path not implemented\n", (const char*)source->m_name);
+#endif
+            continue;
+        }
+        if (not gfxStates.HaveFeatureLevel(source->m_featureLevel))
             m_shaders[source->m_name] = nullptr; // enter the shader so the dictionary search doesn't simply fail, but returns a nullptr
         else {
             Shader* shader = new Shader(source->m_name);

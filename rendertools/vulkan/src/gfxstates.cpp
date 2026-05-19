@@ -379,7 +379,7 @@ void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, c
 
 bool GfxStates::CheckError(const char* operation) noexcept {
 #if 1//def _DEBUG
-    int errors = vkContext.DrainMessages(false);
+    int errors = vkContext.DrainMessages(true);
     if (errors > 0) {
         if (operation and *operation)
             fprintf(stderr, "GfxStates::CheckError: %d Vulkan validation error(s) at '%s'\n", errors, operation);

@@ -21,14 +21,39 @@ struct ShaderMacro {
 };
 
 // =================================================================================================
+// ComputeBindingDesc — describes one slot of a compute shader's descriptor set layout.
+// Used by ShaderSource for compute sources and by ComputeShader::Create when building the
+// VkDescriptorSetLayout / D3D12 root signature.
+
+struct ComputeBindingDesc {
+    enum class Kind {
+        UniformBuffer,
+        SampledImage,
+        StorageImage,
+        StorageBuffer,
+        Sampler,
+        CombinedImageSampler
+    };
+    uint32_t    binding{ 0 };
+    Kind        kind{ Kind::UniformBuffer };
+    uint32_t    count{ 1 };
+};
+
+// =================================================================================================
 
 struct ShaderSourceParams {
-    String                      vs{ "" };
-    String                      fs{ "" };
-    String                      gs{ "" };
-    AutoArray<ShaderMacro>      compilerArgs;
-    ShaderDataLayout            dataLayout;
-    int                         featureLevel{ 0 };
+    String                          vs{ "" };
+    String                          fs{ "" };
+    String                          gs{ "" };
+    // Compute source — when non-empty, the shader is treated as a compute shader (vs/fs/gs
+    // should be empty in that case). Target profile is cs_6_0 (DXC). Compute shaders skip the
+    // graphics PSO / vertex-input setup; instead the backend builds a compute pipeline using
+    // computeBindings as the descriptor-set layout source.
+    String                          cs{ "" };
+    AutoArray<ComputeBindingDesc>   computeBindings{};
+    AutoArray<ShaderMacro>          compilerArgs;
+    ShaderDataLayout                dataLayout;
+    int                             featureLevel{ 0 };
 };
 
 // =================================================================================================
@@ -41,6 +66,8 @@ public:
     String                          m_vs{ "" };
     String                          m_fs{ "" };
     String                          m_gs{ "" };
+    String                          m_cs{ "" };
+    AutoArray<ComputeBindingDesc>   m_computeBindings{};
     mutable AutoArray<ShaderMacro>  m_compilerArgs{};
     int                             m_featureLevel{ 0 };
     ShaderDataLayout                m_dataLayout;
@@ -52,6 +79,8 @@ public:
         , m_vs(params.vs)
         , m_fs(params.fs)
         , m_gs(params.gs)
+        , m_cs(params.cs)
+        , m_computeBindings(params.computeBindings)
         , m_compilerArgs(params.compilerArgs)
         , m_featureLevel(params.featureLevel)
         , m_dataLayout(params.dataLayout)
@@ -90,6 +119,8 @@ public:
         , m_vs(other.m_vs)
         , m_fs(other.m_fs)
         , m_gs(other.m_gs)
+        , m_cs(other.m_cs)
+        , m_computeBindings(other.m_computeBindings)
         , m_compilerArgs(other.m_compilerArgs)
         , m_featureLevel(other.m_featureLevel)
         , m_dataLayout(other.m_dataLayout)
@@ -98,6 +129,10 @@ public:
 
     inline String& GetKey(void) {
         return m_name;
+    }
+
+    inline bool IsCompute(void) const {
+        return not m_cs.IsEmpty();
     }
 
     inline void SetCompilerArgs(const AutoArray<ShaderMacro>& args) const {
@@ -151,11 +186,14 @@ const String& VignetteFunc();
 
 // =================================================================================================
 
-class BaseShaderCode 
-    : public Shader 
+class ComputeShader;
+
+class BaseShaderCode
+    : public Shader
 {
 protected:
-    Dictionary<String, Shader*> m_shaders;
+    Dictionary<String, Shader*>         m_shaders;
+    Dictionary<String, ComputeShader*>  m_computeShaders;
 
 public:
     BaseShaderCode();
@@ -165,6 +203,11 @@ public:
 
     inline Shader* GetShader(String shaderId) {
         Shader** shader = m_shaders.Find(shaderId);
+        return shader ? *shader : nullptr;
+    }
+
+    inline ComputeShader* GetComputeShader(String shaderId) {
+        ComputeShader** shader = m_computeShaders.Find(shaderId);
         return shader ? *shader : nullptr;
     }
 };

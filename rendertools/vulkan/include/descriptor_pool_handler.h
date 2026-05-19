@@ -30,7 +30,8 @@ public:
     static constexpr uint32_t kMaxUbosPerPool = 4096;
     static constexpr uint32_t kMaxSampledImagesPerPool = 8192;  // t0..t15 per draw
     static constexpr uint32_t kMaxSamplersPerPool = 8192;       // s0..s15 per draw
-    static constexpr uint32_t kMaxStoragePerPool = 256;         // u0..u3 per draw
+    static constexpr uint32_t kMaxStoragePerPool = 256;         // u0..u3 per draw (StorageBuffer)
+    static constexpr uint32_t kMaxStorageImagesPerPool = 256;   // u0..u3 per draw (StorageImage, e.g. TSP sky-map target)
 
     VkDevice         m_device       { VK_NULL_HANDLE };
     VkDescriptorPool m_pools[FRAME_COUNT] { };

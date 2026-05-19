@@ -76,17 +76,18 @@ int VKContext::DrainMessages(bool onlyErrors) noexcept
 #if ENABLE_VK_LOGGING
     std::vector<ValidationMessage> drained;
     int errors = 0;
-    {
-        std::lock_guard<std::mutex> lock(m_validationMutex);
-        drained.swap(m_validationLog);
-        errors = m_validationErrorCount;
-        m_validationErrorCount = 0;
-        m_validationWarningCount = 0;
-    }
+    
+    std::lock_guard<std::mutex> lock(m_validationMutex);
+    drained.swap(m_validationLog);
+    errors = m_validationErrorCount;
+    m_validationErrorCount = 0;
+    m_validationWarningCount = 0;
+    
     for (const ValidationMessage& msg : drained) {
         if (onlyErrors and not msg.isError)
             continue;
         fprintf(stderr, "%s\n", msg.text.c_str());
+        ++errors;
     }
     if (not drained.empty())
         fflush(stderr);

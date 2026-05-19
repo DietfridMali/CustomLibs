@@ -78,7 +78,7 @@ VkDescriptorSet DescriptorPoolHandler::Allocate(VkDescriptorSetLayout layout) no
 
 bool DescriptorPoolHandler::CreatePool(uint32_t slot) noexcept
 {
-    VkDescriptorPoolSize sizes[4] { };
+    VkDescriptorPoolSize sizes[5] { };
     sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     sizes[0].descriptorCount = kMaxUbosPerPool;
     sizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -87,6 +87,8 @@ bool DescriptorPoolHandler::CreatePool(uint32_t slot) noexcept
     sizes[2].descriptorCount = kMaxSamplersPerPool;
     sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     sizes[3].descriptorCount = kMaxStoragePerPool;
+    sizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    sizes[4].descriptorCount = kMaxStorageImagesPerPool;
 
     VkDescriptorPoolCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;

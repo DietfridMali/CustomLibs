@@ -78,6 +78,10 @@ public:
         return m_shaderCode->GetShader(shaderId);
     }
 
+    inline ComputeShader* GetComputeShader(String shaderId) {
+        return m_shaderCode->GetComputeShader(shaderId);
+    }
+
     inline FloatArray* GetKernel(int radius) noexcept {
         return ((radius < 1) or (radius > m_kernels.Length())) ? nullptr : m_kernels[radius - 1];
     }

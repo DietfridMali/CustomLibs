@@ -94,8 +94,10 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
+        int skyMaps{ 0 };             // Cross-API; honored only by Vulkan (TSP). DX12/OGL ignore.
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
+        bool storageImage{ false };   // Cross-API; honored only by Vulkan today.
     };
 
     struct RTRenderParams {

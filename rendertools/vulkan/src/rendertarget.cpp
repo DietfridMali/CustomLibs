@@ -28,6 +28,9 @@
 
 static constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
 static constexpr VkFormat kVertexFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+// HDR sky-map format (TSP). RGBA16F = 8 Byte/Pixel, supports HDR cumulus + alpha for premultiplied
+// composit. Sampled+Storage usage so compute can imageStore() and graphics can sampler-read.
+static constexpr VkFormat kSkyMapFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 // D32_SFLOAT: 4 Byte/Pixel, single-channel, kein Stencil. ShadowMap braucht keinen Stencil und
 // kein Treiber-Padding (D24S8 wird auf NVIDIA als D32+S8-Plane = 5 Byte/Pixel allokiert).
 static constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
@@ -42,6 +45,8 @@ static VkFormat FormatForType(BufferInfo::eBufferType type)
         return kDepthFormat;
     case BufferInfo::btVertex:
         return kVertexFormat;
+    case BufferInfo::btSkyMap:
+        return kSkyMapFormat;
     default:
         return kColorFormat;
     }
@@ -309,14 +314,20 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
-    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
-    m_pingPong = m_colorBufferCount > 1;
+    m_bufferInfo.Resize(params.skyMaps + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    // sky-map ping-pong (>=2 sky-maps) qualifies for the pingPong flag as well.
+    m_pingPong = (m_colorBufferCount > 1) or (params.skyMaps > 1);
     m_isScreenBuffer = params.isScreenBuffer;
     m_cmdList = nullptr;  // attached lazily on first Activate via commandListHandler.CreateCmdList
 
     int attachmentIndex = 0;
+
+    // SkyMaps first → caller can address them at m_bufferInfo[0..skyMaps-1] directly.
+    CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMaps);
+
+    // Color buffers next, using m_bufferCount as the next free slot (no longer hard-coded i).
     for (int i = 0; i < m_colorBufferCount; ++i)
-        CreateBuffer(i, attachmentIndex, BufferInfo::btColor);
+        CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
 
     m_vertexBufferCount = params.vertexBufferCount;
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
