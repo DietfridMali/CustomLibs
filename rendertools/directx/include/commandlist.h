@@ -6,10 +6,6 @@
 #include "string.hpp"
 #include "gfxstates.h"
 #include "tracy_wrapper.h"
-// TracyD3D12.hpp pulls in <d3d12.h>; include it here, after dx12framework.h has set NOMINMAX —
-// not in the shared tracy_wrapper.h, which would hit non-DX12 TUs with a <windows.h> min/max clash.
-#include <tracy/TracyD3D12.hpp>
-//#include "shader.h"
 #include "dx12framework.h"
 #include <functional>
 
