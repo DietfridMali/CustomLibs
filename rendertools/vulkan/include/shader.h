@@ -140,8 +140,8 @@ public:
     // Vertex data layout: describes which C++ buffers feed which shader inputs.
     ShaderDataLayout m_dataLayout;
 
-    // Location table (used for "not found" warning suppression)
     AutoArray<UniformHandle*>  m_uniforms;
+    // Per-shader cache of resolved uniform b1 offsets — see SetB1Field / ResolveB1Location.
     ShaderLocationTable        m_locations;
 
     using KeyType = String;
@@ -236,6 +236,10 @@ private:
     // Write 'size' bytes to all stage buffers that contain the field 'name'.
     // Returns the offset in the first matching stage, or -1 if not found in any stage.
     int SetB1Field(const char* name, const void* data, size_t size) noexcept;
+
+    // Cache-miss path for SetB1Field: scan the reflected per-stage field tables once and
+    // record the field's b1 offset for every stage into the cache entry.
+    void ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept;
 
     // Check if 'name' is a b0 field name and write directly to m_b0Staging.
     // Returns true if handled as a b0 field.

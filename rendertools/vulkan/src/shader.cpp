@@ -400,6 +400,7 @@ void Shader::Destroy(void) noexcept
         m_stages[s].size = 0;
         m_stages[s].dirty = true;
     }
+    m_locations.Clear();
     m_vsInputAttributes.clear();
     m_vsInputBindings.clear();
 
@@ -662,33 +663,48 @@ bool Shader::TrySetB0Field(const char* name, const float* data) noexcept
 }
 
 
-int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
+void Shader::ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept
 {
-    int result = -1;
-    String sName(name);
+    static_assert(kStageCount == 3, "ShaderLocation::m_stageOffset assumes 3 stages (VS/PS/GS)");
     for (int s = 0; s < kStageCount; ++s) {
+        loc.m_stageOffset[s] = -1;
         StageConstants& sc = m_stages[s];
         if (sc.size == 0)
             continue;
-        for (auto& kv : sc.fields) {
-            if (kv.first == sName) {
-                uint32_t offset = kv.second.offset;
-                if (offset + size <= sc.staging.size()) {
-                    std::memcpy(sc.staging.data() + offset, data, size);
-                    sc.dirty = true;
-                    if (result < 0)
-                        result = int(offset);
-                }
+        for (auto& kv : sc.fields)
+            if (kv.first == name) {
+                loc.m_stageOffset[s] = int(kv.second.offset);
                 break;
             }
+    }
+    loc.m_resolved = true;
+}
+
+
+int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
+{
+    ShaderLocationTable::ShaderLocation* loc = m_locations[name];
+    if (not loc)
+        return -1;
+    if (not loc->m_resolved)
+        ResolveB1Location(*loc, name);
+
+    int result = -1;
+    for (int s = 0; s < kStageCount; ++s) {
+        int offset = loc->m_stageOffset[s];
+        if (offset < 0)
+            continue;
+        StageConstants& sc = m_stages[s];
+        if (size_t(offset) + size <= sc.staging.size()) {
+            std::memcpy(sc.staging.data() + offset, data, size);
+            sc.dirty = true;
+            if (result < 0)
+                result = offset;
         }
     }
-    if (result < 0) {
-        int* pOffset = m_locations[name];
-        if (pOffset and *pOffset == std::numeric_limits<int>::min()) {
-            *pOffset = -1;
-            fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
-        }
+    if ((result < 0) and not loc->m_warned) {
+        loc->m_warned = true;
+        fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
     }
     return result;
 }

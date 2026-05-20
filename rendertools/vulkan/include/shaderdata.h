@@ -10,13 +10,12 @@
 #include <limits>
 
 // =================================================================================================
-// DX12 shaderdata.h
+// Vulkan shaderdata.h
 //
-// In the OGL version, "location" was a GLint (OpenGL uniform location).
-// In DX12, "location" is an int that stores the byte offset of a field inside the b1
-// (ShaderConstants) constant buffer.  Everything else (UniformData<T>, UniformArray<T>,
-// ShaderLocationTable) is kept structurally identical so that Shader's template helpers
-// (GetUniform, UpdateUniform) compile unchanged.
+// In the OGL version, "location" was a GLint (OpenGL uniform location). In Vulkan a uniform
+// "location" is a ShaderLocation: the b1 byte offset of the field in each shader stage that
+// uses it, resolved once and cached. UniformData<T> / UniformArray<T> below are kept for
+// source compatibility with the OGL Shader API.
 
 // -------------------------------------------------------------------------------------------------
 
@@ -121,29 +120,25 @@ struct FixedUniformArray : public UniformArray<DATA_T>
 };
 
 // -------------------------------------------------------------------------------------------------
-// ShaderLocationTable — maps uniform names to their b1 byte offsets.
-// On first access the offset is std::numeric_limits<int>::min() (unknown).
-// Shader::SetB1Field() resolves it via HLSL reflection and stores it here.
+// ShaderLocationTable — per-shader cache of resolved uniform locations.
+//
+// Each ShaderLocation entry stores, for one uniform name, the b1 byte offset in every shader
+// stage that contains the field (-1 = not present). The offsets are resolved lazily on first
+// use (Shader::ResolveB1Location) and reused for every later set — the lookup on the hot path
+// compares against const char* directly, so no String is allocated per draw.
 
 class ShaderLocationTable
 {
 public:
     struct ShaderLocation {
         String m_name{ "" };
-        int    m_nameLength{ 0 };
-        int    m_location{ std::numeric_limits<int>::min() };
+        int    m_stageOffset[3]{ -1, -1, -1 };  // b1 offset per stage VS/PS/GS; must match Shader::kStageCount
+        bool   m_resolved{ false };
+        bool   m_warned{ false };
 
-        ShaderLocation(String name = "")
-            : m_name(name), m_nameLength(name.Length()),
-              m_location(std::numeric_limits<int>::min())
-        { }
+        ShaderLocation(String name = "") : m_name(std::move(name)) { }
 
-        inline String& Name() noexcept { return m_name; }
-        inline int*    Location() noexcept { return &m_location; }
-
-        inline bool operator==(const String& name) const {
-            return (m_nameLength == name.Length()) && (m_name == name);
-        }
+        inline bool operator==(const char* name) const noexcept { return m_name == name; }
     };
 
 private:
@@ -155,15 +150,21 @@ public:
 
     void Start(void) { /* nothing */ }
 
-    int* operator[](const String name) noexcept {
+    void Clear(void) noexcept { m_locations.Clear(); }
+
+    // Returns the cache entry for 'name', appending a fresh (unresolved) one on first lookup.
+    // A String is allocated only when a new entry is created, never on a cache hit.
+    ShaderLocation* operator[](const char* name) noexcept {
         for (auto& loc : m_locations)
-            if (loc == name) return loc.Location();
+            if (loc == name)
+                return &loc;
         ShaderLocation* loc;
         try { loc = m_locations.Append(); }
         catch (...) { return nullptr; }
-        if (not loc) return nullptr;
+        if (not loc)
+            return nullptr;
         *loc = ShaderLocation(name);
-        return loc->Location();
+        return loc;
     }
 };
 

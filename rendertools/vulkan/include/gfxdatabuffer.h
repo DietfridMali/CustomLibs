@@ -29,7 +29,11 @@ public:
     GfxBufferTarget     m_bufferType;     // Vertex or Index
     char*               m_data;           // unused in Vulkan (kept for source compatibility)
 
-    GfxBuffer           m_buffer;         // VkBuffer + VmaAllocation backing
+    static constexpr int FRAME_COUNT = 2;  // upload-buffer slots, rotated per frame-in-flight
+
+    GfxBuffer           m_buffer[FRAME_COUNT];  // VkBuffer + VmaAllocation; dynamic buffers rotate slots per frame
+    int                 m_activeSlot{ 0 };      // slot the last Update wrote — what Buffer() / IsValid() report
+    uint64_t            m_lastUpdateFrame{ UINT64_MAX };  // FrameNumber() of the last Update — detects same-frame re-update
 
     uint32_t            m_size;           // total buffer size in bytes
     size_t              m_itemSize;       // bytes per vertex element (stride)
@@ -41,7 +45,8 @@ public:
     GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
     void Clear(void) {
-        m_buffer.Destroy();
+        for (auto& b : m_buffer)
+            b.Destroy();
         m_id = 0;
         m_isDynamic = true;
     }
@@ -71,7 +76,7 @@ public:
     inline void DisableAttribs(void) noexcept {}
     inline void Describe(void) noexcept {}
 
-    bool Create(size_t dataSize);
+    bool Create(int slot, size_t dataSize);
 
     // Upload new data and (re-)create the GPU resource if needed.
     // componentCount: components per vertex element (e.g. 3 for float3)
@@ -101,7 +106,7 @@ public:
     }
 
     inline VkBuffer Buffer() const noexcept {
-        return m_buffer.Buffer();
+        return m_buffer[m_activeSlot].Buffer();
     }
 
     // For index buffers: the matching VkIndexType (UINT16 or UINT32).
@@ -110,7 +115,7 @@ public:
     }
 
     inline bool IsValid() const noexcept {
-        return m_buffer.IsValid();
+        return m_buffer[m_activeSlot].IsValid();
     }
 };
 
