@@ -14,6 +14,10 @@
 // For the DX12 port this is fine for both dynamic and static meshes; a future optimisation
 // would copy static buffers into a default-heap resource.
 
+static_assert(GfxDataBuffer::FRAME_COUNT == CommandList::FRAME_COUNT,
+              "GfxDataBuffer upload-slot count must match the command-list frame count");
+
+
 static DXGI_FORMAT IndexFormatFromComponentType(ComponentType componentType) noexcept
 {
     return (componentType == ComponentType::UInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
@@ -57,7 +61,8 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
         m_id = other.m_id;
         m_bufferType = other.m_bufferType;
         m_data = other.m_data;
-        m_resource = other.m_resource;    // shared ref-count via ComPtr
+        for (int i = 0; i < FRAME_COUNT; ++i)
+            m_resource[i] = other.m_resource[i];    // shared ref-count via ComPtr
         m_vbv = other.m_vbv;
         m_ibv = other.m_ibv;
         m_size = other.m_size;
@@ -66,6 +71,7 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
         m_componentCount = other.m_componentCount;
         m_componentType = other.m_componentType;
         m_isDynamic = other.m_isDynamic;
+        m_lastUpdateFrame = other.m_lastUpdateFrame;
     }
     return *this;
 }
@@ -80,7 +86,8 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
         m_id = other.m_id;
         m_bufferType = other.m_bufferType;
         m_data = other.m_data;
-        m_resource = std::move(other.m_resource);
+        for (int i = 0; i < FRAME_COUNT; ++i)
+            m_resource[i] = std::move(other.m_resource[i]);
         m_vbv = other.m_vbv;
         m_ibv = other.m_ibv;
         other.m_vbv = {};
@@ -91,20 +98,21 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
         m_componentCount = other.m_componentCount;
         m_componentType = other.m_componentType;
         m_isDynamic = other.m_isDynamic;
+        m_lastUpdateFrame = other.m_lastUpdateFrame;
     }
     return *this;
 }
 
 
-bool GfxDataBuffer::Create(size_t dataSize) {
+bool GfxDataBuffer::Create(int slot, size_t dataSize) {
 #ifdef _DEBUG
     char name[128];
-    snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] static", m_type, m_id); 
-    m_resource = gfxResourceHandler.GetUploadResource(name, dataSize);
+    snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] slot %d", m_type, m_id, slot);
+    m_resource[slot] = gfxResourceHandler.GetUploadResource(name, dataSize);
 #else
-    m_resource = gfxResourceHandler.GetUploadResource("", dataSize);
+    m_resource[slot] = gfxResourceHandler.GetUploadResource("", dataSize);
 #endif
-    return m_resource != nullptr;
+    return m_resource[slot] != nullptr;
 }
 
 
@@ -127,20 +135,34 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     m_itemCount = uint32_t(dataSize / ((m_itemSize > 0) ? m_itemSize : 1));
     m_size = uint32_t(dataSize);
 
-    if (m_isDynamic or not m_resource or (m_resource->GetDesc().Width < dataSize)) {
-        if (not Create(dataSize))
+    // Dynamic buffers rotate through FRAME_COUNT upload slots so a write never lands on a
+    // resource the GPU may still be reading from a previous in-flight frame; static buffers
+    // always use slot 0. Each slot is created once and reused — no per-frame allocation.
+    //
+    // A second Update of the same buffer within one frame (e.g. MapLayout drawing every map's
+    // layout during init, with no frame boundary between them) would otherwise overwrite a
+    // slot still referenced by an already-recorded draw — so a same-frame re-update takes a
+    // fresh resource. The previous one stays alive via gfxResourceHandler's per-frame tracking
+    // until the next Cleanup / FlushResources.
+    const uint64_t frameNumber = commandListHandler.FrameNumber();
+    const int slot = m_isDynamic ? commandListHandler.FrameIndex() : 0;
+    const bool sameFrameReupdate = (frameNumber == m_lastUpdateFrame);
+    if (sameFrameReupdate or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
+        if (not Create(slot, dataSize))
             return false;
     }
+    m_lastUpdateFrame = frameNumber;
+    ID3D12Resource* resource = m_resource[slot].Get();
 
     // Upload data
     void* mapped = nullptr;
     D3D12_RANGE range{ 0, 0 };
-    if (FAILED(m_resource->Map(0, &range, &mapped)))
+    if (FAILED(resource->Map(0, &range, &mapped)))
         return false;
     std::memcpy(mapped, data, dataSize);
-    m_resource->Unmap(0, nullptr);
+    resource->Unmap(0, nullptr);
 
-    D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = m_resource->GetGPUVirtualAddress();
+    D3D12_GPU_VIRTUAL_ADDRESS gpuAddr = resource->GetGPUVirtualAddress();
 
     if (bufferType == GfxBufferTarget::Index) {
         m_ibv.BufferLocation = gpuAddr;
@@ -158,9 +180,9 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
 
 
 void GfxDataBuffer::Destroy(void) noexcept
-{   
-    if (m_resource)
-        m_resource.Reset();
+{
+    for (auto& r : m_resource)
+        r.Reset();
     m_vbv = {};
     m_ibv = {};
     m_size = 0;

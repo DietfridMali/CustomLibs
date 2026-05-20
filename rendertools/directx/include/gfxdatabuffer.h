@@ -28,7 +28,9 @@ public:
     GfxBufferTarget          m_bufferType;     // Vertex or Index
     char*                    m_data;           // system-memory mirror (not used in DX12)
 
-    ComPtr<ID3D12Resource>   m_resource;       // committed buffer on upload heap
+    static constexpr int     FRAME_COUNT = 2;  // upload-resource slots, rotated per frame-in-flight
+
+    ComPtr<ID3D12Resource>   m_resource[FRAME_COUNT];  // upload-heap buffers; dynamic buffers rotate slots per frame
     D3D12_VERTEX_BUFFER_VIEW m_vbv{};          // valid when m_bufferType == GfxBufferTarget::Vertex
     D3D12_INDEX_BUFFER_VIEW  m_ibv{};          // valid when m_bufferType == GfxBufferTarget::Index
 
@@ -38,11 +40,13 @@ public:
     int                      m_componentCount;
     ComponentType            m_componentType;  // Float / UInt32 / UInt16
     bool                     m_isDynamic;
+    uint64_t                 m_lastUpdateFrame{ UINT64_MAX };  // FrameNumber() of the last Update — detects same-frame re-update
 
     GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
     void Clear(void) {
-        m_resource.Reset();
+        for (auto& r : m_resource)
+            r.Reset();
         m_vbv = {};
         m_ibv = {};
         m_id  = 0;
@@ -74,7 +78,7 @@ public:
     inline void DisableAttribs(void) noexcept {}
     inline void Describe(void) noexcept {}
 
-    bool Create(size_t dataSize);
+    bool Create(int slot, size_t dataSize);
 
 
     // Upload new data and (re-)create the GPU resource if needed.
@@ -105,9 +109,12 @@ public:
         return UINT(m_itemSize); 
     }
 
-    // Returns true when the GPU resource exists and is ready to bind.
-    inline bool IsValid() const noexcept { 
-        return m_resource != nullptr; 
+    // Returns true when at least one upload-resource slot has been created.
+    inline bool IsValid() const noexcept {
+        for (auto& r : m_resource)
+            if (r)
+                return true;
+        return false;
     }
 };
 

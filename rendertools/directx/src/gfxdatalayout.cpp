@@ -5,6 +5,7 @@
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "commandlist.h"
+#include "tracy_wrapper.h"
 
 // =================================================================================================
 // DX12 GfxDataLayout implementation
@@ -186,6 +187,7 @@ bool GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t compon
 
 bool GfxDataLayout::Enable(void) noexcept
 {
+    ZoneScopedN("Layout::Enable");
     Activate();
     m_isBound = true;
 
@@ -262,29 +264,43 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
 #endif
     if (not StartRender())
         return;
-    ActivateTextures(textures);
+    {
+        ZoneScopedN("Layout::ActivateTextures");
+        ActivateTextures(textures);
+    }
 
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
     Shader* shader = baseShaderHandler.ActiveShader();
-    if (shader)
+    if (shader) {
+        ZoneScopedN("Shader::UpdateVariables");
         shader->UpdateVariables();
+    }
 
-    if (commandListHandler.CurrentGfxList()) {
-        if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
-            commandListHandler.DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
-        else {
-            // Non-indexed: sum up vertex count from first GfxDataBuffer
-            UINT vertCount = 0;
-            if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
-                vertCount = UINT(m_dataBuffers[0]->m_itemCount);
-            if (vertCount > 0)
-                commandListHandler.DrawInstanced(vertCount, 1, 0, 0);
+    {
+        ZoneScopedN("Layout::DrawCall");
+        if (commandListHandler.CurrentGfxList()) {
+            if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
+                commandListHandler.DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
+            else {
+                // Non-indexed: sum up vertex count from first GfxDataBuffer
+                UINT vertCount = 0;
+                if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
+                    vertCount = UINT(m_dataBuffers[0]->m_itemCount);
+                if (vertCount > 0)
+                    commandListHandler.DrawInstanced(vertCount, 1, 0, 0);
+            }
         }
     }
-    DeactivateTextures(textures);
-    FinishRender();
-    gfxStates.CheckError();
+    {
+        ZoneScopedN("Layout::Finish");
+        DeactivateTextures(textures);
+        FinishRender();
+    }
+    {
+        ZoneScopedN("Layout::CheckError");
+        gfxStates.CheckError();
+    }
 }
 
 // =================================================================================================

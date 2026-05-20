@@ -568,6 +568,7 @@ Shader& Shader::Move(Shader& other) noexcept
 // =================================================================================================
 
 bool Shader::UploadB0(void) noexcept {
+    ZoneScopedN("Shader::UploadB0");
     auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
@@ -584,6 +585,7 @@ bool Shader::UploadB0(void) noexcept {
 
 bool Shader::UploadB1(void) noexcept
 {
+    ZoneScopedN("Shader::UploadB1");
     auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
@@ -616,7 +618,11 @@ bool Shader::Activate(void) {
     if (not cl)
         return false;
 
-    ID3D12PipelineState* pso = cl->GetPSO(this);
+    ID3D12PipelineState* pso;
+    {
+        ZoneScopedN("Shader::GetPSO");
+        pso = cl->GetPSO(this);
+    }
     if (not pso) {
 #ifdef _DEBUG
         pso = cl->GetPSO(this);
