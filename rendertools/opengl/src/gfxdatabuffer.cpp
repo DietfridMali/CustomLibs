@@ -102,15 +102,12 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable()) {
 #else
-    if (m_handle != 0) {                     // BUGFIX: fehlende Klammer im #else-Zweig ergänzt
+    if (m_handle != 0) {                     // BUGFIX: fehlende Klammer im #else-Zweig ergï¿½nzt
 #endif
-        if (m_isDynamic or forceUpdate)
-            updateSubData = m_size == dataSize;
-        else {
-            Bind();
-            Describe();
-            return true;
-        }
+        // Update() is only called for a dirty buffer, so the data is always new â€” upload it
+        // unconditionally. m_isDynamic only selects the GL usage hint and glBufferSubData vs
+        // glBufferData below, never whether the upload happens.
+        updateSubData = m_size == dataSize;
     }
     else {
 #if USE_SHARED_HANDLES

@@ -337,9 +337,18 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
         SetFrameIndex(frameIndex);
     else
         NextFrame();
-    m_cmdQueue.WaitForFrame(m_frameIndex);
-    cbvAllocator.Reset(UINT(m_frameIndex));
-    gfxResourceHandler.Cleanup(m_frameIndex);
+    {
+        ZoneScopedN("WaitForFrame");
+        m_cmdQueue.WaitForFrame(m_frameIndex);
+    }
+    {
+        ZoneScopedN("cbvAllocator::Reset");
+        cbvAllocator.Reset(UINT(m_frameIndex));
+    }
+    {
+        ZoneScopedN("gfxResourceHandler::Cleanup");
+        gfxResourceHandler.Cleanup(m_frameIndex);
+    }
     return true;
 }
 
