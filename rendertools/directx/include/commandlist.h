@@ -86,6 +86,7 @@ public:
     uint32_t                            m_refCounter{ 1 };
     String                              m_name{ "" };
     ID3D12PipelineState*                m_activePSO{ nullptr };
+    bool                                m_descriptorHeapsBound{ false };  // SetDescriptorHeaps issued since this list's Open()
     tracy::D3D12ZoneScope*              m_gpuZone{ nullptr };   // per-CL GPU profiling zone; spans Open()..Close() (USE_TRACY)
 
     static List<RenderStates>           m_renderStateStack;
@@ -157,6 +158,10 @@ public:
     void SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept;
 
     ID3D12PipelineState* GetPSO(Shader* shader) noexcept;
+
+    // Binds the GPU-visible SRV + sampler descriptor heaps. SetDescriptorHeaps is per-CommandList
+    // state and only needs to be issued once after Open() — the flag is cleared there.
+    void BindDescriptorHeaps(void) noexcept;
 
 #ifdef _DEBUG
     void CheckDeviceRemoved(const char* context) noexcept;

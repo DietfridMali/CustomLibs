@@ -2,6 +2,7 @@
 #include "dx12framework.h"
 #include "dx12context.h"
 #include "commandlist.h"
+#include "descriptor_heap.h"
 #include "resource_handler.h"
 #include "gfxrenderer.h"
 
@@ -191,6 +192,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     m_isRecording = true;
     m_isFlushed = false;
     m_activePSO = nullptr;
+    m_descriptorHeapsBound = false;
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
 #if USE_TRACY
@@ -286,6 +288,26 @@ void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
 #ifdef _DEBUG
     gfxStates.CheckError();
 #endif
+}
+
+
+void CommandList::BindDescriptorHeaps(void) noexcept {
+    if (m_descriptorHeapsBound)
+        return;
+    ID3D12GraphicsCommandList* list = GfxList();
+    if (not list)
+        return;
+    ID3D12DescriptorHeap* srvHeap     = descriptorHeaps.SrvHeapPtr();
+    ID3D12DescriptorHeap* samplerHeap = descriptorHeaps.SamplerHeapPtr();
+    if (srvHeap and samplerHeap) {
+        ID3D12DescriptorHeap* heaps[] = { srvHeap, samplerHeap };
+        list->SetDescriptorHeaps(2, heaps);
+    }
+    else if (srvHeap)
+        list->SetDescriptorHeaps(1, &srvHeap);
+    else
+        return;
+    m_descriptorHeapsBound = true;
 }
 
 

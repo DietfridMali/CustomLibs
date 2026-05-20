@@ -3,7 +3,9 @@
 #include "glew.h"
 #include "tracy_wrapper.h"
 #include <cstdint>                 // TracyOpenGL.hpp's USE_TRACY=0 no-op branch uses int32_t without pulling <cstdint>
-#include <tracy/TracyOpenGL.hpp>
+#if USE_TRACY
+#   include <tracy/TracyOpenGL.hpp>   // GL GPU profiling; glew.h above provides the GL symbols it needs
+#endif
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -168,7 +170,9 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
 void BaseDisplayHandler::EndFrame(void) {
     ZoneScoped;
     SDL_GL_SwapWindow(m_window);
+#if USE_TRACY
     TracyGpuCollect;
+#endif
     FrameMark;
 }
 
