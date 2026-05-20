@@ -17,6 +17,7 @@ OPENGL_FILES := \
  base_shadercode \
  base_texture_shaders \
  blur_shader \
+ compute_shader \
  cubemap \
  gfxdatabuffer \
  gfxdatalayout \

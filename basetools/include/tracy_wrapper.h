@@ -43,4 +43,14 @@
 #	define TracyGpuZone(x)
 #	define TracyGpuCollect
 
+#	ifdef DIRECTX
+		using TracyD3D12Ctx = void*;
+		namespace tracy { class D3D12ZoneScope; }          // Pointer-Member m_gpuZone — Forward-Decl genügt
+
+#		define TracyD3D12Context(device, queue) nullptr   // -> m_gpuProfilerCtx = nullptr
+#		define TracyD3D12Destroy(ctx)
+#		define TracyD3D12NewFrame(ctx)
+#		define TracyD3D12Collect(ctx)
+#	endif
+
 #endif

@@ -350,9 +350,8 @@ int ComputeShader::SetB1(uint32_t offset, const void* data, size_t size) noexcep
 
 int ComputeShader::SetB1Field(const char* name, const void* data, size_t size) noexcept
 {
-    String sName(name);
     for (auto& kv : m_b1Fields) {
-        if (kv.first == sName) {
+        if (kv.first == name) {
             uint32_t offset = kv.second.offset;
             if (offset + size <= m_b1Staging.size()) {
                 std::memcpy(m_b1Staging.data() + offset, data, size);
