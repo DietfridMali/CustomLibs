@@ -2,10 +2,7 @@
 #include "std_defines.h"
 #include "glew.h"
 #include "tracy_wrapper.h"
-#include <cstdint>                 // TracyOpenGL.hpp's USE_TRACY=0 no-op branch uses int32_t without pulling <cstdint>
-#if USE_TRACY
-#   include <tracy/TracyOpenGL.hpp>   // GL GPU profiling; glew.h above provides the GL symbols it needs
-#endif
+#include <cstdint>
 
 #pragma warning(push)
 #pragma warning(disable:26819)

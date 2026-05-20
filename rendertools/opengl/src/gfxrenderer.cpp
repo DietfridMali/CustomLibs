@@ -16,9 +16,6 @@
 #include "gfxrenderer.h"
 #include "gfxapitype.h"
 #include "gfxrenderer.h"
-#if USE_TRACY
-#   include <tracy/TracyOpenGL.hpp>   // GL GPU profiling; glew.h above provides the GL symbols it needs
-#endif
 
 #ifdef _DEBUG
 static Texture* testTexture = nullptr;

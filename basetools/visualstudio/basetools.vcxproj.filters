@@ -180,6 +180,9 @@
     <ClInclude Include="..\include\fmt\format-inl.h">
       <Filter>Header Files\fmt</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\tracy_wrapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">
