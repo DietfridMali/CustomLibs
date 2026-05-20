@@ -5,6 +5,10 @@
 #include "array.hpp"
 #include "string.hpp"
 #include "gfxstates.h"
+#include "tracy_wrapper.h"
+// TracyD3D12.hpp pulls in <d3d12.h>; include it here, after dx12framework.h has set NOMINMAX —
+// not in the shared tracy_wrapper.h, which would hit non-DX12 TUs with a <windows.h> min/max clash.
+#include <tracy/TracyD3D12.hpp>
 //#include "shader.h"
 #include "dx12framework.h"
 #include <functional>
@@ -82,6 +86,7 @@ public:
     uint32_t                            m_refCounter{ 1 };
     String                              m_name{ "" };
     ID3D12PipelineState*                m_activePSO{ nullptr };
+    tracy::D3D12ZoneScope*              m_gpuZone{ nullptr };   // per-CL GPU profiling zone; spans Open()..Close() (USE_TRACY)
 
     static List<RenderStates>           m_renderStateStack;
 
@@ -186,6 +191,7 @@ public:
     int                                     m_frameIndex{ 0 };
     int                                     m_frameCount{ CommandQueue::FRAME_COUNT };
     uint64_t                                m_frameNumber{ 0 };   // monotonic; ++ per BeginFrame — reliable frame-boundary signal
+    TracyD3D12Ctx                           m_gpuProfilerCtx{ nullptr };   // Tracy D3D12 GPU-timestamp context; nullptr when USE_TRACY=0
 
     bool Create(ID3D12Device* device) noexcept;
 

@@ -10,6 +10,8 @@
 #include "gfxrenderer.h"
 #include "shadowmap.h"
 #include "tracy_wrapper.h"
+#include <cstdint>                 // TracyOpenGL.hpp's USE_TRACY=0 no-op branch uses int32_t without pulling <cstdint>
+#include <tracy/TracyOpenGL.hpp>   // GL GPU profiling; glew.h above provides the GL symbols it needs
 #include "base_shaderhandler.h"
 #include "base_displayhandler.h"
 #include "gfxrenderer.h"
@@ -33,6 +35,7 @@ bool GfxRenderer::InitGraphics(void) {
     }
     glGetIntegerv(GL_MAJOR_VERSION, &m_glVersion.major);
     glGetIntegerv(GL_MINOR_VERSION, &m_glVersion.minor);
+    TracyGpuContext;
     return true;
 }
 

@@ -6,6 +6,7 @@
 #include "gfxrenderer.h"
 
 #include <cstdio>
+#include <cstring>
 #include "tracy_wrapper.h"
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
@@ -192,6 +193,13 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     m_activePSO = nullptr;
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
+#if USE_TRACY
+    // GPU timestamp zone for this command list, named after m_name. Begin timestamp is written
+    // here onto the freshly reset list; the end timestamp + ResolveQueryData follow in Close().
+    m_gpuZone = new tracy::D3D12ZoneScope(commandListHandler.m_gpuProfilerCtx,
+        uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
+        (const char*)m_name, size_t(m_name.Length()), m_gfxListPtr.Get(), true);
+#endif
     if (saveRenderStates)
         PushRenderStates();
 #ifdef _DEBUG
@@ -205,6 +213,11 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
     if (not m_isRecording)
         return;
     m_isRecording = false;
+#if USE_TRACY
+    // End the GPU zone (writes the end timestamp + ResolveQueryData) while the list is still open.
+    delete m_gpuZone;
+    m_gpuZone = nullptr;
+#endif
     HRESULT hr = m_gfxListPtr->Close();
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
@@ -326,6 +339,7 @@ bool CommandListHandler::Create(ID3D12Device* device) noexcept {
     if (not m_cmdQueue.Create(device, "MainQueue"))
         return false;
     gfxResourceHandler.Init(m_frameCount);
+    m_gpuProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
     return true;
 }
 
@@ -349,6 +363,7 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
         ZoneScopedN("gfxResourceHandler::Cleanup");
         gfxResourceHandler.Cleanup(m_frameIndex);
     }
+    TracyD3D12Collect(m_gpuProfilerCtx);
     return true;
 }
 
@@ -356,6 +371,7 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
 void CommandListHandler::EndFrame(void) noexcept {
     ZoneScoped;
     m_cmdQueue.Signal(m_frameIndex);
+    TracyD3D12NewFrame(m_gpuProfilerCtx);
 }
 
 
@@ -367,6 +383,8 @@ void CommandListHandler::Flush(void) noexcept {
 
 
 void CommandListHandler::Destroy(void) noexcept {
+    TracyD3D12Destroy(m_gpuProfilerCtx);
+    m_gpuProfilerCtx = nullptr;
     for (auto cl : m_recycledLists) {
         cl->Destroy();
         delete cl;
