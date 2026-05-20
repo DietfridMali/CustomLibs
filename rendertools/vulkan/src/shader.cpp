@@ -478,15 +478,8 @@ bool Shader::Activate(void)
     CommandList* cl = commandListHandler.CurrentCmdList();
     if (cl == nullptr)
         return false;
-    // Skip full pipeline rebind if this shader is already the owner of the current CL's bind
-    // state. Pipeline + descriptor set persist on the CL until something else rebinds.
-    if (m_owner == cl->GetId())
-        return true;
     VkPipeline pipeline = cl->GetPipeline(this);
-    if (pipeline == VK_NULL_HANDLE)
-        return false;
-    m_owner = cl->GetId();
-    return true;
+    return pipeline != VK_NULL_HANDLE;
 }
 
 

@@ -607,17 +607,12 @@ bool Shader::Activate(void) {
     if (not IsValid())
         return false;
 
-    CommandList* cl = commandListHandler.CurrentCmdList();
-    if (not cl)
+    auto* list = commandListHandler.CurrentGfxList();
+    if (not list)
         return false;
 
-    // Skip full rebind if this shader is already the owner of the current CL's bind state.
-    // PSO + RootSig + descriptor heaps persist on the CL until something else rebinds them.
-    if (m_owner == cl->GetId())
-        return true;
-
-    auto* list = cl->GfxList();
-    if (not list)
+    CommandList* cl = commandListHandler.CurrentCmdList();
+    if (not cl)
         return false;
 
     ID3D12PipelineState* pso = cl->GetPSO(this);
@@ -640,7 +635,6 @@ bool Shader::Activate(void) {
         ID3D12DescriptorHeap* heaps[] = { srvHeap.m_heap.Get() };
         list->SetDescriptorHeaps(1, heaps);
     }
-    m_owner = cl->GetId();
     return true;
 }
 
