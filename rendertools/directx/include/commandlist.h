@@ -185,6 +185,7 @@ public:
     uint64_t                                m_cmdListCount{ 0 };
     int                                     m_frameIndex{ 0 };
     int                                     m_frameCount{ CommandQueue::FRAME_COUNT };
+    uint64_t                                m_frameNumber{ 0 };   // monotonic; ++ per BeginFrame — reliable frame-boundary signal
 
     bool Create(ID3D12Device* device) noexcept;
 
@@ -204,6 +205,10 @@ public:
 
     inline int FrameCount(void) const noexcept {
         return m_frameCount;
+    }
+
+    inline uint64_t FrameNumber(void) const noexcept {
+        return m_frameNumber;
     }
 
     inline void SetFrameIndex(int frameIndex) noexcept {

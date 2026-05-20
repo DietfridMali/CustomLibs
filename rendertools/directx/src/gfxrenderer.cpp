@@ -10,6 +10,7 @@
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
 #include "commandlist.h"
+#include "meshhandler.h"
 #include "base_displayhandler.h"
 #include "dx12context.h"
 #include "gfxapitype.h"
@@ -117,6 +118,7 @@ void GfxRenderer::Cleanup(void) noexcept {
     // Flush all in-flight GPU work before releasing any resources, then tear down the
     // command-list handler (releases pools, fence, all tracked resources).
     commandListHandler.CmdQueue().WaitIdle();
+    meshHandler.Destroy();
     commandListHandler.Destroy();
 }
 

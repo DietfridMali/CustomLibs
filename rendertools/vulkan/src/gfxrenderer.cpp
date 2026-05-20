@@ -10,6 +10,7 @@
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
 #include "commandlist.h"
+#include "meshhandler.h"
 #include "base_displayhandler.h"
 #include "vkcontext.h"
 #include "shader_compiler.h"
@@ -179,6 +180,7 @@ void GfxRenderer::Cleanup(void) noexcept {
     // (RT BufferInfo::Release, disposable textures, ...), so the underlying VkImage / VkImageView
     // / VmaAllocation handles are destroyed before gfxResourceHandler / vkContext are torn down.
     commandListHandler.CmdQueue().WaitIdle();
+    meshHandler.Destroy();
     gfxResourceHandler.Cleanup(0);
     gfxResourceHandler.Cleanup(1);
 }

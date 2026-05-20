@@ -29,7 +29,7 @@ public:
     GLuint                  m_handle;
 #endif
     MeshTopology            m_shape{ MeshTopology::Quads };
-    bool                    m_isDynamic{ false };
+    uint32_t                m_dynamicBuffers{ 0 };
     bool                    m_isBound{ false };
 
     static GfxDataLayout*         activeLayout;
@@ -53,20 +53,14 @@ public:
         return gfxDataLayout;
     }
 
-    inline void SetDynamic(bool isDynamic)
-        noexcept
-    {
-        m_isDynamic = isDynamic;
-        for (auto gfxDataBuffer : m_dataBuffers)
-            gfxDataBuffer->SetDynamic(isDynamic);
-        m_indexBuffer.SetDynamic(m_isDynamic);
-    }
+    void SetDynamic(uint32_t dynamicBuffers)
+        noexcept;
 
     inline void SetShape(MeshTopology shape) noexcept {
         m_shape = shape;
     }
 
-    bool Create(MeshTopology shape = MeshTopology::Quads, bool isDynamic = false)
+    bool Create(MeshTopology shape = MeshTopology::Quads, uint32_t dynamicBuffers = 0)
         noexcept;
 
     ~GfxDataLayout() {

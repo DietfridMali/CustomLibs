@@ -1,5 +1,6 @@
 
 #include "gfxdatalayout.h"
+#include "mesh.h"
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 
@@ -27,11 +28,11 @@ List<GfxDataLayout*> GfxDataLayout::layoutStack;
 // =================================================================================================
 // Interface to OpenGL VAOs
 
-bool GfxDataLayout::Create(MeshTopology shape, bool isDynamic)
+bool GfxDataLayout::Create(MeshTopology shape, uint32_t dynamicBuffers)
 noexcept
 {
     m_shape = shape;
-    SetDynamic(isDynamic);
+    SetDynamic(dynamicBuffers);
 #if USE_SHARED_HANDLES
     if (m_handle.IsAvailable())
         return true;
@@ -45,6 +46,16 @@ noexcept
     glGenVertexArrays(1, &m_handle);
     return m_handle != 0;
 #endif
+}
+
+
+void GfxDataLayout::SetDynamic(uint32_t dynamicBuffers)
+noexcept
+{
+    m_dynamicBuffers = dynamicBuffers;
+    for (auto gfxDataBuffer : m_dataBuffers)
+        gfxDataBuffer->SetDynamic((dynamicBuffers & Mesh::MeshBufferBit(gfxDataBuffer->m_type, gfxDataBuffer->m_id)) != 0);
+    m_indexBuffer.SetDynamic((dynamicBuffers & Mesh::mbIndex) != 0);
 }
 
 
@@ -155,7 +166,7 @@ noexcept
     GfxDataBuffer* buffer = FindBuffer(type, id, index);
     if (not buffer and (buffer = new GfxDataBuffer(type, id))) { // otherwise index has been initialized by FindBuffer()
         m_dataBuffers.Append(buffer);
-        buffer->SetDynamic(m_isDynamic);
+        buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
         index = m_dataBuffers.Length() - 1;
     }
     if (buffer)

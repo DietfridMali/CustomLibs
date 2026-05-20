@@ -1,4 +1,6 @@
 
+#include "tracy_wrapper.h"
+
 #include "std_defines.h"
 #include "framecounter.h"
 #include "colordata.h"
@@ -8,6 +10,7 @@
 // =================================================================================================
 
 void BaseFrameCounter::Draw(bool update) {
+    ZoneScoped;
     if (update)
         Update();
     if (m_drawTimer.HasExpired(0, true))

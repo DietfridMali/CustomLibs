@@ -80,7 +80,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>USE_TRACY=0;DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_TRACY=1;DIRECTX;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -131,6 +131,7 @@
     <ClInclude Include="..\..\include\resource_descriptor.h" />
     <ClInclude Include="..\include\cbv_allocator.h" />
     <ClInclude Include="..\include\commandlist.h" />
+    <ClInclude Include="..\include\meshhandler.h" />
     <ClInclude Include="..\include\descriptor_heap.h" />
     <ClInclude Include="..\include\dx12context.h" />
     <ClInclude Include="..\include\cubemap.h" />
@@ -196,6 +197,7 @@
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cbv_allocator.cpp" />
     <ClCompile Include="..\src\commandlist.cpp" />
+    <ClCompile Include="..\src\meshhandler.cpp" />
     <ClCompile Include="..\src\descriptor_heap.cpp" />
     <ClCompile Include="..\src\dx12context.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />

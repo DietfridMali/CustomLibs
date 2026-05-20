@@ -6,6 +6,7 @@
 #include "base_shaderhandler.h"
 #include "colordata.h"
 #include "textrenderer.h"
+#include "meshhandler.h"
 #include "gfxrenderer.h"
 #include "tristate.h"
 
@@ -29,9 +30,7 @@ int TextRenderer::CompareRenderTargets(void* context, const int& key1, const int
 
 TextRenderer::TextRenderer(RGBAColor color, const TextDecoration& decoration, float scale)
     : m_color(color), m_scale(scale), m_font(nullptr), m_textAlignment(taCenter), m_decoration(decoration)
-{ 
-    m_mesh.Init(MeshTopology::Quads, 100);
-    m_mesh.SetDynamic(true);
+{
 }
 
 
@@ -60,7 +59,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     if (flipVertically)
         y = -y;
 
-    m_mesh.ResetGfxData();
+    Mesh* mesh = meshHandler.AllocMesh(Mesh::mbIndex | Mesh::mbVertex | Mesh::mbTexCoord0);
     for (auto glyph : text) {
         FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
 
@@ -68,28 +67,28 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
             // create output quad coordinates
             float w = float(info->glyphSize.width) * scale;
             Vector3f p{ x, y, 0.0f };
-            m_mesh.AddVertex(p);
+            mesh->AddVertex(p);
             p.X() += w;
-            m_mesh.AddVertex(p);
+            mesh->AddVertex(p);
             p.Y() = -y;
-            m_mesh.AddVertex(p);
+            mesh->AddVertex(p);
             p.X() = x;
-            m_mesh.AddVertex(p);
+            mesh->AddVertex(p);
             x += w;
 
             // create input tex coords of the glyph in the atlas
             TexCoord tc{ info->atlasPosition };
-            m_mesh.AddTexCoord(tc);
+            mesh->AddTexCoord(tc);
             tc.X() += info->atlasSize.X();
-            m_mesh.AddTexCoord(tc);
+            mesh->AddTexCoord(tc);
             tc.Y() += info->atlasSize.Y();
-            m_mesh.AddTexCoord(tc);
+            mesh->AddTexCoord(tc);
             tc.X() = info->atlasPosition.X();
-            m_mesh.AddTexCoord(tc);
+            mesh->AddTexCoord(tc);
         }
     }
-    m_mesh.UpdateData(true);
-    m_mesh.Render(m_font->GetAsTexture());
+    mesh->UpdateData(true);
+    mesh->Render(m_font->GetAsTexture());
 }
 
 
@@ -212,8 +211,6 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
             renderTarget->SetClearColor(RGBAColor(1.0f, 0.8f, 0.0f, 1.0f));
 #endif
             if (renderTarget->Activate({ .clear = true })) {
-                baseRenderer.PushViewport();
-                renderTarget->SetViewport(true);
                 if (outlineWidth > 0) {
                     offset.x -= outlineWidth / float(renderTarget->m_width);
                     offset.y -= outlineWidth / float(renderTarget->m_height);
@@ -235,7 +232,6 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                 }
                 if (not baseRenderer.HasOpenGL())
                     renderTarget->Deactivate();
-                baseRenderer.PopViewport();
             }
         }
     }

@@ -26,7 +26,7 @@ bool Mesh::CreateLayout(void) {
         return true;
     if (not (m_gfxDataLayout = new GfxDataLayout()))
         return false;
-    return m_gfxDataLayout->Create(MeshTopology::Quads, m_isDynamic);
+    return m_gfxDataLayout->Create(MeshTopology::Quads, m_dynamicBuffers);
 }
 
 // This only works for linearly increasing quad vertex indices starting at 0!
@@ -127,7 +127,7 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
     if (not createVertexIndex)
         createVertexIndex = (m_shape == MeshTopology::Quads);
 
-    m_gfxDataLayout->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_isDynamic);
+    m_gfxDataLayout->Create(createVertexIndex ? MeshTopology::Triangles : m_shape, m_dynamicBuffers);
     m_tangents.SetDirty((m_tangents.HaveData() and m_vertices.IsDirty()) or m_texCoords[0].IsDirty() or m_normals.IsDirty());
 
     auto updateBuffer = [&forceUpdate, this](auto& buffer, auto&& updateFn) {
@@ -153,7 +153,6 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
     if (createVertexIndex) {
         CreateVertexIndices();
         m_shape = MeshTopology::Triangles;
-        m_gfxDataLayout->m_indexBuffer.SetDynamic(true);
         UpdateIndexBuffer();
     }
     else {
@@ -172,19 +171,42 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
     updateBufferGroup(m_offsetBuffers, [this](int i, bool f) { UpdateOffsetBuffer(i, f); });
 
     m_gfxDataLayout->FinishUpdate();
+
+    // Rebuild the buffer-composition mask from the buffers that actually carry data.
+    m_meshBufferMask = 0;
+    if (m_indices.HaveData())
+        m_meshBufferMask |= mbIndex;
+    if (m_vertices.HaveData())
+        m_meshBufferMask |= mbVertex;
+    for (int i = 0; i < 3; ++i)
+        if (m_texCoords[i].HaveData())
+            m_meshBufferMask |= (uint32_t(mbTexCoord0) << i);
+    if (m_vertexColors.HaveData())
+        m_meshBufferMask |= mbColor;
+    if (m_normals.HaveData())
+        m_meshBufferMask |= mbNormal;
+    if (m_tangents.HaveData())
+        m_meshBufferMask |= mbTangent;
+    for (int i = 0; (i < m_floatBuffers.Length()) and (i < 2); ++i)
+        if (m_floatBuffers[i].HaveData())
+            m_meshBufferMask |= (uint32_t(mbFloat0) << i);
+    for (int i = 0; (i < m_offsetBuffers.Length()) and (i < 4); ++i)
+        if (m_offsetBuffers[i].HaveData())
+            m_meshBufferMask |= (uint32_t(mbOffset0) << i);
+
     return true;
 }
 
 
 void Mesh::ResetGfxData(void) {
+    // Reset the CPU-side buffers only. The GfxDataLayout and its GPU buffers stay alive
+    // so the next UpdateData reuses them instead of reallocating from scratch.
     m_indices.Reset();
     m_vertices.Reset();
     for (auto& tc : m_texCoords)
         tc.Reset();
     m_vertexColors.Reset();
     m_normals.Reset();
-    if (m_gfxDataLayout)
-        m_gfxDataLayout->Destroy();
 }
 
 void Mesh::SetupTexture(Texture* texture, String textureFolder, List<String> textureNames, TextureType textureType) {

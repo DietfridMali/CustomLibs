@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "gfxdatalayout.h"
+#include "mesh.h"
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "commandlist.h"
@@ -57,11 +58,20 @@ List<GfxDataLayout*> GfxDataLayout::layoutStack;
 
 // =================================================================================================
 
-bool GfxDataLayout::Create(MeshTopology shape, bool isDynamic) noexcept
+bool GfxDataLayout::Create(MeshTopology shape, uint32_t dynamicBuffers) noexcept
 {
     m_shape = shape;
-    SetDynamic(isDynamic);
+    SetDynamic(dynamicBuffers);
     return true;
+}
+
+
+void GfxDataLayout::SetDynamic(uint32_t dynamicBuffers) noexcept
+{
+    m_dynamicBuffers = dynamicBuffers;
+    for (auto gfxDataBuffer : m_dataBuffers)
+        gfxDataBuffer->SetDynamic((dynamicBuffers & Mesh::MeshBufferBit(gfxDataBuffer->m_type, gfxDataBuffer->m_id)) != 0);
+    m_indexBuffer.SetDynamic((dynamicBuffers & Mesh::mbIndex) != 0);
 }
 
 
@@ -157,7 +167,7 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_
         if (not buffer)
             return false;
         m_dataBuffers.Append(buffer);
-        buffer->SetDynamic(m_isDynamic);
+        buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
         foundIndex = int(m_dataBuffers.Length()) - 1;
     }
     int slot = FixedSlotForBuffer(type, id);

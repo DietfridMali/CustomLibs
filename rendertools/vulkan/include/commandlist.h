@@ -51,6 +51,7 @@ public:
 
     uint32_t       m_frameIndex  { 0 };
     uint32_t       m_imageIndex  { 0 };
+    uint64_t       m_frameNumber { 0 };   // monotonic; ++ per BeginFrame — reliable frame-boundary signal
 
     bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
                 uint32_t graphicsFamily, uint32_t presentFamily,
@@ -80,6 +81,7 @@ public:
     inline uint32_t GraphicsFamily(void) const noexcept { return m_graphicsFamily; }
     inline uint32_t PresentFamily(void) const noexcept { return m_presentFamily; }
     inline uint32_t FrameIndex(void) const noexcept { return m_frameIndex; }
+    inline uint64_t FrameNumber(void) const noexcept { return m_frameNumber; }
     inline uint32_t ImageIndex(void) const noexcept { return m_imageIndex; }
 
     VkCommandBuffer CmdBuffer(void) const noexcept;

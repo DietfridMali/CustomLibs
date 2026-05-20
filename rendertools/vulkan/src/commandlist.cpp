@@ -78,6 +78,7 @@ void CommandQueue::Destroy(void) noexcept
 
 bool CommandQueue::BeginFrame(void) noexcept
 {
+    ++m_frameNumber;
     // Wait until the GPU has finished using this frame slot.
     VkResult res = vkWaitForFences(m_device, 1, &m_inFlight[m_frameIndex], VK_TRUE, UINT64_MAX);
     if (res != VK_SUCCESS) {

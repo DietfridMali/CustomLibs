@@ -26,7 +26,7 @@ public:
     GfxDataBuffer           m_indexBuffer;
     MeshTopology            m_shape{ MeshTopology::Quads };
 	CommandList*            m_updateList{ nullptr };  
-    bool                    m_isDynamic{ false };
+    uint32_t                m_dynamicBuffers{ 0 };
     bool                    m_isBound{ false };
 
     static GfxDataLayout*         activeLayout;
@@ -46,18 +46,13 @@ public:
         return gfxDataLayout;
     }
 
-    inline void SetDynamic(bool isDynamic) noexcept {
-        m_isDynamic = isDynamic;
-        for (auto GfxDataBuffer : m_dataBuffers) 
-            GfxDataBuffer->SetDynamic(isDynamic);
-        m_indexBuffer.SetDynamic(isDynamic);
-    }
+    void SetDynamic(uint32_t dynamicBuffers) noexcept;
 
     inline void SetShape(MeshTopology shape) noexcept { m_shape = shape; }
 
     // In DX12 there is nothing to initialise at "GfxDataLayout creation" time.
     // Returns true always.
-    bool Create(MeshTopology shape = MeshTopology::Quads, bool isDynamic = false) noexcept;
+    bool Create(MeshTopology shape = MeshTopology::Quads, uint32_t dynamicBuffers = 0) noexcept;
 
     ~GfxDataLayout() { Destroy(); }
 

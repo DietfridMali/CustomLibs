@@ -2,6 +2,7 @@
 #define NOMINMAX
 
 #include <limits>
+#include <cstring>
 
 #include "rendertypes.h"
 #include "sharedpointer.hpp"
@@ -53,11 +54,53 @@ public:
     }
 };
 
+// =================================================================================================
 
 class Mesh
     : public AbstractMesh
 {
 public:
+    // Buffer-composition bitmask: one bit per potential mesh data buffer, ordered as Mesh::UpdateData
+    // processes them. Mesh::m_meshBufferMask carries the composition of a concrete mesh; MeshHandler
+    // matches pooled meshes on it, so a recycled mesh always has exactly the requested buffer set.
+    enum eMeshBufferBits : uint32_t {
+        mbIndex     = 1u << 0,
+        mbVertex    = 1u << 1,
+        mbTexCoord0 = 1u << 2,
+        mbTexCoord1 = 1u << 3,
+        mbTexCoord2 = 1u << 4,
+        mbColor     = 1u << 5,
+        mbNormal    = 1u << 6,
+        mbTangent   = 1u << 7,
+        mbOffset0   = 1u << 8,
+        mbOffset1   = 1u << 9,
+        mbOffset2   = 1u << 10,
+        mbOffset3   = 1u << 11,
+        mbFloat0    = 1u << 12,
+        mbFloat1    = 1u << 13
+    };
+
+    // Maps a GfxDataBuffer's (type, id) tag to its eMeshBufferBits bit; 0 if unknown.
+    static uint32_t MeshBufferBit(const char* type, int id) {
+        if (not strcmp(type, "Index"))
+            return mbIndex;
+        if (not strcmp(type, "Vertex"))
+            return mbVertex;
+        if (not strcmp(type, "TexCoord"))
+            return ((id >= 0) and (id <= 2)) ? (uint32_t(mbTexCoord0) << id) : 0u;
+        if (not strcmp(type, "Color"))
+            return mbColor;
+        if (not strcmp(type, "Normal"))
+            return mbNormal;
+        if (not strcmp(type, "Tangent"))
+            return mbTangent;
+        if (not strcmp(type, "Float"))
+            return ((id >= 0) and (id <= 1)) ? (uint32_t(mbFloat0) << id) : 0u;
+        if (not strcmp(type, "Offset"))
+            return ((id >= 0) and (id <= 3)) ? (uint32_t(mbOffset0) << id) : 0u;
+        return 0u;
+    }
+
     String                          m_name{ "" };
     TextureList                     m_textures;
     VertexBuffer                    m_vertices;
@@ -72,12 +115,13 @@ public:
     MeshTopology                    m_shape{ MeshTopology::Quads };
     Vector3f                        m_vMin{ Vector3f::ZERO };
     Vector3f                        m_vMax{ Vector3f::ZERO };
-    bool                            m_isDynamic{ false };
+    uint32_t                        m_dynamicBuffers{ 0 };   // eMeshBufferBits: buffers needing dynamic treatment
+    uint32_t                        m_meshBufferMask{ 0 };   // eMeshBufferBits, rebuilt in UpdateData
 
     static uint32_t quadTriangleIndices[6];
 
-    Mesh(bool isDynamic = true) {
-        SetDynamic(isDynamic);
+    Mesh(uint32_t dynamicBuffers = 0) {
+        SetDynamic(dynamicBuffers);
     }
 
     ~Mesh() {
@@ -98,10 +142,10 @@ public:
 
     virtual void Destroy(void);
 
-    inline void SetDynamic(bool isDynamic) {
-        m_isDynamic = isDynamic;
+    inline void SetDynamic(uint32_t dynamicBuffers) {
+        m_dynamicBuffers = dynamicBuffers;
         if (m_gfxDataLayout)
-            m_gfxDataLayout->SetDynamic(isDynamic);
+            m_gfxDataLayout->SetDynamic(dynamicBuffers);
     }
 
     inline void SetShape(MeshTopology shape) noexcept {

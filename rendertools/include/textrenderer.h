@@ -40,7 +40,6 @@ private:
     eTextAlignments     m_textAlignment;
     TextDecoration      m_decoration;
     GfxDataLayout       m_gfxDataLayout;
-    Mesh                m_mesh;
     RenderTarget*       m_renderTarget{ nullptr };
     FontHandler*        m_font;
     List<RGBAColor>     m_colorStack;
@@ -60,8 +59,7 @@ public:
 
     inline FontHandler* SetFont(FontHandler * font) noexcept {
         FontHandler* currentFont = m_font;
-        if ((m_font = font))
-            m_mesh.SetupTexture(m_font->GetAsTexture());
+        m_font = font;
         return currentFont;
     }
 

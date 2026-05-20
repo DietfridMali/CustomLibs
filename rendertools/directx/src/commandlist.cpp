@@ -167,6 +167,7 @@ void CommandList::Reset(void) noexcept {
     m_refCounter = 1;
     m_isFlushed = false;
     m_isRecording = false;
+    m_disposableResources.Clear();
 }
 
 
@@ -331,6 +332,7 @@ bool CommandListHandler::Create(ID3D12Device* device) noexcept {
 
 bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
     ZoneScoped;
+    ++m_frameNumber;
     if (frameIndex >= 0)
         SetFrameIndex(frameIndex);
     else

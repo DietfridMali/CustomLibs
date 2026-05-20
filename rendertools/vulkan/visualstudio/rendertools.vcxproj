@@ -131,6 +131,7 @@
     <ClInclude Include="..\..\include\resource_descriptor.h" />
     <ClInclude Include="..\include\cbv_allocator.h" />
     <ClInclude Include="..\include\commandlist.h" />
+    <ClInclude Include="..\include\meshhandler.h" />
     <ClInclude Include="..\include\vkcontext.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
@@ -199,6 +200,7 @@
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cbv_allocator.cpp" />
     <ClCompile Include="..\src\commandlist.cpp" />
+    <ClCompile Include="..\src\meshhandler.cpp" />
     <ClCompile Include="..\src\vkcontext.cpp" />
     <ClCompile Include="..\src\image_layout_tracker.cpp" />
     <ClCompile Include="..\src\descriptor_pool_handler.cpp" />

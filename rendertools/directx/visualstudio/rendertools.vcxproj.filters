@@ -131,6 +131,9 @@
     <ClInclude Include="..\include\commandlist.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\meshhandler.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\cubemap.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
@@ -301,6 +304,9 @@
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\commandlist.cpp">
+      <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\meshhandler.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cubemap.cpp">
