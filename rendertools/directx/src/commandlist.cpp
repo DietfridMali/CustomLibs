@@ -386,6 +386,9 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
         gfxResourceHandler.Cleanup(m_frameIndex);
     }
     TracyD3D12Collect(m_gpuProfilerCtx);
+#if DBG_DIRECTX
+    dx12Context.QueryVRAM();
+#endif
     return true;
 }
 

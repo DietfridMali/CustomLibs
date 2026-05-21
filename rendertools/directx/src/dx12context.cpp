@@ -3,6 +3,7 @@
 
 #include <cstdio>
 #include <memory>
+#include <chrono>
 
 // =================================================================================================
 
@@ -104,6 +105,30 @@ void DX12Context::DumpDRED(void) noexcept {
         fprintf(stderr, "DRED page fault VA=0x%llX\n", (unsigned long long)pf.PageFaultVA);
 
     fflush(stderr);
+}
+
+
+void DX12Context::QueryVRAM(void) noexcept {
+    // Throttle to ~1/s — querying per frame is cheap, printing per frame spams.
+    static std::chrono::steady_clock::time_point lastPrint{};
+    auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPrint).count() < 1000)
+        return;
+
+    ComPtr<IDXGIAdapter3> adapter;
+    if (not m_adapter or FAILED(m_adapter.As(&adapter)))
+        return;
+    DXGI_QUERY_VIDEO_MEMORY_INFO local{}, nonLocal{};
+    if (FAILED(adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &local)))
+        return;
+    adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &nonLocal);
+    lastPrint = now;
+
+    const double toMB = 1.0 / (1024.0 * 1024.0);
+    fprintf(stderr, "VRAM local: usage=%.0f / budget=%.0f MB%s | nonlocal usage=%.0f MB\n",
+        double(local.CurrentUsage) * toMB, double(local.Budget) * toMB,
+        (local.CurrentUsage > local.Budget) ? "  <-- OVER BUDGET" : "",
+        double(nonLocal.CurrentUsage) * toMB);
 }
 
 

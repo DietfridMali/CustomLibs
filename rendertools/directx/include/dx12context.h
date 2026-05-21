@@ -31,6 +31,8 @@ public:
     int DrainMessages(bool onlyErrors = false) noexcept;
     // Dumps DRED auto-breadcrumbs to stderr after device removal.
     void DumpDRED(void) noexcept;
+    // Logs adapter VRAM usage vs. budget to stderr, throttled to ~1/s.
+    void QueryVRAM(void) noexcept;
 #endif
 
     inline D3D_FEATURE_LEVEL FeatureLevel(void) noexcept {
