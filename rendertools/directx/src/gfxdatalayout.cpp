@@ -248,7 +248,7 @@ CommandList* GfxDataLayout::StartUpdate(void) noexcept {
 
 
 bool GfxDataLayout::FinishUpdate(void) noexcept {
-    bool result = baseRenderer.FinishOperation(m_updateList);
+    bool result = baseRenderer.FinishOperation(m_updateList, true);
     m_updateList = nullptr;
     return result;
 }
