@@ -36,6 +36,7 @@ VULKAN_FILES := \
  gfxrenderer \
  gfxstates \
  image_layout_tracker \
+ meshhandler \
  noisetexture \
  outline_shader \
  pipeline_cache \
