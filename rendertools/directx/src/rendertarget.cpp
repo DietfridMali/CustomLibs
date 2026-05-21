@@ -135,10 +135,12 @@ void BufferInfo::FreeUAV(void) {
 
 
 void BufferInfo::Release(void) {
-    gfxResourceHandler.Track(m_rtv.Handle());   // deferred FreeRTV (after the fence)
-    descriptorHeaps.FreeSRV(m_srv.Handle());
-    descriptorHeaps.FreeDSV(m_dsv.Handle());
-    descriptorHeaps.FreeSRV(m_uav.Handle());
+    // All descriptors and the resource go through deferred release — in-flight command lists
+    // may still reference them; gfxResourceHandler frees them once the frame fence has signalled.
+    gfxResourceHandler.Track(m_rtv.Handle());
+    gfxResourceHandler.Track(m_srv.Handle());
+    gfxResourceHandler.Track(m_dsv.Handle());
+    gfxResourceHandler.Track(m_uav.Handle());
     gfxResourceHandler.Track(m_resource);
     Init();
 }

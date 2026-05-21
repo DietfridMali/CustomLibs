@@ -12,7 +12,7 @@
 // GfxResourceHandler: per-frame deferred release of D3D resources and descriptor handles.
 //
 //   Track(resource) — push a ComPtr<ID3D12Resource> into the current slot.
-//   Track(handle)   — push an RTV DescriptorHandle into the current slot (returned to RTV-heap free list on Cleanup).
+//   Track(handle)   — push a DescriptorHandle into the current slot (released to its owning heap on Cleanup).
 //   Cleanup(idx, waitIdle = false) — drain slot[idx]; waitIdle=true forces a CPU/GPU sync first
 //                                    (init/no-frame path); regular frame uses fence wait at BeginFrame.
 //
@@ -24,11 +24,11 @@ class GfxResourceHandler
 {
 public:
     using ResourceArray = AutoArray<ComPtr<ID3D12Resource>>;
-    using RTVArray      = AutoArray<DescriptorHandle>;
+    using DescriptorArray      = AutoArray<DescriptorHandle>;
 
 private:
     AutoArray<ResourceArray>    m_frameResources;
-    AutoArray<RTVArray>         m_frameRTVs;
+    AutoArray<DescriptorArray>         m_frameDescriptors;
 
 public:
     // Resize per-slot arrays to match commandListHandler.FrameCount(). Idempotent — safe to call
@@ -39,9 +39,9 @@ public:
 
     void Track(ComPtr<ID3D12Resource> resource) noexcept;
 
-    void Track(const DescriptorHandle& rtvHandle) noexcept;
+    void Track(const DescriptorHandle& handle) noexcept;
 
-    // Drain slot[frameIndex]: free queued RTV descriptor slots, then drop ComPtr resource refs.
+    // Drain slot[frameIndex]: free queued descriptor slots, then drop ComPtr resource refs.
     // waitIdle=true issues a full CPU/GPU sync first — only needed when there's no fence wait
     // upstream (init phases, explicit Flush()).
     void Cleanup(int frameIndex, bool waitIdle = false) noexcept;

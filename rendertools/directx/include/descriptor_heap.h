@@ -7,12 +7,25 @@
 #include <source_location>
 
 // =================================================================================================
-// DescriptorHandle: a combined CPU+GPU handle plus the linear slot index.
+// BaseDescriptorHeap: abstract base so a DescriptorHandle can be released through a heap
+// back-pointer without knowing its concrete heap type — lets one deferred-free list hold
+// descriptors of every heap type.
+
+class BaseDescriptorHeap {
+public:
+    virtual ~BaseDescriptorHeap() = default;
+    virtual void Free(uint32_t index) noexcept = 0;
+};
+
+// =================================================================================================
+// DescriptorHandle: a combined CPU+GPU handle, the linear slot index, and a back-pointer to the
+// owning heap so the handle can free itself.
 
 struct DescriptorHandle {
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle{ 0 };
     D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle{ 0 };
     uint32_t                    index{ UINT32_MAX };
+    BaseDescriptorHeap*         m_heap{ nullptr };
 
     inline bool IsValid(void) const noexcept { 
         return index != UINT32_MAX;
@@ -31,7 +44,7 @@ struct DescriptorHandle {
 // DescriptorHeap: fixed-size descriptor heap with linear (bump-pointer) allocation.
 // Individual slots are never freed; use for persistent per-resource registrations.
 
-class DescriptorHeap {
+class DescriptorHeap : public BaseDescriptorHeap {
 public:
     ComPtr<ID3D12DescriptorHeap>    m_heap;
     D3D12_DESCRIPTOR_HEAP_TYPE      m_type{};
@@ -47,7 +60,7 @@ public:
     // Allocates the next free slot (reuses freed slots). Returns an invalid handle if the heap is full.
     DescriptorHandle Allocate(void) noexcept;
     // Returns a slot to the free list so it can be reused by a future Allocate().
-    void Free(uint32_t index) noexcept;
+    void Free(uint32_t index) noexcept override;
     
     inline void Free(const DescriptorHandle& h) noexcept { 
         if (h.IsValid()) 

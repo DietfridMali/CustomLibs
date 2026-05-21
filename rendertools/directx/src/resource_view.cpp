@@ -18,9 +18,12 @@ bool RTV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format) {
 }
 
 
-void RTV::Free(void) {
-    descriptorHeaps.FreeRTV(*this);
-    *this = {};
+// One Free for every view type: the handle carries a back-pointer to its owning heap
+// (DescriptorHandle::m_heap), so it can release itself regardless of heap type.
+void ResourceView::Free(void) noexcept {
+    if (m_heap and IsValid())
+        m_heap->Free(index);
+    Handle() = {};
 }
 
 
@@ -39,12 +42,6 @@ bool SRV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 }
 
 
-void SRV::Free(void) {
-    descriptorHeaps.FreeSRV(*this);
-    *this = {};
-}
-
-
 bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 {
     Handle()  = descriptorHeaps.AllocDSV();
@@ -55,11 +52,6 @@ bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
     dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
     dx12Context.Device()->CreateDepthStencilView(resource.Get(), &dsvd, CPUHandle());
     return true;
-}
-
-void DSV::Free(void) {
-    descriptorHeaps.FreeDSV(*this);
-    *this = {};
 }
 
 
@@ -76,12 +68,6 @@ bool UAV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
     uavd.Texture2D.PlaneSlice = 0;
     dx12Context.Device()->CreateUnorderedAccessView(resource.Get(), nullptr, &uavd, CPUHandle());
     return true;
-}
-
-
-void UAV::Free(void) {
-    descriptorHeaps.FreeSRV(*this);
-    *this = {};
 }
 
 // =================================================================================================

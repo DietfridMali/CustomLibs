@@ -11,7 +11,7 @@ void GfxResourceHandler::Init(int frameCount) noexcept {
     if (frameCount < 1)
         frameCount = 1;
     m_frameResources.Resize(frameCount);
-    m_frameRTVs.Resize(frameCount);
+    m_frameDescriptors.Resize(frameCount);
 }
 
 
@@ -50,24 +50,20 @@ void GfxResourceHandler::Track(ComPtr<ID3D12Resource> resource) noexcept {
 }
 
 
-void GfxResourceHandler::Track(const DescriptorHandle& rtvHandle) noexcept {
-    if (not rtvHandle.IsValid())
+void GfxResourceHandler::Track(const DescriptorHandle& handle) noexcept {
+    if (not handle.IsValid())
         return;
-    m_frameRTVs[commandListHandler.FrameIndex()].Push(rtvHandle);
+    m_frameDescriptors[commandListHandler.FrameIndex()].Push(handle);
 }
 
 
 void GfxResourceHandler::Cleanup(int frameIndex, bool waitIdle) noexcept {
     if (waitIdle)
         commandListHandler.CmdQueue().WaitIdle();
-    RTVArray& rtvs = m_frameRTVs[frameIndex];
-    for(auto& rtv : rtvs) {
-        descriptorHeaps.FreeRTV(rtv);
-#if DBG_DIRECTX
-        descriptorHeaps.m_rtvHeap.SetOwner(rtv.GetIndex(), {});
-#endif
-    }
-    rtvs.Clear();
+    DescriptorArray& descriptors = m_frameDescriptors[frameIndex];
+    for (auto& h : descriptors)
+        h.m_heap->Free(h.index);   // each handle frees itself into its own heap (clears m_owners too)
+    descriptors.Clear();
     m_frameResources[frameIndex].Clear();
 }
 

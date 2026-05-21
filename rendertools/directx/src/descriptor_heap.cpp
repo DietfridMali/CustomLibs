@@ -57,6 +57,7 @@ DescriptorHandle DescriptorHeap::Allocate(void) noexcept {
     }
     DescriptorHandle h;
     h.index = idx;
+    h.m_heap = this;
     h.cpuHandle = CpuHandle(idx);
     if (m_gpuVisible)
         h.gpuHandle = GpuHandle(idx);

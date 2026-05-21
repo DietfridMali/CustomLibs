@@ -53,7 +53,8 @@ public:
 
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) = 0;
 
-	virtual void Free(void) = 0;
+	// Releases the descriptor through its owning heap (DescriptorHandle::m_heap) and clears the handle.
+	void Free(void) noexcept;
 
 };
 
@@ -63,8 +64,6 @@ class RTV
 {
 public:
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
-
-	virtual void Free(void) override;
 };
 
 
@@ -73,8 +72,6 @@ class SRV
 {
 public:
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
-
-	virtual void Free(void) override;
 };
 
 
@@ -83,8 +80,6 @@ class DSV
 {
 public:
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
-
-	virtual void Free(void) override;
 };
 
 
@@ -93,8 +88,6 @@ class UAV
 {
 public:
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
-
-	virtual void Free(void) override;
 };
 
 // =================================================================================================
