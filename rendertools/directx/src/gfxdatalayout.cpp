@@ -242,7 +242,7 @@ void GfxDataLayout::Disable(void) noexcept
 
 
 CommandList* GfxDataLayout::StartUpdate(void) noexcept {
-    m_updateList = static_cast<CommandList*>(baseRenderer.StartOperation("GfxDataLayout::Update"));
+    m_updateList = static_cast<CommandList*>(baseRenderer.StartOperation("GfxDataLayout::Update", false));
     return m_updateList;
 }
 
