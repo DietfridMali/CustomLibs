@@ -4,6 +4,9 @@
   <PropertyGroup Label="UserMacros">
     <ExternalLibs>$(ProjectDir)..\..\..\..\External\</ExternalLibs>
     <CustomLibs>$(ProjectDir)\..\..\..\..\Custom\</CustomLibs>
+    <SteamSDK>$(ExternalLibs)steam\sdk\public\steam</SteamSDK>
+    <VulkanSDK>$(ExternalLibs)VulkanSDK\1.4.341.1</VulkanSDK>
+    <VULKAN_SDK>$(VulkanSDK)</VULKAN_SDK>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />
@@ -13,6 +16,16 @@
     </BuildMacro>
     <BuildMacro Include="CustomLibs">
       <Value>$(CustomLibs)</Value>
+    </BuildMacro>
+    <BuildMacro Include="SteamSDK">
+      <Value>$(SteamSDK)</Value>
+    </BuildMacro>
+    <BuildMacro Include="VulkanSDK">
+      <Value>$(VulkanSDK)</Value>
+    </BuildMacro>
+    <BuildMacro Include="VULKAN_SDK">
+      <Value>$(VULKAN_SDK)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
   </ItemGroup>
 </Project>
