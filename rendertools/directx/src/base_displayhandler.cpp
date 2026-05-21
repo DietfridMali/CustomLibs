@@ -187,8 +187,11 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
             return false;
         }
         RTV& rtv = m_rtvs[i];
-        // Allocate or reuse RTV descriptor slot
-        if (not (rtv.IsValid() or rtv.Create(m_backBuffers[i].Get(), BACK_BUFFER_FORMAT), D3D12_RTV_DIMENSION_TEXTURE2D))
+        // A resize replaces the back buffer resources — free any stale
+        // descriptor and rebuild the RTV for the new back buffer.
+        if (rtv.IsValid())
+            rtv.Free();
+        if (not rtv.Create(m_backBuffers[i].Get(), BACK_BUFFER_FORMAT))
             return false;
         m_backBufferStates[i] = D3D12_RESOURCE_STATE_PRESENT;
     }
