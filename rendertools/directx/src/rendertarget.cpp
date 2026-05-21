@@ -135,10 +135,11 @@ void BufferInfo::FreeUAV(void) {
 
 
 void BufferInfo::Release(void) {
-    descriptorHeaps.FreeRTV(m_rtv.Handle());
+    gfxResourceHandler.Track(m_rtv.Handle());   // deferred FreeRTV (after the fence)
     descriptorHeaps.FreeSRV(m_srv.Handle());
     descriptorHeaps.FreeDSV(m_dsv.Handle());
     descriptorHeaps.FreeSRV(m_uav.Handle());
+    gfxResourceHandler.Track(m_resource);
     Init();
 }
 
@@ -347,8 +348,10 @@ void RenderTarget::Destroy(void)
         m_cmdList->Close();
         m_cmdList = nullptr;
     }
-    for (int i = 0; i < m_bufferCount; ++i)
+    for (int i = 0; i < m_bufferCount; ++i) {
         m_bufferInfo[i].Release();
+        gfxStates.CheckError();
+    }
     m_isAvailable = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
