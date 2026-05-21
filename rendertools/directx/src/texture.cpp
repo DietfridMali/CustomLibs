@@ -337,8 +337,10 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
 
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
 {
-    if (not Create())
+    if (not Create()) {
+        SDL_FreeSurface(surface);
         return false;
+    }
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
     m_isDisposable = params.isDisposable;
     return Deploy();

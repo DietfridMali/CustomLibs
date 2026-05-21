@@ -145,10 +145,10 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool
             FlipSurface(source);
         else
             memcpy(m_data.Data(), source->pixels, m_info.m_dataSize);
-        SDL_FreeSurface(source);
         if (premultiply)
             Premultiply();
     }
+    SDL_FreeSurface(source);
     return *this;
 }
 
