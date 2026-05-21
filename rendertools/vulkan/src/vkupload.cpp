@@ -176,8 +176,7 @@ bool UploadSubresource(VkCommandBuffer cb, VkImage dstImage, ImageLayoutTracker&
     copy.imageOffset = { 0, 0, 0 };
     copy.imageExtent = { uint32_t(width), uint32_t(height), 1 };
 
-    vkCmdCopyBufferToImage(cb, outStaging.buffer, dstImage,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    vkCmdCopyBufferToImage(cb, outStaging.buffer, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
     if (addBarrier)
         tracker.ToShaderInput(cb);
@@ -202,26 +201,24 @@ bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
         return false;
 
     VkStagingBuffer stagings[6] { };
-    bool ok = true;
+    bool success = true;
     for (int i = 0; i < faceCount; ++i) {
-        if (not UploadSubresource(cmd.cb, dstImage, tracker, uint32_t(i),
-                                  faces[i], width, height, channels,
-                                  stagings[i], /*addBarrier=*/false)) {
-            ok = false;
+        if (not UploadSubresource(cmd.cb, dstImage, tracker, uint32_t(i), faces[i], width, height, channels, stagings[i], /*addBarrier=*/false)) {
+            success = false;
             break;
         }
     }
 
-    if (ok)
+    if (success)
         tracker.ToShaderInput(cmd.cb);
 
     if (not EndSingleTimeCommands(cmd))
-        ok = false;
+        success = false;
 
     for (int i = 0; i < faceCount; ++i)
         stagings[i].Destroy();
 
-    return ok;
+    return success;
 }
 
 // =================================================================================================
