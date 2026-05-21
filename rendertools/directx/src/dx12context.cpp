@@ -28,7 +28,7 @@ bool DX12Context::SelectAdapter(void) noexcept {
 
 
 bool DX12Context::Create(bool enableDebugLayer) noexcept {
-#ifdef _DEBUG
+#if DBG_DIRECTX
     if (enableDebugLayer) {
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&m_debugController))))
             m_debugController->EnableDebugLayer();
@@ -59,7 +59,7 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
         return false;
     }
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     if (enableDebugLayer) {
         if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&m_infoQueue)))) {
             // All severity breaks disabled — DrainMessages() after each Execute prints everything.
@@ -74,7 +74,7 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
 
 // =================================================================================================
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
 void DX12Context::DumpDRED(void) noexcept {
     if (not m_device)
         return;
@@ -135,7 +135,7 @@ int DX12Context::DrainMessages(bool onlyErrors) noexcept {
             sev = "WARNING";
         CommandList* cl = commandListHandler.CurrentCmdList();
         // split to make debugging real errors easier
-#ifdef _DEBUG
+#if DBG_DIRECTX
         if ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING)) {
             if (not onlyErrors and (unsigned)msg->ID != 820)
                 fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);

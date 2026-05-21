@@ -49,24 +49,19 @@ void GfxResourceHandler::Track(ComPtr<ID3D12Resource> resource) noexcept {
 void GfxResourceHandler::Track(const DescriptorHandle& rtvHandle) noexcept {
     if (not rtvHandle.IsValid())
         return;
-    const int fi = commandListHandler.FrameIndex();
-    if ((fi < 0) or (fi >= m_frameRTVs.Length()))
-        return;
-    m_frameRTVs[fi].Push(rtvHandle);
+    m_frameRTVs[commandListHandler.FrameIndex()].Push(rtvHandle);
 }
 
 
 void GfxResourceHandler::Cleanup(int frameIndex, bool waitIdle) noexcept {
-#ifdef _DEBUG
-    if ((frameIndex < 0) or (frameIndex >= m_frameRTVs.Length()))
-        return;
-#endif
     if (waitIdle)
         commandListHandler.CmdQueue().WaitIdle();
     RTVArray& rtvs = m_frameRTVs[frameIndex];
-    for (int i = rtvs.Length(); i > 0; ) {
-        --i;
-        descriptorHeaps.FreeRTV(rtvs[i]);
+    for(auto& rtv : rtvs) {
+        descriptorHeaps.FreeRTV(rtv);
+#if DBG_DIRECTX
+        descriptorHeaps.m_rtvHeap.SetOwner(rtv.GetIndex(), {});
+#endif
     }
     rtvs.Clear();
     m_frameResources[frameIndex].Clear();

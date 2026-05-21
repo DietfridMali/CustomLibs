@@ -250,7 +250,7 @@ void GfxStates::ClearError(void) noexcept {
 
 
 bool GfxStates::CheckError(const char* operation) noexcept {
-#ifdef _DEBUG
+#if DBG_DIRECTX
     if (dx12Context.DrainMessages(false) > 0)
         return false;
 #endif

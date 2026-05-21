@@ -15,6 +15,7 @@
 #include "rendertarget.h"
 #include "drawbufferhandler.h"
 #include "framecounter.h"
+#include "commandlist.h"
 #include "base_renderer.h"
 
 // =================================================================================================
@@ -54,7 +55,12 @@ public:
 
     virtual bool InitGraphics(void) override;
 
-    virtual void* StartOperation(String name, bool piggyback = true) noexcept override;
+    virtual void* StartOperation(String name = "", bool piggyback = true) noexcept override;
+
+    virtual bool StartOperation(void** cl, String name = "", bool piggyback = true) noexcept override {
+        *cl = StartOperation(name, piggyback);
+        return *cl != nullptr;
+    }
 
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
 

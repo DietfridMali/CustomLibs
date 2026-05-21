@@ -98,8 +98,8 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 	if (not m_skybox)
 		return false;
 
-	void* cl = baseRenderer.StartOperation("skybox");
-	if (not baseRenderer.HasOpenGL() and not cl)
+	void* cl;
+	if (not baseRenderer.StartOperation(&cl, "skybox"))
 		return false;
 	gfxStates.SetFaceCulling(0);
 	gfxStates.SetDepthWrite(0);

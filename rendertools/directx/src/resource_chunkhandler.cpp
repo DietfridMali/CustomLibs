@@ -24,7 +24,7 @@ ComPtr<ID3D12Resource> GfxDataChunkList::Update(size_t dataSize, const char* own
     }
     else if (m_chunks[m_usedChunks]->GetDesc().Width < dataSize) {
         updateResource = 2;
-#ifdef _DEBUG
+#if DBG_DIRECTX
 		fprintf(stderr, "GfxDataChunkList::Update: chunk %d for command '%s' (execId=%llu) is too small (%llu bytes), reallocating\n",
 			m_usedChunks, ownerName, execId, (unsigned long long)m_chunks[m_usedChunks]->GetDesc().Width);
 #endif
@@ -42,7 +42,7 @@ ComPtr<ID3D12Resource> GfxDataChunkList::Update(size_t dataSize, const char* own
                 m_chunks.Pop();
             return nullptr;
         }
-#ifdef _DEBUG
+#if DBG_DIRECTX
         char name[128];
         snprintf(name, sizeof(name), "GfxDataChunk[%s, %s, %llu]", ownerName, type, execId);
         m_chunks[m_usedChunks]->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);

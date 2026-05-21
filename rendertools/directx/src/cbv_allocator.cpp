@@ -29,7 +29,7 @@ bool CbvLinearAllocator::AllocFrame(ID3D12Device* device, UINT frameIdx, UINT ca
         fprintf(stderr, "CbvLinearAllocator: CreateCommittedResource[%u] failed (hr=0x%08X)\n", frameIdx, (unsigned)hr);
         return false;
     }
-#ifdef _DEBUG
+#if DBG_DIRECTX
     char name[64];
     snprintf(name, sizeof(name), "CbvLinearAllocator[%u]", frameIdx);
     f.resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);

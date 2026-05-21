@@ -60,7 +60,7 @@ bool CommandQueue::Create(ID3D12Device* device, const String& name) noexcept {
 
     if (not cbvAllocator.Create(device))
         return false;
-#ifdef _DEBUG
+#if DBG_DIRECTX
     if (not name.IsEmpty())
         m_queue->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
 #endif
@@ -114,7 +114,7 @@ void CommandQueue::WaitIdle(void) noexcept {
         m_fence->SetEventOnCompletion(value, m_fenceEvent);
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
-#ifdef _DEBUG
+#if DBG_DIRECTX
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
         fprintf(stderr, "CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
@@ -147,7 +147,7 @@ bool CommandList::Create(ID3D12Device* device, const String& name, bool isTempor
     }
     m_gfxListPtr->Close();
     m_id = commandListHandler.m_cmdListId++;
-#ifdef _DEBUG
+#if DBG_DIRECTX
     if (not name.IsEmpty())
         m_gfxListPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
 #endif
@@ -204,7 +204,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
 #endif
     if (saveRenderStates)
         PushRenderStates();
-#ifdef _DEBUG
+#if DBG_DIRECTX
     gfxStates.CheckError();
 #endif
     return true;
@@ -223,7 +223,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
     HRESULT hr = m_gfxListPtr->Close();
     if (FAILED(hr))
         fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
-#ifdef _DEBUG
+#if DBG_DIRECTX
     gfxStates.CheckError();
 #endif
     commandListHandler.PopCmdList();
@@ -243,7 +243,7 @@ void CommandList::Flush(void) noexcept {
     ID3D12CommandList* lists[] = { GfxList(true) };
     commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     CheckDeviceRemoved("Flush");
 #endif
     // No synchronous WaitIdle: descriptor slots that depend on this list's completion are
@@ -275,7 +275,7 @@ void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES bef
     b.Transition.StateAfter = after;
     b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     m_gfxListPtr->ResourceBarrier(1, &b);
-#ifdef _DEBUG
+#if DBG_DIRECTX
     gfxStates.CheckError();
 #endif
 }
@@ -285,7 +285,7 @@ void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
     if (not m_isRecording or not barriers or (count <= 0))
         return;
     m_gfxListPtr->ResourceBarrier(UINT(count), barriers);
-#ifdef _DEBUG
+#if DBG_DIRECTX
     gfxStates.CheckError();
 #endif
 }
@@ -323,7 +323,7 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
         m_gfxListPtr->SetPipelineState(pso);
         m_gfxListPtr->SetGraphicsRootSignature(shader->GetRootSignature().Get());
         m_activePSO = pso;
-#ifdef _DEBUG
+#if DBG_DIRECTX
         gfxStates.CheckError();
 #endif
     }
@@ -338,7 +338,7 @@ ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
 }
 
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
 void CommandList::CheckDeviceRemoved(const char* context) noexcept {
     gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
@@ -353,7 +353,7 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept {
 // =================================================================================================
 // CommandListHandler
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
 bool CommandListHandler::m_logCalls = false;
 #endif
 
@@ -431,7 +431,7 @@ void CommandListHandler::PopCmdList(void) noexcept {
 void CommandListHandler::Register(CommandList* cl) noexcept {
     if (not cl)
         return;
-#ifdef _DEBUG
+#if DBG_DIRECTX
 	if (cl->m_name.IsEmpty())
         fprintf(stderr, "CommandListHandler::Register: Unnamed command list\n");
 #endif
@@ -468,7 +468,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
 #endif
     if (n > 0)
         m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.Data());
-#ifdef _DEBUG
+#if DBG_DIRECTX
     gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {

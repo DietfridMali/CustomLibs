@@ -361,8 +361,13 @@ public:
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-    virtual void* StartOperation(String name, bool piggyback = true) noexcept {
+    virtual void* StartOperation(String name = "", bool piggyback = true) noexcept {
         return nullptr; 
+    }
+
+    virtual bool StartOperation(void** cl, String name = "", bool piggyback = true) noexcept {
+        *cl = nullptr;
+        return true;
     }
 
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept {

@@ -193,6 +193,9 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
             rtv.Free();
         if (not rtv.Create(m_backBuffers[i].Get(), BACK_BUFFER_FORMAT))
             return false;
+#ifdef _DEBUG
+        descriptorHeaps.m_rtvHeap.SetOwner(rtv.GetIndex(), std::source_location::current());
+#endif
         m_backBufferStates[i] = D3D12_RESOURCE_STATE_PRESENT;
     }
     return true;

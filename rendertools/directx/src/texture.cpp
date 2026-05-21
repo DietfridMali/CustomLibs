@@ -199,8 +199,10 @@ void Texture::SetParams(bool forceUpdate)
 bool Texture::CreateTextureResource(int w, int h, int arraySize)
 {
     ID3D12Device* device = dx12Context.Device();
-    if (not device)
+    if (not device) {
+        fprintf(stderr, "Texture::CreateTextureResource: no D3D12 device\n");
         return false;
+    }
 
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
@@ -214,8 +216,19 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize)
     rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
     HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource));
-    if (FAILED(hr))
+    if (FAILED(hr)) {
+        fprintf(stderr, "Texture::CreateTextureResource: CreateCommittedResource failed"
+                        " (name='%s', %dx%d, arraySize=%d, R8G8B8A8_UNORM, hr=0x%08X)\n",
+                (const char*)m_name, w, h, arraySize, (unsigned)hr);
+        HRESULT removed = device->GetDeviceRemovedReason();
+        if (FAILED(removed)) {
+            fprintf(stderr, "  device removed (reason=0x%08X) - earlier GPU work faulted\n", (unsigned)removed);
+#if DBG_DIRECTX
+            dx12Context.DumpDRED();
+#endif
+        }
         return false;
+    }
 #ifdef _DEBUG
     char name[128];
     snprintf(name, sizeof(name), "Texture[%s]", (const char*)m_name);

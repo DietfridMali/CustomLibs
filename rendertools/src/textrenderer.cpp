@@ -195,14 +195,10 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
 
         if (not renderTarget) {
 #if 1
-            if (baseRenderer.HasOpenGL())
+            void* cl;
+            if (baseRenderer.StartOperation(&cl, text)) {
                 RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
-            else {
-                void* cl = baseRenderer.StartOperation(text);
-                if (cl) {
                 baseRenderer.FinishOperation(cl);
-                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
-                }
             }
 #endif
         }

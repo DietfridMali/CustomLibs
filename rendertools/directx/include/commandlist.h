@@ -9,7 +9,7 @@
 #include "dx12framework.h"
 #include <functional>
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
 #include <source_location>
 #include <cstdio>
 #endif
@@ -159,7 +159,7 @@ public:
     // state and only needs to be issued once after Open() — the flag is cleared there.
     void BindDescriptorHeaps(void) noexcept;
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     void CheckDeviceRemoved(const char* context) noexcept;
 #endif
 };
@@ -265,10 +265,10 @@ public:
     // Caller owns the memory for non-temporary lists.
     // Set to true to print every logged GPU call (DrawInstanced etc.) with file/line to stderr.
     // Defaults to false to avoid flooding the output in normal operation.
-#ifdef _DEBUG
+#if DBG_DIRECTX
     static bool m_logCalls;
 #endif
-#ifdef _DEBUG
+#if DBG_DIRECTX
     inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
             fprintf(stderr, "[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), loc.line());
@@ -279,7 +279,7 @@ public:
             CurrentGfxList()->DrawInstanced(vtxCount, instCount, startVtx, startInst);
     }
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
             fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), loc.line());
@@ -290,7 +290,7 @@ public:
             CurrentGfxList()->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVtx, startInst);
     }
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION * dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION * src, const D3D12_BOX * srcBox, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
             fprintf(stderr, "[CTR] %s:%u\n", loc.file_name(), loc.line());
@@ -301,7 +301,7 @@ public:
             CurrentGfxList()->CopyTextureRegion(dst, dstX, dstY, dstZ, src, srcBox);
     }
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER* barriers, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
             fprintf(stderr, "[RB]  n=%u  %s:%u\n", numBarriers, loc.file_name(), loc.line());

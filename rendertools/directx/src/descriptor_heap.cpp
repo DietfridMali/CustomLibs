@@ -9,6 +9,7 @@ bool DescriptorHeap::Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE typ
     m_capacity = capacity;
     m_count = 0;
     m_gpuVisible = gpuVisible;
+    m_owners.Resize(capacity);
 
     D3D12_DESCRIPTOR_HEAP_DESC desc{};
     desc.Type = type;
@@ -18,8 +19,7 @@ bool DescriptorHeap::Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE typ
 
     HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap));
     if (FAILED(hr)) {
-        fprintf(stderr, "DescriptorHeap: CreateDescriptorHeap type=%d failed (hr=0x%08X)\n",
-                (int)type, (unsigned)hr);
+        fprintf(stderr, "DescriptorHeap: CreateDescriptorHeap type=%d failed (hr=0x%08X)\n", (int)type, (unsigned)hr);
         return false;
     }
     m_descriptorSize = device->GetDescriptorHandleIncrementSize(type);
@@ -47,8 +47,10 @@ DescriptorHandle DescriptorHeap::Allocate(void) noexcept {
         idx = m_freeList.Pop();
     } else {
         if (m_count >= m_capacity) {
-            fprintf(stderr, "DescriptorHeap: heap full (capacity=%u, type=%d)\n",
-                    m_capacity, (int)m_type);
+#ifdef _DEBUG
+            fprintf(stderr, "DescriptorHeap: heap full (capacity=%u, type=%d)\n", m_capacity, (int)m_type);
+            DumpOwners();
+#endif
             return {};
         }
         idx = m_count++;
@@ -63,10 +65,39 @@ DescriptorHandle DescriptorHeap::Allocate(void) noexcept {
 
 
 void DescriptorHeap::Free(uint32_t index) noexcept {
-    if (m_heap and (index < m_count))
+    if (m_heap and (index < m_count)) {
         m_freeList.Append(index);
+        if (index < uint32_t(m_owners.Length()))
+            m_owners[index] = {};
+    }
 }
 
+
+#if DBG_DIRECTX
+void DescriptorHeap::SetOwner(uint32_t index, const std::source_location& loc) noexcept {
+    if (index < uint32_t(m_owners.Length()))
+        m_owners[index] = loc;
+}
+
+
+void DescriptorHeap::DumpOwners(void) noexcept {
+    uint32_t inUse = m_count - uint32_t(m_freeList.Length());
+    fprintf(stderr, "--- DescriptorHeap type=%d: %u/%u slots in use ---\n", (int)m_type, inUse, m_capacity);
+    for (uint32_t i = 0; i < m_count; ++i) {
+        bool isFree = false;
+        for (uint32_t j = 0; j < uint32_t(m_freeList.Length()); ++j) {
+            if (m_freeList[j] == i) {
+                isFree = true;
+                break;
+            }
+        }
+        if (isFree)
+            continue;
+        const std::source_location& loc = m_owners[i];
+        fprintf(stderr, "  [%u] %s:%u  %s\n", i, loc.file_name(), (unsigned)loc.line(), loc.function_name());
+    }
+}
+#endif
 
 bool DescriptorHeapHandler::Create(ID3D12Device* device) noexcept {
     if (not m_rtvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, RTV_CAPACITY, false))

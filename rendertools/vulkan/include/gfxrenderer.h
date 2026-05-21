@@ -55,6 +55,11 @@ public:
 
     virtual void* StartOperation(String name, bool piggyback = true) noexcept override;
 
+    virtual bool StartOperation(void** cl, String name = "", bool piggyback = true) noexcept override {
+        cl = StartOperation(name, piggyBack);
+        return cl != nullptr;
+    }
+
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
 
     virtual void FlushResources(void) noexcept override;

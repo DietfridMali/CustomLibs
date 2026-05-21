@@ -28,7 +28,7 @@ static Texture* testTexture = nullptr;
 // DX12 Renderer
 
 bool GfxRenderer::InitGraphics(void) {
-#   ifdef _DEBUG
+#   if DBG_DIRECTX
     constexpr bool enableDebugLayer = true;
 #   else
     constexpr bool enableDebugLayer = false;

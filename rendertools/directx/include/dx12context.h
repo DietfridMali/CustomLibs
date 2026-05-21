@@ -15,7 +15,7 @@ public:
     ComPtr<IDXGIAdapter1>       m_adapter;
     D3D_FEATURE_LEVEL           m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     ComPtr<ID3D12Debug>         m_debugController;
     ComPtr<ID3D12InfoQueue>     m_infoQueue;
 #endif
@@ -26,7 +26,7 @@ public:
 
     inline ID3D12Device* Device(void) const noexcept { return m_device.Get(); }
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     // Drains all pending D3D12 InfoQueue messages to stderr.
     int DrainMessages(bool onlyErrors = false) noexcept;
     // Dumps DRED auto-breadcrumbs to stderr after device removal.

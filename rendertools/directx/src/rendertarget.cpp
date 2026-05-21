@@ -87,8 +87,15 @@ void BufferInfo::SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetStat
 }
 
 
-bool BufferInfo::AllocRTV(void) {
+bool BufferInfo::AllocRTV(const std::source_location& loc) {
+#if DBG_DIRECTX
+    if (not m_rtv.Create(m_resource, ViewFormat()))
+        return false;
+    descriptorHeaps.m_rtvHeap.SetOwner(m_rtv.GetIndex(), loc);
+    return true;
+#else
     return m_rtv.Create(m_resource, ViewFormat());
+#endif
 }
 
 
@@ -315,7 +322,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
         return false;
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (not info.RTV().IsValid())
-        if (not info.AllocRTV())
+        if (not info.AllocRTV(m_activateLoc))
             return false;
     info.SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
     return true;
@@ -457,9 +464,10 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 }
 
 
-bool RenderTarget::Activate(const RTActivationParams& params)
+bool RenderTarget::Activate(const RTActivationParams& params, const std::source_location& loc)
 {
     ZoneScoped;
+    m_activateLoc = loc;
     baseRenderer.ActivateDrawBuffer(this);
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
@@ -488,10 +496,12 @@ void RenderTarget::Disable(bool deactivate) noexcept {
         }
         // Hand all allocated RTV slots over to GfxResourceHandler — freed once the slot's GPU
         // work is fenced complete (at next BeginFrame for the same frame slot, or via Flush()).
-        for (int i = 0; i < m_bufferCount; ++i) {
-            if (m_bufferInfo[i].RTV().IsValid()) {
-                gfxResourceHandler.Track(m_bufferInfo[i].RTV().Handle());
-                m_bufferInfo[i].RTV().Handle() = {};
+        if (deactivate) {
+            for (int i = 0; i < m_bufferCount; ++i) {
+                if (m_bufferInfo[i].RTV().IsValid()) {
+                    gfxResourceHandler.Track(m_bufferInfo[i].RTV().Handle());
+                    m_bufferInfo[i].RTV().Handle() = {};
+                }
             }
         }
         m_cmdList->Close(deactivate);

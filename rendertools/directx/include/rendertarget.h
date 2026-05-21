@@ -11,6 +11,8 @@
 #include "drawbufferhandler.h"
 #include "resource_view.h"
 
+#include <source_location>
+
 // =================================================================================================
 // DX12 RenderTarget (Frame Buffer Object)
 //
@@ -56,7 +58,7 @@ public:
 
     void SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState);
 
-    bool AllocRTV(void);
+    bool AllocRTV(const std::source_location& loc = std::source_location::current());
 
     void FreeRTV(void);
 
@@ -182,6 +184,9 @@ public:
     // Own command list — all rendering into this RenderTarget is recorded here.
     CommandList*        m_cmdList{ nullptr };
 
+    // debug: call site of the last Activate(), forwarded to AllocRTV for the RTV-leak diagnostic.
+    std::source_location m_activateLoc{};
+
     // -------------------------------------------------------------------------
 
     RenderTarget();
@@ -202,7 +207,7 @@ public:
             m_cmdList->SetName(name);
     }
 
-    bool Activate(const RTActivationParams& params);
+    bool Activate(const RTActivationParams& params, const std::source_location& loc = std::source_location::current());
 
     bool EnableBuffers(const RTActivationParams& params);
 
