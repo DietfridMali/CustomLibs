@@ -31,6 +31,10 @@ ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(const char* name, s
     ComPtr<ID3D12Resource> resource;
     if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource))))
         return nullptr;
+#if DBG_DIRECTX
+    if (name and name[0])
+        resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
     Track(resource);
     return resource;
 }
