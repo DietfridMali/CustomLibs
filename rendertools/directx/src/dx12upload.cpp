@@ -34,10 +34,10 @@ bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID
     // reset it so the map/copy and the placed-footprint source location are both at offset 0.
     layout.Offset = 0;
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     char name[128];
     snprintf(name, sizeof(name), "Texture Subresource[%d,%d]", width, height);
-    outUpload = gfxResourceHandler.GetUploadResource("", size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
+    outUpload = gfxResourceHandler.GetUploadResource(name, size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
 #else
     outUpload = gfxResourceHandler.GetUploadResource("", size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
 #endif
@@ -117,7 +117,7 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
     ComPtr<ID3D12Resource> resource;
     if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resource))))
         return nullptr;
-#ifdef _DEBUG
+#if DBG_DIRECTX
     char name[128];
     snprintf(name, sizeof(name), "Texture3D - resource[%d,%d]", w, h);
     resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
@@ -129,7 +129,7 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
     UINT64 rowSize = 0;
     device->GetCopyableFootprints(&rd, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
 
-#ifdef _DEBUG
+#if DBG_DIRECTX
     snprintf(name, sizeof(name), "Texture3D - upload[%d,%d]", w, h);
     ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource(name, size_t(uploadSize));
 #else

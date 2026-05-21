@@ -335,7 +335,7 @@ private:
 
         if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
-#ifdef _DEBUG
+#if DBG_DIRECTX
         char name[128];
         snprintf(name, sizeof(name), "NoiseTexture[%s]", (const char*) m_name   );
         m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);

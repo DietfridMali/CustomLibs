@@ -174,7 +174,7 @@ bool NoiseTexture3D::Deploy(int) {
     m_resource = Upload3DTextureData(device, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, fmt, stride, m_data.Data());
     if (not m_resource)
         return false;
-#ifdef _DEBUG
+#if DBG_DIRECTX
     char name[128];
     snprintf(name, sizeof(name), "NoiseTexture3D[%s]", (const char*)m_name);
     m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);

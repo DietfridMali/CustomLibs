@@ -227,7 +227,7 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize)
         }
         return false;
     }
-#ifdef _DEBUG
+#if DBG_DIRECTX
     char name[128];
     snprintf(name, sizeof(name), "Texture[%s]", (const char*)m_name);
     m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);

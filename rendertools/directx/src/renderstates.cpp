@@ -171,7 +171,7 @@ PSO::psoPtr_t PSO::GetPSO(Shader* shader) noexcept
     PSO::PSOComPtr psoComPtr = CreatePSO(shader);
     if (psoComPtr) {
         psoPtr_t psoPtr = psoComPtr.Get();
-#ifdef _DEBUG
+#if DBG_DIRECTX
         String psoName = String("shader:") + shader->m_name;
         psoComPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)psoName.Length(), (const char*)psoName);
 #endif

@@ -105,7 +105,7 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
 
 
 bool GfxDataBuffer::Create(int slot, size_t dataSize) {
-#ifdef _DEBUG
+#if DBG_DIRECTX
     char name[128];
     snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] slot %d", m_type, m_id, slot);
     m_resource[slot] = gfxResourceHandler.GetUploadResource(name, dataSize);
