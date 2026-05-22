@@ -41,7 +41,7 @@ ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(const char* name, s
 
 
 void GfxResourceHandler::Track(ComPtr<ID3D12Resource> resource) noexcept {
-    if (not resource)
+    if (s_shutdown or not resource)
         return;
     const int fi = commandListHandler.FrameIndex();
     if ((fi < 0) or (fi >= m_frameResources.Length()))
@@ -51,13 +51,17 @@ void GfxResourceHandler::Track(ComPtr<ID3D12Resource> resource) noexcept {
 
 
 void GfxResourceHandler::Track(const DescriptorHandle& handle) noexcept {
-    if (not handle.IsValid())
+    if (s_shutdown or not handle.IsValid())
         return;
     m_frameDescriptors[commandListHandler.FrameIndex()].Push(handle);
 }
 
 
 void GfxResourceHandler::Cleanup(int frameIndex, bool waitIdle) noexcept {
+    // Teardown started — the descriptor heaps may already be gone, so a per-slot Free() would
+    // dereference a dangling heap. Nothing to drain anyway (Track() is inert past this point).
+    if (s_shutdown)
+        return;
     if (waitIdle)
         commandListHandler.CmdQueue().WaitIdle();
     DescriptorArray& descriptors = m_frameDescriptors[frameIndex];
@@ -65,6 +69,12 @@ void GfxResourceHandler::Cleanup(int frameIndex, bool waitIdle) noexcept {
         h.m_heap->Free(h.index);   // each handle frees itself into its own heap (clears m_owners too)
     descriptors.Clear();
     m_frameResources[frameIndex].Clear();
+}
+
+
+void GfxResourceHandler::CleanupAll(void) noexcept {
+    for (int i = 0; i < m_frameDescriptors.Length(); ++i)
+        Cleanup(i, false);
 }
 
 // =================================================================================================

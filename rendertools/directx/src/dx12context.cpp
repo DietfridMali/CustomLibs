@@ -109,6 +109,7 @@ void DX12Context::DumpDRED(void) noexcept {
 
 
 void DX12Context::QueryVRAM(void) noexcept {
+#if 0
     // Throttle to ~1/s — querying per frame is cheap, printing per frame spams.
     static std::chrono::steady_clock::time_point lastPrint{};
     auto now = std::chrono::steady_clock::now();
@@ -123,12 +124,12 @@ void DX12Context::QueryVRAM(void) noexcept {
         return;
     adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &nonLocal);
     lastPrint = now;
-
     const double toMB = 1.0 / (1024.0 * 1024.0);
     fprintf(stderr, "VRAM local: usage=%.0f / budget=%.0f MB%s | nonlocal usage=%.0f MB\n",
         double(local.CurrentUsage) * toMB, double(local.Budget) * toMB,
         (local.CurrentUsage > local.Budget) ? "  <-- OVER BUDGET" : "",
         double(nonLocal.CurrentUsage) * toMB);
+#endif
 }
 
 

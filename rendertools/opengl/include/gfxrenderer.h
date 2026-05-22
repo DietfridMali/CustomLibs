@@ -53,6 +53,10 @@ public:
 
     virtual void* StartOperation(String name, bool piggyback = true) noexcept override;
 
+    virtual bool StartOperation(void** cl, String name, bool piggyback = true) noexcept override {
+        return BaseRenderer::StartOperation(cl, name, piggyback);
+    }
+
     virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
 
     inline void Draw3DScene(void) noexcept {

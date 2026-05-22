@@ -115,9 +115,13 @@ void GfxRenderer::FlushResources(void) noexcept {
 
 
 void GfxRenderer::Cleanup(void) noexcept {
-    // Flush all in-flight GPU work before releasing any resources, then tear down the
-    // command-list handler (releases pools, fence, all tracked resources).
+    // Flush all in-flight GPU work, then drain the deferred-release queue once while the
+    // descriptor heaps are still alive. BeginShutdown() makes any further Track()/Cleanup()
+    // inert — RenderTargets destroyed later (incl. at static destruction) must not touch the
+    // deferred mechanism, whose singletons may already be gone.
     commandListHandler.CmdQueue().WaitIdle();
+    gfxResourceHandler.CleanupAll();
+    GfxResourceHandler::BeginShutdown();
     meshHandler.Destroy();
     commandListHandler.Destroy();
 }

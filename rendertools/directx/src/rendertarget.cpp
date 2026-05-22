@@ -135,6 +135,15 @@ void BufferInfo::FreeUAV(void) {
 
 
 void BufferInfo::Release(void) {
+    // During graphics teardown the descriptor heaps are destroyed wholesale and the
+    // gfxResourceHandler singleton may already be gone (RenderTargets die at static
+    // destruction). Skip deferred tracking entirely — Init() drops the resource ref
+    // immediately (GPU is idle) and clears the handles; the heap slots are reclaimed
+    // when the descriptor heaps themselves are destroyed.
+    if (GfxResourceHandler::IsShuttingDown()) {
+        Init();
+        return;
+    }
     // All descriptors and the resource go through deferred release — in-flight command lists
     // may still reference them; gfxResourceHandler frees them once the frame fence has signalled.
     gfxResourceHandler.Track(m_rtv.Handle());

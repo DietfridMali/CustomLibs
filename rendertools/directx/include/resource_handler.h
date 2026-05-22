@@ -30,10 +30,27 @@ private:
     AutoArray<ResourceArray>    m_frameResources;
     AutoArray<DescriptorArray>         m_frameDescriptors;
 
+    // Set once renderer teardown begins. From then on Track()/Cleanup() are inert: the descriptor
+    // heaps are destroyed wholesale at program exit, so per-slot deferred frees during teardown are
+    // both unnecessary and unsafe (RenderTargets die at static destruction, racing the singletons
+    // this mechanism depends on). static — readable even after the singleton itself is gone.
+    static inline bool          s_shutdown{ false };
+
 public:
     // Resize per-slot arrays to match commandListHandler.FrameCount(). Idempotent — safe to call
     // multiple times.
     void Init(int frameCount) noexcept;
+
+    // Marks the start of graphics teardown — see s_shutdown. After this, deferred release is a
+    // no-op and BufferInfo::Release drops descriptors directly. static so it is safe to query
+    // during static-destruction order races.
+    static void BeginShutdown(void) noexcept { s_shutdown = true; }
+
+    static bool IsShuttingDown(void) noexcept { return s_shutdown; }
+
+    // Drain every frame slot at once — called from renderer shutdown while the descriptor heaps
+    // are still alive, before BeginShutdown().
+    void CleanupAll(void) noexcept;
 
     ComPtr<ID3D12Resource> GetUploadResource(const char* name, size_t dataSize);
 
