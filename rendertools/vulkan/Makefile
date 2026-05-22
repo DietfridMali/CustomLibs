@@ -28,6 +28,7 @@ VULKAN_FILES := \
  blur_shader \
  cbv_allocator \
  commandlist \
+ compute_shader \
  cubemap \
  descriptor_pool_handler \
  gfx_buffer \
