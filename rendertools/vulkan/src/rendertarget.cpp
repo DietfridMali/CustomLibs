@@ -642,14 +642,14 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     // PushViewport must run BEFORE Enable(): Enable() issues a bare SetViewport() to the RT's own
     // viewport, so the push has to capture the caller's viewport first — otherwise Deactivate's
     // PopViewport restores the RT viewport instead of the caller's, leaking it.
-    baseRenderer.PushViewport();
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
-        baseRenderer.PopViewport();
         return false;
     }
     if (params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;
+    baseRenderer.PushViewport();
+    SetViewport(true);
     return true;
 }
 

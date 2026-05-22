@@ -391,6 +391,8 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     if (not m_isAvailable)
         fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
+    baseRenderer.PushViewport();
+    SetViewport(true);
     return true;
 }
 
@@ -401,8 +403,6 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     if (not Enable(params))
         return false;
     baseRenderer.ActivateDrawBuffer(this);
-    baseRenderer.PushViewport();
-    SetViewport(true);
     Clear(params);
     return true;
 }
@@ -424,13 +424,13 @@ void RenderTarget::Disable(bool /*deactivate*/) noexcept {
         m_drawBufferGroup = dbNone;
         gfxStates.CheckError();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        baseRenderer.PopViewport();
     }
 }
 
 
 void RenderTarget::Deactivate(void) noexcept {
     baseRenderer.DeactivateDrawBuffer(this);
-    baseRenderer.PopViewport();
 }
 
 
