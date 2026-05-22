@@ -621,8 +621,6 @@ bool RenderTarget::Enable(const RTActivationParams& params)
         if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
             return false;
     }
-    SetViewport();
-
     // Layout transitions in EnableBuffers must happen outside any active vkCmdBeginRendering
     // scope (Vulkan forbids vkCmdPipelineBarrier2 with image-memory barriers inside a render
     // pass instance). On re-activate of an already-active RT (e.g. ping-pong in
@@ -641,12 +639,15 @@ bool RenderTarget::Enable(const RTActivationParams& params)
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
     baseRenderer.ActivateDrawBuffer(this);
+    // PushViewport must run BEFORE Enable(): Enable() issues a bare SetViewport() to the RT's own
+    // viewport, so the push has to capture the caller's viewport first — otherwise Deactivate's
+    // PopViewport restores the RT viewport instead of the caller's, leaking it.
+    baseRenderer.PushViewport();
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
+        baseRenderer.PopViewport();
         return false;
     }
-    baseRenderer.PushViewport();
-    SetViewport();
     if (params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;
     return true;

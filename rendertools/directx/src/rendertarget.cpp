@@ -470,8 +470,6 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
         if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
             return false;
     }
-    SetViewport();
-
     if (not EnableBuffers(params))
         return false;
     return true;
@@ -483,11 +481,15 @@ bool RenderTarget::Activate(const RTActivationParams& params, const std::source_
     ZoneScoped;
     m_activateLoc = loc;
     baseRenderer.ActivateDrawBuffer(this);
+    // PushViewport must run BEFORE Enable(): Enable() issues a bare SetViewport() to the RT's own
+    // viewport, so the push has to capture the caller's viewport first — otherwise Deactivate's
+    // PopViewport restores the RT viewport instead of the caller's, leaking it.
+    baseRenderer.PushViewport();
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
+        baseRenderer.PopViewport();
         return false;
     }
-    baseRenderer.PushViewport();
     SetViewport();
     Clear(params);
     if (params.reactivate)
