@@ -87,7 +87,7 @@
       <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VulkanSDK)\Include;$(VulkanSDK)\Source\SPIRV-Reflect;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>None</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
