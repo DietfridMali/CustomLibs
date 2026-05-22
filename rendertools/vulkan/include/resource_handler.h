@@ -63,12 +63,16 @@ public:
         if (frameIndex >= FRAME_COUNT)
             return;
         m_frameIndex = frameIndex;
-        auto& list = m_cleanupCallbacks[frameIndex];
-        for (auto& cb : list) {
+        // Move the pending list out before firing callbacks: a callback may re-enter
+        // TrackCleanup (e.g. GfxBuffer::Destroy), which would Append into this very list and
+        // invalidate the range-for iterators. Re-entrant registrations land in the now-empty
+        // member slot and fire on the next sweep.
+        AutoArray<std::function<void()>> cbs = std::move(m_cleanupCallbacks[frameIndex]);
+        m_cleanupCallbacks[frameIndex].Clear();
+        for (auto& cb : cbs) {
             if (cb)
                 cb();
         }
-        list.Clear();
     }
 
     inline uint32_t FrameIndex(void) const noexcept { return m_frameIndex; }
