@@ -19,6 +19,13 @@ public:
     String GetLanAddress(void);
 
     uint32_t QueryDate(int timeout);
+
+    static constexpr uint16_t NtpServerPort = 123;
+    static constexpr int NtpRequestSize = 48;
+
+    static void BuildNtpRequest(uint8_t* buf, int len);
+
+    static uint32_t ParseNtpDate(const uint8_t* buf, int len);
 };
 
 
