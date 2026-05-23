@@ -488,12 +488,11 @@ bool RenderTarget::Activate(const RTActivationParams& params, const std::source_
         baseRenderer.DeactivateDrawBuffer(this);
         return false;
     }
-    SetViewport();
     Clear(params);
     if (params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;
     baseRenderer.PushViewport();
-    SetViewport(true);
+    SetViewport();
     return true;
 }
 
