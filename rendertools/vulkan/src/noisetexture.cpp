@@ -351,6 +351,9 @@ bool CloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String n
 void CloudNoiseTexture::Compute(String textureFolder) {
     CloudNoise generator;
 
+#define Amp
+#define Amp2
+
 #if 1
     m_params.normalize = 1 + 2 + 4 + 8;
     NoiseTexture3D rgbaNoise;
