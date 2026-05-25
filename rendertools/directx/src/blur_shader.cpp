@@ -118,9 +118,9 @@ const ShaderSource& FxaaShader() {
 
 // -------------------------------------------------------------------------------------------------
 // Separable Gaussian blur with per-shader kernel (up to 33 taps).
-// 'coeffs' packs 4 coefficients per float4; C++ must upload as 9 × float4.
+// HLSL pads scalar arrays to 16-byte slots; the C++ SetFloatArray setter emits padded uploads.
 // ShaderConstants: vsOffset, direction (0=horiz,1=vert), radius (half-kernel size),
-//                  texelSize, coeffs[9].
+//                  texelSize, coeffs[33].
 const ShaderSource& GaussBlurShader() {
     static const ShaderSource gaussBlurShader(
         "gaussblur",
@@ -133,7 +133,7 @@ const ShaderSource& GaussBlurShader() {
                 float  _pad0;
                 float2 texelSize;
                 float2 _pad1;
-                float4 coeffs[9];   // 36 coefficients; coeffs[i] = coeffs[i/4][i%4]
+                float  coeffs[33];
             };
             Texture2D    surface : register(t0);
             SamplerState s0      : register(s0);
@@ -142,24 +142,13 @@ const ShaderSource& GaussBlurShader() {
                 float3 fragPos   : TEXCOORD0;
                 float2 fragCoord : TEXCOORD1;
             };
-            float GetCoeff(int i) {
-                float4 v = coeffs[i >> 2];
-                int r = i & 3;
-                if (r == 0) 
-                    return v.x;
-                if (r == 1) 
-                    return v.y;
-                if (r == 2) 
-                    return v.z;
-                return v.w;
-            }
             float4 PSMain(PSInput i) : SV_Target {
                 float2 scrollDir = float2(1.0 - direction, direction);
                 float4 sum = (float4)0;
                 int n = 2 * radius + 1;
                 for (int k = 0; k < n; ++k) {
                     float2 coord = i.fragCoord + scrollDir * float(k - radius) * texelSize;
-                    sum += surface.Sample(s0, coord) * GetCoeff(k);
+                    sum += surface.Sample(s0, coord) * coeffs[k];
                 }
                 return float4(sum.rgb, sum.a);
             }

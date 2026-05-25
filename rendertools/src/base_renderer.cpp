@@ -200,7 +200,8 @@ void BaseRenderer::Draw3DScene(bool flipVertically) {
         else {
             PushMatrix();
             Translate(0.5, 0.5, 0);
-            Scale(1, -1, 1);
+            if (HasOpenGL())
+                Scale(1, -1, 1); // flip vertically
             if (not (shader = LoadPostEffectShader()))
                 PopMatrix();
         }

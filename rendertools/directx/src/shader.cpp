@@ -782,19 +782,42 @@ int Shader::SetMatrix3f(const char* name, float* data, bool /*transpose*/) noexc
 }
 
 
+// HLSL cbuffer rules pad every element of a scalar or short-vector array to a 16-byte slot.
+// The Set*Array helpers therefore build a padded staging buffer (4 floats per element) before
+// dispatching to SetB1Field. SetVector4fArray needs no padding (16 bytes per element already).
 int Shader::SetFloatArray(const char* name, const float* data, size_t length) noexcept
 {
-    return SetB1Field(name, data, length * sizeof(float));
+    if (length == 0)
+        return -1;
+    std::vector<float> padded(length * 4, 0.0f);
+    for (size_t i = 0; i < length; ++i)
+        padded[i * 4] = data[i];
+    return SetB1Field(name, padded.data(), length * 4 * sizeof(float));
 }
 
 int Shader::SetVector2fArray(const char* name, const Vector2f* data, int length) noexcept
 {
-    return SetB1Field(name, data, size_t(length) * sizeof(Vector2f));
+    if (length <= 0)
+        return -1;
+    std::vector<float> padded(size_t(length) * 4, 0.0f);
+    for (int i = 0; i < length; ++i) {
+        padded[size_t(i) * 4 + 0] = data[i].X();
+        padded[size_t(i) * 4 + 1] = data[i].Y();
+    }
+    return SetB1Field(name, padded.data(), size_t(length) * 4 * sizeof(float));
 }
 
 int Shader::SetVector3fArray(const char* name, const Vector3f* data, int length) noexcept
 {
-    return SetB1Field(name, data, size_t(length) * sizeof(Vector3f));
+    if (length <= 0)
+        return -1;
+    std::vector<float> padded(size_t(length) * 4, 0.0f);
+    for (int i = 0; i < length; ++i) {
+        padded[size_t(i) * 4 + 0] = data[i].X();
+        padded[size_t(i) * 4 + 1] = data[i].Y();
+        padded[size_t(i) * 4 + 2] = data[i].Z();
+    }
+    return SetB1Field(name, padded.data(), size_t(length) * 4 * sizeof(float));
 }
 
 int Shader::SetVector4fArray(const char* name, const Vector4f* data, int length) noexcept
