@@ -429,6 +429,12 @@ public:
 
     static void DownSample(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
 
+    void ToAvgMip(CloudNoiseTexture* mipTex);
+
+    CloudNoiseTexture* CreateAvgMip(int destSize, String noiseFilename = "");
+
+    static void DownSampleAvg(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
+
 private:
     int              m_gridSize{ 0 };
     NoiseParams      m_params;
@@ -452,6 +458,15 @@ private:
 // =================================================================================================
 
 class NoiseMaxMipTexture
+    : public CloudNoiseTexture
+{
+public:
+    virtual void SetParams(bool enforce = false) override;
+};
+
+// =================================================================================================
+
+class NoiseAvgMipTexture
     : public CloudNoiseTexture
 {
 public:

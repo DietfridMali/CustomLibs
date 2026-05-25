@@ -670,6 +670,97 @@ void NoiseMaxMipTexture::SetParams(bool /*enforce*/) {
 
 // =================================================================================================
 
+void CloudNoiseTexture::DownSampleAvg(float* src, int srcEdgeLen, float* dest, int destEdgeLen) {
+    if ((src == nullptr) or (dest == nullptr))
+        return;
+    if (not IsPowerOfTwo(srcEdgeLen))
+        return;
+    if (not IsPowerOfTwo(destEdgeLen))
+        return;
+    if (destEdgeLen >= srcEdgeLen)
+        return;
+
+    const int ratio = srcEdgeLen / destEdgeLen;
+    const size_t srcRow = size_t(srcEdgeLen);
+    const size_t srcSlice = srcRow * srcRow;
+    const size_t destRow = size_t(destEdgeLen);
+    const size_t destSlice = destRow * destRow;
+    const float invSamples = 1.0f / float(ratio * ratio * ratio);
+
+    for (int zd = 0; zd < destEdgeLen; ++zd) {
+        const int sz0 = zd * ratio;
+        for (int yd = 0; yd < destEdgeLen; ++yd) {
+            const int sy0 = yd * ratio;
+            for (int xd = 0; xd < destEdgeLen; ++xd) {
+                const int sx0 = xd * ratio;
+                float sum = 0.0f;
+                for (int iz = 0; iz < ratio; ++iz) {
+                    const size_t zOff = size_t(sz0 + iz) * srcSlice;
+                    for (int iy = 0; iy < ratio; ++iy) {
+                        const size_t yOff = size_t(sy0 + iy) * srcRow;
+                        for (int ix = 0; ix < ratio; ++ix) {
+                            sum += src[zOff + yOff + size_t(sx0 + ix)];
+                        }
+                    }
+                }
+                dest[size_t(zd) * destSlice + size_t(yd) * destRow + size_t(xd)] = sum * invSamples;
+            }
+        }
+    }
+}
+
+
+void CloudNoiseTexture::ToAvgMip(CloudNoiseTexture* mipTex) {
+    if (mipTex == nullptr)
+        return;
+    DownSampleAvg(m_data.Data(), m_gridSize, mipTex->m_data.Data(), mipTex->m_gridSize);
+}
+
+
+CloudNoiseTexture* CloudNoiseTexture::CreateAvgMip(int mipSize, String noiseFilename) {
+    if (not IsPowerOfTwo(m_gridSize))
+        return nullptr;
+    if (not IsPowerOfTwo(mipSize))
+        return nullptr;
+    if (mipSize >= m_gridSize)
+        return nullptr;
+
+    CloudNoiseTexture* mipTex = new NoiseAvgMipTexture();
+    if (mipTex == nullptr)
+        return nullptr;
+
+    if (not mipTex->Create(mipSize, m_params, noiseFilename, false)) {
+        delete mipTex;
+        return nullptr;
+    }
+
+    if (mipTex->IsDeployed())
+        return mipTex;
+
+    ToAvgMip(mipTex);
+    if (not mipTex->Deploy()) {
+        delete mipTex;
+        return nullptr;
+    }
+    mipTex->SaveToFile(noiseFilename);
+    return mipTex;
+}
+
+
+void NoiseAvgMipTexture::SetParams(bool /*enforce*/) {
+    m_hasParams = true;
+    m_sampling.minFilter = GfxFilterMode::Linear;
+    m_sampling.magFilter = GfxFilterMode::Linear;
+    m_sampling.mipMode = GfxMipMode::None;
+    m_sampling.wrapU = GfxWrapMode::Repeat;
+    m_sampling.wrapV = GfxWrapMode::Repeat;
+    m_sampling.wrapW = GfxWrapMode::Repeat;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = 1.0f;
+}
+
+// =================================================================================================
+
 bool BlueNoiseTexture::Allocate(void) {
     TextureBuffer* texBuf = new TextureBuffer();
     if (not texBuf)
