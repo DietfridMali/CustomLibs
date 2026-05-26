@@ -358,5 +358,8 @@
     <None Include="..\..\src\gfxapitype.inl">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\include\hlslbridge.inl">
+      <Filter>Header Files\Shader</Filter>
+    </None>
   </ItemGroup>
 </Project>
