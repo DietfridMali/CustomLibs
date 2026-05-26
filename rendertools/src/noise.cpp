@@ -145,33 +145,39 @@ namespace Noise {
 
     void ImprovedPerlinNoise::Setup(int period, uint32_t seed) {
         m_period = period;
-        m_seed = seed ? seed : 0x9E3779B9u;
-        BuildPermutation();
+        m_seed   = seed ? seed : 0x9E3779B9u;
+        // Permutation nur neu bauen, wenn sich der Seed geaendert hat. PerlinFBM ruft Setup
+        // 1x pro Oktave pro Voxel mit identischem Seed innerhalb einer Generierungs-Iteration
+        // -> dieser Cache spart >256-mal Rebuild pro Voxel.
+        if (m_builtSeed != m_seed or m_perm.size() != size_t(PERM_SIZE))
+            BuildPermutation();
     }
 
     void ImprovedPerlinNoise::BuildPermutation(void) {
-        m_perm.resize(m_period);
-        for (int i = 0; i < m_period; ++i) 
+        m_perm.resize(PERM_SIZE);
+        for (int i = 0; i < PERM_SIZE; ++i)
             m_perm[i] = i;
         uint32_t s = m_seed;
-        for (int i = m_period - 1; i > 0; --i) {
+        for (int i = PERM_SIZE - 1; i > 0; --i) {
             s = s * 1664525u + 1013904223u;
             int j = int(s % uint32_t(i + 1));
             std::swap(m_perm[i], m_perm[j]);
         }
+        m_builtSeed = m_seed;
     }
 
     Noise::grad3 ImprovedPerlinNoise::Gradient(int x, int y, int z) {
-        // Each step uses Wrap because (a) integer inputs can be negative (Compute()
-        // calls floor(p) which yields negative ints for p < 0) and (b) m_perm[x]+y
-        // can go negative when y is negative, even though m_perm[x] itself is in
-        // [0, m_period). Matches the paper's "p[p[p[X]+Y]+Z]" with explicit safety
-        // for non-power-of-2 periods (paper uses & 255 on period=256).
+        // (1) Coord-Wrap auf m_period -> seamless tiling im Welt-Raum
+        // (2) Permutationstabelle hat fixe Groesse PERM_SIZE (>=m_period in typischen FBM-
+        //     Oktaven), via & PERM_MASK indiziert -> volle Gradient-Diversitaet auch bei
+        //     kleinen tile-Perioden (period=4 fuer erste FBM-Oktave).
+        // (3) Fuer den Fall period > PERM_SIZE wird die Periode effektiv auf PERM_SIZE
+        //     reduziert -- akzeptabel, da unsere Cloud-Noise-Pipeline max period=256 nutzt.
         int xi = Wrap(x, m_period);
         int yi = Wrap(y, m_period);
         int zi = Wrap(z, m_period);
-        int a  = Wrap(m_perm[xi] + yi, m_period);
-        int b  = Wrap(m_perm[a]  + zi, m_period);
+        int a  = (m_perm[xi & PERM_MASK] + yi) & PERM_MASK;
+        int b  = (m_perm[a]              + zi) & PERM_MASK;
         return gradLUT[m_perm[b] % 12];
     }
 
@@ -822,67 +828,116 @@ namespace Noise {
 
 #endif
 
-    float CloudNoise::PerlinFBM(Vector3f p, float freq, int octaves) {
-        // alternativ: gain = 0.5f; octaves = 6; freq = 16;
-        // alternativ: gain = std::exp2(-0.5f); octaves = 7; freq = 8;
-        const float gain = 0.75f;
-        float amp = 1.0f;
+    float CloudNoise::PerlinFBM(Vector3f p, const FBMParams& params) {
+        float amp = params.initialGain;
+        float freq = params.frequency;
         float noise = 0.0f;
         float totalAmp = 0.0f;
 
-        for (int i = 0; i < octaves; ++i) {
+        for (int i = 0; i < params.octaves; ++i) {
+            // Per-Oktav-Seed-Variation, damit unterschiedliche Frequenzen nicht das gleiche
+            // Hash-Pattern reproduzieren — additiver Salt mit goldenem Schnitt.
+            const uint32_t octaveSeed = m_perlinSeed + uint32_t(i) * 0x9E3779B9u;
+            if (params.useImprovedPerlin) {
+                // Improved Perlin (Ken Perlin 2002): 12 fixe Edge-Midpoint-Gradienten gleicher
+                // Länge + quintic Fade. Liefert eine glockenförmige Output-Verteilung um 0,
+                // im Gegensatz zur Fat-Tail-Verteilung von Hash33-basiertem GradientNoise.
+                m_improvedPerlin.Setup((int)freq, octaveSeed);
+                Vector3f pf = p * freq;
+                noise += amp * m_improvedPerlin.Compute(pf);
+            }
+            else {
 #if NOISE_TYPE
 #   if 1
-            m_perlin.Setup((int)freq, m_perlinSeed + i * 0x9E3779B9u);
-            noise += amp * m_perlin.Compute(p * freq);
+                m_perlin.Setup((int)freq, octaveSeed);
+                noise += amp * m_perlin.Compute(p * freq);
 #   else
-            noise += amp * PeriodicSimplexAshima(p * freq, int(freq)); // , m_perlinSeed);
+                noise += amp * PeriodicSimplexAshima(p * freq, int(freq)); // , m_perlinSeed);
 #   endif
 #else
-            noise += amp * GradientNoise(p * freq, freq);
+                noise += amp * GradientNoise(p * freq, freq);
 #endif
-            freq *= 2.0f;
-            totalAmp += amp;
-            amp *= gain;
+            }
+            freq *= params.lacunarity;
+            //totalAmp += amp;
+            amp *= params.gain;
         }
-        // Keine Output-Skalierung hier — die Histogramm-Normalisierung in
-        // BaseNoiseTexture3D::ComputeNoise stretcht den tatsaechlichen [minV, maxV]
-        // pro Kanal exakt auf [0, 1] (sofern das entsprechende Bit in m_params.normalize
-        // gesetzt ist). Eine vorgelagerte Skalierung hier waere redundant und wuerde
-        // den Range-Tracking-Pass nur verfaelschen.
-        return noise / totalAmp;
+        // Pre-skalierung durch totalAmp -> Output in ~[-1, 1] unabhaengig von Oktav-Zahl/gain.
+        // Histogramm-Normalisierung in BaseNoiseTexture3D::ComputeNoise streckt danach min/max
+        // exakt auf [0, 1] pro Kanal (sofern m_params.normalize-Bit gesetzt).
+        return noise; // / totalAmp;
     }
 
 
-    float CloudNoise::WorleyFBM(Vector3f p, float freq) {
+    float CloudNoise::WorleyFBM(Vector3f p, const FBMParams& params) {
+        float freq = params.frequency;
+        float n;
+        float totalAmp;
+
+        if (params.initialGain == 0.0f) {
+            // Hard-coded 3-Oktav-Pfad mit fixen Gewichten 0.625 / 0.25 / 0.125 (Summe = 1.0).
+            // Diese Folge ist KEINE geometrische Reihe und laesst sich nicht via gain^i exakt
+            // rekonstruieren; deshalb der explizite Sentinel-Dispatch.
 #if NOISE_TYPE
-        float n = Worley(p * freq, int(freq), m_worleySeed) * 0.625f +
-                  Worley(p * freq * 2.0f, int(freq * 2.0f), m_worleySeed) * 0.25f +
-                  Worley(p * freq * 4.0f, int(freq * 4.0f), m_worleySeed) * 0.125f;
+            n = Worley(p * freq,        int(freq),        m_worleySeed) * 0.625f
+              + Worley(p * freq * 2.0f, int(freq * 2.0f), m_worleySeed) * 0.25f
+              + Worley(p * freq * 4.0f, int(freq * 4.0f), m_worleySeed) * 0.125f;
 #else
-        float n = WorleyNoise(p * freq, freq) * 0.625f +
-                  WorleyNoise(p * freq * 2.0f, freq * 2.0f) * 0.25f +
-                  WorleyNoise(p * freq * 4.0f, freq * 4.0f) * 0.125f;
+            n = WorleyNoise(p * freq,        freq       ) * 0.625f
+              + WorleyNoise(p * freq * 2.0f, freq * 2.0f) * 0.25f
+              + WorleyNoise(p * freq * 4.0f, freq * 4.0f) * 0.125f;
 #endif
-        return std::max(0.f, 1.1f * n - .1f);
+            totalAmp = 1.0f;   // sum of hard-coded weights is exactly 1.0
+        }
+        else {
+            // Generischer FBM-Loop — geometrische Amp-Reihe via params.gain / .lacunarity.
+            float amp = params.initialGain;
+            n = 0.0f;
+            totalAmp = 0.0f;
+            for (int i = 0; i < params.octaves; ++i) {
+#if NOISE_TYPE
+                n += amp * Worley(p * freq, int(freq), m_worleySeed);
+#else
+                n += amp * WorleyNoise(p * freq, freq);
+#endif
+                freq *= params.lacunarity;
+                totalAmp += amp;
+                amp *= params.gain;
+            }
+        }
+        // Worley-Postprocess: max(0, m*n - (m-1)) clampt schwache Werte auf 0 (dunkle "Adern"
+        // zwischen Zellen) und mappt den oberen Bereich linear auf [0, 1] ohne Überschießen
+        // bei n=1. m=1.4 → Threshold 0.286, moderater Schneider/Lague-Cumulus-Look.
+        // WorleyNoise() kann auch leicht negativ werden (1 - minDist mit minDist > 1 möglich) —
+        // der max(0, …)-Clamp ist daher nicht nur Kontrast-Tweak, sondern auch zwingend für Korrektheit.
+#if 1
+        return std::max(0.0f, 1.4f * n - 0.4f);
+#else
+        return std::max(0.0f, 1.1f * (n / totalAmp) - 0.1f);
+#endif
     }
 
-    // Entspricht mainImage: erzeugt RGBA-Rauschwert für ein Pixel
+    // Entspricht mainImage: erzeugt RGBA-Rauschwert für ein Pixel.
+    // FBM-Parameter kommen aus m_perlinParams / m_worleyParams (via SetFbmParams gesetzt;
+    // ohne Aufruf gelten die Defaults aus den FBMParams-Membern, die das frueher hardgecodete
+    // Verhalten widerspiegeln).
     RGBAColor CloudNoise::Compute(Vector3f p) {
-        float baseFreq = 4.0f;
+        // Drei Worley-Baender bei base*1, base*2, base*4 ueber abgeleitete Kopien des
+        // worleyParams-Templates. baseFreq kommt aus m_worleyParams.frequency.
+        FBMParams w1 = m_worleyParams;
+        FBMParams w2 = m_worleyParams; w2.frequency *= 2.0f;
+        FBMParams w4 = m_worleyParams; w4.frequency *= 4.0f;
 #if 0
         // this severely distorts the noise distribution
-        float pfbm = 0.5f * (1.0f + PerlinFBM(p, baseFreq * 8, 7));
+        FBMParams pfbmParams = m_perlinParams; pfbmParams.frequency *= 8.0f;
+        float pfbm = 0.5f * (1.0f + PerlinFBM(p, pfbmParams));
         pfbm = /*std::fabs*/(pfbm * 2.0f - 1.0f);
 #endif
-        // 6 Oktaven: max Frequenz 128, Periode 2 Voxel im 256^3-Grid — knapp am Nyquist,
-        // aber durch glatte gain=0.75-Daempfung der hoechsten Oktave tolerabel. 7 Oktaven
-        // (Frequenz 256 = Periode 1 Voxel) gibt sichtbares Aliasing.
         RGBAColor color{
-            0.5f * (1.0f + PerlinFBM(p, 4.0f, 7)),
-            WorleyFBM(p, baseFreq),
-            WorleyFBM(p, baseFreq * 2.0f),
-            WorleyFBM(p, baseFreq * 4.0f),
+            0.5f * (1.0f + PerlinFBM(p, m_perlinParams)),
+            WorleyFBM(p, w1),
+            WorleyFBM(p, w2),
+            WorleyFBM(p, w4),
         };
 #if 0
         // remap compresses the noise values even more

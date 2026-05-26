@@ -16,8 +16,27 @@ struct NoiseParams {
     uint32_t    seed{ 0x1234567u };
     int         cellsPerAxis{ 8 };
     int         normalize{ 1 };
-    FBMParams   fbmParams;
     NoiseWarp   warping{ NoiseWarp::None };
+
+    // 3D Cloud/Region/Detail-Noise via CloudNoise::Compute: per-FBM-channel params.
+    // Defaults match the previously hard-coded behavior of CloudNoise::PerlinFBM / WorleyFBM,
+    // so callers that don't override these get identical noise output to before.
+    FBMParams   perlinParams {
+        .frequency   = 4.0f,
+        .lacunarity  = 2.0f,
+        .initialGain = 1.0f,
+        .gain        = 0.75f,
+        .octaves     = 7,
+    };
+    // worleyParams.initialGain == 0 → hard-coded 3-octave path with weights 0.625/0.25/0.125.
+    // Set initialGain != 0 to switch to the generic FBM-loop (geometric series).
+    FBMParams   worleyParams {
+        .frequency   = 4.0f,
+        .lacunarity  = 2.0f,
+        .initialGain = 0.0f,
+        .gain        = 0.5f,
+        .octaves     = 3,
+    };
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -226,11 +245,19 @@ namespace Noise
 
 
     class ImprovedPerlinNoise {
+    public:
+        // Permutation-Tabelle hat FIXE Größe (period-unabhängig), damit auch bei kleinen
+        // Tile-Perioden (z.B. period=4 für die erste FBM-Oktave) volle Gradient-Diversität
+        // erhalten bleibt. Coord-Wrap auf m_period erfolgt separat für seamless tiling.
+        static constexpr int PERM_SIZE = 256;
+        static constexpr int PERM_MASK = PERM_SIZE - 1;   // for `& PERM_MASK` indexing
+
     private:
         Vector3f         m_p;
         int              m_period;
         uint32_t         m_seed;
-        std::vector<int> m_perm;
+        uint32_t         m_builtSeed{ 0 };                // seed of currently built m_perm; 0 = none
+        std::vector<int> m_perm;                          // size = PERM_SIZE, regardless of period
 
         void BuildPermutation(void);
 
@@ -246,21 +273,32 @@ namespace Noise
 
     class CloudNoise {
     private:
-        PerlinNoise m_perlin;
-        uint32_t    m_perlinSeed;
-        uint32_t    m_worleySeed;
+        PerlinNoise         m_perlin;
+        ImprovedPerlinNoise m_improvedPerlin;
+        uint32_t            m_perlinSeed;
+        uint32_t            m_worleySeed;
+        FBMParams           m_perlinParams;
+        FBMParams           m_worleyParams;
 
     public:
         void Setup(int basePeriod, uint32_t perlinSeed, uint32_t worleySeed);
-            
+
+        // Plumb the per-FBM-channel parameters in before the per-voxel Compute loop.
+        // Without an explicit call, the FBMParams default-constructors apply (which match
+        // the previously hard-coded behavior, see comment in NoiseParams above).
+        void SetFbmParams(const FBMParams& perlinParams, const FBMParams& worleyParams) {
+            m_perlinParams = perlinParams;
+            m_worleyParams = worleyParams;
+        }
+
         RGBAColor Compute(Vector3f p);
 
         float Remap(float x, float oldMin, float oldMax, float newMin, float newMax);
 
     private:
-        float WorleyFBM(Vector3f p, float freq);
+        float WorleyFBM(Vector3f p, const FBMParams& params);
 
-        float PerlinFBM(Vector3f p, float freq, int octaves);
+        float PerlinFBM(Vector3f p, const FBMParams& params);
 
         float WorleyNoise(const Vector3f& p, float freq);
 

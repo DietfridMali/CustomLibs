@@ -177,6 +177,7 @@ void BaseNoiseTexture3D::ComputeNoise(void) {
     Vector4f maxVals{ -1e6f, -1e6f, -1e6f, -1e6f };
 
     CloudNoise generator;
+    generator.SetFbmParams(m_params.perlinParams, m_params.worleyParams);
 
     int i = 0;
     Vector3f p;
@@ -273,8 +274,7 @@ bool BaseCloudNoiseTexture::Allocate(int gridSize) {
 }
 
 
-bool BaseCloudNoiseTexture::Create(int gridSize, const NoiseParams& params,
-                                   String noiseFilename, bool compute)
+bool BaseCloudNoiseTexture::Create(int gridSize, const NoiseParams& params, String noiseFilename, bool compute)
 {
     if (not Texture::Create())
         return false;
@@ -297,8 +297,6 @@ bool BaseCloudNoiseTexture::Create(int gridSize, const NoiseParams& params,
 void BaseCloudNoiseTexture::Compute(String textureFolder) {
     CloudNoise generator;
 
-    m_params.normalize = 1 + 2 + 4 + 8;
-    m_params.fbmParams.useImprovedPerlin = true;
     NoiseTexture3D rgbaNoise;
     rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, textureFolder + "/cloudnoise-rgba.bin", false);
 
