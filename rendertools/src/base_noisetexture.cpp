@@ -30,7 +30,7 @@ using namespace Noise;
 
 #define NORMALIZE_NOISE 0
 #define CLOUD_STRUCTURE 0
-#define SPREAD_NOISE    1
+#define SPREAD_NOISE    0
 
 // =================================================================================================
 // Local helpers shared between BaseNoiseTexture3D and BaseCloudNoiseTexture.
