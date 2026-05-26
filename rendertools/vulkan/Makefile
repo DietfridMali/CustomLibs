@@ -58,6 +58,7 @@ VULKAN_FILES := \
  vkupload
 
 COMMON_FILES := \
+ base_noisetexture \
  base_quad \
  base_renderer \
  base_shaderhandler \

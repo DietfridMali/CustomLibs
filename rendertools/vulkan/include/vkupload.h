@@ -1,8 +1,10 @@
 #pragma once
 
 #include "vkframework.h"
+#include "rendertypes.h"
 
 class ImageLayoutTracker;
+class Texture;
 
 // =================================================================================================
 // vkupload — Vulkan equivalent of dx12upload.
@@ -75,5 +77,18 @@ inline bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
 bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStride,
                          const void* data, VkImage& outImage, VmaAllocation& outAllocation,
                          ImageLayoutTracker& outTracker) noexcept;
+
+// =================================================================================================
+// Platform-neutral upload entry points used by base_noisetexture. Each function does the full
+// per-Deploy pipeline for an existing Texture: drops any previously-allocated VkImage / VkImageView
+// owned by tex, creates a new VkImage of the format resolved via ToVkFormat(GfxPixelFormat),
+// uploads the pixel data, creates a matching VkImageView, calls tex.SetParams(false), and sets
+// tex.m_isValid + tex.m_isDeployed on success.
+
+bool Upload2DTexture(Texture& tex, int width, int height,
+                     GfxPixelFormat fmt, const void* data) noexcept;
+
+bool Upload3DTexture(Texture& tex, int width, int height, int depth,
+                     GfxPixelFormat fmt, const void* data) noexcept;
 
 // =================================================================================================

@@ -21,6 +21,23 @@
 #define ENFORCE_STATE false
 
 // =================================================================================================
+// Map API-neutral TextureType to the matching GL_TEXTURE_* enum. Mirror of the helpers in
+// DirectX / Vulkan gfxstates.h so common code can resolve a single TextureType value into the
+// per-backend native binding tag.
+
+inline GLenum TextureTypeToGLenum(TextureType t) noexcept {
+    switch (t) {
+        case TextureType::Texture3D:
+            return GL_TEXTURE_3D;
+        case TextureType::CubeMap:
+            return GL_TEXTURE_CUBE_MAP;
+        case TextureType::Texture2D:
+        default:
+            return GL_TEXTURE_2D;
+    }
+}
+
+// =================================================================================================
 
 class TextureSlotInfo {
 private:

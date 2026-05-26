@@ -267,6 +267,13 @@ public:
         return TextureType::Texture2D;
     }
 
+    // API-neutral type setter. Lets common code (e.g. base_noisetexture) assign m_type via
+    // TextureType without knowing that OGL stores it as GLenum. Mirrors VK/DX where m_type
+    // is already TextureType so the assignment is trivial there.
+    inline void SetType(TextureType t) noexcept {
+        m_type = TextureTypeToGLenum(t);
+    }
+
     inline int WrapMode(void)
         noexcept
     {

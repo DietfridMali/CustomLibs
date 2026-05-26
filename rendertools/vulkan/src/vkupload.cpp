@@ -1,6 +1,8 @@
 #include "vkupload.h"
 #include "vkcontext.h"
 #include "image_layout_tracker.h"
+#include "texture.h"
+#include "gfxpixelformat_vk.h"
 
 #include <cstdio>
 #include <cstring>
@@ -303,6 +305,132 @@ bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStr
         outAllocation = VK_NULL_HANDLE;
         return false;
     }
+    return true;
+}
+
+// =================================================================================================
+// Platform-neutral upload helpers
+//
+// Both create the VkImage + VkImageView straight onto tex (replacing any previously owned ones)
+// and call tex.SetParams(false) so the layered NoiseTexture overrides can populate m_sampling.
+
+static void DestroyTextureGPUResources(Texture& tex) noexcept
+{
+    VkDevice device = vkContext.Device();
+    VmaAllocator allocator = vkContext.Allocator();
+    if (tex.m_imageView != VK_NULL_HANDLE) {
+        vkDestroyImageView(device, tex.m_imageView, nullptr);
+        tex.m_imageView = VK_NULL_HANDLE;
+    }
+    if (tex.m_image != VK_NULL_HANDLE) {
+        vmaDestroyImage(allocator, tex.m_image, tex.m_allocation);
+        tex.m_image = VK_NULL_HANDLE;
+        tex.m_allocation = VK_NULL_HANDLE;
+    }
+}
+
+
+static bool CreateView(Texture& tex, VkImageViewType viewType, VkFormat fmt) noexcept
+{
+    VkDevice device = vkContext.Device();
+    if ((device == VK_NULL_HANDLE) or (tex.m_image == VK_NULL_HANDLE))
+        return false;
+
+    VkImageViewCreateInfo vci { };
+    vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vci.image = tex.m_image;
+    vci.viewType = viewType;
+    vci.format = fmt;
+    vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    vci.subresourceRange.levelCount = 1;
+    vci.subresourceRange.layerCount = 1;
+    return vkCreateImageView(device, &vci, nullptr, &tex.m_imageView) == VK_SUCCESS;
+}
+
+
+bool Upload2DTexture(Texture& tex, int width, int height,
+                     GfxPixelFormat fmt, const void* data) noexcept
+{
+    if ((data == nullptr) or (width <= 0) or (height <= 0))
+        return false;
+
+    VmaAllocator allocator = vkContext.Allocator();
+    VkDevice device = vkContext.Device();
+    if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
+        return false;
+
+    const VkFormat vkFmt = ToVkFormat(fmt);
+    const uint32_t stride = GfxPixelStride(fmt);
+    if ((vkFmt == VK_FORMAT_UNDEFINED) or (stride == 0))
+        return false;
+
+    DestroyTextureGPUResources(tex);
+
+    VkImageCreateInfo info { };
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.imageType = VK_IMAGE_TYPE_2D;
+    info.format = vkFmt;
+    info.extent.width = uint32_t(width);
+    info.extent.height = uint32_t(height);
+    info.extent.depth = 1;
+    info.mipLevels = 1;
+    info.arrayLayers = 1;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocInfo { };
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    if (vmaCreateImage(allocator, &info, &allocInfo, &tex.m_image, &tex.m_allocation, nullptr) != VK_SUCCESS)
+        return false;
+
+    tex.m_layoutTracker.Init(tex.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    const uint8_t* src = reinterpret_cast<const uint8_t*>(data);
+    if (not UploadTextureData(tex.m_image, tex.m_layoutTracker, src, width, height, int(stride))) {
+        DestroyTextureGPUResources(tex);
+        return false;
+    }
+
+    if (not CreateView(tex, VK_IMAGE_VIEW_TYPE_2D, vkFmt)) {
+        DestroyTextureGPUResources(tex);
+        return false;
+    }
+
+    tex.SetParams(false);
+    tex.m_isValid = true;
+    tex.m_isDeployed = true;
+    return true;
+}
+
+
+bool Upload3DTexture(Texture& tex, int width, int height, int depth,
+                     GfxPixelFormat fmt, const void* data) noexcept
+{
+    if ((data == nullptr) or (width <= 0) or (height <= 0) or (depth <= 0))
+        return false;
+
+    const VkFormat vkFmt = ToVkFormat(fmt);
+    const uint32_t stride = GfxPixelStride(fmt);
+    if ((vkFmt == VK_FORMAT_UNDEFINED) or (stride == 0))
+        return false;
+
+    DestroyTextureGPUResources(tex);
+
+    if (not Upload3DTextureData(width, height, depth, vkFmt, stride, data,
+                                tex.m_image, tex.m_allocation, tex.m_layoutTracker))
+        return false;
+
+    if (not CreateView(tex, VK_IMAGE_VIEW_TYPE_3D, vkFmt)) {
+        DestroyTextureGPUResources(tex);
+        return false;
+    }
+
+    tex.SetParams(false);
+    tex.m_isValid = true;
+    tex.m_isDeployed = true;
     return true;
 }
 

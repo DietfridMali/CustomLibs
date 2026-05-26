@@ -217,8 +217,15 @@ public:
         return m_name; 
     }
 
-    inline TextureType GetTextureType(void) const noexcept { 
-        return m_type; 
+    inline TextureType GetTextureType(void) const noexcept {
+        return m_type;
+    }
+
+    // API-neutral type setter. Common code (e.g. base_noisetexture) calls this; the OGL
+    // backend overrides it internally via TextureTypeToGLenum because OGL stores m_type as
+    // GLenum. Here it is a trivial assignment.
+    inline void SetType(TextureType t) noexcept {
+        m_type = t;
     }
 
     // Static release helpers — clear the slot in gfxStates.

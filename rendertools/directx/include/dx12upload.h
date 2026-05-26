@@ -1,6 +1,9 @@
 #pragma once
 
 #include "dx12framework.h"
+#include "rendertypes.h"
+
+class Texture;
 
 // =================================================================================================
 // Low-level: records CopyTextureRegion for one subresource into an already-open list.
@@ -30,5 +33,18 @@ inline bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource,
 
 // Create + upload a Texture3D resource. Returns nullptr on failure.
 ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept;
+
+// =================================================================================================
+// Platform-neutral upload entry points used by base_noisetexture. Each function does the full
+// per-Deploy pipeline for an existing Texture: releases any previously-owned ID3D12Resource,
+// creates a new committed resource of the format resolved via ToDXGIFormat(GfxPixelFormat),
+// uploads the pixel data, (re)allocates an SRV handle in the global descriptor heap, calls
+// tex.SetParams(false), and sets tex.m_isValid + tex.m_isDeployed on success.
+
+bool Upload2DTexture(Texture& tex, int width, int height,
+                     GfxPixelFormat fmt, const void* data) noexcept;
+
+bool Upload3DTexture(Texture& tex, int width, int height, int depth,
+                     GfxPixelFormat fmt, const void* data) noexcept;
 
 // =================================================================================================

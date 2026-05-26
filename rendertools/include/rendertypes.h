@@ -36,6 +36,36 @@ enum class TextureType : uint8_t {
     CubeMap = 2
 };
 
+// Platform-neutral pixel formats used for textures uploaded from CPU-side data buffers.
+// Each backend maps these to its native format type (GLenum / VkFormat / DXGI_FORMAT) via a
+// per-backend helper (To<Api>Format / GfxPixelStride). Names follow Vulkan conventions for
+// channel layout (e.g. RGBA32_SFloat = 4 channels x float32) so they remain unambiguous
+// regardless of which backend reads them.
+enum class GfxPixelFormat : uint8_t {
+    R8_UNorm = 0,
+    RG8_UNorm,
+    RGBA8_UNorm,
+    R16_SFloat,
+    R32_SFloat,
+    RGBA16_SFloat,
+    RGBA32_SFloat
+};
+
+// Bytes per pixel (sum across channels). Used by upload paths to compute row strides without
+// touching API-native format descriptors.
+inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
+    switch (f) {
+        case GfxPixelFormat::R8_UNorm:       return 1;
+        case GfxPixelFormat::RG8_UNorm:      return 2;
+        case GfxPixelFormat::RGBA8_UNorm:    return 4;
+        case GfxPixelFormat::R16_SFloat:     return 2;
+        case GfxPixelFormat::R32_SFloat:     return 4;
+        case GfxPixelFormat::RGBA16_SFloat:  return 8;
+        case GfxPixelFormat::RGBA32_SFloat:  return 16;
+    }
+    return 0;
+}
+
 // =================================================================================================
 // API-neutral render state constants.
 

@@ -135,6 +135,15 @@
     <ClInclude Include="..\include\noisetexture.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\base_noisetexture.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\gfxpixelformat_gl.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\oglupload.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\texturebuffer.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
@@ -276,6 +285,12 @@
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\noisetexture.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\base_noisetexture.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\oglupload.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texturebuffer.cpp">

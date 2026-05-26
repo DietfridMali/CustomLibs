@@ -161,6 +161,12 @@
     <ClInclude Include="..\include\noisetexture.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\base_noisetexture.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\gfxpixelformat_dx.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\sdlhandler.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
@@ -322,6 +328,9 @@
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\noisetexture.cpp">
+      <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\base_noisetexture.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\outline_shader.cpp">

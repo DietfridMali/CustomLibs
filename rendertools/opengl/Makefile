@@ -24,6 +24,7 @@ OPENGL_FILES := \
  gfxstates \
  gfxrenderer \
  noisetexture \
+ oglupload \
  outline_shader \
  primitive_shaders \
  rendertarget \
@@ -34,6 +35,7 @@ OPENGL_FILES := \
  texturehandler
 
 COMMON_FILES := \
+ base_noisetexture \
  base_quad \
  base_renderer \
  base_shaderhandler \

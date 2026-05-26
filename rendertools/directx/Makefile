@@ -7,6 +7,7 @@ AR  := ar
 
 FILES := \
  base_displayhandler \
+ base_noisetexture \
  base_quad \
  base_renderer \
  base_shader_funcs \

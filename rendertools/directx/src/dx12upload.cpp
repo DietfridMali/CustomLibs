@@ -2,6 +2,10 @@
 #include "commandlist.h"
 #include "gfxrenderer.h"
 #include "resource_handler.h"
+#include "texture.h"
+#include "descriptor_heap.h"
+#include "dx12context.h"
+#include "gfxpixelformat_dx.h"
 
 #include <cstring>
 
@@ -174,6 +178,132 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
         return nullptr;
 #endif
     return resource;
+}
+
+// =================================================================================================
+// Platform-neutral upload helpers
+
+static bool EnsureSRVHandle(uint32_t& handleOut) noexcept
+{
+    if (handleOut == UINT32_MAX) {
+        DescriptorHandle hdl = descriptorHeaps.AllocSRV();
+        if (not hdl.IsValid())
+            return false;
+        handleOut = hdl.index;
+    }
+    return true;
+}
+
+
+static void CreateSRV2D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT fmt) noexcept
+{
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc { };
+    srvDesc.Format                  = fmt;
+    srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture2D.MipLevels     = 1;
+    dx12Context.Device()->CreateShaderResourceView(resource, &srvDesc,
+        descriptorHeaps.m_srvHeap.CpuHandle(handle));
+}
+
+
+static void CreateSRV3D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT fmt) noexcept
+{
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc { };
+    srvDesc.Format                  = fmt;
+    srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE3D;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Texture3D.MipLevels     = 1;
+    dx12Context.Device()->CreateShaderResourceView(resource, &srvDesc,
+        descriptorHeaps.m_srvHeap.CpuHandle(handle));
+}
+
+
+bool Upload2DTexture(Texture& tex, int width, int height,
+                     GfxPixelFormat fmt, const void* data) noexcept
+{
+    if ((data == nullptr) or (width <= 0) or (height <= 0))
+        return false;
+
+    ID3D12Device* device = dx12Context.Device();
+    if (not device)
+        return false;
+
+    const DXGI_FORMAT dxgi = ToDXGIFormat(fmt);
+    const uint32_t stride = GfxPixelStride(fmt);
+    if ((dxgi == DXGI_FORMAT_UNKNOWN) or (stride == 0))
+        return false;
+
+    tex.m_resource.Reset();
+
+    D3D12_HEAP_PROPERTIES hp { D3D12_HEAP_TYPE_DEFAULT };
+    D3D12_RESOURCE_DESC rd { };
+    rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    rd.Width            = UINT(width);
+    rd.Height           = UINT(height);
+    rd.DepthOrArraySize = 1;
+    rd.MipLevels        = 1;
+    rd.Format           = dxgi;
+    rd.SampleDesc.Count = 1;
+    rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+                                               D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                               IID_PPV_ARGS(&tex.m_resource))))
+        return false;
+#if DBG_DIRECTX
+    char name[128];
+    snprintf(name, sizeof(name), "Texture2D[%s]", (const char*) tex.m_name);
+    tex.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
+
+    const uint8_t* src = reinterpret_cast<const uint8_t*>(data);
+    if (not UploadTextureData(device, tex.m_resource.Get(), src, width, height, int(stride)))
+        return false;
+
+    if (not EnsureSRVHandle(tex.m_handle))
+        return false;
+    CreateSRV2D(tex.m_handle, tex.m_resource.Get(), dxgi);
+
+    tex.SetParams(false);
+    tex.m_isValid = true;
+    tex.m_isDeployed = true;
+    return true;
+}
+
+
+bool Upload3DTexture(Texture& tex, int width, int height, int depth,
+                     GfxPixelFormat fmt, const void* data) noexcept
+{
+    if ((data == nullptr) or (width <= 0) or (height <= 0) or (depth <= 0))
+        return false;
+
+    ID3D12Device* device = dx12Context.Device();
+    if (not device)
+        return false;
+
+    const DXGI_FORMAT dxgi = ToDXGIFormat(fmt);
+    const uint32_t stride = GfxPixelStride(fmt);
+    if ((dxgi == DXGI_FORMAT_UNKNOWN) or (stride == 0))
+        return false;
+
+    tex.m_resource = Upload3DTextureData(device, width, height, depth, dxgi, stride, data);
+    if (not tex.m_resource)
+        return false;
+#if DBG_DIRECTX
+    char name[128];
+    snprintf(name, sizeof(name), "Texture3D[%s]", (const char*) tex.m_name);
+    tex.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+#endif
+
+    if (not EnsureSRVHandle(tex.m_handle))
+        return false;
+    CreateSRV3D(tex.m_handle, tex.m_resource.Get(), dxgi);
+
+    tex.SetParams(false);
+    tex.m_isValid = true;
+    tex.m_isDeployed = true;
+    return true;
 }
 
 // =================================================================================================
