@@ -148,6 +148,7 @@
     <ClInclude Include="..\..\include\movement.h" />
     <ClInclude Include="..\include\noisetexture.h" />
     <ClInclude Include="..\..\include\base_noisetexture.h" />
+    <ClInclude Include="..\..\include\texture_mips.h" />
     <ClInclude Include="..\include\gfxpixelformat_gl.h" />
     <ClInclude Include="..\include\oglupload.h" />
     <ClInclude Include="..\include\gfxstates.h" />
@@ -204,6 +205,7 @@
     <ClCompile Include="..\..\src\mesh.cpp" />
     <ClCompile Include="..\src\noisetexture.cpp" />
     <ClCompile Include="..\..\src\base_noisetexture.cpp" />
+    <ClCompile Include="..\..\src\texture_mips.cpp" />
     <ClCompile Include="..\src\oglupload.cpp" />
     <ClCompile Include="..\src\gfxstates.cpp" />
     <ClCompile Include="..\..\src\texteffects.cpp" />

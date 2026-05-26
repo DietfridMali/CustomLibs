@@ -71,6 +71,18 @@ void NoiseAvgMipTexture::SetParams(bool) {
 // =================================================================================================
 // BlueNoiseTexture
 
+bool DetailNoiseTexture::Deploy(int) {
+    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R8_UNorm,
+                           reinterpret_cast<const void*>(m_data.Data()));
+}
+
+
+void DetailNoiseTexture::SetParams(bool) {
+    m_hasParams = true;
+    ConfigureSamplingForNoise(m_sampling, GfxFilterMode::Linear, GfxMipMode::None);
+}
+
+
 bool BlueNoiseTexture::Deploy(int) {
     return Upload3DTexture(*this, 128, 128, 64, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.Data()));
 }

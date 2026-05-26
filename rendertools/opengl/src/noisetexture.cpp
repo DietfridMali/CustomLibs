@@ -118,6 +118,26 @@ void NoiseAvgMipTexture::SetParams(bool enforce) {
 }
 
 // =================================================================================================
+// DetailNoiseTexture
+
+bool DetailNoiseTexture::Deploy(int) {
+    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R8_UNorm,
+                           reinterpret_cast<const void*>(m_data.Data()));
+}
+
+
+void DetailNoiseTexture::SetParams(bool enforce) {
+    if (enforce or not m_hasParams) {
+        m_hasParams = true;
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+}
+
+// =================================================================================================
 // BlueNoiseTexture
 
 bool BlueNoiseTexture::Deploy(int) {

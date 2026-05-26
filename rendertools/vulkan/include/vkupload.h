@@ -88,7 +88,6 @@ bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStr
 bool Upload2DTexture(Texture& tex, int width, int height,
                      GfxPixelFormat fmt, const void* data) noexcept;
 
-bool Upload3DTexture(Texture& tex, int width, int height, int depth,
-                     GfxPixelFormat fmt, const void* data) noexcept;
+bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips) noexcept;
 
 // =================================================================================================

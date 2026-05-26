@@ -6,6 +6,7 @@
 #include "descriptor_heap.h"
 #include "dx12context.h"
 #include "gfxpixelformat_dx.h"
+#include "texture_mips.h"
 
 #include <cstring>
 
@@ -207,13 +208,14 @@ static void CreateSRV2D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT f
 }
 
 
-static void CreateSRV3D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT fmt) noexcept
+static void CreateSRV3D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT fmt,
+                        uint32_t mipLevels = 1) noexcept
 {
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc { };
     srvDesc.Format                  = fmt;
     srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE3D;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Texture3D.MipLevels     = 1;
+    srvDesc.Texture3D.MipLevels     = mipLevels;
     dx12Context.Device()->CreateShaderResourceView(resource, &srvDesc,
         descriptorHeaps.m_srvHeap.CpuHandle(handle));
 }
@@ -273,7 +275,8 @@ bool Upload2DTexture(Texture& tex, int width, int height,
 
 
 bool Upload3DTexture(Texture& tex, int width, int height, int depth,
-                     GfxPixelFormat fmt, const void* data) noexcept
+                     GfxPixelFormat fmt, const void* data,
+                     bool generateMips) noexcept
 {
     if ((data == nullptr) or (width <= 0) or (height <= 0) or (depth <= 0))
         return false;
@@ -287,8 +290,30 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth,
     if ((dxgi == DXGI_FORMAT_UNKNOWN) or (stride == 0))
         return false;
 
-    tex.m_resource = Upload3DTextureData(device, width, height, depth, dxgi, stride, data);
-    if (not tex.m_resource)
+    // CPU-side mip chain (functional equivalent of OGL's glGenerateMipmap).
+    // Only built when generateMips=true; otherwise the resource has a single mip level (Mip 0).
+    // BuildMipChain3D + the multi-level upload loop stay intact for future opt-in callers.
+    AutoArray<MipLevel3D> mipChain;
+    if (generateMips)
+        BuildMipChain3D(data, width, height, depth, fmt, mipChain);
+    const uint32_t mipLevels = generateMips ? uint32_t(mipChain.Length()) : 1u;
+
+    tex.m_resource.Reset();
+
+    D3D12_HEAP_PROPERTIES hp { D3D12_HEAP_TYPE_DEFAULT };
+    D3D12_RESOURCE_DESC rd { };
+    rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE3D;
+    rd.Width            = UINT(width);
+    rd.Height           = UINT(height);
+    rd.DepthOrArraySize = UINT16(depth);
+    rd.MipLevels        = UINT16(mipLevels);
+    rd.Format           = dxgi;
+    rd.SampleDesc.Count = 1;
+    rd.Layout           = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
+                                               D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                                               IID_PPV_ARGS(&tex.m_resource))))
         return false;
 #if DBG_DIRECTX
     char name[128];
@@ -296,9 +321,77 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth,
     tex.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
 #endif
 
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("Upload3DTextureMips"));
+    if (not cl)
+        return false;
+
+    // One upload buffer + CopyTextureRegion per mip level.
+    AutoArray<ComPtr<ID3D12Resource>> uploads;
+    uploads.Resize(mipLevels);
+
+    for (uint32_t lv = 0; lv < mipLevels; ++lv) {
+        // When generateMips=false, mipChain is empty — synthesize Mip 0 from the original input.
+        const int mipW = generateMips ? mipChain[lv].width  : width;
+        const int mipH = generateMips ? mipChain[lv].height : height;
+        const int mipD = generateMips ? mipChain[lv].depth  : depth;
+        const uint8_t* src = generateMips ? mipChain[lv].data.Data()
+                                          : reinterpret_cast<const uint8_t*>(data);
+
+        D3D12_RESOURCE_DESC mipDesc = rd;
+        mipDesc.Width            = UINT(mipW);
+        mipDesc.Height           = UINT(mipH);
+        mipDesc.DepthOrArraySize = UINT16(mipD);
+        mipDesc.MipLevels        = 1;
+
+        UINT64 uploadSize = 0;
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout { };
+        UINT rowCount = 0;
+        UINT64 rowSize = 0;
+        device->GetCopyableFootprints(&mipDesc, 0, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
+
+        ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource("", size_t(uploadSize));
+        if (not upload) {
+            baseRenderer.FinishOperation(cl);
+            return false;
+        }
+
+        uint8_t* mapped = nullptr;
+        D3D12_RANGE mapRange { 0, 0 };
+        if (FAILED(upload->Map(0, &mapRange, (void**) &mapped))) {
+            baseRenderer.FinishOperation(cl);
+            return false;
+        }
+        UINT srcRowBytes = UINT(mipW) * stride;
+        UINT slicePitch  = layout.Footprint.RowPitch * rowCount;
+        if (srcRowBytes == layout.Footprint.RowPitch)
+            std::memcpy(mapped + layout.Offset, src, size_t(slicePitch) * UINT(mipD));
+        else
+            for (UINT z = 0; z < UINT(mipD); ++z)
+                for (UINT r = 0; r < rowCount; ++r)
+                    std::memcpy(mapped + layout.Offset + z * slicePitch + r * layout.Footprint.RowPitch,
+                                src + (z * rowCount + r) * srcRowBytes,
+                                srcRowBytes);
+        upload->Unmap(0, nullptr);
+
+        D3D12_TEXTURE_COPY_LOCATION srcLoc { }, dstLoc { };
+        srcLoc.pResource        = upload.Get();
+        srcLoc.Type             = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        srcLoc.PlacedFootprint  = layout;
+        dstLoc.pResource        = tex.m_resource.Get();
+        dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dstLoc.SubresourceIndex = lv;
+        cl->GfxList()->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+
+        uploads[lv] = upload;
+    }
+
+    // Transition all subresources COPY_DEST -> PIXEL_SHADER_RESOURCE.
+    SubresourceBarrier(cl->GfxList(), tex.m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    baseRenderer.FinishOperation(cl);
+
     if (not EnsureSRVHandle(tex.m_handle))
         return false;
-    CreateSRV3D(tex.m_handle, tex.m_resource.Get(), dxgi);
+    CreateSRV3D(tex.m_handle, tex.m_resource.Get(), dxgi, mipLevels);
 
     tex.SetParams(false);
     tex.m_isValid = true;

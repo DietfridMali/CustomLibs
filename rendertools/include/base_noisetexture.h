@@ -279,11 +279,9 @@ template<> struct NoiseTraits<BlueNoiseR8> {
 // signatures live in oglupload.h / vkupload.h / dx12upload.h and are picked up from the per-API
 // include of those headers transitively (every per-API noisetexture.h pulls its upload header).
 
-bool Upload2DTexture(Texture& tex, int width, int height,
-                     GfxPixelFormat fmt, const void* data) noexcept;
+bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, const void* data) noexcept;
 
-bool Upload3DTexture(Texture& tex, int width, int height, int depth,
-                     GfxPixelFormat fmt, const void* data) noexcept;
+bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips = false) noexcept;
 
 // =================================================================================================
 // 2D-noise template — Deploy + SetParams are common; the per-backend upload helper does the work.
@@ -406,18 +404,22 @@ class BaseCloudNoiseTexture
     : public Texture
 {
 public:
-    bool Create(int gridSize, const NoiseParams& params,
-                String noiseFilename = "", bool compute = true);
+    bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "", bool compute = true);
 
     void ToMaxMip(BaseCloudNoiseTexture* mipTex);
+    
     BaseCloudNoiseTexture* CreateMaxMip(int destSize, String noiseFilename = "");
+    
     static void DownSample(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
 
     void ToAvgMip(BaseCloudNoiseTexture* mipTex);
+    
     BaseCloudNoiseTexture* CreateAvgMip(int destSize, String noiseFilename = "");
+    
     static void DownSampleAvg(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
 
     bool Deploy(int bufferIndex = 0) override = 0;
+    
     void SetParams(bool enforce = false) override = 0;
 
 protected:
@@ -426,16 +428,56 @@ protected:
     AutoArray<float> m_data;
 
     bool Allocate(int gridSize);
+    
     void Compute(String textureFolder = "");
+    
     void ApplyWarp(void);
+    
     void ApplyInfiniteWarp(void);
+    
     void ApplyPeriodicWarp(void);
+    
     bool LoadFromFile(const String& filename);
+    
     bool SaveToFile(const String& filename) const;
 
     // Factories — per-backend subclass returns its concrete mip subclass instance.
     virtual BaseCloudNoiseTexture* NewMaxMipTex(void) = 0;
+    
     virtual BaseCloudNoiseTexture* NewAvgMipTex(void) = 0;
+};
+
+// =================================================================================================
+// DetailNoiseTexture — 64³ R8 detail Worley-FBM für Edge-Erosion im Cloud-Shader.
+// Erzeugt intern eine temporaere RGBA NoiseTexture3D (genau wie BaseCloudNoiseTexture::Compute) und
+// schreibt die gewichtete Aggregation der drei Worley-Frequenzkanaele (Gewichte 0.625/0.25/0.125,
+// identisch zur Schneider-Pipeline) als pre-baked R8 in die finale Textur. Speicher: 64³ × 1 Byte
+// = 256 KB. Im Shader sampled das Detail bei hoeherer UV-Frequenz als die Base-Shape und wird an
+// Wolken-Edges subtrahiert.
+
+class BaseDetailNoiseTexture
+    : public Texture
+{
+public:
+    bool Create(int gridSize, const NoiseParams& params,
+                String noiseFilename = "", bool compute = true);
+
+    bool Deploy(int bufferIndex = 0) override = 0;
+    void SetParams(bool enforce = false) override = 0;
+
+protected:
+    int                m_gridSize{ 0 };
+    NoiseParams        m_params;
+    AutoArray<uint8_t> m_data;
+
+    bool Allocate(int gridSize);
+    void Compute(String textureFolder = "");
+    bool LoadFromFile(const String& filename);
+    bool SaveToFile(const String& filename);
+
+    inline uint32_t BufferSize(void) const noexcept {
+        return uint32_t(m_gridSize) * uint32_t(m_gridSize) * uint32_t(m_gridSize);
+    }
 };
 
 // =================================================================================================

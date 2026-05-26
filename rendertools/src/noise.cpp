@@ -12,6 +12,8 @@
 
 #include "noise.h"
 
+#define NORMALIZE_HASH33 0
+
 // =================================================================================================
 
 namespace Noise {
@@ -38,6 +40,14 @@ namespace Noise {
         // linear interpolation
         inline float Lerp(float a, float b, float t) {
             return a + t * (b - a);
+        }
+
+        // Safe modulo for ints: C++ "%" can produce negative results for negative
+        // operands ((-1) % 256 == -1), which would index permutation tables out of
+        // bounds. Wrap brings the result back into [0, p).
+        inline int Wrap(int a, int p) {
+            int r = a % p;
+            return r < 0 ? r + p : r;
         }
 
         inline uint32_t Hash(int x, int y, int z, uint32_t seed = 0xA341316Cu) {
@@ -152,8 +162,17 @@ namespace Noise {
     }
 
     Noise::grad3 ImprovedPerlinNoise::Gradient(int x, int y, int z) {
-        int i = m_perm[(m_perm[(m_perm[x % m_period] + y) % m_period] + z) % m_period];
-        return gradLUT[i % 12];
+        // Each step uses Wrap because (a) integer inputs can be negative (Compute()
+        // calls floor(p) which yields negative ints for p < 0) and (b) m_perm[x]+y
+        // can go negative when y is negative, even though m_perm[x] itself is in
+        // [0, m_period). Matches the paper's "p[p[p[X]+Y]+Z]" with explicit safety
+        // for non-power-of-2 periods (paper uses & 255 on period=256).
+        int xi = Wrap(x, m_period);
+        int yi = Wrap(y, m_period);
+        int zi = Wrap(z, m_period);
+        int a  = Wrap(m_perm[xi] + yi, m_period);
+        int b  = Wrap(m_perm[a]  + zi, m_period);
+        return gradLUT[m_perm[b] % 12];
     }
 
     float ImprovedPerlinNoise::GradientDot(int ix, int iy, int iz) {
@@ -666,12 +685,20 @@ namespace Noise {
         float fx = static_cast<float>(ux) * UIF;
         float fy = static_cast<float>(uy) * UIF;
         float fz = static_cast<float>(uz) * UIF;
-
-        return vec3(
-            -1.0f + 2.0f * fx,
-            -1.0f + 2.0f * fy,
-            -1.0f + 2.0f * fz
-        );
+#if NORMALIZE_HASH33
+        vec3 g(-1.0f + 2.0f * fx, -1.0f + 2.0f * fy, -1.0f + 2.0f * fz);
+        // Auf Einheitslaenge normieren — Standard-Perlin-Anforderung. Roh-Hash liefert
+        // Vektoren im Wuerfel [-1,1]^3 mit Laengen zwischen 0 und sqrt(3), was zu un-
+        // gleichmaessiger Noise-Staerke pro Voxel fuehrt (kurze Gradienten = schwacher
+        // Output, lange = stark). Normierung macht alle Gradienten gleich, sodass der
+        // Output-Range gleichmaessig und vorhersagbar bleibt.
+        float len2 = g.x * g.x + g.y * g.y + g.z * g.z;
+        if (len2 > 1e-8f)
+            g *= 1.0f / std::sqrt(len2);
+        return g;
+#else
+        return vec3 (-1.0f + 2.0f * fx, -1.0f + 2.0f * fy, -1.0f + 2.0f * fz);
+#endif
     }
 
 
@@ -798,9 +825,10 @@ namespace Noise {
     float CloudNoise::PerlinFBM(Vector3f p, float freq, int octaves) {
         // alternativ: gain = 0.5f; octaves = 6; freq = 16;
         // alternativ: gain = std::exp2(-0.5f); octaves = 7; freq = 8;
-        float gain = 0.75f; 
+        const float gain = 0.75f;
         float amp = 1.0f;
         float noise = 0.0f;
+        float totalAmp = 0.0f;
 
         for (int i = 0; i < octaves; ++i) {
 #if NOISE_TYPE
@@ -814,9 +842,15 @@ namespace Noise {
             noise += amp * GradientNoise(p * freq, freq);
 #endif
             freq *= 2.0f;
+            totalAmp += amp;
             amp *= gain;
         }
-        return noise;
+        // Keine Output-Skalierung hier — die Histogramm-Normalisierung in
+        // BaseNoiseTexture3D::ComputeNoise stretcht den tatsaechlichen [minV, maxV]
+        // pro Kanal exakt auf [0, 1] (sofern das entsprechende Bit in m_params.normalize
+        // gesetzt ist). Eine vorgelagerte Skalierung hier waere redundant und wuerde
+        // den Range-Tracking-Pass nur verfaelschen.
+        return noise / totalAmp;
     }
 
 
@@ -841,6 +875,9 @@ namespace Noise {
         float pfbm = 0.5f * (1.0f + PerlinFBM(p, baseFreq * 8, 7));
         pfbm = /*std::fabs*/(pfbm * 2.0f - 1.0f);
 #endif
+        // 6 Oktaven: max Frequenz 128, Periode 2 Voxel im 256^3-Grid — knapp am Nyquist,
+        // aber durch glatte gain=0.75-Daempfung der hoechsten Oktave tolerabel. 7 Oktaven
+        // (Frequenz 256 = Periode 1 Voxel) gibt sichtbares Aliasing.
         RGBAColor color{
             0.5f * (1.0f + PerlinFBM(p, 4.0f, 7)),
             WorleyFBM(p, baseFreq),

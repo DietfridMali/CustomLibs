@@ -40,6 +40,7 @@ FILES := \
  skybox \
  SSBO \
  textrenderer \
+ texture_mips \
  textureatlas \
  texture \
  texturebuffer \

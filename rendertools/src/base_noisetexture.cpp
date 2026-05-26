@@ -108,27 +108,30 @@ static float TrilinearSampleWrap(const float* data, int size, float u, float v, 
 // Channel transfer for cloud-noise mixing. SPREAD_NOISE = 1 widens contrast via a half-cosine
 // S-curve; SPREAD_NOISE = 0 is identity (raw 0..1 noise).
 
-#if SPREAD_NOISE == 2
+#if SPREAD_NOISE
 
 static float Amp(float v) {
     return 0.5f - 0.5f * cos(v * PI);
 }
+
+static float InvAmp(float v) {
+    return 0.5f + 0.5f * cos(v * PI);
+}
+
+#   if SPREAD_NOISE == 2
 
 static float Amp2(float v) {
     return Amp(Amp(v));
 }
 
-#elif SPREAD_NOISE == 1
-
-static float Amp(float v) {
-    return 0.5f - 0.5f * cos(v * PI);
-}
-
-#define Amp2(v) Amp(v)
+#   else
+#       define Amp2(v) Amp(v)
+#   endif
 
 #else
 
 #define Amp(v) (v)
+#define InvAmp(v) (v)
 #define Amp2(v) (v)
 
 #endif
@@ -184,11 +187,11 @@ void BaseNoiseTexture3D::ComputeNoise(void) {
             for (int x = 0; x < m_gridDimensions.x; ++x) {
                 p.x = (float(x) + 0.5f) / float(m_gridDimensions.x);
                 Vector4f noise = generator.Compute(p);
+                data[i++] = noise.x;
+                data[i++] = noise.y;
+                data[i++] = noise.z;
+                data[i++] = noise.a;
                 if (m_params.normalize) {
-                    data[i++] = noise.x;
-                    data[i++] = noise.y;
-                    data[i++] = noise.z;
-                    data[i++] = noise.a;
                     minVals.Minimize(noise);
                     maxVals.Maximize(noise);
                 }
@@ -295,28 +298,46 @@ void BaseCloudNoiseTexture::Compute(String textureFolder) {
     CloudNoise generator;
 
     m_params.normalize = 1 + 2 + 4 + 8;
+    m_params.fbmParams.useImprovedPerlin = true;
     NoiseTexture3D rgbaNoise;
-    rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params,
-                     textureFolder + "/cloudnoise-rgba.bin", false);
+    rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, textureFolder + "/cloudnoise-rgba.bin", false);
 
     float* rgbaData = rgbaNoise.GetData().Data();
     float* data = m_data.Data();
     uint32_t dataSize = m_gridSize * m_gridSize * m_gridSize;
 
+    float dMin = 1.0f, dMax = 0.0f;
     for (int i = dataSize; i; --i) {
-        float perlin = Amp(rgbaData[0]);
+        float perlin = InvAmp(rgbaData[0]);
+#if SPREAD_NOISE
         perlin *= perlin;
+#endif
 #if CLOUD_STRUCTURE == 0
         float worley = Amp2(rgbaData[1]) * 0.625f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.125f;
 #elif CLOUD_STRUCTURE == 1
         float worley = Amp2(rgbaData[1]) * 0.5f + Amp2(rgbaData[2]) * 0.3f + Amp2(rgbaData[3]) * 0.2f;
 #else
-        float worley = Amp2(rgbaData[1]) * 0.65f  + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.1f;
+        float worley = Amp2(rgbaData[1]) * 0.65f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.1f;
 #endif
-        *data++ = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
+#if 1
+        float d = generator.Remap(perlin, Amp2(worley) - 1.0f, 1.0f, 0.0f, 1.0f);
+#else
+        float d = perlin * (1.0f - 0.5f * Amp2(worley));
+#endif
+        if (d < dMin)
+            dMin = d;
+        if (d > dMax)
+            dMax = d;
+        *data++ = d;
         rgbaData += 4;
     }
-
+#if 1 //def _DEBUG
+    if (dMax - dMin < 0.999f) {
+        data = m_data.Data();
+        for (int i = dataSize; i; --i, ++data)
+            *data = generator.Remap(*data, dMin, dMax, 0.0f, 1.0f);
+    }
+#endif
     rgbaNoise.GetData().Reset();
 }
 
@@ -581,6 +602,80 @@ BaseCloudNoiseTexture* BaseCloudNoiseTexture::CreateAvgMip(int mipSize, String n
     }
     mipTex->SaveToFile(noiseFilename);
     return mipTex;
+}
+
+
+// =================================================================================================
+// BaseDetailNoiseTexture — 64³ R8 detail Worley-FBM für Schneider-style Edge-Erosion im Shader.
+
+bool BaseDetailNoiseTexture::Allocate(int gridSize) {
+    TextureBuffer* texBuf = new TextureBuffer();
+    if (not texBuf)
+        return false;
+    if (not m_buffers.Append(texBuf)) {
+        delete texBuf;
+        return false;
+    }
+    m_gridSize = gridSize;
+    m_data.Resize(BufferSize());
+    texBuf->m_info = TextureBuffer::BufferInfo(gridSize, gridSize, 1, 0, 0);
+    return true;
+}
+
+
+bool BaseDetailNoiseTexture::Create(int gridSize, const NoiseParams& params,
+                                    String noiseFilename, bool compute)
+{
+    if (not Texture::Create())
+        return false;
+    SetType(TextureType::Texture3D);
+    if (not Allocate(gridSize))
+        return false;
+    m_params = params;
+    if (not LoadFromFile(noiseFilename)) {
+        if (not compute)
+            return true;
+        std::filesystem::path _p{ noiseFilename.GetStr() };
+        Compute(_p.parent_path().string());
+        SaveToFile(noiseFilename);
+    }
+    return Deploy();
+}
+
+
+void BaseDetailNoiseTexture::Compute(String textureFolder) {
+    // RGBA-Source mit den drei Worley-Frequenzbaendern in GBA — Perlin-Kanal in R wird nicht
+    // genutzt, faellt aber mit ab (akzeptabel, kostet kaum Zeit gegenueber dem Worley-Loop).
+    // Normalisierung aller Kanaele, damit die Worley-Verteilung den vollen [0,1]-Range erreicht.
+    m_params.normalize = 1 + 2 + 4 + 8;
+    NoiseTexture3D rgbaNoise;
+    rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params,
+                     textureFolder + "/detailnoise-rgba.bin", false);
+
+    float* rgbaData = rgbaNoise.GetData().Data();
+    uint8_t* data = m_data.Data();
+    const uint32_t dataSize = BufferSize();
+
+    // Schneider-Standardgewichtung der drei Worley-Frequenzbaender. Summe = 1, also Output ist
+    // direkt in [0, 1]. R8-Quantisierung via *255 + Rundung.
+    for (uint32_t i = dataSize; i; --i) {
+        float worley = rgbaData[1] * 0.625f + rgbaData[2] * 0.25f + rgbaData[3] * 0.125f;
+        worley = std::clamp(worley, 0.0f, 1.0f);
+        *data++ = static_cast<uint8_t>(worley * 255.0f + 0.5f);
+        rgbaData += 4;
+    }
+
+    rgbaNoise.GetData().Reset();
+}
+
+
+bool BaseDetailNoiseTexture::LoadFromFile(const String& filename) {
+    return m_data.LoadFromFile(filename, BufferSize());
+}
+
+
+bool BaseDetailNoiseTexture::SaveToFile(const String& filename) {
+    return m_data.SaveToFile(filename);
 }
 
 

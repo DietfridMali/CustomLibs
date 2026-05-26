@@ -77,6 +77,16 @@ public:
 
 // =================================================================================================
 
+class DetailNoiseTexture
+    : public BaseDetailNoiseTexture
+{
+public:
+    bool Deploy(int bufferIndex = 0) override;
+    void SetParams(bool enforce = false) override;
+};
+
+// =================================================================================================
+
 class BlueNoiseTexture
     : public BaseBlueNoiseTexture
 {

@@ -35,7 +35,8 @@ bool Upload2DTexture(Texture& tex, int width, int height,
 }
 
 bool Upload3DTexture(Texture& tex, int width, int height, int depth,
-                     GfxPixelFormat fmt, const void* data) noexcept
+                     GfxPixelFormat fmt, const void* data,
+                     bool generateMips) noexcept
 {
     if (tex.IsDeployed())
         return true;
@@ -50,7 +51,8 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth,
                  glf.externalFormat, glf.type,
                  data);
     tex.SetParams(false);
-    glGenerateMipmap(GL_TEXTURE_3D);
+    if (generateMips)
+        glGenerateMipmap(GL_TEXTURE_3D);
     tex.Release();
     tex.m_isDeployed = true;
     return true;

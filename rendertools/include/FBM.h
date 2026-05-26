@@ -12,6 +12,7 @@ struct FBMParams {
     int octaves{ 5 };
     int fold{ 0 };
     bool normalize{ true };
+    bool useImprovedPerlin{ true };
 };
 
 template<typename NoiseFn>

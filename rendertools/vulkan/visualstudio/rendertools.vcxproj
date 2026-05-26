@@ -87,7 +87,7 @@
       <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VulkanSDK)\Include;$(VulkanSDK)\Source\SPIRV-Reflect;$(ExternalLibs)VMA;$(ExternalLibs)SDL2_ttf-2.0.15\include;$(ExternalLibs)SDL2-2.30.10\include;$(ExternalLibs)SDL2_image-2.0.5\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -150,6 +150,7 @@
     <ClInclude Include="..\..\include\movement.h" />
     <ClInclude Include="..\include\noisetexture.h" />
     <ClInclude Include="..\..\include\base_noisetexture.h" />
+    <ClInclude Include="..\..\include\texture_mips.h" />
     <ClInclude Include="..\include\gfxpixelformat_vk.h" />
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\texteffects.h" />
@@ -225,6 +226,7 @@
     <ClCompile Include="..\..\src\mesh.cpp" />
     <ClCompile Include="..\src\noisetexture.cpp" />
     <ClCompile Include="..\..\src\base_noisetexture.cpp" />
+    <ClCompile Include="..\..\src\texture_mips.cpp" />
     <ClCompile Include="..\src\gfxstates.cpp" />
     <ClCompile Include="..\..\src\texteffects.cpp" />
     <ClCompile Include="..\src\outline_shader.cpp" />

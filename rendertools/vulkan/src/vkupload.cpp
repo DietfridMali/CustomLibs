@@ -3,6 +3,7 @@
 #include "image_layout_tracker.h"
 #include "texture.h"
 #include "gfxpixelformat_vk.h"
+#include "texture_mips.h"
 
 #include <cstdio>
 #include <cstring>
@@ -330,7 +331,8 @@ static void DestroyTextureGPUResources(Texture& tex) noexcept
 }
 
 
-static bool CreateView(Texture& tex, VkImageViewType viewType, VkFormat fmt) noexcept
+static bool CreateView(Texture& tex, VkImageViewType viewType, VkFormat fmt,
+                       uint32_t mipLevels = 1) noexcept
 {
     VkDevice device = vkContext.Device();
     if ((device == VK_NULL_HANDLE) or (tex.m_image == VK_NULL_HANDLE))
@@ -342,7 +344,7 @@ static bool CreateView(Texture& tex, VkImageViewType viewType, VkFormat fmt) noe
     vci.viewType = viewType;
     vci.format = fmt;
     vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    vci.subresourceRange.levelCount = 1;
+    vci.subresourceRange.levelCount = mipLevels;
     vci.subresourceRange.layerCount = 1;
     return vkCreateImageView(device, &vci, nullptr, &tex.m_imageView) == VK_SUCCESS;
 }
@@ -407,7 +409,8 @@ bool Upload2DTexture(Texture& tex, int width, int height,
 
 
 bool Upload3DTexture(Texture& tex, int width, int height, int depth,
-                     GfxPixelFormat fmt, const void* data) noexcept
+                     GfxPixelFormat fmt, const void* data,
+                     bool generateMips) noexcept
 {
     if ((data == nullptr) or (width <= 0) or (height <= 0) or (depth <= 0))
         return false;
@@ -417,13 +420,103 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth,
     if ((vkFmt == VK_FORMAT_UNDEFINED) or (stride == 0))
         return false;
 
-    DestroyTextureGPUResources(tex);
-
-    if (not Upload3DTextureData(width, height, depth, vkFmt, stride, data,
-                                tex.m_image, tex.m_allocation, tex.m_layoutTracker))
+    VmaAllocator allocator = vkContext.Allocator();
+    VkDevice device = vkContext.Device();
+    if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
         return false;
 
-    if (not CreateView(tex, VK_IMAGE_VIEW_TYPE_3D, vkFmt)) {
+    // CPU-side mip chain (functional equivalent of OGL's glGenerateMipmap).
+    // Only built when generateMips=true; otherwise we ship a single-mip image (Mip 0 only)
+    // — same uploaded data, just no down-filtered Mip 1..N. Keeps BuildMipChain3D + the
+    // multi-level upload loop intact for future opt-in callers.
+    AutoArray<MipLevel3D> mipChain;
+    if (generateMips)
+        BuildMipChain3D(data, width, height, depth, fmt, mipChain);
+    const uint32_t mipLevels = generateMips ? uint32_t(mipChain.Length()) : 1u;
+
+    DestroyTextureGPUResources(tex);
+
+    // Allocate VkImage with full mip pyramid.
+    VkImageCreateInfo info { };
+    info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.imageType     = VK_IMAGE_TYPE_3D;
+    info.format        = vkFmt;
+    info.extent.width  = uint32_t(width);
+    info.extent.height = uint32_t(height);
+    info.extent.depth  = uint32_t(depth);
+    info.mipLevels     = mipLevels;
+    info.arrayLayers   = 1;
+    info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    info.usage         = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocInfo { };
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    if (vmaCreateImage(allocator, &info, &allocInfo, &tex.m_image, &tex.m_allocation, nullptr) != VK_SUCCESS)
+        return false;
+
+    tex.m_layoutTracker.Init(tex.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    // One staging buffer per mip level, all uploads + barriers in a single one-shot command buffer.
+    // When generateMips=false, mipChain is empty — we synthesize a single-entry "chain" pointing
+    // at the original input data for the Mip 0 upload below.
+    AutoArray<VkStagingBuffer> stagings;
+    stagings.Resize(mipLevels);
+    for (uint32_t lv = 0; lv < mipLevels; ++lv) {
+        const int mipW = generateMips ? mipChain[lv].width  : width;
+        const int mipH = generateMips ? mipChain[lv].height : height;
+        const int mipD = generateMips ? mipChain[lv].depth  : depth;
+        const void* mipSrc = generateMips ? mipChain[lv].data.Data() : data;
+        const VkDeviceSize bytes = VkDeviceSize(mipW) * VkDeviceSize(mipH) * VkDeviceSize(mipD) * VkDeviceSize(stride);
+        if (not CreateStagingBuffer(bytes, stagings[lv])) {
+            for (uint32_t i = 0; i < mipLevels; ++i)
+                stagings[i].Destroy();
+            DestroyTextureGPUResources(tex);
+            return false;
+        }
+        std::memcpy(stagings[lv].mapped, mipSrc, size_t(bytes));
+    }
+
+    OneShotCommandBuffer cmd { };
+    if (not BeginSingleTimeCommands(cmd)) {
+        for (uint32_t i = 0; i < mipLevels; ++i)
+            stagings[i].Destroy();
+        DestroyTextureGPUResources(tex);
+        return false;
+    }
+
+    // ToTransferDst barriers all mip levels (subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS).
+    tex.m_layoutTracker.ToTransferDst(cmd.cb);
+
+    for (uint32_t lv = 0; lv < mipLevels; ++lv) {
+        const int mipW = generateMips ? mipChain[lv].width  : width;
+        const int mipH = generateMips ? mipChain[lv].height : height;
+        const int mipD = generateMips ? mipChain[lv].depth  : depth;
+        VkBufferImageCopy copy { };
+        copy.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+        copy.imageSubresource.mipLevel       = lv;
+        copy.imageSubresource.baseArrayLayer = 0;
+        copy.imageSubresource.layerCount     = 1;
+        copy.imageOffset = { 0, 0, 0 };
+        copy.imageExtent = { uint32_t(mipW), uint32_t(mipH), uint32_t(mipD) };
+        vkCmdCopyBufferToImage(cmd.cb, stagings[lv].buffer, tex.m_image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    }
+
+    tex.m_layoutTracker.ToShaderInput(cmd.cb);
+
+    bool ok = EndSingleTimeCommands(cmd);
+    for (uint32_t i = 0; i < mipLevels; ++i)
+        stagings[i].Destroy();
+
+    if (not ok) {
+        DestroyTextureGPUResources(tex);
+        return false;
+    }
+
+    if (not CreateView(tex, VK_IMAGE_VIEW_TYPE_3D, vkFmt, mipLevels)) {
         DestroyTextureGPUResources(tex);
         return false;
     }

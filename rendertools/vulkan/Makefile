@@ -79,6 +79,7 @@ COMMON_FILES := \
  shadowmap \
  texteffects \
  textrenderer \
+ texture_mips \
  textureatlas \
  textureprocessing \
  tiny_gltf \

@@ -138,6 +138,9 @@
     <ClInclude Include="..\..\include\base_noisetexture.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\texture_mips.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\gfxpixelformat_gl.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
@@ -288,6 +291,9 @@
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\base_noisetexture.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\texture_mips.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\oglupload.cpp">

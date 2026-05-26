@@ -155,6 +155,9 @@
     <ClInclude Include="..\..\include\base_noisetexture.h">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\texture_mips.h">
+      <Filter>Header Files\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\gfxpixelformat_vk.h">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
@@ -339,7 +342,7 @@
     <ClCompile Include="..\src\noisetexture.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\base_noisetexture.cpp">
+    <ClCompile Include="..\..\src\texture_mips.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\outline_shader.cpp">
@@ -425,6 +428,9 @@
     </ClCompile>
     <ClCompile Include="..\src\compute_shader.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\base_noisetexture.cpp">
+      <Filter>Source Files\Texture</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
