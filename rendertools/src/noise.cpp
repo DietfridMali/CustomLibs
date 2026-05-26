@@ -911,7 +911,7 @@ namespace Noise {
         // WorleyNoise() kann auch leicht negativ werden (1 - minDist mit minDist > 1 möglich) —
         // der max(0, …)-Clamp ist daher nicht nur Kontrast-Tweak, sondern auch zwingend für Korrektheit.
 #if 1
-        return std::max(0.0f, 1.4f * n - 0.4f);
+        return std::max(0.0f, 1.1f * n - 0.1f);
 #else
         return std::max(0.0f, 1.1f * (n / totalAmp) - 0.1f);
 #endif
