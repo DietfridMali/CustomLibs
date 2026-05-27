@@ -361,7 +361,7 @@ void BaseCloudNoiseTexture::ApplyWarp(void) {
 // Linear cross-axis warp — not periodic in p; only usable when the entire visible world fits in
 // one texture tile (small cloudScale, no wrap sampling).
 void BaseCloudNoiseTexture::ApplyInfiniteWarp(void) {
-    static const float warpStrength = 0.25f;
+    static const float WarpStrength = 0.25f;
 
     uint32_t totalVoxels = uint32_t(m_gridSize) * uint32_t(m_gridSize) * uint32_t(m_gridSize);
 
@@ -381,7 +381,7 @@ void BaseCloudNoiseTexture::ApplyInfiniteWarp(void) {
                 float px = (float(x) + 0.5f) * invSize;
 
                 float n = TrilinearSampleWrap(src, m_gridSize, px * 0.3f, py * 0.3f, pz * 0.3f);
-                float localWarp = warpStrength * (0.5f + n);
+                float localWarp = WarpStrength * (0.5f + n);
 
                 float wx = px + 0.37f * pz;
                 float wz = pz + 0.41f * px;
@@ -398,7 +398,7 @@ void BaseCloudNoiseTexture::ApplyInfiniteWarp(void) {
 
 // Periodic cross-axis warp — sin(2*pi*p)/(2*pi) keeps final[] seamless across tile boundaries.
 void BaseCloudNoiseTexture::ApplyPeriodicWarp(void) {
-    static const float warpStrength = 0.25f;
+    static const float WarpStrength = 0.25f;
     static const float kTwoPi = 6.28318530717958647692f;
     static const float kInvTwoPi = 1.0f / kTwoPi;
 
@@ -420,7 +420,7 @@ void BaseCloudNoiseTexture::ApplyPeriodicWarp(void) {
                 float px = (float(x) + 0.5f) * invSize;
 
                 float n = TrilinearSampleWrap(src, m_gridSize, px * 0.3f, py * 0.3f, pz * 0.3f);
-                float localWarp = warpStrength * (0.5f + n);
+                float localWarp = WarpStrength * (0.5f + n);
 
                 float wx = px + 0.37f * std::sin(kTwoPi * pz) * kInvTwoPi;
                 float wz = pz + 0.41f * std::sin(kTwoPi * px) * kInvTwoPi;
