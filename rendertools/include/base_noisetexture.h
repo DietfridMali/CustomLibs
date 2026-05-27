@@ -2,6 +2,7 @@
 
 #include "texture.h"        // resolved per-backend via include path: opengl / vulkan / directx
 #include "rendertypes.h"
+#include "texturesampling.h"
 #include "noise.h"
 #include "FBM.h"
 #include "array.hpp"
@@ -70,11 +71,11 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
     static constexpr int Components = 1;
 
     static void ConfigureSampling(TextureSampling& s) noexcept {
-        s.minFilter     = GfxFilterMode::Linear;
-        s.magFilter     = GfxFilterMode::Linear;
-        s.mipMode       = GfxMipMode::Linear;
+        s.minFilter = GfxFilterMode::Linear;
+        s.magFilter = GfxFilterMode::Linear;
+        s.mipMode = GfxMipMode::Linear;
         s.wrapU = s.wrapV = s.wrapW = GfxWrapMode::Repeat;
-        s.compareFunc   = GfxOperations::CompareFunc::Always;
+        s.compareFunc = GfxOperations::CompareFunc::Always;
         s.maxAnisotropy = 1.0f;
     }
 

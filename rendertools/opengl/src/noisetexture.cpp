@@ -68,7 +68,11 @@ void NoiseTexture3D::SetParams(bool enforce) {
 // CloudNoiseTexture + mip variants
 
 bool CloudNoiseTexture::Deploy(int) {
-    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R16_SFloat, reinterpret_cast<const void*>(m_data.Data()));
+    // Hardware-Mip-Chain auf der 256³ Shape-Noise erzeugen: ersetzt die separate CPU-vorberechnete
+    // AvgMip-Pyramide (shapeNoiseAvgMip1..4Tex) durch eine lückenlose, statistisch kohärente
+    // Mip-Folge ab dem Original. Distance-LOD im Shader läuft jetzt über ein einziges textureLod
+    // mit lodFloat-Mip-Bias statt zweier separater Samples + manuellem mix.
+    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R16_SFloat, reinterpret_cast<const void*>(m_data.Data()), true);
 }
 
 
@@ -78,7 +82,8 @@ void CloudNoiseTexture::SetParams(bool enforce) {
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        // GL_LINEAR_MIPMAP_LINEAR → trilineares Sampling über die Hardware-Mip-Chain.
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     }
 }

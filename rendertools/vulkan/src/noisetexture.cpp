@@ -38,13 +38,18 @@ void NoiseTexture3D::SetParams(bool) {
 // CloudNoiseTexture + mip variants
 
 bool CloudNoiseTexture::Deploy(int) {
-    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R32_SFloat, reinterpret_cast<const void*>(m_data.Data()));
+    // Hardware-Mip-Chain auf der 256³ Shape-Noise erzeugen: ersetzt die separate CPU-vorberechnete
+    // AvgMip-Pyramide (shapeNoiseAvgMip1..4Tex) durch eine lückenlose, statistisch kohärente
+    // Mip-Folge ab dem Original. Distance-LOD im Shader läuft jetzt über ein einziges SampleLod
+    // mit lodFloat-Mip-Bias statt zweier separater Samples + manuellem lerp.
+    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R32_SFloat, reinterpret_cast<const void*>(m_data.Data()), true);
 }
 
 
 void CloudNoiseTexture::SetParams(bool) {
     m_hasParams = true;
-    ConfigureSamplingForNoise(m_sampling, GfxFilterMode::Linear, GfxMipMode::None);
+    // MipMode::Linear → GPU lerpt trilinear zwischen Mip-Levels gemäß dem lodFloat-Bias.
+    ConfigureSamplingForNoise(m_sampling, GfxFilterMode::Linear, GfxMipMode::Linear);
 }
 
 

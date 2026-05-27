@@ -14,6 +14,7 @@
 // =================================================================================================
 
 static const String HLSLBridge = String(R"(
+    #version 430 core
     // HLSL → GLSL type aliases
     #define float2      vec2
     #define float3      vec3
