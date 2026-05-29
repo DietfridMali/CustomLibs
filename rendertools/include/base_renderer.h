@@ -205,6 +205,10 @@ public:
         return m_frameIndex;
     }
 
+    inline void BumpFrameIndex(void) noexcept {
+        ++m_frameIndex;
+    }
+
     inline void SetSceneViewport(Viewport viewport) noexcept { m_sceneViewport = viewport; }
 
     inline ::Viewport GetSceneViewport(void) noexcept { return m_sceneViewport; }
