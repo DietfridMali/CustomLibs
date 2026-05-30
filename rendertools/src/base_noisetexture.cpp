@@ -60,9 +60,9 @@ static float TrilinearSampleWrap(const float* data, int size, float u, float v, 
     float fy = v * float(size) - 0.5f;
     float fz = w * float(size) - 0.5f;
 
-    int x0 = (int) std::floor(fx);
-    int y0 = (int) std::floor(fy);
-    int z0 = (int) std::floor(fz);
+    int x0 = int(std::floor(fx));
+    int y0 = int(std::floor(fy));
+    int z0 = int(std::floor(fz));
     int x1 = x0 + 1;
     int y1 = y0 + 1;
     int z1 = z0 + 1;

@@ -36,7 +36,7 @@ namespace NoiseTextureUtil {
     }
 
     inline uint8_t ToByte01(float v) noexcept {
-        int iv = (int) std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f);
+        int iv = int(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
         return (uint8_t) std::clamp(iv, 0, 255);
     }
 

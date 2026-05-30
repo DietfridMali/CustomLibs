@@ -272,7 +272,7 @@ static void CheckFileOpen(const std::string& path) {
         std::cerr << "errno=" << errno << " (" << std::strerror(errno) << ")\n";
         std::cerr << "bytes:";
         for (auto c : path) {
-            std::cerr << " " << std::hex << (int)c;
+            std::cerr << " " << std::hex << int(c);
         }
         std::cerr << std::dec << "\n";
     }
