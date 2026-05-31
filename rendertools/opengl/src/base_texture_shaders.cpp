@@ -9,7 +9,7 @@ const ShaderSource& TestShader() {
     static const ShaderSource source(
         "testShader",
         R"(
-            #version 330 core
+            #version 330
             void main() {
                 vec2 positions[3];
                 positions[0] = vec2(-0.5, -0.5);
@@ -34,7 +34,7 @@ const ShaderSource& StencilShader() {
     static const ShaderSource source(
         "stencilShader",
         R"(
-            #version 330 core
+            #version 330
             layout(location = 0) in vec3 position;
             uniform mat4 mModelView;
             uniform mat4 mProjection;
@@ -44,7 +44,7 @@ const ShaderSource& StencilShader() {
             }
         )",
         R"(
-            #version 330 core
+            #version 330
             void main() { }
         )"
     );
@@ -72,7 +72,7 @@ const ShaderSource& ShadowShader() {
         }
         )",
         R"(
-        #version 330 core
+        #version 330
         uniform sampler2D surface;
         uniform vec4 surfaceColor;
         in vec2 fragCoord;
@@ -110,7 +110,7 @@ const ShaderSource& SphereShadowShader() {
             }
         )",
         R"(
-        #version 330 core
+        #version 330
 
 #define CULL_FACES 0
 #if CULL_FACES
@@ -134,7 +134,7 @@ const ShaderSource& DepthRenderer() {
         "depthRenderer",
         Standard2DVS(),
         R"(
-        #version 330 core
+        #version 330
         uniform sampler2D surface;
         in vec2 fragCoord;
         out vec4 fragColor;
@@ -208,7 +208,7 @@ const ShaderSource& GrayScaleShader() {
         "grayScale",
         Standard2DVS(),
         R"(
-        #version 330 core
+        #version 330
         // Für OpenGL ES 3.0 statt dessen:
         // #version 300 es
         // precision mediump float;
@@ -355,7 +355,7 @@ const ShaderSource& TintAndBlurShader() {
         "tintAndBlur",
         Standard2DVS(),
         String(R"(
-            #version 330 core
+            #version 330
             // Für OpenGL ES 3.0 statt dessen:
             // #version 300 es
             // precision mediump float;

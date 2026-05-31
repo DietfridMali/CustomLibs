@@ -14,6 +14,15 @@
 #include "shaderdatalayout.h"
 
 // =================================================================================================
+// GLSLVersion — emits a "#version <value>\n" line to prepend to GLSL shader source. Lives here so
+// the OpenGL shader sources (which include this via shadercode.h) and the HLSL→GLSL bridge
+// (hlslbridge.inl) share one definition.
+
+inline String GLSLVersion(const char* value = "430 core") {
+    return (value and *value) ? String("#version ") + String(value) + String("\n") : String("");
+}
+
+// =================================================================================================
 
 struct ShaderMacro {
     String  m_name{ "" };

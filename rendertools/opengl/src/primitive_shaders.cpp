@@ -10,7 +10,7 @@ const ShaderSource& LineShader() {
         "lineShader",
         Standard2DVS(),
         R"(
-            #version 330 core
+            #version 330
 
             uniform vec2 viewportSize;   // Pixel
             uniform vec4 surfaceColor;
@@ -66,7 +66,7 @@ const ShaderSource& RingShader() {
         "ringShader",
         Standard2DVS(),
         R"(
-            #version 330 core
+            #version 330
 
             uniform vec2  center;          // [0..1] UV
             uniform float radius;          // [0..1] UV (außen, bezogen auf min(viewportSize))
@@ -163,7 +163,7 @@ const ShaderSource& CircleShader() {
                 }
         )",
         R"(
-            #version 330 core
+            #version 330
             
             uniform vec2 viewportSize;   // Pixel
             uniform vec4 surfaceColor;
@@ -210,7 +210,7 @@ const ShaderSource& CircleMaskShader() {
         "circleMaskShader",
         Standard2DVS(),
         R"(
-            #version 330 core
+            #version 330
 
             uniform sampler2D surface;
             uniform vec2 viewportSize;   // Pixel
@@ -265,7 +265,7 @@ const ShaderSource& RectangleShader() {
         "rectangleShader",
         Standard2DVS(),
         R"(
-            #version 330 core
+            #version 330
 
             in vec2 fragCoord;         // UV [0..1]
             out vec4 fragColor;
