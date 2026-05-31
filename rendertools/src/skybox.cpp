@@ -77,7 +77,7 @@ bool Skybox::Setup(const String& textureFolder) {
 }
 
 
-Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness) {
+Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha) {
     Shader* shader = baseShaderHandler.SetupShader("skybox");
     if (shader) {
         shader->SetMatrix4f("mView", view.AsArray(), false);
@@ -85,16 +85,17 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 		for (int i = 0; i < 3; i++) {
 			m_skyTextures[i]->Activate(i);
 			if (baseRenderer.HasOpenGL())
-			shader->SetInt(skyNames[i], i);
+				shader->SetInt(skyNames[i], i);
 			}
 		shader->SetVector3f("lightDirection", lightDirection);
 		shader->SetFloat("brightness", brightness);
-    }
+		shader->SetFloat("alpha", alpha);
+	}
     return shader;
 }
 
 
-bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
+bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime) {
 	if (not m_skybox)
 		return false;
 
@@ -104,7 +105,9 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness) {
 	gfxStates.SetFaceCulling(0);
 	gfxStates.SetDepthWrite(0);
 	gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-	Shader* shader = LoadShader(view, lightDirection, brightness);
+	float alpha = std::min(float(currentTime - m_activationTime) / 1000.0f, 1.0f);
+	gfxStates.SetBlending(alpha < 1.0f ? 1 : 0);
+	Shader* shader = LoadShader(view, lightDirection, brightness, alpha);
 	if (shader) {
 #if 1
 		for (int i = 0; i < 3; i++)
