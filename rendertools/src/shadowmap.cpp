@@ -23,8 +23,8 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	// rendertarget.cpp/resource_view.h. Start bei 8K (industry-typische ShadowMap-Aufloesung),
 	// halbieren bei Fehlschlag bis 1024. Cap zusaetzlich gegen die Hardware-Allocation-Grenze
 	// fuer 4-Byte-Pixel-Formate, falls die GPU weniger als 8K verkraftet.
-	constexpr int kShadowDepthBytesPerPixel = 4;
-	const int maxSize = gfxStates.MaxTextureSize(kShadowDepthBytesPerPixel);
+	constexpr int ShadowDepthBytesPerPixel = 4;
+	const int maxSize = gfxStates.MaxTextureSize(ShadowDepthBytesPerPixel);
 	int startSize = std::min<int>(maxSize, 16384);
 	for (int size = startSize; size >= 1024; size /= 2) {
 		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
