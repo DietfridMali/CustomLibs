@@ -227,12 +227,13 @@ public:
     static constexpr uint32_t kUavSlots     = 4;   // matches Shader::kUavSlots
 
     VkImageView  m_boundSrvViews         [kSrvSlots]     { };
+    VkImageLayout m_boundSrvLayouts      [kSrvSlots]     { };
     VkSampler    m_boundSamplers         [kSamplerSlots] { };
     VkBuffer     m_boundStorageBuffers   [kUavSlots]     { };
     VkDeviceSize m_boundStorageBufferSize[kUavSlots]     { };
 
     void ResetBindings(void) noexcept;
-    void BindSampledImage(uint32_t slot, VkImageView view) noexcept;
+    void BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) noexcept;
     void BindSampler(uint32_t slot, VkSampler sampler) noexcept;
     void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
 

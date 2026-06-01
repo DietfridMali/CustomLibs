@@ -40,6 +40,7 @@ public:
 
     // Convenience wrappers for the common targets — encode the standard stage/access pairs.
     void ToShaderInput(VkCommandBuffer cb) noexcept;
+    void ToShadowInput(VkCommandBuffer cb) noexcept;
     void ToColorAttachment(VkCommandBuffer cb) noexcept;
     void ToDepthAttachment(VkCommandBuffer cb) noexcept;
     void ToTransferDst(VkCommandBuffer cb) noexcept;

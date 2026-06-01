@@ -129,7 +129,10 @@ void BufferInfo::SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShad
         return;
 
     if (asShaderRead) {
-        m_layoutTracker.ToShaderInput(cb);
+        if ((usageHint == btDepth) or (usageHint == btStencil))
+            m_layoutTracker.ToShadowInput(cb);
+        else
+            m_layoutTracker.ToShaderInput(cb);
         return;
     }
     if ((usageHint == btDepth) or (usageHint == btStencil))
@@ -896,10 +899,11 @@ Texture* RenderTarget::GetDepthAsTexture(void)
     if (m_cmdList and not m_isInRendering) {
         VkCommandBuffer cb = m_cmdList->GfxList();
         if (cb != VK_NULL_HANDLE)
-            info.m_layoutTracker.ToShaderInput(cb);
+            info.m_layoutTracker.ToShadowInput(cb);
     }
     m_depthTexture.m_image = info.m_image;
     m_depthTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+    m_depthTexture.m_sampleLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     m_depthTexture.m_handle = info.m_srvIndex;
     m_depthTexture.Validate();
     return &m_depthTexture;
@@ -920,10 +924,11 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
     if (m_cmdList and not m_isInRendering) {
         VkCommandBuffer cb = m_cmdList->GfxList();
         if (cb != VK_NULL_HANDLE)
-            info.m_layoutTracker.ToShaderInput(cb);
+            info.m_layoutTracker.ToShadowInput(cb);
     }
     m_shadowTexture.m_image = info.m_image;
     m_shadowTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
+    m_shadowTexture.m_sampleLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
     m_shadowTexture.m_handle = info.m_srvIndex;
     m_shadowTexture.Validate();
     return &m_shadowTexture;

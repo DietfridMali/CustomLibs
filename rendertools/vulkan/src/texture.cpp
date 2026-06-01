@@ -205,7 +205,7 @@ bool Texture::Bind(int tmuIndex)
     // next draw (descriptorPoolHandler.Allocate + vkUpdateDescriptorSets + vkCmdBindDescriptorSets).
     // The DX12 SetGraphicsRootDescriptorTable equivalent.
     if (tmuIndex >= 0 and uint32_t(tmuIndex) < CommandListHandler::kSrvSlots) {
-        commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_imageView);
+        commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_imageView, m_sampleLayout);
         VkSampler sampler = samplerCache.GetSampler(m_sampling);
         commandListHandler.BindSampler(uint32_t(tmuIndex), sampler);
     }

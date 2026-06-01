@@ -87,6 +87,7 @@ public:
     VkImageView                 m_imageView{ VK_NULL_HANDLE };
     VmaAllocation               m_allocation{ VK_NULL_HANDLE };
     ImageLayoutTracker          m_layoutTracker;
+    VkImageLayout               m_sampleLayout{ VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 
     String                      m_name;
     List<TextureBuffer*>        m_buffers;

@@ -588,7 +588,7 @@ bool Shader::UpdateVariables(void) noexcept {
         if (v == VK_NULL_HANDLE)
             continue;
         imgInfos[i].imageView   = v;
-        imgInfos[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imgInfos[i].imageLayout = commandListHandler.m_boundSrvLayouts[i];
         imgInfos[i].sampler     = VK_NULL_HANDLE;
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

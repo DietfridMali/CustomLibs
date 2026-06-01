@@ -58,6 +58,13 @@ void ImageLayoutTracker::ToShaderInput(VkCommandBuffer cb) noexcept
 }
 
 
+void ImageLayoutTracker::ToShadowInput(VkCommandBuffer cb) noexcept
+{
+    TransitionTo(cb, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, VK_ACCESS_2_SHADER_READ_BIT);
+}
+
+
 void ImageLayoutTracker::ToColorAttachment(VkCommandBuffer cb) noexcept
 {
     TransitionTo(cb, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,

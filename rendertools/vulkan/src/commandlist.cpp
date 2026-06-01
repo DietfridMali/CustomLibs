@@ -697,8 +697,10 @@ CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTempor
 
 void CommandListHandler::ResetBindings(void) noexcept
 {
-    for (uint32_t i = 0; i < kSrvSlots; ++i)
+    for (uint32_t i = 0; i < kSrvSlots; ++i) {
         m_boundSrvViews[i] = VK_NULL_HANDLE;
+        m_boundSrvLayouts[i] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    }
     for (uint32_t i = 0; i < kSamplerSlots; ++i)
         m_boundSamplers[i] = VK_NULL_HANDLE;
     for (uint32_t i = 0; i < kUavSlots; ++i) {
@@ -708,10 +710,12 @@ void CommandListHandler::ResetBindings(void) noexcept
 }
 
 
-void CommandListHandler::BindSampledImage(uint32_t slot, VkImageView view) noexcept
+void CommandListHandler::BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout) noexcept
 {
-    if (slot < kSrvSlots)
+    if (slot < kSrvSlots) {
         m_boundSrvViews[slot] = view;
+        m_boundSrvLayouts[slot] = layout;
+    }
 }
 
 
