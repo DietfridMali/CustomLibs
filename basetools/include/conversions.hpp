@@ -3,6 +3,7 @@
 #define _USE_MATH_DEFINES // for C++
 #define NOMINMAX
 
+#include <algorithm>
 #include <concepts>   // std::integral, std::signed_integral
 #include <utility>    // std::pair
 #include <stdexcept>  // std::invalid_argument
@@ -83,6 +84,18 @@ namespace Conversions
 
     inline float Remap(float v, float oldMin, float oldMax, float newMin, float newMax) {
         return std::lerp(newMin, newMax, (v - oldMin) / (oldMax - oldMin));
+    }
+
+
+    template <std::integral Int>
+    Int Fold(Int v, Int vMin, Int vMax, Int vScale) {
+        return (std::clamp(v, vMin, vMax) - vMin) / vScale;
+    }
+
+
+    template <std::integral Int>
+    Int Unfold(Int v, Int vMin, Int vMax, Int vScale) {
+        return std::clamp(v * vScale + vMin, vMin, vMax);
     }
 
 
