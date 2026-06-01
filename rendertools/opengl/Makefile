@@ -29,7 +29,6 @@ OPENGL_FILES := \
  primitive_shaders \
  rendertarget \
  shader \
- skybox \
  texture \
  texturebuffer \
  texturehandler
@@ -54,6 +53,7 @@ COMMON_FILES := \
  projector \
  rendermatrices \
  shadowmap \
+ skybox \
  texteffects \
  textrenderer \
  texture_mips \

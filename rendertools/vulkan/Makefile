@@ -49,7 +49,6 @@ VULKAN_FILES := \
  sampler_cache \
  shader \
  shader_compiler \
- skybox \
  swapchain \
  texture \
  texturebuffer \
@@ -77,6 +76,7 @@ COMMON_FILES := \
  projector \
  rendermatrices \
  shadowmap \
+ skybox \
  texteffects \
  textrenderer \
  texture_mips \
