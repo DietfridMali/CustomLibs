@@ -56,6 +56,7 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
 
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     ZoneScoped;
+    TracyGpuZone("DrawScreen");
     if (m_screenIsAvailable) {
         m_frameCounter.Draw(true);
         Stop2DScene();

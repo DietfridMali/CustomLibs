@@ -211,6 +211,7 @@ bool CommandQueue::AcquireNextImage(void) noexcept
 
 void CommandQueue::Present(void) noexcept
 {
+    ZoneScopedN("CmdQueue::Present");
     VkPresentInfoKHR present { };
     present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present.waitSemaphoreCount = 1;
@@ -270,9 +271,9 @@ bool CommandList::Create(const String& name, bool isTemporary) noexcept
         return false;
 
     VkCommandPoolCreateInfo poolInfo{};
-    poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = vkContext.GraphicsFamily();
-    poolInfo.flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
 
     for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
         VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &m_pools[i]);
@@ -281,9 +282,9 @@ bool CommandList::Create(const String& name, bool isTemporary) noexcept
             return false;
         }
         VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool        = m_pools[i];
-        allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = m_pools[i];
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocInfo.commandBufferCount = 1;
         res = vkAllocateCommandBuffers(device, &allocInfo, &m_cmdBuffers[i]);
         if (res != VK_SUCCESS) {
@@ -399,13 +400,13 @@ void CommandList::Flush(void) noexcept
 
     uint32_t fi = ActiveFrameIndex();
     VkCommandBufferSubmitInfo cbInfo{};
-    cbInfo.sType         = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    cbInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
     cbInfo.commandBuffer = m_cmdBuffers[fi];
 
     VkSubmitInfo2 submit{};
-    submit.sType                  = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+    submit.sType  = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
     submit.commandBufferInfoCount = 1;
-    submit.pCommandBufferInfos    = &cbInfo;
+    submit.pCommandBufferInfos = &cbInfo;
 
     VkResult res = vkQueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
     if (res != VK_SUCCESS)
@@ -435,9 +436,9 @@ void CommandList::SetBarrier(const VkImageMemoryBarrier2* barriers, int count)
     if (not m_isRecording or not barriers or (count <= 0))
         return;
     VkDependencyInfo dep{};
-    dep.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dep.sType   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
     dep.imageMemoryBarrierCount = uint32_t(count);
-    dep.pImageMemoryBarriers    = barriers;
+    dep.pImageMemoryBarriers = barriers;
     vkCmdPipelineBarrier2(GfxList(), &dep);
 #ifdef _DEBUG
     //gfxStates.CheckError();
@@ -594,6 +595,7 @@ void CommandListHandler::Register(CommandList* cl) noexcept
 
 void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 {
+    ZoneScopedN("ExecuteAll");
     // intermediate=false (default): frame-end submit — binds the swapchain frame-sync triplet
     //   (imageAvailable wait, renderFinished signal, inFlight fence). Must be called between a
     //   prior BeginFrame (which signaled imageAvailable via vkAcquireNextImageKHR and reset the
@@ -626,32 +628,35 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
     }
     if (n > 0) {
         VkSubmitInfo2 submit{};
-        submit.sType                  = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
         submit.commandBufferInfoCount = uint32_t(n);
-        submit.pCommandBufferInfos    = cbInfos.Data();
+        submit.pCommandBufferInfos = cbInfos.Data();
 
         VkSemaphoreSubmitInfo waitInfo{};
         VkSemaphoreSubmitInfo signalInfo{};
         VkFence fence = VK_NULL_HANDLE;
         if (not intermediate) {
-            waitInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             waitInfo.semaphore = m_cmdQueue.SubmitWaitSemaphore();
             waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-            signalInfo.sType     = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
             signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
             signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
-            submit.waitSemaphoreInfoCount   = 1;
-            submit.pWaitSemaphoreInfos      = &waitInfo;
+            submit.waitSemaphoreInfoCount = 1;
+            submit.pWaitSemaphoreInfos = &waitInfo;
             submit.signalSemaphoreInfoCount = 1;
-            submit.pSignalSemaphoreInfos    = &signalInfo;
+            submit.pSignalSemaphoreInfos = &signalInfo;
             fence = m_cmdQueue.SubmitSignalFence();
         }
 
-        VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
-        if (res != VK_SUCCESS)
-            fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
+        {
+            ZoneScopedN("vkQueueSubmit2");
+            VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
+            if (res != VK_SUCCESS)
+                fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
+        }
     }
 #ifdef _DEBUG
     //gfxStates.CheckError();
@@ -697,7 +702,7 @@ void CommandListHandler::ResetBindings(void) noexcept
     for (uint32_t i = 0; i < kSamplerSlots; ++i)
         m_boundSamplers[i] = VK_NULL_HANDLE;
     for (uint32_t i = 0; i < kUavSlots; ++i) {
-        m_boundStorageBuffers[i]    = VK_NULL_HANDLE;
+        m_boundStorageBuffers[i] = VK_NULL_HANDLE;
         m_boundStorageBufferSize[i] = 0;
     }
 }
@@ -720,7 +725,7 @@ void CommandListHandler::BindSampler(uint32_t slot, VkSampler sampler) noexcept
 void CommandListHandler::BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept
 {
     if (slot < kUavSlots) {
-        m_boundStorageBuffers[slot]    = buffer;
+        m_boundStorageBuffers[slot] = buffer;
         m_boundStorageBufferSize[slot] = range;
     }
 }

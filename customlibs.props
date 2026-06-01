@@ -8,6 +8,7 @@
     <VulkanSDK>$(ExternalLibs)VulkanSDK\1.4.341.1</VulkanSDK>
     <VULKAN_SDK>$(VulkanSDK)</VULKAN_SDK>
     <MS_GRDK>$(ExternalLibs)Microsoft\GRD\GRDK</MS_GRDK>
+    <TracyDir>$(ExternalLibs)..\..\Tools\Tracy\public\</TracyDir>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />
