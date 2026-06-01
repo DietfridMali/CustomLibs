@@ -6,6 +6,7 @@
 #include "gfxstates.h"
 
 #include <cstdio>
+#include <cstring>
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL. Es gibt in dem Sinne keine verschachtelten Render-Tasks.
@@ -350,6 +351,11 @@ bool CommandList::Open(bool saveRenderStates) noexcept
     // which is what the submit sequence uses. ExecuteAll forces a Close on anything
     // still in m_openLists at frame end.
     commandListHandler.m_openLists.Push(this);
+#if USE_TRACY
+    m_gpuZone = new tracy::VkCtxScope(commandListHandler.m_gpuProfilerCtx,
+        uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
+        (const char*)m_name, size_t(m_name.Length()), m_cmdBuffers[fi], true);
+#endif
     if (saveRenderStates)
         PushRenderStates();
 #ifdef _DEBUG
@@ -364,6 +370,10 @@ void CommandList::Close(bool restoreRenderStates) noexcept
     if (not m_isRecording)
         return;
     m_isRecording = false;
+#if USE_TRACY
+    delete m_gpuZone;
+    m_gpuZone = nullptr;
+#endif
     uint32_t fi = ActiveFrameIndex();
     VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
     if (res != VK_SUCCESS)
@@ -514,12 +524,36 @@ bool CommandListHandler::Create(VkDevice device, VkQueue graphicsQueue, VkQueue 
                                 uint32_t graphicsFamily, uint32_t presentFamily,
                                 const String& name) noexcept
 {
-    return m_cmdQueue.Create(device, graphicsQueue, presentQueue, graphicsFamily, presentFamily, name);
+    if (not m_cmdQueue.Create(device, graphicsQueue, presentQueue, graphicsFamily, presentFamily, name))
+        return false;
+#if USE_TRACY
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolInfo.queueFamilyIndex = graphicsFamily;
+    VkCommandPool tracyPool = VK_NULL_HANDLE;
+    if (vkCreateCommandPool(device, &poolInfo, nullptr, &tracyPool) == VK_SUCCESS) {
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.commandPool = tracyPool;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocInfo.commandBufferCount = 1;
+        VkCommandBuffer tracyCb = VK_NULL_HANDLE;
+        if (vkAllocateCommandBuffers(device, &allocInfo, &tracyCb) == VK_SUCCESS)
+            m_gpuProfilerCtx = TracyVkContext(vkContext.PhysicalDevice(), device, graphicsQueue, tracyCb);
+        vkDestroyCommandPool(device, tracyPool, nullptr);
+    }
+#endif
+    return true;
 }
 
 
 void CommandListHandler::Destroy(void) noexcept
 {
+    if (m_gpuProfilerCtx) {
+        TracyVkDestroy(m_gpuProfilerCtx);
+        m_gpuProfilerCtx = nullptr;
+    }
     for (auto cl : m_recycledLists) {
         cl->Destroy();
         delete cl;

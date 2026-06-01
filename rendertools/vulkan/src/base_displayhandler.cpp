@@ -7,6 +7,7 @@
 #include "descriptor_pool_handler.h"
 #include "cbv_allocator.h"
 #include "resource_handler.h"
+#include "tracy_wrapper.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -199,20 +200,24 @@ void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
         m_isInRendering = false;
     }
     m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
+    TracyVkCollect(commandListHandler.m_gpuProfilerCtx, cb);
 }
 
 
 void BaseDisplayHandler::EndFrame(void) {
+    ZoneScoped;
     if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
     // Submit all registered command buffers, then present + advance frame slot.
     commandListHandler.ExecuteAll();
     commandListHandler.CmdQueue().EndFrame();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
+    FrameMark;
 }
 
 
 void BaseDisplayHandler::BeginFrame(void) {
+    ZoneScoped;
     if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
     // CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, and

@@ -51,6 +51,17 @@
 #		define TracyD3D12Destroy(ctx)
 #		define TracyD3D12NewFrame(ctx)
 #		define TracyD3D12Collect(ctx)
+#		define TracyD3D12Zone(...)
+#		define TracyD3D12ZoneC(...)
+#	elif !defined(OPENGL)
+		using TracyVkCtx = void*;
+		namespace tracy { class VkCtxScope; }
+#		define TracyVkContext(...) nullptr
+#		define TracyVkContextCalibrated(...) nullptr
+#		define TracyVkDestroy(...)
+#		define TracyVkCollect(...)
+#		define TracyVkZone(...)
+#		define TracyVkZoneC(...)
 #	endif
 
 #endif

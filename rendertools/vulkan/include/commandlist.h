@@ -8,6 +8,7 @@
 #include "renderstates.h"
 #include "image_layout_tracker.h"
 #include "swapchain.h"
+#include "tracy_wrapper.h"
 
 #include <functional>
 
@@ -121,6 +122,7 @@ public:
     uint32_t                            m_refCounter   { 1 };
     String                              m_name         { "" };
     VkPipeline                          m_activePipeline { VK_NULL_HANDLE };
+    tracy::VkCtxScope*                  m_gpuZone { nullptr };
 
     static List<RenderStates>           m_renderStateStack;
 
@@ -202,6 +204,7 @@ public:
     CommandListData                     m_currentListData;
     uint64_t                            m_cmdListId    { 1 };
     uint64_t                            m_cmdListCount { 0 };
+    TracyVkCtx                          m_gpuProfilerCtx { nullptr };
 
 #ifdef _DEBUG
     static bool s_logCalls;
