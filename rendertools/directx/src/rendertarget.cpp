@@ -558,10 +558,18 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.SRVIndex()));
 
     // Bind the matching sampler from m_renderTexture's sampling configuration.
-    // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets
-    // LINEAR/CLAMP_TO_EDGE/COMPARE_NONE — the canonical RT-source sampler).
+    // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets the
+    // wrap/mip/compare defaults).
     if (not m_renderTexture.m_hasParams)
         m_renderTexture.SetParams(false);
+    // Color and worldPos/normal MRT (btVertex) buffers must be POINT-sampled, mirroring the OGL
+    // RT buffer creation (GL_NEAREST for RGBA8 color + RGBA32F MRT buffers; LINEAR only for
+    // skymap/depth). Linear filtering interpolates world positions across geometry silhouettes,
+    // which smears decals along moving geometry. Set per bind (m_renderTexture is shared across
+    // buffer types, so this must not rely on the one-shot SetParams above).
+    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex);
+    m_renderTexture.m_sampling.minFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
+    m_renderTexture.m_sampling.magFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
     auto& samplerHeap = descriptorHeaps.m_samplerHeap;
     if (samplerHeap.m_heap) {
         uint32_t slot = samplerCache.GetSlot(m_renderTexture.m_sampling);
@@ -597,9 +605,20 @@ void RenderTarget::Clear(const RTActivationParams& params)
     if (not list)
         return;
     if (params.bufferIndex < 0) {
-        for (int i = 0; i < m_colorBufferCount; ++i)
-            if (m_bufferInfo[i].RTV().Handle().IsValid())
-                list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
+        // Clear color AND worldPos/normal MRT (btVertex) buffers, matching Vulkan (loadOp=CLEAR
+        // for color+vertex in dbAll) and OGL (glClear over all active draw buffers). Iterating
+        // only m_colorBufferCount left the btVertex buffers uncleared, so stale world positions
+        // persisted where moving geometry (e.g. an opening door) vacated pixels — the decal pass
+        // then mapped those stale positions into its volume and smeared the decal along the motion.
+        // Gate on RENDER_TARGET state so only currently-attached draw buffers are cleared
+        // (ClearRenderTargetView requires that state).
+        for (int i = 0; i < m_bufferCount; ++i) {
+            BufferInfo& bi = m_bufferInfo[i];
+            if ((bi.m_type != BufferInfo::btColor) and (bi.m_type != BufferInfo::btVertex))
+                continue;
+            if (bi.RTV().Handle().IsValid() and (bi.m_state == D3D12_RESOURCE_STATE_RENDER_TARGET))
+                list->ClearRenderTargetView(bi.RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
+        }
     }
     else if ((params.bufferIndex < m_colorBufferCount) and m_bufferInfo[params.bufferIndex].RTV().Handle().IsValid()) {
         list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);

@@ -141,6 +141,14 @@ public:
         UINT clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
         auto& heap = descriptorHeaps.m_srvHeap;
         list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
+        // ClearUnorderedAccessViewUint is not implicitly ordered against subsequent UAV
+        // accesses. Without a UAV barrier the clear can run concurrently with or after the
+        // following shader pass (e.g. the decal mask's InterlockedMin), corrupting the data.
+        // (OpenGL serializes glClearNamedBufferData before SSBO access implicitly; DX12 does not.)
+        D3D12_RESOURCE_BARRIER b{};
+        b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        b.UAV.pResource = m_resource.Get();
+        list->ResourceBarrier(1, &b);
     }
 
     bool Upload(void) {

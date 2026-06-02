@@ -307,14 +307,16 @@ void BaseCloudNoiseTexture::Compute(String textureFolder) {
     float dMin = 1.0f, dMax = 0.0f;
     for (int i = dataSize; i; --i) {
         float perlin = InvAmp(rgbaData[0]);
-#if SPREAD_NOISE
+#if SPREAD_NOISE == 1
+        perlin = float(pow(perlin, 1.5f));
+#elif SPREAD_NOISE == 2
         perlin *= perlin;
 #endif
-#if CLOUD_STRUCTURE == 0
+#if CLOUD_STRUCTURE == 0 // standard distribution
         float worley = Amp2(rgbaData[1]) * 0.625f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.125f;
-#elif CLOUD_STRUCTURE == 1
+#elif CLOUD_STRUCTURE == 1 // less coarser structures, more detail
         float worley = Amp2(rgbaData[1]) * 0.5f + Amp2(rgbaData[2]) * 0.3f + Amp2(rgbaData[3]) * 0.2f;
-#else
+#else // bigger coarsers structures, less detail
         float worley = Amp2(rgbaData[1]) * 0.65f + Amp2(rgbaData[2]) * 0.25f + Amp2(rgbaData[3]) * 0.1f;
 #endif
 #if 1

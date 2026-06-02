@@ -146,7 +146,46 @@ public:
         // case (R32_UINT, value = 0xFFFFFFFF) the pattern matches the element layout exactly.
         static_assert(sizeof(DATA_T) == sizeof(uint32_t),
                       "GfxArray::Clear assumes 32-bit elements; widen the fill path for other sizes.");
+
+        // vkCmdFillBuffer is a transfer-stage write with no implicit ordering against the
+        // fragment-shader storage accesses around it (the decal mask's InterlockedMin write in
+        // pass 0 / read in pass 1). Two buffer barriers make the clear self-synchronizing — legal
+        // here because Clear is always called outside a dynamic-rendering scope (DecalHandler::Render
+        // brackets it with EndRendering/BeginRendering). GfxStates::SetMemoryBarrier only covers the
+        // fragment->fragment pass-0->pass-1 dependency and never names the transfer stage:
+        //   • before: a prior shader pass (the previous decal's pass-1 read) must finish before this
+        //     fill overwrites the buffer (WAR);
+        //   • after: the fill must finish before the next shader pass reads/writes it (RAW) — the
+        //     analogue of the DX12 UAV barrier after ClearUnorderedAccessViewUint.
+        auto BufferBarrier = [&](VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+                                 VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
+            VkBufferMemoryBarrier2 b{};
+            b.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+            b.srcStageMask        = srcStage;
+            b.srcAccessMask       = srcAccess;
+            b.dstStageMask        = dstStage;
+            b.dstAccessMask       = dstAccess;
+            b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            b.buffer              = m_buffer;
+            b.offset              = 0;
+            b.size                = m_bufferSize;
+            VkDependencyInfo dep{};
+            dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dep.bufferMemoryBarrierCount = 1;
+            dep.pBufferMemoryBarriers    = &b;
+            vkCmdPipelineBarrier2(cb, &dep);
+        };
+
+        BufferBarrier(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                      VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                      VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                      VK_ACCESS_2_TRANSFER_WRITE_BIT);
         vkCmdFillBuffer(cb, m_buffer, 0, m_bufferSize, uint32_t(value));
+        BufferBarrier(VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                      VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                      VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                      VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
     }
 
     bool Upload(void) {
