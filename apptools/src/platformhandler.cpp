@@ -28,6 +28,7 @@ bool PlatformHandler::Init(PlatformType type) {
     if (not (itf and itf->Login()))
         return false;
     m_activeInterface = itf;
+    m_platformType = type;
     return true;
 }
 
