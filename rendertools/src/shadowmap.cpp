@@ -217,8 +217,12 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	Vector3f mapCenter = (worldMin + worldMax) * 0.5f;
 #ifdef _DEBUG
 	static int trafoType = 2;
-	if (trafoType == 2)
-		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+	if (trafoType == 2) {
+		if (baseRenderer.HasPerspective(BaseRenderer::rpForward))
+			CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+		else
+			CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
+	}
 	else if (trafoType == 1)
 		CreatePerspectiveTransformation(center, lightDirection, lightOffset, worldRadius);
 	else
