@@ -161,10 +161,11 @@ void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Ve
 }
 
 
-void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax) {
+void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightOffset, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax) {
 	Matrix4f lightView, lightProj;
 
-	float lightOffset = worldSize.Length();
+	if (lightOffset <= 0.0f) // fall back to a sensible default if the caller didn't supply a distance
+		lightOffset = worldSize.Length();
 	m_lightPosition = center + lightDirection * lightOffset;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 
@@ -211,6 +212,9 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		center = (worldMin + worldMax) * 0.5f;
 	if ((m_status == 0) and not CreateMap(Vector2f(worldSize.X(), worldSize.Z())))
 		return false;
+	// top-down uses an orthographic light frustum centred on the map (height-independent); the regular
+	// (forward) view uses the viewer-aligned frustum around the player.
+	Vector3f mapCenter = (worldMin + worldMax) * 0.5f;
 #ifdef _DEBUG
 	static int trafoType = 2;
 	if (trafoType == 2)
@@ -218,9 +222,12 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	else if (trafoType == 1)
 		CreatePerspectiveTransformation(center, lightDirection, lightOffset, worldRadius);
 	else
-		CreateOrthoTransformation(center, lightDirection, worldSize, worldMin, worldMax);
+		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #else
-	CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+	if (baseRenderer.IsPerspective(BaseRenderer::rpForward))
+		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+	else
+		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #endif
 	return true;
 }

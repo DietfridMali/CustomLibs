@@ -108,7 +108,7 @@ private:
 
 	void CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius);
 
-	void CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax);
+	void CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightOffset, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax);
 
 	void CreateLightTransformation(const Matrix4f& lightView, const Matrix4f& lightProj);
 };

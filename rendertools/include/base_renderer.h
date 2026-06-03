@@ -34,6 +34,11 @@ public:
         rpFull
     };
 
+    enum eRenderPerspective {
+        rpForward,
+        rpTopDown
+    };
+
 protected:
     RenderTarget*           m_screenBuffer;
     RenderTarget*           m_sceneBuffer;
@@ -62,6 +67,8 @@ protected:
     RGBAColor               m_backgroundColor;
     RenderPassType          m_renderPass;
     MovingFrameCounter      m_frameCounter;
+
+    eRenderPerspective      m_perspective{ rpForward };
 
     static List<::Viewport> m_viewportStack;
     List<RenderTarget*>     m_sceneBufferStack;
@@ -228,11 +235,23 @@ public:
         return false; 
     }
 
-    virtual bool DeactivateCamera(void) { 
-        return false; 
+    virtual bool DeactivateCamera(void) {
+        return false;
     }
 
-    inline RenderTarget* ScreenBuffer(void) noexcept { 
+    inline eRenderPerspective GetPerspective(void) noexcept { 
+        return m_perspective; 
+    }
+
+    inline bool IsPerspective(eRenderPerspective value) noexcept { 
+        return m_perspective == value;
+    }
+
+    inline void SetPerspective(eRenderPerspective value) noexcept { 
+        m_perspective = value; 
+    }
+
+    inline RenderTarget* ScreenBuffer(void) noexcept {
         return m_screenBuffer; 
     }
 
