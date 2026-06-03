@@ -40,15 +40,16 @@ using TextureArray = AutoArray<Texture*>;
 // =================================================================================================
 
 struct TextureCreationParams {
-    bool     premultiply{ false };
-    bool     flipVertically{ false };
-    bool     cartoonize{ false };
-    bool     isRequired{ true };
-    bool     isDisposable{ false };
-    uint16_t blur{ 4 };
-    uint16_t gradients{ 7 };
-    uint16_t outline{ 4 };
-    String   keyDecoration{ "{}" };
+    bool        premultiply{ false };
+    bool        flipVertically{ false };
+    bool        cartoonize{ false };
+    bool        isRequired{ true };
+    bool        isDisposable{ false };
+    bool        useMipMaps{ false };
+    uint16_t    blur{ 4 };
+    uint16_t    gradients{ 7 };
+    uint16_t    outline{ 4 };
+    String      keyDecoration{ "{}" };
 };
 
 // =================================================================================================
@@ -253,7 +254,7 @@ public:
         m_isDeployed = false;
     }
 
-    bool CreateTextureResource(int w, int h, int arraySize);
+    bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1);
 
     bool CreateSRV(void);
 

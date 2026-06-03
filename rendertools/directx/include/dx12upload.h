@@ -31,6 +31,10 @@ inline bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource,
     return UploadTextureData(device, dstResource, &pixels, 1, width, height, channels);
 }
 
+// Build a CPU mip chain from the base image (2×2 box filter, edge-clamped) and upload one
+// subresource per level. dstResource must have been created with the matching MipLevels count.
+bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels) noexcept;
+
 // Create + upload a Texture3D resource. Returns nullptr on failure.
 ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept;
 

@@ -20,6 +20,7 @@
 #include "dx12context.h"
 #include "dx12upload.h"
 #include "resource_handler.h"
+#include "texture_mips.h"
 
 // =================================================================================================
 // DX12 Texture implementation
@@ -192,11 +193,12 @@ void Texture::SetParams(bool forceUpdate)
     m_sampling.wrapV     = GfxWrapMode::Repeat;
     m_sampling.wrapW     = GfxWrapMode::Repeat;
     m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
-    m_sampling.maxAnisotropy = 1.0f;
+    // Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
+    m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;
 }
 
 
-bool Texture::CreateTextureResource(int w, int h, int arraySize)
+bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels)
 {
     ID3D12Device* device = dx12Context.Device();
     if (not device) {
@@ -210,7 +212,7 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize)
     rd.Width = UINT(w);
     rd.Height = UINT(h);
     rd.DepthOrArraySize = UINT16(arraySize);
-    rd.MipLevels = 1;
+    rd.MipLevels = UINT16(mipLevels);
     rd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     rd.SampleDesc.Count = 1;
     rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
@@ -258,7 +260,8 @@ bool Texture::CreateSRV(void)
     }
     else {
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = 1;
+        // Expose the full mip chain that was created (1 when mip-mapping is disabled).
+        srvDesc.Texture2D.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
     }
 
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
@@ -282,10 +285,16 @@ bool Texture::Deploy(int bufferIndex)
     if (w <= 0 or h <= 0)
         return false;
 
-    if (not CreateTextureResource(w, h, 1))
+    const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
+    if (not CreateTextureResource(w, h, 1, int(mipLevels)))
         return false;
     const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-    if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, tb->m_info.m_componentCount))
+    const int channels = tb->m_info.m_componentCount;
+    if (mipLevels > 1) {
+        if (not UploadTextureDataWithMips(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels, mipLevels))
+            return false;
+    }
+    else if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels))
         return false;
     if (not CreateSRV())
         return false;
@@ -341,6 +350,7 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         return false;
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
+    m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
     return Deploy();
 }
@@ -353,6 +363,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
         return false;
     }
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
+    m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
     return Deploy();
 }

@@ -9,6 +9,7 @@
 #include "texture_mips.h"
 
 #include <cstring>
+#include <algorithm>
 
 // =================================================================================================
 
@@ -100,6 +101,65 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
             baseRenderer.FinishOperation(cl);
             return false;
         }
+    }
+    SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    return baseRenderer.FinishOperation(cl, true);
+}
+
+
+// 2×2 box-filter downsample of an 8-bit, N-channel image. Odd source extents clamp the second
+// tap to the last texel (same edge convention as the 3D box filter / glGenerateMipmap).
+static void Downsample2D_8bit(const uint8_t* src, int sw, int sh, int channels, uint8_t* dst, int dw, int dh) noexcept
+{
+    for (int yd = 0; yd < dh; ++yd) {
+        int ys0 = yd * 2;
+        int ys1 = std::min(ys0 + 1, sh - 1);
+        for (int xd = 0; xd < dw; ++xd) {
+            int xs0 = xd * 2;
+            int xs1 = std::min(xs0 + 1, sw - 1);
+            const uint8_t* p00 = src + (size_t(ys0) * sw + xs0) * channels;
+            const uint8_t* p01 = src + (size_t(ys0) * sw + xs1) * channels;
+            const uint8_t* p10 = src + (size_t(ys1) * sw + xs0) * channels;
+            const uint8_t* p11 = src + (size_t(ys1) * sw + xs1) * channels;
+            uint8_t* o = dst + (size_t(yd) * dw + xd) * channels;
+            for (int c = 0; c < channels; ++c)
+                o[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+        }
+    }
+}
+
+
+bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels) noexcept
+{
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureDataWithMips"));
+    if (not cl)
+        return false;
+
+    // One upload buffer kept alive per level until the list is flushed; CPU-side downsample
+    // buffers for levels 1..N-1 (level 0 uploads straight from the caller's pixels).
+    AutoArray<ComPtr<ID3D12Resource>> uploads;
+    AutoArray<AutoArray<uint8_t>>     levels;
+    uploads.Resize(mipLevels);
+    levels.Resize(mipLevels);
+
+    bool ok = UploadSubresource(device, cl->GfxList(), dstResource, 0, pixels, width, height, channels, uploads[0], /*addBarrier=*/false);
+
+    const uint8_t* prevData = pixels;
+    int prevW = width, prevH = height;
+    for (uint32_t lv = 1; lv < mipLevels and ok; ++lv) {
+        int curW = std::max(1, prevW / 2);
+        int curH = std::max(1, prevH / 2);
+        levels[lv].Resize(uint32_t(size_t(curW) * size_t(curH) * size_t(channels)));
+        Downsample2D_8bit(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
+        ok = UploadSubresource(device, cl->GfxList(), dstResource, lv, levels[lv].Data(), curW, curH, channels, uploads[lv], /*addBarrier=*/false);
+        prevData = levels[lv].Data();
+        prevW = curW;
+        prevH = curH;
+    }
+
+    if (not ok) {
+        baseRenderer.FinishOperation(cl);
+        return false;
     }
     SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
     return baseRenderer.FinishOperation(cl, true);
