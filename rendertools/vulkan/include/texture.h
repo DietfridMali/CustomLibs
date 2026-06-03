@@ -49,6 +49,7 @@ struct TextureCreationParams {
     bool     cartoonize{ false };
     bool     isRequired{ true };
     bool     isDisposable{ false };
+    bool     useMipMaps{ false };
     uint16_t blur{ 4 };
     uint16_t gradients{ 7 };
     uint16_t outline{ 4 };

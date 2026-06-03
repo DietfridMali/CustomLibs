@@ -56,6 +56,7 @@ static String HLSLBridge(const char* glslVersion = nullptr) {
             #   define SampleLod(tex, samp, uvw, lod) textureLod((tex), (uvw), (lod))
             #   define Sample2D(tex, samp, uv)        texture((tex), (uv))
             #   define Sample3D(tex, samp, uvw)       texture((tex), (uvw))
+            #   define TextureSize(tex, samp, dim)    (dim) = vec2(textureSize((tex), 0))
             #endif //_HLSL_BRIDGE_
         )");
     return source;
@@ -64,7 +65,15 @@ static String HLSLBridge(const char* glslVersion = nullptr) {
 #else
 
 static String HLSLBridge(const char* glslVersion = nullptr) {
-    return String("");
+    String source =
+        String(R"(
+            #ifndef _HLSL_BRIDGE_
+            #   define _HLSL_BRIDGE_
+            #   define SampleLod(tex, samp, uvw, lod) (tex).SampleLevel(samp, uvw, lod)
+            #   define TextureSize(tex, samp, dim)    (tex).GetDimensions((dim).x, (dim).y)
+            #endif //_HLSL_BRIDGE_
+        )");
+    return source;
 }
 
 #endif
