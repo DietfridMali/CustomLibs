@@ -243,7 +243,7 @@ public:
         return m_perspective; 
     }
 
-    inline bool IsPerspective(eRenderPerspective value) noexcept { 
+    inline bool HasPerspective(eRenderPerspective value) noexcept { 
         return m_perspective == value;
     }
 

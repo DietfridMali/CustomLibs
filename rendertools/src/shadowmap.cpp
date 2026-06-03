@@ -224,7 +224,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	else
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #else
-	if (baseRenderer.IsPerspective(BaseRenderer::rpForward))
+	if (baseRenderer.HasPerspective(BaseRenderer::rpForward))
 		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
 	else
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
