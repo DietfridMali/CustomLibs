@@ -5,6 +5,7 @@
 #include "array.hpp"
 #include "gfxstates.h"
 #include "sharedgfxhandle.hpp"
+#include "gfxtypes.h"
 
 class BaseGfxArray {
 public:
@@ -15,7 +16,7 @@ public:
 	}
 };
 
-template <typename DATA_T>
+template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
 class GfxArray
 	: public BaseGfxArray
 {

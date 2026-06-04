@@ -6,6 +6,7 @@
 #include "commandlist.h"
 #include "shader.h"
 #include "array.hpp"
+#include "gfxtypes.h"
 
 #include <cstdio>
 #include <cstring>
@@ -35,8 +36,7 @@ public:
     static inline bool IsAvailable{ true };
 };
 
-
-template <typename DATA_T>
+template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
 class GfxArray : public BaseGfxArray
 {
 public:
