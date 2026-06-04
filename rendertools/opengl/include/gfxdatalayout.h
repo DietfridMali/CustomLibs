@@ -30,6 +30,7 @@ public:
 #endif
     MeshTopology            m_shape{ MeshTopology::Quads };
     uint32_t                m_dynamicBuffers{ 0 };
+    uint32_t                m_instanceCount{ 1 };
     bool                    m_isBound{ false };
 
     static GfxDataLayout*         activeLayout;
@@ -58,6 +59,14 @@ public:
 
     inline void SetShape(MeshTopology shape) noexcept {
         m_shape = shape;
+    }
+
+    inline void SetInstanceCount(uint32_t instanceCount) noexcept {
+        m_instanceCount = instanceCount;
+    }
+
+    inline uint32_t GetInstanceCount(void) noexcept {
+        return m_instanceCount;
     }
 
     bool Create(MeshTopology shape = MeshTopology::Quads, uint32_t dynamicBuffers = 0)

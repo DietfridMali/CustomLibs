@@ -88,6 +88,7 @@ GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other) {
         m_indexBuffer = other.m_indexBuffer;
         m_handle = other.m_handle;
         m_shape = other.m_shape;
+        m_instanceCount = other.m_instanceCount;
     }
     return *this;
 }
@@ -107,6 +108,7 @@ noexcept
         other.m_handle = 0;
 #endif
         m_shape = other.m_shape;
+        m_instanceCount = other.m_instanceCount;
     }
     return *this;
 }
@@ -316,9 +318,9 @@ noexcept
 #endif
 #if 1
     if (m_indexBuffer.m_data)
-        glDrawElements(ToGLenum(m_shape), m_indexBuffer.m_itemCount, m_indexBuffer.m_componentType, nullptr); // draw using an index buffer
+        glDrawElementsInstanced(ToGLenum(m_shape), m_indexBuffer.m_itemCount, m_indexBuffer.m_componentType, nullptr, m_instanceCount); // draw using an index buffer
     else
-        glDrawArrays(ToGLenum(m_shape), 0, m_dataBuffers[0]->m_itemCount); // draw non indexed arrays
+        glDrawArraysInstanced(ToGLenum(m_shape), 0, m_dataBuffers[0]->m_itemCount, m_instanceCount); // draw non indexed arrays
 #endif
     DisableTextures(textures);
     FinishRender();

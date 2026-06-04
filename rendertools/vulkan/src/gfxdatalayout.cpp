@@ -90,6 +90,7 @@ GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other)
         m_dataBuffers = other.m_dataBuffers;
         m_indexBuffer = other.m_indexBuffer;
         m_shape = other.m_shape;
+        m_instanceCount = other.m_instanceCount;
     }
     return *this;
 }
@@ -102,6 +103,7 @@ GfxDataLayout& GfxDataLayout::Move(GfxDataLayout& other) noexcept
         m_dataBuffers = std::move(other.m_dataBuffers);
         m_indexBuffer = std::move(other.m_indexBuffer);
         m_shape = other.m_shape;
+        m_instanceCount = other.m_instanceCount;
     }
     return *this;
 }
@@ -294,13 +296,13 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
     //gfxStates.CheckError();
     if (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
-            commandListHandler.DrawIndexedInstanced(uint32_t(m_indexBuffer.m_itemCount), 1, 0, 0, 0);
+            commandListHandler.DrawIndexedInstanced(uint32_t(m_indexBuffer.m_itemCount), m_instanceCount, 0, 0, 0);
         else {
             uint32_t vertCount = 0;
             if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
                 vertCount = uint32_t(m_dataBuffers[0]->m_itemCount);
             if (vertCount > 0)
-                commandListHandler.DrawInstanced(vertCount, 1, 0, 0);
+                commandListHandler.DrawInstanced(vertCount, m_instanceCount, 0, 0);
         }
     }
     //gfxStates.CheckError();

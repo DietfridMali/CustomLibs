@@ -27,6 +27,7 @@ public:
     MeshTopology            m_shape{ MeshTopology::Quads };
 	CommandList*            m_updateList{ nullptr };  
     uint32_t                m_dynamicBuffers{ 0 };
+    uint32_t                m_instanceCount{ 1 };
     bool                    m_isBound{ false };
 
     static GfxDataLayout*         activeLayout;
@@ -49,6 +50,10 @@ public:
     void SetDynamic(uint32_t dynamicBuffers) noexcept;
 
     inline void SetShape(MeshTopology shape) noexcept { m_shape = shape; }
+
+    inline void SetInstanceCount(uint32_t instanceCount) noexcept { m_instanceCount = instanceCount; }
+
+    inline uint32_t GetInstanceCount(void) noexcept { return m_instanceCount; }
 
     // In DX12 there is nothing to initialise at "GfxDataLayout creation" time.
     // Returns true always.
