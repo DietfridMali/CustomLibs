@@ -23,7 +23,7 @@ void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod
         RenderTarget::RTRenderParams params = { .clearBuffer = true, .scale = 1.0f };
         gfxStates.ClearError();
         baseRenderer.Set2DRenderStates(0);
-        params.shader = baseShaderHandler.SetupShader(aaMethod.method);
+        params.shader = baseShaderHandler.SetupRenderShader(aaMethod.method);
         if (params.shader == nullptr)
             return;
         if (baseRenderer.HasOpenGL())
@@ -57,7 +57,7 @@ void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod
 void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& decoration, bool premultiply) {
     if (decoration.HaveOutline()) {
         baseRenderer.Set2DRenderStates();
-        Shader* shader = baseShaderHandler.SetupShader("outline");
+        Shader* shader = baseShaderHandler.SetupRenderShader("outline");
         if (shader and not baseRenderer.IsShadowPass()) {
             if (baseRenderer.HasOpenGL())
                 shader->SetInt("surface", 0);

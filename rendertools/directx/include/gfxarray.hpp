@@ -129,6 +129,15 @@ public:
             return DownloadTexture();
     }
 
+    // Upload only [first, first+count) elements (structured-buffer path); leaves the rest of the
+    // GPU buffer untouched. Used to spawn one particle system without resetting the others.
+    bool UploadRange(int first, int count) {
+        if constexpr (isBuffer)
+            return UploadBufferRange(first, count);
+        else
+            return false;
+    }
+
 private:
     bool CreateTexture(int width, int height) {
         Destroy();
@@ -208,7 +217,9 @@ private:
         rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
         rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-        m_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        // Buffers ignore a non-COMMON InitialState (D3D12 warning 1328) and are created in COMMON.
+        // Track that honestly so the first SetBarrier transitions from the real state, not a phantom one.
+        m_state = D3D12_RESOURCE_STATE_COMMON;
         if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, m_state, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
 
@@ -320,6 +331,48 @@ private:
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
         list->CopyBufferRegion(m_resource.Get(), 0, m_upload.Get(), 0, byteSize);
+        SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        return true;
+    }
+
+    bool UploadBufferRange(int first, int count) {
+        if (not m_resource or m_data.IsEmpty() or (count <= 0))
+            return false;
+        ID3D12Device* device = dx12Context.Device();
+        if (not device)
+            return false;
+
+        size_t elemSize = sizeof(DATA_T);
+        size_t fullSize = size_t(DataSize());
+        size_t offset = size_t(first) * elemSize;
+        size_t bytes = size_t(count) * elemSize;
+        if (offset + bytes > fullSize)
+            return false;
+
+        if (not m_upload) {
+            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
+            D3D12_RESOURCE_DESC rd{};
+            rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            rd.Width = fullSize;
+            rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
+            rd.SampleDesc.Count = 1;
+            rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_upload))))
+                return false;
+        }
+
+        void* mapped = nullptr;
+        D3D12_RANGE readRange{ 0, 0 };
+        if (FAILED(m_upload->Map(0, &readRange, &mapped)))
+            return false;
+        std::memcpy(static_cast<uint8_t*>(mapped) + offset, reinterpret_cast<const uint8_t*>(m_data.Data()) + offset, bytes);
+        m_upload->Unmap(0, nullptr);
+
+        auto* list = commandListHandler.CurrentGfxList();
+        if (not list)
+            return false;
+        SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
+        list->CopyBufferRegion(m_resource.Get(), offset, m_upload.Get(), offset, bytes);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         return true;
     }

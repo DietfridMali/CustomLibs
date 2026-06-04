@@ -215,7 +215,7 @@ public:
         return shader ? *shader : nullptr;
     }
 
-    inline ComputeShader* GetComputeShader(String shaderId) {
+    inline ComputeShader* SetupComputeShader(String shaderId) {
         ComputeShader** shader = m_computeShaders.Find(shaderId);
         return shader ? *shader : nullptr;
     }

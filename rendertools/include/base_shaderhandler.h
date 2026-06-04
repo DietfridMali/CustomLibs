@@ -57,11 +57,11 @@ public:
 
     Shader* SelectShader(Texture* texture);
 
-    Shader* SetupShader(String shaderId, String depthShaderId = "shadowShader");
+    Shader* SetupRenderShader(String shaderId, String depthShaderId = "shadowShader");
 
     void StopShader(bool needLegacyMatrices = false);
 
-    // Reset active-shader tracking so the next SetupShader() call forces a full Activate().
+    // Reset active-shader tracking so the next SetupRenderShader() call forces a full Activate().
     // Must be called after a DX12 BeginFrame() (new command list clears all pipeline state).
     inline void InvalidateActiveShader(void) noexcept {
         m_activeShader = nullptr;
@@ -78,8 +78,8 @@ public:
         return m_shaderCode->GetShader(shaderId);
     }
 
-    inline ComputeShader* GetComputeShader(String shaderId) {
-        return m_shaderCode->GetComputeShader(shaderId);
+    inline ComputeShader* SetupComputeShader(String shaderId) {
+        return m_shaderCode->SetupComputeShader(shaderId);
     }
 
     inline FloatArray* GetKernel(int radius) noexcept {

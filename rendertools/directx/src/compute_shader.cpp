@@ -135,6 +135,7 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
             case ComputeBindingDesc::Kind::SampledImage:  return binding - 4u;     // t0..
             case ComputeBindingDesc::Kind::Sampler:       return binding - 20u;    // s0..
             case ComputeBindingDesc::Kind::StorageImage:  return binding - 36u;    // u0..
+            case ComputeBindingDesc::Kind::StorageBuffer: return binding - 36u;    // u0..
             default: return binding;
         }
     };
@@ -187,7 +188,7 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
                 p.DescriptorTable.pDescriptorRanges = &samplerRanges.back();
                 if (reg < 16) m_samplerRootIndex[reg] = int32_t(params.size());
             }
-            else if (kind == ComputeBindingDesc::Kind::StorageImage) {
+            else if ((kind == ComputeBindingDesc::Kind::StorageImage) or (kind == ComputeBindingDesc::Kind::StorageBuffer)) {
                 r.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                 uavRanges.push_back(r);
                 p.DescriptorTable.NumDescriptorRanges = 1;

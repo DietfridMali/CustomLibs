@@ -78,7 +78,7 @@ bool Skybox::Setup(const String& textureFolder) {
 
 
 Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha) {
-    Shader* shader = baseShaderHandler.SetupShader("skybox");
+    Shader* shader = baseShaderHandler.SetupRenderShader("skybox");
     if (shader) {
         shader->SetMatrix4f("mView", view.AsArray(), false);
 		StaticArray<String, 3> skyNames = { "sky1", "sky2", "sky3" };
