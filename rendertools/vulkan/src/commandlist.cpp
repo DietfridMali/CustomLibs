@@ -517,7 +517,7 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept
 // CommandListHandler
 
 #ifdef _DEBUG
-bool CommandListHandler::s_logCalls = false;
+bool CommandListHandler::s_logCalls = true;
 #endif
 
 

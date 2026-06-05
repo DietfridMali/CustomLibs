@@ -288,8 +288,10 @@ public:
 #ifdef _DEBUG
     inline void DrawIndexedInstanced(uint32_t idxCount, uint32_t instCount, uint32_t startIdx, int32_t baseVtx, uint32_t startInst,
                                      std::source_location loc = std::source_location::current()) noexcept {
+#if 0
         if (s_logCalls)
             fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), (unsigned)loc.line());
+#endif
 #else
     inline void DrawIndexedInstanced(uint32_t idxCount, uint32_t instCount, uint32_t startIdx, int32_t baseVtx, uint32_t startInst) noexcept {
 #endif
