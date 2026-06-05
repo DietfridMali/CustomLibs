@@ -83,9 +83,9 @@ const ShaderSource& StencilShader() {
 
 // -------------------------------------------------------------------------------------------------
 // Shadow/depth pass: projects through light transform, PS does alpha-cutout test.
-const ShaderSource& ShadowShader() {
+const ShaderSource& SurfaceShadowShader() {
     static const ShaderSource source(
-        "shadowShader",
+        "surfaceShadowShader",
         R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;

@@ -9,7 +9,7 @@
 
 const ShaderSource& TestShader();
 const ShaderSource& StencilShader();
-const ShaderSource& ShadowShader();
+const ShaderSource& SurfaceShadowShader();
 const ShaderSource& SphereShadowShader();
 const ShaderSource& DepthRenderer();
 const ShaderSource& LineShader();
@@ -36,7 +36,7 @@ BaseShaderCode::BaseShaderCode() {
     AutoArray<const ShaderSource*> shaderSource = {
         &TestShader(),
         &StencilShader(),
-        &ShadowShader(),
+        &SurfaceShadowShader(),
         &SphereShadowShader(),
         &DepthRenderer(),
         &LineShader(),

@@ -122,8 +122,28 @@ static void Downsample2D_8bit(const uint8_t* src, int sw, int sh, int channels, 
             const uint8_t* p10 = src + (size_t(ys1) * sw + xs0) * channels;
             const uint8_t* p11 = src + (size_t(ys1) * sw + xs1) * channels;
             uint8_t* o = dst + (size_t(yd) * dw + xd) * channels;
+#if 0
+            // Alpha-cutout coverage mode (flip the guard to 1 to enable):
+            // colour channels keep the 2×2 box average, but Alpha (RGBA only) takes the MINIMUM
+            // of the four taps so a fully-transparent region stays exactly 0 through the whole mip
+            // chain. This preserves the alpha-cutout invariant (`a == 0 ⇒ discard`): box-averaging
+            // bleeds neighbouring opaque alpha into a transparent border, turning a hard 0 into a
+            // small non-zero value that survives the discard as a thin fringe at coarse mips
+            // (visible only at distance). Cost: erodes the cutout silhouette ~1 texel per level AND
+            // is wrong for textures with genuine graded transparency (their alpha would shrink at
+            // distance) — hence opt-in, off by default.
+            const int alphaChannel = (channels == 4) ? 3 : -1;
+            for (int c = 0; c < channels; ++c) {
+                if (c == alphaChannel)
+                    o[c] = std::min(std::min(p00[c], p01[c]), std::min(p10[c], p11[c]));
+                else
+                    o[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+            }
+#else
+            // Default: 2×2 box average for every channel (alpha included).
             for (int c = 0; c < channels; ++c)
                 o[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+#endif
         }
     }
 }

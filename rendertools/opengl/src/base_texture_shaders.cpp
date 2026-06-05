@@ -52,9 +52,9 @@ const ShaderSource& StencilShader() {
 }
 
 
-const ShaderSource& ShadowShader() {
+const ShaderSource& SurfaceShadowShader() {
     static const ShaderSource source(
-        "shadowShader",
+        "surfaceShadowShader",
         R"(
         #version 330
         layout(location = 0) in vec3 vertex;
