@@ -535,7 +535,10 @@ bool CommandListHandler::Create(VkDevice device, VkQueue graphicsQueue, VkQueue 
 #if USE_TRACY
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    // RESET_COMMAND_BUFFER_BIT: TracyVkContext's VkCtx constructor calibrates by re-recording the
+    // SAME cmdbuf three times (begin/end/submit/wait), without resetting it between begins. Begins #2
+    // and #3 are implicit per-buffer resets, which need this bit (else VUID-vkBeginCommandBuffer-00050).
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = graphicsFamily;
     VkCommandPool tracyPool = VK_NULL_HANDLE;
     if (vkCreateCommandPool(device, &poolInfo, nullptr, &tracyPool) == VK_SUCCESS) {

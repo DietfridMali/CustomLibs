@@ -204,9 +204,11 @@ Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool pre
 
 Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply) {
     Shader* shader = SetupRenderShader("colorMesh");
+#if 0
     if (shader) {
         shader->SetInt("premultiply", premultiply ? 1 : 0);
     }
+#endif
     return shader;
 }
 

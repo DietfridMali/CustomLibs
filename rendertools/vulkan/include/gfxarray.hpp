@@ -234,8 +234,13 @@ public:
         if (allocator == VK_NULL_HANDLE)
             return false;
 
+        // The per-frame staging buffer mirrors the FULL device-buffer width, and the range is written
+        // at its real dstOffset (not 0). Several UploadRange calls in one frame (e.g. an explosion's
+        // body + filament slots) then land at distinct staging offsets, so the second memcpy cannot
+        // clobber the first slot's not-yet-executed copy. Costs one full-width host-visible buffer per
+        // frame slot; the per-frame rotation still guards against frames-in-flight reuse.
         uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
-        if (not EnsureStagingBuffer(m_uploadBuffer[fi], m_uploadAlloc[fi], bytes,
+        if (not EnsureStagingBuffer(m_uploadBuffer[fi], m_uploadAlloc[fi], m_bufferSize,
                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
             return false;
@@ -243,10 +248,10 @@ public:
         void* mapped = nullptr;
         if (vmaMapMemory(allocator, m_uploadAlloc[fi], &mapped) != VK_SUCCESS)
             return false;
-        std::memcpy(mapped, m_data.Data() + first, size_t(bytes));
+        std::memcpy(static_cast<uint8_t*>(mapped) + dstOffset, m_data.Data() + first, size_t(bytes));
         vmaUnmapMemory(allocator, m_uploadAlloc[fi]);
 
-        return CopyFromStaging(m_uploadBuffer[fi], 0, dstOffset, bytes);
+        return CopyFromStaging(m_uploadBuffer[fi], dstOffset, dstOffset, bytes);
     }
 
     bool Download(void) {

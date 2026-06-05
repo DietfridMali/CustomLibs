@@ -406,6 +406,16 @@ bool VKContext::CreateDevice(void) noexcept
     featsLocalRead.dynamicRenderingLocalRead = VK_TRUE;
     featsUnusedAtt.pNext = &featsLocalRead;
 
+    // scalarBlockLayout: the particle StructuredBuffers (Particle = 36 B, ParticleSystemParams = 108 B)
+    // are tightly packed to match the C++ upload structs (compiled with -fvk-use-dx-layout), so their
+    // array stride is not a multiple of 16. Standard/relaxed storage-buffer layout rejects that — a
+    // float3 member forces 16-byte stride alignment — making vkCreateShaderModule fail spirv-val on the
+    // particle sim/draw shaders. Scalar block layout permits the tight stride (= the C++ memory layout).
+    VkPhysicalDeviceVulkan12Features feats12 { };
+    feats12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    feats12.scalarBlockLayout = VK_TRUE;
+    featsLocalRead.pNext = &feats12;
+
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).
     // fragmentStoresAndAtomics enables RWTexture2D + InterlockedMin in the fragment
     // stage (used by DecalShader's two-pass depth mask).
