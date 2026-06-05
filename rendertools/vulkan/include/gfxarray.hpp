@@ -219,6 +219,47 @@ public:
         return true;
     }
 
+    // Partial upload of [first, first+count) elements only — lets the particle handler push freshly
+    // spawned systems without re-uploading (and thereby resetting) the live systems' GPU state.
+    bool UploadRange(int first, int count) {
+        if ((m_buffer == VK_NULL_HANDLE) or m_data.IsEmpty() or (count <= 0) or (first < 0))
+            return false;
+
+        VkDeviceSize elemSize = VkDeviceSize(sizeof(DATA_T));
+        VkDeviceSize dstOffset = VkDeviceSize(first) * elemSize;
+        VkDeviceSize bytes = VkDeviceSize(count) * elemSize;
+        if (dstOffset + bytes > m_bufferSize)
+            return false;
+
+        VmaAllocator allocator = vkContext.Allocator();
+        if (allocator == VK_NULL_HANDLE)
+            return false;
+
+        if (not EnsureStagingBuffer(m_uploadBuffer, m_uploadAlloc, bytes,
+                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
+            return false;
+
+        void* mapped = nullptr;
+        if (vmaMapMemory(allocator, m_uploadAlloc, &mapped) != VK_SUCCESS)
+            return false;
+        std::memcpy(mapped, m_data.Data() + first, size_t(bytes));
+        vmaUnmapMemory(allocator, m_uploadAlloc);
+
+        OneShotCommandBuffer once;
+        if (not BeginSingleTimeCommands(once))
+            return false;
+
+        VkBufferCopy region{};
+        region.srcOffset = 0;
+        region.dstOffset = dstOffset;
+        region.size = bytes;
+        vkCmdCopyBuffer(once.cb, m_uploadBuffer, m_buffer, 1, &region);
+
+        EndSingleTimeCommands(once);
+        return true;
+    }
+
     bool Download(void) {
         if (m_buffer == VK_NULL_HANDLE or m_data.IsEmpty())
             return false;
