@@ -47,9 +47,14 @@ public:
     VkDeviceSize           m_bufferSize     { 0 };
 
     // Lazy-allocated host-visible staging buffers, kept across calls so repeat Upload/Download
-    // doesn't churn allocations.
-    VkBuffer               m_uploadBuffer   { VK_NULL_HANDLE };
-    VmaAllocation          m_uploadAlloc    { VK_NULL_HANDLE };
+    // doesn't churn allocations. The upload staging rotates FRAME_COUNT slots (indexed by the
+    // active frame): a CL-aware Upload records the staging->device copy into the frame command
+    // list, which executes only at submit. With FRAME_COUNT frames in flight, the next frame's
+    // memcpy must not clobber a staging buffer whose copy has not run yet — so each frame slot
+    // owns its own staging buffer. Same idiom as GfxDataBuffer's per-frame upload-buffer slots;
+    // the inFlight fence guarantees a slot's GPU copy has completed before that slot is reused.
+    VkBuffer               m_uploadBuffer[CommandQueue::FRAME_COUNT] { };
+    VmaAllocation          m_uploadAlloc [CommandQueue::FRAME_COUNT] { };
     VkBuffer               m_readbackBuffer { VK_NULL_HANDLE };
     VmaAllocation          m_readbackAlloc  { VK_NULL_HANDLE };
 
@@ -102,10 +107,12 @@ public:
                 m_buffer = VK_NULL_HANDLE;
                 m_allocation = VK_NULL_HANDLE;
             }
-            if (m_uploadBuffer != VK_NULL_HANDLE) {
-                vmaDestroyBuffer(allocator, m_uploadBuffer, m_uploadAlloc);
-                m_uploadBuffer = VK_NULL_HANDLE;
-                m_uploadAlloc = VK_NULL_HANDLE;
+            for (uint32_t i = 0; i < CommandQueue::FRAME_COUNT; ++i) {
+                if (m_uploadBuffer[i] != VK_NULL_HANDLE) {
+                    vmaDestroyBuffer(allocator, m_uploadBuffer[i], m_uploadAlloc[i]);
+                    m_uploadBuffer[i] = VK_NULL_HANDLE;
+                    m_uploadAlloc[i] = VK_NULL_HANDLE;
+                }
             }
             if (m_readbackBuffer != VK_NULL_HANDLE) {
                 vmaDestroyBuffer(allocator, m_readbackBuffer, m_readbackAlloc);
@@ -196,27 +203,19 @@ public:
         if (allocator == VK_NULL_HANDLE)
             return false;
 
-        if (not EnsureStagingBuffer(m_uploadBuffer, m_uploadAlloc, m_bufferSize,
+        uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
+        if (not EnsureStagingBuffer(m_uploadBuffer[fi], m_uploadAlloc[fi], m_bufferSize,
                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
             return false;
 
         void* mapped = nullptr;
-        if (vmaMapMemory(allocator, m_uploadAlloc, &mapped) != VK_SUCCESS)
+        if (vmaMapMemory(allocator, m_uploadAlloc[fi], &mapped) != VK_SUCCESS)
             return false;
         std::memcpy(mapped, m_data.Data(), size_t(m_bufferSize));
-        vmaUnmapMemory(allocator, m_uploadAlloc);
+        vmaUnmapMemory(allocator, m_uploadAlloc[fi]);
 
-        OneShotCommandBuffer once;
-        if (not BeginSingleTimeCommands(once))
-            return false;
-
-        VkBufferCopy region{};
-        region.size = m_bufferSize;
-        vkCmdCopyBuffer(once.cb, m_uploadBuffer, m_buffer, 1, &region);
-
-        EndSingleTimeCommands(once);
-        return true;
+        return CopyFromStaging(m_uploadBuffer[fi], 0, 0, m_bufferSize);
     }
 
     // Partial upload of [first, first+count) elements only — lets the particle handler push freshly
@@ -235,29 +234,19 @@ public:
         if (allocator == VK_NULL_HANDLE)
             return false;
 
-        if (not EnsureStagingBuffer(m_uploadBuffer, m_uploadAlloc, bytes,
+        uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
+        if (not EnsureStagingBuffer(m_uploadBuffer[fi], m_uploadAlloc[fi], bytes,
                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                     VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
             return false;
 
         void* mapped = nullptr;
-        if (vmaMapMemory(allocator, m_uploadAlloc, &mapped) != VK_SUCCESS)
+        if (vmaMapMemory(allocator, m_uploadAlloc[fi], &mapped) != VK_SUCCESS)
             return false;
         std::memcpy(mapped, m_data.Data() + first, size_t(bytes));
-        vmaUnmapMemory(allocator, m_uploadAlloc);
+        vmaUnmapMemory(allocator, m_uploadAlloc[fi]);
 
-        OneShotCommandBuffer once;
-        if (not BeginSingleTimeCommands(once))
-            return false;
-
-        VkBufferCopy region{};
-        region.srcOffset = 0;
-        region.dstOffset = dstOffset;
-        region.size = bytes;
-        vkCmdCopyBuffer(once.cb, m_uploadBuffer, m_buffer, 1, &region);
-
-        EndSingleTimeCommands(once);
-        return true;
+        return CopyFromStaging(m_uploadBuffer[fi], 0, dstOffset, bytes);
     }
 
     bool Download(void) {
@@ -293,6 +282,46 @@ public:
     }
 
 private:
+    // Issues the staging -> GPU copy from the caller-selected per-frame staging buffer. Mid-frame
+    // (a per-frame command list is open) it records into that list with a transfer -> shader barrier
+    // (like the DX path), so no blocking one-shot submit + vkQueueWaitIdle corrupts the in-flight
+    // frame. Only at setup time (no open CL) does it fall back to the one-shot path.
+    bool CopyFromStaging(VkBuffer staging, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkDeviceSize bytes) {
+        VkBufferCopy region{};
+        region.srcOffset = srcOffset;
+        region.dstOffset = dstOffset;
+        region.size = bytes;
+
+        VkCommandBuffer frameCB = commandListHandler.CurrentGfxList();
+        if (frameCB != VK_NULL_HANDLE) {
+            vkCmdCopyBuffer(frameCB, staging, m_buffer, 1, &region);
+            VkBufferMemoryBarrier2 b{};
+            b.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+            b.srcStageMask        = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+            b.srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+            b.dstStageMask        = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+            b.dstAccessMask       = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+            b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            b.buffer              = m_buffer;
+            b.offset              = dstOffset;
+            b.size                = bytes;
+            VkDependencyInfo dep{};
+            dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dep.bufferMemoryBarrierCount = 1;
+            dep.pBufferMemoryBarriers    = &b;
+            vkCmdPipelineBarrier2(frameCB, &dep);
+            return true;
+        }
+
+        OneShotCommandBuffer once;
+        if (not BeginSingleTimeCommands(once))
+            return false;
+        vkCmdCopyBuffer(once.cb, staging, m_buffer, 1, &region);
+        EndSingleTimeCommands(once);
+        return true;
+    }
+
     bool EnsureStagingBuffer(VkBuffer& outBuffer, VmaAllocation& outAlloc, VkDeviceSize bytes,
                              VkBufferUsageFlags usage, VmaAllocationCreateFlags hostFlags) noexcept
     {

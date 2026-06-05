@@ -305,7 +305,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
                 commandListHandler.DrawInstanced(vertCount, m_instanceCount, 0, 0);
         }
     }
-    //gfxStates.CheckError();
+    gfxStates.CheckError("GfxDataLayout::Render draw");
     DeactivateTextures(textures);
     //gfxStates.CheckError();
     FinishRender();

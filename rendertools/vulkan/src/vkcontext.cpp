@@ -66,6 +66,13 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VkContextDebugCallback(
         else if (isWarning)
             ++ctx.m_validationWarningCount;
     }
+    // Print errors/warnings immediately so they surface even when GfxStates::CheckError ->
+    // DrainMessages is not called in the render path. Synchronous on the offending call's thread,
+    // so the message lands right at the bad vkCmd. The buffer stays intact for DrainMessages.
+    if (isError or isWarning) {
+        fprintf(stderr, "%s%s\n", header, data ? data->pMessage : "(no msg)");
+        fflush(stderr);
+    }
     return VK_FALSE;  // never abort the offending Vulkan call
 }
 #endif
@@ -402,9 +409,14 @@ bool VKContext::CreateDevice(void) noexcept
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).
     // fragmentStoresAndAtomics enables RWTexture2D + InterlockedMin in the fragment
     // stage (used by DecalShader's two-pass depth mask).
+    // vertexPipelineStoresAndAtomics lets the vertex stage access UAV-style storage buffers
+    // (RWStructuredBuffer particles/systems/activeSlots) — required by the particle draw's
+    // vertex-pulling VS; without it vkCreateGraphicsPipelines rejects the SPIR-V (the storage
+    // buffers are not NonWritable).
     VkPhysicalDeviceFeatures features { };
     features.samplerAnisotropy = VK_TRUE;
     features.fragmentStoresAndAtomics = VK_TRUE;
+    features.vertexPipelineStoresAndAtomics = VK_TRUE;
 
     const char* deviceExtensions[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,

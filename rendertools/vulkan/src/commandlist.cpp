@@ -273,7 +273,12 @@ bool CommandList::Create(const String& name, bool isTemporary) noexcept
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = vkContext.GraphicsFamily();
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    // RESET_COMMAND_BUFFER_BIT: these per-frame / temporary command buffers are re-recorded every
+    // frame (ONE_TIME_SUBMIT, so they become invalid after execution). Open() resets the whole pool
+    // via vkResetCommandPool, but a recycled/temporary list can reach vkBeginCommandBuffer with its CB
+    // not in the initial state — the bit makes that (implicit) per-buffer reset legal instead of a
+    // validation error. TRANSIENT_BIT stays as the short-lived-buffers allocator hint.
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
         VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &m_pools[i]);
@@ -380,7 +385,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept
     if (res != VK_SUCCESS)
         fprintf(stderr, "CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
 #ifdef _DEBUG
-    //gfxStates.CheckError();
+    gfxStates.CheckError((const char*)m_name);
 #endif
     commandListHandler.PopCmdList();
     // Register in pendingLists in close-order. ExecuteAll iterates pendingLists in
@@ -517,7 +522,7 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept
 // CommandListHandler
 
 #ifdef _DEBUG
-bool CommandListHandler::s_logCalls = true;
+bool CommandListHandler::s_logCalls = false;
 #endif
 
 
@@ -659,7 +664,7 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
         }
     }
 #ifdef _DEBUG
-    //gfxStates.CheckError();
+    gfxStates.CheckError("CommandListHandler::ExecuteAll submit");
 #endif
     for (auto l : m_pendingLists) {
         if (l->IsTemporary())
