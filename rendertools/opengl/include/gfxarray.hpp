@@ -57,9 +57,8 @@ public:
 
 	void Destroy(void) {
 		if (m_handle) {
-			Release();
 			m_handle.Release();
-			m_data.Destroy();
+			m_data.Reset();
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 		}
 	}
@@ -83,6 +82,22 @@ public:
 			return false;
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
 		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, this->DataSize(), this->Data());
+		return true;
+	}
+
+
+	// Upload only [first, first+count) elements; leaves the rest of the GPU buffer untouched.
+	// Used to spawn one particle system without resetting the others.
+	bool UploadRange(int first, int count) {
+		if (not m_handle or (count <= 0))
+			return false;
+		int elemSize = int(sizeof(DATA_T));
+		GLintptr offset = GLintptr(first) * elemSize;
+		GLsizeiptr bytes = GLsizeiptr(count) * elemSize;
+		if (offset + bytes > GLsizeiptr(this->DataSize()))
+			return false;
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, bytes, reinterpret_cast<const uint8_t*>(this->Data()) + size_t(offset));
 		return true;
 	}
 

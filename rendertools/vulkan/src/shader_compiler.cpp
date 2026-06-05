@@ -152,6 +152,11 @@ bool CompileHlslToSpirv(const char* hlslSource,
     std::vector<const wchar_t*> args;
     args.push_back(L"-spirv");
     args.push_back(L"-fspv-target-env=vulkan1.3");
+    // DX-compatible memory layout for cbuffers and StructuredBuffers: tight packing that matches the
+    // C++ upload structs (Particle = 36 B, ParticleSystemParams = 108 B; float3 + scalar packed with
+    // no std430 16-byte rounding). Without this, DXC's default layout rounds the StructuredBuffer
+    // ArrayStride up, so particles[>0] / systems[>0] read from the wrong offset and render nothing.
+    args.push_back(L"-fvk-use-dx-layout");
     args.push_back(L"-E");
     args.push_back(entryWide.c_str());
     args.push_back(L"-T");
