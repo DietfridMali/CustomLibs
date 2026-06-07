@@ -213,8 +213,11 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
     psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     int nrt = shader->m_dataLayout.m_numRenderTargets;
     psoDesc.NumRenderTargets = UINT(nrt);
+    // Slot 0 (color) follows the active render target's color format (RenderStates::colorFormat, set
+    // in RenderTarget::Enable) so one shader serves both the RGBA8 screen and the HDR scene buffer.
+    // Slots 1+ (worldNormal/worldPos MRTs) keep their shader-declared formats.
     for (int i = 0; i < nrt; ++i)
-        psoDesc.RTVFormats[i] = ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
+        psoDesc.RTVFormats[i] = (i == 0) ? baseRenderer.RenderStates().colorFormat : ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
     psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable) ? dxDepthDSVFormat : DXGI_FORMAT_UNKNOWN;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.SampleDesc.Count = 1;

@@ -73,7 +73,7 @@ DXGI_FORMAT BufferInfo::ViewFormat(void)
         case BufferInfo::btSkyMap:
             return dxSkyMapFormat;
         default:
-            return dxColorFormat;
+            return m_colorFormat;
     }
 }
 
@@ -201,6 +201,7 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 
 bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
+    info.m_colorFormat = m_colorFormat;
     D3D12_CLEAR_VALUE cv{};
     cv.Format = info.ViewFormat();
     info.m_resource = CreateRTResource(device, w, h, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
@@ -291,6 +292,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
+    m_colorFormat = params.colorFormat;
     m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
@@ -472,6 +474,8 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     }
     if (not EnableBuffers(params))
         return false;
+    // The PSO's slot-0 RTV format follows this render target (HDR scene vs RGBA8 screen/UI).
+    baseRenderer.RenderStates().colorFormat = m_colorFormat;
     return true;
 }
 

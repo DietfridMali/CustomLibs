@@ -59,6 +59,10 @@ struct RenderStates {
     // Polygon offset (OGL glPolygonOffset equivalent: factor -> slopeScaledDepthBias, units -> depthBias)
     int32_t     depthBias{ 0 };
     float       slopeScaledDepthBias{ 0.0f };
+    // RTV color format for slot 0; lets a PSO match the active render target (RGBA8 screen/UI vs
+    // R16G16B16A16_FLOAT HDR scene). Part of the memcmp'd PSO cache key, so the same shader gets
+    // separate PSOs per target format. Set in RenderTarget::Enable from the RT's own m_colorFormat.
+    DXGI_FORMAT colorFormat{ DXGI_FORMAT_R8G8B8A8_UNORM };
 
     bool operator==(const RenderStates& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;

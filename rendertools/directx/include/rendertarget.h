@@ -53,6 +53,7 @@ public:
     UAV                     m_uav;
     D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
     eBufferType             m_type{ btColor };
+    DXGI_FORMAT             m_colorFormat{ dxColorFormat };  // per-RT color format; HDR scene/sky use R16G16B16A16_FLOAT
 
     void Init(void);
 
@@ -120,6 +121,7 @@ public:
     struct RTCreationParams {
         String name{ "" };
         int colorBufferCount{ 1 };
+        DXGI_FORMAT colorFormat{ dxColorFormat };  // R16G16B16A16_FLOAT for HDR color targets
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
@@ -156,6 +158,7 @@ public:
     int                 m_scale{ 1 };
     int                 m_bufferCount{ 0 };
     int                 m_colorBufferCount{ 0 };
+    DXGI_FORMAT         m_colorFormat{ dxColorFormat };
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
