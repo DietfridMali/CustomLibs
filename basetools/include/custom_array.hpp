@@ -829,8 +829,9 @@ public:
 // =================================================================================================
 
 template < class DATA_T, int32_t capacity >
-class StaticArray : public AutoArray < DATA_T > {
-
+class StaticArray 
+	: public AutoArray < DATA_T > 
+{
 protected:
 	DATA_T		m_buffer[capacity];
 
