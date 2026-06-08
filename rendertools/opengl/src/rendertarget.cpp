@@ -215,8 +215,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     CreateRenderArea();
     // Sky-map-only RTs (compute write target, no FBO attachments) skip AttachBuffers because
     // glCheckFramebufferStatus would return INCOMPLETE_MISSING_ATTACHMENT — the FBO is unused.
-    bool hasFboAttachments = (params.colorBufferCount > 0) || (params.depthBufferCount > 0)
-                          || (params.stencilBufferCount > 0) || (params.vertexBufferCount > 0);
+    bool hasFboAttachments = (params.colorBufferCount > 0) || (params.depthBufferCount > 0) || (params.stencilBufferCount > 0) || (params.vertexBufferCount > 0);
     if (hasFboAttachments) {
         if (not AttachBuffers(params.hasMRTs))
             return false;
