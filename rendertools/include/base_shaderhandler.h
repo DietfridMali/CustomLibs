@@ -18,11 +18,11 @@ class BaseShaderHandler
     : public PolymorphSingleton<BaseShaderHandler>
 {
 public:
-    AutoArray<FloatArray*>   m_kernels;
-    Shader*                     m_activeShader;
-    String                      m_activeShaderId;
-    Texture                     m_grayNoise;
-    BaseShaderCode*             m_shaderCode;
+    AutoArray<FloatArray*>  m_kernels;
+    Shader*                 m_activeShader;
+    String                  m_activeShaderId;
+    Texture                 m_grayNoise;
+    BaseShaderCode*         m_shaderCode;
 
     BaseShaderHandler()
         : m_kernels(16), m_shaderCode(nullptr), m_activeShader(nullptr), m_activeShaderId("")
