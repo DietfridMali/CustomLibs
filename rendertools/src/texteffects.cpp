@@ -30,8 +30,9 @@ void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod
             params.shader->SetInt("surface", 0);
         params.shader->SetFloat("offset", 0.0f);
         //params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
+        params.shader->SetVector2f("texelSize", baseRenderer.TexelSize());
         if (aaMethod.method != "gaussblur") {
-            params.shader->SetVector2f("texelSize", baseRenderer.TexelSize());
+            params.destination = renderTarget->NextBuffer(params.source);
             renderTarget->AutoRender(params);
         }
         else {

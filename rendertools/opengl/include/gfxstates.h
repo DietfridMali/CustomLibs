@@ -333,8 +333,8 @@ public:
 	}
 
 	inline std::tuple<GLenum, GLenum> BlendFunc(GLenum sFactor, GLenum dFactor) {
-		static int32_t stateID = -1;
-		return FuncState(stateID, std::make_tuple(sFactor, dFactor), glBlendFunc);
+		auto previous = BlendFuncSeparate(sFactor, dFactor, sFactor, dFactor);
+		return std::make_tuple(std::get<0>(previous), std::get<1>(previous));
 	}
 
 	inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA) {

@@ -67,6 +67,7 @@ public:
     int                         m_scale;
     int                         m_bufferCount;
     int                         m_colorBufferCount;
+    GLenum                      m_colorFormat{ GL_RGBA8 };
     int                         m_extraBufferCount;
     int                         m_extraBufferIndex;
     int                         m_depthBufferIndex;
@@ -94,6 +95,7 @@ public:
     struct RTCreationParams {
         String name{ "" };
         int colorBufferCount{ 1 };
+        GLenum colorFormat{ GL_RGBA8 };
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };

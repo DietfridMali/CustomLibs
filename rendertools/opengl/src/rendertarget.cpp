@@ -88,8 +88,10 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     }
     else {
-        if (bufferType == BufferInfo::btColor)
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        if (bufferType == BufferInfo::btColor) {
+            GLenum type = (m_colorFormat == GL_RGBA8) ? GL_UNSIGNED_BYTE : GL_HALF_FLOAT;
+            glTexImage2D(GL_TEXTURE_2D, 0, m_colorFormat, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, type, nullptr);
+        }
         else
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -191,6 +193,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_bufferCount = 0;
+    m_colorFormat = params.colorFormat;
     m_isScreenBuffer = params.isScreenBuffer;
     m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount + params.skyMapCount);
     int attachmentIndex = 0;
