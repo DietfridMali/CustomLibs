@@ -268,7 +268,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
         return true;
 
     case dbAll:
-        if ((m_drawBufferGroup == params.drawBufferGroup) and not params.reenable)
+        if ((m_drawBufferGroup == params.drawBufferGroup) and not params.reactivate)
             return true;
         [[fallthrough]];
 
@@ -282,7 +282,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
         return true;
 
     case dbColor:
-        if ((m_drawBufferGroup != params.drawBufferGroup) or params.reenable) {
+        if ((m_drawBufferGroup != params.drawBufferGroup) or params.reactivate) {
             int i = 0;
             for (; i < m_colorBufferCount; ++i) {
                 m_drawBuffers[i] = m_bufferInfo[i].m_attachment;
@@ -296,7 +296,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
         return true;
 
     case dbExtra:
-        if ((m_drawBufferGroup != params.drawBufferGroup) or params.reenable) {
+        if ((m_drawBufferGroup != params.drawBufferGroup) or params.reactivate) {
             int i = 0;
             for (; i < m_colorBufferCount; ++i) {
                 DetachBuffer(i);

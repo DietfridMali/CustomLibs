@@ -121,7 +121,7 @@ public:
         int bufferIndex{ -1 };
         eDrawBufferGroups drawBufferGroup{ dbAll };
         bool clear{ true };
-        bool reenable{ false };
+        bool reactivate{ false };
     };
 
     RenderTarget();
@@ -142,8 +142,8 @@ public:
 
     bool SelectDrawBuffers(const RTActivationParams& params);
 
-    inline bool Reactivate(bool clear = false, bool reenable = false) {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reenable = reenable };
+    inline bool Reactivate(bool clear = false, bool reactivate = false) {
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = reactivate };
         return Activate(params);
     }
 
@@ -268,9 +268,9 @@ public:
 
     void ReleaseBuffers(void);
 
-    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reenable);
+    bool SelectDrawBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool reactivate);
 
-    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reenable);
+    bool EnableBuffers(int bufferIndex, eDrawBufferGroups drawBufferGroup, bool clear, bool reactivate);
 
     void SelectCustomDrawBuffers(DrawBufferList& drawBuffers);
 
