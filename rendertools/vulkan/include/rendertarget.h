@@ -55,6 +55,7 @@ public:
     ImageLayoutTracker  m_layoutTracker;
     uint32_t            m_srvIndex    { UINT32_MAX };  // logical id for source-compat
     eBufferType         m_type        { btColor };
+    VkFormat            m_colorFormat { VK_FORMAT_R8G8B8A8_UNORM };  // per-RT color format; HDR scene/sky use R16G16B16A16_SFLOAT
 
     void Init(void);
 
@@ -86,6 +87,7 @@ public:
     struct RTCreationParams {
         String name{ "" };
         int colorBufferCount{ 1 };
+        VkFormat colorFormat{ VK_FORMAT_R8G8B8A8_UNORM };  // R16G16B16A16_SFLOAT for HDR color targets
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
@@ -124,6 +126,7 @@ public:
     int                 m_scale{ 1 };
     int                 m_bufferCount{ 0 };
     int                 m_colorBufferCount{ 0 };
+    VkFormat            m_colorFormat{ VK_FORMAT_R8G8B8A8_UNORM };
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };

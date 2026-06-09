@@ -264,7 +264,7 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 
 void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 {
-    VkFormat fmt = FormatForType(info.m_type);
+    VkFormat fmt = (info.m_type == BufferInfo::btColor) ? info.m_colorFormat : FormatForType(info.m_type);
     if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
                           info.m_image, info.m_allocation))
         return;
@@ -282,6 +282,7 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     BufferInfo& info = m_bufferInfo[bufferIndex];
     info.Init();
     info.m_type = bufferType;
+    info.m_colorFormat = m_colorFormat;
 
     int w = m_width * m_scale;
     int h = m_height * m_scale;
@@ -317,6 +318,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_height = height;
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
+    m_colorFormat = params.colorFormat;
     m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
     // Compute ping-pong (>=2 compute buffers) qualifies for the pingPong flag as well.
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
@@ -1008,7 +1010,7 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
             break;
         case dbSingle:
             if ((m_activeBufferIndex >= 0) and (m_activeBufferIndex < m_colorBufferCount))
-                key.colorFormats[key.colorFormatCount++] = kColorFormat;
+                key.colorFormats[key.colorFormatCount++] = m_colorFormat;
             break;
         case dbExtra:
             for (int j = 0; j < m_vertexBufferCount; ++j)
@@ -1016,13 +1018,13 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
             break;
         case dbAll:
             for (int i = 0; i < m_colorBufferCount; ++i)
-                key.colorFormats[key.colorFormatCount++] = kColorFormat;
+                key.colorFormats[key.colorFormatCount++] = m_colorFormat;
             for (int j = 0; j < m_vertexBufferCount; ++j)
                 key.colorFormats[key.colorFormatCount++] = kVertexFormat;
             break;
         default: // dbColor, dbCustom — color only
             for (int i = 0; i < m_colorBufferCount; ++i)
-                key.colorFormats[key.colorFormatCount++] = kColorFormat;
+                key.colorFormats[key.colorFormatCount++] = m_colorFormat;
             break;
     }
     if (HaveDepthBuffer(true))

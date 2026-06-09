@@ -405,11 +405,7 @@ public:
     }
 
     inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
-        auto& s = ActiveState();
-        s.blendSrcRGB = src;
-        s.blendDstRGB = dst;
-        s.blendSrcAlpha = src;
-        s.blendDstAlpha = dst;
+        BlendFuncSeparate(src, dst, src, dst);
     }
 
     inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
