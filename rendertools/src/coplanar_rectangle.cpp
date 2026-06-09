@@ -267,7 +267,13 @@ noexcept
     if ((d0 * d1 > 0) and (std::min(fabs(d0), fabs(d1)) > radius))
         return -1; // start and end on same side of plane and both too far away
 
-    if (line.Length() < m_tolerance) {
+    // A ~stationary query has no real travel. Extend the line along the normal so the intersection math
+    // still has a direction (needed for penetration detection of an already-touching/overlapping sphere),
+    // but remember that: the reported endPoint must then stay at p0. Otherwise endPoint lands up to one
+    // unit along the normal and the caller's "movement to contact" becomes LONGER than the real (zero)
+    // move -> the wall-bounce shoves the actor by that phantom distance (flung off a door post on a touch).
+    bool zeroMove = (line.Length() < m_tolerance);
+    if (zeroMove) {
         line.pts.p1 = line.pts.p0 + m_normal;
         line.Refresh();
     }
@@ -292,7 +298,7 @@ noexcept
             float d = Distance(candidate);
             Vector3f vCoplanarRectangle = candidate - m_normal * d;
             if (Contains(vCoplanarRectangle)) {
-                endPoint = candidate;
+                endPoint = zeroMove ? line.pts.p0 : candidate;
                 collisionPoint = vCoplanarRectangle;
                 return (line.Normal().Dot(m_normal) >= 0) ? 0 : 1;
             }
@@ -319,7 +325,7 @@ noexcept
     if (not AllowMovement(bestOffset))
         return -1;
     collisionPoint = bestPoint;
-    endPoint = line.pts.p0 + line.Velocity() * bestOffset;
+    endPoint = zeroMove ? line.pts.p0 : (line.pts.p0 + line.Velocity() * bestOffset);
     if (line.Normal().Dot(m_normal) >= 0) // just touching quad and moving away
         return 0;
     return 1;
