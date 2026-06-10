@@ -252,7 +252,7 @@ public:
         m_isDeployed = false;
     }
 
-    bool CreateTextureResource(int w, int h, int arraySize);
+    bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1);
 
     bool CreateSRV(void);
 

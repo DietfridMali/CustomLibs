@@ -7,6 +7,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 
 // =================================================================================================
 // VkStagingBuffer
@@ -222,6 +223,104 @@ bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
         stagings[i].Destroy();
 
     return success;
+}
+
+// =================================================================================================
+// UploadTextureDataWithMips
+
+// 2×2 box-filter downsample of an 8-bit, N-channel image. Odd source extents clamp the second
+// tap to the last texel (same edge convention as the 3D box filter / glGenerateMipmap).
+static void Downsample2D_8bit(const uint8_t* src, int sw, int sh, int channels, uint8_t* dst, int dw, int dh) noexcept
+{
+    for (int yd = 0; yd < dh; ++yd) {
+        int ys0 = yd * 2;
+        int ys1 = std::min(ys0 + 1, sh - 1);
+        for (int xd = 0; xd < dw; ++xd) {
+            int xs0 = xd * 2;
+            int xs1 = std::min(xs0 + 1, sw - 1);
+            const uint8_t* p00 = src + (size_t(ys0) * sw + xs0) * channels;
+            const uint8_t* p01 = src + (size_t(ys0) * sw + xs1) * channels;
+            const uint8_t* p10 = src + (size_t(ys1) * sw + xs0) * channels;
+            const uint8_t* p11 = src + (size_t(ys1) * sw + xs1) * channels;
+            uint8_t* o = dst + (size_t(yd) * dw + xd) * channels;
+            for (int c = 0; c < channels; ++c)
+                o[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+        }
+    }
+}
+
+
+bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
+                               const uint8_t* pixels, int width, int height, int channels,
+                               uint32_t mipLevels) noexcept
+{
+    if ((dstImage == VK_NULL_HANDLE) or (pixels == nullptr))
+        return false;
+    if ((width <= 0) or (height <= 0) or (channels <= 0) or (mipLevels == 0))
+        return false;
+
+    // CPU-side downsample buffers for levels 1..N-1 (level 0 uploads straight from the caller's
+    // pixels); one staging buffer per level, all kept alive until the one-shot submit has completed.
+    AutoArray<AutoArray<uint8_t>> levels;
+    AutoArray<VkStagingBuffer>    stagings;
+    levels.Resize(mipLevels);
+    stagings.Resize(mipLevels);
+
+    const uint8_t* prevData = pixels;
+    int prevW = width, prevH = height;
+    for (uint32_t lv = 1; lv < mipLevels; ++lv) {
+        int curW = std::max(1, prevW / 2);
+        int curH = std::max(1, prevH / 2);
+        levels[lv].Resize(uint32_t(size_t(curW) * size_t(curH) * size_t(channels)));
+        Downsample2D_8bit(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
+        prevData = levels[lv].Data();
+        prevW = curW;
+        prevH = curH;
+    }
+
+    bool ok = true;
+    int lvW = width, lvH = height;
+    for (uint32_t lv = 0; lv < mipLevels; ++lv) {
+        const uint8_t* lvData = (lv == 0) ? pixels : levels[lv].Data();
+        const VkDeviceSize bytes = VkDeviceSize(lvW) * VkDeviceSize(lvH) * VkDeviceSize(channels);
+        if (not CreateStagingBuffer(bytes, stagings[lv])) {
+            ok = false;
+            break;
+        }
+        std::memcpy(stagings[lv].mapped, lvData, size_t(bytes));
+        lvW = std::max(1, lvW / 2);
+        lvH = std::max(1, lvH / 2);
+    }
+
+    OneShotCommandBuffer cmd { };
+    if (ok and BeginSingleTimeCommands(cmd)) {
+        // ToTransferDst barriers all mip levels (subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS).
+        tracker.ToTransferDst(cmd.cb);
+        lvW = width;
+        lvH = height;
+        for (uint32_t lv = 0; lv < mipLevels; ++lv) {
+            VkBufferImageCopy copy { };
+            copy.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+            copy.imageSubresource.mipLevel       = lv;
+            copy.imageSubresource.baseArrayLayer = 0;
+            copy.imageSubresource.layerCount     = 1;
+            copy.imageOffset = { 0, 0, 0 };
+            copy.imageExtent = { uint32_t(lvW), uint32_t(lvH), 1 };
+            vkCmdCopyBufferToImage(cmd.cb, stagings[lv].buffer, dstImage,
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+            lvW = std::max(1, lvW / 2);
+            lvH = std::max(1, lvH / 2);
+        }
+        tracker.ToShaderInput(cmd.cb);
+        if (not EndSingleTimeCommands(cmd))
+            ok = false;
+    }
+    else
+        ok = false;
+
+    for (uint32_t lv = 0; lv < mipLevels; ++lv)
+        stagings[lv].Destroy();
+    return ok;
 }
 
 // =================================================================================================

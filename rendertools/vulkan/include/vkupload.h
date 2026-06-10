@@ -69,6 +69,12 @@ inline bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
     return UploadTextureData(dstImage, tracker, &pixels, 1, width, height, channels);
 }
 
+// Build a CPU mip chain from the base image (2×2 box filter, edge-clamped) and upload one
+// subresource per level. dstImage must have been created with the matching mipLevels count.
+bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
+                               const uint8_t* pixels, int width, int height, int channels,
+                               uint32_t mipLevels) noexcept;
+
 // =================================================================================================
 // Create + upload a Texture3D (VkImage with imageType=VK_IMAGE_TYPE_3D). On success outImage,
 // outAllocation and outTracker hold the new image and its initial layout state (SHADER_READ_ONLY).

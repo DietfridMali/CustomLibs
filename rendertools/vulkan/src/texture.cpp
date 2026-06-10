@@ -17,6 +17,7 @@
 #include "sampler_cache.h"
 #include "gfxstates.h"
 #include "resource_handler.h"
+#include "texture_mips.h"
 
 // =================================================================================================
 // Vulkan Texture implementation
@@ -237,11 +238,12 @@ void Texture::SetParams(bool forceUpdate)
     m_sampling.wrapV = GfxWrapMode::Repeat;
     m_sampling.wrapW = GfxWrapMode::Repeat;
     m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
-    m_sampling.maxAnisotropy = 1.0f;
+    // Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
+    m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;
 }
 
 
-bool Texture::CreateTextureResource(int w, int h, int arraySize)
+bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels)
 {
     VmaAllocator allocator = vkContext.Allocator();
     if (allocator == VK_NULL_HANDLE)
@@ -254,7 +256,7 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize)
     info.extent.width = uint32_t(w);
     info.extent.height = uint32_t(h);
     info.extent.depth = 1;
-    info.mipLevels = 1;
+    info.mipLevels = uint32_t(mipLevels);
     info.arrayLayers = uint32_t(arraySize);
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -323,10 +325,16 @@ bool Texture::Deploy(int bufferIndex)
     if ((w <= 0) or (h <= 0))
         return false;
 
-    if (not CreateTextureResource(w, h, 1))
+    const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
+    if (not CreateTextureResource(w, h, 1, int(mipLevels)))
         return false;
     const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-    if (not UploadTextureData(m_image, m_layoutTracker, pixels, w, h, tb->m_info.m_componentCount))
+    const int channels = tb->m_info.m_componentCount;
+    if (mipLevels > 1) {
+        if (not UploadTextureDataWithMips(m_image, m_layoutTracker, pixels, w, h, channels, mipLevels))
+            return false;
+    }
+    else if (not UploadTextureData(m_image, m_layoutTracker, pixels, w, h, channels))
         return false;
     if (not CreateSRV())
         return false;
@@ -382,6 +390,7 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         return false;
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
+    m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
     return Deploy();
 }
@@ -392,6 +401,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     if (not Create())
         return false;
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
+    m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
     return Deploy();
 }
