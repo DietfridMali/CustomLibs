@@ -142,8 +142,8 @@ public:
 
     bool SelectDrawBuffers(const RTActivationParams& params);
 
-    inline bool Reactivate(bool clear = false, bool reactivate = false) {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = reactivate };
+    inline bool Reactivate(bool clear = false) {
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = true };
         return Activate(params);
     }
 

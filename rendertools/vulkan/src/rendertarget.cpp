@@ -644,17 +644,20 @@ bool RenderTarget::Enable(const RTActivationParams& params)
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
     baseRenderer.ActivateDrawBuffer(this);
-    // PushViewport must run BEFORE Enable(): Enable() issues a bare SetViewport() to the RT's own
-    // viewport, so the push has to capture the caller's viewport first — otherwise Deactivate's
-    // PopViewport restores the RT viewport instead of the caller's, leaking it.
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
         return false;
     }
+    // Activate/Deactivate are a balanced viewport push/pop pair: Activate pushes the caller's
+    // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
+    // has no Deactivate of its own, so it must not push or set a viewport — the caller's
+    // viewport is restored by the PopViewport immediately following in Deactivate().
     if (params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;
-    baseRenderer.PushViewport();
-    SetViewport(true);
+    else {
+        baseRenderer.PushViewport();
+        SetViewport(true);
+    }
     return true;
 }
 
