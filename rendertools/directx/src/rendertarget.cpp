@@ -495,8 +495,10 @@ bool RenderTarget::Activate(const RTActivationParams& params, const std::source_
     Clear(params);
     if (params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;
-    baseRenderer.PushViewport();
-    SetViewport();
+    else {
+        baseRenderer.PushViewport();
+        SetViewport();
+    }
     return true;
 }
 
