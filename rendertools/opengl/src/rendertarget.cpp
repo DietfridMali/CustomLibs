@@ -331,6 +331,20 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 }
 
 
+// Attach the source's depth texture to this FBO's depth slot (persistent FBO state, so a one-time
+// call covers all later Activates). Clear/ClearDepthBuffer keep gating on an OWN depth buffer
+// (HaveDepthBuffer), so the foreign depth is never cleared through this target.
+void RenderTarget::SetDepthSource(RenderTarget* source) {
+    m_depthSource = source;
+    GLuint depthHandle = 0;
+    if ((source != nullptr) and (source->m_depthBufferIndex >= 0))
+        depthHandle = source->m_bufferInfo[source->m_depthBufferIndex].m_handle;
+    glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthHandle, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+
 void RenderTarget::Clear(const RTActivationParams& params) { // clear color has been set in Renderer.SetupGraphics()
     if (params.clear) {
         baseRenderer.PushViewport();

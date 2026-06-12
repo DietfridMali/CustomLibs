@@ -89,6 +89,7 @@ public:
     BaseQuad                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
     RGBAColor                   m_clearColor;
+    RenderTarget*               m_depthSource{ nullptr };   // foreign depth buffer attached instead of an own one (SetDepthSource)
 
     static GLint                m_activeHandle;
 
@@ -171,10 +172,13 @@ public:
 
     void Clear(const RTActivationParams& params);
 
-    // Depth-buffer sharing is not implemented in OpenGL (DX12-only so far; used by the DX wet-splat
-    // pass, which is gated off in the other backends). Present for common-code source compatibility.
-    // An OGL implementation would attach the source's depth texture to this FBO.
-    inline void SetDepthSource(RenderTarget* /*source*/) noexcept {}
+    // Share another render target's depth buffer: attaches the source's depth texture to this FBO's
+    // depth slot (persistent FBO state -- done once here, every Activate sees it). The foreign depth
+    // is never cleared, because Clear/ClearDepthBuffer gate on an OWN depth buffer (HaveDepthBuffer),
+    // which this target does not have; it is meant to be tested against, not written (leave depth
+    // write off). Lets an overlay pass (e.g. the wet-splat decal buffer) hardware-depth-test against
+    // the scene. Pass nullptr to detach again.
+    void SetDepthSource(RenderTarget* source);
 
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
