@@ -176,6 +176,7 @@ public:
 
     RenderStates        m_renderStates{};
     Viewport            m_viewport;
+    RenderTarget*       m_depthSource{ nullptr };   // foreign depth buffer to bind instead of an own one (SetDepthSource)
     Viewport*           m_viewportSave{ nullptr };
     RenderTargetTexture m_renderTexture;
     RenderTargetTexture m_depthTexture;
@@ -259,6 +260,15 @@ public:
     void ClearDepthBuffer(float clearValue = 1.0f);
 
     void ClearStencilBuffer(void);
+
+    // Share another render target's depth buffer: while set, activating this target binds the
+    // source's DSV instead of an own depth buffer (this target needs none of its own). The foreign
+    // depth is never cleared — all Clear*/GetDepth* paths stay own-buffer-based — and is meant to
+    // be tested against, not written (leave depth write off). Lets an overlay pass (e.g. the
+    // wet-splat decal buffer) hardware-depth-test against the scene. Pass nullptr to unshare.
+    inline void SetDepthSource(RenderTarget* source) noexcept {
+        m_depthSource = source;
+    }
 
     // Render helpers (same as OGL)
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
@@ -393,6 +403,13 @@ private:
 
     inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
         return HaveDepthBuffer(true) ? m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandleAddress() : nullptr;
+    }
+
+    // The DSV to bind when this target is activated: the shared source's depth (SetDepthSource)
+    // takes precedence over an own depth buffer. Used by SelectDrawBuffers only — the Clear* and
+    // GetDepth* paths intentionally keep using the own buffer.
+    inline const D3D12_CPU_DESCRIPTOR_HANDLE* ActiveDepthBufferHandle() noexcept {
+        return (m_depthSource != nullptr) ? m_depthSource->DepthBufferHandle() : DepthBufferHandle();
     }
 };
 

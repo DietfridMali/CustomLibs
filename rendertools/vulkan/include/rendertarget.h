@@ -218,6 +218,10 @@ public:
 
     void ClearStencilBuffer(void);
 
+    // Depth-buffer sharing is not implemented in Vulkan (DX12-only so far; used by the DX wet-splat
+    // pass, which is gated off in the other backends). Present for common-code source compatibility.
+    inline void SetDepthSource(RenderTarget* /*source*/) noexcept {}
+
     // Render helpers (same as OGL)
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 

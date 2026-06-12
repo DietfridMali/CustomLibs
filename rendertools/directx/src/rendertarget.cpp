@@ -385,7 +385,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     if (params.drawBufferGroup == dbDepth) {
         for (int i = 0; i < m_colorBufferCount; ++i)
             m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        pDSV = DepthBufferHandle();
+        pDSV = ActiveDepthBufferHandle();
     }
     else if (params.drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
@@ -397,7 +397,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (i != params.bufferIndex)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        pDSV = DepthBufferHandle();
+        pDSV = ActiveDepthBufferHandle();
     }
     else {
         m_activeBufferIndex = -1;
@@ -409,14 +409,14 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
                 if (AttachBuffer(i))
                     rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
-            pDSV = DepthBufferHandle();
+            pDSV = ActiveDepthBufferHandle();
         }
         else if (m_drawBufferGroup == dbColor) {
             for (int i = 0; i < m_colorBufferCount; ++i) {
                 if (AttachBuffer(i))
                     rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
-            pDSV = DepthBufferHandle();
+            pDSV = ActiveDepthBufferHandle();
             for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
@@ -428,7 +428,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
                 if (AttachBuffer(i))
                     rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
             }
-            pDSV = DepthBufferHandle();
+            pDSV = ActiveDepthBufferHandle();
         }
     }
 
@@ -443,7 +443,8 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup)
 {
-    if (m_depthBufferIndex < 0)
+    // a shared depth source (SetDepthSource) is bound like an own depth buffer
+    if ((m_depthBufferIndex < 0) and (m_depthSource == nullptr))
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);

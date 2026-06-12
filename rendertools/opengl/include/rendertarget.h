@@ -171,6 +171,11 @@ public:
 
     void Clear(const RTActivationParams& params);
 
+    // Depth-buffer sharing is not implemented in OpenGL (DX12-only so far; used by the DX wet-splat
+    // pass, which is gated off in the other backends). Present for common-code source compatibility.
+    // An OGL implementation would attach the source's depth texture to this FBO.
+    inline void SetDepthSource(RenderTarget* /*source*/) noexcept {}
+
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
 
     Texture* GetDepthAsTexture(void);
