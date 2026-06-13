@@ -27,12 +27,20 @@ NetworkEndpoint::NetworkEndpoint(uint32_t host, uint16_t port, ByteOrder byteOrd
 
 
 void NetworkEndpoint::UpdateNetworkID(uint64_t networkID, eNetworkType networkType) noexcept {
-    m_type = networkType;
-    m_id.id = networkID;
-    m_socketAddress.host = 0;
-    m_socketAddress.port = 0;
-    m_ipAddress = "";
-    m_port = 0;
+    if (networkType == ntIPv4) { // an IPv4 network id holds the full socket address (host + port in network byte order)
+        m_id.id = networkID;
+        m_socketAddress.host = m_id.host;
+        m_socketAddress.port = m_id.port;
+        UpdateFromSocketAddress();
+    }
+    else {
+        m_type = networkType;
+        m_id.id = networkID;
+        m_socketAddress.host = 0;
+        m_socketAddress.port = 0;
+        m_ipAddress = "";
+        m_port = 0;
+    }
 }
 
 
