@@ -145,6 +145,7 @@ public:
 
     RenderStates        m_renderStates{};
     Viewport            m_viewport;
+    RenderTarget*       m_depthSource{ nullptr };   // foreign depth buffer to bind/test against instead of an own one (SetDepthSource)
     Viewport*           m_viewportSave{ nullptr };
     RenderTargetTexture m_renderTexture;
     RenderTargetTexture m_depthTexture;
@@ -218,9 +219,15 @@ public:
 
     void ClearStencilBuffer(void);
 
-    // Depth-buffer sharing is not implemented in Vulkan (DX12-only so far; used by the DX wet-splat
-    // pass, which is gated off in the other backends). Present for common-code source compatibility.
-    inline void SetDepthSource(RenderTarget* /*source*/) noexcept {}
+    // Share another render target's depth buffer: while set, activating this target binds the
+    // source's depth image view as the depth attachment instead of an own one (this target needs
+    // none of its own). The foreign depth is never cleared (loadOp is forced to LOAD even when the
+    // activation clears) — all Clear*/GetDepth* paths stay own-buffer-based — and is meant to be
+    // tested against, not written (leave depth write off). Lets an overlay pass (e.g. the wet-splat
+    // decal buffer) hardware-depth-test against the scene. Pass nullptr to unshare.
+    inline void SetDepthSource(RenderTarget* source) noexcept {
+        m_depthSource = source;
+    }
 
     // Render helpers (same as OGL)
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
@@ -361,6 +368,19 @@ private:
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0)
             and (not checkHandle or (m_bufferInfo[m_depthBufferIndex].m_imageView != VK_NULL_HANDLE));
+    }
+
+    // A shared depth source (SetDepthSource) takes precedence over an own depth buffer for the
+    // bound depth attachment / pipeline depth format. The Clear*/GetDepth* paths intentionally keep
+    // using the own buffer, so the foreign depth is never cleared or written.
+    inline bool HaveActiveDepthBuffer(void) noexcept {
+        return HaveDepthBuffer(true) or ((m_depthSource != nullptr) and m_depthSource->HaveDepthBuffer(true));
+    }
+
+    inline BufferInfo* ActiveDepthInfo(void) noexcept {
+        if (m_depthSource != nullptr)
+            return m_depthSource->HaveDepthBuffer(true) ? &m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex] : nullptr;
+        return HaveDepthBuffer(true) ? &m_bufferInfo[m_depthBufferIndex] : nullptr;
     }
 
     // DepthBufferHandle in DX12 returned a CPU descriptor handle pointer. In Vulkan there is no

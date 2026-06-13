@@ -438,7 +438,8 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
 
     VkRenderingAttachmentInfo colors[RT_MAX_COLOR_BUFFERS]{};
     int colorCount = 0;
-    bool wantDepth = HaveDepthBuffer(true);
+    BufferInfo* depthInfo = ActiveDepthInfo();   // own depth, or a shared source's depth (SetDepthSource)
+    bool wantDepth = (depthInfo != nullptr);
 
     auto ConfigColor = [&](int i) {
         BufferInfo& bi = m_bufferInfo[i];
@@ -478,11 +479,13 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
 
     VkRenderingAttachmentInfo depth{};
     if (wantDepth) {
-        BufferInfo& di = m_bufferInfo[m_depthBufferIndex];
         depth.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        depth.imageView   = di.m_imageView;
+        depth.imageView   = depthInfo->m_imageView;
         depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        depth.loadOp      = clearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+        // A shared depth source (SetDepthSource) is only tested against, never cleared or written:
+        // force LOAD even when the activation clears, so the scene depth survives the overlay pass.
+        depth.loadOp      = (m_depthSource != nullptr) ? VK_ATTACHMENT_LOAD_OP_LOAD
+                                                       : (clearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD);
         depth.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
         depth.clearValue  = MakeClearDepth(1.0f);
     }
@@ -552,19 +555,37 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     if (cb == VK_NULL_HANDLE)
         return false;
 
+    // Validate dbSingle's target up front, before we touch the render-pass scope below.
+    if ((params.drawBufferGroup == dbSingle) and
+        ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length())))
+        return false;
+
+    // AttachBuffer/DetachBuffer issue image-layout barriers, which Vulkan forbids inside an active
+    // vkCmdBeginRendering scope. When this is called mid-pass -- a post-effect switching the scene
+    // buffer to colour-0-only and back (the wet-splat composite, the single-output overlays) -- close
+    // the pass first, reconfigure the attachments, then reopen it preserving the contents
+    // (loadOp = LOAD). In the Enable() path m_isInRendering is already false (Enable ended it and
+    // re-Begins itself), so this self-management is a no-op there and never double-begins.
+    bool wasRendering = m_isInRendering;
+    if (wasRendering)
+        EndRendering();
+
     if (params.drawBufferGroup == dbDepth) {
         for (int i = 0; i < m_colorBufferCount; ++i)
             DetachBuffer(i);
     }
     else if (params.drawBufferGroup == dbSingle) {
         m_drawBufferGroup = dbSingle;
-        if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
-            return false;
         m_activeBufferIndex = params.bufferIndex;
         AttachBuffer(params.bufferIndex);
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (i != params.bufferIndex)
                 DetachBuffer(i);
+        // Also detach the vertex-buffer MRTs (worldNormals/worldPos) -> SHADER_READ_ONLY: a post-effect
+        // rendering only into colour 0 must not keep them bound as attachments, and one that samples
+        // them (wetSplats) needs them in a readable layout.
+        for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
+            DetachBuffer(i);
     }
     else {
         m_activeBufferIndex = -1;
@@ -591,13 +612,24 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     }
     if (HaveDepthBuffer(true))
         AttachBuffer(m_depthBufferIndex);
+    else if ((m_depthSource != nullptr) and (m_depthSource->m_depthBufferIndex >= 0))
+        // Shared depth (SetDepthSource): transition the foreign depth image into depth-attachment
+        // layout on OUR command buffer so it can be bound and tested against in this pass. The
+        // barrier must run here, outside the vkCmdBeginRendering scope; the source's own layout
+        // tracker is updated, mirroring the cross-RT use when the scene depth is sampled as a texture.
+        m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, false);
+
+    // Reopen the pass we closed above, with the reconfigured attachment set and contents preserved.
+    if (wasRendering)
+        BeginRendering(false, false);
     return true;
 }
 
 
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups /*drawBufferGroup*/)
 {
-    if (m_depthBufferIndex < 0)
+    // a shared depth source (SetDepthSource) is treated like an own depth buffer
+    if ((m_depthBufferIndex < 0) and (m_depthSource == nullptr))
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
@@ -1030,7 +1062,7 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
                 key.colorFormats[key.colorFormatCount++] = m_colorFormat;
             break;
     }
-    if (HaveDepthBuffer(true))
+    if (HaveActiveDepthBuffer())
         key.depthFormat = kDepthFormat;
 }
 
