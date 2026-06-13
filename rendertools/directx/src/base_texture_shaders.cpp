@@ -274,8 +274,7 @@ const ShaderSource& GrayScaleShader() {
                 // Rec.601 luma weights in gamma space
                 float gray = dot(texColor.rgb, float3(0.299, 0.587, 0.114));
                 gray *= brightness;
-                float3 rgb = (invert != 0) ? float3(1.0 - gray, 1.0 - gray, 1.0 - gray)
-                                           : float3(gray, gray, gray);
+                float3 rgb = (invert != 0) ? float3(1.0 - gray, 1.0 - gray, 1.0 - gray) : float3(gray, gray, gray);
                 return float4(rgb, texColor.a);
             }
         )",

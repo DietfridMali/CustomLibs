@@ -8,6 +8,12 @@ class RGBAColor;
 class RGBColor 
     : public Vector3f {
 public:
+    static RGBColor Grayscale(const RGBColor& color) {
+        static const Vector3f luma(0.299, 0.587, 0.114);
+        float gray = color.Dot (luma);
+        return RGBColor(gray, gray, gray);
+    }
+
     RGBColor(float r = 1.0f, float g = 1.0f, float b = 1.0f)
         : Vector3f({ r, g, b })
     {
