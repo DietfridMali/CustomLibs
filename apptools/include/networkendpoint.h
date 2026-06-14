@@ -57,10 +57,7 @@ public:
     }
 
     NetworkEndpoint(NetworkEndpoint&& other) noexcept {
-        if (UpdateSocketAddress(other.m_ipAddress, other.m_port)) {
-			m_id = std::move(other.m_id);
-            m_ipAddress = std::move(other.m_ipAddress);
-        }
+        *this = other;
     }
 
     ~NetworkEndpoint() = default;
