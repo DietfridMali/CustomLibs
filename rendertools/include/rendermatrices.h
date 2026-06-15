@@ -134,7 +134,7 @@ public:
     }
 
 
-    void CreateMatrices(int windowWidth, int windowHeight, float aspectRatio, float fov, float zNear, float zFar);
+    void CreateMatrices(float aspectRatio, float fov, float zNear, float zFar);
 
     inline int SelectMatrixStack(int i) {
         int current = m_activeStack;
