@@ -25,7 +25,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	// fuer 4-Byte-Pixel-Formate, falls die GPU weniger als 8K verkraftet.
 	constexpr int ShadowDepthBytesPerPixel = 4;
 	const int maxSize = gfxStates.MaxTextureSize(ShadowDepthBytesPerPixel);
-	int startSize = std::min<int>(maxSize, 8192);
+	int startSize = std::min<int>(maxSize, 4096);
 	for (int size = startSize; size >= 1024; size /= 2) {
 		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
 			m_status = 1;
@@ -80,6 +80,9 @@ bool ShadowMap::StopRender(void) noexcept {
 
 void ShadowMap::Stabilize(float shadowMapSize)
 {
+	// NOTE: inert with the active perspective path -- UpdateTransformation() overwrites m_modelViewTransform
+	// right after this. The working texel-snap belongs to the viewer-focused ORTHO path (#if 0'd in
+	// CreateViewerAlignedTransformation); it must snap m_lightTransform and is ortho-only.
 	Vector4f shadowOrigin = m_modelViewTransform * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
 	shadowOrigin *= shadowMapSize * 0.5f;
 	Vector2f roundedOrigin = Vector2f::Round(Vector2f(shadowOrigin.x, shadowOrigin.y));
@@ -107,41 +110,64 @@ void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mMod
 }
 
 
-void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
+// Forward view: viewer-aligned PERSPECTIVE frustum (active). The viewer-focused ORTHO variant below is kept
+// under #if 0 -- no perceptible benefit over perspective, only crawling stepped edges (even at 4K): its
+// texel-snap (Stabilize) damps only translation, not the sun's slow rotation, and ortho spreads texels
+// uniformly so the near field stays coarse. Viewer sits near the rear edge (centre shifted 0.8*radius fwd).
+void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, const Vector3f& worldMin, const Vector3f& worldMax) {
 	Matrix4f lightView, lightProj;
 
-	worldRadius = std::min(worldRadius, m_maxLightRadius);
+#if 0   // viewer-focused ORTHO frustum (disabled). Re-enabling also needs the m_lightTransform texel-snap
+        // in Stabilize() (ortho-only). frustumWidth == 2*coverage matches shadowCoverage in the shaders.
+	float coverage = m_maxLightRadius;
 	if (lightDistance <= 0.0f)
-		lightDistance = 100.0f * worldRadius;
-
-	// Viewer-Blickrichtung in Weltkoordinaten
+		lightDistance = 100.0f * coverage;
 	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
 	viewDir.Normalize();
-
-	// Frustumzentrum vor den Viewer schieben (Viewer knapp am hinteren Rand)
+	center += viewDir * coverage * 0.8f;   // viewer near rear edge
+	m_lightPosition = center + lightDirection * lightDistance;
+	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
+	Vector4f corners[8] = {
+		{ center.X() - coverage, worldMin.Y(), center.Z() - coverage, 1.0f },
+		{ center.X() + coverage, worldMin.Y(), center.Z() - coverage, 1.0f },
+		{ center.X() - coverage, worldMax.Y(), center.Z() - coverage, 1.0f },
+		{ center.X() + coverage, worldMax.Y(), center.Z() - coverage, 1.0f },
+		{ center.X() - coverage, worldMin.Y(), center.Z() + coverage, 1.0f },
+		{ center.X() + coverage, worldMin.Y(), center.Z() + coverage, 1.0f },
+		{ center.X() - coverage, worldMax.Y(), center.Z() + coverage, 1.0f },
+		{ center.X() + coverage, worldMax.Y(), center.Z() + coverage, 1.0f }
+	};
+	Vector4f vMin{ FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+	Vector4f vMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
+	for (int i = 0; i < 8; i++) {
+		Vector4f v = lightView * corners[i];
+		vMin.Minimize(v);
+		vMax.Maximize(v);
+	}
+	Projector projector;
+	lightProj = projector.ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
+#else   // viewer-aligned PERSPECTIVE frustum: worldRadius-sized cone around the area in front of the viewer,
+        // centre shifted forward so the viewer sits near the rear edge. Near field gets more density than ortho.
+	float worldRadius = std::min(Vector3f::Abs(worldMax - worldMin).Length() * 0.5f, m_maxLightRadius);
+	if (lightDistance <= 0.0f)
+		lightDistance = 100.0f * worldRadius;
+	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+	viewDir.Normalize();
 	center += viewDir * worldRadius * 0.8f;
-
-	Vector3f f = -lightDirection; // angenommen normalisiert
+	Vector3f f = -lightDirection;
 	float dotFV = f.Dot(viewDir);
-
-	// X-Achse im Lichtraum: Projektionsanteil der Viewrichtung senkrecht zu f
-	Vector3f s = viewDir - f * dotFV;      // liegt senkrecht zu f
+	Vector3f s = viewDir - f * dotFV;      // view-direction component perpendicular to the light
 	s.Normalize();
-
-	// Up-Vektor so w�hlen, dass LookAt(s) als Right bekommt
 	Vector3f upParam = s.Cross(f);
 	upParam.Normalize();
-
 	m_lightPosition = center + lightDirection * lightDistance;
-
 	lightView.LookAt(m_lightPosition, center, upParam);
-
 	float halfFov = std::atan(worldRadius / lightDistance);
 	float zNear = std::max(0.01f, lightDistance - worldRadius);
 	float zFar = lightDistance + worldRadius;
-
 	Projector projector(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
 	lightProj = projector.Compute3DProjection();
+#endif
 
 	CreateLightTransformation(lightView, lightProj);
 }
@@ -200,7 +226,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	if (m_status < 0)
 		return false;
 	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
-	float worldRadius = worldSize.Length() * 0.5f;
+	[[maybe_unused]] float worldRadius = worldSize.Length() * 0.5f; // only the _DEBUG perspective path (CreatePerspectiveTransformation) still uses this
 	if (not center.IsValid()) 
 #if 0
 	{
@@ -219,7 +245,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	static int trafoType = 2;
 	if (trafoType == 2) {
 		if (baseRenderer.HasPerspective(BaseRenderer::rpForward))
-			CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+			CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldMin, worldMax);
 		else
 			CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 	}
@@ -229,7 +255,7 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #else
 	if (baseRenderer.HasPerspective(BaseRenderer::rpForward))
-		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldRadius);
+		CreateViewerAlignedTransformation(center, lightDirection, lightOffset, worldMin, worldMax);
 	else
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #endif
