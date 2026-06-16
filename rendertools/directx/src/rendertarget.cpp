@@ -695,7 +695,26 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
     BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
     if (not info.m_resource)
         return nullptr;
-    m_shadowTexture.m_handle = info.SRVIndex();
+    ID3D12Device* device = dx12Context.Device();
+    if (not device)
+        return nullptr;
+    // info.SRVIndex() is the depth buffer's own (DSV-side) view and is not a sample-able, shader-visible
+    // texture SRV -- binding it directly leaves the slot effectively unbound (shows up missing in a capture).
+    // Create a dedicated shader-visible R32_FLOAT SRV over the R32-typeless depth resource so the shadow
+    // shaders can SampleCmp it. Descriptor allocated once (cached in m_handle); the view is (re)written each
+    // call so it follows a recreated depth resource (e.g. after a resolution change).
+    if (m_shadowTexture.m_handle == UINT32_MAX) {
+        DescriptorHandle hdl = descriptorHeaps.AllocSRV();
+        if (not hdl.IsValid())
+            return nullptr;
+        m_shadowTexture.m_handle = hdl.index;
+    }
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+    srvDesc.Format                  = dxDepthSRVFormat;   // R32_FLOAT view of the R32-typeless depth resource
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels     = 1;
+    device->CreateShaderResourceView(info.m_resource.Get(), &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_shadowTexture.m_handle));
     m_shadowTexture.m_resource = info.m_resource;
     m_shadowTexture.Validate();
     return &m_shadowTexture;
@@ -753,7 +772,9 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     else {
         if (params.premultiply)
             m_viewportArea.Premultiply();
+#if 1
         baseRenderer.Set2DRenderStates(params.destination < 0);
+#endif
         m_viewportArea.Render(nullptr, source, color);
     }
     baseRenderer.PopMatrix();
