@@ -103,10 +103,10 @@ class LinearFrameCounter
     : public BaseFrameCounter
 {
 public:
-    size_t                  m_frameCount[2]; // total frame count / frames during last second
-    float                   m_fps[2];
-    size_t                  m_renderStartTime;
-    Timer                   m_fpsTimer{ 1000 };
+    size_t  m_frameCount[2]; // total frame count / frames during last second
+    float   m_fps[2];
+    size_t  m_renderStartTime;
+    Timer   m_fpsTimer{ 1000 };
 
     LinearFrameCounter() = default;
 
