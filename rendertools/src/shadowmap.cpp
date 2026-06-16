@@ -31,7 +31,7 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 			m_status = 1;
 			return true;
 		}
-		m_maxLightRadius *= 0.9f;
+		//m_maxLightRadius *= 0.9f;
 	}
 #endif
 	return false;
