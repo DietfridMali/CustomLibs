@@ -417,7 +417,11 @@ bool RenderTarget::IsActive(void) noexcept {
 }
 
 
+#ifdef _DEBUG
+bool RenderTarget::Activate(const RTActivationParams& params, const std::source_location& loc)
+#else
 bool RenderTarget::Activate(const RTActivationParams& params)
+#endif
 {
     ZoneScoped;
     if (not Enable(params))
@@ -427,8 +431,8 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
     // has no Deactivate of its own, so it must not push or set a viewport — the caller's
     // viewport is restored by the PopViewport immediately following in Deactivate().
-    if (not (m_wasActivated or not params.reactivate))
-        baseRenderer.PushViewport();
+    if (not (m_wasActivated or params.reactivate))
+        baseRenderer.PushViewport(loc);
     SetViewport(true);
     Clear(params);
     m_wasActivated = true;
@@ -525,8 +529,8 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         gfxStates.SetBlending(1);
     }
     else { // rendering to another RenderTarget (than the main buffer)
-        enableLocally = not IsEnabled();
-        if (enableLocally and not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+        enableLocally = not IsActive();
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
         gfxStates.SetBlending(0);
@@ -569,7 +573,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PopMatrix();
     if (enableLocally)
-        Disable();
+        Deactivate();
     return true;
 }
 

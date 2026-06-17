@@ -10,8 +10,9 @@
 #include "base_quad.h"
 #include "drawbufferhandler.h"
 #include "resource_view.h"
-
-#include <source_location>
+#ifdef _DEBUG
+#   include <source_location>
+#endif
 
 // =================================================================================================
 // DX12 RenderTarget (Frame Buffer Object)
@@ -214,7 +215,11 @@ public:
 
     bool IsActive(void) noexcept;
 
+#ifdef _DEBUG
     bool Activate(const RTActivationParams& params, const std::source_location& loc = std::source_location::current());
+#else
+    bool Activate(const RTActivationParams& params);
+#endif
 
     bool EnableBuffers(const RTActivationParams& params);
 

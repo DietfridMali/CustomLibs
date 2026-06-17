@@ -3,6 +3,9 @@
 #include <math.h>
 #include <utility>
 #include <stdlib.h>
+#ifdef _DEBUG
+#   include <source_location>
+#endif
 
 #include "std_defines.h"
 #include "basesingleton.hpp"

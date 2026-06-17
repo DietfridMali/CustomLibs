@@ -8,6 +8,9 @@
 #include "texture.h"
 #include "colordata.h"
 #include "drawbufferhandler.h"
+#ifdef _DEBUG
+#   include <source_location>
+#endif
 
 // =================================================================================================
 
@@ -140,7 +143,11 @@ public:
 
     bool IsActive(void) noexcept;
 
+#ifdef _DEBUG
+    bool Activate(const RTActivationParams& params, const std::source_location& loc = std::source_location::current());
+#else
     bool Activate(const RTActivationParams& params);
+#endif
 
     bool EnableBuffers(const RTActivationParams& params);
 

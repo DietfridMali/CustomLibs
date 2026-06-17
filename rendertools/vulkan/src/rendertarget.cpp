@@ -673,8 +673,18 @@ bool RenderTarget::Enable(const RTActivationParams& params)
 }
 
 
+bool RenderTarget::IsActive(void) noexcept
+{
+    return baseRenderer.IsActiveDrawBuffer(this);
+}
+
+
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
+    if (m_wasActivated or params.reactivate)
+        baseRenderer.RenderStates() = m_renderStates;
+    else
+        baseRenderer.PushViewport();
     baseRenderer.ActivateDrawBuffer(this);
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
@@ -684,12 +694,8 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
     // has no Deactivate of its own, so it must not push or set a viewport — the caller's
     // viewport is restored by the PopViewport immediately following in Deactivate().
-    if (params.reactivate)
-        baseRenderer.RenderStates() = m_renderStates;
-    else {
-        baseRenderer.PushViewport();
-        SetViewport(true);
-    }
+    SetViewport(true);
+    m_wasActivated = true;
     return true;
 }
 
@@ -718,6 +724,7 @@ void RenderTarget::Deactivate(void) noexcept
 {
     baseRenderer.DeactivateDrawBuffer(this);
     baseRenderer.PopViewport();
+    m_wasActivated = false;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -997,7 +1004,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
 {
     bool enableLocally = false;
     if (params.destination >= 0) {
-        enableLocally = not IsEnabled();
+        enableLocally = not IsActive();
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
@@ -1018,7 +1025,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PopMatrix();
     if (enableLocally)
-        Disable();
+        Deactivate();
     return true;
 }
 

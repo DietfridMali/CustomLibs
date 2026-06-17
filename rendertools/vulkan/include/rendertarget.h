@@ -139,6 +139,7 @@ public:
     bool                m_isAvailable{ false };
     bool                m_isScreenBuffer{ false };
     bool                m_isInRendering{ false };  // active vkCmdBeginRendering scope
+    bool                m_wasActivated{ false };
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
     DrawBufferList      m_drawBuffers{};
@@ -178,6 +179,8 @@ public:
     }
 
     bool Activate(const RTActivationParams& params);
+
+    bool IsActive(void) noexcept;
 
     bool EnableBuffers(const RTActivationParams& params);
 

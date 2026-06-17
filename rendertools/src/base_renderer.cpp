@@ -3,9 +3,6 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <utility>
-#ifdef _DEBUG
-#   include <source_location>
-#endif
 #include "conversions.hpp"
 #include "tristate.h"
 #include "base_renderer.h"
