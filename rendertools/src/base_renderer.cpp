@@ -110,6 +110,11 @@ void BaseRenderer::StartShadowPass(void) noexcept {
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Less);
     gfxStates.ColorMask(false, false, false, false);
     gfxStates.SetBlending(0);
+    // Caster-side slope-scaled depth bias: push the occluder depth away from the light so receivers sit
+    // clearly in front -> self-shadow / grazing acne is killed at the SOURCE, without a receiver-side bias
+    // that would displace the cast shadow. The slope term scales with the occluder's depth gradient
+    // (handles grazing). Reset to 0 in StartColorPass/StartFullPass. Tune factor (slope) / units (const).
+    //gfxStates.SetPolygonOffset(1.0f, 1.0f);
 }
 
 
@@ -120,6 +125,7 @@ void BaseRenderer::StartColorPass(void) noexcept {
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.ColorMask(true, true, true, true);
     gfxStates.SetBlending(0);
+    gfxStates.SetPolygonOffset(0.0f, 0.0f);   // clear the shadow-pass depth bias
 }
 
 
@@ -130,6 +136,7 @@ void BaseRenderer::StartFullPass(void) noexcept {
     gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
     gfxStates.ColorMask(true, true, true, true);
     gfxStates.SetBlending(0);
+    gfxStates.SetPolygonOffset(0.0f, 0.0f);   // clear the shadow-pass depth bias
 }
 
 
