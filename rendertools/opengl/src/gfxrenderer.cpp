@@ -62,8 +62,7 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
         Stop2DScene();
         m_screenIsAvailable = false;
         if (m_screenBuffer) {
-            gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-            gfxStates.SetFaceCulling(0); // required for vertical flipping because that inverts the buffer's winding
+            Set2DRenderStates();
             //SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 #if 0
             if (m_screenBuffer->Activate({})) {

@@ -97,6 +97,10 @@ void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
 void BaseRenderer::Set2DRenderStates(int blending) noexcept {
     gfxStates.SetDepthTest(0);
     gfxStates.SetDepthWrite(0);
+#if 0
+    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
+#endif
     gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
     gfxStates.SetFaceCulling(0);
     gfxStates.SetBlending(blending);
