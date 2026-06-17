@@ -329,7 +329,11 @@ public:
 
     void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept;
 
+#ifdef _DEBUG
+    void PushViewport(const std::source_location& caller = std::source_location::current());
+#else
     void PushViewport(void);
+#endif
 
     void PopViewport(void);
 

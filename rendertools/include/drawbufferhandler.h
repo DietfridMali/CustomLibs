@@ -41,6 +41,10 @@ public:
     inline RenderTarget* GetActiveBuffer(void) noexcept {
         return m_activeBuffer;
     }
+
+    inline bool IsActiveDrawBuffer(RenderTarget* buffer) noexcept {
+        return (buffer != nullptr) and (buffer == m_activeBuffer);
+    }
 };
 
 // =================================================================================================

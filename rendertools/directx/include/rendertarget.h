@@ -169,6 +169,7 @@ public:
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };
     bool                m_isAvailable{ false };
+    bool                m_wasActivated{ false };
     bool                m_isScreenBuffer{ false };
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
@@ -210,6 +211,8 @@ public:
         if (m_cmdList)
             m_cmdList->SetName(name);
     }
+
+    bool IsActive(void) noexcept;
 
     bool Activate(const RTActivationParams& params, const std::source_location& loc = std::source_location::current());
 

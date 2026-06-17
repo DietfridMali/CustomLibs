@@ -84,6 +84,7 @@ public:
     ShadowTexture               m_shadowTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
     bool                        m_isAvailable;
+    bool                        m_wasActivated;
     bool                        m_isScreenBuffer;
     int                         m_lastDestination;
     BaseQuad                    m_viewportArea;
@@ -136,6 +137,8 @@ public:
     bool Create(int width, int height, int scale, const RTCreationParams& params);
 
     void Destroy(void);
+
+    bool IsActive(void) noexcept;
 
     bool Activate(const RTActivationParams& params);
 

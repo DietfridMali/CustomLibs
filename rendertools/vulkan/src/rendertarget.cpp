@@ -995,7 +995,9 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
+    bool enableLocally = false;
     if (params.destination >= 0) {
+        enableLocally = not IsEnabled();
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
@@ -1015,6 +1017,8 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         m_viewportArea.Render(nullptr, source, color);
     }
     baseRenderer.PopMatrix();
+    if (enableLocally)
+        Disable();
     return true;
 }
 

@@ -31,6 +31,7 @@ void RenderTarget::Init(void) {
     m_activeBufferIndex = -1;
     m_pingPong = true;
     m_isAvailable = false;
+    m_wasActivated = false;
     m_drawBufferGroup = dbNone;
     m_clearColor = ColorData::Invisible;
     m_bufferInfo.Reset();
@@ -411,6 +412,11 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 }
 
 
+bool RenderTarget::IsActive(void) noexcept {
+    return baseRenderer.IsActiveDrawBuffer(this);
+}
+
+
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
     ZoneScoped;
@@ -421,11 +427,11 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
     // has no Deactivate of its own, so it must not push or set a viewport — the caller's
     // viewport is restored by the PopViewport immediately following in Deactivate().
-    if (not params.reactivate) {
+    if (not (m_wasActivated or not params.reactivate))
         baseRenderer.PushViewport();
-        SetViewport(true);
-    }
+    SetViewport(true);
     Clear(params);
+    m_wasActivated = true;
     return true;
 }
 
@@ -453,6 +459,7 @@ void RenderTarget::Disable(bool /*deactivate*/) noexcept {
 void RenderTarget::Deactivate(void) noexcept {
     baseRenderer.DeactivateDrawBuffer(this);
     baseRenderer.PopViewport();
+    m_wasActivated = false;
 }
 
 
@@ -514,13 +521,12 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params) {
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color) {
     bool enableLocally = false;
-    bool isEnabled = IsEnabled();
     if (params.destination < 0) {// rendering to the current render target
         gfxStates.SetBlending(1);
     }
     else { // rendering to another RenderTarget (than the main buffer)
         enableLocally = not IsEnabled();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+        if (enableLocally and not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
         gfxStates.SetBlending(0);

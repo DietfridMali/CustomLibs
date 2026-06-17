@@ -481,10 +481,19 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 }
 
 
+bool RenderTarget::IsActive(void) noexcept {
+    return baseRenderer.IsActiveDrawBuffer(this);
+}
+
+
 bool RenderTarget::Activate(const RTActivationParams& params, const std::source_location& loc)
 {
     ZoneScoped;
     m_activateLoc = loc;
+    if (m_wasActivated or params.reactivate) // -> reactivating
+        baseRenderer.RenderStates() = m_renderStates;
+    else
+        baseRenderer.PushViewport(loc);
     baseRenderer.ActivateDrawBuffer(this);
     if (not Enable(params)) {
         baseRenderer.DeactivateDrawBuffer(this);
@@ -495,12 +504,8 @@ bool RenderTarget::Activate(const RTActivationParams& params, const std::source_
     // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
     // has no Deactivate of its own, so it must not push or set a viewport — the caller's
     // viewport is restored by the PopViewport immediately following in Deactivate().
-    if (params.reactivate)
-        baseRenderer.RenderStates() = m_renderStates;
-    else {
-        baseRenderer.PushViewport();
-        SetViewport();
-    }
+    SetViewport();
+    m_wasActivated = true;
     return true;
 }
 
@@ -536,6 +541,7 @@ void RenderTarget::Disable(bool deactivate) noexcept {
 void RenderTarget::Deactivate(void) noexcept {
     baseRenderer.DeactivateDrawBuffer(this);
     baseRenderer.PopViewport();
+    m_wasActivated = false;
 }
 
 
@@ -753,7 +759,9 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
     ZoneScoped;
+    bool enableLocally = false;
     if (params.destination >= 0) {
+        enableLocally = not IsActive();
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
@@ -778,6 +786,8 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         m_viewportArea.Render(nullptr, source, color);
     }
     baseRenderer.PopMatrix();
+    if (enableLocally)
+        Deactivate();
     return true;
 }
 

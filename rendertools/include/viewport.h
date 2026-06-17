@@ -164,7 +164,18 @@ public:
     inline void SetGfxViewport(void) noexcept {
         gfxStates.SetViewport(m_gfxViewport);
     }
+#ifdef _DEBUG
+    String          m_owner;
 
+    template<typename T>
+    void SetOwner(T&& owner) noexcept {
+        m_owner = std::forward<T>(owner);
+    }
+
+    void SetOwner(const char* owner) noexcept {
+        m_owner = String(owner);
+    }
+#endif
 };
 
 // =================================================================================================

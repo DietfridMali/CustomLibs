@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <utility>
-
+#ifdef _DEBUG
+#   include <source_location>
+#endif
 #include "conversions.hpp"
 #include "tristate.h"
 #include "base_renderer.h"
@@ -267,8 +269,14 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
 }
 
 
-void BaseRenderer::PushViewport(void) {
+#ifdef _DEBUG
+void BaseRenderer::PushViewport(const std::source_location& caller)
+#else
+void BaseRenderer::PushViewport(void)
+#endif
+{
     m_viewport.GetGfxViewport();
+    m_viewport.SetOwner(caller.function_name());
     m_viewportStack.Append(m_viewport);
 }
 
