@@ -338,9 +338,11 @@ public:
         return gfxStates.ClearColorBuffers();
     }
 
-    // Shared API (WBOIT accum/revealage per-buffer clear). Stub for now -- the DX caller gates on
-    // HasDirectX, so this is never reached on OpenGL until the WBOIT path is ported.
-    inline void ClearColorBuffer(int, RGBAColor) {}
+    // WBOIT accum/revealage per-buffer clear: clear a single draw buffer of the bound FBO (accum -> 0,
+    // revealage -> 1). Call right after Activate (the FBO + its draw-buffer mapping must be bound).
+    inline void ClearColorBuffer(int bufferIndex, RGBAColor color) {
+        glClearBufferfv(GL_COLOR, bufferIndex, color.Data());
+    }
 
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_handle);

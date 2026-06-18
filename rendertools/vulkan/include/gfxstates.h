@@ -417,12 +417,40 @@ public:
         s.blendDstAlpha = dstAlpha;
     }
 
-    // Independent per-RT blend (WBOIT). Stubs for the shared API; the Vulkan WBOIT path is not wired yet
-    // (the DX caller gates on HasDirectX, so these are never reached here).
-    inline int SetIndependentBlend(int) { return 0; }
-    inline int SetBlendingRT1(int) { return 0; }
-    inline void BlendFuncRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
-    inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
+    // Independent per-RT blending for MRT passes (e.g. WBOIT: RT0 additive accum, RT1 multiplicative
+    // revealage). When off (default) RT0's blend replicates to every target. The RT1 setters below feed
+    // the second render target via the RenderStates' *1 fields (-> PSO key); turn SetIndependentBlend
+    // back off after the pass.
+    inline int SetIndependentBlend(int state) {
+        auto& s = ActiveState();
+        int prevState = int(s.independentBlend);
+        s.independentBlend = uint8_t(state);
+        return prevState;
+    }
+
+    inline int SetBlendingRT1(int state) {
+        auto& s = ActiveState();
+        int prevState = int(s.blendEnable1);
+        s.blendEnable1 = uint8_t(state);
+        return prevState;
+    }
+
+    inline void BlendFuncRT1(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
+        auto& s = ActiveState();
+        s.blendSrcRGB1 = src;
+        s.blendDstRGB1 = dst;
+        s.blendSrcAlpha1 = src;
+        s.blendDstAlpha1 = dst;
+    }
+
+    inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
+        GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
+        auto& s = ActiveState();
+        s.blendSrcRGB1 = srcRGB;
+        s.blendDstRGB1 = dstRGB;
+        s.blendSrcAlpha1 = srcAlpha;
+        s.blendDstAlpha1 = dstAlpha;
+    }
 
     inline RGBAColor ClearColor(RGBAColor color) {
         RGBAColor prev = m_clearColor;

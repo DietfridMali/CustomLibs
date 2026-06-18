@@ -160,4 +160,23 @@ VkPipelineColorBlendAttachmentState& RenderStates::SetBlendAttachment(VkPipeline
     return att;
 }
 
+
+VkPipelineColorBlendAttachmentState& RenderStates::SetBlendAttachment1(VkPipelineColorBlendAttachmentState& att) const noexcept
+{
+    att.blendEnable = blendEnable1 ? VK_TRUE : VK_FALSE;
+    att.srcColorBlendFactor = ToVkBlend(blendSrcRGB1);
+    att.dstColorBlendFactor = ToVkBlend(blendDstRGB1);
+    att.colorBlendOp = ToVkBlendOp(blendOpRGB1);
+    att.srcAlphaBlendFactor = ToVkBlend(blendSrcAlpha1);
+    att.dstAlphaBlendFactor = ToVkBlend(blendDstAlpha1);
+    att.alphaBlendOp = ToVkBlendOp(blendOpAlpha1);
+
+    att.colorWriteMask = 0;
+    if (colorMask1 & 0x01) att.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
+    if (colorMask1 & 0x02) att.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
+    if (colorMask1 & 0x04) att.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
+    if (colorMask1 & 0x08) att.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
+    return att;
+}
+
 // =================================================================================================

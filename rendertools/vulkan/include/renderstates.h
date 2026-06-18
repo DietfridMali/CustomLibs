@@ -41,6 +41,17 @@ struct RenderStates {
     BlendFactor blendDstAlpha { BlendFactor::InvSrcAlpha };
     BlendOp     blendOpRGB { BlendOp::Add };
     BlendOp     blendOpAlpha { BlendOp::Add };
+    // Independent blend for RT1 (MRT passes that need a different blend per target, e.g. WBOIT: RT0
+    // additive accum, RT1 multiplicative revealage). 0 -> RT0's blend applies to all targets (default).
+    uint8_t     independentBlend { 0 };
+    uint8_t     blendEnable1 { 0 };
+    BlendFactor blendSrcRGB1 { BlendFactor::One };
+    BlendFactor blendDstRGB1 { BlendFactor::Zero };
+    BlendFactor blendSrcAlpha1 { BlendFactor::One };
+    BlendFactor blendDstAlpha1 { BlendFactor::Zero };
+    BlendOp     blendOpRGB1 { BlendOp::Add };
+    BlendOp     blendOpAlpha1 { BlendOp::Add };
+    uint8_t     colorMask1 { 0x0F };
     // Color mask (bit0=R bit1=G bit2=B bit3=A)
     uint8_t     colorMask { 0x0F };
     // Scissor
@@ -84,8 +95,12 @@ struct RenderStates {
     // Fills in depthTestEnable / depthWriteEnable / depthCompareOp / stencil ops.
     VkPipelineDepthStencilStateCreateInfo& SetDepthStencilInfo(VkPipelineDepthStencilStateCreateInfo& info) const noexcept;
 
-    // Fills in blend factors / ops / colorWriteMask for one color attachment.
+    // Fills in blend factors / ops / colorWriteMask for one color attachment (RT0's blend config).
     VkPipelineColorBlendAttachmentState& SetBlendAttachment(VkPipelineColorBlendAttachmentState& att) const noexcept;
+
+    // Fills RT1's independent blend config (the *1 fields) into an attachment (WBOIT revealage target).
+    // Only applied when independentBlend is set; otherwise RT0's config replicates to all targets.
+    VkPipelineColorBlendAttachmentState& SetBlendAttachment1(VkPipelineColorBlendAttachmentState& att) const noexcept;
 };
 #pragma pack(pop)
 

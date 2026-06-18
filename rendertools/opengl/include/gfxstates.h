@@ -373,12 +373,27 @@ public:
 			GfxToGL::ToGLenum(srcAlpha), GfxToGL::ToGLenum(dstAlpha));
 	}
 
-	// Independent per-RT blend (WBOIT). Stubs for the shared API; the OpenGL WBOIT path is not wired yet
-	// (the DX caller gates on HasDirectX, so these are never reached here).
+	// Independent per-RT blend (WBOIT: RT0 additive accum, RT1 multiplicative revealage). GL has per-draw-
+	// buffer blend natively (glBlendFuncSeparatei / glEnablei) -- no global "independent enable" toggle, so
+	// SetIndependentBlend is a no-op. The global BlendFunc still sets RT0 (and every buffer); RT1 is then
+	// overridden here. NOTE: these bypass the global FuncState cache -> after the pass, reset RT1 explicitly
+	// (BlendFuncRT1) and re-issue the global BlendFunc so RT1 does not stay desynced for a later MRT pass.
 	inline int SetIndependentBlend(int) { return 0; }
-	inline int SetBlendingRT1(int) { return 0; }
-	inline void BlendFuncRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
-	inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
+
+	inline int SetBlendingRT1(int state) {
+		if (state) glEnablei(GL_BLEND, 1); else glDisablei(GL_BLEND, 1);
+		return 0;
+	}
+
+	inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
+		GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
+		glBlendFuncSeparatei(1, GfxToGL::ToGLenum(srcRGB), GfxToGL::ToGLenum(dstRGB),
+			GfxToGL::ToGLenum(srcAlpha), GfxToGL::ToGLenum(dstAlpha));
+	}
+
+	inline void BlendFuncRT1(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
+		BlendFuncSeparateRT1(src, dst, src, dst);
+	}
 
 	inline void StencilFunc(GfxOperations::CompareFunc func, uint8_t ref, uint8_t mask) {
 		StencilFunc(GfxToGL::ToGLenum(func), ref, mask);

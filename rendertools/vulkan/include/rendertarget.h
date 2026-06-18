@@ -226,9 +226,9 @@ public:
 
     void ClearColorBuffers(void);
 
-    // Shared API (WBOIT accum/revealage per-buffer clear). Stub for now -- the DX caller gates on
-    // HasDirectX, so this is never reached on Vulkan until the WBOIT path is ported.
-    inline void ClearColorBuffer(int, RGBAColor) {}
+    // WBOIT accum/revealage per-buffer clear: clear a single colour attachment of the bound FBO to its
+    // own value (accum -> 0, revealage -> 1). Call right after Activate (inside the render scope).
+    void ClearColorBuffer(int bufferIndex, RGBAColor color);
 
     void ClearDepthBuffer(float clearValue = 1.0f);
 

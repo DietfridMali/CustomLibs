@@ -481,8 +481,11 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
     if (wantDepth) {
         depth.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         depth.imageView   = depthInfo->m_imageView;
-        depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        // A shared depth source (SetDepthSource) is only tested against, never cleared or written:
+        // A shared depth source (SetDepthSource) is read-only (only tested against, never cleared or
+        // written): use the read-only layout so the SAME image can serve as the depth attachment AND a
+        // sampled texture in the same pass (WBOIT soft particles). An own depth buffer stays writable.
+        depth.imageLayout = (m_depthSource != nullptr) ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                                       : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         // force LOAD even when the activation clears, so the scene depth survives the overlay pass.
         depth.loadOp      = (m_depthSource != nullptr) ? VK_ATTACHMENT_LOAD_OP_LOAD
                                                        : (clearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD);
@@ -613,11 +616,12 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     if (HaveDepthBuffer(true))
         AttachBuffer(m_depthBufferIndex);
     else if ((m_depthSource != nullptr) and (m_depthSource->m_depthBufferIndex >= 0))
-        // Shared depth (SetDepthSource): transition the foreign depth image into depth-attachment
-        // layout on OUR command buffer so it can be bound and tested against in this pass. The
-        // barrier must run here, outside the vkCmdBeginRendering scope; the source's own layout
-        // tracker is updated, mirroring the cross-RT use when the scene depth is sampled as a texture.
-        m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, false);
+        // Shared depth (SetDepthSource): transition the foreign depth image into the read-only depth layout
+        // (DEPTH_STENCIL_READ_ONLY_OPTIMAL via asShaderRead) on OUR command buffer so it can be both tested
+        // against AND sampled in this pass (WBOIT soft particles). The barrier must run here, outside the
+        // vkCmdBeginRendering scope; a later in-pass GetDepthAsTexture (ToShadowInput) is then a no-op
+        // (TransitionTo early-outs on the same layout), so no forbidden in-pass barrier is emitted.
+        m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, true);
 
     // Reopen the pass we closed above, with the reconfigured attachment set and contents preserved.
     if (wasRendering)
@@ -804,6 +808,27 @@ void RenderTarget::Clear(const RTActivationParams& params)
     rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
     rect.layerCount  = 1;
     vkCmdClearAttachments(cb, uint32_t(n), atts.Data(), 1, &rect);
+}
+
+
+// WBOIT per-buffer clear: clear one colour attachment to an explicit value mid-pass (accum and revealage
+// need different clears, which the single m_clearColor can't express). Attachment index = draw-buffer slot.
+void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
+{
+    if (not m_cmdList or not m_isInRendering)
+        return;
+    VkCommandBuffer cb = m_cmdList->GfxList();
+    if ((cb == VK_NULL_HANDLE) or (bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return;
+    VkClearAttachment a{};
+    a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+    a.colorAttachment = uint32_t(bufferIndex);
+    a.clearValue      = MakeClearColor(color);
+    VkClearRect rect{};
+    rect.rect.offset = { 0, 0 };
+    rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    rect.layerCount  = 1;
+    vkCmdClearAttachments(cb, 1, &a, 1, &rect);
 }
 
 

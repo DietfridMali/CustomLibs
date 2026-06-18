@@ -160,10 +160,13 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     VkPipelineDepthStencilStateCreateInfo depthStencil { };
     key.states.SetDepthStencilInfo(depthStencil);
 
-    // Color blend — same RenderStates blend config applied to every color attachment.
+    // Color blend — RT0's config applied to every color attachment, then RT1 gets its own independent
+    // blend when requested (WBOIT: RT0 additive accum, RT1 multiplicative revealage).
     VkPipelineColorBlendAttachmentState attachments[8] { };
     for (uint32_t i = 0; i < key.colorFormatCount; ++i)
         key.states.SetBlendAttachment(attachments[i]);
+    if (key.states.independentBlend and (key.colorFormatCount > 1))
+        key.states.SetBlendAttachment1(attachments[1]);
 
     VkPipelineColorBlendStateCreateInfo colorBlend { };
     colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
