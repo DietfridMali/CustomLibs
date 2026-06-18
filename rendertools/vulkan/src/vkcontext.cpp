@@ -423,10 +423,13 @@ bool VKContext::CreateDevice(void) noexcept
     // (RWStructuredBuffer particles/systems/activeSlots) — required by the particle draw's
     // vertex-pulling VS; without it vkCreateGraphicsPipelines rejects the SPIR-V (the storage
     // buffers are not NonWritable).
+    // independentBlend allows per-attachment blend states in one pipeline — required by WBOIT,
+    // whose MRT pass blends RT0 additively (accum) and RT1 multiplicatively (revealage).
     VkPhysicalDeviceFeatures features { };
     features.samplerAnisotropy = VK_TRUE;
     features.fragmentStoresAndAtomics = VK_TRUE;
     features.vertexPipelineStoresAndAtomics = VK_TRUE;
+    features.independentBlend = VK_TRUE;
 
     const char* deviceExtensions[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,

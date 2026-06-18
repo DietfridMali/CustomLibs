@@ -324,7 +324,8 @@ void RenderTarget::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
 
 
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup) {
-    if (not HaveDepthBuffer(true))
+    // a shared depth source (SetDepthSource) is bound like an own depth buffer
+    if ((m_depthBufferIndex < 0) and (m_depthSource == nullptr))
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);

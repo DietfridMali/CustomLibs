@@ -552,6 +552,14 @@ void RenderTarget::Disable(bool deactivate) noexcept {
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
                 m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            // The depth buffer is an RT output too: the deferred shadow (and the soft-particle / WBOIT pass)
+            // sample it as an SRV to reconstruct world position. Colour + MRT above were made shader-readable
+            // but the depth was missed -> a sampled depth left in DEPTH_WRITE reads as garbage on D3D12, so the
+            // deferred shadow mask came out all-lit (cast shadows on walls/floor/decals vanished). Transition
+            // it to a read+sample state too; a later depth-write pass restores DEPTH_WRITE via the depthOwner
+            // block in SelectDrawBuffers. (An RT with a shared depth source has m_depthBufferIndex < 0 -> skip.)
+            if (m_depthBufferIndex >= 0)
+                m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
         // Hand all allocated RTV slots over to GfxResourceHandler — freed once the slot's GPU
         // work is fenced complete (at next BeginFrame for the same frame slot, or via Flush()).
@@ -812,7 +820,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
-        gfxStates.SetBlending(0);
+        //gfxStates.SetBlending(0);
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
