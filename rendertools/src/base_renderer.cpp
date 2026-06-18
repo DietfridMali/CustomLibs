@@ -272,8 +272,10 @@ void BaseRenderer::PushViewport(const std::source_location& caller)
 void BaseRenderer::PushViewport(void)
 #endif
 {
-    m_viewport.GetGfxViewport();
+#ifdef _DEBUG
     m_viewport.SetOwner(caller.function_name());
+#endif
+    m_viewport.GetGfxViewport();
     m_viewportStack.Append(m_viewport);
 }
 
