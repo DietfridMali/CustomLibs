@@ -421,6 +421,7 @@ bool RenderTarget::IsActive(void) noexcept {
 bool RenderTarget::Activate(const RTActivationParams& params, const std::source_location& loc)
 #else
 bool RenderTarget::Activate(const RTActivationParams& params)
+#   define loc
 #endif
 {
     ZoneScoped;
