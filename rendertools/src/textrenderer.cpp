@@ -212,11 +212,8 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                     offset.y -= outlineWidth / float(renderTarget->m_height);
                 }
                 renderTarget->m_lastDestination = 0;
-                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically ? -1 : 1);
+                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
                 uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
-
-                if (baseRenderer.HasOpenGL())
-                    renderTarget->Deactivate();
 #if 0 // debug
                 postProcess = 0;
 #endif
@@ -226,8 +223,7 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
                     else
                         AntiAlias(renderTarget, m_decoration.aaMethod);
                 }
-                if (not baseRenderer.HasOpenGL())
-                    renderTarget->Deactivate();
+                renderTarget->Deactivate();
             }
         }
     }
