@@ -494,7 +494,6 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 #endif
 {
     ZoneScoped;
-    m_activateLoc = loc;
     if (m_wasActivated or params.reactivate) // -> reactivating
         baseRenderer.RenderStates() = m_renderStates;
     else
