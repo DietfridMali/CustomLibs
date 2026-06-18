@@ -51,6 +51,7 @@ public:
     RTV                     m_rtv;
     SRV                     m_srv;
     DSV                     m_dsv;
+    DSV                     m_dsvReadOnly;   // read-only depth view (compare, no write) for simultaneous SRV sampling
     UAV                     m_uav;
     D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
     eBufferType             m_type{ btColor };
@@ -69,6 +70,8 @@ public:
     void FreeSRV(void);
 
     bool AllocDSV(void);
+
+    bool AllocReadOnlyDSV(void);
 
     void FreeDSV(void);
 
@@ -119,6 +122,15 @@ public:
         dbNone = -1
     } eDrawBufferGroups;
 
+    // How an own depth buffer is bound on activation. Orthogonal to the draw-buffer group (which selects
+    // *which* buffers attach). dbmReadOnly binds the read-only DSV (compare, no write) AND transitions the
+    // depth into a shader-readable state, so the same depth may be sampled as an SRV in the same pass
+    // (soft particles, etc.). dbmWrite (default) is the normal writable/compare depth.
+    typedef enum {
+        dbmWrite,
+        dbmReadOnly
+    } eDepthBufferMode;
+
     struct RTCreationParams {
         String name{ "" };
         int colorBufferCount{ 1 };
@@ -149,6 +161,7 @@ public:
 		eDrawBufferGroups drawBufferGroup{ dbAll };
         bool clear{ true };
 		bool reactivate{ false };
+		eDepthBufferMode depthMode{ dbmWrite };
 	};
 
     // -------------------------------------------------------------------------

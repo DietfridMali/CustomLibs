@@ -55,6 +55,20 @@ bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 }
 
 
+bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, D3D12_DSV_FLAGS flags)
+{
+    Handle()  = descriptorHeaps.AllocDSV();
+    if (not IsValid())
+        return false;
+    D3D12_DEPTH_STENCIL_VIEW_DESC dsvd{};
+    dsvd.Format = format;
+    dsvd.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    dsvd.Flags = flags;
+    dx12Context.Device()->CreateDepthStencilView(resource.Get(), &dsvd, CPUHandle());
+    return true;
+}
+
+
 // UAV uses the CBV_SRV_UAV heap (descriptorHeaps.AllocSRV) — the heap type is shared.
 bool UAV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 {

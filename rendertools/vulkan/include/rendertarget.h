@@ -84,6 +84,13 @@ public:
         dbNone = -1
     } eDrawBufferGroups;
 
+    // Shared API with the DX backend (read-only/sampleable depth for soft particles etc.). Not yet acted
+    // on here -- Vulkan keeps the normal writable depth until the feature is ported.
+    typedef enum {
+        dbmWrite,
+        dbmReadOnly
+    } eDepthBufferMode;
+
     struct RTCreationParams {
         String name{ "" };
         int colorBufferCount{ 1 };
@@ -116,6 +123,7 @@ public:
 		eDrawBufferGroups drawBufferGroup{ dbAll };
         bool clear{ true };
 		bool reactivate{ false };
+		eDepthBufferMode depthMode{ dbmWrite };
 	};
 
     // -------------------------------------------------------------------------

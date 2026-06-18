@@ -80,6 +80,10 @@ class DSV
 {
 public:
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
+
+	// Read-only / sampleable variant: pass D3D12_DSV_FLAG_READ_ONLY_DEPTH to bind the depth as a
+	// read-only DSV (compare, no write) so the same resource may be sampled as an SRV in the same pass.
+	bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, D3D12_DSV_FLAGS flags);
 };
 
 

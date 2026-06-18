@@ -56,6 +56,7 @@ void BufferInfo::Init(void)
     RTV().Handle() = {};
     SRV().Handle() = {};
     DSV().Handle() = {};
+    m_dsvReadOnly.Handle() = {};
     m_uav.Handle() = {};
     m_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_type = btColor;
@@ -119,6 +120,11 @@ bool BufferInfo::AllocDSV(void) {
 }
 
 
+bool BufferInfo::AllocReadOnlyDSV(void) {
+    return m_dsvReadOnly.Create(m_resource, dxDepthDSVFormat, D3D12_DSV_FLAG_READ_ONLY_DEPTH);
+}
+
+
 void BufferInfo::FreeDSV(void) {
     m_dsv.Free();
 }
@@ -149,6 +155,7 @@ void BufferInfo::Release(void) {
     gfxResourceHandler.Track(m_rtv.Handle());
     gfxResourceHandler.Track(m_srv.Handle());
     gfxResourceHandler.Track(m_dsv.Handle());
+    gfxResourceHandler.Track(m_dsvReadOnly.Handle());
     gfxResourceHandler.Track(m_uav.Handle());
     gfxResourceHandler.Track(m_resource);
     Init();
@@ -192,6 +199,10 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
     info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
     if (not info.AllocDSV())
+        return false;
+    // Read-only DSV over the same depth resource: lets a pass bind the depth for compare-only testing
+    // while simultaneously sampling it as an SRV (soft particles). One extra descriptor, no extra memory.
+    if (not info.AllocReadOnlyDSV())
         return false;
     if (not info.AllocSRV())
         return false;
@@ -432,6 +443,19 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
         }
     }
 
+    // Bind the depth either writable (normal) or read-only + shader-readable (dbmReadOnly: a pass that
+    // samples the same depth it tests against, e.g. soft particles). Own depth only -- a shared
+    // SetDepthSource keeps its source's writable DSV. dbmWrite restores DEPTH_WRITE, so a later normal
+    // pass transitions back on its own and never has to know a read-only pass happened.
+    if ((m_depthBufferIndex >= 0) and (m_depthSource == nullptr) and pDSV) {
+        if (params.depthMode == dbmReadOnly) {
+            m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            pDSV = m_bufferInfo[m_depthBufferIndex].m_dsvReadOnly.CPUHandleAddress();
+        }
+        else
+            m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    }
+
     if (count > 0)
         list->OMSetRenderTargets(count, rtvs, FALSE, pDSV);
     else if (pDSV)
@@ -641,7 +665,9 @@ void RenderTarget::Clear(const RTActivationParams& params)
     else if ((params.bufferIndex < m_colorBufferCount) and m_bufferInfo[params.bufferIndex].RTV().Handle().IsValid()) {
         list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
     }
-    if (HaveDepthBuffer(true))
+    // A read-only depth activation must not clear depth: ClearDepthStencilView needs the writable DSV and
+    // DEPTH_WRITE state, neither of which holds in dbmReadOnly.
+    if (HaveDepthBuffer(true) and (params.depthMode != dbmReadOnly))
         list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 }
 

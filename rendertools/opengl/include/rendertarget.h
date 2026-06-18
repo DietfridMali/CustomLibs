@@ -63,6 +63,13 @@ public:
         dbNone = -1
     } eDrawBufferGroups;
 
+    // Shared API with the DX backend (read-only/sampleable depth for soft particles etc.). Not yet acted
+    // on here -- OpenGL keeps the normal writable depth until the feature is ported.
+    typedef enum {
+        dbmWrite,
+        dbmReadOnly
+    } eDepthBufferMode;
+
     String                      m_name;
     SharedFramebufferHandle     m_handle;
     int                         m_width;
@@ -127,6 +134,7 @@ public:
         eDrawBufferGroups drawBufferGroup{ dbAll };
         bool clear{ true };
         bool reactivate{ false };
+        eDepthBufferMode depthMode{ dbmWrite };
     };
 
     RenderTarget();
