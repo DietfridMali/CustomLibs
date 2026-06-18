@@ -127,6 +127,21 @@ D3D12_BLEND_DESC RenderStates::SetBlendDesc(D3D12_BLEND_DESC& desc) {
         desc.RenderTarget[0].DestBlendAlpha = ToD3DBlend(blendDstAlpha);
         desc.RenderTarget[0].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha);
     }
+    // Independent RT1 blend (e.g. WBOIT: RT0 additive accum, RT1 multiplicative revealage). Only when
+    // requested; otherwise IndependentBlendEnable stays FALSE and RT0's blend replicates to all targets.
+    if (independentBlend) {
+        desc.IndependentBlendEnable = TRUE;
+        desc.RenderTarget[1].RenderTargetWriteMask = colorMask1;
+        if (blendEnable1) {
+            desc.RenderTarget[1].BlendEnable = TRUE;
+            desc.RenderTarget[1].SrcBlend = ToD3DBlend(blendSrcRGB1);
+            desc.RenderTarget[1].DestBlend = ToD3DBlend(blendDstRGB1);
+            desc.RenderTarget[1].BlendOp = ToD3DBlendOp(blendOpRGB1);
+            desc.RenderTarget[1].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha1);
+            desc.RenderTarget[1].DestBlendAlpha = ToD3DBlend(blendDstAlpha1);
+            desc.RenderTarget[1].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha1);
+        }
+    }
     return desc;
 }
 

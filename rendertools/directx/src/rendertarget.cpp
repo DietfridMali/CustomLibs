@@ -444,16 +444,19 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     }
 
     // Bind the depth either writable (normal) or read-only + shader-readable (dbmReadOnly: a pass that
-    // samples the same depth it tests against, e.g. soft particles). Own depth only -- a shared
-    // SetDepthSource keeps its source's writable DSV. dbmWrite restores DEPTH_WRITE, so a later normal
-    // pass transitions back on its own and never has to know a read-only pass happened.
-    if ((m_depthBufferIndex >= 0) and (m_depthSource == nullptr) and pDSV) {
+    // samples the same depth it tests against, e.g. soft particles / WBOIT accumulation). Routed through
+    // the depth owner, so this works both for an own depth buffer AND a shared one (SetDepthSource) -- an
+    // overlay buffer can then hardware-depth-test against the scene depth AND sample it. dbmWrite restores
+    // DEPTH_WRITE, so a later normal pass transitions back on its own and never has to know about it.
+    RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
+    if ((depthOwner->m_depthBufferIndex >= 0) and pDSV) {
+        BufferInfo& di = depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex];
         if (params.depthMode == dbmReadOnly) {
-            m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            pDSV = m_bufferInfo[m_depthBufferIndex].m_dsvReadOnly.CPUHandleAddress();
+            di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            pDSV = di.m_dsvReadOnly.CPUHandleAddress();
         }
         else
-            m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+            di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
     }
 
     if (count > 0)
@@ -689,6 +692,20 @@ void RenderTarget::ClearColorBuffers(void)
     for (int i = 0; i < m_colorBufferCount; ++i)
         if (m_bufferInfo[i].RTV().Handle().IsValid())
             gfxStates.ClearColorBuffers(m_bufferInfo[i].RTV().CPUHandle());
+}
+
+
+void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
+{
+    auto* list = m_cmdList ? m_cmdList->GfxList() : nullptr;
+    if (not list)
+        return;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return;
+    BufferInfo& bi = m_bufferInfo[bufferIndex];
+    // ClearRenderTargetView requires the RENDER_TARGET state -> only clear an attached draw buffer.
+    if (bi.RTV().Handle().IsValid() and (bi.m_state == D3D12_RESOURCE_STATE_RENDER_TARGET))
+        list->ClearRenderTargetView(bi.RTV().CPUHandle(), color.Data(), 0, nullptr);
 }
 
 

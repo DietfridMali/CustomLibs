@@ -373,6 +373,13 @@ public:
 			GfxToGL::ToGLenum(srcAlpha), GfxToGL::ToGLenum(dstAlpha));
 	}
 
+	// Independent per-RT blend (WBOIT). Stubs for the shared API; the OpenGL WBOIT path is not wired yet
+	// (the DX caller gates on HasDirectX, so these are never reached here).
+	inline int SetIndependentBlend(int) { return 0; }
+	inline int SetBlendingRT1(int) { return 0; }
+	inline void BlendFuncRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
+	inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
+
 	inline void StencilFunc(GfxOperations::CompareFunc func, uint8_t ref, uint8_t mask) {
 		StencilFunc(GfxToGL::ToGLenum(func), ref, mask);
 	}

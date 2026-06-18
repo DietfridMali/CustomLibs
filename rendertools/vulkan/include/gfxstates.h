@@ -417,6 +417,13 @@ public:
         s.blendDstAlpha = dstAlpha;
     }
 
+    // Independent per-RT blend (WBOIT). Stubs for the shared API; the Vulkan WBOIT path is not wired yet
+    // (the DX caller gates on HasDirectX, so these are never reached here).
+    inline int SetIndependentBlend(int) { return 0; }
+    inline int SetBlendingRT1(int) { return 0; }
+    inline void BlendFuncRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
+    inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor, GfxOperations::BlendFactor) {}
+
     inline RGBAColor ClearColor(RGBAColor color) {
         RGBAColor prev = m_clearColor;
         m_clearColor = color;

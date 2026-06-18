@@ -408,6 +408,44 @@ public:
         s.blendDstAlpha = dstAlpha;
     }
 
+    // Independent per-RT blending for MRT passes (e.g. WBOIT: RT0 additive accum, RT1 multiplicative
+    // revealage). When off (default) RT0's blend replicates to every target. The RT1 setters below feed
+    // the second render target; remember to turn SetIndependentBlend back off after the pass.
+    inline int SetIndependentBlend(int state) {
+        auto& s = ActiveState();
+        int prevState = int(s.independentBlend);
+        s.independentBlend = uint8_t(state);
+        return prevState;
+    }
+
+    inline int SetBlendingRT1(int state) {
+        auto& s = ActiveState();
+        int prevState = int(s.blendEnable1);
+        s.blendEnable1 = uint8_t(state);
+        return prevState;
+    }
+
+    inline void BlendFuncRT1(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
+        auto& s = ActiveState();
+        s.blendSrcRGB1 = src;
+        s.blendDstRGB1 = dst;
+        s.blendSrcAlpha1 = src;
+        s.blendDstAlpha1 = dst;
+    }
+
+    // Separate RGB/alpha RT1 blend. Needed when the RGB factor is a *colour* factor (SrcColor/InvSrcColor/
+    // DestColor/...): D3D12 rejects those in the alpha slots, so the alpha blend must use an alpha-only
+    // factor. (WBOIT revealage: RGB = Zero/InvSrcColor for the (1-alpha) product; alpha is unused -> any
+    // valid alpha factor, e.g. Zero/InvSrcAlpha.)
+    inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
+        GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
+        auto& s = ActiveState();
+        s.blendSrcRGB1 = srcRGB;
+        s.blendDstRGB1 = dstRGB;
+        s.blendSrcAlpha1 = srcAlpha;
+        s.blendDstAlpha1 = dstAlpha;
+    }
+
     inline RGBAColor ClearColor(RGBAColor color) {
         RGBAColor prev = m_clearColor;
         m_clearColor = color;

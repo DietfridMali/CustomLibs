@@ -278,6 +278,10 @@ public:
 
     void ClearColorBuffers(void);
 
+    // Clear a single attached color buffer to its own value (e.g. WBOIT: accum -> 0, revealage -> 1).
+    // The buffer must be currently attached (RENDER_TARGET state) -- call right after Activate.
+    void ClearColorBuffer(int bufferIndex, RGBAColor color);
+
     void ClearDepthBuffer(float clearValue = 1.0f);
 
     void ClearStencilBuffer(void);
