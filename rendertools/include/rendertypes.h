@@ -55,13 +55,20 @@ enum class GfxPixelFormat : uint8_t {
 // touching API-native format descriptors.
 inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
     switch (f) {
-        case GfxPixelFormat::R8_UNorm:       return 1;
-        case GfxPixelFormat::RG8_UNorm:      return 2;
-        case GfxPixelFormat::RGBA8_UNorm:    return 4;
-        case GfxPixelFormat::R16_SFloat:     return 2;
-        case GfxPixelFormat::R32_SFloat:     return 4;
-        case GfxPixelFormat::RGBA16_SFloat:  return 8;
-        case GfxPixelFormat::RGBA32_SFloat:  return 16;
+        case GfxPixelFormat::R8_UNorm:       
+            return 1;
+        case GfxPixelFormat::RG8_UNorm:      
+            return 2;
+        case GfxPixelFormat::RGBA8_UNorm:    
+            return 4;
+        case GfxPixelFormat::R16_SFloat:     
+            return 2;
+        case GfxPixelFormat::R32_SFloat:     
+            return 4;
+        case GfxPixelFormat::RGBA16_SFloat:  
+            return 8;
+        case GfxPixelFormat::RGBA32_SFloat:  
+            return 16;
     }
     return 0;
 }
