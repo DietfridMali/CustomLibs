@@ -141,6 +141,11 @@ D3D12_BLEND_DESC RenderStates::SetBlendDesc(D3D12_BLEND_DESC& desc) {
             desc.RenderTarget[1].DestBlendAlpha = ToD3DBlend(blendDstAlpha1);
             desc.RenderTarget[1].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha1);
         }
+        // RT2 (3-MRT G-buffer worldPos) must stay an opaque full write under independent blending: once
+        // IndependentBlendEnable stops RT0's replication, the zero-initialised RT2 desc has WriteMask 0 and
+        // would stop writing. worldPos must never blend (its .w is gloss, not opacity). Harmless for <=2-RT
+        // independent passes (WBOIT only touches RT0/RT1).
+        desc.RenderTarget[2].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }
     return desc;
 }
