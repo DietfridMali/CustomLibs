@@ -36,8 +36,8 @@ void DrawBufferHandler::ActivateDrawBuffer(RenderTarget* buffer) {
             m_drawBufferStack.Push(m_activeBuffer);
         }
         m_activeBuffer = buffer;
-        SetActiveDrawBuffers();
     }
+    SetActiveDrawBuffers();
 }
 
 

@@ -258,13 +258,13 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
         if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
             return false;
         m_activeBufferIndex = params.bufferIndex;
-        m_drawBuffers[0] = m_bufferInfo[params.bufferIndex].m_attachment;
         AttachBuffer(params.bufferIndex);
         for (int i = 0; i < l; ++i)
             if (i != params.bufferIndex) {
                 DetachBuffer(i);
                 m_drawBuffers[i] = GL_NONE;
             }
+        m_drawBuffers[0] = m_bufferInfo[params.bufferIndex].m_attachment;
         return true;
 
     case dbAll:
@@ -526,12 +526,12 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params) {
 
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color) {
-    bool enableLocally = false;
+    bool deactivate = false;
     if (params.destination < 0) {// rendering to the current render target
         gfxStates.SetBlending(1);
     }
     else { // rendering to another RenderTarget (than the main buffer)
-        enableLocally = not IsActive();
+        deactivate = not IsActive();
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
@@ -574,7 +574,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         }
     }
     baseRenderer.PopMatrix();
-    if (enableLocally)
+    if (deactivate)
         Deactivate();
     return true;
 }

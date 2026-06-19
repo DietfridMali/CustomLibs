@@ -521,7 +521,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 #endif
 {
     ZoneScoped;
-    if (m_wasActivated or params.reactivate) // -> reactivating
+    if (/*m_wasActivated or*/ params.reactivate) // -> reactivating
         baseRenderer.RenderStates() = m_renderStates;
     else
         baseRenderer.PushViewport(loc);
@@ -814,10 +814,10 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
     ZoneScoped;
-    bool enableLocally = false;
+    bool deactivate = false;
     if (params.destination >= 0) {
-        enableLocally = not IsActive();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+        deactivate = not IsActive();
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = params.clearBuffer }))
             return false;
         m_lastDestination = params.destination;
         //gfxStates.SetBlending(0);
@@ -841,7 +841,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         m_viewportArea.Render(nullptr, source, color);
     }
     baseRenderer.PopMatrix();
-    if (enableLocally)
+    if (deactivate)
         Deactivate();
     return true;
 }
