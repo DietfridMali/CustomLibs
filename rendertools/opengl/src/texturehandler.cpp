@@ -77,9 +77,15 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
 TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, TextureType textureType, const TextureCreationParams& params) {
     TextureGetter getter;
     switch (textureType) {
-        case TextureType::CubeMap:   getter = [&](String& name) { return GetCubemap(name); }; break;
-        case TextureType::Texture3D: getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); }; break;
-        default:                     getter = [&](String& name) { return GetStandardTexture(name); }; break;
+        case TextureType::CubeMap:   
+            getter = [&](String& name) { return GetCubemap(name); }; 
+            break;
+        case TextureType::Texture3D: 
+            getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); }; 
+            break;
+        default:                     
+            getter = [&](String& name) { return GetStandardTexture(name); }; 
+            break;
     }
     return CreateTextures(textureFolder, textureNames, getter, params);
 }

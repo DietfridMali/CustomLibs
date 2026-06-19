@@ -49,14 +49,9 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
     TextureList textures;
     for (auto& name : textureNames) {
         List<String> fileNames; // must be local here so it gets reset every loop iteration
-        String key;
-        if (params.keyDecoration.IsEmpty())
-            key = name;
-        else
-            key.Format((const char*)params.keyDecoration, (const char*)name);
-        Texture* t = FindTexture(key);
+        Texture* t = FindTexture(name);
         if (not t) {
-            fileNames.Append(key);
+            fileNames.Append(name);
             if (not ((t = getTexture(name)) and t->CreateFromFile(textureFolder, fileNames, params))) {
                 if (t) {
                     delete t;
@@ -74,8 +69,7 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
             }
         }
         //t->m_id.name = n.Split('.')[0];
-        if (t)
-            textures.Append(t);
+        textures.Append(t);
     }
     return textures;
 }
