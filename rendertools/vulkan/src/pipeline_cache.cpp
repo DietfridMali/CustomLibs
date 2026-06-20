@@ -167,6 +167,14 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
         key.states.SetBlendAttachment(attachments[i]);
     if (key.states.independentBlend and (key.colorFormatCount > 1))
         key.states.SetBlendAttachment1(attachments[1]);
+    // RT2 (3-MRT G-buffer worldPos) must stay an opaque full write under independent blending: the loop
+    // above copied RT0's config (e.g. the window glass-colour blend) onto every attachment, which would
+    // bleed the glass alpha into worldPos.w (gloss / packed flag) -> decals + deferred lighting read
+    // garbage at window pixels. Force RT2 to no-blend / write-all. Mirrors the DX SetBlendDesc RT2 override.
+    if (key.states.independentBlend and (key.colorFormatCount > 2)) {
+        attachments[2].blendEnable = VK_FALSE;
+        attachments[2].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    }
 
     VkPipelineColorBlendStateCreateInfo colorBlend { };
     colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
