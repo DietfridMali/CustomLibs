@@ -177,6 +177,8 @@ void RenderTarget::Init(void)
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
+    m_computeBufferIndex = -1;
+    m_computeBufferCount = 0;
     m_activeBufferIndex = 0;
     m_lastDestination = -1;
     m_pingPong = false;
@@ -313,10 +315,6 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
         return false;
 
     int attachmentIndex = 0;
-    // Compute buffers first → caller can address them at m_bufferInfo[m_computeBufferIndex..]
-    // (currently 0..count-1 since they precede everything else).
-    m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
-    m_computeBufferCount = params.skyMapCount;
     for (int i = 0; i < m_colorBufferCount; ++i)
         CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
 
@@ -325,6 +323,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
+    // Compute buffers come last so the existing color/vertex/depth-buffer iterations
+    // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
+    // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
+    m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
+    m_computeBufferCount = params.skyMapCount;
 
     m_cmdList->Flush();
     m_cmdList = nullptr;
@@ -347,7 +350,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
         return false;
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (not info.RTV().IsValid())
-        if (not info.AllocRTV(m_activateLoc))
+        if (not info.AllocRTV())
             return false;
     info.SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
     return true;
@@ -379,6 +382,8 @@ void RenderTarget::Destroy(void)
     m_isAvailable = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
+    m_computeBufferIndex = -1;
+    m_computeBufferCount = 0;
     m_bufferInfo.Reset();
 }
 
@@ -539,6 +544,9 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     m_wasActivated = true;
     return true;
 }
+#ifndef _DEBUG
+#   undef loc
+#endif
 
 
 void RenderTarget::Disable(bool deactivate) noexcept {
@@ -863,7 +871,7 @@ void RenderTarget::CreateRenderArea(void)
 
 bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color)
 {
-    return Render(params, color);
+    return Render({ .source = m_lastDestination, .destination = NextBuffer(m_lastDestination), .clearBuffer = params.clearBuffer, .scale = params.scale, .shader = params.shader }, color);
 }
 
 // =================================================================================================

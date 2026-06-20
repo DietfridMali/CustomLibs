@@ -203,9 +203,6 @@ public:
     // Own command list — all rendering into this RenderTarget is recorded here.
     CommandList*        m_cmdList{ nullptr };
 
-    // debug: call site of the last Activate(), forwarded to AllocRTV for the RTV-leak diagnostic.
-    std::source_location m_activateLoc{};
-
     // -------------------------------------------------------------------------
 
     RenderTarget();

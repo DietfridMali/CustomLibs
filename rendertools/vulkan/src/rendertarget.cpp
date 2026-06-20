@@ -194,6 +194,8 @@ void RenderTarget::Init(void)
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
+    m_computeBufferIndex = -1;
+    m_computeBufferCount = 0;
     m_activeBufferIndex = 0;
     m_lastDestination = -1;
     m_pingPong = false;
@@ -327,13 +329,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 
     int attachmentIndex = 0;
 
-    // Compute buffers first → caller addresses them at m_bufferInfo[m_computeBufferIndex..].
-    m_computeBufferIndex = (params.skyMapCount > 0)
-        ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount)
-        : -1;
-    m_computeBufferCount = params.skyMapCount;
-
-    // Color buffers next, using m_bufferCount as the next free slot (no longer hard-coded i).
+    // Color buffers first, using m_bufferCount as the next free slot.
     for (int i = 0; i < m_colorBufferCount; ++i)
         CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
 
@@ -341,6 +337,14 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
     m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
+
+    // Compute buffers come last so the existing color/vertex/depth-buffer iterations
+    // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
+    // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
+    m_computeBufferIndex = (params.skyMapCount > 0)
+        ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount)
+        : -1;
+    m_computeBufferCount = params.skyMapCount;
 
     int w = width * scale;
     int h = height * scale;
@@ -362,6 +366,8 @@ void RenderTarget::Destroy(void)
     m_isAvailable = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
+    m_computeBufferIndex = -1;
+    m_computeBufferCount = 0;
     m_bufferInfo.Reset();
 }
 
@@ -1064,7 +1070,7 @@ bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
 
 bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color)
 {
-    return Render(params, color);
+    return Render({ .source = m_lastDestination, .destination = NextBuffer(m_lastDestination), .clearBuffer = params.clearBuffer, .scale = params.scale, .shader = params.shader }, color);
 }
 
 

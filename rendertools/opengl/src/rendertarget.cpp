@@ -27,6 +27,8 @@ void RenderTarget::Init(void) {
     m_colorBufferCount = -1;
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
+    m_computeBufferIndex = -1;
+    m_computeBufferCount = 0;
     m_lastDestination = -1;
     m_activeBufferIndex = -1;
     m_pingPong = true;
@@ -440,6 +442,9 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     m_wasActivated = true;
     return true;
 }
+#ifndef _DEBUG
+#   undef loc
+#endif
 
 
 void RenderTarget::Disable(bool /*deactivate*/) noexcept {
@@ -532,7 +537,6 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
-        gfxStates.SetBlending(0);
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
