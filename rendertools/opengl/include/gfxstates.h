@@ -385,6 +385,13 @@ public:
 		return 0;
 	}
 
+	// RT2 (3-MRT G-buffer worldPos) must stay opaque while RT0 (glass colour) blends: the global BlendFunc
+	// enables blend on every draw buffer, so disable it on RT2 explicitly (DX/VK force this in the pipeline).
+	inline int SetBlendingRT2(int state) {
+		if (state) glEnablei(GL_BLEND, 2); else glDisablei(GL_BLEND, 2);
+		return 0;
+	}
+
 	inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
 		GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
 		glBlendFuncSeparatei(1, GfxToGL::ToGLenum(srcRGB), GfxToGL::ToGLenum(dstRGB),

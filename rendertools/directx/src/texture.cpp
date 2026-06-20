@@ -188,10 +188,10 @@ void Texture::SetParams(bool forceUpdate)
     // With mipmaps: linear mip filter; without: mip filter disabled and LOD clamped to base level.
     m_sampling.minFilter = GfxFilterMode::Linear;
     m_sampling.magFilter = GfxFilterMode::Linear;
-    m_sampling.mipMode   = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
-    m_sampling.wrapU     = GfxWrapMode::Repeat;
-    m_sampling.wrapV     = GfxWrapMode::Repeat;
-    m_sampling.wrapW     = GfxWrapMode::Repeat;
+    m_sampling.mipMode = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
+    m_sampling.wrapU = GfxWrapMode::Repeat;
+    m_sampling.wrapV = GfxWrapMode::Repeat;
+    m_sampling.wrapW = GfxWrapMode::Repeat;
     m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
     // Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
     m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;

@@ -685,7 +685,7 @@ bool RenderTarget::IsActive(void) noexcept
 
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
-    if (m_wasActivated or params.reactivate)
+    if (/*m_wasActivated or*/ params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;
     else
         baseRenderer.PushViewport();

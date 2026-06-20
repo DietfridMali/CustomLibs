@@ -527,10 +527,7 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params) {
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color) {
     bool deactivate = false;
-    if (params.destination < 0) {// rendering to the current render target
-        gfxStates.SetBlending(1);
-    }
-    else { // rendering to another RenderTarget (than the main buffer)
+    if (params.destination >= 0) {
         deactivate = not IsActive();
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;

@@ -177,11 +177,17 @@ void Texture::SetParams(bool forceUpdate) {
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glGenerateMipmap(m_type);
+            // Anisotropic filtering, coupled to mip-mapping like the DX12/VK backends
+            // (TextureSampling.maxAnisotropy = useMipMaps ? 16 : 1); clamp to the driver max.
+            GLfloat maxAniso = 1.0f;
+            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
+            glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, (maxAniso < 16.0f) ? maxAniso : 16.0f);
         }
         else {
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
             glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
+            glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
         }
         glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -346,6 +352,7 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         return false;
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
+    m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
     return Deploy();
 }
@@ -355,6 +362,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     if (not Create())
         return false;
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
+    m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
     return Deploy();
 }

@@ -435,6 +435,10 @@ public:
         return prevState;
     }
 
+    // RT2 (3-MRT G-buffer worldPos) is forced opaque in the pipeline cache under independent blend; nothing to
+    // toggle per draw here -- provided for API parity with the GL backend's explicit per-RT blend disable.
+    inline int SetBlendingRT2(int) { return 0; }
+
     inline void BlendFuncRT1(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
         auto& s = ActiveState();
         s.blendSrcRGB1 = src;

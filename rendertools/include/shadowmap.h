@@ -31,8 +31,12 @@ public:
 
 	void UpdateTransformation(void);
 
-	int IsAvailable(void) noexcept {
-		return m_renderShadows and m_applyShadows and (m_status >= 0);
+	int IsAvailable(void) noexcept {   // do we have a shadow-map RT at all (mandatory wherever the shadow texture must be bound)
+		return m_status >= 0;
+	}
+
+	int IsApplicable(void) noexcept {  // should cast shadows actually be rendered / applied this frame
+		return IsAvailable() and m_applyShadows and m_renderShadows;
 	}
 
 	int IsReady(void) noexcept {
