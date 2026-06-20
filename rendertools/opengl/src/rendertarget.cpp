@@ -343,9 +343,17 @@ void RenderTarget::SetDepthSource(RenderTarget* source) {
     GLuint depthHandle = 0;
     if ((source != nullptr) and (source->m_depthBufferIndex >= 0))
         depthHandle = source->m_bufferInfo[source->m_depthBufferIndex].m_handle;
+    // Bind this FBO only to (re)attach its depth slot, then restore whatever framebuffer was bound
+    // before. Hard-binding 0 here would desync the GL framebuffer binding from the DrawBufferHandler's
+    // active draw buffer: a later *direct* SelectDrawBuffers on that still-"active" target then issues
+    // glFramebufferTexture2D against the default framebuffer (FBO 0) -> GL_INVALID_OPERATION. SetDepthSource
+    // must be transparent w.r.t. the framebuffer binding (e.g. DecalHandler::RenderStuckParticles calls
+    // SetDepthSource(nullptr) while the scene buffer stays the active draw target).
+    GLint prevFramebuffer = GL_NONE;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevFramebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthHandle, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, GLuint(prevFramebuffer));
 }
 
 
