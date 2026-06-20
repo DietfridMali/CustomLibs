@@ -1027,13 +1027,12 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
-    bool enableLocally = false;
+    bool deactivate = false;
     if (params.destination >= 0) {
-        enableLocally = not IsActive();
+        deactivate = not IsActive();
         if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
             return false;
         m_lastDestination = params.destination;
-        gfxStates.SetBlending(0);
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
@@ -1049,7 +1048,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         m_viewportArea.Render(nullptr, source, color);
     }
     baseRenderer.PopMatrix();
-    if (enableLocally)
+    if (deactivate)
         Deactivate();
     return true;
 }

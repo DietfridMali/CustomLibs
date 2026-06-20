@@ -69,8 +69,8 @@ bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
 bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	if (not m_atlas)
 		return false;
-	bool enableLocally = not m_atlas->IsEnabled();
-	if (enableLocally) {
+	bool deactivate = not m_atlas->IsEnabled();
+	if (deactivate) {
 		baseRenderer.PushViewport();
 		m_atlas->Activate({});
 	}
@@ -113,7 +113,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 #endif
 	}
 
-	if (enableLocally) {
+	if (deactivate) {
 		m_atlas->Deactivate();
 		baseRenderer.PopViewport();
 	}

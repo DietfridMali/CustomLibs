@@ -295,6 +295,13 @@ public:
         return m_scale;
     }
 
+    // Texel size of THIS render target's own texture (1 / actual buffer dimensions). Use this instead of
+    // baseRenderer.TexelSize() for any in-buffer step (blur / denoise / bloom): half-res scratch buffers
+    // have a different texel size than the full-res scene / viewport.
+    inline TexCoord TexelSize(void) noexcept {
+        return TexCoord(1.0f / float(GetWidth()), 1.0f / float(GetHeight()));
+    }
+
     inline bool IsAvailable(void) noexcept {
         return m_isAvailable;
     }
