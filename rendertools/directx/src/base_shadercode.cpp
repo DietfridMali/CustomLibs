@@ -28,6 +28,7 @@ const ShaderSource& BlurTextureShader();
 const ShaderSource& GrayScaleShader();
 const ShaderSource& TintAndBlurShader();
 const ShaderSource& OutlineShader();
+const ShaderSource& BevelShader();
 const ShaderSource& BoxBlurShader();
 const ShaderSource& FxaaShader();
 const ShaderSource& GaussBlurShader();
@@ -57,6 +58,7 @@ BaseShaderCode::BaseShaderCode() {
         &GrayScaleShader(),
         &TintAndBlurShader(),
         &OutlineShader(),
+        &BevelShader(),
         &BoxBlurShader(),
         &FxaaShader(),
         &GaussBlurShader()

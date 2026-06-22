@@ -62,6 +62,45 @@ const ShaderSource& OutlineShader() {
 
 
 // -------------------------------------------------------------------------------------------------
-// (OutlineFilterShader removed — the icon outline now reuses the regular "outline" shader via PrerenderedImage.)
+// Bevel: fake raised / "reverse emboss" look. Treats the source alpha as a height field, takes its
+// screen-space gradient at the edge and lights it from lightDir — highlight on the side facing the light,
+// shadow on the opposite side, flat interior (zero gradient) left unchanged. bevelWidth = edge sampling
+// distance in texels (= width of the lit band ~ perceived thickness). ShaderConstants: texelSize, lightDir,
+// bevelWidth, strength.
+const ShaderSource& BevelShader() {
+    static const ShaderSource bevelShader(
+        "bevel",
+        Standard2DVS(),
+        R"(
+            cbuffer ShaderConstants : register(b1) {
+                float2 texelSize;    // 1 / buffer size
+                float2 lightDir;     // screen-space direction to the light (y down); normalized in-shader
+                float  bevelWidth;   // edge sampling distance in texels
+                float  strength;     // emboss intensity
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 color = surface.Sample(s0, i.fragCoord);
+                float2 o  = bevelWidth * texelSize;
+                float  aL = surface.SampleLevel(s0, i.fragCoord - float2(o.x, 0), 0).a;
+                float  aR = surface.SampleLevel(s0, i.fragCoord + float2(o.x, 0), 0).a;
+                float  aU = surface.SampleLevel(s0, i.fragCoord - float2(0, o.y), 0).a;
+                float  aD = surface.SampleLevel(s0, i.fragCoord + float2(0, o.y), 0).a;
+                float2 grad = float2(aR - aL, aD - aU);                      // uphill of the alpha height field
+                float  lit  = dot(-grad, normalize(lightDir)) * strength;    // + toward light, - away from it
+                float3 rgb  = saturate(color.rgb * (1.0 + lit));
+                return float4(rgb, color.a);
+            }
+        )",
+        ShaderDataLayout(VtxTcAttrs, 2)
+    );
+    return bevelShader;
+}
 
 // =================================================================================================

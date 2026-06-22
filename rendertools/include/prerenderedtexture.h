@@ -50,6 +50,8 @@ public:
     virtual void Render(void) {}
 
     void RenderOutline(const TextEffects::Decoration& decoration);
+
+    void RenderBevel(int bevelWidth, const Vector2f& lightDir, float strength);
 };
 
 // =================================================================================================

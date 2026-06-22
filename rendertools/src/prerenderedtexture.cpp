@@ -33,10 +33,31 @@ bool PrerenderedItem::Create(int bufferCount) {
 void PrerenderedItem::RenderOutline(const TextEffects::Decoration & decoration) {
     if (decoration.HaveOutline()) {
         m_renderTarget.Activate({ .clear = false });
-        m_renderTarget.SetLastDestination(0);
         TextEffects().RenderOutline(&m_renderTarget, decoration);
         m_renderTarget.Deactivate();
     }
+}
+
+
+// Raised / "reverse emboss" look via the "bevel" shader. Chains like RenderOutline: reads the current
+// last-destination buffer and writes the next (AutoRender), so call it between Create and RenderOutline
+// (Create -> buffer 0, RenderBevel -> buffer 1, RenderOutline -> buffer 0).
+void PrerenderedItem::RenderBevel(int bevelWidth, const Vector2f& lightDir, float strength) {
+    if (bevelWidth <= 0)
+        return;
+    m_renderTarget.Activate({ .clear = false });
+    baseRenderer.Set2DRenderStates();
+    Shader* shader = baseShaderHandler.SetupRenderShader("bevel");
+    if (shader and not baseRenderer.IsShadowPass()) {
+        if (baseRenderer.HasOpenGL())
+            shader->SetInt("surface", 0);
+        shader->SetVector2f("texelSize", m_renderTarget.TexelSize());
+        shader->SetVector2f("lightDir", lightDir);
+        shader->SetFloat("bevelWidth", float(bevelWidth));
+        shader->SetFloat("strength", strength);
+        m_renderTarget.AutoRender({ .clearBuffer = true, .shader = shader });
+    }
+    m_renderTarget.Deactivate();
 }
 
 // =================================================================================================
