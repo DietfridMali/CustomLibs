@@ -116,6 +116,12 @@ public:
         return LoadRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width, height, strength, radius, antialias);
     }
 
+    Shader* LoadShadedRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height, float strength, float radius = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
+
+    Shader* LoadShadedRectangleShader(RGBAColor&& color, Vector2f&& center, float width, float height, float strength, float radius = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true) {
+        return LoadShadedRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width, height, strength, radius, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
+    }
+
 
     Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
 

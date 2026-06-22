@@ -318,4 +318,71 @@ const ShaderSource& RectangleShader() {
     return source;
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// SDF rounded rectangle stroke with an independent alpha/colour gradient across the border band.
+// Like RectangleShader, plus a linear ramp from the OUTER edge to the INNER edge of the stroke:
+//   innerAlpha / outerAlpha - alpha multiplier at the inner / outer edge (1,1 = no fade).
+//   innerColor / outerColor - base-colour brightness multiplier at the inner / outer edge (1,1 = none).
+// To grade the whole rectangle instead of just the border, set strength = half the rect size.
+// Only affects the stroke (strength > 0); the filled branch is unchanged.
+const ShaderSource& ShadedRectangleShader() {
+    static const ShaderSource source(
+        "shadedRectangleShader",
+        Standard2DVS(),
+        R"(
+            cbuffer ShaderConstants : register(b1) {
+                float2 viewportSize;
+                float2 center;
+                float2 size;
+                float4 surfaceColor;
+                float  strength;
+                float  radius;
+                float  innerAlpha;
+                float  outerAlpha;
+                float  innerColor;
+                float  outerColor;
+                int    antialias;
+            };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            float sdRoundRect(float2 pxFrag, float2 pxCenter, float2 pxHalf, float pxR) {
+                float2 q = abs(pxFrag - pxCenter) - (pxHalf - float2(pxR, pxR));
+                return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - pxR;
+            }
+            float4 PSMain(PSInput i) : SV_Target {
+                float2 pxFragCoord = i.fragCoord * viewportSize;
+                float2 pxCenter    = center * viewportSize;
+                float2 pxSize      = size   * viewportSize;
+                float  pxRadius    = clamp(radius * min(viewportSize.x, viewportSize.y),
+                                           0.0, min(pxSize.x, pxSize.y));
+                float sd  = sdRoundRect(pxFragCoord, pxCenter, pxSize, pxRadius);
+                float aaw = (antialias != 0) ? fwidth(sd) : 0.0;
+                if (strength <= 0.0) {
+                    if (sd > aaw) discard;
+                    float alpha = 1.0 - smoothstep(0.0, aaw, sd);
+                    return float4(surfaceColor.rgb, surfaceColor.a * alpha);
+                } else {
+                    float pxStrength = strength * min(viewportSize.x, viewportSize.y);
+                    float sdi = sd + pxStrength;
+                    if (sd > aaw || sdi < -aaw) discard;
+                    float covOuter = 1.0 - smoothstep(0.0, aaw, sd);
+                    float covInner =       smoothstep(0.0, aaw, sdi);
+                    float alpha    = covOuter * covInner;
+                    if (alpha <= 0.0) discard;
+                    float tOuter = clamp(-sd / pxStrength, 0.0, 1.0); // 0 = outer edge, 1 = inner edge
+                    float aMul   = lerp(outerAlpha, innerAlpha, tOuter);
+                    float cMul   = lerp(outerColor, innerColor, tOuter);
+                    return float4(surfaceColor.rgb * cMul, surfaceColor.a * alpha * aMul);
+                }
+            }
+        )",
+        ShaderDataLayout(VtxTcAttrs, 2)
+    );
+    return source;
+}
+
 // =================================================================================================
