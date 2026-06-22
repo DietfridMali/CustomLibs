@@ -60,4 +60,8 @@ const ShaderSource& OutlineShader() {
     return outlineShader;
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// (OutlineFilterShader removed — the icon outline now reuses the regular "outline" shader via PrerenderedImage.)
+
 // =================================================================================================

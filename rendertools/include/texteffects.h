@@ -17,8 +17,14 @@ public:
         float           outlineWidth = 0.0f;
         RGBAColor       outlineColor = ColorData::Invisible;
         struct AAMethod aaMethod = {};
-        inline bool HaveOutline() const { return (outlineWidth > 0.0f) and (outlineColor.A() > 0.0f); };
-        inline bool ApplyAA() const { return aaMethod.ApplyAA(); };
+
+        inline bool HaveOutline() const { 
+            return (outlineWidth > 0.0f) and (outlineColor.A() > 0.0f); 
+        };
+
+        inline bool ApplyAA() const { 
+            return aaMethod.ApplyAA(); 
+        };
     };
 
     void AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply = false);

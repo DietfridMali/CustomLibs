@@ -128,7 +128,6 @@ public:
         return LoadShadedRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
     }
 
-
     Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
 
     Shader* LoadColorMeshShader(bool premultiply = false);

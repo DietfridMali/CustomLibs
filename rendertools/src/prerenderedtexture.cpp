@@ -6,9 +6,15 @@
 #include "rendertarget.h"
 #include "gfxrenderer.h"
 #include "textrenderer.h"
+#include "base_shaderhandler.h"
 #include "prerenderedtexture.h"
 
 // =================================================================================================
+
+bool PrerenderedItem::Create(int width, int height, int scale, int bufferCount) {
+    return m_renderTarget.Create(width, height, 2, { .colorBufferCount = bufferCount });
+}
+
 
 bool PrerenderedItem::Create(int bufferCount) {
     if (m_renderTarget.IsAvailable() and (m_bufferCount == bufferCount)) {
@@ -19,18 +25,31 @@ bool PrerenderedItem::Create(int bufferCount) {
         m_renderTarget.Destroy();
     }
     m_bufferCount = bufferCount;
-    m_renderTarget.Create(m_viewport.m_width, m_viewport.m_height, 2, { .colorBufferCount = bufferCount } );
+    return Create(m_viewport.m_width, m_viewport.m_height, 2, bufferCount );
     return true;
+}
+
+
+void PrerenderedItem::RenderOutline(const TextEffects::Decoration & decoration) {
+    if (decoration.HaveOutline()) {
+        m_renderTarget.Activate({ .clear = false });
+        m_renderTarget.SetLastDestination(0);
+        TextEffects().RenderOutline(&m_renderTarget, decoration);
+        m_renderTarget.Deactivate();
+    }
 }
 
 // =================================================================================================
 
 PrerenderedText::PrerenderedText(int bufferCount, Viewport viewport, float scale)
     : PrerenderedItem(viewport)
-    , m_bufferCount(bufferCount), m_scale(scale), m_text("")
+    , m_bufferCount(bufferCount)
+    , m_scale(scale)
+    , m_text("")
 { }
 
-bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignment, RGBAColor color, const TextRenderer::TextDecoration& decoration) {
+
+bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignment, RGBAColor color, const TextEffects::Decoration& decoration) {
     if (m_bufferCount == 0)
         m_bufferCount = 2;//  (m_outlineWidth == 0) ? 1 : 2;
     if (not PrerenderedItem::Create(m_bufferCount) and (m_text == text))
@@ -46,18 +65,6 @@ bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignmen
 }
 
 
-void PrerenderedText::RenderOutline(const TextRenderer::TextDecoration& decoration) {
-    if (decoration.HaveOutline()) {
-        baseRenderer.PushViewport();
-        m_renderTarget.SetViewport();
-        m_renderTarget.SetLastDestination(0);
-        textRenderer.SetDecoration(decoration);
-        textRenderer.RenderOutline(&m_renderTarget, decoration);
-        baseRenderer.PopViewport();
-    }
-}
-
-
 void PrerenderedText::Render(bool setViewport, int flipVertically, RGBAColor color, float scale) {
     textRenderer.SetColor(color.IsVisible() ? color : m_color);
     textRenderer.SetScale((scale > 0.0f) ? scale : m_scale);
@@ -68,17 +75,24 @@ void PrerenderedText::Render(bool setViewport, int flipVertically, RGBAColor col
 
 // =================================================================================================
 
-void PrerenderedImage::Create(void) {
-    PrerenderedItem::Create();
-    m_viewport.SetViewport();
-    m_viewport.Fill(static_cast<RGBColor>(m_backgroundColor), 1);
-    m_renderTarget.RenderAsTexture(&m_image, { .destination = 0, .clearBuffer = true });
+void PrerenderedImage::Create(int outlineWidth) {
+    m_renderTarget.SetClearColor(m_backgroundColor);
+    PrerenderedItem::Create(m_image->GetWidth() + 2 * outlineWidth, m_image->GetHeight() + 2 * outlineWidth, 1, 2);
+    m_renderTarget.Activate({});
+    float scale = float(m_image->GetWidth()) / float(m_image->GetWidth() + 2 * outlineWidth);
+    m_renderTarget.RenderAsTexture(m_image, { .destination = 0, .clearBuffer = true, .scale = scale });
+    m_renderTarget.Deactivate();
 }
 
 
 void PrerenderedImage::Render(void) {
-    m_viewport.SetViewport();
-    m_renderTarget.Render({ .source = 0, .destination = -1 });
+    Render(ColorData::White);
+}
+
+
+// draws the (outlined) result into the CURRENT viewport — the caller sets it (so it follows window resizes)
+void PrerenderedImage::Render(RGBAColor color) {
+    m_renderTarget.Render({ .source = m_renderTarget.GetLastDestination(), .destination = -1}, color);
 }
 
 // =================================================================================================

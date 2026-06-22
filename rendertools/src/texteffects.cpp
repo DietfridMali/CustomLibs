@@ -62,11 +62,14 @@ void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& de
         if (shader and not baseRenderer.IsShadowPass()) {
             if (baseRenderer.HasOpenGL())
                 shader->SetInt("surface", 0);
+#if 0
             else {
                 int nextBuf = renderTarget->NextBuffer(renderTarget->GetLastDestination());
                 renderTarget->Activate({ .bufferIndex = nextBuf, .drawBufferGroup = RenderTarget::dbAll });
                 renderTarget->SetLastDestination(nextBuf);
             }
+#endif
+            shader->SetVector2f("texelSize", renderTarget->TexelSize());
             shader->SetFloat("outlineWidth", decoration.outlineWidth);
             shader->SetVector4f("outlineColor", decoration.outlineColor);
             shader->SetFloat("offset", 0.0f); // 0.5f);

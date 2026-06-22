@@ -20,11 +20,11 @@ public:
 
     PrerenderedItem()
         : m_bufferCount(0)
-    { }
+    {}
 
     PrerenderedItem(Viewport& viewport)
         : m_bufferCount(0), m_viewport(viewport)
-    { }
+    {}
 
 
     RenderTarget& GetRenderTarget(void) noexcept {
@@ -41,11 +41,15 @@ public:
 
     bool Create(int bufferCount = 1);
 
+    bool Create(int width, int height, int scale, int bufferCount);
+
     void Destroy() {
         m_renderTarget.Destroy();
     }
 
     virtual void Render(void) {}
+
+    void RenderOutline(const TextEffects::Decoration& decoration);
 };
 
 // =================================================================================================
@@ -70,7 +74,7 @@ public:
         PrerenderedItem::Destroy();
     }
 
-    bool Create(String text, TextRenderer::eTextAlignments alignment = TextRenderer::taCenter, RGBAColor color = ColorData::White, const TextRenderer::TextDecoration& decoration = {});
+    bool Create(String text, TextRenderer::eTextAlignments alignment = TextRenderer::taCenter, RGBAColor color = ColorData::White, const TextEffects::Decoration& decoration = {});
 
     inline void SetColor(RGBAColor color) noexcept {
         m_color = color;
@@ -84,8 +88,6 @@ public:
         m_scale = scale;
     }
 
-    void RenderOutline(const TextRenderer::TextDecoration& decoration = {});
-
     virtual void Render(bool setViewport = true, int flipVertically = 0, RGBAColor color = ColorData::Invisible, float scale = 0.0f);
 };
 
@@ -93,17 +95,29 @@ public:
 
 class PrerenderedImage : public PrerenderedItem {
 public:
-    Texture     m_image;
+    Texture*    m_image;
     RGBAColor   m_backgroundColor;
-    float       m_scale;
-    BaseQuad   m_viewportArea;
+    RGBAColor   m_outlineColor;
 
-    PrerenderedImage(Texture& image, Viewport viewport, RGBAColor backgroundColor = ColorData::White, float scale = 1.0f)
-        : PrerenderedItem(viewport), m_image(image), m_backgroundColor(backgroundColor), m_scale(scale)
+    PrerenderedImage()
+        : m_backgroundColor(ColorData::White)
     {
     }
 
-    void Create(void);
+    PrerenderedImage(Texture* image, RGBAColor backgroundColor = ColorData::Invisible, float scale = 1.0f)
+        : PrerenderedItem()
+        , m_image(image)
+        , m_backgroundColor(backgroundColor)
+    {
+    }
+
+    void Create(int outlineWidth);
+
+    inline bool IsAvailable(void) noexcept {
+        return m_renderTarget.IsAvailable();
+    }
+
+    void Render(RGBAColor color);
 
     virtual void Render(void);
 };
