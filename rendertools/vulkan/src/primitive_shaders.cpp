@@ -385,4 +385,78 @@ const ShaderSource& ShadedRectangleShader() {
     return source;
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// SDF ring / arc with an independent alpha/colour gradient across the ring band.
+// Like RingShader, plus a linear ramp from the OUTER edge to the INNER edge of the band:
+//   innerAlpha / outerAlpha - alpha multiplier at the inner / outer edge (1,1 = no fade).
+//   innerColor / outerColor - base-colour brightness multiplier at the inner / outer edge (1,1 = none).
+const ShaderSource& ShadedRingShader() {
+    static const ShaderSource source(
+        "shadedRingShader",
+        Standard2DVS(),
+        R"(
+            cbuffer ShaderConstants : register(b1) {
+                float2 center;
+                float2 viewportSize;
+                float4 surfaceColor;
+                float  radius;
+                float  strength;
+                float  startAngle;
+                float  endAngle;
+                float  innerAlpha;
+                float  outerAlpha;
+                float  innerColor;
+                float  outerColor;
+                int    antialias;
+            };
+            struct PSInput {
+                float4 pos       : SV_Position;
+                float3 fragPos   : TEXCOORD0;
+                float2 fragCoord : TEXCOORD1;
+            };
+            static const float PI = 3.14159265358979323846;
+            float Rad2Deg(float r) { return r * (180.0 / PI); }
+            float Degrees(float2 d) {
+                float r = 0.5 * PI - atan2(-d.y, d.x);
+                r -= floor(r / (2.0 * PI)) * (2.0 * PI);
+                return Rad2Deg(r);
+            }
+            float4 PSMain(PSInput i) : SV_Target {
+                float  pxScale    = min(viewportSize.x, viewportSize.y);
+                float2 pxDelta    = (i.fragCoord - center) * viewportSize;
+                float  pxDist     = length(pxDelta);
+                float  pxRadius   = radius   * pxScale;
+                float  pxStrength = strength * pxScale;
+                float  a          = Degrees(pxDelta);
+                if (a < 0.0) a += 360.0;
+                bool renderSegment = (startAngle != endAngle);
+                if (renderSegment && (a < startAngle || a > endAngle))
+                    discard;
+                float outerR = pxRadius;
+                float innerR = max(pxRadius - pxStrength, 0.0);
+                float dOuter = pxDist - outerR;
+                float dInner = innerR - pxDist;
+                float alpha;
+                if (antialias != 0) {
+                    float pxWidth = 0.5 * fwidth(pxDist);
+                    if (dOuter > pxWidth || dInner > pxWidth) discard;
+                    float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
+                    float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
+                    alpha = aOuter * aInner;
+                } else {
+                    if (dOuter > 0.0 || dInner > 0.0) discard;
+                    alpha = 1.0;
+                }
+                float tOuter = clamp((outerR - pxDist) / max(pxStrength, 1e-4), 0.0, 1.0); // 0 = outer edge, 1 = inner edge
+                float aMul   = lerp(outerAlpha, innerAlpha, tOuter);
+                float cMul   = lerp(outerColor, innerColor, tOuter);
+                return float4(surfaceColor.rgb * cMul, surfaceColor.a * alpha * aMul);
+            }
+        )",
+        ShaderDataLayout(VtxTcAttrs, 2)
+    );
+    return source;
+}
+
 // =================================================================================================

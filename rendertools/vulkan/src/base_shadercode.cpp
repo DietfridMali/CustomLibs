@@ -17,6 +17,7 @@ const ShaderSource& CircleShader();
 const ShaderSource& CircleMaskShader();
 const ShaderSource& RectangleShader();
 const ShaderSource& ShadedRectangleShader();
+const ShaderSource& ShadedRingShader();
 const ShaderSource& ColorMeshShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& PlainTextureShader();
@@ -45,6 +46,7 @@ BaseShaderCode::BaseShaderCode() {
         &CircleMaskShader(),
         &RectangleShader(),
         &ShadedRectangleShader(),
+        &ShadedRingShader(),
         &ColorMeshShader(),
         &PlainColorShader(),
         &PlainTextureShader(),

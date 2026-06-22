@@ -399,4 +399,85 @@ const ShaderSource& ShadedRectangleShader() {
     return source;
 }
 
+
+// ring / arc with an independent alpha/colour gradient across the ring band (see shadedRectangleShader).
+const ShaderSource& ShadedRingShader() {
+    static const ShaderSource source(
+        "shadedRingShader",
+        Standard2DVS(),
+        R"(
+            #version 330
+
+            uniform vec2  center;
+            uniform float radius;
+            uniform float strength;
+            uniform vec4  surfaceColor;
+            uniform bool  antialias;
+            uniform vec2  viewportSize;
+            uniform float startAngle;
+            uniform float endAngle;
+            uniform float innerAlpha;
+            uniform float outerAlpha;
+            uniform float innerColor;
+            uniform float outerColor;
+
+            in vec2 fragCoord;
+            out vec4 fragColor;
+
+            const float PI = 3.14159265358979323846;
+
+            float Rad2Deg(float r) { return r * (180.0 / PI); }
+
+            float Degrees(vec2 d) {
+                float r = 0.5 * PI - atan(-d.y, d.x);
+                r -= floor(r / (2.0 * PI)) * (2.0 * PI);
+                return Rad2Deg(r);
+            }
+
+            void main() {
+                float pxScale     = min(viewportSize.x, viewportSize.y);
+                vec2  pxDelta     = (fragCoord - center) * viewportSize;
+                float pxDist      = length(pxDelta);
+                float pxRadius    = radius   * pxScale;
+                float pxStrength  = strength * pxScale;
+
+                float a = Degrees(pxDelta);
+                if (a < 0.0)
+                    a += 360.0;
+
+                bool renderSegment = startAngle != endAngle;
+                if (renderSegment && (a < startAngle || a > endAngle))
+                    discard;
+
+                float outerR = pxRadius;
+                float innerR = max(pxRadius - pxStrength, 0.0);
+
+                float dOuter = pxDist - outerR;
+                float dInner = innerR - pxDist;
+
+                float alpha;
+                if (antialias) {
+                    float pxWidth = 0.5 * fwidth(pxDist);
+                    if (dOuter > pxWidth || dInner > pxWidth)
+                        discard;
+                    float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
+                    float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
+                    alpha = aOuter * aInner;
+                }
+                else {
+                    if (dOuter > 0.0 || dInner > 0.0)
+                        discard;
+                    alpha = 1.0;
+                }
+
+                float tOuter = clamp((outerR - pxDist) / max(pxStrength, 1e-4), 0.0, 1.0); // 0 = outer edge, 1 = inner edge
+                float aMul   = mix(outerAlpha, innerAlpha, tOuter);
+                float cMul   = mix(outerColor, innerColor, tOuter);
+                fragColor = vec4(surfaceColor.rgb * cMul, surfaceColor.a * alpha * aMul);
+            }
+        )");
+
+    return source;
+}
+
 // =================================================================================================

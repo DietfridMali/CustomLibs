@@ -122,6 +122,12 @@ public:
         return LoadShadedRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width, height, strength, radius, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
     }
 
+    Shader* LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
+
+    Shader* LoadShadedRingShader(RGBAColor&& color, Vector2f&& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true) {
+        return LoadShadedRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
+    }
+
 
     Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
 
