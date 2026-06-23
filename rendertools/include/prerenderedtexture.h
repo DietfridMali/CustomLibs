@@ -106,7 +106,7 @@ public:
     {
     }
 
-    PrerenderedImage(Texture* image, RGBAColor backgroundColor = ColorData::Invisible, float scale = 1.0f)
+    PrerenderedImage(Texture* image, RGBAColor backgroundColor = ColorData::Invisible)
         : PrerenderedItem()
         , m_image(image)
         , m_backgroundColor(backgroundColor)
