@@ -693,7 +693,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 {
     if (/*m_wasActivated or*/ params.reactivate)
         baseRenderer.RenderStates() = m_renderStates;
-    else
+    else if (not m_wasActivated)
         baseRenderer.PushViewport();
     baseRenderer.ActivateDrawBuffer(this);
     if (not Enable(params)) {
@@ -1036,7 +1036,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool deactivate = false;
     if (params.destination >= 0) {
         deactivate = not IsActive();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .reactivate = not deactivate }))
             return false;
         m_lastDestination = params.destination;
     }

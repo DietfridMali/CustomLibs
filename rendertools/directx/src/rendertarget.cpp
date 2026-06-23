@@ -528,7 +528,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     ZoneScoped;
     if (/*m_wasActivated or*/ params.reactivate) // -> reactivating
         baseRenderer.RenderStates() = m_renderStates;
-    else
+    else if (not m_wasActivated)
         baseRenderer.PushViewport(loc);
     baseRenderer.ActivateDrawBuffer(this);
     if (not Enable(params)) {
@@ -825,7 +825,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool deactivate = false;
     if (params.destination >= 0) {
         deactivate = not IsActive();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = params.clearBuffer }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = params.clearBuffer, .reactivate = not deactivate }))
             return false;
         m_lastDestination = params.destination;
         //gfxStates.SetBlending(0);

@@ -542,7 +542,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool deactivate = false;
     if (params.destination >= 0) {
         deactivate = not IsActive();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .reactivate = not deactivate }))
             return false;
         m_lastDestination = params.destination;
     }
