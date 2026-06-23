@@ -310,6 +310,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
 
+    bool deferSubmit = (commandListHandler.CurrentCmdList() != nullptr);
     m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
     if (not m_cmdList or not m_cmdList->Open())
         return false;
@@ -329,7 +330,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
     m_computeBufferCount = params.skyMapCount;
 
-    m_cmdList->Flush();
+    if (deferSubmit)
+        m_cmdList->Close();
+    else
+        m_cmdList->Flush();
     m_cmdList = nullptr;
 
     int w = width * scale;

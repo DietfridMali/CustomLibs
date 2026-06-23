@@ -191,6 +191,8 @@ void RenderTarget::CreateRenderArea(void) {
 bool RenderTarget::Create(int width, int height, int scale, const RTCreationParams& params) {
     if (width * height == 0)
         return false;
+    GLint prevFramebuffer = GL_NONE;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevFramebuffer);
     m_handle = SharedFramebufferHandle(0);
     m_width = width;
     m_height = height;
@@ -231,6 +233,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_drawBuffers.Resize(std::max(m_colorBufferCount, 1) + m_extraBufferCount);
     m_name = params.name;
     Disable();
+    glBindFramebuffer(GL_FRAMEBUFFER, GLuint(prevFramebuffer));
     gfxStates.CheckError();
     return true;
 }
