@@ -106,7 +106,7 @@ bool FontHandler::InitTTF(void) {
     if (not haveTTF) {
         haveTTF = (0 > TTF_Init()) ? -1 : 1;
         if (haveTTF < 0) 
-            fprintf(stderr, "Smiley-Battle: Cannot initialize font system.\n");
+            fprintf(stderr, "Paintjob-Rampage: Cannot initialize font system.\n");
     }
     return haveTTF > 0;
 }
@@ -125,7 +125,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
 
     String fontFile = fontFolder + fontName;
     if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
-        fprintf(stderr, "Smiley-Battle: Cannot load font '%s'(%s).\n", (char*) fontName, TTF_GetError());
+        fprintf(stderr, "Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*) fontName, TTF_GetError());
         return false;
     }
     //SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));

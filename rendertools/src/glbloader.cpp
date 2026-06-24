@@ -20,7 +20,7 @@
 // the actual color of the smiley depending on the player color.
 // This loader corrects each animation target's hull shape by removing all dents and protrusions,
 // recalculates normals based on weighted face normals, and adjusts all morph targets accordingly.
-// It does so because the Blender created smiley model used in Smiley-Battle is beautiful, but has tiny flaws
+// It does so because the Blender created smiley model used in Paintjob-Rampage is beautiful, but has tiny flaws
 // that make it look bad when rendered with full lighting, shadowing and self-shadowing.
 // The output is an non indexed triangle soup, with three vertices and colors per triangle and so on.
 // In case a properly constructed model is available, this loader can be easily adapted to just load the model data without any corrections.

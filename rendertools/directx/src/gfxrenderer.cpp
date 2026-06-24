@@ -34,16 +34,16 @@ bool GfxRenderer::InitGraphics(void) {
     constexpr bool enableDebugLayer = false;
 #   endif
     if (not dx12Context.Create(enableDebugLayer)) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 device.\n");
+        fprintf(stderr, "Cannot create DX12 device.\n");
         return false;
     }
     gfxStates.Init();
     if (not commandListHandler.Create(dx12Context.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 command queue.\n");
+        fprintf(stderr, "Cannot create DX12 command queue.\n");
         return false;
     }
     if (not DescriptorHeapHandler::Instance().Create(dx12Context.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create DX12 descriptor heaps.\n");
+        fprintf(stderr, "Cannot create DX12 descriptor heaps.\n");
         return false;
     }
     // Open the command list so displayHandler.Create() and renderer.Create()
@@ -51,7 +51,7 @@ bool GfxRenderer::InitGraphics(void) {
     // Init runs in slot 0 — all deferred RTV / resource pushes during setup land here and are
     // drained by the explicit Flush() calls between setup phases.
     if (not commandListHandler.BeginFrame(0)) {
-        fprintf(stderr, "Smiley-Battle: Cannot begin first DX12 frame.\n");
+        fprintf(stderr, "Cannot begin first DX12 frame.\n");
         return false;
     }
     return true;
