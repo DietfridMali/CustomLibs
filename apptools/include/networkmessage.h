@@ -36,12 +36,12 @@ class NetworkMessage {
     */
 
     public:
-        String                  m_payload{ "" };
-        NetworkEndpoint         m_address;
-        int                     m_numValues{ 0 };
-        int                     m_result{ -1 };
-        bool                    m_isBroadcast{ false }; // used for sending this message as a broadcast in a LAN
-        bool                    m_valueError{ false };
+        String               m_payload{ "" };
+        NetworkEndpoint      m_address;
+        int                  m_numValues{ 0 };
+        int                  m_result{ -1 };
+        bool                 m_isBroadcast{ false }; // used for sending this message as a broadcast in a LAN
+        bool                 m_valueError{ false };
         AutoArray<String>    m_values;
 
         NetworkMessage() 
