@@ -150,7 +150,7 @@ class BaseSoundHandler
         void Stop(int id, void* owner = nullptr);
 
         inline bool IsPlaying(int id) {
-            return Mix_Playing(id);
+            return (id >= 0) and Mix_Playing(id);
         }
 
         void StopSoundsByOwner(void* owner);
