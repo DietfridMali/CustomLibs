@@ -51,7 +51,7 @@ bool NetworkMessage::IsValid(int requiredValueCount, int maxValueCount) {
             }
         }
 #ifdef _DEBUG
-        fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)\n", static_cast<char*>(keyword), requiredValueCount, m_numValues);
+        fprintf(stderr, "message %s has wrong number of values (expected %d, found %d)\n", static_cast<char*>(keyword), abs(requiredValueCount), m_numValues);
 #endif
     }
     catch (...) {
