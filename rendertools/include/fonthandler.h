@@ -50,6 +50,8 @@ private:
     String                      m_glyphs;
     RGBAColor                   m_color;
     GlyphSize                   m_maxGlyphSize;
+    float                       m_inkTop{ 0.0f };       // start of the glyphs' actual ink band as a fraction of the (metric-padded) glyph surface height
+    float                       m_inkHeight{ 1.0f };    // height of the ink band as a fraction of the glyph surface height; 1.0 = use full surface (no metric correction)
     GfxDataLayout               m_gfxDataLayout;
     bool                        m_isAvailable;
 
@@ -95,6 +97,14 @@ public:
         return m_isAvailable;
     }
 
+    inline float InkTop(void) const noexcept {
+        return m_inkTop;
+    }
+
+    inline float InkHeight(void) const noexcept {
+        return m_inkHeight;
+    }
+
     TextDimensions TextSize(String text);
 
 private:
@@ -109,6 +119,8 @@ private:
     int BuildAtlas(void);
         
     bool CreateAtlas(void);
+
+    void ComputeInkBand(void);
 
     bool RenderGlyphToAtlas(const String& key, GlyphInfo* info);
 

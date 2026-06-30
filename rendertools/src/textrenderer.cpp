@@ -76,12 +76,16 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
             mesh->AddVertex(p);
             x += w;
 
-            // create input tex coords of the glyph in the atlas
-            TexCoord tc{ info->atlasPosition };
+            // create input tex coords of the glyph in the atlas; sample only the ink band so the font's
+            // metric padding (loose ascent/descent) is not scaled into the viewport. InkTop()/InkHeight()
+            // are fractions of the glyph cell height (0 / 1 = full cell = no correction).
+            float atlasTop = info->atlasPosition.Y() + m_font->InkTop() * info->atlasSize.Y();
+            float atlasBottom = atlasTop + m_font->InkHeight() * info->atlasSize.Y();
+            TexCoord tc{ info->atlasPosition.X(), atlasTop };
             mesh->AddTexCoord(tc);
             tc.X() += info->atlasSize.X();
             mesh->AddTexCoord(tc);
-            tc.Y() += info->atlasSize.Y();
+            tc.Y() = atlasBottom;
             mesh->AddTexCoord(tc);
             tc.X() = info->atlasPosition.X();
             mesh->AddTexCoord(tc);

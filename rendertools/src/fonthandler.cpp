@@ -138,7 +138,65 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
 
 bool FontHandler::Create(String fontFolder, String fontName, int fontSize, String glyphs) {
     m_isAvailable = InitFont(fontFolder, fontName, fontSize, glyphs) and CreateAtlas();
+    if (m_isAvailable)
+        ComputeInkBand();
     return m_isAvailable;
+}
+
+
+// SDL_ttf renders every glyph onto a surface of the full font height (ascent + descent), so glyphs from
+// fonts with loose vertical metrics carry a lot of empty padding around the actual ink. That padding would
+// be scaled into the target viewport and make the text appear too small. Measure the real ink band of the
+// rasterized glyph set once (via the glyph metrics) and express it as fractions of the surface height. Since
+// all glyph surfaces share the same height and baseline, the band is identical for every glyph, so two
+// numbers suffice. TextSize() uses m_inkHeight for fitting, TextRenderer samples only [m_inkTop, m_inkTop +
+// m_inkHeight] of each glyph. Falls back to the full surface (0 / 1) if metrics are unavailable.
+void FontHandler::ComputeInkBand(void) {
+    m_inkTop = 0.0f;
+    m_inkHeight = 1.0f;
+    if (not m_font)
+        return;
+    int fontHeight = TTF_FontHeight(m_font);
+    int ascent = TTF_FontAscent(m_font);
+    if (fontHeight <= 0)
+        return;
+
+    int inkTop = fontHeight, inkBottom = 0;
+    bool haveInk = false;
+    auto Accumulate = [&](Uint16 ch) {
+        int minx, maxx, miny, maxy, advance;
+        if (TTF_GlyphMetrics(m_font, ch, &minx, &maxx, &miny, &maxy, &advance) != 0)
+            return;
+        if (maxy <= miny) // empty glyph (e.g. space)
+            return;
+        int top = ascent - maxy;    // surface row of the glyph's top ink (baseline sits at 'ascent' from the top)
+        int bottom = ascent - miny; // surface row of the glyph's bottom ink
+        if (not haveInk) {
+            inkTop = top;
+            inkBottom = bottom;
+            haveInk = true;
+        }
+        else {
+            if (top < inkTop)
+                inkTop = top;
+            if (bottom > inkBottom)
+                inkBottom = bottom;
+        }
+    };
+    for (char* glyph = m_glyphs.Data(); *glyph; glyph++)
+        Accumulate(Uint16(uint8_t(*glyph)));
+    Accumulate(Uint16(0x20AC)); // euro sign, rasterized alongside the glyph set in CreateTextures
+
+    if (not haveInk)
+        return;
+    if (inkTop < 0)
+        inkTop = 0;
+    if (inkBottom > fontHeight)
+        inkBottom = fontHeight;
+    if (inkBottom <= inkTop)
+        return;
+    m_inkTop = float(inkTop) / float(fontHeight);
+    m_inkHeight = float(inkBottom - inkTop) / float(fontHeight);
 }
 
 
@@ -221,6 +279,7 @@ FontHandler::TextDimensions FontHandler::TextSize(String text) {
         if (d.height < th)
             d.height = th;
         }
+    d.height = int(float(d.height) * m_inkHeight + 0.5f); // fit against the real ink height, not the metric-padded surface height
     return d.Update();
 }
 
