@@ -222,6 +222,9 @@ public:
     void SetWrapping(GfxWrapMode wrapMode)
         noexcept;
 
+    void SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
+        noexcept;
+
     virtual bool Deploy(int bufferIndex = 0) override;
 
     bool Redeploy(void);

@@ -301,8 +301,7 @@ static void CreateSRV3D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT f
 }
 
 
-bool Upload2DTexture(Texture& tex, int width, int height,
-                     GfxPixelFormat fmt, const void* data) noexcept
+bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, const void* data) noexcept
 {
     if ((data == nullptr) or (width <= 0) or (height <= 0))
         return false;
@@ -354,9 +353,7 @@ bool Upload2DTexture(Texture& tex, int width, int height,
 }
 
 
-bool Upload3DTexture(Texture& tex, int width, int height, int depth,
-                     GfxPixelFormat fmt, const void* data,
-                     bool generateMips) noexcept
+bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips) noexcept
 {
     if ((data == nullptr) or (width <= 0) or (height <= 0) or (depth <= 0))
         return false;

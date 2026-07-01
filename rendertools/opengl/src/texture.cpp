@@ -208,6 +208,20 @@ noexcept
 }
 
 
+void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
+noexcept
+{
+    if (Bind()) {
+        const int glModeU = (wrapU == GfxWrapMode::Repeat) ? int(GL_REPEAT) : int(GL_CLAMP_TO_EDGE);
+        const int glModeV = (wrapV == GfxWrapMode::Repeat) ? int(GL_REPEAT) : int(GL_CLAMP_TO_EDGE);
+        m_wrapMode = glModeU;
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, glModeU);
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, glModeV);
+        Release();
+    }
+}
+
+
 void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses) {
     for (auto& b : m_buffers)
         b->Cartoonize(blurStrength, gradients, outlinePasses);

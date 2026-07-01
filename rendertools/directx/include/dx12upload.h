@@ -45,8 +45,7 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
 // uploads the pixel data, (re)allocates an SRV handle in the global descriptor heap, calls
 // tex.SetParams(false), and sets tex.m_isValid + tex.m_isDeployed on success.
 
-bool Upload2DTexture(Texture& tex, int width, int height,
-                     GfxPixelFormat fmt, const void* data) noexcept;
+bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, const void* data) noexcept;
 
 bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips) noexcept;
 

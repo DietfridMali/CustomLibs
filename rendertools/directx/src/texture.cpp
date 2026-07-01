@@ -179,7 +179,7 @@ void Texture::Release(void)
 
 void Texture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
+    if (m_hasParams and not forceUpdate)
         return;
     m_hasParams = true;
 
@@ -298,7 +298,7 @@ bool Texture::Deploy(int bufferIndex)
         return false;
     if (not CreateSRV())
         return false;
-
+    SetParams();
     m_isDeployed = true;
     return true;
 }
@@ -385,6 +385,15 @@ void Texture::SetWrapping(GfxWrapMode wrapMode) noexcept
 }
 
 
+void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept
+{
+    m_wrapMode = wrapU;
+    m_sampling.wrapU = wrapU;
+    m_sampling.wrapV = wrapV;
+    m_sampling.wrapW = wrapV;
+}
+
+
 RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
 noexcept
 {
@@ -408,7 +417,7 @@ noexcept
 
 void TiledTexture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
+    if (m_hasParams and not forceUpdate)
         return;
     Texture::SetParams(forceUpdate);
     m_sampling.wrapU = GfxWrapMode::Repeat;
@@ -423,7 +432,7 @@ void TiledTexture::SetParams(bool forceUpdate)
 
 void RenderTargetTexture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
+    if (m_hasParams and not forceUpdate)
         return;
     m_hasParams = true;
     m_sampling.minFilter   = GfxFilterMode::Linear;
@@ -439,7 +448,7 @@ void RenderTargetTexture::SetParams(bool forceUpdate)
 
 void ShadowTexture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
+    if (m_hasParams and not forceUpdate)
         return;
     m_hasParams = true;
     // OGL: GL_TEXTURE_COMPARE_MODE = GL_COMPARE_REF_TO_TEXTURE,

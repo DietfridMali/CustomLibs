@@ -180,6 +180,8 @@ public:
 
     void SetWrapping(GfxWrapMode wrapMode) noexcept;
 
+    void SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept;
+
     bool Redeploy(void);
 
     bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);

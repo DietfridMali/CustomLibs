@@ -347,8 +347,7 @@ protected:
         TextureBuffer* texBuf = m_buffers[0];
         const int w = texBuf->m_info.m_width;
         const int h = texBuf->m_info.m_height;
-        return Upload2DTexture(*this, w, h, NoiseTraits<Tag>::format,
-                               reinterpret_cast<const void*>(m_data.Data()));
+        return Upload2DTexture(*this, w, h, NoiseTraits<Tag>::format, reinterpret_cast<const void*>(m_data.Data()));
     }
 };
 

@@ -423,6 +423,15 @@ void Texture::SetWrapping(GfxWrapMode wrapMode) noexcept
 }
 
 
+void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept
+{
+    m_wrapMode = wrapU;
+    m_sampling.wrapU = wrapU;
+    m_sampling.wrapV = wrapV;
+    m_sampling.wrapW = wrapV;
+}
+
+
 RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
 noexcept
 {
