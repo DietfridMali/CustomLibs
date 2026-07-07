@@ -4,7 +4,9 @@
 
 #pragma once
 
-#define NOMINMAX
+#ifndef NOMINMAX
+#	define NOMINMAX
+#endif
 
 #if (USE_STD || USE_STD_VECTOR)
 

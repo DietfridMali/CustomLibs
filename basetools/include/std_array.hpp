@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <cstring>
 #include <cassert>
 #include <stdexcept>
 #include <algorithm>
@@ -20,6 +21,7 @@ private:
     bool                m_autoFit{ false };
     bool                m_isShrinkable{ true };
     DATA_T              m_defaultValue{};
+    int32_t             m_pos{ 0 };
 
 public:
 	static const int32_t MaxIndex = std::numeric_limits<int32_t>::max();
@@ -491,6 +493,22 @@ public:
         if ((nCount == 0) or (nCount > len - nOffset))
             nCount = len - nOffset;
         return cf.Write(Data() + nOffset, sizeof(DATA_T), nCount, bCompressed);
+    }
+
+    inline void SetName(const char*) noexcept { }
+
+    inline const char* GetName(void) const noexcept { return ""; }
+
+    inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - Data()); }
+
+    inline DATA_T* Current(void) noexcept { return IsEmpty() ? nullptr : Data() + m_pos; }
+
+    inline void Pos(uint32_t pos) noexcept { m_pos = (Length() > 0) ? static_cast<int32_t>(pos % static_cast<uint32_t>(Length())) : 0; }
+
+    inline void Clear(uint8_t filler, uint32_t count = 0xffffffff) noexcept {
+        uint32_t len = static_cast<uint32_t>(Length());
+        if (len > 0)
+            memset(Data(), filler, static_cast<size_t>((count < len) ? count : len) * sizeof(DATA_T));
     }
 
 };
