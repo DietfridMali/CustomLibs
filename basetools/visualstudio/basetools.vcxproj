@@ -54,6 +54,7 @@
     <ClInclude Include="..\include\simpledatapool.hpp" />
     <ClInclude Include="..\include\basesingleton.hpp" />
     <ClInclude Include="..\include\smartpointer.hpp" />
+    <ClInclude Include="..\include\stack.hpp" />
     <ClInclude Include="..\include\std_array.hpp" />
     <ClInclude Include="..\include\std_defines.h" />
     <ClInclude Include="..\include\std_list.hpp" />

@@ -24,7 +24,7 @@ private:
 public:
 	static const int32_t MaxIndex = std::numeric_limits<int32_t>::max();
 
-    // Konstruktor für 1D-AutoArray
+    // Konstruktor fï¿½r 1D-AutoArray
     inline AutoArray(int32_t size = 0)
         : m_array(static_cast<size_t>(std::max<int32_t>(size, 0))) {
     }
@@ -34,7 +34,7 @@ public:
     {
     }
 
-    // Konstruktor für 2D-AutoArray
+    // Konstruktor fï¿½r 2D-AutoArray
     inline AutoArray(int32_t width, int32_t height)
         : m_array(ValidatedSize2D(width, height, 0))
         {
@@ -99,15 +99,23 @@ public:
         return *this;
     }
 
-    inline int32_t Capacity(void) const noexcept { return static_cast<int32_t>(m_array.capacity()); }
+    inline int32_t Capacity(void) const noexcept { 
+        return static_cast<int32_t>(m_array.capacity()); 
+    }
 
-    // Zugriff auf Länge
-    inline int32_t Length(void) const noexcept { return static_cast<int32_t>(m_array.size()); }
+    // Zugriff auf Laenge
+    inline int32_t Length(void) const noexcept { 
+        return static_cast<int32_t>(m_array.size()); 
+    }
 
-    inline bool IsEmpty(void) const noexcept { return Length() == 0; }
+    inline bool IsEmpty(void) const noexcept { 
+        return Length() == 0; 
+    }
 
     // Gesamte Datenmenge in Bytes
-    inline int32_t DataSize() const noexcept { return Length() * static_cast<int32_t>(sizeof(DATA_T)); }
+    inline int32_t DataSize() const noexcept { 
+        return Length() * static_cast<int32_t>(sizeof(DATA_T)); 
+    }
 
     inline int32_t AutoFit(int32_t i) {
         if (not m_autoFit)
@@ -274,7 +282,7 @@ public:
         return &m_array.back();
     }
 #if 0
-    // Zeiger auf Rohdaten (z.B. für OpenGL)
+    // Zeiger auf Rohdaten (z.B. fï¿½r OpenGL)
     inline DATA_T* Data(int32_t i = 0) noexcept { 
         return m_array.data() + i; 
     }
@@ -449,6 +457,40 @@ public:
             return false;
         f.write(reinterpret_cast<const char*>(Data()), size_t(Length()) * sizeof(DATA_T));
         return f.good();
+    }
+
+    // --- d2x-xl CArray compatibility shims (type migration; same semantics, legacy names) ---
+    inline DATA_T* Buffer(int32_t i = 0) noexcept { return Data(i); }
+
+    inline const DATA_T* Buffer(int32_t i = 0) const noexcept { return Data(i); }
+
+    inline DATA_T* Pointer(int32_t i) noexcept { return Data(i); }
+
+    inline DATA_T* Create(int32_t length, const char* = nullptr) { Resize(length); return Data(); }
+
+    inline int32_t Size(void) const noexcept { return DataSize(); }
+
+    inline void Init(void) { Clear(); }
+
+    // CFile-style block I/O (FILE_T resolved at the call site, so basetools needs no CFile knowledge)
+    template <typename FILE_T>
+    size_t Read(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
+        uint32_t len = static_cast<uint32_t>(Length());
+        if ((len == 0) or (nOffset >= len))
+            return static_cast<size_t>(-1);
+        if ((nCount == 0) or (nCount > len - nOffset))
+            nCount = len - nOffset;
+        return cf.Read(Data() + nOffset, sizeof(DATA_T), nCount, bCompressed);
+    }
+
+    template <typename FILE_T>
+    size_t Write(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
+        uint32_t len = static_cast<uint32_t>(Length());
+        if ((len == 0) or (nOffset >= len))
+            return static_cast<size_t>(-1);
+        if ((nCount == 0) or (nCount > len - nOffset))
+            nCount = len - nOffset;
+        return cf.Write(Data() + nOffset, sizeof(DATA_T), nCount, bCompressed);
     }
 
 };
