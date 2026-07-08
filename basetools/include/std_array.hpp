@@ -7,6 +7,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <algorithm>
+#include <type_traits>
 #include <fstream>
 #include <filesystem>
 
@@ -284,7 +285,7 @@ public:
         return &m_array.back();
     }
 #if 0
-    // Zeiger auf Rohdaten (z.B. f�r OpenGL)
+    // Zeiger auf Rohdaten (z.B. fuer OpenGL)
     inline DATA_T* Data(int32_t i = 0) noexcept { 
         return m_array.data() + i; 
     }
@@ -474,6 +475,10 @@ public:
 
     inline void Init(void) { Clear(); }
 
+    inline bool IsElement(const DATA_T* elem, bool = false) const noexcept {
+        return (elem >= Data()) and (elem < Data() + Length());
+    }
+
     // CFile-style block I/O (FILE_T resolved at the call site, so basetools needs no CFile knowledge)
     template <typename FILE_T>
     size_t Read(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
@@ -505,10 +510,17 @@ public:
 
     inline void Pos(uint32_t pos) noexcept { m_pos = (Length() > 0) ? static_cast<int32_t>(pos % static_cast<uint32_t>(Length())) : 0; }
 
-    inline void Clear(uint8_t filler, uint32_t count = 0xffffffff) noexcept {
+    // Reset elements in place, size kept. Trivial types: byte-fill (memset, honours filler).
+    // Class types: reset each element via its default ctor (filler ignored) - see d2x-xl CArray::Clear migration.
+    inline void Clear(uint8_t filler, uint32_t count = 0xffffffff) {
         uint32_t len = static_cast<uint32_t>(Length());
-        if (len > 0)
-            memset(Data(), filler, static_cast<size_t>((count < len) ? count : len) * sizeof(DATA_T));
+        if (len == 0)
+            return;
+        uint32_t n = (count < len) ? count : len;
+        if constexpr (std::is_trivial_v<DATA_T>)
+            memset(Data(), filler, static_cast<size_t>(n) * sizeof(DATA_T));
+        else
+            std::fill(begin(), begin() + static_cast<ptrdiff_t>(n), DATA_T {});
     }
 
 };
