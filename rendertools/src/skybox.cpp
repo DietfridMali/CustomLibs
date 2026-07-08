@@ -7,7 +7,7 @@
 
 // =================================================================================================
 
-static List<String> skyboxDirections = { "-lf", "-rt", "-up", "-dn", "-ft", "-bk" }; 
+static List<String> skyboxDirections = { "-rt", "-lf", "-up", "-dn", "-ft", "-bk" }; 
 static List<String> skyTextureSizes = { "-4k", "-2k", "-1k" };
 static List<String> skyTextureTypes = { "-bright", "-medium", "-dark" };
 
