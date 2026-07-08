@@ -7,13 +7,13 @@
 
 // =================================================================================================
 
-static List<String> skyboxDirections = { "lf", "rt", "up", "dn", "ft", "bk" }; 
+static List<String> skyboxDirections = { "-lf", "-rt", "-up", "-dn", "-ft", "-bk" }; 
 static List<String> skyTextureSizes = { "-4k", "-2k", "-1k" };
-static List<String> skyTextureTypes = { "bright-", "medium-", "dark-" };
+static List<String> skyTextureTypes = { "-bright", "-medium", "-dark" };
 
 
 Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size) {
-	String id = String("skybox-") + type;
+	String id = baseName + type;
 	Cubemap* texture = textureHandler.GetCubemap(id);
     if (not texture)
         return nullptr;
@@ -22,7 +22,7 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseNam
 	for (int i = 0; i < skyboxDirections.Length(); i++) 
 		filenames.Append(String::Concat(baseName, type, skyboxDirections[i], size, ".png"));
 	
-	texture = new Cubemap();
+	//texture = new Cubemap();
 	if (not texture->CreateFromFile(textureFolder, filenames, {})) {
 		delete texture;
 		return nullptr;
@@ -49,14 +49,14 @@ bool Skybox::Setup(const String& textureFolder) {
 		return false;
 
 	for (int i = 0; i < 3; i++) {
-		if (not (m_skyTextures[0][i] = LoadTextures(textureFolder, "sky-", skyTextureTypes[i], skyTextureSizes[textureSize]))) {
+		if (not (m_skyTextures[0][i] = LoadTextures(textureFolder, "sky", skyTextureTypes[i], skyTextureSizes[textureSize]))) {
 			while (--i >= 0)
 				delete m_skyTextures[0][i];
 			return false;
 		}
 	}
 
-	if ((m_skyTextures[1][0] = LoadTextures(textureFolder, "nightsky-", "", skyTextureSizes[textureSize])))
+	if ((m_skyTextures[1][0] = LoadTextures(textureFolder, "nightsky", "", skyTextureSizes[textureSize])))
 		m_skyTextures[1][1] = m_skyTextures[1][2] = m_skyTextures[1][0];
 	else {
 		delete m_skyTextures[1][0];
@@ -102,7 +102,7 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 }
 
 
-bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime) {
+bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime) {
 	if (not m_skybox)
 		return false;
 
@@ -111,12 +111,14 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness, i
 		return false;
 	gfxStates.SetFaceCulling(0);
 	gfxStates.SetDepthWrite(0);
-	gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+	gfxStates.SetDepthTest(1);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
 	float alpha = std::min(float(currentTime - m_activationTime) / 1000.0f, 1.0f);
 	gfxStates.SetBlending(alpha < 1.0f ? 1 : 0);
-	Shader* shader = LoadShader(view, lightDirection, brightness, alpha);
+	if (not HasNightSky())
+		skyType = 0;
+	Shader* shader = LoadShader(view, lightDirection, skyType ? 0.7f : brightness, alpha);
 	if (shader) {
-		int skyType = ((lightDirection == Vector3f::ZERO) and (m_skyTextures[1][0] != nullptr)) ? 1 : 0;
 #if 1
 		for (int i = 0; i < 3; i++)
 			m_skyTextures[skyType][i]->Activate(i);

@@ -91,8 +91,12 @@ public:
 		return m_renderShadows;
 	}
 
-	inline void ApplyShadows(bool applyShadows) noexcept {
+	inline void SetApplyShadows(bool applyShadows) noexcept {
 		m_applyShadows = applyShadows;
+	}
+
+	inline bool ApplyShadows(void) noexcept {
+		return m_applyShadows;
 	}
 
 	inline const Vector3f& LightPosition() const noexcept {

@@ -24,7 +24,7 @@ public:
 
 	bool Setup(const String& textureFolder);
 
-	bool Render(Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime);
+	bool Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime);
 
 	inline bool IsAvailable(void) const noexcept {
 		return (m_skybox != nullptr);
@@ -32,6 +32,10 @@ public:
 
 	inline void FadeIn(uint32_t t) noexcept {
 		m_activationTime = t;
+	}
+
+	inline bool HasNightSky(void) noexcept {
+		return m_skyTextures[1][0] != nullptr;
 	}
 
 private:
