@@ -12,7 +12,7 @@ static List<String> skyTextureSizes = { "-4k", "-2k", "-1k" };
 static List<String> skyTextureTypes = { "bright-", "medium-", "dark-" };
 
 
-Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& type, const String& size) {
+Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size) {
 	String id = String("skybox-") + type;
 	Cubemap* texture = textureHandler.GetCubemap(id);
     if (not texture)
@@ -20,7 +20,7 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& type, c
 
 	List<String> filenames;
 	for (int i = 0; i < skyboxDirections.Length(); i++) 
-		filenames.Append(String::Concat("sky-", type, skyboxDirections[i], size, ".png"));
+		filenames.Append(String::Concat(baseName, type, skyboxDirections[i], size, ".png"));
 	
 	texture = new Cubemap();
 	if (not texture->CreateFromFile(textureFolder, filenames, {})) {
@@ -49,12 +49,20 @@ bool Skybox::Setup(const String& textureFolder) {
 		return false;
 
 	for (int i = 0; i < 3; i++) {
-		if (not (m_skyTextures[i] = LoadTextures(textureFolder, skyTextureTypes[i], skyTextureSizes[i]))) {
+		if (not (m_skyTextures[0][i] = LoadTextures(textureFolder, "sky-", skyTextureTypes[i], skyTextureSizes[textureSize]))) {
 			while (--i >= 0)
-				delete m_skyTextures[i];
+				delete m_skyTextures[0][i];
 			return false;
 		}
 	}
+
+	if ((m_skyTextures[1][0] = LoadTextures(textureFolder, "nightsky-", "", skyTextureSizes[textureSize])))
+		m_skyTextures[1][1] = m_skyTextures[1][2] = m_skyTextures[1][0];
+	else {
+		delete m_skyTextures[1][0];
+		m_skyTextures[1][0] = nullptr;
+	}
+
 	m_skybox = new Mesh();
 	if (not m_skybox)
 		return false;
@@ -83,7 +91,6 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
         shader->SetMatrix4f("mView", view.AsArray(), false);
 		StaticArray<String, 3> skyNames = { "sky1", "sky2", "sky3" };
 		for (int i = 0; i < 3; i++) {
-			m_skyTextures[i]->Activate(i);
 			if (baseRenderer.HasOpenGL())
 				shader->SetInt(skyNames[i], i);
 			}
@@ -109,14 +116,15 @@ bool Skybox::Render(Matrix4f& view, Vector3f lightDirection, float brightness, i
 	gfxStates.SetBlending(alpha < 1.0f ? 1 : 0);
 	Shader* shader = LoadShader(view, lightDirection, brightness, alpha);
 	if (shader) {
+		int skyType = ((lightDirection == Vector3f::ZERO) and (m_skyTextures[1][0] != nullptr)) ? 1 : 0;
 #if 1
 		for (int i = 0; i < 3; i++)
-			m_skyTextures[i]->Activate(i);
+			m_skyTextures[skyType][i]->Activate(i);
 #endif
 		m_skybox->Render({}); // m_skyTextures);
 #if 1
 		for (int i = 0; i < 3; i++)
-			m_skyTextures[i]->Deactivate();
+			m_skyTextures[skyType][i]->Deactivate();
 #endif
 	}
 	baseRenderer.FinishOperation(cl);

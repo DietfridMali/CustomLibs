@@ -13,7 +13,7 @@ class Skybox
 	: public BaseSingleton<Skybox>
 {
 private:
-	Cubemap* m_skyTextures[3] = { nullptr, nullptr, nullptr };
+	Cubemap* m_skyTextures[2][3] = { { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr } };
 	Mesh* m_skybox{ nullptr };
 	int32_t	m_activationTime{ -1 };
 
@@ -35,7 +35,7 @@ public:
 	}
 
 private:
-	Cubemap* LoadTextures(const String& textureFolder, const String& type, const String& size);
+	Cubemap* LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size);
 
 	Shader* LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha);
 
