@@ -45,6 +45,7 @@
     <ClInclude Include="..\include\list.hpp" />
     <ClInclude Include="..\include\list_helpers.h" />
     <ClInclude Include="..\include\matrix.hpp" />
+    <ClInclude Include="..\include\noise.hpp" />
     <ClInclude Include="..\include\quicksort.hpp" />
     <ClInclude Include="..\include\random.hpp" />
     <ClInclude Include="..\include\segmentedlist.hpp" />
