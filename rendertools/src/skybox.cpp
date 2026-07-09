@@ -56,7 +56,7 @@ bool Skybox::Setup(const String& textureFolder) {
 		}
 	}
 
-	if ((m_skyTextures[1][0] = LoadTextures(textureFolder, "nightsky", "", skyTextureSizes[textureSize])))
+	if ((m_skyTextures[1][0] = LoadTextures(textureFolder, "starmap", "", skyTextureSizes[textureSize])))
 		m_skyTextures[1][1] = m_skyTextures[1][2] = m_skyTextures[1][0];
 	else {
 		delete m_skyTextures[1][0];
