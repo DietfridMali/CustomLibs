@@ -269,7 +269,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
                 DetachBuffer(i);
                 m_drawBuffers[i] = GL_NONE;
             }
-        m_drawBuffers[0] = m_bufferInfo[params.bufferIndex].m_attachment;
+        m_drawBuffers[params.bufferIndex] = m_bufferInfo[params.bufferIndex].m_attachment;
         return true;
 
     case dbAll:
@@ -385,10 +385,8 @@ bool RenderTarget::ReattachBuffers(void) {
 
 
 bool RenderTarget::EnableBuffers(const RTActivationParams& params) {
-    gfxStates.CheckError();
     if (not SelectDrawBuffers(params))
         return false;
-    gfxStates.CheckError();
 #ifdef _DEBUG
     if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup))
         gfxStates.SetDepthTest(true);
@@ -461,9 +459,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 void RenderTarget::Disable(bool /*deactivate*/) noexcept {
     ZoneScoped;
     if (IsEnabled()) {
-        gfxStates.CheckError();
         ReleaseBuffers();
-        gfxStates.CheckError();
 #if 1
         for (int i = 0; i < m_colorBufferCount; ++i) {
             m_drawBuffers[i] = GL_NONE;
@@ -472,7 +468,6 @@ void RenderTarget::Disable(bool /*deactivate*/) noexcept {
 #endif
         m_activeBufferIndex = -1;
         m_drawBufferGroup = dbNone;
-        gfxStates.CheckError();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 }
