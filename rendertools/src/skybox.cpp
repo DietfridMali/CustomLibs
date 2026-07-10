@@ -63,6 +63,13 @@ bool Skybox::Setup(const String& textureFolder) {
 		m_skyTextures[1][0] = nullptr;
 	}
 
+	if ((m_skyTextures[2][0] = LoadTextures(textureFolder, "nightsky", "", skyTextureSizes[textureSize])))
+		m_skyTextures[2][1] = m_skyTextures[2][2] = m_skyTextures[2][0];
+	else {
+		delete m_skyTextures[2][0];
+		m_skyTextures[2][0] = nullptr;
+	}
+
 	m_skybox = new Mesh();
 	if (not m_skybox)
 		return false;
@@ -115,7 +122,7 @@ bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, fl
 	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
 	float alpha = std::min(float(currentTime - m_activationTime) / 1000.0f, 1.0f);
 	gfxStates.SetBlending(alpha < 1.0f ? 1 : 0);
-	if (not HasNightSky())
+	if (not HasNightSky(skyType))
 		skyType = 0;
 	Shader* shader = LoadShader(view, lightDirection, skyType ? 0.7f : brightness, alpha);
 	if (shader) {

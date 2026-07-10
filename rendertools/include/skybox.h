@@ -13,7 +13,7 @@ class Skybox
 	: public BaseSingleton<Skybox>
 {
 private:
-	Cubemap* m_skyTextures[2][3] = { { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr } };
+	Cubemap* m_skyTextures[3][3] = { { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr } };
 	Mesh* m_skybox{ nullptr };
 	int32_t	m_activationTime{ -1 };
 
@@ -34,8 +34,8 @@ public:
 		m_activationTime = t;
 	}
 
-	inline bool HasNightSky(void) noexcept {
-		return m_skyTextures[1][0] != nullptr;
+	inline bool HasNightSky(int32_t i) noexcept {
+		return (i == 0) ? false : m_skyTextures[i-1][0] != nullptr;
 	}
 
 private:
