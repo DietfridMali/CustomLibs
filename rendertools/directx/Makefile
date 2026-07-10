@@ -23,6 +23,7 @@ FILES := \
  framecounter \
  glbloader \
  icosphere \
+ lightningnoise \
  linesegment \
  mesh \
  noise \

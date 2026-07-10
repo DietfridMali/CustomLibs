@@ -153,6 +153,7 @@
     <ClInclude Include="..\include\oglupload.h" />
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\texteffects.h" />
+    <ClInclude Include="..\..\include\lightningnoise.h" />
     <ClInclude Include="..\..\include\noise.h" />
     <ClInclude Include="..\..\include\coplanar_rectangle.h" />
     <ClInclude Include="..\..\include\projector.h" />
@@ -217,6 +218,7 @@
     <ClCompile Include="..\src\shader.cpp" />
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
+    <ClCompile Include="..\..\src\lightningnoise.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\..\src\textureatlas.cpp" />
