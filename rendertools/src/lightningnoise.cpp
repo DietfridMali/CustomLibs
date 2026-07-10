@@ -73,3 +73,61 @@ Vector3f LightningNoise::Fbm3D(float x, uint32_t seed, int32_t octaves, float ga
 }
 
 // =================================================================================================
+// 2D gradient (Perlin) noise -- the y axis is meant as an independent time axis for animation.
+
+float LightningNoise::GradDot2(int32_t ix, int32_t iy, float dx, float dy, uint32_t seed) {
+    uint32_t h = Hash((uint32_t(ix) * 0x27d4eb2fu) ^ (uint32_t(iy) * 0x9e3779b9u) ^ seed);
+    float a = float(h & 0xffffu) * (6.28318530718f / 65536.0f);   // random gradient angle in [0, 2pi)
+    return std::cos(a) * dx + std::sin(a) * dy;
+}
+
+
+float LightningNoise::Perlin2D(float x, float y, uint32_t seed) {
+    int32_t xi = int32_t(std::floor(x));
+    int32_t yi = int32_t(std::floor(y));
+    float xf = x - float(xi);
+    float yf = y - float(yi);
+    float u = Fade(xf);
+    float v = Fade(yf);
+    float n00 = GradDot2(xi,     yi,     xf,        yf,        seed);
+    float n10 = GradDot2(xi + 1, yi,     xf - 1.0f, yf,        seed);
+    float n01 = GradDot2(xi,     yi + 1, xf,        yf - 1.0f, seed);
+    float n11 = GradDot2(xi + 1, yi + 1, xf - 1.0f, yf - 1.0f, seed);
+    float nx0 = n00 + (n10 - n00) * u;
+    float nx1 = n01 + (n11 - n01) * u;
+    return (nx0 + (nx1 - nx0) * v) * 1.41421356f;   // 2D perlin peaks near sqrt(2)/2 -> scale to ~[-1, 1]
+}
+
+
+float LightningNoise::Fbm2D(float x, float y, uint32_t seed, int32_t octaves, float gain, float lacunarity) {
+    if (octaves < 1)
+        octaves = 1;
+    float sum = 0.0f, amp = 1.0f, freq = 1.0f, norm = 0.0f;
+    for (int32_t o = 0; o < octaves; o++) {
+        sum += Perlin2D(x * freq + float(o) * 1.6180339887f, y * freq, seed + uint32_t(o) * 0x9e3779b9u) * amp;
+        norm += amp;
+        amp *= gain;
+        freq *= lacunarity;
+    }
+    return (norm > 1e-6f) ? sum / norm : sum;
+}
+
+
+Vector3f LightningNoise::Fbm2Dv3(float x, float y, uint32_t seed, int32_t octaves, float gain, float lacunarity) {
+    if (octaves < 1)
+        octaves = 1;
+    Vector3f sum(0.0f, 0.0f, 0.0f);
+    float amp = 1.0f, freq = 1.0f, norm = 0.0f;
+    for (int32_t o = 0; o < octaves; o++) {
+        float px = x * freq + float(o) * 1.6180339887f;
+        float py = y * freq;
+        uint32_t s = seed + uint32_t(o) * 0x9e3779b9u;
+        sum += Vector3f(Perlin2D(px, py, s), Perlin2D(px, py, s ^ 0x9e3779b9u), Perlin2D(px, py, s ^ 0x85ebca6bu)) * amp;
+        norm += amp;
+        amp *= gain;
+        freq *= lacunarity;
+    }
+    return (norm > 1e-6f) ? sum * (1.0f / norm) : sum;
+}
+
+// =================================================================================================
