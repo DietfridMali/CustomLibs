@@ -211,7 +211,7 @@ void BaseRenderer::Draw3DScene(bool flipVertically) {
         else {
             PushMatrix();
             Translate(0.5, 0.5, 0);
-            if (HasOpenGL())
+            if (UsesOpenGL())
                 Scale(1, -1, 1); // flip vertically
             if (not (shader = LoadPostEffectShader()))
                 PopMatrix();
@@ -262,7 +262,7 @@ void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowH
     m_viewport = viewport;
     if (flipVertically)
         m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
-    m_viewport.BuildTransformation(windowWidth, windowHeight, HasOpenGL() and flipVertically);
+    m_viewport.BuildTransformation(windowWidth, windowHeight, UsesOpenGL() and flipVertically);
 }
 
 

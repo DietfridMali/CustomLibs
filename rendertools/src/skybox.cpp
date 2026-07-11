@@ -98,7 +98,7 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
         shader->SetMatrix4f("mView", view.AsArray(), false);
 		StaticArray<String, 3> skyNames = { "sky1", "sky2", "sky3" };
 		for (int i = 0; i < 3; i++) {
-			if (baseRenderer.HasOpenGL())
+			if (baseRenderer.UsesOpenGL())
 				shader->SetInt(skyNames[i], i);
 			}
 		shader->SetVector3f("lightDirection", lightDirection);

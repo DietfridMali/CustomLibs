@@ -49,7 +49,7 @@ void PrerenderedItem::RenderBevel(int bevelWidth, const Vector2f& lightDir, floa
     baseRenderer.Set2DRenderStates();
     Shader* shader = baseShaderHandler.SetupRenderShader("bevel");
     if (shader and not baseRenderer.IsShadowPass()) {
-        if (baseRenderer.HasOpenGL())
+        if (baseRenderer.UsesOpenGL())
             shader->SetInt("surface", 0);
         shader->SetVector2f("texelSize", m_renderTarget.TexelSize());
         shader->SetVector2f("lightDir", lightDir);
@@ -80,7 +80,7 @@ bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignmen
     textRenderer.SetColor(m_color);
     textRenderer.SetDecoration(decoration);
     textRenderer.SetScale(1.0f);
-    textRenderer.RenderToBuffer(m_text, alignment, &m_renderTarget, m_renderTarget.m_viewport, 0, 0, /*baseRenderer.HasOpenGL() ? -1 : */ 1); // m_outlineWidth == 0);
+    textRenderer.RenderToBuffer(m_text, alignment, &m_renderTarget, m_renderTarget.m_viewport, 0, 0, /*baseRenderer.UsesOpenGL() ? -1 : */ 1); // m_outlineWidth == 0);
     /*textRenderer.SetColor();*/
     return true;
 }

@@ -67,7 +67,7 @@ Shader* BaseShaderHandler::SetupRenderShader(String shaderId, String depthShader
         shaderId = depthShaderId; // override all shaders with simplest possible shader during depth pass
     // In OpenGL the program binding persists across draw calls, so skip re-enabling
     // if the same shader is already active.
-    if (baseRenderer.HasOpenGL() and (m_activeShaderId == shaderId) and (m_activeShader != nullptr)) {
+    if (baseRenderer.UsesOpenGL() and (m_activeShaderId == shaderId) and (m_activeShader != nullptr)) {
         shader = m_activeShader;
     }
     else {
@@ -220,7 +220,7 @@ Shader* BaseShaderHandler::LoadShadedRingShader(const RGBAColor& color, const Ve
 Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, float radius, float maskScale, bool antialias) {
     Shader* shader = SetupRenderShader("circleMaskShader");
     if (shader) {
-        if (baseRenderer.HasOpenGL())
+        if (baseRenderer.UsesOpenGL())
             shader->SetInt("surface", 0);
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
@@ -272,7 +272,7 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool f
 Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
     Shader* shader = SetupRenderShader("blurTexture");
     if (shader) {
-        if (baseRenderer.HasOpenGL())
+        if (baseRenderer.UsesOpenGL())
             shader->SetInt("surface", 0);
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
@@ -290,7 +290,7 @@ Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, bool invert, co
         if (baseRenderer.IsShadowPass())
             shader->SetVector4f("surfaceColor", ColorData::White);
         else {
-            if (baseRenderer.HasOpenGL())
+            if (baseRenderer.UsesOpenGL())
                 shader->SetInt("surface", 0);
             shader->SetInt("invert", invert ? 1 : 0);
             shader->SetVector2f("tcOffset", tcOffset);
