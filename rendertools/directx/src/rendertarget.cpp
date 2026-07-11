@@ -783,10 +783,10 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
         m_shadowTexture.m_handle = hdl.index;
     }
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format                  = dxDepthSRVFormat;   // R32_FLOAT view of the R32-typeless depth resource
+    srvDesc.Format = dxDepthSRVFormat;   // R32_FLOAT view of the R32-typeless depth resource
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension           = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels     = 1;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
     device->CreateShaderResourceView(info.m_resource.Get(), &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_shadowTexture.m_handle));
     m_shadowTexture.m_resource = info.m_resource;
     m_shadowTexture.Validate();
