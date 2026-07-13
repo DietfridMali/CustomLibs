@@ -131,7 +131,7 @@ public:
         noexcept;
 
     inline uint8_t* DataBuffer(void) noexcept {
-        return m_data.Data();
+        return m_data.DataPtr();
     }
 
     inline int Width(void) noexcept {

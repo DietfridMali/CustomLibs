@@ -27,7 +27,7 @@ public:
     // reserve capacity only - the stack stays empty (ToS() == 0)
     inline DATA_T* Create(int32_t length, const char* = nullptr) {
         Base::Reserve(length);
-        return Base::Data();
+        return Base::DataPtr();
     }
 
     inline void Reset(void) { Base::Clear(); }      // size -> 0, capacity retained
@@ -45,7 +45,7 @@ public:
 
     inline DATA_T* Top(void) noexcept {
         int32_t n = Base::Length();
-        return n ? Base::Data() + (n - 1) : nullptr;
+        return n ? Base::DataPtr(n - 1) : nullptr;
     }
 
     // grow the fill level by i (additive), allocating as needed
@@ -77,7 +77,7 @@ public:
         if (static_cast<int32_t>(i) >= n)
             return false;
         for (int32_t j = static_cast<int32_t>(i); j < n - 1; j++)
-            Base::Data()[j] = std::move(Base::Data()[j + 1]);
+            Base::DataPtr(j) = std::move(Base::DataPtr(j + 1));
         Base::Resize(n - 1);
         return true;
     }
@@ -86,7 +86,7 @@ public:
 
     inline DATA_T& Pull(DATA_T& elem, uint32_t i) {
         if (static_cast<int32_t>(i) < Base::Length()) {
-            elem = Base::Data()[i];
+            elem = Base::DataPtr(i);
             Delete(i);
         }
         return elem;
@@ -105,13 +105,13 @@ public:
     inline void SortAscending(int32_t left = 0, int32_t right = -1) {
         int32_t n = Base::Length();
         if (n > 0)
-            std::sort(Base::Data() + left, Base::Data() + ((right >= 0) ? right + 1 : n));
+            std::sort(Base::DataPtr(left), Base::DataPtr((right >= 0) ? right + 1 : n));
     }
 
     inline void SortDescending(int32_t left = 0, int32_t right = -1) {
         int32_t n = Base::Length();
         if (n > 0)
-            std::sort(Base::Data() + left, Base::Data() + ((right >= 0) ? right + 1 : n), std::greater<DATA_T>());
+            std::sort(Base::Data(left), Base::Data((right >= 0) ? right + 1 : n), std::greater<DATA_T>());
     }
 };
 

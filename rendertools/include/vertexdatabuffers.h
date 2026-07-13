@@ -88,7 +88,7 @@ public:
 
 		inline void CopyGLData(AutoArray<APP_DATA_T>& appData) { // directly set m_gfxData without going over m_appData
 			m_gfxData.Resize(appData.Length() * m_componentCount);
-			GL_DATA_T* glData = m_gfxData.Data();
+			GL_DATA_T* glData = m_gfxData.DataPtr();
             for (auto data : appData) {
                 memcpy(glData, data.Data(), m_componentCount * sizeof(GL_DATA_T));
 				glData += m_componentCount;
@@ -120,7 +120,7 @@ public:
         }
 
         virtual void* GfxDataBuffer(void) noexcept override {
-            return reinterpret_cast<void*>(m_gfxData.Data());
+            return reinterpret_cast<void*>(m_gfxData.DataPtr());
         }
 
         virtual uint32_t GfxDataLength(void) const noexcept override {
@@ -233,7 +233,7 @@ class VertexBuffer
         virtual AutoArray<float>& Setup(void) {
             if (HaveAppData()) {
                 m_gfxData.Resize(m_appData.Length() * 3);
-                float* glData = m_gfxData.Data();
+                float* glData = m_gfxData.DataPtr();
                 for (auto& v : m_appData) {
                     memcpy(glData, v.Data(), v.DataSize());
                     glData += 3;
@@ -283,7 +283,7 @@ public:
     virtual AutoArray<float>& Setup(void) {
         if (HaveAppData()) {
             m_gfxData.Resize(m_appData.Length() * 4);
-            float* glData = m_gfxData.Data();
+            float* glData = m_gfxData.DataPtr();
             for (auto& v : m_appData) {
                 memcpy(glData, v.Data(), v.DataSize());
                 glData += 4;
@@ -334,7 +334,7 @@ class IndexBuffer
         if (HaveAppData()) {
             uint32_t* glData = m_gfxData.Resize(m_appData.Length() * m_componentCount);
             for (auto& v : m_appData) {
-                memcpy(glData, v.Data(), v.DataSize());
+                memcpy(glData, v.DataPtr(), v.DataSize());
                 glData += v.Length();
             }
         }

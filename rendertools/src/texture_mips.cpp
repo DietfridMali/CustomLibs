@@ -128,7 +128,7 @@ void BuildMipChain3D(const void* src, int w, int h, int d, GfxPixelFormat fmt,
     l0.depth  = d;
     size_t bytes0 = size_t(w) * size_t(h) * size_t(d) * size_t(stride);
     l0.data.Resize(uint32_t(bytes0));
-    std::memcpy(l0.data.Data(), src, bytes0);
+    std::memcpy(l0.data.DataPtr(), src, bytes0);
 
     // Levels 1..N-1 — downsample from previous level via 2³ box filter.
     for (int lv = 1; lv < levels; ++lv) {
@@ -142,28 +142,28 @@ void BuildMipChain3D(const void* src, int w, int h, int d, GfxPixelFormat fmt,
 
         switch (fmt) {
         case GfxPixelFormat::R32_SFloat:
-            Downsample3D_R32F(reinterpret_cast<const float*>(prev.data.Data()),
+            Downsample3D_R32F(reinterpret_cast<const float*>(prev.data.DataPtr()),
                               prev.width, prev.height, prev.depth,
-                              reinterpret_cast<float*>(cur.data.Data()),
+                              reinterpret_cast<float*>(cur.data.DataPtr()),
                               cur.width, cur.height, cur.depth);
             break;
 
         case GfxPixelFormat::RGBA32_SFloat:
-            Downsample3D_RGBA32F(reinterpret_cast<const float*>(prev.data.Data()),
+            Downsample3D_RGBA32F(reinterpret_cast<const float*>(prev.data.DataPtr()),
                                  prev.width, prev.height, prev.depth,
-                                 reinterpret_cast<float*>(cur.data.Data()),
+                                 reinterpret_cast<float*>(cur.data.DataPtr()),
                                  cur.width, cur.height, cur.depth);
             break;
 
         case GfxPixelFormat::R8_UNorm:
-            Downsample3D_R8(prev.data.Data(), prev.width, prev.height, prev.depth,
-                            cur.data.Data(), cur.width, cur.height, cur.depth);
+            Downsample3D_R8(prev.data.DataPtr(), prev.width, prev.height, prev.depth,
+                            cur.data.DataPtr(), cur.width, cur.height, cur.depth);
             break;
 
         default:
             // Half-precision float formats are OGL-only and never reach this path. Zero-fill so
             // callers won't read uninitialised memory in case the path is exercised by mistake.
-            std::memset(cur.data.Data(), 0, bytes);
+            std::memset(cur.data.DataPtr(), 0, bytes);
             break;
         }
     }

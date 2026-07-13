@@ -49,7 +49,7 @@ void ApplyTextureSamplingToGL(GLenum target, const TextureSampling& s) noexcept
 // NoiseTexture3D
 
 bool NoiseTexture3D::Deploy(int) {
-    return Upload3DTexture(*this, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, GfxPixelFormat::RGBA16_SFloat, reinterpret_cast<const void*>(m_data.Data()));
+    return Upload3DTexture(*this, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, GfxPixelFormat::RGBA16_SFloat, reinterpret_cast<const void*>(m_data.DataPtr()));
 }
 
 
@@ -72,7 +72,7 @@ bool CloudNoiseTexture::Deploy(int) {
     // AvgMip-Pyramide (shapeNoiseAvgMip1..4Tex) durch eine lückenlose, statistisch kohärente
     // Mip-Folge ab dem Original. Distance-LOD im Shader läuft jetzt über ein einziges textureLod
     // mit lodFloat-Mip-Bias statt zweier separater Samples + manuellem mix.
-    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R16_SFloat, reinterpret_cast<const void*>(m_data.Data()), true);
+    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R16_SFloat, reinterpret_cast<const void*>(m_data.DataPtr()), true);
 }
 
 
@@ -126,8 +126,7 @@ void NoiseAvgMipTexture::SetParams(bool enforce) {
 // DetailNoiseTexture
 
 bool DetailNoiseTexture::Deploy(int) {
-    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R8_UNorm,
-                           reinterpret_cast<const void*>(m_data.Data()));
+    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.DataPtr()));
 }
 
 
@@ -146,7 +145,7 @@ void DetailNoiseTexture::SetParams(bool enforce) {
 // BlueNoiseTexture
 
 bool BlueNoiseTexture::Deploy(int) {
-    return Upload3DTexture(*this, m_gridSize.x, m_gridSize.y, 64, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.Data()));
+    return Upload3DTexture(*this, m_gridSize.x, m_gridSize.y, 64, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.DataPtr()));
 }
 
 

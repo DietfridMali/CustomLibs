@@ -69,30 +69,6 @@
     <ClInclude Include="..\include\basesingleton.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\custom_array.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\custom_list.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\custom_matrix.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\custom_sharedglhandle.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\custom_sharedpointer.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\custom_stack.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\custom_string.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\custom_vector.hpp">
-      <Filter>Header Files\custom</Filter>
-    </ClInclude>
     <ClInclude Include="..\include\std_array.hpp">
       <Filter>Header Files\std</Filter>
     </ClInclude>
@@ -134,9 +110,6 @@
     </ClInclude>
     <ClInclude Include="..\include\list.hpp">
       <Filter>Header Files\general</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\quicksort.hpp">
-      <Filter>Header Files\custom</Filter>
     </ClInclude>
     <ClInclude Include="..\include\smartpointer.hpp">
       <Filter>Header Files\general</Filter>

@@ -68,7 +68,7 @@ noexcept
     int pitch = source->pitch; // row size
     int h = source->h;
     char* pixels = (char*)source->pixels + h * pitch;
-    uint8_t* dataPtr = reinterpret_cast<uint8_t*>(m_data.Data());
+    uint8_t* dataPtr = reinterpret_cast<uint8_t*>(m_data.DataPtr());
 
     for (int i = 0; i < h; i++) {
         pixels -= pitch;
@@ -90,7 +90,7 @@ uint8_t TextureBuffer::Premultiply(uint16_t c, uint16_t a) noexcept {
 
 void TextureBuffer::Premultiply(void) {
     if (m_info.m_format == GL_RGBA8) {
-        RGBA8* p = reinterpret_cast<RGBA8*>(m_data.Data());
+        RGBA8* p = reinterpret_cast<RGBA8*>(m_data.DataPtr());
         for (int i = m_info.m_dataSize / 4; i; --i, ++p) {
             uint16_t a = uint16_t (p->a);
             p->r = Premultiply(uint16_t(p->r), a);
@@ -120,12 +120,12 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount, void* da
     }
     if (data) {
 #if USE_SHARED_POINTERS
-        if (m_data.Data() == nullptr)
+        if (m_data.DataPtr() == nullptr)
 #else
         if (m_data.Length() < m_info.m_dataSize)
 #endif
             return false;
-        memcpy(m_data.Data(), data, m_info.m_dataSize);
+        memcpy(m_data.DataPtr(), data, m_info.m_dataSize);
     }
     return true;
 }
@@ -145,7 +145,7 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool
             FlipSurface(source);
         else
 #endif
-            memcpy(m_data.Data(), source->pixels, m_info.m_dataSize);
+            memcpy(m_data.DataPtr(), source->pixels, m_info.m_dataSize);
         SDL_FreeSurface(source);
         if (premultiply)
             Premultiply();
@@ -246,8 +246,8 @@ static void ComputeOutline(RGBA8* colorBuffer, uint8_t* maskBuffer, int w, int h
 
 static void Outline(RGBA8* colorBuffer, int w, int h, int nPasses) {
     AutoArray<uint8_t> maskBuffer(w * h);
-    PrepareOutline(colorBuffer, maskBuffer.Data(), w * h);
-    ComputeOutline(colorBuffer, maskBuffer.Data(), w, h, nPasses);
+    PrepareOutline(colorBuffer, maskBuffer.DataPtr(), w * h);
+    ComputeOutline(colorBuffer, maskBuffer.DataPtr(), w, h, nPasses);
 }
 
 
@@ -488,13 +488,13 @@ static void GaussBlurV(T* dest, T* src, int w, int h, int r)
 void TextureBuffer::BoxBlur(uint16_t strength) {
     if (m_info.m_componentCount == 3) {
         AutoArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
-        BoxBlurH<RGB8>(blurBuffer.Data(), reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
-        BoxBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+        BoxBlurH<RGB8>(blurBuffer.DataPtr(), reinterpret_cast<RGB8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
+        BoxBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, int(strength));
     }
     else if (m_info.m_componentCount == 4) {
         AutoArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
-        BoxBlurH<RGBA8>(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
-        BoxBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+        BoxBlurH<RGBA8>(blurBuffer.DataPtr(), reinterpret_cast<RGBA8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
+        BoxBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, int(strength));
     }
 }
 
@@ -502,13 +502,13 @@ void TextureBuffer::BoxBlur(uint16_t strength) {
 void TextureBuffer::GaussBlur(uint16_t strength) {
     if (m_info.m_componentCount == 3) {
         AutoArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
-        GaussBlurH<RGB8>(blurBuffer.Data(), reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
-        GaussBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurH<RGB8>(blurBuffer.DataPtr(), reinterpret_cast<RGB8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, int(strength));
     }
     else if (m_info.m_componentCount == 4) {
         AutoArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
-        GaussBlurH<RGBA8>(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
-        GaussBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurH<RGBA8>(blurBuffer.DataPtr(), reinterpret_cast<RGBA8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, int(strength));
     }
 }
 
@@ -517,9 +517,9 @@ void TextureBuffer::Posterize(uint16_t gradients) {
     if (not m_isPosterized) {
         m_isPosterized = true;
         if (m_info.m_componentCount == 3)
-            ::Posterize<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width * m_info.m_height, gradients);
+            ::Posterize<RGB8>(reinterpret_cast<RGB8*>(m_data.DataPtr()), m_info.m_width * m_info.m_height, gradients);
         else if (m_info.m_componentCount == 4)
-            ::Posterize<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width * m_info.m_height, gradients);
+            ::Posterize<RGBA8>(reinterpret_cast<RGBA8*>(m_data.DataPtr()), m_info.m_width * m_info.m_height, gradients);
         }
 }
 
@@ -530,7 +530,7 @@ void TextureBuffer::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16
         Posterize(gradients);
         GaussBlur(blurStrength);
         if (m_info.m_componentCount == 4) 
-            ::Outline(reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(outlinePasses));
+            ::Outline(reinterpret_cast<RGBA8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(outlinePasses));
     }
 }
 

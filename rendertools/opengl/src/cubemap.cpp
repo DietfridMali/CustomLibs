@@ -26,12 +26,18 @@ bool Cubemap::Deploy(int bufferIndex) {
     TextureBuffer* texBuf = nullptr;
     for (auto it = m_buffers.begin(); it != m_buffers.end(); ++it) {
         texBuf = *it;
-        glTexImage2D(GLenum (GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, texBuf->m_data.Data());
+        glTexImage2D(GLenum (GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), 0, texBuf->m_info.m_internalFormat, 
+                             texBuf->m_info.m_width, texBuf->m_info.m_height, 0, 
+                             texBuf->m_info.m_format, GL_UNSIGNED_BYTE, 
+                             texBuf->m_data.DataPtr());
         ++i;
     }
     if (texBuf) {
         for (; i < 6; i++)
-            glTexImage2D(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, texBuf->m_data.Data());
+            glTexImage2D(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), 0, texBuf->m_info.m_internalFormat, 
+                         texBuf->m_info.m_width, texBuf->m_info.m_height, 0, 
+                         texBuf->m_info.m_format, GL_UNSIGNED_BYTE, 
+                         texBuf->m_data.DataPtr());
     }
     Release ();
     m_isDeployed = true;

@@ -85,7 +85,7 @@ bool Skybox::Setup(const String& textureFolder) {
 	}
 	AutoArray<GfxTypes::Uint> indices;
 	indices.Resize(sizeof(Cube::triangleIndices) / sizeof(GfxTypes::Uint));
-	memcpy(indices.Data(), Cube::triangleIndices, sizeof(Cube::triangleIndices));
+	memcpy(indices.DataPtr(), Cube::triangleIndices, sizeof(Cube::triangleIndices));
 	m_skybox->SetIndices(indices);
 	m_skybox->UpdateData();
 	return true;

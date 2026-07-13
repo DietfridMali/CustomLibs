@@ -980,11 +980,11 @@ bool GLBLoader::SaveToFile(const String& filename) const {
     if (not writeU32(shapeKeyCount))
         return false;
 
-    if (not writeBuffer(m_data.vertices.Data(), size_t(vertexCount) * sizeof(Vector3f)))
+    if (not writeBuffer(m_data.vertices.DataPtr(), size_t(vertexCount) * sizeof(Vector3f)))
         return false;
-    if (not writeBuffer(m_data.colors.Data(), size_t(colorCount) * sizeof(RGBAColor)))
+    if (not writeBuffer(m_data.colors.DataPtr(), size_t(colorCount) * sizeof(RGBAColor)))
         return false;
-    if (not writeBuffer(m_data.normals.Data(), size_t(normalCount) * sizeof(Vector3f)))
+    if (not writeBuffer(m_data.normals.DataPtr(), size_t(normalCount) * sizeof(Vector3f)))
         return false;
 
     for (auto& sk : m_data.shapeKeys) {
@@ -1000,12 +1000,12 @@ bool GLBLoader::SaveToFile(const String& filename) const {
 
         if (not writeU32(deltaCount))
             return false;
-        if (not writeBuffer(sk.deltas.Data(), size_t(deltaCount) * sizeof(Vector3f)))
+        if (not writeBuffer(sk.deltas.DataPtr(), size_t(deltaCount) * sizeof(Vector3f)))
             return false;
 
         if (not writeU32(normalDeltaCount))
             return false;
-        if (not writeBuffer(sk.normalDeltas.Data(), size_t(normalDeltaCount) * sizeof(Vector3f)))
+        if (not writeBuffer(sk.normalDeltas.DataPtr(), size_t(normalDeltaCount) * sizeof(Vector3f)))
             return false;
     }
 
@@ -1055,11 +1055,11 @@ bool GLBLoader::LoadFromFile(const String& filename) {
     m_data.colors.Resize(int32_t(colorCount));
     m_data.normals.Resize(int32_t(normalCount));
 
-    if (not readBuffer(m_data.vertices.Data(), size_t(vertexCount) * sizeof(Vector3f)))
+    if (not readBuffer(m_data.vertices.DataPtr(), size_t(vertexCount) * sizeof(Vector3f)))
         return false;
-    if (not readBuffer(m_data.colors.Data(), size_t(colorCount) * sizeof(RGBAColor)))
+    if (not readBuffer(m_data.colors.DataPtr(), size_t(colorCount) * sizeof(RGBAColor)))
         return false;
-    if (not readBuffer(m_data.normals.Data(), size_t(normalCount) * sizeof(Vector3f)))
+    if (not readBuffer(m_data.normals.DataPtr(), size_t(normalCount) * sizeof(Vector3f)))
         return false;
 
     if (m_data.colors.Length() != m_data.vertices.Length())
@@ -1085,13 +1085,13 @@ bool GLBLoader::LoadFromFile(const String& filename) {
         if (not readU32(deltaCount))
             return false;
         sk.deltas.Resize(int32_t(deltaCount));
-        if (not readBuffer(sk.deltas.Data(), size_t(deltaCount) * sizeof(Vector3f)))
+        if (not readBuffer(sk.deltas.DataPtr(), size_t(deltaCount) * sizeof(Vector3f)))
             return false;
 
         if (not readU32(normalDeltaCount))
             return false;
         sk.normalDeltas.Resize(int32_t(normalDeltaCount));
-        if (not readBuffer(sk.normalDeltas.Data(), size_t(normalDeltaCount) * sizeof(Vector3f)))
+        if (not readBuffer(sk.normalDeltas.DataPtr(), size_t(normalDeltaCount) * sizeof(Vector3f)))
             return false;
 
         if (sk.deltas.Length() != m_data.vertices.Length())

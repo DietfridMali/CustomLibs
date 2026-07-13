@@ -171,7 +171,7 @@ bool BaseNoiseTexture3D::Create(Vector3i gridDimensions, const NoiseParams& para
 
 
 void BaseNoiseTexture3D::ComputeNoise(void) {
-    float* data = m_data.Data();
+    float* data = m_data.DataPtr();
 
     Vector4f minVals{ 1e6f, 1e6f, 1e6f, 1e6f };
     Vector4f maxVals{ -1e6f, -1e6f, -1e6f, -1e6f };
@@ -200,7 +200,7 @@ void BaseNoiseTexture3D::ComputeNoise(void) {
         }
     }
 
-    data = m_data.Data();
+    data = m_data.DataPtr();
     int dataSize = i / 4;
     for (int j = dataSize; j; --j) {
         for (int k = 0; k < 4; ++k, ++data) {
@@ -232,7 +232,7 @@ bool BaseNoiseTexture3D::LoadFromFile(const String& filename) {
     if (m_data.Length() != voxelCount)
         m_data.Resize(voxelCount);
 
-    f.read(reinterpret_cast<char*>(m_data.Data()), expectedBytes);
+    f.read(reinterpret_cast<char*>(m_data.DataPtr()), expectedBytes);
     return f.good();
 }
 
@@ -250,7 +250,7 @@ bool BaseNoiseTexture3D::SaveToFile(const String& filename) const {
     if (m_data.Length() != voxelCount)
         return false;
 
-    f.write(reinterpret_cast<const char*>(m_data.Data()), bytes);
+    f.write(reinterpret_cast<const char*>(m_data.DataPtr()), bytes);
     return f.good();
 }
 
@@ -300,8 +300,8 @@ void BaseCloudNoiseTexture::Compute(String textureFolder) {
     NoiseTexture3D rgbaNoise;
     rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params, textureFolder + "/cloudnoise-rgba.bin", false);
 
-    float* rgbaData = rgbaNoise.GetData().Data();
-    float* data = m_data.Data();
+    float* rgbaData = rgbaNoise.GetData().DataPtr();
+    float* data = m_data.DataPtr();
     uint32_t dataSize = m_gridSize * m_gridSize * m_gridSize;
 
     float dMin = 1.0f, dMax = 0.0f;
@@ -333,7 +333,7 @@ void BaseCloudNoiseTexture::Compute(String textureFolder) {
     }
 #if 1 //def _DEBUG
     if (dMax - dMin < 0.999f) {
-        data = m_data.Data();
+        data = m_data.DataPtr();
         for (int i = dataSize; i; --i, ++data)
             *data = generator.Remap(*data, dMin, dMax, 0.0f, 1.0f);
     }
@@ -369,10 +369,10 @@ void BaseCloudNoiseTexture::ApplyInfiniteWarp(void) {
 
     AutoArray<float> raw;
     raw.Resize(totalVoxels);
-    std::memcpy(raw.Data(), m_data.Data(), size_t(totalVoxels) * sizeof(float));
+    std::memcpy(raw.DataPtr(), m_data.DataPtr(), size_t(totalVoxels) * sizeof(float));
 
-    const float* src = raw.Data();
-    float* dst = m_data.Data();
+    const float* src = raw.DataPtr();
+    float* dst = m_data.DataPtr();
     const float invSize = 1.0f / float(m_gridSize);
 
     for (int z = 0; z < m_gridSize; ++z) {
@@ -408,10 +408,10 @@ void BaseCloudNoiseTexture::ApplyPeriodicWarp(void) {
 
     AutoArray<float> raw;
     raw.Resize(totalVoxels);
-    std::memcpy(raw.Data(), m_data.Data(), size_t(totalVoxels) * sizeof(float));
+    std::memcpy(raw.DataPtr(), m_data.DataPtr(), size_t(totalVoxels) * sizeof(float));
 
-    const float* src = raw.Data();
-    float* dst = m_data.Data();
+    const float* src = raw.DataPtr();
+    float* dst = m_data.DataPtr();
     const float invSize = 1.0f / float(m_gridSize);
 
     for (int z = 0; z < m_gridSize; ++z) {
@@ -494,7 +494,7 @@ void BaseCloudNoiseTexture::DownSample(float* src, int srcEdgeLen, float* dest, 
 void BaseCloudNoiseTexture::ToMaxMip(BaseCloudNoiseTexture* mipTex) {
     if (mipTex == nullptr)
         return;
-    DownSample(m_data.Data(), m_gridSize, mipTex->m_data.Data(), mipTex->m_gridSize);
+    DownSample(m_data.DataPtr(), m_gridSize, mipTex->m_data.DataPtr(), mipTex->m_gridSize);
 }
 
 
@@ -571,7 +571,7 @@ void BaseCloudNoiseTexture::DownSampleAvg(float* src, int srcEdgeLen, float* des
 void BaseCloudNoiseTexture::ToAvgMip(BaseCloudNoiseTexture* mipTex) {
     if (mipTex == nullptr)
         return;
-    DownSampleAvg(m_data.Data(), m_gridSize, mipTex->m_data.Data(), mipTex->m_gridSize);
+    DownSampleAvg(m_data.DataPtr(), m_gridSize, mipTex->m_data.DataPtr(), mipTex->m_gridSize);
 }
 
 
@@ -652,8 +652,8 @@ void BaseDetailNoiseTexture::Compute(String textureFolder) {
     rgbaNoise.Create({ m_gridSize, m_gridSize, m_gridSize }, m_params,
                      textureFolder + "/detailnoise-rgba.bin", false);
 
-    float* rgbaData = rgbaNoise.GetData().Data();
-    uint8_t* data = m_data.Data();
+    float* rgbaData = rgbaNoise.GetData().DataPtr();
+    uint8_t* data = m_data.DataPtr();
     const uint32_t dataSize = BufferSize();
 
     // Schneider-Standardgewichtung der drei Worley-Frequenzbaender. Summe = 1, also Output ist
@@ -717,7 +717,7 @@ void BaseBlueNoiseTexture::Compute(String textureFolder) {
         String filename = textureFolder + "/bluenoise/stbn_scalar_2Dx1Dx1D_128x128x64x1_" + String(i) + ".png";
         SDL_Surface* image = IMG_Load(filename.Data());
         if (image) {
-            std::memcpy(m_data.Data(layerSize * i), image->pixels, layerSize);
+            std::memcpy(m_data.DataPtr(layerSize * i), image->pixels, layerSize);
             SDL_FreeSurface(image);
         }
     }

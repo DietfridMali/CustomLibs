@@ -188,7 +188,7 @@ public:
 
     inline DATA_T* operator()(int32_t x, int32_t y, bool rangeCheck) {
         int32_t i = AutoFit(rangeCheck ? GetCheckedIndex(x, y) : GetIndex(x, y));
-        return (i < 0) ? nullptr : Data(i);
+        return (i < 0) ? nullptr : DataPtr(i);
     }
 
     inline const DATA_T& operator()(int32_t x, int32_t y) const {
@@ -286,19 +286,19 @@ public:
     }
 #if 0
     // Zeiger auf Rohdaten (z.B. fuer OpenGL)
-    inline DATA_T* Data(int32_t i = 0) noexcept { 
+    inline DATA_T* DataPtr(int32_t i = 0) noexcept { 
         return m_array.data() + i; 
     }
 
-    inline const DATA_T* Data(int32_t i = 0) const noexcept { 
+    inline const DATA_T* DataPtr(int32_t i = 0) const noexcept { 
         return m_array.data() + i; 
     }
 #else
-    inline auto Data(int32_t i = 0) noexcept { 
+    inline auto DataPtr(int32_t i = 0) noexcept { 
         return m_array.data() + i; 
     }
 
-    inline auto Data(int32_t i = 0) const noexcept { 
+    inline auto DataPtr(int32_t i = 0) const noexcept { 
         return m_array.data() + i; 
     }
 #endif
@@ -307,7 +307,7 @@ public:
         if (m_width * m_height <= 0)
             throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
 #endif    
-        return Data(y * m_width);
+        return DataPtr(y * m_width);
     }
 
     inline void Reserve(int32_t capacity) {
@@ -323,13 +323,13 @@ public:
     inline DATA_T* Resize(int32_t newSize) {
         if (AllowResize(static_cast<size_t>(newSize)))
             m_array.resize(static_cast<size_t>(newSize));
-        return Data();
+        return DataPtr();
     }
 
     inline DATA_T* Resize(int32_t newSize, const DATA_T& value) {
         if (AllowResize(static_cast<size_t>(newSize)))
             m_array.resize(static_cast<size_t>(newSize), value);
-        return Data();
+        return DataPtr();
     }
 
     inline DATA_T* Resize(int32_t width, int32_t height) {
@@ -338,7 +338,7 @@ public:
             m_width = width;
             m_height = height;
         }
-        return Data();
+        return DataPtr();
     }
 
     inline void Clear(void) {
@@ -348,6 +348,10 @@ public:
     inline void Reset(void) {
         m_array.clear();
         m_array.shrink_to_fit();
+    }
+
+    inline void Destroy(void) {
+        Reset();
     }
 
     inline auto begin() noexcept { return m_array.begin(); }
@@ -447,7 +451,7 @@ public:
         if (Length() != int32_t(elemCount))
             Resize(int32_t(elemCount));
 
-        f.read(reinterpret_cast<char*>(Data()), dataSize);
+        f.read(reinterpret_cast<char*>(DataPtr()), dataSize);
         return f.good();
     }
 
@@ -458,25 +462,29 @@ public:
         std::ofstream f(filename.c_str(), std::ios::binary | std::ios::trunc);
         if (not f)
             return false;
-        f.write(reinterpret_cast<const char*>(Data()), size_t(Length()) * sizeof(DATA_T));
+        f.write(reinterpret_cast<const char*>(DataPtr()), size_t(Length()) * sizeof(DATA_T));
         return f.good();
     }
 
     // --- d2x-xl CArray compatibility shims (type migration; same semantics, legacy names) ---
-    inline DATA_T* Buffer(int32_t i = 0) noexcept { return Data(i); }
+    inline DATA_T* Buffer(int32_t i = 0) noexcept { return DataPtr(i); }
 
-    inline const DATA_T* Buffer(int32_t i = 0) const noexcept { return Data(i); }
+    inline const DATA_T* Buffer(int32_t i = 0) const noexcept { return DataPtr(i); }
 
-    inline DATA_T* Pointer(int32_t i) noexcept { return Data(i); }
+    inline DATA_T* Pointer(int32_t i) noexcept { return DataPtr(i); }
 
-    inline DATA_T* Create(int32_t length, const char* = nullptr) { Resize(length); return Data(); }
+    inline DATA_T* operator+(int32_t i) noexcept { return DataPtr(i); }
+
+    inline const DATA_T* operator+(int32_t i) const noexcept { return DataPtr(i); }
+
+    inline DATA_T* Create(int32_t length, const char* = nullptr) { Resize(length); return DataPtr(); }
 
     inline int32_t Size(void) const noexcept { return DataSize(); }
 
     inline void Init(void) { Clear(); }
 
     inline bool IsElement(const DATA_T* elem, bool = false) const noexcept {
-        return (elem >= Data()) and (elem < Data() + Length());
+        return (elem >= DataPtr()) and (elem < DataPtr() + Length());
     }
 
     // CFile-style block I/O (FILE_T resolved at the call site, so basetools needs no CFile knowledge)
@@ -487,7 +495,7 @@ public:
             return static_cast<size_t>(-1);
         if ((nCount == 0) or (nCount > len - nOffset))
             nCount = len - nOffset;
-        return cf.Read(Data() + nOffset, sizeof(DATA_T), nCount, bCompressed);
+        return cf.Read(DataPtr() + nOffset, sizeof(DATA_T), nCount, bCompressed);
     }
 
     template <typename FILE_T>
@@ -497,16 +505,16 @@ public:
             return static_cast<size_t>(-1);
         if ((nCount == 0) or (nCount > len - nOffset))
             nCount = len - nOffset;
-        return cf.Write(Data() + nOffset, sizeof(DATA_T), nCount, bCompressed);
+        return cf.Write(DataPtr() + nOffset, sizeof(DATA_T), nCount, bCompressed);
     }
 
     inline void SetName(const char*) noexcept { }
 
     inline const char* GetName(void) const noexcept { return ""; }
 
-    inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - Data()); }
+    inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - DataPtr()); }
 
-    inline DATA_T* Current(void) noexcept { return IsEmpty() ? nullptr : Data() + m_pos; }
+    inline DATA_T* Current(void) noexcept { return IsEmpty() ? nullptr : DataPtr() + m_pos; }
 
     inline void Pos(uint32_t pos) noexcept { m_pos = (Length() > 0) ? static_cast<int32_t>(pos % static_cast<uint32_t>(Length())) : 0; }
 
@@ -518,7 +526,7 @@ public:
             return;
         uint32_t n = (count < len) ? count : len;
         if constexpr (std::is_trivial_v<DATA_T>)
-            memset(Data(), filler, static_cast<size_t>(n) * sizeof(DATA_T));
+            memset(DataPtr(), filler, static_cast<size_t>(n) * sizeof(DATA_T));
         else
             std::fill(begin(), begin() + static_cast<ptrdiff_t>(n), DATA_T {});
     }

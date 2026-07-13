@@ -83,7 +83,7 @@ template<> struct NoiseTraits<ValueNoiseR32F> {
                         int /*octave*/, uint32_t /*seed*/)
     {
         data.Resize(gridSize * gridSize);
-        float* dataPtr = data.Data();
+        float* dataPtr = data.DataPtr();
         for (int y = 0; y < gridSize; ++y)
             for (int x = 0; x < gridSize; ++x)
                 *dataPtr++ = NoiseTextureUtil::Hash2i(x % xPeriod, y % yPeriod);
@@ -114,7 +114,7 @@ template<> struct NoiseTraits<PerlinNoiseR32F> {
         Noise::PerlinNoise perlin;
         const int period = (xPeriod > yPeriod) ? xPeriod : yPeriod;
         perlin.Setup((period < 2) ? 2 : period, seed);
-        float* dataPtr = data.Data();
+        float* dataPtr = data.DataPtr();
         const float invGrid = 1.0f / float(gridSize);
         for (int y = 0; y < gridSize; ++y) {
             for (int x = 0; x < gridSize; ++x) {
@@ -155,7 +155,7 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
         FBMParams params;
         params.octaves = (octaves < 1) ? 1 : octaves;
         FBM<Noise::PerlinFunctor> fbm(functor, params);
-        float* dataPtr = data.Data();
+        float* dataPtr = data.DataPtr();
         const float invGrid = 1.0f / float(gridSize);
         for (int y = 0; y < gridSize; ++y) {
             for (int x = 0; x < gridSize; ++x) {
@@ -255,7 +255,7 @@ template<> struct NoiseTraits<BlueNoiseR8> {
             }
         }
 
-        uint8_t* dst = data.Data();
+        uint8_t* dst = data.DataPtr();
         for (int y = 0; y < N; ++y) {
             for (int x = 0; x < N; ++x) {
                 float sum = 0.0f;

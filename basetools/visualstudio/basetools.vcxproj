@@ -26,14 +26,6 @@
     <ClInclude Include="..\include\avltreetraits.h" />
     <ClInclude Include="..\include\basicdatapool.hpp" />
     <ClInclude Include="..\include\conversions.hpp" />
-    <ClInclude Include="..\include\custom_array.hpp" />
-    <ClInclude Include="..\include\custom_list.hpp" />
-    <ClInclude Include="..\include\custom_matrix.hpp" />
-    <ClInclude Include="..\include\custom_sharedglhandle.hpp" />
-    <ClInclude Include="..\include\custom_sharedpointer.hpp" />
-    <ClInclude Include="..\include\custom_stack.hpp" />
-    <ClInclude Include="..\include\custom_string.hpp" />
-    <ClInclude Include="..\include\custom_vector.hpp" />
     <ClInclude Include="..\include\datacontainer.hpp" />
     <ClInclude Include="..\include\dictionary.hpp" />
     <ClInclude Include="..\include\fmt\core.h" />
@@ -46,7 +38,6 @@
     <ClInclude Include="..\include\list_helpers.h" />
     <ClInclude Include="..\include\matrix.hpp" />
     <ClInclude Include="..\include\noise.hpp" />
-    <ClInclude Include="..\include\quicksort.hpp" />
     <ClInclude Include="..\include\random.hpp" />
     <ClInclude Include="..\include\segmentedlist.hpp" />
     <ClInclude Include="..\include\sharedgfxhandle.hpp" />

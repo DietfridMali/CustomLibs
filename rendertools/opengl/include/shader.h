@@ -272,14 +272,14 @@ class Shader
             noexcept;
 
         inline GLint SetMatrix4f(const char* name, AutoArray<GLfloat>& data, bool transpose = false) noexcept {
-            return SetMatrix4f(name, data.Data(), transpose);
+            return SetMatrix4f(name, data.DataPtr(), transpose);
         }
 
         GLint SetMatrix3f(const char* name, float* data, bool transpose = false)
             noexcept;
 
         inline GLint SetMatrix3f(const char* name, AutoArray<GLfloat>& data, bool transpose) noexcept {
-            return SetMatrix3f(name, data.Data(), transpose);
+            return SetMatrix3f(name, data.DataPtr(), transpose);
         }
 
         inline GLint SetInt(const char* name, int data) noexcept {
@@ -359,7 +359,7 @@ class Shader
         }
 
         inline GLint SetFloatArray(const char* name, const FloatArray& data) noexcept {
-            return SetUniformArray<float>(name, data.Data(), data.Length());
+            return SetUniformArray<float>(name, data.DataPtr(), data.Length());
         }
 
         // -----------------------------------------------------------------------------------------
@@ -382,7 +382,7 @@ class Shader
             {
                 return glData;
             }
-            GetFloatData(id, size, glData.Data());
+            GetFloatData(id, size, glData.DataPtr());
             return glData;
         }
 

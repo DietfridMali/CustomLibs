@@ -235,8 +235,11 @@ bool Texture::Deploy(int bufferIndex)
     if (not Bind(0, true))
         return false;
     TextureBuffer* texBuf = m_buffers[bufferIndex];
-    uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.Data());
-    glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, texBuf->m_info.m_height, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(texBuf->m_data.Data()));
+    uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.DataPtr());
+    glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, 
+                 texBuf->m_info.m_height, 0, 
+                 texBuf->m_info.m_format, GL_UNSIGNED_BYTE, 
+                 reinterpret_cast<const void*>(texBuf->m_data.DataPtr()));
     SetParams();
 #ifdef _DEBUG
     gfxStates.CheckError();

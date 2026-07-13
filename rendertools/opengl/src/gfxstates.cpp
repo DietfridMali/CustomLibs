@@ -163,7 +163,7 @@ void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) {
 	if (drawBuffers.IsEmpty())
 		glDrawBuffer(GL_BACK);
 	else
-		glDrawBuffers(drawBuffers.Length(), drawBuffers.Data());
+		glDrawBuffers(drawBuffers.Length(), drawBuffers.DataPtr());
 }
 
 
