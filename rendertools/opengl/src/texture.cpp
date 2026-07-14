@@ -12,6 +12,7 @@
 
 #include "texture.h"
 #include "ddsloader.h"
+#include "gfxpixelformat_gl.h"
 #include "gfxstates.h"
 #include "gfxrenderer.h"
 
@@ -174,10 +175,19 @@ void Texture::Release(void) {
 void Texture::SetParams(bool forceUpdate) {
     if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
-        if (m_useMipMaps) {
+        // Block-compressed textures carry their mip chain in the DDS; glGenerateMipmap cannot build
+        // mips for them, so only enable mip filtering when the DDS actually provided levels and cap
+        // GL_TEXTURE_MAX_LEVEL to what was uploaded. Uncompressed textures generate mips on the GPU.
+        const bool compressed = (m_compression != tcNone);
+        const int  mipCount   = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
+        const bool useMips    = compressed ? (mipCount > 1) : (m_useMipMaps != 0);
+        if (useMips) {
             glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glGenerateMipmap(m_type);
+            if (compressed)
+                glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
+            else
+                glGenerateMipmap(m_type);
             // Anisotropic filtering, coupled to mip-mapping like the DX12/VK backends
             // (TextureSampling.maxAnisotropy = useMipMaps ? 16 : 1); clamp to the driver max.
             GLfloat maxAniso = 1.0f;
@@ -236,11 +246,27 @@ bool Texture::Deploy(int bufferIndex)
     if (not Bind(0, true))
         return false;
     TextureBuffer* texBuf = m_buffers[bufferIndex];
-    uint32_t* data = reinterpret_cast<uint32_t*>(texBuf->m_data.DataPtr());
-    glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width, 
-                 texBuf->m_info.m_height, 0, 
-                 texBuf->m_info.m_format, GL_UNSIGNED_BYTE, 
-                 reinterpret_cast<const void*>(texBuf->m_data.DataPtr()));
+    const GfxPixelFormat gfxFmt = texBuf->m_info.m_gfxFormat;
+    if (GfxIsBlockCompressed(gfxFmt)) {
+        // Block-compressed: upload each mip level straight from the DDS payload (no glGenerateMipmap).
+        const GLenum   internalFormat = ToGLFormat(gfxFmt).internalFormat;
+        const uint32_t blockBytes     = GfxBlockBytes(gfxFmt);
+        const uint8_t* level          = reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr());
+        int w = texBuf->m_info.m_width, h = texBuf->m_info.m_height;
+        for (int mip = 0; mip < texBuf->m_info.m_mipCount; ++mip) {
+            const GLsizei imgSize = GLsizei(uint32_t((w + 3) / 4) * uint32_t((h + 3) / 4) * blockBytes);
+            glCompressedTexImage2D(m_type, mip, internalFormat, w, h, 0, imgSize, level);
+            level += imgSize;
+            w = (w > 1) ? (w >> 1) : 1;
+            h = (h > 1) ? (h >> 1) : 1;
+        }
+    }
+    else {
+        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width,
+                     texBuf->m_info.m_height, 0,
+                     texBuf->m_info.m_format, GL_UNSIGNED_BYTE,
+                     reinterpret_cast<const void*>(texBuf->m_data.DataPtr()));
+    }
     SetParams();
 #ifdef _DEBUG
     gfxStates.CheckError();
@@ -328,7 +354,7 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
             }
         }
         else {
-            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/false);
+            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
             if (not texBuf)
                 return false;
             m_buffers.Append(texBuf);

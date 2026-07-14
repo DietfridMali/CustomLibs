@@ -75,6 +75,14 @@ bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
                                const uint8_t* pixels, int width, int height, int channels,
                                uint32_t mipLevels) noexcept;
 
+// Upload a block-compressed (BC1/BC4/BC5/BC7) texture: one staging buffer + copy per (face, mip).
+// faces[f] points at face f's tightly-packed mip chain (level 0 first; ceil(w/4)*ceil(h/4)*GfxBlockBytes
+// bytes per level). dstImage must have been created with the matching BC VkFormat, arrayLayers ==
+// faceCount (1 for plain 2D, 6 for a cubemap) and the given mip count.
+bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
+                          const uint8_t* const* faces, int faceCount,
+                          int width, int height, GfxPixelFormat fmt, int mipCount) noexcept;
+
 // =================================================================================================
 // Create + upload a Texture3D (VkImage with imageType=VK_IMAGE_TYPE_3D). On success outImage,
 // outAllocation and outTracker hold the new image and its initial layout state (SHADER_READ_ONLY).

@@ -89,6 +89,7 @@ public:
     VmaAllocation               m_allocation{ VK_NULL_HANDLE };
     ImageLayoutTracker          m_layoutTracker;
     VkImageLayout               m_sampleLayout{ VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    VkFormat                    m_vkFormat{ VK_FORMAT_R8G8B8A8_UNORM };  // GPU format of m_image + its view
 
     String                      m_name;
     List<TextureBuffer*>        m_buffers;
@@ -259,7 +260,7 @@ public:
         m_isDeployed = false;
     }
 
-    bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1);
+    bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1, VkFormat format = VK_FORMAT_R8G8B8A8_UNORM);
 
     bool CreateSRV(void);
 

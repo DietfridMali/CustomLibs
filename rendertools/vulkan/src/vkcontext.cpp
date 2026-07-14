@@ -427,6 +427,7 @@ bool VKContext::CreateDevice(void) noexcept
     // whose MRT pass blends RT0 additively (accum) and RT1 multiplicatively (revealage).
     VkPhysicalDeviceFeatures features { };
     features.samplerAnisotropy = VK_TRUE;
+    features.textureCompressionBC = VK_TRUE;   // BC1/BC4/BC5/BC7 for skybox + material DDS textures (universal on desktop/Xbox)
     features.fragmentStoresAndAtomics = VK_TRUE;
     features.vertexPipelineStoresAndAtomics = VK_TRUE;
     features.independentBlend = VK_TRUE;

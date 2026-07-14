@@ -319,6 +319,10 @@ public:
         return m_arrayPtr->data();
     }
 
+    inline const DATA_T* Data(void) const noexcept {
+        return m_arrayPtr->data();
+    }
+
 #if 0
     // Zeiger auf Rohdaten (z.B. fuer OpenGL)
     inline DATA_T* DataPtr(int32_t i = 0) noexcept { 

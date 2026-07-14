@@ -12,6 +12,7 @@
 
 #include "texture.h"
 #include "ddsloader.h"
+#include "gfxpixelformat_vk.h"
 #include "vkcontext.h"
 #include "vkupload.h"
 #include "commandlist.h"
@@ -244,16 +245,18 @@ void Texture::SetParams(bool forceUpdate)
 }
 
 
-bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels)
+bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, VkFormat format)
 {
     VmaAllocator allocator = vkContext.Allocator();
     if (allocator == VK_NULL_HANDLE)
         return false;
 
+    m_vkFormat = format;
+
     VkImageCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     info.imageType = VK_IMAGE_TYPE_2D;
-    info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    info.format = m_vkFormat;
     info.extent.width = uint32_t(w);
     info.extent.height = uint32_t(h);
     info.extent.depth = 1;
@@ -290,7 +293,7 @@ bool Texture::CreateSRV(void)
     VkImageViewCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     info.image = m_image;
-    info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    info.format = m_vkFormat;
     info.viewType = (m_type == TextureType::CubeMap) ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
     info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -326,17 +329,28 @@ bool Texture::Deploy(int bufferIndex)
     if ((w <= 0) or (h <= 0))
         return false;
 
-    const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
-    if (not CreateTextureResource(w, h, 1, int(mipLevels)))
-        return false;
-    const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-    const int channels = tb->m_info.m_componentCount;
-    if (mipLevels > 1) {
-        if (not UploadTextureDataWithMips(m_image, m_layoutTracker, pixels, w, h, channels, mipLevels))
+    const GfxPixelFormat gfxFmt = tb->m_info.m_gfxFormat;
+    if (GfxIsBlockCompressed(gfxFmt)) {
+        const int mipCount = tb->m_info.m_mipCount;
+        if (not CreateTextureResource(w, h, 1, mipCount, ToVkFormat(gfxFmt)))
+            return false;
+        const uint8_t* face = static_cast<const uint8_t*>(tb->DataBuffer());
+        if (not UploadCompressedData(m_image, m_layoutTracker, &face, 1, w, h, gfxFmt, mipCount))
             return false;
     }
-    else if (not UploadTextureData(m_image, m_layoutTracker, pixels, w, h, channels))
-        return false;
+    else {
+        const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
+        if (not CreateTextureResource(w, h, 1, int(mipLevels)))
+            return false;
+        const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
+        const int channels = tb->m_info.m_componentCount;
+        if (mipLevels > 1) {
+            if (not UploadTextureDataWithMips(m_image, m_layoutTracker, pixels, w, h, channels, mipLevels))
+                return false;
+        }
+        else if (not UploadTextureData(m_image, m_layoutTracker, pixels, w, h, channels))
+            return false;
+    }
     if (not CreateSRV())
         return false;
 
@@ -365,7 +379,7 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
             m_buffers.Append(texBuf);
         }
         else {
-            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/false);
+            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
             if (not texBuf)
                 return false;
             m_buffers.Append(texBuf);

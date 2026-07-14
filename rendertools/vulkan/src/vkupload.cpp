@@ -324,6 +324,80 @@ bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
 }
 
 // =================================================================================================
+// UploadCompressedData — block-compressed (BC1/BC4/BC5/BC7) upload. One staging buffer + copy per
+// (face, mip); no CPU downsampling (mips come from the DDS). Mirrors UploadTextureDataWithMips but
+// uses block-sized payloads and writes each face into its own array layer.
+
+bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
+                          const uint8_t* const* faces, int faceCount,
+                          int width, int height, GfxPixelFormat fmt, int mipCount) noexcept
+{
+    if ((dstImage == VK_NULL_HANDLE) or (faces == nullptr) or (faceCount <= 0) or (mipCount <= 0))
+        return false;
+    if (faceCount > 6)
+        faceCount = 6;
+    const uint32_t blockBytes = GfxBlockBytes(fmt);
+    if (blockBytes == 0)
+        return false;   // caller passed a non-block-compressed format
+
+    const uint32_t total = uint32_t(faceCount) * uint32_t(mipCount);
+    AutoArray<VkStagingBuffer> stagings;
+    stagings.Resize(total);
+
+    // One staging buffer per (face, mip), copied straight from each face's packed DDS mip chain.
+    bool     ok  = true;
+    uint32_t idx = 0;
+    for (int face = 0; ok and (face < faceCount); ++face) {
+        const uint8_t* level = faces[face];
+        int w = width, h = height;
+        for (int mip = 0; mip < mipCount; ++mip) {
+            const VkDeviceSize bytes = VkDeviceSize((w + 3) / 4) * VkDeviceSize((h + 3) / 4) * blockBytes;
+            if (not CreateStagingBuffer(bytes, stagings[idx])) {
+                ok = false;
+                break;
+            }
+            std::memcpy(stagings[idx].mapped, level, size_t(bytes));
+            level += bytes;
+            ++idx;
+            w = (w > 1) ? (w >> 1) : 1;
+            h = (h > 1) ? (h >> 1) : 1;
+        }
+    }
+
+    OneShotCommandBuffer cmd { };
+    if (ok and BeginSingleTimeCommands(cmd)) {
+        tracker.ToTransferDst(cmd.cb);   // barriers all mips + layers (VK_REMAINING_*)
+        idx = 0;
+        for (int face = 0; face < faceCount; ++face) {
+            int w = width, h = height;
+            for (int mip = 0; mip < mipCount; ++mip) {
+                VkBufferImageCopy copy { };
+                copy.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+                copy.imageSubresource.mipLevel       = uint32_t(mip);
+                copy.imageSubresource.baseArrayLayer = uint32_t(face);
+                copy.imageSubresource.layerCount     = 1;
+                copy.imageOffset = { 0, 0, 0 };
+                copy.imageExtent = { uint32_t(w), uint32_t(h), 1 };
+                vkCmdCopyBufferToImage(cmd.cb, stagings[idx].buffer, dstImage,
+                                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+                ++idx;
+                w = (w > 1) ? (w >> 1) : 1;
+                h = (h > 1) ? (h >> 1) : 1;
+            }
+        }
+        tracker.ToShaderInput(cmd.cb);
+        if (not EndSingleTimeCommands(cmd))
+            ok = false;
+    }
+    else
+        ok = false;
+
+    for (uint32_t i = 0; i < total; ++i)
+        stagings[i].Destroy();
+    return ok;
+}
+
+// =================================================================================================
 // Upload3DTextureData
 
 bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStride,

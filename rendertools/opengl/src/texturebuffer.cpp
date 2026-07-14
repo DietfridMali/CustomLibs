@@ -374,7 +374,7 @@ static void BoxBlurV(T* dest, T* src, int w, int h, int r)
 using GaussKernel = StaticArray<double, 31>;
 
 static void ComputeKernel(GaussKernel& kernel, int r) {
-    kernel.Clear(0.0);
+    kernel.Clear();
     double sigma = r > 0 ? r * 0.5 : 1.0;
     double s2 = 2.0 * sigma * sigma;
     double norm = 0.0;
