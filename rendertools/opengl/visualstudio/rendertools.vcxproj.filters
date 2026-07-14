@@ -293,6 +293,9 @@
     <ClCompile Include="..\..\src\base_noisetexture.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\ddsloader.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\texture_mips.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>

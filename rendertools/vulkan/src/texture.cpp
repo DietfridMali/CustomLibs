@@ -11,6 +11,7 @@
 #pragma warning(pop)
 
 #include "texture.h"
+#include "ddsloader.h"
 #include "vkcontext.h"
 #include "vkupload.h"
 #include "commandlist.h"
@@ -364,15 +365,9 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
             m_buffers.Append(texBuf);
         }
         else {
-            String fullPath = folder + "/" + fileName;
-            SDL_Surface* image = IMG_Load((const char*)fullPath);
-            if (not image) {
-                if (params.isRequired)
-                    fprintf(stderr, "Texture::Load: failed to load '%s'\n", (const char*)fullPath);
+            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/false);
+            if (not texBuf)
                 return false;
-            }
-            texBuf = new TextureBuffer();
-            texBuf->Create(image, params.premultiply, params.flipVertically);
             m_buffers.Append(texBuf);
         }
     }
@@ -388,6 +383,8 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         return true;
     if (not Load(folder, fileNames, params))
         return false;
+    if (not m_buffers.IsEmpty())
+        m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
     m_useMipMaps = params.useMipMaps;

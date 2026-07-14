@@ -52,7 +52,9 @@ enum class GfxPixelFormat : uint8_t {
     // Block-compressed formats (DDS-backed, GPU-native). Data is organized in 4x4 texel blocks,
     // so GfxPixelStride does not apply — use GfxBlockBytes / GfxIsBlockCompressed instead.
     BC1_UNorm,      // RGB (1-bit punch-through alpha), 8 bytes / 4x4 block  (DXT1)
-    BC7_UNorm       // RGBA, 16 bytes / 4x4 block
+    BC7_UNorm,      // RGBA, 16 bytes / 4x4 block
+    BC4_UNorm,      // 1 channel (grayscale: AO / spec / roughness), 8 bytes / 4x4 block  (RGTC1)
+    BC5_UNorm       // 2 channels (tangent normal XY, Z reconstructed), 16 bytes / 4x4 block  (RGTC2)
 };
 
 // Bytes per pixel (sum across channels). Used by upload paths to compute row strides without
@@ -75,6 +77,8 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
             return 16;
         case GfxPixelFormat::BC1_UNorm:
         case GfxPixelFormat::BC7_UNorm:
+        case GfxPixelFormat::BC4_UNorm:
+        case GfxPixelFormat::BC5_UNorm:
             return 0;   // block-compressed: stride is per 4x4 block, see GfxBlockBytes
     }
     return 0;
@@ -84,7 +88,8 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
 // True for block-compressed (BCn) formats. Their data is stored in 4x4 texel blocks, so the
 // per-pixel GfxPixelStride is meaningless — upload paths must use block math (GfxBlockBytes).
 inline constexpr bool GfxIsBlockCompressed(GfxPixelFormat f) noexcept {
-    return (f == GfxPixelFormat::BC1_UNorm) or (f == GfxPixelFormat::BC7_UNorm);
+    return (f == GfxPixelFormat::BC1_UNorm) or (f == GfxPixelFormat::BC7_UNorm)
+        or (f == GfxPixelFormat::BC4_UNorm) or (f == GfxPixelFormat::BC5_UNorm);
 }
 
 // Bytes per 4x4 texel block for block-compressed formats; 0 for uncompressed formats. A full mip
@@ -92,8 +97,33 @@ inline constexpr bool GfxIsBlockCompressed(GfxPixelFormat f) noexcept {
 inline constexpr uint32_t GfxBlockBytes(GfxPixelFormat f) noexcept {
     switch (f) {
         case GfxPixelFormat::BC1_UNorm:  return 8;
+        case GfxPixelFormat::BC4_UNorm:  return 8;
         case GfxPixelFormat::BC7_UNorm:  return 16;
+        case GfxPixelFormat::BC5_UNorm:  return 16;
         default:                         return 0;
+    }
+}
+
+
+// Game-facing texture-compression descriptor (mirrors the block-compressed GfxPixelFormat values;
+// tcNone = uncompressed). Stored per Texture so game code / shaders can react to it — e.g. tell the
+// wall shader that a normal map is BC5 (2-channel, reconstruct Z) rather than an uncompressed PNG.
+enum eTextureCompression {
+    tcNone = 0,
+    tcBC1,
+    tcBC4,
+    tcBC5,
+    tcBC7
+};
+
+// Map a loaded GfxPixelFormat to the game-facing compression descriptor.
+inline eTextureCompression GfxFormatToCompression(GfxPixelFormat f) noexcept {
+    switch (f) {
+        case GfxPixelFormat::BC1_UNorm: return tcBC1;
+        case GfxPixelFormat::BC4_UNorm: return tcBC4;
+        case GfxPixelFormat::BC5_UNorm: return tcBC5;
+        case GfxPixelFormat::BC7_UNorm: return tcBC7;
+        default:                        return tcNone;
     }
 }
 

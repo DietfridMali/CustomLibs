@@ -102,6 +102,7 @@ public:
     int                         m_tmuIndex{ -1 };
     int                         m_wrapMode{ GL_REPEAT };
     int                         m_useMipMaps{ false };
+    eTextureCompression         m_compression{ tcNone };  // set from the DDS format at load; tcNone = uncompressed / PNG
     bool                        m_hasParams{ false };
     bool                        m_isDeployed{ false };
     bool                        m_isValid{ false };
@@ -269,6 +270,10 @@ public:
         if (m_type == GL_TEXTURE_3D)    return TextureType::Texture3D;
         if (m_type == GL_TEXTURE_CUBE_MAP) return TextureType::CubeMap;
         return TextureType::Texture2D;
+    }
+
+    inline eTextureCompression GetCompression(void) noexcept {
+        return m_compression;
     }
 
     // API-neutral type setter. Lets common code (e.g. base_noisetexture) assign m_type via

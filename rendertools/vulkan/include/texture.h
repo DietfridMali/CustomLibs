@@ -97,6 +97,7 @@ public:
     int                         m_tmuIndex{ -1 };
     GfxWrapMode                 m_wrapMode{ GfxWrapMode::Repeat };
     int                         m_useMipMaps{ false };
+    eTextureCompression         m_compression{ tcNone };  // set from the DDS format at load; tcNone = uncompressed / PNG
     bool                        m_hasParams{ false };
     bool                        m_isValid{ false };
     bool                        m_isDeployed{ false };
@@ -220,6 +221,10 @@ public:
 
     inline TextureType GetTextureType(void) const noexcept {
         return m_type;
+    }
+
+    inline eTextureCompression GetCompression(void) noexcept {
+        return m_compression;
     }
 
     // API-neutral type setter. Common code (e.g. base_noisetexture) calls this; the OGL

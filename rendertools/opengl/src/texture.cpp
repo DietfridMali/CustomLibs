@@ -11,6 +11,7 @@
 #pragma warning(pop)
 
 #include "texture.h"
+#include "ddsloader.h"
 #include "gfxstates.h"
 #include "gfxrenderer.h"
 
@@ -317,9 +318,6 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
     m_filenames = fileNames;
     m_name = fileNames.First();
     TextureBuffer* texBuf = nullptr;
-#ifdef _DEBUG
-    String bufferName = "";
-#endif
     for (auto& fileName : fileNames) {
         if (fileName.IsEmpty()) { // This means that the last previously loaded texture should be used here as well; must never be true for first filename
             if (not texBuf) // must always be true here -> fileNames[0] must always contain a valid filename of an existing texture file
@@ -327,33 +325,13 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
             else {
                 ++(texBuf->m_refCount);
                 m_buffers.Append(texBuf);
-#ifdef _DEBUG
-                texBuf->m_name = bufferName;
-#endif
             }
         }
         else {
-            String fullName = folder + fileName;
-#if 0 // def _DEBUG
-            bufferName = fileName;
-            CheckFileOpen(fullName);
-#endif
-            SDL_Surface* image = IMG_Load(fullName.Data());
-            if (not image) {
-                if (params.isRequired) {
-                    const char* imgError = IMG_GetError();
-                    fprintf(stderr, "Couldn't load '%s (%s)'\n", (char*)(fullName), imgError);
-                }
+            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/false);
+            if (not texBuf)
                 return false;
-            }
-            texBuf = new TextureBuffer();
-            if (texBuf) {
-                texBuf->Create(image, params.premultiply, params.flipVertically);
-                m_buffers.Append(texBuf);
-#ifdef _DEBUG
-                texBuf->m_name = bufferName;
-#endif
-            }
+            m_buffers.Append(texBuf);
         }
     }
     return true;
@@ -367,6 +345,8 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         return true;
     if (not Load(folder, fileNames, params))
         return false;
+    if (not m_buffers.IsEmpty())
+        m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
     if (params.cartoonize)
         Cartoonize(params.blur, params.gradients, params.outline);
     m_useMipMaps = params.useMipMaps;

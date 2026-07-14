@@ -6,6 +6,8 @@
 #include <cstring>
 #include <cstdio>
 #include <fstream>
+#include <string>
+#include <filesystem>
 
 // =================================================================================================
 // DDS parsing. The container is little-endian; every target platform (x64 / ARM64 desktop + Xbox)
@@ -19,6 +21,10 @@ namespace {
 constexpr uint32_t kDDSMagic    = 0x20534444; // 'D','D','S',' '
 constexpr uint32_t kFourCC_DXT1 = 0x31545844; // 'D','X','T','1'
 constexpr uint32_t kFourCC_DX10 = 0x30315844; // 'D','X','1','0'
+constexpr uint32_t kFourCC_ATI1 = 0x31495441; // 'A','T','I','1'  (BC4, classic FourCC)
+constexpr uint32_t kFourCC_BC4U = 0x55344342; // 'B','C','4','U'
+constexpr uint32_t kFourCC_ATI2 = 0x32495441; // 'A','T','I','2'  (BC5, classic FourCC)
+constexpr uint32_t kFourCC_BC5U = 0x55354342; // 'B','C','5','U'
 constexpr uint32_t kDDPF_FOURCC = 0x4;        // DDS_PIXELFORMAT.dwFlags bit: FourCC field is valid
 
 // DXGI_FORMAT values carried by the DX10-extended header. Kept local so this stays platform-neutral
@@ -27,6 +33,8 @@ constexpr uint32_t kDXGI_BC1_UNORM      = 71;
 constexpr uint32_t kDXGI_BC1_UNORM_SRGB = 72;
 constexpr uint32_t kDXGI_BC7_UNORM      = 98;
 constexpr uint32_t kDXGI_BC7_UNORM_SRGB = 99;
+constexpr uint32_t kDXGI_BC4_UNORM      = 80;
+constexpr uint32_t kDXGI_BC5_UNORM      = 83;
 
 // Field offsets inside DDS_HEADER (relative to the byte right after the 4-byte magic).
 constexpr size_t kOffHeight     = 8;
@@ -101,6 +109,12 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
     if (fourCC == kFourCC_DXT1) {
         format = GfxPixelFormat::BC1_UNorm;
     }
+    else if ((fourCC == kFourCC_ATI1) or (fourCC == kFourCC_BC4U)) {
+        format = GfxPixelFormat::BC4_UNorm;
+    }
+    else if ((fourCC == kFourCC_ATI2) or (fourCC == kFourCC_BC5U)) {
+        format = GfxPixelFormat::BC5_UNorm;
+    }
     else if (fourCC == kFourCC_DX10) {
         extraHeader = 20;
         uint8_t dx10[20];
@@ -114,8 +128,12 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
             format = GfxPixelFormat::BC1_UNorm;
         else if ((dxgiFormat == kDXGI_BC7_UNORM) or (dxgiFormat == kDXGI_BC7_UNORM_SRGB))
             format = GfxPixelFormat::BC7_UNorm;
+        else if (dxgiFormat == kDXGI_BC4_UNORM)
+            format = GfxPixelFormat::BC4_UNorm;
+        else if (dxgiFormat == kDXGI_BC5_UNORM)
+            format = GfxPixelFormat::BC5_UNorm;
         else {
-            fprintf(stderr, "LoadDDS: '%s' has unsupported DXGI format %u (need BC1/BC7)\n", name, dxgiFormat);
+            fprintf(stderr, "LoadDDS: '%s' has unsupported DXGI format %u (need BC1/BC4/BC5/BC7)\n", name, dxgiFormat);
             return false;
         }
     }
@@ -171,6 +189,72 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
     }
 
     return true;
+}
+
+// =================================================================================================
+// Unified file loading with automatic DDS preference. One code path for all three backends.
+
+namespace {
+
+// Join folder + name with exactly one separator (folder may or may not already end in a slash).
+std::string JoinPath(const char* folder, const std::string& name) {
+    std::string f = folder ? folder : "";
+    if (f.empty())
+        return name;
+    const char last = f.back();
+    if ((last == '/') or (last == '\\'))
+        return f + name;
+    return f + "/" + name;
+}
+
+// If a sibling "<base>.dds" exists next to fileName, return its name; otherwise return fileName.
+// Only the extension is swapped; any directory part of the name is preserved.
+std::string PreferDDSName(const char* folder, const std::string& fileName) {
+    const size_t dot   = fileName.find_last_of('.');
+    const size_t slash = fileName.find_last_of("/\\");
+    if ((dot == std::string::npos) or ((slash != std::string::npos) and (dot < slash)))
+        return fileName;   // no extension to swap
+    const std::string ddsName = fileName.substr(0, dot) + ".dds";
+    std::error_code ec;
+    if (std::filesystem::exists(JoinPath(folder, ddsName), ec))
+        return ddsName;
+    return fileName;
+}
+
+} // namespace
+
+
+TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
+                               bool premultiply, bool flipVertically, bool isRequired,
+                               bool allowDDS) noexcept
+{
+    const char* folderC = (const char*) folder;
+    std::string wanted  = (const char*) fileName;
+    if (allowDDS)
+        wanted = PreferDDSName(folderC, wanted);
+
+    const std::string full = JoinPath(folderC, wanted);
+    const String      fullPath(full.c_str());
+
+    TextureBuffer* buf = new TextureBuffer();
+
+    if (IsDDSFile(fullPath)) {
+        if (not LoadDDS(fullPath, *buf)) {
+            delete buf;
+            return nullptr;
+        }
+        return buf;
+    }
+
+    SDL_Surface* image = IMG_Load(full.c_str());
+    if (not image) {
+        if (isRequired)
+            fprintf(stderr, "LoadTextureFile: failed to load '%s'\n", full.c_str());
+        delete buf;
+        return nullptr;
+    }
+    buf->Create(image, premultiply, flipVertically);
+    return buf;
 }
 
 // =================================================================================================

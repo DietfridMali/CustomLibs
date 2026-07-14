@@ -35,3 +35,16 @@ inline bool IsDDSFile(const String& path) noexcept {
 bool LoadDDS(const String& path, TextureBuffer& buf) noexcept;
 
 // =================================================================================================
+// Unified texture-file loader shared by every backend's Texture::Load, so the DDS-vs-PNG decision
+// (and the path joining) lives in exactly one place. Returns a newly-allocated TextureBuffer (the
+// caller owns it) or nullptr on failure (logged to stderr when isRequired).
+//   • allowDDS && a sibling "<base>.dds" exists next to fileName  → load that DDS
+//   • fileName already ends in ".dds"                             → load it as DDS
+//   • otherwise                                                   → SDL image loader (PNG etc.)
+// allowDDS is passed false by backends whose Deploy can't upload block-compressed data yet.
+
+TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
+                               bool premultiply, bool flipVertically, bool isRequired,
+                               bool allowDDS) noexcept;
+
+// =================================================================================================
