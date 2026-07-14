@@ -48,7 +48,11 @@ enum class GfxPixelFormat : uint8_t {
     R16_SFloat,
     R32_SFloat,
     RGBA16_SFloat,
-    RGBA32_SFloat
+    RGBA32_SFloat,
+    // Block-compressed formats (DDS-backed, GPU-native). Data is organized in 4x4 texel blocks,
+    // so GfxPixelStride does not apply — use GfxBlockBytes / GfxIsBlockCompressed instead.
+    BC1_UNorm,      // RGB (1-bit punch-through alpha), 8 bytes / 4x4 block  (DXT1)
+    BC7_UNorm       // RGBA, 16 bytes / 4x4 block
 };
 
 // Bytes per pixel (sum across channels). Used by upload paths to compute row strides without
@@ -69,8 +73,28 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
             return 8;
         case GfxPixelFormat::RGBA32_SFloat:  
             return 16;
+        case GfxPixelFormat::BC1_UNorm:
+        case GfxPixelFormat::BC7_UNorm:
+            return 0;   // block-compressed: stride is per 4x4 block, see GfxBlockBytes
     }
     return 0;
+}
+
+
+// True for block-compressed (BCn) formats. Their data is stored in 4x4 texel blocks, so the
+// per-pixel GfxPixelStride is meaningless — upload paths must use block math (GfxBlockBytes).
+inline constexpr bool GfxIsBlockCompressed(GfxPixelFormat f) noexcept {
+    return (f == GfxPixelFormat::BC1_UNorm) or (f == GfxPixelFormat::BC7_UNorm);
+}
+
+// Bytes per 4x4 texel block for block-compressed formats; 0 for uncompressed formats. A full mip
+// level occupies ceil(w/4) * ceil(h/4) * GfxBlockBytes bytes.
+inline constexpr uint32_t GfxBlockBytes(GfxPixelFormat f) noexcept {
+    switch (f) {
+        case GfxPixelFormat::BC1_UNorm:  return 8;
+        case GfxPixelFormat::BC7_UNorm:  return 16;
+        default:                         return 0;
+    }
 }
 
 // =================================================================================================

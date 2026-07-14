@@ -21,6 +21,8 @@
 #include "dx12upload.h"
 #include "resource_handler.h"
 #include "texture_mips.h"
+#include "gfxpixelformat_dx.h"
+#include "ddsloader.h"
 
 // =================================================================================================
 // DX12 Texture implementation
@@ -198,7 +200,7 @@ void Texture::SetParams(bool forceUpdate)
 }
 
 
-bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels)
+bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, DXGI_FORMAT format)
 {
     ID3D12Device* device = dx12Context.Device();
     if (not device) {
@@ -213,13 +215,14 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels)
     rd.Height = UINT(h);
     rd.DepthOrArraySize = UINT16(arraySize);
     rd.MipLevels = UINT16(mipLevels);
-    rd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    m_dxgiFormat = format;
+    rd.Format = m_dxgiFormat;
     rd.SampleDesc.Count = 1;
     rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
     HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource));
     if (FAILED(hr)) {
-        fprintf(stderr, "Texture::CreateTextureResource: CreateCommittedResource failed" " (name='%s', %dx%d, arraySize=%d, R8G8B8A8_UNORM, hr=0x%08X)\n", (const char*)m_name, w, h, arraySize, (unsigned)hr);
+        fprintf(stderr, "Texture::CreateTextureResource: CreateCommittedResource failed" " (name='%s', %dx%d, arraySize=%d, DXGI_FORMAT=%u, hr=0x%08X)\n", (const char*)m_name, w, h, arraySize, (unsigned)m_dxgiFormat, (unsigned)hr);
         HRESULT removed = device->GetDeviceRemovedReason();
         if (FAILED(removed)) {
             fprintf(stderr, "  device removed (reason=0x%08X) - earlier GPU work faulted\n", (unsigned)removed);
@@ -252,11 +255,12 @@ bool Texture::CreateSRV(void)
     }
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srvDesc.Format = m_dxgiFormat;
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     if (m_type == TextureType::CubeMap) {
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-        srvDesc.TextureCube.MipLevels = 1;
+        // Expose the full mip chain (1 for the uncompressed cubemaps, N for BC skyboxes with mips).
+        srvDesc.TextureCube.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
     }
     else {
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
@@ -285,17 +289,28 @@ bool Texture::Deploy(int bufferIndex)
     if (w <= 0 or h <= 0)
         return false;
 
-    const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
-    if (not CreateTextureResource(w, h, 1, int(mipLevels)))
-        return false;
-    const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-    const int channels = tb->m_info.m_componentCount;
-    if (mipLevels > 1) {
-        if (not UploadTextureDataWithMips(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels, mipLevels))
+    const GfxPixelFormat gfxFmt = tb->m_info.m_gfxFormat;
+    if (GfxIsBlockCompressed(gfxFmt)) {
+        const int mipCount = tb->m_info.m_mipCount;
+        if (not CreateTextureResource(w, h, 1, mipCount, ToDXGIFormat(gfxFmt)))
+            return false;
+        const uint8_t* face = static_cast<const uint8_t*>(tb->DataBuffer());
+        if (not UploadCompressedData(dx12Context.Device(), m_resource.Get(), &face, 1, w, h, gfxFmt, mipCount))
             return false;
     }
-    else if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels))
-        return false;
+    else {
+        const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
+        if (not CreateTextureResource(w, h, 1, int(mipLevels)))
+            return false;
+        const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
+        const int channels = tb->m_info.m_componentCount;
+        if (mipLevels > 1) {
+            if (not UploadTextureDataWithMips(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels, mipLevels))
+                return false;
+        }
+        else if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels))
+            return false;
+    }
     if (not CreateSRV())
         return false;
     SetParams();
@@ -325,15 +340,26 @@ bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreatio
         }
         else {
             String fullPath = folder + "/" + fileName;
-            SDL_Surface* image = IMG_Load((const char*)fullPath);
-            if (not image) {
-                if (params.isRequired)
-                    fprintf(stderr, "Texture::Load: failed to load '%s'\n", (const char*)fullPath);
-                return false;
+            if (IsDDSFile(fileName)) {
+                texBuf = new TextureBuffer();
+                if (not LoadDDS(fullPath, *texBuf)) {
+                    delete texBuf;
+                    texBuf = nullptr;
+                    return false;
+                }
+                m_buffers.Append(texBuf);
             }
-            texBuf = new TextureBuffer();
-            texBuf->Create(image, params.premultiply, params.flipVertically);
-            m_buffers.Append(texBuf);
+            else {
+                SDL_Surface* image = IMG_Load((const char*)fullPath);
+                if (not image) {
+                    if (params.isRequired)
+                        fprintf(stderr, "Texture::Load: failed to load '%s'\n", (const char*)fullPath);
+                    return false;
+                }
+                texBuf = new TextureBuffer();
+                texBuf->Create(image, params.premultiply, params.flipVertically);
+                m_buffers.Append(texBuf);
+            }
         }
     }
     return true;

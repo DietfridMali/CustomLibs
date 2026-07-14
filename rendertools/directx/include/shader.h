@@ -234,17 +234,17 @@ public:
 
     int SetMatrix4f(const char* name, const float* data, bool transpose = false) noexcept;
     int SetMatrix4f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {
-        return SetMatrix4f(name, data.Data(), transpose);
+        return SetMatrix4f(name, data.DataPtr(), transpose);
     }
 
     int SetMatrix3f(const char* name, float* data, bool transpose = false) noexcept;
     int SetMatrix3f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {
-        return SetMatrix3f(name, data.Data(), transpose);
+        return SetMatrix3f(name, data.DataPtr(), transpose);
     }
 
     int SetFloatArray(const char* name, const float* data, size_t length) noexcept;
     int SetFloatArray(const char* name, const AutoArray<float>& data) noexcept {
-        return SetFloatArray(name, data.Data(), data.Length());
+        return SetFloatArray(name, data.DataPtr(), data.Length());
     }
 
     int SetVector2fArray(const char* name, const Vector2f* data, int length) noexcept;

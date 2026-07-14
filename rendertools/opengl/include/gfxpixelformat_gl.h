@@ -27,6 +27,10 @@ inline constexpr GLFormat ToGLFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::R32_SFloat:     return { GL_R32F,    GL_RED,  GL_FLOAT };
         case GfxPixelFormat::RGBA16_SFloat:  return { GL_RGBA16F, GL_RGBA, GL_FLOAT };
         case GfxPixelFormat::RGBA32_SFloat:  return { GL_RGBA32F, GL_RGBA, GL_FLOAT };
+        // Block-compressed: externalFormat/type are ignored by glCompressedTexImage2D, but the
+        // struct needs values — keep the nominal channel layout for documentation.
+        case GfxPixelFormat::BC1_UNorm:      return { GL_COMPRESSED_RGB_S3TC_DXT1_EXT, GL_RGB,  GL_UNSIGNED_BYTE };
+        case GfxPixelFormat::BC7_UNorm:      return { GL_COMPRESSED_RGBA_BPTC_UNORM,   GL_RGBA, GL_UNSIGNED_BYTE };
     }
     return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
 }

@@ -48,6 +48,11 @@ public:
         GLenum  m_internalFormat;
         GLenum  m_format;
         int     m_dataSize;
+        // Set by the DDS path for block-compressed / mip-mapped assets; the SDL (PNG) path keeps
+        // the defaults (RGBA8, one mip) so existing loads are unaffected. For BC data
+        // m_componentCount == 0 and m_dataSize is the total byte size across all mip levels.
+        GfxPixelFormat  m_gfxFormat{ GfxPixelFormat::RGBA8_UNorm };
+        int             m_mipCount{ 1 };
 
         BufferInfo(int width = 0, int height = 0, int componentCount = 0, int internalFormat = 0, int format = 0)
             : m_width(width)
@@ -68,6 +73,8 @@ public:
             m_internalFormat = 0;
             m_format = 0;
             m_dataSize = 0;
+            m_gfxFormat = GfxPixelFormat::RGBA8_UNorm;
+            m_mipCount = 1;
         }
     };
 

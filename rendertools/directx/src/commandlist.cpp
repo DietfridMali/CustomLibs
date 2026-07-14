@@ -470,7 +470,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     fprintf(stderr, "\n");
 #endif
     if (n > 0)
-        m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.Data());
+        m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
 #if DBG_DIRECTX
     gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;

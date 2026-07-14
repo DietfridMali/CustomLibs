@@ -43,7 +43,7 @@ bool MovingFrameCounter::Start(void) {
 
 void MovingFrameCounter::Reset(void) {
     BaseFrameCounter::Reset();
-    m_movingFrameTimes.fill(0);
+    m_movingFrameTimes.Clear(0);
     m_movingTotalTicks = 0;
     m_movingFrameIndex = 0;
     m_movingFrameCount = 0;

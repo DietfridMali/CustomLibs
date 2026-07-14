@@ -16,6 +16,8 @@ inline constexpr DXGI_FORMAT ToDXGIFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::R32_SFloat:     return DXGI_FORMAT_R32_FLOAT;
         case GfxPixelFormat::RGBA16_SFloat:  return DXGI_FORMAT_R16G16B16A16_FLOAT;
         case GfxPixelFormat::RGBA32_SFloat:  return DXGI_FORMAT_R32G32B32A32_FLOAT;
+        case GfxPixelFormat::BC1_UNorm:      return DXGI_FORMAT_BC1_UNORM;
+        case GfxPixelFormat::BC7_UNorm:      return DXGI_FORMAT_BC7_UNORM;
     }
     return DXGI_FORMAT_UNKNOWN;
 }

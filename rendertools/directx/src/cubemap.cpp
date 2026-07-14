@@ -5,6 +5,7 @@
 #include "descriptor_heap.h"
 #include "dx12context.h"
 #include "dx12upload.h"
+#include "gfxpixelformat_dx.h"
 
 // =================================================================================================
 // DX12 Cubemap implementation
@@ -35,15 +36,27 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
     if (w <= 0 or h <= 0)
         return false;
 
-    if (not CreateTextureResource(w, h, 6))
-        return false;
-
+    // Assemble the 6 faces (fewer buffers repeat the last one across the remaining faces — the
+    // "same texture on several faces without reloading" case the loader supports).
     int faceCount = m_buffers.Length();
     const uint8_t* faces[6];
     for (int i = 0; i < 6; ++i)
         faces[i] = m_buffers[i < faceCount ? i : faceCount - 1]->DataBuffer();
-    if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), faces, 6, w, h, 4))
-        return false;
+
+    const GfxPixelFormat fmt = first->m_info.m_gfxFormat;
+    if (GfxIsBlockCompressed(fmt)) {
+        const int mipCount = first->m_info.m_mipCount;
+        if (not CreateTextureResource(w, h, 6, mipCount, ToDXGIFormat(fmt)))
+            return false;
+        if (not UploadCompressedData(dx12Context.Device(), m_resource.Get(), faces, 6, w, h, fmt, mipCount))
+            return false;
+    }
+    else {
+        if (not CreateTextureResource(w, h, 6))
+            return false;
+        if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), faces, 6, w, h, 4))
+            return false;
+    }
 
     if (not CreateSRV())
         return false;

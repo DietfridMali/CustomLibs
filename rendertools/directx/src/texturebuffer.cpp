@@ -245,8 +245,8 @@ static void ComputeOutline(RGBA8* colorBuffer, uint8_t* maskBuffer, int w, int h
 
 static void Outline(RGBA8* colorBuffer, int w, int h, int nPasses) {
     AutoArray<uint8_t> maskBuffer(w * h);
-    PrepareOutline(colorBuffer, maskBuffer.Data(), w * h);
-    ComputeOutline(colorBuffer, maskBuffer.Data(), w, h, nPasses);
+    PrepareOutline(colorBuffer, maskBuffer.DataPtr(), w * h);
+    ComputeOutline(colorBuffer, maskBuffer.DataPtr(), w, h, nPasses);
 }
 
 
@@ -373,7 +373,7 @@ static void BoxBlurV(T* dest, T* src, int w, int h, int r)
 using GaussKernel = StaticArray<double, 31>;
 
 static void ComputeKernel(GaussKernel& kernel, int r) {
-    kernel.fill(0.0);
+    kernel.Fill(0.0);
     double sigma = r > 0 ? r * 0.5 : 1.0;
     double s2 = 2.0 * sigma * sigma;
     double norm = 0.0;
@@ -501,12 +501,12 @@ void TextureBuffer::BoxBlur(uint16_t strength) {
 void TextureBuffer::GaussBlur(uint16_t strength) {
     if (m_info.m_componentCount == 3) {
         AutoArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
-        GaussBlurH<RGB8>(blurBuffer.Data(), reinterpret_cast<RGB8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
-        GaussBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurH<RGB8>(blurBuffer.Data(), reinterpret_cast<RGB8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, int(strength));
     }
     else if (m_info.m_componentCount == 4) {
         AutoArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
-        GaussBlurH<RGBA8>(blurBuffer.Data(), reinterpret_cast<RGBA8*>(m_data.Data()), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurH<RGBA8>(blurBuffer.DataPtr(), reinterpret_cast<RGBA8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
         GaussBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.Data()), blurBuffer.Data(), m_info.m_width, m_info.m_height, int(strength));
     }
 }

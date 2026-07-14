@@ -82,6 +82,7 @@ public:
     uint32_t                    m_handle{ UINT32_MAX };
 
     ComPtr<ID3D12Resource>      m_resource;   // default-heap resource (D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+    DXGI_FORMAT                 m_dxgiFormat{ DXGI_FORMAT_R8G8B8A8_UNORM };  // GPU format of m_resource + its SRV
     String                      m_name;
     List<TextureBuffer*>        m_buffers;
     List<String>                m_filenames;
@@ -256,7 +257,7 @@ public:
         m_isDeployed = false;
     }
 
-    bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1);
+    bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
 
     bool CreateSRV(void);
 

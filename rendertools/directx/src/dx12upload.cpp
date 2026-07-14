@@ -186,6 +186,102 @@ bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource
 }
 
 
+// =================================================================================================
+// Block-compressed (BC1/BC7) upload. GetCopyableFootprints understands BC formats: for a BC
+// subresource it returns NumRows = ceil(height/4) block-rows and RowSizeInBytes = ceil(width/4) *
+// blockBytes, with RowPitch padded to D3D12_TEXTURE_DATA_PITCH_ALIGNMENT. We copy the packed source
+// row-by-row into that padded pitch — same shape as UploadSubresource, but the row geometry comes
+// from the footprint instead of width*channels.
+
+static bool UploadSubresourceBlocks(ID3D12Device* device, ID3D12GraphicsCommandList* list,
+                                    ID3D12Resource* dstResource, UINT subresource,
+                                    const uint8_t* src, UINT srcRowBytes,
+                                    ComPtr<ID3D12Resource>& outUpload) noexcept
+{
+    D3D12_RESOURCE_DESC dstDesc = dstResource->GetDesc();
+
+    UINT64 uploadSize = 0;
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+    UINT   rowCount = 0;
+    UINT64 rowSize  = 0;
+    device->GetCopyableFootprints(&dstDesc, subresource, 1, 0, &layout, &rowCount, &rowSize, &uploadSize);
+    layout.Offset = 0;
+
+    outUpload = gfxResourceHandler.GetUploadResource("", size_t(UINT64(layout.Footprint.RowPitch) * rowCount));
+    if (not outUpload)
+        return false;
+
+    uint8_t* destBuffer = nullptr;
+    D3D12_RANGE mapRange{ 0, 0 };
+    if (FAILED(outUpload->Map(0, &mapRange, (void**)&destBuffer)))
+        return false;
+
+    const UINT copyBytes = (srcRowBytes < UINT(rowSize)) ? srcRowBytes : UINT(rowSize);
+    for (UINT r = 0; r < rowCount; ++r)
+        std::memcpy(destBuffer + size_t(r) * layout.Footprint.RowPitch, src + size_t(r) * srcRowBytes, copyBytes);
+    outUpload->Unmap(0, nullptr);
+
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+    srcLoc.pResource        = outUpload.Get();
+    srcLoc.Type             = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    srcLoc.PlacedFootprint  = layout;
+    dstLoc.pResource        = dstResource;
+    dstLoc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dstLoc.SubresourceIndex = subresource;
+    list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+    return true;
+}
+
+
+bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces,
+                          int faceCount, int width, int height, GfxPixelFormat fmt, int mipCount) noexcept
+{
+    if ((faceCount < 1) or (mipCount < 1))
+        return false;
+    const uint32_t blockBytes = GfxBlockBytes(fmt);
+    if (blockBytes == 0)
+        return false;   // caller passed a non-block-compressed format
+
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadCompressedData"));
+    if (not cl)
+        return false;
+
+    // One staging buffer per (face, mip), kept alive until the list is flushed.
+    AutoArray<ComPtr<ID3D12Resource>> uploads;
+    uploads.Resize(uint32_t(faceCount * mipCount));
+    uint32_t uploadIdx = 0;
+    bool ok = true;
+
+    for (int face = 0; ok and (face < faceCount); ++face) {
+        const uint8_t* level = faces[face];   // start of this face's packed mip chain (level 0 first)
+        uint32_t w = uint32_t(width), h = uint32_t(height);
+        for (int mip = 0; mip < mipCount; ++mip) {
+            const uint32_t blocksW     = (w + 3u) / 4u;
+            const uint32_t blocksH     = (h + 3u) / 4u;
+            const uint32_t srcRowBytes = blocksW * blockBytes;
+            const uint32_t levelBytes  = srcRowBytes * blocksH;
+            // D3D12 subresource index for (arraySlice = face, mipSlice = mip) is mip + face * mipCount.
+            const UINT subresource = UINT(mip + face * mipCount);
+            if (not UploadSubresourceBlocks(device, cl->GfxList(), dstResource, subresource, level, srcRowBytes, uploads[uploadIdx++])) {
+                ok = false;
+                break;
+            }
+            level += levelBytes;
+            w = (w > 1u) ? (w >> 1) : 1u;
+            h = (h > 1u) ? (h >> 1) : 1u;
+        }
+    }
+
+    if (not ok) {
+        baseRenderer.FinishOperation(cl);
+        return false;
+    }
+    SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    return baseRenderer.FinishOperation(cl, true);
+}
+
+// =================================================================================================
+
 ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept
 {
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };

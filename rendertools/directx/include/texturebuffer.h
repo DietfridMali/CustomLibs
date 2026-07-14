@@ -47,6 +47,11 @@ public:
         uint32_t    m_internalFormat;
         uint32_t    m_format;
         int32_t     m_dataSize;
+        // Set by the DDS path for block-compressed / mip-mapped assets; the SDL (PNG) path keeps
+        // the defaults (RGBA8, one mip) so existing loads are unaffected. For BC data
+        // m_componentCount == 0 and m_dataSize is the total byte size across all mip levels.
+        GfxPixelFormat  m_gfxFormat{ GfxPixelFormat::RGBA8_UNorm };
+        int32_t         m_mipCount{ 1 };
 
         BufferInfo(int32_t width = 0, int32_t height = 0, int32_t componentCount = 0, uint32_t internalFormat = 0, uint32_t format = 0)
             : m_width(width)
@@ -67,6 +72,8 @@ public:
             m_internalFormat = 0;
             m_format = 0;
             m_dataSize = 0;
+            m_gfxFormat = GfxPixelFormat::RGBA8_UNorm;
+            m_mipCount = 1;
         }
     };
 

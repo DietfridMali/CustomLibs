@@ -16,18 +16,21 @@
 template<typename DATA_T>
 class AutoArray {
 private:
-    std::vector<DATA_T> m_array;
-    int32_t             m_width{ 0 };
-    int32_t             m_height{ 0 };
-    bool                m_autoFit{ false };
-    bool                m_isShrinkable{ true };
-    DATA_T              m_defaultValue{};
-    int32_t             m_pos{ 0 };
+    using DataArray = std::vector<DATA_T>;
+
+    DataArray               m_array;
+    DataArray*              m_arrayPtr{ &m_array };
+    int32_t                 m_width{ 0 };
+    int32_t                 m_height{ 0 };
+    bool                    m_autoFit{ false };
+    bool                    m_isShrinkable{ true };
+    DATA_T                  m_defaultValue{};
+    int32_t                 m_pos{ 0 };
 
 public:
 	static const int32_t MaxIndex = std::numeric_limits<int32_t>::max();
 
-    // Konstruktor f�r 1D-AutoArray
+    // Konstruktor fuer 1D-AutoArray
     inline AutoArray(int32_t size = 0)
         : m_array(static_cast<size_t>(std::max<int32_t>(size, 0))) {
     }
@@ -51,7 +54,7 @@ public:
     }
 
     AutoArray(const AutoArray& other)
-        : m_array(other.m_array),
+        : m_array(*other.m_arrayPtr),
         m_width(other.m_width),
         m_height(other.m_height),
         m_autoFit(other.m_autoFit),
@@ -62,19 +65,25 @@ public:
 
     // Move-Konstruktor
     AutoArray(AutoArray&& other) noexcept
-        : m_array(std::move(other.m_array)),
-        m_width(std::exchange(other.m_width, 0)),
+        : m_width(std::exchange(other.m_width, 0)),
         m_height(std::exchange(other.m_height, 0)),
         m_autoFit(std::exchange(other.m_autoFit, false)),
         m_isShrinkable(std::exchange(other.m_isShrinkable, true)),
         m_defaultValue(std::move(other.m_defaultValue))
     {
+        if (other.IsArrayOwner()) {
+            m_array = std::move(other.m_array);
+        }
+        else {
+            m_arrayPtr = other.m_arrayPtr;
+            other.m_arrayPtr = &other.m_array;
+        }
     }
 
     // Copy-Zuweisungsoperator
     AutoArray& operator=(const AutoArray& other) {
         if (this != &other) {
-            m_array = other.m_array;
+            (*m_arrayPtr) = (*other.m_arrayPtr);
             m_width = other.m_width;
             m_height = other.m_height;
             m_autoFit = other.m_autoFit;
@@ -87,7 +96,16 @@ public:
     // Move-Zuweisungsoperator
     AutoArray& operator=(AutoArray&& other) noexcept {
         if (this != &other) {
-            m_array = std::move(other.m_array);
+            if (other.IsArrayOwner()) {
+                m_arrayPtr = &m_array;
+                m_array = std::move(other.m_array);
+            }
+            else {
+                m_array.clear();
+                m_array.shrink_to_fit();
+                m_arrayPtr = other.m_arrayPtr;
+                other.m_arrayPtr = &other.m_array;
+            }
             m_width = std::exchange(other.m_width, 0);
             m_height = std::exchange(other.m_height, 0);
             m_autoFit = std::exchange(other.m_autoFit, false);
@@ -97,18 +115,30 @@ public:
         return *this;
     }
 
+    inline DataArray* ArrayPtr(void) noexcept {
+        return m_arrayPtr;
+    }
+
+    inline void ShareBuffer(DataArray* other = nullptr) {
+        m_arrayPtr = other ? other : &m_array;
+    }
+
+    bool IsArrayOwner(void) noexcept {
+        return m_arrayPtr == &m_array;
+    }
+
     AutoArray& operator=(std::initializer_list<DATA_T> data) {
-        m_array = data;
+        (*m_arrayPtr) = data;
         return *this;
     }
 
     inline int32_t Capacity(void) const noexcept { 
-        return static_cast<int32_t>(m_array.capacity()); 
+        return static_cast<int32_t>(m_arrayPtr->capacity()); 
     }
 
     // Zugriff auf Laenge
     inline int32_t Length(void) const noexcept { 
-        return static_cast<int32_t>(m_array.size()); 
+        return static_cast<int32_t>(m_arrayPtr->size()); 
     }
 
     inline bool IsEmpty(void) const noexcept { 
@@ -126,7 +156,7 @@ public:
         if (ValidatedSize(static_cast<size_t>(i)) < 0)
             return -1;
         if (i >= Length())
-            m_array.resize(static_cast<size_t>(i) + 1, m_defaultValue);
+            m_arrayPtr->resize(static_cast<size_t>(i) + 1, m_defaultValue);
         return i;
     }
 
@@ -135,17 +165,17 @@ public:
 		if (AutoFit(i) < 0)
             throw std::out_of_range("AutoArray::operator[]: index out of range");
 #if defined(_DEBUG)
-        return m_array.at(static_cast<size_t>(i));
+        return m_arrayPtr->at(static_cast<size_t>(i));
 #else
-        return m_array[static_cast<size_t>(i)];
+        return (*m_arrayPtr)[static_cast<size_t>(i)];
 #endif
     }
 
     inline decltype(auto) operator[](int32_t i) const {
 #if defined(_DEBUG)
-        return m_array.at(static_cast<size_t>(i));
+        return m_arrayPtr->at(static_cast<size_t>(i));
 #else
-        return m_array[static_cast<size_t>(i)];
+        return (*m_arrayPtr)[static_cast<size_t>(i)];
 #endif
     }
 
@@ -156,9 +186,9 @@ public:
         int32_t i = AutoFit(ValidatedSize(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)));
         if (i < 0)
             throw std::out_of_range("AutoArray::operator(): indices out of range");
-        return m_array.at(static_cast<size_t>(i));
+        return m_arrayPtr->at(static_cast<size_t>(i));
 #else
-        return m_array[static_cast<size_t>(y * m_width + x)];
+        return (*m_arrayPtr)[static_cast<size_t>(y * m_width + x)];
 #endif
     }
 
@@ -194,15 +224,15 @@ public:
     inline const DATA_T& operator()(int32_t x, int32_t y) const {
         assert(m_width > 0 and m_height > 0);
 #if defined(_DEBUG)
-        return m_array.at(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x));
+        return m_arrayPtr->at(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x));
 #else
-        return m_array[static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)];
+        return (*m_arrayPtr)[static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)];
 #endif
     }
 
     void Append(const DATA_T& data) { 
         if (Length() < MaxIndex)
-            m_array.push_back(data);
+            m_arrayPtr->push_back(data);
     }
 
     AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
@@ -210,9 +240,9 @@ public:
 		if (size >= 0) {
             Reserve(size);
             if (copyData)
-                m_array.insert(m_array.end(), other.begin(), other.end());
+                m_arrayPtr->insert(m_arrayPtr->end(), other.begin(), other.end());
             else {
-                m_array.insert(m_array.end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
+                m_arrayPtr->insert(m_arrayPtr->end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
                 other.Clear();
             }
         }
@@ -237,30 +267,30 @@ public:
         AutoArray result;
         int32_t size = ValidatedSize(Length() + other.Length());
         if (size >= 0) {
-            result.m_array.reserve(static_cast<size_t>(size));
-            result.m_array.insert(result.m_array.end(), m_array.begin(), m_array.end());
-            result.m_array.insert(result.m_array.end(), other.m_array.begin(), other.m_array.end());
+            result.m_arrayPtr->reserve(static_cast<size_t>(size));
+            result.m_arrayPtr->insert(result.m_arrayPtr->end(), m_arrayPtr->begin(), m_arrayPtr->end());
+            result.m_arrayPtr->insert(result.m_arrayPtr->end(), other.m_arrayPtr->begin(), other.m_arrayPtr->end());
         }
         return result;
     }
 
 
     void Fill(DATA_T value) noexcept {
-        std::fill(m_array.begin(), m_array.end(), value);
+        std::fill(m_arrayPtr->begin(), m_arrayPtr->end(), value);
     }
 
 
     DATA_T* Append(void) {
 		if (Length() == MaxIndex)
             return nullptr;
-        m_array.emplace_back();
-        return &m_array.back();
+        m_arrayPtr->emplace_back();
+        return &m_arrayPtr->back();
     }
 
 
     bool Push(DATA_T data) { 
         if (Length() < MaxIndex) {
-            m_array.push_back(data);
+            m_arrayPtr->push_back(data);
             return true;
         }
         return false;
@@ -268,10 +298,10 @@ public:
 
 
     DATA_T Pop(void) {
-        if (m_array.empty())
+        if (m_arrayPtr->empty())
             return DATA_T();
-        DATA_T data = m_array.back();
-        m_array.pop_back();
+        DATA_T data = m_arrayPtr->back();
+        m_arrayPtr->pop_back();
         return data;
     }
 
@@ -281,25 +311,30 @@ public:
         auto argCount = sizeof...(Args);
 		if (size_t(Length()) + argCount > static_cast<size_t>(MaxIndex))
             return nullptr;
-        m_array.emplace_back(std::forward<Args>(args)...);
-        return &m_array.back();
+        m_arrayPtr->emplace_back(std::forward<Args>(args)...);
+        return &m_arrayPtr->back();
     }
+
+    inline DATA_T* Data(void) noexcept {
+        return m_arrayPtr->data();
+    }
+
 #if 0
     // Zeiger auf Rohdaten (z.B. fuer OpenGL)
     inline DATA_T* DataPtr(int32_t i = 0) noexcept { 
-        return m_array.data() + i; 
+        return m_arrayPtr->data() + i; 
     }
 
     inline const DATA_T* DataPtr(int32_t i = 0) const noexcept { 
-        return m_array.data() + i; 
+        return m_arrayPtr->data() + i; 
     }
 #else
     inline auto DataPtr(int32_t i = 0) noexcept { 
-        return m_array.data() + i; 
+        return m_arrayPtr->data() + i; 
     }
 
     inline auto DataPtr(int32_t i = 0) const noexcept { 
-        return m_array.data() + i; 
+        return m_arrayPtr->data() + i; 
     }
 #endif
     DATA_T* DataRow(int32_t y) {
@@ -312,7 +347,7 @@ public:
 
     inline void Reserve(int32_t capacity) {
         if (ValidatedSize(capacity) > -1)
-            m_array.reserve(static_cast<size_t>(capacity));
+            m_arrayPtr->reserve(static_cast<size_t>(capacity));
     }
 
     inline bool AllowResize(size_t newSize) const noexcept { 
@@ -322,19 +357,19 @@ public:
     // Resize-Methoden
     inline DATA_T* Resize(int32_t newSize) {
         if (AllowResize(static_cast<size_t>(newSize)))
-            m_array.resize(static_cast<size_t>(newSize));
+            m_arrayPtr->resize(static_cast<size_t>(newSize));
         return DataPtr();
     }
 
     inline DATA_T* Resize(int32_t newSize, const DATA_T& value) {
         if (AllowResize(static_cast<size_t>(newSize)))
-            m_array.resize(static_cast<size_t>(newSize), value);
+            m_arrayPtr->resize(static_cast<size_t>(newSize), value);
         return DataPtr();
     }
 
     inline DATA_T* Resize(int32_t width, int32_t height) {
 		if (ValidatedSize2D(width, height) > -1) {
-            m_array.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
+            m_arrayPtr->resize(static_cast<size_t>(width) * static_cast<size_t>(height));
             m_width = width;
             m_height = height;
         }
@@ -342,49 +377,52 @@ public:
     }
 
     inline void Clear(void) {
-        m_array.clear();
+        if (IsArrayOwner())
+            m_arrayPtr->clear();
     }
 
     inline void Reset(void) {
-        m_array.clear();
-        m_array.shrink_to_fit();
+        if (IsArrayOwner()) {
+            m_arrayPtr->clear();
+            m_arrayPtr->shrink_to_fit();
+        }
     }
 
     inline void Destroy(void) {
         Reset();
     }
 
-    inline auto begin() noexcept { return m_array.begin(); }
+    inline auto begin() noexcept { return m_arrayPtr->begin(); }
 
-    inline auto end() noexcept { return m_array.end(); }
+    inline auto end() noexcept { return m_arrayPtr->end(); }
 
-    inline auto begin() const noexcept { return m_array.begin(); }
+    inline auto begin() const noexcept { return m_arrayPtr->begin(); }
 
-    inline auto end() const noexcept { return m_array.end(); }
+    inline auto end() const noexcept { return m_arrayPtr->end(); }
 
-    inline auto rbegin() noexcept { return m_array.rbegin(); }
+    inline auto rbegin() noexcept { return m_arrayPtr->rbegin(); }
 
-    inline auto rend() noexcept { return m_array.rend(); }
+    inline auto rend() noexcept { return m_arrayPtr->rend(); }
 
-    inline auto rbegin() const noexcept { return m_array.rbegin(); }
+    inline auto rbegin() const noexcept { return m_arrayPtr->rbegin(); }
 
-    inline auto rend() const noexcept { return m_array.rend(); }
+    inline auto rend() const noexcept { return m_arrayPtr->rend(); }
 
     // Typecast-Operator zu std::vector<DATA_T>
-    inline operator std::vector<DATA_T>& () noexcept { return m_array; }
+    inline operator std::vector<DATA_T>& () noexcept { return (*m_arrayPtr); }
 
-    inline operator const std::vector<DATA_T>& () const noexcept { return m_array; }
+    inline operator const std::vector<DATA_T>& () const noexcept { return (*m_arrayPtr); }
 
     template <typename Predicate>
     auto Find(Predicate compare) {
-        return std::find_if(m_array.begin(), m_array.end(), compare);
+        return std::find_if(m_arrayPtr->begin(), m_arrayPtr->end(), compare);
     }
 
 
     template<typename KEY_T, typename COMPARE_T>
     int32_t FindLinear(const KEY_T& key, COMPARE_T compare) const {
         int32_t i = 0;
-        for (const auto& data : m_array) {
+        for (const auto& data : (*m_arrayPtr)) {
             if (not compare(data, key))
                 return i;
             ++i;
@@ -396,13 +434,13 @@ public:
     template<typename KEY_T, typename COMPARE_T>
     int32_t FindBinary(const KEY_T& key, COMPARE_T compare) const {
         auto it = std::lower_bound(
-            m_array.begin(), m_array.end(), key,
+            m_arrayPtr->begin(), m_arrayPtr->end(), key,
             [&](const DATA_T& data, const KEY_T& key) {
                 return compare(data, key) < 0; // a < b
             }
         );
-        if (it != m_array.end() and compare(*it, key) == 0)
-            return static_cast<int32_t>(std::distance(m_array.begin(), it));
+        if (it != m_arrayPtr->end() and compare(*it, key) == 0)
+            return static_cast<int32_t>(std::distance(m_arrayPtr->begin(), it));
         else
             return -1;
     }
@@ -465,14 +503,14 @@ public:
         f.write(reinterpret_cast<const char*>(DataPtr()), size_t(Length()) * sizeof(DATA_T));
         return f.good();
     }
-
+#if 0
     // --- d2x-xl CArray compatibility shims (type migration; same semantics, legacy names) ---
     inline DATA_T* Buffer(int32_t i = 0) noexcept { return DataPtr(i); }
 
     inline const DATA_T* Buffer(int32_t i = 0) const noexcept { return DataPtr(i); }
 
     inline DATA_T* Pointer(int32_t i) noexcept { return DataPtr(i); }
-
+#endif
     inline DATA_T* operator+(int32_t i) noexcept { return DataPtr(i); }
 
     inline const DATA_T* operator+(int32_t i) const noexcept { return DataPtr(i); }
@@ -535,53 +573,18 @@ public:
 
 // =================================================================================================
 
-class ByteArray : public AutoArray<uint8_t> {
-public:
-    ByteArray(const int32_t nLength) {
-        Resize(nLength);
-    }
-};
+using ByteArray = AutoArray<uint8_t>;
 
-class ShortArray : public AutoArray<int16_t> {
-public:
-    ShortArray(const int32_t nLength) {
-        Resize(nLength);
-    }
-};
+using ShortArray = AutoArray<int16_t>;
 
-class UShortArray : public AutoArray<uint16_t> {
-public:
-    UShortArray(const int32_t nLength) {
-        Resize(nLength);
-    }
-};
+using UShortArray = AutoArray<uint16_t>;
 
-class IntArray : public AutoArray<int32_t> {
-public:
-    IntArray(const int32_t nLength) {
-        Resize(nLength);
-    }
-};
+using IntArray = AutoArray<int32_t>;
 
-class UIntArray : public AutoArray<uint32_t> {
-public:
-    UIntArray(const int32_t nLength) {
-        Resize(nLength);
-    }
-};
+using UIntArray = AutoArray<uint32_t>;
 
-class SizeArray : public AutoArray<size_t> {
-public:
-    SizeArray(const int32_t nLength) {
-        Resize(nLength);
-    }
-};
+using SizeArray = AutoArray<size_t>;
 
-class FloatArray : public AutoArray<float> {
-public:
-    FloatArray(const int32_t nLength) {
-        Resize(nLength);
-    }
-};
+using FloatArray = AutoArray<float>;
 
 // =================================================================================================

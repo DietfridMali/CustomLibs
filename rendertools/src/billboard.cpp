@@ -4,9 +4,9 @@
 
 // =================================================================================================
 
-bool Billboard::Setup(String iconName) {
+bool Billboard::Setup(String textureFolder, String iconName) {
 	List<String> filename = { iconName };
-	TextureList	texture = textureHandler.CreateStandardTextures("", filename, {});
+	TextureList	texture = textureHandler.CreateStandardTextures(textureFolder, filename, {});
 	if (texture.IsEmpty())
 		return false;
 	m_icon = texture[0];
