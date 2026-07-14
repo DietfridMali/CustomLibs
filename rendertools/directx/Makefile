@@ -19,6 +19,7 @@ FILES := \
  cube \
  cubemap \
  fbo \
+ ddsloader \
  fonthandler \
  framecounter \
  glbloader \

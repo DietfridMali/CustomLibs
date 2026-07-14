@@ -42,6 +42,7 @@ COMMON_FILES := \
  coplanar_rectangle \
  cube \
  drawbufferhandler \
+ ddsloader \
  fonthandler \
  framecounter \
  glbloader \
