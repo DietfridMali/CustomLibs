@@ -20,7 +20,7 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseNam
 
 	List<String> filenames;
 	for (int i = 0; i < skyboxDirections.Length(); i++) 
-		filenames.Append(String::Concat(baseName, type, skyboxDirections[i], size, ".png"));
+		filenames.Append(String::Concat(baseName, type, skyboxDirections[i], size, ".DDS"));
 	
 	//texture = new Cubemap();
 	if (not texture->CreateFromFile(textureFolder, filenames, {})) {
