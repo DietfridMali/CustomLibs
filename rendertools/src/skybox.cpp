@@ -3,6 +3,7 @@
 #include "cube.h"
 #include "gfxstates.h"
 #include "gfxrenderer.h"
+#include "random.hpp"
 #include "base_renderer.h"
 
 #define RENDER_BLACKHOLE 1
@@ -106,7 +107,7 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 		}
 		shader->SetMatrix4f("mView", view.AsArray(), false);
 		shader->SetVector3f("direction", Vector3f({ 0.0f, 0.20f, -0.99f }));   // normalisiert, horizontnah
-		shader->SetFloat("distance", 20.0f);
+		shader->SetFloat("distance", 15.0f + 5.0f * sinf(currentTime / 1.8e6f));
 		shader->SetVector3f("diskNormal", Vector3f({ -0.2f, 0.8f, 0.0f }));
 		shader->SetFloat("gravity", 0.95f);
 		shader->SetFloat("time", float(currentTime) / 1000.0f);   // currentTime durchreichen
@@ -114,8 +115,8 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 		shader->SetFloat("innerDiskRad", 2.6f);
 		shader->SetFloat("outerDiskRad", 9.0f);
 		shader->SetFloat("angSpeed", 0.35f);
-		shader->SetFloat("brightness", brightness);
-		shader->SetFloat("noiseScale", 0.025f);
+		shader->SetFloat("brightness", 1.0f); // brightness);
+		shader->SetFloat("noiseScale", 0.25f);
 		shader->SetVector3f("lightDirection", lightDirection);
 		shader->SetFloat("brightness", brightness);
 		shader->SetFloat("alpha", alpha);
