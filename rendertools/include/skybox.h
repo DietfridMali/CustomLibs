@@ -4,6 +4,7 @@
 #include "basesingleton.hpp"
 #include "texture.h"
 #include "mesh.h"
+#include "noisetexture.h"
 #include "base_shaderhandler.h"
 #include "texturehandler.h"
 
@@ -14,6 +15,7 @@ class Skybox
 {
 private:
 	Cubemap* m_skyTextures[3][3] = { { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr } };
+	CloudNoiseTexture* m_noiseTexture{ nullptr };
 	Mesh* m_skybox{ nullptr };
 	int32_t	m_activationTime{ -1 };
 
@@ -22,7 +24,7 @@ public:
 
 	~Skybox() = default;
 
-	bool Setup(const String& textureFolder);
+	bool Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture = nullptr);
 
 	bool Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime);
 
@@ -41,7 +43,7 @@ public:
 private:
 	Cubemap* LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size);
 
-	Shader* LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha);
+	Shader* LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime);
 
 	int MaxTextureSize(void);
 };
