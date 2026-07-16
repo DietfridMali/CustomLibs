@@ -104,7 +104,11 @@ Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, flo
 		}
 		shader->SetMatrix4f("mView", view.AsArray(), false);
 		shader->SetVector3f("direction", Vector3f({ 0.0f, 0.20f, -0.99f }));   // normalisiert, horizontnah
-		shader->SetFloat("distance", 25.0f + 5.0f * sinf(currentTime / 1.8e6f));
+#if 0
+		shader->SetFloat("distance", 20.0f + 10.0f * sinf(currentTime / 1.8e3f));
+#else
+		shader->SetFloat("distance", 25.0f + 5.0f * sinf(currentTime / 1.8e3f));
+#endif
 		shader->SetVector3f("diskNormal", Vector3f({ -0.2f, 0.8f, 0.0f }));
 		shader->SetFloat("gravity", 0.95f);
 		shader->SetFloat("time", float(currentTime) / 1000.0f);   // currentTime durchreichen
@@ -152,20 +156,20 @@ bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, fl
 	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
 	float alpha = std::min(float(currentTime - m_activationTime) / 1000.0f, 1.0f);
 	gfxStates.SetBlending(alpha < 1.0f ? 1 : 0);
+	Shader* shader = nullptr;
 	if (not HasNightSky(skyType))
 		skyType = 0;
-	else if ((skyType == 3) and (m_noiseTexture == nullptr))
-		skyType = 1;
-	Shader* shader = nullptr;
-	if ((skyType == 3) and (shader = LoadBlackholeShader(view, lightDirection, 1.0f, alpha, currentTime))) {
-		m_skyTextures[1][0]->Activate(0);
-		m_noiseTexture->Activate(1);
-		m_skybox->Render({}); // m_skyTextures);
-		m_skyTextures[1][0]->Deactivate();
-		m_noiseTexture->Deactivate();
-	}
-	else {
-		skyType = 1;
+	else if (skyType == 3) {
+		if ((m_noiseTexture != nullptr) and (shader = LoadBlackholeShader(view, lightDirection, 1.0f, alpha, currentTime))) {
+			m_skyTextures[1][0]->Activate(0);
+			m_noiseTexture->Activate(1);
+			m_skybox->Render({}); // m_skyTextures);
+			m_skyTextures[1][0]->Deactivate();
+			m_noiseTexture->Deactivate();
+		}
+		else {
+			skyType = 1;
+		}
 	}
 	if (skyType != 3) {
 		if ((shader = LoadShader(view, lightDirection, skyType ? 0.7f : brightness, alpha, currentTime))) {
