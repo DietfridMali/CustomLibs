@@ -104,10 +104,10 @@ Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, flo
 		}
 		shader->SetMatrix4f("mView", view.AsArray(), false);
 		shader->SetVector3f("direction", Vector3f({ 0.0f, 0.20f, -0.99f }));   // normalisiert, horizontnah
-#if 0
+#ifdef _DEBUG
 		shader->SetFloat("distance", 20.0f + 10.0f * sinf(currentTime / 1.8e3f));
 #else
-		shader->SetFloat("distance", 25.0f + 5.0f * sinf(currentTime / 1.8e3f));
+		shader->SetFloat("distance", 25.0f + 5.0f * sinf(currentTime / 1.8e6f));
 #endif
 		shader->SetVector3f("diskNormal", Vector3f({ -0.2f, 0.8f, 0.0f }));
 		shader->SetFloat("gravity", 0.95f);
