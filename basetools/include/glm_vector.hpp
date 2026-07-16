@@ -377,36 +377,6 @@ public:
     inline float& U() noexcept { return X(); }
     inline float& V() noexcept { return Y(); }
 
-    // --- d2x-xl CFloatVector compatibility shims (type migration: CFloatVector -> Vector4f) ---
-    inline float& Red() noexcept { return R(); }
-    inline float  Red() const noexcept { return R(); }
-    inline float& Green() noexcept { return G(); }
-    inline float  Green() const noexcept { return G(); }
-    inline float& Blue() noexcept { return B(); }
-    inline float  Blue() const noexcept { return B(); }
-    inline float& Alpha() noexcept { return A(); }
-    inline float  Alpha() const noexcept { return A(); }
-
-    inline void Set(float f0, float f1, float f2, float f3 = 1.0f) noexcept {
-        (*this)[0] = f0; (*this)[1] = f1;
-        if constexpr (VEC_TYPE::length() > 2) (*this)[2] = f2;
-        if constexpr (VEC_TYPE::length() > 3) (*this)[3] = f3;
-    }
-    inline void Set(const float* p) noexcept {
-        for (int i = 0; i < VEC_TYPE::length(); ++i) (*this)[i] = p[i];
-    }
-
-    inline void SetZero() noexcept { *this = Vector(); }
-    inline float Mag() const noexcept { return Length(); }
-    inline float SqrMag() const noexcept { return LengthSquared(); }
-    inline Vector& Neg() noexcept { return Negate(); }
-
-    static float Dot(const Vector& a, const Vector& b) noexcept { return a.Dot(b); }
-    static float Dist(const Vector& a, const Vector& b) noexcept { return (a - b).Length(); }
-    static Vector Avg(const Vector& a, const Vector& b) noexcept { return (a + b) * 0.5f; }
-    static float Normalize(Vector& v) noexcept { float l = v.Length(); if (l != 0.0f) v /= l; return l; }
-    static Vector Create(float f0, float f1, float f2, float f3 = 1.0f) noexcept { Vector r; r.Set(f0, f1, f2, f3); return r; }
-
     static const Vector<VEC_TYPE> NONE;
     static const Vector<VEC_TYPE> ZERO;
     static const Vector<VEC_TYPE> HALF;
