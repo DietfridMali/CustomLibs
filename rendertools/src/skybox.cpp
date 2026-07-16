@@ -154,8 +154,10 @@ bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, fl
 	gfxStates.SetBlending(alpha < 1.0f ? 1 : 0);
 	if (not HasNightSky(skyType))
 		skyType = 0;
-	Shader* shader;
-	if ((skyType == 2) and (m_noiseTexture != nullptr) and (shader = LoadBlackholeShader(view, lightDirection, 1.0f, alpha, currentTime))) {
+	else if ((skyType == 3) and (m_noiseTexture == nullptr))
+		skyType = 1;
+	Shader* shader = nullptr;
+	if ((skyType == 3) and (shader = LoadBlackholeShader(view, lightDirection, 1.0f, alpha, currentTime))) {
 		m_skyTextures[1][0]->Activate(0);
 		m_noiseTexture->Activate(1);
 		m_skybox->Render({}); // m_skyTextures);
@@ -163,7 +165,9 @@ bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, fl
 		m_noiseTexture->Deactivate();
 	}
 	else {
-		skyType %= 2;
+		skyType = 1;
+	}
+	if (skyType != 3) {
 		if ((shader = LoadShader(view, lightDirection, skyType ? 0.7f : brightness, alpha, currentTime))) {
 			for (int i = 0; i < 3; i++)
 				m_skyTextures[skyType][i]->Activate(i);
