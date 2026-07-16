@@ -6,8 +6,6 @@
 #include "random.hpp"
 #include "base_renderer.h"
 
-#define RENDER_BLACKHOLE 1
-
 // =================================================================================================
 
 static List<String> skyboxDirections = { "-rt", "-lf", "-up", "-dn", "-ft", "-bk" }; 
@@ -96,8 +94,7 @@ bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture)
 }
 
 
-Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime) {
-#if RENDER_BLACKHOLE
+Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime) {
 	Shader* shader = baseShaderHandler.SetupRenderShader("blackhole");
 	if (shader) {
 		shader->SetMatrix4f("mView", view.AsArray(), false);
@@ -121,21 +118,24 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 		shader->SetFloat("brightness", brightness);
 		shader->SetFloat("alpha", alpha);
 	}
-#else
-    Shader* shader = baseShaderHandler.SetupRenderShader("skybox");
-    if (shader) {
-        shader->SetMatrix4f("mView", view.AsArray(), false);
+    return shader;
+}
+
+
+Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime) {
+	Shader* shader = baseShaderHandler.SetupRenderShader("skybox");
+	if (shader) {
+		shader->SetMatrix4f("mView", view.AsArray(), false);
 		StaticArray<String, 3> skyNames = { "sky1", "sky2", "sky3" };
 		for (int i = 0; i < 3; i++) {
 			if (baseRenderer.UsesOpenGL())
 				shader->SetInt(skyNames[i], i);
-			}
+		}
 		shader->SetVector3f("lightDirection", lightDirection);
 		shader->SetFloat("brightness", brightness);
 		shader->SetFloat("alpha", alpha);
 	}
-#endif
-    return shader;
+	return shader;
 }
 
 
@@ -154,25 +154,23 @@ bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, fl
 	gfxStates.SetBlending(alpha < 1.0f ? 1 : 0);
 	if (not HasNightSky(skyType))
 		skyType = 0;
-	Shader* shader = LoadShader(view, lightDirection, skyType ? 0.7f : brightness, alpha, currentTime);
-	if (shader) {
-#if RENDER_BLACKHOLE
+	Shader* shader;
+	if ((skyType == 2) and (m_noiseTexture != nullptr) and (shader = LoadBlackholeShader(view, lightDirection, 1.0f, alpha, currentTime))) {
 		m_skyTextures[1][0]->Activate(0);
 		m_noiseTexture->Activate(1);
 		m_skybox->Render({}); // m_skyTextures);
 		m_skyTextures[1][0]->Deactivate();
 		m_noiseTexture->Deactivate();
-#else
-#	if 1
-		for (int i = 0; i < 3; i++)
-			m_skyTextures[skyType][i]->Activate(i);
-#	endif
-		m_skybox->Render({}); // m_skyTextures);
-#	if 1
-		for (int i = 0; i < 3; i++)
-			m_skyTextures[skyType][i]->Deactivate();
-#	endif
-#endif
+	}
+	else {
+		skyType %= 2;
+		if ((shader = LoadShader(view, lightDirection, skyType ? 0.7f : brightness, alpha, currentTime))) {
+			for (int i = 0; i < 3; i++)
+				m_skyTextures[skyType][i]->Activate(i);
+			m_skybox->Render({}); // m_skyTextures);
+			for (int i = 0; i < 3; i++)
+				m_skyTextures[skyType][i]->Deactivate();
+		}
 	}
 	baseRenderer.FinishOperation(cl);
 	return shader != nullptr;

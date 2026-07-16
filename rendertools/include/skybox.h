@@ -37,13 +37,15 @@ public:
 	}
 
 	inline bool HasNightSky(int32_t i) noexcept {
-		return (i == 0) ? false : m_skyTextures[i-1][0] != nullptr;
+		return (i == 0) ? false : m_skyTextures[(i - 1) % 2][0] != nullptr; // i == 2 --> sky #0 with black hole
 	}
 
 private:
 	Cubemap* LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size);
 
 	Shader* LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime);
+
+	Shader* LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime);
 
 	int MaxTextureSize(void);
 };
