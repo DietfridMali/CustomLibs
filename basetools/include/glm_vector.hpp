@@ -176,6 +176,16 @@ public:
         return Vector(glm::round(v));
     }
 
+    // arithmetic mean of the vector's own components
+    float Avg() const noexcept {
+        float sum = 0.0f;
+        for (int i = 0; i < VEC_TYPE::length(); ++i)
+            sum += (*this)[i];
+        return sum / float(VEC_TYPE::length());
+    }
+
+    float Dist(const Vector& other) const noexcept { return (*this - other).Length(); }
+
     float Dot(const Vector& other, int range = VEC_TYPE::length()) const noexcept {
         float dot = 0.0f;
         for (int i = 0; i < range; ++i) 
