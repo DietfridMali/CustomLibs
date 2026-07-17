@@ -50,6 +50,32 @@ Matrix4f& Matrix4f::EulerComputeZYX(float sinX, float cosX, float sinY, float co
 }
 
 
+Matrix4f& Matrix4f::EulerComputeYXZ(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ) noexcept {
+    // Descent/D2 rotation order Ry(heading) * Rx(pitch) * Rz(bank), stored in the same (transposed/view)
+    // convention as EulerComputeZYX. Reproduces CFixMatrix::Create bit-for-bit with X=pitch, Y=heading, Z=bank.
+    m[0][0] = cosY * cosZ + sinY * sinX * sinZ;
+    m[0][1] = -cosY * sinZ + sinY * sinX * cosZ;
+    m[0][2] = sinY * cosX;
+    m[0][3] = 0.0f;
+
+    m[1][0] = cosX * sinZ;
+    m[1][1] = cosX * cosZ;
+    m[1][2] = -sinX;
+    m[1][3] = 0.0f;
+
+    m[2][0] = -sinY * cosZ + cosY * sinX * sinZ;
+    m[2][1] = sinY * sinZ + cosY * sinX * cosZ;
+    m[2][2] = cosY * cosX;
+    m[2][3] = 0.0f;
+
+    m[3][0] = 0.0f;
+    m[3][1] = 0.0f;
+    m[3][2] = 0.0f;
+    m[3][3] = 1.0f;
+    return *this;
+}
+
+
 Matrix4f Matrix4f::AffineInverse(void) noexcept {
     glm::mat3 r(m);
     glm::mat3 ri = glm::inverse(r);

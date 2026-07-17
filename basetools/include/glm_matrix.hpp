@@ -62,6 +62,10 @@ public:
     Matrix4f& EulerComputeZYX(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ)
  noexcept;
 
+    // ===== EulerComputeYXZ (D2/Descent order Ry*Rx*Rz; body-relative yaw-pitch-roll) =====
+    Matrix4f& EulerComputeYXZ(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ)
+ noexcept;
+
     // ===== Static builders =====
     static Matrix4f Identity() noexcept(noexcept(glm::mat4(1.0f))) {
         return Matrix4f(glm::mat4(1.0f));
@@ -105,12 +109,12 @@ public:
     }
 
     static Matrix4f& Rotation(Matrix4f& rotation, float x, float y, float z)
- noexcept(noexcept(rotation.EulerComputeZYX(std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
+ noexcept(noexcept(rotation.EulerComputeYXZ(std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
     {
         float radX = Conversions::DegToRad(x);
         float radY = Conversions::DegToRad(y);
         float radZ = Conversions::DegToRad(z);
-        return rotation.EulerComputeZYX(std::sin(radX), std::cos(radX), std::sin(radY), std::cos(radY), std::sin(radZ), std::cos(radZ));
+        return rotation.EulerComputeYXZ(std::sin(radX), std::cos(radX), std::sin(radY), std::cos(radY), std::sin(radZ), std::cos(radZ));
     }
 
     static Matrix4f Rotation(float x, float y, float z)
@@ -263,7 +267,7 @@ public:
  noexcept(noexcept(std::declval<glm::mat4>()* std::declval<Vector4f>()))
     {
         Vector4f h = v;
-        return static_cast<Vector3f>(m * h);  // BUGFIX: Rückgabetyp korrekt zu Vector3f
+        return static_cast<Vector3f>(m * h);  // BUGFIX: Rï¿½ckgabetyp korrekt zu Vector3f
     }
 
     operator const float* () const noexcept { return glm::value_ptr(m); }
