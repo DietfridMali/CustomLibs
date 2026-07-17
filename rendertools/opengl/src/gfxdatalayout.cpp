@@ -3,6 +3,9 @@
 #include "mesh.h"
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
+#include "shaderdatalayout.h"
+
+#include <cassert>
 
 // =================================================================================================
 
@@ -166,13 +169,21 @@ noexcept
 
     int index;
     GfxDataBuffer* buffer = FindBuffer(type, id, index);
-    if (not buffer and (buffer = new GfxDataBuffer(type, id))) { // otherwise index has been initialized by FindBuffer()
+    if (not buffer and (buffer = new GfxDataBuffer(type, id))) {
         m_dataBuffers.Append(buffer);
         buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
-        index = m_dataBuffers.Length() - 1;
+    }
+    // attribute location comes from the central vertex attribute registry, not from the
+    // buffer's position in m_dataBuffers — GLSL shaders declare layout(location = N) accordingly
+    int slot = GfxAttributeSlot(type, id);
+    assert(slot >= 0);  // unknown buffer tags are not part of the attribute registry
+    if (slot < 0) {
+        if (disabled)
+            Disable();
+        return false;
     }
     if (buffer)
-        buffer->Update(type, GL_ARRAY_BUFFER, index, data, dataSize, componentType, componentCount, forceUpdate);
+        buffer->Update(type, GL_ARRAY_BUFFER, slot, data, dataSize, componentType, componentCount, forceUpdate);
 
     if (disabled)
         Disable();
@@ -268,8 +279,8 @@ static void CheckLayout(GLuint handle, const char* label = "") {
 #if 1
     std::cout << "GL_ELEMENT_ARRAY_BUFFER_BINDING: " << elementBuffer << std::endl;
 #endif
-    // Attribute 0-3 checken (Position, TexCoord, Normal, etc.)
-    for (int i = 0; i < 7; i++) {
+    // alle Registry-Slots checken (0-12, siehe GfxAttributeSlot)
+    for (int i = 0; i < 13; i++) {
         GLint enabled, size, type, stride, bufferBinding;
         GLvoid* pointer;
 

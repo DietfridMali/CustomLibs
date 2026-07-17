@@ -25,6 +25,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <type_traits>
 #include <algorithm>
 #include <initializer_list>
@@ -38,6 +39,7 @@ class StaticArray {
 private:
     std::array<DATA_T, CAPACITY> m_array{};
     int32_t                      m_length{ static_cast<int32_t>(CAPACITY) };
+    std::string                  m_name;
 
 public:
     using value_type = DATA_T;
@@ -78,6 +80,32 @@ public:
             m_array.fill(DATA_T{});
     }
     inline void Fill(const DATA_T& value) noexcept { m_array.fill(value); }
+
+    inline void SetName(const char* name) { m_name = name ? name : ""; }
+    inline const std::string& GetName(void) const noexcept { return m_name; }
+
+    inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - m_array.data()); }
+
+    // CFile-style block I/O (FILE_T resolved at the call site; same contract as AutoArray::Read/Write)
+    template <typename FILE_T>
+    size_t Read(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
+        uint32_t len = static_cast<uint32_t>(Length());
+        if ((len == 0) or (nOffset >= len))
+            return static_cast<size_t>(-1);
+        if ((nCount == 0) or (nCount > len - nOffset))
+            nCount = len - nOffset;
+        return cf.Read(Data(static_cast<int32_t>(nOffset)), sizeof(DATA_T), nCount, bCompressed);
+    }
+
+    template <typename FILE_T>
+    size_t Write(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
+        uint32_t len = static_cast<uint32_t>(Length());
+        if ((len == 0) or (nOffset >= len))
+            return static_cast<size_t>(-1);
+        if ((nCount == 0) or (nCount > len - nOffset))
+            nCount = len - nOffset;
+        return cf.Write(Data(static_cast<int32_t>(nOffset)), sizeof(DATA_T), nCount, bCompressed);
+    }
 
     // ---- std::array-style interface (rendertools / Smiley-Battle) ----
     inline DATA_T& operator[](size_t i) noexcept { return m_array[i]; }

@@ -84,66 +84,9 @@ namespace {
 // -------------------------------------------------------------------------------------------------
 // Helpers to translate ShaderDataAttributes to D3D12_INPUT_ELEMENT_DESC.
 
-// Maps C++ buffer type + id to the DX12 input slot used by GfxDataLayout::FixedSlotForBuffer.
-//   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color,
-//   slot 5: Normal, slot 6: Tangent, slot 7+: Offset/Float
-static int SlotForAttr(const char* datatype, int id) noexcept
-{
-    if (strcmp(datatype, "Vertex") == 0)
-        return 0;
-    if (strcmp(datatype, "TexCoord") == 0) {
-        if (id >= 0 and id <= 2)
-            return 1 + id;
-        return -1;
-    }
-    if (strcmp(datatype, "Color") == 0)
-        return 4;
-    if (strcmp(datatype, "Normal") == 0)
-        return 5;
-    if (strcmp(datatype, "Tangent") == 0)
-        return 6;
-    if (strcmp(datatype, "Offset") == 0)
-        return 7 + id;
-    if (strcmp(datatype, "Float") == 0)
-        return 7 + id;
-    return -1;
-}
-
-// Maps C++ buffer type + id to an HLSL semantic name and index.
-// Offset/N uses TEXCOORD(N+3) to avoid collisions with TexCoord/0..2.
-static const char* SemanticForAttr(const char* datatype, int id, UINT& semanticIndex) noexcept
-{
-    if (strcmp(datatype, "Vertex") == 0)   { 
-        semanticIndex = 0;        
-        return "POSITION"; 
-    }
-    if (strcmp(datatype, "TexCoord") == 0) { 
-        semanticIndex = UINT(id); 
-        return "TEXCOORD"; 
-    }
-    if (strcmp(datatype, "Color") == 0)    { 
-        semanticIndex = UINT(id); 
-        return "COLOR"; 
-    }
-    if (strcmp(datatype, "Normal") == 0)   { 
-        semanticIndex = UINT(id); 
-        return "NORMAL"; 
-    }
-    if (strcmp(datatype, "Tangent") == 0)  { 
-        semanticIndex = UINT(id); 
-        return "TANGENT"; 
-    }
-    if (strcmp(datatype, "Offset") == 0)   {
-        semanticIndex = UINT(id);
-        return "OFFSET";
-    }
-    if (strcmp(datatype, "Float") == 0)   {
-        semanticIndex = UINT(id);
-        return "FLOAT";
-    }
-    semanticIndex = 0;
-    return "TEXCOORD";
-}
+// Input slots and HLSL semantics come from the central vertex attribute registry
+// (GfxAttributeSlot / GfxAttributeSemantic in shaderdatalayout.h), shared with the
+// OpenGL and Vulkan backends and with GfxDataLayout.
 
 static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
 {
@@ -391,8 +334,8 @@ void Shader::BuildInputLayout(void) noexcept
         for (int i = 0; i < m_dataLayout.m_count; ++i) {
             const ShaderDataAttributes& attr = m_dataLayout.m_attrs[i];
             UINT semanticIndex = 0;
-            const char* semantic = SemanticForAttr(attr.datatype, attr.id, semanticIndex);
-            int slot = SlotForAttr(attr.datatype, attr.id);
+            const char* semantic = GfxAttributeSemantic(attr.datatype, attr.id, semanticIndex);
+            int slot = GfxAttributeSlot(attr.datatype, attr.id);
             if (slot < 0)
                 continue;
             D3D12_INPUT_ELEMENT_DESC desc{};

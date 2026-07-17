@@ -7,6 +7,8 @@
 #include "commandlist.h"
 #include "tracy_wrapper.h"
 
+#include <cassert>
+
 // =================================================================================================
 // DX12 GfxDataLayout implementation
 
@@ -26,31 +28,8 @@ static DXGI_FORMAT ToIndexFormat(ComponentType componentType) noexcept
     return (componentType == ComponentType::UInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 }
 
-// Fixed input-slot mapping matching kInputLayout in shader.cpp:
-//   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color,
-//   slot 5: Normal, slot 6: Tangent, slot 7+: Offset/Float
-// Returns -1 for unknown types (caller falls back to insertion order).
-static int FixedSlotForBuffer(const char* type, int id) noexcept
-{
-    if (strcmp(type, "Vertex") == 0)
-        return 0;
-    if (strcmp(type, "TexCoord") == 0) {
-        if (id >= 0 and id <= 2)
-            return 1 + id;
-        return -1;
-    }
-    if (strcmp(type, "Color") == 0)
-        return 4;
-    if (strcmp(type, "Normal") == 0)
-        return 5;
-    if (strcmp(type, "Tangent") == 0)
-        return 6;
-    if (strcmp(type, "Offset") == 0)
-        return 7 + id;
-    if (strcmp(type, "Float") == 0)
-        return 7 + id;
-    return -1;
-}
+// Input slots come from the central vertex attribute registry (GfxAttributeSlot in
+// shaderdatalayout.h), matching the D3D12_INPUT_ELEMENT_DESC slots built in shader.cpp.
 
 // =================================================================================================
 
@@ -173,9 +152,10 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_
         buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
         foundIndex = int(m_dataBuffers.Length()) - 1;
     }
-    int slot = FixedSlotForBuffer(type, id);
+    int slot = GfxAttributeSlot(type, id);
+    assert(slot >= 0);  // unknown buffer tags are not part of the attribute registry
     if (slot < 0)
-        slot = foundIndex;
+        return false;
 
     return buffer->Update(type, GfxBufferTarget::Vertex, slot, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
 }
@@ -200,8 +180,8 @@ bool GfxDataLayout::Enable(void) noexcept
     // Bind all vertex buffer streams
     int vbCount = m_dataBuffers.Length();
     if (vbCount > 0) {
-        // Build views array; use a fixed stack buffer (max 8 streams)
-        constexpr int kMaxStreams = 12;
+        // Build views array; fixed stack buffer covering all registry slots (0-12)
+        constexpr int kMaxStreams = 16;
         D3D12_VERTEX_BUFFER_VIEW views[kMaxStreams]{};
         int maxSlot = 0;
         for (auto GfxDataBuffer : m_dataBuffers) {

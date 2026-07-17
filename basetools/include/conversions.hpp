@@ -1,7 +1,9 @@
 #pragma once
 
 #define _USE_MATH_DEFINES // for C++
-#define NOMINMAX
+#ifndef NOMINMAX
+#	define NOMINMAX
+#endif
 
 #include <algorithm>
 #include <concepts>   // std::integral, std::signed_integral
@@ -128,7 +130,7 @@ namespace Conversions
     using FloatInterval = Interval<float>;
 
 
-    // Liefert floor(sqrt(i)) für beliebige Integraltypen (signed/unsigned)
+    // Liefert floor(sqrt(i)) fï¿½r beliebige Integraltypen (signed/unsigned)
     // Newton-Raphson algorithm
     template <std::integral Int>
     constexpr std::make_unsigned_t<Int> IntSqrt(Int i) {
@@ -141,7 +143,7 @@ namespace Conversions
         Unsign n = static_cast<Unsign>(i);
         if (n < 2) return n;
 
-        // Startwert: 2^ceil(bit_width(n)/2)  (leichtes Über-Estimate)
+        // Startwert: 2^ceil(bit_width(n)/2)  (leichtes ï¿½ber-Estimate)
         unsigned bw = std::bit_width(n);
         Unsign x = Unsign{ 1 } << ((bw + 1) / 2);
 
@@ -154,7 +156,7 @@ namespace Conversions
             x = y;
         }
 
-        // Exakte Korrektur (max. 1–2 Schritte), geschützt vor Overflow via Division
+        // Exakte Korrektur (max. 1ï¿½2 Schritte), geschï¿½tzt vor Overflow via Division
         while (x > n / x)
             --x;
         while ((x + 1) <= n / (x + 1))
@@ -186,14 +188,14 @@ namespace Conversions
         Unsign m = (n < 0) ? Unsign(-(n + 1)) + 1 : Unsign(n);
 
         Unsign d = IntSqrt(m);               // unsere schnelle integer sqrt
-        while ((d > 0) and (m % d != 0)) {   // Schritt zurück, bis echter Teiler
+        while ((d > 0) and (m % d != 0)) {   // Schritt zurï¿½ck, bis echter Teiler
             --d;
         }
 
         Int w = static_cast<Int>(d);
         if constexpr (std::signed_integral<Int>) {
             if (n < 0)
-                w = -w;           // bei negativen n a negativ wählen
+                w = -w;           // bei negativen n a negativ wï¿½hlen
         }
 
         return { w, n / w };

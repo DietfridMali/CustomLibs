@@ -26,6 +26,7 @@ private:
     bool                    m_isShrinkable{ true };
     DATA_T                  m_defaultValue{};
     int32_t                 m_pos{ 0 };
+    std::string             m_name;
 
 public:
 	static const int32_t MaxIndex = std::numeric_limits<int32_t>::max();
@@ -550,9 +551,9 @@ public:
         return cf.Write(DataPtr() + nOffset, sizeof(DATA_T), nCount, bCompressed);
     }
 
-    inline void SetName(const char*) noexcept { }
+    inline void SetName(const char* name) { m_name = name ? name : ""; }
 
-    inline const char* GetName(void) const noexcept { return ""; }
+    inline const std::string& GetName(void) const noexcept { return m_name; }
 
     inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - DataPtr()); }
 

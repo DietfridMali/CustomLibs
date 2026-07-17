@@ -7,6 +7,7 @@
 #include "commandlist.h"
 #include "gfxstates.h"
 
+#include <cassert>
 #include <cstring>
 
 // =================================================================================================
@@ -20,32 +21,9 @@
 // vkCmdBindVertexBuffers / vkCmdBindIndexBuffer / vkCmdDrawIndexed via the CommandListHandler
 // wrappers, with the temp-CL routing through baseRenderer.StartOperation / FinishOperation.
 
-// Fixed input-slot mapping matching shader.h kSrvBase / kBindingB0 etc. — slot 0..N corresponds
-// to VkVertexInputBindingDescription.binding 0..N (and HLSL register-layout positions after
-// DXC -> SPIR-V translation).
-//   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color,
-//   slot 5: Normal, slot 6: Tangent, slot 7+: Offset/Float
-static int FixedSlotForBuffer(const char* type, int id) noexcept
-{
-    if (strcmp(type, "Vertex") == 0)
-        return 0;
-    if (strcmp(type, "TexCoord") == 0) {
-        if (id >= 0 and id <= 2)
-            return 1 + id;
-        return -1;
-    }
-    if (strcmp(type, "Color") == 0)
-        return 4;
-    if (strcmp(type, "Normal") == 0)
-        return 5;
-    if (strcmp(type, "Tangent") == 0)
-        return 6;
-    if (strcmp(type, "Offset") == 0)
-        return 7 + id;
-    if (strcmp(type, "Float") == 0)
-        return 7 + id;
-    return -1;
-}
+// Input slots come from the central vertex attribute registry (GfxAttributeSlot in
+// shaderdatalayout.h) — slot N corresponds to VkVertexInputBindingDescription.binding N
+// and to the [[vk::location(N)]] annotations in the HLSL vertex inputs.
 
 // =================================================================================================
 
@@ -168,9 +146,10 @@ bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_
         buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
         foundIndex = int(m_dataBuffers.Length()) - 1;
     }
-    int slot = FixedSlotForBuffer(type, id);
+    int slot = GfxAttributeSlot(type, id);
+    assert(slot >= 0);  // unknown buffer tags are not part of the attribute registry
     if (slot < 0)
-        slot = foundIndex;
+        return false;
 
     return buffer->Update(type, GfxBufferTarget::Vertex, slot, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
 }

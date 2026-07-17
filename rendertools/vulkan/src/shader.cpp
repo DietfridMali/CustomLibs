@@ -193,30 +193,8 @@ bool Shader::CreatePipelineLayout(void) noexcept
 }
 
 
-// Slot mapping matches GfxDataLayout::FixedSlotForBuffer exactly — must stay in sync.
-//   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color,
-//   slot 5: Normal, slot 6: Tangent, slot 7+: Offset/Float
-static int SlotForAttr(const char* datatype, int id) noexcept
-{
-    if (strcmp(datatype, "Vertex") == 0)
-        return 0;
-    if (strcmp(datatype, "TexCoord") == 0) {
-        if ((id >= 0) and (id <= 2))
-            return 1 + id;
-        return -1;
-    }
-    if (strcmp(datatype, "Color") == 0)
-        return 4;
-    if (strcmp(datatype, "Normal") == 0)
-        return 5;
-    if (strcmp(datatype, "Tangent") == 0)
-        return 6;
-    if (strcmp(datatype, "Offset") == 0)
-        return 7 + id;
-    if (strcmp(datatype, "Float") == 0)
-        return 7 + id;
-    return -1;
-}
+// Input slots come from the central vertex attribute registry (GfxAttributeSlot in
+// shaderdatalayout.h), shared with GfxDataLayout and the other backends.
 
 
 static VkFormat VkFormatForAttr(ShaderDataAttributes::Format f) noexcept
@@ -254,16 +232,15 @@ void Shader::BuildVertexInput(void) noexcept
     // One VkVertexInputBindingDescription per slot, one VkVertexInputAttributeDescription
     // per declared attribute. Each slot reads one C++ buffer with offset 0 (the GfxDataBuffer
     // model — separate buffers, no interleaving). Stride is the per-vertex size of that slot's
-    // format. SPIR-V locations follow the slot numbering (HLSL semantic order is preserved by
-    // DXC in the order POSITION → TEXCOORD0..2 → COLOR → NORMAL → TANGENT → OFFSET0..3, which
-    // matches SlotForAttr); explicit [[vk::location(N)]] would tighten this, but is not strictly
-    // required as long as the HLSL declarations are kept in the same canonical order.
+    // format. location = slot requires every HLSL vertex input to carry an explicit
+    // [[vk::location(N)]] with its registry slot — without it DXC numbers SPIR-V locations
+    // densely in declaration order, which diverges as soon as the used slots have gaps.
     m_vsInputAttributes.reserve(size_t(m_dataLayout.m_count));
     m_vsInputBindings.reserve(size_t(m_dataLayout.m_count));
 
     for (int i = 0; i < m_dataLayout.m_count; ++i) {
         const ShaderDataAttributes& attr = m_dataLayout.m_attrs[i];
-        int slot = SlotForAttr(attr.datatype, attr.id);
+        int slot = GfxAttributeSlot(attr.datatype, attr.id);
         if (slot < 0)
             continue;
 

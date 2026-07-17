@@ -184,7 +184,9 @@ public:
         return sum / float(VEC_TYPE::length());
     }
 
-    float Dist(const Vector& other) const noexcept { return (*this - other).Length(); }
+    float DistanceTo(const Vector& other) const noexcept { 
+        return (*this - other).Length(); 
+    }
 
     float Dot(const Vector& other, int range = VEC_TYPE::length()) const noexcept {
         float dot = 0.0f;

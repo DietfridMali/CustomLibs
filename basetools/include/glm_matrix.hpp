@@ -27,6 +27,14 @@ public:
     Matrix4f& operator=(Matrix4f&&) noexcept = default;
     ~Matrix4f() noexcept = default;
 
+    // Assigning an angle vector (x = pitch, y = heading, z = bank; degrees) builds the
+    // rotation matrix from it via EulerComputeYXZ (Descent order Ry*Rx*Rz).
+    Matrix4f& operator=(const Vector3f& angles)
+ noexcept(noexcept(Rotation(std::declval<Matrix4f&>(), std::declval<float>(), std::declval<float>(), std::declval<float>())))
+    {
+        return Rotation(*this, angles.X(), angles.Y(), angles.Z());
+    }
+
     // ===== Constructors =====
     explicit Matrix4f(const glm::mat4& mat) noexcept : m(mat) {}
 

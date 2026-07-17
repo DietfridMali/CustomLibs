@@ -6,6 +6,7 @@
 #include <utility>
 #include <stdexcept>
 #include <string.h>
+#include "random.hpp"
 
 #include "std_defines.h"
 
@@ -337,6 +338,12 @@ public:
         return static_cast<DATA_T>(sqrt(LengthSquared()));
     }
 
+
+    inline Vector& Random(float scale = 1.0f) {
+        for (size_t i = 0; i < dimensions; ++i)
+            if (m_data[i] = random.Float(scale);
+        return *this;
+    }
 
     inline Vector& Normalize(void) {
         DATA_T l = this->Length();

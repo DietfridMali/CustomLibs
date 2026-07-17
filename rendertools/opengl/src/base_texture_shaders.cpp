@@ -176,7 +176,7 @@ const ShaderSource& ColorMeshShader() {
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
             layout(location = 0) in vec3 position;
-            layout(location = 1) in vec4 color;
+            layout(location = 4) in vec4 color;
             uniform mat4 mModelView;
             uniform mat4 mProjection;
             uniform mat4 mViewport;
