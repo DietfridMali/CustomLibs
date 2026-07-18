@@ -309,8 +309,8 @@ public:
 		if (bufferIndex < 0)
 			return FuncState<GLenum, GL_NONE>(state, stateID, glBlendEquation);
 		stateID = -1;
-		glBlendEquation(bufferIndex, state);
-		return -1;
+		glBlendEquationi(bufferIndex, state);
+		return GLenum(-1);
 	}
 
 	inline GLenum FrontFace(GLenum state) {
@@ -333,9 +333,13 @@ public:
 		return FuncState<GLboolean, GLboolean(-1)>(GLboolean(state), stateID, glDepthMask);
 	}
 
-	inline std::tuple<GLboolean, GLboolean, GLboolean, GLboolean> ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a) {
+	inline std::tuple<GLboolean, GLboolean, GLboolean, GLboolean> ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a, int bufferIndex = -1) {
 		static int32_t stateID = -1;
-		return FuncState(stateID, std::make_tuple(r, g, b, a), glColorMask);
+		if (bufferIndex < 0)
+			return FuncState(stateID, std::make_tuple(r, g, b, a), glColorMask);
+		stateID = -1;
+		glColorMaski(bufferIndex, r, g, b, a);
+		return std::make_tuple(true, true, true, true);
 	}
 
 	inline std::tuple<float, float, float, float> ClearColor(float r, float g, float b, float a) {
