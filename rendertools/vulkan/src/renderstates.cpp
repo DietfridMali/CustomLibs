@@ -144,38 +144,38 @@ VkPipelineDepthStencilStateCreateInfo& RenderStates::SetDepthStencilInfo(VkPipel
 
 VkPipelineColorBlendAttachmentState& RenderStates::SetBlendAttachment(VkPipelineColorBlendAttachmentState& att) const noexcept
 {
-    att.blendEnable = blendEnable ? VK_TRUE : VK_FALSE;
-    att.srcColorBlendFactor = ToVkBlend(blendSrcRGB);
-    att.dstColorBlendFactor = ToVkBlend(blendDstRGB);
-    att.colorBlendOp = ToVkBlendOp(blendOpRGB);
-    att.srcAlphaBlendFactor = ToVkBlend(blendSrcAlpha);
-    att.dstAlphaBlendFactor = ToVkBlend(blendDstAlpha);
-    att.alphaBlendOp = ToVkBlendOp(blendOpAlpha);
+    att.blendEnable = blendEnable[0] ? VK_TRUE : VK_FALSE;
+    att.srcColorBlendFactor = ToVkBlend(blendSrcRGB[0]);
+    att.dstColorBlendFactor = ToVkBlend(blendDstRGB[0]);
+    att.colorBlendOp = ToVkBlendOp(blendOpRGB[0]);
+    att.srcAlphaBlendFactor = ToVkBlend(blendSrcAlpha[0]);
+    att.dstAlphaBlendFactor = ToVkBlend(blendDstAlpha[0]);
+    att.alphaBlendOp = ToVkBlendOp(blendOpAlpha[0]);
 
     att.colorWriteMask = 0;
-    if (colorMask & 0x01) att.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
-    if (colorMask & 0x02) att.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
-    if (colorMask & 0x04) att.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
-    if (colorMask & 0x08) att.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
+    if (colorMask[0] & 0x01) att.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
+    if (colorMask[0] & 0x02) att.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
+    if (colorMask[0] & 0x04) att.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
+    if (colorMask[0] & 0x08) att.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
     return att;
 }
 
 
 VkPipelineColorBlendAttachmentState& RenderStates::SetBlendAttachment1(VkPipelineColorBlendAttachmentState& att) const noexcept
 {
-    att.blendEnable = blendEnable1 ? VK_TRUE : VK_FALSE;
-    att.srcColorBlendFactor = ToVkBlend(blendSrcRGB1);
-    att.dstColorBlendFactor = ToVkBlend(blendDstRGB1);
-    att.colorBlendOp = ToVkBlendOp(blendOpRGB1);
-    att.srcAlphaBlendFactor = ToVkBlend(blendSrcAlpha1);
-    att.dstAlphaBlendFactor = ToVkBlend(blendDstAlpha1);
-    att.alphaBlendOp = ToVkBlendOp(blendOpAlpha1);
+    att.blendEnable = blendEnable[1] ? VK_TRUE : VK_FALSE;
+    att.srcColorBlendFactor = ToVkBlend(blendSrcRGB[1]);
+    att.dstColorBlendFactor = ToVkBlend(blendDstRGB[1]);
+    att.colorBlendOp = ToVkBlendOp(blendOpRGB[1]);
+    att.srcAlphaBlendFactor = ToVkBlend(blendSrcAlpha[1]);
+    att.dstAlphaBlendFactor = ToVkBlend(blendDstAlpha[1]);
+    att.alphaBlendOp = ToVkBlendOp(blendOpAlpha[1]);
 
     att.colorWriteMask = 0;
-    if (colorMask1 & 0x01) att.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
-    if (colorMask1 & 0x02) att.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
-    if (colorMask1 & 0x04) att.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
-    if (colorMask1 & 0x08) att.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
+    if (colorMask[1] & 0x01) att.colorWriteMask |= VK_COLOR_COMPONENT_R_BIT;
+    if (colorMask[1] & 0x02) att.colorWriteMask |= VK_COLOR_COMPONENT_G_BIT;
+    if (colorMask[1] & 0x04) att.colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
+    if (colorMask[1] & 0x08) att.colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
     return att;
 }
 

@@ -304,9 +304,13 @@ public:
 		return FuncState<GLenum, GL_NONE>(state, stateID, glDepthFunc);
 	}
 
-	inline GLenum BlendEquation(GLenum state) {
+	inline GLenum BlendEquation(GLenum state, int bufferIndex = -1) {
 		static int32_t stateID = -1;
-		return FuncState<GLenum, GL_NONE>(state, stateID, glBlendEquation);
+		if (bufferIndex < 0)
+			return FuncState<GLenum, GL_NONE>(state, stateID, glBlendEquation);
+		stateID = -1;
+		glBlendEquation(bufferIndex, state);
+		return -1;
 	}
 
 	inline GLenum FrontFace(GLenum state) {
@@ -374,8 +378,8 @@ public:
 		return mode;
 	}
 
-	inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp op) {
-		BlendEquation(GfxToGL::ToGLenum(op));
+	inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp op, int bufferIndex = -1) {
+		BlendEquation(GfxToGL::ToGLenum(op), bufferIndex);
 		return op;
 	}
 
