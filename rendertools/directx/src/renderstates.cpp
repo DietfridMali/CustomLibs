@@ -117,29 +117,29 @@ D3D12_RASTERIZER_DESC& RenderStates::SetRasterizerDesc(D3D12_RASTERIZER_DESC& de
 
 
 D3D12_BLEND_DESC RenderStates::SetBlendDesc(D3D12_BLEND_DESC& desc) {
-    desc.RenderTarget[0].RenderTargetWriteMask = colorMask;
-    if (blendEnable) {
+    desc.RenderTarget[0].RenderTargetWriteMask = colorMask[0];
+    if (blendEnable[0]) {
         desc.RenderTarget[0].BlendEnable = TRUE;
-        desc.RenderTarget[0].SrcBlend = ToD3DBlend(blendSrcRGB);
-        desc.RenderTarget[0].DestBlend = ToD3DBlend(blendDstRGB);
-        desc.RenderTarget[0].BlendOp = ToD3DBlendOp(blendOpRGB);
-        desc.RenderTarget[0].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha);
-        desc.RenderTarget[0].DestBlendAlpha = ToD3DBlend(blendDstAlpha);
-        desc.RenderTarget[0].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha);
+        desc.RenderTarget[0].SrcBlend = ToD3DBlend(blendSrcRGB[0]);
+        desc.RenderTarget[0].DestBlend = ToD3DBlend(blendDstRGB[0]);
+        desc.RenderTarget[0].BlendOp = ToD3DBlendOp(blendOpRGB[0]);
+        desc.RenderTarget[0].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha[0]);
+        desc.RenderTarget[0].DestBlendAlpha = ToD3DBlend(blendDstAlpha[0]);
+        desc.RenderTarget[0].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha[0]);
     }
     // Independent RT1 blend (e.g. WBOIT: RT0 additive accum, RT1 multiplicative revealage). Only when
     // requested; otherwise IndependentBlendEnable stays FALSE and RT0's blend replicates to all targets.
     if (independentBlend) {
         desc.IndependentBlendEnable = TRUE;
-        desc.RenderTarget[1].RenderTargetWriteMask = colorMask1;
-        if (blendEnable1) {
+        desc.RenderTarget[1].RenderTargetWriteMask = colorMask[1];
+        if (blendEnable[1]) {
             desc.RenderTarget[1].BlendEnable = TRUE;
-            desc.RenderTarget[1].SrcBlend = ToD3DBlend(blendSrcRGB1);
-            desc.RenderTarget[1].DestBlend = ToD3DBlend(blendDstRGB1);
-            desc.RenderTarget[1].BlendOp = ToD3DBlendOp(blendOpRGB1);
-            desc.RenderTarget[1].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha1);
-            desc.RenderTarget[1].DestBlendAlpha = ToD3DBlend(blendDstAlpha1);
-            desc.RenderTarget[1].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha1);
+            desc.RenderTarget[1].SrcBlend = ToD3DBlend(blendSrcRGB[1]);
+            desc.RenderTarget[1].DestBlend = ToD3DBlend(blendDstRGB[1]);
+            desc.RenderTarget[1].BlendOp = ToD3DBlendOp(blendOpRGB[1]);
+            desc.RenderTarget[1].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha[1]);
+            desc.RenderTarget[1].DestBlendAlpha = ToD3DBlend(blendDstAlpha[1]);
+            desc.RenderTarget[1].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha[1]);
         }
         // RT2 (3-MRT G-buffer worldPos) must stay an opaque full write under independent blending: once
         // IndependentBlendEnable stops RT0's replication, the zero-initialised RT2 desc has WriteMask 0 and

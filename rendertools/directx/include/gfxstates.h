@@ -291,10 +291,10 @@ public:
         return prevState;
     }
 
-    inline int SetBlending(int state) {
+    inline int SetBlending(int state, int bufferIndex = 0) {
         auto& s = ActiveState();
-        int prevState = int(s.blendEnable);
-        s.blendEnable = uint8_t(state);
+        int prevState = int(s.blendEnable[bufferIndex]);
+        s.blendEnable[bufferIndex] = uint8_t(state);
         return prevState;
     }
 
@@ -366,11 +366,11 @@ public:
         return prevState;
     }
 
-    inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp state) {
+    inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp state, int bufferIndex = 0) {
         auto& s = ActiveState();
-        auto prevState = s.blendOpRGB;
-        s.blendOpRGB = state;
-        s.blendOpAlpha = state;
+        auto prevState = s.blendOpRGB[bufferIndex];
+        s.blendOpRGB[bufferIndex] = state;
+        s.blendOpAlpha[bufferIndex] = state;
         return prevState;
     }
 
@@ -395,17 +395,18 @@ public:
         s.depthBias = int32_t(units);
     }
 
-    inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
-        BlendFuncSeparate(src, dst, src, dst);
+    inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst, int bufferIndex = 0) {
+        BlendFuncSeparate(src, dst, src, dst, bufferIndex);
     }
 
     inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
-        GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
+                                  GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha,
+                                  int bufferIndex = 0) {
         auto& s = ActiveState();
-        s.blendSrcRGB = srcRGB;
-        s.blendDstRGB = dstRGB;
-        s.blendSrcAlpha = srcAlpha;
-        s.blendDstAlpha = dstAlpha;
+        s.blendSrcRGB[bufferIndex] = srcRGB;
+        s.blendDstRGB[bufferIndex] = dstRGB;
+        s.blendSrcAlpha[bufferIndex] = srcAlpha;
+        s.blendDstAlpha[bufferIndex] = dstAlpha;
     }
 
     // Independent per-RT blending for MRT passes (e.g. WBOIT: RT0 additive accum, RT1 multiplicative
@@ -416,38 +417,6 @@ public:
         int prevState = int(s.independentBlend);
         s.independentBlend = uint8_t(state);
         return prevState;
-    }
-
-    inline int SetBlendingRT1(int state) {
-        auto& s = ActiveState();
-        int prevState = int(s.blendEnable1);
-        s.blendEnable1 = uint8_t(state);
-        return prevState;
-    }
-
-    // RT2 (3-MRT G-buffer worldPos) is forced opaque in SetBlendDesc (RenderTargetWriteMask = ALL); nothing to
-    // toggle per draw here -- provided for API parity with the GL backend's explicit per-RT blend disable.
-    inline int SetBlendingRT2(int) { return 0; }
-
-    inline void BlendFuncRT1(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
-        auto& s = ActiveState();
-        s.blendSrcRGB1 = src;
-        s.blendDstRGB1 = dst;
-        s.blendSrcAlpha1 = src;
-        s.blendDstAlpha1 = dst;
-    }
-
-    // Separate RGB/alpha RT1 blend. Needed when the RGB factor is a *colour* factor (SrcColor/InvSrcColor/
-    // DestColor/...): D3D12 rejects those in the alpha slots, so the alpha blend must use an alpha-only
-    // factor. (WBOIT revealage: RGB = Zero/InvSrcColor for the (1-alpha) product; alpha is unused -> any
-    // valid alpha factor, e.g. Zero/InvSrcAlpha.)
-    inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
-        GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
-        auto& s = ActiveState();
-        s.blendSrcRGB1 = srcRGB;
-        s.blendDstRGB1 = dstRGB;
-        s.blendSrcAlpha1 = srcAlpha;
-        s.blendDstAlpha1 = dstAlpha;
     }
 
     inline RGBAColor ClearColor(RGBAColor color) {
@@ -482,10 +451,10 @@ public:
             m_clearColor = m_clearColorStack.Pop();
     }
 
-    inline std::tuple<bool, bool, bool, bool> ColorMask(bool r, bool g, bool b, bool a) {
+    inline std::tuple<bool, bool, bool, bool> ColorMask(bool r, bool g, bool b, bool a, int bufferIndex = 0) {
         auto& s = ActiveState();
-        uint8_t prevState = s.colorMask;
-        s.colorMask = uint8_t((r ? 1u : 0u) | (g ? 2u : 0u) | (b ? 4u : 0u) | (a ? 8u : 0u));;
+        uint8_t prevState = s.colorMask[bufferIndex];
+        s.colorMask[bufferIndex] = uint8_t((r ? 1u : 0u) | (g ? 2u : 0u) | (b ? 4u : 0u) | (a ? 8u : 0u));;
         return { bool(prevState & 1u), bool(prevState & 2u), bool(prevState & 4u), bool(prevState & 8u) };
     }
 

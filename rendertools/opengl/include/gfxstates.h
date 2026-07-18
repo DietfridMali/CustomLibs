@@ -182,10 +182,13 @@ public:
 	}
 
 	template<GLenum stateID>
-	inline int SetState(int state) {
+	inline int SetState(int state, bool invalidate = false) {
 		static int current = -1;
-		if (state < 0)
+		if (state < 0) {
+			if (invalidate)
+				current = -1;
 			return current;
+		}
 		int previous = current;
 		if (ENFORCE_STATE or (current != state)) {
 			current = state;
@@ -199,7 +202,16 @@ public:
 
 	inline int SetDepthTest(int state) { return SetState<GL_DEPTH_TEST>(state); }
 
-	inline int SetBlending(int state) { return SetState<GL_BLEND>(state); }
+	inline int SetBlending(int state, int bufferIndex = -1) { 
+		if (bufferIndex < 0)
+			return SetState<GL_BLEND>(state); 
+		SetState<GL_BLEND>(-1, true);
+		if (state)
+			glEnablei(GL_BLEND, bufferIndex);
+		else
+			glDisablei(GL_BLEND, bufferIndex);
+		return -1;
+	}
 
 	inline int SetFaceCulling(int state) { return SetState<GL_CULL_FACE>(state); }
 
@@ -332,14 +344,18 @@ public:
 		return RGBAColor{ std::get<0>(t), std::get<1>(t), std::get<2>(t), std::get<3>(t) };
 	}
 
-	inline std::tuple<GLenum, GLenum> BlendFunc(GLenum sFactor, GLenum dFactor) {
-		auto previous = BlendFuncSeparate(sFactor, dFactor, sFactor, dFactor);
+	inline std::tuple<GLenum, GLenum> BlendFunc(GLenum sFactor, GLenum dFactor, int bufferIndex = -1) {
+		auto previous = BlendFuncSeparate(sFactor, dFactor, sFactor, dFactor, bufferIndex);
 		return std::make_tuple(std::get<0>(previous), std::get<1>(previous));
 	}
 
-	inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA) {
+	inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA, int bufferIndex = -1) {
 		static int32_t stateID = -1;
-		return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
+		if (bufferIndex < 0)
+			return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
+		stateID = -1;
+		glBlendFuncSeparatei(bufferIndex, srcRGB, dstRGB, srcA, dstA);
+		return std::make_tuple(0, 0, 0, 0);
 	}
 
 	// GfxOperations overloads — shared code uses these; internally convert to GLenum
@@ -363,14 +379,8 @@ public:
 		return op;
 	}
 
-	inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
-		BlendFunc(GfxToGL::ToGLenum(src), GfxToGL::ToGLenum(dst));
-	}
-
-	inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
-		GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
-		BlendFuncSeparate(GfxToGL::ToGLenum(srcRGB), GfxToGL::ToGLenum(dstRGB),
-			GfxToGL::ToGLenum(srcAlpha), GfxToGL::ToGLenum(dstAlpha));
+	inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst, int bufferIndex = -1) {
+		BlendFunc(GfxToGL::ToGLenum(src), GfxToGL::ToGLenum(dst), bufferIndex);
 	}
 
 	// Independent per-RT blend (WBOIT: RT0 additive accum, RT1 multiplicative revealage). GL has per-draw-
@@ -380,26 +390,10 @@ public:
 	// (BlendFuncRT1) and re-issue the global BlendFunc so RT1 does not stay desynced for a later MRT pass.
 	inline int SetIndependentBlend(int) { return 0; }
 
-	inline int SetBlendingRT1(int state) {
-		if (state) glEnablei(GL_BLEND, 1); else glDisablei(GL_BLEND, 1);
-		return 0;
-	}
-
-	// RT2 (3-MRT G-buffer worldPos) must stay opaque while RT0 (glass colour) blends: the global BlendFunc
-	// enables blend on every draw buffer, so disable it on RT2 explicitly (DX/VK force this in the pipeline).
-	inline int SetBlendingRT2(int state) {
-		if (state) glEnablei(GL_BLEND, 2); else glDisablei(GL_BLEND, 2);
-		return 0;
-	}
-
-	inline void BlendFuncSeparateRT1(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
-		GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha) {
-		glBlendFuncSeparatei(1, GfxToGL::ToGLenum(srcRGB), GfxToGL::ToGLenum(dstRGB),
-			GfxToGL::ToGLenum(srcAlpha), GfxToGL::ToGLenum(dstAlpha));
-	}
-
-	inline void BlendFuncRT1(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst) {
-		BlendFuncSeparateRT1(src, dst, src, dst);
+	inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
+								  GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha,
+								  int bufferIndex = -1) {
+		BlendFuncSeparate(GfxToGL::ToGLenum(srcRGB), GfxToGL::ToGLenum(dstRGB), GfxToGL::ToGLenum(srcAlpha), GfxToGL::ToGLenum(dstAlpha), bufferIndex);
 	}
 
 	inline void StencilFunc(GfxOperations::CompareFunc func, uint8_t ref, uint8_t mask) {

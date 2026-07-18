@@ -30,26 +30,18 @@ struct RenderStates {
     CompareFunc depthFunc{ CompareFunc::LessEqual };
     uint8_t     stencilTest{ 0 };
     // Blend (RT0)
-    uint8_t     blendEnable{ 0 };
-    BlendFactor blendSrcRGB{ BlendFactor::SrcAlpha };
-    BlendFactor blendDstRGB{ BlendFactor::InvSrcAlpha };
-    BlendFactor blendSrcAlpha{ BlendFactor::SrcAlpha };
-    BlendFactor blendDstAlpha{ BlendFactor::InvSrcAlpha };
-    BlendOp     blendOpRGB{ BlendOp::Add };
-    BlendOp     blendOpAlpha{ BlendOp::Add };
+    uint8_t     blendEnable[2]{ 0, 0 };
+    BlendFactor blendSrcRGB[2]{ BlendFactor::SrcAlpha, BlendFactor::One };
+    BlendFactor blendDstRGB[2]{ BlendFactor::InvSrcAlpha, BlendFactor::Zero };
+    BlendFactor blendSrcAlpha[2]{ BlendFactor::SrcAlpha, BlendFactor::One };
+    BlendFactor blendDstAlpha[2]{ BlendFactor::InvSrcAlpha, BlendFactor::Zero };
+    BlendOp     blendOpRGB[2]{ BlendOp::Add, BlendOp::Add };
+    BlendOp     blendOpAlpha[2]{ BlendOp::Add, BlendOp::Add };
     // Independent blend for RT1 (MRT passes that need a different blend per target, e.g. WBOIT: RT0
     // additive accum, RT1 multiplicative revealage). 0 -> RT0's blend applies to all targets (default).
     uint8_t     independentBlend{ 0 };
-    uint8_t     blendEnable1{ 0 };
-    BlendFactor blendSrcRGB1{ BlendFactor::One };
-    BlendFactor blendDstRGB1{ BlendFactor::Zero };
-    BlendFactor blendSrcAlpha1{ BlendFactor::One };
-    BlendFactor blendDstAlpha1{ BlendFactor::Zero };
-    BlendOp     blendOpRGB1{ BlendOp::Add };
-    BlendOp     blendOpAlpha1{ BlendOp::Add };
-    uint8_t     colorMask1{ 0x0F };
     // Color mask (bit0=R bit1=G bit2=B bit3=A)
-    uint8_t     colorMask{ 0x0F };
+    uint8_t     colorMask[2]{ 0x0F, 0x0F };
     // Scissor
     uint8_t     scissorTest{ 0 };
     // Stencil comparison (applied to both faces)

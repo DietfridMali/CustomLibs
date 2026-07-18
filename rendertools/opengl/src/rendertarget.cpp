@@ -540,7 +540,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool deactivate = false;
     if (params.destination >= 0) {
         deactivate = not IsActive();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = true, .reactivate = not deactivate }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = params.clearBuffer, .reactivate = not deactivate }))
             return false;
         m_lastDestination = params.destination;
     }
@@ -576,6 +576,9 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
         {
             if (params.premultiply)
                 m_viewportArea.Premultiply();
+            // DX/VK parity: the no-shader composite sets its own 2D states (blending on for
+            // screen composites, off for buffer-to-buffer) instead of inheriting the caller's state
+            baseRenderer.Set2DRenderStates(params.destination < 0);
             //m_viewportArea.SetTransformations({ .flipVertically = params.flipVertically == 1 });
             m_viewportArea.Render(nullptr, source, color); // texture has been assigned to m_viewportArea above
         }
