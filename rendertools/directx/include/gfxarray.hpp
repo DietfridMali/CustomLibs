@@ -55,7 +55,20 @@ public:
 
     void Destroy(void) {
         if (m_resource) {
-            descriptorHeaps.FreeSRV(m_uavHandle);
+            // In-flight command lists (previous frames) may still reference the resource, the staging
+            // buffers and the SRV/UAV slot, so a live destroy (e.g. grow-on-demand recreate via Create)
+            // must go through the per-frame deferred release -- same idiom as BufferInfo::Release.
+            // During teardown gfxResourceHandler is inert/gone: free the descriptor slot directly.
+            if (GfxResourceHandler::IsShuttingDown())
+                descriptorHeaps.FreeSRV(m_uavHandle);
+            else {
+                gfxResourceHandler.Track(m_uavHandle);
+                gfxResourceHandler.Track(m_resource);
+                if (m_upload)
+                    gfxResourceHandler.Track(m_upload);
+                if (m_readback)
+                    gfxResourceHandler.Track(m_readback);
+            }
             m_uavHandle = {};
             m_cpuHeap.Reset();
             m_cpuUavHandle = {};

@@ -70,6 +70,16 @@ public:
     inline int     DataSize(void) { return m_data.DataSize(); }
 
     bool Create(int width, int height = 1) {
+        // Recreating over a live buffer (grow-on-demand): previously SUBMITTED frames may still read
+        // it, and there is no deferred-destroy queue for buffers -- sync once before the destroy.
+        // The current frame's still-recording CB never references it (the caller recreates before
+        // Bind), so waiting on the submitted work is sufficient. Recreate is a rare event (a couple
+        // of doublings until the high-water mark), so the stall is acceptable.
+        if (m_buffer != VK_NULL_HANDLE) {
+            VkDevice device = vkContext.Device();
+            if (device != VK_NULL_HANDLE)
+                vkDeviceWaitIdle(device);
+        }
         Destroy();
         m_width  = uint32_t(width);
         m_height = uint32_t(height);
