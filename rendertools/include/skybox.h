@@ -16,6 +16,7 @@ class Skybox
 private:
 	Cubemap* m_skyTextures[3][3] = { { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr } };
 	CloudNoiseTexture* m_noiseTexture{ nullptr };
+	Texture* m_blueNoise{ nullptr };
 	Mesh* m_skybox{ nullptr };
 	int32_t	m_activationTime{ -1 };
 
@@ -24,7 +25,7 @@ public:
 
 	~Skybox() = default;
 
-	bool Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture = nullptr);
+	bool Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture = nullptr, Texture* blueNoise = nullptr);
 
 	bool Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime);
 

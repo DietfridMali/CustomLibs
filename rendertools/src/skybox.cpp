@@ -44,8 +44,9 @@ int Skybox::MaxTextureSize(void) {
 }
 
 
-bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture) {
+bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture, Texture* blueNoise) {
 	m_noiseTexture = noiseTexture;
+	m_blueNoise = blueNoise;
 	int textureSize = MaxTextureSize();
 	if (textureSize < 0)
 		return false;
@@ -101,11 +102,12 @@ Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, flo
 		if (baseRenderer.UsesOpenGL()) {
 			shader->SetInt("sky", 0);
 			shader->SetInt("noiseTex", 1);
+			shader->SetInt("blueNoiseTex", 2);
 		}
 		shader->SetMatrix4f("mView", view.AsArray(), false);
 		shader->SetVector3f("direction", Vector3f({ 0.0f, 0.20f, -0.99f }));   // normalisiert, horizontnah
 #ifdef _DEBUG
-		shader->SetFloat("distance", 20.0f + 10.0f * sinf(currentTime / 1.8e3f));
+		shader->SetFloat("distance", 20.0f + 10.0f * sinf(currentTime / 1.8e4f));
 #else
 		shader->SetFloat("distance", 25.0f + 5.0f * sinf(currentTime / 1.8e6f));
 #endif
@@ -119,7 +121,7 @@ Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, flo
 		shader->SetFloat("brightness", 1.0f); // brightness);
 		shader->SetFloat("noiseScale", 0.25f);
 		shader->SetVector3f("lightDirection", lightDirection);
-		shader->SetFloat("brightness", brightness);
+		shader->SetFloat("brightness", brightness * 6.0f);
 		shader->SetFloat("alpha", alpha);
 	}
     return shader;
@@ -163,9 +165,13 @@ bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, fl
 		if ((m_noiseTexture != nullptr) and (shader = LoadBlackholeShader(view, lightDirection, 1.0f, alpha, currentTime))) {
 			m_skyTextures[1][0]->Activate(0);
 			m_noiseTexture->Activate(1);
+			if (m_blueNoise != nullptr)
+				m_blueNoise->Activate(2);
 			m_skybox->Render({}); // m_skyTextures);
 			m_skyTextures[1][0]->Deactivate();
 			m_noiseTexture->Deactivate();
+			if (m_blueNoise != nullptr)
+				m_blueNoise->Deactivate();
 		}
 		else {
 			skyType = 1;
