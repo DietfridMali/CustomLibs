@@ -214,7 +214,7 @@ std::string PreferDDSName(const char* folder, const std::string& fileName) {
     const size_t slash = fileName.find_last_of("/\\");
     if ((dot == std::string::npos) or ((slash != std::string::npos) and (dot < slash)))
         return fileName;   // no extension to swap
-    const std::string ddsName = fileName.substr(0, dot) + ".dds";
+    const std::string ddsName = fileName.substr(0, dot) + ".DDS";
     std::error_code ec;
     if (std::filesystem::exists(JoinPath(folder, ddsName), ec))
         return ddsName;
