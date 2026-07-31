@@ -7,7 +7,7 @@
 #include "vertexdatabuffers.h"
 #include "texturehandler.h"
 #include "colordata.h"
-#include "coplanar_rectangle.h"
+#include "quad.h"
 #include "mesh.h"
 
 #define USE_STATIC_GFX_DATA 0

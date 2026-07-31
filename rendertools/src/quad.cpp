@@ -7,7 +7,7 @@
 
 #include "std_defines.h"
 #include "conversions.hpp"
-#include "coplanar_rectangle.h"
+#include "quad.h"
 
 // =================================================================================================
 // Geometric computations in planes and rectangles in a plane
