@@ -4,7 +4,7 @@
 #include "vector.hpp"
 #include "colordata.h"
 #include "rectangle.h"
-#include "base_quad.h"
+#include "base_quadmesh.h"
 #include "texture.h"
 #include "viewport.h"
 #include "rendertarget.h"

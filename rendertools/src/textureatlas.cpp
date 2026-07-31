@@ -5,7 +5,7 @@
 
 // =================================================================================================
 
-BaseQuad TextureAtlas::renderQuad;
+BaseQuadMesh TextureAtlas::renderQuad;
 
 TextureAtlas::TextureAtlas()
 	: m_atlas(nullptr)
@@ -17,7 +17,7 @@ TextureAtlas::TextureAtlas()
 
 
 void TextureAtlas::Initialize(void) {
-	renderQuad.Setup(BaseQuad::defaultVertices[BaseQuad::voZero], BaseQuad::defaultTexCoords[BaseQuad::tcRegular], true);
+	renderQuad.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voZero], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular], true);
 	renderQuad.SetTransformations({ .centerOrigin = false, .autoClear = false });
 }
 

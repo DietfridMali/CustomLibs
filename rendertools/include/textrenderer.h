@@ -6,7 +6,7 @@
 #pragma warning(pop)
 
 #include "vector.hpp"
-#include "base_quad.h"
+#include "base_quadmesh.h"
 #include "rendertarget.h"
 #include "dictionary.hpp" // Dictionary<K,V> — faster lookup than std::map
 #include "colordata.h"
@@ -132,7 +132,7 @@ public:
     }
 
 private:
-    BaseQuad& CreateQuad(BaseQuad& q, float x, float y, float w, Texture* t, bool flipVertically);
+    BaseQuadMesh& CreateQuad(BaseQuadMesh& q, float x, float y, float w, Texture* t, bool flipVertically);
 
     RenderTarget* GetRenderTarget(int scale);
 

@@ -27,7 +27,7 @@ void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float
 	h *= width;
 	if (offset)
 		p1 += f * offset;
-	BaseQuad::Setup({ p1 - h - v, p1 - h + v, p1 + h + v, p1 + h - v });
+	BaseQuadMesh::Setup({ p1 - h - v, p1 - h + v, p1 + h + v, p1 + h - v });
 }
 
 
@@ -35,7 +35,7 @@ void  Billboard::Render(void) {
 	gfxStates.SetFaceCulling(0);
 	gfxStates.SetBlending(1);
 	//SetTransformations({ .centerOrigin = true });
-	BaseQuad::Render(nullptr, m_icon);
+	BaseQuadMesh::Render(nullptr, m_icon);
 }
 
 // =================================================================================================

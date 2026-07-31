@@ -41,7 +41,7 @@ protected:
 	GlyphSize		m_glyphSize;
 	Vector2f		m_scale;
 
-	static BaseQuad	renderQuad;
+	static BaseQuadMesh	renderQuad;
 
 public:
 	TextureAtlas();

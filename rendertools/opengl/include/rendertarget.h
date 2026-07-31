@@ -97,7 +97,7 @@ public:
     bool                        m_wasActivated;
     bool                        m_isScreenBuffer;
     int                         m_lastDestination;
-    BaseQuad                    m_viewportArea;
+    BaseQuadMesh                    m_viewportArea;
     eDrawBufferGroups           m_drawBufferGroup;
     RGBAColor                   m_clearColor;
     RenderTarget*               m_depthSource{ nullptr };   // foreign depth buffer attached instead of an own one (SetDepthSource)

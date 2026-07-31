@@ -5,7 +5,7 @@
 #include "rectangle.h"
 #include "vector.hpp"
 #include "matrix.hpp"
-#include "base_quad.h"
+#include "base_quadmesh.h"
 #include "colordata.h"
 
 // =================================================================================================

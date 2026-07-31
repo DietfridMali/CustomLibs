@@ -96,7 +96,7 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
 }
 
 
-BaseQuad& TextRenderer::CreateQuad(BaseQuad& q, float x, float y, float w, Texture* t, bool flipVertically) {
+BaseQuadMesh& TextRenderer::CreateQuad(BaseQuadMesh& q, float x, float y, float w, Texture* t, bool flipVertically) {
     if (flipVertically)
         q.Setup({ Vector3f{x, y, 0.0}, Vector3f{x + w, y, 0.0}, Vector3f{x + w, -y, 0.0}, Vector3f{x, -y, 0.0} },
                 { TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0} });
@@ -112,7 +112,7 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
     Shader* shader = LoadShader();
     if (not shader)
         return;
-    BaseQuad q;
+    BaseQuadMesh q;
     for (auto glyph : text) {
         FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
         if (info->index < 0)

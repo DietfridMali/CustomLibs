@@ -183,7 +183,7 @@ bool RenderTarget::AttachBuffers(bool hasMRTs) {
 
 
 void RenderTarget::CreateRenderArea(void) {
-    m_viewportArea.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter], BaseQuad::defaultTexCoords[BaseQuad::tcRegular]);
+    m_viewportArea.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular]);
     m_viewport = Viewport(0, 0, m_width * m_scale, m_height * m_scale);
 }
 

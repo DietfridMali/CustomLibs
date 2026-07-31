@@ -12,7 +12,7 @@
 // =================================================================================================
 // Geometric computations in planes and rectangles in a plane
 
-CoplanarRectangle::CoplanarRectangle()
+Quad::Quad()
 noexcept
     : m_tolerance(Conversions::NumericTolerance), m_toleranceSquared(Conversions::NumericTolerance* Conversions::NumericTolerance)
 {
@@ -21,20 +21,20 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-CoplanarRectangle::CoplanarRectangle(std::initializer_list<Vector3f> vertices) {
+Quad::Quad(std::initializer_list<Vector3f> vertices) {
     Init(vertices);
 }
 
 // -------------------------------------------------------------------------------------------------
 
-CoplanarRectangle& CoplanarRectangle::operator= (std::initializer_list<Vector3f> vertices) {
+Quad& Quad::operator= (std::initializer_list<Vector3f> vertices) {
     Init(vertices);
     return *this;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-int CoplanarRectangle::Winding(void)
+int Quad::Winding(void)
 noexcept
 {
     Vector3f e0 = m_coordinates[1] - m_coordinates[0];
@@ -45,7 +45,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-void CoplanarRectangle::Init(std::initializer_list<Vector3f> vertices) {
+void Quad::Init(std::initializer_list<Vector3f> vertices) {
     m_tolerance = Conversions::NumericTolerance;
     m_coordinates = vertices;
 #if 0
@@ -65,7 +65,7 @@ void CoplanarRectangle::Init(std::initializer_list<Vector3f> vertices) {
 
 // -------------------------------------------------------------------------------------------------
 
-void CoplanarRectangle::Translate(Vector3f t)
+void Quad::Translate(Vector3f t)
 noexcept
 {
     m_center += t;
@@ -78,7 +78,7 @@ noexcept
 // -------------------------------------------------------------------------------------------------
 // project point p onto plane (i.e. compute a point in the plane 
 // so that a vector from that point to p is perpendicular to the plane)
-float CoplanarRectangle::Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
+float Quad::Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
 noexcept
 {
     float d = Distance(p);
@@ -88,7 +88,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-float CoplanarRectangle::NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
+float Quad::NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
 noexcept
 {
     Vector3f vLine = p1 - p0; // Richtungsvektor der Linie
@@ -109,7 +109,7 @@ noexcept
 // if clampToSegment is true, the distance is computed to the line segment p0 - p1. Otherwise p0,p1 define an infinite line
 // and the perpendicular distance from p2 to that line is computed
 
-float CoplanarRectangle::PointToLineDistanceEx(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1, bool clampToSegment, bool squared)
+float Quad::PointToLineDistanceEx(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1, bool clampToSegment, bool squared)
 noexcept
 {
     Vector3f v = lp1;
@@ -136,7 +136,7 @@ noexcept
 // Will return None if v parallel to the plane or doesn't intersect with plane 
 // (i.e. both points are on the same side of the plane)
 // returns: -1 -> no hit, 0 -> touched at vCoplanarRectanglePoint, 1 -> penetrated at vCoplanarRectanglePoint
-int CoplanarRectangle::LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vCoplanarRectanglePoint)
+int Quad::LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vCoplanarRectanglePoint)
 noexcept
 {
     Vector3f vLine = p1 - p0;
@@ -172,7 +172,7 @@ noexcept
 // -------------------------------------------------------------------------------------------------
 // find point on line p0 - p1 with distance d to plane
 // returns: -1 -> no point found, 0: line is parallel to plane, 1: point returned in vCoplanarRectanglePoint
-int CoplanarRectangle::PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
+int Quad::PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
 noexcept
 {
     float denom = line.Normal().Dot(line.Velocity());
@@ -193,7 +193,7 @@ noexcept
 // -------------------------------------------------------------------------------------------------
 // barycentric method for testing whether a point lies in an arbitrarily shaped triangle
 // not needed for rectangular shapes in a plane
-bool CoplanarRectangle::TriangleContains(const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c)
+bool Quad::TriangleContains(const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c)
 noexcept
 {
     Vector3f ab = b - a;
@@ -215,7 +215,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-bool CoplanarRectangle::Contains(Vector3f& p, bool barycentric)
+bool Quad::Contains(Vector3f& p, bool barycentric)
 noexcept
 {
     // barycentric method is rather computation heavy and not needed for rectangles in a plane
@@ -236,7 +236,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-bool CoplanarRectangle::SpherePenetratesQuad(LineSegment& line, float radius)
+bool Quad::SpherePenetratesQuad(LineSegment& line, float radius)
 noexcept
 {
     // Projektion von p0 in die Ebene und Innen-Test
@@ -259,7 +259,7 @@ noexcept
 
 // -------------------------------------------------------------------------------------------------
 
-int CoplanarRectangle::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
+int Quad::SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
 noexcept
 {
     float d0 = Distance(line.pts.p0);
@@ -362,7 +362,7 @@ static float SegmentSegmentDistance(Vector3f p0, Vector3f p1, Vector3f q0, Vecto
 
 // -------------------------------------------------------------------------------------------------
 
-float CoplanarRectangle::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
+float Quad::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
     // rect[0] is origin, rect[1] and rect[3] define the two perpendicular axes
     Vector3f axisX = m_coordinates[1] - m_coordinates[0];
     Vector3f axisY = m_coordinates[3] - m_coordinates[0];
@@ -372,7 +372,7 @@ float CoplanarRectangle::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
     // Normalize axes for projection
     Vector3f u = axisX * (1.0f / ((width > m_toleranceSquared) ? width : 1.0f));
     Vector3f v = axisY * (1.0f / ((height > m_toleranceSquared) ? height : 1.0f));
-    Vector3f normal = u.Cross(v); // CoplanarRectangle normal
+    Vector3f normal = u.Cross(v); // Quad normal
 
     // 1. Intersection & Quasi-Parallel check
     Vector3f segDir = s2 - s1;
@@ -417,7 +417,7 @@ float CoplanarRectangle::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
 
 // -------------------------------------------------------------------------------------------------
 
-float CoplanarRectangle::PointDistance(Vector3f p, bool intersectRectangle) noexcept {
+float Quad::PointDistance(Vector3f p, bool intersectRectangle) noexcept {
 	Vector3f pIntersect;
 	float distToPlane = Project(p, pIntersect);
     if (Contains(pIntersect))

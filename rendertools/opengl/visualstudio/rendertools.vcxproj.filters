@@ -60,7 +60,7 @@
     <ClInclude Include="..\..\include\projector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\base_quad.h">
+    <ClInclude Include="..\..\include\base_quadmesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\rectangle.h">
@@ -105,7 +105,7 @@
     <ClInclude Include="..\..\include\linesegment.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\coplanar_rectangle.h">
+    <ClInclude Include="..\..\include\quad.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\movement.h">
@@ -230,7 +230,7 @@
     <ClCompile Include="..\..\src\projector.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\base_quad.cpp">
+    <ClCompile Include="..\..\src\base_quadmesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\rendermatrices.cpp">
@@ -239,7 +239,7 @@
     <ClCompile Include="..\..\src\viewport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\coplanar_rectangle.cpp">
+    <ClCompile Include="..\..\src\quad.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\texteffects.cpp">

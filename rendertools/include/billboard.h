@@ -1,12 +1,12 @@
 #pragma once
 
-#include "base_quad.h"
+#include "base_quadmesh.h"
 #include "texture.h"
 
 // =================================================================================================
 
 class Billboard 
-	: public BaseQuad
+	: public BaseQuadMesh
 {
 protected:
 	Texture* m_icon;

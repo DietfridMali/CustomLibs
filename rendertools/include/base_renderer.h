@@ -54,7 +54,7 @@ protected:
     Viewport                m_sceneViewport;
     Vector2f                m_ndcScale;
     Vector2f                m_ndcBias;
-    BaseQuad                m_renderQuad;
+    BaseQuadMesh                m_renderQuad;
 
     int                     m_renderQuality;
     int                     m_frameIndex;
@@ -320,7 +320,7 @@ public:
         gfxStates.ResetClearColor();
     }
 
-    inline BaseQuad& RenderQuad(void) noexcept { 
+    inline BaseQuadMesh& RenderQuad(void) noexcept { 
         return m_renderQuad; 
     }
 

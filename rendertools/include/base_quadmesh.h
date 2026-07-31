@@ -14,8 +14,8 @@
 
 // =================================================================================================
 
-class BaseQuad
-    : public CoplanarRectangle
+class BaseQuadMesh
+    : public Quad
     , public Mesh
 {
 public:
@@ -68,7 +68,7 @@ public:
     static std::initializer_list<Vector3f> defaultVertices[3];
     static std::initializer_list<TexCoord> defaultTexCoords[6];
 
-    BaseQuad()
+    BaseQuadMesh()
         : m_aspectRatio(1.0f)
         , m_offset(0.0f)
         , m_isAvailable(false)
@@ -80,9 +80,9 @@ public:
 
 #pragma warning(push)
 #pragma warning(disable:4100)
-    BaseQuad(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateGfxData = false)
+    BaseQuadMesh(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateGfxData = false)
 #pragma warning(pop)
-        : CoplanarRectangle(vertices)
+        : Quad(vertices)
         , m_isAvailable(true)
         , m_privateGfxData(privateGfxData)
         , m_premultiply(false)
@@ -91,26 +91,26 @@ public:
         Setup(vertices, texCoords);
     }
 
-    BaseQuad(const BaseQuad& other) {
+    BaseQuadMesh(const BaseQuadMesh& other) {
         Copy(other);
     }
 
-    ~BaseQuad() = default;
+    ~BaseQuadMesh() = default;
 
     void Init(void);
 
     virtual bool Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateGfxData = false);
 
-    BaseQuad& Copy(const BaseQuad& other);
+    BaseQuadMesh& Copy(const BaseQuadMesh& other);
 
-    BaseQuad& Move(BaseQuad& other)
+    BaseQuadMesh& Move(BaseQuadMesh& other)
  noexcept;
 
-    BaseQuad& operator= (const BaseQuad& other) {
+    BaseQuadMesh& operator= (const BaseQuadMesh& other) {
         return Copy(other);
     }
 
-    BaseQuad& operator= (BaseQuad&& other) noexcept {
+    BaseQuadMesh& operator= (BaseQuadMesh&& other) noexcept {
         return Move(other);
     }
 
