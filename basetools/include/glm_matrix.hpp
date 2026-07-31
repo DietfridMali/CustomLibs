@@ -32,13 +32,8 @@ public:
     // Assigning an angle vector (x = pitch, y = heading, z = bank; degrees) builds the
     // rotation matrix from it via EulerComputeYXZ (Descent order Ry*Rx*Rz).
     // An assigned matrix IS that orientation, so this never transposes.
-    Matrix4f& operator=(const Vector3f& angles)
-        noexcept(noexcept(Rotation(std::declval<Matrix4f&>(), std::declval<float>(), std::declval<float>(), std::declval<float>(), std::declval<bool>())))
-    {
-        return Rotation(*this, angles.X(), angles.Y(), angles.Z(), false);
-    }
-
-    // same for the type safe angle vector; defined in anglevector.hpp
+    // Only AngleVector, never a plain Vector3f - that took any vector, angles or not.
+    // Defined in anglevector.hpp.
     Matrix4f& operator=(const AngleVector& angles) noexcept;
 
     // ===== Constructors =====
@@ -164,6 +159,10 @@ public:
     // Orthonormal basis from a forward vector, put in the columns (object orientation).
     // A zero up or right vector is computed from the others; if both are zero, both are.
     static Matrix4f Create(const Vector3f& f, const Vector3f& u = Vector3f::ZERO, const Vector3f& r = Vector3f::ZERO) noexcept;
+
+    // An AngleVector would bind to the forward vector above and be read as a direction.
+    // Deleted so that this is a compiler error instead - use Rotation () or the ctor.
+    static Matrix4f Create(const AngleVector& f, const Vector3f& u = Vector3f::ZERO, const Vector3f& r = Vector3f::ZERO) = delete;
 
     // ===== Member transforms =====
     Matrix4f& Translate(float x, float y, float z)
