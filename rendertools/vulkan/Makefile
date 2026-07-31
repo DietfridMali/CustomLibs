@@ -58,11 +58,10 @@ VULKAN_FILES := \
 
 COMMON_FILES := \
  base_noisetexture \
- base_quad \
+ base_quadmesh \
  base_renderer \
  base_shaderhandler \
  billboard \
- coplanar_rectangle \
  cube \
  drawbufferhandler \
  ddsloader \
@@ -76,6 +75,7 @@ COMMON_FILES := \
  noise \
  prerenderedtexture \
  projector \
+ quad \
  rendermatrices \
  shadowmap \
  skybox \
