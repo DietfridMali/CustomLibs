@@ -7,7 +7,7 @@
 #include "colordata.h"
 #include "descriptor_heap.h"
 #include "commandlist.h"
-#include "base_quad.h"
+#include "base_quadmesh.h"
 #include "drawbufferhandler.h"
 #include "resource_view.h"
 #ifdef _DEBUG
@@ -196,7 +196,7 @@ public:
     RenderTargetTexture m_renderTexture;
     RenderTargetTexture m_depthTexture;
     ShadowTexture       m_shadowTexture; // ShadowTexture mit Compare-Sampler fuer HW-PCF (sampler2DShadow-Aequivalent)
-    BaseQuad            m_viewportArea;
+    BaseQuadMesh        m_viewportArea;
 
     AutoArray<BufferInfo>   m_bufferInfo;
 
