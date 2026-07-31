@@ -50,28 +50,87 @@ Matrix4f& Matrix4f::EulerComputeZYX(float sinX, float cosX, float sinY, float co
 }
 
 
-Matrix4f& Matrix4f::EulerComputeYXZ(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ) noexcept {
-    // Descent/D2 rotation order Ry(heading) * Rx(pitch) * Rz(bank), stored in the same (transposed/view)
-    // convention as EulerComputeZYX. Reproduces CFixMatrix::Create bit-for-bit with X=pitch, Y=heading, Z=bank.
-    m[0][0] = cosY * cosZ + sinY * sinX * sinZ;
-    m[0][1] = -cosY * sinZ + sinY * sinX * cosZ;
-    m[0][2] = sinY * cosX;
-    m[0][3] = 0.0f;
+static bool NormalizeVec(glm::vec3& v) noexcept {
+    float l = glm::length(v);
+    if (l == 0.0f)
+        return false;
+    v /= l;
+    return true;
+}
 
-    m[1][0] = cosX * sinZ;
-    m[1][1] = cosX * cosZ;
-    m[1][2] = -sinX;
-    m[1][3] = 0.0f;
 
-    m[2][0] = -sinY * cosZ + cosY * sinX * sinZ;
-    m[2][1] = sinY * sinZ + cosY * sinX * cosZ;
-    m[2][2] = cosY * cosX;
-    m[2][3] = 0.0f;
+// right and up for a forward vector that carries no other information
+static void BasisFromForward(glm::vec3& r, glm::vec3& u, const glm::vec3& f) noexcept {
+    if ((f.x == 0.0f) and (f.z == 0.0f)) { // straight up or down
+        r = glm::vec3(1.0f, 0.0f, 0.0f);
+        u = glm::vec3(0.0f, 0.0f, (f.y < 0.0f) ? 1.0f : -1.0f);
+    }
+    else {
+        r = glm::vec3(f.z, 0.0f, -f.x);
+        NormalizeVec(r);
+        u = glm::cross(f, r);
+    }
+}
 
-    m[3][0] = 0.0f;
-    m[3][1] = 0.0f;
-    m[3][2] = 0.0f;
-    m[3][3] = 1.0f;
+
+Matrix4f Matrix4f::Create(const Vector3f& fVec, const Vector3f& uVec, const Vector3f& rVec) noexcept {
+    glm::vec3 f(fVec), u(0.0f), r(0.0f);
+
+    NormalizeVec(f);
+    if (not uVec.IsZero()) {
+        u = glm::vec3(uVec);
+        if (not NormalizeVec(u))
+            BasisFromForward(r, u, f);
+        r = glm::cross(u, f);
+        if (not NormalizeVec(r))
+            BasisFromForward(r, u, f);
+        u = glm::cross(f, r);
+    }
+    else if (not rVec.IsZero()) {
+        r = glm::vec3(rVec);
+        if (not NormalizeVec(r))
+            BasisFromForward(r, u, f);
+        u = glm::cross(f, r);
+        if (not NormalizeVec(u))
+            BasisFromForward(r, u, f);
+        r = glm::cross(u, f);
+    }
+    else
+        BasisFromForward(r, u, f);
+
+    Matrix4f m;
+    m.m[0] = glm::vec4(r, 0.0f);
+    m.m[1] = glm::vec4(u, 0.0f);
+    m.m[2] = glm::vec4(f, 0.0f);
+    m.m[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    return m;
+}
+
+
+Matrix4f& Matrix4f::EulerComputeYXZ(float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ, bool transpose) noexcept {
+    // Descent/D2 rotation order Ry(heading) * Rx(pitch) * Rz(bank), X=pitch, Y=heading, Z=bank.
+    // The three axis vectors are the ones CFixMatrix::Create computes (r, u, f).
+    // transpose = true for camera matrices, false for object orientations
+    const float sbsh = sinZ * sinY;
+    const float cbch = cosZ * cosY;
+    const float cbsh = cosZ * sinY;
+    const float sbch = sinZ * cosY;
+
+    const glm::vec3 r(cbch + sinX * sbsh, sinZ * cosX, sinX * sbch - cbsh);
+    const glm::vec3 u(sinX * cbsh - sbch, cosZ * cosX, sbsh + sinX * cbch);
+    const glm::vec3 f(sinY * cosX, -sinX, cosY * cosX);
+
+    if (transpose) {
+        m[0] = glm::vec4(r.x, u.x, f.x, 0.0f);
+        m[1] = glm::vec4(r.y, u.y, f.y, 0.0f);
+        m[2] = glm::vec4(r.z, u.z, f.z, 0.0f);
+    }
+    else {
+        m[0] = glm::vec4(r, 0.0f);
+        m[1] = glm::vec4(u, 0.0f);
+        m[2] = glm::vec4(f, 0.0f);
+    }
+    m[3] = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
     return *this;
 }
 

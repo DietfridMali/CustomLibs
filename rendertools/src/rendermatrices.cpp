@@ -78,7 +78,7 @@ Matrix4f& RenderMatrices::Rotate(Matrix4f& r) noexcept {
 
 Matrix4f& RenderMatrices::Rotate(Vector3f angles) noexcept {
 #if USE_GLM
-    Matrix4f r = Matrix4f::Rotation(angles);
+    Matrix4f r = Matrix4f::Rotation(angles, true); // the matrix stack is view context
 #else
     Matrix4f r = Matrix4f::Rotation(angles, ModelView().IsColMajor());
 #endif
