@@ -156,7 +156,7 @@
     <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\lightningnoise.h" />
     <ClInclude Include="..\..\include\noise.h" />
-    <ClInclude Include="..\..\include\coplanar_rectangle.h" />
+    <ClInclude Include="..\..\include\quad.h" />
     <ClInclude Include="..\..\include\projector.h" />
     <ClInclude Include="..\..\include\base_quadmesh.h" />
     <ClInclude Include="..\..\include\rectangle.h" />
@@ -233,7 +233,7 @@
     <ClCompile Include="..\src\gfxstates.cpp" />
     <ClCompile Include="..\..\src\texteffects.cpp" />
     <ClCompile Include="..\src\outline_shader.cpp" />
-    <ClCompile Include="..\..\src\coplanar_rectangle.cpp" />
+    <ClCompile Include="..\..\src\quad.cpp" />
     <ClCompile Include="..\..\src\projector.cpp" />
     <ClCompile Include="..\..\src\base_quadmesh.cpp" />
     <ClCompile Include="..\src\gfxrenderer.cpp" />

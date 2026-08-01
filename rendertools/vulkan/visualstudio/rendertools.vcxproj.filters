@@ -46,7 +46,7 @@
     <ClInclude Include="..\..\include\colordata.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\coplanar_rectangle.h">
+    <ClInclude Include="..\..\include\quad.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\cube.h">
@@ -260,7 +260,7 @@
     <ClCompile Include="..\..\src\billboard.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\coplanar_rectangle.cpp">
+    <ClCompile Include="..\..\src\quad.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\cube.cpp">

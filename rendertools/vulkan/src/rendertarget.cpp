@@ -374,7 +374,7 @@ void RenderTarget::Destroy(void)
 
 void RenderTarget::CreateRenderArea(void)
 {
-    m_viewportArea.Setup(BaseQuad::defaultVertices[BaseQuad::voCenter], BaseQuad::defaultTexCoords[BaseQuad::tcRegular]);
+    m_viewportArea.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular]);
 }
 
 
