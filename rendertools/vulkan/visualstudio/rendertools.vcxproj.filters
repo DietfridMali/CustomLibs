@@ -85,7 +85,7 @@
     <ClInclude Include="..\..\include\texteffects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\base_quad.h">
+    <ClInclude Include="..\..\include\base_quadmesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\projector.h">
@@ -251,7 +251,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->
-    <ClCompile Include="..\..\src\base_quad.cpp">
+    <ClCompile Include="..\..\src\base_quadmesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\base_shaderhandler.cpp">
