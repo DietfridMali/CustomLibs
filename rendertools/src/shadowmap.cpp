@@ -205,16 +205,22 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	// below can never blow up or flip sign.
 	Matrix4f warpShift = Matrix4f::Translation(0.0f, n - vMin.y, 0.0f);
 
-	// Perspective warp along y: (x, y, z, 1) -> (n*x, a*y + b, n*z, y). After the divide by w = y this
+	// Perspective warp along y: (x, y, z, 1) -> (x, (a*y + b)/n, z, y/n). After the divide by w this
 	// maps y = n to -1 and y = n+d to +1, while x and z get squeezed by n/y -- near field keeps its
 	// scale, far field shrinks, which is exactly the texel redistribution we are after.
+	//
+	// The whole matrix is divided by n (homogeneous matrices are only defined up to a scalar, so NDC is
+	// bit-identical either way). That makes w = y/n, i.e. w == 1 at the near edge and w == 1 + d/n at the
+	// far edge -- exactly the factor by which the shadow bias has to grow along the warp axis. The shaders
+	// therefore just do "bias *= shadowCoord.w" and need no n_opt uniform. See the bias note above.
 	float a = (2.0f * n + d) / d;
 	float b = -2.0f * n * (n + d) / d;
+	float rn = 1.0f / n;
 	Matrix4f warp({   // Matrix4f(initializer_list) feeds glm::make_mat4 -> COLUMN major: each row here is one column
-		   n, 0.0f, 0.0f, 0.0f,
-		0.0f,    a, 0.0f, 1.0f,
-		0.0f, 0.0f,    n, 0.0f,
-		0.0f,    b, 0.0f, 0.0f
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, a * rn, 0.0f, rn,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, b * rn, 0.0f, 0.0f
 		});
 	Matrix4f warpTransform = warp * warpShift;
 
@@ -287,6 +293,17 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	float zFar = lightDistance + worldRadius;
 	Projector projector(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
 	lightProj = projector.Compute3DProjection();
+	// Normalize w the same way the LiSPSM branch does, so that "bias *= shadowCoord.w" in the shaders is
+	// path-agnostic: here w is the light-space depth (~lightDistance), so dividing the whole matrix by it
+	// yields w ~= 1 over the whole region (it varies by only +-worldRadius/lightDistance, ~1.5%). Scaling a
+	// homogeneous matrix changes nothing about the resulting NDC. The ortho paths already have w == 1.
+	{
+		float rd = 1.0f / lightDistance;
+		lightProj = Matrix4f({ rd, 0.0f, 0.0f, 0.0f,
+							 0.0f,   rd, 0.0f, 0.0f,
+							 0.0f, 0.0f,   rd, 0.0f,
+							 0.0f, 0.0f, 0.0f,   rd }) * lightProj;
+	}
 #endif
 
 	CreateLightTransformation(lightView, lightProj);

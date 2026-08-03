@@ -103,6 +103,13 @@ public:
 		return m_lightPosition;
 	}
 
+	// Half the width of the focused light frustum in world units (frustumWidth == 2 * MaxLightRadius).
+	// Shaders take this as the "shadowCoverage" uniform; it must not be duplicated as a shader-side
+	// constant, because CreateMap() may shrink it when the shadow map has to be downsized.
+	inline float MaxLightRadius() const noexcept {
+		return m_maxLightRadius;
+	}
+
 	inline Vector3f LightDirection(Vector3f p) noexcept {
 		return (m_lightPosition - p).Normalize();
 	}
