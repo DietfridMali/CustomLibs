@@ -2,6 +2,14 @@
 
 #define APPLY_POLYGON_OFFSET 1
 
+// LiSPSM (Light Space Perspective Shadow Maps, Wimmer/Scherzer/Purgathofer 2004).
+// 1 = warped light frustum: same focused region as before, but texel density is redistributed
+//     towards the near field (~1/z) instead of being spread uniformly -> kills the near-field
+//     stair-stepping that soft shadows only mask.
+// 0 = the previous viewer-aligned perspective frustum (uniform density).
+// Both live in CreateViewerAlignedTransformation(); only that function branches on this.
+#define LiSPSM 1
+
 // =================================================================================================
 
 bool ShadowMap::Setup(void) {
@@ -110,14 +118,126 @@ void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mMod
 }
 
 
-// Forward view: viewer-aligned PERSPECTIVE frustum (active). The viewer-focused ORTHO variant below is kept
-// under #if 0 -- no perceptible benefit over perspective, only crawling stepped edges (even at 4K): its
-// texel-snap (Stabilize) damps only translation, not the sun's slow rotation, and ortho spreads texels
-// uniformly so the near field stays coarse. Viewer sits near the rear edge (centre shifted 0.8*radius fwd).
+// Forward view. Three variants, all focusing the same region in front of the viewer (centre shifted
+// 0.8*radius forward, so the viewer sits near the rear edge):
+//   #if LiSPSM   warped light frustum, near-field texel density ~1/z  -- ACTIVE (see #define LiSPSM)
+//   #elif 0      viewer-focused ORTHO, kept for reference: no perceptible benefit over the perspective
+//                variant, only crawling stepped edges (even at 4K). Its texel-snap (Stabilize) damps
+//                translation but not the sun's slow rotation, and ortho spreads texels uniformly, so
+//                the near field stays coarse. Re-enabling also needs the m_lightTransform texel-snap.
+//   #else        viewer-aligned PERSPECTIVE frustum -- the previous default. At lightDistance 1000 and
+//                radius <= 15 its halfFov is ~0.86 deg, i.e. numerically indistinguishable from ortho;
+//                the density is uniform, which is what leaves the near-field stair-stepping in place.
 void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, const Vector3f& worldMin, const Vector3f& worldMax) {
 	Matrix4f lightView, lightProj;
 
-#if 0   // viewer-focused ORTHO frustum (disabled). Re-enabling also needs the m_lightTransform texel-snap
+#if LiSPSM
+
+	// LiSPSM: the focused region is the same as in the #else path (worldRadius around a centre shifted
+	// 0.8*radius forward), but the light frustum is warped along the viewer's forward axis so near-field
+	// texels get denser. The warp axis is the view direction made perpendicular to the light, and it is
+	// handed to LookAt as the UP vector -- that is the whole trick: afterwards the forward axis lies on
+	// light-space +y, and the perspective warp below runs along y ONLY. x (perpendicular to both view and
+	// light) stays unwarped, which is what distinguishes LiSPSM from plain PSM.
+	//
+	// BIAS NOTE: the warp makes NDC z non-linear over the region. The constant ShadowBias() offset in the
+	// shaders and SetPolygonOffset() in StartRender() were tuned against the #else path, which is
+	// effectively linear (halfFov ~0.86 deg at lightDistance 1000). Expect to retune them: the same NDC
+	// offset now corresponds to a smaller world distance near the viewer and a larger one far away.
+
+	float worldRadius = std::min(Vector3f::Abs(worldMax - worldMin).Length() * 0.5f, m_maxLightRadius);
+	if (lightDistance <= 0.0f)
+		lightDistance = 100.0f * worldRadius;
+	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
+	viewDir.Normalize();
+	center += viewDir * worldRadius * 0.8f;   // viewer near rear edge
+
+	Vector3f lightVec = -lightDirection;                      // direction the light travels
+	Vector3f warpAxis = viewDir - lightVec * lightVec.Dot(viewDir);   // view direction perpendicular to the light
+	float sinGamma = warpAxis.Length();                       // both operands are unit -> this IS sin(gamma)
+
+	// Looking (anti)parallel to the light degenerates the warp axis. Rebuild it from any perpendicular
+	// axis so LookAt stays well-defined; the warp itself is then disabled via the sinGamma clamp below.
+	static constexpr float minSinGamma = 0.15f;
+	if (sinGamma < 1.0e-4f) {
+		Vector3f fallback = (std::fabs(lightVec.Y()) < 0.9f) ? Vector3f(0.0f, 1.0f, 0.0f) : Vector3f(1.0f, 0.0f, 0.0f);
+		warpAxis = fallback - lightVec * lightVec.Dot(fallback);
+	}
+	warpAxis.Normalize();
+	// n_opt grows as 1/sin(gamma); clamping sinGamma from below makes the warp fade smoothly towards
+	// ortho near the degenerate case instead of popping.
+	float sinGammaClamped = std::max(sinGamma, minSinGamma);
+
+	m_lightPosition = center + lightDirection * lightDistance;
+	lightView.LookAt(m_lightPosition, center, warpAxis);
+
+	// The shadowed body: the focused region in x/z, the full world height in y (same box the disabled
+	// ortho variant below uses).
+	Vector4f corners[8] = {
+		{ center.X() - worldRadius, worldMin.Y(), center.Z() - worldRadius, 1.0f },
+		{ center.X() + worldRadius, worldMin.Y(), center.Z() - worldRadius, 1.0f },
+		{ center.X() - worldRadius, worldMax.Y(), center.Z() - worldRadius, 1.0f },
+		{ center.X() + worldRadius, worldMax.Y(), center.Z() - worldRadius, 1.0f },
+		{ center.X() - worldRadius, worldMin.Y(), center.Z() + worldRadius, 1.0f },
+		{ center.X() + worldRadius, worldMin.Y(), center.Z() + worldRadius, 1.0f },
+		{ center.X() - worldRadius, worldMax.Y(), center.Z() + worldRadius, 1.0f },
+		{ center.X() + worldRadius, worldMax.Y(), center.Z() + worldRadius, 1.0f }
+	};
+
+	Vector4f vMin{ FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+	Vector4f vMax{ -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX };
+	for (int i = 0; i < 8; i++) {
+		Vector4f v = lightView * corners[i];
+		vMin.Minimize(v);
+		vMax.Maximize(v);
+	}
+
+	// n_opt = (zn + sqrt(zn*zf)) / sin(gamma). zn/zf are CAMERA distances along the view direction; the
+	// sinGamma division converts them onto the warp axis. zn is deliberately clamped far above the camera
+	// near plane -- a tiny zn drags n_opt down, which over-warps the near field and starves the far field.
+	static constexpr float lispsmNearClamp = 0.5f;
+	float zn = lispsmNearClamp;
+	float zf = std::max(zn + 0.01f, 1.8f * worldRadius);   // body reaches 0.8*R + R ahead of the viewer
+	float n = (zn + std::sqrt(zn * zf)) / sinGammaClamped;
+	float d = std::max(vMax.y - vMin.y, 0.01f);            // body extent along the warp axis
+
+	// Shift the body so its near edge sits at y = n. Every y is then >= n > 0, so the divide by w = y
+	// below can never blow up or flip sign.
+	Matrix4f warpShift = Matrix4f::Translation(0.0f, n - vMin.y, 0.0f);
+
+	// Perspective warp along y: (x, y, z, 1) -> (n*x, a*y + b, n*z, y). After the divide by w = y this
+	// maps y = n to -1 and y = n+d to +1, while x and z get squeezed by n/y -- near field keeps its
+	// scale, far field shrinks, which is exactly the texel redistribution we are after.
+	float a = (2.0f * n + d) / d;
+	float b = -2.0f * n * (n + d) / d;
+	Matrix4f warp({   // Matrix4f(initializer_list) feeds glm::make_mat4 -> COLUMN major: each row here is one column
+		   n, 0.0f, 0.0f, 0.0f,
+		0.0f,    a, 0.0f, 1.0f,
+		0.0f, 0.0f,    n, 0.0f,
+		0.0f,    b, 0.0f, 0.0f
+		});
+	Matrix4f warpTransform = warp * warpShift;
+
+	// Normalize the warped body onto the unit cube. Taking the bounds AFTER the perspective divide is
+	// legitimate because the ortho matrix is affine and leaves w untouched, so ortho*(warp*p) divided by w
+	// equals ortho applied to the already divided point. Going through ComputeOrthoProjection also inherits
+	// whatever depth convention the backend's glm build uses, exactly like CreateOrthoTransformation.
+	Matrix4f warpedView = warpTransform * lightView;
+	float xMin = FLT_MAX, xMax = -FLT_MAX, yMin = FLT_MAX, yMax = -FLT_MAX, zMin = FLT_MAX, zMax = -FLT_MAX;
+	for (int i = 0; i < 8; i++) {
+		Vector4f v = warpedView * corners[i];
+		float rw = 1.0f / v.w;
+		float x = v.x * rw, y = v.y * rw, z = v.z * rw;
+		xMin = std::min(xMin, x); xMax = std::max(xMax, x);
+		yMin = std::min(yMin, y); yMax = std::max(yMax, y);
+		zMin = std::min(zMin, z); zMax = std::max(zMax, z);
+	}
+	Projector projector;
+	// z is negative in front of the light camera (LookAt looks down -z), same negation as the ortho path.
+	lightProj = projector.ComputeOrthoProjection(xMin, xMax, yMin, yMax, -zMax, -zMin);
+	lightProj *= warpTransform;
+
+#elif 0 // viewer-focused ORTHO frustum (disabled). Re-enabling also needs the m_lightTransform texel-snap
         // in Stabilize() (ortho-only). frustumWidth == 2*coverage matches shadowCoverage in the shaders.
 	float coverage = m_maxLightRadius;
 	if (lightDistance <= 0.0f)
