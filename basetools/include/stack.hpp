@@ -77,7 +77,7 @@ public:
         if (static_cast<int32_t>(i) >= n)
             return false;
         for (int32_t j = static_cast<int32_t>(i); j < n - 1; j++)
-            Base::DataPtr(j) = std::move(Base::DataPtr(j + 1));
+            Base::Data()[j] = std::move(Base::Data()[j + 1]);
         Base::Resize(n - 1);
         return true;
     }
@@ -86,7 +86,7 @@ public:
 
     inline DATA_T& Pull(DATA_T& elem, uint32_t i) {
         if (static_cast<int32_t>(i) < Base::Length()) {
-            elem = Base::DataPtr(i);
+            elem = Base::Data()[i];
             Delete(i);
         }
         return elem;

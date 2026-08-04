@@ -557,6 +557,34 @@ public:
 
     inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - DataPtr()); }
 
+    // Sorting. left/right are inclusive bounds (right < 0 = up to the last element), as the
+    // hand written quick sort these replace used them.
+    inline void SortAscending(int32_t left = 0, int32_t right = -1) {
+        if (right < 0)
+            right = Length() - 1;
+        if (right > left)
+            std::sort(Data() + left, Data() + right + 1);
+    }
+
+    inline void SortDescending(int32_t left = 0, int32_t right = -1) {
+        if (right < 0)
+            right = Length() - 1;
+        if (right > left)
+            std::sort(Data() + left, Data() + right + 1, std::greater<DATA_T>());
+    }
+
+    // compare returns < 0, 0 or > 0 like the classic C comparators
+    template <typename COMPARE_T>
+    inline void Sort(COMPARE_T compare, int32_t left = 0, int32_t right = -1) {
+        if (right < 0)
+            right = Length() - 1;
+        if (right > left)
+            std::sort(Data() + left, Data() + right + 1,
+                      [compare](const DATA_T& a, const DATA_T& b) {
+                          return compare(const_cast<DATA_T*>(&a), const_cast<DATA_T*>(&b)) < 0;
+                      });
+    }
+
     inline DATA_T* Current(void) noexcept { return IsEmpty() ? nullptr : DataPtr() + m_pos; }
 
     inline void Pos(uint32_t pos) noexcept { m_pos = (Length() > 0) ? static_cast<int32_t>(pos % static_cast<uint32_t>(Length())) : 0; }
