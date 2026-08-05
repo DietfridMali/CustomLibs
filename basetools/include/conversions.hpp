@@ -16,14 +16,15 @@
 #include <memory>
 #include <new>    // std::nothrow
 
+// PI and TWO_PI used to live here as global constexpr float. They are Conversions::Pi and
+// Conversions::TwoPi now, and double: 16 digits are what uniquely identifies the double closest
+// to pi - anything beyond that cannot change the stored value.
 #ifdef PI
 #   undef PI
 #endif
-constexpr float PI = 3.14159265358979323846f;
 #ifdef TWO_PI
 #   undef TWO_PI
 #endif
-constexpr float TWO_PI = 6.28318530717958647692f;
 
 // =================================================================================================
 
@@ -32,16 +33,20 @@ constexpr float TWO_PI = 6.28318530717958647692f;
 
 namespace Conversions
 {
+    constexpr double Pi = 3.141592653589793;
+
+    constexpr double TwoPi = 6.283185307179586;
+
     inline float DegToRad(float deg)
  noexcept
     {
-        return static_cast<float>((static_cast<double>(deg) / 180.0 * PI));
+        return static_cast<float>((static_cast<double>(deg) / 180.0 * Pi));
     }
 
     inline float RadToDeg(float rad)
  noexcept
     {
-        return static_cast<float>((static_cast<double>(rad) * 180.0 / PI));
+        return static_cast<float>((static_cast<double>(rad) * 180.0 / Pi));
     }
 
     inline float DotToRad(float dot)

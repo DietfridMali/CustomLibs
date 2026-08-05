@@ -111,11 +111,11 @@ static float TrilinearSampleWrap(const float* data, int size, float u, float v, 
 #if SPREAD_NOISE
 
 static float Amp(float v) {
-    return 0.5f - 0.5f * cos(v * PI);
+    return 0.5f - 0.5f * cos(v * float (Conversions::Pi));
 }
 
 static float InvAmp(float v) {
-    return 0.5f + 0.5f * cos(v * PI);
+    return 0.5f + 0.5f * cos(v * float (Conversions::Pi));
 }
 
 #   if SPREAD_NOISE == 2
