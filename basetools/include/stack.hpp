@@ -111,7 +111,7 @@ public:
     inline void SortDescending(int32_t left = 0, int32_t right = -1) {
         int32_t n = Base::Length();
         if (n > 0)
-            std::sort(Base::Data(left), Base::Data((right >= 0) ? right + 1 : n), std::greater<DATA_T>());
+            std::sort(Base::DataPtr(left), Base::DataPtr((right >= 0) ? right + 1 : n), std::greater<DATA_T>());
     }
 };
 

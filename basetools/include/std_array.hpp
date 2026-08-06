@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <span>
 #include <string>
 #include <cstdint>
 #include <cstring>
@@ -342,6 +343,27 @@ public:
         return m_arrayPtr->data() + i; 
     }
 #endif
+    // Non owning view of [offset, offset + count), count < 0 = up to the last element.
+    // Sorting or writing through the span acts on this array's elements; the span becomes
+    // invalid when the array is resized or destroyed.
+    inline std::span<DATA_T> Span(int32_t offset = 0, int32_t count = -1) noexcept {
+        int32_t length = Length();
+        if ((offset < 0) or (offset > length))
+            return {};
+        if ((count < 0) or (count > length - offset))
+            count = length - offset;
+        return std::span<DATA_T>(DataPtr(offset), static_cast<size_t>(count));
+    }
+
+    inline std::span<const DATA_T> Span(int32_t offset = 0, int32_t count = -1) const noexcept {
+        int32_t length = Length();
+        if ((offset < 0) or (offset > length))
+            return {};
+        if ((count < 0) or (count > length - offset))
+            count = length - offset;
+        return std::span<const DATA_T>(DataPtr(offset), static_cast<size_t>(count));
+    }
+
     DATA_T* DataRow(int32_t y) {
 #if defined(_DEBUG)
         if (m_width * m_height <= 0)

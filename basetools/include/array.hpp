@@ -10,7 +10,6 @@
 
 #if (USE_STD || USE_STD_VECTOR)
 
-#	include <span>
 #	include <vector>
 #	include <algorithm>
 #	include <utility>
@@ -23,6 +22,7 @@
 #endif //USE_STD_VECTOR
 
 #include <array>
+#include <span>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -85,6 +85,27 @@ public:
     inline const std::string& GetName(void) const noexcept { return m_name; }
 
     inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - m_array.data()); }
+
+    // Non owning view of [offset, offset + count), count < 0 = up to the last element.
+    // Sorting or writing through the span acts on this array's elements; the span becomes
+    // invalid when the array is destroyed.
+    inline std::span<DATA_T> Span(int32_t offset = 0, int32_t count = -1) noexcept {
+        int32_t length = Length();
+        if ((offset < 0) or (offset > length))
+            return {};
+        if ((count < 0) or (count > length - offset))
+            count = length - offset;
+        return std::span<DATA_T>(m_array.data() + offset, static_cast<size_t>(count));
+    }
+
+    inline std::span<const DATA_T> Span(int32_t offset = 0, int32_t count = -1) const noexcept {
+        int32_t length = Length();
+        if ((offset < 0) or (offset > length))
+            return {};
+        if ((count < 0) or (count > length - offset))
+            count = length - offset;
+        return std::span<const DATA_T>(m_array.data() + offset, static_cast<size_t>(count));
+    }
 
     // CFile-style block I/O (FILE_T resolved at the call site; same contract as AutoArray::Read/Write)
     template <typename FILE_T>
