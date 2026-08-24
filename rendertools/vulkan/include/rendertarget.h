@@ -43,7 +43,7 @@ public:
     typedef enum {
         btColor,
         btDepth,
-        btStencil,
+        btStencil, // never created as a buffer of its own -- stencil is a plane of btDepth (see RenderTarget::m_stencilBufferIndex)
         btVertex,
         btSkyMap   // R16G16B16A16_SFLOAT, color+sampled+storage usage — compute-only target
     } eBufferType;
@@ -138,7 +138,12 @@ public:
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
+    // Stencil is never a buffer of its own: the hardware interleaves both planes, and VK_FORMAT_S8_UINT is
+    // an optional format hardly any driver exposes. stencilBufferCount > 0 therefore gives the DEPTH buffer
+    // a stencil plane (D32_SFLOAT_S8_UINT instead of D32_SFLOAT), and m_stencilBufferIndex is just an alias
+    // of m_depthBufferIndex. Without it the depth buffer stays plain D32_SFLOAT.
     int                 m_stencilBufferIndex{ -1 };
+    bool                m_hasStencil{ false };
     int                 m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
     int                 m_computeBufferCount{ 0 };
     int                 m_activeBufferIndex{ 0 };
@@ -390,6 +395,17 @@ private:
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0)
             and (not checkHandle or (m_bufferInfo[m_depthBufferIndex].m_imageView != VK_NULL_HANDLE));
+    }
+
+    // The depth buffer carries a stencil plane (see m_stencilBufferIndex).
+    inline bool HaveStencilBuffer(bool checkHandle = true) noexcept {
+        return m_hasStencil and HaveDepthBuffer(checkHandle);
+    }
+
+    // Format of this target's depth attachment; the pipeline key and the image both have to use it.
+    inline VkFormat DepthFormat(void) noexcept {
+        RenderTarget* owner = (m_depthSource != nullptr) ? m_depthSource : this;
+        return owner->m_hasStencil ? VK_FORMAT_D32_SFLOAT_S8_UINT : VK_FORMAT_D32_SFLOAT;
     }
 
     // A shared depth source (SetDepthSource) takes precedence over an own depth buffer for the

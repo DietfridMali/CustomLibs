@@ -199,9 +199,12 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     renderingInfo.colorAttachmentCount = key.colorFormatCount;
     renderingInfo.pColorAttachmentFormats = key.colorFormats;
     renderingInfo.depthAttachmentFormat = key.depthFormat;
-    renderingInfo.stencilAttachmentFormat = (key.depthFormat == VK_FORMAT_D24_UNORM_S8_UINT)
-                                          ? key.depthFormat
-                                          : VK_FORMAT_UNDEFINED;
+    // A combined depth/stencil format has to be named on BOTH attachment slots, or the stencil test is
+    // silently dead: the pipeline would carry no stencil attachment for vkCmdBeginRendering to match.
+    bool hasStencilPlane = (key.depthFormat == VK_FORMAT_D24_UNORM_S8_UINT)
+                        or (key.depthFormat == VK_FORMAT_D32_SFLOAT_S8_UINT)
+                        or (key.depthFormat == VK_FORMAT_D16_UNORM_S8_UINT);
+    renderingInfo.stencilAttachmentFormat = hasStencilPlane ? key.depthFormat : VK_FORMAT_UNDEFINED;
 
     VkGraphicsPipelineCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;

@@ -12,6 +12,13 @@ static constexpr DXGI_FORMAT dxVertexFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
 static constexpr DXGI_FORMAT dxTypelessDepthFormat = DXGI_FORMAT_R32_TYPELESS;
 static constexpr DXGI_FORMAT dxDepthDSVFormat = DXGI_FORMAT_D32_FLOAT;
 static constexpr DXGI_FORMAT dxDepthSRVFormat = DXGI_FORMAT_R32_FLOAT;
+// Depth + stencil for targets that request a stencil plane (stencilBufferCount > 0). Stencil is never a
+// buffer of its own: DXGI has no pure stencil format at all, both planes always live in one resource.
+// D32_FLOAT_S8X24 keeps the depth precision of the plain format above; only stencil targets pay the
+// padding (64 bit/pixel). The SRV names the depth plane, which is what GetDepthAsTexture hands to shaders.
+static constexpr DXGI_FORMAT dxTypelessDepthStencilFormat = DXGI_FORMAT_R32G8X24_TYPELESS;
+static constexpr DXGI_FORMAT dxDepthStencilDSVFormat = DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+static constexpr DXGI_FORMAT dxDepthStencilSRVFormat = DXGI_FORMAT_R32_FLOAT_X8X24_TYPELESS;
 
 // -------------------------------------------------------------------------------------------------
 

@@ -21,7 +21,7 @@ public:
     typedef enum {
         btColor,
         btDepth,
-        btStencil,
+        btStencil, // never created as a buffer of its own -- stencil is a plane of btDepth (see RenderTarget::m_stencilBufferIndex)
         btVertex,
         btSkyMap  // RGBA16F texture for compute write (image2D); not attached to FBO
     } eBufferType;
@@ -81,7 +81,12 @@ public:
     int                         m_extraBufferCount;
     int                         m_extraBufferIndex;
     int                         m_depthBufferIndex;
+    // A stencil buffer is never a buffer of its own: the hardware stores depth and stencil interleaved,
+    // and DX12 has no pure stencil format at all. stencilBufferCount > 0 therefore gives the DEPTH buffer
+    // a stencil plane (GL_DEPTH32F_STENCIL8 instead of GL_DEPTH_COMPONENT32F), and m_stencilBufferIndex
+    // is just an alias of m_depthBufferIndex. Without it the depth buffer stays 32 bit.
     int                         m_stencilBufferIndex;
+    bool                        m_hasStencil{ false };
     int                         m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
     int                         m_computeBufferCount{ 0 };
     int                         m_activeBufferIndex;
@@ -355,13 +360,21 @@ public:
         return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_handle);
     }
 
+    // The depth buffer carries a stencil plane (see m_stencilBufferIndex).
+    inline bool HaveStencilBuffer(bool checkHandle = true) noexcept {
+        return m_hasStencil and HaveDepthBuffer(checkHandle);
+    }
+
     inline void ClearDepthBuffer(float clearValue = 1.0f) noexcept {
         if (HaveDepthBuffer(true))
             gfxStates.ClearDepthBuffer(clearValue);
     }
 
     inline void ClearStencilBuffer(int clearValue = 0) noexcept {
-        gfxStates.ClearStencilBuffer(clearValue);
+        // Gated like ClearDepthBuffer: without a stencil plane the glClear would be a no-op that still
+        // costs a state change, and on a target with no depth buffer at all it would clear the wrong FBO's.
+        if (HaveStencilBuffer(true))
+            gfxStates.ClearStencilBuffer(clearValue);
     }
 
 private:

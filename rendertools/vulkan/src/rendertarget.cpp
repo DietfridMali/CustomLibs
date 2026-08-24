@@ -34,6 +34,11 @@ static constexpr VkFormat kSkyMapFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
 // D32_SFLOAT: 4 Byte/Pixel, single-channel, kein Stencil. ShadowMap braucht keinen Stencil und
 // kein Treiber-Padding (D24S8 wird auf NVIDIA als D32+S8-Plane = 5 Byte/Pixel allokiert).
 static constexpr VkFormat kDepthFormat = VK_FORMAT_D32_SFLOAT;
+// Depth + stencil for targets that request a stencil plane (stencilBufferCount > 0). Stencil is never a
+// buffer of its own -- the hardware interleaves both planes, and VK_FORMAT_S8_UINT is an optional format
+// hardly any driver exposes. D32_SFLOAT_S8_UINT keeps the depth precision of the plain kDepthFormat, at
+// the price of the padding the comment above avoids; only stencil targets pay it.
+static constexpr VkFormat kDepthStencilFormat = VK_FORMAT_D32_SFLOAT_S8_UINT;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -65,8 +70,9 @@ static VkImageUsageFlags UsageForType(BufferInfo::eBufferType type)
 
 static VkImageAspectFlags AspectForType(BufferInfo::eBufferType type)
 {
-    // kDepthFormat = D32_SFLOAT enthaelt kein Stencil-Plane mehr. btStencil sollte hier nicht
-    // mehr aufkommen, ist aber als Fallback weiter im selben Aspekt-Schema.
+    // btStencil is never created as a buffer of its own (see RenderTarget::m_stencilBufferIndex), so only
+    // btDepth arrives here. A depth buffer WITH a stencil plane does not go through this helper either --
+    // CreateDepthBuffer picks its aspect from m_hasStencil, because the type alone cannot tell.
     if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
         return VK_IMAGE_ASPECT_DEPTH_BIT;
     return VK_IMAGE_ASPECT_COLOR_BIT;
@@ -194,6 +200,7 @@ void RenderTarget::Init(void)
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
+    m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
     m_activeBufferIndex = 0;
@@ -239,14 +246,18 @@ bool RenderTarget::CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspec
 
 void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 {
-    if (not CreateRTImage(w, h, kDepthFormat, UsageForType(info.m_type),
+    VkFormat fmt = m_hasStencil ? kDepthStencilFormat : kDepthFormat;
+    // The attachment side addresses both planes; the sampling view below must name exactly one aspect,
+    // because Vulkan forbids sampling a view that spans depth AND stencil.
+    VkImageAspectFlags attachmentAspect = m_hasStencil ? (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)
+                                                       : VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
                           info.m_image, info.m_allocation))
         return;
-    info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED,
-                              VK_IMAGE_ASPECT_DEPTH_BIT);
+    info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, attachmentAspect);
 
-    // Attachment view: depth aspect only (D32_SFLOAT, kein Stencil).
-    if (not CreateSRV(info, kDepthFormat, VK_IMAGE_ASPECT_DEPTH_BIT))
+    // Attachment view: depth (plus stencil, if the target asked for a stencil plane).
+    if (not CreateSRV(info, fmt, attachmentAspect))
         return;
 
     // Sampling view: depth aspect only — for use as a sampled texture (sampler2DShadow / shadow map).
@@ -255,7 +266,7 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
     vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     vci.image = info.m_image;
     vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    vci.format = kDepthFormat;
+    vci.format = fmt;
     vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
     vci.subresourceRange.levelCount = 1;
     vci.subresourceRange.layerCount = 1;
@@ -321,7 +332,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
-    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
+    // for stencil without depth still yields one combined buffer.
+    m_hasStencil = params.stencilBufferCount > 0;
+    int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
+    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount);
     // Compute ping-pong (>=2 compute buffers) qualifies for the pingPong flag as well.
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
@@ -335,8 +350,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 
     m_vertexBufferCount = params.vertexBufferCount;
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
-    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
-    m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
+    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, depthBufferCount);
+    m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
 
     // Compute buffers come last so the existing color/vertex/depth-buffer iterations
     // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
@@ -366,6 +381,7 @@ void RenderTarget::Destroy(void)
     m_isAvailable = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
+    m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
     m_bufferInfo.Reset();
@@ -507,6 +523,17 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
     info.colorAttachmentCount = uint32_t(colorCount);
     info.pColorAttachments    = (colorCount > 0) ? colors : nullptr;
     info.pDepthAttachment     = wantDepth ? &depth : nullptr;
+    // With a stencil plane the same view serves the stencil slot. It must be named here as well, or the
+    // pipeline (which declares stencilAttachmentFormat, see PipelineCache) does not match the render pass
+    // and the stencil test never runs. Contents are always preserved -- shadow volumes clear the stencil
+    // themselves, between passes.
+    VkRenderingAttachmentInfo stencil{};
+    if (wantDepth and (DepthFormat() == kDepthStencilFormat)) {
+        stencil            = depth;
+        stencil.loadOp     = VK_ATTACHMENT_LOAD_OP_LOAD;
+        stencil.storeOp    = VK_ATTACHMENT_STORE_OP_STORE;
+        info.pStencilAttachment = &stencil;
+    }
 
     vkCmdBeginRendering(cb, &info);
     m_isInRendering = true;
@@ -883,7 +910,9 @@ void RenderTarget::ClearDepthBuffer(float clearValue)
 
 void RenderTarget::ClearStencilBuffer(void)
 {
-    if (not HaveDepthBuffer(true) or not m_cmdList or not m_isInRendering)
+    // Gated on an own stencil PLANE, not just on a depth buffer: without one the clear would address an
+    // aspect the attachment does not have.
+    if (not HaveStencilBuffer(true) or not m_cmdList or not m_isInRendering)
         return;
     VkCommandBuffer cb = m_cmdList->GfxList();
     if (cb == VK_NULL_HANDLE)
@@ -1104,7 +1133,7 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
             break;
     }
     if (HaveActiveDepthBuffer())
-        key.depthFormat = kDepthFormat;
+        key.depthFormat = DepthFormat();
 }
 
 // =================================================================================================

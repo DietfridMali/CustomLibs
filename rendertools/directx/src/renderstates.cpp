@@ -238,7 +238,11 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
     // Slots 1+ (worldNormal/worldPos MRTs) keep their shader-declared formats.
     for (int i = 0; i < nrt; ++i)
         psoDesc.RTVFormats[i] = (i == 0) ? baseRenderer.RenderStates().colorFormat : ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
-    psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable) ? dxDepthDSVFormat : DXGI_FORMAT_UNKNOWN;
+    // Must match the DSV bound by the active render target, combined depth/stencil included — see
+    // RenderStates::depthFormat.
+    psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable)
+                      ? baseRenderer.RenderStates().depthFormat
+                      : DXGI_FORMAT_UNKNOWN;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.SampleDesc.Count = 1;
 

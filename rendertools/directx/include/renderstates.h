@@ -66,6 +66,10 @@ struct RenderStates {
     // R16G16B16A16_FLOAT HDR scene). Part of the memcmp'd PSO cache key, so the same shader gets
     // separate PSOs per target format. Set in RenderTarget::Enable from the RT's own m_colorFormat.
     DXGI_FORMAT colorFormat{ DXGI_FORMAT_R8G8B8A8_UNORM };
+    // DSV format of the active render target. A depth buffer with a stencil plane uses the combined
+    // format, and the PSO must name the SAME one as the bound DSV, or D3D12 rejects the draw. Also part
+    // of the memcmp'd PSO cache key. Set in RenderTarget::Enable from the RT's own depth buffer.
+    DXGI_FORMAT depthFormat{ DXGI_FORMAT_D32_FLOAT };
 
     bool operator==(const RenderStates& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;

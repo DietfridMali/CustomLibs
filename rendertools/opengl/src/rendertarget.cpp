@@ -27,6 +27,8 @@ void RenderTarget::Init(void) {
     m_colorBufferCount = -1;
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
+    m_stencilBufferIndex = -1;
+    m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
     m_lastDestination = -1;
@@ -45,9 +47,11 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     bufferInfo.Init();
     if (bufferType == BufferInfo::btDepth)
-        bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
-    else if (bufferType == BufferInfo::btStencil)
-        bufferInfo.m_attachment = GL_DEPTH_ATTACHMENT;
+        // With a stencil plane the single texture serves both attachment points at once, so it goes to
+        // GL_DEPTH_STENCIL_ATTACHMENT. Attaching a separate GL_STENCIL_INDEX8 texture next to a depth
+        // texture is what the old btStencil path did, and drivers are free to reject that combination
+        // with GL_FRAMEBUFFER_UNSUPPORTED.
+        bufferInfo.m_attachment = m_hasStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
     else if (bufferType == BufferInfo::btSkyMap)
         bufferInfo.m_attachment = GL_NONE; // compute-write target, not framebuffer-attached
     else
@@ -74,21 +78,22 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         return;
     }
     if (bufferType == BufferInfo::btDepth) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        if (m_hasStencil)
+            // 32F depth + 8 bit stencil. D24S8 would fit in half the memory, but it would also cost depth
+            // precision against the plain D32F used everywhere else, and a stencil target is the one place
+            // where that precision matters most (shadow volumes).
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH32F_STENCIL8, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, nullptr);
+        else
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, m_width * m_scale, m_height * m_scale, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        // Sampling a packed depth/stencil texture returns the depth plane; say so explicitly instead of
+        // relying on the default, because GetDepthAsTexture hands this handle straight to a sampler2D.
+        if (m_hasStencil)
+            glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-    else if (bufferType == BufferInfo::btStencil) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_STENCIL_INDEX8, m_width * m_scale, m_height * m_scale, 0, GL_STENCIL_INDEX, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
     }
     else {
         if (bufferType == BufferInfo::btColor) {
@@ -200,7 +205,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_bufferCount = 0;
     m_colorFormat = params.colorFormat;
     m_isScreenBuffer = params.isScreenBuffer;
-    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount + params.skyMapCount);
+    // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
+    // for stencil without depth still yields one combined buffer.
+    m_hasStencil = params.stencilBufferCount > 0;
+    int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
+    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.skyMapCount);
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
@@ -210,8 +219,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
     // depth buffer must be created last or draw buffer management will fail as it relies on all draw buffers being stored in bufferInfo contiguously, starting at index 0
-    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
-    m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
+    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, depthBufferCount);
+    m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
     // Compute buffers come last so the existing color/vertex/depth-buffer iterations
     // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
     // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
@@ -220,7 +229,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     CreateRenderArea();
     // Sky-map-only RTs (compute write target, no FBO attachments) skip AttachBuffers because
     // glCheckFramebufferStatus would return INCOMPLETE_MISSING_ATTACHMENT — the FBO is unused.
-    bool hasFboAttachments = (params.colorBufferCount > 0) || (params.depthBufferCount > 0) || (params.stencilBufferCount > 0) || (params.vertexBufferCount > 0);
+    bool hasFboAttachments = (params.colorBufferCount > 0) || (depthBufferCount > 0) || (params.vertexBufferCount > 0);
     if (hasFboAttachments) {
         if (not AttachBuffers(params.hasMRTs))
             return false;
@@ -342,10 +351,18 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 // call covers all later Activates). Clear/ClearDepthBuffer keep gating on an OWN depth buffer
 // (HaveDepthBuffer), so the foreign depth is never cleared through this target.
 void RenderTarget::SetDepthSource(RenderTarget* source) {
-    m_depthSource = source;
+    // The attachment point follows the buffer that is (or was) attached: a source whose depth carries a
+    // stencil plane sits on GL_DEPTH_STENCIL_ATTACHMENT, and detaching must address the same point, or the
+    // stencil plane stays attached. On detach the old source is the one that knows which point that was.
+    RenderTarget* attached = (source != nullptr) ? source : m_depthSource;
+    GLenum attachment = GL_DEPTH_ATTACHMENT;
     GLuint depthHandle = 0;
-    if ((source != nullptr) and (source->m_depthBufferIndex >= 0))
-        depthHandle = source->m_bufferInfo[source->m_depthBufferIndex].m_handle;
+    if ((attached != nullptr) and (attached->m_depthBufferIndex >= 0)) {
+        attachment = attached->m_bufferInfo[attached->m_depthBufferIndex].m_attachment;
+        if (source != nullptr)
+            depthHandle = attached->m_bufferInfo[attached->m_depthBufferIndex].m_handle;
+    }
+    m_depthSource = source;
     // Bind this FBO only to (re)attach its depth slot, then restore whatever framebuffer was bound
     // before. Hard-binding 0 here would desync the GL framebuffer binding from the DrawBufferHandler's
     // active draw buffer: a later *direct* SelectDrawBuffers on that still-"active" target then issues
@@ -355,7 +372,7 @@ void RenderTarget::SetDepthSource(RenderTarget* source) {
     GLint prevFramebuffer = GL_NONE;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevFramebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthHandle, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, depthHandle, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, GLuint(prevFramebuffer));
 }
 

@@ -60,6 +60,7 @@ void BufferInfo::Init(void)
     m_uav.Handle() = {};
     m_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_type = btColor;
+    m_hasStencil = false;
 }
 
 
@@ -68,7 +69,7 @@ DXGI_FORMAT BufferInfo::ViewFormat(void)
     switch (m_type) {
         case BufferInfo::btDepth:
         case BufferInfo::btStencil:
-            return dxDepthSRVFormat;
+            return m_hasStencil ? dxDepthStencilSRVFormat : dxDepthSRVFormat;
         case BufferInfo::btVertex:
             return dxVertexFormat;
         case BufferInfo::btSkyMap:
@@ -116,12 +117,16 @@ void BufferInfo::FreeSRV(void) {
 
 
 bool BufferInfo::AllocDSV(void) {
-    return m_dsv.Create(m_resource, dxDepthDSVFormat);
+    return m_dsv.Create(m_resource, m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat);
 }
 
 
 bool BufferInfo::AllocReadOnlyDSV(void) {
-    return m_dsvReadOnly.Create(m_resource, dxDepthDSVFormat, D3D12_DSV_FLAG_READ_ONLY_DEPTH);
+    // With a stencil plane the read-only view has to lock BOTH planes: D3D12 rejects a DSV that leaves the
+    // stencil writable while the same resource is bound as an SRV.
+    D3D12_DSV_FLAGS flags = m_hasStencil ? (D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL)
+                                         : D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+    return m_dsvReadOnly.Create(m_resource, m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat, flags);
 }
 
 
@@ -177,6 +182,7 @@ void RenderTarget::Init(void)
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
+    m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
     m_activeBufferIndex = 0;
@@ -191,11 +197,13 @@ void RenderTarget::Init(void)
 
 bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
+    info.m_hasStencil = m_hasStencil;   // must be set before the views below are allocated
     D3D12_CLEAR_VALUE cv{};
-    cv.Format = dxDepthDSVFormat;
+    cv.Format = m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
     cv.DepthStencil.Depth = 1.0f;
     cv.DepthStencil.Stencil = 0;
-    info.m_resource = CreateRTResource(device, w, h, dxTypelessDepthFormat, D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
+    info.m_resource = CreateRTResource(device, w, h, m_hasStencil ? dxTypelessDepthStencilFormat : dxTypelessDepthFormat,
+                                       D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
     if (not info.m_resource)
         return false;
     info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
@@ -306,7 +314,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
-    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.depthBufferCount + params.stencilBufferCount);
+    // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
+    // for stencil without depth still yields one combined buffer.
+    m_hasStencil = params.stencilBufferCount > 0;
+    int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
+    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount);
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
 
@@ -322,8 +334,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_vertexBufferCount = params.vertexBufferCount;
     // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
-    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, params.depthBufferCount);
-    m_stencilBufferIndex = CreateSpecialBuffers(BufferInfo::btStencil, attachmentIndex, params.stencilBufferCount);
+    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, depthBufferCount);
+    m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
     // Compute buffers come last so the existing color/vertex/depth-buffer iterations
     // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
     // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
@@ -386,6 +398,7 @@ void RenderTarget::Destroy(void)
     m_isAvailable = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
+    m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
     m_bufferInfo.Reset();
@@ -513,6 +526,9 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
         return false;
     // The PSO's slot-0 RTV format follows this render target (HDR scene vs RGBA8 screen/UI).
     baseRenderer.RenderStates().colorFormat = m_colorFormat;
+    // Same for the DSV format: with a stencil plane it is the combined one. A shared depth source
+    // (SetDepthSource) is the buffer that actually gets bound, so it decides.
+    baseRenderer.RenderStates().depthFormat = DepthFormat();
     return true;
 }
 
@@ -738,7 +754,9 @@ void RenderTarget::ClearDepthBuffer(float clearValue)
 
 void RenderTarget::ClearStencilBuffer(void)
 {
-    if (HaveDepthBuffer(true))
+    // Gated on an own stencil PLANE, not just on a depth buffer: without one the clear would address a
+    // plane the DSV does not have.
+    if (HaveStencilBuffer(true))
         gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle());
 }
 

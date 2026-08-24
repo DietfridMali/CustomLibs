@@ -42,7 +42,7 @@ public:
     typedef enum {
         btColor,
         btDepth,
-        btStencil,
+        btStencil, // never created as a buffer of its own -- stencil is a plane of btDepth (see RenderTarget::m_stencilBufferIndex)
         btVertex,
         btSkyMap  // Compute-only storage texture (R16G16B16A16_FLOAT, UAV+SRV+RTV-for-clear, no DSV)
     } eBufferType;
@@ -56,6 +56,9 @@ public:
     D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
     eBufferType             m_type{ btColor };
     DXGI_FORMAT             m_colorFormat{ dxColorFormat };  // per-RT color format; HDR scene/sky use R16G16B16A16_FLOAT
+    // Set by RenderTarget::CreateDepthBuffer before the views are allocated: this depth buffer carries a
+    // stencil plane, so resource, DSV and SRV all have to use the combined formats.
+    bool                    m_hasStencil{ false };
 
     void Init(void);
 
@@ -176,7 +179,12 @@ public:
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
+    // Stencil is never a buffer of its own: DXGI has no pure stencil format, both planes always share one
+    // resource. stencilBufferCount > 0 therefore gives the DEPTH buffer a stencil plane (R32G8X24_TYPELESS
+    // instead of R32_TYPELESS), and m_stencilBufferIndex is just an alias of m_depthBufferIndex. Without it
+    // the depth buffer stays 32 bit.
     int                 m_stencilBufferIndex{ -1 };
+    bool                m_hasStencil{ false };
     int                 m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
     int                 m_computeBufferCount{ 0 };
     int                 m_activeBufferIndex{ 0 };
@@ -428,6 +436,18 @@ private:
 
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsv.IsValid());
+    }
+
+    // The depth buffer carries a stencil plane (see m_stencilBufferIndex).
+    inline bool HaveStencilBuffer(bool checkHandle = true) noexcept {
+        return m_hasStencil and HaveDepthBuffer(checkHandle);
+    }
+
+    // DSV format of the depth buffer that actually gets bound; a shared depth source (SetDepthSource)
+    // takes precedence, exactly like ActiveDepthBufferHandle.
+    inline DXGI_FORMAT DepthFormat(void) noexcept {
+        RenderTarget* owner = (m_depthSource != nullptr) ? m_depthSource : this;
+        return owner->m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
     }
 
     inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
