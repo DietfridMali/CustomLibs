@@ -34,7 +34,7 @@ Matrix4f Projector::ComputeFrustum(float left, float right, float bottom, float 
 noexcept
 {
 #if USE_GLM
-    return Matrix4f();
+    return Matrix4f(glm::frustum(left, right, bottom, top, m_zNear, m_zFar));
 #else
     float nearCoplanarRectangle = 2.0f * m_zNear;
     float depth = m_zFar - m_zNear;

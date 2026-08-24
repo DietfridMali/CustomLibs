@@ -35,7 +35,7 @@ int TextureSlotInfo::Bind(GLuint handle, int tmuIndex) {
 			return tmuIndex;
 		// binding to a different TMU, so unbind from previous TMU if bound
 		if (boundTMU >= 0) {
-			glActiveTexture(GL_TEXTURE0 + boundTMU);
+			gfxStates.ActiveTexture(GL_TEXTURE0 + boundTMU);
 			glBindTexture(m_type, 0);
 			m_bindings[boundTMU] = 0;
 		}
@@ -46,7 +46,7 @@ int TextureSlotInfo::Bind(GLuint handle, int tmuIndex) {
 	if (not Update(handle, tmuIndex))
 		return -1;
 
-	glActiveTexture(GL_TEXTURE0 + tmuIndex);
+	gfxStates.ActiveTexture(GL_TEXTURE0 + tmuIndex);
 	glBindTexture(m_type, handle);
 	return handle ? tmuIndex : -1;
 }
@@ -57,7 +57,7 @@ bool TextureSlotInfo::Release(GLuint handle, int tmuIndex) {
 	if (boundTMU < 0)
 		return false;
 	m_bindings[boundTMU] = 0;
-	glActiveTexture(GL_TEXTURE0 + boundTMU);
+	gfxStates.ActiveTexture(GL_TEXTURE0 + boundTMU);
 	glBindTexture(m_type, 0);
 	return true;
 }

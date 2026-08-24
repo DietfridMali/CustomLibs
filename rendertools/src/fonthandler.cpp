@@ -206,8 +206,8 @@ bool FontHandler::CreateTexture(const char* szChar, String key, int index)
     if (info.texture == nullptr)
         return false;
     SDL_Surface* surface = (strlen(szChar) == 1)
-        ? TTF_RenderText_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255))
-        : TTF_RenderUTF8_Solid(m_font, szChar, SDL_Color(255, 255, 255, 255));
+        ? TTF_RenderText_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255))
+        : TTF_RenderUTF8_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255));
     if ((surface == nullptr) or not info.texture->CreateFromSurface(surface, { .isDisposable = true })) {
         delete info.texture;
         info = GlyphInfo();
