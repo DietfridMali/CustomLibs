@@ -122,14 +122,14 @@ Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f
 }
 
 
-Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, float startAngle, float endAngle, bool antialias) {
+Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle, float endAngle, bool antialias) {
     Shader* shader = SetupRenderShader("ringShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector2f("center", center);
-            shader->SetFloat("radius", radius);
+            shader->SetVector2f("radius", radius);
             shader->SetFloat("strength", strength);
             shader->SetFloat("startAngle", startAngle);
             shader->SetFloat("endAngle", endAngle);
@@ -140,14 +140,14 @@ Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f
 }
 
 
-Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector2f& center, float radius, float fillLevel, float brightness, bool antialias) {
+Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float fillLevel, float brightness, bool antialias) {
     Shader* shader = SetupRenderShader("circleShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector2f("center", center);
-            shader->SetFloat("radius", radius);
+            shader->SetVector2f("radius", radius);
             shader->SetFloat("fillLevel", fillLevel);
             shader->SetFloat("brightness", brightness);
             shader->SetInt("antialias", antialias ? 1 : 0);
@@ -195,14 +195,14 @@ Shader* BaseShaderHandler::LoadShadedRectangleShader(const RGBAColor& color, con
 }
 
 
-Shader* BaseShaderHandler::LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, float startAngle, float endAngle, float innerAlpha, float outerAlpha, float innerColor, float outerColor, bool antialias) {
+Shader* BaseShaderHandler::LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle, float endAngle, float innerAlpha, float outerAlpha, float innerColor, float outerColor, bool antialias) {
     Shader* shader = SetupRenderShader("shadedRingShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             shader->SetVector2f("center", center);
-            shader->SetFloat("radius", radius);
+            shader->SetVector2f("radius", radius);
             shader->SetFloat("strength", strength);
             shader->SetFloat("startAngle", startAngle);
             shader->SetFloat("endAngle", endAngle);
@@ -217,7 +217,7 @@ Shader* BaseShaderHandler::LoadShadedRingShader(const RGBAColor& color, const Ve
 }
 
 
-Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, float radius, float maskScale, bool antialias) {
+Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, const Vector2f& radius, float maskScale, bool antialias) {
     Shader* shader = SetupRenderShader("circleMaskShader");
     if (shader) {
         if (baseRenderer.UsesOpenGL())
@@ -227,7 +227,7 @@ Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RG
             shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
             //shader->SetVector4f("maskColor", maskColor);
             shader->SetVector2f("center", center);
-            shader->SetFloat("radius", radius);
+            shader->SetVector2f("radius", radius);
             shader->SetFloat("maskScale", maskScale);
             shader->SetInt("antialias", antialias ? 1 : 0);
         }

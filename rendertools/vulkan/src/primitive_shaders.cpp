@@ -84,7 +84,7 @@ const ShaderSource& RingShader() {
                 float2 center;
                 float2 viewportSize;
                 float4 surfaceColor;
-                float  radius;
+                float2 radius;
                 float  strength;
                 float  startAngle;
                 float  endAngle;
@@ -103,24 +103,32 @@ const ShaderSource& RingShader() {
                 r -= floor(r / (2.0 * PI)) * (2.0 * PI);
                 return Rad2Deg(r);
             }
+            // Signed distance to an ellipse with the pixel half axes pxRadius, in pixels and negative
+            // inside. Derived from the implicit form (x/a)^2 + (y/b)^2 - 1 divided by the length of its
+            // gradient; for a circle (a == b) this reduces to length(pxDelta) - a, so nothing changes
+            // for the isotropic case.
+            float EllipseDist(float2 pxDelta, float2 pxRadius) {
+                float2 r = max(pxRadius, float2(1e-6, 1e-6));
+                float2 q = pxDelta / r;
+                float  k = dot(q, q) - 1.0;
+                float2 g = 2.0 * q / r;
+                return k / max(length(g), 1e-6);
+                }
             float4 PSMain(PSInput i) : SV_Target {
                 float  pxScale    = min(viewportSize.x, viewportSize.y);
                 float2 pxDelta    = (i.fragCoord - center) * viewportSize;
-                float  pxDist     = length(pxDelta);
-                float  pxRadius   = radius   * pxScale;
+                float2 pxRadius   = radius   * viewportSize;
                 float  pxStrength = strength * pxScale;
                 float  a          = Degrees(pxDelta);
                 if (a < 0.0) a += 360.0;
                 bool renderSegment = (startAngle != endAngle);
                 if (renderSegment && (a < startAngle || a > endAngle))
                     discard;
-                float outerR = pxRadius;
-                float innerR = max(pxRadius - pxStrength, 0.0);
-                float dOuter = pxDist - outerR;
-                float dInner = innerR - pxDist;
+                float dOuter =  EllipseDist(pxDelta, pxRadius);
+                float dInner = -EllipseDist(pxDelta, pxRadius - pxStrength);
                 float alpha;
                 if (antialias != 0) {
-                    float pxWidth = 0.5 * fwidth(pxDist);
+                    float pxWidth = 0.5 * fwidth(dOuter);
                     if (dOuter > pxWidth || dInner > pxWidth) discard;
                     float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
@@ -173,7 +181,7 @@ const ShaderSource& CircleShader() {
                 float2 viewportSize;
                 float2 center;
                 float4 surfaceColor;
-                float  radius;
+                float2 radius;
                 float  fillLevel;
                 float  brightness;
                 int    antialias;
@@ -184,14 +192,24 @@ const ShaderSource& CircleShader() {
                 float2 fragCoord : TEXCOORD1;
                 float  vertexY   : TEXCOORD2;
             };
+            // Signed distance to an ellipse with the pixel half axes pxRadius, in pixels and negative
+            // inside. Derived from the implicit form (x/a)^2 + (y/b)^2 - 1 divided by the length of its
+            // gradient; for a circle (a == b) this reduces to length(pxDelta) - a, so nothing changes
+            // for the isotropic case.
+            float EllipseDist(float2 pxDelta, float2 pxRadius) {
+                float2 r = max(pxRadius, float2(1e-6, 1e-6));
+                float2 q = pxDelta / r;
+                float  k = dot(q, q) - 1.0;
+                float2 g = 2.0 * q / r;
+                return k / max(length(g), 1e-6);
+                }
             float4 PSMain(PSInput i) : SV_Target {
                 float2 pxDelta  = (i.fragCoord - center) * viewportSize;
-                float  pxDist   = length(pxDelta);
-                float  pxRadius = radius * min(viewportSize.x, viewportSize.y);
-                float  d        = pxDist - pxRadius;
+                float2 pxRadius = radius * viewportSize;
+                float  d        = EllipseDist(pxDelta, pxRadius);
                 float  alpha;
                 if (antialias != 0) {
-                    float pxWidth = 0.5 * fwidth(pxDist);
+                    float pxWidth = 0.5 * fwidth(d);
                     if (d > pxWidth) discard;
                     alpha = 1.0 - smoothstep(0.0, pxWidth, d);
                 } else {
@@ -224,7 +242,7 @@ const ShaderSource& CircleMaskShader() {
                 float2 center;
                 float4 surfaceColor;
                 //float4 maskColor;
-                float  radius;
+                float2 radius;
                 float  maskScale;
                 int    antialias;
             };
@@ -235,18 +253,28 @@ const ShaderSource& CircleMaskShader() {
                 float3 fragPos   : TEXCOORD0;
                 float2 fragCoord : TEXCOORD1;
             };
+            // Signed distance to an ellipse with the pixel half axes pxRadius, in pixels and negative
+            // inside. Derived from the implicit form (x/a)^2 + (y/b)^2 - 1 divided by the length of its
+            // gradient; for a circle (a == b) this reduces to length(pxDelta) - a, so nothing changes
+            // for the isotropic case.
+            float EllipseDist(float2 pxDelta, float2 pxRadius) {
+                float2 r = max(pxRadius, float2(1e-6, 1e-6));
+                float2 q = pxDelta / r;
+                float  k = dot(q, q) - 1.0;
+                float2 g = 2.0 * q / r;
+                return k / max(length(g), 1e-6);
+                }
             float4 PSMain(PSInput i) : SV_Target {
                 float2 fcDelta = i.fragCoord - center;
                 float4 mask    = surface.Sample(s0, clamp(center + fcDelta * maskScale, 0.0, 1.0));
                 if (mask.a > 0)
                     return mask;
                 float2 pxDelta  = (i.fragCoord - center) * viewportSize;
-                float  pxDist   = length(pxDelta);
-                float  pxRadius = radius * min(viewportSize.x, viewportSize.y);
-                float  d        = pxDist - pxRadius;
+                float2 pxRadius = radius * viewportSize;
+                float  d        = EllipseDist(pxDelta, pxRadius);
                 float  alpha;
                 if (antialias != 0) {
-                    float pxWidth = 0.5 * fwidth(pxDist);
+                    float pxWidth = 0.5 * fwidth(d);
                     if (d > pxWidth) discard;
                     alpha = 1.0 - smoothstep(0.0, pxWidth, d);
                 } else {
@@ -400,7 +428,7 @@ const ShaderSource& ShadedRingShader() {
                 float2 center;
                 float2 viewportSize;
                 float4 surfaceColor;
-                float  radius;
+                float2 radius;
                 float  strength;
                 float  startAngle;
                 float  endAngle;
@@ -422,24 +450,32 @@ const ShaderSource& ShadedRingShader() {
                 r -= floor(r / (2.0 * PI)) * (2.0 * PI);
                 return Rad2Deg(r);
             }
+            // Signed distance to an ellipse with the pixel half axes pxRadius, in pixels and negative
+            // inside. Derived from the implicit form (x/a)^2 + (y/b)^2 - 1 divided by the length of its
+            // gradient; for a circle (a == b) this reduces to length(pxDelta) - a, so nothing changes
+            // for the isotropic case.
+            float EllipseDist(float2 pxDelta, float2 pxRadius) {
+                float2 r = max(pxRadius, float2(1e-6, 1e-6));
+                float2 q = pxDelta / r;
+                float  k = dot(q, q) - 1.0;
+                float2 g = 2.0 * q / r;
+                return k / max(length(g), 1e-6);
+                }
             float4 PSMain(PSInput i) : SV_Target {
                 float  pxScale    = min(viewportSize.x, viewportSize.y);
                 float2 pxDelta    = (i.fragCoord - center) * viewportSize;
-                float  pxDist     = length(pxDelta);
-                float  pxRadius   = radius   * pxScale;
+                float2 pxRadius   = radius   * viewportSize;
                 float  pxStrength = strength * pxScale;
                 float  a          = Degrees(pxDelta);
                 if (a < 0.0) a += 360.0;
                 bool renderSegment = (startAngle != endAngle);
                 if (renderSegment && (a < startAngle || a > endAngle))
                     discard;
-                float outerR = pxRadius;
-                float innerR = max(pxRadius - pxStrength, 0.0);
-                float dOuter = pxDist - outerR;
-                float dInner = innerR - pxDist;
+                float dOuter =  EllipseDist(pxDelta, pxRadius);
+                float dInner = -EllipseDist(pxDelta, pxRadius - pxStrength);
                 float alpha;
                 if (antialias != 0) {
-                    float pxWidth = 0.5 * fwidth(pxDist);
+                    float pxWidth = 0.5 * fwidth(dOuter);
                     if (dOuter > pxWidth || dInner > pxWidth) discard;
                     float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
@@ -448,7 +484,7 @@ const ShaderSource& ShadedRingShader() {
                     if (dOuter > 0.0 || dInner > 0.0) discard;
                     alpha = 1.0;
                 }
-                float tOuter = clamp((outerR - pxDist) / max(pxStrength, 1e-4), 0.0, 1.0); // 0 = outer edge, 1 = inner edge
+                float tOuter = clamp(-dOuter / max(pxStrength, 1e-4), 0.0, 1.0); // 0 = outer edge, 1 = inner edge
                 float aMul   = lerp(outerAlpha, innerAlpha, tOuter);
                 float cMul   = lerp(outerColor, innerColor, tOuter);
                 return float4(surfaceColor.rgb * cMul, surfaceColor.a * alpha * aMul);

@@ -92,21 +92,21 @@ public:
         return LoadLineShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(start), static_cast<const Vector2f&>(end), strength, antialias);
     }
 
-    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true);
+    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true);
 
-    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true) {
+    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true) {
         return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, antialias);
     }
 
-    Shader* LoadCircleShader(const RGBAColor& color, const Vector2f& center, float radius, float fillLevel = 1.0f, float brightness = 1.0f, bool antialias = true);
+    Shader* LoadCircleShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float fillLevel = 1.0f, float brightness = 1.0f, bool antialias = true);
 
-    Shader* LoadCircleShader(RGBAColor&& color, Vector2f&& center, float radius, float fillLevel = 1.0f, float brightness = 1.0f, bool antialias = true) {
+    Shader* LoadCircleShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float fillLevel = 1.0f, float brightness = 1.0f, bool antialias = true) {
         return LoadCircleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, fillLevel, brightness, antialias);
     }
 
-    Shader* LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, float radius, float maskScale = 1.0f, bool antialias = true);
+    Shader* LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, const Vector2f& radius, float maskScale = 1.0f, bool antialias = true);
 
-    Shader* LoadCircleMaskShader(RGBAColor&& color, RGBAColor&& maskColor, Vector2f&& center, float radius, float maskScale = 1.0f, bool antialias = true) {
+    Shader* LoadCircleMaskShader(RGBAColor&& color, RGBAColor&& maskColor, Vector2f&& center, const Vector2f& radius, float maskScale = 1.0f, bool antialias = true) {
         return LoadCircleMaskShader(static_cast<const RGBAColor&>(color), static_cast<const RGBAColor&>(maskColor), static_cast<const Vector2f&>(center), radius, maskScale, antialias);
     }
 
@@ -122,9 +122,9 @@ public:
         return LoadShadedRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width, height, strength, radius, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
     }
 
-    Shader* LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
+    Shader* LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
 
-    Shader* LoadShadedRingShader(RGBAColor&& color, Vector2f&& center, float radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true) {
+    Shader* LoadShadedRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true) {
         return LoadShadedRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
     }
 
