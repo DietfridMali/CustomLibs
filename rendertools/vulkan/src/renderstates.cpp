@@ -125,7 +125,7 @@ VkPipelineDepthStencilStateCreateInfo& RenderStates::SetDepthStencilInfo(VkPipel
     info.front.depthFailOp = ToVkStencilOp(stencilDPFail);
     info.front.compareOp = ToVkCompareOp(stencilFunc);
     info.front.compareMask = stencilMask;
-    info.front.writeMask = stencilMask;
+    info.front.writeMask = stencilWriteMask;
     info.front.reference = stencilRef;
 
     info.back.failOp = ToVkStencilOp(stencilBackSFail);
@@ -133,7 +133,7 @@ VkPipelineDepthStencilStateCreateInfo& RenderStates::SetDepthStencilInfo(VkPipel
     info.back.depthFailOp = ToVkStencilOp(stencilBackDPFail);
     info.back.compareOp = ToVkCompareOp(stencilFunc);
     info.back.compareMask = stencilMask;
-    info.back.writeMask = stencilMask;
+    info.back.writeMask = stencilWriteMask;
     info.back.reference = stencilRef;
 
     info.minDepthBounds = 0.0f;

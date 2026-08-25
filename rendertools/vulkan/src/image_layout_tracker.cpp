@@ -65,6 +65,18 @@ void ImageLayoutTracker::ToShadowInput(VkCommandBuffer cb) noexcept
 }
 
 
+// Read-only depth that stays BOUND as the depth attachment while it is also sampled (RenderTarget::
+// dbmReadOnly). Same layout as ToShadowInput, but the destination scopes have to cover both consumers:
+// the fixed-function depth test in the early/late fragment tests and the texture fetch in the shader.
+void ImageLayoutTracker::ToDepthReadOnly(VkCommandBuffer cb) noexcept
+{
+    TransitionTo(cb, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                 VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT |
+                 VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                 VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_SHADER_READ_BIT);
+}
+
+
 void ImageLayoutTracker::ToColorAttachment(VkCommandBuffer cb) noexcept
 {
     TransitionTo(cb, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,

@@ -92,10 +92,13 @@ public:
         return LoadLineShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(start), static_cast<const Vector2f&>(end), strength, antialias);
     }
 
-    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true);
+    // dashCount = 0 draws a solid ring. Otherwise the ring (or, with startAngle != endAngle, the segment)
+    // is divided into dashCount periods and the first dashRatio of each period is drawn; dashOffset shifts
+    // the pattern in whole periods.
+    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true, float dashCount = 0.0f, float dashRatio = 0.5f, float dashOffset = 0.0f);
 
-    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true) {
-        return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, antialias);
+    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true, float dashCount = 0.0f, float dashRatio = 0.5f, float dashOffset = 0.0f) {
+        return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, antialias, dashCount, dashRatio, dashOffset);
     }
 
     Shader* LoadCircleShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float fillLevel = 1.0f, float brightness = 1.0f, bool antialias = true);

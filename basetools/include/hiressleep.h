@@ -8,6 +8,9 @@
 #   ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #       define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
 #   endif
+#else
+#   include <time.h>
+#   include <cerrno>
 #endif
 
 // =================================================================================================
@@ -55,7 +58,7 @@ public:
                 return;
             }
         }
-        Sleep((DWORD)((diff + 999) / 1000));                 // Fallback
+        ::Sleep((DWORD)((diff + 999) / 1000));               // Fallback
 #else
 #ifdef TIMER_ABSTIME
         timespec ts;

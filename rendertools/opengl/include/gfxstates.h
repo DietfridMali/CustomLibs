@@ -235,11 +235,28 @@ public:
 		FuncState(stateID, std::make_tuple(sfail, dpfail, dppass), [](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
 	}
 
+	// The offset is on as soon as EITHER term is non-zero -- a pure slope scale (factor, 0) and a pure
+	// constant offset (0, units) are both valid and used. And the values are pushed on every call: gating
+	// them on the enable state swallowed a change of factor/units while the offset was already on.
 	inline int SetPolygonOffset(GfxTypes::Float factor = 0.0f, GfxTypes::Float units = 0.0f) { 
-		if (not SetState<GL_POLYGON_OFFSET_FILL>((factor * units == 0.0f) ? 0 : 1))
-			return 0;
-		glPolygonOffset(factor, units);
-		return 1;
+		int enable = ((factor == 0.0f) and (units == 0.0f)) ? 0 : 1;
+		SetState<GL_POLYGON_OFFSET_FILL>(enable);
+		if (enable)
+			glPolygonOffset(factor, units);
+		return enable;
+	}
+
+	// Companion of the DX/VK stub of the same name: there the polygon offset is part of the rasterizer
+	// state and is always live, so the enable is a no-op; in OpenGL it is a real toggle.
+	inline int SetPolygonOffsetFill(int state) {
+		return SetState<GL_POLYGON_OFFSET_FILL>(state);
+	}
+
+	// Depth clipping. DX (DepthClipEnable) and Vulkan (depthClampEnable) carry it in the rasterizer state;
+	// OpenGL expresses the same thing inverted, as GL_DEPTH_CLAMP.
+	inline int SetDepthClip(int state) {
+		int prevState = SetState<GL_DEPTH_CLAMP>((state < 0) ? -1 : (state ? 0 : 1));
+		return (prevState < 0) ? prevState : (prevState ? 0 : 1);
 	}
 
 	inline int SetDither(int state) { 
@@ -331,6 +348,16 @@ public:
 	inline int SetDepthWrite(int state) {
 		static int32_t stateID = -1;
 		return FuncState<GLboolean, GLboolean(-1)>(GLboolean(state), stateID, glDepthMask);
+	}
+
+	// Stencil write mask. Pass -1 to query without changing it. Separate from the comparison mask set by
+	// StencilFunc, so a pass can test against the stencil without writing it.
+	// Masked to 8 bits so the returned previous value matches DX/VK (uint8 mask, GL's default is all ones);
+	// every backend's depth buffer carries an 8 bit stencil plane, so the upper bits carry no information.
+	inline int SetStencilWrite(int mask) {
+		static int32_t stateID = -1;
+		GLuint state = (mask < 0) ? GLuint(-1) : GLuint(mask & 0xFF);
+		return int(FuncState<GLuint, GLuint(-1)>(state, stateID, glStencilMask) & 0xFF);
 	}
 
 	inline std::tuple<GLboolean, GLboolean, GLboolean, GLboolean> ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a, int bufferIndex = -1) {
@@ -473,7 +500,11 @@ public:
 		SetClearColor(ColorData::Invisible);
 	}
 
+	// Masked by the colour write mask, same as the depth and stencil clears below: a pass that had
+	// channels masked off (e.g. a depth prepass) would clear nothing, while DX (ClearRenderTargetView)
+	// and Vulkan (loadOp CLEAR) clear all channels regardless.
 	inline void ClearColorBuffers(void) noexcept {
+		ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
@@ -481,19 +512,26 @@ public:
 	// any texture regardless of FBO attachment — no temporary CL needed (GL is immediate-mode).
 	void ClearSkyMaps(class RenderTarget* rt) noexcept;
 
+	// glClear is masked by the depth write mask, so with depth writes off the clear silently does nothing
+	// -- DX (ClearDepthStencilView) and Vulkan (loadOp CLEAR) clear regardless. The write is enabled here
+	// and deliberately left enabled afterwards, per the render state contract (every stage sets what it
+	// needs); stashing and restoring the previous value is exactly what that rule forbids.
 	inline void ClearDepthBuffer(GfxTypes::Float clearValue = 1.0f) {
 		if (m_depthClearValue != clearValue) {
 			m_depthClearValue = clearValue;
 			glClearDepth(clearValue);
 		}
+		SetDepthWrite(1);
 		glClear(GL_DEPTH_BUFFER_BIT);
 	}
 
+	// Masked by the stencil write mask for the same reason.
 	inline void ClearStencilBuffer(GfxTypes::Int clearValue = 0) {
 		if (m_stencilClearValue != clearValue) {
 			m_stencilClearValue = clearValue;
 			glClearStencil(clearValue);
 		}
+		SetStencilWrite(0xFF);
 		glClear(GL_STENCIL_BUFFER_BIT);
 	}
 

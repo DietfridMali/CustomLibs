@@ -401,7 +401,31 @@ void RenderTarget::Destroy(void)
     m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
+    m_depthMode = dbmWrite;
     m_bufferInfo.Reset();
+    m_customDrawBuffers.Reset();
+}
+
+
+// A render-target slot that a custom draw-buffer setup leaves unused still has to occupy its position in
+// the OMSetRenderTargets array, or every later fragment output would shift down by one slot. D3D12 rejects
+// a zeroed handle there, so one null RTV descriptor is created on first use and shared from then on.
+D3D12_CPU_DESCRIPTOR_HANDLE RenderTarget::NullRTV(void)
+{
+    static DescriptorHandle nullHandle;
+    if (not nullHandle.IsValid()) {
+        ID3D12Device* device = dx12Context.Device();
+        if (not device)
+            return D3D12_CPU_DESCRIPTOR_HANDLE{ 0 };
+        nullHandle = descriptorHeaps.AllocRTV();
+        if (not nullHandle.IsValid())
+            return D3D12_CPU_DESCRIPTOR_HANDLE{ 0 };
+        D3D12_RENDER_TARGET_VIEW_DESC desc{};
+        desc.Format = dxColorFormat;
+        desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+        device->CreateRenderTargetView(nullptr, &desc, descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index));
+    }
+    return descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index);
 }
 
 
@@ -463,6 +487,31 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             }
             pDSV = ActiveDepthBufferHandle();
         }
+        else if (m_drawBufferGroup == dbCustom) {
+            // Caller-defined setup: slot i draws into m_customDrawBuffers[i]. Everything not named goes to
+            // PIXEL_SHADER_RESOURCE, so a buffer left out of the list can be sampled by the same pass.
+            int listed = m_customDrawBuffers.Length();
+            for (int i = 0; i < m_bufferCount; ++i) {
+                BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
+                if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex))
+                    continue;
+                bool isTarget = false;
+                for (int j = 0; (j < listed) and not isTarget; ++j)
+                    isTarget = (m_customDrawBuffers[j] == i);
+                if (not isTarget)
+                    m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            }
+            for (int i = 0; (i < listed) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
+                int bufferIndex = m_customDrawBuffers[i];
+                // An unused slot still occupies its position, or every later output would shift down one
+                // slot. D3D12 needs a real null RTV descriptor for that, hence NullRTV().
+                if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not AttachBuffer(bufferIndex))
+                    rtvs[count++] = NullRTV();
+                else
+                    rtvs[count++] = m_bufferInfo[bufferIndex].RTV().CPUHandle();
+            }
+            pDSV = ActiveDepthBufferHandle();
+        }
     }
 
     // Bind the depth either writable (normal) or read-only + shader-readable (dbmReadOnly: a pass that
@@ -470,6 +519,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     // the depth owner, so this works both for an own depth buffer AND a shared one (SetDepthSource) -- an
     // overlay buffer can then hardware-depth-test against the scene depth AND sample it. dbmWrite restores
     // DEPTH_WRITE, so a later normal pass transitions back on its own and never has to know about it.
+    SetDepthMode(params.depthMode);
     RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
     if ((depthOwner->m_depthBufferIndex >= 0) and pDSV) {
         BufferInfo& di = depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex];
@@ -490,6 +540,14 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 }
 
 
+void RenderTarget::SelectCustomDrawBuffers(const CustomDrawBufferList& bufferIndices)
+{
+    m_customDrawBuffers = bufferIndices;
+    m_activeBufferIndex = -1;
+    m_drawBufferGroup = dbCustom;
+}
+
+
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup)
 {
     // a shared depth source (SetDepthSource) is bound like an own depth buffer
@@ -497,7 +555,7 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
-    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth);
+    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth) or (m_drawBufferGroup == dbCustom);
 }
 
 

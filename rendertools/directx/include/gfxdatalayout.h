@@ -143,6 +143,15 @@ public:
                 t->Deactivate();
     }
 
+    // Names used by the OpenGL backend for the same two calls.
+    inline bool EnableTextures(std::span<Texture* const> textures = {}) noexcept {
+        return ActivateTextures(textures);
+    }
+
+    inline void DisableTextures(std::span<Texture* const> textures = {}) noexcept {
+        DeactivateTextures(textures);
+    }
+
     GfxDataBuffer* FindBuffer(const char* type, int id, int& index) noexcept;
 
     bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;

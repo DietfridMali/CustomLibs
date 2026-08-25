@@ -40,6 +40,8 @@ void RenderTarget::Init(void) {
     m_clearColor = ColorData::Invisible;
     m_bufferInfo.Reset();
     m_drawBuffers.Reset();
+    m_customDrawBuffers.Reset();
+    m_depthMode = dbmWrite;
 }
 
 
@@ -260,6 +262,13 @@ void RenderTarget::Destroy(void) {
 bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
     int l = m_drawBuffers.Length();
 
+    // dbmReadOnly: the depth buffer is tested against but not written, so it may be sampled as a texture
+    // in the same pass (soft particles / WBOIT). OpenGL has no read-only depth view -- turning depth (and
+    // stencil) writes off is the equivalent, and it is what makes the feedback loop well-defined.
+    // dbmWrite does NOT restore the write mask: every stage sets the states it needs (render state
+    // contract), and the DX read-only DSV is just as one-way while it is bound.
+    SetDepthMode(params.depthMode);
+
     switch (params.drawBufferGroup) {
     case dbDepth:
         m_drawBufferGroup = dbDepth;
@@ -324,16 +333,50 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
         return true;
 
     case dbCustom:
+        // Re-apply the caller's own setup (Reactivate, or an Activate that keeps dbCustom).
+        m_drawBufferGroup = dbCustom;
+        ApplyCustomDrawBuffers();
+        return true;
+
     default:
         return true;
     }
 }
 
 
-void RenderTarget::SelectCustomDrawBuffers(DrawBufferList& drawBuffers) {
-    m_drawBuffers = drawBuffers;
+// Translate the API-neutral buffer-index list into GL attachment points: slot i draws into
+// m_bufferInfo[index].m_attachment, GL_NONE where the caller left a slot unused. Everything not named in
+// the list is detached, so no leftover attachment of a previous group keeps receiving writes.
+void RenderTarget::ApplyCustomDrawBuffers(void) {
+    int slots = m_drawBuffers.Length();
+    int listed = m_customDrawBuffers.Length();
+    for (int i = 0; i < slots; ++i)
+        m_drawBuffers[i] = GL_NONE;
+    for (int i = 0; i < m_bufferCount; ++i) {
+        BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
+        if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex))
+            continue;
+        bool isTarget = false;
+        for (int j = 0; (j < listed) and not isTarget; ++j)
+            isTarget = (m_customDrawBuffers[j] == i);
+        if (isTarget)
+            AttachBuffer(i);
+        else
+            DetachBuffer(i);
+    }
+    for (int i = 0; (i < listed) and (i < slots); ++i) {
+        int bufferIndex = m_customDrawBuffers[i];
+        if ((bufferIndex >= 0) and (bufferIndex < m_bufferCount))
+            m_drawBuffers[i] = m_bufferInfo[bufferIndex].m_attachment;
+    }
+}
+
+
+void RenderTarget::SelectCustomDrawBuffers(const CustomDrawBufferList& bufferIndices) {
+    m_customDrawBuffers = bufferIndices;
     m_activeBufferIndex = -1;
     m_drawBufferGroup = dbCustom;
+    ApplyCustomDrawBuffers();
 }
 
 
@@ -343,7 +386,7 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
-    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth);
+    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth) or (m_drawBufferGroup == dbCustom);
 }
 
 
@@ -383,7 +426,7 @@ void RenderTarget::Clear(const RTActivationParams& params) { // clear color has 
         gfxStates.SetViewport(0, 0, m_width * m_scale, m_height * m_scale);
         gfxStates.PushClearColor();
         gfxStates.SetClearColor(m_clearColor);
-        if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup))
+        if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup) and (params.depthMode != dbmReadOnly))
             ClearDepthBuffer();
         if (m_colorBufferCount)
             ClearColorBuffers();

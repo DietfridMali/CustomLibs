@@ -75,6 +75,8 @@ D3D12_SAMPLER_DESC SamplerCache::ToD3D12Desc(const TextureSampling& s) noexcept 
                 return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
             case GfxWrapMode::ClampToEdge:
                 return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            case GfxWrapMode::ClampToBorder:
+                return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
         }
         return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
     };

@@ -122,7 +122,7 @@ Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f
 }
 
 
-Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle, float endAngle, bool antialias) {
+Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle, float endAngle, bool antialias, float dashCount, float dashRatio, float dashOffset) {
     Shader* shader = SetupRenderShader("ringShader");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
@@ -134,6 +134,9 @@ Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f
             shader->SetFloat("startAngle", startAngle);
             shader->SetFloat("endAngle", endAngle);
             shader->SetInt("antialias", antialias ? 1 : 0);
+            shader->SetFloat("dashCount", dashCount);
+            shader->SetFloat("dashRatio", dashRatio);
+            shader->SetFloat("dashOffset", dashOffset);
         }
     }
     return shader;

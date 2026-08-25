@@ -157,7 +157,7 @@ D3D12_DEPTH_STENCIL_DESC RenderStates::SetStencilDesc(D3D12_DEPTH_STENCIL_DESC& 
     desc.DepthFunc = ToD3DCompFunc(depthFunc);
     desc.StencilEnable = stencilTest ? TRUE : FALSE;
     desc.StencilReadMask = stencilMask;
-    desc.StencilWriteMask = stencilMask;
+    desc.StencilWriteMask = stencilWriteMask;
     desc.FrontFace = { ToD3DStencilOp(stencilSFail), ToD3DStencilOp(stencilDPFail), ToD3DStencilOp(stencilDPPass), ToD3DCompFunc(stencilFunc) };
     desc.BackFace = { ToD3DStencilOp(stencilBackSFail), ToD3DStencilOp(stencilBackDPFail), ToD3DStencilOp(stencilBackDPPass), ToD3DCompFunc(stencilFunc) };
     return desc;

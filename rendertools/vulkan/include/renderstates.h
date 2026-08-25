@@ -58,9 +58,13 @@ struct RenderStates {
     StencilOp   stencilBackSFail { StencilOp::Keep };
     StencilOp   stencilBackDPFail { StencilOp::Keep };
     StencilOp   stencilBackDPPass { StencilOp::Keep };
-    // Stencil reference value and mask
+    // Stencil reference value and comparison (read) mask
     uint8_t     stencilRef { 0 };
     uint8_t     stencilMask { 0xFF };
+    // Stencil write mask, separate from the comparison mask: a pass may test against the stencil without
+    // writing it (see RenderTarget::dbmReadOnly, which needs both depth and stencil writes off so the
+    // depth/stencil image can be sampled while it stays bound).
+    uint8_t     stencilWriteMask { 0xFF };
     // Rasterizer depth clipping
     uint8_t     depthClip { 1 };
     // Polygon offset (OGL glPolygonOffset equivalent: factor -> slopeScaledDepthBias, units -> depthBias)

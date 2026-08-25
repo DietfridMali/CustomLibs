@@ -89,6 +89,9 @@ const ShaderSource& RingShader() {
                 float  startAngle;
                 float  endAngle;
                 int    antialias;
+                float  dashCount;    // dashes over the full ring (or over the segment); 0 = solid
+                float  dashRatio;    // dash length as a fraction of one dash period
+                float  dashOffset;   // phase shift in dash periods
             };
             struct PSInput {
                 float4 pos       : SV_Position;
@@ -136,6 +139,22 @@ const ShaderSource& RingShader() {
                 } else {
                     if (dOuter > 0.0 || dInner > 0.0) discard;
                     alpha = 1.0;
+                }
+                // Dashes: cut the ring into dashCount periods along its circumference and keep the first
+                // dashRatio of each. The edge softening uses the arc length per period computed from the
+                // radius instead of fwidth, which would jump at the 0/360 seam.
+                if (dashCount > 0.0) {
+                    float span  = renderSegment ? (endAngle - startAngle) : 360.0;
+                    float rel   = renderSegment ? (a - startAngle) : a;
+                    float f     = frac(rel / span * dashCount + dashOffset);
+                    float sd    = max(-f, f - dashRatio);   // < 0 inside a dash
+                    if (antialias != 0) {
+                        float pxPerPeriod = (span / max(dashCount, 1e-6)) * (PI / 180.0) * 0.5 * (pxRadius.x + pxRadius.y);
+                        float dPx = sd * max(pxPerPeriod, 1e-6);
+                        alpha *= 1.0 - smoothstep(-0.5, 0.5, dPx);
+                    }
+                    else if (sd > 0.0)
+                        discard;
                 }
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }

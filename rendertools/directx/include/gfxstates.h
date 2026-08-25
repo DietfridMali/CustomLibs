@@ -287,42 +287,59 @@ public:
     inline int SetDepthWrite(int state) {
         auto& s = ActiveState();
         int prevState = int(s.depthWrite);
-        s.depthWrite = uint8_t(state);
+        if (state >= 0)
+            s.depthWrite = uint8_t(state);
+        return prevState;
+    }
+
+
+    // Stencil write mask. Pass -1 to query without changing it. Separate from the comparison mask set by
+    // StencilFunc, so a pass can test against the stencil without writing it.
+    inline int SetStencilWrite(int mask) {
+        auto& s = ActiveState();
+        int prevState = int(s.stencilWriteMask);
+        if (mask >= 0)
+            s.stencilWriteMask = uint8_t(mask);
         return prevState;
     }
 
     inline int SetBlending(int state, int bufferIndex = 0) {
         auto& s = ActiveState();
         int prevState = int(s.blendEnable[bufferIndex]);
-        s.blendEnable[bufferIndex] = uint8_t(state);
+        if (state >= 0)
+            s.blendEnable[bufferIndex] = uint8_t(state);
         return prevState;
     }
 
     inline int SetDepthClip(int state) {
         auto& s = ActiveState();
         int prevState = int(s.depthClip);
-        s.depthClip = uint8_t(state);
+        if (state >= 0)
+            s.depthClip = uint8_t(state);
         return prevState;
     }
 
     inline int SetFaceCulling(int state) {
         auto& s = ActiveState();
         int prevState = (s.cullMode != GfxOperations::CullFace::None) ? 1 : 0;
-        s.cullMode = state ? GfxOperations::CullFace::Back : GfxOperations::CullFace::None;
+        if (state >= 0)
+            s.cullMode = state ? GfxOperations::CullFace::Back : GfxOperations::CullFace::None;
         return prevState;
     }
 
     inline int SetScissorTest(int state) {
         auto& s = ActiveState();
         int prevState = int(s.scissorTest);
-        s.scissorTest = uint8_t(state);
+        if (state >= 0)
+            s.scissorTest = uint8_t(state);
         return prevState;
     }
 
     inline int SetStencilTest(int state) {
         auto& s = ActiveState();
         int prevState = int(s.stencilTest);
-        s.stencilTest = uint8_t(state);
+        if (state >= 0)
+            s.stencilTest = uint8_t(state);
         return prevState;
     }
 

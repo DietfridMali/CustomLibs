@@ -467,9 +467,16 @@ void ShadowTexture::SetParams(bool forceUpdate)
     m_sampling.minFilter   = GfxFilterMode::Linear;
     m_sampling.magFilter   = GfxFilterMode::Linear;
     m_sampling.mipMode     = GfxMipMode::None;
-    m_sampling.wrapU       = GfxWrapMode::ClampToEdge;
-    m_sampling.wrapV       = GfxWrapMode::ClampToEdge;
-    m_sampling.wrapW       = GfxWrapMode::ClampToEdge;
+    // Outside the shadow map there is no shadow: clamp to a WHITE border (depth 1 = farthest) instead of
+    // repeating the edge texel, which smeared the border shadow across everything beyond the map. This is
+    // what the OpenGL backend has always done (GL_CLAMP_TO_BORDER + white border colour).
+    m_sampling.wrapU       = GfxWrapMode::ClampToBorder;
+    m_sampling.wrapV       = GfxWrapMode::ClampToBorder;
+    m_sampling.wrapW       = GfxWrapMode::ClampToBorder;
+    m_sampling.borderColor[0] = 1.0f;
+    m_sampling.borderColor[1] = 1.0f;
+    m_sampling.borderColor[2] = 1.0f;
+    m_sampling.borderColor[3] = 1.0f;
     m_sampling.compareFunc = GfxOperations::CompareFunc::Less;
     m_sampling.maxAnisotropy = 1.0f;
 }

@@ -52,7 +52,8 @@ public:
     }
 
     void SetInterface(PlatformType type, PlatformInterface* itf) {
-        m_interfaces[int(type)] = itf;
+        if (type != PlatformType::Unknown)
+            m_interfaces[int(type)] = itf;
     }
 
 private:

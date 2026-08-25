@@ -27,7 +27,15 @@ void ApplyTextureSamplingToGL(GLenum target, const TextureSampling& s) noexcept
     magFilter = (s.magFilter == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
 
     auto wrap = [](GfxWrapMode m) -> GLint {
-        return (m == GfxWrapMode::Repeat) ? GL_REPEAT : GL_CLAMP_TO_EDGE;
+        switch (m) {
+            case GfxWrapMode::Repeat:
+                return GL_REPEAT;
+            case GfxWrapMode::ClampToBorder:
+                return GL_CLAMP_TO_BORDER;
+            case GfxWrapMode::ClampToEdge:
+            default:
+                return GL_CLAMP_TO_EDGE;
+        }
     };
 
     glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
@@ -35,13 +43,32 @@ void ApplyTextureSamplingToGL(GLenum target, const TextureSampling& s) noexcept
     glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap(s.wrapU));
     glTexParameteri(target, GL_TEXTURE_WRAP_T, wrap(s.wrapV));
     glTexParameteri(target, GL_TEXTURE_WRAP_R, wrap(s.wrapW));
+    glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, s.borderColor);
+
+    // Depth compare (sampler2DShadow / HW PCF). Same rule as the DX and Vulkan sampler caches: a
+    // compareFunc of Always means "no comparison".
+    if (s.compareFunc != GfxOperations::CompareFunc::Always) {
+        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GfxToGL::ToGLenum(s.compareFunc));
+    }
+    else
+        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+
+    // Anisotropy, LOD bias and LOD range were dropped here while DX/VK honoured them.
+    glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, (s.maxAnisotropy > 1.0f) ? s.maxAnisotropy : 1.0f);
+    glTexParameterf(target, GL_TEXTURE_LOD_BIAS, s.mipLodBias);
 
     if (s.mipMode != GfxMipMode::None) {
         glGenerateMipmap(target);
+        glTexParameterf(target, GL_TEXTURE_MIN_LOD, s.minLOD);
+        glTexParameterf(target, GL_TEXTURE_MAX_LOD, s.maxLOD);
     }
     else {
         glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
+        // Match DX/VK, which clamp LOD to the base level when mip-mapping is off.
+        glTexParameterf(target, GL_TEXTURE_MIN_LOD, 0.0f);
+        glTexParameterf(target, GL_TEXTURE_MAX_LOD, 0.0f);
     }
 }
 

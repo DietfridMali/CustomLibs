@@ -17,6 +17,14 @@ class DrawBufferHandler
 public:
     using DrawBufferList = AutoArray <GfxTypes::Uint>;
 
+    // Custom draw-buffer setup (RenderTarget::SelectCustomDrawBuffers). Entry i is the BUFFER INDEX of the
+    // render target's buffer bound to fragment output slot i, or CUSTOM_DRAW_BUFFER_NONE for a slot that is
+    // left unwritten. API-neutral on purpose: the OpenGL backend translates the indices into attachment
+    // points, DX and Vulkan into RTVs / colour attachments, so one and the same list works everywhere.
+    using CustomDrawBufferList = AutoArray <int>;
+
+    static constexpr int CUSTOM_DRAW_BUFFER_NONE = -1;
+
 protected:
     RenderTarget*       m_activeBuffer{ nullptr };
     List<RenderTarget*> m_drawBufferStack{};

@@ -190,6 +190,19 @@ public:
         }
     }
 
+    // Names used by the DX and Vulkan backends for the same two calls.
+    inline bool ActivateTextures(std::span<Texture* const> textures = {})
+        noexcept
+    {
+        return EnableTextures(textures);
+    }
+
+    inline void DeactivateTextures(std::span<Texture* const> textures = {})
+        noexcept
+    {
+        DisableTextures(textures);
+    }
+
 
     GfxDataBuffer* FindBuffer(const char* type, int id, int& index)
         noexcept;

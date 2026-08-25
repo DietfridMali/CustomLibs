@@ -69,6 +69,8 @@ static VkSamplerAddressMode ToVkWrap(GfxWrapMode m) noexcept {
             return VK_SAMPLER_ADDRESS_MODE_REPEAT;
         case GfxWrapMode::ClampToEdge:
             return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        case GfxWrapMode::ClampToBorder:
+            return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     }
     return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 }

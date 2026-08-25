@@ -27,7 +27,10 @@ enum class GfxBufferTarget : uint8_t {
 
 enum class GfxWrapMode : uint8_t {
     Repeat = 0,
-    ClampToEdge = 1
+    ClampToEdge = 1,
+    // Samples outside [0,1] return TextureSampling::borderColor. Needed by the shadow sampler, where the
+    // area outside the shadow map has to read as "no shadow" (white border) rather than smearing the edge.
+    ClampToBorder = 2
 };
 
 enum class TextureType : uint8_t {

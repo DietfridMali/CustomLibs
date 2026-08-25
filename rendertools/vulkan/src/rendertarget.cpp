@@ -208,8 +208,10 @@ void RenderTarget::Init(void)
     m_pingPong = false;
     m_isAvailable = false;
     m_drawBufferGroup = dbAll;
+    m_depthMode = dbmWrite;
     m_clearColor = ColorData::Invisible;
     m_bufferInfo.Reset();
+    m_customDrawBuffers.Reset();
 }
 
 
@@ -494,7 +496,26 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
         for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             ConfigColor(i);
     }
-    else {  // dbColor, dbCustom — color only
+    else if (m_drawBufferGroup == dbCustom) {
+        // Slot order is the caller's; an unused slot keeps its position with a null image view (Vulkan
+        // discards writes to it), or every later fragment output would shift down by one slot.
+        int listed = m_customDrawBuffers.Length();
+        for (int i = 0; (i < listed) and (colorCount < RT_MAX_COLOR_BUFFERS); ++i) {
+            int bufferIndex = m_customDrawBuffers[i];
+            VkImageView view = VK_NULL_HANDLE;
+            if ((bufferIndex >= 0) and (bufferIndex < m_bufferCount))
+                view = m_bufferInfo[bufferIndex].m_imageView;
+            VkRenderingAttachmentInfo a{};
+            a.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            a.imageView   = view;
+            a.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            a.loadOp      = clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+            a.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
+            a.clearValue  = MakeClearColor(m_clearColor);
+            colors[colorCount++] = a;
+        }
+    }
+    else {  // dbColor — color only
         for (int i = 0; i < m_colorBufferCount; ++i)
             ConfigColor(i);
     }
@@ -503,14 +524,16 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
     if (wantDepth) {
         depth.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         depth.imageView   = depthInfo->m_imageView;
-        // A shared depth source (SetDepthSource) is read-only (only tested against, never cleared or
-        // written): use the read-only layout so the SAME image can serve as the depth attachment AND a
-        // sampled texture in the same pass (WBOIT soft particles). An own depth buffer stays writable.
-        depth.imageLayout = (m_depthSource != nullptr) ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-                                                       : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        // force LOAD even when the activation clears, so the scene depth survives the overlay pass.
-        depth.loadOp      = (m_depthSource != nullptr) ? VK_ATTACHMENT_LOAD_OP_LOAD
-                                                       : (clearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD);
+        // Read-only depth: a shared source (SetDepthSource, only ever tested against) or an activation
+        // that asked for dbmReadOnly. The read-only layout lets the SAME image serve as the depth
+        // attachment AND a sampled texture in the same pass (WBOIT soft particles). An own depth buffer
+        // in dbmWrite stays writable.
+        bool readOnlyDepth = (m_depthSource != nullptr) or (m_depthMode == dbmReadOnly);
+        depth.imageLayout = readOnlyDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+                                          : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        // force LOAD even when the activation clears, so the existing depth survives the pass.
+        depth.loadOp      = readOnlyDepth ? VK_ATTACHMENT_LOAD_OP_LOAD
+                                          : (clearDepth ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD);
         depth.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
         depth.clearValue  = MakeClearDepth(1.0f);
     }
@@ -596,6 +619,8 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
         ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length())))
         return false;
 
+    SetDepthMode(params.depthMode);
+
     // AttachBuffer/DetachBuffer issue image-layout barriers, which Vulkan forbids inside an active
     // vkCmdBeginRendering scope. When this is called mid-pass -- a post-effect switching the scene
     // buffer to colour-0-only and back (the wet-splat composite, the single-output overlays) -- close
@@ -645,21 +670,55 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
                 AttachBuffer(i);
         }
+        else if (m_drawBufferGroup == dbCustom) {
+            // Caller-defined setup: slot i draws into m_customDrawBuffers[i]. Everything not named is
+            // detached (-> SHADER_READ_ONLY), so a buffer left out of the list can be sampled by the pass.
+            int listed = m_customDrawBuffers.Length();
+            for (int i = 0; i < m_bufferCount; ++i) {
+                BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
+                if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex))
+                    continue;
+                bool isTarget = false;
+                for (int j = 0; (j < listed) and not isTarget; ++j)
+                    isTarget = (m_customDrawBuffers[j] == i);
+                if (isTarget)
+                    AttachBuffer(i);
+                else
+                    DetachBuffer(i);
+            }
+        }
     }
-    if (HaveDepthBuffer(true))
-        AttachBuffer(m_depthBufferIndex);
+    if (HaveDepthBuffer(true)) {
+        // dbmReadOnly: keep the own depth image in the read-only depth layout instead of the writable
+        // attachment layout, so this pass can test against it AND sample it (soft particles / WBOIT).
+        // The barrier must run here, outside the vkCmdBeginRendering scope.
+        if (m_depthMode == dbmReadOnly)
+            m_bufferInfo[m_depthBufferIndex].m_layoutTracker.ToDepthReadOnly(cb);
+        else
+            AttachBuffer(m_depthBufferIndex);
+    }
     else if ((m_depthSource != nullptr) and (m_depthSource->m_depthBufferIndex >= 0))
         // Shared depth (SetDepthSource): transition the foreign depth image into the read-only depth layout
         // (DEPTH_STENCIL_READ_ONLY_OPTIMAL via asShaderRead) on OUR command buffer so it can be both tested
         // against AND sampled in this pass (WBOIT soft particles). The barrier must run here, outside the
         // vkCmdBeginRendering scope; a later in-pass GetDepthAsTexture (ToShadowInput) is then a no-op
         // (TransitionTo early-outs on the same layout), so no forbidden in-pass barrier is emitted.
-        m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, true);
+        // ToDepthReadOnly rather than ToShadowInput: the image stays BOUND as the depth attachment here,
+        // so the destination scopes have to cover the depth test too, not just the shader fetch.
+        m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex].m_layoutTracker.ToDepthReadOnly(cb);
 
     // Reopen the pass we closed above, with the reconfigured attachment set and contents preserved.
     if (wasRendering)
         BeginRendering(false, false);
     return true;
+}
+
+
+void RenderTarget::SelectCustomDrawBuffers(const CustomDrawBufferList& bufferIndices)
+{
+    m_customDrawBuffers = bufferIndices;
+    m_activeBufferIndex = -1;
+    m_drawBufferGroup = dbCustom;
 }
 
 
@@ -670,7 +729,7 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups /*draw
         return false;
     if (bufferIndex >= 0)
         return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
-    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth);
+    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth) or (m_drawBufferGroup == dbCustom);
 }
 
 
@@ -809,16 +868,33 @@ void RenderTarget::Clear(const RTActivationParams& params)
     if (cb == VK_NULL_HANDLE)
         return;
 
-    AutoArray<VkClearAttachment> atts(m_colorBufferCount + 1);
+    int maxAtts = (m_customDrawBuffers.Length() > m_colorBufferCount) ? m_customDrawBuffers.Length() : m_colorBufferCount;
+    AutoArray<VkClearAttachment> atts(maxAtts + 1);
     int n = 0;
     VkClearValue cv = MakeClearColor(m_clearColor);
     if (params.bufferIndex < 0) {
-        for (int i = 0; i < m_colorBufferCount; ++i) {
-            VkClearAttachment a{};
-            a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-            a.colorAttachment = uint32_t(i);
-            a.clearValue      = cv;
-            atts[n++] = a;
+        // Clear by ATTACHMENT SLOT. With a custom setup the slots are the caller's list (and an unused
+        // slot has no image view, so it is skipped); otherwise slot i is colour buffer i.
+        if (m_drawBufferGroup == dbCustom) {
+            for (int i = 0; (i < m_customDrawBuffers.Length()) and (i < RT_MAX_COLOR_BUFFERS); ++i) {
+                int bufferIndex = m_customDrawBuffers[i];
+                if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
+                    continue;
+                VkClearAttachment a{};
+                a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+                a.colorAttachment = uint32_t(i);
+                a.clearValue      = cv;
+                atts[n++] = a;
+            }
+        }
+        else {
+            for (int i = 0; i < m_colorBufferCount; ++i) {
+                VkClearAttachment a{};
+                a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
+                a.colorAttachment = uint32_t(i);
+                a.clearValue      = cv;
+                atts[n++] = a;
+            }
         }
     }
     else if (params.bufferIndex < m_colorBufferCount) {
@@ -828,7 +904,9 @@ void RenderTarget::Clear(const RTActivationParams& params)
         a.clearValue      = cv;
         atts[n++] = a;
     }
-    if (HaveDepthBuffer(true)) {
+    // A read-only depth activation must not clear the depth it is only allowed to test against (same rule
+    // as in the DX backend, where the writable DSV is not even bound).
+    if (HaveDepthBuffer(true) and (params.depthMode != dbmReadOnly)) {
         VkClearAttachment a{};
         a.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
         a.clearValue = MakeClearDepth(1.0f);
@@ -1127,7 +1205,18 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
             for (int j = 0; j < m_vertexBufferCount; ++j)
                 key.colorFormats[key.colorFormatCount++] = kVertexFormat;
             break;
-        default: // dbColor, dbCustom — color only
+        case dbCustom:
+            // The pipeline has to name the attachment formats in the SAME slot order BeginRendering binds
+            // them, or the render pass and the pipeline do not match. An unused slot is UNDEFINED.
+            for (int i = 0; (i < m_customDrawBuffers.Length()) and (key.colorFormatCount < RT_MAX_COLOR_BUFFERS); ++i) {
+                int bufferIndex = m_customDrawBuffers[i];
+                key.colorFormats[key.colorFormatCount++] =
+                    ((bufferIndex >= 0) and (bufferIndex < m_bufferCount))
+                    ? ((m_bufferInfo[bufferIndex].m_type == BufferInfo::btVertex) ? kVertexFormat : m_colorFormat)
+                    : VK_FORMAT_UNDEFINED;
+            }
+            break;
+        default: // dbColor — color only
             for (int i = 0; i < m_colorBufferCount; ++i)
                 key.colorFormats[key.colorFormatCount++] = m_colorFormat;
             break;

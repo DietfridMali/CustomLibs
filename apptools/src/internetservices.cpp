@@ -102,8 +102,10 @@ String InternetServices::GetLanAddress(void) {
         return String("");
 
     SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock == INVALID_SOCKET)
+    if (sock == INVALID_SOCKET) {
+        WSACleanup();
         return String("");
+    }
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
@@ -125,11 +127,11 @@ String InternetServices::GetLanAddress(void) {
     }
 
     char buf[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf));
+    bool ok = (inet_ntop(AF_INET, &local.sin_addr, buf, sizeof(buf)) != nullptr);
 
     closesocket(sock);
     WSACleanup();
-    return String(buf);
+    return ok ? String(buf) : String("");
 }
 
 #else

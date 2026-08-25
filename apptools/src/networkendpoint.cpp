@@ -48,13 +48,25 @@ bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, int32_t port)
     if (not ipAddress.IsEmpty()) {
         AutoArray<String> fields = ipAddress.Split('.');
         unsigned fieldValues[4] = { 0,0,0,0 };
-        int i = 0, l = fields.Length();
-        for (; i < l; ++i) {
+        int l = fields.Length();
+        // More than four fields overran fieldValues; an octet above 255 bled into the next byte of the
+        // packed host address. Both are rejected now, and the message names the offending input rather
+        // than the previously stored address.
+        if (l > 4) {
+            fprintf(stderr, "invalid ip address '%s'\n", (const char*) ipAddress);
+            return false;
+        }
+        for (int i = 0; i < l; ++i) {
             try {
-                fieldValues[i] = fields[i].IsEmpty() ? 0 : uint16_t(fields[i]);
+                unsigned value = fields[i].IsEmpty() ? 0 : unsigned(uint16_t(fields[i]));
+                if (value > 255) {
+                    fprintf(stderr, "invalid ip address '%s'\n", (const char*) ipAddress);
+                    return false;
+                }
+                fieldValues[i] = value;
             }
             catch (...) {
-                fprintf(stderr, "invalid ip address '%s'\n", (const char*) m_ipAddress);
+                fprintf(stderr, "invalid ip address '%s'\n", (const char*) ipAddress);
                 return false;
             }
         }

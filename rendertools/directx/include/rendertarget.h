@@ -112,7 +112,8 @@ public:
 class RenderTarget
 {
 public:
-    using DrawBufferList = DrawBufferHandler::DrawBufferList; // required for high level compatibility
+    using DrawBufferList = DrawBufferHandler::DrawBufferList;
+    using CustomDrawBufferList = DrawBufferHandler::CustomDrawBufferList; // required for high level compatibility
 
     typedef enum {
         dbAll,
@@ -195,7 +196,11 @@ public:
     bool                m_isScreenBuffer{ false };
     RGBAColor           m_clearColor{ ColorData::Invisible };
     eDrawBufferGroups   m_drawBufferGroup{ dbAll };
+    // Depth mode of the current activation, so a Reactivate does not silently drop back to a writable
+    // depth buffer while a pass is still sampling it.
+    eDepthBufferMode    m_depthMode{ dbmWrite };
     DrawBufferList      m_drawBuffers{};
+    CustomDrawBufferList m_customDrawBuffers{};   // see SelectCustomDrawBuffers
 
     RenderStates        m_renderStates{};
     Viewport            m_viewport;
@@ -243,8 +248,17 @@ public:
 
     bool SelectDrawBuffers(const RTActivationParams& params);
 
+    // Custom draw-buffer setup: bypasses the standard groups (dbAll / dbColor / dbExtra / dbSingle) so a
+    // pass can bind an arbitrary set of this target's buffers, in an arbitrary slot order, without the
+    // general draw-buffer handling interfering. Entry i of the list is the buffer index bound to fragment
+    // output slot i, or CUSTOM_DRAW_BUFFER_NONE to leave that slot unwritten. Buffers not named in the
+    // list are released to shader-readable state. Stays in effect until another draw-buffer group is
+    // selected; a Reactivate (or any Activate with dbCustom) re-applies it. The depth buffer is
+    // unaffected and follows the usual rules.
+    void SelectCustomDrawBuffers(const CustomDrawBufferList& bufferIndices);
+
     inline bool Reactivate(bool clear = false) noexcept {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = true };
+        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = true, .depthMode = m_depthMode };
         return Activate(params);
     }
 
@@ -397,6 +411,8 @@ public:
         return this != &o;
     }
 
+    static D3D12_CPU_DESCRIPTOR_HANDLE NullRTV(void);
+
     bool AttachBuffer(int bufferIndex);
 
     bool DetachBuffer(int bufferIndex);
@@ -410,7 +426,7 @@ public:
     }
 
     inline int ExtraBufferIndex(int i = 0) noexcept {
-        return m_extraBufferIndex + i;
+        return m_vertexBufferCount ? m_extraBufferIndex + i : -1;
     }
 
     inline int VertexBufferIndex(int i = 0) noexcept {
@@ -441,6 +457,22 @@ private:
     // The depth buffer carries a stencil plane (see m_stencilBufferIndex).
     inline bool HaveStencilBuffer(bool checkHandle = true) noexcept {
         return m_hasStencil and HaveDepthBuffer(checkHandle);
+    }
+
+    // Depth/stencil write state for the requested depth mode, identical in all three backends: dbmReadOnly
+    // means "test against the depth buffer, never write it", which is what allows the same buffer to be
+    // sampled while it stays bound. DX and Vulkan additionally reject a writing pipeline over a read-only
+    // depth view, so turning the writes off here is not optional there either. Only the stencil plane of
+    // the ACTIVE depth buffer (own, or a shared source's) is considered. dbmWrite deliberately restores
+    // nothing: every stage sets the states it needs (render state contract).
+    inline void SetDepthMode(eDepthBufferMode depthMode) {
+        m_depthMode = depthMode;
+        if (depthMode != dbmReadOnly)
+            return;
+        gfxStates.SetDepthWrite(0);
+        RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
+        if (depthOwner->HaveStencilBuffer(true))
+            gfxStates.SetStencilWrite(0);
     }
 
     // DSV format of the depth buffer that actually gets bound; a shared depth source (SetDepthSource)
