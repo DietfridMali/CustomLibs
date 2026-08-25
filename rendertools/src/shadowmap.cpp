@@ -8,7 +8,15 @@
 //     stair-stepping that soft shadows only mask.
 // 0 = the previous viewer-aligned perspective frustum (uniform density).
 // Both live in CreateViewerAlignedTransformation(); only that function branches on this.
-#define LiSPSM 1
+//
+// SET TO 0 on 2026-08-25 while a shadow offset on the smileys is being tracked down. Reasoning: the
+// warped path is the ONLY change to the shadow chain since the shadows last looked right (added
+// 2026-08-03, never verified in-game), and it ships with a bias that was admittedly never retuned
+// for it -- see the BIAS NOTE in CreateViewerAlignedTransformation(). The stencil work of
+// 2026-08-24 is ruled out: no render target in the game requests a stencil plane (CreateMap below
+// asks for depthBufferCount = 1 and nothing else), so every format there is bit-identical to before.
+// Flip this back to 1 to retest once the bias behaves.
+#define LiSPSM 0
 
 // =================================================================================================
 
@@ -120,7 +128,7 @@ void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mMod
 
 // Forward view. Three variants, all focusing the same region in front of the viewer (centre shifted
 // 0.8*radius forward, so the viewer sits near the rear edge):
-//   #if LiSPSM   warped light frustum, near-field texel density ~1/z  -- ACTIVE (see #define LiSPSM)
+//   #if LiSPSM   warped light frustum, near-field texel density ~1/z  -- currently OFF (see #define LiSPSM)
 //   #elif 0      viewer-focused ORTHO, kept for reference: no perceptible benefit over the perspective
 //                variant, only crawling stepped edges (even at 4K). Its texel-snap (Stabilize) damps
 //                translation but not the sun's slow rotation, and ortho spreads texels uniformly, so
