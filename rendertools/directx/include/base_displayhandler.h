@@ -90,6 +90,17 @@ public:
     void EndFrame(void);
     void BeginFrame(void);
 
+    // Applies vertical sync. The tearing flag is a swap chain creation flag, so this rebuilds the
+    // back buffers - like UpdateDisplayMode () it has to run between two frames, not inside one.
+    bool SetVSync(bool vSync);
+
+    inline bool VSync(void) noexcept {
+        return m_vSync;
+    }
+
+    // Recreates the back buffers for the current dimensions and vertical sync setting.
+    bool ResizeSwapChain(void);
+
     // Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
     void EnableBackBuffer(void) noexcept;
 

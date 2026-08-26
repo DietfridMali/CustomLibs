@@ -304,19 +304,35 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) 
     m_aspectRatio = float(m_width) / float(m_height);
 
     // Resize the swap chain back buffers
-    if (m_swapChain) {
-        // GPU must be idle before resize
-        commandListHandler.CmdQueue().WaitIdle();
-        ReleaseBackBuffers();
-        HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT, UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
-        if (FAILED(hr)) {
-            fprintf(stderr, "BaseDisplayHandler::RequestDisplayChange: ResizeBuffers failed (hr=0x%08X)\n", (unsigned)hr);
-            return false;
-        }
-        AcquireBackBuffers();
-        m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+    return ResizeSwapChain();
+}
+
+
+bool BaseDisplayHandler::ResizeSwapChain(void) {
+    if (not m_swapChain)
+        return true;
+    // GPU must be idle before resize
+    commandListHandler.CmdQueue().WaitIdle();
+    ReleaseBackBuffers();
+    HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT, UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
+    if (FAILED(hr)) {
+        fprintf(stderr, "BaseDisplayHandler::ResizeSwapChain: ResizeBuffers failed (hr=0x%08X)\n", (unsigned)hr);
+        return false;
     }
+    AcquireBackBuffers();
+    m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
     return true;
+}
+
+
+bool BaseDisplayHandler::SetVSync(bool vSync) {
+    if (vSync == m_vSync)
+        return true;
+    m_vSync = vSync;
+    // Present () reads the sync interval per frame, but DXGI_PRESENT_ALLOW_TEARING may only be
+    // passed if the swap chain was created with DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING - so the back
+    // buffers have to be rebuilt with the flag the new setting needs.
+    return ResizeSwapChain();
 }
 
 

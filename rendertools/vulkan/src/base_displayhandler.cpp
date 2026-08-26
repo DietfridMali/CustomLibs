@@ -282,25 +282,40 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) 
 
     // Resize the swapchain on dimension change. Called between EndFrame and BeginFrame
     // (see DisplayHandler::Update) — no submit is mid-flight at this point.
-    if (m_swapchain.Handle() != VK_NULL_HANDLE) {
-        VkSurfaceKHR surface = vkContext.Surface();
-        if (not m_swapchain.Recreate(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
-            fprintf(stderr, "BaseDisplayHandler::UpdateDisplayMode: Swapchain::Recreate failed\n");
-            return false;
-        }
-        m_backBufferIndex = 0;
-        // The cached swapchain handle inside CommandQueue is stale — refresh it.
-        commandListHandler.CmdQueue().m_swapchain = m_swapchain.Handle();
-        // The per-slot binary semaphores were last used as present-wait for images of the
-        // destroyed swapchain. Those images can never be re-acquired, so the semaphores stay
-        // "in use by VkSwapchainKHR" from the validator's point of view — re-signaling them
-        // would trip VUID-vkQueueSubmit2-semaphore-03868. Destroy and re-create them.
-        if (not commandListHandler.CmdQueue().RecreateSyncObjects()) {
-            fprintf(stderr, "BaseDisplayHandler::UpdateDisplayMode: RecreateSyncObjects failed\n");
-            return false;
-        }
+    return RecreateSwapchain();
+}
+
+
+bool BaseDisplayHandler::RecreateSwapchain(void) {
+    if (m_swapchain.Handle() == VK_NULL_HANDLE)
+        return true;
+    VkSurfaceKHR surface = vkContext.Surface();
+    if (not m_swapchain.Recreate(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
+        fprintf(stderr, "BaseDisplayHandler::RecreateSwapchain: Swapchain::Recreate failed\n");
+        return false;
+    }
+    m_backBufferIndex = 0;
+    // The cached swapchain handle inside CommandQueue is stale — refresh it.
+    commandListHandler.CmdQueue().m_swapchain = m_swapchain.Handle();
+    // The per-slot binary semaphores were last used as present-wait for images of the
+    // destroyed swapchain. Those images can never be re-acquired, so the semaphores stay
+    // "in use by VkSwapchainKHR" from the validator's point of view — re-signaling them
+    // would trip VUID-vkQueueSubmit2-semaphore-03868. Destroy and re-create them.
+    if (not commandListHandler.CmdQueue().RecreateSyncObjects()) {
+        fprintf(stderr, "BaseDisplayHandler::RecreateSwapchain: RecreateSyncObjects failed\n");
+        return false;
     }
     return true;
+}
+
+
+bool BaseDisplayHandler::SetVSync(bool vSync) {
+    if (vSync == m_vSync)
+        return true;
+    m_vSync = vSync;
+    // The present mode (FIFO with vertical sync, MAILBOX/IMMEDIATE without) is baked into the
+    // swapchain, so switching means rebuilding it.
+    return RecreateSwapchain();
 }
 
 

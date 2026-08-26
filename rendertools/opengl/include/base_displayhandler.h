@@ -61,12 +61,27 @@ public:
     virtual void ComputeDimensions(int width, int height, bool useFullscreen)
         noexcept;
 
+    // The GL attributes the context is created with. SetupDisplay () calls this after
+    // SDL_GL_ResetAttributes (), so an application that needs more than the defaults below
+    // (a stencil buffer, a deeper depth buffer, FSAA, quad buffer stereo) overrides this,
+    // calls the base version and adds its own attributes.
+    virtual void SetGLAttributes(void);
+
     virtual void SetupDisplay(String windowTitle);
 
     virtual void Update(void);
 
     void EndFrame(void);
     void BeginFrame(void);
+
+    // Applies the swap interval to the current context. Returns false if the driver refused
+    // (SDL_GL_SetSwapInterval () fails without a context, and for adaptive vsync it may not
+    // be supported at all).
+    bool SetVSync(bool vSync);
+
+    inline bool VSync(void) noexcept {
+        return m_vSync;
+    }
 
     inline int GetWidth(void) noexcept {
         return m_width;

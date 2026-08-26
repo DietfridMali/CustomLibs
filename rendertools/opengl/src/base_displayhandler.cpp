@@ -112,6 +112,22 @@ BaseDisplayHandler::~BaseDisplayHandler() {
 }
 
 
+void BaseDisplayHandler::SetGLAttributes(void) {
+    SDL_GL_ResetAttributes();
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    // GL 4.3 minimum — required for compute shaders (glDispatchCompute, image2D bindings,
+    // shader storage buffers). The TSP cloud-rendering path relies on this.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+    //SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "0"); 
+}
+
+
 void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     int screenType = SDL_WINDOW_OPENGL;
 #if 0
@@ -126,20 +142,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     if (m_isFullscreen)
         screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
 #endif
-#if 1
-    SDL_GL_ResetAttributes();
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    // GL 4.3 minimum — required for compute shaders (glDispatchCompute, image2D bindings,
-    // shader storage buffers). The TSP cloud-rendering path relies on this.
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-    //SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "0"); 
-#endif
+    SetGLAttributes();
     try {
         m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, screenType);
     }
@@ -160,7 +163,13 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         fprintf(stderr, "Smiley-Battle: Couldn't get OpenGL context (error '%s')\n", SDL_GetError());
         exit(1);
     }
-    SDL_GL_SetSwapInterval(m_vSync ? 1 : 0);
+    SetVSync(m_vSync);
+}
+
+
+bool BaseDisplayHandler::SetVSync(bool vSync) {
+    m_vSync = vSync;
+    return SDL_GL_SetSwapInterval(m_vSync ? 1 : 0) == 0;
 }
 
 

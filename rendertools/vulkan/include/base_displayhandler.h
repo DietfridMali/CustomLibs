@@ -96,6 +96,17 @@ public:
     void EndFrame(void);
     void BeginFrame(void);
 
+    // Applies vertical sync. The present mode belongs to the swapchain, so this rebuilds it - like
+    // UpdateDisplayMode () it has to run between two frames, not inside one.
+    bool SetVSync(bool vSync);
+
+    inline bool VSync(void) noexcept {
+        return m_vSync;
+    }
+
+    // Recreates the swapchain for the current dimensions and vertical sync setting.
+    bool RecreateSwapchain(void);
+
     // Transition current back buffer PRESENT/UNDEFINED → COLOR_ATTACHMENT and open a
     // vkCmdBeginRendering scope (loadOp = DONT_CARE; clears go through ClearBackBuffer).
     void EnableBackBuffer(void) noexcept;
