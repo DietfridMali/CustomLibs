@@ -330,7 +330,9 @@ public:
 
     void SetViewport(bool flipVertically = false) noexcept;
 
-    void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept;
+    // virtual: a renderer derived from this one decides what setting a viewport means for it. D2X-XL's
+    // does the scissoring the viewport matrix cannot do (it scales into the rectangle, it does not clip).
+    virtual void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept;
 
 #ifdef _DEBUG
     void PushViewport(const std::source_location& caller = std::source_location::current());
