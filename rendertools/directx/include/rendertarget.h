@@ -206,6 +206,11 @@ public:
     Viewport            m_viewport;
     RenderTarget*       m_depthSource{ nullptr };   // foreign depth buffer to bind instead of an own one (SetDepthSource)
     Viewport*           m_viewportSave{ nullptr };
+    // How this target's colour buffer is sampled when it is read back as a texture. One that gets
+    // rescaled on the way out (post processing) wants LINEAR; one that is read texel for texel - a
+    // TextureAtlas, whose cells sit flush against each other - must not be filtered at all. Only the
+    // owner knows which of the two it is, so RenderTargetTexture::SetParams () takes it from here.
+    GfxFilterMode               m_filtering{ GfxFilterMode::Linear };
     RenderTargetTexture m_renderTexture;
     RenderTargetTexture m_depthTexture;
     ShadowTexture       m_shadowTexture; // ShadowTexture mit Compare-Sampler fuer HW-PCF (sampler2DShadow-Aequivalent)
@@ -391,6 +396,13 @@ public:
     inline int  NextBuffer(int i) noexcept {
         return (i + 1) % m_bufferCount;
     }
+
+    inline GfxFilterMode Filtering(void) noexcept {
+        return m_filtering;
+    }
+
+    // Hands the filter down to the render texture and makes it re-apply its parameters.
+    void SetFiltering(GfxFilterMode filtering);
 
     inline RenderTargetTexture* GetRenderTexture(void) noexcept {
         return &m_renderTexture;

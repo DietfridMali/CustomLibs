@@ -5,6 +5,7 @@
 #include "texture.h"
 #include "rendertarget.h"
 #include "colordata.h"
+#include "base_quadmesh.h"	// static BaseQuadMesh renderQuad below - the header has to stand alone
 
 // =================================================================================================
 

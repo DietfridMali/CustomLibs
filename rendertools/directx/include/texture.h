@@ -289,6 +289,9 @@ class RenderTargetTexture
     : public Texture
 {
 public:
+    // Set by the owning RenderTarget (RenderTarget::SetFiltering ()); SetParams () applies it.
+    GfxFilterMode   m_filtering{ GfxFilterMode::Linear };
+
     RenderTargetTexture() = default;
     ~RenderTargetTexture();
     virtual void SetParams(bool forceUpdate = false) override;

@@ -769,6 +769,20 @@ bool RenderTarget::Enable(const RTActivationParams& params)
 }
 
 
+// The filter the colour buffer is read back with. Nothing else about a render target's sampling is
+// negotiable - one level, no wrapping, no depth compare - but whether it is scaled or read texel for
+// texel is the owner's business, not RenderTargetTexture::SetParams ()'s.
+
+void RenderTarget::SetFiltering(GfxFilterMode filtering) {
+    if (filtering == m_filtering)
+        return;
+    m_filtering = filtering;
+    m_renderTexture.m_filtering = filtering;
+    m_renderTexture.SetParams(true);
+}
+
+// =================================================================================================
+
 bool RenderTarget::IsActive(void) noexcept
 {
     return baseRenderer.IsActiveDrawBuffer(this);

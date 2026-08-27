@@ -14,6 +14,7 @@
 #include "avltree.hpp"
 #include "gfxstates.h"
 #include "texturebuffer.h"
+#include "texturesampling.h"	// GfxFilterMode
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -327,6 +328,9 @@ class RenderTargetTexture
     : public Texture
 {
 public:
+    // Set by the owning RenderTarget (RenderTarget::SetFiltering ()); SetParams () applies it.
+    GfxFilterMode   m_filtering{ GfxFilterMode::Linear };
+
     RenderTargetTexture() {
         m_isRenderTarget = true;
     }

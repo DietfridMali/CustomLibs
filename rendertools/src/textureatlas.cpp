@@ -38,6 +38,9 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 		return false;
 	}
 	m_scale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
+	// An atlas is an image store, not a picture: its cells sit flush against each other, so filtering
+	// it blurs every glyph and bleeds the neighbouring cells in at the edges.
+	m_atlas->SetFiltering(GfxFilterMode::Nearest);
 #if 0
 	Texture* renderTexture = GetAsTexture();
 	renderTexture->m_handle = m_atlas->BufferHandle(0);
