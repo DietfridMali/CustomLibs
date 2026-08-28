@@ -130,30 +130,43 @@ int RenderTarget::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& 
 
 bool RenderTarget::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
-    if (not bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
+    if (not bufferInfo.m_isAttached or (bufferInfo.m_boundAttachment == GL_NONE))
         return true;
-    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, 0, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_boundAttachment, GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
+    bufferInfo.m_boundAttachment = GL_NONE;
     return true;
 }
 
 
-bool RenderTarget::AttachBuffer(int bufferIndex) {
+bool RenderTarget::AttachBuffer(int bufferIndex, int attachment) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
-#ifdef _DEBUG
-    if (bufferInfo.m_attachment == GL_NONE)
-#else
-    if (bufferInfo.m_isAttached or (bufferInfo.m_attachment == GL_NONE))
-#endif
+    if (bufferInfo.m_attachment == GL_NONE)  // compute write target, never framebuffer attached
         return true;
-    GLuint h = bufferInfo.m_handle;
+    int point = (attachment < 0) ? bufferInfo.m_attachment : attachment;
+    // Sitting on a different point than the one wanted (a dbSingle remap being set up or undone):
+    // the old attachment has to go first, or it keeps the texture on a slot nobody accounts for.
+    if (bufferInfo.m_isAttached and (bufferInfo.m_boundAttachment != point))
+        DetachBuffer(bufferIndex);
+#ifndef _DEBUG
+    if (bufferInfo.m_isAttached)
+        return true;
+#endif
     gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_attachment, GL_TEXTURE_2D, bufferInfo.m_handle, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (point), GL_TEXTURE_2D, bufferInfo.m_handle, 0);
+    bufferInfo.m_boundAttachment = point;
 #ifdef _DEBUG
     return bufferInfo.m_isAttached = gfxStates.CheckError();
 #else
     return bufferInfo.m_isAttached = true;
 #endif
+}
+
+
+void RenderTarget::ReleaseRemappedBuffers(void) {
+    for (int i = 0; i < m_bufferCount; ++i)
+        if (m_bufferInfo[i].m_isAttached and (m_bufferInfo[i].m_boundAttachment != m_bufferInfo[i].m_attachment))
+            DetachBuffer(i);
 }
 
 
@@ -269,6 +282,13 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
     // contract), and the DX read-only DSV is just as one-way while it is bound.
     SetDepthMode(params.depthMode);
 
+    // Leaving dbSingle: the buffer it had moved onto GL_COLOR_ATTACHMENT0 goes off that point first,
+    // so restoring the canonical layout below does not attach buffer 0 to a slot the remapped buffer
+    // still believes it owns (its detach would then tear buffer 0 off again). dbSingle does its own
+    // bookkeeping - it detaches every other buffer anyway.
+    if (params.drawBufferGroup != dbSingle)
+        ReleaseRemappedBuffers();
+
     switch (params.drawBufferGroup) {
     case dbDepth:
         m_drawBufferGroup = dbDepth;
@@ -281,13 +301,26 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
         if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
             return false;
         m_activeBufferIndex = params.bufferIndex;
-        AttachBuffer(params.bufferIndex);
-        for (int i = 0; i < l; ++i)
-            if (i != params.bufferIndex) {
+        for (int i = 0; i < l; ++i) {
+            if (i != params.bufferIndex)
                 DetachBuffer(i);
-                m_drawBuffers[i] = GL_NONE;
-            }
-        m_drawBuffers[params.bufferIndex] = m_bufferInfo[params.bufferIndex].m_attachment;
+            m_drawBuffers[i] = GL_NONE;
+        }
+        // DX and Vulkan make the selected buffer output slot 0 (RTV 0 / colour attachment 0), so a
+        // shader with one output writes it no matter which buffer was picked. OpenGL cannot express
+        // that through the draw buffer list: glDrawBuffers demands bufs [i] == COLOR_ATTACHMENTi or
+        // NONE, so naming COLOR_ATTACHMENT2 in slot 0 is an INVALID_OPERATION, and naming it in slot 2
+        // routes fragment output 2 - which a single output shader (layout (location = 0)) never writes.
+        // The only way to put buffer k on output 0 is to attach its texture to COLOR_ATTACHMENT0.
+        if (m_bufferInfo[params.bufferIndex].m_type == BufferInfo::btColor) {
+            AttachBuffer(params.bufferIndex, int (GL_COLOR_ATTACHMENT0));
+            m_drawBuffers[0] = GL_COLOR_ATTACHMENT0;
+        }
+        else {
+            AttachBuffer(params.bufferIndex);
+            if (params.bufferIndex < l)   // a depth buffer has no draw buffer slot
+                m_drawBuffers[params.bufferIndex] = m_bufferInfo[params.bufferIndex].m_attachment;
+        }
         return true;
 
     case dbAll:
@@ -344,30 +377,29 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
 }
 
 
-// Translate the API-neutral buffer-index list into GL attachment points: slot i draws into
-// m_bufferInfo[index].m_attachment, GL_NONE where the caller left a slot unused. Everything not named in
-// the list is detached, so no leftover attachment of a previous group keeps receiving writes.
+// Translate the API-neutral buffer-index list into GL attachment points: the buffer named for slot i is
+// attached to GL_COLOR_ATTACHMENTi and drawn into from fragment output i, GL_NONE where the caller left a
+// slot unused. Everything not named in the list is detached, so no leftover attachment of a previous
+// group keeps receiving writes.
 void RenderTarget::ApplyCustomDrawBuffers(void) {
     int slots = m_drawBuffers.Length();
     int listed = m_customDrawBuffers.Length();
     for (int i = 0; i < slots; ++i)
         m_drawBuffers[i] = GL_NONE;
+    // Everything off first: slot i is served by GL_COLOR_ATTACHMENTi and nothing else (glDrawBuffers
+    // demands bufs [i] == COLOR_ATTACHMENTi or NONE), so the listed buffers are attached to the point
+    // their SLOT dictates, not to the one they own - and two of them may want to trade places.
     for (int i = 0; i < m_bufferCount; ++i) {
         BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
-        if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex))
-            continue;
-        bool isTarget = false;
-        for (int j = 0; (j < listed) and not isTarget; ++j)
-            isTarget = (m_customDrawBuffers[j] == i);
-        if (isTarget)
-            AttachBuffer(i);
-        else
+        if ((type == BufferInfo::btColor) or (type == BufferInfo::btVertex))
             DetachBuffer(i);
     }
     for (int i = 0; (i < listed) and (i < slots); ++i) {
         int bufferIndex = m_customDrawBuffers[i];
-        if ((bufferIndex >= 0) and (bufferIndex < m_bufferCount))
-            m_drawBuffers[i] = m_bufferInfo[bufferIndex].m_attachment;
+        if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
+            continue;
+        AttachBuffer(bufferIndex, int (GL_COLOR_ATTACHMENT0) + i);
+        m_drawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
     }
 }
 

@@ -29,17 +29,22 @@ public:
 
     SharedTextureHandle m_handle;
     int                 m_attachment;
+    // Where the buffer is attached RIGHT NOW. Normally m_attachment, but dbSingle moves the selected
+    // colour buffer onto GL_COLOR_ATTACHMENT0 (see RenderTarget::SelectDrawBuffers), and a detach has
+    // to address the point the texture actually sits on, not the one it belongs to.
+    int                 m_boundAttachment;
     int                 m_tmuIndex;
     eBufferType         m_type;
     bool                m_isAttached;
 
     BufferInfo(GLuint handle = 0, int attachment = 0)
-        : m_handle(handle), m_attachment(attachment), m_tmuIndex(-1), m_type(btColor), m_isAttached(false)
+        : m_handle(handle), m_attachment(attachment), m_boundAttachment(GL_NONE), m_tmuIndex(-1), m_type(btColor), m_isAttached(false)
     {}
 
     void Init(void) {
         m_handle = SharedTextureHandle(0);
         m_attachment = 0;
+        m_boundAttachment = GL_NONE;
         m_tmuIndex = -1;
         m_type = btColor;
         m_isAttached = false;
@@ -317,7 +322,9 @@ public:
         return &m_renderTexture;
     }
 
-    bool AttachBuffer(int bufferIndex);
+    // attachment < 0: the buffer's own attachment point (m_attachment); otherwise the point given -
+    // that is how dbSingle puts the selected colour buffer on GL_COLOR_ATTACHMENT0.
+    bool AttachBuffer(int bufferIndex, int attachment = -1);
 
     bool DetachBuffer(int bufferIndex);
 
@@ -427,6 +434,10 @@ private:
     void ApplyCustomDrawBuffers(void);
 
     bool ReattachBuffers();
+
+    // Put every buffer that dbSingle moved to a foreign attachment point back off that point, so the
+    // canonical layout can be restored without one buffer's detach tearing down another one's slot.
+    void ReleaseRemappedBuffers(void);
 
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
