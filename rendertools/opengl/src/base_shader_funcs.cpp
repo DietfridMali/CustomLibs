@@ -82,7 +82,7 @@ const String& GaussBlurFuncs() {
     static const String source(
         R"(
         uniform vec2 texelSize;
-        uniform int blurStrengh;
+        uniform int blurStrength;
         uniform float blurSpread;
 
         vec4 GaussBlur7x7(vec2 baseUV, float spread) {
@@ -162,7 +162,7 @@ const String& GaussBlurFuncs() {
         }
 
         vec4 GaussBlur(vec2 baseUV, int strength, float spread) {
-            switch((strength < 0) ? blurStrengh : strength) {
+            switch((strength < 0) ? blurStrength : strength) {
                 case 3:
                     return GaussBlur7x7(baseUV, (spread < 0) ? blurSpread : spread);
                 case 2:
