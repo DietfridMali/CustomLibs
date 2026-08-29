@@ -9,11 +9,21 @@
 
 class BaseGfxArray {
 public:
-	static inline bool IsAvailable;
-	
-	BaseGfxArray() {
-		IsAvailable = gfxStates.HasExtension("GL_ARB_shader_storage_buffer_object");
+	// Asked fresh, NOT snapshotted in the constructor. A GfxArray can be a member of an object with
+	// static storage duration, and then its constructor runs long before there is a GL context: the
+	// query would answer "no extensions", the snapshot would say "no SSBOs", and the array would stay
+	// unavailable for the rest of the run - silently, because Create () just returns false.
+	// (It was a shared static on top, so the LAST array constructed decided for all of them.)
+	static bool IsAvailable(void) {
+		// Two ways to have shader storage buffers, and a core profile context may only offer the second:
+		// a 3.3 driver advertises them through the ARB extension, but from GL 4.3 on they are CORE and the
+		// driver is free to stop listing that extension altogether. Asking for the string alone therefore
+		// turned SSBOs off on exactly the contexts that have them built in - the same trap that once hid
+		// multitexturing, VBOs and occlusion queries in d2x-xl.
+		return gfxStates.HasExtension("GL_ARB_shader_storage_buffer_object") or gfxStates.HaveFeatureLevel(430);
 	}
+
+	BaseGfxArray() = default;
 };
 
 template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
@@ -41,10 +51,18 @@ public:
 
 
 	bool Create(int width, int height = 1) {
-		if (not IsAvailable)
+		if (not IsAvailable ())
 			return false;
 		if (not gfxStates.HaveFeatureLevel(GfxStates::SSBOFeatureLevel))
 			return false;
+		// Set the handle up HERE and not in the constructor. SharedGfxHandle copies the allocator into a
+		// lambda, and with GLEW glGenBuffers is not a function but a variable that glewInit () fills in.
+		// A GfxArray that is a member of an object with static storage duration is therefore built while
+		// that variable is still null, and the lambda keeps the null forever - Claim () then returns 0 and
+		// Create () fails for the rest of the run. By the time anyone calls Create () there is a context.
+		// (This is why it works in Paintjob Rampage: its handlers are BaseSingletons, constructed lazily
+		// on first use, so their arrays never see the uninitialised GLEW pointers.)
+		m_handle = SharedGfxHandle(0, glGenBuffers, glDeleteBuffers);
 		if (m_handle.Claim() == 0)
 			return false;
 		int size = width * height;

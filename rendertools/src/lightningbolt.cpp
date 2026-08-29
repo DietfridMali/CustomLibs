@@ -237,12 +237,20 @@ void LightningBolt::Build(const LightningBoltParams& params) {
     // pattern (corner sharpness ratio preserved); kinkAmplitude keeps its meaning "kink peak at the
     // calibration step boltSegmentLength".
     const float stepLength = fullLength / float(totalSegments);
-    const float kinkAmplitude = look.kinkAmplitude * (stepLength / ((look.boltSegmentLength > 1e-4f) ? look.boltSegmentLength : 1e-4f));
+    // the bolt may bring its own corner sharpness; negative means "use the application default"
+    const float lookKink = (params.fbm.kinkAmplitude >= 0.0f) ? params.fbm.kinkAmplitude : look.kinkAmplitude;
+    const float kinkAmplitude = lookKink * (stepLength / ((look.boltSegmentLength > 1e-4f) ? look.boltSegmentLength : 1e-4f));
 #else
     const float stepLength = look.boltSegmentLength;      // world-fixed raster (node step == cell by SegmentCount)
-    const float kinkAmplitude = look.kinkAmplitude;
+    const float kinkAmplitude = (params.fbm.kinkAmplitude >= 0.0f) ? params.fbm.kinkAmplitude : look.kinkAmplitude;
 #endif
-    const float kinkScale = stepLength * std::pow(look.lacunarity, float(look.kinkOctaves - 1));
+    // The bundle may bring its own noise shape; out of range means "use the application default".
+    // Resolved before kinkScale, which is built from two of them.
+    const int32_t octaves = (params.fbm.octaves > 0) ? params.fbm.octaves : look.octaves;
+    const int32_t kinkOctaves = (params.fbm.kinkOctaves > 0) ? params.fbm.kinkOctaves : look.kinkOctaves;
+    const float gain = (params.fbm.gain >= 0.0f) ? params.fbm.gain : look.gain;
+    const float lacunarity = (params.fbm.lacunarity > 0.0f) ? params.fbm.lacunarity : look.lacunarity;
+    const float kinkScale = stepLength * std::pow(lacunarity, float(kinkOctaves - 1));
 
     m_nodes.Reserve(totalSegments + 1);
     for (int32_t i = 0; i <= totalSegments; i++) {
@@ -254,22 +262,22 @@ void LightningBolt::Build(const LightningBoltParams& params) {
         // so the peak lateral swing is exactly `amplitude` and the wobble is multi-octave. Direction and
         // magnitude use independent fbm channels. `time` is the 2nd noise axis -> advancing it morphs the
         // bolt in place (animation) instead of sliding the shape sideways as `x + time` did.
-        Vector3f fbmVec = LightningNoise::Fbm2Dv3(x, params.time, params.seed, look.octaves, look.gain, look.lacunarity);
+        Vector3f fbmVec = LightningNoise::Fbm2Dv3(x, params.time, params.seed, octaves, gain, lacunarity);
         Vector3f perp = SwingVector(fbmVec, axis, planeDir, params.swingMode);
         float pl = perp.Length();
         Vector3f dir = (pl > 1e-5f) ? perp * (1.0f / pl) : Vector3f(0.0f, 0.0f, 0.0f);   // normalized swing direction
-        float mag = std::fabs(LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, look.octaves, look.gain, look.lacunarity));
+        float mag = std::fabs(LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity));
         Vector3f disp = dir * (mag * params.amplitude * window);
         // KINK layer -- world-fixed fine jaggedness, tiled along the bolt: sampled once per finest cell
         // (see kinkScale), so consecutive nodes get ~independent values -> hard corners of world-constant
         // size and spacing on every bolt, trunk and branchlet alike. Same swing convention and window as
         // the path layer (endpoints stay pinned); own seed streams.
         float s = (t * fullLength) / ((kinkScale > 1e-5f) ? kinkScale : 1e-5f);
-        Vector3f kinkVec = LightningNoise::Fbm2Dv3(s, params.time, params.seed ^ 0x7f4a7c15u, look.kinkOctaves, look.gain, look.lacunarity);
+        Vector3f kinkVec = LightningNoise::Fbm2Dv3(s, params.time, params.seed ^ 0x7f4a7c15u, kinkOctaves, gain, lacunarity);
         Vector3f kperp = SwingVector(kinkVec, axis, planeDir, params.swingMode);
         float kl = kperp.Length();
         if (kl > 1e-5f) {
-            float kmag = std::fabs(LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, look.kinkOctaves, look.gain, look.lacunarity));
+            float kmag = std::fabs(LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, kinkOctaves, gain, lacunarity));
             disp += kperp * (kmag * kinkAmplitude * window / kl);
         }
         LightningNode* node = m_nodes.Append();
@@ -379,7 +387,8 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
         .time = time,
         .swingMode = m_swingMode,
         .planeNormal = m_planeNormal,
-        .tailFraction = m_tailFraction
+        .tailFraction = m_tailFraction,
+        .fbm = Fbm()
     };
     LightningBolt bolt;
     bolt.Build(boltParams);
@@ -630,7 +639,8 @@ void LightningArc::Generate(int64_t now) {
             .time = time + float(b) * 1.7f,
             .swingMode = m_swingMode,
             .planeNormal = m_planeNormal,
-            .tailFraction = m_tailFraction
+            .tailFraction = m_tailFraction,
+        .fbm = Fbm()
         };
         LightningBolt bolt;
         bolt.Build(boltParams);

@@ -385,6 +385,32 @@ public:
         return 0;
     }
 
+    // No OpenGL style line antialiasing toggle here (see the OpenGL backend); stubbed for parity, like
+    // SetPolygonOffsetFill / SetDither / SetMultiSample above.
+    inline int SetLineSmooth(int) noexcept {
+        return 0;
+    }
+
+    // --- queries ---------------------------------------------------------------------------------
+    // Same contract in every backend: SetX () returns the PREVIOUS state, GetX () only asks.
+    inline int GetDepthTest(void) { return SetDepthTest(-1); }
+    inline int GetDepthWrite(void) { return SetDepthWrite(-1); }
+    inline int GetBlending(void) { return SetBlending(-1); }
+    inline int GetFaceCulling(void) { return SetFaceCulling(-1); }
+    inline int GetScissorTest(void) { return SetScissorTest(-1); }
+    inline int GetStencilTest(void) { return SetStencilTest(-1); }
+    inline int GetDepthClip(void) { return SetDepthClip(-1); }
+    inline int GetPolygonOffsetFill(void) { return 0; }
+    inline int GetDither(void) { return 0; }
+    inline int GetMultiSample(void) { return 0; }
+    inline int GetLineSmooth(void) { return 0; }
+
+    inline GfxOperations::CompareFunc GetDepthFunc(void) { return ActiveState().depthFunc; }
+    inline GfxOperations::CullFace GetCullFace(void) { return ActiveState().cullMode; }
+    inline GfxOperations::Winding GetFrontFace(void) { return ActiveState().winding; }
+    inline GfxOperations::BlendOp GetBlendEquation(int bufferIndex = 0) { return ActiveState().blendOpRGB[bufferIndex]; }
+
+
     inline GfxOperations::CompareFunc DepthFunc(GfxOperations::CompareFunc state) {
         auto& s = ActiveState();
         auto prevState = s.depthFunc;
@@ -433,6 +459,13 @@ public:
         s.blendDstRGB[bufferIndex] = dstRGB;
         s.blendSrcAlpha[bufferIndex] = srcAlpha;
         s.blendDstAlpha[bufferIndex] = dstAlpha;
+    }
+
+    // The blend factors currently in effect - the counterpart of the OpenGL backend's GetBlendFunc ().
+    inline void GetBlendFunc(GfxOperations::BlendFactor& src, GfxOperations::BlendFactor& dst, int bufferIndex = 0) {
+        auto& s = ActiveState();
+        src = s.blendSrcRGB[bufferIndex];
+        dst = s.blendDstRGB[bufferIndex];
     }
 
     // Independent per-RT blending for MRT passes (e.g. WBOIT: RT0 additive accum, RT1 multiplicative

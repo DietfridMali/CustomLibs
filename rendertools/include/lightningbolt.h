@@ -98,6 +98,20 @@ struct LightningLook {
 // persistent animated bundle; each kind ignores the other's fields. start/end stay separate arguments
 // (they get re-anchored live via UpdateStrike/SetEndpoints).
 
+// The noise properties of a BUNDLE. Every discharge in one system shares them - they are what makes
+// its bolts the same KIND of discharge, so there is one instance per system and its lightnings point
+// at it (LightningSystem::m_fbm). Changing it there changes every bolt of that bundle, including the
+// ones its emitter ignites later. Out of range = fall back to the application wide LightningLook.
+struct LightningFbmParams {
+    float   kinkAmplitude{ -1.0f };   // world-fixed peak of the KINK layer (wu) - corner sharpness
+    int32_t octaves{ -1 };            // PATH layer fbm octaves - how much fine detail rides on the swing
+    float   gain{ -1.0f };            // fbm amplitude falloff per octave; BOTH layers use it
+    float   lacunarity{ -1.0f };      // fbm frequency growth per octave; BOTH layers use it
+    int32_t kinkOctaves{ -1 };        // KINK layer octaves - detail of the fine jaggedness
+};
+
+// -------------------------------------------------------------------------------------------------
+
 struct LightningCreationParams {
     // shape (strike + arc)
     float      startWidth{ 0.2f };   // half-width at the source end
@@ -106,6 +120,9 @@ struct LightningCreationParams {
     Vector3f   color{ Vector3f(1.0f, 1.0f, 1.0f) };   // per-bolt tint of the halo (multiplies the shader's haloColor); white = the shader's own colour
     float      amplitudeFactor{ 0.2f };   // lateral swing as a fraction of the bolt length
     float      waveRatio{ 3.0f };   // wavelength / amplitude -> base jaggedness (coupled -> length-invariant, self-similar)
+    // Noise properties. They belong to the BUNDLE, not to the single bolt - the system copies them
+    // into its own LightningFbmParams and every discharge it holds reads them from there.
+    LightningFbmParams fbm;
     eSwingMode swingMode{ smHorizontal };  // see eSwingMode; 6DoF worlds want smPerpendicular
     Vector3f   planeNormal{ Vector3f::ZERO };  // smPlane only: normal of the plane the bolt has to stay in
     bool       useElevationCap{ true };   // gravity world: cap how much steeper upward a branch may point than its parent
@@ -149,6 +166,7 @@ struct LightningBoltParams {
     eSwingMode swingMode{ smHorizontal };
     Vector3f   planeNormal{ Vector3f::ZERO };
     float      tailFraction{ 0.0f };
+    LightningFbmParams fbm;              // the bundle's noise properties, see LightningFbmParams
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -189,6 +207,19 @@ public:
     eSwingMode               m_swingMode{ smHorizontal }; // see eSwingMode
     Vector3f                 m_planeNormal{ Vector3f::ZERO };
     bool                     m_useElevationCap{ true };
+    // Not owned: this points at the LightningFbmParams of the system this lightning belongs to, which
+    // outlives it (the system owns its lightnings). nullptr only for a lightning built outside a
+    // system - Fbm () then answers with the neutral defaults.
+    const LightningFbmParams* m_fbm{ nullptr };
+
+    // The system hands its own instance over when it takes the lightning in (AddStrike / AddArc).
+    inline void SetFbm(const LightningFbmParams* fbm) { m_fbm = fbm; }
+
+    inline const LightningFbmParams& Fbm(void) const {
+        static const LightningFbmParams defaults;
+        return m_fbm ? *m_fbm : defaults;
+    }
+
     float                    m_tailFraction{ 0.0f };
     int32_t                  m_segments{ 8 };             // fixed intermediate-point count (from the base length)
     int32_t                  m_waveCount{ 1 };            // fixed wiggle count (from the base length)

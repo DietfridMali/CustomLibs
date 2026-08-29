@@ -117,6 +117,70 @@ namespace GfxToGL {
 }
 
 // =================================================================================================
+// GLenum -> GfxOperations, the inverse of GfxToGL::ToGLenum above. DX and VK keep their state blocks in
+// GfxOperations values and can hand the previous one back directly; OpenGL keeps GLenums, so the
+// GfxOperations overloads of DepthFunc () and friends have to translate back to return the same thing.
+// Round trip stable with ToGLenum, including its CullFace::None -> GL_FRONT_AND_BACK mapping.
+
+namespace GLToGfx {
+	using namespace GfxOperations;
+
+	inline CompareFunc ToCompareFunc(GLenum e) noexcept {
+		switch (e) {
+			case GL_NEVER:    return CompareFunc::Never;
+			case GL_LESS:     return CompareFunc::Less;
+			case GL_EQUAL:    return CompareFunc::Equal;
+			case GL_GREATER:  return CompareFunc::Greater;
+			case GL_NOTEQUAL: return CompareFunc::NotEqual;
+			case GL_GEQUAL:   return CompareFunc::GreaterEqual;
+			case GL_ALWAYS:   return CompareFunc::Always;
+			case GL_LEQUAL:
+			default:          return CompareFunc::LessEqual;   // also the answer for the "nothing set yet" GL_NONE
+		}
+	}
+
+	inline BlendOp ToBlendOp(GLenum e) noexcept {
+		switch (e) {
+			case GL_FUNC_SUBTRACT:         return BlendOp::Subtract;
+			case GL_FUNC_REVERSE_SUBTRACT: return BlendOp::RevSubtract;
+			case GL_MIN:                   return BlendOp::Min;
+			case GL_MAX:                   return BlendOp::Max;
+			case GL_FUNC_ADD:
+			default:                       return BlendOp::Add;
+		}
+	}
+
+	inline CullFace ToCullFace(GLenum e) noexcept {
+		switch (e) {
+			case GL_FRONT:          return CullFace::Front;
+			case GL_FRONT_AND_BACK: return CullFace::None;
+			case GL_BACK:
+			default:                return CullFace::Back;
+		}
+	}
+
+	inline Winding ToWinding(GLenum e) noexcept {
+		return (e == GL_CW) ? Winding::Regular : Winding::Reverse;
+	}
+
+	inline BlendFactor ToBlendFactor(GLenum e) noexcept {
+		switch (e) {
+			case GL_ZERO:                return BlendFactor::Zero;
+			case GL_SRC_COLOR:           return BlendFactor::SrcColor;
+			case GL_ONE_MINUS_SRC_COLOR: return BlendFactor::InvSrcColor;
+			case GL_SRC_ALPHA:           return BlendFactor::SrcAlpha;
+			case GL_ONE_MINUS_SRC_ALPHA: return BlendFactor::InvSrcAlpha;
+			case GL_DST_ALPHA:           return BlendFactor::DstAlpha;
+			case GL_ONE_MINUS_DST_ALPHA: return BlendFactor::InvDstAlpha;
+			case GL_DST_COLOR:           return BlendFactor::DstColor;
+			case GL_ONE_MINUS_DST_COLOR: return BlendFactor::InvDstColor;
+			case GL_ONE:
+			default:                     return BlendFactor::One;
+		}
+	}
+}
+
+// =================================================================================================
 
 class GfxStates
 	: public BaseSingleton<GfxStates>
@@ -151,7 +215,13 @@ public:
 
 	void DetermineExtensions(void);
 
+	// The list is read in the constructor, but this singleton can be touched before a GL context exists
+	// (any object with static storage duration that asks something of gfxStates does that). Then the
+	// query comes back empty and would stay empty for the whole run, silently turning off everything
+	// that is gated on an extension. So: if it is still empty, ask again.
 	inline bool HasExtension(const char* extension) {
+		if (not m_haveExtensions)
+			DetermineExtensions();
 		return m_extensions.find(extension) != m_extensions.end();
 	}
 
@@ -263,9 +333,34 @@ public:
 		return SetState<GL_DITHER>(state); 
 	}
 
-	inline int SetMultiSample(int state) { 
-		return SetState<GL_MULTISAMPLE>(state); 
+	inline int SetMultiSample(int state) {
+		return SetState<GL_MULTISAMPLE>(state);
 	}
+
+	// Line antialiasing. Core profile still has GL_LINE_SMOOTH; DX and VK carry no equivalent toggle and
+	// stub this out, the same way SetPolygonOffsetFill / SetDither / SetMultiSample are handled there.
+	inline int SetLineSmooth(int state) {
+		int prevState = SetState<GL_LINE_SMOOTH>(state);
+		if (state > 0)
+			glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+		return prevState;
+	}
+
+	// --- queries ---------------------------------------------------------------------------------
+	// Every setter above doubles as a query through its "unknown" sentinel (-1 for the toggles, GL_NONE
+	// for the enum states). These are the readable spelling of that, and they exist in all three backends,
+	// so that the rule reads the same everywhere: SetX () returns the PREVIOUS state, GetX () asks.
+	inline int GetDepthTest(void) { return SetDepthTest(-1); }
+	inline int GetDepthWrite(void) { return SetDepthWrite(-1); }
+	inline int GetBlending(void) { return SetBlending(-1); }
+	inline int GetFaceCulling(void) { return SetFaceCulling(-1); }
+	inline int GetScissorTest(void) { return SetScissorTest(-1); }
+	inline int GetStencilTest(void) { return SetStencilTest(-1); }
+	inline int GetPolygonOffsetFill(void) { return SetPolygonOffsetFill(-1); }
+	inline int GetDepthClip(void) { return SetDepthClip(-1); }
+	inline int GetDither(void) { return SetDither(-1); }
+	inline int GetMultiSample(void) { return SetMultiSample(-1); }
+	inline int GetLineSmooth(void) { return SetState<GL_LINE_SMOOTH>(-1); }
 
 	template <class T>
 	struct StateRegistry {
@@ -384,35 +479,72 @@ public:
 		return std::make_tuple(std::get<0>(previous), std::get<1>(previous));
 	}
 
+	// The state id is a member and no longer a function local static, so GetBlendFunc () below can read
+	// the cached pair without setting anything. There is one GfxStates, so this is the same single slot
+	// the static was.
+	int32_t m_blendFuncStateID{ -1 };
+
 	inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA, int bufferIndex = -1) {
-		static int32_t stateID = -1;
 		if (bufferIndex < 0)
-			return FuncState(stateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
-		stateID = -1;
+			return FuncState(m_blendFuncStateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
+		m_blendFuncStateID = -1;
 		glBlendFuncSeparatei(bufferIndex, srcRGB, dstRGB, srcA, dstA);
 		return std::make_tuple(0, 0, 0, 0);
 	}
 
-	// GfxOperations overloads — shared code uses these; internally convert to GLenum
+	// The blend factors currently in effect. The tuple FuncState has no "unknown" sentinel to query with
+	// (a tuple has no spare value), so this reads the cache directly. GL_ONE / GL_ZERO before anything was
+	// set - the GL default.
+	inline std::tuple<GLenum, GLenum, GLenum, GLenum> GetBlendFuncSeparateGL(void) {
+		if (m_blendFuncStateID < 0)
+			return std::make_tuple(GLenum(GL_ONE), GLenum(GL_ZERO), GLenum(GL_ONE), GLenum(GL_ZERO));
+		return MultiStateRegistry<GLenum, GLenum, GLenum, GLenum>::list[m_blendFuncStateID];
+	}
+
+	inline std::tuple<GLenum, GLenum> GetBlendFuncGL(void) {
+		auto current = GetBlendFuncSeparateGL();
+		return std::make_tuple(std::get<0>(current), std::get<1>(current));
+	}
+
+	inline void GetBlendFunc(GfxOperations::BlendFactor& src, GfxOperations::BlendFactor& dst) {
+		auto current = GetBlendFuncGL();
+		src = GLToGfx::ToBlendFactor(std::get<0>(current));
+		dst = GLToGfx::ToBlendFactor(std::get<1>(current));
+	}
+
+	// GfxOperations overloads — shared code uses these; internally convert to GLenum.
+	// CONTRACT: a state setter returns the PREVIOUS state, so a caller can snapshot it and restore it
+	// afterwards. These used to return their argument here (DX and VK always returned the previous one),
+	// which made the same line mean two different things depending on the backend and silently turned
+	// every save/restore around an OpenGL draw into a no-op.
 	inline GfxOperations::CompareFunc DepthFunc(GfxOperations::CompareFunc func) {
-		DepthFunc(GfxToGL::ToGLenum(func));
-		return func;
+		return GLToGfx::ToCompareFunc(DepthFunc(GfxToGL::ToGLenum(func)));
 	}
 
 	inline GfxOperations::CullFace CullFace(GfxOperations::CullFace mode) {
-		CullFace(GfxToGL::ToGLenum(mode));
-		return mode;
+		return GLToGfx::ToCullFace(CullFace(GfxToGL::ToGLenum(mode)));
 	}
 
 	inline GfxOperations::Winding FrontFace(GfxOperations::Winding mode) {
-		FrontFace(GfxToGL::ToGLenum(mode));
-		return mode;
+		return GLToGfx::ToWinding(FrontFace(GfxToGL::ToGLenum(mode)));
 	}
 
 	inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp op, int bufferIndex = -1) {
-		BlendEquation(GfxToGL::ToGLenum(op), bufferIndex);
-		return op;
+		return GLToGfx::ToBlendOp(BlendEquation(GfxToGL::ToGLenum(op), bufferIndex));
 	}
+
+	// The enum state queries. The portable spelling returns the GfxOperations vocabulary and exists in
+	// every backend; the *GL variants sit next to the GLenum setters that only OpenGL has and spare an
+	// application that talks GL anyway (d2x-xl) the conversion back and forth.
+	inline GfxOperations::CompareFunc GetDepthFunc(void) { return GLToGfx::ToCompareFunc(DepthFunc(GLenum(GL_NONE))); }
+	inline GfxOperations::CullFace GetCullFace(void) { return GLToGfx::ToCullFace(CullFace(GLenum(GL_NONE))); }
+	inline GfxOperations::Winding GetFrontFace(void) { return GLToGfx::ToWinding(FrontFace(GLenum(GL_NONE))); }
+	inline GfxOperations::BlendOp GetBlendEquation(void) { return GLToGfx::ToBlendOp(BlendEquation(GLenum(GL_NONE))); }
+
+	inline GLenum GetDepthFuncGL(void) { return DepthFunc(GLenum(GL_NONE)); }
+	inline GLenum GetCullFaceGL(void) { return CullFace(GLenum(GL_NONE)); }
+	inline GLenum GetFrontFaceGL(void) { return FrontFace(GLenum(GL_NONE)); }
+	inline GLenum GetBlendEquationGL(void) { return BlendEquation(GLenum(GL_NONE)); }
 
 	inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst, int bufferIndex = -1) {
 		BlendFunc(GfxToGL::ToGLenum(src), GfxToGL::ToGLenum(dst), bufferIndex);

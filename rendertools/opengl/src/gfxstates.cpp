@@ -139,12 +139,15 @@ bool GfxStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
 void GfxStates::DetermineExtensions(void) {
 	GLint extCount = 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
+	if (extCount < 1)   // no GL context (yet): leave m_haveExtensions clear so HasExtension () retries
+		return;
 	m_extensions.reserve(extCount);
 	for (GLint i = 0; i < extCount; ++i) {
 		const char* s = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, i));
 		if (s)
 			m_extensions.emplace(s);
 	}
+	m_haveExtensions = not m_extensions.empty();
 }
 
 

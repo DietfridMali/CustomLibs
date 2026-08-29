@@ -86,18 +86,23 @@ void LightningEmitter::DrawEndpoints(Vector3f& start, Vector3f& end) const {
 
 void LightningEmitter::Ignite(int64_t now, LightningSystem& system) {
     system.Clear();
+    // The burn time is drawn FIRST and handed to the discharges as their lifetime. Jittering the two
+    // separately made the emitter wipe the system while the strikes were still alive (or leave dead ones
+    // standing) -- the effect then ended visibly early, at whatever the shorter of the two came out as.
+    float burnTime = Jitter(m_params.lifetime, m_emitterParams.timeJitter);
+    if (burnTime < 0.0f)
+        burnTime = 0.0f;
+    LightningCreationParams params = m_params;
+    params.lifetime = burnTime;
     int32_t count = (m_emitterParams.count < 1) ? 1 : m_emitterParams.count;
     for (int32_t i = 0; i < count; i++) {
         Vector3f start, end;
         DrawEndpoints(start, end);
         if (m_emitterParams.kind == lkArc)
-            system.AddArc(start, end, m_params);
+            system.AddArc(start, end, params);
         else
-            system.AddStrike(start, end, m_params, now);
+            system.AddStrike(start, end, params, now);
     }
-    float burnTime = Jitter(m_params.lifetime, m_emitterParams.timeJitter);
-    if (burnTime < 0.0f)
-        burnTime = 0.0f;
     m_burnUntil = now + int64_t(burnTime * 1000.0f);
     m_nextIgnition = m_burnUntil + int64_t(Jitter(m_emitterParams.offTime, m_emitterParams.timeJitter) * 1000.0f);
     m_burning = true;

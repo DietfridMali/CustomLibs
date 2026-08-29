@@ -18,6 +18,8 @@ void LightningSystem::Clear(void) {
 
 LightningStrike* LightningSystem::AddStrike(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t now) {
     LightningStrike* strike = new LightningStrike();
+    m_fbm = params.fbm;
+    strike->SetFbm(&m_fbm);
     strike->Setup(start, end, params, now);
     m_lightnings.Append(strike);
     return strike;
@@ -26,6 +28,8 @@ LightningStrike* LightningSystem::AddStrike(const Vector3f& start, const Vector3
 
 LightningArc* LightningSystem::AddArc(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params) {
     LightningArc* arc = new LightningArc();
+    m_fbm = params.fbm;
+    arc->SetFbm(&m_fbm);
     arc->Setup(start, end, params);
     m_lightnings.Append(arc);
     return arc;

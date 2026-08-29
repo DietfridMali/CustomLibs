@@ -20,6 +20,10 @@ class LightningSystem {
 public:
     AutoArray<BaseLightning*> m_lightnings;   // owned; deleted in the dtor
     LightningEmitter*         m_emitter{ nullptr };   // owned; nullptr = no time control
+    // The noise properties of this bundle - kink sharpness, fbm octaves and gain. They describe the
+    // KIND of discharge, which every bolt in the bundle shares, so they live here once and the
+    // lightnings only point at them. Taken from the creation parameters of the first one added.
+    LightningFbmParams        m_fbm;
     int64_t m_spawnTime{ 0 };
     int64_t m_ttl{ 0 };                       // ms; <= 0 = permanent
 
