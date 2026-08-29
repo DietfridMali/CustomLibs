@@ -67,7 +67,10 @@ public:
     inline DATA_T* operator+(int32_t i) noexcept { return m_array.data() + i; }
     inline const DATA_T* operator+(int32_t i) const noexcept { return m_array.data() + i; }
 
-    inline DATA_T* Create(int32_t length = static_cast<int32_t>(CAPACITY), const char* = nullptr) noexcept {
+    // The reallocate flag exists so a call can be written the same way for both array types. A
+    // StaticArray owns its elements for its entire lifetime and never allocates, so there is nothing
+    // to release and rebuild here - see AutoArray::Create ().
+    inline DATA_T* Create(int32_t length = static_cast<int32_t>(CAPACITY), const char* = nullptr, bool = false) noexcept {
         m_length = (length < static_cast<int32_t>(CAPACITY)) ? length : static_cast<int32_t>(CAPACITY);
         return m_array.data();
     }

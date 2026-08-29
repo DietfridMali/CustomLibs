@@ -542,7 +542,22 @@ public:
 
     inline const DATA_T* operator+(int32_t i) const noexcept { return DataPtr(i); }
 
-    inline DATA_T* Create(int32_t length, const char* = nullptr) { Resize(length); return DataPtr(); }
+    // reallocate = false keeps the array in place and only adjusts its length, so the elements that
+    // are already there survive. reallocate = true releases the buffer and builds a new one, which
+    // runs the destructor of every old element and the constructor of every new one - what
+    // CArray::Create () did (Destroy () followed by new DATA_T [length]) and what a caller of a class
+    // type array needs when it wants freshly constructed elements rather than whatever the previous
+    // use left behind.
+    inline DATA_T* Create(int32_t length, const char* = nullptr, bool reallocate = false) {
+        if (not reallocate)
+            Resize(length);
+        else if ((ValidatedSize(static_cast<size_t>(length)) > -1) and IsArrayOwner()) {
+            m_arrayPtr->clear();
+            m_arrayPtr->shrink_to_fit();
+            m_arrayPtr->resize(static_cast<size_t>(length));
+        }
+        return DataPtr();
+    }
 
     inline int32_t Size(void) const noexcept { return DataSize(); }
 
