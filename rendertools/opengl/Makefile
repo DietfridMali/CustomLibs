@@ -47,6 +47,9 @@ COMMON_FILES := \
  glbloader \
  icosphere \
  lightningnoise \
+ lightningbolt \
+ lightningemitter \
+ lightningsystem \
  linesegment \
  mesh \
  noise \

@@ -154,6 +154,9 @@
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\lightningnoise.h" />
+    <ClInclude Include="..\..\include\lightningbolt.h" />
+    <ClInclude Include="..\..\include\lightningemitter.h" />
+    <ClInclude Include="..\..\include\lightningsystem.h" />
     <ClInclude Include="..\..\include\noise.h" />
     <ClInclude Include="..\..\include\quad.h" />
     <ClInclude Include="..\..\include\projector.h" />
@@ -220,6 +223,9 @@
     <ClCompile Include="..\..\src\base_shaderhandler.cpp" />
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\lightningnoise.cpp" />
+    <ClCompile Include="..\..\src\lightningbolt.cpp" />
+    <ClCompile Include="..\..\src\lightningemitter.cpp" />
+    <ClCompile Include="..\..\src\lightningsystem.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />
     <ClCompile Include="..\src\texture.cpp" />
     <ClCompile Include="..\..\src\textureatlas.cpp" />
