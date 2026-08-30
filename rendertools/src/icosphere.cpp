@@ -8,7 +8,22 @@
 // vertices are normalized. The more iterations this is run through, the finer the resulting mesh
 // becomes and the smoother does the sphere look.
 
-uint32_t IcoSphere::AddVertexIndices(Dictionary<VertexKey, uint32_t>& indexLookup, uint32_t i1, uint32_t i2) { // find index pair i1,i2 in 
+// The normal of a vertex on a sphere around the origin is the vertex itself at unit length. The
+// vertices are half of that - the sphere is built with a diameter of one - so they cannot be handed
+// over as normals unchanged.
+
+void IcoSphere::SetVertexNormals(void) {
+    m_normals.Reset();
+    for (auto& v : m_vertices.AppData()) {
+        Vector3f n = v;
+        n.Normalize();
+        m_normals.Append(n);
+    }
+    m_normals.SetDirty(true);
+}
+
+
+uint32_t IcoSphere::AddVertexIndices(Dictionary<VertexKey, uint32_t>& indexLookup, uint32_t i1, uint32_t i2) { // find index pair i1,i2 in
     VertexKey key;
     if (i1 < i2)
         key = { i1, i2 };
@@ -36,11 +51,20 @@ List<Vector3f> IcoSphere::CreateFaceNormals(VertexBuffer& vertices, SegmentedLis
 // =================================================================================================
 // Create an ico sphere based on a shape with triangular faces
 
+// The base mesh decides how evenly the vertices end up spread over the sphere: subdividing halves
+// every edge on the great circle through its ends, so the spread the base shape starts with is the
+// spread the finished sphere has. Measured as the ratio of the longest to the shortest edge, an
+// icosahedron gives 1.19 and an octahedron 1.28, at every level of subdivision. Perfectly even is
+// not to be had beyond the platonic solids.
+
 void TriangleIcoSphere::Create(int quality) {
-    CreateBaseMesh(0);
+    CreateBaseMesh(1);
     m_vertexCount = m_vertices.AppDataLength();
     Refine(m_indices.AppData(), quality);
     m_faceCount = m_indices.AppDataLength();
+    // On a sphere around the origin the normal at a vertex is the vertex itself, only unit length -
+    // the vertices are half that, since the sphere is built with a diameter of one.
+    SetVertexNormals();
     m_vertices.SetDirty(true);
     m_indices.SetDirty(true);
     UpdateData();
@@ -64,11 +88,14 @@ void TriangleIcoSphere::CreateOctahedron(void) {
     float Y = float(sqrt(0.5));
     float Z = 0.5;
     m_vertices.AppData() = {
-        Vector3f{-X,0,-Z}, Vector3f{X,0,-Z}, Vector3f{X,0,Z}, Vector3f{-X,0,Z}, Vector3f{0,-Y,0}, Vector3f{0,Y,0} 
+        Vector3f{-X,0,-Z}, Vector3f{X,0,-Z}, Vector3f{X,0,Z}, Vector3f{-X,0,Z}, Vector3f{0,-Y,0}, Vector3f{0,Y,0}
     };
+    // The lower cap used to name vertex 6, which does not exist - there are six vertices, 0 to 5,
+    // and the one below the ring is 4. Its faces also have to run the other way round: seen from
+    // outside, a face around the lower tip walks the ring backwards, or the cap ends up inside out.
     m_indices.AppData() = {
         VertexIndices({0,1,5}), VertexIndices({1,2,5}), VertexIndices({2,3,5}), VertexIndices({3,0,5}),
-        VertexIndices({0,1,6}), VertexIndices({1,2,6}), VertexIndices({2,3,6}), VertexIndices({3,0,6}) 
+        VertexIndices({1,0,4}), VertexIndices({2,1,4}), VertexIndices({3,2,4}), VertexIndices({0,3,4})
     };
 }
 
@@ -103,15 +130,20 @@ void TriangleIcoSphere::SubDivide(SegmentedList<VertexIndices>& faces) {
         uint32_t i0 = AddVertexIndices(indexLookup, f[0], f[1]);
         uint32_t i1 = AddVertexIndices(indexLookup, f[1], f[2]);
         uint32_t i2 = AddVertexIndices(indexLookup, f[2], f[0]);
+        // The three corner children each hold one corner of the parent and the midpoints of the two
+        // edges meeting there; the fourth is the middle triangle spanned by all three midpoints.
+        // Two of them named the wrong vertices: the child at f1 took the midpoint of the far edge
+        // instead of its own, and the middle one started at f0 - so two of the four triangles
+        // overlapped and the area between them was left open.
         VertexIndices* a;
         a = subFaces.Append();
         *a = { f[0], i0, i2 };
         a = subFaces.Append();
-        *a = { f[1], i1, i2 };
+        *a = { f[1], i1, i0 };
         a = subFaces.Append();
         *a = { f[2], i2, i1 };
         a = subFaces.Append();
-        *a = { f[0], i1, i2 };
+        *a = { i0, i1, i2 };
     }
     faces.Clear();
     faces = std::move(subFaces);
@@ -127,16 +159,20 @@ void TriangleIcoSphere::Refine(SegmentedList<VertexIndices>& faces, int quality)
 // =================================================================================================
 // Create an ico sphere based on a shape with rectangular faces
 
+// The quad base shapes are a cube and the same cube with every face split into four - and that is
+// exactly what one subdivision of the cube produces: measured against each other, the two are the
+// same sphere one level apart, down to the edge lengths. The finer base therefore does not spread
+// the vertices any more evenly - quads keep the cube's ratio of 1.28 either way - it only starts
+// four times as high, so the cube stays the base and the caller decides the resolution.
+
 void RectangleIcoSphere::Create(int quality) {
     CreateBaseMesh(0);
     m_vertexCount = m_vertices.AppDataLength ();
-#if 1
     Refine(m_indices.AppData(), quality);
-#endif
     m_faceCount = m_indices.AppDataLength();
-    m_normals = m_vertices;
+    // m_normals = m_vertices left the normals at half unit length - the sphere has a diameter of one
+    SetVertexNormals();
     m_vertices.SetDirty(true);
-    m_normals.SetDirty(true);
     m_indices.SetDirty(true);
     CreateTriangleVertexIndices();
     UpdateData();
@@ -196,8 +232,9 @@ void RectangleIcoSphere::CreateIcosahedron(void) {
         Vector3f{-X, +Y, +Z}, Vector3f{-X, -Y, +Z}, Vector3f{+X, +Y, +Z}, Vector3f{+X, -Y, +Z},
         // base cube face center vertices
         Vector3f{0, 0, -Z}, Vector3f{-X, 0, 0}, Vector3f{+X, 0, 0}, Vector3f{0, 0, +Z}, Vector3f{0, +Y, 0}, Vector3f{0, -Y, 0},
-        // front face edge center vertices
-        Vector3f{0, -Y, -Z}, Vector3f{+X, 0, -Z}, Vector3f{0, +Y, +Z}, Vector3f{-X, 0, -Z},
+        // front face edge center vertices - the third one held {0,+Y,+Z}, a point on the BACK face
+        // (and a duplicate of vertex 24). The four faces using it all sit at z = -Z.
+        Vector3f{0, -Y, -Z}, Vector3f{+X, 0, -Z}, Vector3f{0, +Y, -Z}, Vector3f{-X, 0, -Z},
         // left side face edge center vertices
         Vector3f{-X, +Y, 0}, Vector3f{-X, 0, +Z}, Vector3f{-X, -Y, 0},
         // right side face edge center vertices
@@ -212,7 +249,9 @@ void RectangleIcoSphere::CreateIcosahedron(void) {
         VertexIndices({10, 15,  1, 21}), VertexIndices({10, 21,  7, 22}), VertexIndices({10, 22,  6, 23}), VertexIndices({10, 23,  2, 15}),
         VertexIndices({11, 22,  7, 25}), VertexIndices({11, 25,  5, 19}), VertexIndices({11, 19,  4, 24}), VertexIndices({11, 24,  6, 22}),
         VertexIndices({12, 16,  2, 23}), VertexIndices({12, 23,  6, 24}), VertexIndices({12, 24,  4, 18}), VertexIndices({12, 18,  3, 16}),
-        VertexIndices({13, 14,  0, 18}), VertexIndices({13, 18,  5, 25}), VertexIndices({13, 25,  7, 21}), VertexIndices({13, 21,  1, 14})
+        // the two faces at the left of the bottom named vertex 18 ({-X,+Y,0}, at the TOP of the left
+        // side) where they meet the bottom's left edge centre, which is vertex 20 ({-X,-Y,0})
+        VertexIndices({13, 14,  0, 20}), VertexIndices({13, 20,  5, 25}), VertexIndices({13, 25,  7, 21}), VertexIndices({13, 21,  1, 14})
     };
 }
 

@@ -214,10 +214,15 @@ std::string PreferDDSName(const char* folder, const std::string& fileName) {
     const size_t slash = fileName.find_last_of("/\\");
     if ((dot == std::string::npos) or ((slash != std::string::npos) and (dot < slash)))
         return fileName;   // no extension to swap
-    const std::string ddsName = fileName.substr(0, dot) + ".DDS";
+    const std::string base = fileName.substr(0, dot);
     std::error_code ec;
-    if (std::filesystem::exists(JoinPath(folder, ddsName), ec))
-        return ddsName;
+    // Both spellings: on a case sensitive file system only the one that is actually on disk is found,
+    // and which of the two that is depends on whoever converted the textures.
+    for (const char* ext : { ".DDS", ".dds" }) {
+        const std::string ddsName = base + ext;
+        if (std::filesystem::exists(JoinPath(folder, ddsName), ec))
+            return ddsName;
+    }
     return fileName;
 }
 

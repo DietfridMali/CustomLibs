@@ -69,6 +69,10 @@ public:
     }
 
 protected:
+    // Fills the normal buffer from the vertices: on a sphere around the origin the normal at a vertex
+    // is the vertex itself, at unit length.
+    void SetVertexNormals(void);
+
     uint32_t AddVertexIndices(Dictionary<VertexKey, uint32_t>& indexLookup, uint32_t i1, uint32_t i2);
 
     List<Vector3f> CreateFaceNormals(VertexBuffer& vertices, SegmentedList<std::span<uint32_t>>& faces);
