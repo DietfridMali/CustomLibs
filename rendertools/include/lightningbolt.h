@@ -61,6 +61,10 @@ struct LightningLook {
 
     int32_t kinkOctaves{ 2 };            // KINK layer octaves
     float   kinkAmplitude{ 0.4f };       // world-fixed peak of the kink layer (wu) -- the corner sharpness knob
+    // How much of the swing may leave the bolt's own plane, as a share of the in-plane swing. 0 = a
+    // strictly flat bolt, 1 = the plane means nothing. A small share keeps a bolt from collapsing to
+    // a straight line when it is seen edge on, without letting the path circle its axis again.
+    float   planeDistTolerance{ 0.5f };
 
     // Branch deflection off the parent's local tangent: normal distribution (high-speed camera statistics:
     // weak branches deflect ~40-45 deg, normally distributed, sigma 14-24 deg -- the values are 2D projections,
@@ -108,6 +112,7 @@ struct LightningFbmParams {
     float   gain{ -1.0f };            // fbm amplitude falloff per octave; BOTH layers use it
     float   lacunarity{ -1.0f };      // fbm frequency growth per octave; BOTH layers use it
     int32_t kinkOctaves{ -1 };        // KINK layer octaves - detail of the fine jaggedness
+    float   planeDistTolerance{ -1.0f };      // share of the swing that may leave the plane; negative = the look default
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -163,6 +168,10 @@ struct LightningBoltParams {
     float      amplitude{ 1.0f };
     uint32_t   seed{ 0 };
     float      time{ 0.0f };
+    // The noise time the STRUCTURE is decided at - the spawn phase, which does not move while the bolt
+    // animates. The swing plane is derived at this phase (see Build), so it stays put instead of
+    // rotating along with the writhing.
+    float      basePhase{ 0.0f };
     eSwingMode swingMode{ smHorizontal };
     Vector3f   planeNormal{ Vector3f::ZERO };
     float      tailFraction{ 0.0f };

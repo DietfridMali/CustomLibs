@@ -124,6 +124,42 @@ namespace {
         }
     }
 
+    // The two directions the swing is built on, for the whole bolt. Returning a BASIS instead of a single
+    // direction per sample is what keeps the path from curling: with a normalized direction times a
+    // magnitude that could never change sign (|fbm|), the displacement could only circle the axis, and a
+    // direction turning steadily along the bolt then draws a helix - the corkscrew curls. Two SIGNED
+    // channels on a fixed basis swing THROUGH the axis instead, which is what a discharge does.
+    // v is zero where the mode allows one direction only; the caller then simply adds nothing for it.
+    void BuildSwingBasis(const Vector3f& axis, const Vector3f& planeDir, eSwingMode mode, Vector3f& u, Vector3f& v) {
+        switch (mode) {
+            case smPlane:
+                u = planeDir;
+                v = Vector3f::ZERO;
+                return;
+            case smHorizontal:
+                // world xz only: node.y stays == base.y, so no segment can run upward (gravity worlds)
+                u = Vector3f(1.0f, 0.0f, 0.0f);
+                v = Vector3f(0.0f, 0.0f, 1.0f);
+                return;
+            case smPerpendicular:
+            default:
+                break;
+        }
+        // any orthonormal pair across the bolt will do - the noise decides where the swing points
+        Vector3f ref = (std::fabs(axis.y) > 0.9f) ? Vector3f(1.0f, 0.0f, 0.0f) : Vector3f(0.0f, 1.0f, 0.0f);
+        u = ref.Cross(axis);
+        float l = u.Length();
+        if (l < 1e-4f) {
+            ref = Vector3f(0.0f, 0.0f, 1.0f);
+            u = ref.Cross(axis);
+            l = u.Length();
+        }
+        u = (l > 1e-4f) ? u * (1.0f / l) : Vector3f(1.0f, 0.0f, 0.0f);
+        v = axis.Cross(u);
+        l = v.Length();
+        v = (l > 1e-4f) ? v * (1.0f / l) : Vector3f::ZERO;
+    }
+
     // smPlane: the lateral direction inside the plane = normalize (planeNormal x axis). Degenerates when the
     // plane normal is parallel to the bolt -- then any perpendicular of the axis will do.
     Vector3f BuildPlaneDir(const Vector3f& planeNormal, const Vector3f& axis) {
@@ -252,34 +288,63 @@ void LightningBolt::Build(const LightningBoltParams& params) {
     const float lacunarity = (params.fbm.lacunarity > 0.0f) ? params.fbm.lacunarity : look.lacunarity;
     const float kinkScale = stepLength * std::pow(lacunarity, float(kinkOctaves - 1));
 
+    // One swing basis for the whole bolt - see BuildSwingBasis () for why it is a basis and not a
+    // direction per sample. Both noise layers ride on it.
+    Vector3f swingU, swingV;
+    BuildSwingBasis(axis, planeDir, params.swingMode, swingU, swingV);
+
+    // THE BOLT'S OWN PLANE. Its dominant direction is not drawn from a separate random source but read
+    // off the noise itself, at the MIDDLE of the bolt - there the sin window is fully open, so that is
+    // where the swing decides the bolt's character; at the first node the window is near zero and the
+    // direction there says nothing about the rest. Sampled at basePhase, the FIXED spawn phase, never
+    // at the animated time: a plane derived from moving noise would rotate as the bolt writhes, and a
+    // rotating plane is the corkscrew again, only slower. (Same reason the fork decisions below are
+    // taken on a reference build at m_timeOffset.) The plane is tied to the AXIS, so it turns with the
+    // bolt when its endpoints move, and a branch gets its own from its own axis and seed.
+    if ((params.swingMode == smPerpendicular) and not swingV.IsZero()) {
+        float mx = 0.5f * float(params.waveCount);
+        float mu = LightningNoise::Fbm2D(mx, params.basePhase, params.seed, octaves, gain, lacunarity);
+        float mv = LightningNoise::Fbm2D(mx, params.basePhase, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity);
+        float ml = std::sqrt(mu * mu + mv * mv);
+        if (ml > 1e-5f) {
+            Vector3f dominant = (swingU * mu + swingV * mv) * (1.0f / ml);
+            Vector3f across = axis.Cross(dominant);
+            float al = across.Length();
+            if (al > 1e-4f) {
+                swingU = dominant;             // in the plane
+                swingV = across * (1.0f / al); // out of it, and weighted down below
+            }
+        }
+    }
+
+    // How much may leave that plane. Only the perpendicular mode has a plane of its own; smPlane is
+    // flat by definition (swingV is zero) and smHorizontal wants both world axes at full weight.
+    const float planeDistTolerance = (params.swingMode == smPerpendicular)
+        				  ? ((params.fbm.planeDistTolerance >= 0.0f) ? params.fbm.planeDistTolerance : look.planeDistTolerance)
+        				  : 1.0f;
+    // keeps the peak swing at exactly `amplitude` however the two channels are weighted
+    const float swingScale = swingV.IsZero() ? 1.0f : 1.0f / std::sqrt(1.0f + planeDistTolerance * planeDistTolerance);
+
     m_nodes.Reserve(totalSegments + 1);
     for (int32_t i = 0; i <= totalSegments; i++) {
         float t = float(i) / float(totalSegments);
         Vector3f base = params.start + fullDelta * t;
         float window = std::sin(Pi * t);                                  // 0 at both ends of the FULL span -> anchored envelope
         float x = t * float(params.waveCount);   // length axis only; `time` is a SEPARATE 2nd noise axis (below)
-        // PATH layer -- fractal (fbm) swing: a normalized direction times a fractal magnitude |fbm| in [0,1],
-        // so the peak lateral swing is exactly `amplitude` and the wobble is multi-octave. Direction and
-        // magnitude use independent fbm channels. `time` is the 2nd noise axis -> advancing it morphs the
+        // PATH layer -- the slow fractal swing: one SIGNED fbm channel per basis direction, so the path
+        // crosses the axis instead of orbiting it. `time` is the 2nd noise axis -> advancing it morphs the
         // bolt in place (animation) instead of sliding the shape sideways as `x + time` did.
-        Vector3f fbmVec = LightningNoise::Fbm2Dv3(x, params.time, params.seed, octaves, gain, lacunarity);
-        Vector3f perp = SwingVector(fbmVec, axis, planeDir, params.swingMode);
-        float pl = perp.Length();
-        Vector3f dir = (pl > 1e-5f) ? perp * (1.0f / pl) : Vector3f(0.0f, 0.0f, 0.0f);   // normalized swing direction
-        float mag = std::fabs(LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity));
-        Vector3f disp = dir * (mag * params.amplitude * window);
+        float du = LightningNoise::Fbm2D(x, params.time, params.seed, octaves, gain, lacunarity);
+        float dv = LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity);
+        Vector3f disp = (swingU * du + swingV * (dv * planeDistTolerance)) * (params.amplitude * window * swingScale);
         // KINK layer -- world-fixed fine jaggedness, tiled along the bolt: sampled once per finest cell
         // (see kinkScale), so consecutive nodes get ~independent values -> hard corners of world-constant
-        // size and spacing on every bolt, trunk and branchlet alike. Same swing convention and window as
-        // the path layer (endpoints stay pinned); own seed streams.
+        // size and spacing on every bolt, trunk and branchlet alike. Same basis, same window (endpoints
+        // stay pinned) and the same signed convention as the path layer; own seed streams.
         float s = (t * fullLength) / ((kinkScale > 1e-5f) ? kinkScale : 1e-5f);
-        Vector3f kinkVec = LightningNoise::Fbm2Dv3(s, params.time, params.seed ^ 0x7f4a7c15u, kinkOctaves, gain, lacunarity);
-        Vector3f kperp = SwingVector(kinkVec, axis, planeDir, params.swingMode);
-        float kl = kperp.Length();
-        if (kl > 1e-5f) {
-            float kmag = std::fabs(LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, kinkOctaves, gain, lacunarity));
-            disp += kperp * (kmag * kinkAmplitude * window / kl);
-        }
+        float ku = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x7f4a7c15u, kinkOctaves, gain, lacunarity);
+        float kv = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, kinkOctaves, gain, lacunarity);
+        disp += (swingU * ku + swingV * (kv * planeDistTolerance)) * (kinkAmplitude * window * swingScale);
         LightningNode* node = m_nodes.Append();
         node->position = base + disp;
         // width tapers over the VISIBLE span, so the drawn tip carries endWidth even with a free tail
@@ -385,6 +450,7 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
         .amplitude = amplitude,
         .seed = seed,
         .time = time,
+        .basePhase = m_timeOffset,
         .swingMode = m_swingMode,
         .planeNormal = m_planeNormal,
         .tailFraction = m_tailFraction,
@@ -637,6 +703,7 @@ void LightningArc::Generate(int64_t now) {
             .amplitude = amplitude,
             .seed = m_seed + uint32_t(b) * 2654435761u,
             .time = time + float(b) * 1.7f,
+            .basePhase = m_timeOffset,
             .swingMode = m_swingMode,
             .planeNormal = m_planeNormal,
             .tailFraction = m_tailFraction,
