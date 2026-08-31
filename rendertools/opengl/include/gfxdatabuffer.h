@@ -93,6 +93,16 @@ public:
             glDisableVertexAttribArray(m_index);
     }
 
+    // An integer attribute has to be bound with glVertexAttribIPointer (): glVertexAttribPointer ()
+    // hands the shader a float, so a "uint" input would read a converted value or garbage. The index
+    // buffer never comes through here (its m_index is -1).
+    inline bool IsIntegerAttrib(void)
+        noexcept
+    {
+        return (m_componentType == GL_UNSIGNED_INT) or (m_componentType == GL_INT) or
+               (m_componentType == GL_UNSIGNED_SHORT) or (m_componentType == GL_SHORT);
+    }
+
 #ifdef _DEBUG
     void Describe(void);
 #else
@@ -100,7 +110,10 @@ public:
         noexcept
     {
         if (m_index > -1) {
-            glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
+            if (IsIntegerAttrib())
+                glVertexAttribIPointer(m_index, m_componentCount, m_componentType, 0, nullptr);
+            else
+                glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
             EnableAttribs();
         }
     }

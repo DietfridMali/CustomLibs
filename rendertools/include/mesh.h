@@ -79,7 +79,9 @@ public:
         mbOffset2   = 1u << 10,
         mbOffset3   = 1u << 11,
         mbFloat0    = 1u << 12,
-        mbFloat1    = 1u << 13
+        mbFloat1    = 1u << 13,
+        mbUint0     = 1u << 14,
+        mbUint1     = 1u << 15
     };
 
     // Maps a GfxDataBuffer's (type, id) tag to its eMeshBufferBits bit; 0 if unknown.
@@ -100,6 +102,8 @@ public:
             return ((id >= 0) and (id <= 1)) ? (uint32_t(mbFloat0) << id) : 0u;
         if (not strcmp(type, "Offset"))
             return ((id >= 0) and (id <= 3)) ? (uint32_t(mbOffset0) << id) : 0u;
+        if (not strcmp(type, "Uint"))
+            return ((id >= 0) and (id <= 1)) ? (uint32_t(mbUint0) << id) : 0u;
         return 0u;
     }
 
@@ -113,6 +117,7 @@ public:
     IndexBuffer                     m_indices;
     List<FloatDataBuffer>           m_floatBuffers;
     List<VertexBuffer>              m_offsetBuffers;
+    List<UintDataBuffer>            m_uintBuffers;
     GfxDataLayout* m_gfxDataLayout{ nullptr };
     MeshTopology                    m_shape{ MeshTopology::Quads };
     Vector3f                        m_vMin{ Vector3f::ZERO };
@@ -184,6 +189,8 @@ public:
 
     inline VertexBuffer& OffsetBuffer(int i) noexcept { return m_offsetBuffers[i]; }
 
+    inline UintDataBuffer& UintBuffer(int i) noexcept { return m_uintBuffers[i]; }
+
     inline void UpdateVertexBuffer(bool forceUpdate = false) {
         if (m_gfxDataLayout)
             m_gfxDataLayout->UpdateDataBuffer("Vertex", 0, m_vertices, ComponentType::Float, forceUpdate);
@@ -218,6 +225,11 @@ public:
     inline void UpdateOffsetBuffer(int i, bool forceUpdate = false) {
         if (m_gfxDataLayout)
             m_gfxDataLayout->UpdateDataBuffer("Offset", i, m_offsetBuffers[i], ComponentType::Float, forceUpdate);
+    }
+
+    inline void UpdateUintDataBuffer(int i, bool forceUpdate = false) {
+        if (m_gfxDataLayout)
+            m_gfxDataLayout->UpdateDataBuffer("Uint", i, m_uintBuffers[i], ComponentType::UInt32, forceUpdate);
     }
 
     inline void UpdateIndexBuffer(bool forceUpdate = false) {
@@ -267,6 +279,18 @@ public:
 
     inline void ResetOffsetBuffers(void) noexcept {
         m_offsetBuffers.Clear();
+    }
+
+    inline void AddUintBuffer(void) noexcept {
+        m_uintBuffers.Append();
+    }
+
+    inline void ResetUintBuffers(void) noexcept {
+        m_uintBuffers.Clear();
+    }
+
+    inline void AddUint(int i, const uint32_t n) {
+        m_uintBuffers[i].Append(n);
     }
 
     inline void AddVertex(const Vector3f& v) {

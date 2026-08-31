@@ -204,6 +204,10 @@ static VkFormat VkFormatForAttr(ShaderDataAttributes::Format f) noexcept
         case ShaderDataAttributes::Float2: return VK_FORMAT_R32G32_SFLOAT;
         case ShaderDataAttributes::Float3: return VK_FORMAT_R32G32B32_SFLOAT;
         case ShaderDataAttributes::Float4: return VK_FORMAT_R32G32B32A32_SFLOAT;
+        case ShaderDataAttributes::Uint1:  return VK_FORMAT_R32_UINT;
+        case ShaderDataAttributes::Uint2:  return VK_FORMAT_R32G32_UINT;
+        case ShaderDataAttributes::Uint3:  return VK_FORMAT_R32G32B32_UINT;
+        case ShaderDataAttributes::Uint4:  return VK_FORMAT_R32G32B32A32_UINT;
     }
     return VK_FORMAT_UNDEFINED;
 }
@@ -216,6 +220,10 @@ static uint32_t StrideForFormat(ShaderDataAttributes::Format f) noexcept
         case ShaderDataAttributes::Float2: return 8;
         case ShaderDataAttributes::Float3: return 12;
         case ShaderDataAttributes::Float4: return 16;
+        case ShaderDataAttributes::Uint1:  return 4;
+        case ShaderDataAttributes::Uint2:  return 8;
+        case ShaderDataAttributes::Uint3:  return 12;
+        case ShaderDataAttributes::Uint4:  return 16;
     }
     return 0;
 }

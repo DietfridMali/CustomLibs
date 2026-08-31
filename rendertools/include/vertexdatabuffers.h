@@ -391,3 +391,35 @@ public:
 };
 
 // =================================================================================================
+// Buffer for INTEGER vertex data. Unlike every other attribute buffer here, its contents reach the
+// shader as integers, not as floats - the backends bind it with glVertexAttribIPointer () / an
+// R32_UINT input element, and the shader declares it as uint/uvec. Meant for per vertex tags a shader
+// looks things up with (a cluster or segment id, a material index), which must survive as an exact
+// value and must not be interpolated (declare the varying "flat").
+
+class UintDataBuffer
+    : public VertexDataBuffer <uint32_t, uint32_t> {
+public:
+    UintDataBuffer(uint32_t componentCount = 1, uint32_t listSegmentSize = 1)
+        : VertexDataBuffer(componentCount, listSegmentSize)
+    {
+    }
+
+    // Create a densely packed array from the vertex data
+    virtual AutoArray<uint32_t>& Setup(void) {
+        if (HaveAppData()) {
+            uint32_t* glData = m_gfxData.Resize(m_appData.Length() * m_componentCount);
+            for (auto& v : m_appData) {
+                *glData++ = v;
+            }
+        }
+        return m_gfxData;
+    }
+
+    UintDataBuffer& operator= (UintDataBuffer const& other) {
+        Copy(other);
+        return *this;
+    }
+};
+
+// =================================================================================================

@@ -169,6 +169,7 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
 
     updateBufferGroup(m_floatBuffers, [this](int i, bool f) { UpdateFloatDataBuffer(i, f); });
     updateBufferGroup(m_offsetBuffers, [this](int i, bool f) { UpdateOffsetBuffer(i, f); });
+    updateBufferGroup(m_uintBuffers, [this](int i, bool f) { UpdateUintDataBuffer(i, f); });
 
     m_gfxDataLayout->FinishUpdate();
 
@@ -193,6 +194,9 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
     for (int i = 0; (i < m_offsetBuffers.Length()) and (i < 4); ++i)
         if (m_offsetBuffers[i].HaveData())
             m_meshBufferMask |= (uint32_t(mbOffset0) << i);
+    for (int i = 0; (i < m_uintBuffers.Length()) and (i < 2); ++i)
+        if (m_uintBuffers[i].HaveData())
+            m_meshBufferMask |= (uint32_t(mbUint0) << i);
 
     return true;
 }
@@ -288,6 +292,8 @@ noexcept(
     for (auto& b : m_floatBuffers)
         b.Destroy();
     for (auto& b : m_offsetBuffers)
+        b.Destroy();
+    for (auto& b : m_uintBuffers)
         b.Destroy();
     m_vertexColors.Destroy();
     m_indices.Destroy();

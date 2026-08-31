@@ -97,8 +97,16 @@ static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
         return DXGI_FORMAT_R32G32_FLOAT;
     case ShaderDataAttributes::Float3: 
         return DXGI_FORMAT_R32G32B32_FLOAT;
-    case ShaderDataAttributes::Float4: 
+    case ShaderDataAttributes::Float4:
         return DXGI_FORMAT_R32G32B32A32_FLOAT;
+    case ShaderDataAttributes::Uint1:
+        return DXGI_FORMAT_R32_UINT;
+    case ShaderDataAttributes::Uint2:
+        return DXGI_FORMAT_R32G32_UINT;
+    case ShaderDataAttributes::Uint3:
+        return DXGI_FORMAT_R32G32B32_UINT;
+    case ShaderDataAttributes::Uint4:
+        return DXGI_FORMAT_R32G32B32A32_UINT;
     }
     return DXGI_FORMAT_R32G32B32_FLOAT;
 }

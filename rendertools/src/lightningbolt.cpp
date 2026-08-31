@@ -194,8 +194,14 @@ namespace {
                     d = -1.0f;
                 float deg = std::acos(d) / DegToRad;
                 int32_t bucket = int32_t(deg);
-                if (bucket > MaxDeg)
-                    bucket = MaxDeg;
+                // Unsigned compare: catches the upper end AND anything negative in the one test that
+                // was here anyway. A node pair with a NaN position makes the dot product NaN - the
+                // clamp above does not catch that, because every comparison with NaN is false - and
+                // the cast of NaN to int yields the "integer indefinite" value INT32_MIN, which as an
+                // unsigned is far above MaxDeg. There is no angle to measure in that case, so drop it
+                // rather than clamp it into a bucket it does not belong in.
+                if (uint32_t(bucket) > uint32_t(MaxDeg))
+                    continue;
                 histogram[bucket]++;
                 sum += deg;
                 n++;
@@ -434,7 +440,10 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
     const LightningLook& look = lightningLook;
     Vector3f delta = end - start;
     float length = delta.Length();
-    if (length < 1e-4f)
+    // Written as "not long enough" rather than "shorter than": if an endpoint carries a NaN, length is
+    // NaN, and `NaN < 1e-4f` is FALSE - the guard would wave it through and every node of the bolt, and
+    // of its branches, would come out NaN. Phrased this way the test fails closed.
+    if (not (length >= 1e-4f))
         return;
     int32_t segments = SegmentCount(length);
     int32_t waveCount = m_waveCount;   // coupled + length-invariant -> same base wiggle count for trunk & branches

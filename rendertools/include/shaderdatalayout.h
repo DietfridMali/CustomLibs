@@ -14,8 +14,8 @@
 // so shaders address buffers by slot, independently of the order in which a mesh's buffers
 // were created.
 //   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color, slot 5: Normal, slot 6: Tangent,
-//   slot 7-10: Offset/0-3, slot 11-12: Float/0-1
-// 13 slots total - OpenGL and Vulkan only guarantee 16 vertex attributes/bindings, so any
+//   slot 7-10: Offset/0-3, slot 11-12: Float/0-1, slot 13-14: Uint/0-1
+// 15 slots total - OpenGL and Vulkan only guarantee 16 vertex attributes/bindings, so any
 // extension of this table must stay below that limit.
 // Returns -1 for unknown (datatype, id) tags; callers skip such buffers.
 
@@ -35,6 +35,8 @@ inline int GfxAttributeSlot(const char* datatype, int id) noexcept
         return ((id >= 0) and (id <= 3)) ? 7 + id : -1;
     if (strcmp(datatype, "Float") == 0)
         return ((id >= 0) and (id <= 1)) ? 11 + id : -1;
+    if (strcmp(datatype, "Uint") == 0)
+        return ((id >= 0) and (id <= 1)) ? 13 + id : -1;
     return -1;
 }
 
@@ -69,6 +71,10 @@ inline const char* GfxAttributeSemantic(const char* datatype, int id, uint32_t& 
         semanticIndex = uint32_t(id);
         return "FLOAT";
     }
+    if (strcmp(datatype, "Uint") == 0) {
+        semanticIndex = uint32_t(id);
+        return "UINT";
+    }
     semanticIndex = 0;
     return "TEXCOORD";
 }
@@ -90,9 +96,10 @@ enum class TextureFormat {
 
 struct ShaderDataAttributes {
     const char* datatype;   // C++ buffer type: "Vertex", "Normal", "Color",
-                            //   "TexCoord", "Tangent", "Offset"
+                            //   "TexCoord", "Tangent", "Offset", "Float", "Uint"
     int         id;         // index for multi-instance types (TexCoord/0, Offset/2, ...)
-    enum Format { Float1, Float2, Float3, Float4 } format;
+    // Uint* reaches the shader as an integer, not as a float - see UintDataBuffer.
+    enum Format { Float1, Float2, Float3, Float4, Uint1, Uint2, Uint3, Uint4 } format;
 };
 
 static constexpr int MaxRenderTargets = 8;

@@ -144,7 +144,10 @@ noexcept(noexcept(Bind()) && noexcept(Describe()))
 void GfxDataBuffer::Describe(void)
 {
     if (m_index > -1) {
-        glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
+        if (IsIntegerAttrib())
+            glVertexAttribIPointer(m_index, m_componentCount, m_componentType, 0, nullptr);
+        else
+            glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
         EnableAttribs();
     }
 }
