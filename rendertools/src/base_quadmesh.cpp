@@ -170,15 +170,30 @@ void BaseQuadMesh::ResetTransformation(void) {
 }
 
 
+// UpdateTransformation () pushes a matrix and ResetTransformation () pops it, and the two have to stay
+// paired on EVERY path. They did not: the push sits inside LoadShader (), which only runs when the caller
+// passes no shader of its own, while the pop at the end ran unconditionally - so a caller handing in its
+// own shader popped a matrix it never pushed. The stack is shared by all matrix types
+// (MatrixStack::m_stack), so such a pop takes whatever another bracket had pushed and writes it into the
+// model view. The two early exits leaked the push the other way round. Push here, once, for both paths,
+// and unwind it on every exit.
 bool BaseQuadMesh::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
     ZoneScoped;
     //gfxStates.CheckError();
-    if (not (shader or (shader = LoadShader(textures, color)))) {
+    if (shader) {
+        UpdateTransformation();
+        // the caller set its shader up before the quad's own transformation went onto the stack
+        if (HaveTransformations())
+            shader->UpdateMatrices();
+    }
+    else if (not (shader = LoadShader(textures, color))) {   // LoadShader () pushes on this path
+        ResetTransformation();
         //gfxStates.CheckError();
         return false;
     }
     //gfxStates.CheckError();
     if (not UpdateData()) {
+        ResetTransformation();
         //gfxStates.CheckError();
         return false;
     }
