@@ -32,6 +32,8 @@ const ShaderSource& BevelShader();
 const ShaderSource& BoxBlurShader();
 const ShaderSource& FxaaShader();
 const ShaderSource& GaussBlurShader();
+const ShaderSource& LightningDrawShader();
+const ShaderSource& LightningFlareShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -61,7 +63,9 @@ BaseShaderCode::BaseShaderCode() {
         &BevelShader(),
         &BoxBlurShader(),
         &FxaaShader(),
-        &GaussBlurShader()
+        &GaussBlurShader(),
+        &LightningDrawShader(),
+        &LightningFlareShader()
     };
     AddShaders(shaderSource);
 }

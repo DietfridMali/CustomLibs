@@ -347,7 +347,7 @@ public:
     }
 
     inline TexCoord TexelSize(void) noexcept {
-        return TexCoord(1.0f / float(m_viewport.Width()), 1.0f / float(m_viewport.Height()));
+        return m_viewport.TexelSize();
     }
 
     void Render(Shader* shader, std::span<Texture* const> textures = {}, const RGBAColor& color = ColorData::White);

@@ -78,6 +78,14 @@ public:
 
     inline int WindowHeight(void) noexcept { return m_windowHeight; }
 
+    // One over the viewport's size: what a shader needs to convert between pixels and the normalized
+    // coordinates the projection produces. It belongs here because it is a property of the viewport -
+    // BaseRenderer::TexelSize() hands this one out, and RenderTarget has its own for steps that work
+    // inside a buffer rather than inside the viewport.
+    inline TexCoord TexelSize(void) noexcept {
+        return TexCoord(1.0f / float(m_width), 1.0f / float(m_height));
+    }
+
     inline int FlipVertically(void) noexcept { return m_flipVertically; }
 
     inline Vector2f Center(void) const noexcept {

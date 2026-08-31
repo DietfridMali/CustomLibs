@@ -348,6 +348,9 @@
     <ClCompile Include="..\src\blur_shader.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\lightning_shader.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\commandlist.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>

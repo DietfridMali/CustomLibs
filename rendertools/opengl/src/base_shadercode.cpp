@@ -29,6 +29,8 @@ const ShaderSource& OutlineShader();
 const ShaderSource& BoxBlurShader();
 const ShaderSource& FxaaShader();
 const ShaderSource& GaussBlurShader();
+const ShaderSource& LightningDrawShader();
+const ShaderSource& LightningFlareShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -56,7 +58,9 @@ BaseShaderCode::BaseShaderCode() {
         &OutlineShader(),
         &BoxBlurShader(),
         &FxaaShader(),
-        &GaussBlurShader()
+        &GaussBlurShader(),
+        &LightningDrawShader(),
+        &LightningFlareShader()
     };
     AddShaders(shaderSource);
 }
