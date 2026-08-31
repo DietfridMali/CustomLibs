@@ -313,7 +313,7 @@ static void CheckLayout(GLuint handle, const char* label = "") {
 
 #endif
 
-void GfxDataLayout::Render(std::span<Texture* const> textures)
+void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstIndex, uint32_t indexCount)
 noexcept
 {
 #ifdef _DEBUG
@@ -328,8 +328,14 @@ noexcept
         return;
 #endif
 #if 1
-    if (m_indexBuffer.m_data)
-        glDrawElementsInstanced(ToGLenum(m_shape), m_indexBuffer.m_itemCount, m_indexBuffer.m_componentType, nullptr, m_instanceCount); // draw using an index buffer
+    if (m_indexBuffer.m_data) {
+        // the range to draw; glDrawElements takes a BYTE offset into the bound index buffer
+        GLsizei count = (indexCount > 0) ? GLsizei(indexCount) : (m_indexBuffer.m_itemCount - GLsizei(firstIndex));
+        size_t componentSize = (m_indexBuffer.m_componentType == GL_UNSIGNED_INT) ? sizeof(uint32_t) : sizeof(uint16_t);
+        if (count > 0)
+            glDrawElementsInstanced(ToGLenum(m_shape), count, m_indexBuffer.m_componentType,
+                                    reinterpret_cast<const void*>(size_t(firstIndex) * componentSize), m_instanceCount);
+    }
     else
         glDrawArraysInstanced(ToGLenum(m_shape), 0, m_dataBuffers[0]->m_itemCount, m_instanceCount); // draw non indexed arrays
 #endif

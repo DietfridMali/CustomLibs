@@ -338,6 +338,9 @@ public:
 
     virtual bool Render(std::span<Texture* const> textures = {}, float alpha = 1.0);
 
+    // Draws only part of the index buffer - see GfxDataLayout::Render (). indexCount 0 = to the end.
+    bool RenderRange(uint32_t firstIndex, uint32_t indexCount, std::span<Texture* const> textures = {});
+
     inline bool Render(Texture* texture = nullptr, float alpha = 1.0) {
         return Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{}, alpha);
     }

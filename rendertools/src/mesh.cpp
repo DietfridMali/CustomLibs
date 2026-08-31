@@ -260,6 +260,15 @@ bool Mesh::Render(std::span<Texture* const> textures, float alpha) {
     return true;
 }
 
+
+bool Mesh::RenderRange(uint32_t firstIndex, uint32_t indexCount, std::span<Texture* const> textures) {
+    ZoneScoped;
+    if ((m_gfxDataLayout == nullptr) or not m_gfxDataLayout->IsValid())
+        return false;
+    m_gfxDataLayout->Render(textures, firstIndex, indexCount);
+    return true;
+}
+
 void Mesh::Destroy(void)
 noexcept(
  noexcept(m_vertices.Destroy()) &&

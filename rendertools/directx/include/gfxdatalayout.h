@@ -158,7 +158,11 @@ public:
 
     void UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;
 
-    void Render(std::span<Texture* const> textures = {}) noexcept;
+    // Draws a RANGE of the index buffer instead of all of it: firstIndex is where to start, indexCount
+    // how many indices to draw, and 0 means "to the end". A consumer that keeps several batches in one
+    // mesh - a model whose faces are grouped by texture, say - would otherwise need a mesh per batch,
+    // which is a state change and a buffer each.
+    void Render(std::span<Texture* const> textures = {}, uint32_t firstIndex = 0, uint32_t indexCount = 0) noexcept;
 
     inline void Render(Texture* texture) {
         Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{});

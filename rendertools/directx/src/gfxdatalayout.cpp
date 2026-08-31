@@ -236,7 +236,7 @@ bool GfxDataLayout::FinishUpdate(void) noexcept {
 }
 
 
-void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
+void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstIndex, uint32_t indexCount) noexcept
 {
 #if 0 //def _DEBUG
     fprintf(stderr, "GfxDataLayout::Render on list %p, indexCount=%u, vertCount=%u\n",
@@ -262,8 +262,11 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
     {
         ZoneScopedN("Layout::DrawCall");
         if (commandListHandler.CurrentGfxList()) {
-            if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
-                commandListHandler.DrawIndexedInstanced(UINT(m_indexBuffer.m_itemCount), m_instanceCount, 0, 0, 0);
+            if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
+                UINT count = (indexCount > 0) ? UINT(indexCount) : UINT(m_indexBuffer.m_itemCount) - UINT(firstIndex);
+                if (count > 0)
+                    commandListHandler.DrawIndexedInstanced(count, m_instanceCount, UINT(firstIndex), 0, 0);
+            }
             else {
                 // Non-indexed: sum up vertex count from first GfxDataBuffer
                 UINT vertCount = 0;

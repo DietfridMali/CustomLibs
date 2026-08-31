@@ -260,7 +260,7 @@ bool GfxDataLayout::ActivateTextures(std::span<Texture* const> textures) noexcep
 }
 
 
-void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
+void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstIndex, uint32_t indexCount) noexcept
 {
     if (not StartRender())
         return;
@@ -274,8 +274,11 @@ void GfxDataLayout::Render(std::span<Texture* const> textures) noexcept
         shader->UpdateVariables();
     //gfxStates.CheckError();
     if (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE) {
-        if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0))
-            commandListHandler.DrawIndexedInstanced(uint32_t(m_indexBuffer.m_itemCount), m_instanceCount, 0, 0, 0);
+        if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
+            uint32_t count = (indexCount > 0) ? uint32_t(indexCount) : uint32_t(m_indexBuffer.m_itemCount) - uint32_t(firstIndex);
+            if (count > 0)
+                commandListHandler.DrawIndexedInstanced(count, m_instanceCount, uint32_t(firstIndex), 0, 0);
+        }
         else {
             uint32_t vertCount = 0;
             if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
