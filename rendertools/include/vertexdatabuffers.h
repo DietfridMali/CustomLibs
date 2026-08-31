@@ -329,6 +329,19 @@ class IndexBuffer
         : VertexDataBuffer(componentCount, listSegmentSize)
     { }
 
+    using VertexDataBuffer <AutoArray<uint32_t>, uint32_t>::Append;
+
+    // A single index cannot go into the app data: that holds one TUPLE of m_componentCount indices per
+    // primitive, and AutoArray's non explicit size constructor would silently turn a lone index into a
+    // tuple of that LENGTH - garbage that Setup () then reads past the end of its buffer. So put it
+    // straight into the gfx data, where Setup () leaves it alone as long as there is no app data.
+    inline bool Append(uint32_t index) {
+        if (not m_gfxData.Push(index))
+            return false;
+        m_isDirty = true;
+        return true;
+    }
+
     // Create a densely packed array from the vertex data
     virtual AutoArray<uint32_t>& Setup(void) {
         if (HaveAppData()) {
