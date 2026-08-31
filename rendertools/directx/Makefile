@@ -16,6 +16,7 @@ FILES := \
  base_texture_shaders \
  billboard \
  blur_shader \
+ tonemap_shader \
  lightning_shader \
  cube \
  cubemap \

@@ -225,7 +225,10 @@ public:
 
     void Draw3DScene(bool flipVertically);
 
-    virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically);
+    // shader: what to draw the quad with. nullptr takes the plain texture shader, which is what a
+    // straight composite wants; a caller that has to process the frame on its way to the screen -
+    // tone mapping an HDR target, say - passes its own.
+    virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader = nullptr);
 
 #pragma warning(push)
 #pragma warning(disable:4100)

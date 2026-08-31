@@ -30,6 +30,7 @@ const ShaderSource& TintAndBlurShader();
 const ShaderSource& OutlineShader();
 const ShaderSource& BevelShader();
 const ShaderSource& BoxBlurShader();
+const ShaderSource& ToneMapShader();
 const ShaderSource& FxaaShader();
 const ShaderSource& GaussBlurShader();
 const ShaderSource& LightningDrawShader();
@@ -62,6 +63,7 @@ BaseShaderCode::BaseShaderCode() {
         &OutlineShader(),
         &BevelShader(),
         &BoxBlurShader(),
+        &ToneMapShader(),
         &FxaaShader(),
         &GaussBlurShader(),
         &LightningDrawShader(),

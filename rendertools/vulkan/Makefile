@@ -26,6 +26,7 @@ VULKAN_FILES := \
  base_shadercode \
  base_texture_shaders \
  blur_shader \
+ tonemap_shader \
  lightning_shader \
  cbv_allocator \
  commandlist \

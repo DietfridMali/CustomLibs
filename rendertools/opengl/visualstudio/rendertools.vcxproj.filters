@@ -275,6 +275,9 @@
     <ClCompile Include="..\src\base_shadercode.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\tonemap_shader.cpp">
+      <Filter>Source Files\Shader</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\blur_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>

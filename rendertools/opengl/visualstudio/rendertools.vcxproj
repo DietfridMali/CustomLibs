@@ -195,6 +195,7 @@
     <ClCompile Include="..\src\compute_shader.cpp" />
     <ClCompile Include="..\..\src\billboard.cpp" />
     <ClCompile Include="..\src\blur_shader.cpp" />
+    <ClCompile Include="..\src\tonemap_shader.cpp" />
     <ClCompile Include="..\src\lightning_shader.cpp" />
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />

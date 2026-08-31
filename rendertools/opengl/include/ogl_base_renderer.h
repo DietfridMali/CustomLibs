@@ -182,7 +182,7 @@ public:
         return m_sceneViewport;
     }
 
-    virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically);
+    virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader = nullptr);
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically);
 

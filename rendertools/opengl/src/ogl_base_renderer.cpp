@@ -283,7 +283,7 @@ void BaseRenderer::Draw3DScene(void) {
 }
 
 
-void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically) {
+void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader) {
 #if 0
     Translate(0.5, 0.5, 0);
     if (bRotate)
@@ -294,7 +294,7 @@ void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRot
     m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = (bRotate ? 90.0f : 0.0f) });
 #endif
 #if 1
-    m_renderQuad.Render(nullptr, texture, color); // bFlipVertically);
+    m_renderQuad.Render(shader, texture, color);
 #else
     m_renderQuad.Fill(color); // bFlipVertically);
 #endif

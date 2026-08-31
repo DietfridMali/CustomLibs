@@ -23,11 +23,7 @@
 // stderr. Yardstick from high-speed camera statistics: >70% of the step deflections lie below 30 deg,
 // lognormal shape (many small kinks, rare big outliers). Tune waveRatio/gain until the print matches.
 // Purely diagnostic -- no visual change. 0 = off.
-#ifdef _DEBUG
-#   define TORTUOSITY 1
-#else
-#   define TORTUOSITY 0
-#endif
+#define TORTUOSITY 0
 #if TORTUOSITY
 #   include <cstdio>
 #endif
