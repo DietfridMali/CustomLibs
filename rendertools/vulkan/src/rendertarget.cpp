@@ -3,21 +3,22 @@
 #include "rendertarget.h"
 #include "vkcontext.h"
 #include "image_layout_tracker.h"
+#include "vkupload.h"	// CreateReadbackBuffer / one-shot command buffer for ReadBuffer ()
 #include "resource_handler.h"
 
 #include <algorithm>
 #include <cstdio>
 
 // =================================================================================================
-// Vulkan RenderTarget implementation — Phase B (resource setup)
+// Vulkan RenderTarget implementation - Phase B (resource setup)
 //
 // What is functional in this Phase B pass:
-//   • BufferInfo (Init / SetState / Release) ported to VkImage + VkImageView +
+//   - BufferInfo (Init / SetState / Release) ported to VkImage + VkImageView +
 //     VmaAllocation + ImageLayoutTracker.
-//   • RenderTarget::Init / Destroy / Create.
-//   • CreateBuffer / CreateColorBuffer / CreateDepthBuffer / CreateSRV (= vkCreateImageView).
-//   • CreateRenderArea (BaseQuad setup, API-neutral).
-//   • BufferHandle (logical id accessor, API-neutral).
+//   - RenderTarget::Init / Destroy / Create.
+//   - CreateBuffer / CreateColorBuffer / CreateDepthBuffer / CreateSRV (= vkCreateImageView).
+//   - CreateRenderArea (BaseQuad setup, API-neutral).
+//   - BufferHandle (logical id accessor, API-neutral).
 //
 // Rendering / activation / clearing / binding methods (Activate / Enable / Disable / Deactivate /
 // Render / RenderAsTexture / AutoRender / Fill / Clear / ClearColorBuffers / ClearDepthBuffer /
@@ -80,7 +81,8 @@ static VkImageAspectFlags AspectForType(BufferInfo::eBufferType type)
 
 
 static bool CreateRTImage(int w, int h, VkFormat format, VkImageUsageFlags usage,
-                          VkImage& outImage, VmaAllocation& outAllocation) noexcept
+                          VkImage& outImage, VmaAllocation& outAllocation,
+                          int arrayLayers = 1, bool cubeCompatible = false) noexcept
 {
     VmaAllocator allocator = vkContext.Allocator();
     if (allocator == VK_NULL_HANDLE)
@@ -94,7 +96,11 @@ static bool CreateRTImage(int w, int h, VkFormat format, VkImageUsageFlags usage
     info.extent.height = uint32_t(h);
     info.extent.depth = 1;
     info.mipLevels = 1;
-    info.arrayLayers = 1;
+    // Six for a cube map, one for everything else. CUBE_COMPATIBLE is what allows a
+    // VK_IMAGE_VIEW_TYPE_CUBE view over those six layers later on.
+    info.arrayLayers = uint32_t(arrayLayers);
+    if (cubeCompatible)
+        info.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
     info.usage = usage;
@@ -121,6 +127,8 @@ void BufferInfo::Init(void)
     m_allocation = VK_NULL_HANDLE;
     m_imageView = VK_NULL_HANDLE;
     m_depthSampleView = VK_NULL_HANDLE;
+    for (int face = 0; face < 6; ++face)
+        m_cubeView[face] = VK_NULL_HANDLE;
     m_layoutTracker = ImageLayoutTracker { };
     m_srvIndex = UINT32_MAX;
     m_type = btColor;
@@ -153,7 +161,7 @@ void BufferInfo::Release(void)
     VkDevice device = vkContext.Device();
     VmaAllocator allocator = vkContext.Allocator();
 
-    // Defer GPU-resource teardown by one frame slot — in-flight command buffers may still
+    // Defer GPU-resource teardown by one frame slot - in-flight command buffers may still
     // reference the image/view. Same pattern as Texture::Destroy(m_isDisposable). Safe in the
     // app-shutdown path as long as gfxResourceHandler.Cleanup() processes both frame slots
     // before the handler itself is torn down.
@@ -163,6 +171,19 @@ void BufferInfo::Release(void)
             vkDestroyImageView(device, view, nullptr);
         });
         m_imageView = VK_NULL_HANDLE;
+    }
+    // The six per face views of a cube map buffer. m_imageView above is the cube view over all layers
+    // and is a separate object, so both have to go.
+    for (int face = 0; face < 6; ++face) {
+        if ((m_cubeView[face] == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
+            continue;
+
+        VkImageView view = m_cubeView[face];
+
+        gfxResourceHandler.TrackCleanup([device, view]() {
+            vkDestroyImageView(device, view, nullptr);
+        });
+        m_cubeView[face] = VK_NULL_HANDLE;
     }
     if ((m_depthSampleView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
         VkImageView view = m_depthSampleView;
@@ -262,7 +283,7 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
     if (not CreateSRV(info, fmt, attachmentAspect))
         return;
 
-    // Sampling view: depth aspect only — for use as a sampled texture (sampler2DShadow / shadow map).
+    // Sampling view: depth aspect only - for use as a sampled texture (sampler2DShadow / shadow map).
     VkDevice device = vkContext.Device();
     VkImageViewCreateInfo vci { };
     vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -292,6 +313,74 @@ void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 }
 
 
+// One image with six layers: six single layer views to render into, one cube view to sample with.
+//
+// An attachment addresses exactly one layer, so rendering the six faces needs six views; sampling by
+// direction needs a VK_IMAGE_VIEW_TYPE_CUBE view over all six. Both come off the same image.
+
+void RenderTarget::CreateCubemapBuffer(BufferInfo& info, int edge)
+{
+    VkDevice device = vkContext.Device();
+
+    info.m_colorFormat = m_cubeMapFormat;
+    // Square by definition, so the edge length serves for both dimensions.
+    if (not CreateRTImage(edge, edge, m_cubeMapFormat, UsageForType(BufferInfo::btColor),
+                          info.m_image, info.m_allocation, 6, true))
+        return;
+    info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    for (int face = 0; face < 6; ++face) {
+        VkImageViewCreateInfo vci { };
+
+        vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vci.image = info.m_image;
+        vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        vci.format = m_cubeMapFormat;
+        vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        vci.subresourceRange.levelCount = 1;
+        vci.subresourceRange.baseArrayLayer = uint32_t(face);
+        vci.subresourceRange.layerCount = 1;
+        if (vkCreateImageView(device, &vci, nullptr, &info.m_cubeView[face]) != VK_SUCCESS) {
+            fprintf(stderr, "RenderTarget::CreateCubemapBuffer: vkCreateImageView failed for face %d\n", face);
+            return;
+        }
+    }
+
+    VkImageViewCreateInfo cubeView { };
+
+    cubeView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    cubeView.image = info.m_image;
+    cubeView.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    cubeView.format = m_cubeMapFormat;
+    cubeView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    cubeView.subresourceRange.levelCount = 1;
+    cubeView.subresourceRange.baseArrayLayer = 0;
+    cubeView.subresourceRange.layerCount = 6;
+    if (vkCreateImageView(device, &cubeView, nullptr, &info.m_imageView) != VK_SUCCESS)
+        fprintf(stderr, "RenderTarget::CreateCubemapBuffer: cube view creation failed\n");
+}
+
+
+// One face of a cube map buffer as the current attachment. The target has to be active; this only
+// swaps which of the six layer views is attached, so everything downstream is unaffected. Six of these
+// with a draw in between capture the surroundings of a point.
+
+bool RenderTarget::SelectCubeFace(int face, int bufferIndex)
+{
+    if ((m_cubeMapCount <= 0) or (face < 0) or (face > 5))
+        return false;
+
+    int index = (bufferIndex < 0) ? m_cubeMapIndex : bufferIndex;
+
+    if ((index < 0) or (index >= m_bufferCount) or (m_bufferInfo[index].m_type != BufferInfo::btCubemap))
+        return false;
+    if (m_bufferInfo[index].m_cubeView[face] == VK_NULL_HANDLE)
+        return false;
+    m_cubeFace = face;
+    return true;
+}
+
+
 void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType)
 {
     BufferInfo& info = m_bufferInfo[bufferIndex];
@@ -304,6 +393,10 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
 
     if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil))
         CreateDepthBuffer(info, w, h);
+    else if (bufferType == BufferInfo::btCubemap)
+        // Edge length is the WIDTH - a cube map is square, and taking the height as well would quietly
+        // produce something that is not a cube.
+        CreateCubemapBuffer(info, w);
     else
         CreateColorBuffer(info, w, h);
     ++m_bufferCount;
@@ -334,11 +427,12 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
+    m_cubeMapFormat = params.cubeMapFormat;
     // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
     // for stencil without depth still yields one combined buffer.
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
-    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount);
+    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.cubeMapCount);
     // Compute ping-pong (>=2 compute buffers) qualifies for the pingPong flag as well.
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
@@ -362,6 +456,13 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
         ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount)
         : -1;
     m_computeBufferCount = params.skyMapCount;
+    // Cube maps last, for the same reason as the compute buffers: everything that walks the colour
+    // buffers assumes they sit contiguously from index 0.
+    m_cubeMapIndex = (params.cubeMapCount > 0)
+        ? CreateSpecialBuffers(BufferInfo::btCubemap, attachmentIndex, params.cubeMapCount)
+        : -1;
+    m_cubeMapCount = params.cubeMapCount;
+    m_cubeFace = 0;
 
     int w = width * scale;
     int h = height * scale;
@@ -448,7 +549,7 @@ VkClearValue MakeClearDepth(float depth) {
 }  // anonymous
 
 // -------------------------------------------------------------------------------------------------
-// BeginRendering / EndRendering — manage the vkCmdBeginRendering scope for this RT.
+// BeginRendering / EndRendering - manage the vkCmdBeginRendering scope for this RT.
 
 void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
 {
@@ -515,7 +616,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
             colors[colorCount++] = a;
         }
     }
-    else {  // dbColor — color only
+    else {  // dbColor - color only
         for (int i = 0; i < m_colorBufferCount; ++i)
             ConfigColor(i);
     }
@@ -757,7 +858,7 @@ bool RenderTarget::Enable(const RTActivationParams& params)
     // Layout transitions in EnableBuffers must happen outside any active vkCmdBeginRendering
     // scope (Vulkan forbids vkCmdPipelineBarrier2 with image-memory barriers inside a render
     // pass instance). On re-activate of an already-active RT (e.g. ping-pong in
-    // TextEffects::AntiAlias) m_isInRendering is still true from the previous BeginRendering —
+    // TextEffects::AntiAlias) m_isInRendering is still true from the previous BeginRendering -
     // close it first, run the transitions, then re-open with the new attachment layout.
     if (m_isInRendering)
         EndRendering();
@@ -802,7 +903,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     }
     // Activate/Deactivate are a balanced viewport push/pop pair: Activate pushes the caller's
     // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
-    // has no Deactivate of its own, so it must not push or set a viewport — the caller's
+    // has no Deactivate of its own, so it must not push or set a viewport - the caller's
     // viewport is restored by the PopViewport immediately following in Deactivate().
     SetViewport(true);
     m_wasActivated = true;
@@ -1020,7 +1121,7 @@ void RenderTarget::ClearStencilBuffer(void)
 }
 
 // -------------------------------------------------------------------------------------------------
-// BindBuffer — bind RT color buffer as shader sampling source.
+// BindBuffer - bind RT color buffer as shader sampling source.
 
 bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
 {
@@ -1055,7 +1156,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
 // GetAsTexture* hand a RenderTarget's color / depth buffer over to the shader-input side
 // of the pipeline. The buffer was last written as a color or depth attachment, so the image
 // is in COLOR_ATTACHMENT_OPTIMAL / DEPTH_STENCIL_ATTACHMENT_OPTIMAL. Vulkan requires a layout
-// transition to SHADER_READ_ONLY_OPTIMAL before the image can be sampled — emit it here on
+// transition to SHADER_READ_ONLY_OPTIMAL before the image can be sampled - emit it here on
 // the active CommandBuffer so the caller (Texture::Bind + vkCmdDraw) sees a sample-ready
 // image. ToShaderInput is a no-op when the tracker already records SHADER_READ_ONLY_OPTIMAL.
 
@@ -1131,7 +1232,7 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
 }
 
 // -------------------------------------------------------------------------------------------------
-// UpdateTransformation / RenderAsTexture / Render / AutoRender — API-neutral, 1:1 from DX12.
+// UpdateTransformation / RenderAsTexture / Render / AutoRender - API-neutral, 1:1 from DX12.
 
 bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 {
@@ -1230,13 +1331,178 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
                     : VK_FORMAT_UNDEFINED;
             }
             break;
-        default: // dbColor — color only
+        default: // dbColor - color only
             for (int i = 0; i < m_colorBufferCount; ++i)
                 key.colorFormats[key.colorFormatCount++] = m_colorFormat;
             break;
     }
     if (HaveActiveDepthBuffer())
         key.depthFormat = DepthFormat();
+}
+
+// =================================================================================================
+// Reading a colour buffer back to the CPU.
+//
+// Like D3D12, Vulkan cannot map a device-local image: the texels go through a host visible buffer
+// first, filled by a GPU copy. The copy is recorded into a one-shot command buffer that is submitted
+// and waited on right here - which is why this must not be called while a frame is being recorded.
+//
+// vkCmdCopyImageToBuffer writes TIGHTLY PACKED rows (bufferRowLength = 0), so unlike the D3D12 path
+// there is no row padding to undo and the destination can be filled with one memcpy.
+
+static size_t ColorFormatBytes(VkFormat format) {
+    switch (format) {
+        case VK_FORMAT_R8G8B8A8_UNORM:
+            return 4;
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            return 8;
+        case VK_FORMAT_R32G32B32A32_SFLOAT:
+            return 16;
+        case VK_FORMAT_R16_SFLOAT:
+            return 2;
+        case VK_FORMAT_R32_SFLOAT:
+            return 4;
+        case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
+            return 4;
+        default:
+            return 0;
+    }
+}
+
+
+size_t RenderTarget::BufferSize(int bufferIndex) {
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return 0;
+
+    size_t texelBytes = ColorFormatBytes(m_colorFormat);
+
+    return texelBytes ? size_t(GetWidth(true)) * size_t(GetHeight(true)) * texelBytes : 0;
+}
+
+
+bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) {
+    if (not (buffer and m_isAvailable))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+
+    if (info.m_image == VK_NULL_HANDLE)
+        return false;
+
+    size_t needed = BufferSize(bufferIndex);
+
+    if ((needed == 0) or (bufferSize < needed))
+        return false;
+
+    VkStagingBuffer readback;
+
+    if (not CreateReadbackBuffer(VkDeviceSize(needed), readback))
+        return false;
+
+    OneShotCommandBuffer cmd;
+
+    if (not BeginSingleTimeCommands(cmd)) {
+        readback.Destroy();
+        return false;
+    }
+
+    VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
+
+    info.m_layoutTracker.ToTransferSrc(cmd.cb);
+
+    VkBufferImageCopy copy { };
+
+    copy.bufferOffset = 0;
+    copy.bufferRowLength = 0;       // tightly packed, like the upload path
+    copy.bufferImageHeight = 0;
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy.imageSubresource.mipLevel = 0;
+    copy.imageSubresource.baseArrayLayer = 0;
+    copy.imageSubresource.layerCount = 1;
+    copy.imageOffset = { 0, 0, 0 };
+    copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };
+
+    vkCmdCopyImageToBuffer(cmd.cb, info.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           readback.buffer, 1, &copy);
+    // Back to the layout the caller left it in - the next pass expects to find it there.
+    if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
+        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore);
+    if (not EndSingleTimeCommands(cmd)) {
+        readback.Destroy();
+        return false;
+    }
+    if (readback.mapped == nullptr) {
+        readback.Destroy();
+        return false;
+    }
+    // Host visible and coherent through VMA's AUTO mapping, so what the copy wrote is visible here.
+    memcpy(buffer, readback.mapped, needed);
+    readback.Destroy();
+    return true;
+}
+
+// =================================================================================================
+
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize) {
+    if (not (data and m_isAvailable))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+
+    if (info.m_image == VK_NULL_HANDLE)
+        return false;
+
+    size_t needed = BufferSize(bufferIndex);
+
+    if ((needed == 0) or (dataSize < needed))
+        return false;
+
+    VkStagingBuffer staging;
+
+    if (not CreateStagingBuffer(VkDeviceSize(needed), staging))
+        return false;
+    if (staging.mapped == nullptr) {
+        staging.Destroy();
+        return false;
+    }
+    memcpy(staging.mapped, data, needed);
+
+    OneShotCommandBuffer cmd;
+
+    if (not BeginSingleTimeCommands(cmd)) {
+        staging.Destroy();
+        return false;
+    }
+
+    VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
+
+    info.m_layoutTracker.ToTransferDst(cmd.cb);
+
+    VkBufferImageCopy copy { };
+
+    copy.bufferOffset = 0;
+    copy.bufferRowLength = 0;       // tightly packed
+    copy.bufferImageHeight = 0;
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy.imageSubresource.mipLevel = 0;
+    copy.imageSubresource.baseArrayLayer = 0;
+    copy.imageSubresource.layerCount = 1;
+    copy.imageOffset = { 0, 0, 0 };
+    copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };
+
+    vkCmdCopyBufferToImage(cmd.cb, staging.buffer, info.m_image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
+        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore);
+
+    bool ok = EndSingleTimeCommands(cmd);
+
+    staging.Destroy();
+    return ok;
 }
 
 // =================================================================================================

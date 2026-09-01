@@ -5,20 +5,27 @@
 
 // =================================================================================================
 
-BaseQuadMesh TextureAtlas::renderQuad;
+BaseQuadMesh BaseTextureAtlas::renderQuad;
 
-TextureAtlas::TextureAtlas()
-	: m_atlas(nullptr)
-	, m_size(0)
-	, m_glyphSize(0)
-	, m_scale(Vector2f::ONE)
-{
+void BaseTextureAtlas::Initialize(void) {
+	renderQuad.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voZero], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular], true);
+	renderQuad.SetTransformations({ .centerOrigin = false, .autoClear = false });
 }
 
 
-void TextureAtlas::Initialize(void) {
-	renderQuad.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voZero], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular], true);
-	renderQuad.SetTransformations({ .centerOrigin = false, .autoClear = false });
+bool BaseTextureAtlas::Render(Shader* shader) {
+	if (not (m_atlas and shader))
+		return false;
+	m_atlas->Render({ .clearBuffer = false, .centerOrigin = true, .shader = shader });
+	return true;
+}
+
+
+TextureAtlas::TextureAtlas()
+	: m_size(0)
+	, m_glyphSize(0)
+	, m_scale(Vector2f::ONE)
+{
 }
 
 // condition: all glyphs must fit into glyphWidth, glyphHeight - that's the grid they will be rendered into
@@ -47,14 +54,6 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 	renderTexture->Validate();
 	renderTexture->SetParams(true);
 #endif
-	return true;
-}
-
-
-bool TextureAtlas::Render(Shader* shader) {
-	if (not (m_atlas and shader))
-		return false;
-	m_atlas->Render({ .clearBuffer = false, .centerOrigin = true, .shader = shader });
 	return true;
 }
 

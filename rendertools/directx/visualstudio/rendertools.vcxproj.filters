@@ -124,6 +124,9 @@
     <ClInclude Include="..\..\include\textureatlas.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\variabletextureatlas.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\texturehandler.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
@@ -306,6 +309,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\textureatlas.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\variabletextureatlas.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\textureprocessing.cpp">

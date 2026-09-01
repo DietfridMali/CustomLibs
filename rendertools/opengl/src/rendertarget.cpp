@@ -1,4 +1,4 @@
-﻿#include "glew.h"
+#include "glew.h"
 #include "conversions.hpp"
 #include "rendertarget.h"
 #include "gfxrenderer.h"
@@ -62,6 +62,27 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
+    if (bufferType == BufferInfo::btCubemap) {
+        // Six faces of one resource. The edge length is the target's WIDTH - a cube map is square by
+        // definition, and taking the height as well would silently produce something that is not a cube.
+        // Nearest filtering and clamp: a shadow cube map is compared, not interpolated, and filtering
+        // across a face seam would compare against a blend of two directions.
+        gfxStates.BindCubemap(bufferInfo.m_handle, 0);
+        for (int face = 0; face < 6; ++face)
+            glTexImage2D(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face), 0, GLint(m_cubeMapFormat),
+                         m_width * m_scale, m_width * m_scale, 0, GL_RED, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, 0);
+        gfxStates.BindCubemap(0, 0);
+        gfxStates.CheckError();
+        ++m_bufferCount;
+        return;
+    }
     gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
     if (bufferType == BufferInfo::btSkyMap) {
         // RGBA16F image for compute output. Linear sampling so the composit-PS can read it
@@ -132,7 +153,9 @@ bool RenderTarget::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (not bufferInfo.m_isAttached or (bufferInfo.m_boundAttachment == GL_NONE))
         return true;
-    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_boundAttachment, GL_TEXTURE_2D, 0, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_boundAttachment,
+                           (bufferInfo.m_type == BufferInfo::btCubemap)
+                           ? GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_cubeFace) : GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
     bufferInfo.m_boundAttachment = GL_NONE;
     return true;
@@ -152,8 +175,15 @@ bool RenderTarget::AttachBuffer(int bufferIndex, int attachment) {
     if (bufferInfo.m_isAttached)
         return true;
 #endif
+    if (bufferInfo.m_type == BufferInfo::btCubemap) {
+        gfxStates.ReleaseTexture(GL_TEXTURE_CUBE_MAP, bufferInfo.m_handle);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (point),
+                               GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_cubeFace), bufferInfo.m_handle, 0);
+    }
+    else {
     gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (point), GL_TEXTURE_2D, bufferInfo.m_handle, 0);
+    }
     bufferInfo.m_boundAttachment = point;
 #ifdef _DEBUG
     return bufferInfo.m_isAttached = gfxStates.CheckError();
@@ -202,6 +232,35 @@ bool RenderTarget::AttachBuffers(bool hasMRTs) {
 }
 
 
+// One face of a cube map buffer as the current draw target. The target has to be active - this only
+// re-points the attachment, it does not bind the framebuffer.
+//
+// Six of these with a draw in between capture the surroundings of a point in every direction. Nothing
+// else about the target changes, which is why this is a call of its own rather than a full Activate:
+// re-activating six times would re-select draw buffers and depth state that have not changed.
+
+bool RenderTarget::SelectCubeFace(int face, int bufferIndex) {
+    if ((m_cubeMapCount <= 0) or (face < 0) or (face > 5))
+        return false;
+    int index = (bufferIndex < 0) ? m_cubeMapIndex : bufferIndex;
+    if ((index < 0) or (index >= m_bufferCount) or (m_bufferInfo[index].m_type != BufferInfo::btCubemap))
+        return false;
+    if ((m_cubeFace == face) and m_bufferInfo[index].m_isAttached)
+        return true;
+    // The point the buffer currently sits on has to be kept: dbSingle moves a colour target onto
+    // COLOR_ATTACHMENT0, and re-attaching to its own m_attachment instead would take the face off the
+    // slot the draw buffer list names.
+    int point = m_bufferInfo[index].m_isAttached ? m_bufferInfo[index].m_boundAttachment
+                                                 : m_bufferInfo[index].m_attachment;
+
+    m_cubeFace = face;
+    // AttachBuffer reads m_cubeFace, so the detach has to happen first - it would otherwise leave the
+    // previous face on the attachment point and re-attach onto itself.
+    DetachBuffer(index);
+    return AttachBuffer(index, point);
+}
+
+
 void RenderTarget::CreateRenderArea(void) {
     m_viewportArea.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular]);
     m_viewport = Viewport(0, 0, m_width * m_scale, m_height * m_scale);
@@ -219,12 +278,13 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_bufferCount = 0;
     m_colorFormat = params.colorFormat;
+    m_cubeMapFormat = params.cubeMapFormat;
     m_isScreenBuffer = params.isScreenBuffer;
     // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
     // for stencil without depth still yields one combined buffer.
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
-    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.skyMapCount);
+    m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.skyMapCount + params.cubeMapCount);
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
@@ -241,10 +301,15 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
     m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
     m_computeBufferCount = params.skyMapCount;
+    // Cube maps last, for the same reason as the compute buffers: everything that walks the colour
+    // buffers assumes they sit contiguously from index 0.
+    m_cubeMapIndex = (params.cubeMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btCubemap, attachmentIndex, params.cubeMapCount) : -1;
+    m_cubeMapCount = params.cubeMapCount;
+    m_cubeFace = 0;
     CreateRenderArea();
     // Sky-map-only RTs (compute write target, no FBO attachments) skip AttachBuffers because
-    // glCheckFramebufferStatus would return INCOMPLETE_MISSING_ATTACHMENT — the FBO is unused.
-    bool hasFboAttachments = (params.colorBufferCount > 0) || (depthBufferCount > 0) || (params.vertexBufferCount > 0);
+    // glCheckFramebufferStatus would return INCOMPLETE_MISSING_ATTACHMENT - the FBO is unused.
+    bool hasFboAttachments = (params.colorBufferCount > 0) || (depthBufferCount > 0) || (params.vertexBufferCount > 0) || (params.cubeMapCount > 0);
     if (hasFboAttachments) {
         if (not AttachBuffers(params.hasMRTs))
             return false;
@@ -312,7 +377,11 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params) {
         // NONE, so naming COLOR_ATTACHMENT2 in slot 0 is an INVALID_OPERATION, and naming it in slot 2
         // routes fragment output 2 - which a single output shader (layout (location = 0)) never writes.
         // The only way to put buffer k on output 0 is to attach its texture to COLOR_ATTACHMENT0.
-        if (m_bufferInfo[params.bufferIndex].m_type == BufferInfo::btColor) {
+        // A cube map face is a colour target like any other and takes the same route: it has to sit on
+        // COLOR_ATTACHMENT0 to be reachable from fragment output 0. AttachBuffer () picks the face that
+        // SelectCubeFace () last chose.
+        if ((m_bufferInfo[params.bufferIndex].m_type == BufferInfo::btColor) or
+            (m_bufferInfo[params.bufferIndex].m_type == BufferInfo::btCubemap)) {
             AttachBuffer(params.bufferIndex, int (GL_COLOR_ATTACHMENT0));
             m_drawBuffers[0] = GL_COLOR_ATTACHMENT0;
         }
@@ -556,7 +625,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     baseRenderer.ActivateDrawBuffer(this);
     // Activate/Deactivate are a balanced viewport push/pop pair: Activate pushes the caller's
     // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
-    // has no Deactivate of its own, so it must not push or set a viewport — the caller's
+    // has no Deactivate of its own, so it must not push or set a viewport - the caller's
     // viewport is restored by the PopViewport immediately following in Deactivate().
     if (not (m_wasActivated or params.reactivate))
         baseRenderer.PushViewport(loc);
@@ -603,7 +672,10 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
     for (int i = 0; i < m_bufferCount; ++i)
         if ((i != bufferIndex) and (m_bufferInfo[i].m_tmuIndex == tmuIndex))
             m_bufferInfo[i].m_tmuIndex = -1;
-    gfxStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, tmuIndex);
+    // A cube map is sampled by direction, so it has to go on the cube map target - binding it as 2D
+    // would leave the sampler reading nothing.
+    gfxStates.BindTexture((m_bufferInfo[bufferIndex].m_type == BufferInfo::btCubemap) ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D,
+                          m_bufferInfo[bufferIndex].m_handle, tmuIndex);
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
     return true;
 }
@@ -774,6 +846,106 @@ bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color) 
 
 bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color) {
     return Render({ .source = m_lastDestination, .destination = NextBuffer(m_lastDestination), .clearBuffer = params.clearBuffer, .scale = params.scale, .shader = params.shader }, color);
+}
+
+// =================================================================================================
+// Reading a colour buffer back to the CPU.
+//
+// The external format and type have to match the internal one: glGetTexImage converts, but only
+// between things that fit, and a packed format (R11F_G11F_B10F) has to be read as the packed word it
+// is - one uint32 per texel, not three floats.
+
+static bool ColorReadFormat(GLenum internalFormat, GLenum& format, GLenum& type, size_t& texelBytes) {
+    switch (internalFormat) {
+        case GL_RGBA8:
+            format = GL_RGBA; type = GL_UNSIGNED_BYTE; texelBytes = 4; return true;
+        case GL_RGBA16F:
+            format = GL_RGBA; type = GL_HALF_FLOAT; texelBytes = 8; return true;
+        case GL_RGBA32F:
+            format = GL_RGBA; type = GL_FLOAT; texelBytes = 16; return true;
+        case GL_R16F:
+            format = GL_RED; type = GL_HALF_FLOAT; texelBytes = 2; return true;
+        case GL_R32F:
+            format = GL_RED; type = GL_FLOAT; texelBytes = 4; return true;
+        case GL_R11F_G11F_B10F:
+            format = GL_RGB; type = GL_UNSIGNED_INT_10F_11F_11F_REV; texelBytes = 4; return true;
+    }
+    return false;
+}
+
+
+size_t RenderTarget::BufferSize(int bufferIndex) {
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return 0;
+
+    GLenum format, type;
+    size_t texelBytes;
+
+    if (not ColorReadFormat(m_colorFormat, format, type, texelBytes))
+        return 0;
+    return size_t(GetWidth(true)) * size_t(GetHeight(true)) * texelBytes;
+}
+
+
+bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) {
+    if (not (buffer and m_isAvailable))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+
+    GLenum format, type;
+    size_t texelBytes;
+
+    if (not ColorReadFormat(m_colorFormat, format, type, texelBytes))
+        return false;
+
+    size_t needed = size_t(GetWidth(true)) * size_t(GetHeight(true)) * texelBytes;
+
+    if (bufferSize < needed)
+        return false;
+    gfxStates.ClearError();
+    // Bound past the TMU bookkeeping and put back afterwards: this is a read, not a binding the
+    // renderer is meant to keep - leaving the atlas on a texture unit would outlive the call.
+    int boundTexture = gfxStates.GetBoundTexture(GL_TEXTURE_2D, 0);
+
+    gfxStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, 0);
+    glGetTexImage(GL_TEXTURE_2D, 0, format, type, buffer);
+
+    bool ok = gfxStates.CheckError();
+
+    gfxStates.BindTexture(GL_TEXTURE_2D, GLuint(boundTexture), 0);
+    return ok;
+}
+
+// =================================================================================================
+
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize) {
+    if (not (data and m_isAvailable))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+
+    GLenum format, type;
+    size_t texelBytes;
+
+    if (not ColorReadFormat(m_colorFormat, format, type, texelBytes))
+        return false;
+
+    size_t needed = size_t(GetWidth(true)) * size_t(GetHeight(true)) * texelBytes;
+
+    if (dataSize < needed)
+        return false;
+    gfxStates.ClearError();
+
+    int boundTexture = gfxStates.GetBoundTexture(GL_TEXTURE_2D, 0);
+
+    gfxStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, 0);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, GetWidth(true), GetHeight(true), format, type, data);
+
+    bool ok = gfxStates.CheckError();
+
+    gfxStates.BindTexture(GL_TEXTURE_2D, GLuint(boundTexture), 0);
+    return ok;
 }
 
 // =================================================================================================

@@ -27,6 +27,42 @@ void ResourceView::Free(void) noexcept {
 }
 
 
+bool RTV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int arraySlice) {
+    Handle() = descriptorHeaps.AllocRTV();
+    if (not IsValid())
+        return false;
+    D3D12_RENDER_TARGET_VIEW_DESC rtvd{};
+    rtvd.Format = format;
+    // TEXTURE2DARRAY with a slice count of one - that is what addressing a single face of a cube map
+    // looks like to a render target. D3D12 has no RTV dimension for cube maps.
+    rtvd.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
+    rtvd.Texture2DArray.MipSlice = 0;
+    rtvd.Texture2DArray.FirstArraySlice = UINT(arraySlice);
+    rtvd.Texture2DArray.ArraySize = 1;
+    rtvd.Texture2DArray.PlaneSlice = 0;
+    dx12Context.Device()->CreateRenderTargetView(resource.Get(), &rtvd, CPUHandle());
+    ++rtvCount;
+    return true;
+}
+
+
+bool SRV::CreateCube(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
+{
+    Handle() = descriptorHeaps.AllocSRV();
+    if (not IsValid())
+        return false;
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvd{};
+    srvd.Format = format;
+    srvd.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvd.TextureCube.MostDetailedMip = 0;
+    srvd.TextureCube.MipLevels = 1;
+    srvd.TextureCube.ResourceMinLODClamp = 0.0f;
+    dx12Context.Device()->CreateShaderResourceView(resource.Get(), &srvd, CPUHandle());
+    return true;
+}
+
+
 bool SRV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 {
     Handle() = descriptorHeaps.AllocSRV();
@@ -69,7 +105,7 @@ bool DSV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, D3D12_DSV_
 }
 
 
-// UAV uses the CBV_SRV_UAV heap (descriptorHeaps.AllocSRV) — the heap type is shared.
+// UAV uses the CBV_SRV_UAV heap (descriptorHeaps.AllocSRV) - the heap type is shared.
 bool UAV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
 {
     Handle() = descriptorHeaps.AllocSRV();

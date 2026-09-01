@@ -27,6 +27,9 @@ inline constexpr GLFormat ToGLFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::R32_SFloat:     return { GL_R32F,    GL_RED,  GL_FLOAT };
         case GfxPixelFormat::RGBA16_SFloat:  return { GL_RGBA16F, GL_RGBA, GL_FLOAT };
         case GfxPixelFormat::RGBA32_SFloat:  return { GL_RGBA32F, GL_RGBA, GL_FLOAT };
+        // The upload type is the packed one, not GL_FLOAT: the texel IS one 32 bit word, so a CPU
+        // side buffer holds uint32 per texel and not three floats.
+        case GfxPixelFormat::RG11B10_SFloat: return { GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV };
         // Block-compressed: externalFormat/type are ignored by glCompressedTexImage2D, but the
         // struct needs values — keep the nominal channel layout for documentation.
         case GfxPixelFormat::BC1_UNorm:      return { GL_COMPRESSED_RGB_S3TC_DXT1_EXT, GL_RGB,  GL_UNSIGNED_BYTE };
@@ -35,6 +38,15 @@ inline constexpr GLFormat ToGLFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::BC5_UNorm:      return { GL_COMPRESSED_RG_RGTC2,          GL_RG,   GL_UNSIGNED_BYTE };
     }
     return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+}
+
+
+
+// The same mapping under a name that is spelled identically in all three backends, so that code
+// outside the backend directories (TextureAtlas and friends) can fill RTCreationParams::colorFormat
+// without knowing whether that field is a GLenum, a DXGI_FORMAT or a VkFormat.
+inline constexpr GLenum ToNativeColorFormat(GfxPixelFormat f) noexcept {
+    return ToGLFormat(f).internalFormat;
 }
 
 // =================================================================================================

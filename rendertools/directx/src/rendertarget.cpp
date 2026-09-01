@@ -27,14 +27,16 @@ static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 static constexpr DXGI_FORMAT dxSkyMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 
-static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt, D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal, D3D12_RESOURCE_FLAGS flags) noexcept
+static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt, D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal, D3D12_RESOURCE_FLAGS flags, int arraySize = 1) noexcept
 {
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
     rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     rd.Width = UINT(w);
     rd.Height = UINT(h);
-    rd.DepthOrArraySize = 1;
+    // Six for a cube map, one for everything else. A cube map is a plain texture array as far as the
+    // resource is concerned; what makes it a cube is the SRV that reads it (SRV::CreateCube).
+    rd.DepthOrArraySize = UINT16(arraySize);
     rd.MipLevels = 1;
     rd.Format = fmt;
     rd.SampleDesc.Count = 1;
@@ -54,6 +56,8 @@ void BufferInfo::Init(void)
 {
     m_resource.Reset();
     RTV().Handle() = {};
+    for (int face = 0; face < 6; ++face)
+        m_cubeRtv[face].Handle() = {};
     SRV().Handle() = {};
     DSV().Handle() = {};
     m_dsvReadOnly.Handle() = {};
@@ -148,16 +152,23 @@ void BufferInfo::FreeUAV(void) {
 void BufferInfo::Release(void) {
     // During graphics teardown the descriptor heaps are destroyed wholesale and the
     // gfxResourceHandler singleton may already be gone (RenderTargets die at static
-    // destruction). Skip deferred tracking entirely — Init() drops the resource ref
+    // destruction). Skip deferred tracking entirely - Init() drops the resource ref
     // immediately (GPU is idle) and clears the handles; the heap slots are reclaimed
     // when the descriptor heaps themselves are destroyed.
     if (GfxResourceHandler::IsShuttingDown()) {
         Init();
         return;
     }
-    // All descriptors and the resource go through deferred release — in-flight command lists
+    // All descriptors and the resource go through deferred release - in-flight command lists
     // may still reference them; gfxResourceHandler frees them once the frame fence has signalled.
-    gfxResourceHandler.Track(m_rtv.Handle());
+    // On a cube map buffer m_rtv is an ALIAS of m_cubeRtv[m_cubeFace] (see SelectCubeFace), so tracking
+    // both would hand the same descriptor slot back twice. The six face views are tracked instead.
+    if (m_type == btCubemap) {
+        for (int face = 0; face < 6; ++face)
+            gfxResourceHandler.Track(m_cubeRtv[face].Handle());
+    }
+    else
+        gfxResourceHandler.Track(m_rtv.Handle());
     gfxResourceHandler.Track(m_srv.Handle());
     gfxResourceHandler.Track(m_dsv.Handle());
     gfxResourceHandler.Track(m_dsvReadOnly.Handle());
@@ -220,6 +231,41 @@ bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int
 }
 
 
+bool BufferInfo::AllocCubeViews(void)
+{
+    for (int face = 0; face < 6; ++face)
+        if (not m_cubeRtv[face].Create(m_resource, ViewFormat(), face))
+            return false;
+    // The face selected first is face 0 - RenderTarget::SelectCubeFace () moves m_rtv along afterwards.
+    m_rtv = m_cubeRtv[0];
+    return m_srv.CreateCube(m_resource, ViewFormat());
+}
+
+
+bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, int edge)
+{
+    info.m_colorFormat = m_cubeMapFormat;
+
+    D3D12_CLEAR_VALUE cv{};
+
+    cv.Format = info.ViewFormat();
+    // Square by definition, so the edge length is used for both dimensions, and six slices.
+    info.m_resource = CreateRTResource(device, edge, edge, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv,
+                                       ResourceFlagsForType(info.m_type), 6);
+    if (not info.m_resource)
+        return false;
+    info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    if (not info.AllocCubeViews())
+        return false;
+
+    auto* list = m_cmdList->GfxList();
+
+    if (list)
+        info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    return true;
+}
+
+
 bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
     info.m_colorFormat = m_colorFormat;
@@ -253,10 +299,29 @@ bool RenderTarget::CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, i
         return false;
     if (not info.AllocUAV())
         return false;
-    // RTV for GfxStates::ClearSkyMaps via ClearRenderTargetView (cleaner than ClearUAV —
+    // RTV for GfxStates::ClearSkyMaps via ClearRenderTargetView (cleaner than ClearUAV -
     // the RTV-heap is non-shader-visible by design, no auxiliary heap quirks).
     if (not info.AllocRTV())
         return false;
+    return true;
+}
+
+
+// One face of a cube map buffer as the current render target. The target has to be active; this only
+// swaps which of the six views m_rtv refers to, so everything that binds render targets goes on
+// working unchanged. Six of these with a draw in between capture the surroundings of a point.
+
+bool RenderTarget::SelectCubeFace(int face, int bufferIndex)
+{
+    if ((m_cubeMapCount <= 0) or (face < 0) or (face > 5))
+        return false;
+
+    int index = (bufferIndex < 0) ? m_cubeMapIndex : bufferIndex;
+
+    if ((index < 0) or (index >= m_bufferCount) or (m_bufferInfo[index].m_type != BufferInfo::btCubemap))
+        return false;
+    m_cubeFace = face;
+    m_bufferInfo[index].m_rtv = m_bufferInfo[index].m_cubeRtv[face];
     return true;
 }
 
@@ -278,6 +343,12 @@ bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         }
         else if (bufferType == BufferInfo::btSkyMap) {
             if (not CreateComputeBuffer(device, info, w, h))
+                return false;
+        }
+        else if (bufferType == BufferInfo::btCubemap) {
+            // Edge length is the WIDTH - a cube map is square, and taking the height as well would
+            // quietly produce something that is not a cube.
+            if (not CreateCubemapBuffer(device, info, w))
                 return false;
         }
         else {
@@ -314,11 +385,12 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
+    m_cubeMapFormat = params.cubeMapFormat;
     // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
     // for stencil without depth still yields one combined buffer.
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
-    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount);
+    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.cubeMapCount);
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
 
@@ -341,6 +413,11 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
     m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
     m_computeBufferCount = params.skyMapCount;
+    // Cube maps last, for the same reason as the compute buffers: everything that walks the colour
+    // buffers assumes they sit contiguously from index 0.
+    m_cubeMapIndex = (params.cubeMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btCubemap, attachmentIndex, params.cubeMapCount) : -1;
+    m_cubeMapCount = params.cubeMapCount;
+    m_cubeFace = 0;
 
     if (deferSubmit)
         m_cmdList->Close();
@@ -633,7 +710,7 @@ bool RenderTarget::Activate(const RTActivationParams& params)
     Clear(params);
     // Activate/Deactivate are a balanced viewport push/pop pair: Activate pushes the caller's
     // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
-    // has no Deactivate of its own, so it must not push or set a viewport — the caller's
+    // has no Deactivate of its own, so it must not push or set a viewport - the caller's
     // viewport is restored by the PopViewport immediately following in Deactivate().
     SetViewport();
     m_wasActivated = true;
@@ -664,7 +741,7 @@ void RenderTarget::Disable(bool deactivate) noexcept {
             if (m_depthBufferIndex >= 0)
                 m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
-        // Hand all allocated RTV slots over to GfxResourceHandler — freed once the slot's GPU
+        // Hand all allocated RTV slots over to GfxResourceHandler - freed once the slot's GPU
         // work is fenced complete (at next BeginFrame for the same frame slot, or via Flush()).
         if (deactivate) {
             for (int i = 0; i < m_bufferCount; ++i) {
@@ -764,7 +841,7 @@ void RenderTarget::Clear(const RTActivationParams& params)
         // Clear color AND worldPos/normal MRT (btVertex) buffers, matching Vulkan (loadOp=CLEAR
         // for color+vertex in dbAll) and OGL (glClear over all active draw buffers). Iterating
         // only m_colorBufferCount left the btVertex buffers uncleared, so stale world positions
-        // persisted where moving geometry (e.g. an opening door) vacated pixels — the decal pass
+        // persisted where moving geometry (e.g. an opening door) vacated pixels - the decal pass
         // then mapped those stale positions into its volume and smeared the decal along the motion.
         // Gate on RENDER_TARGET state so only currently-attached draw buffers are cleared
         // (ClearRenderTargetView requires that state).
@@ -969,6 +1046,215 @@ void RenderTarget::CreateRenderArea(void)
 bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color)
 {
     return Render({ .source = m_lastDestination, .destination = NextBuffer(m_lastDestination), .clearBuffer = params.clearBuffer, .scale = params.scale, .shader = params.shader }, color);
+}
+
+// =================================================================================================
+// Reading a colour buffer back to the CPU.
+//
+// D3D12 has no equivalent of glGetTexImage: a texture in the default heap cannot be mapped at all.
+// The texels have to be copied into a READBACK heap buffer first, and that copy runs on the GPU, so
+// the call records a copy, submits it and waits for it to finish before it maps anything.
+//
+// The readback buffer's rows are padded to D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256 bytes), which the
+// caller's tightly packed buffer is not - hence the row by row copy at the end. GetCopyableFootprints
+// works out both pitches, so nothing here has to know the format's byte size.
+
+size_t RenderTarget::BufferSize(int bufferIndex) {
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return 0;
+
+    ID3D12Resource* resource = m_bufferInfo[bufferIndex].m_resource.Get();
+    ID3D12Device* device = dx12Context.Device();
+
+    if (not (resource and device))
+        return 0;
+
+    D3D12_RESOURCE_DESC desc = resource->GetDesc();
+    UINT rowCount = 0;
+    UINT64 rowSize = 0, totalSize = 0;
+
+    device->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, &rowCount, &rowSize, &totalSize);
+    // What the CALLER's packed buffer needs - rowSize is the unpadded row, unlike totalSize.
+    return size_t(rowSize) * size_t(rowCount);
+}
+
+
+bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) {
+    if (not (buffer and m_isAvailable))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    ID3D12Resource* resource = info.m_resource.Get();
+    ID3D12Device* device = dx12Context.Device();
+
+    if (not (resource and device))
+        return false;
+
+    D3D12_RESOURCE_DESC desc = resource->GetDesc();
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+    UINT rowCount = 0;
+    UINT64 rowSize = 0, totalSize = 0;
+
+    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+    if (bufferSize < size_t(rowSize) * size_t(rowCount))
+        return false;
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    D3D12_RESOURCE_DESC readbackDesc{};
+
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+    readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    readbackDesc.Width = totalSize;
+    readbackDesc.Height = 1;
+    readbackDesc.DepthOrArraySize = 1;
+    readbackDesc.MipLevels = 1;
+    readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
+    readbackDesc.SampleDesc.Count = 1;
+    readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    readbackDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    ComPtr<ID3D12Resource> readback;
+
+    if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
+                                               D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
+        return false;
+
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("ReadBuffer"));
+
+    if (not cl)
+        return false;
+
+    D3D12_RESOURCE_STATES stateBefore = info.m_state;
+
+    info.SetState(cl, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+
+    srcLoc.pResource = resource;
+    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    srcLoc.SubresourceIndex = 0;
+    dstLoc.pResource = readback.Get();
+    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dstLoc.PlacedFootprint = layout;
+    if (ID3D12GraphicsCommandList* list = cl->GfxList())
+        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+    // Back to what it was: the caller's next pass expects the buffer in the state it left it in.
+    info.SetState(cl, stateBefore);
+    // Flushed, not just closed - the map below reads what the GPU wrote, so the copy has to be done.
+    baseRenderer.FinishOperation(cl, true);
+
+    uint8_t* source = nullptr;
+    D3D12_RANGE readRange{ 0, size_t(totalSize) };
+
+    if (FAILED(readback->Map(0, &readRange, reinterpret_cast<void**>(&source))))
+        return false;
+
+    uint8_t* dest = static_cast<uint8_t*>(buffer);
+
+    for (UINT row = 0; row < rowCount; ++row)
+        memcpy(dest + size_t(row) * size_t(rowSize),
+               source + size_t(layout.Offset) + size_t(row) * size_t(layout.Footprint.RowPitch),
+               size_t(rowSize));
+
+    D3D12_RANGE writeRange{ 0, 0 };   // nothing was written from the CPU side
+
+    readback->Unmap(0, &writeRange);
+    return true;
+}
+
+// =================================================================================================
+
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize) {
+    if (not (data and m_isAvailable))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    ID3D12Resource* resource = info.m_resource.Get();
+    ID3D12Device* device = dx12Context.Device();
+
+    if (not (resource and device))
+        return false;
+
+    D3D12_RESOURCE_DESC desc = resource->GetDesc();
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+    UINT rowCount = 0;
+    UINT64 rowSize = 0, totalSize = 0;
+
+    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+    if (dataSize < size_t(rowSize) * size_t(rowCount))
+        return false;
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    D3D12_RESOURCE_DESC uploadDesc{};
+
+    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+    uploadDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    uploadDesc.Width = totalSize;
+    uploadDesc.Height = 1;
+    uploadDesc.DepthOrArraySize = 1;
+    uploadDesc.MipLevels = 1;
+    uploadDesc.Format = DXGI_FORMAT_UNKNOWN;
+    uploadDesc.SampleDesc.Count = 1;
+    uploadDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    uploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    ComPtr<ID3D12Resource> upload;
+
+    if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadDesc,
+                                               D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
+        return false;
+
+    uint8_t* dest = nullptr;
+    D3D12_RANGE readRange{ 0, 0 };   // nothing is read back from this one
+
+    if (FAILED(upload->Map(0, &readRange, reinterpret_cast<void**>(&dest))))
+        return false;
+
+    const uint8_t* source = static_cast<const uint8_t*>(data);
+
+    // Row by row: the caller's data is packed, the upload buffer's rows are padded to
+    // D3D12_TEXTURE_DATA_PITCH_ALIGNMENT.
+    for (UINT row = 0; row < rowCount; ++row)
+        memcpy(dest + size_t(layout.Offset) + size_t(row) * size_t(layout.Footprint.RowPitch),
+               source + size_t(row) * size_t(rowSize),
+               size_t(rowSize));
+    upload->Unmap(0, nullptr);
+
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("WriteBuffer"));
+
+    if (not cl)
+        return false;
+
+    D3D12_RESOURCE_STATES stateBefore = info.m_state;
+
+    info.SetState(cl, D3D12_RESOURCE_STATE_COPY_DEST);
+
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+
+    srcLoc.pResource = upload.Get();
+    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    srcLoc.PlacedFootprint = layout;
+    dstLoc.pResource = resource;
+    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dstLoc.SubresourceIndex = 0;
+    if (ID3D12GraphicsCommandList* list = cl->GfxList())
+        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+    info.SetState(cl, stateBefore);
+    // Flushed: the upload buffer is a local and must not go out of scope before the copy has run.
+    baseRenderer.FinishOperation(cl, true);
+    return true;
 }
 
 // =================================================================================================

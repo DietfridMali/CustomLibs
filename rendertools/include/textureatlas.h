@@ -9,7 +9,77 @@
 
 // =================================================================================================
 
-class TextureAtlas {
+// The part every atlas has, whatever its cells look like: one render target holding the image store,
+// and the handful of operations that go with it. TextureAtlas puts a fixed grid of glyphs on top of
+// this, VariableTextureAtlas a shelf packer with tiles of differing sizes - neither of the two has any
+// business knowing about the other's layout, which is why the shared half lives here.
+
+class BaseTextureAtlas {
+protected:
+	RenderTarget*	m_atlas;
+
+	static BaseQuadMesh	renderQuad;
+
+public:
+	BaseTextureAtlas()
+		: m_atlas(nullptr)
+	{
+	}
+
+	// Not virtual by intent: nothing owns an atlas through a base pointer, and a vtable would be the
+	// only thing this class costs. Add one here the moment that changes.
+	~BaseTextureAtlas() = default;
+
+	void Destroy(void) {
+		delete m_atlas;
+		m_atlas = nullptr;
+	}
+
+	// Sets up the shared quad the render calls below draw with. Once per program run, not per atlas.
+	static void Initialize(void);
+
+	bool Render(Shader* shader);
+
+	Texture* GetAsTexture(void) noexcept {
+		return m_atlas ? m_atlas->GetAsTexture({}) :  nullptr;
+	}
+
+	inline bool Activate(void) {
+		return m_atlas ? m_atlas->Activate({ .clear = true }) : false;
+	}
+
+	inline void Deactivate(void) {
+		if (m_atlas)
+			m_atlas->Deactivate();
+	}
+
+	inline void SetViewport(void) {
+		if (m_atlas)
+			m_atlas->SetViewport();
+	}
+
+	inline int GetWidth(bool scaled = false) noexcept {
+		return m_atlas ? m_atlas->GetWidth(scaled) : 0;
+	}
+
+	inline int GetHeight(bool scaled = false) noexcept {
+		return m_atlas ? m_atlas->GetHeight(scaled) : 0;
+	}
+
+	inline RenderTarget* GetRenderTarget(void) noexcept {
+		return m_atlas;
+	}
+
+	inline bool IsAvailable(void) noexcept {
+		return m_atlas != nullptr;
+	}
+};
+
+// -------------------------------------------------------------------------------------------------
+
+class TextureAtlas
+	: public BaseTextureAtlas
+{
 public:
 	struct GlyphSize {
 		int width{ 0 };
@@ -37,24 +107,14 @@ public:
 	};
 
 protected:
-	RenderTarget*	m_atlas;
 	TableSize		m_size;
 	GlyphSize		m_glyphSize;
 	Vector2f		m_scale;
-
-	static BaseQuadMesh	renderQuad;
 
 public:
 	TextureAtlas();
 
 	~TextureAtlas() = default;
-
-	void Destroy(void) {
-		delete m_atlas;
-		m_atlas = nullptr;
-	}
-
-	void Initialize(void);
 
 	inline Vector2f GlyphOffset(int glyphIndex) {
 		return
@@ -69,50 +129,14 @@ public:
 
 	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1);
 
-	bool Render(Shader* shader);
-
 	bool RenderColored(int glyphIndex, RGBAColor color = ColorData::White);
 
 	bool RenderGrayscale(int glyphIndex, float brightness = 1.0f);
 
 	bool Add(Texture* glyph, int glyphIndex, Vector2f& scale);
 
-	Texture* GetAsTexture(void) noexcept {
-		return m_atlas ? m_atlas->GetAsTexture({}) :  nullptr;
-	}
-
-	inline bool Activate(void) {
-		return m_atlas ? m_atlas->Activate({ .clear = true }) : false;
-	}
-
-	inline void Deactivate(void) {
-		if (m_atlas)
-			m_atlas->Deactivate();
-	}
-
-	inline void SetViewport(void) {
-		if (m_atlas)
-			m_atlas->SetViewport();
-	}
-
 	inline TableSize& Size(void) {
 		return m_size;
-	}
-	 
-	inline int GetWidth(bool scaled = false) noexcept {
-		return m_atlas ? m_atlas->GetWidth(scaled) : 0;
-	}
-
-	inline int GetHeight(bool scaled = false) noexcept {
-		return m_atlas ? m_atlas->GetHeight(scaled) : 0;
-	}
-
-	inline RenderTarget* GetRenderTarget(void) noexcept {
-		return m_atlas;
-	}
-
-	inline bool IsAvailable(void) noexcept {
-		return m_atlas != nullptr;
 	}
 };
 

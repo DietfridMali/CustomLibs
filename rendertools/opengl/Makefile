@@ -65,6 +65,7 @@ COMMON_FILES := \
  textrenderer \
  texture_mips \
  textureatlas \
+ variabletextureatlas \
  textureprocessing \
  tiny_gltf \
  viewport

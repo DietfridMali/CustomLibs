@@ -8,6 +8,7 @@
 #include "texture.h"
 #include "colordata.h"
 #include "drawbufferhandler.h"
+#include "gfxpixelformat_gl.h"	// ToNativeColorFormat () for RTCreationParams::colorFormat - backend neutral
 #ifdef _DEBUG
 #   include <source_location>
 #endif
@@ -23,7 +24,12 @@ public:
         btDepth,
         btStencil, // never created as a buffer of its own -- stencil is a plane of btDepth (see RenderTarget::m_stencilBufferIndex)
         btVertex,
-        btSkyMap  // RGBA16F texture for compute write (image2D); not attached to FBO
+        btSkyMap, // RGBA16F texture for compute write (image2D); not attached to FBO
+        // A cube map rendered INTO, one face at a time - see SelectCubeFace (). Six faces in one
+        // resource, so a shader can sample it by direction afterwards. What it is for: anything that
+        // has to capture its surroundings in every direction from one point, an omnidirectional shadow
+        // map above all.
+        btCubemap
     } eBufferType;
 
 
@@ -85,6 +91,7 @@ public:
     int                         m_bufferCount;
     int                         m_colorBufferCount;
     GLenum                      m_colorFormat{ GL_RGBA8 };
+    GLenum                      m_cubeMapFormat{ GL_R32F };
     int                         m_extraBufferCount;
     int                         m_extraBufferIndex;
     int                         m_depthBufferIndex;
@@ -96,6 +103,9 @@ public:
     bool                        m_hasStencil{ false };
     int                         m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
     int                         m_computeBufferCount{ 0 };
+    int                         m_cubeMapIndex{ -1 };         // start of cube-map slot range in m_bufferInfo
+    int                         m_cubeMapCount{ 0 };
+    int                         m_cubeFace{ 0 };              // face currently attached, see SelectCubeFace
     int                         m_activeBufferIndex;
     AutoArray<BufferInfo>       m_bufferInfo;
     DrawBufferList              m_drawBuffers;
@@ -133,6 +143,12 @@ public:
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
         int skyMapCount{ 0 };  // Compute-only storage textures (RGBA16F image2D), no FBO attachment.
+        // Cube maps to render into (btCubemap). Their edge length is the target's width, so a cube map
+        // target is square by definition. cubeMapFormat is separate from colorFormat because the two
+        // rarely want the same thing - a shadow cube map holds one distance per texel, a colour target
+        // holds RGBA.
+        int cubeMapCount{ 0 };
+        GLenum cubeMapFormat{ GL_R32F };
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
         bool storageImage{ false };   // Cross-API; honored only by Vulkan today.
@@ -220,6 +236,23 @@ public:
     void SetDepthSource(RenderTarget* source);
 
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
+
+    // One colour buffer's texels into a CPU buffer, in the target's own colour format. bufferSize is
+    // the size of the destination in BYTES and is checked against BufferSize (), so a buffer that is
+    // too small is refused rather than overrun.
+    //
+    // This DRAINS THE PIPELINE: everything queued has to finish before the texels can be handed over.
+    // It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
+    // per frame.
+    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize);
+
+    // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
+    // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
+    // Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
+    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize);
+
+    // Bytes one colour buffer occupies, at the target's scaled size and its colour format.
+    size_t BufferSize(int bufferIndex);
 
     Texture* GetDepthAsTexture(void);
 
@@ -348,6 +381,19 @@ public:
 #else
         return (bufferIndex < m_bufferCount) ? m_bufferInfo[bufferIndex].m_handle : Texture::nullHandle;
 #endif
+    }
+
+    // Points the framebuffer at one face of a cube map buffer. The target must be active; everything
+    // drawn afterwards lands on that face until another one is selected. Six calls with a draw in
+    // between capture the whole surroundings of a point.
+    bool SelectCubeFace(int face, int bufferIndex = -1);
+
+    inline int CubeMapIndex(int i = 0) noexcept {
+        return m_cubeMapCount ? m_cubeMapIndex + i : -1;
+    }
+
+    inline int CubeMapCount(void) noexcept {
+        return m_cubeMapCount;
     }
 
     inline int ExtraBufferIndex(int i = 0) noexcept {

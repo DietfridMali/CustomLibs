@@ -149,6 +149,38 @@ bool CreateStagingBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) noe
     return true;
 }
 
+bool CreateReadbackBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) noexcept
+{
+    VmaAllocator allocator = vkContext.Allocator();
+    if (allocator == VK_NULL_HANDLE)
+        return false;
+
+    VkBufferCreateInfo bufInfo { };
+    bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufInfo.size = byteSize;
+    bufInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VmaAllocationCreateInfo allocInfo { };
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    // RANDOM, not SEQUENTIAL_WRITE: the host READS this one, and sequential write access may land in
+    // write-combined memory, where reading is correct but ruinously slow.
+    allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT
+                    | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+    VmaAllocationInfo allocResult { };
+    VkResult res = vmaCreateBuffer(allocator, &bufInfo, &allocInfo,
+                                   &outStaging.buffer, &outStaging.allocation, &allocResult);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "vkupload::CreateReadbackBuffer: vmaCreateBuffer failed (%d)
+", (int)res);
+        return false;
+    }
+    outStaging.mapped = allocResult.pMappedData;
+    outStaging.size = byteSize;
+    return true;
+}
+
 // =================================================================================================
 // UploadSubresource
 

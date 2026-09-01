@@ -52,6 +52,11 @@ enum class GfxPixelFormat : uint8_t {
     R32_SFloat,
     RGBA16_SFloat,
     RGBA32_SFloat,
+    // Packed HDR, 4 bytes per texel and no alpha: 11+11 bits mantissa/exponent for red and green,
+    // 10 for blue. Colour-renderable everywhere, which the similarly sized RGB9_E5 is not - that one
+    // is texture only, so nothing can be rendered INTO it. Half the memory of RGBA16_SFloat at the
+    // precision a light map needs.
+    RG11B10_SFloat,
     // Block-compressed formats (DDS-backed, GPU-native). Data is organized in 4x4 texel blocks,
     // so GfxPixelStride does not apply — use GfxBlockBytes / GfxIsBlockCompressed instead.
     BC1_UNorm,      // RGB (1-bit punch-through alpha), 8 bytes / 4x4 block  (DXT1)
@@ -78,6 +83,8 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
             return 8;
         case GfxPixelFormat::RGBA32_SFloat:  
             return 16;
+        case GfxPixelFormat::RG11B10_SFloat:
+            return 4;
         case GfxPixelFormat::BC1_UNorm:
         case GfxPixelFormat::BC7_UNorm:
         case GfxPixelFormat::BC4_UNorm:

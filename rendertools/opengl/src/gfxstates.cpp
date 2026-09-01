@@ -112,7 +112,10 @@ int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 #if !TRACK_TMU_USAGE
 
 	ActiveTexture(GL_TEXTURE0 + tmuIndex);
-	glBindTexture(typeID, handle);
+	// The PARAMETER, not typeID - that one is the template argument of the inline wrapper above and is
+	// always GL_TEXTURE_2D here, so a cube map would be bound on the 2D target and the sampler read
+	// nothing. Dead while TRACK_TMU_USAGE is 1, wrong the moment it is turned off.
+	glBindTexture(type, handle);
 
 #else
 

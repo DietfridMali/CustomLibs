@@ -9,6 +9,7 @@
 #include "commandlist.h"
 #include "base_quadmesh.h"
 #include "drawbufferhandler.h"
+#include "gfxpixelformat_vk.h"	// ToNativeColorFormat () for RTCreationParams::colorFormat - backend neutral
 
 // =================================================================================================
 // Vulkan RenderTarget (Frame Buffer Object)
@@ -16,18 +17,18 @@
 // In OpenGL a RenderTarget bound a set of texture attachments as render targets. In DX12 render
 // targets are set with OMSetRenderTargets and need RTV descriptors. In Vulkan 1.3 with
 // dynamic_rendering (Core in 1.3) we describe the attachments via VkRenderingAttachmentInfo
-// and call vkCmdBeginRendering / vkCmdEndRendering on the command buffer — no preallocated
+// and call vkCmdBeginRendering / vkCmdEndRendering on the command buffer - no preallocated
 // RTV/DSV descriptor objects required.
 //
 // This class manages:
-//   • Up to RT_MAX_COLOR_BUFFERS color attachments (VkImage + VmaAllocation + VkImageView).
-//   • One depth/stencil attachment (VkImage with VK_FORMAT_D24_UNORM_S8_UINT + depth ImageView).
-//   • An image view per attachment used both as render-target attachment (color/depth) and
+//   - Up to RT_MAX_COLOR_BUFFERS color attachments (VkImage + VmaAllocation + VkImageView).
+//   - One depth/stencil attachment (VkImage with VK_FORMAT_D24_UNORM_S8_UINT + depth ImageView).
+//   - An image view per attachment used both as render-target attachment (color/depth) and
 //     as shader-read source (combined image sampler bind in subsequent passes).
-//   • BufferHandle(i) returns a uint32_t& (logical id, kept for source compatibility with
+//   - BufferHandle(i) returns a uint32_t& (logical id, kept for source compatibility with
 //     m_renderTexture.m_handle assignments).
-//   • Image-layout transitions through ImageLayoutTracker (per-buffer member).
-//   • Ping-pong: destination >= 0 issues a SHADER_READ → COLOR_ATTACHMENT transition before
+//   - Image-layout transitions through ImageLayoutTracker (per-buffer member).
+//   - Ping-pong: destination >= 0 issues a SHADER_READ -> COLOR_ATTACHMENT transition before
 //     and back after render.
 //
 // RTCreationParams and RTRenderParams are kept identical to the OGL/DX12 version.
@@ -45,12 +46,23 @@ public:
         btDepth,
         btStencil, // never created as a buffer of its own -- stencil is a plane of btDepth (see RenderTarget::m_stencilBufferIndex)
         btVertex,
-        btSkyMap   // R16G16B16A16_SFLOAT, color+sampled+storage usage — compute-only target
+        btSkyMap,  // R16G16B16A16_SFLOAT, color+sampled+storage usage - compute-only target
+        // A cube map rendered INTO, one face at a time - see SelectCubeFace (). One image with six
+        // array layers and VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, sampled through a
+        // VK_IMAGE_VIEW_TYPE_CUBE view; one view per layer to render into, because an attachment
+        // addresses a single layer.
+        btCubemap
     } eBufferType;
 
     VkImage             m_image       { VK_NULL_HANDLE };
     VmaAllocation       m_allocation  { VK_NULL_HANDLE };
     VkImageView         m_imageView   { VK_NULL_HANDLE };  // attachment view + sampling source
+    // A cube map is one image with six array layers, and an attachment view addresses exactly one
+    // layer - so a btCubemap buffer needs six views to render into where every other type needs one.
+    // m_imageView above is the CUBE view used for sampling; m_cubeView[face] is what gets attached
+    // (RenderTarget::SelectCubeFace).
+    VkImageView         m_cubeView[6] { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE,
+                                        VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
     VkImageView         m_depthSampleView { VK_NULL_HANDLE };  // depth-only sampling view (set for btDepth)
     ImageLayoutTracker  m_layoutTracker;
     uint32_t            m_srvIndex    { UINT32_MAX };  // logical id for source-compat
@@ -100,8 +112,13 @@ public:
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
         // Compute-only storage textures (R16G16B16A16_SFLOAT, COLOR+SAMPLED+STORAGE usage).
-        // Occupy m_bufferInfo[m_computeBufferIndex..] — caller addresses them via that offset.
+        // Occupy m_bufferInfo[m_computeBufferIndex..] - caller addresses them via that offset.
         int skyMapCount{ 0 };
+        // Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
+        // square by definition. Its format is separate from colorFormat: a shadow cube map holds one
+        // distance per texel, a colour target holds RGBA.
+        int cubeMapCount{ 0 };
+        VkFormat cubeMapFormat{ VK_FORMAT_R32_SFLOAT };
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
         bool storageImage{ false };  // legacy; superseded by skyMapCount
@@ -135,6 +152,7 @@ public:
     int                 m_scale{ 1 };
     int                 m_bufferCount{ 0 };
     int                 m_colorBufferCount{ 0 };
+    VkFormat            m_cubeMapFormat { VK_FORMAT_R32_SFLOAT };
     VkFormat            m_colorFormat{ VK_FORMAT_R8G8B8A8_UNORM };
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
@@ -147,6 +165,9 @@ public:
     bool                m_hasStencil{ false };
     int                 m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
     int                 m_computeBufferCount{ 0 };
+    int                 m_cubeMapIndex{ -1 };         // start of cube-map slot range in m_bufferInfo
+    int                 m_cubeMapCount{ 0 };
+    int                 m_cubeFace{ 0 };              // face currently attached, see SelectCubeFace
     int                 m_activeBufferIndex{ 0 };
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };
@@ -178,7 +199,7 @@ public:
 
     AutoArray<BufferInfo>   m_bufferInfo;
 
-    // Own command list — rendering recorded for this RT goes through it.
+    // Own command list - rendering recorded for this RT goes through it.
     CommandList*        m_cmdList{ nullptr };
 
     // -------------------------------------------------------------------------
@@ -261,7 +282,7 @@ public:
     // Share another render target's depth buffer: while set, activating this target binds the
     // source's depth image view as the depth attachment instead of an own one (this target needs
     // none of its own). The foreign depth is never cleared (loadOp is forced to LOAD even when the
-    // activation clears) — all Clear*/GetDepth* paths stay own-buffer-based — and is meant to be
+    // activation clears) - all Clear*/GetDepth* paths stay own-buffer-based - and is meant to be
     // tested against, not written (leave depth write off). Lets an overlay pass (e.g. the wet-splat
     // decal buffer) hardware-depth-test against the scene. Pass nullptr to unshare.
     inline void SetDepthSource(RenderTarget* source) noexcept {
@@ -270,6 +291,24 @@ public:
 
     // Render helpers (same as OGL)
     Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
+
+    // One colour buffer's texels into a CPU buffer, in the target's own colour format. bufferSize is
+    // the size of the destination in BYTES and is checked against BufferSize (), so a buffer that is
+    // too small is refused rather than overrun.
+    //
+    // This DRAINS THE PIPELINE: everything queued has to finish before the texels can be handed over.
+    // It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
+    // per frame - and it has to be called OUTSIDE frame recording, where it can flush a command list
+    // of its own and wait for it.
+    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize);
+
+    // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
+    // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
+    // Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
+    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize);
+
+    // Bytes one colour buffer occupies, at the target's scaled size and its colour format.
+    size_t BufferSize(int bufferIndex);
 
     Texture* GetDepthAsTexture(void);
 
@@ -383,6 +422,23 @@ public:
         return m_depthBufferIndex;
     }
 
+    // Points the render target at one face of a cube map buffer. The target must be active; everything
+    // drawn afterwards lands on that face until another one is selected. Six calls with a draw in
+    // between capture the whole surroundings of a point.
+    //
+    // A call of its own rather than a field in RTActivationParams: nothing else about the target
+    // changes between faces, and re-activating six times would re-select draw buffers and depth state
+    // that have not moved.
+    bool SelectCubeFace(int face, int bufferIndex = -1);
+
+    inline int CubeMapIndex(int i = 0) noexcept {
+        return m_cubeMapCount ? m_cubeMapIndex + i : -1;
+    }
+
+    inline int CubeMapCount(void) noexcept {
+        return m_cubeMapCount;
+    }
+
     inline int ExtraBufferIndex(int i = 0) noexcept {
         return m_vertexBufferCount ? m_extraBufferIndex + i : -1;
     }
@@ -401,7 +457,7 @@ public:
     void FillPipelineKey(struct PipelineKey& key) noexcept;
 
     // Manage the active vkCmdBeginRendering scope for this RT. Parameterless call (defaults
-    // false/false) gives LOAD_OP_LOAD on both — used to resume a previously suspended scope.
+    // false/false) gives LOAD_OP_LOAD on both - used to resume a previously suspended scope.
     void BeginRendering(bool clearColor = false, bool clearDepth = false);
     void EndRendering(void);
 
@@ -411,6 +467,10 @@ private:
     bool CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspectFlags aspect);
 
     void CreateColorBuffer(BufferInfo& info, int w, int h);
+
+    // One image with six layers plus its seven views - see the implementation. Square by definition,
+    // hence one edge length instead of width and height.
+    void CreateCubemapBuffer(BufferInfo& info, int edge);
 
     void CreateDepthBuffer(BufferInfo& info, int w, int h);
 
@@ -464,7 +524,7 @@ private:
     }
 
     // DepthBufferHandle in DX12 returned a CPU descriptor handle pointer. In Vulkan there is no
-    // such thing — depth attachment is described inline in the VkRenderingAttachmentInfo built
+    // such thing - depth attachment is described inline in the VkRenderingAttachmentInfo built
     // from m_bufferInfo[m_depthBufferIndex].m_imageView. The accessor is removed; callers
     // consult m_bufferInfo[m_depthBufferIndex] directly.
 };

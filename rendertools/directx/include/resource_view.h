@@ -67,10 +67,15 @@ public:
 
 
 class RTV
-	: public ResourceView 
+	: public ResourceView
 {
 public:
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
+
+	// One SLICE of a texture array as the render target. A render target view always addresses a single
+	// slice, so a cube map needs six of these, one per face - there is no RTV dimension for a cube map.
+	// Additive: the two argument form above is untouched and keeps producing a plain TEXTURE2D view.
+	bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int arraySlice);
 };
 
 
@@ -79,6 +84,10 @@ class SRV
 {
 public:
 	virtual bool Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format = {}) override;
+
+	// A six slice resource seen as a CUBE MAP, so a shader samples it by direction instead of by slice
+	// index. Additive, like the RTV overload above.
+	bool CreateCube(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format);
 };
 
 

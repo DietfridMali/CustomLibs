@@ -49,6 +49,7 @@ FILES := \
  textrenderer \
  texture_mips \
  textureatlas \
+ variabletextureatlas \
  texture \
  texturebuffer \
  texturehandler \
