@@ -143,6 +143,20 @@ void BaseRenderer::StartFullPass(void) noexcept {
 }
 
 
+// See the note at the declaration. One call, all three pieces of state - the backends differ in what
+// they do with them, not in what they are.
+
+void BaseRenderer::SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::BlendOp op) noexcept {
+    GfxOperations::BlendFactor src, dst;
+
+    GfxOperations::BlendFactors(mode, src, dst);
+    gfxStates.SetBlending(mode != GfxOperations::BlendMode::Replace);
+    gfxStates.BlendFunc(src, dst);
+    gfxStates.BlendEquation(op);
+}
+
+// =================================================================================================
+
 bool BaseRenderer::Start3DScene(void) {
     ZoneScoped;
     m_frameCounter.Start();

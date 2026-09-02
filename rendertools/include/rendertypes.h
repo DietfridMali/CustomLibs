@@ -174,6 +174,34 @@ namespace GfxOperations {
         Max
     };
 
+    // The named COMBINATIONS a renderer draws with, one step up from the factors above. A draw asks for
+    // what it wants to look like - "additive", "alpha" - and not for a pair of factors, so the factors
+    // stay in one place and a backend that cannot set them per draw (Vulkan bakes blending into the
+    // pipeline) has one value to key its pipeline on instead of two.
+    //
+    // Deliberately NOT a list of every possible pair: these are the ones a renderer actually uses, and
+    // anything else belongs in this list before it belongs at a call site.
+    enum class BlendMode : uint8_t {
+        Replace,            // One, Zero - overwrite, blending effectively off
+        Alpha,              // SrcAlpha, InvSrcAlpha - the ordinary transparency blend
+        Additive,           // One, One - light adds to light; the tone mapper caps the range, not the blend
+        Multiply,           // DstColor, Zero - darkening overlays
+        AlphaControlled     // One, SrcAlpha - additive whose strength the source's alpha decides
+    };
+
+    // The factor pair one mode stands for. Shared by every backend - what differs between them is only
+    // what they do with the pair, not what the pair is.
+    inline constexpr void BlendFactors(BlendMode mode, BlendFactor& src, BlendFactor& dst) noexcept {
+        switch (mode) {
+            case BlendMode::Replace:         src = BlendFactor::One;      dst = BlendFactor::Zero;        break;
+            case BlendMode::Additive:        src = BlendFactor::One;      dst = BlendFactor::One;         break;
+            case BlendMode::Multiply:        src = BlendFactor::DstColor; dst = BlendFactor::Zero;        break;
+            case BlendMode::AlphaControlled: src = BlendFactor::One;      dst = BlendFactor::SrcAlpha;    break;
+            case BlendMode::Alpha:
+            default:                         src = BlendFactor::SrcAlpha; dst = BlendFactor::InvSrcAlpha; break;
+        }
+    }
+
     enum class CullFace : uint8_t {
         Front,
         Back,

@@ -199,6 +199,17 @@ public:
         return m_renderPass; 
     }
 
+    // HOW A DRAW BLENDS, in the renderer's own vocabulary rather than the backend's. One call sets all
+    // three pieces of state that belong together - blending on, the factor pair, the equation - because
+    // a step that set only some of them inherited the rest from whatever ran before it. The equation in
+    // particular: a step that switches to Max (the lightning and glow renderers do) used to leave it
+    // behind for the next one.
+    //
+    // Implemented once, in terms of gfxStates, which every backend provides with the same neutral types
+    // (GfxOperations). What differs between them is what they DO with it - OpenGL sets it immediately,
+    // Vulkan folds it into the pipeline key - and none of that belongs here or at a call site.
+    void SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::BlendOp op = GfxOperations::BlendOp::Add) noexcept;
+
     virtual bool Start3DScene(void);
 
     virtual bool Stop3DScene(void);
