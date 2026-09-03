@@ -2,24 +2,28 @@
 
 #include "vector.hpp"
 #include "list.hpp"
+#include "skylinepacker.h"
 #include "textureatlas.h"
 #include "rendertypes.h"
 
 // =================================================================================================
-// An atlas whose cells differ in size, packed by a shelf algorithm.
+// An atlas whose cells differ in size, packed by a skyline algorithm.
 //
 // TextureAtlas puts a fixed grid over its render target: every cell has the same size and a cell's
 // place follows from its index. That is right for glyphs and wrong for anything measured in world
 // units - a light map tile is as large as the surface it lights, and those differ by orders of
 // magnitude. This class shares the render target half (BaseTextureAtlas) and replaces the layout.
 //
-// SHELF PACKING keeps a current row ("shelf") and fills it left to right; when the next tile no
-// longer fits in the row's remaining width, a new shelf opens above the tallest tile of the old one.
-// It wastes the difference between a shelf's height and the height of its shorter tiles, which is
-// why callers should add tiles TALLEST FIRST - then every shelf is filled by tiles of nearly its own
-// height and the waste is small. The packer does not sort by itself: it hands out places in the
-// order it is asked, so that a caller can keep its own tile order (a face index, say) as the index
-// it gets back.
+// SKYLINE PACKING keeps the top contour of everything already placed as a list of horizontal
+// segments and puts each new tile where its top edge ends up lowest (ties to the narrower segment,
+// which keeps wide gaps free for wide tiles). Unlike shelf packing it does not waste the difference
+// between a row's height and its shorter tiles - a row opened for a 1024 tile no longer keeps 256
+// tiles from using the space beside them. Callers should still add tiles LARGEST FIRST, which is
+// what every packer of this kind wants. It does not sort by itself: it hands out places in the order
+// it is asked, so a caller can keep its own tile order (a face index, say) as the index it gets back.
+//
+// A tile that does not fit leaves the contour untouched, so the same tile can be offered to several
+// atlases in turn.
 //
 // LAYERS are colour buffers of one render target, all of the same size and format. A light map needs
 // two (diffuse and ambient) that are written by the same pass and sampled by the same fragment, and
@@ -49,10 +53,9 @@ protected:
 	List<Tile>			m_tiles;
 	int					m_tileCount{ 0 };
 	int					m_layers{ 1 };
-	// The current shelf: its bottom edge, the next free column in it, and the height it has grown to.
-	int					m_shelfX{ 0 };
-	int					m_shelfY{ 0 };
-	int					m_shelfHeight{ 0 };
+	// The packing itself knows nothing about textures - see skylinepacker.h. Keeping it separate is
+	// what lets a caller try a packing without creating a single render target.
+	SkylinePacker		m_packer;
 
 public:
 	VariableTextureAtlas() = default;

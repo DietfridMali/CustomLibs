@@ -184,6 +184,7 @@
     <ClInclude Include="..\include\texture.h" />
     <ClInclude Include="..\..\include\textureatlas.h" />
     <ClInclude Include="..\..\include\variabletextureatlas.h" />
+    <ClInclude Include="..\..\include\skylinepacker.h" />
     <ClInclude Include="..\include\texturebuffer.h" />
     <ClInclude Include="..\..\include\texturehandler.h" />
     <ClInclude Include="..\include\gfxdatalayout.h" />

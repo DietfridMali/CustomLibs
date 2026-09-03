@@ -30,7 +30,7 @@ private:
     std::string             m_name;
 
 public:
-	static const int32_t MaxIndex = std::numeric_limits<int32_t>::max();
+	static const int32_t MaxIndex = (std::numeric_limits<int32_t>::max)();
 
     // Konstruktor fuer 1D-AutoArray
     inline AutoArray(int32_t size = 0)

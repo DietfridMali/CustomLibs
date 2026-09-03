@@ -41,7 +41,7 @@ namespace StringUtils {
 
     inline uint16_t ToUInt16(std::string_view s) {
         unsigned long val = ToSizeT(s);
-        if (val > std::numeric_limits<uint16_t>::max())
+        if (val > (std::numeric_limits<uint16_t>::max)())
             throw std::out_of_range("Wert überschreitet uint16_t");
         return static_cast<uint16_t>(val);
     }

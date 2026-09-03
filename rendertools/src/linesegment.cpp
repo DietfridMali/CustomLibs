@@ -50,7 +50,7 @@ noexcept
 
     float sqrtD = sqrtf(D);
     float tBest = limits.max;
-    float minAbsT = std::numeric_limits<float>::max();
+    float minAbsT = (std::numeric_limits<float>::max)();
 
     solutions = 0;
     for (int sign : {-1, 1}) {

@@ -123,7 +123,7 @@ namespace Conversions
 
     template<typename T>
     struct Interval {
-        T min = std::numeric_limits<T>::lowest();
+        T min = (std::numeric_limits<T>::lowest)();
         T max = (std::numeric_limits<T>::max)();
         bool Contains(T v) const
  noexcept

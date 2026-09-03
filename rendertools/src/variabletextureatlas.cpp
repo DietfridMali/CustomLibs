@@ -36,43 +36,29 @@ bool VariableTextureAtlas::Create(String name, int width, int height, int layers
 void VariableTextureAtlas::Reset(void) noexcept {
 	m_tiles.Clear();
 	m_tileCount = 0;
-	m_shelfX = 0;
-	m_shelfY = 0;
-	m_shelfHeight = 0;
+	if (m_atlas)
+		m_packer.Reset(m_atlas->GetWidth(), m_atlas->GetHeight());
 }
 
 
 int VariableTextureAtlas::Add(int width, int height) {
-	if (not (m_atlas and (width > 0) and (height > 0)))
+	if (not m_atlas)
 		return -1;
 
-	int atlasWidth = m_atlas->GetWidth();
-	int atlasHeight = m_atlas->GetHeight();
+	SkylinePacker::Place place;
 
-	if ((width > atlasWidth) or (height > atlasHeight))
-		return -1;	// larger than the page itself - no packing can help that
-	// Does not fit in what is left of the current shelf: open the next one above it. The new shelf
-	// starts at the top edge of the old one, which is its bottom plus the tallest tile it took.
-	if (m_shelfX + width > atlasWidth) {
-		m_shelfY += m_shelfHeight;
-		m_shelfX = 0;
-		m_shelfHeight = 0;
-	}
-	if (m_shelfY + height > atlasHeight)
-		return -1;	// page is full
+	// A refusal leaves the packer untouched, so the same tile can be offered to the next atlas.
+	if (not m_packer.Add(width, height, place))
+		return -1;
 
 	Tile tile;
 
-	tile.x = m_shelfX;
-	tile.y = m_shelfY;
+	tile.x = place.x;
+	tile.y = place.y;
 	tile.w = width;
 	tile.h = height;
 	if (not m_tiles.Append(std::move(tile)))
 		return -1;
-	m_shelfX += width;
-	// The shelf is as tall as its tallest tile - that is what the next shelf has to clear.
-	if (m_shelfHeight < height)
-		m_shelfHeight = height;
 	return m_tileCount++;
 }
 

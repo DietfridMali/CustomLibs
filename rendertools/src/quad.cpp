@@ -306,7 +306,7 @@ noexcept
     }
 
     // 2. Kanten durchgehen
-    float bestOffset = std::numeric_limits<float>::lowest(); // > permissible values
+    float bestOffset = (std::numeric_limits<float>::lowest)(); // > permissible values
     Vector3f bestPoint;
 
     for (int i = 0; i < 4; ++i) {
@@ -320,7 +320,7 @@ noexcept
         }
     }
 
-    if (bestOffset == std::numeric_limits<float>::lowest())
+    if (bestOffset == (std::numeric_limits<float>::lowest)())
         return -1;
     if (not AllowMovement(bestOffset))
         return -1;
@@ -396,7 +396,7 @@ float Quad::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
     }
 
     // 2. Minimum distance to the 4 boundary edges
-    float minDist = std::numeric_limits<float>::max();
+    float minDist = (std::numeric_limits<float>::max)();
     for (int i = 0; i < 4; ++i) {
         minDist = std::min(minDist, SegmentSegmentDistance(s1, s2, m_coordinates[i], m_coordinates[(i + 1) % 4], m_toleranceSquared));
     }
@@ -409,7 +409,7 @@ float Quad::SegmentDistance(Vector3f s1, Vector3f s2) noexcept {
         if ((projX >= 0.0f) and (projX <= width) and (projY >= 0.0f) and (projY <= height)) {
             return std::abs(relP.Dot(normal));
         }
-        return std::numeric_limits<float>::max();
+        return (std::numeric_limits<float>::max)();
         };
 
     return std::min({ minDist, CheckEndpoint(s1), CheckEndpoint(s2) });
@@ -422,7 +422,7 @@ float Quad::PointDistance(Vector3f p, bool intersectRectangle) noexcept {
 	float distToPlane = Project(p, pIntersect);
     if (Contains(pIntersect))
         return distToPlane;
-    float minDist = std::numeric_limits<float>::max();
+    float minDist = (std::numeric_limits<float>::max)();
     if (not intersectRectangle) {
         for (int i = 0; i < 4; ++i)
             minDist = std::min(minDist, PointToLineDistanceEx(p, m_coordinates[i], m_coordinates[(i + 1) % 4], true, false));

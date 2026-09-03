@@ -328,7 +328,7 @@ inline T String::ToNumber(std::string caller) const noexcept {
     try {
         if constexpr (std::is_signed_v<T>) {
             long long n = std::stoll(m_str, nullptr, 10);
-            if ((n < static_cast<long long>(std::numeric_limits<T>::min())) or (n > static_cast<long long>(std::numeric_limits<T>::max()))) {
+            if ((n < static_cast<long long>((std::numeric_limits<T>::min)())) or (n > static_cast<long long>((std::numeric_limits<T>::max)()))) {
                 LogError(caller);
                 return 0;
             }
@@ -336,7 +336,7 @@ inline T String::ToNumber(std::string caller) const noexcept {
         }
         else {
             unsigned long long n = std::stoull(m_str, nullptr, 10);
-            if (n > static_cast<unsigned long long>(std::numeric_limits<T>::max())) {
+            if (n > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
                 LogError(caller);
                 return 0;
             }

@@ -9,9 +9,9 @@ uint32_t Mesh::quadTriangleIndices[6] = { 0, 2, 1, 0, 3, 2 };
 void Mesh::Init(MeshTopology shape, int32_t listSegmentSize) {
     m_shape = shape;
     m_indices.m_componentCount = ShapeSize();
-    //float f = std::numeric_limits<float>::lowest();
+    //float f = (std::numeric_limits<float>::lowest)();
     m_vMax = Vector3f{ -1e6, -1e6, -1e6 }; // f, f, f);
-    //f = std::numeric_limits<float>::max();
+    //f = (std::numeric_limits<float>::max)();
     m_vMin = Vector3f{ 1e6, 1e6, 1e6 }; // f, f, f);
     m_vertices = VertexBuffer(listSegmentSize);
     m_normals = VertexBuffer(listSegmentSize);

@@ -127,6 +127,9 @@
     <ClInclude Include="..\..\include\variabletextureatlas.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\skylinepacker.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\texturehandler.h">
       <Filter>Header Files\Texture</Filter>
     </ClInclude>
