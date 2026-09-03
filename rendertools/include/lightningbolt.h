@@ -87,6 +87,15 @@ struct LightningLook {
     float   firstBranchWidthFactor{ 0.3f };
     float   deepBranchWidthFactor{ 0.9f };
 
+    // The DEFAULT ribbon width, and it is a RATIO rather than a width: half width per unit of bolt
+    // length. A width in world units cannot serve as a default across effects, because one number
+    // would have to fit a 2 unit discharge around a small object AND a 20 unit bolt across a room -
+    // which is exactly what went wrong before. A ratio is scale free: it survives a change of world
+    // scale and it is the same number in both applications. 1 : 60 is where Paintjob Rampage's bolts
+    // sit (half width 0.5 over a 30 unit strike), and that is the look this was calibrated against.
+    // A bundle that states a startWidth of its own never consults this.
+    float   widthRatio{ 1.0f / 60.0f };
+
     float   flickerRate{ 18.0f };        // strike: pseudo-random brightness levels per second
     float   flickerFloor{ 0.3f };
 
@@ -119,8 +128,13 @@ struct LightningFbmParams {
 
 struct LightningCreationParams {
     // shape (strike + arc)
-    float      startWidth{ 0.2f };   // half-width at the source end
-    float      endWidth{ 0.1f };   // strike: half-width at the tip (0 = pointed); arc: ignored (uniform = startWidth)
+    // Half width at the source end, in world units. 0 - the default - means DERIVE IT: the bolt takes
+    // its own length times LightningLook::widthRatio, so an effect that has no opinion about width
+    // still scales correctly with whatever length it happens to have.
+    float      startWidth{ 0.0f };
+    // Strike: half width at the tip. 0 runs to a point and is a real value, so 0 cannot mean "derive"
+    // here - NEGATIVE does, and yields half of the resolved start width. Arc: ignored (uniform).
+    float      endWidth{ -1.0f };
     float      coreWidth{ 0.5f };   // white-core band as a fraction of the ribbon half-width; the rest is blue halo
     Vector3f   color{ Vector3f(1.0f, 1.0f, 1.0f) };   // per-bolt tint of the halo (multiplies the shader's haloColor); white = the shader's own colour
     float      amplitudeFactor{ 0.2f };   // lateral swing as a fraction of the bolt length

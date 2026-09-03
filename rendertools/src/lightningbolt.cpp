@@ -363,8 +363,13 @@ void LightningBolt::Build(const LightningBoltParams& params) {
 void BaseLightning::SetupCommon(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params) {
     m_start = start;
     m_end = end;
-    m_startWidth = params.startWidth;
-    m_endWidth = params.endWidth;
+    // The width defaults are resolved HERE and nowhere else, because this is the first place that knows
+    // the parameters AND the endpoints: startWidth 0 means "the bolt's length times the global ratio",
+    // endWidth below 0 means "half of whatever the start came out as" (0 is a real value there - a tip
+    // that runs to a point). A caller that states world units gets exactly those.
+    m_startWidth = (params.startWidth > 0.0f) ? params.startWidth
+                                             : (end - start).Length() * lightningLook.widthRatio;
+    m_endWidth = (params.endWidth >= 0.0f) ? params.endWidth : m_startWidth * 0.5f;
     m_coreWidth = params.coreWidth;
     m_color = params.color;
     m_amplitudeFactor = params.amplitudeFactor;
@@ -682,7 +687,9 @@ void LightningStrike::UpdateEndpoints(const Vector3f& /*start*/, const Vector3f&
 
 void LightningArc::Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params) {
     SetupCommon(start, end, params);
-    m_endWidth = params.startWidth;   // arc: uniform width (endWidth ignored) -- unchanged behavior
+    // the RESOLVED start width, not params.startWidth: that one may be the 0 that means "derive", and
+    // copying it would give the arc a tip width of zero instead of the uniform width it wants
+    m_endWidth = m_startWidth;   // arc: uniform width (endWidth ignored)
     m_boltCount = (params.boltCount < 1) ? 1 : params.boltCount;
     m_seed = uint32_t(Random::Int(0x7fffffff));
     ComputeCounts();
