@@ -674,8 +674,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
             m_bufferInfo[i].m_tmuIndex = -1;
     // A cube map is sampled by direction, so it has to go on the cube map target - binding it as 2D
     // would leave the sampler reading nothing.
-    gfxStates.BindTexture((m_bufferInfo[bufferIndex].m_type == BufferInfo::btCubemap) ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D,
-                          m_bufferInfo[bufferIndex].m_handle, tmuIndex);
+    gfxStates.BindTexture((m_bufferInfo[bufferIndex].m_type == BufferInfo::btCubemap) ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, tmuIndex);
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
     return true;
 }
@@ -786,9 +785,12 @@ void RenderTarget::Fill(RGBAColor color) {
 Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) {
     if (params.source == params.destination)
         return nullptr;
+    // A negative source is a texture handle from OUTSIDE this target. It must not be wrapped as an
+    // owned handle: the wrapper would delete the texture when the render texture is next pointed
+    // elsewhere - which used to take a colour buffer of the caller's frame with it.
     SharedTextureHandle handle =
         (params.source < 0)
-        ? SharedTextureHandle(GLuint(-params.source))
+        ? SharedTextureHandle(GLuint(-params.source), false)
         : BufferHandle(params.source);
     //DetachBuffer((params.source < 0) ? -params.source : params.source);
     m_renderTexture.Validate();

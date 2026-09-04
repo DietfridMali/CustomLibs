@@ -185,6 +185,14 @@ public:
         : SharedGfxHandle(handle, glGenTextures, glDeleteTextures)
     {
     }
+
+    // A handle this wrapper does NOT own: no releaser, so dropping the last reference leaves the
+    // texture alone. For a texture that belongs to somebody else (another render target's colour
+    // buffer handed in as a source) - the owning constructor would delete it on release.
+    SharedTextureHandle(GLuint handle, bool owned)
+        : SharedGfxHandle(handle, glGenTextures, owned ? glDeleteTextures : nullptr)
+    {
+    }
 };
 
 
