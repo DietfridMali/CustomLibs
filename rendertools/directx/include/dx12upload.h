@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "dx12framework.h"
 #include "rendertypes.h"
@@ -34,6 +34,15 @@ inline bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource,
 // Build a CPU mip chain from the base image (2×2 box filter, edge-clamped) and upload one
 // subresource per level. dstResource must have been created with the matching MipLevels count.
 bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels) noexcept;
+
+// Upload an uncompressed 2D texture ARRAY: one subresource per (layer, mip). layers[l] points at that
+// layer's tightly packed mip chain, level 0 first - what BaseTextureArray::BuildMipChains () hands out.
+// dstResource must exist with DepthOrArraySize == layerCount and MipLevels == mipCount.
+// firstLayer lets a caller refresh a single layer in place: pass one pointer, layerCount 1 and that
+// layer's index.
+bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* layers,
+                            int layerCount, int width, int height, int channels, int mipCount,
+                            int firstLayer = 0) noexcept;
 
 // Upload a block-compressed (BC1/BC7) texture: one subresource per (face, mip). faces[f] points at
 // face f's tightly-packed mip chain (level 0 first; ceil(w/4)*ceil(h/4)*GfxBlockBytes bytes per

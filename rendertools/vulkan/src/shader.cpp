@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <utility>
 #include <cstring>
@@ -764,6 +764,17 @@ int Shader::SetFloatArray(const char* name, const float* data, size_t length) no
     for (size_t i = 0; i < length; ++i)
         padded[i * 4] = data[i];
     return SetB1Field(name, padded.data(), length * 4 * sizeof(float));
+}
+
+// Same padding as SetFloatArray: a scalar array occupies one 16 byte slot per element.
+int Shader::SetIntArray(const char* name, const int* data, size_t length) noexcept
+{
+    if (length == 0)
+        return -1;
+    std::vector<int> padded(length * 4, 0);
+    for (size_t i = 0; i < length; ++i)
+        padded[i * 4] = data[i];
+    return SetB1Field(name, padded.data(), length * 4 * sizeof(int));
 }
 
 int Shader::SetVector2fArray(const char* name, const Vector2f* data, int length) noexcept

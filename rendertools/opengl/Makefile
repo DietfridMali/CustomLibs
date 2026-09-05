@@ -32,12 +32,14 @@ OPENGL_FILES := \
  rendertarget \
  shader \
  texture \
+ texturearray \
  texturebuffer \
  texturehandler
 
 COMMON_FILES := \
  base_noisetexture \
  base_quadmesh \
+ base_texturearray \
  base_renderer \
  base_shaderhandler \
  billboard \

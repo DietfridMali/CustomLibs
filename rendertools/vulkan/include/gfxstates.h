@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <array>
 #include <tuple>
@@ -177,6 +177,8 @@ inline GLenum TextureTypeToGLenum(TextureType t) noexcept {
         return GLenum(GL_TEXTURE_3D);
     case TextureType::CubeMap:
         return GLenum(GL_TEXTURE_CUBE_MAP);
+    case TextureType::Texture2DArray:
+        return GLenum(GL_TEXTURE_2D_ARRAY);
     default:
         return GLenum(GL_TEXTURE_2D);
     }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <type_traits>
 #include <cstring>
@@ -279,6 +279,7 @@ public:
     }
 
     int SetFloatArray(const char* name, const float* data, size_t length) noexcept;
+    int SetIntArray(const char* name, const int* data, size_t length) noexcept;
     int SetFloatArray(const char* name, const AutoArray<float>& data) noexcept {
         return SetFloatArray(name, data.Data(), data.Length());
     }

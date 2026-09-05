@@ -358,6 +358,10 @@ class Shader
             return SetUniformArray<float>(name, data, length);
         }
 
+        inline GLint SetIntArray(const char* name, const int* data, size_t length) noexcept {
+            return SetUniformArray<int>(name, data, length);
+        }
+
         inline GLint SetFloatArray(const char* name, const FloatArray& data) noexcept {
             return SetUniformArray<float>(name, data.DataPtr(), data.Length());
         }

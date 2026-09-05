@@ -20,6 +20,8 @@ FILES := \
  lightning_shader \
  cube \
  cubemap \
+ texturearray \
+ base_texturearray \
  fbo \
  ddsloader \
  fonthandler \

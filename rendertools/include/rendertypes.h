@@ -36,7 +36,11 @@ enum class GfxWrapMode : uint8_t {
 enum class TextureType : uint8_t {
     Texture2D = 0,
     Texture3D = 1,
-    CubeMap = 2
+    CubeMap = 2,
+    // A stack of same sized 2D images sampled with a third coordinate. Unlike an atlas every layer
+    // keeps its own borders and its own mip chain, so a layer can be filtered and mip mapped without
+    // bleeding a neighbour in - which is why sprite sheets belong here and not in a TextureAtlas.
+    Texture2DArray = 3
 };
 
 // Platform-neutral pixel formats used for textures uploaded from CPU-side data buffers.

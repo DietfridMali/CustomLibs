@@ -1,4 +1,4 @@
-#include "dx12upload.h"
+﻿#include "dx12upload.h"
 #include "commandlist.h"
 #include "gfxrenderer.h"
 #include "resource_handler.h"
@@ -230,6 +230,51 @@ static bool UploadSubresourceBlocks(ID3D12Device* device, ID3D12GraphicsCommandL
     dstLoc.SubresourceIndex = subresource;
     list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     return true;
+}
+
+
+// Same shape as UploadCompressedData below, for uncompressed pixels: one subresource per (layer, mip),
+// each layer's chain packed tightly with level 0 first.
+
+bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* layers,
+                            int layerCount, int width, int height, int channels, int mipCount,
+                            int firstLayer) noexcept
+{
+    if ((layerCount < 1) or (mipCount < 1) or (channels < 1) or (firstLayer < 0))
+        return false;
+
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureArrayData"));
+    if (not cl)
+        return false;
+
+    AutoArray<ComPtr<ID3D12Resource>> uploads;
+    uploads.Resize(uint32_t(layerCount * mipCount));
+    uint32_t uploadIdx = 0;
+    bool ok = true;
+
+    for (int layer = 0; ok and (layer < layerCount); ++layer) {
+        const uint8_t* level = layers[layer];
+        int w = width, h = height;
+        for (int mip = 0; mip < mipCount; ++mip) {
+            // D3D12 subresource index for (arraySlice, mipSlice) is mip + arraySlice * mipCount.
+            const UINT subresource = UINT(mip + (firstLayer + layer) * mipCount);
+            if (not UploadSubresource(device, cl->GfxList(), dstResource, subresource, level, w, h, channels,
+                                      uploads[uploadIdx++], false)) {
+                ok = false;
+                break;
+            }
+            level += size_t(w) * size_t(h) * size_t(channels);
+            w = (w > 1) ? (w >> 1) : 1;
+            h = (h > 1) ? (h >> 1) : 1;
+        }
+    }
+
+    if (not ok) {
+        baseRenderer.FinishOperation(cl);
+        return false;
+    }
+    SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
+    return baseRenderer.FinishOperation(cl, true);
 }
 
 

@@ -276,6 +276,7 @@ public:
     inline TextureType GetTextureType(void) const noexcept {
         if (m_type == GL_TEXTURE_3D)    return TextureType::Texture3D;
         if (m_type == GL_TEXTURE_CUBE_MAP) return TextureType::CubeMap;
+        if (m_type == GL_TEXTURE_2D_ARRAY) return TextureType::Texture2DArray;
         return TextureType::Texture2D;
     }
 

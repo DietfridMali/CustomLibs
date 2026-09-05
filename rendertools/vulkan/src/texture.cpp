@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include <utility>
 #include <stdio.h>
@@ -296,7 +296,9 @@ bool Texture::CreateSRV(void)
     info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     info.image = m_image;
     info.format = m_vkFormat;
-    info.viewType = (m_type == TextureType::CubeMap) ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_2D;
+    info.viewType = (m_type == TextureType::CubeMap) ? VK_IMAGE_VIEW_TYPE_CUBE
+                  : (m_type == TextureType::Texture2DArray) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                  : VK_IMAGE_VIEW_TYPE_2D;
     info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
     info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
     info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;

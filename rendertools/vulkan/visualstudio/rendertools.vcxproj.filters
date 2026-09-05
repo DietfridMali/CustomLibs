@@ -97,6 +97,9 @@
     <ClInclude Include="..\..\include\base_quadmesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\base_texturearray.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\projector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -153,6 +156,9 @@
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\cubemap.h">
+      <Filter>Header Files\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\texturearray.h">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\include\rendertarget.h">
@@ -269,6 +275,9 @@
     <ClCompile Include="..\..\src\base_quadmesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\base_texturearray.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\base_shaderhandler.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
@@ -370,6 +379,9 @@
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\cubemap.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\texturearray.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\src\rendertarget.cpp">

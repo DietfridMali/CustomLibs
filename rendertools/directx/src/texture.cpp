@@ -264,6 +264,13 @@ bool Texture::CreateSRV(void)
         // Expose the full mip chain (1 for the uncompressed cubemaps, N for BC skyboxes with mips).
         srvDesc.TextureCube.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
     }
+    else if (m_type == TextureType::Texture2DArray) {
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MostDetailedMip = 0;
+        srvDesc.Texture2DArray.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
+        srvDesc.Texture2DArray.FirstArraySlice = 0;
+        srvDesc.Texture2DArray.ArraySize = m_resource ? m_resource->GetDesc().DepthOrArraySize : 1;
+    }
     else {
         srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
         // Expose the full mip chain that was created (1 when mip-mapping is disabled).

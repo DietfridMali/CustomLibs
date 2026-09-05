@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "vkframework.h"
 #include "rendertypes.h"
@@ -84,6 +84,15 @@ bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
 // faces[f] points at face f's tightly-packed mip chain (level 0 first; ceil(w/4)*ceil(h/4)*GfxBlockBytes
 // bytes per level). dstImage must have been created with the matching BC VkFormat, arrayLayers ==
 // faceCount (1 for plain 2D, 6 for a cubemap) and the given mip count.
+// Upload an uncompressed 2D texture ARRAY: one copy per (layer, mip). layers[l] points at that layer's
+// tightly packed mip chain, level 0 first - what BaseTextureArray::BuildMipChains () hands out. The
+// image must exist with arrayLayers == layerCount and mipLevels == mipCount. firstLayer lets a caller
+// refresh a single layer in place: pass one pointer, layerCount 1 and that layer's index.
+bool UploadTextureArrayData(VkImage dstImage, ImageLayoutTracker& tracker,
+                            const uint8_t* const* layers, int layerCount,
+                            int width, int height, int channels, int mipCount,
+                            int firstLayer = 0) noexcept;
+
 bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
                           const uint8_t* const* faces, int faceCount,
                           int width, int height, GfxPixelFormat fmt, int mipCount) noexcept;

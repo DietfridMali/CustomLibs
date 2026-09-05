@@ -53,6 +53,7 @@ VULKAN_FILES := \
  shader_compiler \
  swapchain \
  texture \
+ texturearray \
  texturebuffer \
  texturehandler \
  vkcontext \
@@ -61,6 +62,7 @@ VULKAN_FILES := \
 COMMON_FILES := \
  base_noisetexture \
  base_quadmesh \
+ base_texturearray \
  base_renderer \
  base_shaderhandler \
  billboard \
