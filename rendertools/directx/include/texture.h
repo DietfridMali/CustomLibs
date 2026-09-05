@@ -88,7 +88,8 @@ public:
     List<String>                m_filenames;
     TextureType                 m_type{ TextureType::Texture2D };
     int                         m_tmuIndex{ -1 };
-    GfxWrapMode                 m_wrapMode{ GfxWrapMode::Repeat };
+    GfxWrapMode                 m_wrapMode{ GfxWrapMode::Repeat };    // U axis - set through SetWrapping ()
+    GfxWrapMode                 m_wrapModeV{ GfxWrapMode::Repeat };   // V/W axis; differs only where asked for
     int                         m_useMipMaps{ false };
     eTextureCompression         m_compression{ tcNone };  // set from the DDS format at load; tcNone = uncompressed / PNG
     bool                        m_hasParams{ false };

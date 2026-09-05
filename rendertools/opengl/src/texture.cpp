@@ -33,6 +33,7 @@ Texture::Texture(GLuint handle, int type, int wrapMode)
     , m_type(type)
     , m_tmuIndex(-1)
     , m_wrapMode(wrapMode)
+    , m_wrapModeV(wrapMode)
     , m_name("")
 {
 #if USE_TEXTURE_LUT
@@ -156,7 +157,15 @@ bool Texture::Bind(int tmuIndex, bool isDeploying)
 #else
         gfxStates.BindTexture(m_type, m_handle, tmuIndex);
 #endif
-    return m_tmuIndex >= 0;
+    if ((m_tmuIndex < 0) or isDeploying)
+        return m_tmuIndex >= 0;
+    // A wrap or filter wish made since the last time is applied HERE, on the texture that was just
+    // bound - SetWrapping () only records it, and glTexParameteri needs a binding. m_hasParams makes
+    // this a single comparison whenever nothing changed. Not while deploying: the texture is not
+    // finished then, and the upload calls SetParams () itself once it is. Same as DX and Vulkan.
+    if (not m_hasParams)
+        SetParams(false);
+    return true;
 }
 
 
@@ -200,36 +209,41 @@ void Texture::SetParams(bool forceUpdate) {
             glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
             glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
         }
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        // What SetWrapping () asked for, not a fixed GL_REPEAT - a texture that was created to clamp
+        // used to have that overwritten here on its first use.
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, m_wrapMode);
+        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, m_wrapModeV);
     }
 }
 
 
+// The GL constant for a wrap mode. ClampToBorder is a mode of its own - it used to fall back to
+// ClampToEdge, which smears the edge texel instead of reading the border colour.
+int Texture::GLWrapMode(GfxWrapMode wrapMode) noexcept {
+    switch (wrapMode) {
+        case GfxWrapMode::Repeat:        return int(GL_REPEAT);
+        case GfxWrapMode::ClampToBorder: return int(GL_CLAMP_TO_BORDER);
+        default:                         return int(GL_CLAMP_TO_EDGE);
+    }
+}
+
+
+// Records the wish and leaves the applying to SetParams (). It used to bind the texture, write the
+// parameters and RELEASE it again - which took the binding away from whoever had just made it, and
+// SetParams () overwrote the result with GL_REPEAT the next time it ran anyway.
 void Texture::SetWrapping(GfxWrapMode wrapMode)
 noexcept
 {
-    if (Bind()) {
-        const int glMode = (wrapMode == GfxWrapMode::Repeat) ? int(GL_REPEAT) : int(GL_CLAMP_TO_EDGE);
-        m_wrapMode = glMode;
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, m_wrapMode);
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, m_wrapMode);
-        Release();
-    }
+    SetWrapping(wrapMode, wrapMode);
 }
 
 
 void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
 noexcept
 {
-    if (Bind()) {
-        const int glModeU = (wrapU == GfxWrapMode::Repeat) ? int(GL_REPEAT) : int(GL_CLAMP_TO_EDGE);
-        const int glModeV = (wrapV == GfxWrapMode::Repeat) ? int(GL_REPEAT) : int(GL_CLAMP_TO_EDGE);
-        m_wrapMode = glModeU;
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, glModeU);
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, glModeV);
-        Release();
-    }
+    m_wrapMode = GLWrapMode(wrapU);
+    m_wrapModeV = GLWrapMode(wrapV);
+    m_hasParams = false;   // SetParams () writes them on the next use
 }
 
 

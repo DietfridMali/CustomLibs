@@ -101,7 +101,8 @@ public:
     List<String>                m_filenames;
     GLenum                      m_type{ GL_TEXTURE_2D };
     int                         m_tmuIndex{ -1 };
-    int                         m_wrapMode{ GL_REPEAT };
+    int                         m_wrapMode{ GL_REPEAT };   // GL constant, S axis - set through SetWrapping ()
+    int                         m_wrapModeV{ GL_REPEAT };  // T axis; the two differ only where asked for
     int                         m_useMipMaps{ false };
     eTextureCompression         m_compression{ tcNone };  // set from the DDS format at load; tcNone = uncompressed / PNG
     bool                        m_hasParams{ false };
@@ -136,7 +137,12 @@ public:
         return updateLUT;
     }
 
-    Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_CLAMP_TO_EDGE);
+    // GL_REPEAT, not GL_CLAMP_TO_EDGE: SetParams () forced repeat on every texture regardless of this
+    // value, so repeat is what the default HAS been all along. Now that SetParams () reads the member,
+    // the default has to say the same thing.
+    Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_REPEAT);
+
+    static int GLWrapMode(GfxWrapMode wrapMode) noexcept;
 
     ~Texture() noexcept;
 

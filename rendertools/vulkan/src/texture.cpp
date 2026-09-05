@@ -236,9 +236,11 @@ void Texture::SetParams(bool forceUpdate)
     m_sampling.minFilter = GfxFilterMode::Linear;
     m_sampling.magFilter = GfxFilterMode::Linear;
     m_sampling.mipMode = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
-    m_sampling.wrapU = GfxWrapMode::Repeat;
-    m_sampling.wrapV = GfxWrapMode::Repeat;
-    m_sampling.wrapW = GfxWrapMode::Repeat;
+    // What SetWrapping () asked for, not a fixed Repeat - a texture created to clamp used to have that
+    // overwritten here on its first use. TiledTexture::SetParams () sets Repeat on purpose.
+    m_sampling.wrapU = m_wrapMode;
+    m_sampling.wrapV = m_wrapModeV;
+    m_sampling.wrapW = m_wrapModeV;
     m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
     // Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
     m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;
@@ -427,19 +429,18 @@ void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t out
 
 void Texture::SetWrapping(GfxWrapMode wrapMode) noexcept
 {
-    m_wrapMode = wrapMode;
-    m_sampling.wrapU = wrapMode;
-    m_sampling.wrapV = wrapMode;
-    m_sampling.wrapW = wrapMode;
+    SetWrapping(wrapMode, wrapMode);
 }
 
 
 void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept
 {
     m_wrapMode = wrapU;
+    m_wrapModeV = wrapV;
     m_sampling.wrapU = wrapU;
     m_sampling.wrapV = wrapV;
     m_sampling.wrapW = wrapV;
+    m_hasParams = false;   // SetParams () writes them on the next use
 }
 
 
