@@ -41,20 +41,28 @@ void VariableTextureAtlas::Reset(void) noexcept {
 }
 
 
-int VariableTextureAtlas::Add(int width, int height) {
+int VariableTextureAtlas::Add(int width, int height, int padding) {
 	if (not m_atlas)
 		return -1;
 
 	SkylinePacker::Place place;
 
+	// The packer reserves the margin with it; the tile that comes out of this is the usable area inside.
 	// A refusal leaves the packer untouched, so the same tile can be offered to the next atlas.
-	if (not m_packer.Add(width, height, place))
+	if (not m_packer.Add(width + 2 * padding, height + 2 * padding, place))
+		return -1;
+	return Place(place.x + padding, place.y + padding, width, height);
+}
+
+
+int VariableTextureAtlas::Place(int x, int y, int width, int height) {
+	if (not m_atlas)
 		return -1;
 
 	Tile tile;
 
-	tile.x = place.x;
-	tile.y = place.y;
+	tile.x = x;
+	tile.y = y;
 	tile.w = width;
 	tile.h = height;
 	if (not m_tiles.Append(std::move(tile)))

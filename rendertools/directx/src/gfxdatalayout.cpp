@@ -279,7 +279,11 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     }
     {
         ZoneScopedN("Layout::Finish");
-        DeactivateTextures(textures);
+        // The textures stay bound. GfxStates::BindTexture () returns at once when the same texture is
+            // already on the same unit, so a batch that keeps using them costs nothing after the first draw -
+            // releasing them here threw that away and made every draw bind again, plus two calls for the
+            // release itself. Nor did it protect anything: a slot a later draw does not assign is a fault in
+            // that draw's shader setup, and one that is better seen than papered over.
         FinishRender();
     }
     {

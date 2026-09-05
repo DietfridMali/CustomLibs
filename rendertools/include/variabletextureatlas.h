@@ -70,7 +70,18 @@ public:
 
 	// Reserves width x height texels and returns the tile's INDEX, or -1 when the atlas is full.
 	// Tiles are handed out in call order, so the index is the caller's to use as it likes.
-	int Add(int width, int height);
+	//
+	// padding is a margin RESERVED AROUND the tile and belonging to nobody - it keeps a filter that
+	// samples near an edge from reaching into the neighbour. What the tile then IS, and what GetTile ()
+	// and the two UV calls report, is the usable area inside that margin: the caller asks for the size
+	// it wants to write and gets exactly that back, whatever the packer had to set aside for it.
+	int Add(int width, int height, int padding = 0);
+
+	// A tile at a FIXED place, for an arrangement that was worked out elsewhere - read back from a file,
+	// say - instead of packed here. The packer is not consulted and the area is not checked against
+	// other tiles: whoever hands the rectangle in is stating that it is free. Same index sequence as
+	// Add (), and the rectangle is the usable area, as there.
+	int Place(int x, int y, int width, int height);
 
 	// Frees every tile without touching the render target, so the same atlas can be packed again.
 	void Reset(void) noexcept;
