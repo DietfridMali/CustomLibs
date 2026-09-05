@@ -47,15 +47,18 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
 }
 
 
+// A registered texture leaves textureLUT when it is deleted, whether or not it ever became valid:
+// the registration happens in TextureHandler::GetTexture () BEFORE the texture is loaded, so a load
+// that fails is deleted while the LUT still points at it (Skybox::LoadTextures () does exactly that).
+// Tying the removal to m_isValid left that dangling pointer behind.
 Texture::~Texture() noexcept
 {
-    if (m_isValid) {
-        if (UpdateLUT()) {
-            textureLUT.Remove(m_name);
-            m_name = "";
-        }
-        Destroy();
+    if (UpdateLUT() and (m_name.Length() > 0)) {
+        textureLUT.Remove(m_name);
+        m_name = "";
     }
+    if (m_isValid)
+        Destroy();
 }
 
 
@@ -338,7 +341,12 @@ bool Texture::Redeploy(void)
 bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params)
 {
     m_filenames = fileNames;
-    m_name = fileNames.First();
+    // The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
+    // replaced by the file name here: the destructor removes the entry under m_name, and with the
+    // key overwritten the LUT kept a dangling pointer under the registration key while removing a
+    // key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
+    if (m_name.Length() == 0)
+        m_name = fileNames.First();
     TextureBuffer* texBuf = nullptr;
     for (auto& fileName : fileNames) {
         if (fileName.IsEmpty()) {

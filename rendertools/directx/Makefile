@@ -18,6 +18,8 @@ FILES := \
  blur_shader \
  tonemap_shader \
  lightning_shader \
+ blackhole_shader \
+ skybox_shader \
  cube \
  cubemap \
  texturearray \

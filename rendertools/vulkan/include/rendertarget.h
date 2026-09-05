@@ -63,11 +63,20 @@ public:
     // (RenderTarget::SelectCubeFace).
     VkImageView         m_cubeView[6] { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE,
                                         VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
+    // A colour buffer that is a texture ARRAY is one image with m_layerView.Length () array layers, and
+    // an attachment addresses exactly one layer - the same situation as the cube map above, only with a
+    // layer count that is not fixed at six. m_imageView is the 2D_ARRAY view used for sampling;
+    // m_layerView[layer] is what gets attached (RenderTarget::SelectArrayLayer).
+    AutoArray<VkImageView> m_layerView;
     VkImageView         m_depthSampleView { VK_NULL_HANDLE };  // depth-only sampling view (set for btDepth)
     ImageLayoutTracker  m_layoutTracker;
     uint32_t            m_srvIndex    { UINT32_MAX };  // logical id for source-compat
     eBufferType         m_type        { btColor };
     VkFormat            m_colorFormat { VK_FORMAT_R8G8B8A8_UNORM };  // per-RT color format; HDR scene/sky use R16G16B16A16_SFLOAT
+    // Rendered into one layer at a time, sampled as a whole through a sampler2DArray. A flag rather
+    // than a buffer type of its own, because such a buffer IS a colour buffer - it takes part in MRT,
+    // in the attachment list and in every count, and only its views differ.
+    bool                m_isArray     { false };
 
     void Init(void);
 
@@ -117,6 +126,11 @@ public:
         // Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
         // square by definition. Its format is separate from colorFormat: a shadow cube map holds one
         // distance per texel, a colour target holds RGBA.
+        // Makes the colour buffers texture ARRAYS of this many layers, each layer of the target's own
+        // width and height, in colorFormat like any colour buffer. Rendering picks one layer at a time
+        // (SelectArrayLayer); sampling reads the whole stack through a sampler2DArray. Everything else
+        // - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
+        int arrayLayerCount{ 0 };
         int cubeMapCount{ 0 };
         VkFormat cubeMapFormat{ VK_FORMAT_R32_SFLOAT };
         bool hasMRTs{ false };
@@ -168,6 +182,10 @@ public:
     int                 m_cubeMapIndex{ -1 };         // start of cube-map slot range in m_bufferInfo
     int                 m_cubeMapCount{ 0 };
     int                 m_cubeFace{ 0 };              // face currently attached, see SelectCubeFace
+    // Layers per colour buffer. 0 means plain 2D buffers; anything else makes EVERY colour buffer of
+    // this target a texture array of that many layers, of which m_arrayLayer is the one attached.
+    int                 m_arrayLayerCount{ 0 };
+    int                 m_arrayLayer{ 0 };            // layer currently attached, see SelectArrayLayer
     int                 m_activeBufferIndex{ 0 };
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };
@@ -306,12 +324,14 @@ public:
     // It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
     // per frame - and it has to be called OUTSIDE frame recording, where it can flush a command list
     // of its own and wait for it.
-    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize);
+    // arraySlice picks the LAYER on a colour buffer that is a texture array (arrayLayerCount > 0) and
+    // is ignored on a plain one.
+    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);
 
     // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
     // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
     // Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
-    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize);
+    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
 
     // Bytes one colour buffer occupies, at the target's scaled size and its colour format.
     size_t BufferSize(int bufferIndex);
@@ -438,6 +458,29 @@ public:
     // that have not moved.
     bool SelectCubeFace(int face, int bufferIndex = -1);
 
+    // Points the attachments at one layer of the colour buffer arrays - ALL of them, so an MRT pass
+    // writes the same layer of every buffer. Everything drawn afterwards lands on that layer until
+    // another one is selected.
+    bool SelectArrayLayer(int layer);
+
+    inline int ArrayLayerCount(void) noexcept {
+        return m_arrayLayerCount;
+    }
+
+    inline int ArrayLayer(void) noexcept {
+        return m_arrayLayer;
+    }
+
+    inline bool HasArrayBuffers(void) noexcept {
+        return m_arrayLayerCount > 0;
+    }
+
+    // What a colour attachment has to point at. For a plain buffer that is m_imageView; for a buffer
+    // made of layers - a cube map or a texture array - it is the view of the ONE layer selected, since
+    // an attachment addresses a single layer and the cube / array view over all of them is only good
+    // for sampling.
+    VkImageView AttachmentView(int bufferIndex) noexcept;
+
     inline int CubeMapIndex(int i = 0) noexcept {
         return m_cubeMapCount ? m_cubeMapIndex + i : -1;
     }
@@ -474,6 +517,10 @@ private:
     bool CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspectFlags aspect);
 
     void CreateColorBuffer(BufferInfo& info, int w, int h);
+
+    // One image of m_arrayLayerCount layers, with a view per layer to render into and a 2D_ARRAY view
+    // over all of them to sample with.
+    void CreateArrayBuffer(BufferInfo& info, int w, int h, VkFormat fmt);
 
     // One image with six layers plus its seven views - see the implementation. Square by definition,
     // hence one edge length instead of width and height.

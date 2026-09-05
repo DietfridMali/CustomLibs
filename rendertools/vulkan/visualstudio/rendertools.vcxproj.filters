@@ -372,6 +372,12 @@
     <ClCompile Include="..\src\lightning_shader.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\blackhole_shader.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\skybox_shader.cpp">
+      <Filter>Source Files\Vulkan</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\commandlist.cpp">
       <Filter>Source Files\Vulkan</Filter>
     </ClCompile>

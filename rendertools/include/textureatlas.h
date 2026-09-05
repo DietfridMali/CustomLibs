@@ -17,12 +17,18 @@
 class BaseTextureAtlas {
 protected:
 	RenderTarget*	m_atlas;
+	// An atlas normally owns its target. It may instead be ONE ARRAY LAYER of a target somebody else
+	// owns - which is what puts many pages of the same atlas into a single texture, so a shader reaches
+	// them through a layer index instead of through a texture binding. m_layer is that page's layer;
+	// Activate () selects it, and the owner is responsible for the target's life.
+	bool			m_ownsAtlas;
+	int				m_layer;
 
 	static BaseQuadMesh	renderQuad;
 
 public:
 	BaseTextureAtlas()
-		: m_atlas(nullptr)
+		: m_atlas(nullptr), m_ownsAtlas(true), m_layer(0)
 	{
 	}
 
@@ -31,8 +37,11 @@ public:
 	~BaseTextureAtlas() = default;
 
 	void Destroy(void) {
-		delete m_atlas;
+		if (m_ownsAtlas)
+			delete m_atlas;
 		m_atlas = nullptr;
+		m_ownsAtlas = true;
+		m_layer = 0;
 	}
 
 	// Sets up the shared quad the render calls below draw with. Once per program run, not per atlas.
@@ -44,8 +53,14 @@ public:
 		return m_atlas ? m_atlas->GetAsTexture({}) :  nullptr;
 	}
 
+	// Selecting the layer BEFORE activating: Activate () attaches and clears, and a clear has to land on
+	// this page's layer rather than on whichever one was selected last.
 	inline bool Activate(void) {
-		return m_atlas ? m_atlas->Activate({ .clear = true }) : false;
+		if (m_atlas == nullptr)
+			return false;
+		if (m_atlas->HasArrayBuffers())
+			m_atlas->SelectArrayLayer(m_layer);
+		return m_atlas->Activate({ .clear = true });
 	}
 
 	inline void Deactivate(void) {
@@ -72,6 +87,14 @@ public:
 
 	inline bool IsAvailable(void) noexcept {
 		return m_atlas != nullptr;
+	}
+
+	inline int Layer(void) noexcept {
+		return m_layer;
+	}
+
+	inline bool OwnsRenderTarget(void) noexcept {
+		return m_ownsAtlas;
 	}
 };
 

@@ -62,9 +62,13 @@ void BufferInfo::Init(void)
     DSV().Handle() = {};
     m_dsvReadOnly.Handle() = {};
     m_uav.Handle() = {};
+    for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
+        m_arrayRtv[layer].Handle() = {};
+    m_arrayRtv.Destroy();
     m_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     m_type = btColor;
     m_hasStencil = false;
+    m_isArray = false;
 }
 
 
@@ -167,6 +171,12 @@ void BufferInfo::Release(void) {
         for (int face = 0; face < 6; ++face)
             gfxResourceHandler.Track(m_cubeRtv[face].Handle());
     }
+    // Same on an array buffer: m_rtv is an ALIAS of m_arrayRtv[m_arrayLayer], so tracking both would
+    // hand the same descriptor slot back twice. The per layer views are tracked instead.
+    else if (m_isArray) {
+        for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
+            gfxResourceHandler.Track(m_arrayRtv[layer].Handle());
+    }
     else
         gfxResourceHandler.Track(m_rtv.Handle());
     gfxResourceHandler.Track(m_srv.Handle());
@@ -196,6 +206,8 @@ void RenderTarget::Init(void)
     m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
+    m_arrayLayerCount = 0;
+    m_arrayLayer = 0;
     m_activeBufferIndex = 0;
     m_lastDestination = -1;
     m_pingPong = false;
@@ -242,6 +254,18 @@ bool BufferInfo::AllocCubeViews(void)
 }
 
 
+bool BufferInfo::AllocArrayViews(int layerCount)
+{
+    m_arrayRtv.Resize(layerCount);
+    for (int layer = 0; layer < layerCount; ++layer)
+        if (not m_arrayRtv[layer].Create(m_resource, ViewFormat(), layer))
+            return false;
+    // The layer selected first is layer 0 - RenderTarget::SelectArrayLayer () moves m_rtv along.
+    m_rtv = m_arrayRtv[0];
+    return m_srv.CreateArray(m_resource, ViewFormat(), layerCount);
+}
+
+
 bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, int edge)
 {
     info.m_colorFormat = m_cubeMapFormat;
@@ -269,14 +293,22 @@ bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, i
 bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
     info.m_colorFormat = m_colorFormat;
+    info.m_isArray = m_arrayLayerCount > 0;
     D3D12_CLEAR_VALUE cv{};
     cv.Format = info.ViewFormat();
-    info.m_resource = CreateRTResource(device, w, h, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type));
+    int arraySize = info.m_isArray ? m_arrayLayerCount : 1;
+    info.m_resource = CreateRTResource(device, w, h, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type), arraySize);
     if (not info.m_resource)
         return false;
     info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    if (not info.AllocSRV())
+    // An array buffer takes its views here - one RTV per layer plus an array SRV - instead of the
+    // plain SRV (and the RTV that AllocRTV () makes for a single 2D resource) below.
+    if (info.m_isArray) {
+        if (not info.AllocArrayViews(m_arrayLayerCount))
+            return false;
+    }
+    else if (not info.AllocSRV())
         return false;
 
     auto* list = m_cmdList->GfxList();
@@ -322,6 +354,23 @@ bool RenderTarget::SelectCubeFace(int face, int bufferIndex)
         return false;
     m_cubeFace = face;
     m_bufferInfo[index].m_rtv = m_bufferInfo[index].m_cubeRtv[face];
+    return true;
+}
+
+
+bool RenderTarget::SelectArrayLayer(int layer)
+{
+    if ((m_arrayLayerCount <= 0) or (layer < 0) or (layer >= m_arrayLayerCount))
+        return false;
+    if (m_arrayLayer == layer)
+        return true;
+    m_arrayLayer = layer;
+    // EVERY colour buffer moves, so an MRT pass writes the same layer of all of them. m_rtv is the view
+    // everything that binds render targets reads, so moving it is the whole operation - there is no
+    // attach/detach here as there is in OpenGL.
+    for (int i = 0; i < m_colorBufferCount; ++i)
+        if (m_bufferInfo[i].m_isArray and (layer < m_bufferInfo[i].m_arrayRtv.Length()))
+            m_bufferInfo[i].m_rtv = m_bufferInfo[i].m_arrayRtv[layer];
     return true;
 }
 
@@ -386,6 +435,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
     m_cubeMapFormat = params.cubeMapFormat;
+    // Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of resource to
+    // allocate, and SelectArrayLayer () bounds against it.
+    m_arrayLayerCount = params.arrayLayerCount;
+    m_arrayLayer = 0;
     // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
     // for stencil without depth still yields one combined buffer.
     m_hasStencil = params.stencilBufferCount > 0;
@@ -1095,7 +1148,7 @@ size_t RenderTarget::BufferSize(int bufferIndex) {
 }
 
 
-bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) {
+bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice) {
     if (not (buffer and m_isAvailable))
         return false;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
@@ -1154,7 +1207,7 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) 
 
     srcLoc.pResource = resource;
     srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    srcLoc.SubresourceIndex = 0;
+    srcLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0);   // one mip level, so the index IS the layer
     dstLoc.pResource = readback.Get();
     dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dstLoc.PlacedFootprint = layout;
@@ -1186,7 +1239,7 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) 
 
 // =================================================================================================
 
-bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize) {
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice) {
     if (not (data and m_isAvailable))
         return false;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
@@ -1264,7 +1317,7 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     srcLoc.PlacedFootprint = layout;
     dstLoc.pResource = resource;
     dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    dstLoc.SubresourceIndex = 0;
+    dstLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0);   // one mip level, so the index IS the layer
     if (ID3D12GraphicsCommandList* list = cl->GfxList())
         list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     info.SetState(cl, stateBefore);

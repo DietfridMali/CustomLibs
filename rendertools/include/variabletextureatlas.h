@@ -84,6 +84,17 @@ public:
 	int Place(int x, int y, int width, int height);
 
 	// Frees every tile without touching the render target, so the same atlas can be packed again.
+	// Creates ONE target for `pages` atlas pages: `layers` colour buffers, each an array of `pages`
+	// layers. Every page is then attached to it with Attach () below and is one layer of that array, so
+	// all of them are reachable through a single binding and a layer index. The caller owns the target
+	// that comes back and has to outlive every page attached to it.
+	static RenderTarget* CreateShared(String name, int width, int height, int pages, int layers = 1,
+												 GfxPixelFormat format = GfxPixelFormat::RGBA8_UNorm, int scale = 1);
+
+	// This atlas becomes page `layer` of a shared target. It does not own the target: Destroy () only
+	// drops the pointer, and the packing state is reset as Create () leaves it.
+	bool Attach(RenderTarget* target, int layer);
+
 	void Reset(void) noexcept;
 
 	inline int TileCount(void) noexcept {

@@ -207,6 +207,8 @@
     <ClCompile Include="..\src\blur_shader.cpp" />
     <ClCompile Include="..\src\tonemap_shader.cpp" />
     <ClCompile Include="..\src\lightning_shader.cpp" />
+    <ClCompile Include="..\src\blackhole_shader.cpp" />
+    <ClCompile Include="..\src\skybox_shader.cpp" />
     <ClCompile Include="..\..\src\cube.cpp" />
     <ClCompile Include="..\src\cbv_allocator.cpp" />
     <ClCompile Include="..\src\commandlist.cpp" />

@@ -28,6 +28,8 @@ VULKAN_FILES := \
  blur_shader \
  tonemap_shader \
  lightning_shader \
+ blackhole_shader \
+ skybox_shader \
  cbv_allocator \
  commandlist \
  compute_shader \

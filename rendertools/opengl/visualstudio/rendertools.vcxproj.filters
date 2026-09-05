@@ -299,6 +299,12 @@
     <ClCompile Include="..\src\lightning_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\blackhole_shader.cpp">
+      <Filter>Source Files\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\skybox_shader.cpp">
+      <Filter>Source Files\Shader</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\framecounter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

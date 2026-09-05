@@ -88,6 +88,10 @@ public:
 	// A six slice resource seen as a CUBE MAP, so a shader samples it by direction instead of by slice
 	// index. Additive, like the RTV overload above.
 	bool CreateCube(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format);
+
+	// The whole stack of a texture ARRAY as one view, sampled by layer index (Texture2DArray in HLSL,
+	// sampler2DArray in GLSL). The RTVs address the slices one at a time, this reads all of them.
+	bool CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int layerCount);
 };
 
 

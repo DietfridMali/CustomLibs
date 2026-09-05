@@ -32,8 +32,10 @@ Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseNam
 }
 
 
-int Skybox::MaxTextureSize(void) {
+int Skybox::MaxTextureSize(int maxTextureSize) {
 	int maxSize = gfxStates.MaxTextureSize();
+	if ((maxTextureSize > 0) and (maxTextureSize < maxSize))
+		maxSize = maxTextureSize;
 	if (maxSize >= 4096)
 		return 0;
 	if (maxSize >= 2048)
@@ -44,10 +46,10 @@ int Skybox::MaxTextureSize(void) {
 }
 
 
-bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture, Texture* blueNoise) {
+bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture, Texture* blueNoise, int maxTextureSize) {
 	m_noiseTexture = noiseTexture;
 	m_blueNoise = blueNoise;
-	int textureSize = MaxTextureSize();
+	int textureSize = MaxTextureSize(maxTextureSize);
 	if (textureSize < 0)
 		return false;
 
@@ -92,6 +94,30 @@ bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture,
 	m_skybox->SetIndices(indices);
 	m_skybox->UpdateData();
 	return true;
+}
+
+
+// The night sky and star map entries alias one texture across all three slots (Setup ()), so a
+// straight loop over the array would delete the same object three times - collect what is there and
+// clear every reference to it first.
+
+void Skybox::Destroy(void) {
+	for (int i = 0; i < 3; i++) {
+		for (int j = 0; j < 3; j++) {
+			Cubemap* texture = m_skyTextures[i][j];
+			if (texture == nullptr)
+				continue;
+			for (int k = j; k < 3; k++)
+				if (m_skyTextures[i][k] == texture)
+					m_skyTextures[i][k] = nullptr;
+			delete texture;
+		}
+	}
+	if (m_skybox != nullptr) {
+		delete m_skybox;
+		m_skybox = nullptr;
+	}
+	m_activationTime = -1;
 }
 
 

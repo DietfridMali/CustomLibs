@@ -129,9 +129,11 @@ void BufferInfo::Init(void)
     m_depthSampleView = VK_NULL_HANDLE;
     for (int face = 0; face < 6; ++face)
         m_cubeView[face] = VK_NULL_HANDLE;
+    m_layerView.Destroy();
     m_layoutTracker = ImageLayoutTracker { };
     m_srvIndex = UINT32_MAX;
     m_type = btColor;
+    m_isArray = false;
 }
 
 
@@ -185,6 +187,19 @@ void BufferInfo::Release(void)
         });
         m_cubeView[face] = VK_NULL_HANDLE;
     }
+    // The per layer views of an array buffer, for the same reason: m_imageView is the 2D_ARRAY view
+    // over all layers and a separate object.
+    for (int layer = 0; layer < m_layerView.Length(); ++layer) {
+        if ((m_layerView[layer] == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
+            continue;
+
+        VkImageView view = m_layerView[layer];
+
+        gfxResourceHandler.TrackCleanup([device, view]() {
+            vkDestroyImageView(device, view, nullptr);
+        });
+        m_layerView[layer] = VK_NULL_HANDLE;
+    }
     if ((m_depthSampleView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
         VkImageView view = m_depthSampleView;
         gfxResourceHandler.TrackCleanup([device, view]() {
@@ -218,6 +233,8 @@ void RenderTarget::Init(void)
     m_width = m_height = 0;
     m_scale = 1;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
+    m_arrayLayerCount = 0;
+    m_arrayLayer = 0;
     m_extraBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
@@ -301,6 +318,11 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 {
     VkFormat fmt = (info.m_type == BufferInfo::btColor) ? info.m_colorFormat : FormatForType(info.m_type);
+    info.m_isArray = (info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0);
+    if (info.m_isArray) {
+        CreateArrayBuffer(info, w, h, fmt);
+        return;
+    }
     if (not CreateRTImage(w, h, fmt, UsageForType(info.m_type),
                           info.m_image, info.m_allocation))
         return;
@@ -358,6 +380,85 @@ void RenderTarget::CreateCubemapBuffer(BufferInfo& info, int edge)
     cubeView.subresourceRange.layerCount = 6;
     if (vkCreateImageView(device, &cubeView, nullptr, &info.m_imageView) != VK_SUCCESS)
         fprintf(stderr, "RenderTarget::CreateCubemapBuffer: cube view creation failed\n");
+}
+
+
+// One image with m_arrayLayerCount layers: one single layer view per layer to render into, one
+// 2D_ARRAY view over all of them to sample with. Same split as the cube map above, and for the same
+// reason - an attachment addresses exactly one layer.
+
+void RenderTarget::CreateArrayBuffer(BufferInfo& info, int w, int h, VkFormat fmt)
+{
+    VkDevice device = vkContext.Device();
+
+    if (not CreateRTImage(w, h, fmt, UsageForType(BufferInfo::btColor),
+                          info.m_image, info.m_allocation, m_arrayLayerCount))
+        return;
+    info.m_layoutTracker.Init(info.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    info.m_layerView.Resize(m_arrayLayerCount);
+    for (int layer = 0; layer < m_arrayLayerCount; ++layer) {
+        VkImageViewCreateInfo vci { };
+
+        vci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        vci.image = info.m_image;
+        vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        vci.format = fmt;
+        vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        vci.subresourceRange.levelCount = 1;
+        vci.subresourceRange.baseArrayLayer = uint32_t(layer);
+        vci.subresourceRange.layerCount = 1;
+        if (vkCreateImageView(device, &vci, nullptr, &info.m_layerView[layer]) != VK_SUCCESS) {
+            fprintf(stderr, "RenderTarget::CreateArrayBuffer: vkCreateImageView failed for layer %d\n", layer);
+            return;
+        }
+    }
+
+    VkImageViewCreateInfo arrayView { };
+
+    arrayView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    arrayView.image = info.m_image;
+    arrayView.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    arrayView.format = fmt;
+    arrayView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    arrayView.subresourceRange.levelCount = 1;
+    arrayView.subresourceRange.baseArrayLayer = 0;
+    arrayView.subresourceRange.layerCount = uint32_t(m_arrayLayerCount);
+    if (vkCreateImageView(device, &arrayView, nullptr, &info.m_imageView) != VK_SUCCESS) {
+        fprintf(stderr, "RenderTarget::CreateArrayBuffer: array view creation failed\n");
+        return;
+    }
+    // The same logical id CreateSRV () derives - GetAsTexture () and everything downstream identify a
+    // buffer's sampling source by it, and an array buffer does not go through CreateSRV ().
+    info.m_srvIndex = uint32_t(uintptr_t(info.m_imageView) & 0xFFFFFFFFu);
+}
+
+
+// The view a colour attachment has to point at. A cube map's or an array's m_imageView is the view
+// over ALL layers and can only be sampled through - attaching it is invalid, an attachment addresses
+// one layer. Which one that is comes from SelectCubeFace () / SelectArrayLayer ().
+
+VkImageView RenderTarget::AttachmentView(int bufferIndex) noexcept
+{
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
+        return VK_NULL_HANDLE;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    if (info.m_isArray)
+        return (m_arrayLayer < info.m_layerView.Length()) ? info.m_layerView[m_arrayLayer] : VK_NULL_HANDLE;
+    if (info.m_type == BufferInfo::btCubemap)
+        return ((m_cubeFace >= 0) and (m_cubeFace < 6)) ? info.m_cubeView[m_cubeFace] : VK_NULL_HANDLE;
+    return info.m_imageView;
+}
+
+
+bool RenderTarget::SelectArrayLayer(int layer)
+{
+    if ((m_arrayLayerCount <= 0) or (layer < 0) or (layer >= m_arrayLayerCount))
+        return false;
+    // EVERY colour buffer moves with it, so an MRT pass writes the same layer of all of them - which is
+    // why this is one number on the target rather than one per buffer. AttachmentView () reads it.
+    m_arrayLayer = layer;
+    return true;
 }
 
 
@@ -428,6 +529,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
     m_cubeMapFormat = params.cubeMapFormat;
+    // Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of image to
+    // allocate, and SelectArrayLayer () bounds against it.
+    m_arrayLayerCount = params.arrayLayerCount;
+    m_arrayLayer = 0;
     // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
     // for stencil without depth still yields one combined buffer.
     m_hasStencil = params.stencilBufferCount > 0;
@@ -571,12 +676,12 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
     bool wantDepth = (depthInfo != nullptr);
 
     auto ConfigColor = [&](int i) {
-        BufferInfo& bi = m_bufferInfo[i];
-        if (bi.m_imageView == VK_NULL_HANDLE)
+        VkImageView attachment = AttachmentView(i);
+        if (attachment == VK_NULL_HANDLE)
             return;
         VkRenderingAttachmentInfo a{};
         a.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        a.imageView   = bi.m_imageView;
+        a.imageView   = attachment;
         a.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         a.loadOp      = clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
         a.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
@@ -607,9 +712,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
         int listed = m_customDrawBuffers.Length();
         for (int i = 0; (i < listed) and (colorCount < RT_MAX_COLOR_BUFFERS); ++i) {
             int bufferIndex = m_customDrawBuffers[i];
-            VkImageView view = VK_NULL_HANDLE;
-            if ((bufferIndex >= 0) and (bufferIndex < m_bufferCount))
-                view = m_bufferInfo[bufferIndex].m_imageView;
+            VkImageView view = AttachmentView(bufferIndex);
             VkRenderingAttachmentInfo a{};
             a.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
             a.imageView   = view;
@@ -1394,7 +1497,7 @@ size_t RenderTarget::BufferSize(int bufferIndex) {
 }
 
 
-bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) {
+bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice) {
     if (not (buffer and m_isAvailable))
         return false;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
@@ -1433,7 +1536,7 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) 
     copy.bufferImageHeight = 0;
     copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     copy.imageSubresource.mipLevel = 0;
-    copy.imageSubresource.baseArrayLayer = 0;
+    copy.imageSubresource.baseArrayLayer = uint32_t(info.m_isArray ? arraySlice : 0);
     copy.imageSubresource.layerCount = 1;
     copy.imageOffset = { 0, 0, 0 };
     copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };
@@ -1459,7 +1562,7 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) 
 
 // =================================================================================================
 
-bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize) {
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice) {
     if (not (data and m_isAvailable))
         return false;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
@@ -1503,7 +1606,7 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     copy.bufferImageHeight = 0;
     copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     copy.imageSubresource.mipLevel = 0;
-    copy.imageSubresource.baseArrayLayer = 0;
+    copy.imageSubresource.baseArrayLayer = uint32_t(info.m_isArray ? arraySlice : 0);
     copy.imageSubresource.layerCount = 1;
     copy.imageOffset = { 0, 0, 0 };
     copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };

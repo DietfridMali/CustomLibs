@@ -59,6 +59,11 @@ public:
     // the view of the face currently selected (RenderTarget::SelectCubeFace), so everything that binds
     // render targets goes on working unchanged.
     RTV                     m_cubeRtv[6];
+    // A colour buffer that is a texture ARRAY is one resource with m_arrayRtv.Length () slices, and a
+    // render target view addresses exactly one of them - the same situation as the cube map above, only
+    // with a layer count that is not fixed at six. m_rtv stays the view of the layer currently selected
+    // (RenderTarget::SelectArrayLayer), so everything that binds render targets goes on working.
+    AutoArray<RTV>          m_arrayRtv;
     SRV                     m_srv;
     DSV                     m_dsv;
     DSV                     m_dsvReadOnly;   // read-only depth view (compare, no write) for simultaneous SRV sampling
@@ -69,6 +74,10 @@ public:
     // Set by RenderTarget::CreateDepthBuffer before the views are allocated: this depth buffer carries a
     // stencil plane, so resource, DSV and SRV all have to use the combined formats.
     bool                    m_hasStencil{ false };
+    // Rendered into one layer at a time, sampled as a whole through a Texture2DArray. A flag rather
+    // than a buffer type of its own, because such a buffer IS a colour buffer - it takes part in MRT,
+    // in the RTV list and in every count, and only its views differ.
+    bool                    m_isArray{ false };
 
     void Init(void);
 
@@ -79,6 +88,10 @@ public:
     // Six render target views, one per cube map face, plus a cube SRV to sample the finished map by
     // direction. Only meaningful on a btCubemap buffer.
     bool AllocCubeViews(void);
+
+    // One render target view per LAYER, plus an array SRV to sample the whole stack by layer index.
+    // Only meaningful on a colour buffer with m_isArray set.
+    bool AllocArrayViews(int layerCount);
 
     void FreeRTV(void);
 
@@ -160,6 +173,11 @@ public:
         // Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
         // square by definition. The format is separate from colorFormat: a shadow cube map holds one
         // distance per texel, a colour target holds RGBA.
+        // Makes the colour buffers texture ARRAYS of this many layers, each layer of the target's own
+        // width and height, in colorFormat like any colour buffer. Rendering picks one layer at a time
+        // (SelectArrayLayer); sampling reads the whole stack through a Texture2DArray. Everything else
+        // - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
+        int arrayLayerCount{ 0 };
         int cubeMapCount{ 0 };
         DXGI_FORMAT cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
         bool hasMRTs{ false };
@@ -211,6 +229,10 @@ public:
     int                 m_cubeMapIndex{ -1 };         // start of cube-map slot range in m_bufferInfo
     int                 m_cubeMapCount{ 0 };
     int                 m_cubeFace{ 0 };              // face currently attached, see SelectCubeFace
+    // Layers per colour buffer. 0 means plain 2D buffers; anything else makes EVERY colour buffer of
+    // this target a texture array of that many layers, of which m_arrayLayer is the one selected.
+    int                 m_arrayLayerCount{ 0 };
+    int                 m_arrayLayer{ 0 };            // layer currently selected, see SelectArrayLayer
     int                 m_activeBufferIndex{ 0 };
     int                 m_lastDestination{ -1 };
     bool                m_pingPong{ false };
@@ -360,12 +382,14 @@ public:
     // It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
     // per frame - and it has to be called OUTSIDE frame recording, where it can flush a command list
     // of its own and wait for it.
-    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize);
+    // arraySlice picks the LAYER on a colour buffer that is a texture array (arrayLayerCount > 0) and
+    // is ignored on a plain one.
+    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);
 
     // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
     // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
     // Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
-    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize);
+    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
 
     // Bytes one colour buffer occupies, at the target's scaled size and its colour format.
     size_t BufferSize(int bufferIndex);
@@ -494,6 +518,23 @@ public:
     // changes between faces, and re-activating six times would re-select draw buffers and depth state
     // that have not moved.
     bool SelectCubeFace(int face, int bufferIndex = -1);
+
+    // Points the render target views at one layer of the colour buffer arrays - ALL of them, so an MRT
+    // pass writes the same layer of every buffer. Everything drawn afterwards lands on that layer until
+    // another one is selected.
+    bool SelectArrayLayer(int layer);
+
+    inline int ArrayLayerCount(void) noexcept {
+        return m_arrayLayerCount;
+    }
+
+    inline int ArrayLayer(void) noexcept {
+        return m_arrayLayer;
+    }
+
+    inline bool HasArrayBuffers(void) noexcept {
+        return m_arrayLayerCount > 0;
+    }
 
     inline int CubeMapIndex(int i = 0) noexcept {
         return m_cubeMapCount ? m_cubeMapIndex + i : -1;

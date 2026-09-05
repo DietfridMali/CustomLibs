@@ -42,18 +42,21 @@ Texture::Texture(GLuint handle, int type, int wrapMode)
 }
 
 
+// A registered texture leaves textureLUT when it is deleted, whether or not it ever became valid:
+// the registration happens in TextureHandler::GetTexture () BEFORE the texture is loaded, so a load
+// that fails is deleted while the LUT still points at it (Skybox::LoadTextures () does exactly that).
+// Tying the removal to m_isValid left that dangling pointer behind.
 Texture::~Texture()
 noexcept
 {
-    if (m_isValid) {
 #if USE_TEXTURE_LUT
-        if (UpdateLUT()) {
-            textureLUT.Remove(m_name);
-            m_name = "";
-        }
-#endif
-        Destroy();
+    if (UpdateLUT() and (m_name.Length() > 0)) {
+        textureLUT.Remove(m_name);
+        m_name = "";
     }
+#endif
+    if (m_isValid)
+        Destroy();
 }
 
 
@@ -356,7 +359,12 @@ static void CheckFileOpen(const std::string& path) {
 bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) {
     // load texture from file
     m_filenames = fileNames;
-    m_name = fileNames.First();
+    // The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
+    // replaced by the file name here: the destructor removes the entry under m_name, and with the
+    // key overwritten the LUT kept a dangling pointer under the registration key while removing a
+    // key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
+    if (m_name.Length() == 0)
+        m_name = fileNames.First();
     TextureBuffer* texBuf = nullptr;
     for (auto& fileName : fileNames) {
         if (fileName.IsEmpty()) { // This means that the last previously loaded texture should be used here as well; must never be true for first filename
@@ -445,15 +453,19 @@ void TiledTexture::SetParams(bool forceUpdate) {
 void RenderTargetTexture::SetParams(bool forceUpdate) {
     if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
+        // m_type, not a hard coded GL_TEXTURE_2D: a wrapper around a colour buffer that is a texture
+        // ARRAY is bound to GL_TEXTURE_2D_ARRAY, and the parameters would otherwise land on whichever
+        // plain 2D texture happens to sit on the same unit.
+        const GLenum target = m_type;
         const GLint filter = (m_filtering == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE); 
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
+        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE); 
 #if 1
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
 #endif
     }
 }

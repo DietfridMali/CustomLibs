@@ -35,6 +35,8 @@ const ShaderSource& FxaaShader();
 const ShaderSource& GaussBlurShader();
 const ShaderSource& LightningDrawShader();
 const ShaderSource& LightningFlareShader();
+const ShaderSource& SkyboxShader();
+const ShaderSource& BlackholeShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -67,7 +69,9 @@ BaseShaderCode::BaseShaderCode() {
         &FxaaShader(),
         &GaussBlurShader(),
         &LightningDrawShader(),
-        &LightningFlareShader()
+        &LightningFlareShader(),
+        &SkyboxShader(),
+        &BlackholeShader()
     };
     AddShaders(shaderSource);
 }

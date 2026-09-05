@@ -42,9 +42,16 @@ public:
     int                 m_tmuIndex;
     eBufferType         m_type;
     bool                m_isAttached;
+    // A 2D texture ARRAY instead of a plain 2D texture, of which ONE LAYER is attached at a time (see
+    // RenderTarget::SelectArrayLayer). Same idea as btCubemap, and for the same reason: many images in
+    // one resource, so a shader samples them through a layer index instead of through a texture
+    // binding. A flag rather than a buffer type of its own, because such a buffer IS a colour buffer -
+    // it takes part in MRT, in the draw buffer list and in every count, and only the way it is
+    // attached and bound differs.
+    bool                m_isArray;
 
     BufferInfo(GLuint handle = 0, int attachment = 0)
-        : m_handle(handle), m_attachment(attachment), m_boundAttachment(GL_NONE), m_tmuIndex(-1), m_type(btColor), m_isAttached(false)
+        : m_handle(handle), m_attachment(attachment), m_boundAttachment(GL_NONE), m_tmuIndex(-1), m_type(btColor), m_isAttached(false), m_isArray(false)
     {}
 
     void Init(void) {
@@ -54,6 +61,7 @@ public:
         m_tmuIndex = -1;
         m_type = btColor;
         m_isAttached = false;
+        m_isArray = false;
     }
 };
 
@@ -106,6 +114,10 @@ public:
     int                         m_cubeMapIndex{ -1 };         // start of cube-map slot range in m_bufferInfo
     int                         m_cubeMapCount{ 0 };
     int                         m_cubeFace{ 0 };              // face currently attached, see SelectCubeFace
+    // Layers per colour buffer. 0 means plain 2D buffers; anything else makes EVERY colour buffer of
+    // this target a texture array of that many layers, of which m_arrayLayer is the one attached.
+    int                         m_arrayLayerCount{ 0 };
+    int                         m_arrayLayer{ 0 };            // layer currently attached, see SelectArrayLayer
     int                         m_activeBufferIndex;
     AutoArray<BufferInfo>       m_bufferInfo;
     DrawBufferList              m_drawBuffers;
@@ -158,6 +170,12 @@ public:
         // holds RGBA.
         int cubeMapCount{ 0 };
         GLenum cubeMapFormat{ GL_R32F };
+        // Makes the colour buffers texture ARRAYS of this many layers, each layer of the target's own
+        // width and height, in colorFormat like any colour buffer. Rendering picks one layer at a time
+        // (SelectArrayLayer); sampling reads the whole stack through a sampler2DArray. Everything else
+        // - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it, which
+        // is the point of putting it here rather than into a buffer type of its own.
+        int arrayLayerCount{ 0 };
         bool hasMRTs{ false };
         bool isScreenBuffer{ false };
         bool storageImage{ false };   // Cross-API; honored only by Vulkan today.
@@ -253,12 +271,14 @@ public:
     // This DRAINS THE PIPELINE: everything queued has to finish before the texels can be handed over.
     // It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
     // per frame.
-    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize);
+    // arraySlice picks the LAYER on a colour buffer that is a texture array (arrayLayerCount > 0) and
+    // is ignored on a plain one.
+    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);
 
     // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
     // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
     // Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
-    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize);
+    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
 
     // Bytes one colour buffer occupies, at the target's scaled size and its colour format.
     size_t BufferSize(int bufferIndex);
@@ -402,6 +422,29 @@ public:
 
     inline int CubeMapCount(void) noexcept {
         return m_cubeMapCount;
+    }
+
+    // Points the framebuffer at one layer of the colour buffer arrays - ALL of them, so an MRT pass
+    // writes the same layer of every buffer. The target must be active; everything drawn afterwards
+    // lands on that layer until another one is selected. Same contract as SelectCubeFace (), and the
+    // same reason for it: an attachment point can only ever hold one image of the resource.
+    bool SelectArrayLayer(int layer);
+
+    // GL_TEXTURE_2D, GL_TEXTURE_CUBE_MAP or GL_TEXTURE_2D_ARRAY - what this buffer has to be bound to
+    // and released from. A cube map is sampled by direction and an array by layer; binding either as
+    // 2D leaves the sampler reading nothing.
+    GLenum BufferTarget(int bufferIndex) noexcept;
+
+    inline int ArrayLayerCount(void) noexcept {
+        return m_arrayLayerCount;
+    }
+
+    inline int ArrayLayer(void) noexcept {
+        return m_arrayLayer;
+    }
+
+    inline bool HasArrayBuffers(void) noexcept {
+        return m_arrayLayerCount > 0;
     }
 
     inline int ExtraBufferIndex(int i = 0) noexcept {

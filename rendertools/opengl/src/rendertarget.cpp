@@ -35,6 +35,11 @@ void RenderTarget::Init(void) {
     m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
+    m_cubeMapIndex = -1;
+    m_cubeMapCount = 0;
+    m_cubeFace = 0;
+    m_arrayLayerCount = 0;
+    m_arrayLayer = 0;
     m_lastDestination = -1;
     m_activeBufferIndex = -1;
     m_pingPong = true;
@@ -66,6 +71,9 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     bufferInfo.m_handle = SharedTextureHandle();
     bufferInfo.m_handle.Claim();
     bufferInfo.m_type = bufferType;
+    // Only the COLOUR buffers become arrays - a depth buffer, a vertex buffer or a cube map has its own
+    // shape and nothing to gain from layers.
+    bufferInfo.m_isArray = (bufferType == BufferInfo::btColor) and (m_arrayLayerCount > 0);
     if (bufferType == BufferInfo::btCubemap) {
         // Six faces of one resource. The edge length is the target's WIDTH - a cube map is square by
         // definition, and taking the height as well would silently produce something that is not a cube.
@@ -83,6 +91,26 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BASE_LEVEL, 0);
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_LEVEL, 0);
         gfxStates.BindCubemap(0, 0);
+        gfxStates.CheckError();
+        ++m_bufferCount;
+        return;
+    }
+    if (bufferInfo.m_isArray) {
+        // The whole stack in one allocation - unlike the cube map's six faces, which glTexImage2D can
+        // only take one at a time. Every layer has the target's own size, so a layer is a full buffer.
+        // Nearest and clamp like every colour buffer here: what renders into one is read back texel for
+        // texel, and a filter tap at a layer's edge has nothing to reach into anyway.
+        GLenum type = (m_colorFormat == GL_RGBA8) ? GL_UNSIGNED_BYTE : GL_HALF_FLOAT;
+        gfxStates.BindTexture(GL_TEXTURE_2D_ARRAY, bufferInfo.m_handle, 0);
+        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GLint(m_colorFormat), m_width * m_scale, m_height * m_scale,
+                     m_arrayLayerCount, 0, GL_RGBA, type, nullptr);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
+        gfxStates.BindTexture(GL_TEXTURE_2D_ARRAY, 0, 0);
         gfxStates.CheckError();
         ++m_bufferCount;
         return;
@@ -157,9 +185,14 @@ bool RenderTarget::DetachBuffer(int bufferIndex) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (not bufferInfo.m_isAttached or (bufferInfo.m_boundAttachment == GL_NONE))
         return true;
-    glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_boundAttachment,
-                           (bufferInfo.m_type == BufferInfo::btCubemap)
-                           ? GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_cubeFace) : GL_TEXTURE_2D, 0, 0);
+    // An array layer was attached with glFramebufferTextureLayer, and only that call can take it off
+    // again - glFramebufferTexture2D has no layer to name.
+    if (bufferInfo.m_isArray)
+        glFramebufferTextureLayer(GL_FRAMEBUFFER, GLenum(bufferInfo.m_boundAttachment), 0, 0, 0);
+    else
+        glFramebufferTexture2D(GL_FRAMEBUFFER, bufferInfo.m_boundAttachment,
+                               (bufferInfo.m_type == BufferInfo::btCubemap)
+                               ? GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_cubeFace) : GL_TEXTURE_2D, 0, 0);
     bufferInfo.m_isAttached = false;
     bufferInfo.m_boundAttachment = GL_NONE;
     return true;
@@ -170,27 +203,43 @@ bool RenderTarget::AttachBuffer(int bufferIndex, int attachment) {
     BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
     if (bufferInfo.m_attachment == GL_NONE)  // compute write target, never framebuffer attached
         return true;
-    int point = (attachment < 0) ? bufferInfo.m_attachment : attachment;
+    if (attachment < 0) 
+        attachment = bufferInfo.m_attachment;
     // Sitting on a different point than the one wanted (a dbSingle remap being set up or undone):
     // the old attachment has to go first, or it keeps the texture on a slot nobody accounts for.
-    if (bufferInfo.m_isAttached and (bufferInfo.m_boundAttachment != point))
+    gfxStates.CheckError();
+    if (bufferInfo.m_isAttached and (bufferInfo.m_boundAttachment != attachment))
         DetachBuffer(bufferIndex);
 #ifndef _DEBUG
     if (bufferInfo.m_isAttached)
         return true;
 #endif
-    if (bufferInfo.m_type == BufferInfo::btCubemap) {
+    // The queue is emptied HERE so the check below judges this attach and nothing else. Without it any
+    // error left standing by an earlier call - a shader that did not compile, a texture upload that was
+    // refused - came back as "this buffer could not be attached", and the target was then reported
+    // incomplete for a reason that has nothing to do with it.
+    gfxStates.ClearError();
+    if (bufferInfo.m_isArray) {
+        gfxStates.ReleaseTexture(GL_TEXTURE_2D_ARRAY, bufferInfo.m_handle);
+        gfxStates.CheckError();
+        glFramebufferTextureLayer(GL_FRAMEBUFFER, GLenum(attachment), bufferInfo.m_handle, 0, m_arrayLayer);
+        gfxStates.CheckError();
+    }
+    else if (bufferInfo.m_type == BufferInfo::btCubemap) {
         gfxStates.ReleaseTexture(GL_TEXTURE_CUBE_MAP, bufferInfo.m_handle);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (point),
-                               GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_cubeFace), bufferInfo.m_handle, 0);
+        gfxStates.CheckError();
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (attachment), GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + m_cubeFace), bufferInfo.m_handle, 0);
+        gfxStates.CheckError();
     }
     else {
-    gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (point), GL_TEXTURE_2D, bufferInfo.m_handle, 0);
+        gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
+        gfxStates.CheckError();
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (attachment), GL_TEXTURE_2D, bufferInfo.m_handle, 0);
+        gfxStates.CheckError();
     }
-    bufferInfo.m_boundAttachment = point;
+    bufferInfo.m_boundAttachment = attachment;
 #ifdef _DEBUG
-    return bufferInfo.m_isAttached = gfxStates.CheckError();
+    return bufferInfo.m_isAttached = gfxStates.CheckError("RenderTarget::AttachBuffer");
 #else
     return bufferInfo.m_isAttached = true;
 #endif
@@ -265,6 +314,50 @@ bool RenderTarget::SelectCubeFace(int face, int bufferIndex) {
 }
 
 
+GLenum RenderTarget::BufferTarget(int bufferIndex) noexcept {
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
+        return GL_TEXTURE_2D;
+    return m_bufferInfo[bufferIndex].m_isArray ? GLenum(GL_TEXTURE_2D_ARRAY)
+           : (m_bufferInfo[bufferIndex].m_type == BufferInfo::btCubemap) ? GLenum(GL_TEXTURE_CUBE_MAP)
+           : GLenum(GL_TEXTURE_2D);
+}
+
+
+bool RenderTarget::SelectArrayLayer(int layer) {
+    if ((m_arrayLayerCount <= 0) or (layer < 0) or (layer >= m_arrayLayerCount))
+        return false;
+    if (m_arrayLayer == layer)
+        return true;
+    m_arrayLayer = layer;
+    // Re-attaching needs this target's framebuffer bound. While it is not, setting the layer is the
+    // whole job: Activate () attaches every buffer and reads m_arrayLayer while doing it. That is what
+    // lets a caller pick the layer BEFORE activating, which is the only way to have the activation
+    // clear the right one.
+    //
+    // IsEnabled (), not IsActive (): the question is whether the framebuffer is bound RIGHT NOW, and
+    // that is what IsEnabled () asks GL. IsActive () asks the renderer's own draw buffer bookkeeping,
+    // which knows nothing of a framebuffer bound by hand - as ReadBuffer () does.
+    if (not IsEnabled())
+        return true;
+    bool ok = true;
+    // EVERY colour buffer moves, so an MRT pass writes the same layer of all of them. Each keeps the
+    // point it currently sits on: dbSingle may have moved one onto COLOR_ATTACHMENT0, and re-attaching
+    // to its own m_attachment would take it off the slot the draw buffer list names.
+    for (int i = 0; i < m_colorBufferCount; i++) {
+        BufferInfo& bufferInfo = m_bufferInfo[i];
+        if (not bufferInfo.m_isArray)
+            continue;
+        int point = bufferInfo.m_isAttached ? bufferInfo.m_boundAttachment : bufferInfo.m_attachment;
+        // Attaching another layer to the SAME point replaces what sits there, so there is nothing to
+        // detach first - and a detach would only clear the point for the attach to fill it again.
+        // Clearing the flag is what gets AttachBuffer () past its "already attached" shortcut.
+        bufferInfo.m_isAttached = false;
+        ok = AttachBuffer(i, point) and ok;
+    }
+    return ok;
+}
+
+
 void RenderTarget::CreateRenderArea(void) {
     m_viewportArea.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular]);
     m_viewport = Viewport(0, 0, m_width * m_scale, m_height * m_scale);
@@ -292,11 +385,16 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
     m_renderTextures.Resize(params.colorBufferCount);
     int attachmentIndex = 0;
+    // Before the first buffer is made: CreateBuffer () reads it to decide what kind of texture to
+    // allocate, and SelectArrayLayer () bounds against it.
+    m_arrayLayerCount = params.arrayLayerCount;
+    m_arrayLayer = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
         // The wrapper takes the buffer's handle right here - one wrapper per buffer means it never has
         // to be rehung, so GetAsTexture () only looks it up.
         m_renderTextures[i].m_handle = BufferHandle(i);
+        m_renderTextures[i].m_type = BufferTarget(i);
         m_renderTextures[i].m_filtering = m_filtering;
         m_renderTextures[i].Invalidate();
     }
@@ -320,8 +418,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     CreateRenderArea();
     // Sky-map-only RTs (compute write target, no FBO attachments) skip AttachBuffers because
     // glCheckFramebufferStatus would return INCOMPLETE_MISSING_ATTACHMENT - the FBO is unused.
-    bool hasFboAttachments = (params.colorBufferCount > 0) || (depthBufferCount > 0) || (params.vertexBufferCount > 0) || (params.cubeMapCount > 0);
-    if (hasFboAttachments) {
+    if ((params.colorBufferCount > 0) || (depthBufferCount > 0) || (params.vertexBufferCount > 0) || (params.cubeMapCount > 0)) {
         if (not AttachBuffers(params.hasMRTs))
             return false;
     }
@@ -693,7 +790,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
             m_bufferInfo[i].m_tmuIndex = -1;
     // A cube map is sampled by direction, so it has to go on the cube map target - binding it as 2D
     // would leave the sampler reading nothing.
-    gfxStates.BindTexture((m_bufferInfo[bufferIndex].m_type == BufferInfo::btCubemap) ? GL_TEXTURE_CUBE_MAP : GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, tmuIndex);
+    gfxStates.BindTexture(BufferTarget(bufferIndex), m_bufferInfo[bufferIndex].m_handle, tmuIndex);
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
     return true;
 }
@@ -701,7 +798,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
 
 void RenderTarget::ReleaseBuffers(void) {
     for (int i = 0; i < m_bufferCount; i++) {
-        gfxStates.ReleaseTexture(GL_TEXTURE_2D, m_bufferInfo[i].m_handle);
+        gfxStates.ReleaseTexture(BufferTarget(i), m_bufferInfo[i].m_handle);
         m_bufferInfo[i].m_tmuIndex = -1;
     }
 }
@@ -922,10 +1019,12 @@ size_t RenderTarget::BufferSize(int bufferIndex) {
 }
 
 
-bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) {
+bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice) {
     if (not (buffer and m_isAvailable))
         return false;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+    if (m_bufferInfo[bufferIndex].m_isArray and ((arraySlice < 0) or (arraySlice >= m_arrayLayerCount)))
         return false;
 
     GLenum format, type;
@@ -939,6 +1038,38 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) 
     if (bufferSize < needed)
         return false;
     gfxStates.ClearError();
+    if (m_bufferInfo[bufferIndex].m_isArray) {
+        // glGetTexImage on an array hands out EVERY layer at once, and there is no single layer form of
+        // it before GL 4.5. Reading through the framebuffer instead gets one layer without a temporary
+        // the size of the whole stack: attaching a layer is what this class does anyway.
+        GLint prevFramebuffer = 0, prevReadBuffer = 0;
+
+        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFramebuffer);
+        glGetIntegerv(GL_READ_BUFFER, &prevReadBuffer);
+
+        BufferInfo& bufferInfo = m_bufferInfo[bufferIndex];
+        // Attached HERE rather than through SelectArrayLayer (): that one returns at once when the layer
+        // asked for is already selected, and this buffer may still be detached all the same - a dbSingle
+        // pass takes every other colour buffer off its point, and the bake is exactly such a pass.
+        int point = (bufferInfo.m_boundAttachment != GL_NONE) ? bufferInfo.m_boundAttachment : bufferInfo.m_attachment;
+        int prevLayer = m_arrayLayer;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, m_handle);
+        m_arrayLayer = arraySlice;
+        bufferInfo.m_isAttached = false;   // gets AttachBuffer () past its "already attached" shortcut
+        AttachBuffer(bufferIndex, point);
+        glReadBuffer(GLenum(point));
+        glReadPixels(0, 0, GetWidth(true), GetHeight(true), format, type, buffer);
+
+        bool ok = gfxStates.CheckError();
+
+        glReadBuffer(GLenum(prevReadBuffer));
+        // Only the number goes back - the next Activate () attaches every buffer and reads it while
+        // doing so, and re-attaching here would put this one back onto a point the caller may not want.
+        m_arrayLayer = prevLayer;
+        glBindFramebuffer(GL_FRAMEBUFFER, GLuint(prevFramebuffer));
+        return ok;
+    }
     // Bound past the TMU bookkeeping and put back afterwards: this is a read, not a binding the
     // renderer is meant to keep - leaving the atlas on a texture unit would outlive the call.
     int boundTexture = gfxStates.GetBoundTexture(GL_TEXTURE_2D, 0);
@@ -954,10 +1085,12 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize) 
 
 // =================================================================================================
 
-bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize) {
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice) {
     if (not (data and m_isAvailable))
         return false;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+    if (m_bufferInfo[bufferIndex].m_isArray and ((arraySlice < 0) or (arraySlice >= m_arrayLayerCount)))
         return false;
 
     GLenum format, type;
@@ -972,14 +1105,19 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
         return false;
     gfxStates.ClearError();
 
-    int boundTexture = gfxStates.GetBoundTexture(GL_TEXTURE_2D, 0);
+    GLenum target = BufferTarget(bufferIndex);
+    int boundTexture = gfxStates.GetBoundTexture(target, 0);
 
-    gfxStates.BindTexture(GL_TEXTURE_2D, m_bufferInfo[bufferIndex].m_handle, 0);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, GetWidth(true), GetHeight(true), format, type, data);
+    gfxStates.BindTexture(target, m_bufferInfo[bufferIndex].m_handle, 0);
+    if (m_bufferInfo[bufferIndex].m_isArray)
+        // One layer of the stack - the depth of the region is 1, its z offset the slice.
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, arraySlice, GetWidth(true), GetHeight(true), 1, format, type, data);
+    else
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, GetWidth(true), GetHeight(true), format, type, data);
 
     bool ok = gfxStates.CheckError();
 
-    gfxStates.BindTexture(GL_TEXTURE_2D, GLuint(boundTexture), 0);
+    gfxStates.BindTexture(target, GLuint(boundTexture), 0);
     return ok;
 }
 
