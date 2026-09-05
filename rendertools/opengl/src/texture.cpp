@@ -77,6 +77,15 @@ void Texture::Destroy(void)
 {
     if (m_isValid) {
         m_isValid = false;
+        // OUT of the texture unit bookkeeping BEFORE the name goes back to GL. A deleted texture is
+        // unbound by GL itself, but GfxStates does not learn of it and keeps the name in m_bindings -
+        // and GL hands deleted names out again. TextureSlotInfo::Bind () then sees "this handle already
+        // sits on that unit", issues no glBindTexture, and the new texture of the same name never
+        // receives a type: glTexImage goes to whatever really is on the unit, glIsTexture says false,
+        // and attaching it to a framebuffer fails with GL_INVALID_OPERATION on a handle that looks
+        // perfectly sound. A local Texture in a loop - CFont::Create ()'s glyph texture - hits this
+        // once per iteration.
+        gfxStates.ReleaseTexture(m_type, m_handle);
 #if USE_SHARED_HANDLES
         m_handle.Release();
 #else

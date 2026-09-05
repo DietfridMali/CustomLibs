@@ -116,6 +116,10 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         return;
     }
     gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
+#ifdef _DEBUG
+    if (!glIsTexture(bufferInfo.m_handle))
+        gfxStates.BindTexture2D(bufferInfo.m_handle, 0);
+#endif
     if (bufferType == BufferInfo::btSkyMap) {
         // RGBA16F image for compute output. Linear sampling so the composit-PS can read it
         // without nearest-neighbor artifacts; clamp-to-edge to avoid wraparound at the seam of
@@ -154,6 +158,9 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         if (bufferType == BufferInfo::btColor) {
             GLenum type = (m_colorFormat == GL_RGBA8) ? GL_UNSIGNED_BYTE : GL_HALF_FLOAT;
             glTexImage2D(GL_TEXTURE_2D, 0, m_colorFormat, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, type, nullptr);
+            GLboolean isTex = glIsTexture(bufferInfo.m_handle);
+            if (not isTex)
+                isTex = false;
         }
         else
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, GL_FLOAT, nullptr);
@@ -234,6 +241,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex, int attachment) {
     else {
         gfxStates.ReleaseTexture(GL_TEXTURE_2D, bufferInfo.m_handle);
         gfxStates.CheckError();
+        GLboolean isTex = glIsTexture(bufferInfo.m_handle);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GLenum (attachment), GL_TEXTURE_2D, bufferInfo.m_handle, 0);
         gfxStates.CheckError();
     }
@@ -303,14 +311,13 @@ bool RenderTarget::SelectCubeFace(int face, int bufferIndex) {
     // The point the buffer currently sits on has to be kept: dbSingle moves a colour target onto
     // COLOR_ATTACHMENT0, and re-attaching to its own m_attachment instead would take the face off the
     // slot the draw buffer list names.
-    int point = m_bufferInfo[index].m_isAttached ? m_bufferInfo[index].m_boundAttachment
-                                                 : m_bufferInfo[index].m_attachment;
+    int attachment = m_bufferInfo[index].m_isAttached ? m_bufferInfo[index].m_boundAttachment : m_bufferInfo[index].m_attachment;
 
     m_cubeFace = face;
     // AttachBuffer reads m_cubeFace, so the detach has to happen first - it would otherwise leave the
     // previous face on the attachment point and re-attach onto itself.
     DetachBuffer(index);
-    return AttachBuffer(index, point);
+    return AttachBuffer(index, attachment);
 }
 
 
@@ -329,7 +336,15 @@ bool RenderTarget::SelectArrayLayer(int layer) {
     if (m_arrayLayer == layer)
         return true;
     m_arrayLayer = layer;
-    // Re-attaching needs this target's framebuffer bound. While it is not, setting the layer is the
+    // The buffers sit on the PREVIOUS layer and have to come off it, whether or not the framebuffer is
+    // bound at this moment. Remembering the number alone is not enough: AttachBuffer () returns at once
+    // for a buffer it believes is already attached, so a later Activate () would leave every colour
+    // buffer on the layer Create () put it on - and everything drawn into layers 1 and up would land
+    // on layer 0 instead.
+    for (int i = 0; i < m_colorBufferCount; i++)
+        if (m_bufferInfo[i].m_isArray)
+            m_bufferInfo[i].m_isAttached = false;
+    // Re-attaching HERE needs the framebuffer bound. While it is not, clearing the flags above is the
     // whole job: Activate () attaches every buffer and reads m_arrayLayer while doing it. That is what
     // lets a caller pick the layer BEFORE activating, which is the only way to have the activation
     // clear the right one.
@@ -440,6 +455,10 @@ void RenderTarget::Destroy(void) {
     // The wrappers hold references to the buffer handles, so they go before the buffers do.
     m_renderTextures.Destroy();
     for (int i = 0; i < m_bufferCount; i++) {
+        // Out of the texture unit bookkeeping before the name goes back to GL - see the note in
+        // Texture::Destroy (). The target it was bound as has to match, or the entry stays behind and
+        // the next texture that gets this number is treated as already bound.
+        gfxStates.ReleaseTexture(BufferTarget(i), m_bufferInfo[i].m_handle);
         m_bufferInfo[i].m_handle.Release();
     }
     m_handle.Release();
