@@ -117,7 +117,16 @@ public:
     // TextureAtlas, whose cells sit flush against each other - must not be filtered at all. Only the
     // owner knows which of the two it is, so RenderTargetTexture::SetParams () takes it from here.
     GfxFilterMode               m_filtering{ GfxFilterMode::Linear };
-    RenderTargetTexture         m_renderTexture;
+    // One wrapper PER COLOUR BUFFER, not one for the target. A single wrapper had its handle rehung on
+    // every GetAsTexture () call, so two colour buffers of the same target came back as the same
+    // pointer carrying the second one's handle - a draw that wants both at once (an atlas with a
+    // diffuse and an ambient layer, say) could not be served at all.
+    // Sized once in Create (), from colorBufferCount - it must never grow afterwards: the array is a
+    // std::vector and would move its elements, while their addresses are what GetAsTexture () hands out.
+    AutoArray<RenderTargetTexture> m_renderTextures;
+    // For a source from OUTSIDE this target (params.source < 0). Kept apart from the list above: it is
+    // not one of this target's buffers, and it must not be wrapped as an owned handle.
+    RenderTargetTexture         m_externalTexture;
     RenderTargetTexture         m_depthTexture;
     ShadowTexture               m_shadowTexture; // ShadowTexture for sampler2DShadow and HW 2x2 PCF; requires changes in a few shaders
     bool                        m_pingPong;
@@ -351,9 +360,8 @@ public:
         return m_bufferInfo[bufferIndex].m_handle;
     }
 
-    RenderTargetTexture* GetRenderTexture(void) noexcept {
-        return &m_renderTexture;
-    }
+    // The wrapper for one colour buffer. nullptr if there is no such buffer.
+    RenderTargetTexture* GetRenderTexture(int bufferIndex = 0) noexcept;
 
     // attachment < 0: the buffer's own attachment point (m_attachment); otherwise the point given -
     // that is how dbSingle puts the selected colour buffer on GL_COLOR_ATTACHMENT0.

@@ -96,6 +96,11 @@ public:
 	// One layer as a sampleable texture. Layer 0 is what GetAsTexture () hands out.
 	uint32_t LayerHandle(int layer) noexcept;
 
+	// One layer as a Texture object, for a draw that hands its textures over as a list (Mesh::Render (),
+	// where the position in the list IS the texture unit). The render target keeps one wrapper per
+	// colour buffer, so two layers can be held at the same time.
+	Texture* LayerTexture(int layer) noexcept;
+
 	// One layer's texels into a CPU buffer. bufferSize is the size of that buffer in BYTES and is
 	// checked against what the layer actually holds, so a buffer that is too small is refused rather
 	// than overrun. See RenderTarget::ReadBuffer () for what this costs.

@@ -234,7 +234,14 @@ public:
     // TextureAtlas, whose cells sit flush against each other - must not be filtered at all. Only the
     // owner knows which of the two it is, so RenderTargetTexture::SetParams () takes it from here.
     GfxFilterMode               m_filtering{ GfxFilterMode::Linear };
-    RenderTargetTexture m_renderTexture;
+    // One wrapper PER COLOUR BUFFER, not one for the target - a single one had its handle rehung on
+    // every GetAsTexture () call, so two buffers of the same target came back as the same pointer
+    // carrying the second one's handle. Sized once in Create () from colorBufferCount and never grown:
+    // the array is a std::vector and would move its elements, while their addresses are handed out.
+    AutoArray<RenderTargetTexture> m_renderTextures;
+    // For everything that is not a colour buffer - depth, sky map, cube map. Those shared the single
+    // wrapper with the colour buffers before; they keep sharing one, just not with them.
+    RenderTargetTexture m_externalTexture;
     RenderTargetTexture m_depthTexture;
     ShadowTexture       m_shadowTexture; // ShadowTexture mit Compare-Sampler fuer HW-PCF (sampler2DShadow-Aequivalent)
     BaseQuadMesh        m_viewportArea;
@@ -445,8 +452,9 @@ public:
     // Hands the filter down to the render texture and makes it re-apply its parameters.
     void SetFiltering(GfxFilterMode filtering);
 
-    inline RenderTargetTexture* GetRenderTexture(void) noexcept {
-        return &m_renderTexture;
+    // The wrapper for one colour buffer. nullptr if there is no such buffer.
+    inline RenderTargetTexture* GetRenderTexture(int bufferIndex = 0) noexcept {
+        return ((bufferIndex >= 0) and (bufferIndex < m_renderTextures.Length())) ? &m_renderTextures[bufferIndex] : nullptr;
     }
 
     // In DX12 there is no explicit framebuffer binding state - always report enabled.

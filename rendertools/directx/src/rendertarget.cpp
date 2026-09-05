@@ -391,6 +391,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
     m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.cubeMapCount);
+    // One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
+    m_renderTextures.Resize(m_colorBufferCount);
+    for (int i = 0; i < m_renderTextures.Length(); i++)
+        m_renderTextures[i].m_filtering = m_filtering;
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
 
@@ -679,8 +683,11 @@ void RenderTarget::SetFiltering(GfxFilterMode filtering) {
     if (filtering == m_filtering)
         return;
     m_filtering = filtering;
-    m_renderTexture.m_filtering = filtering;
-    m_renderTexture.SetParams(true);
+    // The filtering belongs to the target, so every buffer's wrapper takes it.
+    for (int i = 0; i < m_renderTextures.Length(); i++) {
+        m_renderTextures[i].m_filtering = filtering;
+        m_renderTextures[i].SetParams(true);
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -790,22 +797,25 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
         return false;
     list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.SRVIndex()));
 
-    // Bind the matching sampler from m_renderTexture's sampling configuration.
+    // Bind the matching sampler from the buffer's own sampling configuration.
     // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets the
     // wrap/mip/compare defaults).
-    if (not m_renderTexture.m_hasParams)
-        m_renderTexture.SetParams(false);
+    RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
+    if (texture == nullptr)
+        texture = &m_externalTexture;
+    if (not texture->m_hasParams)
+        texture->SetParams(false);
     // Color and worldPos/normal MRT (btVertex) buffers must be POINT-sampled, mirroring the OGL
     // RT buffer creation (GL_NEAREST for RGBA8 color + RGBA32F MRT buffers; LINEAR only for
     // skymap/depth). Linear filtering interpolates world positions across geometry silhouettes,
-    // which smears decals along moving geometry. Set per bind (m_renderTexture is shared across
-    // buffer types, so this must not rely on the one-shot SetParams above).
+    // which smears decals along moving geometry. Set per bind: the wrapper behind a non colour buffer
+    // is still shared across buffer types, so this must not rely on the one-shot SetParams above.
     bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex);
-    m_renderTexture.m_sampling.minFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
-    m_renderTexture.m_sampling.magFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
+    texture->m_sampling.minFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
+    texture->m_sampling.magFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
     auto& samplerHeap = descriptorHeaps.m_samplerHeap;
     if (samplerHeap.m_heap) {
-        uint32_t slot = samplerCache.GetSlot(m_renderTexture.m_sampling);
+        uint32_t slot = samplerCache.GetSlot(texture->m_sampling);
         if (slot != UINT32_MAX)
             list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase + tmuIndex), samplerHeap.GpuHandle(slot));
     }
@@ -865,13 +875,19 @@ void RenderTarget::Clear(const RTActivationParams& params)
 
 Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex*/)
 {
-    BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
+    int bufferIndex = params.source % m_bufferCount;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
     if (not info.m_resource)
         return nullptr;
-    m_renderTexture.m_handle = info.SRVIndex();
-    m_renderTexture.m_resource = info.m_resource;
-    m_renderTexture.Validate();
-    return &m_renderTexture;
+    // A colour buffer has a wrapper of its own; anything else (depth, sky map, cube map) shares the
+    // one behind the colour buffers, which is what the single wrapper used to be for all of them.
+    RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
+    if (texture == nullptr)
+        texture = &m_externalTexture;
+    texture->m_handle = info.SRVIndex();
+    texture->m_resource = info.m_resource;
+    texture->Validate();
+    return texture;
 }
 
 

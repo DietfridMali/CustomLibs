@@ -433,6 +433,10 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
     m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.cubeMapCount);
+    // One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
+    m_renderTextures.Resize(m_colorBufferCount);
+    for (int i = 0; i < m_renderTextures.Length(); i++)
+        m_renderTextures[i].m_filtering = m_filtering;
     // Compute ping-pong (>=2 compute buffers) qualifies for the pingPong flag as well.
     m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
     m_isScreenBuffer = params.isScreenBuffer;
@@ -878,8 +882,11 @@ void RenderTarget::SetFiltering(GfxFilterMode filtering) {
     if (filtering == m_filtering)
         return;
     m_filtering = filtering;
-    m_renderTexture.m_filtering = filtering;
-    m_renderTexture.SetParams(true);
+    // The filtering belongs to the target, so every buffer's wrapper takes it.
+    for (int i = 0; i < m_renderTextures.Length(); i++) {
+        m_renderTextures[i].m_filtering = filtering;
+        m_renderTextures[i].SetParams(true);
+    }
 }
 
 // =================================================================================================
@@ -1141,13 +1148,16 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
         if (cb != VK_NULL_HANDLE)
             info.m_layoutTracker.ToShaderInput(cb);
     }
-    if (not m_renderTexture.m_hasParams)
-        m_renderTexture.SetParams(false);
-    m_renderTexture.m_image = info.m_image;
-    m_renderTexture.m_imageView = info.m_imageView;
-    m_renderTexture.m_handle = info.m_srvIndex;
-    m_renderTexture.Validate();
-    return m_renderTexture.Bind(tmuIndex);
+    RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
+    if (texture == nullptr)
+        texture = &m_externalTexture;
+    if (not texture->m_hasParams)
+        texture->SetParams(false);
+    texture->m_image = info.m_image;
+    texture->m_imageView = info.m_imageView;
+    texture->m_handle = info.m_srvIndex;
+    texture->Validate();
+    return texture->Bind(tmuIndex);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1162,7 +1172,8 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
 
 Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex*/)
 {
-    BufferInfo& info = m_bufferInfo[params.source % m_bufferCount];
+    int bufferIndex = params.source % m_bufferCount;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
     if (info.m_image == VK_NULL_HANDLE)
         return nullptr;
     // Transition only on our own CL and only when no render-pass scope is open on it.
@@ -1174,11 +1185,14 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
         if (cb != VK_NULL_HANDLE)
             info.m_layoutTracker.ToShaderInput(cb);
     }
-    m_renderTexture.m_image = info.m_image;
-    m_renderTexture.m_imageView = info.m_imageView;
-    m_renderTexture.m_handle = info.m_srvIndex;
-    m_renderTexture.Validate();
-    return &m_renderTexture;
+    RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
+    if (texture == nullptr)
+        texture = &m_externalTexture;
+    texture->m_image = info.m_image;
+    texture->m_imageView = info.m_imageView;
+    texture->m_handle = info.m_srvIndex;
+    texture->Validate();
+    return texture;
 }
 
 

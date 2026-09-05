@@ -16,8 +16,12 @@ RenderTarget::RenderTarget() {
 
 void RenderTarget::Init(void) {
     m_handle = SharedFramebufferHandle(0);
-    m_renderTexture.m_handle = SharedTextureHandle(0);
-    m_renderTexture.Invalidate();
+    for (int i = 0; i < m_renderTextures.Length(); i++) {
+        m_renderTextures[i].m_handle = SharedTextureHandle(0);
+        m_renderTextures[i].Invalidate();
+    }
+    m_externalTexture.m_handle = SharedTextureHandle(0);
+    m_externalTexture.Invalidate();
     m_depthTexture.m_handle = SharedTextureHandle(0);
     m_depthTexture.Invalidate();
     m_width = 0;
@@ -285,9 +289,16 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
     m_bufferInfo.Resize(params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.skyMapCount + params.cubeMapCount);
+    // One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
+    m_renderTextures.Resize(params.colorBufferCount);
     int attachmentIndex = 0;
     for (int i = 0; i < params.colorBufferCount; i++) {
         CreateBuffer(i, attachmentIndex, BufferInfo::btColor, params.hasMRTs or (i == 0));
+        // The wrapper takes the buffer's handle right here - one wrapper per buffer means it never has
+        // to be rehung, so GetAsTexture () only looks it up.
+        m_renderTextures[i].m_handle = BufferHandle(i);
+        m_renderTextures[i].m_filtering = m_filtering;
+        m_renderTextures[i].Invalidate();
     }
 
     m_extraBufferCount = params.vertexBufferCount;
@@ -329,6 +340,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 
 
 void RenderTarget::Destroy(void) {
+    // The wrappers hold references to the buffer handles, so they go before the buffers do.
+    m_renderTextures.Destroy();
     for (int i = 0; i < m_bufferCount; i++) {
         m_bufferInfo[i].m_handle.Release();
     }
@@ -593,16 +606,22 @@ void RenderTarget::SetFiltering(GfxFilterMode filtering) {
     if (filtering == m_filtering)
         return;
     m_filtering = filtering;
-    m_renderTexture.m_filtering = filtering;
+    // Every wrapper that already exists - the filtering belongs to the target, not to one buffer. Ones
+    // created later pick m_filtering up in GetRenderTexture ().
     // SetParams () writes GL state, so the texture has to be bound for it. Before the first
     // GetAsTexture () there is no buffer handle in it yet - and that call runs SetParams () itself,
     // so it picks the new filter up. Save/restore the binding the same way GetAsTexture () does.
-    if (not m_renderTexture.IsAvailable())
-        return;
-    GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, 0);
-    m_renderTexture.Activate(0);
-    m_renderTexture.SetParams(true);
-    gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, 0);
+    for (int i = 0; i < m_renderTextures.Length(); i++) {
+        RenderTargetTexture& texture = m_renderTextures[i];
+        texture.m_filtering = filtering;
+        if (not texture.IsAvailable())
+            continue;
+        GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, 0);
+        texture.Activate(0);
+        texture.SetParams(true);
+        gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, 0);
+    }
+    m_externalTexture.m_filtering = filtering;
 }
 
 // =================================================================================================
@@ -793,17 +812,31 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) 
         ? SharedTextureHandle(GLuint(-params.source), false)
         : BufferHandle(params.source);
     //DetachBuffer((params.source < 0) ? -params.source : params.source);
-    m_renderTexture.Validate();
-    if (m_renderTexture.m_handle != handle) {
-        m_renderTexture.m_handle = handle;
-        if (tmuIndex > -1) {
-            GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
-            m_renderTexture.Activate(tmuIndex);
-            m_renderTexture.SetParams(true);
-            gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
-        }
+    RenderTargetTexture* texture = (params.source < 0) ? &m_externalTexture : GetRenderTexture(params.source);
+    if (texture == nullptr)
+        return nullptr;
+    // A colour buffer's wrapper got its handle in Create () and keeps it - only the external one is ever
+    // pointed somewhere new here. m_hasParams is what still brings a wrapper to apply its sampler
+    // parameters once: with the handle already in place there is no change left to trigger it.
+    bool bChanged = (texture->m_handle != handle);
+    if (bChanged)
+        texture->m_handle = handle;
+    texture->Validate();
+    if ((bChanged or not texture->m_hasParams) and (tmuIndex > -1)) {
+        GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
+        texture->Activate(tmuIndex);
+        texture->SetParams(true);
+        gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
     }
-    return &m_renderTexture;
+    return texture;
+}
+
+
+// One wrapper per colour buffer. The array is dimensioned in Create () and never grows, so the address
+// handed out here stays valid for as long as the target does.
+
+RenderTargetTexture* RenderTarget::GetRenderTexture(int bufferIndex) noexcept {
+    return ((bufferIndex >= 0) and (bufferIndex < m_renderTextures.Length())) ? &m_renderTextures[bufferIndex] : nullptr;
 }
 
 

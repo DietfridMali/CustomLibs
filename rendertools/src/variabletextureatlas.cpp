@@ -98,6 +98,11 @@ uint32_t VariableTextureAtlas::LayerHandle(int layer) noexcept {
 }
 
 
+Texture* VariableTextureAtlas::LayerTexture(int layer) noexcept {
+	return (m_atlas and (layer >= 0) and (layer < m_layers)) ? m_atlas->GetAsTexture({ .source = layer }) : nullptr;
+}
+
+
 size_t VariableTextureAtlas::LayerSize(void) noexcept {
 	return m_atlas ? m_atlas->BufferSize(0) : 0;
 }
