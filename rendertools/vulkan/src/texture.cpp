@@ -130,6 +130,10 @@ void Texture::Destroy(void)
         return;
     m_isValid = false;
     m_isDeployed = false;
+    // The sampler/filter state belongs to the image that is going away, not to this object. Left
+    // standing, SetParams () returns at once for the NEXT texture created here and that one never
+    // gets its sampler set up. 1:1 to the OpenGL path.
+    m_hasParams = false;
 
     VkDevice device = vkContext.Device();
     VmaAllocator allocator = vkContext.Allocator();

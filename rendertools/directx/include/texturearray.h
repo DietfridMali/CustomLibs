@@ -4,7 +4,7 @@
 #include "base_texturearray.h"
 
 // =================================================================================================
-// A Texture2DArray. Everything about layers and staging is in BaseTextureArray; what is added here is
+// A Texture2DArray. Everything about slots and staging is in BaseTextureArray; what is added here is
 // the upload, exactly as Cubemap adds only its six face uploads on top of Texture.
 //
 // Not to be confused with TextureArray in texture.h, which is AutoArray<Texture*> - a list of separate
@@ -29,14 +29,14 @@ public:
 
     // Sprite sheets must not wrap: a bilinear tap at u = 1 would read column 0 back in. Filtering and
     // mip mapping come from Texture::SetParams (), which reads m_wrapMode and m_useMipMaps - unlike an
-    // atlas an array can have a mip chain, because a mip level never mixes two layers.
-    bool Create(String name, int layerWidth, int layerHeight, int layerCount, bool useMipMaps = true);
+    // atlas an array can have a mip chain, because a mip level never mixes two slots.
+    bool Create(String name, int slotWidth, int slotHeight, int slotCount, bool useMipMaps = true);
 
-    // bufferIndex is ignored: the array has no m_buffers, its pixels come from SetLayer ().
+    // bufferIndex is ignored: the array has no m_buffers, its pixels come from SetSlot ().
     virtual bool Deploy(int bufferIndex = 0) override;
 
-    // Sends one layer up again after it changed. Only valid once Deploy () has run.
-    bool UpdateLayer(int layerIndex);
+    // Sends one slot up again after it changed. Only valid once Deploy () has run.
+    bool UpdateSlot(int slotIndex);
 
     virtual void Destroy(void) override;
 };

@@ -200,6 +200,10 @@ private:
 	List<TextureSlotInfo> m_tmuBindings;
 	List<RGBAColor> m_clearColorStack;
 
+	// Static, not a member: it has to survive this object's own destruction, because that is exactly
+	// when it is asked.
+	static inline bool m_isDestroyed{ false };
+
 public:
 	static constexpr int MinFeatureLevel = 330;
 	static constexpr int SSBOFeatureLevel = 330; // actually 430; but NVidia 3.30 drivers support SSBOs, so we rely on querying GL_ARB_shader_storage_buffer_object
@@ -213,6 +217,18 @@ public:
 		// 4-GB-Konstante, damit MaxTextureSize(bytesPerPixel) konsistent zu Vulkan/DX12 rechnet.
 		m_maxAllocSize = uint64_t(4ULL) << 30;
 		DetermineExtensions();
+	}
+
+	// Objects with static storage duration are torn down in an order nobody controls, and some of them
+	// own textures or render targets - their destructors reach in here to drop what they had bound.
+	// Once this singleton is gone, its lists are gone with it, and walking them reads freed memory.
+	// The flag says "do not touch me any more"; every entry point that walks a list checks it.
+	~GfxStates() {
+		m_isDestroyed = true;
+	}
+
+	static inline bool IsDestroyed(void) noexcept {
+		return m_isDestroyed;
 	}
 
 	void DetermineExtensions(void);

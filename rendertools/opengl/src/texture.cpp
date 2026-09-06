@@ -100,6 +100,12 @@ void Texture::Destroy(void)
         }
         m_buffers.Clear();
         m_isDeployed = false; // BUGFIX: Status zur�cksetzen
+        // ... and the filter/wrap state with it. It belongs to the GL name that was just deleted, not
+        // to this object: leaving it set made SetParams () return at once on the NEXT texture created
+        // here, so that one kept GL's default GL_NEAREST_MIPMAP_LINEAR without ever getting a mip
+        // chain. A mip filter without mip levels is an INCOMPLETE texture, and sampling one yields
+        // (0, 0, 0, 1) - black - whatever it actually holds.
+        m_hasParams = false;
     }
 }
 
