@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "vector.hpp"
+#include "matrix.hpp"
 #include "array.hpp"
 
 // =================================================================================================
@@ -206,6 +207,16 @@ public:
 
     void Clear(void);
 
+    inline void Translate(const Vector3f& offset) {
+        for (int32_t i = 0; i < m_nodes.Length(); i++)
+            m_nodes[i].position += offset;
+    }
+
+    inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
+        for (int32_t i = 0; i < m_nodes.Length(); i++)
+            m_nodes[i].position = newPivot + rotation * (m_nodes[i].position - pivot);
+    }
+
     inline int32_t VisibleNodes(void) const {
         int32_t n = m_nodes.Length();
         return ((m_visibleNodes > 0) and (m_visibleNodes < n)) ? m_visibleNodes : n;
@@ -276,6 +287,25 @@ public:
     // so the branches stay put while the tip tracks a slightly swinging target.
     virtual void UpdateEndpoints(const Vector3f& start, const Vector3f& end) { SetEndpoints(start, end); }
 
+    // Carry the lightning along - endpoints AND the geometry already built from them. Both are rigid
+    // motions and therefore keep a bundle whose members sit on endpoints of their own: SetEndpoints would
+    // put all of them on the SAME pair (an emitter in epRandomDirection mode draws one pair per member)
+    // and the bundle would collapse into a single bolt on the next Generate.
+    virtual void Translate(const Vector3f& offset) {
+        m_start += offset;
+        m_end += offset;
+        for (int32_t i = 0; i < m_bolts.Length(); i++)
+            m_bolts[i].Translate(offset);
+    }
+
+    virtual void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
+        m_start = newPivot + rotation * (m_start - pivot);
+        m_end = newPivot + rotation * (m_end - pivot);
+        m_planeNormal = rotation * m_planeNormal;
+        for (int32_t i = 0; i < m_bolts.Length(); i++)
+            m_bolts[i].Transform(pivot, rotation, newPivot);
+    }
+
     virtual void Generate(int64_t now) = 0;               // (re)build the bolt(s) for the current params/time
 
     // Rebuild if the regeneration interval has elapsed. Returns true when the geometry actually changed,
@@ -304,6 +334,14 @@ protected:
 
 // -------------------------------------------------------------------------------------------------
 
+struct LightningRefBolt {
+    LightningBoltParams params;
+    LightningBolt       bolt;
+    bool                valid{ false };
+};
+
+// -------------------------------------------------------------------------------------------------
+
 class LightningStrike : public BaseLightning {
 public:
     int64_t m_spawnTime{ 0 };
@@ -312,6 +350,8 @@ public:
     int32_t m_branchDepth{ 2 };   // recursion depth: 0 = trunk only, 1 = trunk has branches, 2 = branches have branches, ...
     float   m_branchChance{ 1.0f };   // probability [0,1] that a sub-branch forks at each eligible node
     int32_t m_maxBranchTestSkips{ 0 };   // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
+    AutoArray<LightningRefBolt> m_refBolts;
+    int32_t                     m_refIndex{ 0 };
 
     LightningStrike() : BaseLightning(ltStrike) { }
 
@@ -326,6 +366,29 @@ public:
     bool IsFading(int64_t now) const override;            // AFTERGLOW: inside the fade window -> halo only
 
     void UpdateEndpoints(const Vector3f& start, const Vector3f& end) override;   // ignore start, re-anchor the main bolt's last node
+
+    void Translate(const Vector3f& offset) override {
+        BaseLightning::Translate(offset);
+        for (int32_t i = 0; i < m_refBolts.Length(); i++) {
+            if (not m_refBolts[i].valid)
+                continue;
+            m_refBolts[i].bolt.Translate(offset);
+            m_refBolts[i].params.start += offset;
+            m_refBolts[i].params.end += offset;
+        }
+    }
+
+    void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) override {
+        BaseLightning::Transform(pivot, rotation, newPivot);
+        for (int32_t i = 0; i < m_refBolts.Length(); i++) {
+            if (not m_refBolts[i].valid)
+                continue;
+            m_refBolts[i].bolt.Transform(pivot, rotation, newPivot);
+            m_refBolts[i].params.start = newPivot + rotation * (m_refBolts[i].params.start - pivot);
+            m_refBolts[i].params.end = newPivot + rotation * (m_refBolts[i].params.end - pivot);
+            m_refBolts[i].params.planeNormal = rotation * m_refBolts[i].params.planeNormal;
+        }
+    }
 
     bool IsAnimated(void) const override { return m_animSpeed > 0.0f; }   // animSpeed > 0 -> rebuilt over time (wabers); structure stays fixed (seeded)
 

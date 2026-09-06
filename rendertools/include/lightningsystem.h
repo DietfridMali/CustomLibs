@@ -47,6 +47,23 @@ public:
 
     void UpdateEndpoints(const Vector3f& start, const Vector3f& end);   // re-anchor already-built geometry to a moved endpoint
 
+    // Carry the whole bundle - emitter and every lightning in it - along, for a system that hangs on
+    // something that moves. Rigid, unlike SetEndpoints - see BaseLightning::Translate. Inline so the
+    // whole operation lives in the header and no consumer has to relink for it.
+    inline void Translate(const Vector3f& offset) {
+        if (m_emitter != nullptr)
+            m_emitter->Translate(offset);
+        for (int32_t i = 0; i < m_lightnings.Length(); i++)
+            m_lightnings[i]->Translate(offset);
+    }
+
+    inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
+        if (m_emitter != nullptr)
+            m_emitter->Transform(pivot, rotation, newPivot);
+        for (int32_t i = 0; i < m_lightnings.Length(); i++)
+            m_lightnings[i]->Transform(pivot, rotation, newPivot);
+    }
+
     // Emitter first (it may ignite or extinguish), then rebuild the animated lightnings whose regeneration
     // interval has elapsed. Returns true if any geometry changed this frame -> the renderer's segment
     // buffer is stale. Returns false when nothing moved, and then the buffer can simply be reused.

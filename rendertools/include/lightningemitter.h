@@ -71,6 +71,17 @@ public:
         m_end = end;
     }
 
+    // Carry the source along without re-aiming it - see BaseLightning::Translate.
+    inline void Translate(const Vector3f& offset) noexcept {
+        m_start += offset;
+        m_end += offset;
+    }
+
+    inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
+        m_start = newPivot + rotation * (m_start - pivot);
+        m_end = newPivot + rotation * (m_end - pivot);
+    }
+
     // Ignite / extinguish as the clock demands. Returns true if the system's content changed (something
     // was created or removed), so the renderer knows its segment buffer is stale.
     bool Update(int64_t now, LightningSystem& system);

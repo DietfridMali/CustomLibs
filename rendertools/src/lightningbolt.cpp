@@ -102,6 +102,30 @@ namespace {
         return float(h >> 8) * (1.0f / 16777216.0f);
     }
 
+#if CONTROLLED_FORKS
+    bool SameParams(const LightningBoltParams& a, const LightningBoltParams& b) {
+        return (a.start == b.start)
+           and (a.end == b.end)
+           and (a.segments == b.segments)
+           and (a.waveCount == b.waveCount)
+           and (a.startWidth == b.startWidth)
+           and (a.endWidth == b.endWidth)
+           and (a.amplitude == b.amplitude)
+           and (a.seed == b.seed)
+           and (a.time == b.time)
+           and (a.basePhase == b.basePhase)
+           and (a.swingMode == b.swingMode)
+           and (a.planeNormal == b.planeNormal)
+           and (a.tailFraction == b.tailFraction)
+           and (a.fbm.kinkAmplitude == b.fbm.kinkAmplitude)
+           and (a.fbm.octaves == b.fbm.octaves)
+           and (a.fbm.gain == b.fbm.gain)
+           and (a.fbm.lacunarity == b.fbm.lacunarity)
+           and (a.fbm.kinkOctaves == b.fbm.kinkOctaves)
+           and (a.fbm.planeDistTolerance == b.fbm.planeDistTolerance);
+    }
+#endif
+
     // One lateral swing direction for the current noise sample. `axis` is the normalized bolt axis,
     // `planeDir` the precomputed in-plane direction for smPlane (see BuildPlaneDir).
     Vector3f SwingVector(const Vector3f& noiseVec, const Vector3f& axis, const Vector3f& planeDir, eSwingMode mode) {
@@ -428,6 +452,7 @@ void LightningStrike::Setup(const Vector3f& start, const Vector3f& end, const Li
 
 void LightningStrike::Generate(int64_t now) {
     m_bolts.Clear();
+    m_refIndex = 0;
     float time = m_timeOffset + float(now - m_spawnTime) * 0.001f * m_animSpeed;   // relative to spawn -> small noise coord (float precision)
     AddBolt(m_start, m_end, m_startWidth, m_endWidth, 0, m_seed, time);
 #if TORTUOSITY
@@ -488,7 +513,18 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
     if (time != m_timeOffset) {
         LightningBoltParams refParams = boltParams;
         refParams.time = m_timeOffset;
-        refBolt.Build(refParams);
+        int32_t slot = m_refIndex++;
+        if (m_refBolts.Length() <= slot)
+            m_refBolts.Resize(slot + 1);
+        LightningRefBolt& cached = m_refBolts[slot];
+        if (cached.valid and SameParams(cached.params, refParams))
+            refBolt = cached.bolt;
+        else {
+            refBolt.Build(refParams);
+            cached.params = refParams;
+            cached.bolt = refBolt;
+            cached.valid = true;
+        }
         structure = &refBolt;
     }
     // Per-node kink angle (between incoming and outgoing segment) of the structure path. Real lightning
