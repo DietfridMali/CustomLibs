@@ -90,8 +90,10 @@ bool GfxTextureArray::UpdateSlot(int slotIndex) {
 
     const uint8_t* slot = slotPtrs[slotIndex];
 
+    // isRefresh: the resource left Deploy () in PIXEL_SHADER_RESOURCE and has to be taken back to
+    // COPY_DEST before it can be written again.
     return UploadTextureArrayData(dx12Context.Device(), m_resource.Get(), &slot, 1,
-                                  m_slotWidth, m_slotHeight, m_components, mipCount, slotIndex);
+                                  m_slotWidth, m_slotHeight, m_components, mipCount, slotIndex, true);
 }
 
 // =================================================================================================

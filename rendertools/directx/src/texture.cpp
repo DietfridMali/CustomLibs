@@ -119,6 +119,15 @@ void Texture::Destroy(void)
 {
     if (m_isValid) {
         m_isValid = false;
+        // OUT of the texture slot bookkeeping BEFORE the descriptor index goes back. GfxStates keys
+        // a slot on that index, and the heap hands freed indices out again (DescriptorHeap::m_freeList,
+        // fed by BufferInfo::Release ()). Left standing, the entry claims the next texture that gets
+        // this index is already sitting on that slot - BoundTMU () and GetBoundTexture () then answer
+        // for a texture that is long gone. 1:1 to the OpenGL path.
+        // Only for a handle that is one: Texture::Release () writes UINT32_MAX into a slot as its
+        // "nothing here" marker, so releasing UINT32_MAX would sweep every already empty slot.
+        if (m_handle != UINT32_MAX)
+            gfxStates.ReleaseTexture(TextureTypeToGLenum(m_type), m_handle);
         m_isDeployed = false;
         // The sampler/filter state belongs to the resource that is going away, not to this object.
         // Left standing, SetParams () returns at once for the NEXT texture created here and that one

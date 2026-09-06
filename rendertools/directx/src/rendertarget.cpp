@@ -526,6 +526,16 @@ void RenderTarget::Destroy(void)
         m_cmdList = nullptr;
     }
     for (int i = 0; i < m_bufferCount; ++i) {
+        // Out of the texture slot bookkeeping before the SRV index is handed back - see the note in
+        // Texture::Destroy (). The sampling wrappers (m_renderTextures, m_externalTexture) borrow the
+        // buffer's index and register it there on Bind (), but their own Destroy () nulls m_handle
+        // first, so it has to happen here. The tag is GL_TEXTURE_2D whatever the buffer is: a wrapper
+        // is a plain RenderTargetTexture and never carries a cube or array type, so that is what it
+        // was registered under. A buffer without an SRV has UINT32_MAX, which is also what
+        // Texture::Release () parks in an empty slot - releasing it would sweep every empty slot.
+        const uint32_t srvIndex = m_bufferInfo[i].SRVIndex();
+        if (srvIndex != UINT32_MAX)
+            gfxStates.ReleaseTexture(GL_TEXTURE_2D, srvIndex);
         m_bufferInfo[i].Release();
         gfxStates.CheckError();
     }

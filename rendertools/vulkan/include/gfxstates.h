@@ -166,6 +166,9 @@ using GLenum = unsigned int;
 #ifndef GL_TEXTURE_CUBE_MAP
 #   define GL_TEXTURE_CUBE_MAP          0x8513u
 #endif
+#ifndef GL_TEXTURE_2D_ARRAY
+#   define GL_TEXTURE_2D_ARRAY          0x8C1Au
+#endif
 
 // =================================================================================================
 // Map API-neutral TextureType to the GLenum tag used as slot-group key in the state tracker.
@@ -221,6 +224,10 @@ private:
     List<RGBAColor>         m_clearColorStack;
     int                     m_featureLevel{ 0 };
 
+    // Static, not a member: it has to survive this object's own destruction, because that is exactly
+    // when it is asked.
+    static inline bool      m_isDestroyed{ false };
+
     RenderStates& ActiveState(void) noexcept;
 
 public:
@@ -232,6 +239,18 @@ public:
     static constexpr int SSBOFeatureLevel = (int)VK_API_VERSION_1_0;
 
     GfxStates() = default;
+
+    // Objects with static storage duration are torn down in an order nobody controls, and some of them
+    // own textures or render targets - their destructors reach in here to drop what they had bound.
+    // Once this singleton is gone, its lists are gone with it, and walking them reads freed memory.
+    // The flag says "do not touch me any more"; every entry point that walks a list checks it.
+    ~GfxStates() {
+        m_isDestroyed = true;
+    }
+
+    static inline bool IsDestroyed(void) noexcept {
+        return m_isDestroyed;
+    }
 
     void Init(void) noexcept {
         // maxImageDimension2D = Achsen-Grenze einer 2D-Textur (Treiber-Wert, oft 32K auf NVIDIA RTX).

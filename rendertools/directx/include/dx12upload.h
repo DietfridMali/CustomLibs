@@ -11,6 +11,12 @@ class Texture;
 
 void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource);
 
+// The same barrier with both states spelled out. The call above is the upload direction and hard
+// wires COPY_DEST -> PIXEL_SHADER_RESOURCE, which is right for a resource that was just created in
+// COPY_DEST but wrong for one that has already been read by a shader and is written again.
+void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource,
+                        D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
+
 bool UploadSubresource(ID3D12Device* device,
                        ID3D12GraphicsCommandList* list,
                        ID3D12Resource* dstResource,
@@ -40,9 +46,14 @@ bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource
 // dstResource must exist with DepthOrArraySize == layerCount and MipLevels == mipCount.
 // firstLayer lets a caller refresh a single layer in place: pass one pointer, layerCount 1 and that
 // layer's index.
+// isRefresh says the resource has already been through this once and is sitting in
+// PIXEL_SHADER_RESOURCE rather than in the COPY_DEST it was created in. It then gets transitioned
+// back to COPY_DEST before the copies - without that the copy writes a resource in a read state and
+// the closing barrier declares a StateBefore the resource is not in, both of which the debug layer
+// rejects and the driver is free to ignore.
 bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* layers,
                             int layerCount, int width, int height, int channels, int mipCount,
-                            int firstLayer = 0) noexcept;
+                            int firstLayer = 0, bool isRefresh = false) noexcept;
 
 // Upload a block-compressed (BC1/BC7) texture: one subresource per (face, mip). faces[f] points at
 // face f's tightly-packed mip chain (level 0 first; ceil(w/4)*ceil(h/4)*GfxBlockBytes bytes per

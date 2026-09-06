@@ -13,15 +13,22 @@
 
 // =================================================================================================
 
-void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource) {
+void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource,
+                        D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter) {
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
     barrier.Transition.pResource = resource;
-    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.StateBefore = stateBefore;
+    barrier.Transition.StateAfter = stateAfter;
     barrier.Transition.Subresource = subresource;
     list->ResourceBarrier(1, &barrier);
+}
+
+
+void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource) {
+    SubresourceBarrier(list, resource, subresource,
+                       D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 }
 
 
@@ -238,7 +245,7 @@ static bool UploadSubresourceBlocks(ID3D12Device* device, ID3D12GraphicsCommandL
 
 bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* layers,
                             int layerCount, int width, int height, int channels, int mipCount,
-                            int firstLayer) noexcept
+                            int firstLayer, bool isRefresh) noexcept
 {
     if ((layerCount < 1) or (mipCount < 1) or (channels < 1) or (firstLayer < 0))
         return false;
@@ -246,6 +253,13 @@ bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, c
     CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureArrayData"));
     if (not cl)
         return false;
+
+    // A resource that has already been deployed is in PIXEL_SHADER_RESOURCE, not in the COPY_DEST it
+    // was created in - take it back before writing it, so that both the copy and the closing barrier
+    // below see the state they expect.
+    if (isRefresh)
+        SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                           D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 
     AutoArray<ComPtr<ID3D12Resource>> uploads;
     uploads.Resize(uint32_t(layerCount * mipCount));
@@ -270,6 +284,12 @@ bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, c
     }
 
     if (not ok) {
+        // The list is dropped unflushed when it is this call's own temporary one, but not when the
+        // caller had one open - there the transition above is already recorded and has to be undone,
+        // or the resource is left in COPY_DEST while everything downstream samples it.
+        if (isRefresh)
+            SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                               D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         baseRenderer.FinishOperation(cl);
         return false;
     }

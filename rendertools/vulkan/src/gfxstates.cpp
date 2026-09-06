@@ -101,6 +101,12 @@ RenderStates& GfxStates::ActiveState(void) noexcept {
 
 
 TextureSlotInfo* GfxStates::FindInfo(GLenum typeTag) {
+    // Nothing to find once this singleton has been torn down - the list is gone, and iterating it
+    // reads freed memory, while appending to it would be worse still. Textures and render targets
+    // owned by other statics are destroyed after it and drop their bindings here on the way out;
+    // for those there is nothing left to drop.
+    if (IsDestroyed())
+        return nullptr;
     for (auto& info : m_slotInfos)
         if (info.GetTypeTag() == typeTag)
             return &info;
