@@ -148,3 +148,115 @@ const ShaderSource& GaussBlurShader() {
 }
 
 // =================================================================================================
+
+// -------------------------------------------------------------------------------------------------
+// The bilateral (edge stopping) blur. What tells it apart from the gauss above is that the image it
+// filters is not a picture but a value belonging to the SURFACE behind each pixel - an ambient
+// occlusion term, a shadow mask. Filtered flat, such a value walks across every silhouette in the
+// frame and leaves a halo along it. So each tap is weighted by how much its surface agrees with the
+// centre pixel's: by the angle between the two normals, and by how far apart the two surfaces are.
+//
+// distanceSource is the one thing the two users disagree about, and it is a uniform rather than a
+// second shader: with a world position G-buffer the distance is the neighbour's offset from the centre
+// pixel's TANGENT PLANE (a floor running to the horizon stays ~0 and is kept, only real steps are
+// rejected), without one it is the difference of the linearized scene depths. Everything else - the
+// normals, the spatial gauss, the early out where a pixel names no surface - is shared.
+//
+// projDepth carries (A, B) of the projection matrix, so the depth path needs neither the near nor the
+// far plane: the eye space distance of a normalized device z is B / (z + A).
+
+const ShaderSource& BilateralBlurShader() {
+    static const ShaderSource source(
+        "bilateralBlur",
+        String(R"(
+            #version 330
+            layout(location = 0) in vec3 position;
+            layout(location = 1) in vec2 texCoord;
+
+            uniform mat4 mModelView;
+            uniform mat4 mProjection;
+
+            out vec2 fragCoord;
+
+            void main() {
+                fragCoord = texCoord;
+                gl_Position = vec4(position, 1.0);
+                vec4 viewPos = mModelView * vec4(position, 1.0);
+                gl_Position = mProjection * viewPos;
+            }
+        )"),
+        String(R"(
+            #version 330
+            in vec2 fragCoord;
+            out vec4 fragColor;
+
+            uniform sampler2D surface;
+            uniform sampler2D uWorldNormals;
+            uniform sampler2D uWorldPositions;
+            uniform sampler2D uSceneDepth;
+            uniform vec2 texelSize;
+            uniform float direction;
+            uniform int radius;
+            uniform float normalPower;
+            uniform float posSigma;
+            uniform int distanceSource;     // 0 = world positions, 1 = scene depth
+            uniform vec2 projDepth;         // (A, B): eye distance = B / (ndc z + A)
+            uniform bool flipVertically;
+
+            float EyeDepth(float d) {
+                return abs(projDepth.y / (2.0 * d - 1.0 + projDepth.x));
+            }
+
+            void main() {
+                // flipVertically = false: the filtered image, the normals and the depth all share one
+                // orientation - they were rasterized by the same pipeline - and are read at the same uv.
+                // true is the legacy orientation split of the SSAO path, where the G-buffer is read
+                // flipped in the first pass and raw in the second.
+                vec2 muv = fragCoord;                                                          // filtered image / output
+                vec2 uv  = flipVertically ? vec2(fragCoord.x, 1.0 - fragCoord.y) : fragCoord;  // G-buffer
+                vec4 nrmC = textureLod(uWorldNormals, uv, 0.0);
+                if (dot(nrmC.xyz, nrmC.xyz) < 0.25) {
+                    fragColor = textureLod(surface, muv, 0.0);
+                    return;
+                }
+                vec3 NC = normalize(nrmC.xyz);
+                vec3 PC = (distanceSource == 0) ? textureLod(uWorldPositions, uv, 0.0).xyz : vec3(0.0);
+                float DC = (distanceSource == 0) ? 0.0 : EyeDepth(textureLod(uSceneDepth, uv, 0.0).r);
+                vec2 dirStep = (direction < 0.5) ? vec2(texelSize.x, 0.0) : vec2(0.0, texelSize.y);
+                float sigmaS = max(float(radius) * 0.5, 1.0);
+                vec4 sum = vec4(0.0);
+                float sumW = 0.0;
+                for (int i = -radius; i <= radius; ++i) {
+                    vec2 suv  = uv  + dirStep * float(i);   // G-buffer tap
+                    vec2 smuv = muv + dirStep * float(i);   // image tap, same screen pixel as suv
+                    vec4 nrmS = textureLod(uWorldNormals, suv, 0.0);
+                    if (dot(nrmS.xyz, nrmS.xyz) < 0.25)
+                        continue;
+                    vec3 NS = normalize(nrmS.xyz);
+                    float wS = exp(-float(i * i) / (2.0 * sigmaS * sigmaS));
+                    float wN = pow(max(dot(NC, NS), 0.0), normalPower);
+                    float dP;
+                    if (distanceSource == 0) {
+                        // Plane distance, NOT Euclidean: how far the neighbour lies off the centre
+                        // pixel's tangent plane. A grazing same-surface (floor running to the horizon)
+                        // stays ~0 and is kept; only real depth steps are rejected. The old
+                        // length(PC-PS) blew up on grazing surfaces (screen-adjacent pixels sit far
+                        // apart in world space) -> every tap rejected -> no blur -> raw noise survived.
+                        vec3 PS = textureLod(uWorldPositions, suv, 0.0).xyz;
+                        dP = abs(dot(PS - PC, NC));
+                    }
+                    else
+                        dP = abs(EyeDepth(textureLod(uSceneDepth, suv, 0.0).r) - DC);
+                    float wP = exp(-(dP * dP) / (2.0 * posSigma * posSigma));
+                    float w = wS * wN * wP;
+                    sum += textureLod(surface, smuv, 0.0) * w;
+                    sumW += w;
+                }
+                fragColor = (sumW > 0.0) ? sum / sumW : textureLod(surface, muv, 0.0);
+            }
+        )")
+        );
+    return source;
+};
+
+// =================================================================================================

@@ -31,6 +31,7 @@ const ShaderSource& BoxBlurShader();
 const ShaderSource& ToneMapShader();
 const ShaderSource& FxaaShader();
 const ShaderSource& GaussBlurShader();
+const ShaderSource& BilateralBlurShader();
 const ShaderSource& LightningDrawShader();
 const ShaderSource& LightningFlareShader();
 const ShaderSource& SkyboxShader();
@@ -65,6 +66,7 @@ BaseShaderCode::BaseShaderCode() {
         &ToneMapShader(),
         &FxaaShader(),
         &GaussBlurShader(),
+        &BilateralBlurShader(),
         &LightningDrawShader(),
         &LightningFlareShader(),
         &SkyboxShader(),
