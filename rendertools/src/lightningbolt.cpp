@@ -150,12 +150,22 @@ namespace {
     // direction turning steadily along the bolt then draws a helix - the corkscrew curls. Two SIGNED
     // channels on a fixed basis swing THROUGH the axis instead, which is what a discharge does.
     // v is zero where the mode allows one direction only; the caller then simply adds nothing for it.
-    void BuildSwingBasis(const Vector3f& axis, const Vector3f& planeDir, eSwingMode mode, Vector3f& u, Vector3f& v) {
+    void BuildSwingBasis(const Vector3f& axis, const Vector3f& planeDir, const Vector3f& planeNormal, eSwingMode mode, Vector3f& u, Vector3f& v) {
         switch (mode) {
             case smPlane:
                 u = planeDir;
                 v = Vector3f::ZERO;
                 return;
+            case smSurface: {
+                // in the plane ACROSS the surface normal, and out of it along the normal itself - the
+                // one direction that cannot reach into the surface. The caller's normal need not be
+                // exactly perpendicular to the bolt, so it is orthogonalized against the axis here.
+                u = planeDir;
+                Vector3f n = planeNormal - axis * planeNormal.Dot(axis);
+                float l = n.Length();
+                v = (l > 1e-4f) ? n * (1.0f / l) : Vector3f::ZERO;
+                return;
+                }
             case smHorizontal:
                 // world xz only: node.y stays == base.y, so no segment can run upward (gravity worlds)
                 u = Vector3f(1.0f, 0.0f, 0.0f);
@@ -290,7 +300,7 @@ void LightningBolt::Build(const LightningBoltParams& params) {
     Vector3f fullDelta = delta * extent;
     float fullLength = length * extent;
     Vector3f axis = delta * (1.0f / length);
-    Vector3f planeDir = (params.swingMode == smPlane) ? BuildPlaneDir(params.planeNormal, axis) : Vector3f::ZERO;
+    Vector3f planeDir = ((params.swingMode == smPlane) or (params.swingMode == smSurface)) ? BuildPlaneDir(params.planeNormal, axis) : Vector3f::ZERO;
 
     // kink-layer noise scale: input coordinate = world arc position / kinkScale, so the FINEST kink octave
     // has cells of exactly one node step -> one sample per finest cell.
@@ -317,7 +327,7 @@ void LightningBolt::Build(const LightningBoltParams& params) {
     // One swing basis for the whole bolt - see BuildSwingBasis () for why it is a basis and not a
     // direction per sample. Both noise layers ride on it.
     Vector3f swingU, swingV;
-    BuildSwingBasis(axis, planeDir, params.swingMode, swingU, swingV);
+    BuildSwingBasis(axis, planeDir, params.planeNormal, params.swingMode, swingU, swingV);
 
     // THE BOLT'S OWN PLANE. Its dominant direction is not drawn from a separate random source but read
     // off the noise itself, at the MIDDLE of the bolt - there the sin window is fully open, so that is
@@ -343,9 +353,12 @@ void LightningBolt::Build(const LightningBoltParams& params) {
         }
     }
 
-    // How much may leave that plane. Only the perpendicular mode has a plane of its own; smPlane is
-    // flat by definition (swingV is zero) and smHorizontal wants both world axes at full weight.
-    const float planeDistTolerance = (params.swingMode == smPerpendicular)
+    // How much may leave that plane. The perpendicular and the surface mode have a plane of their own;
+    // smPlane is flat by definition (swingV is zero) and smHorizontal wants both world axes at full
+    // weight. On a surface the out of plane channel is ONE SIDED (|noise| below): it rides on the
+    // surface normal, and a signed swing there would push half of it into the surface.
+    const bool bOutward = (params.swingMode == smSurface);
+    const float planeDistTolerance = ((params.swingMode == smPerpendicular) or bOutward)
         				  ? ((params.fbm.planeDistTolerance >= 0.0f) ? params.fbm.planeDistTolerance : look.planeDistTolerance)
         				  : 1.0f;
     // keeps the peak swing at exactly `amplitude` however the two channels are weighted
@@ -362,7 +375,7 @@ void LightningBolt::Build(const LightningBoltParams& params) {
         // bolt in place (animation) instead of sliding the shape sideways as `x + time` did.
         float du = LightningNoise::Fbm2D(x, params.time, params.seed, octaves, gain, lacunarity);
         float dv = LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity);
-        Vector3f disp = (swingU * du + swingV * (dv * planeDistTolerance)) * (params.amplitude * window * swingScale);
+        Vector3f disp = (swingU * du + swingV * ((bOutward ? std::fabs(dv) : dv) * planeDistTolerance)) * (params.amplitude * window * swingScale);
         // KINK layer -- world-fixed fine jaggedness, tiled along the bolt: sampled once per finest cell
         // (see kinkScale), so consecutive nodes get ~independent values -> hard corners of world-constant
         // size and spacing on every bolt, trunk and branchlet alike. Same basis, same window (endpoints
@@ -370,7 +383,7 @@ void LightningBolt::Build(const LightningBoltParams& params) {
         float s = (t * fullLength) / ((kinkScale > 1e-5f) ? kinkScale : 1e-5f);
         float ku = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x7f4a7c15u, kinkOctaves, gain, lacunarity);
         float kv = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, kinkOctaves, gain, lacunarity);
-        disp += (swingU * ku + swingV * (kv * planeDistTolerance)) * (kinkAmplitude * window * swingScale);
+        disp += (swingU * ku + swingV * ((bOutward ? std::fabs(kv) : kv) * planeDistTolerance)) * (kinkAmplitude * window * swingScale);
         LightningNode* node = m_nodes.Append();
         node->position = base + disp;
         // width tapers over the VISIBLE span, so the drawn tip carries endWidth even with a free tail
@@ -665,24 +678,25 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
 
 
 bool LightningStrike::IsAlive(int64_t now) const {
+    if (m_lifetime <= 0.0f)     // a lifetime of zero burns until the application takes it away
+        return true;
     return float(now - m_spawnTime) * 0.001f < m_lifetime;
 }
 
 
 float LightningStrike::Fade(int64_t now) const {
     const LightningLook& look = lightningLook;
-    if (m_lifetime < 1e-4f)
-        return 0.0f;
     float age = float(now - m_spawnTime) * 0.001f;
-    float fadeSpan = m_fadeStart;   // param is in ms before the end of lifetime
-    if (fadeSpan > m_lifetime)
-        fadeSpan = m_lifetime;               // fade window can't start before spawn
-    float fadeBegin = m_lifetime - fadeSpan;
-    float decay;
-    if ((fadeSpan < 1e-4f) || (age <= fadeBegin))   // no fade window, or still in the hold phase
-        decay = 1.0f;
-    else
-        decay = powf(std::clamp(1.0f - (age - fadeBegin) / fadeSpan, 0.0f, 1.0f), 4.0f);
+    float decay = 1.0f;
+    // A lifetime of zero is a permanent strike: no end, so no fade window either - it only flickers.
+    if (m_lifetime > 0.0f) {
+        float fadeSpan = m_fadeStart;   // param is in ms before the end of lifetime
+        if (fadeSpan > m_lifetime)
+            fadeSpan = m_lifetime;               // fade window can't start before spawn
+        float fadeBegin = m_lifetime - fadeSpan;
+        if ((fadeSpan >= 1e-4f) && (age > fadeBegin))   // inside the fade window
+            decay = powf(std::clamp(1.0f - (age - fadeBegin) / fadeSpan, 0.0f, 1.0f), 4.0f);
+    }
     uint32_t bucket = uint32_t(age * look.flickerRate);
     uint32_t h = (bucket + uint32_t(m_spawnTime)) * 2654435761u;
     h ^= h >> 15;
@@ -697,6 +711,8 @@ float LightningStrike::Fade(int64_t now) const {
 // (m_fadeStart's unit handling included) -- keep the two in sync. While this returns true the handler
 // skips the strike in the full-res core pass, so only the blurred halo remains and fades out.
 bool LightningStrike::IsFading(int64_t now) const {
+    if (m_lifetime <= 0.0f)     // permanent - there is no window to be inside of
+        return false;
     float fadeSpan = m_fadeStart;
     if (fadeSpan > m_lifetime)
         fadeSpan = m_lifetime;

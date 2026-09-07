@@ -28,11 +28,18 @@
 //   smPlane         - one single lateral direction inside the plane given by planeNormal
 //                     (dir = normalize (planeNormal x axis)). For discharges creeping ALONG a surface:
 //                     the path stays in the surface instead of lifting off it.
+//   smSurface       - planeNormal is the SURFACE normal, and the swing plane is the one PERPENDICULAR
+//                     to it: the in-plane direction is normalize (planeNormal x axis), and what leaves
+//                     that plane (planeDistTolerance) goes along the normal and only OUTWARD (|noise|).
+//                     For a discharge on a convex edge of a hull - the plane through the edge and
+//                     across its normal lies outside the body on both sides, and the one-sided part
+//                     out of it can only move further away from the surface, never into it.
 
 enum eSwingMode {
     smHorizontal,
     smPerpendicular,
-    smPlane
+    smPlane,
+    smSurface
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -149,7 +156,7 @@ struct LightningCreationParams {
     float      tailFraction{ 0.0f };   // build this much of the length BEYOND the end and do not draw it -> the visible tip is not pinned and dances
     float      regenInterval{ 33.0f };  // ms between path rebuilds of an animated lightning (0 = every frame)
     // strike only
-    float      lifetime{ 1.0f };   // seconds the strike stays (ttl-faded)
+    float      lifetime{ 1.0f };   // seconds the strike stays (ttl-faded); 0 = until it is destroyed
     float      fadeStart{ 150.0f }; // ms before the end of lifetime at which the brightness starts falling off (afterglow); full brightness before
     int32_t    branchDepth{ 2 };      // 0 = trunk only, 1 = trunk branches, 2 = branches branch, ...
     float      branchChance{ 0.2f };   // per-node fork probability [0,1]

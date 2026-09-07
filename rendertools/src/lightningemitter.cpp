@@ -133,7 +133,9 @@ bool LightningEmitter::Update(int64_t now, LightningSystem& system) {
         return changed;
     }
 
-    if (m_burning and (now >= m_burnUntil)) {
+    // A lifetime of zero burns for good: the discharges never die by themselves (LightningStrike::
+    // IsAlive), so the emitter must not take them away either, and there is nothing to re-ignite.
+    if (m_burning and (m_params.lifetime > 0.0f) and (now >= m_burnUntil)) {
         // A strike has faded out by itself at this point (its lifetime IS the burn time); an arc has not,
         // so extinguishing is done here for both -- one rule, no special case.
         if (not system.IsEmpty()) {
