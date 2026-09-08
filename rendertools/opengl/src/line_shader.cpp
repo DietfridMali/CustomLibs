@@ -37,7 +37,7 @@ layout(std430, binding = 0) buffer Lines { LineInstance lines[]; };
 uniform mat4 mModelView;
 uniform mat4 mProjection;
 uniform mat4 mViewport;
-uniform vec2  texelSize;     // one over the VIEWPORT size (BaseRenderer::TexelSize ())
+uniform vec2  texelSize;     // one over the TARGET BUFFER size - mClip below is in the buffer's NDC
 uniform float perspective;   // 1: pixels per unit shrink with depth; 0: orthographic projection
 
 layout(location = 0) in vec3 position;

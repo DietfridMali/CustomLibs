@@ -138,9 +138,18 @@ bool LineRenderer::Render(void) {
         const float* projection = baseRenderer.Projection().AsArray();
 
         shader->SetFloat("perspective", (projection[11] != 0.0f) ? 1.0f : 0.0f);
-        // What the VS converts pixels into view units with: it has to describe the VIEWPORT, not the
-        // buffer behind it (see the lightning ribbon).
-        shader->SetVector2f("texelSize", baseRenderer.TexelSize());
+        // What the VS converts pixels into view units with: the texel size of the ACTIVE RENDER TARGET.
+        // The VS measures the projection through mViewport, i.e. in the NDC of the whole target buffer
+        // (the gfx viewport always spans the buffer; mViewport scales into the sub rectangle), so the
+        // pixel scale is the buffer's - baseRenderer.TexelSize () describes the viewport and inflated a
+        // line drawn into a 370 px wide menu canvas on a 1920 px screen five times. Without an active
+        // buffer the window is the target.
+        RenderTarget* renderTarget = baseRenderer.GetActiveBuffer();
+        TexCoord texelSize = renderTarget
+            ? renderTarget->TexelSize()
+            : TexCoord(1.0f / float(baseRenderer.WindowWidth()), 1.0f / float(baseRenderer.WindowHeight()));
+
+        shader->SetVector2f("texelSize", texelSize);
         shader->SetFloat("dashScale", m_dashScale);
         shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
         m_buffer.Bind(0);

@@ -40,7 +40,7 @@ cbuffer FrameConstants : register(b0) {
 };
 
 cbuffer ShaderConstants : register(b1) {   // same block as the PS
-    float2 texelSize;      // one over the VIEWPORT size (BaseRenderer::TexelSize ())
+    float2 texelSize;      // one over the TARGET BUFFER size - mClip below is in the buffer's NDC
     float  perspective;    // 1: pixels per unit shrink with depth; 0: orthographic projection
     float  dashScale;      // stretches the dash / dot pattern (PS)
     float  antialias;      // 1: analytic edge antialiasing, 0: hard edge (PS)
