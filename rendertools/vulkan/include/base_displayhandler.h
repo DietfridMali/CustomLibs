@@ -129,6 +129,12 @@ public:
         return m_swapchain.LayoutTracker(m_backBufferIndex);
     }
 
+    // The swap chain's pixel format - what a readback of the back buffer (GfxRenderer::ReadBuffer ())
+    // has to swizzle from.
+    inline VkFormat CurrentBackBufferFormat(void) const noexcept {
+        return m_swapchain.Format();
+    }
+
     inline int GetWidth(void) noexcept { return m_width; }
 
     inline int GetHeight(void) noexcept { return m_height; }

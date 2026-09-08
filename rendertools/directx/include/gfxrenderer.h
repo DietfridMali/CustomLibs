@@ -70,6 +70,12 @@ public:
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 
+    // The presented picture as packed RGBA8, bottom row first (the OpenGL convention, so every
+    // backend hands out the same thing): the current swap chain back buffer, copied through a
+    // readback heap. width/height of 0 mean the whole back buffer; a rectangle is (x, y) from the
+    // bottom left, and the destination needs width * height * 4 bytes.
+    bool ReadBuffer(void* buffer, size_t bufferSize, int x = 0, int y = 0, int width = 0, int height = 0);
+
     inline void Draw3DScene(void) noexcept {
         return BaseRenderer::Draw3DScene(false);
     }

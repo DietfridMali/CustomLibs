@@ -159,6 +159,7 @@
     <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\lightningnoise.h" />
     <ClInclude Include="..\..\include\lightningbolt.h" />
+    <ClInclude Include="..\..\include\linerenderer.h" />
     <ClInclude Include="..\..\include\lightningemitter.h" />
     <ClInclude Include="..\..\include\lightningsystem.h" />
     <ClInclude Include="..\..\include\noise.h" />
@@ -207,6 +208,7 @@
     <ClCompile Include="..\src\blur_shader.cpp" />
     <ClCompile Include="..\src\tonemap_shader.cpp" />
     <ClCompile Include="..\src\lightning_shader.cpp" />
+    <ClCompile Include="..\src\line_shader.cpp" />
     <ClCompile Include="..\src\blackhole_shader.cpp" />
     <ClCompile Include="..\src\skybox_shader.cpp" />
     <ClCompile Include="..\..\src\cube.cpp" />
@@ -251,6 +253,7 @@
     <ClCompile Include="..\src\base_shader_funcs.cpp" />
     <ClCompile Include="..\..\src\lightningnoise.cpp" />
     <ClCompile Include="..\..\src\lightningbolt.cpp" />
+    <ClCompile Include="..\..\src\linerenderer.cpp" />
     <ClCompile Include="..\..\src\lightningemitter.cpp" />
     <ClCompile Include="..\..\src\lightningsystem.cpp" />
     <ClCompile Include="..\..\src\noise.cpp" />

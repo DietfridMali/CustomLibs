@@ -65,6 +65,13 @@ public:
 
     virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 
+    // The presented picture as packed RGBA8, bottom row first: the window's back buffer, what
+    // DrawScreen () just put there. width/height of 0 mean the whole back buffer; a rectangle is
+    // (x, y) from the bottom left, and the destination needs width * height * 4 bytes. The same
+    // call exists in every backend - here it is a glReadPixels of the default framebuffer, DX and
+    // VK copy the swap chain image through a readback buffer.
+    bool ReadBuffer(void* buffer, size_t bufferSize, int x = 0, int y = 0, int width = 0, int height = 0);
+
     inline void SetGeometryFrontFace(void) noexcept {
         gfxStates.FrontFace(GfxOperations::Winding::Reverse);
     }

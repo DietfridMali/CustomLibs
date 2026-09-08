@@ -431,6 +431,7 @@ bool VKContext::CreateDevice(void) noexcept
     features.fragmentStoresAndAtomics = VK_TRUE;
     features.vertexPipelineStoresAndAtomics = VK_TRUE;
     features.independentBlend = VK_TRUE;
+    features.fillModeNonSolid = VK_TRUE;       // VK_POLYGON_MODE_LINE for GfxStates::SetFillMode (Wireframe); universal on desktop
 
     const char* deviceExtensions[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,

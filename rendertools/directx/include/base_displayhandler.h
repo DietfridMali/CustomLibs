@@ -112,6 +112,12 @@ public:
         return m_backBuffers[m_backBufferIndex].Get();
     }
 
+    // The resource state the current back buffer is tracked in (PRESENT or RENDER_TARGET) - what a
+    // pass that borrows it for a copy (GfxRenderer::ReadBuffer ()) has to put back afterwards.
+    inline D3D12_RESOURCE_STATES CurrentBackBufferState(void) const noexcept {
+        return m_backBufferStates[m_backBufferIndex];
+    }
+
     // Returns the CPU-side RTV handle for the current back buffer.
     inline D3D12_CPU_DESCRIPTOR_HANDLE CurrentRTV(void) const noexcept {
         return m_rtvs[m_backBufferIndex].CPUHandle();

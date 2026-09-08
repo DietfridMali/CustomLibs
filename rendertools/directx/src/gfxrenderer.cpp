@@ -165,3 +165,111 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
 }
 
 // =================================================================================================
+// The current swap chain back buffer, as DrawScreen () left it - so call this before the present. The
+// copy goes through a readback heap the way RenderTarget::ReadBuffer () does it, the state of the
+// back buffer is put back to what it was. DX rows run top down, the result is turned around to the
+// bottom first order the OpenGL backend delivers.
+
+bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int width, int height) {
+    ID3D12Resource* backBuffer = baseDisplayHandler.CurrentBackBuffer();
+    ID3D12Device* device = dx12Context.Device();
+
+    if (not (buffer and backBuffer and device))
+        return false;
+
+    int w = baseDisplayHandler.GetWidth();
+    int h = baseDisplayHandler.GetHeight();
+
+    if (width <= 0)
+        width = w - x;
+    if (height <= 0)
+        height = h - y;
+    if ((x < 0) or (y < 0) or (width <= 0) or (height <= 0) or (x + width > w) or (y + height > h))
+        return false;
+    if (bufferSize < size_t(width) * size_t(height) * 4)
+        return false;
+
+    D3D12_RESOURCE_DESC desc = backBuffer->GetDesc();
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+    UINT rowCount = 0;
+    UINT64 rowSize = 0, totalSize = 0;
+
+    // the footprint of the WHOLE subresource - GetCopyableFootprints () knows no rectangle; the copy
+    // below moves only the box, the rest of the readback buffer stays untouched
+    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+
+    D3D12_HEAP_PROPERTIES heapProps{};
+    D3D12_RESOURCE_DESC readbackDesc{};
+
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+    readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    readbackDesc.Width = totalSize;
+    readbackDesc.Height = 1;
+    readbackDesc.DepthOrArraySize = 1;
+    readbackDesc.MipLevels = 1;
+    readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
+    readbackDesc.SampleDesc.Count = 1;
+    readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    readbackDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    ComPtr<ID3D12Resource> readback;
+
+    if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
+                                               D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
+        return false;
+
+    CommandList* cl = static_cast<CommandList*>(StartOperation("ReadBuffer"));
+
+    if (not cl)
+        return false;
+
+    D3D12_RESOURCE_STATES stateBefore = baseDisplayHandler.CurrentBackBufferState();
+
+    cl->SetBarrier(backBuffer, stateBefore, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    // DX rows run top down: the rectangle's bottom left (x, y) is row h - y - height from the top
+    UINT top = UINT(h - y - height);
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+    D3D12_BOX box{ UINT(x), top, 0, UINT(x + width), top + UINT(height), 1 };
+
+    srcLoc.pResource = backBuffer;
+    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    srcLoc.SubresourceIndex = 0;
+    dstLoc.pResource = readback.Get();
+    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dstLoc.PlacedFootprint = layout;
+    if (ID3D12GraphicsCommandList* list = cl->GfxList())
+        list->CopyTextureRegion(&dstLoc, UINT(x), top, 0, &srcLoc, &box);
+    cl->SetBarrier(backBuffer, D3D12_RESOURCE_STATE_COPY_SOURCE, stateBefore);
+    // Flushed, not just closed - the map below reads what the GPU wrote, so the copy has to be done.
+    FinishOperation(cl, true);
+
+    uint8_t* source = nullptr;
+    D3D12_RANGE readRange{ 0, size_t(totalSize) };
+
+    if (FAILED(readback->Map(0, &readRange, reinterpret_cast<void**>(&source))))
+        return false;
+
+    uint8_t* dest = static_cast<uint8_t*>(buffer);
+    size_t rowBytes = size_t(width) * 4;
+
+    // bottom row of the rectangle first, like glReadPixels
+    for (int row = 0; row < height; ++row) {
+        size_t sourceRow = size_t(top) + size_t(height - 1 - row);
+
+        memcpy(dest + size_t(row) * rowBytes,
+               source + size_t(layout.Offset) + sourceRow * size_t(layout.Footprint.RowPitch) + size_t(x) * 4,
+               rowBytes);
+    }
+
+    D3D12_RANGE writeRange{ 0, 0 };   // nothing was written from the CPU side
+
+    readback->Unmap(0, &writeRange);
+    return true;
+}
+
+// =================================================================================================

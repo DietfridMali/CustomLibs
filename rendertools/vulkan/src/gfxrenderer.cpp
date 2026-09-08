@@ -19,6 +19,8 @@
 #include "cbv_allocator.h"
 #include "resource_handler.h"
 #include "gfxapitype.h"
+#include "image_layout_tracker.h"
+#include "vkupload.h"	// CreateReadbackBuffer / one shot command buffer for ReadBuffer ()
 
 // =================================================================================================
 // Vulkan Renderer
@@ -183,6 +185,106 @@ void GfxRenderer::Cleanup(void) noexcept {
     meshHandler.Destroy();
     gfxResourceHandler.Cleanup(0);
     gfxResourceHandler.Cleanup(1);
+}
+
+// =================================================================================================
+// The current swap chain image, as DrawScreen () left it - so call this before the present. The copy
+// goes through a host visible readback buffer on a one shot command buffer, the way
+// RenderTarget::ReadBuffer () does it; the image's layout is put back to what it was. Vulkan rows run
+// top down and the swap chain is BGRA as a rule: the result is turned around to the bottom first RGBA
+// order the OpenGL backend delivers.
+
+bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int width, int height) {
+    VkImage image = baseDisplayHandler.CurrentBackBuffer();
+
+    if (not (buffer and (image != VK_NULL_HANDLE)))
+        return false;
+
+    int w = baseDisplayHandler.GetWidth();
+    int h = baseDisplayHandler.GetHeight();
+
+    if (width <= 0)
+        width = w - x;
+    if (height <= 0)
+        height = h - y;
+    if ((x < 0) or (y < 0) or (width <= 0) or (height <= 0) or (x + width > w) or (y + height > h))
+        return false;
+
+    size_t rowBytes = size_t(width) * 4;
+    size_t needed = rowBytes * size_t(height);
+
+    if (bufferSize < needed)
+        return false;
+
+    VkStagingBuffer readback;
+
+    if (not CreateReadbackBuffer(VkDeviceSize(needed), readback))
+        return false;
+
+    OneShotCommandBuffer cmd;
+
+    if (not BeginSingleTimeCommands(cmd)) {
+        readback.Destroy();
+        return false;
+    }
+
+    ImageLayoutTracker& tracker = baseDisplayHandler.CurrentBackBufferTracker();
+    VkImageLayout layoutBefore = tracker.Layout();
+
+    tracker.ToTransferSrc(cmd.cb);
+
+    // Vulkan rows run top down: the rectangle's bottom left (x, y) is row h - y - height from the top
+    VkBufferImageCopy copy { };
+
+    copy.bufferOffset = 0;
+    copy.bufferRowLength = 0;       // tightly packed
+    copy.bufferImageHeight = 0;
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy.imageSubresource.mipLevel = 0;
+    copy.imageSubresource.baseArrayLayer = 0;
+    copy.imageSubresource.layerCount = 1;
+    copy.imageOffset = { int32_t(x), int32_t(h - y - height), 0 };
+    copy.imageExtent = { uint32_t(width), uint32_t(height), 1 };
+
+    vkCmdCopyImageToBuffer(cmd.cb, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1, &copy);
+    // Back to the layout the frame left it in - the present, or the next draw, expects to find it there.
+    if (layoutBefore == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+        tracker.ToPresent(cmd.cb);
+    else if (layoutBefore == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+        tracker.ToColorAttachment(cmd.cb);
+    if (not EndSingleTimeCommands(cmd)) {
+        readback.Destroy();
+        return false;
+    }
+    if (readback.mapped == nullptr) {
+        readback.Destroy();
+        return false;
+    }
+
+    // Host visible and coherent through VMA's AUTO mapping, so what the copy wrote is visible here.
+    // Bottom row first, and BGRA swapped to RGBA where the swap chain is BGRA.
+    const uint8_t* source = static_cast<const uint8_t*>(readback.mapped);
+    uint8_t* dest = static_cast<uint8_t*>(buffer);
+    VkFormat format = baseDisplayHandler.CurrentBackBufferFormat();
+    bool bgra = (format == VK_FORMAT_B8G8R8A8_UNORM) or (format == VK_FORMAT_B8G8R8A8_SRGB);
+
+    for (int row = 0; row < height; ++row) {
+        const uint8_t* sourceRow = source + size_t(height - 1 - row) * rowBytes;
+        uint8_t* destRow = dest + size_t(row) * rowBytes;
+
+        if (not bgra)
+            memcpy(destRow, sourceRow, rowBytes);
+        else {
+            for (size_t i = 0; i < rowBytes; i += 4) {
+                destRow[i + 0] = sourceRow[i + 2];
+                destRow[i + 1] = sourceRow[i + 1];
+                destRow[i + 2] = sourceRow[i + 0];
+                destRow[i + 3] = sourceRow[i + 3];
+            }
+        }
+    }
+    readback.Destroy();
+    return true;
 }
 
 // =================================================================================================

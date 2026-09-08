@@ -77,3 +77,45 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
 }
 
 // =================================================================================================
+// The window's back buffer as DrawScreen () left it - so call this BEFORE the buffer swap; after it the
+// picture has moved to the front buffer, which not every driver hands back. Bottom row first is what
+// glReadPixels delivers anyway; DX and VK turn their top down copies around to match.
+
+bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int width, int height) {
+    if (not buffer)
+        return false;
+
+    int w = WindowWidth();
+    int h = WindowHeight();
+
+    if (width <= 0)
+        width = w - x;
+    if (height <= 0)
+        height = h - y;
+    if ((x < 0) or (y < 0) or (width <= 0) or (height <= 0) or (x + width > w) or (y + height > h))
+        return false;
+    if (bufferSize < size_t(width) * size_t(height) * 4)
+        return false;
+
+    GLint prevFramebuffer = 0;
+    GLint prevReadBuffer = 0;
+    GLint prevAlignment = 4;
+
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevFramebuffer);
+    glGetIntegerv(GL_READ_BUFFER, &prevReadBuffer);
+    glGetIntegerv(GL_PACK_ALIGNMENT, &prevAlignment);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    glReadBuffer(GL_BACK);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);   // packed rows, whatever the width
+    gfxStates.ClearError();
+    glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+    bool ok = gfxStates.CheckError("ReadBuffer");
+
+    glPixelStorei(GL_PACK_ALIGNMENT, prevAlignment);
+    glReadBuffer(GLenum(prevReadBuffer));
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, GLuint(prevFramebuffer));
+    return ok;
+}
+
+// =================================================================================================

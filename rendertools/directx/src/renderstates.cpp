@@ -104,7 +104,7 @@ static D3D12_CULL_MODE ToD3DCullMode(GfxOperations::CullFace mode) noexcept
 // =================================================================================================
 
 D3D12_RASTERIZER_DESC& RenderStates::SetRasterizerDesc(D3D12_RASTERIZER_DESC& desc) noexcept {
-    desc.FillMode = D3D12_FILL_MODE_SOLID;
+    desc.FillMode = (fillMode == GfxOperations::FillMode::Wireframe) ? D3D12_FILL_MODE_WIREFRAME : D3D12_FILL_MODE_SOLID;
     desc.CullMode = ToD3DCullMode(cullMode);
     desc.FrontCounterClockwise = (winding == GfxOperations::Winding::Reverse) ? TRUE : FALSE;
     desc.DepthClipEnable = depthClip ? TRUE : FALSE;

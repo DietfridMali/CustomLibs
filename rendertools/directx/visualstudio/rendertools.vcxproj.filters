@@ -82,6 +82,9 @@
     <ClInclude Include="..\..\include\lightningbolt.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\linerenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\lightningemitter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -302,6 +305,9 @@
     <ClCompile Include="..\..\src\lightningbolt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\linerenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\lightningemitter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -448,6 +454,9 @@
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\src\lightning_shader.cpp">
+      <Filter>Source Files\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\line_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
     <ClCompile Include="..\src\blackhole_shader.cpp">

@@ -217,6 +217,14 @@ namespace GfxOperations {
         Reverse
     };
 
+    // How the rasterizer fills a triangle. OpenGL: glPolygonMode (GL_FRONT_AND_BACK, ...); DX12 and
+    // Vulkan carry it in the rasterizer state, so it is a PSO key there. Always both faces - there is
+    // no per face fill mode in DX12 or Vulkan.
+    enum class FillMode : uint8_t {
+        Solid,
+        Wireframe
+    };
+
     enum class StencilOp : uint8_t {
         Keep,
         Zero,

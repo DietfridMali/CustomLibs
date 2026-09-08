@@ -412,6 +412,18 @@ public:
         return 0;
     }
 
+    // Solid or wireframe rasterization (VkPolygonMode; needs the fillModeNonSolid device feature,
+    // enabled in VkContext). Part of the rasterizer state and therefore of the pipeline key. Returns
+    // the PREVIOUS mode, per the state contract.
+    inline GfxOperations::FillMode SetFillMode(GfxOperations::FillMode mode) {
+        auto& s = ActiveState();
+        auto prevState = s.fillMode;
+        s.fillMode = mode;
+        return prevState;
+    }
+
+    inline GfxOperations::FillMode GetFillMode(void) { return ActiveState().fillMode; }
+
     // --- queries ---------------------------------------------------------------------------------
     // Same contract in every backend: SetX () returns the PREVIOUS state, GetX () only asks.
     inline int GetDepthTest(void) { return SetDepthTest(-1); }

@@ -20,10 +20,12 @@ struct RenderStates {
     using CullFace = GfxOperations::CullFace;
     using Winding = GfxOperations::Winding;
     using StencilOp = GfxOperations::StencilOp;
+    using FillMode = GfxOperations::FillMode;
 
     // Rasterizer
     CullFace    cullMode{ CullFace::Back };
     Winding     winding{ Winding::Regular };
+    FillMode    fillMode{ FillMode::Solid };
     // Depth-stencil
     uint8_t     depthTest{ 1 };
     uint8_t     depthWrite{ 1 };

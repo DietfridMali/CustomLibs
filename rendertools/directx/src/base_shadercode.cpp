@@ -36,6 +36,7 @@ const ShaderSource& GaussBlurShader();
 const ShaderSource& BilateralBlurShader();
 const ShaderSource& LightningDrawShader();
 const ShaderSource& LightningFlareShader();
+const ShaderSource& LineDrawShader();
 const ShaderSource& SkyboxShader();
 const ShaderSource& BlackholeShader();
 
@@ -72,6 +73,7 @@ BaseShaderCode::BaseShaderCode() {
         &BilateralBlurShader(),
         &LightningDrawShader(),
         &LightningFlareShader(),
+        &LineDrawShader(),
         &SkyboxShader(),
         &BlackholeShader()
     };

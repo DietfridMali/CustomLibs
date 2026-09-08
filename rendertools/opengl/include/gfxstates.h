@@ -364,6 +364,26 @@ public:
 		return prevState;
 	}
 
+	// Solid or wireframe rasterization, both faces. glPolygonMode behind a FuncState cache like the
+	// other enum states; DX and VK keep it in their rasterizer state (a PSO key). Returns the PREVIOUS
+	// mode, per the state contract.
+	// The state id is a member, not a function local static, so GetFillMode () can query the same slot
+	// through the GL_NONE sentinel (see m_blendFuncStateID).
+	int32_t m_fillModeStateID{ -1 };
+
+	inline GLenum FillModeGL(GLenum state) {
+		return FuncState<GLenum, GL_NONE>(state, m_fillModeStateID, [](GLenum m) { glPolygonMode(GL_FRONT_AND_BACK, m); });
+	}
+
+	inline GfxOperations::FillMode SetFillMode(GfxOperations::FillMode mode) {
+		GLenum previous = FillModeGL((mode == GfxOperations::FillMode::Wireframe) ? GL_LINE : GL_FILL);
+		return (previous == GL_LINE) ? GfxOperations::FillMode::Wireframe : GfxOperations::FillMode::Solid;
+	}
+
+	inline GfxOperations::FillMode GetFillMode(void) {
+		return (FillModeGL(GLenum(GL_NONE)) == GL_LINE) ? GfxOperations::FillMode::Wireframe : GfxOperations::FillMode::Solid;
+	}
+
 	// --- queries ---------------------------------------------------------------------------------
 	// Every setter above doubles as a query through its "unknown" sentinel (-1 for the toggles, GL_NONE
 	// for the enum states). These are the readable spelling of that, and they exist in all three backends,
