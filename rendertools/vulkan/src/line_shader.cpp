@@ -45,7 +45,7 @@ struct VSInput {
 
 struct PSInput {
     float4 pos     : SV_Position;
-    float4 cap     : TEXCOORD0;   // (along, across, segLen, halfWidth) - capsule local, view units
+    float4 cap     : TEXCOORD0;   // (along, across, segLen, halfWidth) - capsule local, PIXELS
     float4 color   : TEXCOORD1;
     float2 pattern : TEXCOORD2;   // (style, phase)
 };
@@ -68,30 +68,41 @@ PSInput VSMain(VSInput v) {
     // a line seen exactly end on has no unique across direction - any perpendicular will do
     perp = (perpLen > 1e-4) ? perp / perpLen : normalize(cross(axis, float3(0.0, 0.0, 1.0)));
 
-    // Pixels one view unit across the line covers on screen: the projection's derivative along perp at
-    // the line's middle, exact at that depth for a perspective projection and for any orthographic one.
-    // A 2D ortho over a 16:9 viewport scales x and y differently - a width taken from the y scale alone
-    // came out 1.78 times too wide on a vertical line.
+    // Pixels one view unit covers on screen, ACROSS the line and ALONG it: the projection's derivative
+    // along perp and along axis at the line's middle, exact at that depth for a perspective projection
+    // and for any orthographic one. The two differ - a 2D ortho over a wide viewport has more pixels
+    // per unit in x than in y - so the capsule is handed to the PS in PIXELS. Measured in view units
+    // it was an ellipse: the round caps of a horizontal line stuck out 2.7 times further than those of
+    // a vertical one on a menu frame, and a width taken from the y scale alone came out 1.78 times too
+    // wide on a vertical line.
     float4x4 mClip = mul(mViewport, mProjection);
     float4 cMid = mul(mClip, float4(0.5 * (vp0 + vp1), 1.0));
     float4 cPerp = mul(mClip, float4(perp, 0.0));
+    float4 cAxis = mul(mClip, float4(axis, 0.0));
     float wMid = (abs(cMid.w) > 1e-6) ? cMid.w : 1e-6;
-    float2 dScreen = (cPerp.xy - (cMid.xy / wMid) * cPerp.w) / wMid;   // d(ndc) / d(perp)
-    float pxPerUnit = max(length(dScreen * (0.5 / texelSize)), 1e-6);
-    float halfWidth = max(0.5 * l.width / pxPerUnit, 1e-5);
+    float2 pxScale = 0.5 / texelSize;
+    float2 dPerpNdc = (cPerp.xy - (cMid.xy / wMid) * cPerp.w) / wMid;   // d(ndc) / d(perp)
+    float2 dAxisNdc = (cAxis.xy - (cMid.xy / wMid) * cAxis.w) / wMid;   // d(ndc) / d(axis)
+    float pxAcross = max(length(dPerpNdc * pxScale), 1e-6);
+    // a line seen nearly end on has no projected length: the along scale is kept above a fraction of
+    // the across scale, so the cap's extension in view units stays bounded
+    float pxAlong = max(length(dAxisNdc * pxScale), 0.05 * pxAcross);
+    float halfWidth = max(0.5 * l.width, 1e-3);   // pixels
     // one pixel of margin around the capsule, so the antialiased edge has the pixels it fades over
-    float halfDraw = halfWidth + 1.0 / pxPerUnit;
+    float halfDraw = halfWidth + 1.0;
 
-    // capsule bounding box: x along the line (round cap before p0 .. round cap after p1), y across
-    float along  = (v.pos.x + 0.5) * (segLen + 2.0 * halfDraw) - halfDraw;
-    float across = v.pos.y * 2.0 * halfDraw;
+    // capsule bounding box: x along the line (round cap before p0 .. round cap after p1), y across -
+    // spanned in view units, so the pixel margins go back through the scale of their direction
+    float capLen = halfDraw / pxAlong;
+    float along  = (v.pos.x + 0.5) * (segLen + 2.0 * capLen) - capLen;
+    float across = v.pos.y * 2.0 * halfDraw / pxAcross;
     float3 node = vp0 + axis * along + perp * across;
 
     PSInput o;
     o.pos = mul(mViewport, mul(mProjection, float4(node, 1.0)));
-    o.cap = float4(along, across, segLen, halfWidth);
+    o.cap = float4(along * pxAlong, across * pxAcross, segLen * pxAlong, halfWidth);
     o.color = l.color;
-    o.pattern = float2(l.style, l.phase);
+    o.pattern = float2(l.style, l.phase * pxAlong);
     return o;
 }
 )");
@@ -142,7 +153,8 @@ float4 PSMain(PSInput i) : SV_Target {
     }
 
     float dist = length(float2(dAlong, across));
-    // fwidth (dist) is the view units one pixel covers here, so (hw - dist) / fwidth is the pixel
+    // The capsule is in pixels, so fwidth (dist) is about one - it still divides, because under a
+    // perspective projection the pixel scale drifts along the line. (hw - dist) / fwidth is the pixel
     // distance to the edge; a pixel centred that far inside is covered by that plus a half. Measuring
     // the distance alone gave a line on a pixel boundary 37 % per row where it covers 87 %.
     float fw = max(fwidth(dist), 1e-6);
