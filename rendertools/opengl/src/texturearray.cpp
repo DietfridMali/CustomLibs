@@ -1,4 +1,5 @@
 #include "texturearray.h"
+#include "gfxpixelformat_gl.h"
 
 // =================================================================================================
 
@@ -22,9 +23,76 @@ bool GfxTextureArray::Create(String name, int slotWidth, int slotHeight, int slo
 
 // -------------------------------------------------------------------------------------------------
 
+bool GfxTextureArray::CreateCompressed(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount) {
+	if (not Texture::Create())
+		return false;
+	if (not CreateCompressedSlots(name, slotWidth, slotHeight, slotCount, format, mipCount)) {
+		Texture::Destroy();
+		return false;
+	}
+	m_name = name;
+	m_useMipMaps = (mipCount > 1);
+	m_compression = GfxFormatToCompression(format);
+	return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GfxTextureArray::SetSlot(int slotIndex, TextureBuffer& buffer) {
+	if (IsCompressed())
+		return SetCompressedSlot(slotIndex, buffer.DataBuffer(), size_t(buffer.m_info.m_dataSize),
+								 buffer.m_info.m_width, buffer.m_info.m_height, buffer.m_info.m_gfxFormat, buffer.m_info.m_mipCount);
+	return SetSlot(slotIndex, buffer.DataBuffer(), buffer.m_info.m_width, buffer.m_info.m_height, buffer.m_info.m_componentCount);
+}
+
+// -------------------------------------------------------------------------------------------------
+
 void GfxTextureArray::Destroy(void) {
 	Texture::Destroy();
 	DestroySlots();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void GfxTextureArray::SetParams(bool forceUpdate) {
+	if (not IsCompressed()) {
+		Texture::SetParams(forceUpdate);
+		return;
+	}
+	if (forceUpdate or not m_hasParams) {
+		m_hasParams = true;
+		if (m_mipCount > 1) {
+			glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipCount - 1);
+			GLfloat maxAniso = 1.0f;
+			glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
+			glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, (maxAniso < 16.0f) ? maxAniso : 16.0f);
+		}
+		else {
+			glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
+			glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
+			glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
+		}
+		glTexParameteri(m_type, GL_TEXTURE_WRAP_S, m_wrapMode);
+		glTexParameteri(m_type, GL_TEXTURE_WRAP_T, m_wrapModeV);
+	}
+}
+
+// -------------------------------------------------------------------------------------------------
+
+static void UploadCompressedSlot(GLenum internalFormat, int slotIndex, int slotWidth, int slotHeight, int mipCount, const uint8_t* chain, uint32_t blockBytes) {
+	int w = slotWidth;
+	int h = slotHeight;
+	for (int mip = 0; mip < mipCount; mip++) {
+		const GLsizei imgSize = GLsizei(uint32_t((w + 3) / 4) * uint32_t((h + 3) / 4) * blockBytes);
+		glCompressedTexSubImage3D(GL_TEXTURE_2D_ARRAY, mip, 0, 0, slotIndex, w, h, 1, internalFormat, imgSize, chain);
+		chain += imgSize;
+		w = (w > 1) ? (w >> 1) : 1;
+		h = (h > 1) ? (h >> 1) : 1;
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -41,6 +109,21 @@ bool GfxTextureArray::Deploy(int bufferIndex) {
 		return false;
 	if (not Bind(0, true))
 		return false;
+
+	if (IsCompressed()) {
+		const GLenum   internalFormat = ToGLFormat(GfxLinearFormat(m_format)).internalFormat;
+		const uint32_t blockBytes = GfxBlockBytes(m_format);
+		glTexStorage3D(GL_TEXTURE_2D_ARRAY, m_mipCount, internalFormat, m_slotWidth, m_slotHeight, m_slotCount);
+		for (int slot = 0; slot < m_slotCount; slot++)
+			UploadCompressedSlot(internalFormat, slot, m_slotWidth, m_slotHeight, m_mipCount, SlotData(slot), blockBytes);
+		SetParams();
+#ifdef _DEBUG
+		gfxStates.CheckError();
+#endif
+		Release();
+		m_isDeployed = true;
+		return true;
+	}
 
 	const GLenum format = (m_components == 1) ? GL_RED : (m_components == 3) ? GL_RGB : GL_RGBA;
 	const GLenum internalFormat = (m_components == 1) ? GL_R8 : (m_components == 3) ? GL_RGB8 : GL_RGBA8;
@@ -72,6 +155,16 @@ bool GfxTextureArray::UpdateSlot(int slotIndex) {
 		return false;
 	if (not Bind(0, true))
 		return false;
+
+	if (IsCompressed()) {
+		UploadCompressedSlot(ToGLFormat(GfxLinearFormat(m_format)).internalFormat, slotIndex, m_slotWidth, m_slotHeight,
+							 m_mipCount, SlotData(slotIndex), GfxBlockBytes(m_format));
+#ifdef _DEBUG
+		gfxStates.CheckError();
+#endif
+		Release();
+		return true;
+	}
 
 	const GLenum format = (m_components == 1) ? GL_RED : (m_components == 3) ? GL_RGB : GL_RGBA;
 

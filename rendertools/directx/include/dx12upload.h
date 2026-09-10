@@ -60,7 +60,8 @@ bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, c
 // level). dstResource must already exist with the matching DXGI BC format, DepthOrArraySize ==
 // faceCount (1 for a plain 2D texture, 6 for a cubemap) and MipLevels == mipCount.
 bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces,
-                          int faceCount, int width, int height, GfxPixelFormat fmt, int mipCount) noexcept;
+                          int faceCount, int width, int height, GfxPixelFormat fmt, int mipCount,
+                          int firstLayer = 0, bool isRefresh = false) noexcept;
 
 // Create + upload a Texture3D resource. Returns nullptr on failure.
 ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept;

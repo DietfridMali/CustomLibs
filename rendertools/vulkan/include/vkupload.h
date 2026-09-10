@@ -95,7 +95,8 @@ bool UploadTextureArrayData(VkImage dstImage, ImageLayoutTracker& tracker,
 
 bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
                           const uint8_t* const* faces, int faceCount,
-                          int width, int height, GfxPixelFormat fmt, int mipCount) noexcept;
+                          int width, int height, GfxPixelFormat fmt, int mipCount,
+                          int firstLayer = 0) noexcept;
 
 // =================================================================================================
 // Create + upload a Texture3D (VkImage with imageType=VK_IMAGE_TYPE_3D). On success outImage,

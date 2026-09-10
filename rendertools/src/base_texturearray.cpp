@@ -31,6 +31,58 @@ bool BaseTextureArray::CreateSlots(String name, int slotWidth, int slotHeight, i
 	m_slotHeight = slotHeight;
 	m_slotCount = slotCount;
 	m_components = components;
+	m_format = GfxPixelFormat::RGBA8_UNorm;
+	m_mipCount = 1;
+	m_slotBytes = 0;
+	return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+size_t BaseTextureArray::CompressedChainBytes(int width, int height, GfxPixelFormat format, int mipCount) noexcept {
+	const size_t blockBytes = GfxBlockBytes(format);
+	if ((blockBytes == 0) or (width < 1) or (height < 1) or (mipCount < 1))
+		return 0;
+	size_t total = 0;
+	int w = width;
+	int h = height;
+	for (int mip = 0; mip < mipCount; mip++) {
+		total += size_t((w + 3) / 4) * size_t((h + 3) / 4) * blockBytes;
+		w = (w > 1) ? (w >> 1) : 1;
+		h = (h > 1) ? (h >> 1) : 1;
+	}
+	return total;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool BaseTextureArray::CreateCompressedSlots(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount) {
+	DestroySlots();
+	if ((slotWidth < 1) or (slotHeight < 1) or (slotCount < 1) or (mipCount < 1) or not GfxIsBlockCompressed(format))
+		return false;
+	const size_t slotBytes = CompressedChainBytes(slotWidth, slotHeight, format, mipCount);
+	if (slotBytes == 0)
+		return false;
+	const size_t total = slotBytes * size_t(slotCount);
+	if (total > size_t(INT32_MAX))
+		return false;
+	try {
+		m_pixels.Resize(int32_t(total));
+	}
+	catch (...) {
+		return false;
+	}
+	if (size_t(m_pixels.Length()) < total)
+		return false;
+	m_pixels.Clear(0);
+	m_arrayName = name;
+	m_slotWidth = slotWidth;
+	m_slotHeight = slotHeight;
+	m_slotCount = slotCount;
+	m_components = 0;
+	m_format = format;
+	m_mipCount = mipCount;
+	m_slotBytes = slotBytes;
 	return true;
 }
 
@@ -39,6 +91,10 @@ bool BaseTextureArray::CreateSlots(String name, int slotWidth, int slotHeight, i
 void BaseTextureArray::DestroySlots(void) {
 	m_pixels.Reset();
 	m_slotWidth = m_slotHeight = m_slotCount = 0;
+	m_components = 4;
+	m_format = GfxPixelFormat::RGBA8_UNorm;
+	m_mipCount = 1;
+	m_slotBytes = 0;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -87,7 +143,7 @@ void BaseTextureArray::ScaleIntoSlot(uint8_t* dst, const uint8_t* src, int srcWi
 // -------------------------------------------------------------------------------------------------
 
 bool BaseTextureArray::SetSlot(int slotIndex, const uint8_t* data, int width, int height, int components) {
-	if (not HasSlots() or (slotIndex < 0) or (slotIndex >= m_slotCount) or (data == nullptr))
+	if (not HasSlots() or IsCompressed() or (slotIndex < 0) or (slotIndex >= m_slotCount) or (data == nullptr))
 		return false;
 	// A different component count would need a channel conversion, which is a different job from
 	// scaling and has no single right answer (what does an RGB image put in the alpha channel?).
@@ -108,7 +164,42 @@ bool BaseTextureArray::SetSlot(int slotIndex, const uint8_t* data, int width, in
 
 // -------------------------------------------------------------------------------------------------
 
+bool BaseTextureArray::SetCompressedSlot(int slotIndex, const uint8_t* data, size_t dataSize, int width, int height, GfxPixelFormat format, int mipCount) {
+	if (not HasSlots() or not IsCompressed() or (slotIndex < 0) or (slotIndex >= m_slotCount) or (data == nullptr))
+		return false;
+	if ((width != m_slotWidth) or (height != m_slotHeight) or (mipCount != m_mipCount))
+		return false;
+	if (GfxLinearFormat(format) != GfxLinearFormat(m_format))
+		return false;
+	if (dataSize != m_slotBytes)
+		return false;
+	memcpy(m_pixels.DataPtr() + size_t(slotIndex) * m_slotBytes, data, m_slotBytes);
+	return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool BaseTextureArray::SlotPointers(AutoArray<const uint8_t*>& slotPtrs) {
+	if (not HasSlots())
+		return false;
+	try {
+		slotPtrs.Resize(m_slotCount);
+	}
+	catch (...) {
+		return false;
+	}
+	if (slotPtrs.Length() < m_slotCount)
+		return false;
+	for (int slot = 0; slot < m_slotCount; slot++)
+		slotPtrs[slot] = SlotData(slot);
+	return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
 int BaseTextureArray::MipCount(bool useMipMaps) const noexcept {
+	if (IsCompressed())
+		return m_mipCount;
 	if (not useMipMaps)
 		return 1;
 	int n = 1;
@@ -126,7 +217,7 @@ int BaseTextureArray::MipCount(bool useMipMaps) const noexcept {
 // reading past the end.
 
 bool BaseTextureArray::BuildMipChains(int mipCount, AutoArray<uint8_t>& chains, AutoArray<const uint8_t*>& slotPtrs) {
-	if (not HasSlots() or (mipCount < 1))
+	if (not HasSlots() or IsCompressed() or (mipCount < 1))
 		return false;
 
 	// How long one slot's chain is.

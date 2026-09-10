@@ -27,6 +27,12 @@ public:
 	// and unlike an atlas an array can have one, because a mip level never mixes two slots.
 	bool Create(String name, int slotWidth, int slotHeight, int slotCount, bool useMipMaps = true);
 
+	bool CreateCompressed(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount);
+
+	using BaseTextureArray::SetSlot;
+
+	bool SetSlot(int slotIndex, TextureBuffer& buffer);
+
 	// Uploads the whole stack in ONE call - BaseTextureArray stages the slots in exactly the layout
 	// glTexImage3D reads. bufferIndex is ignored: the array has no m_buffers, its pixels come from
 	// SetSlot ().
@@ -35,6 +41,8 @@ public:
 	// Sends one slot up again after it changed, without rebuilding the whole array. Only valid once
 	// Deploy () has run.
 	bool UpdateSlot(int slotIndex);
+
+	virtual void SetParams(bool forceUpdate = false) override;
 
 	virtual void Destroy(void) override;
 };

@@ -27,6 +27,30 @@ bool GfxTextureArray::Create(String name, int slotWidth, int slotHeight, int slo
 
 // -------------------------------------------------------------------------------------------------
 
+bool GfxTextureArray::CreateCompressed(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount) {
+    if (not Texture::Create())
+        return false;
+    if (not CreateCompressedSlots(name, slotWidth, slotHeight, slotCount, format, mipCount)) {
+        Texture::Destroy();
+        return false;
+    }
+    m_name = name;
+    m_useMipMaps = (mipCount > 1);
+    m_compression = GfxFormatToCompression(format);
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GfxTextureArray::SetSlot(int slotIndex, TextureBuffer& buffer) {
+    if (IsCompressed())
+        return SetCompressedSlot(slotIndex, buffer.DataBuffer(), size_t(buffer.m_info.m_dataSize),
+                                 buffer.m_info.m_width, buffer.m_info.m_height, buffer.m_info.m_gfxFormat, buffer.m_info.m_mipCount);
+    return SetSlot(slotIndex, buffer.DataBuffer(), buffer.m_info.m_width, buffer.m_info.m_height, buffer.m_info.m_componentCount);
+}
+
+// -------------------------------------------------------------------------------------------------
+
 void GfxTextureArray::Destroy(void) {
     Texture::Destroy();
     DestroySlots();
@@ -41,6 +65,24 @@ bool GfxTextureArray::Deploy(int /*bufferIndex*/) {
         return true;
     if (not HasSlots())
         return false;
+
+    if (IsCompressed()) {
+        const GfxPixelFormat fmt = GfxLinearFormat(m_format);
+        AutoArray<const uint8_t*> slotPtrs;
+        if (not SlotPointers(slotPtrs))
+            return false;
+        if (not CreateTextureResource(m_slotWidth, m_slotHeight, m_slotCount, m_mipCount, ToVkFormat(fmt)))
+            return false;
+        if (not UploadCompressedData(m_image, m_layoutTracker, slotPtrs.DataPtr(), m_slotCount,
+                                     m_slotWidth, m_slotHeight, fmt, m_mipCount))
+            return false;
+        if (not CreateSRV())
+            return false;
+        SetParams();
+        m_isDeployed = true;
+        return true;
+    }
+
     // The resource format below is fixed at RGBA8; anything else would need a matching one picked
     // here, and there is no caller for that yet. OpenGL derives its format from the component count
     // because its upload call takes one - these two take a format enum instead.
@@ -73,6 +115,12 @@ bool GfxTextureArray::Deploy(int /*bufferIndex*/) {
 bool GfxTextureArray::UpdateSlot(int slotIndex) {
     if (not m_isDeployed or (slotIndex < 0) or (slotIndex >= m_slotCount))
         return false;
+
+    if (IsCompressed()) {
+        const uint8_t* slot = SlotData(slotIndex);
+        return UploadCompressedData(m_image, m_layoutTracker, &slot, 1,
+                                    m_slotWidth, m_slotHeight, GfxLinearFormat(m_format), m_mipCount, slotIndex);
+    }
 
     const int mipCount = MipCount(m_useMipMaps != 0);
 

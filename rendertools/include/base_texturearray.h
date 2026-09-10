@@ -3,6 +3,7 @@
 #include "std_defines.h"
 #include "array.hpp"
 #include "string.hpp"
+#include "rendertypes.h"
 
 // =================================================================================================
 // The API neutral half of a 2D texture array: the slot geometry and the staging the backends upload
@@ -38,6 +39,9 @@ protected:
 	int					m_slotHeight{ 0 };
 	int					m_slotCount{ 0 };
 	int					m_components{ 4 };
+	GfxPixelFormat		m_format{ GfxPixelFormat::RGBA8_UNorm };
+	int					m_mipCount{ 1 };
+	size_t				m_slotBytes{ 0 };
 	String				m_arrayName{ "" };
 
 	// Bilinear resample of a tightly packed image into one slot of m_pixels.
@@ -56,6 +60,8 @@ public:
 	// filled samples as fully transparent black rather than as garbage.
 	bool CreateSlots(String name, int slotWidth, int slotHeight, int slotCount, int components = 4);
 
+	bool CreateCompressedSlots(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount);
+
 	void DestroySlots(void);
 
 	// Puts one image in a slot, scaling it up to slot size if it is smaller. `data` is expected as
@@ -63,6 +69,10 @@ public:
 	// created with. An image LARGER than the slot is refused rather than scaled down: that means the
 	// array was created too small, and quietly losing resolution would hide the mistake.
 	bool SetSlot(int slotIndex, const uint8_t* data, int width, int height, int components);
+
+	bool SetCompressedSlot(int slotIndex, const uint8_t* data, size_t dataSize, int width, int height, GfxPixelFormat format, int mipCount);
+
+	static size_t CompressedChainBytes(int width, int height, GfxPixelFormat format, int mipCount) noexcept;
 
 	// The smallest power of two that holds n. Slot sizes should be rounded up with this so that the
 	// scale factor between a source image and its slot is itself a power of two: sprite sheets are
@@ -87,12 +97,26 @@ public:
 	}
 
 	inline int SlotSize(void) const noexcept {
-		return m_slotWidth * m_slotHeight * m_components;
+		return IsCompressed() ? int(m_slotBytes) : m_slotWidth * m_slotHeight * m_components;
+	}
+
+	inline bool IsCompressed(void) const noexcept {
+		return GfxIsBlockCompressed(m_format);
+	}
+
+	inline GfxPixelFormat SlotFormat(void) const noexcept {
+		return m_format;
+	}
+
+	inline int SlotMipCount(void) const noexcept {
+		return m_mipCount;
 	}
 
 	inline bool HasSlots(void) noexcept {
 		return (m_slotCount > 0) and (m_pixels.Length() > 0);
 	}
+
+	bool SlotPointers(AutoArray<const uint8_t*>& slotPtrs);
 
 	// The whole stack, slot after slot - what a 3D upload call reads.
 	inline uint8_t* SlotData(void) noexcept {

@@ -299,9 +299,10 @@ bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, c
 
 
 bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces,
-                          int faceCount, int width, int height, GfxPixelFormat fmt, int mipCount) noexcept
+                          int faceCount, int width, int height, GfxPixelFormat fmt, int mipCount,
+                          int firstLayer, bool isRefresh) noexcept
 {
-    if ((faceCount < 1) or (mipCount < 1))
+    if ((faceCount < 1) or (mipCount < 1) or (firstLayer < 0))
         return false;
     const uint32_t blockBytes = GfxBlockBytes(fmt);
     if (blockBytes == 0)
@@ -310,6 +311,10 @@ bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, con
     CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadCompressedData"));
     if (not cl)
         return false;
+
+    if (isRefresh)
+        SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                           D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
 
     // One staging buffer per (face, mip), kept alive until the list is flushed.
     AutoArray<ComPtr<ID3D12Resource>> uploads;
@@ -326,7 +331,7 @@ bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, con
             const uint32_t srcRowBytes = blocksW * blockBytes;
             const uint32_t levelBytes  = srcRowBytes * blocksH;
             // D3D12 subresource index for (arraySlice = face, mipSlice = mip) is mip + face * mipCount.
-            const UINT subresource = UINT(mip + face * mipCount);
+            const UINT subresource = UINT(mip + (firstLayer + face) * mipCount);
             if (not UploadSubresourceBlocks(device, cl->GfxList(), dstResource, subresource, level, srcRowBytes, uploads[uploadIdx++])) {
                 ok = false;
                 break;
@@ -338,6 +343,9 @@ bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, con
     }
 
     if (not ok) {
+        if (isRefresh)
+            SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                               D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         baseRenderer.FinishOperation(cl);
         return false;
     }

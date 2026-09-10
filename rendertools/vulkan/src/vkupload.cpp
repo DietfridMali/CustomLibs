@@ -431,12 +431,11 @@ bool UploadTextureArrayData(VkImage dstImage, ImageLayoutTracker& tracker,
 
 bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
                           const uint8_t* const* faces, int faceCount,
-                          int width, int height, GfxPixelFormat fmt, int mipCount) noexcept
+                          int width, int height, GfxPixelFormat fmt, int mipCount,
+                          int firstLayer) noexcept
 {
-    if ((dstImage == VK_NULL_HANDLE) or (faces == nullptr) or (faceCount <= 0) or (mipCount <= 0))
+    if ((dstImage == VK_NULL_HANDLE) or (faces == nullptr) or (faceCount <= 0) or (mipCount <= 0) or (firstLayer < 0))
         return false;
-    if (faceCount > 6)
-        faceCount = 6;
     const uint32_t blockBytes = GfxBlockBytes(fmt);
     if (blockBytes == 0)
         return false;   // caller passed a non-block-compressed format
@@ -475,7 +474,7 @@ bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
                 VkBufferImageCopy copy { };
                 copy.imageSubresource.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
                 copy.imageSubresource.mipLevel       = uint32_t(mip);
-                copy.imageSubresource.baseArrayLayer = uint32_t(face);
+                copy.imageSubresource.baseArrayLayer = uint32_t(firstLayer + face);
                 copy.imageSubresource.layerCount     = 1;
                 copy.imageOffset = { 0, 0, 0 };
                 copy.imageExtent = { uint32_t(w), uint32_t(h), 1 };

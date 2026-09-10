@@ -32,6 +32,12 @@ public:
     // atlas an array can have a mip chain, because a mip level never mixes two slots.
     bool Create(String name, int slotWidth, int slotHeight, int slotCount, bool useMipMaps = true);
 
+    bool CreateCompressed(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount);
+
+    using BaseTextureArray::SetSlot;
+
+    bool SetSlot(int slotIndex, TextureBuffer& buffer);
+
     // bufferIndex is ignored: the array has no m_buffers, its pixels come from SetSlot ().
     virtual bool Deploy(int bufferIndex = 0) override;
 
