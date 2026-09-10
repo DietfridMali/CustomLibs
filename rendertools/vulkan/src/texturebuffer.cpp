@@ -133,7 +133,15 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount, void* da
 
 
 TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool flipVertically) {
-    m_info.m_hasAlpha = (source->format->Amask != 0);   // of the SOURCE - the buffer below is always RGBA
+    // of the SOURCE - the buffer below is always RGBA. An indexed image carries its transparency in the
+    // palette or as a colour key, not in a mask.
+    m_info.m_hasAlpha = (source->format->Amask != 0) or (SDL_HasColorKey(source) == SDL_TRUE);
+    if (not m_info.m_hasAlpha and source->format->palette)
+        for (int i = 0; i < source->format->palette->ncolors; ++i)
+            if (source->format->palette->colors[i].a < 255) {
+                m_info.m_hasAlpha = true;
+                break;
+            }
     if (source->format->format != SDL_PIXELFORMAT_RGBA32) {
         SDL_Surface* h = source;
         source = SDL_ConvertSurfaceFormat(source, SDL_PIXELFORMAT_RGBA32, 0);
