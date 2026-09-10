@@ -40,7 +40,7 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
     for (int i = 0; i < 6; ++i)
         faces[i] = m_buffers[i < faceCount ? i : faceCount - 1]->DataBuffer();
 
-    const GfxPixelFormat fmt = first->m_info.m_gfxFormat;
+    const GfxPixelFormat fmt = GfxLinearFormat(first->m_info.m_gfxFormat);   // display-referred: no sRGB decode
     if (GfxIsBlockCompressed(fmt)) {
         const int mipCount = first->m_info.m_mipCount;
         if (not CreateTextureResource(w, h, 6, mipCount, ToVkFormat(fmt)))

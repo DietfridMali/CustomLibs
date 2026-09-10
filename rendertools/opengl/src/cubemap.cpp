@@ -7,7 +7,7 @@
 // Upload one cubemap face: block-compressed formats push each DDS mip level via
 // glCompressedTexImage2D; uncompressed formats use a single glTexImage2D (level 0).
 static void UploadCubeFace(GLenum target, TextureBuffer* buf) {
-    const GfxPixelFormat gfxFmt = buf->m_info.m_gfxFormat;
+    const GfxPixelFormat gfxFmt = GfxLinearFormat(buf->m_info.m_gfxFormat);   // display-referred: no sRGB decode
     if (GfxIsBlockCompressed(gfxFmt)) {
         const GLenum   internalFormat = ToGLFormat(gfxFmt).internalFormat;
         const uint32_t blockBytes     = GfxBlockBytes(gfxFmt);

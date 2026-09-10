@@ -126,8 +126,10 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
         const uint32_t dxgiFormat = ReadU32(dx10);
         if ((dxgiFormat == kDXGI_BC1_UNORM) or (dxgiFormat == kDXGI_BC1_UNORM_SRGB))
             format = GfxPixelFormat::BC1_UNorm;
-        else if ((dxgiFormat == kDXGI_BC7_UNORM) or (dxgiFormat == kDXGI_BC7_UNORM_SRGB))
+        else if (dxgiFormat == kDXGI_BC7_UNORM)
             format = GfxPixelFormat::BC7_UNorm;
+        else if (dxgiFormat == kDXGI_BC7_UNORM_SRGB)
+            format = GfxPixelFormat::BC7_UNorm_SRGB;   // reported as is; the upload decides (GfxLinearFormat ())
         else if (dxgiFormat == kDXGI_BC4_UNORM)
             format = GfxPixelFormat::BC4_UNorm;
         else if (dxgiFormat == kDXGI_BC5_UNORM)

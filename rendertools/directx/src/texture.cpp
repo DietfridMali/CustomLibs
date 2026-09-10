@@ -314,7 +314,7 @@ bool Texture::Deploy(int bufferIndex)
     if (w <= 0 or h <= 0)
         return false;
 
-    const GfxPixelFormat gfxFmt = tb->m_info.m_gfxFormat;
+    const GfxPixelFormat gfxFmt = GfxLinearFormat(tb->m_info.m_gfxFormat);   // display-referred: no sRGB decode
     if (GfxIsBlockCompressed(gfxFmt)) {
         const int mipCount = tb->m_info.m_mipCount;
         if (not CreateTextureResource(w, h, 1, mipCount, ToDXGIFormat(gfxFmt)))

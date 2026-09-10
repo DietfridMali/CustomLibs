@@ -19,6 +19,7 @@ inline constexpr DXGI_FORMAT ToDXGIFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::RG11B10_SFloat: return DXGI_FORMAT_R11G11B10_FLOAT;
         case GfxPixelFormat::BC1_UNorm:      return DXGI_FORMAT_BC1_UNORM;
         case GfxPixelFormat::BC7_UNorm:      return DXGI_FORMAT_BC7_UNORM;
+        case GfxPixelFormat::BC7_UNorm_SRGB: return DXGI_FORMAT_BC7_UNORM_SRGB;
         case GfxPixelFormat::BC4_UNorm:      return DXGI_FORMAT_BC4_UNORM;
         case GfxPixelFormat::BC5_UNorm:      return DXGI_FORMAT_BC5_UNORM;
     }

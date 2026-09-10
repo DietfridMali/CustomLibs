@@ -281,7 +281,9 @@ bool Texture::Deploy(int bufferIndex)
     const GfxPixelFormat gfxFmt = texBuf->m_info.m_gfxFormat;
     if (GfxIsBlockCompressed(gfxFmt)) {
         // Block-compressed: upload each mip level straight from the DDS payload (no glGenerateMipmap).
-        const GLenum   internalFormat = ToGLFormat(gfxFmt).internalFormat;
+        // Display-referred pipeline: an sRGB encoded payload is uploaded as its linear twin, so the
+        // sampler does not decode it (GfxLinearFormat ()).
+        const GLenum   internalFormat = ToGLFormat(GfxLinearFormat(gfxFmt)).internalFormat;
         const uint32_t blockBytes     = GfxBlockBytes(gfxFmt);
         const uint8_t* level          = reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr());
         int w = texBuf->m_info.m_width, h = texBuf->m_info.m_height;
