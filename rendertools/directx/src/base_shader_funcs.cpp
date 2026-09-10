@@ -255,6 +255,30 @@ const String& NoiseFuncs() {
         float2 noiseVec2(float2 x) {
             return 2.0*float2(valueNoise2D(x), valueNoise2D(x+13.37)) - 1.0;
         }
+        float hash13(float3 p) {
+            return frac(sin(dot(p, float3(127.1, 311.7, 74.7))) * 43758.5453);
+        }
+        float valueNoise3D(float3 x) {
+            float3 i = floor(x), f = frac(x);
+            f = f*f*(3.0 - 2.0*f);
+            float n000 = hash13(i+float3(0,0,0)), n100 = hash13(i+float3(1,0,0));
+            float n010 = hash13(i+float3(0,1,0)), n110 = hash13(i+float3(1,1,0));
+            float n001 = hash13(i+float3(0,0,1)), n101 = hash13(i+float3(1,0,1));
+            float n011 = hash13(i+float3(0,1,1)), n111 = hash13(i+float3(1,1,1));
+            float n00 = lerp(n000, n100, f.x), n10 = lerp(n010, n110, f.x);
+            float n01 = lerp(n001, n101, f.x), n11 = lerp(n011, n111, f.x);
+            return lerp(lerp(n00, n10, f.y), lerp(n01, n11, f.y), f.z);
+        }
+        float fbm3D(float3 x, int octaves) {
+            float sum = 0.0, amp = 0.5, norm = 0.0;
+            for (int i = 0; i < octaves; i++) {
+                sum += valueNoise3D(x) * amp;
+                norm += amp;
+                x = x * 2.03 + 17.1;
+                amp *= 0.5;
+            }
+            return sum / max(norm, 1.0e-5);
+        }
     )");
     return source;
 }

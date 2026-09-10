@@ -264,6 +264,39 @@ const String& NoiseFuncs() {
             float n2 = valueNoise2D(x + 13.37);
             return 2.0 * vec2(n1, n2) - 1.0; // [-1..1]
         }
+        float hash13(vec3 p) {
+            return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+        }
+        float valueNoise3D(vec3 x) {
+            vec3 i = floor(x);
+            vec3 f = fract(x);
+            f = f*f*(3.0 - 2.0*f);
+            float n000 = hash13(i + vec3(0.0, 0.0, 0.0));
+            float n100 = hash13(i + vec3(1.0, 0.0, 0.0));
+            float n010 = hash13(i + vec3(0.0, 1.0, 0.0));
+            float n110 = hash13(i + vec3(1.0, 1.0, 0.0));
+            float n001 = hash13(i + vec3(0.0, 0.0, 1.0));
+            float n101 = hash13(i + vec3(1.0, 0.0, 1.0));
+            float n011 = hash13(i + vec3(0.0, 1.0, 1.0));
+            float n111 = hash13(i + vec3(1.0, 1.0, 1.0));
+            float n00 = mix(n000, n100, f.x);
+            float n10 = mix(n010, n110, f.x);
+            float n01 = mix(n001, n101, f.x);
+            float n11 = mix(n011, n111, f.x);
+            return mix(mix(n00, n10, f.y), mix(n01, n11, f.y), f.z);
+        }
+        float fbm3D(vec3 x, int octaves) {
+            float sum = 0.0;
+            float amp = 0.5;
+            float norm = 0.0;
+            for (int i = 0; i < octaves; i++) {
+                sum += valueNoise3D(x) * amp;
+                norm += amp;
+                x = x * 2.03 + 17.1;
+                amp *= 0.5;
+            }
+            return sum / max(norm, 1.0e-5); // [0..1]
+        }
     )");
     return source;
 }
