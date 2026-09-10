@@ -11,7 +11,12 @@
 
 // =================================================================================================
 
+// A texture may be bound to several units at once - a texture array that serves as the base texture on
+// one unit and as the overlay on another, say - so tmuIndex is answered first: is the handle on THAT
+// unit? Only when it is not is the first unit that holds it returned.
 int TextureSlotInfo::Find(GLuint handle, int tmuIndex) noexcept {
+	if ((tmuIndex >= 0) and (tmuIndex < m_maxUsedTMU) and (m_bindings[tmuIndex] == handle))
+		return tmuIndex;
 	for (int i = 0; i < m_maxUsedTMU; ++i)
 		if (m_bindings[i] == handle) {
 			return i;
@@ -30,17 +35,15 @@ bool TextureSlotInfo::Update(GLuint handle, int tmuIndex) noexcept {
 }
 
 
+// A handle that is already on the unit is left there; a handle on ANOTHER unit stays there too. The
+// eviction that used to happen here - unbinding the texture from its previous unit before binding it
+// to this one - assumed one unit per texture, and that is not what a draw with a texture array on the
+// base unit and the same array on the overlay unit needs: it put the array on the second unit and took
+// it off the first.
 int TextureSlotInfo::Bind(GLuint handle, int tmuIndex) {
 	if (handle != 0) {
-		int boundTMU = Find(handle, tmuIndex);
-		if (boundTMU == tmuIndex)
+		if (Find(handle, tmuIndex) == tmuIndex)
 			return tmuIndex;
-		// binding to a different TMU, so unbind from previous TMU if bound
-		if (boundTMU >= 0) {
-			gfxStates.ActiveTexture(GL_TEXTURE0 + boundTMU);
-			glBindTexture(m_type, 0);
-			m_bindings[boundTMU] = 0;
-		}
 	}
 	else if (tmuIndex < 0)
 		return std::numeric_limits<int>::min();
