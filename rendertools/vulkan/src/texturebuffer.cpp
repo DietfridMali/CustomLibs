@@ -133,7 +133,8 @@ bool TextureBuffer::Allocate(int width, int height, int componentCount, void* da
 
 
 TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool flipVertically) {
-    if (source->pitch / source->w < 4) {
+    m_info.m_hasAlpha = (source->format->Amask != 0);   // of the SOURCE - the buffer below is always RGBA
+    if (source->format->format != SDL_PIXELFORMAT_RGBA32) {
         SDL_Surface* h = source;
         source = SDL_ConvertSurfaceFormat(source, SDL_PIXELFORMAT_RGBA32, 0);
         SDL_FreeSurface(h);

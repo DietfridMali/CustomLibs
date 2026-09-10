@@ -42,44 +42,49 @@ void Mesh::CreateVertexIndices(void) {
 }
 
 
+// Computed from the GFX data, not the app data: a mesh may be filled through its gfx data directly
+// (a level mesh with a hundred thousand vertices does that), and one filled through the app data has
+// been packed by UpdateData () by the time this runs. The result goes into the gfx data the same way;
+// Setup () leaves it alone as long as the tangent app data stays empty.
 void Mesh::UpdateTangents(void) {
-    AutoArray<Vector3f> vertices;
-    vertices.Resize(m_vertices.AppDataLength());
-    int i = 0;
-    for (auto v : m_vertices.AppData())
-        vertices[i++] = v;
+    AutoArray<float>& vertexData = m_vertices.GfxData();
+    AutoArray<float>& normalData = m_normals.GfxData();
+    AutoArray<float>& texCoordData = m_texCoords[0].GfxData();
+    const uint32_t vertexCount = uint32_t(vertexData.Length()) / 3;
 
-    AutoArray<Vector3f> normals;
-    normals.Resize(m_vertices.AppDataLength());
-    i = 0;
-    for (auto n : m_normals.AppData())
-        normals[i++] = n;
+    if ((vertexCount == 0) or (uint32_t(normalData.Length()) < vertexCount * 3) or (uint32_t(texCoordData.Length()) < vertexCount * 2))
+        return;
 
-    AutoArray<TexCoord> texCoords;
-    texCoords.Resize(m_vertices.AppDataLength());
-    i = 0;
-    for (auto tc : m_texCoords[0].AppData())
-        texCoords[i++] = tc;
+    auto vertexAt = [&vertexData](uint32_t i) {
+        return Vector3f(vertexData[i * 3], vertexData[i * 3 + 1], vertexData[i * 3 + 2]);
+    };
+    auto normalAt = [&normalData](uint32_t i) {
+        return Vector3f(normalData[i * 3], normalData[i * 3 + 1], normalData[i * 3 + 2]);
+    };
+    auto texCoordAt = [&texCoordData](uint32_t i) {
+        return Vector2f(texCoordData[i * 2], texCoordData[i * 2 + 1]);
+    };
 
     AutoArray<Vector3f> tangents;
-    tangents.Resize(m_vertices.AppDataLength());
+    tangents.Resize(int32_t(vertexCount));
 
     AutoArray<Vector3f> bitangents;
-    bitangents.Resize(m_vertices.AppDataLength());
+    bitangents.Resize(int32_t(vertexCount));
 
     AutoArray<uint32_t>& indices = m_indices.GfxData();
-    m_tangents.AppData().Reset();
 
-    for (int i = 0, l = indices.Length(); i < l;) {
+    for (int i = 0, l = indices.Length(); i + 2 < l;) {
         uint32_t i0 = indices[i++];
         uint32_t i1 = indices[i++];
         uint32_t i2 = indices[i++];
 
-        Vector3f edge1 = vertices[i1] - vertices[i0];
-        Vector3f edge2 = vertices[i2] - vertices[i0];
+        Vector3f v0 = vertexAt(i0);
+        Vector3f edge1 = vertexAt(i1) - v0;
+        Vector3f edge2 = vertexAt(i2) - v0;
 
-        Vector2f deltaUV1 = texCoords[i1] - texCoords[i0];
-        Vector2f deltaUV2 = texCoords[i2] - texCoords[i0];
+        Vector2f uv0 = texCoordAt(i0);
+        Vector2f deltaUV1 = texCoordAt(i1) - uv0;
+        Vector2f deltaUV2 = texCoordAt(i2) - uv0;
 
         float det = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
         if (det != 0.0f) {
@@ -99,22 +104,30 @@ void Mesh::UpdateTangents(void) {
         // fallback for det == 0.0f see below
     }
 
-    for (int i = 0; i < vertices.Length(); ++i) {
-        Vector3f n = normals[i].Normal();
+    m_tangents.AppData().Reset();
+    float* pTangent = m_tangents.GfxData().Resize(int32_t(vertexCount) * 4);
+    if (not pTangent)
+        return;
+
+    for (uint32_t i = 0; i < vertexCount; ++i) {
+        Vector3f n = normalAt(i).Normal();
         Vector3f t = tangents[i];
         Vector3f b = bitangents[i];
+        float handedness = 1.0f;
 
         if (t.Dot(t) * b.Dot(b) == 0.0f) {
             Vector3f ref = (fabs(n.z) < 0.999f) ? Vector3f(0.0f, 0.0f, 1.0f) : Vector3f(0.0f, 1.0f, 0.0f);
             t = ref.Cross(n).Normalize();
-            AddTangent(Vector4f(t, 1.0f));
         }
         else {
             t -= n * n.Dot(t);
             t.Normalize();
-            float handedness = (n.Cross(t).Dot(b) < 0.0f) ? -1.0f : 1.0f;
-            AddTangent(Vector4f(t, handedness));
+            handedness = (n.Cross(t).Dot(b) < 0.0f) ? -1.0f : 1.0f;
         }
+        *pTangent++ = t.x;
+        *pTangent++ = t.y;
+        *pTangent++ = t.z;
+        *pTangent++ = handedness;
     }
     m_tangents.Setup();
     UpdateTangentBuffer();
