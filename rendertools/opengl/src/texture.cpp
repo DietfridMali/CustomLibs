@@ -202,35 +202,86 @@ void Texture::Release(void) {
 void Texture::SetParams(bool forceUpdate) {
     if (forceUpdate or not m_hasParams) {
         m_hasParams = true;
-        // Block-compressed textures carry their mip chain in the DDS; glGenerateMipmap cannot build
-        // mips for them, so only enable mip filtering when the DDS actually provided levels and cap
-        // GL_TEXTURE_MAX_LEVEL to what was uploaded. Uncompressed textures generate mips on the GPU.
-        const bool compressed = (m_compression != tcNone);
-        const int  mipCount   = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
-        const bool useMips    = compressed ? (mipCount > 1) : (m_useMipMaps != 0);
-        if (useMips) {
-            glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-            glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            if (compressed)
-                glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
-            else
-                glGenerateMipmap(m_type);
-            // Anisotropic filtering, coupled to mip-mapping like the DX12/VK backends
-            // (TextureSampling.maxAnisotropy = useMipMaps ? 16 : 1); clamp to the driver max.
-            GLfloat maxAniso = 1.0f;
-            glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
-            glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, (maxAniso < 16.0f) ? maxAniso : 16.0f);
-        }
-        else {
-            glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
-            glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
-            glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
-        }
-        // What SetWrapping () asked for, not a fixed GL_REPEAT - a texture that was created to clamp
-        // used to have that overwritten here on its first use.
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_S, m_wrapMode);
-        glTexParameteri(m_type, GL_TEXTURE_WRAP_T, m_wrapModeV);
+        DefaultSampling();
+        ApplySampling();
+    }
+}
+
+
+// The default policy, the same one DX and Vulkan fill their m_sampling with: linear filtering, a
+// linear mip filter where there are mip levels, anisotropy coupled to that, and the wrap modes
+// SetWrapping () recorded. Block-compressed textures carry their mip chain in the DDS, so for them
+// "there are mip levels" means the file brought more than one.
+void Texture::DefaultSampling(void) noexcept {
+    const bool compressed = (m_compression != tcNone);
+    const int  mipCount   = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
+    const bool useMips    = compressed ? (mipCount > 1) : (m_useMipMaps != 0);
+    m_sampling.minFilter = GfxFilterMode::Linear;
+    m_sampling.magFilter = GfxFilterMode::Linear;
+    m_sampling.mipMode = useMips ? GfxMipMode::Linear : GfxMipMode::None;
+    m_sampling.wrapU = WrapModeFromGL(m_wrapMode);
+    m_sampling.wrapV = WrapModeFromGL(m_wrapModeV);
+    m_sampling.wrapW = m_sampling.wrapV;
+    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+    m_sampling.maxAnisotropy = useMips ? 16.0f : 1.0f;
+}
+
+
+static inline GLint GLMagFilter(GfxFilterMode filter) noexcept {
+    return (filter == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
+}
+
+
+static inline GLint GLMinFilter(GfxFilterMode filter, GfxMipMode mipMode) noexcept {
+    if (mipMode == GfxMipMode::None)
+        return GLMagFilter(filter);
+    if (mipMode == GfxMipMode::Nearest)
+        return (filter == GfxFilterMode::Nearest) ? GL_NEAREST_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_NEAREST;
+    return (filter == GfxFilterMode::Nearest) ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_LINEAR;
+}
+
+
+// Writes m_sampling to the texture that is bound right now. A mip filter without mip levels makes
+// the texture incomplete (every sample comes back black), so the levels are dealt with here as well:
+// glGenerateMipmap cannot build levels for a block-compressed texture, there GL_TEXTURE_MAX_LEVEL is
+// capped to what the DDS brought; an uncompressed one gets its chain generated. Without a mip
+// filter the texture is pinned to its base level.
+void Texture::ApplySampling(void) {
+    const bool compressed = (m_compression != tcNone);
+    const int  mipCount   = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
+    const bool useMips    = (m_sampling.mipMode != GfxMipMode::None);
+    glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GLMinFilter(m_sampling.minFilter, m_sampling.mipMode));
+    glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GLMagFilter(m_sampling.magFilter));
+    if (useMips) {
+        if (compressed)
+            glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
+        else
+            glGenerateMipmap(m_type);
+    }
+    else {
+        glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
+        glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
+    }
+    GLfloat maxAniso = 1.0f;
+    if (m_sampling.maxAnisotropy > 1.0f)
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
+    glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, (maxAniso < m_sampling.maxAnisotropy) ? maxAniso : m_sampling.maxAnisotropy);
+    glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GLWrapMode(m_sampling.wrapU));
+    glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GLWrapMode(m_sampling.wrapV));
+    if ((m_sampling.wrapU == GfxWrapMode::ClampToBorder) or (m_sampling.wrapV == GfxWrapMode::ClampToBorder))
+        glTexParameterfv(m_type, GL_TEXTURE_BORDER_COLOR, m_sampling.borderColor);
+    if (m_sampling.compareFunc != GfxOperations::CompareFunc::Always) {
+        glTexParameteri(m_type, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTexParameteri(m_type, GL_TEXTURE_COMPARE_FUNC, GfxToGL::ToGLenum(m_sampling.compareFunc));
+    }
+}
+
+
+GfxWrapMode Texture::WrapModeFromGL(int glWrapMode) noexcept {
+    switch (glWrapMode) {
+        case GL_REPEAT:          return GfxWrapMode::Repeat;
+        case GL_CLAMP_TO_BORDER: return GfxWrapMode::ClampToBorder;
+        default:                 return GfxWrapMode::ClampToEdge;
     }
 }
 
@@ -259,8 +310,12 @@ noexcept
 void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
 noexcept
 {
-    m_wrapMode = GLWrapMode(wrapU);
-    m_wrapModeV = GLWrapMode(wrapV);
+    const int glWrapU = GLWrapMode(wrapU);
+    const int glWrapV = GLWrapMode(wrapV);
+    if ((m_wrapMode == glWrapU) and (m_wrapModeV == glWrapV))
+        return;   // nothing changes, so nothing has to be written again
+    m_wrapMode = glWrapU;
+    m_wrapModeV = glWrapV;
     m_hasParams = false;   // SetParams () writes them on the next use
 }
 

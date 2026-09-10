@@ -189,6 +189,7 @@ class GfxStates
 {
 private:
 	int m_maxTextureSize{ 0 };
+	GLint m_maxTextureUnits{ 0 };
 	uint64_t m_maxAllocSize{ 0 };
 	std::unordered_set<std::string> m_extensions;
 	bool m_haveExtensions{ false };
@@ -259,6 +260,18 @@ public:
 		return m_maxTextureSize;
 	}
 
+	// How many textures a draw can have bound at once. Asked lazily for the same reason
+	// HasExtension () asks again: this singleton may exist before the GL context does.
+	inline int MaxTextureUnits(void) noexcept {
+		if (m_maxTextureUnits == 0)
+			glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_maxTextureUnits);
+		return m_maxTextureUnits;
+	}
+
+	// Vendor and device as one printable string, e.g. for a log line or a vendor check. OpenGL:
+	// GL_VENDOR plus GL_RENDERER; DX: the adapter description; Vulkan: the physical device name.
+	String DeviceName(void);
+
 	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
 	inline int MaxTextureSize(int bytesPerPixel) noexcept {
 		if (bytesPerPixel <= 1)
@@ -304,6 +317,14 @@ public:
 	inline int SetFaceCulling(int state) { return SetState<GL_CULL_FACE>(state); }
 
 	inline int SetScissorTest(int state) { return SetState<GL_SCISSOR_TEST>(state); }
+
+	// The scissor rectangle. Same coordinate convention as SetViewport () - the backend's own, so
+	// here the origin is the bottom left corner of the target, as with glScissor (). Whether the
+	// rectangle clips is SetScissorTest ()'s business.
+	inline void SetScissor(GfxTypes::Int left, GfxTypes::Int top, GfxTypes::Int width, GfxTypes::Int height) {
+		static int32_t stateID = -1;
+		FuncState(stateID, std::make_tuple(left, top, width, height), glScissor);
+	}
 
 	inline int SetStencilTest(int state) { return SetState<GL_STENCIL_TEST>(state); }
 

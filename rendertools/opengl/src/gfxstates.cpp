@@ -1,4 +1,6 @@
 
+#include <cstdio>
+
 #include "gfxstates.h"
 #include "array.hpp"
 
@@ -161,6 +163,15 @@ void GfxStates::DetermineExtensions(void) {
 			m_extensions.emplace(s);
 	}
 	m_haveExtensions = not m_extensions.empty();
+}
+
+
+String GfxStates::DeviceName(void) {
+	const char* vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+	const char* renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+	char buffer[256];
+	snprintf(buffer, sizeof(buffer), "%s %s", vendor ? vendor : "", renderer ? renderer : "");
+	return String(buffer);
 }
 
 

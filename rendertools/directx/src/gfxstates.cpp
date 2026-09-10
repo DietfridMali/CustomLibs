@@ -242,7 +242,44 @@ void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, c
         m_viewport[1] = top;
         m_viewport[2] = width;
         m_viewport[3] = height;
+        m_scissor[0] = 0;
+        m_scissor[1] = 0;
+        m_scissor[2] = left + width;
+        m_scissor[3] = top + height;
     }
+}
+
+
+void GfxStates::SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
+    m_scissor[0] = left;
+    m_scissor[1] = top;
+    m_scissor[2] = width;
+    m_scissor[3] = height;
+    auto* list = commandListHandler.CurrentGfxList();
+    if (list) {
+        D3D12_RECT scissorArea{ left, top, left + width, top + height };
+        list->RSSetScissorRects(1, &scissorArea);
+    }
+}
+
+
+int GfxStates::MaxTextureUnits(void) noexcept {
+    return int(Shader::kSrvSlots);
+}
+
+
+String GfxStates::DeviceName(void) {
+    char buffer[128] = "";
+    if (dx12Context.m_adapter) {
+        DXGI_ADAPTER_DESC1 desc{};
+        if (SUCCEEDED(dx12Context.m_adapter->GetDesc1(&desc))) {
+            size_t i = 0;
+            for (; (i < sizeof(buffer) - 1) and desc.Description[i]; ++i)
+                buffer[i] = (desc.Description[i] < 128) ? char(desc.Description[i]) : '?';
+            buffer[i] = '\0';
+        }
+    }
+    return String(buffer);
 }
 
 

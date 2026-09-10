@@ -110,6 +110,10 @@ public:
     bool                        m_isValid{ false };
     bool                        m_isRenderTarget{ false };
     bool                        m_isDisposable{ false };
+    // The sampling state the texture is parameterized with - the same record DX and Vulkan keep.
+    // SetParams () fills it (DefaultSampling ()) and writes it to GL (ApplySampling ()); a derived
+    // texture with a filter policy of its own fills it differently and applies it the same way.
+    TextureSampling             m_sampling;
 
     static SharedTextureHandle  nullHandle;
 
@@ -226,6 +230,14 @@ public:
     }
 
     virtual void SetParams(bool forceUpdate = false) override;
+
+    // The two halves of SetParams (): the default policy (linear, mip mapped if asked for, the wrap
+    // modes SetWrapping () recorded) into m_sampling, and m_sampling into the bound GL texture.
+    void DefaultSampling(void) noexcept;
+
+    void ApplySampling(void);
+
+    static GfxWrapMode WrapModeFromGL(int glWrapMode) noexcept;
 
     void SetWrapping(GfxWrapMode wrapMode)
         noexcept;

@@ -237,7 +237,13 @@ void Texture::SetParams(bool forceUpdate)
     if (not (forceUpdate or not m_hasParams))
         return;
     m_hasParams = true;
+    DefaultSampling();
+    ApplySampling();
+}
 
+
+void Texture::DefaultSampling(void) noexcept
+{
     // Default: linear filter, repeat wrap (most textures in this app are tile/wrap-style).
     // Subclasses that need clamp (RenderTargetTexture, ShadowTexture, Cubemap) override this.
     m_sampling.minFilter = GfxFilterMode::Linear;
@@ -449,6 +455,8 @@ void Texture::SetWrapping(GfxWrapMode wrapMode) noexcept
 
 void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept
 {
+    if ((m_wrapMode == wrapU) and (m_wrapModeV == wrapV))
+        return;   // nothing changes, so nothing has to be written again
     m_wrapMode = wrapU;
     m_wrapModeV = wrapV;
     m_sampling.wrapU = wrapU;

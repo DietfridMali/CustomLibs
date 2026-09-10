@@ -11,6 +11,7 @@
 #include "dx12context.h"
 #include "array.hpp"
 #include "list.hpp"
+#include "string.hpp"
 #include "dictionary.hpp"
 #include "basesingleton.hpp"
 #include "colordata.h"
@@ -217,6 +218,7 @@ private:
     RenderStates            m_renderStates;
     List<TextureSlotInfo>   m_slotInfos;
     GfxTypes::Int           m_viewport[4];
+    GfxTypes::Int           m_scissor[4]{ 0, 0, 0, 0 };
     int                     m_maxTextureSize{ 0 };
     uint64_t                m_maxAllocSize{ 0 };
     RGBAColor               m_clearColor{ ColorData::Invisible };
@@ -286,6 +288,12 @@ public:
     inline int MaxTextureSize(void) const noexcept {
         return m_maxTextureSize;
     }
+
+    // How many textures a draw can have bound at once: the SRV slots of the root signature.
+    int MaxTextureUnits(void) noexcept;
+
+    // Vendor and device as one printable string: the DXGI adapter description.
+    String DeviceName(void);
 
     // Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
     inline int MaxTextureSize(int bytesPerPixel) const noexcept {
@@ -597,6 +605,10 @@ public:
     }
 
     void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int right, const GfxTypes::Int bottom) noexcept;
+
+    // The scissor rectangle, in the same window pixel coordinates as SetViewport () (origin top left).
+    // SetViewport () resets it to the viewport, so a caller that wants a smaller one sets it afterwards.
+    void SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept;
 
     using DrawBufferList = AutoArray <GfxTypes::Uint>;
 

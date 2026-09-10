@@ -165,6 +165,14 @@ public:
 
     virtual void SetParams(bool forceUpdate = false) override;
 
+    // The two halves of SetParams (), spelled the same in every backend: the default policy into
+    // m_sampling, and m_sampling to the API. Here the sampler is derived from m_sampling on every
+    // bind (samplerCache), so applying is nothing; OpenGL writes texture parameters there.
+    void DefaultSampling(void) noexcept;
+
+    inline void ApplySampling(void) noexcept {
+    }
+
     virtual bool Deploy(int bufferIndex = 0) override;
 
     virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;

@@ -411,6 +411,38 @@ void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, c
     scissor.extent.width = (width < 0) ? 0u : uint32_t(width);
     scissor.extent.height = (height < 0) ? 0u : uint32_t(height);
     vkCmdSetScissor(cb, 0, 1, &scissor);
+    m_scissor[0] = left;
+    m_scissor[1] = top;
+    m_scissor[2] = width;
+    m_scissor[3] = height;
+}
+
+
+void GfxStates::SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
+    m_scissor[0] = left;
+    m_scissor[1] = top;
+    m_scissor[2] = width;
+    m_scissor[3] = height;
+
+    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+    if (cb == VK_NULL_HANDLE)
+        return;
+    VkRect2D scissor{};
+    scissor.offset.x = (left < 0) ? 0 : left;
+    scissor.offset.y = (top < 0) ? 0 : top;
+    scissor.extent.width = (width < 0) ? 0u : uint32_t(width);
+    scissor.extent.height = (height < 0) ? 0u : uint32_t(height);
+    vkCmdSetScissor(cb, 0, 1, &scissor);
+}
+
+
+int GfxStates::MaxTextureUnits(void) noexcept {
+    return int(CommandListHandler::kSrvSlots);
+}
+
+
+String GfxStates::DeviceName(void) {
+    return String(vkContext.DeviceProps().deviceName);
 }
 
 // =================================================================================================
