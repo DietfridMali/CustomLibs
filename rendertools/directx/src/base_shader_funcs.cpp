@@ -209,6 +209,21 @@ const String& CelShadingFuncs() {
         float3 CelShade(float3 light, float3 normal, float3 viewDir, int bands, float rimPower, float rimStrength) {
             return CelLight(light + (float3)RimLight(normal, viewDir, rimPower, rimStrength), bands);
         }
+
+        float CelQuantizeRound(float value, int levels) {
+            float f = value * (float)levels;
+            float e = clamp(fwidth(f), 0.05, 0.5);
+            return (floor(f) + smoothstep(0.5 - e, 0.5 + e, frac(f))) / (float)levels;
+        }
+
+        float3 CelAlbedo(float3 color, int levels) {
+            if (levels <= 0)
+                return color;
+            float peak = CelPeak(color);
+            if (peak <= 0.0)
+                return color;
+            return color * (CelQuantizeRound(min(peak, 1.0), levels) / peak);
+        }
     )");
     return source;
 }

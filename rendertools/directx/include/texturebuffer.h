@@ -163,7 +163,7 @@ public:
 
     void BoxBlur(uint16_t strength = 4);
 
-    void GaussBlur(uint16_t strength = 4);
+    void GaussBlur(uint16_t strength = 4, bool wrap = false);
 
     void Posterize(uint16_t gradients = 7);
 

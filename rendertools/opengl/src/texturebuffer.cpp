@@ -413,7 +413,7 @@ static GaussKernel& GetKernel(int r)
 }
 
 template <typename T>
-static void GaussBlurH(T* dest, T* src, int w, int h, int r)
+static void GaussBlurH(T* dest, T* src, int w, int h, int r, bool wrap)
 {
     GaussKernel& kernel = GetKernel(r);
 
@@ -428,15 +428,17 @@ static void GaussBlurH(T* dest, T* src, int w, int h, int r)
 
             for (int k = -r; k <= r; ++k) {
                 int sx = x + k;
-                if (sx >= 0 and sx < w) {
-                    T& c = src[row + sx];
-                    if (c.IsVisible()) {
-                        double wv = kernel[15 + k];
-                        a[0] += wv * (int)c.r;
-                        a[1] += wv * (int)c.g;
-                        a[2] += wv * (int)c.b;
-                        wsum += wv;
-                    }
+                if (wrap)
+                    sx = ((sx % w) + w) % w;
+                else if (sx < 0 or sx >= w)
+                    continue;
+                T& c = src[row + sx];
+                if (c.IsVisible()) {
+                    double wv = kernel[15 + k];
+                    a[0] += wv * (int)c.r;
+                    a[1] += wv * (int)c.g;
+                    a[2] += wv * (int)c.b;
+                    wsum += wv;
                 }
             }
 
@@ -454,7 +456,7 @@ static void GaussBlurH(T* dest, T* src, int w, int h, int r)
 }
 
 template <typename T>
-static void GaussBlurV(T* dest, T* src, int w, int h, int r)
+static void GaussBlurV(T* dest, T* src, int w, int h, int r, bool wrap)
 {
     GaussKernel& kernel = GetKernel(r);
 
@@ -468,15 +470,17 @@ static void GaussBlurV(T* dest, T* src, int w, int h, int r)
 
             for (int k = -r; k <= r; ++k) {
                 int sy = y + k;
-                if (sy >= 0 and sy < h) {
-                    T& c = src[sy * w + x];
-                    if (c.IsVisible()) {
-                        double wv = kernel[15 + k];
-                        a[0] += wv * (int)c.r;
-                        a[1] += wv * (int)c.g;
-                        a[2] += wv * (int)c.b;
-                        wsum += wv;
-                    }
+                if (wrap)
+                    sy = ((sy % h) + h) % h;
+                else if (sy < 0 or sy >= h)
+                    continue;
+                T& c = src[sy * w + x];
+                if (c.IsVisible()) {
+                    double wv = kernel[15 + k];
+                    a[0] += wv * (int)c.r;
+                    a[1] += wv * (int)c.g;
+                    a[2] += wv * (int)c.b;
+                    wsum += wv;
                 }
             }
 
@@ -508,16 +512,17 @@ void TextureBuffer::BoxBlur(uint16_t strength) {
 }
 
 
-void TextureBuffer::GaussBlur(uint16_t strength) {
+void TextureBuffer::GaussBlur(uint16_t strength, bool wrap) {
+    int r = std::min(int(strength), 15);
     if (m_info.m_componentCount == 3) {
         AutoArray<RGB8> blurBuffer(m_info.m_width * m_info.m_height);
-        GaussBlurH<RGB8>(blurBuffer.DataPtr(), reinterpret_cast<RGB8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
-        GaussBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurH<RGB8>(blurBuffer.DataPtr(), reinterpret_cast<RGB8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, r, wrap);
+        GaussBlurV<RGB8>(reinterpret_cast<RGB8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, r, wrap);
     }
     else if (m_info.m_componentCount == 4) {
         AutoArray<RGBA8> blurBuffer(m_info.m_width * m_info.m_height);
-        GaussBlurH<RGBA8>(blurBuffer.DataPtr(), reinterpret_cast<RGBA8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, int(strength));
-        GaussBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, int(strength));
+        GaussBlurH<RGBA8>(blurBuffer.DataPtr(), reinterpret_cast<RGBA8*>(m_data.DataPtr()), m_info.m_width, m_info.m_height, r, wrap);
+        GaussBlurV<RGBA8>(reinterpret_cast<RGBA8*>(m_data.DataPtr()), blurBuffer.DataPtr(), m_info.m_width, m_info.m_height, r, wrap);
     }
 }
 
