@@ -180,6 +180,41 @@ const String& GaussBlurFuncs() {
 
 
 // -------------------------------------------------------------------------------------------------
+const String& CelShadingFuncs() {
+    static const String source(R"(
+        float CelPeak(float3 light) {
+            return max(light.r, max(light.g, light.b));
+        }
+
+        float CelQuantize(float value, int bands) {
+            float f = value * (float)bands;
+            float e = clamp(fwidth(f), 0.001, 0.5);
+            return (floor(f) + smoothstep(1.0 - e, 1.0, frac(f))) / (float)bands;
+        }
+
+        float3 CelLight(float3 light, int bands) {
+            if (bands <= 0)
+                return light;
+            float peak = CelPeak(light);
+            if (peak <= 0.0)
+                return light;
+            return light * (CelQuantize(min(peak, 1.0), bands) / peak);
+        }
+
+        float RimLight(float3 normal, float3 viewDir, float power, float strength) {
+            float rim = 1.0 - saturate(dot(normalize(normal), normalize(viewDir)));
+            return strength * pow(rim, power);
+        }
+
+        float3 CelShade(float3 light, float3 normal, float3 viewDir, int bands, float rimPower, float rimStrength) {
+            return CelLight(light + (float3)RimLight(normal, viewDir, rimPower, rimStrength), bands);
+        }
+    )");
+    return source;
+}
+
+
+// -------------------------------------------------------------------------------------------------
 const String& BoostFuncs() {
     static const String source(R"(
         float Boost(float v, float strength) {
