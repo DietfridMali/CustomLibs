@@ -225,12 +225,31 @@ private:
     RGBAColor               m_clearColor{ ColorData::Invisible };
     List<RGBAColor>         m_clearColorStack;
     int                     m_featureLevel{ 0 };
+    uint32_t                m_drawCount{ 0 };
 
     // Static, not a member: it has to survive this object's own destruction, because that is exactly
     // when it is asked.
     static inline bool      m_isDestroyed{ false };
 
     RenderStates& ActiveState(void) noexcept;
+
+public:
+    // THE DRAW COUNTER. Every draw the library issues (GfxDataLayout::Render ()) counts here; an
+    // application resets it where its frame begins and reads it at its pass boundaries to see what a
+    // pass costs in draws. The count is what the batching work is measured by.
+    inline void CountDraw(void) noexcept {
+        m_drawCount++;
+    }
+
+    inline uint32_t DrawCount(void) const noexcept {
+        return m_drawCount;
+    }
+
+    inline void ResetDrawCount(void) noexcept {
+        m_drawCount = 0;
+    }
+
+private:
 
 public:
     // FeatureLevel maps onto Vulkan's encoded API version (VK_MAKE_API_VERSION).

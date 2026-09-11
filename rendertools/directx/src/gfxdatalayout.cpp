@@ -264,16 +264,20 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
         if (commandListHandler.CurrentGfxList()) {
             if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
                 UINT count = (indexCount > 0) ? UINT(indexCount) : UINT(m_indexBuffer.m_itemCount) - UINT(firstIndex);
-                if (count > 0)
+                if (count > 0) {
                     commandListHandler.DrawIndexedInstanced(count, m_instanceCount, UINT(firstIndex), 0, 0);
+                    gfxStates.CountDraw();
+                }
             }
             else {
                 // Non-indexed: sum up vertex count from first GfxDataBuffer
                 UINT vertCount = 0;
                 if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
                     vertCount = UINT(m_dataBuffers[0]->m_itemCount);
-                if (vertCount > 0)
+                if (vertCount > 0) {
                     commandListHandler.DrawInstanced(vertCount, m_instanceCount, 0, 0);
+                    gfxStates.CountDraw();
+                }
             }
         }
     }

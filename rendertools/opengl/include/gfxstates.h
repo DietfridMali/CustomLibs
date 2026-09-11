@@ -197,6 +197,7 @@ private:
 	float m_depthClearValue{ 1.0f };
 	int m_stencilClearValue{ 0 };
 	int m_featureLevel{ 0 };
+	uint32_t m_drawCount{ 0 };
 
 	List<TextureSlotInfo> m_tmuBindings;
 	List<RGBAColor> m_clearColorStack;
@@ -258,6 +259,21 @@ public:
 
 	inline int MaxTextureSize(void) noexcept {
 		return m_maxTextureSize;
+	}
+
+	// THE DRAW COUNTER. Every draw the library issues (GfxDataLayout::Render ()) counts here; an
+	// application resets it where its frame begins and reads it at its pass boundaries to see what a
+	// pass costs in draws. The count is what the batching work is measured by.
+	inline void CountDraw(void) noexcept {
+		m_drawCount++;
+	}
+
+	inline uint32_t DrawCount(void) const noexcept {
+		return m_drawCount;
+	}
+
+	inline void ResetDrawCount(void) noexcept {
+		m_drawCount = 0;
 	}
 
 	// How many textures a draw can have bound at once. Asked lazily for the same reason

@@ -332,12 +332,16 @@ noexcept
         // the range to draw; glDrawElements takes a BYTE offset into the bound index buffer
         GLsizei count = (indexCount > 0) ? GLsizei(indexCount) : (m_indexBuffer.m_itemCount - GLsizei(firstIndex));
         size_t componentSize = (m_indexBuffer.m_componentType == GL_UNSIGNED_INT) ? sizeof(uint32_t) : sizeof(uint16_t);
-        if (count > 0)
+        if (count > 0) {
             glDrawElementsInstanced(ToGLenum(m_shape), count, m_indexBuffer.m_componentType,
                                     reinterpret_cast<const void*>(size_t(firstIndex) * componentSize), m_instanceCount);
+            gfxStates.CountDraw();
+        }
     }
-    else
+    else {
         glDrawArraysInstanced(ToGLenum(m_shape), 0, m_dataBuffers[0]->m_itemCount, m_instanceCount); // draw non indexed arrays
+        gfxStates.CountDraw();
+    }
 #endif
     // The textures stay bound. GfxStates::BindTexture () returns at once when the same texture is
     // already on the same unit, so a batch that keeps using them costs nothing after the first draw -
