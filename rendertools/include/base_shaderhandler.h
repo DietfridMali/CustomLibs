@@ -45,15 +45,12 @@ public:
     }
 
 protected:
-    virtual void CreateShaderCode(void) { 
-        m_shaderCode = new BaseShaderCode(); 
+    virtual void CreateShaderCode(const String& shaderFolder) {
+        m_shaderCode = new BaseShaderCode(shaderFolder);
     } // allokiert -> nicht noexcept
 
 public:
-    void CreateShaders(void) {
-        if (m_shaderCode == nullptr)
-            CreateShaderCode();
-    }
+    void CreateShaders(const String& shaderFolder);
 
     Shader* SelectShader(Texture* texture);
 

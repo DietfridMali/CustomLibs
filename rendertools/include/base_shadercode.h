@@ -214,9 +214,10 @@ class BaseShaderCode
 protected:
     Dictionary<String, Shader*>         m_shaders;
     Dictionary<String, ComputeShader*>  m_computeShaders;
+    String                              m_shaderFolder;
 
 public:
-    BaseShaderCode();
+    BaseShaderCode(const String& shaderFolder);
     ~BaseShaderCode() = default;
 
     void AddShaders(AutoArray<const ShaderSource*>& shaderSource);
