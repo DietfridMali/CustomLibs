@@ -15,6 +15,7 @@
 #include <wrl/client.h>
 
 #include "shader.h"
+#include "shadercache.h"
 #include "cbv_allocator.h"
 #include "shadowmap.h"
 #include "gfxrenderer.h"
@@ -55,6 +56,20 @@ namespace {
             while (*utf8)
                 s.push_back(wchar_t(uint8_t(*utf8++)));
         return s;
+    }
+
+    uint64_t CompileKey(const char* hlslCode, const std::vector<const wchar_t*>& args) noexcept {
+        uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslCode);
+        key = ShaderCache::Hash(key, args.data(), args.size());
+        Microsoft::WRL::ComPtr<IDxcVersionInfo> versionInfo;
+        if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
+            UINT32 major = 0;
+            UINT32 minor = 0;
+            versionInfo->GetVersion(&major, &minor);
+            key = ShaderCache::Hash(key, &major, sizeof(major));
+            key = ShaderCache::Hash(key, &minor, sizeof(minor));
+        }
+        return key;
     }
 
     // DXC-based reflection that returns the same ID3D12ShaderReflection* as D3DReflect.
@@ -114,7 +129,7 @@ static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
 
 // =================================================================================================
 
-bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut) noexcept
+bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut, const String& shaderFolder)
 {
     if (not hlslCode or not *hlslCode)
         return false;
@@ -144,6 +159,19 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 #else
     args.push_back(L"-O3");
 #endif
+
+    const bool useCache = not shaderFolder.IsEmpty();
+    const String fileName = m_name + String(".") + String(target) + String(".dxil");
+    uint64_t key = 0;
+    if (useCache) {
+        key = CompileKey(hlslCode, args);
+        std::vector<uint8_t> dxil;
+        uint32_t tag = 0;
+        if (ShaderCache::Read(shaderFolder, fileName, key, dxil, tag) and SUCCEEDED(D3DCreateBlob(dxil.size(), &blobOut))) {
+            std::memcpy(blobOut->GetBufferPointer(), dxil.data(), dxil.size());
+            return true;
+        }
+    }
 
     ComPtr<IDxcResult> result;
     HRESULT hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
@@ -189,6 +217,8 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     if (FAILED(D3DCreateBlob(dxilBlob->GetBufferSize(), &blobOut)))
         return false;
     std::memcpy(blobOut->GetBufferPointer(), dxilBlob->GetBufferPointer(), dxilBlob->GetBufferSize());
+    if (useCache)
+        ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(blobOut->GetBufferPointer()), blobOut->GetBufferSize());
     return true;
 }
 
@@ -282,12 +312,22 @@ bool Shader::CreateRootSignature(void) noexcept
     params[3].Descriptor.RegisterSpace = 0;
     params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
 
+    params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[4].Descriptor.ShaderRegister = 1;
+    params[4].Descriptor.RegisterSpace = 0;
+    params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_HULL;
+
+    params[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    params[5].Descriptor.ShaderRegister = 1;
+    params[5].Descriptor.RegisterSpace = 0;
+    params[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_DOMAIN;
+
     // One 1-entry descriptor table per SRV slot (t0..t15)
     for (int i = 0; i < kSrvSlots; ++i) {
         params[kSrvBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[kSrvBase + i].DescriptorTable.NumDescriptorRanges = 1;
         params[kSrvBase + i].DescriptorTable.pDescriptorRanges = &srvRanges[i];
-        params[kSrvBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[kSrvBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
     // One 1-entry descriptor table per sampler slot (s0..s15)
@@ -295,7 +335,7 @@ bool Shader::CreateRootSignature(void) noexcept
         params[kSamplerBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[kSamplerBase + i].DescriptorTable.NumDescriptorRanges = 1;
         params[kSamplerBase + i].DescriptorTable.pDescriptorRanges = &samplerRanges[i];
-        params[kSamplerBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[kSamplerBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
     // One 1-entry descriptor table per UAV slot (u0..u3)
@@ -314,9 +354,7 @@ bool Shader::CreateRootSignature(void) noexcept
     rsd.pParameters       = params;
     rsd.NumStaticSamplers = 0;
     rsd.pStaticSamplers   = nullptr;
-    rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
-              | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS
-              | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
+    rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     ComPtr<ID3DBlob> sig, err;
     if (FAILED(D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
@@ -328,6 +366,7 @@ bool Shader::CreateRootSignature(void) noexcept
 #endif
         return false;
     }
+    m_rootSignatureBlob = sig;
     return SUCCEEDED(device->CreateRootSignature(0,
         sig->GetBufferPointer(), sig->GetBufferSize(),
         IID_PPV_ARGS(&m_rootSignature)));
@@ -391,17 +430,29 @@ void Shader::BuildInputLayout(void) noexcept
 }
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode)
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder)
 {
     if (IsValid())
         return true;
 
-    if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsBlob))
+    if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
+#ifdef _DEBUG
+        fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
+#endif
         return false;
-    if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_psBlob))
+    }
+    if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsBlob, shaderFolder))
+        return false;
+    if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_psBlob, shaderFolder))
         return false;
     if (gsCode.Length() > 0)
-        Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob);  // optional — failure is non-fatal
+        Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob, shaderFolder);  // optional — failure is non-fatal
+    if (not tcsCode.IsEmpty()) {
+        if (not Compile(static_cast<const char*>(tcsCode), "HSMain", "hs_6_0", m_hsBlob, shaderFolder))
+            return false;
+        if (not Compile(static_cast<const char*>(tesCode), "DSMain", "ds_6_0", m_dsBlob, shaderFolder))
+            return false;
+    }
 
     BuildInputLayout();
 
@@ -409,6 +460,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     UpdateStageFields(m_psBlob.Get(), kStagePS);
     if (m_gsBlob)
         UpdateStageFields(m_gsBlob.Get(), kStageGS);
+    if (m_hsBlob)
+        UpdateStageFields(m_hsBlob.Get(), kStageHS);
+    if (m_dsBlob)
+        UpdateStageFields(m_dsBlob.Get(), kStageDS);
 
     if (not CreateRootSignature())
         return false;
@@ -475,9 +530,12 @@ void Shader::Destroy(void) noexcept
     m_locations.Clear();
     m_vsInputLayout.clear();
     m_rootSignature.Reset();
+    m_rootSignatureBlob.Reset();
     m_vsBlob.Reset();
     m_psBlob.Reset();
     m_gsBlob.Reset();
+    m_hsBlob.Reset();
+    m_dsBlob.Reset();
 }
 
 
@@ -503,7 +561,10 @@ Shader& Shader::Move(Shader& other) noexcept
         m_vsBlob       = std::move(other.m_vsBlob);
         m_psBlob       = std::move(other.m_psBlob);
         m_gsBlob       = std::move(other.m_gsBlob);
+        m_hsBlob       = std::move(other.m_hsBlob);
+        m_dsBlob       = std::move(other.m_dsBlob);
         m_rootSignature = std::move(other.m_rootSignature);
+        m_rootSignatureBlob = std::move(other.m_rootSignatureBlob);
         m_b0Staging    = other.m_b0Staging;
         for (int s = 0; s < kStageCount; ++s) {
             m_stages[s].size    = other.m_stages[s].size;
@@ -631,7 +692,7 @@ bool Shader::TrySetB0Field(const char* name, const float* data) noexcept
 
 void Shader::ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept
 {
-    static_assert(kStageCount == 3, "ShaderLocation::m_stageOffset assumes 3 stages (VS/PS/GS)");
+    static_assert(kStageCount == 5, "ShaderLocation::m_stageOffset assumes 5 stages (VS/PS/GS/HS/DS)");
     for (int s = 0; s < kStageCount; ++s) {
         loc.m_stageOffset[s] = -1;
         StageConstants& sc = m_stages[s];

@@ -44,6 +44,7 @@ public:
     String                              m_cs;
     Microsoft::WRL::ComPtr<ID3DBlob>    m_csBytecode;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
+    Microsoft::WRL::ComPtr<ID3DBlob>    m_rootSignatureBlob;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipeline;
     AutoArray<ComputeBindingDesc>       m_bindings;
 
@@ -78,9 +79,9 @@ public:
         Destroy();
     }
 
-    bool Compile(const char* hlslCode, const char* entryPoint) noexcept;
+    bool Compile(const char* hlslCode, const char* entryPoint, const String& shaderFolder);
 
-    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings);
+    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
 
     void Destroy(void) noexcept;
 

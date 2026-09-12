@@ -85,6 +85,12 @@ static const wchar_t* const kArgsPS[] = {
 static const wchar_t* const kArgsGS[] = {
     L"-fvk-bind-register", L"b1", L"0", L"3", L"0",
 };
+static const wchar_t* const kArgsHS[] = {
+    L"-fvk-bind-register", L"b1", L"0", L"40", L"0",
+};
+static const wchar_t* const kArgsDS[] = {
+    L"-fvk-bind-register", L"b1", L"0", L"41", L"0",
+};
 
 static std::vector<const wchar_t*> StageArgs(int stage)
 {
@@ -99,6 +105,8 @@ static std::vector<const wchar_t*> StageArgs(int stage)
         case Shader::kStageVS: extra = kArgsVS; count = uint32_t(sizeof(kArgsVS) / sizeof(kArgsVS[0])); break;
         case Shader::kStagePS: extra = kArgsPS; count = uint32_t(sizeof(kArgsPS) / sizeof(kArgsPS[0])); break;
         case Shader::kStageGS: extra = kArgsGS; count = uint32_t(sizeof(kArgsGS) / sizeof(kArgsGS[0])); break;
+        case Shader::kStageHS: extra = kArgsHS; count = uint32_t(sizeof(kArgsHS) / sizeof(kArgsHS[0])); break;
+        case Shader::kStageDS: extra = kArgsDS; count = uint32_t(sizeof(kArgsDS) / sizeof(kArgsDS[0])); break;
     }
     for (uint32_t i = 0; i < count; ++i)
         args.push_back(extra[i]);
@@ -109,7 +117,7 @@ static std::vector<const wchar_t*> StageArgs(int stage)
 
 
 bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target,
-                     std::vector<uint8_t>& spirvOut) noexcept
+                     std::vector<uint8_t>& spirvOut, const String& shaderFolder)
 {
     if ((not hlslCode) or (not *hlslCode))
         return false;
@@ -119,12 +127,17 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
         stage = kStagePS;
     else if (std::strncmp(target, "gs_", 3) == 0)
         stage = kStageGS;
+    else if (std::strncmp(target, "hs_", 3) == 0)
+        stage = kStageHS;
+    else if (std::strncmp(target, "ds_", 3) == 0)
+        stage = kStageDS;
 
     auto args = StageArgs(stage);
     String error;
     if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target,
                                                args.data(), uint32_t(args.size()),
-                                               spirvOut, error)) {
+                                               spirvOut, error,
+                                               shaderFolder, m_name + String(".") + String(target) + String(".spv"))) {
         fprintf(stderr, "Shader '%s': compile failed (entry=%s, target=%s):\n%s\n",
                 (const char*)m_name, entryPoint, target, (const char*)error);
         return false;
@@ -160,13 +173,16 @@ bool Shader::CreatePipelineLayout(void) noexcept
     addBinding(kBindingB1GS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     for (uint32_t i = 0; i < kSrvSlots; ++i)
-        addBinding(kSrvBase + i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+        addBinding(kSrvBase + i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
 
     for (uint32_t i = 0; i < kSamplerSlots; ++i)
-        addBinding(kSamplerBase + i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+        addBinding(kSamplerBase + i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
 
     for (uint32_t i = 0; i < kUavSlots; ++i)
         addBinding(kUavBase + i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
+
+    addBinding(kBindingB1HS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
+    addBinding(kBindingB1DS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
     VkDescriptorSetLayoutCreateInfo setInfo { };
     setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -284,7 +300,9 @@ void Shader::UpdateStageFields(const std::vector<uint8_t>& spirv, int stage) noe
     StageConstants& sc = m_stages[stage];
     const uint32_t targetBinding = (stage == kStageVS) ? kBindingB1VS
                                  : (stage == kStagePS) ? kBindingB1PS
-                                                       : kBindingB1GS;
+                                 : (stage == kStageGS) ? kBindingB1GS
+                                 : (stage == kStageHS) ? kBindingB1HS
+                                                       : kBindingB1DS;
 
     uint32_t count = 0;
     spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
@@ -327,18 +345,52 @@ void Shader::UpdateStageFields(const std::vector<uint8_t>& spirv, int stage) noe
 }
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode)
+uint32_t Shader::ReflectPatchControlPoints(const std::vector<uint8_t>& spirv) noexcept
+{
+    SpvReflectShaderModule module{};
+    if (spvReflectCreateShaderModule(spirv.size(), spirv.data(), &module) != SPV_REFLECT_RESULT_SUCCESS)
+        return 0;
+    uint32_t count = 0;
+    spvReflectEnumerateInputVariables(&module, &count, nullptr);
+    std::vector<SpvReflectInterfaceVariable*> inputs(count);
+    spvReflectEnumerateInputVariables(&module, &count, inputs.data());
+    uint32_t controlPoints = 0;
+    for (SpvReflectInterfaceVariable* v : inputs) {
+        if (v and (v->array.dims_count > 0) and (v->array.dims[0] > controlPoints))
+            controlPoints = v->array.dims[0];
+    }
+    spvReflectDestroyShaderModule(&module);
+    return controlPoints;
+}
+
+
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder)
 {
     if (IsValid())
         return true;
 
-    if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsSpirv))
+    if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
+        fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
         return false;
-    if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_fsSpirv))
+    }
+    if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsSpirv, shaderFolder))
+        return false;
+    if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_fsSpirv, shaderFolder))
         return false;
     if (not gsCode.IsEmpty()) {
-        if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsSpirv))
+        if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsSpirv, shaderFolder))
             return false;
+    }
+    if (not tcsCode.IsEmpty()) {
+        if (not Compile(static_cast<const char*>(tcsCode), "HSMain", "hs_6_0", m_hsSpirv, shaderFolder))
+            return false;
+        if (not Compile(static_cast<const char*>(tesCode), "DSMain", "ds_6_0", m_dsSpirv, shaderFolder))
+            return false;
+        m_patchControlPoints = ReflectPatchControlPoints(m_hsSpirv);
+        if (m_patchControlPoints == 0) {
+            fprintf(stderr, "Shader '%s': hull shader input patch size not found\n", (const char*)m_name);
+            return false;
+        }
     }
 
     m_vsModule = ShaderCompiler::CreateShaderModule(m_vsSpirv);
@@ -350,6 +402,12 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         if (m_gsModule == VK_NULL_HANDLE)
             return false;
     }
+    if (not m_hsSpirv.empty()) {
+        m_hsModule = ShaderCompiler::CreateShaderModule(m_hsSpirv);
+        m_dsModule = ShaderCompiler::CreateShaderModule(m_dsSpirv);
+        if ((m_hsModule == VK_NULL_HANDLE) or (m_dsModule == VK_NULL_HANDLE))
+            return false;
+    }
 
     if (not CreatePipelineLayout())
         return false;
@@ -359,6 +417,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     UpdateStageFields(m_fsSpirv, kStagePS);
     if (not m_gsSpirv.empty())
         UpdateStageFields(m_gsSpirv, kStageGS);
+    if (not m_hsSpirv.empty())
+        UpdateStageFields(m_hsSpirv, kStageHS);
+    if (not m_dsSpirv.empty())
+        UpdateStageFields(m_dsSpirv, kStageDS);
 
     // Allocate per-stage staging buffers sized to the reflected b1 size.
     for (int s = 0; s < kStageCount; ++s) {
@@ -402,13 +464,20 @@ void Shader::Destroy(void) noexcept
         ShaderCompiler::DestroyShaderModule(m_vsModule);
         ShaderCompiler::DestroyShaderModule(m_fsModule);
         ShaderCompiler::DestroyShaderModule(m_gsModule);
+        ShaderCompiler::DestroyShaderModule(m_hsModule);
+        ShaderCompiler::DestroyShaderModule(m_dsModule);
     }
     m_vsModule = VK_NULL_HANDLE;
     m_fsModule = VK_NULL_HANDLE;
     m_gsModule = VK_NULL_HANDLE;
+    m_hsModule = VK_NULL_HANDLE;
+    m_dsModule = VK_NULL_HANDLE;
+    m_patchControlPoints = 0;
     m_vsSpirv.clear();
     m_fsSpirv.clear();
     m_gsSpirv.clear();
+    m_hsSpirv.clear();
+    m_dsSpirv.clear();
 }
 
 
@@ -434,9 +503,14 @@ Shader& Shader::Move(Shader& other) noexcept
         m_vsSpirv = std::move(other.m_vsSpirv);
         m_fsSpirv = std::move(other.m_fsSpirv);
         m_gsSpirv = std::move(other.m_gsSpirv);
+        m_hsSpirv = std::move(other.m_hsSpirv);
+        m_dsSpirv = std::move(other.m_dsSpirv);
         m_vsModule = std::exchange(other.m_vsModule, VkShaderModule(VK_NULL_HANDLE));
         m_fsModule = std::exchange(other.m_fsModule, VkShaderModule(VK_NULL_HANDLE));
         m_gsModule = std::exchange(other.m_gsModule, VkShaderModule(VK_NULL_HANDLE));
+        m_hsModule = std::exchange(other.m_hsModule, VkShaderModule(VK_NULL_HANDLE));
+        m_dsModule = std::exchange(other.m_dsModule, VkShaderModule(VK_NULL_HANDLE));
+        m_patchControlPoints = other.m_patchControlPoints;
         m_pipelineLayout = std::exchange(other.m_pipelineLayout, VkPipelineLayout(VK_NULL_HANDLE));
         m_setLayout = std::exchange(other.m_setLayout, VkDescriptorSetLayout(VK_NULL_HANDLE));
         m_b0Staging = other.m_b0Staging;
@@ -538,9 +612,9 @@ bool Shader::UpdateVariables(void) noexcept {
 
     // Worst-case write count: 4 dynamic UBOs + kSrvSlots images + kSamplerSlots samplers
     // + kUavSlots storage images.
-    constexpr uint32_t kMaxWrites = 4 + 16 + 16 + 4;
+    constexpr uint32_t kMaxWrites = kDynamicOffsetCount + 16 + 16 + 4;
     VkWriteDescriptorSet writes[kMaxWrites] { };
-    VkDescriptorBufferInfo bufInfos[4]                              { };
+    VkDescriptorBufferInfo bufInfos[kDynamicOffsetCount]            { };
     VkDescriptorImageInfo  imgInfos[CommandListHandler::kSrvSlots]  { };
     VkDescriptorImageInfo  smpInfos[CommandListHandler::kSamplerSlots] { };
     VkDescriptorBufferInfo stoInfos[CommandListHandler::kUavSlots]  { };
@@ -564,6 +638,8 @@ bool Shader::UpdateVariables(void) noexcept {
     AddDynamicUbo(kBindingB1VS,  m_stages[kStageVS].size,             1);
     AddDynamicUbo(kBindingB1PS,  m_stages[kStagePS].size,             2);
     AddDynamicUbo(kBindingB1GS,  m_stages[kStageGS].size,             3);
+    AddDynamicUbo(kBindingB1HS,  m_stages[kStageHS].size,             4);
+    AddDynamicUbo(kBindingB1DS,  m_stages[kStageDS].size,             5);
 
     // Sampled images (t-slots). Only slots with a non-null view are written; unbound slots
     // keep whatever the descriptor pool initialized (validation will warn if a shader actually
@@ -651,7 +727,7 @@ bool Shader::TrySetB0Field(const char* name, const float* data) noexcept
 
 void Shader::ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept
 {
-    static_assert(kStageCount == 3, "ShaderLocation::m_stageOffset assumes 3 stages (VS/PS/GS)");
+    static_assert(kStageCount == 5, "ShaderLocation::m_stageOffset assumes 5 stages (VS/PS/GS/HS/DS)");
     for (int s = 0; s < kStageCount; ++s) {
         loc.m_stageOffset[s] = -1;
         StageConstants& sc = m_stages[s];

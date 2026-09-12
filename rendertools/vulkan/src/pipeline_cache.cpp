@@ -1,9 +1,11 @@
 #include "pipeline_cache.h"
 #include "shader.h"
 #include "vkcontext.h"
+#include "shadercache.h"
 
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 // =================================================================================================
 // PipelineCache
@@ -48,6 +50,55 @@ void PipelineCache::Destroy(void) noexcept
     m_keys.Reset();
     m_cache.Clear();
     m_device = VK_NULL_HANDLE;
+}
+
+
+bool PipelineCache::Load(const String& shaderFolder)
+{
+    m_folder = shaderFolder;
+    if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
+        return false;
+    std::vector<uint8_t> data;
+    if (not ShaderCache::ReadFile(shaderFolder, String("pipelines.vulkan"), data))
+        return false;
+    VkPipelineCacheHeaderVersionOne header { };
+    if (data.size() < sizeof(header))
+        return false;
+    std::memcpy(&header, data.data(), sizeof(header));
+    const VkPhysicalDeviceProperties& props = vkContext.DeviceProps();
+    if ((header.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE)
+        or (header.headerSize < sizeof(header))
+        or (header.vendorID != props.vendorID)
+        or (header.deviceID != props.deviceID)
+        or (std::memcmp(header.pipelineCacheUUID, props.pipelineCacheUUID, VK_UUID_SIZE) != 0))
+        return false;
+
+    VkPipelineCacheCreateInfo info { };
+    info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+    info.initialDataSize = data.size();
+    info.pInitialData = data.data();
+    VkPipelineCache loaded = VK_NULL_HANDLE;
+    if (vkCreatePipelineCache(m_device, &info, nullptr, &loaded) != VK_SUCCESS)
+        return false;
+    VkResult res = vkMergePipelineCaches(m_device, m_pipelineCache, 1, &loaded);
+    vkDestroyPipelineCache(m_device, loaded, nullptr);
+    return res == VK_SUCCESS;
+}
+
+
+bool PipelineCache::Save(void)
+{
+    if (m_folder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
+        return false;
+    size_t size = 0;
+    if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, nullptr) != VK_SUCCESS)
+        return false;
+    if (size == 0)
+        return false;
+    std::vector<uint8_t> data(size, 0);
+    if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, data.data()) != VK_SUCCESS)
+        return false;
+    return ShaderCache::WriteFile(m_folder, String("pipelines.vulkan"), data.data(), size);
 }
 
 
@@ -103,8 +154,8 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     if ((not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
         return VK_NULL_HANDLE;
 
-    // Stages: VS + PS (+ optional GS).
-    VkPipelineShaderStageCreateInfo stages[3] { };
+    // Stages: VS + PS (+ optional GS, HS + DS).
+    VkPipelineShaderStageCreateInfo stages[5] { };
     uint32_t stageCount = 0;
 
     stages[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -127,6 +178,21 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
         ++stageCount;
     }
 
+    const bool isTessellated = shader->IsTessellated();
+    if (isTessellated) {
+        stages[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[stageCount].stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+        stages[stageCount].module = shader->m_hsModule;
+        stages[stageCount].pName = "HSMain";
+        ++stageCount;
+
+        stages[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[stageCount].stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+        stages[stageCount].module = shader->m_dsModule;
+        stages[stageCount].pName = "DSMain";
+        ++stageCount;
+    }
+
     // Vertex input
     VkPipelineVertexInputStateCreateInfo vertexInput { };
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -138,8 +204,12 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     // Input assembly: triangle list (matches DX12 PrimitiveTopologyType_TRIANGLE).
     VkPipelineInputAssemblyStateCreateInfo inputAssembly { };
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.topology = isTessellated ? VK_PRIMITIVE_TOPOLOGY_PATCH_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+    VkPipelineTessellationStateCreateInfo tessellation { };
+    tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+    tessellation.patchControlPoints = shader->m_patchControlPoints;
 
     // Viewport / scissor: counts only — actual values set dynamically per draw.
     VkPipelineViewportStateCreateInfo viewport { };
@@ -213,6 +283,7 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     info.pStages = stages;
     info.pVertexInputState = &vertexInput;
     info.pInputAssemblyState = &inputAssembly;
+    info.pTessellationState = isTessellated ? &tessellation : nullptr;
     info.pViewportState = &viewport;
     info.pRasterizationState = &rasterization;
     info.pMultisampleState = &multisample;

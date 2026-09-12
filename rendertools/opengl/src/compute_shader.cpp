@@ -8,9 +8,18 @@
 
 // -------------------------------------------------------------------------------------------------
 
-bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings) {
+bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder) {
     m_cs = csCode;
     m_bindings = bindings;
+
+    const bool useCache = not shaderFolder.IsEmpty();
+    const String fileName = m_name + String(".glcomp");
+    const uint64_t key = useCache ? ProgramKey({ static_cast<const char*>(m_cs) }) : 0;
+    if (useCache) {
+        m_handle = LoadProgramBinary(shaderFolder, fileName, key);
+        if (m_handle)
+            return true;
+    }
 
     GLuint csHandle = Compile((const char*)m_cs, GL_COMPUTE_SHADER);
     if (not csHandle)
@@ -22,6 +31,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
         return false;
     }
     glAttachShader(program, csHandle);
+    glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
     glLinkProgram(program);
     GLint linked = 0;
     glGetProgramiv(program, GL_LINK_STATUS, &linked);
@@ -38,6 +48,8 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
     glDetachShader(program, csHandle);
     glDeleteShader(csHandle);
     m_handle = program;
+    if (useCache)
+        SaveProgramBinary(shaderFolder, fileName, key);
     return true;
 }
 

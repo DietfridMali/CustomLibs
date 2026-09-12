@@ -2,8 +2,10 @@
 #include <utility>
 #include <string_view>
 #include <ranges>
+#include <vector>
 
 #include "shader.h"
+#include "shadercache.h"
 #include "shadowmap.h"
 #include "gfxrenderer.h"
 
@@ -85,28 +87,32 @@ GLuint Shader::Compile(const char* code, GLuint type) {
 }
 
 
+static void DeleteShaders(std::initializer_list<GLuint> handles) {
+    for (GLuint handle : handles)
+        if (handle)
+            glDeleteShader(handle);
+}
+
+
 GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle, GLuint tcsHandle, GLuint tesHandle) {
     m_isTessellated = false;
-    if (not vsHandle or not fsHandle)
+    if (not vsHandle or not fsHandle) {
+        DeleteShaders({ vsHandle, fsHandle, gsHandle, tcsHandle, tesHandle });
         return 0;
+    }
     // the tessellation stages come as a pair; a program with only one of them does not link
     if ((tcsHandle != 0) != (tesHandle != 0)) {
 #ifdef _DEBUG
         fprintf(stderr, "\n***** %s shader: tessellation control and evaluation shader must both be present *****\n\n", (char*)m_name);
 #endif
-        glDeleteShader(vsHandle);
-        glDeleteShader(fsHandle);
-        if (gsHandle)
-            glDeleteShader(gsHandle);
-        if (tcsHandle)
-            glDeleteShader(tcsHandle);
-        if (tesHandle)
-            glDeleteShader(tesHandle);
+        DeleteShaders({ vsHandle, fsHandle, gsHandle, tcsHandle, tesHandle });
         return 0;
     }
     GLuint handle = glCreateProgram();
-    if (not handle)
+    if (not handle) {
+        DeleteShaders({ vsHandle, fsHandle, gsHandle, tcsHandle, tesHandle });
         return 0;
+    }
     glAttachShader(handle, vsHandle);
     glAttachShader(handle, fsHandle);
 	if (gsHandle)
@@ -115,6 +121,7 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle, GLuint tc
         glAttachShader(handle, tcsHandle);
         glAttachShader(handle, tesHandle);
     }
+    glProgramParameteri(handle, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
     glLinkProgram(handle);
     GLint isLinked = 0;
     glGetProgramiv(handle, GL_LINK_STATUS, &isLinked);
@@ -127,6 +134,7 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle, GLuint tc
             glDetachShader(handle, tcsHandle);
             glDetachShader(handle, tesHandle);
         }
+        DeleteShaders({ vsHandle, fsHandle, gsHandle, tcsHandle, tesHandle });
         m_isTessellated = tcsHandle != 0;
         return handle;
     }
@@ -150,6 +158,93 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle, GLuint tc
     }
     glDeleteProgram(handle);
     return 0;
+}
+
+
+static bool HaveProgramBinaryFormat(GLenum format) {
+    GLint formatCount = 0;
+    glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formatCount);
+    if (formatCount <= 0)
+        return false;
+    std::vector<GLint> formats(size_t(formatCount), 0);
+    glGetIntegerv(GL_PROGRAM_BINARY_FORMATS, formats.data());
+    for (GLint f : formats)
+        if (GLenum(f) == format)
+            return true;
+    return false;
+}
+
+
+uint64_t Shader::ProgramKey(std::initializer_list<const char*> sources) {
+    uint64_t key = ShaderCache::kHashSeed;
+    key = ShaderCache::Hash(key, reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
+    key = ShaderCache::Hash(key, reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
+    key = ShaderCache::Hash(key, reinterpret_cast<const char*>(glGetString(GL_VERSION)));
+    for (const char* source : sources)
+        key = ShaderCache::Hash(key, source);
+    return key;
+}
+
+
+GLuint Shader::LoadProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key) {
+    std::vector<uint8_t> binary;
+    uint32_t format = 0;
+    if (not ShaderCache::Read(shaderFolder, fileName, key, binary, format))
+        return 0;
+    if (not HaveProgramBinaryFormat(GLenum(format)))
+        return 0;
+    GLuint handle = glCreateProgram();
+    if (not handle)
+        return 0;
+    glProgramBinary(handle, GLenum(format), binary.data(), GLsizei(binary.size()));
+    GLint isLinked = 0;
+    glGetProgramiv(handle, GL_LINK_STATUS, &isLinked);
+    if (isLinked == GL_TRUE)
+        return handle;
+    glDeleteProgram(handle);
+    return 0;
+}
+
+
+void Shader::SaveProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key) {
+    GLint formatCount = 0;
+    glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formatCount);
+    if (formatCount <= 0)
+        return;
+    GLint length = 0;
+    glGetProgramiv(m_handle, GL_PROGRAM_BINARY_LENGTH, &length);
+    if (length <= 0)
+        return;
+    std::vector<uint8_t> binary(size_t(length), 0);
+    GLsizei written = 0;
+    GLenum format = 0;
+    glGetProgramBinary(m_handle, length, &written, &format, binary.data());
+    if (written <= 0)
+        return;
+    ShaderCache::Write(shaderFolder, fileName, key, uint32_t(format), binary.data(), size_t(written));
+}
+
+
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder) {
+    const bool useCache = not shaderFolder.IsEmpty();
+    const String fileName = m_name + String(".glprog");
+    const uint64_t key = useCache
+                       ? ProgramKey({ static_cast<const char*>(vsCode), static_cast<const char*>(fsCode), static_cast<const char*>(gsCode), static_cast<const char*>(tcsCode), static_cast<const char*>(tesCode) })
+                       : 0;
+    if (useCache) {
+        m_handle = LoadProgramBinary(shaderFolder, fileName, key);
+        if (m_handle) {
+            m_isTessellated = not tcsCode.IsEmpty();
+            return true;
+        }
+    }
+    m_handle = Link(Compile(static_cast<const char*>(vsCode), GL_VERTEX_SHADER), Compile(static_cast<const char*>(fsCode), GL_FRAGMENT_SHADER), Compile(static_cast<const char*>(gsCode), GL_GEOMETRY_SHADER),
+                    Compile(static_cast<const char*>(tcsCode), GL_TESS_CONTROL_SHADER), Compile(static_cast<const char*>(tesCode), GL_TESS_EVALUATION_SHADER));
+    if (m_handle == 0)
+        return false;
+    if (useCache)
+        SaveProgramBinary(shaderFolder, fileName, key);
+    return true;
 }
 
 // set modelview, projection and viewport matrices in shader. 

@@ -4,6 +4,7 @@
 #include "basesingleton.hpp"
 #include "avltree.hpp"
 #include "array.hpp"
+#include "string.hpp"
 #include "renderstates.h"
 
 class Shader;
@@ -41,6 +42,7 @@ public:
     VkDevice         m_device         { VK_NULL_HANDLE };
     VkPipelineCache  m_pipelineCache  { VK_NULL_HANDLE };
     Cache            m_cache;
+    String           m_folder;
 
     // Companion lists kept in lock-step. Used for Destroy iteration and RemoveShader sweep.
     AutoArray<VkPipeline>   m_pipelines;
@@ -50,6 +52,9 @@ public:
 
     bool Create(VkDevice device) noexcept;
     void Destroy(void) noexcept;
+
+    bool Load(const String& shaderFolder);
+    bool Save(void);
 
     // Cache lookup. On miss, builds the pipeline via vkCreateGraphicsPipelines and inserts it.
     // Returns VK_NULL_HANDLE on shader/build failure.

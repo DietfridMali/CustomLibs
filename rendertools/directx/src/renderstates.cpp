@@ -4,6 +4,9 @@
 #include "dx12context.h"
 #include "gfxrenderer.h"
 #include "resource_view.h"
+#include "shadercache.h"
+
+#include <cwchar>
 
 
 // =================================================================================================
@@ -165,6 +168,38 @@ D3D12_DEPTH_STENCIL_DESC RenderStates::SetStencilDesc(D3D12_DEPTH_STENCIL_DESC& 
 
 // =================================================================================================
 
+static uint64_t PipelineKey(const Shader* shader, const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc) noexcept
+{
+    uint64_t key = ShaderCache::kHashSeed;
+    key = ShaderCache::Hash(key, desc.VS.pShaderBytecode, desc.VS.BytecodeLength);
+    key = ShaderCache::Hash(key, desc.PS.pShaderBytecode, desc.PS.BytecodeLength);
+    if (desc.GS.pShaderBytecode)
+        key = ShaderCache::Hash(key, desc.GS.pShaderBytecode, desc.GS.BytecodeLength);
+    if (desc.HS.pShaderBytecode)
+        key = ShaderCache::Hash(key, desc.HS.pShaderBytecode, desc.HS.BytecodeLength);
+    if (desc.DS.pShaderBytecode)
+        key = ShaderCache::Hash(key, desc.DS.pShaderBytecode, desc.DS.BytecodeLength);
+    key = ShaderCache::Hash(key, shader->m_rootSignatureBlob->GetBufferPointer(), shader->m_rootSignatureBlob->GetBufferSize());
+    for (UINT i = 0; i < desc.InputLayout.NumElements; ++i) {
+        const D3D12_INPUT_ELEMENT_DESC& e = desc.InputLayout.pInputElementDescs[i];
+        key = ShaderCache::Hash(key, e.SemanticName);
+        key = ShaderCache::Hash(key, &e.SemanticIndex, sizeof(e.SemanticIndex));
+        key = ShaderCache::Hash(key, &e.Format, sizeof(e.Format));
+        key = ShaderCache::Hash(key, &e.InputSlot, sizeof(e.InputSlot));
+        key = ShaderCache::Hash(key, &e.AlignedByteOffset, sizeof(e.AlignedByteOffset));
+        key = ShaderCache::Hash(key, &e.InputSlotClass, sizeof(e.InputSlotClass));
+        key = ShaderCache::Hash(key, &e.InstanceDataStepRate, sizeof(e.InstanceDataStepRate));
+    }
+    const RenderStates& states = baseRenderer.RenderStates();
+    key = ShaderCache::Hash(key, &states, sizeof(RenderStates));
+    key = ShaderCache::Hash(key, &desc.PrimitiveTopologyType, sizeof(desc.PrimitiveTopologyType));
+    key = ShaderCache::Hash(key, &desc.NumRenderTargets, sizeof(desc.NumRenderTargets));
+    key = ShaderCache::Hash(key, desc.RTVFormats, sizeof(desc.RTVFormats[0]) * desc.NumRenderTargets);
+    key = ShaderCache::Hash(key, &desc.DSVFormat, sizeof(desc.DSVFormat));
+    return key;
+}
+
+
 int PSO::ComparePSOs(void* context, const PSOKey& key1, const PSOKey& key2) {
     return memcmp(&key1, &key2, sizeof(PSOKey));
 }
@@ -205,13 +240,89 @@ PSO::psoPtr_t PSO::GetPSO(Shader* shader) noexcept
 
 void PSO::RemovePSOs(Shader* shader) noexcept {
     PSOKey key{ shader };
-    PSOCache cache = GetCache(CompareShaders);
+    PSOCache& cache = GetCache(CompareShaders);
     while (cache.Remove(key))
         ;
 }
 
 
-PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
+std::wstring PSO::PipelineName(const String& shaderName, uint64_t key)
+{
+    wchar_t hex[17];
+    std::swprintf(hex, 17, L"%016llx", static_cast<unsigned long long>(key));
+    std::wstring name;
+    for (const char* c = static_cast<const char*>(shaderName); *c; ++c)
+        name.push_back(wchar_t(uint8_t(*c)));
+    name.push_back(L'_');
+    name.append(hex);
+    return name;
+}
+
+
+HRESULT PSO::StorePipeline(const std::wstring& name, ID3D12PipelineState* pso) noexcept
+{
+    PipelineLibrary& lib = GetLibrary();
+    HRESULT hr = lib.library->StorePipeline(name.c_str(), pso);
+    if (SUCCEEDED(hr))
+        lib.dirty = true;
+    return hr;
+}
+
+
+bool PSO::LoadPipelineLibrary(const String& shaderFolder)
+{
+    PipelineLibrary& lib = GetLibrary();
+    lib.library.Reset();
+    lib.data.clear();
+    lib.dirty = false;
+    lib.folder = shaderFolder;
+    if (shaderFolder.IsEmpty())
+        return false;
+    ComPtr<ID3D12Device1> device;
+    if (FAILED(dx12Context.Device()->QueryInterface(IID_PPV_ARGS(device.GetAddressOf()))))
+        return false;
+    if (ShaderCache::ReadFile(shaderFolder, String("pipelines.d3d12"), lib.data)
+        and SUCCEEDED(device->CreatePipelineLibrary(lib.data.data(), lib.data.size(), IID_PPV_ARGS(lib.library.GetAddressOf()))))
+        return true;
+    lib.data.clear();
+    return SUCCEEDED(device->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(lib.library.ReleaseAndGetAddressOf())));
+}
+
+
+bool PSO::SavePipelineLibrary(void)
+{
+    PipelineLibrary& lib = GetLibrary();
+    if (not (lib.library and lib.dirty))
+        return true;
+    size_t size = lib.library->GetSerializedSize();
+    std::vector<uint8_t> data(size, 0);
+    if (FAILED(lib.library->Serialize(data.data(), size)))
+        return false;
+    if (not ShaderCache::WriteFile(lib.folder, String("pipelines.d3d12"), data.data(), size))
+        return false;
+    lib.dirty = false;
+    return true;
+}
+
+
+bool PSO::CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc, const String& shaderName, ID3DBlob* rootSignatureBlob, PSOComPtr& pso)
+{
+    PipelineLibrary& lib = GetLibrary();
+    if (not lib.library)
+        return SUCCEEDED(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(pso.ReleaseAndGetAddressOf())));
+    uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, desc.CS.pShaderBytecode, desc.CS.BytecodeLength);
+    key = ShaderCache::Hash(key, rootSignatureBlob->GetBufferPointer(), rootSignatureBlob->GetBufferSize());
+    std::wstring name = PipelineName(shaderName, key);
+    if (SUCCEEDED(lib.library->LoadComputePipeline(name.c_str(), &desc, IID_PPV_ARGS(pso.ReleaseAndGetAddressOf()))))
+        return true;
+    if (FAILED(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(pso.ReleaseAndGetAddressOf()))))
+        return false;
+    StorePipeline(name, pso.Get());
+    return true;
+}
+
+
+PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
 {
     ID3D12Device* device = dx12Context.Device();
     if (not (device and shader->m_rootSignature and shader->m_vsBlob and shader->m_psBlob))
@@ -225,12 +336,16 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
     psoDesc.PS = { shader->m_psBlob->GetBufferPointer(), shader->m_psBlob->GetBufferSize() };
     if (shader->m_gsBlob)
         psoDesc.GS = { shader->m_gsBlob->GetBufferPointer(), shader->m_gsBlob->GetBufferSize() };
+    if (shader->IsTessellated()) {
+        psoDesc.HS = { shader->m_hsBlob->GetBufferPointer(), shader->m_hsBlob->GetBufferSize() };
+        psoDesc.DS = { shader->m_dsBlob->GetBufferPointer(), shader->m_dsBlob->GetBufferSize() };
+    }
     psoDesc.InputLayout = { shader->m_vsInputLayout.data(), UINT(shader->m_vsInputLayout.size()) };
     baseRenderer.RenderStates().SetRasterizerDesc(psoDesc.RasterizerState);
     baseRenderer.RenderStates().SetBlendDesc(psoDesc.BlendState);
     baseRenderer.RenderStates().SetStencilDesc(psoDesc.DepthStencilState);
 
-    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    psoDesc.PrimitiveTopologyType = shader->IsTessellated() ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     int nrt = shader->m_dataLayout.m_numRenderTargets;
     psoDesc.NumRenderTargets = UINT(nrt);
     // Slot 0 (color) follows the active render target's color format (RenderStates::colorFormat, set
@@ -247,6 +362,13 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
     psoDesc.SampleDesc.Count = 1;
 
     PSOComPtr psoComPtr;
+    PipelineLibrary& lib = GetLibrary();
+    std::wstring name;
+    if (lib.library) {
+        name = PipelineName(shader->m_name, PipelineKey(shader, psoDesc));
+        if (SUCCEEDED(lib.library->LoadGraphicsPipeline(name.c_str(), &psoDesc, IID_PPV_ARGS(&psoComPtr))))
+            return psoComPtr;
+    }
     HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&psoComPtr));
     if (FAILED(hr)) {
 #ifdef _DEBUG
@@ -254,6 +376,8 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader) noexcept
 #endif
         return nullptr;
     }
+    if (lib.library)
+        StorePipeline(name, psoComPtr.Get());
     return psoComPtr;
 }
 

@@ -23,6 +23,15 @@ static D3D_PRIMITIVE_TOPOLOGY ToD3DTopology(MeshTopology topology) noexcept
     }
 }
 
+static D3D_PRIMITIVE_TOPOLOGY ToD3DPatchTopology(MeshTopology topology) noexcept
+{
+    switch (topology) {
+        case MeshTopology::Lines:     return D3D_PRIMITIVE_TOPOLOGY_2_CONTROL_POINT_PATCHLIST;
+        case MeshTopology::Points:    return D3D_PRIMITIVE_TOPOLOGY_1_CONTROL_POINT_PATCHLIST;
+        default:                      return D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST;
+    }
+}
+
 static DXGI_FORMAT ToIndexFormat(ComponentType componentType) noexcept
 {
     return (componentType == ComponentType::UInt16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
@@ -262,6 +271,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     {
         ZoneScopedN("Layout::DrawCall");
         if (commandListHandler.CurrentGfxList()) {
+            commandListHandler.CurrentGfxList()->IASetPrimitiveTopology((shader and shader->IsTessellated()) ? ToD3DPatchTopology(m_shape) : ToD3DTopology(m_shape));
             if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
                 UINT count = (indexCount > 0) ? UINT(indexCount) : UINT(m_indexBuffer.m_itemCount) - UINT(firstIndex);
                 if (count > 0) {

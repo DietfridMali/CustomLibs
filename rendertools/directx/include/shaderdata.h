@@ -132,7 +132,7 @@ class ShaderLocationTable
 public:
     struct ShaderLocation {
         String m_name{ "" };
-        int    m_stageOffset[3]{ -1, -1, -1 };  // b1 offset per stage VS/PS/GS; must match Shader::kStageCount
+        int    m_stageOffset[5]{ -1, -1, -1, -1, -1 };  // b1 offset per stage VS/PS/GS/HS/DS; must match Shader::kStageCount
         bool   m_resolved{ false };
         bool   m_warned{ false };
 

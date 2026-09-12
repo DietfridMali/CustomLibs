@@ -13,6 +13,8 @@
 #include <wrl/client.h>
 
 #include "compute_shader.h"
+#include "shadercache.h"
+#include "renderstates.h"
 #include "dx12context.h"
 #include "cbv_allocator.h"
 
@@ -63,7 +65,7 @@ std::wstring ToWide(const char* utf8) noexcept {
 }  // namespace
 
 
-bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint) noexcept
+bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const String& shaderFolder)
 {
     if ((not hlslCode) or (not *hlslCode))
         return false;
@@ -87,6 +89,28 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint) noexce
 #endif
     };
 
+    const bool useCache = not shaderFolder.IsEmpty();
+    const String fileName = m_name + String(".cs_6_0.dxil");
+    uint64_t key = 0;
+    if (useCache) {
+        key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslCode);
+        key = ShaderCache::Hash(key, args.data(), args.size());
+        ComPtr<IDxcVersionInfo> versionInfo;
+        if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
+            UINT32 major = 0;
+            UINT32 minor = 0;
+            versionInfo->GetVersion(&major, &minor);
+            key = ShaderCache::Hash(key, &major, sizeof(major));
+            key = ShaderCache::Hash(key, &minor, sizeof(minor));
+        }
+        std::vector<uint8_t> dxil;
+        uint32_t tag = 0;
+        if (ShaderCache::Read(shaderFolder, fileName, key, dxil, tag) and SUCCEEDED(D3DCreateBlob(dxil.size(), m_csBytecode.ReleaseAndGetAddressOf()))) {
+            std::memcpy(m_csBytecode->GetBufferPointer(), dxil.data(), dxil.size());
+            return true;
+        }
+    }
+
     ComPtr<IDxcResult> result;
     HRESULT hr = g_dxcCompiler->Compile(&src, args.data(), UINT32(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
     if (FAILED(hr))
@@ -109,6 +133,8 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint) noexce
     if (FAILED(D3DCreateBlob(obj->GetBufferSize(), m_csBytecode.GetAddressOf())))
         return false;
     std::memcpy(m_csBytecode->GetBufferPointer(), obj->GetBufferPointer(), obj->GetBufferSize());
+    if (useCache)
+        ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(m_csBytecode->GetBufferPointer()), m_csBytecode->GetBufferSize());
     return true;
 }
 
@@ -218,6 +244,7 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
                     (const char*)m_name, (const char*)err->GetBufferPointer());
         return false;
     }
+    m_rootSignatureBlob = sig;
     return SUCCEEDED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(),
                                                  IID_PPV_ARGS(m_rootSignature.GetAddressOf())));
 }
@@ -236,15 +263,15 @@ bool ComputeShader::CreatePipeline(void) noexcept
     psd.NodeMask = 0;
     psd.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
-    return SUCCEEDED(device->CreateComputePipelineState(&psd, IID_PPV_ARGS(m_pipeline.GetAddressOf())));
+    return PSO::CreateComputePipeline(device, psd, m_name, m_rootSignatureBlob.Get(), m_pipeline);
 }
 
 
-bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings)
+bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder)
 {
     if (IsValid())
         return true;
-    if (not Compile((const char*)csCode, "CSMain"))
+    if (not Compile((const char*)csCode, "CSMain", shaderFolder))
         return false;
     m_bindings = bindings;
     if (not CreateRootSignature(bindings))
@@ -312,6 +339,7 @@ void ComputeShader::Destroy(void) noexcept
 {
     m_pipeline.Reset();
     m_rootSignature.Reset();
+    m_rootSignatureBlob.Reset();
     m_csBytecode.Reset();
     m_b1Staging.clear();
     m_b1Fields.Reset();

@@ -182,9 +182,20 @@ void GfxRenderer::Cleanup(void) noexcept {
     // (RT BufferInfo::Release, disposable textures, ...), so the underlying VkImage / VkImageView
     // / VmaAllocation handles are destroyed before gfxResourceHandler / vkContext are torn down.
     commandListHandler.CmdQueue().WaitIdle();
+    SavePipelineCache();
     meshHandler.Destroy();
     gfxResourceHandler.Cleanup(0);
     gfxResourceHandler.Cleanup(1);
+}
+
+
+void GfxRenderer::LoadPipelineCache(const String& shaderFolder) {
+    pipelineCache.Load(shaderFolder);
+}
+
+
+void GfxRenderer::SavePipelineCache(void) {
+    pipelineCache.Save();
 }
 
 // =================================================================================================

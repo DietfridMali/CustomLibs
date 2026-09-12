@@ -16,6 +16,7 @@
 #include "gfxapitype.h"
 #include "tracy_wrapper.h"
 #include "resource_handler.h"
+#include "renderstates.h"
 #include "gfxrenderer.h"
 
 #ifdef _DEBUG
@@ -120,10 +121,21 @@ void GfxRenderer::Cleanup(void) noexcept {
     // inert — RenderTargets destroyed later (incl. at static destruction) must not touch the
     // deferred mechanism, whose singletons may already be gone.
     commandListHandler.CmdQueue().WaitIdle();
+    SavePipelineCache();
     gfxResourceHandler.CleanupAll();
     GfxResourceHandler::BeginShutdown();
     meshHandler.Destroy();
     commandListHandler.Destroy();
+}
+
+
+void GfxRenderer::LoadPipelineCache(const String& shaderFolder) {
+    PSO::LoadPipelineLibrary(shaderFolder);
+}
+
+
+void GfxRenderer::SavePipelineCache(void) {
+    PSO::SavePipelineLibrary();
 }
 
 

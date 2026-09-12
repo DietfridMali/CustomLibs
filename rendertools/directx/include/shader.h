@@ -77,9 +77,12 @@ public:
     ComPtr<ID3DBlob>  m_vsBlob;
     ComPtr<ID3DBlob>  m_psBlob;
     ComPtr<ID3DBlob>  m_gsBlob;  // optional
+    ComPtr<ID3DBlob>  m_hsBlob;
+    ComPtr<ID3DBlob>  m_dsBlob;
 
     // Shared root signature (fixed layout, created once per shader)
     ComPtr<ID3D12RootSignature> m_rootSignature;
+    ComPtr<ID3DBlob>            m_rootSignatureBlob;
 
     // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
     FrameConstants          m_b0Staging{};
@@ -90,8 +93,10 @@ public:
     static constexpr int kStageVS       = 0;
     static constexpr int kStagePS       = 1;
     static constexpr int kStageGS       = 2;
-    static constexpr int kStageCount    = 3;
-    static constexpr int kSrvBase       = 4;
+    static constexpr int kStageHS       = 3;
+    static constexpr int kStageDS       = 4;
+    static constexpr int kStageCount    = 5;
+    static constexpr int kSrvBase       = 1 + kStageCount;
     static constexpr int kSrvSlots      = 16;
     static constexpr int kSamplerBase   = kSrvBase + kSrvSlots;
     static constexpr int kSamplerSlots  = 16;
@@ -153,15 +158,19 @@ public:
 
     // Compile a single HLSL stage.  entryPoint: "VSMain" or "PSMain"; target: "vs_5_1"/"ps_5_1"
     bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
-                 ComPtr<ID3DBlob>& blobOut) noexcept;
+                 ComPtr<ID3DBlob>& blobOut, const String& shaderFolder);
 
     // Link: build root signature, build input layout from m_dataLayout (or reflection fallback),
     // reflect b1 fields. gsCode is optional.
-    bool Create(const String& vsCode, const String& fsCode, const String& gsCode = "");
+    bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder);
 
     void Destroy(void) noexcept;
 
     inline bool IsValid(void) const noexcept { return m_vsBlob && m_psBlob; }  // GS is optional
+
+    inline bool IsTessellated(void) const noexcept {
+        return m_hsBlob and m_dsBlob;
+    }
 
     // -----------------------------------------------------------------------------------------
     // Runtime

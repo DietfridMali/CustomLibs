@@ -8,6 +8,7 @@
 #include "vkframework.h"
 #include "compute_shader.h"
 #include "shader_compiler.h"
+#include "pipeline_cache.h"
 #include "vkcontext.h"
 #include "cbv_allocator.h"
 #include <spirv_reflect.h>
@@ -93,7 +94,7 @@ static constexpr uint32_t kComputeBindArgCount = uint32_t(sizeof(kComputeBindArg
 }  // namespace
 
 
-bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut) noexcept
+bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut, const String& shaderFolder)
 {
     if ((not hlslCode) or (not *hlslCode))
         return false;
@@ -101,7 +102,8 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
     String error;
     if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, "cs_6_0",
                                                kComputeBindArgs, kComputeBindArgCount,
-                                               spirvOut, error)) {
+                                               spirvOut, error,
+                                               shaderFolder, m_name + String(".cs_6_0.spv"))) {
         fprintf(stderr, "ComputeShader '%s': compile failed (entry=%s):\n%s\n",
                 (const char*)m_name, entryPoint, (const char*)error);
         return false;
@@ -172,7 +174,7 @@ bool ComputeShader::CreatePipeline(void) noexcept
     info.stage = stage;
     info.layout = m_pipelineLayout;
 
-    VkResult res = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &m_pipeline);
+    VkResult res = vkCreateComputePipelines(device, pipelineCache.m_pipelineCache, 1, &info, nullptr, &m_pipeline);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "ComputeShader '%s': vkCreateComputePipelines failed (%d)\n", (const char*)m_name, (int)res);
         return false;
@@ -181,12 +183,12 @@ bool ComputeShader::CreatePipeline(void) noexcept
 }
 
 
-bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings)
+bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder)
 {
     if (IsValid())
         return true;
 
-    if (not Compile((const char*)csCode, "CSMain", m_csSpirv))
+    if (not Compile((const char*)csCode, "CSMain", m_csSpirv, shaderFolder))
         return false;
 
     m_csModule = ShaderCompiler::CreateShaderModule(m_csSpirv);

@@ -45,7 +45,9 @@ namespace ShaderCompiler
                             const wchar_t* const* extraArgs,
                             uint32_t extraArgsCount,
                             std::vector<uint8_t>& outSpirv,
-                            String& outError) noexcept;
+                            String& outError,
+                            const String& shaderFolder,
+                            const String& fileName);
 
     // Creates a VkShaderModule from raw SPIR-V bytes (must be 4-byte-aligned multiple).
     // Returns VK_NULL_HANDLE on failure.

@@ -1,8 +1,11 @@
 #pragma once
 
 #include <array>
+#include <string>
+#include <vector>
 
 #include "dx12framework.h"
+#include "string.hpp"
 #include "basesingleton.hpp"
 #include "avltree.hpp"
 #include "rendertypes.h"
@@ -122,6 +125,13 @@ class PSO
     typedef ID3D12PipelineState* psoPtr_t;
     using PSOCache = AVLTree<PSOKey, PSOComPtr>;
 
+    struct PipelineLibrary {
+        ComPtr<ID3D12PipelineLibrary>   library;
+        std::vector<uint8_t>            data;
+        String                          folder;
+        bool                            dirty{ false };
+    };
+
 private:
     static PSOCache& GetCache(PSOCache::Comparator comparator) noexcept {
         static PSOCache cache;
@@ -129,17 +139,32 @@ private:
         return cache;
     }
 
+    static PipelineLibrary& GetLibrary(void) noexcept {
+        static PipelineLibrary library;
+        return library;
+    }
+
     static int ComparePSOs(void* context, const PSOKey& key1, const PSOKey& key2);
 
     static int CompareShaders(void* context, const PSOKey& key1, const PSOKey& key2);
+
+    static std::wstring PipelineName(const String& shaderName, uint64_t key);
+
+    static HRESULT StorePipeline(const std::wstring& name, ID3D12PipelineState* pso) noexcept;
 
 public:
     static psoPtr_t GetPSO(Shader* shader) noexcept;
 
     static void RemovePSOs(Shader* shader) noexcept;
 
+    static bool LoadPipelineLibrary(const String& shaderFolder);
+
+    static bool SavePipelineLibrary(void);
+
+    static bool CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc, const String& shaderName, ID3DBlob* rootSignatureBlob, PSOComPtr& pso);
+
 private:
-    static PSOComPtr CreatePSO(Shader* shader) noexcept;
+    static PSOComPtr CreatePSO(Shader* shader);
 };
 
 #define psoHandler PSOHandler::Instance()

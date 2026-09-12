@@ -49,7 +49,7 @@ public:
     // Compile + link a compute-only program from GLSL source. bindings is retained for
     // descriptor-introspection (e.g. when the caller wants to validate slot usage); GL itself
     // resolves bindings from the explicit `layout(binding=N)` qualifiers inside the shader source.
-    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings);
+    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
 
     // glUseProgram on m_handle. Returns false if the program is invalid.
     bool Activate(void);

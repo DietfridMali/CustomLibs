@@ -430,6 +430,10 @@ public:
     // Application::Destroy before the general resource handlers (textureHandler etc.) tear
     // down. Default no-op for APIs without an explicit GPU resource queue (OpenGL).
     virtual void Cleanup(void) noexcept {}
+
+    virtual void LoadPipelineCache(const String& /*shaderFolder*/) {}
+
+    virtual void SavePipelineCache(void) {}
 #pragma warning(push)
 
 #include "gfxapitype.h"

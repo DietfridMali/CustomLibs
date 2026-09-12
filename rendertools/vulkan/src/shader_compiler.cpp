@@ -22,6 +22,7 @@
 #endif
 
 #include "shader_compiler.h"
+#include "shadercache.h"
 #include "vkcontext.h"
 
 #ifndef LINUX
@@ -123,7 +124,9 @@ bool CompileHlslToSpirv(const char* hlslSource,
                         const wchar_t* const* extraArgs,
                         uint32_t extraArgsCount,
                         std::vector<uint8_t>& outSpirv,
-                        String& outError) noexcept
+                        String& outError,
+                        const String& shaderFolder,
+                        const String& fileName)
 {
     outSpirv.clear();
     outError = "";
@@ -167,6 +170,25 @@ bool CompileHlslToSpirv(const char* hlslSource,
     for (uint32_t i = 0; i < extraArgsCount; ++i)
         args.push_back(extraArgs[i]);
 
+    const bool useCache = not shaderFolder.IsEmpty();
+    uint64_t key = 0;
+    if (useCache) {
+        key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslSource);
+        key = ShaderCache::Hash(key, args.data(), args.size());
+        ComPtr<IDxcVersionInfo> versionInfo;
+        if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
+            UINT32 major = 0;
+            UINT32 minor = 0;
+            versionInfo->GetVersion(&major, &minor);
+            key = ShaderCache::Hash(key, &major, sizeof(major));
+            key = ShaderCache::Hash(key, &minor, sizeof(minor));
+        }
+        uint32_t tag = 0;
+        if (ShaderCache::Read(shaderFolder, fileName, key, outSpirv, tag) and ((outSpirv.size() % 4) == 0))
+            return true;
+        outSpirv.clear();
+    }
+
     ComPtr<IDxcResult> result;
     HRESULT hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()),
                                         nullptr, IID_PPV_ARGS(result.GetAddressOf()));
@@ -202,6 +224,8 @@ bool CompileHlslToSpirv(const char* hlslSource,
     const uint8_t* src = static_cast<const uint8_t*>(objectBlob->GetBufferPointer());
     size_t bytes = size_t(objectBlob->GetBufferSize());
     outSpirv.assign(src, src + bytes);
+    if (useCache)
+        ShaderCache::Write(shaderFolder, fileName, key, 0, outSpirv.data(), outSpirv.size());
     return true;
 }
 

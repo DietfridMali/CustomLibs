@@ -4,6 +4,7 @@
 #include <functional>
 #include <cstring>
 #include <memory>
+#include <initializer_list>
 
 #include "glew.h"
 #include "array.hpp"
@@ -136,11 +137,13 @@ class Shader
         // does not link.
         GLuint Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle = 0, GLuint tcsHandle = 0, GLuint tesHandle = 0);
 
-        inline bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode = "", const String& tesCode = "") {
-            m_handle = Link(Compile((const char*)vsCode, GL_VERTEX_SHADER), Compile((const char*)fsCode, GL_FRAGMENT_SHADER), Compile((const char*)gsCode, GL_GEOMETRY_SHADER),
-                            Compile((const char*)tcsCode, GL_TESS_CONTROL_SHADER), Compile((const char*)tesCode, GL_TESS_EVALUATION_SHADER));
-            return m_handle != 0;
-        }
+        bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder);
+
+        static uint64_t ProgramKey(std::initializer_list<const char*> sources);
+
+        GLuint LoadProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key);
+
+        void SaveProgramBinary(const String& shaderFolder, const String& fileName, uint64_t key);
 
         inline bool IsTessellated(void) const noexcept {
             return m_isTessellated;

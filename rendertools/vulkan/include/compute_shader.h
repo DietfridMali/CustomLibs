@@ -61,9 +61,9 @@ public:
         Destroy();
     }
 
-    bool Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut) noexcept;
+    bool Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut, const String& shaderFolder);
 
-    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings);
+    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
 
     void Destroy(void) noexcept;
 

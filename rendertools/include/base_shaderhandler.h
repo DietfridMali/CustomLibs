@@ -52,6 +52,8 @@ protected:
 public:
     void CreateShaders(const String& shaderFolder);
 
+    void CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds);
+
     Shader* SelectShader(Texture* texture);
 
     Shader* SetupRenderShader(String shaderId, String depthShaderId = "surfaceShadowShader");

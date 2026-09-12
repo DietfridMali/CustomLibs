@@ -84,11 +84,16 @@ public:
     std::vector<uint8_t> m_vsSpirv;
     std::vector<uint8_t> m_fsSpirv;
     std::vector<uint8_t> m_gsSpirv;
+    std::vector<uint8_t> m_hsSpirv;
+    std::vector<uint8_t> m_dsSpirv;
 
     // Vulkan shader modules (one per stage).
     VkShaderModule  m_vsModule { VK_NULL_HANDLE };
     VkShaderModule  m_fsModule { VK_NULL_HANDLE };
     VkShaderModule  m_gsModule { VK_NULL_HANDLE };
+    VkShaderModule  m_hsModule { VK_NULL_HANDLE };
+    VkShaderModule  m_dsModule { VK_NULL_HANDLE };
+    uint32_t        m_patchControlPoints { 0 };
 
     // Pipeline layout + descriptor set layout (fixed layout per shader).
     VkPipelineLayout       m_pipelineLayout { VK_NULL_HANDLE };
@@ -103,7 +108,9 @@ public:
     static constexpr int kStageVS = 0;
     static constexpr int kStagePS = 1;
     static constexpr int kStageGS = 2;
-    static constexpr int kStageCount = 3;
+    static constexpr int kStageHS = 3;
+    static constexpr int kStageDS = 4;
+    static constexpr int kStageCount = 5;
 
     // Descriptor-set bindings (Vulkan numeric layout — see header comment above).
     static constexpr uint32_t kBindingB0 = 0;
@@ -116,7 +123,9 @@ public:
     static constexpr uint32_t kSamplerSlots = 16;
     static constexpr uint32_t kUavBase = kSamplerBase + kSamplerSlots;  // u0..u3 -> bindings 36..39
     static constexpr uint32_t kUavSlots = 4;
-    static constexpr uint32_t kBindingCount = kUavBase + kUavSlots;
+    static constexpr uint32_t kBindingB1HS = kUavBase + kUavSlots;
+    static constexpr uint32_t kBindingB1DS = kBindingB1HS + 1;
+    static constexpr uint32_t kBindingCount = kBindingB1DS + 1;
 
     struct StageConstants {
         uint32_t size { 0 };
@@ -130,7 +139,7 @@ public:
     // Dynamic UBO offsets, filled by UploadB0 / UploadB1 from cbvAllocator allocations.
     // Order matches descriptor-set bindings 0..3 (b0, b1-VS, b1-PS, b1-GS). Forwarded to
     // vkCmdBindDescriptorSets via pDynamicOffsets in Shader::UpdateVariables.
-    static constexpr uint32_t kDynamicOffsetCount = 4;
+    static constexpr uint32_t kDynamicOffsetCount = 1 + kStageCount;
     uint32_t  m_dynamicOffsets[kDynamicOffsetCount] { };
 
     // Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
@@ -186,17 +195,23 @@ public:
     // Compile a single HLSL stage to SPIR-V via DXC. entryPoint: "VSMain" / "PSMain" / "GSMain";
     // target: "vs_6_0" / "ps_6_0" / "gs_6_0".
     bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
-                 std::vector<uint8_t>& spirvOut) noexcept;
+                 std::vector<uint8_t>& spirvOut, const String& shaderFolder);
 
     // Link: build pipeline layout + descriptor-set layout, build vertex input description from
     // m_dataLayout, reflect b1 fields. gsCode is optional.
-    bool Create(const String& vsCode, const String& fsCode, const String& gsCode = "");
+    bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder);
 
     void Destroy(void) noexcept;
 
     inline bool IsValid(void) const noexcept {
         return (m_vsModule != VK_NULL_HANDLE) and (m_fsModule != VK_NULL_HANDLE);  // GS optional
     }
+
+    inline bool IsTessellated(void) const noexcept {
+        return (m_hsModule != VK_NULL_HANDLE) and (m_dsModule != VK_NULL_HANDLE);
+    }
+
+    uint32_t ReflectPatchControlPoints(const std::vector<uint8_t>& spirv) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Runtime
