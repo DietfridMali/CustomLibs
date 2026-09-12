@@ -75,6 +75,7 @@ class Shader
         String          m_name;
         String          m_vs;
         String          m_fs;
+        bool            m_isTessellated{ false };
         AutoArray<UniformHandle*>   m_uniforms;
         ShaderLocationTable         m_locations;
 
@@ -97,11 +98,13 @@ class Shader
 
         Shader(const Shader& other) {
             m_handle = other.m_handle;
+            m_isTessellated = other.m_isTessellated;
             m_uniforms = other.m_uniforms;
         }
 
         Shader (Shader&& other) noexcept {
             m_handle = std::exchange(other.m_handle, 0);
+            m_isTessellated = other.m_isTessellated;
             m_uniforms = std::move(other.m_uniforms);
         }
 
@@ -111,6 +114,7 @@ class Shader
 
         Shader& operator=(Shader&& other) noexcept {
             m_handle = other.m_handle;
+            m_isTessellated = other.m_isTessellated;
             other.m_handle = 0;
             return *this;
         }
@@ -127,11 +131,19 @@ class Shader
 
         GLuint Compile(const char* code, GLuint type);
 
-        GLuint Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle = 0);
+        // A program with both tessellation stages is tessellated: it must be drawn with patches
+        // (GfxDataLayout::Render () does that from IsTessellated ()); one stage without the other
+        // does not link.
+        GLuint Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle = 0, GLuint tcsHandle = 0, GLuint tesHandle = 0);
 
-        inline bool Create(const String& vsCode, const String& fsCode, const String& gsCode) {
-            m_handle = Link(Compile((const char*)vsCode, GL_VERTEX_SHADER), Compile((const char*)fsCode, GL_FRAGMENT_SHADER), Compile((const char*)gsCode, GL_GEOMETRY_SHADER));
+        inline bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode = "", const String& tesCode = "") {
+            m_handle = Link(Compile((const char*)vsCode, GL_VERTEX_SHADER), Compile((const char*)fsCode, GL_FRAGMENT_SHADER), Compile((const char*)gsCode, GL_GEOMETRY_SHADER),
+                            Compile((const char*)tcsCode, GL_TESS_CONTROL_SHADER), Compile((const char*)tesCode, GL_TESS_EVALUATION_SHADER));
             return m_handle != 0;
+        }
+
+        inline bool IsTessellated(void) const noexcept {
+            return m_isTessellated;
         }
 
 

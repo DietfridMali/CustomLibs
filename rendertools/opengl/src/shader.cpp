@@ -14,7 +14,7 @@
 
 void Shader::PrintLog(String infoLog, String title) {
 #ifdef _DEBUG
-    // Gesamtzahl der Zeilen zählen
+    // Gesamtzahl der Zeilen zï¿½hlen
     const size_t lineCount = std::ranges::count(infoLog, '\n') + 1;
     const int width = static_cast<int>(std::to_string(lineCount).size());
 
@@ -85,9 +85,25 @@ GLuint Shader::Compile(const char* code, GLuint type) {
 }
 
 
-GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle) {
+GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle, GLuint tcsHandle, GLuint tesHandle) {
+    m_isTessellated = false;
     if (not vsHandle or not fsHandle)
         return 0;
+    // the tessellation stages come as a pair; a program with only one of them does not link
+    if ((tcsHandle != 0) != (tesHandle != 0)) {
+#ifdef _DEBUG
+        fprintf(stderr, "\n***** %s shader: tessellation control and evaluation shader must both be present *****\n\n", (char*)m_name);
+#endif
+        glDeleteShader(vsHandle);
+        glDeleteShader(fsHandle);
+        if (gsHandle)
+            glDeleteShader(gsHandle);
+        if (tcsHandle)
+            glDeleteShader(tcsHandle);
+        if (tesHandle)
+            glDeleteShader(tesHandle);
+        return 0;
+    }
     GLuint handle = glCreateProgram();
     if (not handle)
         return 0;
@@ -95,6 +111,10 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle) {
     glAttachShader(handle, fsHandle);
 	if (gsHandle)
         glAttachShader(handle, gsHandle);
+    if (tcsHandle) {
+        glAttachShader(handle, tcsHandle);
+        glAttachShader(handle, tesHandle);
+    }
     glLinkProgram(handle);
     GLint isLinked = 0;
     glGetProgramiv(handle, GL_LINK_STATUS, &isLinked);
@@ -103,18 +123,31 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle) {
         glDetachShader(handle, fsHandle);
         if (gsHandle)
             glDetachShader(handle, gsHandle);
+        if (tcsHandle) {
+            glDetachShader(handle, tcsHandle);
+            glDetachShader(handle, tesHandle);
+        }
+        m_isTessellated = tcsHandle != 0;
         return handle;
     }
 #ifdef _DEBUG
     String shaderLog = GetInfoLog(handle, true);
     fprintf(stderr, "\n***** GLSL linker error in %s shader: *****\n\n", (char*)m_name);
     PrintShaderSource(vsHandle, String("Vertex shader:"));
+    if (tcsHandle) {
+        PrintShaderSource(tcsHandle, String("Tessellation control shader:"));
+        PrintShaderSource(tesHandle, String("Tessellation evaluation shader:"));
+    }
     PrintShaderSource(fsHandle, String("Fragment shader:"));
 #endif
     glDeleteShader(vsHandle);
     glDeleteShader(fsHandle);
     if (gsHandle)
 		glDeleteShader(gsHandle);
+    if (tcsHandle) {
+        glDeleteShader(tcsHandle);
+        glDeleteShader(tesHandle);
+    }
     glDeleteProgram(handle);
     return 0;
 }

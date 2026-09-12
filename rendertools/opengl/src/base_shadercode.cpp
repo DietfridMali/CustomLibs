@@ -99,7 +99,7 @@ void BaseShaderCode::AddShaders(AutoArray<const ShaderSource*>& shaderSource) {
         }
         else {
             Shader* shader = new Shader(source->m_name);
-            if (shader->Create(source->m_vs, source->m_fs, source->m_gs))
+            if (shader->Create(source->m_vs, source->m_fs, source->m_gs, source->m_tcs, source->m_tes))
                 m_shaders[source->m_name] = shader;
             else {
                 m_shaders[source->m_name] = nullptr;

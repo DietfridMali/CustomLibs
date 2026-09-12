@@ -19,6 +19,27 @@ static GLenum ToGLenum(MeshTopology topology) noexcept {
     }
 }
 
+// A tessellated program (Shader::IsTessellated ()) takes its primitives as patches; the patch is the
+// topology's primitive, so the index buffer needs no change for it.
+static GLint PatchVertices(MeshTopology topology) noexcept {
+    switch (topology) {
+        case MeshTopology::Triangles: return 3;
+        case MeshTopology::Lines:     return 2;
+        case MeshTopology::Points:    return 1;
+        case MeshTopology::Quads:     return 4;
+        default:                      return 3;
+    }
+}
+
+static GLenum DrawMode(MeshTopology topology) noexcept {
+    Shader* shader = baseShaderHandler.ActiveShader();
+    if (shader and shader->IsTessellated()) {
+        glPatchParameteri(GL_PATCH_VERTICES, PatchVertices(topology));
+        return GL_PATCHES;
+    }
+    return ToGLenum(topology);
+}
+
 static GLenum ToGLenum(ComponentType ct) noexcept {
     return ct == ComponentType::UInt32 ? GL_UNSIGNED_INT : GL_FLOAT;
 }
@@ -333,13 +354,13 @@ noexcept
         GLsizei count = (indexCount > 0) ? GLsizei(indexCount) : (m_indexBuffer.m_itemCount - GLsizei(firstIndex));
         size_t componentSize = (m_indexBuffer.m_componentType == GL_UNSIGNED_INT) ? sizeof(uint32_t) : sizeof(uint16_t);
         if (count > 0) {
-            glDrawElementsInstanced(ToGLenum(m_shape), count, m_indexBuffer.m_componentType,
+            glDrawElementsInstanced(DrawMode(m_shape), count, m_indexBuffer.m_componentType,
                                     reinterpret_cast<const void*>(size_t(firstIndex) * componentSize), m_instanceCount);
             gfxStates.CountDraw();
         }
     }
     else {
-        glDrawArraysInstanced(ToGLenum(m_shape), 0, m_dataBuffers[0]->m_itemCount, m_instanceCount); // draw non indexed arrays
+        glDrawArraysInstanced(DrawMode(m_shape), 0, m_dataBuffers[0]->m_itemCount, m_instanceCount); // draw non indexed arrays
         gfxStates.CountDraw();
     }
 #endif

@@ -54,6 +54,10 @@ struct ShaderSourceParams {
     String                          vs{ "" };
     String                          fs{ "" };
     String                          gs{ "" };
+    // Tessellation control and evaluation source - both or neither. A program with them is drawn
+    // with patches (OpenGL: GfxDataLayout::Render ()).
+    String                          tcs{ "" };
+    String                          tes{ "" };
     // Compute source — when non-empty, the shader is treated as a compute shader (vs/fs/gs
     // should be empty in that case). Target profile is cs_6_0 (DXC). Compute shaders skip the
     // graphics PSO / vertex-input setup; instead the backend builds a compute pipeline using
@@ -75,6 +79,8 @@ public:
     String                          m_vs{ "" };
     String                          m_fs{ "" };
     String                          m_gs{ "" };
+    String                          m_tcs{ "" };
+    String                          m_tes{ "" };
     String                          m_cs{ "" };
     AutoArray<ComputeBindingDesc>   m_computeBindings{};
     mutable AutoArray<ShaderMacro>  m_compilerArgs{};
@@ -88,6 +94,8 @@ public:
         , m_vs(params.vs)
         , m_fs(params.fs)
         , m_gs(params.gs)
+        , m_tcs(params.tcs)
+        , m_tes(params.tes)
         , m_cs(params.cs)
         , m_computeBindings(params.computeBindings)
         , m_compilerArgs(params.compilerArgs)
@@ -128,6 +136,8 @@ public:
         , m_vs(other.m_vs)
         , m_fs(other.m_fs)
         , m_gs(other.m_gs)
+        , m_tcs(other.m_tcs)
+        , m_tes(other.m_tes)
         , m_cs(other.m_cs)
         , m_computeBindings(other.m_computeBindings)
         , m_compilerArgs(other.m_compilerArgs)
