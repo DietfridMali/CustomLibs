@@ -162,6 +162,9 @@
     <ClInclude Include="..\include\stack.hpp">
       <Filter>Header Files\std</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\anglevector.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp">
