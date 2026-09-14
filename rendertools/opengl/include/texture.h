@@ -250,7 +250,9 @@ public:
 
     virtual bool Deploy(int bufferIndex = 0) override;
 
-    void UploadSRGBMipChain(GLenum internalFormat, TextureBuffer* texBuf);
+    void UploadSRGBMipChain(GLenum internalFormat, GLenum format, const uint8_t* data, int width, int height, int channels);
+
+    bool GenerateSRGBMipChain(void);
 
     bool Redeploy(void);
 

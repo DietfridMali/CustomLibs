@@ -482,7 +482,7 @@ bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, co
     if (not device)
         return false;
 
-    const DXGI_FORMAT dxgi = ToDXGIFormat(fmt);
+    const DXGI_FORMAT dxgi = ToDXGIFormat(GfxEncodedFormat(fmt, tex.m_colorEncoding));
     const uint32_t stride = GfxPixelStride(fmt);
     if ((dxgi == DXGI_FORMAT_UNKNOWN) or (stride == 0))
         return false;

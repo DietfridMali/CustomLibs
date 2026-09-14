@@ -263,7 +263,7 @@ void Texture::ApplySampling(void) {
             glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
         else if (m_mipChainLength > 0)
             glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipChainLength - 1);
-        else
+        else if (not GenerateSRGBMipChain())
             glGenerateMipmap(m_type);
     }
     else {
@@ -334,27 +334,59 @@ void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t out
 }
 
 
-void Texture::UploadSRGBMipChain(GLenum internalFormat, TextureBuffer* texBuf)
+void Texture::UploadSRGBMipChain(GLenum internalFormat, GLenum format, const uint8_t* data, int width, int height, int channels)
 {
-    const int channels = texBuf->m_info.m_componentCount;
-    const int mipCount = CalcMipLevels(texBuf->m_info.m_width, texBuf->m_info.m_height, 1);
+    const int mipCount = CalcMipLevels(width, height, 1);
     AutoArray<uint8_t> levels[2];
-    const uint8_t* src = reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr());
-    int srcW = texBuf->m_info.m_width;
-    int srcH = texBuf->m_info.m_height;
+    const uint8_t* src = data;
+    int srcW = width;
+    int srcH = height;
     for (int mip = 1; mip < mipCount; ++mip) {
         const int dstW = (srcW > 1) ? (srcW >> 1) : 1;
         const int dstH = (srcH > 1) ? (srcH >> 1) : 1;
         AutoArray<uint8_t>& dst = levels[mip & 1];
         dst.Resize(int32_t(dstW * dstH * channels));
         Downsample2D_SRGB8(src, srcW, srcH, channels, dst.Data(), dstW, dstH);
-        glTexImage2D(m_type, mip, internalFormat, dstW, dstH, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE,
+        glTexImage2D(m_type, mip, internalFormat, dstW, dstH, 0, format, GL_UNSIGNED_BYTE,
                      reinterpret_cast<const void*>(dst.Data()));
         src = dst.Data();
         srcW = dstW;
         srcH = dstH;
     }
     m_mipChainLength = mipCount;
+}
+
+
+bool Texture::GenerateSRGBMipChain(void)
+{
+    if (m_type != GL_TEXTURE_2D)
+        return false;
+    GLint internalFormat = 0;
+    glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
+    if ((internalFormat != GL_SRGB8_ALPHA8) and (internalFormat != GL_SRGB8))
+        return false;
+    GLint width = 0;
+    GLint height = 0;
+    glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_WIDTH, &width);
+    glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_HEIGHT, &height);
+    if ((width <= 0) or (height <= 0))
+        return false;
+    const int channels = (internalFormat == GL_SRGB8_ALPHA8) ? 4 : 3;
+    const GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
+    AutoArray<uint8_t> level;
+    level.Resize(int32_t(width * height * channels));
+    GLint packAlignment = 4;
+    glGetIntegerv(GL_PACK_ALIGNMENT, &packAlignment);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glGetTexImage(m_type, 0, format, GL_UNSIGNED_BYTE, reinterpret_cast<void*>(level.Data()));
+    glPixelStorei(GL_PACK_ALIGNMENT, packAlignment);
+    GLint unpackAlignment = 4;
+    glGetIntegerv(GL_UNPACK_ALIGNMENT, &unpackAlignment);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    UploadSRGBMipChain(GLenum(internalFormat), format, level.Data(), width, height, channels);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, unpackAlignment);
+    glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipChainLength - 1);
+    return true;
 }
 
 
@@ -389,7 +421,8 @@ bool Texture::Deploy(int bufferIndex)
                      reinterpret_cast<const void*>(texBuf->m_data.DataPtr()));
         m_mipChainLength = 0;
         if (m_useMipMaps and (internalFormat != texBuf->m_info.m_internalFormat))
-            UploadSRGBMipChain(internalFormat, texBuf);
+            UploadSRGBMipChain(internalFormat, texBuf->m_info.m_format, reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr()),
+                               texBuf->m_info.m_width, texBuf->m_info.m_height, texBuf->m_info.m_componentCount);
     }
     SetParams();
 #ifdef _DEBUG

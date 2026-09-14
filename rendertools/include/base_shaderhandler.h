@@ -23,6 +23,8 @@ public:
     String                  m_activeShaderId;
     Texture                 m_grayNoise;
     BaseShaderCode*         m_shaderCode;
+    bool                    m_encodeSRGBTextures{ false };
+    bool                    m_decodeColors{ false };
 
     BaseShaderHandler()
         : m_kernels(16), m_shaderCode(nullptr), m_activeShader(nullptr), m_activeShaderId("")
@@ -134,7 +136,21 @@ public:
 
     Shader* LoadColorMeshShader(bool premultiply = false);
 
-    Shader* LoadPlainTextureShader(const RGBAColor& color, bool flipVertically = false, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false);
+    inline void SetEncodeSRGBTextures(bool encode) noexcept {
+        m_encodeSRGBTextures = encode;
+    }
+
+    inline bool SetDecodeColors(bool decode) noexcept {
+        bool decodeSave = m_decodeColors;
+        m_decodeColors = decode;
+        return decodeSave;
+    }
+
+    inline bool DecodeColors(void) const noexcept {
+        return m_decodeColors;
+    }
+
+    Shader* LoadPlainTextureShader(const RGBAColor& color, bool flipVertically = false, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false, eColorEncoding textureEncoding = ecLinear);
 
     Shader* LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& params = {}, bool premultiply = false);
 

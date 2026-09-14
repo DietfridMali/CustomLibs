@@ -19,13 +19,17 @@ bool Upload2DTexture(Texture& tex, int width, int height,
     if (not tex.Bind(0, true))
         return false;
 
-    const GLFormat glf = ToGLFormat(fmt);
+    const GfxPixelFormat encodedFmt = GfxEncodedFormat(fmt, tex.m_colorEncoding);
+    const GLFormat glf = ToGLFormat(encodedFmt);
     glPixelStorei(GL_UNPACK_ALIGNMENT, UnpackAlignmentFor(fmt));
     glTexImage2D(GL_TEXTURE_2D, 0,
                  glf.internalFormat,
                  width, height, 0,
                  glf.externalFormat, glf.type,
                  data);
+    tex.m_mipChainLength = 0;
+    if (tex.m_useMipMaps and (encodedFmt != GfxLinearFormat(encodedFmt)))
+        tex.UploadSRGBMipChain(glf.internalFormat, glf.externalFormat, reinterpret_cast<const uint8_t*>(data), width, height, int(GfxPixelStride(fmt)));
     // SetParams is virtual — the concrete NoiseTexture override may additionally call
     // glGenerateMipmap for tags that request mipmap-linear filtering.
     tex.SetParams(false);

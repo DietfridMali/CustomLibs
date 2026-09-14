@@ -9,6 +9,18 @@
 
 // =================================================================================================
 
+static inline float DecodeSRGB(float c) noexcept {
+    c = (c > 0.0f) ? c : 0.0f;
+    return (c <= 0.04045f) ? c / 12.92f : float(std::pow((c + 0.055f) / 1.055f, 2.4f));
+}
+
+
+static inline RGBAColor DecodeSRGB(const RGBAColor& color) noexcept {
+    return RGBAColor(DecodeSRGB(color.R()), DecodeSRGB(color.G()), DecodeSRGB(color.B()), color.A());
+}
+
+// =================================================================================================
+
 FloatArray* BaseShaderHandler::ComputeGaussKernel1D(int radius) {
     FloatArray* kernel = new FloatArray(2 * radius + 1);
 
@@ -260,7 +272,8 @@ Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RG
 Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool premultiply) {
     Shader* shader = SetupRenderShader("plainColor");
     if (shader) {
-        shader->SetVector4f("surfaceColor", premultiply ? color.Premultiplied() : color);
+        const RGBAColor surfaceColor = m_decodeColors ? DecodeSRGB(color) : color;
+        shader->SetVector4f("surfaceColor", premultiply ? surfaceColor.Premultiplied() : surfaceColor);
     }
     return shader;
 }
@@ -277,10 +290,13 @@ Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply) {
 }
 
 
-Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool flipVertically, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply) {
+Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool flipVertically, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply, eColorEncoding textureEncoding) {
     Shader* shader = SetupRenderShader("plainTexture");
     if (shader) {
         shader->SetVector4f("surfaceColor", color);
+        shader->SetInt("bEncodeTexture", (m_encodeSRGBTextures and (textureEncoding == ecSRGB) and (baseRenderer.GetActiveBuffer() == nullptr)) ? 1 : 0);
+        shader->SetInt("bDecodeColors", m_decodeColors ? 1 : 0);
+        shader->SetInt("bDecodeTexture", (m_decodeColors and (textureEncoding != ecSRGB)) ? 1 : 0);
         if (not baseRenderer.IsShadowPass()) {
             shader->SetVector2f("tcOffset", tcOffset);
             shader->SetVector2f("tcScale", tcScale);

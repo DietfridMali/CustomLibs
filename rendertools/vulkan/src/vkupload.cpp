@@ -637,7 +637,7 @@ bool Upload2DTexture(Texture& tex, int width, int height,
     if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
         return false;
 
-    const VkFormat vkFmt = ToVkFormat(fmt);
+    const VkFormat vkFmt = ToVkFormat(GfxEncodedFormat(fmt, tex.m_colorEncoding));
     const uint32_t stride = GfxPixelStride(fmt);
     if ((vkFmt == VK_FORMAT_UNDEFINED) or (stride == 0))
         return false;

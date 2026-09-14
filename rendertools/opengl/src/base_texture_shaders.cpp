@@ -245,17 +245,35 @@ const ShaderSource& PlainTextureShader() {
         uniform vec4 surfaceColor;
         uniform vec2 tcOffset;
         uniform vec2 tcScale;
+        uniform int bEncodeTexture;
+        uniform int bDecodeColors;
+        uniform int bDecodeTexture;
         //uniform float premultiply;
         in vec3 fragPos;
         in vec2 fragCoord;
 
         layout(location = 0) out vec4 fragColor;
-        
+
+        vec3 LinearToSRGB(vec3 c) {
+            c = clamp(c, 0.0, 1.0);
+            return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+        }
+
+        vec3 SRGBToLinear(vec3 c) {
+            c = max(c, vec3(0.0));
+            return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+        }
+
         void main() {
             vec4 texColor = texture(surface, tcOffset + tcScale * fragCoord);
+            if (bEncodeTexture != 0)
+                texColor.rgb = LinearToSRGB(texColor.rgb);
+            else if (bDecodeTexture != 0)
+                texColor.rgb = SRGBToLinear(texColor.rgb);
+            vec3 color = (bDecodeColors != 0) ? SRGBToLinear(surfaceColor.rgb) : surfaceColor.rgb;
             float a = texColor.a * surfaceColor.a;
             if (a == 0) discard;
-            fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
+            fragColor = vec4 (texColor.rgb * color /** mix (1.0, a, premultiply)*/, a);
             }
         )");
     return source;

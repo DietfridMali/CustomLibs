@@ -57,7 +57,14 @@ inline uint32_t BlocksAcross(uint32_t x) noexcept {
     return (x + 3u) / 4u;
 }
 
+bool useFileColorEncoding = false;
+
 } // namespace
+
+
+void SetUseFileColorEncoding(bool use) noexcept {
+    useFileColorEncoding = use;
+}
 
 
 bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
@@ -186,7 +193,7 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
     buf.m_info.m_mipCount       = int32_t(mipCount);
     buf.m_info.m_dataSize       = int32_t(expected);
     buf.m_info.m_colorEncoding  = colorEncoding;
-    buf.m_info.m_hasColorEncoding = hasColorEncoding;
+    buf.m_info.m_hasColorEncoding = hasColorEncoding and useFileColorEncoding;
 
     buf.m_data.Resize(uint32_t(expected));
     if (uint32_t(buf.m_data.Length()) < uint32_t(expected)) {
@@ -240,6 +247,8 @@ std::string PreferDDSName(const char* folder, const std::string& fileName) {
 }
 
 void ReadPNGColorEncoding(const std::string& path, TextureBuffer::BufferInfo& info) noexcept {
+    if (not useFileColorEncoding)
+        return;
     std::ifstream f(path, std::ios::binary);
     if (not f.is_open())
         return;
@@ -249,6 +258,7 @@ void ReadPNGColorEncoding(const std::string& path, TextureBuffer::BufferInfo& in
     if (not f or (std::memcmp(head, signature, sizeof(signature)) != 0))
         return;
     uint8_t chunk[8];
+    bool hasOtherColorSpace = false;
     while (f.read(reinterpret_cast<char*>(chunk), std::streamsize(sizeof(chunk)))) {
         const uint32_t length = (uint32_t(chunk[0]) << 24) | (uint32_t(chunk[1]) << 16) | (uint32_t(chunk[2]) << 8) | uint32_t(chunk[3]);
         if (std::memcmp(chunk + 4, "sRGB", 4) == 0) {
@@ -256,8 +266,15 @@ void ReadPNGColorEncoding(const std::string& path, TextureBuffer::BufferInfo& in
             info.m_hasColorEncoding = true;
             return;
         }
-        if ((std::memcmp(chunk + 4, "IDAT", 4) == 0) or (std::memcmp(chunk + 4, "IEND", 4) == 0))
+        if ((std::memcmp(chunk + 4, "iCCP", 4) == 0) or (std::memcmp(chunk + 4, "gAMA", 4) == 0) or (std::memcmp(chunk + 4, "cHRM", 4) == 0))
+            hasOtherColorSpace = true;
+        if ((std::memcmp(chunk + 4, "IDAT", 4) == 0) or (std::memcmp(chunk + 4, "IEND", 4) == 0)) {
+            if (not hasOtherColorSpace) {
+                info.m_colorEncoding = ecSRGB;
+                info.m_hasColorEncoding = true;
+            }
             return;
+        }
         f.seekg(std::streamoff(length) + 4, std::ios::cur);
     }
 }

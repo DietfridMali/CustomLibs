@@ -24,6 +24,7 @@ const ShaderSource& ToneMapShader() {
             #version 330
             uniform sampler2D surface;
             uniform float exposure;
+            uniform int bEncodeSRGB;
             in vec2 fragCoord;
             out vec4 fragColor;
 
@@ -42,9 +43,17 @@ const ShaderSource& ToneMapShader() {
                 return mix(c, vec3(newPeak), g);
             }
 
+            vec3 LinearToSRGB(vec3 c) {
+                c = clamp(c, 0.0, 1.0);
+                return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+            }
+
             void main() {
                 vec4 sceneColor = texture(surface, fragCoord);
-                fragColor = vec4(ToneMap(sceneColor.rgb), sceneColor.a);
+                vec3 color = ToneMap(sceneColor.rgb);
+                if (bEncodeSRGB != 0)
+                    color = LinearToSRGB(color);
+                fragColor = vec4(color, sceneColor.a);
             }
         )")
     );

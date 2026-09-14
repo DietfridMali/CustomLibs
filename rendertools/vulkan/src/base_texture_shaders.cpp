@@ -295,6 +295,9 @@ const ShaderSource& PlainTextureShader() {
                 float4 surfaceColor;
                 float2 tcOffset;
                 float2 tcScale;
+                int    bEncodeTexture;
+                int    bDecodeColors;
+                int    bDecodeTexture;
             };
             Texture2D    surface : register(t0);
             SamplerState s0      : register(s0);
@@ -303,11 +306,24 @@ const ShaderSource& PlainTextureShader() {
                 float3 fragPos   : TEXCOORD0;
                 float2 fragCoord : TEXCOORD1;
             };
+            float3 LinearToSRGB(float3 c) {
+                c = saturate(c);
+                return lerp(c * 12.92, 1.055 * pow(c, 1.0 / 2.4) - 0.055, step(0.0031308, c));
+            }
+            float3 SRGBToLinear(float3 c) {
+                c = max(c, 0.0);
+                return lerp(c / 12.92, pow((c + 0.055) / 1.055, 2.4), step(0.04045, c));
+            }
             float4 PSMain(PSInput i) : SV_Target {
                 float4 texColor = surface.Sample(s0, tcOffset + tcScale * i.fragCoord);
+                if (bEncodeTexture != 0)
+                    texColor.rgb = LinearToSRGB(texColor.rgb);
+                else if (bDecodeTexture != 0)
+                    texColor.rgb = SRGBToLinear(texColor.rgb);
+                float3 color = (bDecodeColors != 0) ? SRGBToLinear(surfaceColor.rgb) : surfaceColor.rgb;
                 float a = texColor.a * surfaceColor.a;
                 if (a == 0) discard;
-                return float4(texColor.rgb * surfaceColor.rgb, a);
+                return float4(texColor.rgb * color, a);
             }
         )",
         ShaderDataLayout(VtxTcAttrs, 2)

@@ -21,6 +21,7 @@ const ShaderSource& ToneMapShader() {
             cbuffer ShaderConstants : register(b1) {
                 float vsOffset;   // VS 'offset' lives at byte 0; PS ignores it
                 float exposure;
+                int   bEncodeSRGB;
             };
             Texture2D    surface : register(t0);
             SamplerState s0      : register(s0);
@@ -45,9 +46,17 @@ const ShaderSource& ToneMapShader() {
                 return lerp(c, float3(newPeak, newPeak, newPeak), g);
             }
 
+            float3 LinearToSRGB(float3 c) {
+                c = saturate(c);
+                return lerp(c * 12.92, 1.055 * pow(c, 1.0 / 2.4) - 0.055, step(0.0031308, c));
+            }
+
             float4 PSMain(PSInput i) : SV_Target {
                 float4 sceneColor = surface.Sample(s0, i.fragCoord);
-                return float4(ToneMap(sceneColor.rgb), sceneColor.a);
+                float3 color = ToneMap(sceneColor.rgb);
+                if (bEncodeSRGB != 0)
+                    color = LinearToSRGB(color);
+                return float4(color, sceneColor.a);
             }
         )"),
         ShaderDataLayout(VtxTcAttrs, 2)
