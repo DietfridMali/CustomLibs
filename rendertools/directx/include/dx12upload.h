@@ -39,7 +39,7 @@ inline bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource,
 
 // Build a CPU mip chain from the base image (2×2 box filter, edge-clamped) and upload one
 // subresource per level. dstResource must have been created with the matching MipLevels count.
-bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels) noexcept;
+bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels, eColorEncoding colorEncoding) noexcept;
 
 // Upload an uncompressed 2D texture ARRAY: one subresource per (layer, mip). layers[l] points at that
 // layer's tightly packed mip chain, level 0 first - what BaseTextureArray::BuildMipChains () hands out.

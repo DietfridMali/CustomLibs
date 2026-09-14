@@ -284,7 +284,7 @@ static void Downsample2D_8bit(const uint8_t* src, int sw, int sh, int channels, 
 
 bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
                                const uint8_t* pixels, int width, int height, int channels,
-                               uint32_t mipLevels) noexcept
+                               uint32_t mipLevels, eColorEncoding colorEncoding) noexcept
 {
     if ((dstImage == VK_NULL_HANDLE) or (pixels == nullptr))
         return false;
@@ -304,7 +304,10 @@ bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
         int curW = std::max(1, prevW / 2);
         int curH = std::max(1, prevH / 2);
         levels[lv].Resize(uint32_t(size_t(curW) * size_t(curH) * size_t(channels)));
-        Downsample2D_8bit(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
+        if (colorEncoding == ecSRGB)
+            Downsample2D_SRGB8(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
+        else
+            Downsample2D_8bit(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
         prevData = levels[lv].Data();
         prevW = curW;
         prevH = curH;

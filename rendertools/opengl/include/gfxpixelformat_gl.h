@@ -37,8 +37,21 @@ inline constexpr GLFormat ToGLFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::BC7_UNorm_SRGB: return { GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM, GL_RGBA, GL_UNSIGNED_BYTE };
         case GfxPixelFormat::BC4_UNorm:      return { GL_COMPRESSED_RED_RGTC1,         GL_RED,  GL_UNSIGNED_BYTE };
         case GfxPixelFormat::BC5_UNorm:      return { GL_COMPRESSED_RG_RGTC2,          GL_RG,   GL_UNSIGNED_BYTE };
+        case GfxPixelFormat::RGBA8_UNorm_SRGB: return { GL_SRGB8_ALPHA8,                GL_RGBA, GL_UNSIGNED_BYTE };
+        case GfxPixelFormat::BC1_UNorm_SRGB: return { GL_COMPRESSED_SRGB_S3TC_DXT1_EXT, GL_RGB,  GL_UNSIGNED_BYTE };
     }
     return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+}
+
+
+inline constexpr GLenum ToGLEncodedFormat(GLenum internalFormat, eColorEncoding colorEncoding) noexcept {
+    if (colorEncoding != ecSRGB)
+        return internalFormat;
+    if (internalFormat == GL_RGBA8)
+        return GL_SRGB8_ALPHA8;
+    if (internalFormat == GL_RGB8)
+        return GL_SRGB8;
+    return internalFormat;
 }
 
 

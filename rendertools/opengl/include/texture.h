@@ -49,6 +49,7 @@ struct TextureCreationParams {
 	bool        isRequired{ true };
     bool        isDisposable{ false };
     bool        useMipMaps{ false };
+    eColorEncoding colorEncoding{ ecLinear };
     uint16_t    blur{ 4 };
     uint16_t    gradients{ 7 };
     uint16_t    outline{ 4 };
@@ -105,6 +106,8 @@ public:
     int                         m_wrapModeV{ GL_REPEAT };  // T axis; the two differ only where asked for
     int                         m_useMipMaps{ false };
     eTextureCompression         m_compression{ tcNone };  // set from the DDS format at load; tcNone = uncompressed / PNG
+    eColorEncoding              m_colorEncoding{ ecLinear };
+    int                         m_mipChainLength{ 0 };
     bool                        m_hasParams{ false };
     bool                        m_isDeployed{ false };
     bool                        m_isValid{ false };
@@ -247,6 +250,8 @@ public:
 
     virtual bool Deploy(int bufferIndex = 0) override;
 
+    void UploadSRGBMipChain(GLenum internalFormat, TextureBuffer* texBuf);
+
     bool Redeploy(void);
 
     virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
@@ -294,6 +299,16 @@ public:
 
     inline eTextureCompression GetCompression(void) noexcept {
         return m_compression;
+    }
+
+    inline void SetColorEncoding(eColorEncoding colorEncoding) noexcept {
+        m_colorEncoding = colorEncoding;
+    }
+
+    inline eColorEncoding ColorEncoding(int bufferIndex = 0) noexcept {
+        if ((bufferIndex < m_buffers.Length()) and m_buffers[bufferIndex]->m_info.m_hasColorEncoding)
+            return m_buffers[bufferIndex]->m_info.m_colorEncoding;
+        return m_colorEncoding;
     }
 
     // API-neutral type setter. Lets common code (e.g. base_noisetexture) assign m_type via

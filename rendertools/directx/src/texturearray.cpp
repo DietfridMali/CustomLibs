@@ -68,7 +68,7 @@ bool GfxTextureArray::Deploy(int /*bufferIndex*/) {
         return false;
 
     if (IsCompressed()) {
-        const GfxPixelFormat fmt = GfxLinearFormat(m_format);
+        const GfxPixelFormat fmt = GfxEncodedFormat(m_format, m_colorEncoding);
         AutoArray<const uint8_t*> slotPtrs;
         if (not SlotPointers(slotPtrs))
             return false;
@@ -95,10 +95,10 @@ bool GfxTextureArray::Deploy(int /*bufferIndex*/) {
     AutoArray<uint8_t>          chains;
     AutoArray<const uint8_t*>   slotPtrs;
 
-    if (not BuildMipChains(mipCount, chains, slotPtrs))
+    if (not BuildMipChains(mipCount, chains, slotPtrs, m_colorEncoding))
         return false;
 
-    if (not CreateTextureResource(m_slotWidth, m_slotHeight, m_slotCount, mipCount, DXGI_FORMAT_R8G8B8A8_UNORM))
+    if (not CreateTextureResource(m_slotWidth, m_slotHeight, m_slotCount, mipCount, ToDXGIFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, m_colorEncoding))))
         return false;
     if (not UploadTextureArrayData(dx12Context.Device(), m_resource.Get(), slotPtrs.DataPtr(),
                                    m_slotCount, m_slotWidth, m_slotHeight, m_components, mipCount))
@@ -122,7 +122,7 @@ bool GfxTextureArray::UpdateSlot(int slotIndex) {
     if (IsCompressed()) {
         const uint8_t* slot = SlotData(slotIndex);
         return UploadCompressedData(dx12Context.Device(), m_resource.Get(), &slot, 1,
-                                    m_slotWidth, m_slotHeight, GfxLinearFormat(m_format), m_mipCount, slotIndex, true);
+                                    m_slotWidth, m_slotHeight, GfxEncodedFormat(m_format, m_colorEncoding), m_mipCount, slotIndex, true);
     }
 
     const int mipCount = MipCount(m_useMipMaps != 0);
@@ -133,7 +133,7 @@ bool GfxTextureArray::UpdateSlot(int slotIndex) {
     // BuildMipChains () works on the whole stack; only this slot's chain is uploaded from it. Building
     // all of them to send one up is wasteful but keeps one code path, and this runs on a texture change,
     // not per frame.
-    if (not BuildMipChains(mipCount, chains, slotPtrs))
+    if (not BuildMipChains(mipCount, chains, slotPtrs, m_colorEncoding))
         return false;
 
     const uint8_t* slot = slotPtrs[slotIndex];

@@ -6,8 +6,8 @@
 
 // Upload one cubemap face: block-compressed formats push each DDS mip level via
 // glCompressedTexImage2D; uncompressed formats use a single glTexImage2D (level 0).
-static void UploadCubeFace(GLenum target, TextureBuffer* buf) {
-    const GfxPixelFormat gfxFmt = GfxLinearFormat(buf->m_info.m_gfxFormat);   // display-referred: no sRGB decode
+static void UploadCubeFace(GLenum target, TextureBuffer* buf, eColorEncoding colorEncoding) {
+    const GfxPixelFormat gfxFmt = GfxEncodedFormat(buf->m_info.m_gfxFormat, colorEncoding);
     if (GfxIsBlockCompressed(gfxFmt)) {
         const GLenum   internalFormat = ToGLFormat(gfxFmt).internalFormat;
         const uint32_t blockBytes     = GfxBlockBytes(gfxFmt);
@@ -22,7 +22,7 @@ static void UploadCubeFace(GLenum target, TextureBuffer* buf) {
         }
     }
     else {
-        glTexImage2D(target, 0, buf->m_info.m_internalFormat, buf->m_info.m_width, buf->m_info.m_height, 0,
+        glTexImage2D(target, 0, ToGLEncodedFormat(buf->m_info.m_internalFormat, colorEncoding), buf->m_info.m_width, buf->m_info.m_height, 0,
                      buf->m_info.m_format, GL_UNSIGNED_BYTE, buf->m_data.DataPtr());
     }
 }
@@ -49,14 +49,16 @@ bool Cubemap::Deploy(int bufferIndex) {
     // Special case one textures: all cubemap faces bear the same texture
     // Special case two textures: first texture goes to first 5 cubemap faces, 2nd texture goes to 6th cubemap face. Special case for smileys with a uniform skin and a face
     TextureBuffer* texBuf = nullptr;
+    eColorEncoding colorEncoding = m_colorEncoding;
     for (auto it = m_buffers.begin(); it != m_buffers.end(); ++it) {
         texBuf = *it;
-        UploadCubeFace(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), texBuf);
+        colorEncoding = ColorEncoding(i);
+        UploadCubeFace(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), texBuf, colorEncoding);
         ++i;
     }
     if (texBuf) {
         for (; i < 6; i++)
-            UploadCubeFace(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), texBuf);
+            UploadCubeFace(GLenum(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), texBuf, colorEncoding);
     }
     Release ();
     m_isDeployed = true;

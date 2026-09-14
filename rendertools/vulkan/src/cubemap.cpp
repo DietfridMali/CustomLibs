@@ -40,7 +40,8 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
     for (int i = 0; i < 6; ++i)
         faces[i] = m_buffers[i < faceCount ? i : faceCount - 1]->DataBuffer();
 
-    const GfxPixelFormat fmt = GfxLinearFormat(first->m_info.m_gfxFormat);   // display-referred: no sRGB decode
+    const eColorEncoding colorEncoding = ColorEncoding(0);
+    const GfxPixelFormat fmt = GfxEncodedFormat(first->m_info.m_gfxFormat, colorEncoding);
     if (GfxIsBlockCompressed(fmt)) {
         const int mipCount = first->m_info.m_mipCount;
         if (not CreateTextureResource(w, h, 6, mipCount, ToVkFormat(fmt)))
@@ -49,7 +50,7 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
             return false;
     }
     else {
-        if (not CreateTextureResource(w, h, 6))
+        if (not CreateTextureResource(w, h, 6, 1, ToVkFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
             return false;
         if (not UploadTextureData(m_image, m_layoutTracker, faces, 6, w, h, 4))
             return false;

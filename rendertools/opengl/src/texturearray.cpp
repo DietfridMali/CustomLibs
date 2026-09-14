@@ -96,6 +96,20 @@ static void UploadCompressedSlot(GLenum internalFormat, int slotIndex, int slotW
 }
 
 // -------------------------------------------------------------------------------------------------
+
+static void UploadSlotChain(GLenum format, int slotIndex, int slotWidth, int slotHeight, int components, int firstMip, int mipCount, const uint8_t* chain) {
+	int w = slotWidth;
+	int h = slotHeight;
+	for (int mip = 0; mip < mipCount; mip++) {
+		if (mip >= firstMip)
+			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, mip, 0, 0, slotIndex, w, h, 1, format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(chain));
+		chain += size_t(w) * size_t(h) * size_t(components);
+		w = (w > 1) ? (w >> 1) : 1;
+		h = (h > 1) ? (h >> 1) : 1;
+	}
+}
+
+// -------------------------------------------------------------------------------------------------
 // The whole stack in one call: BaseTextureArray stages slot after slot, rows within a slot, which
 // is precisely what glTexImage3D reads for a GL_TEXTURE_2D_ARRAY.
 //
@@ -111,7 +125,7 @@ bool GfxTextureArray::Deploy(int bufferIndex) {
 		return false;
 
 	if (IsCompressed()) {
-		const GLenum   internalFormat = ToGLFormat(GfxLinearFormat(m_format)).internalFormat;
+		const GLenum   internalFormat = ToGLFormat(GfxEncodedFormat(m_format, m_colorEncoding)).internalFormat;
 		const uint32_t blockBytes = GfxBlockBytes(m_format);
 		glTexStorage3D(GL_TEXTURE_2D_ARRAY, m_mipCount, internalFormat, m_slotWidth, m_slotHeight, m_slotCount);
 		for (int slot = 0; slot < m_slotCount; slot++)
@@ -126,7 +140,8 @@ bool GfxTextureArray::Deploy(int bufferIndex) {
 	}
 
 	const GLenum format = (m_components == 1) ? GL_RED : (m_components == 3) ? GL_RGB : GL_RGBA;
-	const GLenum internalFormat = (m_components == 1) ? GL_R8 : (m_components == 3) ? GL_RGB8 : GL_RGBA8;
+	const GLenum linearFormat = (m_components == 1) ? GL_R8 : (m_components == 3) ? GL_RGB8 : GL_RGBA8;
+	const GLenum internalFormat = ToGLEncodedFormat(linearFormat, m_colorEncoding);
 
 	// Rows are tightly packed whatever the width is - the default of 4 would skew every slot whose
 	// row length is not a multiple of it.
@@ -134,8 +149,24 @@ bool GfxTextureArray::Deploy(int bufferIndex) {
 	glGetIntegerv(GL_UNPACK_ALIGNMENT, &packAlignment);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GLint(internalFormat), m_slotWidth, m_slotHeight, m_slotCount,
-					 0, format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(SlotData()));
+	m_mipChainLength = 0;
+	if (m_useMipMaps and (internalFormat != linearFormat)) {
+		const int mipCount = MipCount(true);
+		AutoArray<uint8_t>			chains;
+		AutoArray<const uint8_t*>	slotPtrs;
+		if (not BuildMipChains(mipCount, chains, slotPtrs, m_colorEncoding)) {
+			glPixelStorei(GL_UNPACK_ALIGNMENT, packAlignment);
+			Release();
+			return false;
+		}
+		glTexStorage3D(GL_TEXTURE_2D_ARRAY, mipCount, internalFormat, m_slotWidth, m_slotHeight, m_slotCount);
+		for (int slot = 0; slot < m_slotCount; slot++)
+			UploadSlotChain(format, slot, m_slotWidth, m_slotHeight, m_components, 0, mipCount, slotPtrs[slot]);
+		m_mipChainLength = mipCount;
+	}
+	else
+		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GLint(internalFormat), m_slotWidth, m_slotHeight, m_slotCount,
+						 0, format, GL_UNSIGNED_BYTE, reinterpret_cast<const void*>(SlotData()));
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, packAlignment);
 
@@ -157,7 +188,7 @@ bool GfxTextureArray::UpdateSlot(int slotIndex) {
 		return false;
 
 	if (IsCompressed()) {
-		UploadCompressedSlot(ToGLFormat(GfxLinearFormat(m_format)).internalFormat, slotIndex, m_slotWidth, m_slotHeight,
+		UploadCompressedSlot(ToGLFormat(GfxEncodedFormat(m_format, m_colorEncoding)).internalFormat, slotIndex, m_slotWidth, m_slotHeight,
 							 m_mipCount, SlotData(slotIndex), GfxBlockBytes(m_format));
 #ifdef _DEBUG
 		gfxStates.CheckError();
@@ -176,11 +207,18 @@ bool GfxTextureArray::UpdateSlot(int slotIndex) {
 						 format, GL_UNSIGNED_BYTE,
 						 reinterpret_cast<const void*>(SlotData() + size_t(slotIndex) * size_t(SlotSize())));
 
+	if (m_mipChainLength > 0) {
+		AutoArray<uint8_t>			chains;
+		AutoArray<const uint8_t*>	slotPtrs;
+		if (BuildMipChains(m_mipChainLength, chains, slotPtrs, m_colorEncoding))
+			UploadSlotChain(format, slotIndex, m_slotWidth, m_slotHeight, m_components, 1, m_mipChainLength, slotPtrs[slotIndex]);
+	}
+
 	glPixelStorei(GL_UNPACK_ALIGNMENT, packAlignment);
 
 	// The mip chain of the changed slot is stale now. glGenerateMipmap rebuilds the whole array's,
 	// which is more than is needed but is the only thing GL offers short of building the levels here.
-	if (m_useMipMaps)
+	if (m_useMipMaps and (m_mipChainLength == 0))
 		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 #ifdef _DEBUG
 	gfxStates.CheckError();

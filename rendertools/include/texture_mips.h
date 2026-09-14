@@ -31,4 +31,6 @@ void BuildMipChain3D(const void* src, int width, int height, int depth,
                      GfxPixelFormat fmt,
                      AutoArray<MipLevel3D>& outChain) noexcept;
 
+void Downsample2D_SRGB8(const uint8_t* src, int sw, int sh, int channels, uint8_t* dst, int dw, int dh) noexcept;
+
 // =================================================================================================

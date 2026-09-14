@@ -105,6 +105,8 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
 
     GfxPixelFormat format = GfxPixelFormat::RGBA8_UNorm;
     size_t         extraHeader = 0;   // DX10 header size, when present
+    eColorEncoding colorEncoding = ecLinear;
+    bool           hasColorEncoding = false;
 
     if (fourCC == kFourCC_DXT1) {
         format = GfxPixelFormat::BC1_UNorm;
@@ -124,12 +126,19 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
             return false;
         }
         const uint32_t dxgiFormat = ReadU32(dx10);
-        if ((dxgiFormat == kDXGI_BC1_UNORM) or (dxgiFormat == kDXGI_BC1_UNORM_SRGB))
+        hasColorEncoding = true;
+        if (dxgiFormat == kDXGI_BC1_UNORM)
             format = GfxPixelFormat::BC1_UNorm;
+        else if (dxgiFormat == kDXGI_BC1_UNORM_SRGB) {
+            format = GfxPixelFormat::BC1_UNorm_SRGB;
+            colorEncoding = ecSRGB;
+        }
         else if (dxgiFormat == kDXGI_BC7_UNORM)
             format = GfxPixelFormat::BC7_UNorm;
-        else if (dxgiFormat == kDXGI_BC7_UNORM_SRGB)
-            format = GfxPixelFormat::BC7_UNorm_SRGB;   // reported as is; the upload decides (GfxLinearFormat ())
+        else if (dxgiFormat == kDXGI_BC7_UNORM_SRGB) {
+            format = GfxPixelFormat::BC7_UNorm_SRGB;
+            colorEncoding = ecSRGB;
+        }
         else if (dxgiFormat == kDXGI_BC4_UNORM)
             format = GfxPixelFormat::BC4_UNorm;
         else if (dxgiFormat == kDXGI_BC5_UNORM)
@@ -176,6 +185,8 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
     buf.m_info.m_gfxFormat      = format;
     buf.m_info.m_mipCount       = int32_t(mipCount);
     buf.m_info.m_dataSize       = int32_t(expected);
+    buf.m_info.m_colorEncoding  = colorEncoding;
+    buf.m_info.m_hasColorEncoding = hasColorEncoding;
 
     buf.m_data.Resize(uint32_t(expected));
     if (uint32_t(buf.m_data.Length()) < uint32_t(expected)) {
@@ -228,6 +239,29 @@ std::string PreferDDSName(const char* folder, const std::string& fileName) {
     return fileName;
 }
 
+void ReadPNGColorEncoding(const std::string& path, TextureBuffer::BufferInfo& info) noexcept {
+    std::ifstream f(path, std::ios::binary);
+    if (not f.is_open())
+        return;
+    static constexpr uint8_t signature[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+    uint8_t head[8];
+    f.read(reinterpret_cast<char*>(head), std::streamsize(sizeof(head)));
+    if (not f or (std::memcmp(head, signature, sizeof(signature)) != 0))
+        return;
+    uint8_t chunk[8];
+    while (f.read(reinterpret_cast<char*>(chunk), std::streamsize(sizeof(chunk)))) {
+        const uint32_t length = (uint32_t(chunk[0]) << 24) | (uint32_t(chunk[1]) << 16) | (uint32_t(chunk[2]) << 8) | uint32_t(chunk[3]);
+        if (std::memcmp(chunk + 4, "sRGB", 4) == 0) {
+            info.m_colorEncoding = ecSRGB;
+            info.m_hasColorEncoding = true;
+            return;
+        }
+        if ((std::memcmp(chunk + 4, "IDAT", 4) == 0) or (std::memcmp(chunk + 4, "IEND", 4) == 0))
+            return;
+        f.seekg(std::streamoff(length) + 4, std::ios::cur);
+    }
+}
+
 } // namespace
 
 
@@ -261,6 +295,7 @@ TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
         return nullptr;
     }
     buf->Create(image, premultiply, flipVertically);
+    ReadPNGColorEncoding(full, buf->m_info);
     return buf;
 }
 

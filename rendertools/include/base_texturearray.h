@@ -133,11 +133,7 @@ public:
 	// Builds a mip chain PER SLOT, 2x2 box filtered and edge clamped, and hands out one pointer per
 	// slot into `chains` - each pointing at that slot's levels packed tightly, level 0 first. That is
 	// the layout the DX12 and Vulkan array uploads read, one subresource per (slot, level).
-	//
-	// OpenGL does not need this: glGenerateMipmap does the same thing driver side. The split follows
-	// the one texture_mips.h already makes for 3D textures - CPU chain for DX/VK, driver for OGL - and
-	// the result is functionally the same pyramid either way.
-	bool BuildMipChains(int mipCount, AutoArray<uint8_t>& chains, AutoArray<const uint8_t*>& slotPtrs);
+	bool BuildMipChains(int mipCount, AutoArray<uint8_t>& chains, AutoArray<const uint8_t*>& slotPtrs, eColorEncoding colorEncoding);
 };
 
 // =================================================================================================

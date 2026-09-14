@@ -4,6 +4,57 @@
 
 #include <algorithm>
 #include <cstring>
+#include <cmath>
+
+// =================================================================================================
+
+struct SRGBDecodeTable {
+    double values[256];
+
+    SRGBDecodeTable(void) noexcept {
+        for (int i = 0; i < 256; ++i) {
+            const double c = double(i) / 255.0;
+            values[i] = (c <= 0.04045) ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
+        }
+    }
+};
+
+
+static const double* SRGBDecodeValues(void) noexcept {
+    static const SRGBDecodeTable table;
+    return table.values;
+}
+
+
+static inline uint8_t EncodeSRGB8(double l) noexcept {
+    l = std::clamp(l, 0.0, 1.0);
+    const double c = (l <= 0.0031308) ? l * 12.92 : 1.055 * std::pow(l, 1.0 / 2.4) - 0.055;
+    return uint8_t(c * 255.0 + 0.5);
+}
+
+
+void Downsample2D_SRGB8(const uint8_t* src, int sw, int sh, int channels, uint8_t* dst, int dw, int dh) noexcept
+{
+    const double* decode = SRGBDecodeValues();
+    const int colorChannels = (channels >= 3) ? 3 : 0;
+    for (int yd = 0; yd < dh; ++yd) {
+        int ys0 = yd * 2;
+        int ys1 = std::min(ys0 + 1, sh - 1);
+        for (int xd = 0; xd < dw; ++xd) {
+            int xs0 = xd * 2;
+            int xs1 = std::min(xs0 + 1, sw - 1);
+            const uint8_t* p00 = src + (size_t(ys0) * sw + xs0) * channels;
+            const uint8_t* p01 = src + (size_t(ys0) * sw + xs1) * channels;
+            const uint8_t* p10 = src + (size_t(ys1) * sw + xs0) * channels;
+            const uint8_t* p11 = src + (size_t(ys1) * sw + xs1) * channels;
+            uint8_t* o = dst + (size_t(yd) * dw + xd) * channels;
+            for (int c = 0; c < colorChannels; ++c)
+                o[c] = EncodeSRGB8((decode[p00[c]] + decode[p01[c]] + decode[p10[c]] + decode[p11[c]]) * 0.25);
+            for (int c = colorChannels; c < channels; ++c)
+                o[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+        }
+    }
+}
 
 // =================================================================================================
 

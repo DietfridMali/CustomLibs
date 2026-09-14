@@ -13,6 +13,7 @@
 #include "texture.h"
 #include "ddsloader.h"
 #include "gfxpixelformat_gl.h"
+#include "texture_mips.h"
 #include "gfxstates.h"
 #include "gfxrenderer.h"
 
@@ -106,6 +107,7 @@ void Texture::Destroy(void)
         // chain. A mip filter without mip levels is an INCOMPLETE texture, and sampling one yields
         // (0, 0, 0, 1) - black - whatever it actually holds.
         m_hasParams = false;
+        m_mipChainLength = 0;
     }
 }
 
@@ -120,9 +122,11 @@ Texture& Texture::Copy(const Texture& other) {
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
+        m_colorEncoding = other.m_colorEncoding;
+        m_mipChainLength = other.m_mipChainLength;
         m_isDeployed = other.m_isDeployed;
         m_hasParams = other.m_hasParams;
-        m_isValid = other.m_isValid;     
+        m_isValid = other.m_isValid;
     }
     return *this;
 }
@@ -143,9 +147,11 @@ noexcept
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
-        m_isDeployed = other.m_isDeployed; 
+        m_colorEncoding = other.m_colorEncoding;
+        m_mipChainLength = other.m_mipChainLength;
+        m_isDeployed = other.m_isDeployed;
         m_hasParams = other.m_hasParams;
-        m_isValid = other.m_isValid;     
+        m_isValid = other.m_isValid;
         textureLUT.Remove(m_name);
         textureLUT.Insert(m_name, this, true); // overwrite the data entry for key m_id with this texture
     }
@@ -255,6 +261,8 @@ void Texture::ApplySampling(void) {
     if (useMips) {
         if (compressed)
             glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
+        else if (m_mipChainLength > 0)
+            glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipChainLength - 1);
         else
             glGenerateMipmap(m_type);
     }
@@ -326,6 +334,30 @@ void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t out
 }
 
 
+void Texture::UploadSRGBMipChain(GLenum internalFormat, TextureBuffer* texBuf)
+{
+    const int channels = texBuf->m_info.m_componentCount;
+    const int mipCount = CalcMipLevels(texBuf->m_info.m_width, texBuf->m_info.m_height, 1);
+    AutoArray<uint8_t> levels[2];
+    const uint8_t* src = reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr());
+    int srcW = texBuf->m_info.m_width;
+    int srcH = texBuf->m_info.m_height;
+    for (int mip = 1; mip < mipCount; ++mip) {
+        const int dstW = (srcW > 1) ? (srcW >> 1) : 1;
+        const int dstH = (srcH > 1) ? (srcH >> 1) : 1;
+        AutoArray<uint8_t>& dst = levels[mip & 1];
+        dst.Resize(int32_t(dstW * dstH * channels));
+        Downsample2D_SRGB8(src, srcW, srcH, channels, dst.Data(), dstW, dstH);
+        glTexImage2D(m_type, mip, internalFormat, dstW, dstH, 0, texBuf->m_info.m_format, GL_UNSIGNED_BYTE,
+                     reinterpret_cast<const void*>(dst.Data()));
+        src = dst.Data();
+        srcW = dstW;
+        srcH = dstH;
+    }
+    m_mipChainLength = mipCount;
+}
+
+
 bool Texture::Deploy(int bufferIndex)
 {
     if (IsDeployed())
@@ -334,11 +366,10 @@ bool Texture::Deploy(int bufferIndex)
         return false;
     TextureBuffer* texBuf = m_buffers[bufferIndex];
     const GfxPixelFormat gfxFmt = texBuf->m_info.m_gfxFormat;
+    const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
     if (GfxIsBlockCompressed(gfxFmt)) {
         // Block-compressed: upload each mip level straight from the DDS payload (no glGenerateMipmap).
-        // Display-referred pipeline: an sRGB encoded payload is uploaded as its linear twin, so the
-        // sampler does not decode it (GfxLinearFormat ()).
-        const GLenum   internalFormat = ToGLFormat(GfxLinearFormat(gfxFmt)).internalFormat;
+        const GLenum   internalFormat = ToGLFormat(GfxEncodedFormat(gfxFmt, colorEncoding)).internalFormat;
         const uint32_t blockBytes     = GfxBlockBytes(gfxFmt);
         const uint8_t* level          = reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr());
         int w = texBuf->m_info.m_width, h = texBuf->m_info.m_height;
@@ -351,10 +382,14 @@ bool Texture::Deploy(int bufferIndex)
         }
     }
     else {
-        glTexImage2D(m_type, 0, texBuf->m_info.m_internalFormat, texBuf->m_info.m_width,
+        const GLenum internalFormat = ToGLEncodedFormat(texBuf->m_info.m_internalFormat, colorEncoding);
+        glTexImage2D(m_type, 0, internalFormat, texBuf->m_info.m_width,
                      texBuf->m_info.m_height, 0,
                      texBuf->m_info.m_format, GL_UNSIGNED_BYTE,
                      reinterpret_cast<const void*>(texBuf->m_data.DataPtr()));
+        m_mipChainLength = 0;
+        if (m_useMipMaps and (internalFormat != texBuf->m_info.m_internalFormat))
+            UploadSRGBMipChain(internalFormat, texBuf);
     }
     SetParams();
 #ifdef _DEBUG
@@ -471,6 +506,7 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         Cartoonize(params.blur, params.gradients, params.outline);
     m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
+    m_colorEncoding = params.colorEncoding;
     return Deploy();
 }
 
@@ -481,6 +517,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
     m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
+    m_colorEncoding = params.colorEncoding;
     return Deploy();
 }
 

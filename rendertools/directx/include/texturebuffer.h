@@ -56,6 +56,8 @@ public:
         // converts), so this is the only trace of it - a consumer that treats a 24 bit image
         // differently from a 32 bit one (d2x-xl's super transparency key colour) reads it here.
         bool            m_hasAlpha{ true };
+        eColorEncoding  m_colorEncoding{ ecLinear };
+        bool            m_hasColorEncoding{ false };
 
         BufferInfo(int32_t width = 0, int32_t height = 0, int32_t componentCount = 0, uint32_t internalFormat = 0, uint32_t format = 0)
             : m_width(width)
@@ -79,6 +81,8 @@ public:
             m_gfxFormat = GfxPixelFormat::RGBA8_UNorm;
             m_mipCount = 1;
             m_hasAlpha = true;
+            m_colorEncoding = ecLinear;
+            m_hasColorEncoding = false;
         }
     };
 

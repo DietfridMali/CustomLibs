@@ -24,6 +24,8 @@ inline constexpr VkFormat ToVkFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::BC7_UNorm_SRGB: return VK_FORMAT_BC7_SRGB_BLOCK;
         case GfxPixelFormat::BC4_UNorm:      return VK_FORMAT_BC4_UNORM_BLOCK;
         case GfxPixelFormat::BC5_UNorm:      return VK_FORMAT_BC5_UNORM_BLOCK;
+        case GfxPixelFormat::RGBA8_UNorm_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
+        case GfxPixelFormat::BC1_UNorm_SRGB: return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
     }
     return VK_FORMAT_UNDEFINED;
 }

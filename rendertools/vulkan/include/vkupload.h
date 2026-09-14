@@ -78,7 +78,7 @@ inline bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
 // subresource per level. dstImage must have been created with the matching mipLevels count.
 bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
                                const uint8_t* pixels, int width, int height, int channels,
-                               uint32_t mipLevels) noexcept;
+                               uint32_t mipLevels, eColorEncoding colorEncoding) noexcept;
 
 // Upload a block-compressed (BC1/BC4/BC5/BC7) texture: one staging buffer + copy per (face, mip).
 // faces[f] points at face f's tightly-packed mip chain (level 0 first; ceil(w/4)*ceil(h/4)*GfxBlockBytes

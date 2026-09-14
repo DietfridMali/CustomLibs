@@ -156,7 +156,7 @@ static void Downsample2D_8bit(const uint8_t* src, int sw, int sh, int channels, 
 }
 
 
-bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels) noexcept
+bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels, eColorEncoding colorEncoding) noexcept
 {
     CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureDataWithMips"));
     if (not cl)
@@ -177,7 +177,10 @@ bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource
         int curW = std::max(1, prevW / 2);
         int curH = std::max(1, prevH / 2);
         levels[lv].Resize(uint32_t(size_t(curW) * size_t(curH) * size_t(channels)));
-        Downsample2D_8bit(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
+        if (colorEncoding == ecSRGB)
+            Downsample2D_SRGB8(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
+        else
+            Downsample2D_8bit(prevData, prevW, prevH, channels, levels[lv].Data(), curW, curH);
         ok = UploadSubresource(device, cl->GfxList(), dstResource, lv, levels[lv].Data(), curW, curH, channels, uploads[lv], /*addBarrier=*/false);
         prevData = levels[lv].Data();
         prevW = curW;

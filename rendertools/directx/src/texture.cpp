@@ -74,6 +74,7 @@ Texture& Texture::Copy(const Texture& other)
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
+        m_colorEncoding = other.m_colorEncoding;
         m_isDeployed = other.m_isDeployed;
         m_hasParams = other.m_hasParams;
         m_isValid = other.m_isValid;
@@ -94,6 +95,7 @@ Texture& Texture::Move(Texture& other) noexcept
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
+        m_colorEncoding = other.m_colorEncoding;
         m_isDeployed = other.m_isDeployed;
         m_hasParams = other.m_hasParams;
         m_isValid = std::exchange(other.m_isValid, false);
@@ -320,7 +322,8 @@ bool Texture::Deploy(int bufferIndex)
     if (w <= 0 or h <= 0)
         return false;
 
-    const GfxPixelFormat gfxFmt = GfxLinearFormat(tb->m_info.m_gfxFormat);   // display-referred: no sRGB decode
+    const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
+    const GfxPixelFormat gfxFmt = GfxEncodedFormat(tb->m_info.m_gfxFormat, colorEncoding);
     if (GfxIsBlockCompressed(gfxFmt)) {
         const int mipCount = tb->m_info.m_mipCount;
         if (not CreateTextureResource(w, h, 1, mipCount, ToDXGIFormat(gfxFmt)))
@@ -331,12 +334,12 @@ bool Texture::Deploy(int bufferIndex)
     }
     else {
         const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
-        if (not CreateTextureResource(w, h, 1, int(mipLevels)))
+        if (not CreateTextureResource(w, h, 1, int(mipLevels), ToDXGIFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
             return false;
         const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
         const int channels = tb->m_info.m_componentCount;
         if (mipLevels > 1) {
-            if (not UploadTextureDataWithMips(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels, mipLevels))
+            if (not UploadTextureDataWithMips(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels, mipLevels, colorEncoding))
                 return false;
         }
         else if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels))
@@ -399,6 +402,7 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
         Cartoonize(params.blur, params.gradients, params.outline);
     m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
+    m_colorEncoding = params.colorEncoding;
     return Deploy();
 }
 
@@ -412,6 +416,7 @@ bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParam
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
     m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;
+    m_colorEncoding = params.colorEncoding;
     return Deploy();
 }
 

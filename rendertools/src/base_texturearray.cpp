@@ -1,4 +1,5 @@
 #include "base_texturearray.h"
+#include "texture_mips.h"
 
 // =================================================================================================
 
@@ -216,7 +217,7 @@ int BaseTextureArray::MipCount(bool useMipMaps) const noexcept {
 // the last row or column, so a 1 pixel wide level averages that one pixel with itself instead of
 // reading past the end.
 
-bool BaseTextureArray::BuildMipChains(int mipCount, AutoArray<uint8_t>& chains, AutoArray<const uint8_t*>& slotPtrs) {
+bool BaseTextureArray::BuildMipChains(int mipCount, AutoArray<uint8_t>& chains, AutoArray<const uint8_t*>& slotPtrs, eColorEncoding colorEncoding) {
 	if (not HasSlots() or IsCompressed() or (mipCount < 1))
 		return false;
 
@@ -255,19 +256,23 @@ bool BaseTextureArray::BuildMipChains(int mipCount, AutoArray<uint8_t>& chains, 
 			int dstW = (srcW > 1) ? (srcW >> 1) : 1;
 			int dstH = (srcH > 1) ? (srcH >> 1) : 1;
 
-			for (int y = 0; y < dstH; y++) {
-				int y0 = y * 2;
-				int y1 = (y0 + 1 < srcH) ? y0 + 1 : y0;
-				for (int x = 0; x < dstW; x++) {
-					int x0 = x * 2;
-					int x1 = (x0 + 1 < srcW) ? x0 + 1 : x0;
-					const uint8_t* p00 = src + (size_t(y0) * size_t(srcW) + size_t(x0)) * size_t(m_components);
-					const uint8_t* p01 = src + (size_t(y0) * size_t(srcW) + size_t(x1)) * size_t(m_components);
-					const uint8_t* p10 = src + (size_t(y1) * size_t(srcW) + size_t(x0)) * size_t(m_components);
-					const uint8_t* p11 = src + (size_t(y1) * size_t(srcW) + size_t(x1)) * size_t(m_components);
-					uint8_t* q = dst + (size_t(y) * size_t(dstW) + size_t(x)) * size_t(m_components);
-					for (int c = 0; c < m_components; c++)
-						q[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+			if (colorEncoding == ecSRGB)
+				Downsample2D_SRGB8(src, srcW, srcH, m_components, dst, dstW, dstH);
+			else {
+				for (int y = 0; y < dstH; y++) {
+					int y0 = y * 2;
+					int y1 = (y0 + 1 < srcH) ? y0 + 1 : y0;
+					for (int x = 0; x < dstW; x++) {
+						int x0 = x * 2;
+						int x1 = (x0 + 1 < srcW) ? x0 + 1 : x0;
+						const uint8_t* p00 = src + (size_t(y0) * size_t(srcW) + size_t(x0)) * size_t(m_components);
+						const uint8_t* p01 = src + (size_t(y0) * size_t(srcW) + size_t(x1)) * size_t(m_components);
+						const uint8_t* p10 = src + (size_t(y1) * size_t(srcW) + size_t(x0)) * size_t(m_components);
+						const uint8_t* p11 = src + (size_t(y1) * size_t(srcW) + size_t(x1)) * size_t(m_components);
+						uint8_t* q = dst + (size_t(y) * size_t(dstW) + size_t(x)) * size_t(m_components);
+						for (int c = 0; c < m_components; c++)
+							q[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+					}
 				}
 			}
 			src = dst;

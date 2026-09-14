@@ -68,15 +68,39 @@ enum class GfxPixelFormat : uint8_t {
     BC4_UNorm,      // 1 channel (grayscale: AO / spec / roughness), 8 bytes / 4x4 block  (RGTC1)
     BC5_UNorm,      // 2 channels (tangent normal XY, Z reconstructed), 16 bytes / 4x4 block  (RGTC2)
     // BC7 whose payload is sRGB encoded (DXGI 99). The same blocks as BC7_UNorm; what differs is
-    // whether the sampler decodes them to linear. A pipeline that works display-referred uploads it
-    // as BC7_UNorm (GfxLinearFormat ()) - the decision is the uploader's, the loader only reports.
-    BC7_UNorm_SRGB
+    // whether the sampler decodes them to linear.
+    BC7_UNorm_SRGB,
+    RGBA8_UNorm_SRGB,
+    BC1_UNorm_SRGB
+};
+
+enum eColorEncoding {
+    ecLinear = 0,
+    ecSRGB
 };
 
 // The linear twin of an sRGB format, itself for every other - what an upload uses when the sampler
 // is not to decode.
 inline constexpr GfxPixelFormat GfxLinearFormat(GfxPixelFormat f) noexcept {
-    return (f == GfxPixelFormat::BC7_UNorm_SRGB) ? GfxPixelFormat::BC7_UNorm : f;
+    switch (f) {
+        case GfxPixelFormat::BC7_UNorm_SRGB:   return GfxPixelFormat::BC7_UNorm;
+        case GfxPixelFormat::RGBA8_UNorm_SRGB: return GfxPixelFormat::RGBA8_UNorm;
+        case GfxPixelFormat::BC1_UNorm_SRGB:   return GfxPixelFormat::BC1_UNorm;
+        default:                               return f;
+    }
+}
+
+inline constexpr GfxPixelFormat GfxSRGBFormat(GfxPixelFormat f) noexcept {
+    switch (f) {
+        case GfxPixelFormat::BC7_UNorm:   return GfxPixelFormat::BC7_UNorm_SRGB;
+        case GfxPixelFormat::RGBA8_UNorm: return GfxPixelFormat::RGBA8_UNorm_SRGB;
+        case GfxPixelFormat::BC1_UNorm:   return GfxPixelFormat::BC1_UNorm_SRGB;
+        default:                          return f;
+    }
+}
+
+inline constexpr GfxPixelFormat GfxEncodedFormat(GfxPixelFormat f, eColorEncoding encoding) noexcept {
+    return (encoding == ecSRGB) ? GfxSRGBFormat(f) : GfxLinearFormat(f);
 }
 
 // Bytes per pixel (sum across channels). Used by upload paths to compute row strides without
@@ -87,9 +111,10 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
             return 1;
         case GfxPixelFormat::RG8_UNorm:      
             return 2;
-        case GfxPixelFormat::RGBA8_UNorm:    
+        case GfxPixelFormat::RGBA8_UNorm:
+        case GfxPixelFormat::RGBA8_UNorm_SRGB:
             return 4;
-        case GfxPixelFormat::R16_SFloat:     
+        case GfxPixelFormat::R16_SFloat:
             return 2;
         case GfxPixelFormat::R32_SFloat:     
             return 4;
@@ -100,6 +125,7 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::RG11B10_SFloat:
             return 4;
         case GfxPixelFormat::BC1_UNorm:
+        case GfxPixelFormat::BC1_UNorm_SRGB:
         case GfxPixelFormat::BC7_UNorm:
         case GfxPixelFormat::BC7_UNorm_SRGB:
         case GfxPixelFormat::BC4_UNorm:
@@ -113,8 +139,8 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
 // True for block-compressed (BCn) formats. Their data is stored in 4x4 texel blocks, so the
 // per-pixel GfxPixelStride is meaningless — upload paths must use block math (GfxBlockBytes).
 inline constexpr bool GfxIsBlockCompressed(GfxPixelFormat f) noexcept {
-    return (f == GfxPixelFormat::BC1_UNorm) or (f == GfxPixelFormat::BC7_UNorm) or (f == GfxPixelFormat::BC7_UNorm_SRGB)
-        or (f == GfxPixelFormat::BC4_UNorm) or (f == GfxPixelFormat::BC5_UNorm);
+    return (f == GfxPixelFormat::BC1_UNorm) or (f == GfxPixelFormat::BC1_UNorm_SRGB) or (f == GfxPixelFormat::BC7_UNorm)
+        or (f == GfxPixelFormat::BC7_UNorm_SRGB) or (f == GfxPixelFormat::BC4_UNorm) or (f == GfxPixelFormat::BC5_UNorm);
 }
 
 // Bytes per 4x4 texel block for block-compressed formats; 0 for uncompressed formats. A full mip
@@ -122,6 +148,7 @@ inline constexpr bool GfxIsBlockCompressed(GfxPixelFormat f) noexcept {
 inline constexpr uint32_t GfxBlockBytes(GfxPixelFormat f) noexcept {
     switch (f) {
         case GfxPixelFormat::BC1_UNorm:  return 8;
+        case GfxPixelFormat::BC1_UNorm_SRGB: return 8;
         case GfxPixelFormat::BC4_UNorm:  return 8;
         case GfxPixelFormat::BC7_UNorm:  return 16;
         case GfxPixelFormat::BC7_UNorm_SRGB: return 16;
@@ -146,6 +173,7 @@ enum eTextureCompression {
 inline eTextureCompression GfxFormatToCompression(GfxPixelFormat f) noexcept {
     switch (f) {
         case GfxPixelFormat::BC1_UNorm: return tcBC1;
+        case GfxPixelFormat::BC1_UNorm_SRGB: return tcBC1;
         case GfxPixelFormat::BC4_UNorm: return tcBC4;
         case GfxPixelFormat::BC5_UNorm: return tcBC5;
         case GfxPixelFormat::BC7_UNorm: return tcBC7;
