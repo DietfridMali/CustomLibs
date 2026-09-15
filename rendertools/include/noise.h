@@ -1,6 +1,8 @@
 #pragma once
 
 
+#include <vector>
+
 #include "FBM.h"
 #include "colordata.h"
 
