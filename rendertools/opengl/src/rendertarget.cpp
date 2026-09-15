@@ -939,10 +939,10 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int tmuIndex) 
         texture->m_handle = handle;
     texture->Validate();
     if ((bChanged or not texture->m_hasParams) and (tmuIndex > -1)) {
-        GLuint boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
+        int boundHandle = gfxStates.GetBoundTexture(GL_TEXTURE_2D, tmuIndex);
         texture->Activate(tmuIndex);
         texture->SetParams(true);
-        gfxStates.SetBoundTexture(GL_TEXTURE_2D, boundHandle, tmuIndex);
+        gfxStates.BindTexture(GL_TEXTURE_2D, GLuint(std::max(boundHandle, 0)), tmuIndex);
     }
     return texture;
 }
