@@ -1,4 +1,5 @@
 #include "pipeline_cache.h"
+#include "gfxpixelformat_vk.h"
 #include "shader.h"
 #include "vkcontext.h"
 #include "shadercache.h"
@@ -244,6 +245,11 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     if (key.states.independentBlend and (key.colorFormatCount > 2)) {
         attachments[2].blendEnable = VK_FALSE;
         attachments[2].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    }
+
+    for (uint32_t i = 0; i < key.colorFormatCount; ++i) {
+        if (IsIntegerColorFormat(key.colorFormats[i]))
+            attachments[i].blendEnable = VK_FALSE;
     }
 
     VkPipelineColorBlendStateCreateInfo colorBlend { };

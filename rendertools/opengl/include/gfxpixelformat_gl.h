@@ -39,8 +39,14 @@ inline constexpr GLFormat ToGLFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::BC5_UNorm:      return { GL_COMPRESSED_RG_RGTC2,          GL_RG,   GL_UNSIGNED_BYTE };
         case GfxPixelFormat::RGBA8_UNorm_SRGB: return { GL_SRGB8_ALPHA8,                GL_RGBA, GL_UNSIGNED_BYTE };
         case GfxPixelFormat::BC1_UNorm_SRGB: return { GL_COMPRESSED_SRGB_S3TC_DXT1_EXT, GL_RGB,  GL_UNSIGNED_BYTE };
+        case GfxPixelFormat::R16_UInt:       return { GL_R16UI,   GL_RED_INTEGER, GL_UNSIGNED_SHORT };
+        case GfxPixelFormat::R32_UInt:       return { GL_R32UI,   GL_RED_INTEGER, GL_UNSIGNED_INT };
     }
     return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+}
+
+inline constexpr bool IsIntegerColorFormat(GLenum internalFormat) noexcept {
+    return (internalFormat == GL_R16UI) or (internalFormat == GL_R32UI);
 }
 
 

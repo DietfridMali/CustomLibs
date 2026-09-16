@@ -24,8 +24,14 @@ inline constexpr DXGI_FORMAT ToDXGIFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::BC5_UNorm:      return DXGI_FORMAT_BC5_UNORM;
         case GfxPixelFormat::RGBA8_UNorm_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
         case GfxPixelFormat::BC1_UNorm_SRGB: return DXGI_FORMAT_BC1_UNORM_SRGB;
+        case GfxPixelFormat::R16_UInt:       return DXGI_FORMAT_R16_UINT;
+        case GfxPixelFormat::R32_UInt:       return DXGI_FORMAT_R32_UINT;
     }
     return DXGI_FORMAT_UNKNOWN;
+}
+
+inline constexpr bool IsIntegerColorFormat(DXGI_FORMAT format) noexcept {
+    return (format == DXGI_FORMAT_R16_UINT) or (format == DXGI_FORMAT_R32_UINT);
 }
 
 

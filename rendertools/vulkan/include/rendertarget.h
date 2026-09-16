@@ -89,6 +89,8 @@ public:
 
 // =================================================================================================
 
+class GfxReadTarget;
+
 class RenderTarget
 {
 public:
@@ -327,6 +329,12 @@ public:
     // arraySlice picks the LAYER on a colour buffer that is a texture array (arrayLayerCount > 0) and
     // is ignored on a plain one.
     bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);
+
+    bool ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice = 0);
+
+    inline bool IsIntegerColorBuffer(int bufferIndex) const noexcept {
+        return (bufferIndex >= 0) and (bufferIndex < m_colorBufferCount) and IsIntegerColorFormat(m_colorFormat);
+    }
 
     // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
     // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.

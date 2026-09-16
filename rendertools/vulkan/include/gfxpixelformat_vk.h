@@ -26,8 +26,14 @@ inline constexpr VkFormat ToVkFormat(GfxPixelFormat f) noexcept {
         case GfxPixelFormat::BC5_UNorm:      return VK_FORMAT_BC5_UNORM_BLOCK;
         case GfxPixelFormat::RGBA8_UNorm_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
         case GfxPixelFormat::BC1_UNorm_SRGB: return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
+        case GfxPixelFormat::R16_UInt:       return VK_FORMAT_R16_UINT;
+        case GfxPixelFormat::R32_UInt:       return VK_FORMAT_R32_UINT;
     }
     return VK_FORMAT_UNDEFINED;
+}
+
+inline constexpr bool IsIntegerColorFormat(VkFormat format) noexcept {
+    return (format == VK_FORMAT_R16_UINT) or (format == VK_FORMAT_R32_UINT);
 }
 
 

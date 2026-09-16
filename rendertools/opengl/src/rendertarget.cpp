@@ -1,11 +1,29 @@
 #include "glew.h"
 #include "conversions.hpp"
 #include "rendertarget.h"
+#include "readtarget.h"
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "tracy_wrapper.h"
 
 GLint RenderTarget::m_activeHandle = GL_NONE;
+
+// =================================================================================================
+
+static void ColorTexImageFormat(GLenum internalFormat, GLenum& format, GLenum& type) {
+    switch (internalFormat) {
+        case GL_R16UI:
+            format = GL_RED_INTEGER;
+            type = GL_UNSIGNED_SHORT;
+            return;
+        case GL_R32UI:
+            format = GL_RED_INTEGER;
+            type = GL_UNSIGNED_INT;
+            return;
+    }
+    format = GL_RGBA;
+    type = (internalFormat == GL_RGBA8) ? GL_UNSIGNED_BYTE : GL_HALF_FLOAT;
+}
 
 // =================================================================================================
 
@@ -100,10 +118,12 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         // only take one at a time. Every layer has the target's own size, so a layer is a full buffer.
         // Nearest and clamp like every colour buffer here: what renders into one is read back texel for
         // texel, and a filter tap at a layer's edge has nothing to reach into anyway.
-        GLenum type = (m_colorFormat == GL_RGBA8) ? GL_UNSIGNED_BYTE : GL_HALF_FLOAT;
+        GLenum format;
+        GLenum type;
+        ColorTexImageFormat(m_colorFormat, format, type);
         gfxStates.BindTexture(GL_TEXTURE_2D_ARRAY, bufferInfo.m_handle, 0);
         glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GLint(m_colorFormat), m_width * m_scale, m_height * m_scale,
-                     m_arrayLayerCount, 0, GL_RGBA, type, nullptr);
+                     m_arrayLayerCount, 0, format, type, nullptr);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -156,8 +176,10 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
     }
     else {
         if (bufferType == BufferInfo::btColor) {
-            GLenum type = (m_colorFormat == GL_RGBA8) ? GL_UNSIGNED_BYTE : GL_HALF_FLOAT;
-            glTexImage2D(GL_TEXTURE_2D, 0, m_colorFormat, m_width * m_scale, m_height * m_scale, 0, GL_RGBA, type, nullptr);
+            GLenum format;
+            GLenum type;
+            ColorTexImageFormat(m_colorFormat, format, type);
+            glTexImage2D(GL_TEXTURE_2D, 0, m_colorFormat, m_width * m_scale, m_height * m_scale, 0, format, type, nullptr);
             GLboolean isTex = glIsTexture(bufferInfo.m_handle);
             if (not isTex)
                 isTex = false;
@@ -390,6 +412,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_bufferCount = 0;
     m_colorFormat = params.colorFormat;
+    if (IsIntegerColorFormat(m_colorFormat))
+        m_filtering = GfxFilterMode::Nearest;
     m_cubeMapFormat = params.cubeMapFormat;
     m_isScreenBuffer = params.isScreenBuffer;
     // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
@@ -658,10 +682,43 @@ void RenderTarget::Clear(const RTActivationParams& params) { // clear color has 
         gfxStates.SetClearColor(m_clearColor);
         if (DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup) and (params.depthMode != dbmReadOnly))
             ClearDepthBuffer();
-        if (m_colorBufferCount)
-            ClearColorBuffers();
+        if (m_colorBufferCount) {
+            if (IsIntegerColorFormat(m_colorFormat))
+                ClearIntegerColorBuffers(m_clearColor);
+            else
+                ClearColorBuffers();
+        }
         gfxStates.PopClearColor();
         baseRenderer.PopViewport();
+    }
+}
+
+
+bool RenderTarget::IsColorBufferAttachment(GLenum attachment) {
+    for (int i = 0; i < m_colorBufferCount; i++) {
+        if ((GLenum(m_bufferInfo[i].m_attachment) == attachment) or (GLenum(m_bufferInfo[i].m_boundAttachment) == attachment))
+            return true;
+    }
+    return false;
+}
+
+
+void RenderTarget::ClearIntegerColorBuffers(const RGBAColor& color) {
+    const float* src = color.Data();
+    GLuint value[4];
+
+    for (int i = 0; i < 4; i++)
+        value[i] = (src[i] > 0.0f) ? GLuint(src[i]) : 0;
+    gfxStates.ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    for (int i = 0; i < m_drawBuffers.Length(); i++) {
+        GLenum attachment = GLenum(m_drawBuffers[i]);
+
+        if (attachment == GL_NONE)
+            continue;
+        if (IsColorBufferAttachment(attachment))
+            glClearBufferuiv(GL_COLOR, i, value);
+        else
+            glClearBufferfv(GL_COLOR, i, src);
     }
 }
 
@@ -719,6 +776,8 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 // texel is the owner's business, not RenderTargetTexture::SetParams ()'s.
 
 void RenderTarget::SetFiltering(GfxFilterMode filtering) {
+    if (IsIntegerColorFormat(m_colorFormat))
+        filtering = GfxFilterMode::Nearest;
     if (filtering == m_filtering)
         return;
     m_filtering = filtering;
@@ -1020,6 +1079,16 @@ static bool ColorReadFormat(GLenum internalFormat, GLenum& format, GLenum& type,
             format = GL_RED; type = GL_FLOAT; texelBytes = 4; return true;
         case GL_R11F_G11F_B10F:
             format = GL_RGB; type = GL_UNSIGNED_INT_10F_11F_11F_REV; texelBytes = 4; return true;
+        case GL_R16UI:
+            format = GL_RED_INTEGER;
+            type = GL_UNSIGNED_SHORT;
+            texelBytes = 2;
+            return true;
+        case GL_R32UI:
+            format = GL_RED_INTEGER;
+            type = GL_UNSIGNED_INT;
+            texelBytes = 4;
+            return true;
     }
     return false;
 }
@@ -1039,23 +1108,69 @@ size_t RenderTarget::BufferSize(int bufferIndex) {
 
 
 bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice) {
-    if (not (buffer and m_isAvailable))
-        return false;
-    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
-        return false;
-    if (m_bufferInfo[bufferIndex].m_isArray and ((arraySlice < 0) or (arraySlice >= m_arrayLayerCount)))
+    if (not buffer)
         return false;
 
+    size_t needed = ReadableBufferSize(bufferIndex, arraySlice);
+
+    if ((needed == 0) or (bufferSize < needed))
+        return false;
+    return ReadTexels(bufferIndex, arraySlice, buffer);
+}
+
+
+bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice) {
+    if (not readTarget.IsIdle())
+        return false;
+
+    size_t needed = ReadableBufferSize(bufferIndex, arraySlice);
+
+    if ((needed == 0) or not readTarget.Allocate(needed))
+        return false;
+
+    GLint prevBuffer = 0;
+
+    glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &prevBuffer);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, readTarget.Handle());
+
+    bool ok = ReadTexels(bufferIndex, arraySlice, nullptr);
+
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, GLuint(prevBuffer));
+    return ok and readTarget.Submit(needed, GetWidth(true), GetHeight(true));
+}
+
+
+size_t RenderTarget::ReadableBufferSize(int bufferIndex, int arraySlice) {
+    if (not m_isAvailable)
+        return 0;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return 0;
+    if (m_bufferInfo[bufferIndex].m_isArray and ((arraySlice < 0) or (arraySlice >= m_arrayLayerCount)))
+        return 0;
+    return BufferSize(bufferIndex);
+}
+
+
+bool RenderTarget::ReadTexels(int bufferIndex, int arraySlice, void* buffer) {
     GLenum format, type;
     size_t texelBytes;
 
     if (not ColorReadFormat(m_colorFormat, format, type, texelBytes))
         return false;
 
-    size_t needed = size_t(GetWidth(true)) * size_t(GetHeight(true)) * texelBytes;
+    GLint prevAlignment = 4;
 
-    if (bufferSize < needed)
-        return false;
+    glGetIntegerv(GL_PACK_ALIGNMENT, &prevAlignment);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+
+    bool ok = ReadTexelsAs(bufferIndex, arraySlice, buffer, format, type);
+
+    glPixelStorei(GL_PACK_ALIGNMENT, prevAlignment);
+    return ok;
+}
+
+
+bool RenderTarget::ReadTexelsAs(int bufferIndex, int arraySlice, void* buffer, GLenum format, GLenum type) {
     gfxStates.ClearError();
     if (m_bufferInfo[bufferIndex].m_isArray) {
         // glGetTexImage on an array hands out EVERY layer at once, and there is no single layer form of

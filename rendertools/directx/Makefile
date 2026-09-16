@@ -24,6 +24,7 @@ FILES := \
  cubemap \
  texturearray \
  base_texturearray \
+ readtarget \
  fbo \
  ddsloader \
  fonthandler \

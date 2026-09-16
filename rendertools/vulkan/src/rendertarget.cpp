@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "rendertarget.h"
+#include "readtarget.h"
 #include "vkcontext.h"
 #include "image_layout_tracker.h"
 #include "vkupload.h"	// CreateReadbackBuffer / one-shot command buffer for ReadBuffer ()
@@ -528,6 +529,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
+    if (IsIntegerColorFormat(m_colorFormat))
+        m_filtering = GfxFilterMode::Nearest;
     m_cubeMapFormat = params.cubeMapFormat;
     // Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of image to
     // allocate, and SelectArrayLayer () bounds against it.
@@ -638,9 +641,14 @@ uint32_t& RenderTarget::BufferHandle(int bufferIndex)
 
 namespace {
 
-VkClearValue MakeClearColor(const RGBAColor& c) {
+VkClearValue MakeClearColor(const RGBAColor& c, bool isInteger) {
     VkClearValue v{};
     const float* d = c.Data();
+    if (isInteger) {
+        for (int i = 0; i < 4; i++)
+            v.color.uint32[i] = (d[i] > 0.0f) ? uint32_t(d[i]) : 0;
+        return v;
+    }
     v.color.float32[0] = d[0];
     v.color.float32[1] = d[1];
     v.color.float32[2] = d[2];
@@ -685,7 +693,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
         a.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         a.loadOp      = clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
         a.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
-        a.clearValue  = MakeClearColor(m_clearColor);
+        a.clearValue  = MakeClearColor(m_clearColor, IsIntegerColorBuffer(i));
         colors[colorCount++] = a;
     };
 
@@ -719,7 +727,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
             a.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
             a.loadOp      = clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
             a.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
-            a.clearValue  = MakeClearColor(m_clearColor);
+            a.clearValue  = MakeClearColor(m_clearColor, IsIntegerColorBuffer(bufferIndex));
             colors[colorCount++] = a;
         }
     }
@@ -982,6 +990,8 @@ bool RenderTarget::Enable(const RTActivationParams& params)
 // texel is the owner's business, not RenderTargetTexture::SetParams ()'s.
 
 void RenderTarget::SetFiltering(GfxFilterMode filtering) {
+    if (IsIntegerColorFormat(m_colorFormat))
+        filtering = GfxFilterMode::Nearest;
     if (filtering == m_filtering)
         return;
     m_filtering = filtering;
@@ -1067,7 +1077,7 @@ void RenderTarget::Fill(RGBAColor color)
 
     AutoArray<VkClearAttachment> attachments(m_colorBufferCount);
     int n = 0;
-    VkClearValue clearVal = MakeClearColor(color);
+    VkClearValue clearVal = MakeClearColor(color, IsIntegerColorFormat(m_colorFormat));
     for (int i = 0; i < m_colorBufferCount; ++i) {
         VkClearAttachment a{};
         a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1096,7 +1106,7 @@ void RenderTarget::Clear(const RTActivationParams& params)
     int maxAtts = (m_customDrawBuffers.Length() > m_colorBufferCount) ? m_customDrawBuffers.Length() : m_colorBufferCount;
     AutoArray<VkClearAttachment> atts(maxAtts + 1);
     int n = 0;
-    VkClearValue cv = MakeClearColor(m_clearColor);
+    VkClearValue cv = MakeClearColor(m_clearColor, IsIntegerColorFormat(m_colorFormat));
     if (params.bufferIndex < 0) {
         // Clear by ATTACHMENT SLOT. With a custom setup the slots are the caller's list (and an unused
         // slot has no image view, so it is skipped); otherwise slot i is colour buffer i.
@@ -1108,7 +1118,7 @@ void RenderTarget::Clear(const RTActivationParams& params)
                 VkClearAttachment a{};
                 a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
                 a.colorAttachment = uint32_t(i);
-                a.clearValue      = cv;
+                a.clearValue      = MakeClearColor(m_clearColor, IsIntegerColorBuffer(bufferIndex));
                 atts[n++] = a;
             }
         }
@@ -1159,7 +1169,7 @@ void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
     VkClearAttachment a{};
     a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
     a.colorAttachment = uint32_t(bufferIndex);
-    a.clearValue      = MakeClearColor(color);
+    a.clearValue      = MakeClearColor(color, IsIntegerColorFormat(m_colorFormat));
     VkClearRect rect{};
     rect.rect.offset = { 0, 0 };
     rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
@@ -1177,7 +1187,7 @@ void RenderTarget::ClearColorBuffers(void)
         return;
     AutoArray<VkClearAttachment> atts(m_colorBufferCount);
     int n = 0;
-    VkClearValue cv = MakeClearColor(m_clearColor);
+    VkClearValue cv = MakeClearColor(m_clearColor, IsIntegerColorFormat(m_colorFormat));
     for (int i = 0; i < m_colorBufferCount; ++i) {
         VkClearAttachment a{};
         a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1481,6 +1491,10 @@ static size_t ColorFormatBytes(VkFormat format) {
             return 4;
         case VK_FORMAT_B10G11R11_UFLOAT_PACK32:
             return 4;
+        case VK_FORMAT_R16_UINT:
+            return 2;
+        case VK_FORMAT_R32_UINT:
+            return 4;
         default:
             return 0;
     }
@@ -1558,6 +1572,53 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
     memcpy(buffer, readback.mapped, needed);
     readback.Destroy();
     return true;
+}
+
+
+bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice) {
+    if (not (m_isAvailable and readTarget.IsIdle()))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+
+    if (info.m_image == VK_NULL_HANDLE)
+        return false;
+
+    VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+
+    if (cb == VK_NULL_HANDLE)
+        return false;
+
+    size_t needed = BufferSize(bufferIndex);
+
+    if ((needed == 0) or not readTarget.Allocate(needed))
+        return false;
+
+    VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
+
+    info.m_layoutTracker.ToTransferSrc(cb);
+
+    VkBufferImageCopy copy { };
+
+    copy.bufferOffset = 0;
+    copy.bufferRowLength = 0;
+    copy.bufferImageHeight = 0;
+    copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    copy.imageSubresource.mipLevel = 0;
+    copy.imageSubresource.baseArrayLayer = uint32_t(info.m_isArray ? arraySlice : 0);
+    copy.imageSubresource.layerCount = 1;
+    copy.imageOffset = { 0, 0, 0 };
+    copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };
+
+    vkCmdCopyImageToBuffer(cb, info.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readTarget.Buffer(), 1, &copy);
+    if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
+        info.m_layoutTracker.TransitionTo(cb, layoutBefore);
+
+    CommandQueue& queue = commandListHandler.CmdQueue();
+
+    return readTarget.Submit(needed, GetWidth(true), GetHeight(true), queue.FrameNumber(), int(queue.FrameIndex()));
 }
 
 // =================================================================================================

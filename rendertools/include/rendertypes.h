@@ -71,7 +71,9 @@ enum class GfxPixelFormat : uint8_t {
     // whether the sampler decodes them to linear.
     BC7_UNorm_SRGB,
     RGBA8_UNorm_SRGB,
-    BC1_UNorm_SRGB
+    BC1_UNorm_SRGB,
+    R16_UInt,
+    R32_UInt
 };
 
 enum eColorEncoding {
@@ -124,6 +126,10 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
             return 16;
         case GfxPixelFormat::RG11B10_SFloat:
             return 4;
+        case GfxPixelFormat::R16_UInt:
+            return 2;
+        case GfxPixelFormat::R32_UInt:
+            return 4;
         case GfxPixelFormat::BC1_UNorm:
         case GfxPixelFormat::BC1_UNorm_SRGB:
         case GfxPixelFormat::BC7_UNorm:
@@ -141,6 +147,10 @@ inline constexpr uint32_t GfxPixelStride(GfxPixelFormat f) noexcept {
 inline constexpr bool GfxIsBlockCompressed(GfxPixelFormat f) noexcept {
     return (f == GfxPixelFormat::BC1_UNorm) or (f == GfxPixelFormat::BC1_UNorm_SRGB) or (f == GfxPixelFormat::BC7_UNorm)
         or (f == GfxPixelFormat::BC7_UNorm_SRGB) or (f == GfxPixelFormat::BC4_UNorm) or (f == GfxPixelFormat::BC5_UNorm);
+}
+
+inline constexpr bool GfxIsIntegerFormat(GfxPixelFormat f) noexcept {
+    return (f == GfxPixelFormat::R16_UInt) or (f == GfxPixelFormat::R32_UInt);
 }
 
 // Bytes per 4x4 texel block for block-compressed formats; 0 for uncompressed formats. A full mip

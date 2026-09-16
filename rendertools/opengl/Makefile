@@ -31,6 +31,7 @@ OPENGL_FILES := \
  oglupload \
  outline_shader \
  primitive_shaders \
+ readtarget \
  rendertarget \
  shader \
  texture \

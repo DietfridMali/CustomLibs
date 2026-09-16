@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "rendertarget.h"
+#include "readtarget.h"
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "commandlist.h"
@@ -434,6 +435,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_scale = scale;
     m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
     m_colorFormat = params.colorFormat;
+    if (IsIntegerColorFormat(m_colorFormat))
+        m_filtering = GfxFilterMode::Nearest;
     m_cubeMapFormat = params.cubeMapFormat;
     // Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of resource to
     // allocate, and SelectArrayLayer () bounds against it.
@@ -743,6 +746,8 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 // that rule leaves alone. For a colour buffer - what a TextureAtlas is - DX already point samples.
 
 void RenderTarget::SetFiltering(GfxFilterMode filtering) {
+    if (IsIntegerColorFormat(m_colorFormat))
+        filtering = GfxFilterMode::Nearest;
     if (filtering == m_filtering)
         return;
     m_filtering = filtering;
@@ -1245,6 +1250,58 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
 
     readback->Unmap(0, &writeRange);
     return true;
+}
+
+
+bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice) {
+    if (not (m_isAvailable and readTarget.IsIdle()))
+        return false;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return false;
+    if (not commandListHandler.CurrentCmdList())
+        return false;
+
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    ID3D12Resource* resource = info.m_resource.Get();
+    ID3D12Device* device = dx12Context.Device();
+
+    if (not (resource and device))
+        return false;
+
+    D3D12_RESOURCE_DESC desc = resource->GetDesc();
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+    UINT rowCount = 0;
+    UINT64 rowSize = 0;
+    UINT64 totalSize = 0;
+
+    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+    if (not readTarget.Allocate(totalSize))
+        return false;
+
+    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("ReadBufferAsync"));
+
+    if (not cl)
+        return false;
+
+    D3D12_RESOURCE_STATES stateBefore = info.m_state;
+
+    info.SetState(cl, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+    D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+
+    srcLoc.pResource = resource;
+    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    srcLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0);
+    dstLoc.pResource = readTarget.Resource();
+    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dstLoc.PlacedFootprint = layout;
+    if (ID3D12GraphicsCommandList* list = cl->GfxList())
+        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+    info.SetState(cl, stateBefore);
+    baseRenderer.FinishOperation(cl, false);
+    return readTarget.Submit(layout, rowCount, rowSize, GetWidth(true), GetHeight(true),
+                             commandListHandler.FrameNumber(), commandListHandler.FrameIndex());
 }
 
 // =================================================================================================

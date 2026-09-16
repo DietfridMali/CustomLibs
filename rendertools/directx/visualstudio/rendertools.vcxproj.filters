@@ -103,6 +103,9 @@
     <ClInclude Include="..\..\include\base_texturearray.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\base_readtarget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\projector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -162,6 +165,9 @@
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\texturearray.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\readtarget.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="..\include\descriptor_heap.h">
@@ -358,6 +364,9 @@
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texturearray.cpp">
+      <Filter>Source Files\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\readtarget.cpp">
       <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\src\descriptor_heap.cpp">

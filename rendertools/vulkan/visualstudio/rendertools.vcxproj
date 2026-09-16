@@ -135,6 +135,7 @@
     <ClInclude Include="..\include\vkcontext.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\texturearray.h" />
+    <ClInclude Include="..\include\readtarget.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
     <ClInclude Include="..\include\renderstates.h" />
@@ -165,6 +166,7 @@
     <ClInclude Include="..\..\include\projector.h" />
     <ClInclude Include="..\..\include\base_quadmesh.h" />
     <ClInclude Include="..\..\include\base_texturearray.h" />
+    <ClInclude Include="..\..\include\base_readtarget.h" />
     <ClInclude Include="..\..\include\rectangle.h" />
     <ClInclude Include="..\..\include\rendertypes.h" />
     <ClInclude Include="..\include\gfxrenderer.h" />
@@ -230,6 +232,7 @@
     <ClCompile Include="..\src\swapchain.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\texturearray.cpp" />
+    <ClCompile Include="..\src\readtarget.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />
     <ClCompile Include="..\src\renderstates.cpp" />
     <ClCompile Include="..\src\rendertarget.cpp" />

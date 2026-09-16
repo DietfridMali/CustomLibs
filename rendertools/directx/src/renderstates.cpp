@@ -1,4 +1,5 @@
 #include "renderstates.h"
+#include "gfxpixelformat_dx.h"
 #include "gfxstates.h"
 #include "shader.h"
 #include "dx12context.h"
@@ -25,7 +26,9 @@ static DXGI_FORMAT ToDXGIFormat(TextureFormat fmt) noexcept
         DXGI_FORMAT_R32_FLOAT,
         DXGI_FORMAT_R32G32_FLOAT,
         DXGI_FORMAT_R32G32B32A32_FLOAT,
-        DXGI_FORMAT_D32_FLOAT
+        DXGI_FORMAT_D32_FLOAT,
+        DXGI_FORMAT_R16_UINT,
+        DXGI_FORMAT_R32_UINT
     };
     return lut[int(fmt)];
 }
@@ -353,6 +356,18 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
     // Slots 1+ (worldNormal/worldPos MRTs) keep their shader-declared formats.
     for (int i = 0; i < nrt; ++i)
         psoDesc.RTVFormats[i] = (i == 0) ? baseRenderer.RenderStates().colorFormat : ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
+    for (int i = 1; i < nrt; ++i) {
+        if (IsIntegerColorFormat(psoDesc.RTVFormats[i]) and psoDesc.BlendState.RenderTarget[0].BlendEnable and not psoDesc.BlendState.IndependentBlendEnable) {
+            psoDesc.BlendState.IndependentBlendEnable = TRUE;
+            for (int j = 1; j < nrt; ++j)
+                psoDesc.BlendState.RenderTarget[j] = psoDesc.BlendState.RenderTarget[0];
+            break;
+        }
+    }
+    for (int i = 0; i < nrt; ++i) {
+        if (IsIntegerColorFormat(psoDesc.RTVFormats[i]))
+            psoDesc.BlendState.RenderTarget[i].BlendEnable = FALSE;
+    }
     // Must match the DSV bound by the active render target, combined depth/stencil included — see
     // RenderStates::depthFormat.
     psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable)

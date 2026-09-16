@@ -46,6 +46,7 @@ VULKAN_FILES := \
  outline_shader \
  pipeline_cache \
  primitive_shaders \
+ readtarget \
  renderstates \
  rendertarget \
  resource_chunkhandler \

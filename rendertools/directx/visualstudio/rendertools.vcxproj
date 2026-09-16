@@ -136,6 +136,7 @@
     <ClInclude Include="..\include\dx12context.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\texturearray.h" />
+    <ClInclude Include="..\include\readtarget.h" />
     <ClInclude Include="..\include\base_displayhandler.h" />
     <ClInclude Include="..\..\include\FBM.h" />
     <ClInclude Include="..\include\dx12upload.h" />
@@ -167,6 +168,7 @@
     <ClInclude Include="..\..\include\projector.h" />
     <ClInclude Include="..\..\include\base_quadmesh.h" />
     <ClInclude Include="..\..\include\base_texturearray.h" />
+    <ClInclude Include="..\..\include\base_readtarget.h" />
     <ClInclude Include="..\..\include\rectangle.h" />
     <ClInclude Include="..\..\include\rendertypes.h" />
     <ClInclude Include="..\include\gfxrenderer.h" />
@@ -219,6 +221,7 @@
     <ClCompile Include="..\src\dx12context.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />
     <ClCompile Include="..\src\texturearray.cpp" />
+    <ClCompile Include="..\src\readtarget.cpp" />
     <ClCompile Include="..\src\base_displayhandler.cpp" />
     <ClCompile Include="..\src\dx12upload.cpp" />
     <ClCompile Include="..\src\renderstates.cpp" />

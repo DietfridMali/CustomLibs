@@ -67,6 +67,8 @@ public:
 
 // =================================================================================================
 
+class GfxReadTarget;
+
 class RenderTarget {
 public:
     using DrawBufferList = DrawBufferHandler::DrawBufferList;
@@ -275,6 +277,8 @@ public:
     // is ignored on a plain one.
     bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);
 
+    bool ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice = 0);
+
     // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
     // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
     // Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
@@ -481,8 +485,22 @@ public:
     // WBOIT accum/revealage per-buffer clear: clear a single draw buffer of the bound FBO (accum -> 0,
     // revealage -> 1). Call right after Activate (the FBO + its draw-buffer mapping must be bound).
     inline void ClearColorBuffer(int bufferIndex, RGBAColor color) {
-        glClearBufferfv(GL_COLOR, bufferIndex, color.Data());
+        if (IsIntegerColorFormat(m_colorFormat) and (bufferIndex >= 0) and (bufferIndex < m_drawBuffers.Length())
+            and IsColorBufferAttachment(GLenum(m_drawBuffers[bufferIndex]))) {
+            const float* src = color.Data();
+            GLuint value[4];
+
+            for (int i = 0; i < 4; i++)
+                value[i] = (src[i] > 0.0f) ? GLuint(src[i]) : 0;
+            glClearBufferuiv(GL_COLOR, bufferIndex, value);
+        }
+        else
+            glClearBufferfv(GL_COLOR, bufferIndex, color.Data());
     }
+
+    void ClearIntegerColorBuffers(const RGBAColor& color);
+
+    bool IsColorBufferAttachment(GLenum attachment);
 
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_handle);
@@ -539,6 +557,12 @@ private:
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
     void CreateRenderArea(void);
+
+    size_t ReadableBufferSize(int bufferIndex, int arraySlice);
+
+    bool ReadTexels(int bufferIndex, int arraySlice, void* buffer);
+
+    bool ReadTexelsAs(int bufferIndex, int arraySlice, void* buffer, GLenum format, GLenum type);
 };
 
 // =================================================================================================

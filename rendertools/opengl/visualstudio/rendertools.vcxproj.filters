@@ -45,6 +45,9 @@
     <ClInclude Include="..\include\texturearray.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\readtarget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\base_displayhandler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -67,6 +70,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\base_texturearray.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\base_readtarget.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\rectangle.h">
@@ -384,6 +390,9 @@
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\texturearray.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\readtarget.cpp">
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\base_renderer.cpp">
