@@ -468,7 +468,9 @@ public:
 	{
 		bool initialized = stateID >= 0;
 		auto& currentList = MultiStateRegistry<Args...>::list;
-		if (not initialized) {
+		if (stateID < -1)
+			stateID = -stateID - 2;
+		else if (not initialized) {
 			stateID = currentList.Length();
 			currentList.Append(state);
 		}
@@ -486,6 +488,11 @@ public:
 		static inline AutoArray<std::tuple<Args...>> list{};
 	};
 
+	inline void InvalidateFuncState(int32_t& stateID) noexcept {
+		if (stateID >= 0)
+			stateID = -stateID - 2;
+	}
+
 	inline GLenum DepthFunc(GLenum state) {
 		static int32_t stateID = -1;
 		return FuncState<GLenum, GL_NONE>(state, stateID, glDepthFunc);
@@ -495,7 +502,8 @@ public:
 		static int32_t stateID = -1;
 		if (bufferIndex < 0)
 			return FuncState<GLenum, GL_NONE>(state, stateID, glBlendEquation);
-		stateID = -1;
+		if (stateID >= 0)
+			StateRegistry<GLenum>::list[stateID] = GL_NONE;
 		glBlendEquationi(bufferIndex, state);
 		return GLenum(-1);
 	}
@@ -534,7 +542,7 @@ public:
 		static int32_t stateID = -1;
 		if (bufferIndex < 0)
 			return FuncState(stateID, std::make_tuple(r, g, b, a), glColorMask);
-		stateID = -1;
+		InvalidateFuncState(stateID);
 		glColorMaski(bufferIndex, r, g, b, a);
 		return std::make_tuple(true, true, true, true);
 	}
@@ -562,7 +570,7 @@ public:
 	inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA, int bufferIndex = -1) {
 		if (bufferIndex < 0)
 			return FuncState(m_blendFuncStateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
-		m_blendFuncStateID = -1;
+		InvalidateFuncState(m_blendFuncStateID);
 		glBlendFuncSeparatei(bufferIndex, srcRGB, dstRGB, srcA, dstA);
 		return std::make_tuple(0, 0, 0, 0);
 	}
