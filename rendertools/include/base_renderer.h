@@ -148,24 +148,24 @@ public:
     // Mirrors SetupOpenGL from the OGL version — same call sites, DX12 internals.
     void SetupGraphics(void) noexcept;
 
-    void Set3DRenderStates(int depthWrite = -1) noexcept;
+    virtual void Set3DRenderStates(int depthWrite = -1) noexcept;
 
-    void Set2DRenderStates(int blending = 0) noexcept;
+    virtual void Set2DRenderStates(int blending = 0) noexcept;
 
     inline void SetRenderPass(RenderPassType renderPass) noexcept { 
         m_renderPass = renderPass; 
     }
 
-    inline int GetRenderQuality(void) noexcept {
+    virtual int GetRenderQuality(void) noexcept {
         return m_renderQuality;
     }
 
-    inline void SetRenderQuality(int quality) noexcept {
+    virtual void SetRenderQuality(int quality) noexcept {
         m_renderQuality = quality;
     }
 
     inline bool HasRenderQuality(int quality) noexcept {
-        return m_renderQuality == quality;
+        return GetRenderQuality() == quality;
     }
 
     virtual void StartShadowPass(void) noexcept;
