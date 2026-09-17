@@ -8,7 +8,7 @@
 
 const ShaderSource& TestShader();
 const ShaderSource& StencilShader();
-const ShaderSource& ShadowShader();
+const ShaderSource& SurfaceShadowShader();
 const ShaderSource& SphereShadowShader();
 const ShaderSource& DepthRenderer();
 const ShaderSource& LineShader();
@@ -27,6 +27,7 @@ const ShaderSource& BlurTextureShader();
 const ShaderSource& GrayScaleShader();
 const ShaderSource& TintAndBlurShader();
 const ShaderSource& OutlineShader();
+const ShaderSource& BevelShader();
 const ShaderSource& BoxBlurShader();
 const ShaderSource& ToneMapShader();
 const ShaderSource& FxaaShader();
@@ -46,7 +47,7 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
     AutoArray<const ShaderSource*> shaderSource = {
         &TestShader(),
         &StencilShader(),
-        &ShadowShader(),
+        &SurfaceShadowShader(),
         &SphereShadowShader(),
         &DepthRenderer(),
         &LineShader(),
@@ -65,6 +66,7 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
         &GrayScaleShader(),
         &TintAndBlurShader(),
         &OutlineShader(),
+        &BevelShader(),
         &BoxBlurShader(),
         &ToneMapShader(),
         &FxaaShader(),

@@ -20,16 +20,12 @@ VULKAN_INC_DIR := $(VULKAN_SDK_DIR)/include
 # API-neutrale gemeinsame Quelldateien (../src/ = rendertools/src/)
 SRCDIR := ../src
 
+# Gemeinsame HLSL-Quellen von DirectX und Vulkan (../src/common-hlsl/)
+HLSL_SRCDIR := ../src/common-hlsl
+
 VULKAN_FILES := \
  base_displayhandler \
- base_shader_funcs \
  base_shadercode \
- base_texture_shaders \
- blur_shader \
- tonemap_shader \
- lightning_shader \
- blackhole_shader \
- skybox_shader \
  cbv_allocator \
  commandlist \
  compute_shader \
@@ -43,9 +39,7 @@ VULKAN_FILES := \
  image_layout_tracker \
  meshhandler \
  noisetexture \
- outline_shader \
  pipeline_cache \
- primitive_shaders \
  readtarget \
  renderstates \
  rendertarget \
@@ -61,6 +55,18 @@ VULKAN_FILES := \
  texturehandler \
  vkcontext \
  vkupload
+
+HLSL_FILES := \
+ base_shader_funcs \
+ base_texture_shaders \
+ blackhole_shader \
+ blur_shader \
+ lightning_shader \
+ line_shader \
+ outline_shader \
+ primitive_shaders \
+ skybox_shader \
+ tonemap_shader
 
 COMMON_FILES := \
  base_noisetexture \
@@ -141,11 +147,13 @@ else
 endif
 
 VULKAN_SOURCES := $(addprefix $(VULKAN_SRCDIR)/,$(addsuffix .cpp,$(VULKAN_FILES)))
+HLSL_SOURCES := $(addprefix $(HLSL_SRCDIR)/,$(addsuffix .cpp,$(HLSL_FILES)))
 COMMON_SOURCES := $(addprefix $(SRCDIR)/,$(addsuffix .cpp,$(COMMON_FILES)))
 VULKAN_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(VULKAN_FILES)))
+HLSL_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(HLSL_FILES)))
 COMMON_OBJECTS := $(addprefix $(OBJDIR)/,$(addsuffix .o,$(COMMON_FILES)))
 SPIRV_REFLECT_OBJECT := $(OBJDIR)/spirv_reflect.o
-OBJECTS := $(VULKAN_OBJECTS) $(COMMON_OBJECTS) $(SPIRV_REFLECT_OBJECT)
+OBJECTS := $(VULKAN_OBJECTS) $(HLSL_OBJECTS) $(COMMON_OBJECTS) $(SPIRV_REFLECT_OBJECT)
 
 LIB := librendertools$(LIB_SUFFIX).a
 
@@ -158,6 +166,10 @@ $(LIB): $(OBJECTS)
 >$(AR) rcs $@ $^
 
 $(VULKAN_OBJECTS): $(OBJDIR)/%.o: $(VULKAN_SRCDIR)/%.cpp
+>@mkdir -p $(OBJDIR)
+>$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(HLSL_OBJECTS): $(OBJDIR)/%.o: $(HLSL_SRCDIR)/%.cpp
 >@mkdir -p $(OBJDIR)
 >$(CXX) $(CXXFLAGS) -c $< -o $@
 

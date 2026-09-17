@@ -577,6 +577,7 @@ private:
 
     void CreateRenderArea(void);
 
+public:
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsv.IsValid());
     }
@@ -602,6 +603,7 @@ private:
             gfxStates.SetStencilWrite(0);
     }
 
+private:
     // DSV format of the depth buffer that actually gets bound; a shared depth source (SetDepthSource)
     // takes precedence, exactly like ActiveDepthBufferHandle.
     inline DXGI_FORMAT DepthFormat(void) noexcept {

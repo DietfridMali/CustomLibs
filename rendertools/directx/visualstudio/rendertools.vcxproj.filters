@@ -456,34 +456,34 @@
     <ClCompile Include="..\src\base_displayhandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\tonemap_shader.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\tonemap_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\blur_shader.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\blur_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\lightning_shader.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\lightning_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\line_shader.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\line_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\blackhole_shader.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\blackhole_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\skybox_shader.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\skybox_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\outline_shader.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\outline_shader.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\base_texture_shaders.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\base_texture_shaders.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\base_shader_funcs.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\base_shader_funcs.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\primitive_shaders.cpp">
+    <ClCompile Include="..\..\src\common-hlsl\primitive_shaders.cpp">
       <Filter>Source Files\Shader</Filter>
     </ClCompile>
   </ItemGroup>

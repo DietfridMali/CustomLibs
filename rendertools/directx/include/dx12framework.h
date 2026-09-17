@@ -1,8 +1,12 @@
 #pragma once
 
 #define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#define NOGDI       // suppress GDI declarations (Rectangle, Ellipse, …) — not needed for DX12
+#ifndef NOMINMAX
+#   define NOMINMAX
+#endif
+#ifndef NOGDI
+#   define NOGDI    // suppress GDI declarations (Rectangle, Ellipse, …) — not needed for DX12
+#endif
 #include <windows.h>
 
 // DirectX 12

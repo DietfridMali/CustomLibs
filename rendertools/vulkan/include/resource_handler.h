@@ -18,7 +18,9 @@
 // active (i.e. after that frame's fence has signalled, so the GPU is provably done).
 //
 // Used by:
-//   • Texture::Destroy when m_isDisposable is set (one frame of safety after detach).
+//   • Texture::Destroy and the upload path's image replacement — for EVERY texture, not just the
+//     disposable ones: a caller may drop a long-lived texture in mid-frame just as well.
+//   • RenderTarget BufferInfo::Release, LinearTexture::Update, GfxBuffer::Destroy.
 //   • Anywhere a Vulkan handle outlives its owner by one frame.
 
 class GfxResourceHandler

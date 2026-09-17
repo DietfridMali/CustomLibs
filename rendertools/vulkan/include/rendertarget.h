@@ -540,6 +540,7 @@ private:
 
     void CreateRenderArea(void);
 
+public:
     inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
         return (m_depthBufferIndex >= 0)
             and (not checkHandle or (m_bufferInfo[m_depthBufferIndex].m_imageView != VK_NULL_HANDLE));
@@ -566,6 +567,7 @@ private:
             gfxStates.SetStencilWrite(0);
     }
 
+private:
     // Format of this target's depth attachment; the pipeline key and the image both have to use it.
     inline VkFormat DepthFormat(void) noexcept {
         RenderTarget* owner = (m_depthSource != nullptr) ? m_depthSource : this;

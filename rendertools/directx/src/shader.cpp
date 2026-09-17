@@ -153,6 +153,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     args.push_back(entryWide.c_str());
     args.push_back(L"-T");
     args.push_back(targetWide.c_str());
+    args.push_back(L"-Wno-ignored-attributes");
 #ifdef _DEBUG
     args.push_back(L"-Zi");
     args.push_back(L"-Od");

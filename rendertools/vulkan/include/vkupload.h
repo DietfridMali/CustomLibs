@@ -41,6 +41,8 @@ struct OneShotCommandBuffer
     VkCommandBuffer cb   { VK_NULL_HANDLE };
 };
 
+bool CreateStagingBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) noexcept;
+
 // A staging buffer for the other direction: TRANSFER_DST and host READ access, so the GPU copies
 // into it and the CPU reads it out. CreateStagingBuffer () above is write-only from the host side
 // (SEQUENTIAL_WRITE) and reading from it would be a mistake on some memory types.

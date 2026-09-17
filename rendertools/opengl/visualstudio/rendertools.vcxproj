@@ -144,6 +144,7 @@
     <ClInclude Include="..\..\include\glbloader.h" />
     <ClInclude Include="..\include\gfxtypes.h" />
     <ClInclude Include="..\include\gputimer.h" />
+    <ClInclude Include="..\include\gpuzone.h" />
     <ClInclude Include="..\..\include\skybox.h" />
     <ClInclude Include="..\..\include\icosphere.h" />
     <ClInclude Include="..\include\lineartexture.h" />

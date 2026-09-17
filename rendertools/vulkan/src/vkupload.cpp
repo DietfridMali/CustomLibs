@@ -4,6 +4,7 @@
 #include "texture.h"
 #include "gfxpixelformat_vk.h"
 #include "texture_mips.h"
+#include "resource_handler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -172,8 +173,7 @@ bool CreateReadbackBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) no
     VkResult res = vmaCreateBuffer(allocator, &bufInfo, &allocInfo,
                                    &outStaging.buffer, &outStaging.allocation, &allocResult);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::CreateReadbackBuffer: vmaCreateBuffer failed (%d)
-", (int)res);
+        fprintf(stderr, "vkupload::CreateReadbackBuffer: vmaCreateBuffer failed (%d)\n", (int)res);
         return false;
     }
     outStaging.mapped = allocResult.pMappedData;
@@ -591,16 +591,26 @@ bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStr
 // Both create the VkImage + VkImageView straight onto tex (replacing any previously owned ones)
 // and call tex.SetParams(false) so the layered NoiseTexture overrides can populate m_sampling.
 
+// Through the deletion queue, like Texture::Destroy (): this replaces the image of a texture that may
+// well be bound in a command buffer that is still recording - an asset re-uploaded during a frame.
+
 static void DestroyTextureGPUResources(Texture& tex) noexcept
 {
     VkDevice device = vkContext.Device();
     VmaAllocator allocator = vkContext.Allocator();
-    if (tex.m_imageView != VK_NULL_HANDLE) {
-        vkDestroyImageView(device, tex.m_imageView, nullptr);
+    if ((tex.m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+        VkImageView view = tex.m_imageView;
+        gfxResourceHandler.TrackCleanup([device, view]() {
+            vkDestroyImageView(device, view, nullptr);
+        });
         tex.m_imageView = VK_NULL_HANDLE;
     }
-    if (tex.m_image != VK_NULL_HANDLE) {
-        vmaDestroyImage(allocator, tex.m_image, tex.m_allocation);
+    if ((tex.m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+        VkImage image = tex.m_image;
+        VmaAllocation alloc = tex.m_allocation;
+        gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
+            vmaDestroyImage(allocator, image, alloc);
+        });
         tex.m_image = VK_NULL_HANDLE;
         tex.m_allocation = VK_NULL_HANDLE;
     }

@@ -82,6 +82,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
         L"-E", wEntry.c_str(),
         L"-T", L"cs_6_0",
         L"-Zpc",        // column-major matrices
+        L"-Wno-ignored-attributes",
 #ifdef _DEBUG
         L"-Zi", L"-Od",
 #else

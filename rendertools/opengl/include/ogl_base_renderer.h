@@ -220,6 +220,13 @@ public:
         return m_frameCounter;
     }
 
+    // What the end of a screen pass leaves behind - see the DX/VK version of this class. There is no
+    // frame index here, so the screen's availability is all of it. NOT the frame counter's overlay,
+    // that one is a draw. Call it AFTER Stop2DScene ().
+    inline void UpdateFrameMetrics(void) noexcept {
+        m_screenIsAvailable = false;
+    }
+
     template <typename T>
     inline void SetBackgroundColor(T&& backgroundColor) {
         m_backgroundColor = std::forward<T>(backgroundColor);

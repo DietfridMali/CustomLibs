@@ -139,46 +139,36 @@ void Texture::Destroy(void)
     VkDevice device = vkContext.Device();
     VmaAllocator allocator = vkContext.Allocator();
 
-    // 1:1 to the DX12 path (directx/src/texture.cpp): if the texture is marked disposable
-    // (set via TextureCreationParams::isDisposable, e.g. one-shot glyph render sources), defer
-    // the GPU-resource teardown into the next cycle of the current frame slot. The CPU-side
-    // Texture object is invalidated immediately; the VkImageView / VkImage live on for one
-    // full frame-slot cycle, until in-flight command buffers that bound them have signalled
-    // their fence. Without this, a single-use texture destroyed mid-frame invalidates any
-    // command buffer that still has its ImageView bound (typical case: TextureAtlas::Add
-    // re-uses the atlas command list across many glyphs, each glyph deallocated after its
-    // own draw).
+    // The GPU-resource teardown goes through the deletion queue, ALWAYS (RT BufferInfo::Release does
+    // the same). The CPU-side Texture object is invalidated right here; the VkImageView / VkImage live
+    // on for one full frame-slot cycle, until the in-flight command buffers that bound them have
+    // signalled their fence.
     //
-    // Non-disposable textures (long-lived assets) destroy synchronously — the only time
-    // Destroy runs for them is at app shutdown after WaitIdle, where deferring would leak.
-    if (m_isDisposable) {
-        if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
-            VkImageView view = m_imageView;
-            gfxResourceHandler.TrackCleanup([device, view]() {
-                vkDestroyImageView(device, view, nullptr);
-            });
-            m_imageView = VK_NULL_HANDLE;
-        }
-        if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
-            VkImage image = m_image;
-            VmaAllocation alloc = m_allocation;
-            gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
-                vmaDestroyImage(allocator, image, alloc);
-            });
-            m_image = VK_NULL_HANDLE;
-            m_allocation = VK_NULL_HANDLE;
-        }
+    // This used to depend on TextureCreationParams::isDisposable, on the assumption that a long-lived
+    // texture is only ever destroyed at shutdown behind a WaitIdle. It is not: a caller that drops
+    // textures during a frame - a texture cache being flushed, a font being rebuilt - invalidated every
+    // command buffer that still had one of those views bound, and from that point on the frame was
+    // never submitted (vkEndCommandBuffer rejects an invalidated buffer) and the swapchain image went
+    // to the present in UNDEFINED layout.
+    //
+    // Nothing leaks at shutdown: GfxRenderer::Cleanup drains both queues behind a WaitIdle, and what a
+    // later destructor still drops lands in the queue that ~GfxResourceHandler flushes. Once the device
+    // is gone the guards below drop the handles without queueing anything - they went with the device.
+    if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+        VkImageView view = m_imageView;
+        gfxResourceHandler.TrackCleanup([device, view]() {
+            vkDestroyImageView(device, view, nullptr);
+        });
+        m_imageView = VK_NULL_HANDLE;
     }
-    else {
-        if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
-            vkDestroyImageView(device, m_imageView, nullptr);
-            m_imageView = VK_NULL_HANDLE;
-        }
-        if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
-            vmaDestroyImage(allocator, m_image, m_allocation);
-            m_image = VK_NULL_HANDLE;
-            m_allocation = VK_NULL_HANDLE;
-        }
+    if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+        VkImage image = m_image;
+        VmaAllocation alloc = m_allocation;
+        gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
+            vmaDestroyImage(allocator, image, alloc);
+        });
+        m_image = VK_NULL_HANDLE;
+        m_allocation = VK_NULL_HANDLE;
     }
     m_layoutTracker = ImageLayoutTracker { };
     m_handle = UINT32_MAX;

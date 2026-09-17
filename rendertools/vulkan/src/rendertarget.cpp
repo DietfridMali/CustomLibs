@@ -165,7 +165,7 @@ void BufferInfo::Release(void)
     VmaAllocator allocator = vkContext.Allocator();
 
     // Defer GPU-resource teardown by one frame slot - in-flight command buffers may still
-    // reference the image/view. Same pattern as Texture::Destroy(m_isDisposable). Safe in the
+    // reference the image/view. Same pattern as Texture::Destroy(). Safe in the
     // app-shutdown path as long as gfxResourceHandler.Cleanup() processes both frame slots
     // before the handler itself is torn down.
     if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
@@ -1540,6 +1540,8 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
     }
 
     VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
+    VkPipelineStageFlags2 stageBefore = info.m_layoutTracker.Stage();
+    VkAccessFlags2 accessBefore = info.m_layoutTracker.Access();
 
     info.m_layoutTracker.ToTransferSrc(cmd.cb);
 
@@ -1559,7 +1561,7 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
                            readback.buffer, 1, &copy);
     // Back to the layout the caller left it in - the next pass expects to find it there.
     if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
-        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore);
+        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore, stageBefore, accessBefore);
     if (not EndSingleTimeCommands(cmd)) {
         readback.Destroy();
         return false;
@@ -1597,6 +1599,8 @@ bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, i
         return false;
 
     VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
+    VkPipelineStageFlags2 stageBefore = info.m_layoutTracker.Stage();
+    VkAccessFlags2 accessBefore = info.m_layoutTracker.Access();
 
     info.m_layoutTracker.ToTransferSrc(cb);
 
@@ -1614,7 +1618,7 @@ bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, i
 
     vkCmdCopyImageToBuffer(cb, info.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readTarget.Buffer(), 1, &copy);
     if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
-        info.m_layoutTracker.TransitionTo(cb, layoutBefore);
+        info.m_layoutTracker.TransitionTo(cb, layoutBefore, stageBefore, accessBefore);
 
     CommandQueue& queue = commandListHandler.CmdQueue();
 
@@ -1657,6 +1661,8 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     }
 
     VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
+    VkPipelineStageFlags2 stageBefore = info.m_layoutTracker.Stage();
+    VkAccessFlags2 accessBefore = info.m_layoutTracker.Access();
 
     info.m_layoutTracker.ToTransferDst(cmd.cb);
 
@@ -1675,7 +1681,7 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     vkCmdCopyBufferToImage(cmd.cb, staging.buffer, info.m_image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
     if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
-        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore);
+        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore, stageBefore, accessBefore);
 
     bool ok = EndSingleTimeCommands(cmd);
 

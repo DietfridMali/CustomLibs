@@ -6,6 +6,7 @@
 
 #include "vkcontext.h"
 #include "vkupload.h"
+#include "resource_handler.h"
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
@@ -67,13 +68,22 @@ public:
         if ((allocator == VK_NULL_HANDLE) or (device == VK_NULL_HANDLE))
             return false;
 
-        // (Re-)create a 2D image with height=1 and the trait-specific format.
+        // (Re-)create a 2D image with height=1 and the trait-specific format. The old one goes through
+        // the deletion queue - an update during a frame would otherwise invalidate every command buffer
+        // that still has the view bound (see Texture::Destroy ()).
         if (m_imageView != VK_NULL_HANDLE) {
-            vkDestroyImageView(device, m_imageView, nullptr);
+            VkImageView view = m_imageView;
+            gfxResourceHandler.TrackCleanup([device, view]() {
+                vkDestroyImageView(device, view, nullptr);
+            });
             m_imageView = VK_NULL_HANDLE;
         }
         if (m_image != VK_NULL_HANDLE) {
-            vmaDestroyImage(allocator, m_image, m_allocation);
+            VkImage image = m_image;
+            VmaAllocation alloc = m_allocation;
+            gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
+                vmaDestroyImage(allocator, image, alloc);
+            });
             m_image = VK_NULL_HANDLE;
             m_allocation = VK_NULL_HANDLE;
         }

@@ -60,7 +60,7 @@ void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     if (m_screenIsAvailable) {
         m_frameCounter.Draw(true);
         Stop2DScene();
-        m_screenIsAvailable = false;
+        UpdateFrameMetrics();
         if (m_screenBuffer) {
             Set2DRenderStates();
             //SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));

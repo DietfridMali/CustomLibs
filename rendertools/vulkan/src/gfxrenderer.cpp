@@ -128,10 +128,9 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {
     if (not m_screenIsAvailable)
         return;
-    ++m_frameIndex;
     m_frameCounter.Draw(true);
     Stop2DScene();
-    m_screenIsAvailable = false;
+    UpdateFrameMetrics();
     if (not m_screenBuffer)
         return;
 

@@ -230,6 +230,16 @@ public:
         ++m_frameIndex;
     }
 
+    // What the end of a screen pass leaves behind: the screen is no longer available to draw into and
+    // the frame is counted. Here so that a DrawScreen () override of its own does not have to know
+    // which members those are. NOT the frame counter's overlay - that one is a draw, and where it
+    // lands is decided by the pass it is issued in, not by a metrics update.
+    // Call it AFTER Stop2DScene (): that one returns at once once m_screenIsAvailable is false.
+    inline void UpdateFrameMetrics(void) noexcept {
+        m_screenIsAvailable = false;
+        BumpFrameIndex();
+    }
+
     inline void SetSceneViewport(Viewport viewport) noexcept { m_sceneViewport = viewport; }
 
     inline ::Viewport GetSceneViewport(void) noexcept { return m_sceneViewport; }
