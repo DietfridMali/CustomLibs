@@ -74,17 +74,17 @@ const ShaderSource& BlackholeShader() {
 
             #define SampleLod(tex, samp, uvw, lod) (tex).SampleLevel(samp, uvw, lod)
 
-            static const int   MAX_STEPS    = 200;
-            static const float STEP_MIN     = 0.02;
-            static const float STEP_MAX     = 0.60;
-            static const float DISK_OPACITY = 1.0;
-            static const float PI           = 3.141592653589793;
-            static const float TAU           = 6.28318530718;
-            static const float TANG_PERIODS  = 2.0;
-            static const float RAD_SCALE     = 0.5;
-            static const float SPIRAL_TWIST  = 4.0;
-            static const float MORPH_SPEED   = 0.02;
-            static const float DUST_STRENGTH = 0.7;
+            static const int   MAX_STEPS        = 200;
+            static const float STEP_MIN         = 0.02;
+            static const float STEP_MAX         = 0.60;
+            static const float DISK_OPACITY     = 1.0;
+            static const float PI               = 3.141592653589793;
+            static const float TAU              = 6.28318530718;
+            static const float TANG_PERIODS     = 2.0;
+            static const float RAD_SCALE        = 0.5;
+            static const float SPIRAL_TWIST     = 4.0;
+            static const float MORPH_SPEED      = 0.02;
+            static const float DUST_STRENGTH    = 0.7;
             static const float SLAB_THICKNESS   = 0.7;   // full disk thickness [wu]
             static const int   SLAB_SAMPLES     = 3;     // noise samples per march segment inside the slab
             static const float SLAB_DENSITY     = 4.0;   // optical depth of a face-on crossing at full cover
@@ -94,13 +94,13 @@ const ShaderSource& BlackholeShader() {
             static const float CLUMP_START      = 4.5;   // clump layer fades in from this radius ...
             static const float CLUMP_FULL       = 6.5;   // ... and is fully active from here on
             static const float SPIRAL_RMAX      = 5.0;   // spiral shear saturates beyond this radius
-            static const float STAR_SECTORS    = 24.0;
-            static const int   STAR_LAYERS     = 6;
-            static const float STAR_LEN        = 0.0075;
-            static const float STAR_WIDTH      = 0.0025;
-            static const float STAR_SPEED      = 0.25;
-            static const float STAR_BRIGHTNESS = 1.5;
-            static const float STAR_FIELD_ANG  = 1.7;  // angular field radius [rad], independent of hole distance
+            static const float STAR_SECTORS     = 24.0;
+            static const int   STAR_LAYERS      = 6;
+            static const float STAR_LEN         = 0.0075;
+            static const float STAR_WIDTH       = 0.0025;
+            static const float STAR_SPEED       = 0.25;
+            static const float STAR_BRIGHTNESS  = 1.5;
+            static const float STAR_FIELD_ANG   = 1.7;  // angular field radius [rad], independent of hole distance
 #if 1
             static float Amp(float v) {
                 return 0.5f - 0.5f * cos(v * PI);
@@ -114,21 +114,20 @@ const ShaderSource& BlackholeShader() {
                 return Amp(Amp(v));
             }
 
-            float Ridged(float v) {
-                return 1.0 - abs(2.0 * v - 1.0);
+            float Ridged(float v) { 
+                return 1.0 - abs(2.0 * v - 1.0); 
             }
 
-            float Ridged2(float v) {
-                v = Ridged(v);
+            float Ridged2(float v) { 
+                v = Ridged(v); 
                 return v * v;
             }
 #else
 
-#   define Amp2(v)      (v)
+#   define Amp2(v)      (v)           
 #   define Ridged(v)    (v)
 
 #endif
-
             float3 DiskColor(float t) {
                 float3 cool = float3(1.00, 0.42, 0.16);
                 float3 mid  = float3(1.00, 0.72, 0.40);

@@ -3,11 +3,20 @@
 #include "base_shadercode.h"
 
 // =================================================================================================
-// Line ribbon shader (Vulkan). Mirrors directx/src/line_shader.cpp - HLSL compiled to SPIR-V via DXC,
-// the register() bindings (u0 lines, b0 FrameConstants, b1 ShaderConstants) map through the VK bind
-// register tables exactly as on DX; the vertex inputs carry their [[vk::location]] as every VK shader
-// here must. abs () on the projection element in the VS: the VK projection may carry a negative Y
-// scale (NDC convention). See the DX file for what the shader does.
+// Line ribbon shader (DX). The general purpose line drawer of the library (LineRenderer,
+// include/linerenderer.h): one line per instance, pulled from the structured buffer (u0) and expanded
+// from the unit quad into a ribbon in VIEW space, the way the lightning ribbon does it. The width is
+// given in TARGET PIXELS and converted into view units at the line's depth - DX12 has no line width
+// of its own, and OpenGL's was at the driver's mercy. The FS draws a capsule distance field (round
+// caps), so joints of a strip close without a second pass, and cuts the dash / dot pattern out of it
+// along the line.
+//
+// Pattern lengths are multiples of the line width w (a dot is the round cap alone, a circle of
+// diameter w); dashScale stretches them. Given as CORE lengths, the caps add w/2 at every end:
+//   dashed   period 4.5 w: dash core 2 w (3 w visible), gap 1.5 w visible
+//   dotted   period 2.5 w: dot core 0     (1 w visible), gap 1.5 w visible
+//   dash-dot period 7 w:   dash, gap, dot, gap
+// The record matches the 64 byte C++ layout (LineRenderer::Line).
 
 static const ShaderDataAttributes LineQuadAttrs[] = {
     { "Vertex",   0, ShaderDataAttributes::Float3 },
@@ -118,7 +127,7 @@ struct PSInput {
 cbuffer ShaderConstants : register(b1) {
     float2 texelSize;
     float  perspective;
-    float  dashScale;      // stretches the dash / dot pattern (1 = the lengths in the DX file)
+    float  dashScale;      // stretches the dash / dot pattern (1 = the lengths above)
     float  antialias;      // 1: analytic edge antialiasing, 0: hard edge
 };
 

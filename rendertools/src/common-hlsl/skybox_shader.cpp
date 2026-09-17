@@ -32,7 +32,7 @@ const ShaderSource& SkyboxShader() {
             cbuffer ShaderConstants : register(b1) {
                 column_major float4x4 mView;
             };
-            struct VSInput { float3 pos : POSITION; };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; };
             struct PSInput {
                 float4 pos          : SV_Position;
                 float3 viewDirection : TEXCOORD0;

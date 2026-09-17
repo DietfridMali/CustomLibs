@@ -47,8 +47,8 @@ cbuffer ShaderConstants : register(b1) {   // same layout as the FS block (VS ne
 };
 
 struct VSInput {
-    float3 pos : POSITION;
-    float2 tc  : TEXCOORD;
+    [[vk::location(0)]] float3 pos : POSITION;
+    [[vk::location(1)]] float2 tc  : TEXCOORD;
     uint   iid : SV_InstanceID;
 };
 
@@ -237,8 +237,8 @@ cbuffer ShaderConstants : register(b1) {
 };
 
 struct VSInput {
-    float3 pos : POSITION;
-    float2 tc  : TEXCOORD;
+    [[vk::location(0)]] float3 pos : POSITION;
+    [[vk::location(1)]] float2 tc  : TEXCOORD;
     uint   iid : SV_InstanceID;
 };
 
