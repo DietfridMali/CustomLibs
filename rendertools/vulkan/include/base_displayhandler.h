@@ -11,6 +11,8 @@
 #include "basesingleton.hpp"
 #include "sdlhandler.h"
 
+class CommandList;
+
 // =================================================================================================
 // Vulkan DisplayHandler: manages the SDL window, the VkSwapchainKHR (via the Swapchain wrapper)
 // and the per-back-buffer ImageLayoutTracker. Provides the same external API as the DX12 version
@@ -48,6 +50,17 @@ public:
     Swapchain       m_swapchain;
     uint32_t        m_backBufferIndex { 0 };
     bool            m_isInRendering { false };  // active vkCmdBeginRendering scope on the back buffer
+    // The command buffer the back buffer's rendering scope was opened on. vkCmdEndRendering has to go
+    // into the same one, and by the time it is issued another list may well be the current one.
+    VkCommandBuffer m_backBufferCb { VK_NULL_HANDLE };
+    // The list the back buffer brings along when nobody else has one open. A render target creates its
+    // own (RenderTarget::Enable ()); the back buffer is the bottom of that stack and needs the same,
+    // or its draws are recorded nowhere at all.
+    CommandList*    m_backBufferList { nullptr };
+    // Whether this frame has already drawn on the back buffer. Decides the loadOp of the NEXT scope
+    // on it: the first one in a frame throws the old content away, every later one loads it, or a
+    // render target activated in between would cost everything drawn on the screen so far.
+    bool            m_backBufferWasWritten { false };
 
     AutoArray<SDL_DisplayMode>      m_displayModes;
     int                             m_activeDisplayMode{ 0 };
@@ -116,6 +129,15 @@ public:
     // Close the vkCmdBeginRendering scope and transition COLOR_ATTACHMENT → PRESENT_SRC_KHR.
     // Call before Present.
     void DisableBackBuffer(void) noexcept;
+
+    // Close the scope and NOTHING else - the image stays a colour attachment. What a render target
+    // becoming the draw buffer needs: Vulkan allows no second rendering scope inside an open one,
+    // and the back buffer keeps its content for the scope that follows.
+    void SuspendBackBuffer(void) noexcept;
+
+    // The list everything on the back buffer is recorded into: the current one when there is one,
+    // otherwise the back buffer's own, opened here. Null only when even that fails.
+    CommandList* BackBufferList(void) noexcept;
 
     inline bool IsInRendering(void) const noexcept { return m_isInRendering; }
 

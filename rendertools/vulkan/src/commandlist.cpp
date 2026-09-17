@@ -615,6 +615,11 @@ void CommandListHandler::Register(CommandList* cl) noexcept
 void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 {
     ZoneScopedN("ExecuteAll");
+    // No command buffer may be submitted with an open rendering scope, and the back buffer's belongs
+    // to nobody in particular - it is opened where the draw buffer stack runs empty
+    // (DrawBufferHandler::SetActiveDrawBuffers ()) and would otherwise still stand here in a setup
+    // phase drain. Closing it is free when there is none.
+    baseDisplayHandler.SuspendBackBuffer();
     // intermediate=false (default): frame-end submit — binds the swapchain frame-sync triplet
     //   (imageAvailable wait, renderFinished signal, inFlight fence). Must be called between a
     //   prior BeginFrame (which signaled imageAvailable via vkAcquireNextImageKHR and reset the

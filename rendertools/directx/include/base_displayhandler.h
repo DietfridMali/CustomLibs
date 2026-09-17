@@ -11,6 +11,8 @@
 #include "sdlhandler.h"
 #include "resource_view.h"
 
+class CommandList;
+
 // =================================================================================================
 // DX12 DisplayHandler: manages the SDL window, extracts the Win32 HWND, creates the DXGI swap chain
 // with double-buffered back buffers, and provides the RTV descriptors for each back buffer.
@@ -44,6 +46,10 @@ public:
     RTV                             m_rtvs[BACK_BUFFER_COUNT];
     D3D12_RESOURCE_STATES           m_backBufferStates[BACK_BUFFER_COUNT]{};
     UINT                            m_backBufferIndex{ 0 };
+    // The list the back buffer brings along when nobody else has one open. A render target creates its
+    // own (RenderTarget::Enable ()); the back buffer is the bottom of that stack and needs the same,
+    // or its barrier, its binding and its draws are recorded nowhere at all.
+    CommandList*                    m_backBufferList{ nullptr };
 
     AutoArray<SDL_DisplayMode>      m_displayModes;
     int                             m_activeDisplayMode{ 0 };
@@ -108,6 +114,16 @@ public:
 
     // Transition current back buffer RENDER_TARGET → PRESENT. Call before Present().
     void DisableBackBuffer(void) noexcept;
+
+    // The counterpart of Vulkan's SuspendBackBuffer (): there, a render target becoming the draw
+    // buffer has to close the back buffer's rendering scope first. DX12 has no such scope - the
+    // target's own OMSetRenderTargets () replaces the binding - so there is nothing to do, and the
+    // resource stays in RENDER_TARGET state for the draws that follow on it.
+    inline void SuspendBackBuffer(void) noexcept { }
+
+    // The list everything on the back buffer is recorded into: the current one when there is one,
+    // otherwise the back buffer's own, opened here. Null only when even that fails.
+    CommandList* BackBufferList(void) noexcept;
 
     // Returns the current back buffer resource (set as render target before drawing).
     inline ID3D12Resource* CurrentBackBuffer(void) const noexcept {

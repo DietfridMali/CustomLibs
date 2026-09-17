@@ -16,6 +16,7 @@
 #include "commandlist.h"
 #include "descriptor_pool_handler.h"
 #include "gfxrenderer.h"
+#include "base_displayhandler.h"
 #include <spirv_reflect.h>
 
 // =================================================================================================
@@ -557,6 +558,14 @@ Shader& Shader::Move(Shader& other) noexcept
 
 bool Shader::Activate(void)
 {
+    // Nothing on the draw buffer stack means the back buffer is the target, and here is where that has
+    // to become true: image layout, rendering scope, and a command list of its own when nobody else
+    // has one open. The draw buffer handler only sees the MOMENT a target comes or goes - an app that
+    // draws on the back buffer without ever having activated one (a menu before the game starts) would
+    // otherwise record nothing at all. Idempotent, and skipped while a target is active.
+    if (baseRenderer.GetActiveBuffer() == nullptr)
+        baseDisplayHandler.EnableBackBuffer();
+
     CommandList* cl = commandListHandler.CurrentCmdList();
     if (cl == nullptr)
         return false;

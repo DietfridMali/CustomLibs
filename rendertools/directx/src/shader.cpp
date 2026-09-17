@@ -19,6 +19,7 @@
 #include "cbv_allocator.h"
 #include "shadowmap.h"
 #include "gfxrenderer.h"
+#include "base_displayhandler.h"
 #include "commandlist.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"
@@ -637,6 +638,14 @@ bool Shader::Activate(void) {
     ZoneScoped;
     if (not IsValid())
         return false;
+
+    // Nothing on the draw buffer stack means the back buffer is the target, and here is where that has
+    // to become true: the resource state, its render target binding, and a command list of its own when
+    // nobody else has one open. The draw buffer handler only sees the MOMENT a target comes or goes -
+    // an app that draws on the back buffer without ever having activated one would otherwise record
+    // nothing at all. Idempotent, and skipped while a target is active.
+    if (baseRenderer.GetActiveBuffer() == nullptr)
+        baseDisplayHandler.EnableBackBuffer();
 
     auto* list = commandListHandler.CurrentGfxList();
     if (not list)

@@ -164,8 +164,34 @@ bool BaseDisplayHandler::SetupSwapchain(void) {
 // DisableBackBuffer closes the scope and transitions back to PRESENT_SRC_KHR before
 // vkQueuePresentKHR.
 
+// Everything that goes onto the back buffer - its layout barrier, the rendering scope, the draws - is
+// recorded into a command list, and outside a render target there is none: those bring their own
+// (RenderTarget::Enable ()). The back buffer is the bottom of that stack, so it brings one too.
+// Opening it makes it the current list, so the draws that follow land in it, and ExecuteAll () closes
+// and submits whatever is still open at the end of the frame.
+
+CommandList* BaseDisplayHandler::BackBufferList(void) noexcept {
+    CommandList* cl = commandListHandler.CurrentCmdList();
+
+    if (cl)
+        return cl;
+    m_backBufferList = commandListHandler.CreateCmdList(String("backBuffer"), true);
+    if (not m_backBufferList)
+        return nullptr;
+    if (not m_backBufferList->Open()) {
+        m_backBufferList = nullptr;
+        return nullptr;
+    }
+    return m_backBufferList;
+}
+
+
 void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
+    if (not BackBufferList())
+        return;
+
     VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+
     if (cb == VK_NULL_HANDLE)
         return;
     m_swapchain.LayoutTracker(m_backBufferIndex).ToColorAttachment(cb);
@@ -177,7 +203,7 @@ void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
     color.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     color.imageView = m_swapchain.ImageView(m_backBufferIndex);
     color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color.loadOp = m_backBufferWasWritten ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
     VkRenderingInfo info{};
@@ -190,17 +216,33 @@ void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
 
     vkCmdBeginRendering(cb, &info);
     m_isInRendering = true;
+    m_backBufferCb = cb;
+    m_backBufferWasWritten = true;
+}
+
+
+void BaseDisplayHandler::SuspendBackBuffer(void) noexcept {
+    if (not m_isInRendering)
+        return;
+    if (m_backBufferCb != VK_NULL_HANDLE)
+        vkCmdEndRendering(m_backBufferCb);
+    m_isInRendering = false;
+    m_backBufferCb = VK_NULL_HANDLE;
 }
 
 
 void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
+    SuspendBackBuffer();
+    // The transition to the presentable layout has to be recorded somewhere as well - a frame in which
+    // nothing was drawn at all has no open list either, and the image would reach the present in the
+    // layout it was acquired in.
+    if (not BackBufferList())
+        return;
+
     VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+
     if (cb == VK_NULL_HANDLE)
         return;
-    if (m_isInRendering) {
-        vkCmdEndRendering(cb);
-        m_isInRendering = false;
-    }
     m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
     TracyVkCollect(commandListHandler.m_gpuProfilerCtx, cb);
 }
@@ -210,10 +252,15 @@ void BaseDisplayHandler::EndFrame(void) {
     ZoneScoped;
     if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
+    // The back buffer goes to the present from here, whoever drew on it last - the scope may still be
+    // open from a draw that did not go through DrawScreen (). Idempotent: an already presentable image
+    // is left alone (ImageLayoutTracker::TransitionTo).
+    DisableBackBuffer();
     // Submit all registered command buffers, then present + advance frame slot.
     commandListHandler.ExecuteAll();
     commandListHandler.CmdQueue().EndFrame();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
+    m_backBufferList = nullptr;
     FrameMark;
 }
 
@@ -229,6 +276,7 @@ void BaseDisplayHandler::BeginFrame(void) {
     commandListHandler.CmdQueue().BeginFrame();
     //gfxStates.CheckError();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
+    m_backBufferWasWritten = false;
     const uint32_t slot = commandListHandler.CmdQueue().FrameIndex();
     //gfxStates.CheckError();
     descriptorPoolHandler.BeginFrame(slot);

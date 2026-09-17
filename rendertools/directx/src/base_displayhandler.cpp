@@ -204,8 +204,31 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
 }
 
 
+// Everything that goes onto the back buffer - its state barrier, its render target binding, the draws
+// - is recorded into a command list, and outside a render target there is none: those bring their own
+// (RenderTarget::Enable ()). The back buffer is the bottom of that stack, so it brings one too.
+// Opening it makes it the current list, so the draws that follow land in it, and ExecuteAll () closes
+// and submits whatever is still open at the end of the frame.
+
+CommandList* BaseDisplayHandler::BackBufferList(void) noexcept {
+    CommandList* cl = commandListHandler.CurrentCmdList();
+
+    if (cl)
+        return cl;
+    m_backBufferList = commandListHandler.CreateCmdList(String("backBuffer"), true);
+    if (not m_backBufferList)
+        return nullptr;
+    if (not m_backBufferList->Open()) {
+        m_backBufferList = nullptr;
+        return nullptr;
+    }
+    return m_backBufferList;
+}
+
+
 void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
-    auto* cl = commandListHandler.CurrentCmdList();
+    auto* cl = BackBufferList();
+
     if (not cl)
         return;
     auto* list = cl->GfxList();
@@ -223,7 +246,9 @@ void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
 void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
     if (m_backBufferStates[m_backBufferIndex] == D3D12_RESOURCE_STATE_PRESENT)
         return;
-    auto* cl = commandListHandler.CurrentCmdList();
+
+    auto* cl = BackBufferList();
+
     if (not cl)
         return;
     cl->SetBarrier(m_backBuffers[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
@@ -241,6 +266,9 @@ void BaseDisplayHandler::EndFrame(void) {
     ZoneScoped;
     if (not m_swapChain)
         return;
+    // The back buffer goes to the present from here, whoever drew on it last - not only the callers
+    // that went through DrawScreen (). A no-op for an already presentable back buffer.
+    DisableBackBuffer();
     // Close the main renderer list — registers it for submission.
     // Submit all registered lists (RenderTarget lists first, main list last — registration order).
     commandListHandler.ExecuteAll();
@@ -251,6 +279,7 @@ void BaseDisplayHandler::EndFrame(void) {
     if (FAILED(hr))
         fprintf(stderr, "BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+    m_backBufferList = nullptr;
     FrameMark;
 }
 

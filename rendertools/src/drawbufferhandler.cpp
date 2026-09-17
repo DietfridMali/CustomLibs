@@ -24,8 +24,24 @@ void DrawBufferHandler::Setup(int windowWidth, int windowHeight) {
 }
 
 
+// The back buffer is the bottom of the stack - under OpenGL an empty draw buffer list IS the default
+// framebuffer and that is all it takes. DX12 and Vulkan have to be told: there the back buffer needs
+// its render target binding (DX) or a rendering scope plus the matching image layout (VK), and the one
+// that a render target opens for itself must not sit inside it. Both calls are idempotent, and both
+// return without doing anything while no frame is being recorded - which is what makes this safe in
+// the setup phase, where render targets are activated long before the first frame.
+//
+// Runs AFTER a target was pushed on the stack and BEFORE its own Enable () (RenderTarget::Activate ()),
+// so the back buffer's scope is closed before the target opens its own.
+
 void DrawBufferHandler::SetActiveDrawBuffers(void) {
     gfxStates.SetDrawBuffers(m_activeBuffer ? m_activeBuffer->DrawBuffers() : DrawBufferList{});
+#ifndef OPENGL
+    if (m_activeBuffer)
+        baseDisplayHandler.SuspendBackBuffer();
+    else
+        baseDisplayHandler.EnableBackBuffer();
+#endif
 }
 
 
