@@ -122,6 +122,7 @@ public:
     uint32_t                            m_refCounter   { 1 };
     String                              m_name         { "" };
     VkPipeline                          m_activePipeline { VK_NULL_HANDLE };
+    uint8_t                             m_activeTopology { uint8_t(MeshTopology::Triangles) };
     tracy::VkCtxScope*                  m_gpuZone { nullptr };
 
     static List<RenderStates>           m_renderStateStack;
@@ -166,6 +167,8 @@ public:
     void SetActivePipeline(VkPipeline pipeline, Shader* shader) noexcept;
 
     VkPipeline GetPipeline(Shader* shader) noexcept;
+
+    bool SetTopology(Shader* shader, MeshTopology topology) noexcept;
 
 #ifdef _DEBUG
     void CheckDeviceRemoved(const char* context) noexcept;
@@ -225,17 +228,21 @@ public:
     static constexpr uint32_t kSrvSlots     = 16;  // matches Shader::kSrvSlots
     static constexpr uint32_t kSamplerSlots = 16;  // matches Shader::kSamplerSlots
     static constexpr uint32_t kUavSlots     = 4;   // matches Shader::kUavSlots
+    static constexpr uint32_t kSsboSlots    = 17;  // matches Shader::kSsboSlots
 
     VkImageView  m_boundSrvViews         [kSrvSlots]     { };
     VkImageLayout m_boundSrvLayouts      [kSrvSlots]     { };
     VkSampler    m_boundSamplers         [kSamplerSlots] { };
     VkBuffer     m_boundStorageBuffers   [kUavSlots]     { };
     VkDeviceSize m_boundStorageBufferSize[kUavSlots]     { };
+    VkBuffer     m_boundReadOnlyBuffers   [kSsboSlots]   { };
+    VkDeviceSize m_boundReadOnlyBufferSize[kSsboSlots]   { };
 
     void ResetBindings(void) noexcept;
     void BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) noexcept;
     void BindSampler(uint32_t slot, VkSampler sampler) noexcept;
     void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
+    void BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
 
     bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
                 uint32_t graphicsFamily, uint32_t presentFamily,

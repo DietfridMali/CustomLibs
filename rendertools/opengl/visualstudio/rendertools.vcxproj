@@ -156,6 +156,7 @@
     <ClInclude Include="..\..\include\texture_mips.h" />
     <ClInclude Include="..\include\gfxpixelformat_gl.h" />
     <ClInclude Include="..\include\oglupload.h" />
+    <ClInclude Include="..\include\gfxupload.h" />
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\texteffects.h" />
     <ClInclude Include="..\..\include\lightningnoise.h" />

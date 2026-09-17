@@ -107,6 +107,12 @@ Texture& Texture::Move(Texture& other) noexcept
 bool Texture::Create(void)
 {
     Destroy();
+    return CreateHandle();
+}
+
+
+bool Texture::CreateHandle(void)
+{
     // Allocate an SRV descriptor index.
     DescriptorHandle hdl = descriptorHeaps.AllocSRV();
     if (not hdl.IsValid()) 
@@ -158,7 +164,7 @@ bool Texture::IsAvailable(void)
 }
 
 
-bool Texture::Bind(int tmuIndex)
+bool Texture::Bind(int tmuIndex, bool)
 {
     if (not IsAvailable())
         return false;

@@ -25,7 +25,8 @@
 // DXC compile uses -fvk-bind-register for every resource class, because b1 needs a
 // stage-specific Vulkan binding (1/2/3 for VS/PS/GS) and DXC rejects mixing
 // -fvk-bind-register with the -fvk-{b,t,s,u}-shift options. Bindings match the layout
-// in CreatePipelineLayout: b0=0, b1=1/2/3, t0..t15=4..19, s0..s15=20..35, u0..u3=36..39.
+// in CreatePipelineLayout: b0=0, b1=1/2/3/40/41, t0..t15=4..19, s0..s15=20..35, u0..u3=36..39,
+// t0..t16 space1=42..58.
 
 // =================================================================================================
 // Compile (HLSL -> SPIR-V via DXC)
@@ -72,6 +73,23 @@ static const wchar_t* const kCommonBindArgs[] = {
     L"-fvk-bind-register", L"u1", L"0", L"37", L"0",
     L"-fvk-bind-register", L"u2", L"0", L"38", L"0",
     L"-fvk-bind-register", L"u3", L"0", L"39", L"0",
+    L"-fvk-bind-register", L"t0", L"1", L"42", L"0",
+    L"-fvk-bind-register", L"t1", L"1", L"43", L"0",
+    L"-fvk-bind-register", L"t2", L"1", L"44", L"0",
+    L"-fvk-bind-register", L"t3", L"1", L"45", L"0",
+    L"-fvk-bind-register", L"t4", L"1", L"46", L"0",
+    L"-fvk-bind-register", L"t5", L"1", L"47", L"0",
+    L"-fvk-bind-register", L"t6", L"1", L"48", L"0",
+    L"-fvk-bind-register", L"t7", L"1", L"49", L"0",
+    L"-fvk-bind-register", L"t8", L"1", L"50", L"0",
+    L"-fvk-bind-register", L"t9", L"1", L"51", L"0",
+    L"-fvk-bind-register", L"t10", L"1", L"52", L"0",
+    L"-fvk-bind-register", L"t11", L"1", L"53", L"0",
+    L"-fvk-bind-register", L"t12", L"1", L"54", L"0",
+    L"-fvk-bind-register", L"t13", L"1", L"55", L"0",
+    L"-fvk-bind-register", L"t14", L"1", L"56", L"0",
+    L"-fvk-bind-register", L"t15", L"1", L"57", L"0",
+    L"-fvk-bind-register", L"t16", L"1", L"58", L"0",
 };
 static constexpr uint32_t kCommonBindArgCount = uint32_t(sizeof(kCommonBindArgs) / sizeof(kCommonBindArgs[0]));
 
@@ -146,7 +164,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 }
 
 // =================================================================================================
-// CreatePipelineLayout — descriptor set layout (40 bindings: see shader.h table) + pipeline layout
+// CreatePipelineLayout — descriptor set layout (59 bindings: see shader.h table) + pipeline layout
 
 bool Shader::CreatePipelineLayout(void) noexcept
 {
@@ -183,6 +201,9 @@ bool Shader::CreatePipelineLayout(void) noexcept
 
     addBinding(kBindingB1HS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
     addBinding(kBindingB1DS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
+
+    for (uint32_t i = 0; i < kSsboSlots; ++i)
+        addBinding(kSsboBase + i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
 
     VkDescriptorSetLayoutCreateInfo setInfo { };
     setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -611,13 +632,15 @@ bool Shader::UpdateVariables(void) noexcept {
         return false;
 
     // Worst-case write count: 4 dynamic UBOs + kSrvSlots images + kSamplerSlots samplers
-    // + kUavSlots storage images.
-    constexpr uint32_t kMaxWrites = kDynamicOffsetCount + 16 + 16 + 4;
+    // + kUavSlots storage buffers + kSsboSlots read-only storage buffers.
+    constexpr uint32_t kMaxWrites = kDynamicOffsetCount + CommandListHandler::kSrvSlots + CommandListHandler::kSamplerSlots
+                                  + CommandListHandler::kUavSlots + CommandListHandler::kSsboSlots;
     VkWriteDescriptorSet writes[kMaxWrites] { };
     VkDescriptorBufferInfo bufInfos[kDynamicOffsetCount]            { };
     VkDescriptorImageInfo  imgInfos[CommandListHandler::kSrvSlots]  { };
     VkDescriptorImageInfo  smpInfos[CommandListHandler::kSamplerSlots] { };
     VkDescriptorBufferInfo stoInfos[CommandListHandler::kUavSlots]  { };
+    VkDescriptorBufferInfo ssboInfos[CommandListHandler::kSsboSlots] { };
     uint32_t writeCount = 0;
 
     auto AddDynamicUbo = [&](uint32_t binding, uint32_t bytes, uint32_t bufSlot) {
@@ -689,6 +712,22 @@ bool Shader::UpdateVariables(void) noexcept {
         w.descriptorCount = 1;
         w.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         w.pBufferInfo     = &stoInfos[i];
+    }
+    for (uint32_t i = 0; i < CommandListHandler::kSsboSlots; ++i) {
+        VkBuffer b = commandListHandler.m_boundReadOnlyBuffers[i];
+        if (b == VK_NULL_HANDLE)
+            continue;
+        ssboInfos[i].buffer = b;
+        ssboInfos[i].offset = 0;
+        ssboInfos[i].range  = commandListHandler.m_boundReadOnlyBufferSize[i];
+        VkWriteDescriptorSet& w = writes[writeCount++];
+        w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        w.dstSet          = set;
+        w.dstBinding      = kSsboBase + i;
+        w.dstArrayElement = 0;
+        w.descriptorCount = 1;
+        w.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        w.pBufferInfo     = &ssboInfos[i];
     }
 
     if (writeCount > 0)

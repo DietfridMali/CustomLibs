@@ -351,11 +351,23 @@ public:
         return prevState;
     }
 
-    inline int SetBlending(int state, int bufferIndex = 0) {
+    static inline bool BlendTargets(int bufferIndex, int& first, int& last) noexcept {
+        first = (bufferIndex < 0) ? 0 : bufferIndex;
+        last = (bufferIndex < 0) ? RenderStates::kColorTargets : bufferIndex + 1;
+        return first < RenderStates::kColorTargets;
+    }
+
+    inline int SetBlending(int state, int bufferIndex = -1) {
+        int first;
+        int last;
+        if (not BlendTargets(bufferIndex, first, last))
+            return 0;
         auto& s = ActiveState();
-        int prevState = int(s.blendEnable[bufferIndex]);
-        if (state >= 0)
-            s.blendEnable[bufferIndex] = uint8_t(state);
+        int prevState = int(s.blendEnable[first]);
+        if (state >= 0) {
+            for (int i = first; i < last; ++i)
+                s.blendEnable[i] = uint8_t(state);
+        }
         return prevState;
     }
 
@@ -412,8 +424,14 @@ public:
         s.stencilBackDPPass = dppass;
     }
 
-    inline int SetPolygonOffsetFill(int) noexcept {
-        return 0;
+    inline int SetPolygonOffsetFill(int state) noexcept {
+        auto& s = ActiveState();
+        int prevState = ((s.depthBias != 0) or (s.slopeScaledDepthBias != 0.0f)) ? 1 : 0;
+        if (state == 0) {
+            s.depthBias = 0;
+            s.slopeScaledDepthBias = 0.0f;
+        }
+        return prevState;
     }
 
     inline int SetDither(int) noexcept {
@@ -450,7 +468,7 @@ public:
     inline int GetScissorTest(void) { return SetScissorTest(-1); }
     inline int GetStencilTest(void) { return SetStencilTest(-1); }
     inline int GetDepthClip(void) { return SetDepthClip(-1); }
-    inline int GetPolygonOffsetFill(void) { return 0; }
+    inline int GetPolygonOffsetFill(void) { return SetPolygonOffsetFill(-1); }
     inline int GetDither(void) { return 0; }
     inline int GetMultiSample(void) { return 0; }
     inline int GetLineSmooth(void) { return 0; }
@@ -458,7 +476,7 @@ public:
     inline GfxOperations::CompareFunc GetDepthFunc(void) { return ActiveState().depthFunc; }
     inline GfxOperations::CullFace GetCullFace(void) { return ActiveState().cullMode; }
     inline GfxOperations::Winding GetFrontFace(void) { return ActiveState().winding; }
-    inline GfxOperations::BlendOp GetBlendEquation(int bufferIndex = 0) { return ActiveState().blendOpRGB[bufferIndex]; }
+    inline GfxOperations::BlendOp GetBlendEquation(int bufferIndex = 0) { return ActiveState().blendOpRGB[((bufferIndex < 0) or (bufferIndex >= RenderStates::kColorTargets)) ? 0 : bufferIndex]; }
 
 
     inline GfxOperations::CompareFunc DepthFunc(GfxOperations::CompareFunc state) {
@@ -468,11 +486,17 @@ public:
         return prevState;
     }
 
-    inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp state, int bufferIndex = 0) {
+    inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp state, int bufferIndex = -1) {
+        int first;
+        int last;
+        if (not BlendTargets(bufferIndex, first, last))
+            return state;
         auto& s = ActiveState();
-        auto prevState = s.blendOpRGB[bufferIndex];
-        s.blendOpRGB[bufferIndex] = state;
-        s.blendOpAlpha[bufferIndex] = state;
+        auto prevState = s.blendOpRGB[first];
+        for (int i = first; i < last; ++i) {
+            s.blendOpRGB[i] = state;
+            s.blendOpAlpha[i] = state;
+        }
         return prevState;
     }
 
@@ -497,30 +521,37 @@ public:
         s.depthBias = int32_t(units);
     }
 
-    inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst, int bufferIndex = 0) {
+    inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst, int bufferIndex = -1) {
         BlendFuncSeparate(src, dst, src, dst, bufferIndex);
     }
 
     inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
                                   GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha,
-                                  int bufferIndex = 0) {
+                                  int bufferIndex = -1) {
+        int first;
+        int last;
+        if (not BlendTargets(bufferIndex, first, last))
+            return;
         auto& s = ActiveState();
-        s.blendSrcRGB[bufferIndex] = srcRGB;
-        s.blendDstRGB[bufferIndex] = dstRGB;
-        s.blendSrcAlpha[bufferIndex] = srcAlpha;
-        s.blendDstAlpha[bufferIndex] = dstAlpha;
+        for (int i = first; i < last; ++i) {
+            s.blendSrcRGB[i] = srcRGB;
+            s.blendDstRGB[i] = dstRGB;
+            s.blendSrcAlpha[i] = srcAlpha;
+            s.blendDstAlpha[i] = dstAlpha;
+        }
     }
 
     // The blend factors currently in effect - the counterpart of the OpenGL backend's GetBlendFunc ().
     inline void GetBlendFunc(GfxOperations::BlendFactor& src, GfxOperations::BlendFactor& dst, int bufferIndex = 0) {
         auto& s = ActiveState();
-        src = s.blendSrcRGB[bufferIndex];
-        dst = s.blendDstRGB[bufferIndex];
+        int i = ((bufferIndex < 0) or (bufferIndex >= RenderStates::kColorTargets)) ? 0 : bufferIndex;
+        src = s.blendSrcRGB[i];
+        dst = s.blendDstRGB[i];
     }
 
     // Independent per-RT blending for MRT passes (e.g. WBOIT: RT0 additive accum, RT1 multiplicative
-    // revealage). When off (default) RT0's blend replicates to every target. The RT1 setters below feed
-    // the second render target; remember to turn SetIndependentBlend back off after the pass.
+    // revealage). When off (default) RT0's blend replicates to every target. Blend setters with a
+    // bufferIndex >= 0 feed that target only; remember to turn SetIndependentBlend back off after the pass.
     inline int SetIndependentBlend(int state) {
         auto& s = ActiveState();
         int prevState = int(s.independentBlend);
@@ -560,10 +591,15 @@ public:
             m_clearColor = m_clearColorStack.Pop();
     }
 
-    inline std::tuple<bool, bool, bool, bool> ColorMask(bool r, bool g, bool b, bool a, int bufferIndex = 0) {
+    inline std::tuple<bool, bool, bool, bool> ColorMask(bool r, bool g, bool b, bool a, int bufferIndex = -1) {
+        int first;
+        int last;
+        if (not BlendTargets(bufferIndex, first, last))
+            return { r, g, b, a };
         auto& s = ActiveState();
-        uint8_t prevState = s.colorMask[bufferIndex];
-        s.colorMask[bufferIndex] = uint8_t((r ? 1u : 0u) | (g ? 2u : 0u) | (b ? 4u : 0u) | (a ? 8u : 0u));;
+        uint8_t prevState = s.colorMask[first];
+        for (int i = first; i < last; ++i)
+            s.colorMask[i] = uint8_t((r ? 1u : 0u) | (g ? 2u : 0u) | (b ? 4u : 0u) | (a ? 8u : 0u));
         return { bool(prevState & 1u), bool(prevState & 2u), bool(prevState & 4u), bool(prevState & 8u) };
     }
 
@@ -595,6 +631,12 @@ public:
     void ClearColorBuffers(D3D12_CPU_DESCRIPTOR_HANDLE rtv) noexcept;
 
     void ClearBackBuffer(const RGBAColor& color = ColorData::Invisible) noexcept;
+
+    void ClearColorBuffers(void) noexcept;
+
+    void ClearDepthBuffer(float clearValue = 1.0f) noexcept;
+
+    void ClearStencilBuffer(int clearValue = 0) noexcept;
 
     void ClearDepthBuffer(D3D12_CPU_DESCRIPTOR_HANDLE dsv, float clearValue = 1.0f) noexcept;
 

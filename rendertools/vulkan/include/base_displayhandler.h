@@ -88,6 +88,8 @@ public:
 
     virtual void ComputeDimensions(int width, int height, bool useFullscreen) noexcept;
 
+    virtual void SetContextAttributes(void) {}
+
     virtual void SetupDisplay(String windowTitle);
 
     // Present the current back buffer, advance to the next one.

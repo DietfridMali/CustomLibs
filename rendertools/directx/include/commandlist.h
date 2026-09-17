@@ -82,6 +82,8 @@ public:
     uint32_t                            m_refCounter{ 1 };
     String                              m_name{ "" };
     ID3D12PipelineState*                m_activePSO{ nullptr };
+    ID3D12RootSignature*                m_activeRootSignature{ nullptr };
+    uint8_t                             m_activeTopology{ uint8_t(MeshTopology::Triangles) };
     bool                                m_descriptorHeapsBound{ false };  // SetDescriptorHeaps issued since this list's Open()
     tracy::D3D12ZoneScope*              m_gpuZone{ nullptr };   // per-CL GPU profiling zone; spans Open()..Close() (USE_TRACY)
 
@@ -154,6 +156,8 @@ public:
     void SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept;
 
     ID3D12PipelineState* GetPSO(Shader* shader) noexcept;
+
+    bool SetTopology(Shader* shader, MeshTopology topology) noexcept;
 
     // Binds the GPU-visible SRV + sampler descriptor heaps. SetDescriptorHeaps is per-CommandList
     // state and only needs to be issued once after Open() — the flag is cleared there.

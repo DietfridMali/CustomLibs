@@ -95,6 +95,16 @@ public:
 	}
 
 
+	bool BindReadOnly(GLuint bindingPoint) {
+		return Bind(bindingPoint);
+	}
+
+
+	void ReleaseReadOnly(GLuint bindingPoint) {
+		Release(bindingPoint);
+	}
+
+
 	bool Upload(void) {
 		if (not m_handle)
 			return false;

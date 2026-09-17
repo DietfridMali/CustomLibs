@@ -198,6 +198,10 @@ public:
 
     virtual bool Create(void) override;
 
+    bool CreateHandle(void);
+
+    bool HasHandle(void) const noexcept;
+
     virtual void Destroy(void) override;
 
     virtual bool IsAvailable(bool isDeploying = false) override;

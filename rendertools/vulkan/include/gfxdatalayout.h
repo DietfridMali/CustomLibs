@@ -83,6 +83,8 @@ public:
 
     void Destroy(void) noexcept;
 
+    static void DestroyDefaultStreams(void) noexcept;
+
     inline bool IsValid(void) noexcept { 
         return true; 
     }  // always "valid" in DX12

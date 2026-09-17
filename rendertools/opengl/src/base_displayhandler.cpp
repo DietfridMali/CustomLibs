@@ -27,7 +27,7 @@ int BaseDisplayHandler::GetDisplayModes(void) {
     for (int i = 0; i < n; ++i)
         SDL_GetDisplayMode(0, i, &m[i]);
 
-    std::sort(m_displayModes.begin(), m_displayModes.end(),
+    std::sort(m.begin(), m.end(),
         [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
             int64_t areaA = int64_t(a.w) * int64_t(a.h);
             int64_t areaB = int64_t(b.w) * int64_t(b.h);
@@ -40,6 +40,7 @@ int BaseDisplayHandler::GetDisplayModes(void) {
             return a.format > b.format;
         });
 
+    m_displayModes.Reset();
     int64_t ai = 0, aj = 0;
     for (int i = 0; i < n; ++i) {
         aj = ai;
@@ -112,7 +113,7 @@ BaseDisplayHandler::~BaseDisplayHandler() {
 }
 
 
-void BaseDisplayHandler::SetGLAttributes(void) {
+void BaseDisplayHandler::SetContextAttributes(void) {
     SDL_GL_ResetAttributes();
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     // GL 4.3 minimum — required for compute shaders (glDispatchCompute, image2D bindings,
@@ -142,7 +143,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     if (m_isFullscreen)
         screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
 #endif
-    SetGLAttributes();
+    SetContextAttributes();
     try {
         m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, screenType);
     }

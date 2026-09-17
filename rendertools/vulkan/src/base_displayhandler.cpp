@@ -35,7 +35,7 @@ int BaseDisplayHandler::GetDisplayModes(void) {
     for (int i = 0; i < n; ++i)
         SDL_GetDisplayMode(0, i, &m[i]);
 
-    std::sort(m_displayModes.begin(), m_displayModes.end(),
+    std::sort(m.begin(), m.end(),
         [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
             int64_t areaA = int64_t(a.w) * int64_t(a.h);
             int64_t areaB = int64_t(b.w) * int64_t(b.h);
@@ -48,6 +48,7 @@ int BaseDisplayHandler::GetDisplayModes(void) {
             return a.format > b.format;
         });
 
+    m_displayModes.Reset();
     int64_t ai = 0, aj = 0;
     for (int i = 0; i < n; ++i) {
         aj = ai;
@@ -118,6 +119,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     if (m_isFullscreen)
         windowFlags |= SDL_WINDOW_FULLSCREEN;
 
+    SetContextAttributes();
     m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, windowFlags);
     if (not m_window) {
         fprintf(stderr, "BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());

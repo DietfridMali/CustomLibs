@@ -199,7 +199,7 @@ bool VKContext::CreateInstance(SDL_Window* window, bool enableValidationLayers) 
 
     VkApplicationInfo appInfo { };
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Smiley-Battle";
+    appInfo.pApplicationName = SDL_GetWindowTitle(window);
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "rendertools";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -433,6 +433,8 @@ bool VKContext::CreateDevice(void) noexcept
     features.independentBlend = VK_TRUE;
     features.fillModeNonSolid = VK_TRUE;       // VK_POLYGON_MODE_LINE for GfxStates::SetFillMode (Wireframe); universal on desktop
     features.tessellationShader = VK_TRUE;
+    features.geometryShader = VK_TRUE;
+    features.depthClamp = VK_TRUE;
 
     const char* deviceExtensions[] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,

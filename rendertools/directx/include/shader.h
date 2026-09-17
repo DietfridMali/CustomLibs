@@ -101,6 +101,11 @@ public:
     static constexpr int kSamplerBase   = kSrvBase + kSrvSlots;
     static constexpr int kSamplerSlots  = 16;
     static constexpr int kUavBase       = kSamplerBase + kSamplerSlots;
+    static constexpr int kUavSlots      = 4;
+    static constexpr int kSsboBase      = kUavBase + kUavSlots;
+    static constexpr int kSsboSlots     = 17;
+    static constexpr int kSsboSpace     = 1;
+    static constexpr int kRootParamCount = kSsboBase + kSsboSlots;
 
     struct StageConstants {
         uint32_t size{ 0 };

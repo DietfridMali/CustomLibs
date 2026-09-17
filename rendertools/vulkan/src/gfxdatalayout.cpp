@@ -9,6 +9,9 @@
 
 #include <cassert>
 #include <cstring>
+#include <algorithm>
+#include <new>
+#include <vector>
 
 // =================================================================================================
 // Vulkan GfxDataLayout implementation
@@ -161,6 +164,50 @@ bool GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t compon
 }
 
 // =================================================================================================
+
+struct DefaultVertexStreams {
+    GfxDataBuffer   zeros { "DefaultVertexZeros", 0, GfxBufferTarget::Vertex, true };
+    GfxDataBuffer   unitW { "DefaultVertexUnitW", 0, GfxBufferTarget::Vertex, true };
+    uint32_t        capacity { 0 };
+};
+
+static DefaultVertexStreams* defaultStreams = nullptr;
+
+
+static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::Format format) noexcept
+{
+    if (not defaultStreams) {
+        defaultStreams = new (std::nothrow) DefaultVertexStreams;
+        if (not defaultStreams)
+            return VK_NULL_HANDLE;
+    }
+    DefaultVertexStreams& streams = *defaultStreams;
+    if (vertexCount > streams.capacity) {
+        uint32_t capacity = std::max(std::max(vertexCount, streams.capacity * 2), uint32_t(4096));
+        std::vector<float> data(size_t(capacity) * 4, 0.0f);
+        if (not streams.zeros.Update("DefaultVertexZeros", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float), ComponentType::Float, 4))
+            return VK_NULL_HANDLE;
+        for (size_t i = 3; i < data.size(); i += 4)
+            data[i] = 1.0f;
+        if (not streams.unitW.Update("DefaultVertexUnitW", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float), ComponentType::Float, 4))
+            return VK_NULL_HANDLE;
+        streams.capacity = capacity;
+    }
+    return (format == ShaderDataAttributes::Float4) ? streams.unitW.Buffer() : streams.zeros.Buffer();
+}
+
+
+void GfxDataLayout::DestroyDefaultStreams(void) noexcept
+{
+    if (not defaultStreams)
+        return;
+    defaultStreams->zeros.Destroy();
+    defaultStreams->unitW.Destroy();
+    delete defaultStreams;
+    defaultStreams = nullptr;
+}
+
+// =================================================================================================
 // Enable / Disable / Render / StartUpdate / FinishUpdate — Vulkan implementation.
 //
 // 1:1 port of the DX12 path. IASetVertexBuffers -> vkCmdBindVertexBuffers,
@@ -176,7 +223,7 @@ bool GfxDataLayout::Enable(void) noexcept
     if (cb == VK_NULL_HANDLE)
         return true;
 
-    constexpr int kMaxStreams = 12;
+    constexpr int kMaxStreams = 16;
     VkBuffer     buffers[kMaxStreams] { };
     VkDeviceSize offsets[kMaxStreams] { };
     bool         filled[kMaxStreams]  { };
@@ -192,6 +239,28 @@ bool GfxDataLayout::Enable(void) noexcept
         filled[slot] = true;
         if (slot >= maxSlot)
             maxSlot = slot + 1;
+    }
+    Shader* shader = baseShaderHandler.ActiveShader();
+    if (shader) {
+        uint32_t vertexCount = 0;
+        for (auto* gdb : m_dataBuffers) {
+            if (gdb and gdb->IsValid() and (gdb->m_bufferType == GfxBufferTarget::Vertex))
+                vertexCount = std::max(vertexCount, gdb->m_itemCount);
+        }
+        const ShaderDataLayout& layout = shader->m_dataLayout;
+        for (int i = 0; i < layout.m_count; ++i) {
+            int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
+            if ((slot < 0) or (slot >= kMaxStreams) or filled[slot])
+                continue;
+            VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format);
+            if (buffer == VK_NULL_HANDLE)
+                continue;
+            buffers[slot] = buffer;
+            offsets[slot] = 0;
+            filled[slot] = true;
+            if (slot >= maxSlot)
+                maxSlot = slot + 1;
+        }
     }
     // Bind contiguous ranges only — vkCmdBindVertexBuffers does not accept VK_NULL_HANDLE
     // elements without the nullDescriptor feature. The fixed slot layout has semantic gaps
@@ -213,7 +282,7 @@ bool GfxDataLayout::Enable(void) noexcept
         vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
 
     // Primitive topology is baked into the VkPipeline (no IASetPrimitiveTopology equivalent
-    // in dynamic rendering). m_shape feeds the PipelineKey via baseRenderer.RenderStates().
+    // in dynamic rendering). Render () feeds m_shape into the PipelineKey via CommandList::SetTopology ().
     return true;
 }
 
@@ -270,8 +339,11 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU and
     // materialize the bind table into a VkDescriptorSet for this draw.
     Shader* shader = baseShaderHandler.ActiveShader();
-    if (shader)
+    if (shader) {
+        if (CommandList* cl = commandListHandler.CurrentCmdList())
+            cl->SetTopology(shader, m_shape);
         shader->UpdateVariables();
+    }
     //gfxStates.CheckError();
     if (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {

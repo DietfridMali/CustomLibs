@@ -8,6 +8,9 @@
 #include "tracy_wrapper.h"
 
 #include <cassert>
+#include <algorithm>
+#include <new>
+#include <vector>
 
 // =================================================================================================
 // DX12 GfxDataLayout implementation
@@ -175,6 +178,68 @@ bool GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t compon
     return m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
 }
 
+// =================================================================================================
+
+struct DefaultVertexStreams {
+    GfxDataBuffer   zeros{ "DefaultVertexZeros", 0, GfxBufferTarget::Vertex, true };
+    GfxDataBuffer   unitW{ "DefaultVertexUnitW", 0, GfxBufferTarget::Vertex, true };
+    uint32_t        capacity{ 0 };
+};
+
+static DefaultVertexStreams* defaultStreams = nullptr;
+
+
+static size_t AttributeStride(ShaderDataAttributes::Format format) noexcept
+{
+    switch (format) {
+        case ShaderDataAttributes::Float1:
+        case ShaderDataAttributes::Uint1:
+            return 4;
+        case ShaderDataAttributes::Float2:
+        case ShaderDataAttributes::Uint2:
+            return 8;
+        case ShaderDataAttributes::Float3:
+        case ShaderDataAttributes::Uint3:
+            return 12;
+        default:
+            return 16;
+    }
+}
+
+
+static const D3D12_VERTEX_BUFFER_VIEW* DefaultVertexView(uint32_t vertexCount, ShaderDataAttributes::Format format) noexcept
+{
+    if (not defaultStreams) {
+        defaultStreams = new (std::nothrow) DefaultVertexStreams;
+        if (not defaultStreams)
+            return nullptr;
+    }
+    DefaultVertexStreams& streams = *defaultStreams;
+    if (vertexCount > streams.capacity) {
+        uint32_t capacity = std::max(std::max(vertexCount, streams.capacity * 2), uint32_t(4096));
+        std::vector<float> data(size_t(capacity) * 4, 0.0f);
+        if (not streams.zeros.Update("DefaultVertexZeros", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float), ComponentType::Float, 4))
+            return nullptr;
+        for (size_t i = 3; i < data.size(); i += 4)
+            data[i] = 1.0f;
+        if (not streams.unitW.Update("DefaultVertexUnitW", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float), ComponentType::Float, 4))
+            return nullptr;
+        streams.capacity = capacity;
+    }
+    return (format == ShaderDataAttributes::Float4) ? &streams.unitW.m_vbv : &streams.zeros.m_vbv;
+}
+
+
+void GfxDataLayout::DestroyDefaultStreams(void) noexcept
+{
+    if (not defaultStreams)
+        return;
+    defaultStreams->zeros.Destroy();
+    defaultStreams->unitW.Destroy();
+    delete defaultStreams;
+    defaultStreams = nullptr;
+}
+
 
 bool GfxDataLayout::Enable(void) noexcept
 {
@@ -189,7 +254,7 @@ bool GfxDataLayout::Enable(void) noexcept
     // Bind all vertex buffer streams
     int vbCount = m_dataBuffers.Length();
     if (vbCount > 0) {
-        // Build views array; fixed stack buffer covering all registry slots (0-12)
+        // Build views array; fixed stack buffer covering all registry slots (0-15)
         constexpr int kMaxStreams = 16;
         D3D12_VERTEX_BUFFER_VIEW views[kMaxStreams]{};
         int maxSlot = 0;
@@ -199,6 +264,27 @@ bool GfxDataLayout::Enable(void) noexcept
             int slot = (GfxDataBuffer->m_index >= 0) ? GfxDataBuffer->m_index : maxSlot;
             if (slot < kMaxStreams) {
                 views[slot] = GfxDataBuffer->m_vbv;
+                if (slot >= maxSlot)
+                    maxSlot = slot + 1;
+            }
+        }
+        Shader* shader = baseShaderHandler.ActiveShader();
+        if (shader) {
+            uint32_t vertexCount = 0;
+            for (auto gdb : m_dataBuffers) {
+                if (gdb and gdb->IsValid() and (gdb->m_bufferType == GfxBufferTarget::Vertex))
+                    vertexCount = std::max(vertexCount, gdb->m_itemCount);
+            }
+            const ShaderDataLayout& layout = shader->m_dataLayout;
+            for (int i = 0; i < layout.m_count; ++i) {
+                int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
+                if ((slot < 0) or (slot >= kMaxStreams) or (views[slot].BufferLocation != 0))
+                    continue;
+                const D3D12_VERTEX_BUFFER_VIEW* pView = DefaultVertexView(vertexCount, layout.m_attrs[i].format);
+                if (not pView)
+                    continue;
+                views[slot] = *pView;
+                views[slot].StrideInBytes = UINT(AttributeStride(layout.m_attrs[i].format));
                 if (slot >= maxSlot)
                     maxSlot = slot + 1;
             }
@@ -264,6 +350,8 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
     Shader* shader = baseShaderHandler.ActiveShader();
     if (shader) {
+        if (CommandList* cl = commandListHandler.CurrentCmdList())
+            cl->SetTopology(shader, m_shape);
         ZoneScopedN("Shader::UpdateVariables");
         shader->UpdateVariables();
     }

@@ -34,19 +34,20 @@ struct RenderStates {
     uint8_t     depthWrite{ 1 };
     CompareFunc depthFunc{ CompareFunc::LessEqual };
     uint8_t     stencilTest{ 0 };
-    // Blend (RT0)
-    uint8_t     blendEnable[2]{ 0, 0 };
-    BlendFactor blendSrcRGB[2]{ BlendFactor::SrcAlpha, BlendFactor::One };
-    BlendFactor blendDstRGB[2]{ BlendFactor::InvSrcAlpha, BlendFactor::Zero };
-    BlendFactor blendSrcAlpha[2]{ BlendFactor::SrcAlpha, BlendFactor::One };
-    BlendFactor blendDstAlpha[2]{ BlendFactor::InvSrcAlpha, BlendFactor::Zero };
-    BlendOp     blendOpRGB[2]{ BlendOp::Add, BlendOp::Add };
-    BlendOp     blendOpAlpha[2]{ BlendOp::Add, BlendOp::Add };
-    // Independent blend for RT1 (MRT passes that need a different blend per target, e.g. WBOIT: RT0
-    // additive accum, RT1 multiplicative revealage). 0 -> RT0's blend applies to all targets (default).
+    static constexpr int kColorTargets = 8;
+    // Blend, one entry per color target
+    uint8_t     blendEnable[kColorTargets]{ 0, 0, 0, 0, 0, 0, 0, 0 };
+    BlendFactor blendSrcRGB[kColorTargets]{ BlendFactor::SrcAlpha, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One };
+    BlendFactor blendDstRGB[kColorTargets]{ BlendFactor::InvSrcAlpha, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero };
+    BlendFactor blendSrcAlpha[kColorTargets]{ BlendFactor::SrcAlpha, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One, BlendFactor::One };
+    BlendFactor blendDstAlpha[kColorTargets]{ BlendFactor::InvSrcAlpha, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero, BlendFactor::Zero };
+    BlendOp     blendOpRGB[kColorTargets]{ BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add };
+    BlendOp     blendOpAlpha[kColorTargets]{ BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add, BlendOp::Add };
+    // Independent blend (MRT passes that need a different blend per target, e.g. WBOIT: RT0 additive
+    // accum, RT1 multiplicative revealage). 0 -> RT0's blend applies to all targets (default).
     uint8_t     independentBlend{ 0 };
     // Color mask (bit0=R bit1=G bit2=B bit3=A)
-    uint8_t     colorMask[2]{ 0x0F, 0x0F };
+    uint8_t     colorMask[kColorTargets]{ 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F };
     // Scissor
     uint8_t     scissorTest{ 0 };
     // Stencil comparison (applied to both faces)
@@ -68,6 +69,7 @@ struct RenderStates {
     uint8_t     stencilWriteMask{ 0xFF };
     // Rasterizer depth clipping
     uint8_t     depthClip{ 1 };
+    uint8_t     topology{ uint8_t(MeshTopology::Triangles) };
     // Polygon offset (OGL glPolygonOffset equivalent: factor -> slopeScaledDepthBias, units -> depthBias)
     int32_t     depthBias{ 0 };
     float       slopeScaledDepthBias{ 0.0f };

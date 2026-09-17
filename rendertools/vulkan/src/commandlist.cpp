@@ -505,9 +505,20 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
     }
 
     VkPipeline p = pipelineCache.GetOrCreate(key);
-    if (p != VK_NULL_HANDLE)
+    if (p != VK_NULL_HANDLE) {
         SetActivePipeline(p, shader);
+        m_activeTopology = key.states.topology;
+    }
     return p;
+}
+
+
+bool CommandList::SetTopology(Shader* shader, MeshTopology topology) noexcept
+{
+    if (m_activeTopology == uint8_t(topology))
+        return true;
+    baseRenderer.RenderStates().topology = uint8_t(topology);
+    return GetPipeline(shader) != VK_NULL_HANDLE;
 }
 
 
@@ -715,6 +726,10 @@ void CommandListHandler::ResetBindings(void) noexcept
         m_boundStorageBuffers[i] = VK_NULL_HANDLE;
         m_boundStorageBufferSize[i] = 0;
     }
+    for (uint32_t i = 0; i < kSsboSlots; ++i) {
+        m_boundReadOnlyBuffers[i] = VK_NULL_HANDLE;
+        m_boundReadOnlyBufferSize[i] = 0;
+    }
 }
 
 
@@ -739,6 +754,15 @@ void CommandListHandler::BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDev
     if (slot < kUavSlots) {
         m_boundStorageBuffers[slot] = buffer;
         m_boundStorageBufferSize[slot] = range;
+    }
+}
+
+
+void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept
+{
+    if (slot < kSsboSlots) {
+        m_boundReadOnlyBuffers[slot] = buffer;
+        m_boundReadOnlyBufferSize[slot] = range;
     }
 }
 

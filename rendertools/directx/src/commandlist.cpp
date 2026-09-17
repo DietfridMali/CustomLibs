@@ -192,6 +192,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     m_isRecording = true;
     m_isFlushed = false;
     m_activePSO = nullptr;
+    m_activeRootSignature = nullptr;
     m_descriptorHeapsBound = false;
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
@@ -321,7 +322,11 @@ void CommandList::DisposeResources(void) noexcept {
 void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept {
     if (pso != m_activePSO) {
         m_gfxListPtr->SetPipelineState(pso);
-        m_gfxListPtr->SetGraphicsRootSignature(shader->GetRootSignature().Get());
+        ID3D12RootSignature* rootSignature = shader->GetRootSignature().Get();
+        if (rootSignature != m_activeRootSignature) {
+            m_gfxListPtr->SetGraphicsRootSignature(rootSignature);
+            m_activeRootSignature = rootSignature;
+        }
         m_activePSO = pso;
 #if DBG_DIRECTX
         gfxStates.CheckError();
@@ -332,9 +337,19 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
 
 ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
     ID3D12PipelineState* pso = PSO::GetPSO(shader);
-    if (pso)
+    if (pso) {
         SetActivePSO(pso, shader);
+        m_activeTopology = baseRenderer.RenderStates().topology;
+    }
     return pso;
+}
+
+
+bool CommandList::SetTopology(Shader* shader, MeshTopology topology) noexcept {
+    if (m_activeTopology == uint8_t(topology))
+        return true;
+    baseRenderer.RenderStates().topology = uint8_t(topology);
+    return GetPSO(shader) != nullptr;
 }
 
 

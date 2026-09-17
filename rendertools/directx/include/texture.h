@@ -60,7 +60,7 @@ public:
     virtual bool Create(void) = 0;
     virtual void Destroy(void) = 0;
     virtual bool IsAvailable(void) = 0;
-    virtual bool Bind(int tmuIndex) = 0;
+    virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
     virtual void Release(void) = 0;
     virtual void SetParams(bool forceUpdate = false) = 0;
     virtual bool Deploy(int bufferIndex = 0) = 0;
@@ -154,16 +154,22 @@ public:
     }
 
     inline bool operator!=(const Texture& o) const noexcept { 
-        return m_handle != o.m_handle; 
+        return m_handle != o.m_handle;
     }
 
     virtual bool Create(void) override;
+
+    bool CreateHandle(void);
+
+    inline bool HasHandle(void) const noexcept {
+        return m_handle != UINT32_MAX;
+    }
 
     virtual void Destroy(void) override;
     
     virtual bool IsAvailable(void) override;
     
-    virtual bool Bind(int tmuIndex = 0) override;
+    virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
     
     virtual void Release(void) override;
     

@@ -33,7 +33,7 @@
 
 class BaseGfxArray {
 public:
-    static inline bool IsAvailable{ true };
+    static bool IsAvailable(void) { return true; }
 };
 
 template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
@@ -136,17 +136,28 @@ public:
     }
 
     bool Bind(uint32_t bindingPoint) {
-        if (m_buffer == VK_NULL_HANDLE)
+        if ((m_buffer == VK_NULL_HANDLE) or (bindingPoint >= CommandListHandler::kUavSlots))
             return false;
         m_bindingPoint = bindingPoint;
-        if (bindingPoint < CommandListHandler::kUavSlots)
-            commandListHandler.BindStorageBuffer(bindingPoint, m_buffer, m_bufferSize);
+        commandListHandler.BindStorageBuffer(bindingPoint, m_buffer, m_bufferSize);
         return true;
     }
 
     void Release(uint32_t bindingPoint) {
         if (bindingPoint < CommandListHandler::kUavSlots)
             commandListHandler.BindStorageBuffer(bindingPoint, VK_NULL_HANDLE, 0);
+    }
+
+    bool BindReadOnly(uint32_t bindingPoint) {
+        if ((m_buffer == VK_NULL_HANDLE) or (bindingPoint >= CommandListHandler::kSsboSlots))
+            return false;
+        commandListHandler.BindReadOnlyBuffer(bindingPoint, m_buffer, m_bufferSize);
+        return true;
+    }
+
+    void ReleaseReadOnly(uint32_t bindingPoint) {
+        if (bindingPoint < CommandListHandler::kSsboSlots)
+            commandListHandler.BindReadOnlyBuffer(bindingPoint, VK_NULL_HANDLE, 0);
     }
 
     // Writes vkCmdFillBuffer onto the currently active CommandList's CB. Contract: caller ensures
@@ -314,7 +325,9 @@ private:
             b.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
             b.srcStageMask        = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             b.srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            b.dstStageMask        = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT;
+            b.dstStageMask        = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT
+                                  | VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT
+                                  | VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
             b.dstAccessMask       = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
             b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

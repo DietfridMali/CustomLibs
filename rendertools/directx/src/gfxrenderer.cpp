@@ -124,6 +124,7 @@ void GfxRenderer::Cleanup(void) noexcept {
     SavePipelineCache();
     gfxResourceHandler.CleanupAll();
     GfxResourceHandler::BeginShutdown();
+    GfxDataLayout::DestroyDefaultStreams();
     meshHandler.Destroy();
     commandListHandler.Destroy();
 }

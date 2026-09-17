@@ -988,12 +988,12 @@ void RenderTarget::ClearDepthBuffer(float clearValue)
 }
 
 
-void RenderTarget::ClearStencilBuffer(void)
+void RenderTarget::ClearStencilBuffer(int clearValue)
 {
     // Gated on an own stencil PLANE, not just on a depth buffer: without one the clear would address a
     // plane the DSV does not have.
     if (HaveStencilBuffer(true))
-        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle());
+        gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
 }
 
 

@@ -265,6 +265,33 @@ void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
 }
 
 
+void GfxStates::ClearColorBuffers(void) noexcept {
+    RenderTarget* rt = baseRenderer.GetActiveBuffer();
+    if (not rt) {
+        ClearBackBuffer(m_clearColor);
+        return;
+    }
+    RGBAColor clearColor = rt->m_clearColor;
+    rt->SetClearColor(m_clearColor);
+    rt->ClearColorBuffers();
+    rt->SetClearColor(clearColor);
+}
+
+
+void GfxStates::ClearDepthBuffer(float clearValue) noexcept {
+    RenderTarget* rt = baseRenderer.GetActiveBuffer();
+    if (rt)
+        rt->ClearDepthBuffer(clearValue);
+}
+
+
+void GfxStates::ClearStencilBuffer(int clearValue) noexcept {
+    RenderTarget* rt = baseRenderer.GetActiveBuffer();
+    if (rt)
+        rt->ClearStencilBuffer(clearValue);
+}
+
+
 void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
     VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
     if (cb == VK_NULL_HANDLE)

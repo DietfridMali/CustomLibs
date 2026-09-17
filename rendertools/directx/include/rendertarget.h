@@ -362,7 +362,7 @@ public:
 
     void ClearDepthBuffer(float clearValue = 1.0f);
 
-    void ClearStencilBuffer(void);
+    void ClearStencilBuffer(int clearValue = 0);
 
     // Share another render target's depth buffer: while set, activating this target binds the
     // source's DSV instead of an own depth buffer (this target needs none of its own). The foreign

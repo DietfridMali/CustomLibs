@@ -300,8 +300,8 @@ static void CheckLayout(GLuint handle, const char* label = "") {
 #if 1
     std::cout << "GL_ELEMENT_ARRAY_BUFFER_BINDING: " << elementBuffer << std::endl;
 #endif
-    // alle Registry-Slots checken (0-12, siehe GfxAttributeSlot)
-    for (int i = 0; i < 13; i++) {
+    // alle Registry-Slots checken (0-15, siehe GfxAttributeSlot)
+    for (int i = 0; i < 16; i++) {
         GLint enabled, size, type, stride, bufferBinding;
         GLvoid* pointer;
 

@@ -276,7 +276,6 @@ bool Shader::CreateRootSignature(void) noexcept
     }
 
     // Params kUavBase..kUavBase+3: one 1-entry descriptor table per UAV slot (u0..u3).
-    static constexpr int kUavSlots = 4;
     D3D12_DESCRIPTOR_RANGE uavRanges[kUavSlots]{};
     for (int i = 0; i < kUavSlots; ++i) {
         uavRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
@@ -286,7 +285,16 @@ bool Shader::CreateRootSignature(void) noexcept
         uavRanges[i].OffsetInDescriptorsFromTableStart = 0;
     }
 
-    D3D12_ROOT_PARAMETER params[kUavBase + kUavSlots]{};
+    D3D12_DESCRIPTOR_RANGE ssboRanges[kSsboSlots]{};
+    for (int i = 0; i < kSsboSlots; ++i) {
+        ssboRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        ssboRanges[i].NumDescriptors = 1;
+        ssboRanges[i].BaseShaderRegister = UINT(i);
+        ssboRanges[i].RegisterSpace = UINT(kSsboSpace);
+        ssboRanges[i].OffsetInDescriptorsFromTableStart = 0;
+    }
+
+    D3D12_ROOT_PARAMETER params[kRootParamCount]{};
 
     // Root CBV b0 — FrameConstants (visible to all stages)
     params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -346,11 +354,18 @@ bool Shader::CreateRootSignature(void) noexcept
         params[kUavBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
+    for (int i = 0; i < kSsboSlots; ++i) {
+        params[kSsboBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[kSsboBase + i].DescriptorTable.NumDescriptorRanges = 1;
+        params[kSsboBase + i].DescriptorTable.pDescriptorRanges = &ssboRanges[i];
+        params[kSsboBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    }
+
     // Samplers are no longer baked into the root signature — each Texture carries
     // its own TextureSampling, resolved through SamplerCache and bound at draw
     // time via the per-slot sampler tables defined above.
     D3D12_ROOT_SIGNATURE_DESC rsd{};
-    rsd.NumParameters     = kUavBase + kUavSlots;
+    rsd.NumParameters     = kRootParamCount;
     rsd.pParameters       = params;
     rsd.NumStaticSamplers = 0;
     rsd.pStaticSamplers   = nullptr;

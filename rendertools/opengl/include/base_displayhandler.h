@@ -61,11 +61,11 @@ public:
     virtual void ComputeDimensions(int width, int height, bool useFullscreen)
         noexcept;
 
-    // The GL attributes the context is created with. SetupDisplay () calls this after
-    // SDL_GL_ResetAttributes (), so an application that needs more than the defaults below
-    // (a stencil buffer, a deeper depth buffer, FSAA, quad buffer stereo) overrides this,
-    // calls the base version and adds its own attributes.
-    virtual void SetGLAttributes(void);
+    // The attributes the graphics context is created with. SetupDisplay () calls this before it creates
+    // the window, so an application that needs more than the defaults below (a stencil buffer, a deeper
+    // depth buffer, FSAA, quad buffer stereo) overrides this, calls the base version and adds its own
+    // attributes.
+    virtual void SetContextAttributes(void);
 
     virtual void SetupDisplay(String windowTitle);
 

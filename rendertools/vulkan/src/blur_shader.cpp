@@ -193,7 +193,7 @@ const ShaderSource& BilateralBlurShader() {
                 float2 fragCoord : TEXCOORD1;
             };
             float EyeDepth(float d) {
-                return abs(projDepth.y / (2.0 * d - 1.0 + projDepth.x));
+                return abs(projDepth.y / (d + projDepth.x));
             }
             float4 PSMain(PSInput i) : SV_Target {
                 float2 uv = i.fragCoord;

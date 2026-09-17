@@ -202,15 +202,31 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     vertexInput.vertexAttributeDescriptionCount = uint32_t(shader->m_vsInputAttributes.size());
     vertexInput.pVertexAttributeDescriptions = shader->m_vsInputAttributes.data();
 
-    // Input assembly: triangle list (matches DX12 PrimitiveTopologyType_TRIANGLE).
+    // Input assembly: the mesh topology from RenderStates (set per draw by CommandList::SetTopology).
+    const MeshTopology meshTopology = MeshTopology(key.states.topology);
     VkPipelineInputAssemblyStateCreateInfo inputAssembly { };
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = isTessellated ? VK_PRIMITIVE_TOPOLOGY_PATCH_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    if (isTessellated)
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    else if (meshTopology == MeshTopology::Lines)
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    else if (meshTopology == MeshTopology::Points)
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    else
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     VkPipelineTessellationStateCreateInfo tessellation { };
     tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
-    tessellation.patchControlPoints = shader->m_patchControlPoints;
+    if (meshTopology == MeshTopology::Lines)
+        tessellation.patchControlPoints = 2;
+    else if (meshTopology == MeshTopology::Points)
+        tessellation.patchControlPoints = 1;
+    else
+        tessellation.patchControlPoints = 3;
+    if (isTessellated and (tessellation.patchControlPoints != shader->m_patchControlPoints))
+        fprintf(stderr, "PipelineCache::BuildPipeline: shader '%s' expects %u patch control points, the mesh delivers %u\n",
+                (const char*)shader->m_name, shader->m_patchControlPoints, tessellation.patchControlPoints);
 
     // Viewport / scissor: counts only — actual values set dynamically per draw.
     VkPipelineViewportStateCreateInfo viewport { };
@@ -231,22 +247,11 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     VkPipelineDepthStencilStateCreateInfo depthStencil { };
     key.states.SetDepthStencilInfo(depthStencil);
 
-    // Color blend — RT0's config applied to every color attachment, then RT1 gets its own independent
-    // blend when requested (WBOIT: RT0 additive accum, RT1 multiplicative revealage).
-    VkPipelineColorBlendAttachmentState attachments[8] { };
+    // Color blend — RT0's config applied to every color attachment, or each target's own config when
+    // independent blending is requested (WBOIT: RT0 additive accum, RT1 multiplicative revealage).
+    VkPipelineColorBlendAttachmentState attachments[RenderStates::kColorTargets] { };
     for (uint32_t i = 0; i < key.colorFormatCount; ++i)
-        key.states.SetBlendAttachment(attachments[i]);
-    if (key.states.independentBlend and (key.colorFormatCount > 1))
-        key.states.SetBlendAttachment1(attachments[1]);
-    // RT2 (3-MRT G-buffer worldPos) must stay an opaque full write under independent blending: the loop
-    // above copied RT0's config (e.g. the window glass-colour blend) onto every attachment, which would
-    // bleed the glass alpha into worldPos.w (gloss / packed flag) -> decals + deferred lighting read
-    // garbage at window pixels. Force RT2 to no-blend / write-all. Mirrors the DX SetBlendDesc RT2 override.
-    if (key.states.independentBlend and (key.colorFormatCount > 2)) {
-        attachments[2].blendEnable = VK_FALSE;
-        attachments[2].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    }
-
+        key.states.SetBlendAttachment(attachments[i], key.states.independentBlend ? int(i) : 0);
     for (uint32_t i = 0; i < key.colorFormatCount; ++i) {
         if (IsIntegerColorFormat(key.colorFormats[i]))
             attachments[i].blendEnable = VK_FALSE;

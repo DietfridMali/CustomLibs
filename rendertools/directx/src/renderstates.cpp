@@ -123,36 +123,23 @@ D3D12_RASTERIZER_DESC& RenderStates::SetRasterizerDesc(D3D12_RASTERIZER_DESC& de
 
 
 D3D12_BLEND_DESC RenderStates::SetBlendDesc(D3D12_BLEND_DESC& desc) {
-    desc.RenderTarget[0].RenderTargetWriteMask = colorMask[0];
-    if (blendEnable[0]) {
-        desc.RenderTarget[0].BlendEnable = TRUE;
-        desc.RenderTarget[0].SrcBlend = ToD3DBlend(blendSrcRGB[0]);
-        desc.RenderTarget[0].DestBlend = ToD3DBlend(blendDstRGB[0]);
-        desc.RenderTarget[0].BlendOp = ToD3DBlendOp(blendOpRGB[0]);
-        desc.RenderTarget[0].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha[0]);
-        desc.RenderTarget[0].DestBlendAlpha = ToD3DBlend(blendDstAlpha[0]);
-        desc.RenderTarget[0].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha[0]);
-    }
-    // Independent RT1 blend (e.g. WBOIT: RT0 additive accum, RT1 multiplicative revealage). Only when
+    // Independent per-target blend (e.g. WBOIT: RT0 additive accum, RT1 multiplicative revealage). Only when
     // requested; otherwise IndependentBlendEnable stays FALSE and RT0's blend replicates to all targets.
-    if (independentBlend) {
-        desc.IndependentBlendEnable = TRUE;
-        desc.RenderTarget[1].RenderTargetWriteMask = colorMask[1];
-        if (blendEnable[1]) {
-            desc.RenderTarget[1].BlendEnable = TRUE;
-            desc.RenderTarget[1].SrcBlend = ToD3DBlend(blendSrcRGB[1]);
-            desc.RenderTarget[1].DestBlend = ToD3DBlend(blendDstRGB[1]);
-            desc.RenderTarget[1].BlendOp = ToD3DBlendOp(blendOpRGB[1]);
-            desc.RenderTarget[1].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha[1]);
-            desc.RenderTarget[1].DestBlendAlpha = ToD3DBlend(blendDstAlpha[1]);
-            desc.RenderTarget[1].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha[1]);
+    int targetCount = independentBlend ? kColorTargets : 1;
+    for (int i = 0; i < targetCount; ++i) {
+        desc.RenderTarget[i].RenderTargetWriteMask = colorMask[i];
+        if (blendEnable[i]) {
+            desc.RenderTarget[i].BlendEnable = TRUE;
+            desc.RenderTarget[i].SrcBlend = ToD3DBlend(blendSrcRGB[i]);
+            desc.RenderTarget[i].DestBlend = ToD3DBlend(blendDstRGB[i]);
+            desc.RenderTarget[i].BlendOp = ToD3DBlendOp(blendOpRGB[i]);
+            desc.RenderTarget[i].SrcBlendAlpha = ToD3DBlend(blendSrcAlpha[i]);
+            desc.RenderTarget[i].DestBlendAlpha = ToD3DBlend(blendDstAlpha[i]);
+            desc.RenderTarget[i].BlendOpAlpha = ToD3DBlendOp(blendOpAlpha[i]);
         }
-        // RT2 (3-MRT G-buffer worldPos) must stay an opaque full write under independent blending: once
-        // IndependentBlendEnable stops RT0's replication, the zero-initialised RT2 desc has WriteMask 0 and
-        // would stop writing. worldPos must never blend (its .w is gloss, not opacity). Harmless for <=2-RT
-        // independent passes (WBOIT only touches RT0/RT1).
-        desc.RenderTarget[2].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }
+    if (independentBlend)
+        desc.IndependentBlendEnable = TRUE;
     return desc;
 }
 
@@ -348,7 +335,14 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
     baseRenderer.RenderStates().SetBlendDesc(psoDesc.BlendState);
     baseRenderer.RenderStates().SetStencilDesc(psoDesc.DepthStencilState);
 
-    psoDesc.PrimitiveTopologyType = shader->IsTessellated() ? D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH : D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    if (shader->IsTessellated())
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    else if (baseRenderer.RenderStates().topology == uint8_t(MeshTopology::Lines))
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    else if (baseRenderer.RenderStates().topology == uint8_t(MeshTopology::Points))
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    else
+        psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     int nrt = shader->m_dataLayout.m_numRenderTargets;
     psoDesc.NumRenderTargets = UINT(nrt);
     // Slot 0 (color) follows the active render target's color format (RenderStates::colorFormat, set

@@ -15,7 +15,7 @@
 
 class BaseGfxArray {
 public:
-    static inline bool IsAvailable{ true };
+    static bool IsAvailable(void) { return true; }
 };
 
 template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
@@ -23,12 +23,14 @@ class GfxArray : public BaseGfxArray
 {
 public:
     static constexpr bool isBuffer = std::is_same_v<STORAGE_T, GfxTypes::StructuredBuffer>;
+    static constexpr D3D12_RESOURCE_STATES kReadOnlyState = D3D12_RESOURCE_STATES(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
     AutoArray<DATA_T>                   m_data;
     ComPtr<ID3D12Resource>              m_resource;
     ComPtr<ID3D12Resource>              m_upload;
     ComPtr<ID3D12Resource>              m_readback;
     DescriptorHandle                    m_uavHandle;
+    DescriptorHandle                    m_srvHandle;
     ComPtr<ID3D12DescriptorHeap>        m_cpuHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE         m_cpuUavHandle{};
     D3D12_RESOURCE_STATES               m_state{ D3D12_RESOURCE_STATE_COMMON };
@@ -59,10 +61,15 @@ public:
             // buffers and the SRV/UAV slot, so a live destroy (e.g. grow-on-demand recreate via Create)
             // must go through the per-frame deferred release -- same idiom as BufferInfo::Release.
             // During teardown gfxResourceHandler is inert/gone: free the descriptor slot directly.
-            if (GfxResourceHandler::IsShuttingDown())
+            if (GfxResourceHandler::IsShuttingDown()) {
                 descriptorHeaps.FreeSRV(m_uavHandle);
+                if (m_srvHandle.IsValid())
+                    descriptorHeaps.FreeSRV(m_srvHandle);
+            }
             else {
                 gfxResourceHandler.Track(m_uavHandle);
+                if (m_srvHandle.IsValid())
+                    gfxResourceHandler.Track(m_srvHandle);
                 gfxResourceHandler.Track(m_resource);
                 if (m_upload)
                     gfxResourceHandler.Track(m_upload);
@@ -70,6 +77,7 @@ public:
                     gfxResourceHandler.Track(m_readback);
             }
             m_uavHandle = {};
+            m_srvHandle = {};
             m_cpuHeap.Reset();
             m_cpuUavHandle = {};
             m_resource.Reset();
@@ -94,11 +102,13 @@ public:
     }
 
     bool Bind(uint32_t bindingPoint) {
-        if (not m_resource or not m_uavHandle.IsValid())
+        if (not m_resource or not m_uavHandle.IsValid() or (bindingPoint >= uint32_t(Shader::kUavSlots)))
             return false;
         auto* list = commandListHandler.CurrentGfxList();
         if (not list)
             return false;
+        if (m_state == kReadOnlyState)
+            SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         auto& heap = descriptorHeaps.m_srvHeap;
         if (heap.m_heap)
             list->SetGraphicsRootDescriptorTable(UINT(Shader::kUavBase + bindingPoint), heap.GpuHandle(m_uavHandle.index));
@@ -106,6 +116,22 @@ public:
     }
 
     void Release(uint32_t /*bindingPoint*/) {}
+
+    bool BindReadOnly(uint32_t bindingPoint) {
+        if (not isBuffer or not m_resource or not m_srvHandle.IsValid() or (bindingPoint >= uint32_t(Shader::kSsboSlots)))
+            return false;
+        auto* list = commandListHandler.CurrentGfxList();
+        if (not list)
+            return false;
+        if (m_state != D3D12_RESOURCE_STATE_COMMON)
+            SetBarrier(list, kReadOnlyState);
+        auto& heap = descriptorHeaps.m_srvHeap;
+        if (heap.m_heap)
+            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSsboBase + bindingPoint), heap.GpuHandle(m_srvHandle.index));
+        return true;
+    }
+
+    void ReleaseReadOnly(uint32_t /*bindingPoint*/) {}
 
     void Clear([[maybe_unused]] DATA_T value) {
         if constexpr (not isBuffer) {
@@ -251,6 +277,24 @@ private:
         uavDesc.Buffer.CounterOffsetInBytes = 0;
         uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
         device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_uavHandle.cpuHandle);
+
+        m_srvHandle = descriptorHeaps.AllocSRV();
+        if (not m_srvHandle.IsValid()) {
+            descriptorHeaps.FreeSRV(m_uavHandle);
+            m_uavHandle = {};
+            m_resource.Reset();
+            return false;
+        }
+
+        D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srvDesc.Buffer.FirstElement = 0;
+        srvDesc.Buffer.NumElements = UINT(size);
+        srvDesc.Buffer.StructureByteStride = UINT(sizeof(DATA_T));
+        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        device->CreateShaderResourceView(m_resource.Get(), &srvDesc, m_srvHandle.cpuHandle);
         return true;
     }
 
@@ -415,9 +459,11 @@ private:
                 return false;
         }
 
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
+        CommandList* cl = commandListHandler.CreateCmdList("GfxArray::DownloadTexture", true);
+        if (not cl or not cl->Open())
             return false;
+        auto* list = cl->GfxList();
+        D3D12_RESOURCE_STATES stateBefore = m_state;
 
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
@@ -432,7 +478,9 @@ private:
         dstLoc.PlacedFootprint = footprint;
 
         list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-        SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        SetBarrier(list, stateBefore);
+        cl->Flush();
+        commandListHandler.CmdQueue().WaitIdle();
 
         void* mapped = nullptr;
         D3D12_RANGE readRange{ 0, SIZE_T(totalBytes) };
@@ -471,13 +519,17 @@ private:
                 return false;
         }
 
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
+        CommandList* cl = commandListHandler.CreateCmdList("GfxArray::DownloadBuffer", true);
+        if (not cl or not cl->Open())
             return false;
+        auto* list = cl->GfxList();
+        D3D12_RESOURCE_STATES stateBefore = m_state;
 
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_SOURCE);
         list->CopyBufferRegion(m_readback.Get(), 0, m_resource.Get(), 0, byteSize);
-        SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        SetBarrier(list, stateBefore);
+        cl->Flush();
+        commandListHandler.CmdQueue().WaitIdle();
 
         void* mapped = nullptr;
         D3D12_RANGE readRange{ 0, SIZE_T(byteSize) };

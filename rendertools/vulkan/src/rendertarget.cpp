@@ -1221,7 +1221,7 @@ void RenderTarget::ClearDepthBuffer(float clearValue)
 }
 
 
-void RenderTarget::ClearStencilBuffer(void)
+void RenderTarget::ClearStencilBuffer(int clearValue)
 {
     // Gated on an own stencil PLANE, not just on a depth buffer: without one the clear would address an
     // aspect the attachment does not have.
@@ -1232,7 +1232,7 @@ void RenderTarget::ClearStencilBuffer(void)
         return;
     VkClearAttachment a{};
     a.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-    a.clearValue.depthStencil.stencil = 0;
+    a.clearValue.depthStencil.stencil = uint32_t(clearValue);
     VkClearRect rect{};
     rect.rect.offset = { 0, 0 };
     rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };

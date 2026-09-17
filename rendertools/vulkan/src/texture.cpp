@@ -121,8 +121,7 @@ bool Texture::Create(void)
     Destroy();
     // Vulkan: no GPU descriptor-heap slot to allocate. The image itself is created in
     // CreateTextureResource (called from Deploy with the actual pixel dimensions).
-    m_isValid = true;
-    return true;
+    return CreateHandle();
 }
 
 
@@ -202,7 +201,7 @@ bool Texture::IsAvailable(void)
 }
 
 
-bool Texture::Bind(int tmuIndex)
+bool Texture::Bind(int tmuIndex, bool)
 {
     if (not IsAvailable())
         return false;

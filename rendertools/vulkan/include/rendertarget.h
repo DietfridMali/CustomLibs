@@ -303,7 +303,7 @@ public:
 
     void ClearDepthBuffer(float clearValue = 1.0f);
 
-    void ClearStencilBuffer(void);
+    void ClearStencilBuffer(int clearValue = 0);
 
     // Share another render target's depth buffer: while set, activating this target binds the
     // source's depth image view as the depth attachment instead of an own one (this target needs

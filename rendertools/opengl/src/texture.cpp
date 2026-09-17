@@ -63,6 +63,11 @@ noexcept
 
 bool Texture::Create(void) {
     Destroy();
+    return CreateHandle();
+}
+
+
+bool Texture::CreateHandle(void) {
 #if USE_SHARED_HANDLES
     m_handle = SharedTextureHandle();
     m_isValid = m_handle.Claim() != 0;
@@ -71,6 +76,15 @@ bool Texture::Create(void) {
     m_isValid = m_handle != 0;
 #endif
     return m_isValid;
+}
+
+
+bool Texture::HasHandle(void) const noexcept {
+#if USE_SHARED_HANDLES
+    return m_handle.Data() != 0;
+#else
+    return m_handle != 0;
+#endif
 }
 
 
