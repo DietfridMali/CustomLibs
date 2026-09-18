@@ -666,6 +666,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     // the depth owner, so this works both for an own depth buffer AND a shared one (SetDepthSource) -- an
     // overlay buffer can then hardware-depth-test against the scene depth AND sample it. dbmWrite restores
     // DEPTH_WRITE, so a later normal pass transitions back on its own and never has to know about it.
+    m_depthMode = params.depthMode;
     SetDepthMode(params.depthMode);
     RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
     if ((depthOwner->m_depthBufferIndex >= 0) and pDSV) {
@@ -1126,6 +1127,8 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
 #if 0 // must be called before shader load in DirectX!
     baseRenderer.Set2DRenderStates(params.destination < 0);
 #endif

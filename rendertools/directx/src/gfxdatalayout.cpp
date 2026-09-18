@@ -12,6 +12,8 @@
 #include <new>
 #include <vector>
 
+extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
+
 // =================================================================================================
 // DX12 GfxDataLayout implementation
 
@@ -350,8 +352,10 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
     Shader* shader = baseShaderHandler.ActiveShader();
     if (shader) {
-        if (CommandList* cl = commandListHandler.CurrentCmdList())
+        if (CommandList* cl = commandListHandler.CurrentCmdList()) {
             cl->SetTopology(shader, m_shape);
+            ResolveDrawPipeline(cl, shader);
+        }
         ZoneScopedN("Shader::UpdateVariables");
         shader->UpdateVariables();
     }

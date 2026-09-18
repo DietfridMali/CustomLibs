@@ -559,7 +559,10 @@ public:
     // the ACTIVE depth buffer (own, or a shared source's) is considered. dbmWrite deliberately restores
     // nothing: every stage sets the states it needs (render state contract).
     inline void SetDepthMode(eDepthBufferMode depthMode) {
+        bool changed = (m_depthMode != depthMode);
         m_depthMode = depthMode;
+        if (changed and m_isInRendering)
+            SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = false, .reactivate = true, .depthMode = depthMode });
         if (depthMode != dbmReadOnly)
             return;
         gfxStates.SetDepthWrite(0);

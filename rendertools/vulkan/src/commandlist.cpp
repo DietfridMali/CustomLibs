@@ -494,6 +494,19 @@ void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/) noe
 }
 
 
+static RenderStates lastPipelineStates;
+static CommandList* lastPipelineList = nullptr;
+static Shader* lastPipelineShader = nullptr;
+
+bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept
+{
+    if ((cl->m_activePipeline != VK_NULL_HANDLE) and (cl == lastPipelineList) and (shader == lastPipelineShader)
+        and (baseRenderer.RenderStates() == lastPipelineStates))
+        return true;
+    return cl->GetPipeline(shader) != VK_NULL_HANDLE;
+}
+
+
 VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
 {
     // PipelineKey {shader, RenderStates, colour/depth formats}.
@@ -530,6 +543,9 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
     if (p != VK_NULL_HANDLE) {
         SetActivePipeline(p, shader);
         m_activeTopology = key.states.topology;
+        lastPipelineStates = key.states;
+        lastPipelineList = this;
+        lastPipelineShader = shader;
     }
     return p;
 }

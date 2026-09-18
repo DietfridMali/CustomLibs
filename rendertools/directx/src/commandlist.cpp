@@ -336,11 +336,26 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
 }
 
 
+static RenderStates lastPipelineStates;
+static CommandList* lastPipelineList = nullptr;
+static Shader* lastPipelineShader = nullptr;
+
+bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept {
+    if ((cl->m_activePSO != nullptr) and (cl == lastPipelineList) and (shader == lastPipelineShader)
+        and (baseRenderer.RenderStates() == lastPipelineStates))
+        return true;
+    return cl->GetPSO(shader) != nullptr;
+}
+
+
 ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
     ID3D12PipelineState* pso = PSO::GetPSO(shader);
     if (pso) {
         SetActivePSO(pso, shader);
         m_activeTopology = baseRenderer.RenderStates().topology;
+        lastPipelineStates = baseRenderer.RenderStates();
+        lastPipelineList = this;
+        lastPipelineShader = shader;
     }
     return pso;
 }

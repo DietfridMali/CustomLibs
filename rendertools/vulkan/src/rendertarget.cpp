@@ -835,8 +835,6 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
         ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length())))
         return false;
 
-    SetDepthMode(params.depthMode);
-
     // AttachBuffer/DetachBuffer issue image-layout barriers, which Vulkan forbids inside an active
     // vkCmdBeginRendering scope. When this is called mid-pass -- a post-effect switching the scene
     // buffer to colour-0-only and back (the wet-splat composite, the single-output overlays) -- close
@@ -846,6 +844,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     bool wasRendering = m_isInRendering;
     if (wasRendering)
         EndRendering();
+    SetDepthMode(params.depthMode);
 
     if (params.drawBufferGroup == dbDepth) {
         for (int i = 0; i < m_colorBufferCount; ++i)
@@ -1444,6 +1443,8 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     }
     baseRenderer.PushMatrix();
     bool applyTransformation = UpdateTransformation(params);
+    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+    gfxStates.SetFaceCulling(0);
     if (params.shader) {
         if (applyTransformation)
             params.shader->UpdateMatrices();

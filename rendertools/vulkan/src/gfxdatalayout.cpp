@@ -13,6 +13,8 @@
 #include <new>
 #include <vector>
 
+extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
+
 // =================================================================================================
 // Vulkan GfxDataLayout implementation
 //
@@ -340,8 +342,10 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     // materialize the bind table into a VkDescriptorSet for this draw.
     Shader* shader = baseShaderHandler.ActiveShader();
     if (shader) {
-        if (CommandList* cl = commandListHandler.CurrentCmdList())
+        if (CommandList* cl = commandListHandler.CurrentCmdList()) {
             cl->SetTopology(shader, m_shape);
+            ResolveDrawPipeline(cl, shader);
+        }
         shader->UpdateVariables();
     }
     //gfxStates.CheckError();
