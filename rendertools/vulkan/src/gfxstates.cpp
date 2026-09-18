@@ -463,6 +463,15 @@ void GfxStates::SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, co
 }
 
 
+void GfxStates::RestoreViewport(void) noexcept {
+    if ((m_viewport[2] <= 0) or (m_viewport[3] <= 0))
+        return;
+    GfxTypes::Int scissor[4] = { m_scissor[0], m_scissor[1], m_scissor[2], m_scissor[3] };
+    SetViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+    SetScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+}
+
+
 int GfxStates::MaxTextureUnits(void) noexcept {
     return int(CommandListHandler::kSrvSlots);
 }

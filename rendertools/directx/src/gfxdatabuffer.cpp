@@ -144,10 +144,17 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // slot still referenced by an already-recorded draw — so a same-frame re-update takes a
     // fresh resource. The previous one stays alive via gfxResourceHandler's per-frame tracking
     // until the next Cleanup / FlushResources.
+    //
+    // A static buffer has no slot rotation to protect it, so ANY update of one that already holds
+    // data is treated the same way: the frame before may still be in flight with a draw that reads
+    // slot 0, and writing the new data into it would hand that draw the next frame's vertices.
     const uint64_t frameNumber = commandListHandler.FrameNumber();
     const int slot = m_isDynamic ? commandListHandler.FrameIndex() : 0;
     const bool sameFrameReupdate = (frameNumber == m_lastUpdateFrame);
-    if (sameFrameReupdate or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
+    const bool needsFreshBuffer = sameFrameReupdate or not m_isDynamic;
+    if (needsFreshBuffer or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
+        if (m_resource[slot])
+            gfxResourceHandler.Track(m_resource[slot]);
         if (not Create(slot, dataSize))
             return false;
     }

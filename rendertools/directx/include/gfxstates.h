@@ -217,7 +217,7 @@ class GfxStates
 private:
     RenderStates            m_renderStates;
     List<TextureSlotInfo>   m_slotInfos;
-    GfxTypes::Int           m_viewport[4];
+    GfxTypes::Int           m_viewport[4]{ 0, 0, 0, 0 };
     GfxTypes::Int           m_scissor[4]{ 0, 0, 0, 0 };
     int                     m_maxTextureSize{ 0 };
     uint64_t                m_maxAllocSize{ 0 };
@@ -381,9 +381,9 @@ public:
 
     inline int SetFaceCulling(int state) {
         auto& s = ActiveState();
-        int prevState = (s.cullMode != GfxOperations::CullFace::None) ? 1 : 0;
+        int prevState = int(s.faceCulling);
         if (state >= 0)
-            s.cullMode = state ? GfxOperations::CullFace::Back : GfxOperations::CullFace::None;
+            s.faceCulling = uint8_t(state ? 1 : 0);
         return prevState;
     }
 
@@ -670,6 +670,8 @@ public:
     // The scissor rectangle, in the same window pixel coordinates as SetViewport () (origin top left).
     // SetViewport () resets it to the viewport, so a caller that wants a smaller one sets it afterwards.
     void SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept;
+
+    void RestoreViewport(void) noexcept;
 
     using DrawBufferList = AutoArray <GfxTypes::Uint>;
 

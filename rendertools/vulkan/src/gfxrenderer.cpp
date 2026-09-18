@@ -183,6 +183,7 @@ void GfxRenderer::Cleanup(void) noexcept {
     commandListHandler.CmdQueue().WaitIdle();
     SavePipelineCache();
     GfxDataLayout::DestroyDefaultStreams();
+    Shader::DestroyDefaultResources();
     meshHandler.Destroy();
     gfxResourceHandler.Cleanup(0);
     gfxResourceHandler.Cleanup(1);

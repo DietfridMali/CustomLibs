@@ -328,10 +328,11 @@ void CommandList::Reset(void) noexcept
 }
 
 
-bool CommandList::Open(bool saveRenderStates) noexcept
+bool CommandList::Open(bool saveRenderStates, bool detached) noexcept
 {
     if (m_isRecording)
         return true;
+    m_isDetached = detached;
     uint32_t fi = ActiveFrameIndex();
     if ((m_pools[fi] == VK_NULL_HANDLE) or (m_cmdBuffers[fi] == VK_NULL_HANDLE))
         return false;
@@ -352,7 +353,10 @@ bool CommandList::Open(bool saveRenderStates) noexcept
     m_isFlushed = false;
     m_activePipeline = VK_NULL_HANDLE;
     ++m_executionCounter;
-    commandListHandler.PushCmdList(this);
+    if (detached)
+        commandListHandler.Register(this);
+    else
+        commandListHandler.PushCmdList(this);
     // Track as open. Close() will register the CL in m_pendingLists at close-order,
     // which is what the submit sequence uses. ExecuteAll forces a Close on anything
     // still in m_openLists at frame end.
@@ -362,8 +366,11 @@ bool CommandList::Open(bool saveRenderStates) noexcept
         uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
         (const char*)m_name, size_t(m_name.Length()), m_cmdBuffers[fi], true);
 #endif
+    if (detached)
+        return true;
     if (saveRenderStates)
         PushRenderStates();
+    gfxStates.RestoreViewport();
 #ifdef _DEBUG
     //gfxStates.CheckError();
 #endif
@@ -387,6 +394,10 @@ void CommandList::Close(bool restoreRenderStates) noexcept
 #ifdef _DEBUG
     gfxStates.CheckError((const char*)m_name);
 #endif
+    if (m_isDetached) {
+        commandListHandler.Register(this);
+        return;
+    }
     commandListHandler.PopCmdList();
     // Register in pendingLists in close-order. ExecuteAll iterates pendingLists in
     // this order, so the CL whose Close() ran first is submitted first.
@@ -404,14 +415,25 @@ void CommandList::Flush(void) noexcept
     Close();
 
     uint32_t fi = ActiveFrameIndex();
-    VkCommandBufferSubmitInfo cbInfo{};
-    cbInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-    cbInfo.commandBuffer = m_cmdBuffers[fi];
+    VkCommandBufferSubmitInfo cbInfos[2]{};
+    uint32_t cbCount = 0;
+    CommandList* uploadList = commandListHandler.m_uploadList;
+    if (uploadList and (uploadList != this)) {
+        uploadList->m_isFlushed = true;
+        uploadList->Close();
+        commandListHandler.m_uploadList = nullptr;
+        cbInfos[cbCount].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        cbInfos[cbCount].commandBuffer = uploadList->m_cmdBuffers[fi];
+        ++cbCount;
+    }
+    cbInfos[cbCount].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+    cbInfos[cbCount].commandBuffer = m_cmdBuffers[fi];
+    ++cbCount;
 
     VkSubmitInfo2 submit{};
     submit.sType  = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submit.commandBufferInfoCount = 1;
-    submit.pCommandBufferInfos = &cbInfo;
+    submit.commandBufferInfoCount = cbCount;
+    submit.pCommandBufferInfos = cbInfos;
 
     VkResult res = vkQueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
     if (res != VK_SUCCESS)
@@ -636,6 +658,7 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
         if (l->IsRecording())
             l->Close();
     }
+    m_uploadList = nullptr;
 
     if (m_pendingLists.IsEmpty())
         return;
@@ -697,6 +720,50 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 }
 
 
+void CommandListHandler::ExecutePending(void) noexcept
+{
+    ZoneScopedN("ExecutePending");
+    // The upload list is registered when it is opened, so that it runs ahead of the frame - it is the one
+    // pending list that may still be recording. It goes out with the rest; the next upload opens a new one.
+    if (m_uploadList) {
+        m_uploadList->Close();
+        m_uploadList = nullptr;
+    }
+    if (m_pendingLists.IsEmpty())
+        return;
+
+    AutoArray<VkCommandBufferSubmitInfo> cbInfos(m_pendingLists.Length());
+    int n = 0;
+    for (auto l : m_pendingLists) {
+        if (l->IsFlushed())
+            continue;
+        VkCommandBufferSubmitInfo info{};
+        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        info.commandBuffer = l->GfxList(true);
+        cbInfos[n++] = info;
+    }
+    if (n > 0) {
+        VkSubmitInfo2 submit{};
+        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submit.commandBufferInfoCount = uint32_t(n);
+        submit.pCommandBufferInfos = cbInfos.Data();
+
+        VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
+        if (res != VK_SUCCESS)
+            fprintf(stderr, "CommandListHandler::ExecutePending: vkQueueSubmit2 failed (%d)\n", (int)res);
+    }
+#ifdef _DEBUG
+    gfxStates.CheckError("CommandListHandler::ExecutePending submit");
+#endif
+    m_cmdQueue.WaitIdle();
+    for (auto l : m_pendingLists) {
+        if (l->IsTemporary())
+            m_recycledLists.Push(l);
+    }
+    m_pendingLists.Clear();
+}
+
+
 CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary) noexcept
 {
     if (isTemporary and not m_recycledLists.IsEmpty()) {
@@ -713,6 +780,63 @@ CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTempor
     cl->Reset();
     ++m_cmdListCount;
     return cl;
+}
+
+
+bool CommandListHandler::IsInRendering(void) noexcept
+{
+    VkCommandBuffer cb = CurrentGfxList();
+    if (cb == VK_NULL_HANDLE)
+        return false;
+    if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == cb))
+        return true;
+    RenderTarget* rt = baseRenderer.GetActiveBuffer();
+    return rt and rt->m_isInRendering and rt->m_cmdList and (rt->m_cmdList->GfxList() == cb);
+}
+
+
+CommandListHandler::RenderingScope CommandListHandler::SuspendRendering(void) noexcept
+{
+    RenderingScope scope;
+    VkCommandBuffer cb = CurrentGfxList();
+    if (cb == VK_NULL_HANDLE)
+        return scope;
+    if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == cb)) {
+        baseDisplayHandler.SuspendBackBuffer();
+        scope.backBuffer = true;
+        return scope;
+    }
+    RenderTarget* rt = baseRenderer.GetActiveBuffer();
+    if (rt and rt->m_isInRendering and rt->m_cmdList and (rt->m_cmdList->GfxList() == cb)) {
+        rt->EndRendering();
+        scope.target = rt;
+    }
+    return scope;
+}
+
+
+void CommandListHandler::ResumeRendering(const RenderingScope& scope) noexcept
+{
+    if (scope.backBuffer)
+        baseDisplayHandler.EnableBackBuffer();
+    else if (scope.target)
+        scope.target->BeginRendering(false, false);
+}
+
+
+VkCommandBuffer CommandListHandler::UploadCmdBuffer(void) noexcept
+{
+    if (not m_uploadList) {
+        CommandList* cl = CreateCmdList(String("Upload"), true);
+        if (not cl)
+            return VK_NULL_HANDLE;
+        if (not cl->Open(false, true)) {
+            m_recycledLists.Push(cl);
+            return VK_NULL_HANDLE;
+        }
+        m_uploadList = cl;
+    }
+    return m_uploadList->GfxList();
 }
 
 // =================================================================================================

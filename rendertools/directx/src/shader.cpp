@@ -813,9 +813,15 @@ int Shader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/)
 }
 
 
+// A column_major float3x3 in a cbuffer keeps each column in a 16-byte slot (the last one takes 12), so
+// the nine floats are spread over 44 bytes - handed over packed, the second column would start in the
+// first one's padding.
 int Shader::SetMatrix3f(const char* name, float* data, bool /*transpose*/) noexcept
 {
-    return SetB1Field(name, data, 9 * sizeof(float));
+    float padded[11] { };
+    for (int column = 0; column < 3; ++column)
+        std::memcpy(padded + column * 4, data + column * 3, 3 * sizeof(float));
+    return SetB1Field(name, padded, sizeof(padded));
 }
 
 

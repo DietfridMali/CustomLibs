@@ -240,6 +240,12 @@ public:
         BumpFrameIndex();
     }
 
+    // The screen buffer is being drawn into by a client that activates it ITSELF, without the clear
+    // and the 2D setup of Start2DScene () - DrawScreen () only puts it on the back buffer when it knows.
+    inline void SetScreenAvailable(bool available) noexcept {
+        m_screenIsAvailable = available;
+    }
+
     inline void SetSceneViewport(Viewport viewport) noexcept { m_sceneViewport = viewport; }
 
     inline ::Viewport GetSceneViewport(void) noexcept { return m_sceneViewport; }

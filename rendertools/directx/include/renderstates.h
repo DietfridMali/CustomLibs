@@ -27,6 +27,7 @@ struct RenderStates {
 
     // Rasterizer
     CullFace    cullMode{ CullFace::Back };
+    uint8_t     faceCulling{ 1 };
     Winding     winding{ Winding::Regular };
     FillMode    fillMode{ FillMode::Solid };
     // Depth-stencil

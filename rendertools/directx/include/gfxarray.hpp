@@ -27,8 +27,15 @@ public:
 
     AutoArray<DATA_T>                   m_data;
     ComPtr<ID3D12Resource>              m_resource;
-    ComPtr<ID3D12Resource>              m_upload;
+    ComPtr<ID3D12Resource>              m_upload[CommandQueue::FRAME_COUNT];
     ComPtr<ID3D12Resource>              m_readback;
+    uint64_t                            m_appendFrame{ UINT64_MAX };
+    int                                 m_appendBase{ 0 };
+    // What of a slot's upload buffer holds data whose copy has been recorded in the current frame but
+    // has not run yet - see AcquireUpload ().
+    uint64_t                            m_stagedFrame[CommandQueue::FRAME_COUNT]{};
+    size_t                              m_stagedMin[CommandQueue::FRAME_COUNT]{};
+    size_t                              m_stagedMax[CommandQueue::FRAME_COUNT]{};
     DescriptorHandle                    m_uavHandle;
     DescriptorHandle                    m_srvHandle;
     ComPtr<ID3D12DescriptorHeap>        m_cpuHeap;
@@ -71,8 +78,10 @@ public:
                 if (m_srvHandle.IsValid())
                     gfxResourceHandler.Track(m_srvHandle);
                 gfxResourceHandler.Track(m_resource);
-                if (m_upload)
-                    gfxResourceHandler.Track(m_upload);
+                for (auto& upload : m_upload) {
+                    if (upload)
+                        gfxResourceHandler.Track(upload);
+                }
                 if (m_readback)
                     gfxResourceHandler.Track(m_readback);
             }
@@ -81,11 +90,29 @@ public:
             m_cpuHeap.Reset();
             m_cpuUavHandle = {};
             m_resource.Reset();
-            m_upload.Reset();
+            for (auto& upload : m_upload)
+                upload.Reset();
             m_readback.Reset();
         }
         m_data.Reset();
         m_width = m_height = 0;
+        m_appendFrame = UINT64_MAX;
+        m_appendBase = 0;
+    }
+
+    int AppendBase(void) noexcept {
+        uint64_t frame = commandListHandler.FrameNumber();
+        if (frame != m_appendFrame) {
+            m_appendFrame = frame;
+            m_appendBase = 0;
+        }
+        return m_appendBase;
+    }
+
+    void SetAppendBase(int base) noexcept {
+        AppendBase();
+        if (base > m_appendBase)
+            m_appendBase = base;
     }
 
     void SetBarrier(ID3D12GraphicsCommandList* list, D3D12_RESOURCE_STATES after) {
@@ -170,7 +197,9 @@ public:
 
     // Upload only [first, first+count) elements (structured-buffer path); leaves the rest of the
     // GPU buffer untouched. Used to spawn one particle system without resetting the others.
-    bool UploadRange(int first, int count) {
+    // ordered: same parameter as the Vulkan backend's. A copy is legal wherever it is recorded here, so
+    // every upload stays in recording order and the flag changes nothing.
+    bool UploadRange(int first, int count, bool /*ordered*/ = true) {
         if constexpr (isBuffer)
             return UploadBufferRange(first, count);
         else
@@ -178,6 +207,35 @@ public:
     }
 
 private:
+    // The frame slot's upload buffer for a copy of [offset, offset + bytes). A recorded copy runs when
+    // the frame is executed, so a second upload in the same frame that overlaps a range already staged
+    // would replace the data the first copy is still going to read. Such an upload gets an upload
+    // buffer of its own (the caller creates it); the old one is released once the frame is through.
+    // Disjoint ranges share the buffer.
+    ComPtr<ID3D12Resource>& AcquireUpload(size_t offset, size_t bytes) {
+        const int fi = commandListHandler.FrameIndex();
+        const uint64_t frame = commandListHandler.FrameNumber();
+        ComPtr<ID3D12Resource>& upload = m_upload[fi];
+        bool sameFrame = upload and (m_stagedFrame[fi] == frame) and (m_stagedMax[fi] > m_stagedMin[fi]);
+        if (sameFrame and (offset < m_stagedMax[fi]) and (offset + bytes > m_stagedMin[fi])) {
+            gfxResourceHandler.Track(upload);
+            upload.Reset();
+            sameFrame = false;
+        }
+        if (sameFrame) {
+            if (offset < m_stagedMin[fi])
+                m_stagedMin[fi] = offset;
+            if (offset + bytes > m_stagedMax[fi])
+                m_stagedMax[fi] = offset + bytes;
+        }
+        else {
+            m_stagedMin[fi] = offset;
+            m_stagedMax[fi] = offset + bytes;
+        }
+        m_stagedFrame[fi] = frame;
+        return upload;
+    }
+
     bool CreateTexture(int width, int height) {
         Destroy();
         m_width = UINT(width);
@@ -311,7 +369,8 @@ private:
         UINT64 rowSizeInBytes, totalBytes;
         device->GetCopyableFootprints(&resDesc, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalBytes);
 
-        if (not m_upload) {
+        ComPtr<ID3D12Resource>& upload = AcquireUpload(0, size_t(totalBytes));
+        if (not upload) {
             D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
             D3D12_RESOURCE_DESC rd{};
             rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -319,13 +378,13 @@ private:
             rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
             rd.SampleDesc.Count = 1;
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_upload))))
+            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
                 return false;
         }
 
         void* mapped = nullptr;
         D3D12_RANGE readRange{ 0, 0 };
-        if (FAILED(m_upload->Map(0, &readRange, &mapped)))
+        if (FAILED(upload->Map(0, &readRange, &mapped)))
             return false;
 
         UINT srcRowPitch = m_width * sizeof(DATA_T);
@@ -333,7 +392,7 @@ private:
         const uint8_t* src = reinterpret_cast<const uint8_t*>(m_data.Data());
         for (UINT row = 0; row < numRows; ++row)
             std::memcpy(dst + row * footprint.Footprint.RowPitch, src + row * srcRowPitch, srcRowPitch);
-        m_upload->Unmap(0, nullptr);
+        upload->Unmap(0, nullptr);
 
         auto* list = commandListHandler.CurrentGfxList();
         if (not list)
@@ -346,7 +405,7 @@ private:
         dstLoc.SubresourceIndex = 0;
 
         D3D12_TEXTURE_COPY_LOCATION srcLoc{};
-        srcLoc.pResource = m_upload.Get();
+        srcLoc.pResource = upload.Get();
         srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
         srcLoc.PlacedFootprint = footprint;
 
@@ -364,7 +423,8 @@ private:
 
         size_t byteSize = size_t(DataSize());
 
-        if (not m_upload) {
+        ComPtr<ID3D12Resource>& upload = AcquireUpload(0, byteSize);
+        if (not upload) {
             D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
             D3D12_RESOURCE_DESC rd{};
             rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -372,22 +432,22 @@ private:
             rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
             rd.SampleDesc.Count = 1;
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_upload))))
+            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
                 return false;
         }
 
         void* mapped = nullptr;
         D3D12_RANGE readRange{ 0, 0 };
-        if (FAILED(m_upload->Map(0, &readRange, &mapped)))
+        if (FAILED(upload->Map(0, &readRange, &mapped)))
             return false;
         std::memcpy(mapped, m_data.Data(), byteSize);
-        m_upload->Unmap(0, nullptr);
+        upload->Unmap(0, nullptr);
 
         auto* list = commandListHandler.CurrentGfxList();
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
-        list->CopyBufferRegion(m_resource.Get(), 0, m_upload.Get(), 0, byteSize);
+        list->CopyBufferRegion(m_resource.Get(), 0, upload.Get(), 0, byteSize);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         return true;
     }
@@ -406,7 +466,8 @@ private:
         if (offset + bytes > fullSize)
             return false;
 
-        if (not m_upload) {
+        ComPtr<ID3D12Resource>& upload = AcquireUpload(offset, bytes);
+        if (not upload) {
             D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
             D3D12_RESOURCE_DESC rd{};
             rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -414,22 +475,22 @@ private:
             rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
             rd.SampleDesc.Count = 1;
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&m_upload))))
+            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
                 return false;
         }
 
         void* mapped = nullptr;
         D3D12_RANGE readRange{ 0, 0 };
-        if (FAILED(m_upload->Map(0, &readRange, &mapped)))
+        if (FAILED(upload->Map(0, &readRange, &mapped)))
             return false;
         std::memcpy(static_cast<uint8_t*>(mapped) + offset, reinterpret_cast<const uint8_t*>(m_data.Data()) + offset, bytes);
-        m_upload->Unmap(0, nullptr);
+        upload->Unmap(0, nullptr);
 
         auto* list = commandListHandler.CurrentGfxList();
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
-        list->CopyBufferRegion(m_resource.Get(), offset, m_upload.Get(), offset, bytes);
+        list->CopyBufferRegion(m_resource.Get(), offset, upload.Get(), offset, bytes);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         return true;
     }

@@ -148,6 +148,17 @@ public:
     static constexpr uint32_t kDynamicOffsetCount = 1 + kStageCount;
     uint32_t  m_dynamicOffsets[kDynamicOffsetCount] { };
 
+    enum DefaultViewType : uint8_t {
+        dvNone = 0,
+        dv2D,
+        dv2DArray,
+        dvCube,
+        dv3D
+    };
+
+    uint8_t   m_srvDefaults[kSrvSlots] { };
+    bool      m_samplerDeclared[kSamplerSlots] { };
+
     // Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
     std::vector<VkVertexInputAttributeDescription> m_vsInputAttributes;
     std::vector<VkVertexInputBindingDescription>   m_vsInputBindings;
@@ -249,6 +260,10 @@ public:
     void BuildVertexInput(void) noexcept;
 
     void UpdateStageFields(const std::vector<uint8_t>& spirv, int stage) noexcept;
+
+    void UpdateStageResources(const std::vector<uint8_t>& spirv) noexcept;
+
+    static void DestroyDefaultResources(void) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as DX12 / OGL, return int (was GLint)

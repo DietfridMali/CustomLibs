@@ -17,6 +17,10 @@
 #include "descriptor_pool_handler.h"
 #include "gfxrenderer.h"
 #include "base_displayhandler.h"
+#include "image_layout_tracker.h"
+#include "sampler_cache.h"
+#include "texturesampling.h"
+#include "vkupload.h"
 #include <spirv_reflect.h>
 
 // =================================================================================================
@@ -132,7 +136,145 @@ static std::vector<const wchar_t*> StageArgs(int stage)
     return args;
 }
 
+
+struct DefaultImage {
+    VkImage             image { VK_NULL_HANDLE };
+    VmaAllocation       allocation { VK_NULL_HANDLE };
+    ImageLayoutTracker  tracker;
+};
+
+
+struct DefaultResources {
+    DefaultImage    flat;
+    DefaultImage    cube;
+    DefaultImage    volume;
+    VkImageView     views[5] { };
+    bool            attempted { false };
+};
+
+static DefaultResources defaultResources;
+
+static const uint8_t defaultPixel[4] = { 255, 255, 255, 255 };
+
+
+static bool CreateDefaultImage(DefaultImage& target, uint32_t layers, VkImageCreateFlags flags) noexcept
+{
+    VmaAllocator allocator = vkContext.Allocator();
+    if (allocator == VK_NULL_HANDLE)
+        return false;
+
+    VkImageCreateInfo info { };
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.flags = flags;
+    info.imageType = VK_IMAGE_TYPE_2D;
+    info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    info.extent.width = 1;
+    info.extent.height = 1;
+    info.extent.depth = 1;
+    info.mipLevels = 1;
+    info.arrayLayers = layers;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VmaAllocationCreateInfo allocInfo { };
+    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+
+    VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &target.image, &target.allocation, nullptr);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Shader: default image creation failed (%d)\n", int(res));
+        return false;
+    }
+    target.tracker.Init(target.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    const uint8_t* faces[6] = { defaultPixel, defaultPixel, defaultPixel, defaultPixel, defaultPixel, defaultPixel };
+    return UploadTextureData(target.image, target.tracker, faces, int(layers), 1, 1, 4);
+}
+
+
+static VkImageView CreateDefaultView(VkImage image, VkImageViewType viewType) noexcept
+{
+    VkDevice device = vkContext.Device();
+    if ((device == VK_NULL_HANDLE) or (image == VK_NULL_HANDLE))
+        return VK_NULL_HANDLE;
+
+    VkImageViewCreateInfo info { };
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    info.image = image;
+    info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    info.viewType = viewType;
+    info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    info.subresourceRange.baseMipLevel = 0;
+    info.subresourceRange.levelCount = 1;
+    info.subresourceRange.baseArrayLayer = 0;
+    info.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+
+    VkImageView view = VK_NULL_HANDLE;
+    VkResult res = vkCreateImageView(device, &info, nullptr, &view);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Shader: default image view creation failed (%d)\n", int(res));
+        return VK_NULL_HANDLE;
+    }
+    return view;
+}
+
+
+static void CreateDefaultResources(void) noexcept
+{
+    DefaultResources& r = defaultResources;
+    r.attempted = true;
+    if (CreateDefaultImage(r.flat, 1, 0)) {
+        r.views[Shader::dv2D] = CreateDefaultView(r.flat.image, VK_IMAGE_VIEW_TYPE_2D);
+        r.views[Shader::dv2DArray] = CreateDefaultView(r.flat.image, VK_IMAGE_VIEW_TYPE_2D_ARRAY);
+    }
+    if (CreateDefaultImage(r.cube, 6, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT))
+        r.views[Shader::dvCube] = CreateDefaultView(r.cube.image, VK_IMAGE_VIEW_TYPE_CUBE);
+    if (Upload3DTextureData(1, 1, 1, VK_FORMAT_R8G8B8A8_UNORM, 4, defaultPixel, r.volume.image, r.volume.allocation, r.volume.tracker))
+        r.views[Shader::dv3D] = CreateDefaultView(r.volume.image, VK_IMAGE_VIEW_TYPE_3D);
+}
+
+
+static VkImageView DefaultView(uint8_t viewType) noexcept
+{
+    if (viewType == Shader::dvNone)
+        return VK_NULL_HANDLE;
+    if (not defaultResources.attempted)
+        CreateDefaultResources();
+    return defaultResources.views[viewType];
+}
+
+
+static void DestroyDefaultImage(DefaultImage& target) noexcept
+{
+    VmaAllocator allocator = vkContext.Allocator();
+    if ((allocator != VK_NULL_HANDLE) and (target.image != VK_NULL_HANDLE))
+        vmaDestroyImage(allocator, target.image, target.allocation);
+    target = DefaultImage { };
+}
+
 }  // namespace
+
+
+void Shader::DestroyDefaultResources(void) noexcept
+{
+    DefaultResources& r = defaultResources;
+    VkDevice device = vkContext.Device();
+    for (VkImageView& view : r.views) {
+        if ((device != VK_NULL_HANDLE) and (view != VK_NULL_HANDLE))
+            vkDestroyImageView(device, view, nullptr);
+        view = VK_NULL_HANDLE;
+    }
+    DestroyDefaultImage(r.flat);
+    DestroyDefaultImage(r.cube);
+    DestroyDefaultImage(r.volume);
+    r.attempted = false;
+}
 
 
 bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target,
@@ -367,6 +509,48 @@ void Shader::UpdateStageFields(const std::vector<uint8_t>& spirv, int stage) noe
 }
 
 
+void Shader::UpdateStageResources(const std::vector<uint8_t>& spirv) noexcept
+{
+    if (spirv.empty())
+        return;
+
+    SpvReflectShaderModule module{};
+    if (spvReflectCreateShaderModule(spirv.size(), spirv.data(), &module) != SPV_REFLECT_RESULT_SUCCESS)
+        return;
+
+    uint32_t count = 0;
+    spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
+    std::vector<SpvReflectDescriptorBinding*> bindings(count);
+    spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
+
+    for (auto* b : bindings) {
+        if (not b or (b->set != 0))
+            continue;
+        if ((b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER) and (b->binding >= kSamplerBase) and (b->binding < kSamplerBase + kSamplerSlots)) {
+            m_samplerDeclared[b->binding - kSamplerBase] = true;
+            continue;
+        }
+        if ((b->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE) or (b->binding < kSrvBase) or (b->binding >= kSrvBase + kSrvSlots))
+            continue;
+        if (not b->type_description or not (b->type_description->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT))
+            continue;
+        if (b->image.ms != 0)
+            continue;
+
+        uint8_t viewType = dvNone;
+        if (b->image.dim == SpvDim2D)
+            viewType = b->image.arrayed ? dv2DArray : dv2D;
+        else if ((b->image.dim == SpvDimCube) and not b->image.arrayed)
+            viewType = dvCube;
+        else if (b->image.dim == SpvDim3D)
+            viewType = dv3D;
+        m_srvDefaults[b->binding - kSrvBase] = viewType;
+    }
+
+    spvReflectDestroyShaderModule(&module);
+}
+
+
 uint32_t Shader::ReflectPatchControlPoints(const std::vector<uint8_t>& spirv) noexcept
 {
     SpvReflectShaderModule module{};
@@ -444,6 +628,12 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (not m_dsSpirv.empty())
         UpdateStageFields(m_dsSpirv, kStageDS);
 
+    UpdateStageResources(m_vsSpirv);
+    UpdateStageResources(m_fsSpirv);
+    UpdateStageResources(m_gsSpirv);
+    UpdateStageResources(m_hsSpirv);
+    UpdateStageResources(m_dsSpirv);
+
     // Allocate per-stage staging buffers sized to the reflected b1 size.
     for (int s = 0; s < kStageCount; ++s) {
         if (m_stages[s].size > 0)
@@ -473,6 +663,8 @@ void Shader::Destroy(void) noexcept
     m_locations.Clear();
     m_vsInputAttributes.clear();
     m_vsInputBindings.clear();
+    std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
+    std::memset(m_samplerDeclared, 0, sizeof(m_samplerDeclared));
 
     if (device != VK_NULL_HANDLE) {
         if (m_pipelineLayout != VK_NULL_HANDLE) {
@@ -544,6 +736,8 @@ Shader& Shader::Move(Shader& other) noexcept
         }
         m_vsInputAttributes = std::move(other.m_vsInputAttributes);
         m_vsInputBindings = std::move(other.m_vsInputBindings);
+        std::memcpy(m_srvDefaults, other.m_srvDefaults, sizeof(m_srvDefaults));
+        std::memcpy(m_samplerDeclared, other.m_samplerDeclared, sizeof(m_samplerDeclared));
     }
     return *this;
 }
@@ -673,15 +867,20 @@ bool Shader::UpdateVariables(void) noexcept {
     AddDynamicUbo(kBindingB1HS,  m_stages[kStageHS].size,             4);
     AddDynamicUbo(kBindingB1DS,  m_stages[kStageDS].size,             5);
 
-    // Sampled images (t-slots). Only slots with a non-null view are written; unbound slots
-    // keep whatever the descriptor pool initialized (validation will warn if a shader actually
-    // samples an unbound slot).
+    // Sampled images (t-slots). A slot the shader declares but nobody bound gets the default image of
+    // the declared view type (m_srvDefaults, reflected in UpdateStageResources ()); every other
+    // unbound slot is left unwritten.
     for (uint32_t i = 0; i < CommandListHandler::kSrvSlots; ++i) {
         VkImageView v = commandListHandler.m_boundSrvViews[i];
+        VkImageLayout layout = commandListHandler.m_boundSrvLayouts[i];
+        if (v == VK_NULL_HANDLE) {
+            v = DefaultView(m_srvDefaults[i]);
+            layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
         if (v == VK_NULL_HANDLE)
             continue;
         imgInfos[i].imageView   = v;
-        imgInfos[i].imageLayout = commandListHandler.m_boundSrvLayouts[i];
+        imgInfos[i].imageLayout = layout;
         imgInfos[i].sampler     = VK_NULL_HANDLE;
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -694,6 +893,8 @@ bool Shader::UpdateVariables(void) noexcept {
     }
     for (uint32_t i = 0; i < CommandListHandler::kSamplerSlots; ++i) {
         VkSampler s = commandListHandler.m_boundSamplers[i];
+        if ((s == VK_NULL_HANDLE) and m_samplerDeclared[i])
+            s = samplerCache.GetSampler(TextureSampling { });
         if (s == VK_NULL_HANDLE)
             continue;
         smpInfos[i].sampler = s;
@@ -871,9 +1072,15 @@ int Shader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/)
 }
 
 
+// A column_major float3x3 in a cbuffer keeps each column in a 16-byte slot (the last one takes 12), so
+// the nine floats are spread over 44 bytes - handed over packed, the second column would start in the
+// first one's padding.
 int Shader::SetMatrix3f(const char* name, float* data, bool /*transpose*/) noexcept
 {
-    return SetB1Field(name, data, 9 * sizeof(float));
+    float padded[11] { };
+    for (int column = 0; column < 3; ++column)
+        std::memcpy(padded + column * 4, data + column * 3, 3 * sizeof(float));
+    return SetB1Field(name, padded, sizeof(padded));
 }
 
 

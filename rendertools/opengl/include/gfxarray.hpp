@@ -116,7 +116,7 @@ public:
 
 	// Upload only [first, first+count) elements; leaves the rest of the GPU buffer untouched.
 	// Used to spawn one particle system without resetting the others.
-	bool UploadRange(int first, int count) {
+	bool UploadRange(int first, int count, bool /*ordered*/ = true) {
 		if (not m_handle or (count <= 0))
 			return false;
 		int elemSize = int(sizeof(DATA_T));
@@ -127,6 +127,15 @@ public:
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
 		glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, bytes, reinterpret_cast<const uint8_t*>(this->Data()) + size_t(offset));
 		return true;
+	}
+
+
+	inline int AppendBase(void) noexcept {
+		return 0;
+	}
+
+
+	inline void SetAppendBase(int /*base*/) noexcept {
 	}
 
 

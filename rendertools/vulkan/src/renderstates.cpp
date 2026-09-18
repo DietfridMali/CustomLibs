@@ -100,7 +100,7 @@ VkPipelineRasterizationStateCreateInfo& RenderStates::SetRasterizationInfo(VkPip
     info.depthClampEnable = depthClip ? VK_FALSE : VK_TRUE;  // Vk depthClampEnable is the inverse of DX12 DepthClip
     info.rasterizerDiscardEnable = VK_FALSE;
     info.polygonMode = (fillMode == GfxOperations::FillMode::Wireframe) ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;   // LINE needs fillModeNonSolid (VkContext enables it)
-    info.cullMode = ToVkCullMode(cullMode);
+    info.cullMode = faceCulling ? ToVkCullMode(cullMode) : VkCullModeFlags(VK_CULL_MODE_NONE);
     info.frontFace = ToVkFrontFace(winding);
     info.depthBiasEnable = (depthBias != 0) or (slopeScaledDepthBias != 0.0f) ? VK_TRUE : VK_FALSE;
     info.depthBiasConstantFactor = float(depthBias);

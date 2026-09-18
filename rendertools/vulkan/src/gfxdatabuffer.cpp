@@ -148,15 +148,20 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // layout during init, with no frame boundary between them) would overwrite a slot still
     // referenced by an already-recorded draw — so a same-frame re-update takes a fresh buffer
     // and defers the old one's destruction by one frame slot via gfxResourceHandler.
+    //
+    // A static buffer has no slot rotation to protect it, so ANY update of one that already holds
+    // data is treated the same way: the frame before may still be in flight with a draw that reads
+    // slot 0, and writing the new data into it would hand that draw the next frame's vertices.
     const uint64_t frameNumber = commandListHandler.CmdQueue().FrameNumber();
     const int slot = m_isDynamic ? int(commandListHandler.CmdQueue().FrameIndex()) : 0;
     const bool sameFrameReupdate = (frameNumber == m_lastUpdateFrame);
+    const bool needsFreshBuffer = sameFrameReupdate or not m_isDynamic;
 
-    if (sameFrameReupdate and m_buffer[slot].IsValid()) {
+    if (needsFreshBuffer and m_buffer[slot].IsValid()) {
         gfxResourceHandler.TrackCleanup([b = m_buffer[slot]]() mutable { b.Destroy(); });
         m_buffer[slot] = GfxBuffer { };
     }
-    if (sameFrameReupdate or (not m_buffer[slot].IsValid()) or (m_buffer[slot].Size() < dataSize)) {
+    if ((not m_buffer[slot].IsValid()) or (m_buffer[slot].Size() < dataSize)) {
         m_buffer[slot].Destroy();
         if (not Create(slot, dataSize))
             return false;

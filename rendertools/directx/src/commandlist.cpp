@@ -205,6 +205,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
 #endif
     if (saveRenderStates)
         PushRenderStates();
+    gfxStates.RestoreViewport();
 #if DBG_DIRECTX
     gfxStates.CheckError();
 #endif
@@ -501,6 +502,30 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     }
     m_pendingLists.Clear();
     m_cmdListStack.Clear();
+}
+
+
+void CommandListHandler::ExecutePending(void) noexcept {
+    ZoneScoped;
+    if (m_pendingLists.IsEmpty())
+        return;
+    AutoArray<ID3D12CommandList*> execList(m_pendingLists.Length());
+    int n = 0;
+    for (auto l : m_pendingLists) {
+        if (not l->IsFlushed())
+            execList[n++] = l->GfxList(true);
+    }
+    if (n > 0)
+        m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
+#if DBG_DIRECTX
+    gfxStates.CheckError();
+#endif
+    m_cmdQueue.WaitIdle();
+    for (auto l : m_pendingLists) {
+        if (l->m_isTemporary)
+            m_recycledLists.Push(l);
+    }
+    m_pendingLists.Clear();
 }
 
 

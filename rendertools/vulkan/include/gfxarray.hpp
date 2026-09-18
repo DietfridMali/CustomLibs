@@ -4,6 +4,7 @@
 #include "vkcontext.h"
 #include "vkupload.h"
 #include "commandlist.h"
+#include "resource_handler.h"
 #include "shader.h"
 #include "array.hpp"
 #include "gfxtypes.h"
@@ -61,6 +62,13 @@ public:
     uint32_t               m_width          { 0 };
     uint32_t               m_height         { 0 };
     uint32_t               m_bindingPoint   { 0 };
+    uint64_t               m_appendFrame    { UINT64_MAX };
+    int                    m_appendBase     { 0 };
+    // What of a slot's staging buffer holds data whose copy has been recorded in the current frame but
+    // has not run yet - see AcquireStaging ().
+    uint64_t               m_stagedFrame[CommandQueue::FRAME_COUNT] { };
+    VkDeviceSize           m_stagedMin  [CommandQueue::FRAME_COUNT] { };
+    VkDeviceSize           m_stagedMax  [CommandQueue::FRAME_COUNT] { };
 
     GfxArray() = default;
 
@@ -69,17 +77,51 @@ public:
     inline DATA_T* Data(void) { return m_data.Data(); }
     inline int     DataSize(void) { return m_data.DataSize(); }
 
-    bool Create(int width, int height = 1) {
-        // Recreating over a live buffer (grow-on-demand): previously SUBMITTED frames may still read
-        // it, and there is no deferred-destroy queue for buffers -- sync once before the destroy.
-        // The current frame's still-recording CB never references it (the caller recreates before
-        // Bind), so waiting on the submitted work is sufficient. Recreate is a rare event (a couple
-        // of doublings until the high-water mark), so the stall is acceptable.
-        if (m_buffer != VK_NULL_HANDLE) {
-            VkDevice device = vkContext.Device();
-            if (device != VK_NULL_HANDLE)
-                vkDeviceWaitIdle(device);
+    int AppendBase(void) noexcept {
+        uint64_t frame = commandListHandler.CmdQueue().FrameNumber();
+        if (frame != m_appendFrame) {
+            m_appendFrame = frame;
+            m_appendBase = 0;
         }
+        return m_appendBase;
+    }
+
+    void SetAppendBase(int base) noexcept {
+        AppendBase();
+        if (base > m_appendBase)
+            m_appendBase = base;
+    }
+
+    void ReleaseDeferred(void) {
+        VmaAllocator allocator = vkContext.Allocator();
+        if (allocator == VK_NULL_HANDLE)
+            return;
+        if (m_buffer != VK_NULL_HANDLE) {
+            gfxResourceHandler.TrackCleanup([allocator, buffer = m_buffer, allocation = m_allocation]() {
+                vmaDestroyBuffer(allocator, buffer, allocation);
+            });
+            m_buffer = VK_NULL_HANDLE;
+            m_allocation = VK_NULL_HANDLE;
+        }
+        for (uint32_t i = 0; i < CommandQueue::FRAME_COUNT; ++i) {
+            if (m_uploadBuffer[i] != VK_NULL_HANDLE) {
+                gfxResourceHandler.TrackCleanup([allocator, buffer = m_uploadBuffer[i], allocation = m_uploadAlloc[i]]() {
+                    vmaDestroyBuffer(allocator, buffer, allocation);
+                });
+                m_uploadBuffer[i] = VK_NULL_HANDLE;
+                m_uploadAlloc[i] = VK_NULL_HANDLE;
+            }
+        }
+        if (m_readbackBuffer != VK_NULL_HANDLE) {
+            gfxResourceHandler.TrackCleanup([allocator, buffer = m_readbackBuffer, allocation = m_readbackAlloc]() {
+                vmaDestroyBuffer(allocator, buffer, allocation);
+            });
+            m_readbackBuffer = VK_NULL_HANDLE;
+            m_readbackAlloc = VK_NULL_HANDLE;
+        }
+    }
+
+    bool Create(int width, int height = 1) {
         Destroy();
         m_width  = uint32_t(width);
         m_height = uint32_t(height);
@@ -109,30 +151,15 @@ public:
         return true;
     }
 
+    // Deferred, like GfxBuffer::Destroy (): the frame that is being recorded and the one still in flight
+    // may both reference the buffers through their descriptor sets and recorded copies.
     void Destroy(void) {
-        VmaAllocator allocator = vkContext.Allocator();
-        if (allocator != VK_NULL_HANDLE) {
-            if (m_buffer != VK_NULL_HANDLE) {
-                vmaDestroyBuffer(allocator, m_buffer, m_allocation);
-                m_buffer = VK_NULL_HANDLE;
-                m_allocation = VK_NULL_HANDLE;
-            }
-            for (uint32_t i = 0; i < CommandQueue::FRAME_COUNT; ++i) {
-                if (m_uploadBuffer[i] != VK_NULL_HANDLE) {
-                    vmaDestroyBuffer(allocator, m_uploadBuffer[i], m_uploadAlloc[i]);
-                    m_uploadBuffer[i] = VK_NULL_HANDLE;
-                    m_uploadAlloc[i] = VK_NULL_HANDLE;
-                }
-            }
-            if (m_readbackBuffer != VK_NULL_HANDLE) {
-                vmaDestroyBuffer(allocator, m_readbackBuffer, m_readbackAlloc);
-                m_readbackBuffer = VK_NULL_HANDLE;
-                m_readbackAlloc = VK_NULL_HANDLE;
-            }
-        }
+        ReleaseDeferred();
         m_data.Reset();
         m_width = m_height = 0;
         m_bufferSize = 0;
+        m_appendFrame = UINT64_MAX;
+        m_appendBase = 0;
     }
 
     bool Bind(uint32_t bindingPoint) {
@@ -225,9 +252,7 @@ public:
             return false;
 
         uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
-        if (not EnsureStagingBuffer(m_uploadBuffer[fi], m_uploadAlloc[fi], m_bufferSize,
-                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
+        if (not AcquireStaging(fi, 0, m_bufferSize))
             return false;
 
         void* mapped = nullptr;
@@ -236,12 +261,16 @@ public:
         std::memcpy(mapped, m_data.Data(), size_t(m_bufferSize));
         vmaUnmapMemory(allocator, m_uploadAlloc[fi]);
 
-        return CopyFromStaging(m_uploadBuffer[fi], 0, 0, m_bufferSize);
+        return CopyFromStaging(m_uploadBuffer[fi], 0, 0, m_bufferSize, true);
     }
 
     // Partial upload of [first, first+count) elements only — lets the particle handler push freshly
     // spawned systems without re-uploading (and thereby resetting) the live systems' GPU state.
-    bool UploadRange(int first, int count) {
+    // ordered: the copy has to take effect where it is issued in the frame's recording order (a
+    // buffer that is rewritten between passes). false for a caller whose ranges never overlap within
+    // a frame (LineRenderer): its copies may run ahead of the frame, which spares the rendering scope
+    // being closed and reopened around every one of them.
+    bool UploadRange(int first, int count, bool ordered = true) {
         if ((m_buffer == VK_NULL_HANDLE) or m_data.IsEmpty() or (count <= 0) or (first < 0))
             return false;
 
@@ -261,9 +290,7 @@ public:
         // clobber the first slot's not-yet-executed copy. Costs one full-width host-visible buffer per
         // frame slot; the per-frame rotation still guards against frames-in-flight reuse.
         uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
-        if (not EnsureStagingBuffer(m_uploadBuffer[fi], m_uploadAlloc[fi], m_bufferSize,
-                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
+        if (not AcquireStaging(fi, dstOffset, bytes))
             return false;
 
         void* mapped = nullptr;
@@ -272,7 +299,7 @@ public:
         std::memcpy(static_cast<uint8_t*>(mapped) + dstOffset, m_data.Data() + first, size_t(bytes));
         vmaUnmapMemory(allocator, m_uploadAlloc[fi]);
 
-        return CopyFromStaging(m_uploadBuffer[fi], dstOffset, dstOffset, bytes);
+        return CopyFromStaging(m_uploadBuffer[fi], dstOffset, dstOffset, bytes, ordered);
     }
 
     bool Download(void) {
@@ -311,14 +338,28 @@ private:
     // Issues the staging -> GPU copy from the caller-selected per-frame staging buffer. Mid-frame
     // (a per-frame command list is open) it records into that list with a transfer -> shader barrier
     // (like the DX path), so no blocking one-shot submit + vkQueueWaitIdle corrupts the in-flight
-    // frame. Only at setup time (no open CL) does it fall back to the one-shot path.
-    bool CopyFromStaging(VkBuffer staging, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkDeviceSize bytes) {
+    // frame. While a rendering scope is open on that list a copy is illegal there. An ordered copy has
+    // the scope closed around it and reopened with its contents kept, so it stays where it was issued;
+    // an unordered one goes into the handler's detached upload list instead
+    // (CommandListHandler::UploadCmdBuffer ()), which is submitted ahead of the list that is recording.
+    // Only at setup time (no open CL) does it fall back to the one-shot path.
+    bool CopyFromStaging(VkBuffer staging, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkDeviceSize bytes, bool ordered) {
         VkBufferCopy region{};
         region.srcOffset = srcOffset;
         region.dstOffset = dstOffset;
         region.size = bytes;
 
         VkCommandBuffer frameCB = commandListHandler.CurrentGfxList();
+        CommandListHandler::RenderingScope scope;
+        if ((frameCB != VK_NULL_HANDLE) and commandListHandler.IsInRendering()) {
+            if (ordered)
+                scope = commandListHandler.SuspendRendering();
+            else {
+                frameCB = commandListHandler.UploadCmdBuffer();
+                if (frameCB == VK_NULL_HANDLE)
+                    return false;
+            }
+        }
         if (frameCB != VK_NULL_HANDLE) {
             vkCmdCopyBuffer(frameCB, staging, m_buffer, 1, &region);
             VkBufferMemoryBarrier2 b{};
@@ -339,6 +380,7 @@ private:
             dep.bufferMemoryBarrierCount = 1;
             dep.pBufferMemoryBarriers    = &b;
             vkCmdPipelineBarrier2(frameCB, &dep);
+            commandListHandler.ResumeRendering(scope);
             return true;
         }
 
@@ -347,6 +389,48 @@ private:
             return false;
         vkCmdCopyBuffer(once.cb, staging, m_buffer, 1, &region);
         EndSingleTimeCommands(once);
+        return true;
+    }
+
+    // The frame slot's staging buffer for an upload of [offset, offset + bytes). A recorded copy runs
+    // when the frame is submitted, so a second upload in the same frame that overlaps a range already
+    // staged would replace the data the first copy is still going to read - a buffer rewritten between
+    // two passes of one frame would arrive with the last pass's contents in both. Such an upload gets a
+    // staging buffer of its own; the old one is released once the frame is through. Disjoint ranges
+    // (LineRenderer's appended batches) share the buffer. Without an open command list the copy runs at
+    // once (one-shot) and nothing has to be kept apart.
+    bool AcquireStaging(uint32_t fi, VkDeviceSize offset, VkDeviceSize bytes) noexcept {
+        const uint64_t frame = commandListHandler.CmdQueue().FrameNumber();
+        const bool isDeferred = commandListHandler.CurrentGfxList() != VK_NULL_HANDLE;
+        bool sameFrame = isDeferred and (m_uploadBuffer[fi] != VK_NULL_HANDLE) and (m_stagedFrame[fi] == frame) and (m_stagedMax[fi] > m_stagedMin[fi]);
+        if (sameFrame and (offset < m_stagedMax[fi]) and (offset + bytes > m_stagedMin[fi])) {
+            VmaAllocator allocator = vkContext.Allocator();
+            gfxResourceHandler.TrackCleanup([allocator, buffer = m_uploadBuffer[fi], allocation = m_uploadAlloc[fi]]() {
+                vmaDestroyBuffer(allocator, buffer, allocation);
+            });
+            m_uploadBuffer[fi] = VK_NULL_HANDLE;
+            m_uploadAlloc[fi] = VK_NULL_HANDLE;
+            sameFrame = false;
+        }
+        if (not EnsureStagingBuffer(m_uploadBuffer[fi], m_uploadAlloc[fi], m_bufferSize,
+                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
+            return false;
+        if (not isDeferred) {
+            m_stagedMin[fi] = 0;
+            m_stagedMax[fi] = 0;
+        }
+        else if (sameFrame) {
+            if (offset < m_stagedMin[fi])
+                m_stagedMin[fi] = offset;
+            if (offset + bytes > m_stagedMax[fi])
+                m_stagedMax[fi] = offset + bytes;
+        }
+        else {
+            m_stagedMin[fi] = offset;
+            m_stagedMax[fi] = offset + bytes;
+        }
+        m_stagedFrame[fi] = frame;
         return true;
     }
 

@@ -324,8 +324,9 @@ public:
     //
     // This DRAINS THE PIPELINE: everything queued has to finish before the texels can be handed over.
     // It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
-    // per frame - and it has to be called OUTSIDE frame recording, where it can flush a command list
-    // of its own and wait for it.
+    // per frame. It may be called in mid frame, but the target must NOT be enabled: what is read is what
+    // the CLOSED command lists produce (CommandListHandler::ExecutePending ()), and a list still
+    // recording - the target's own, while it is enabled - is not among them.
     // arraySlice picks the LAYER on a colour buffer that is a texture array (arrayLayerCount > 0) and
     // is ignored on a plain one.
     bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);

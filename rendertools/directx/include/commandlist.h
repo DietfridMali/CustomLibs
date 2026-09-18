@@ -264,6 +264,11 @@ public:
     // Clears m_pendingLists afterwards.
     void ExecuteAll(void) noexcept;
 
+    // Submits what has been CLOSED so far, in close order, and waits for it. The lists still recording
+    // are left alone and go out with the frame as usual. For a CPU readback in mid frame: the draws it
+    // wants to read sit in closed lists that have not been submitted yet.
+    void ExecutePending(void) noexcept;
+
     // Returns a CommandList. If isTemporary is true, tries to reuse one from m_recycledLists
     // before allocating a new one. Temporary CLs are recycled after ExecuteAll().
     // Caller owns the memory for non-temporary lists.

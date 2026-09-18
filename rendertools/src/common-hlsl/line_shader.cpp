@@ -44,6 +44,7 @@ cbuffer ShaderConstants : register(b1) {   // same block as the PS
     float  perspective;    // 1: pixels per unit shrink with depth; 0: orthographic projection
     float  dashScale;      // stretches the dash / dot pattern (PS)
     float  antialias;      // 1: analytic edge antialiasing, 0: hard edge (PS)
+    int    firstLine;      // index of this draw's first record in the buffer
 };
 
 struct VSInput {
@@ -60,7 +61,7 @@ struct PSInput {
 };
 
 PSInput VSMain(VSInput v) {
-    LineInstance l = lines[v.iid];
+    LineInstance l = lines[v.iid + uint(firstLine)];
 
     float3 vp0 = mul(mModelView, float4(l.p0, 1.0)).xyz;
     float3 vp1 = mul(mModelView, float4(l.p1, 1.0)).xyz;
@@ -129,6 +130,7 @@ cbuffer ShaderConstants : register(b1) {
     float  perspective;
     float  dashScale;      // stretches the dash / dot pattern (1 = the lengths above)
     float  antialias;      // 1: analytic edge antialiasing, 0: hard edge
+    int    firstLine;
 };
 
 // distance of t to the interval [s, e] along the line, 0 inside

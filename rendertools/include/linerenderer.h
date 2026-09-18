@@ -18,10 +18,12 @@
 // what DX12 has no counterpart for. Works under a perspective projection (3D lines) and under an
 // orthographic one (HUD / 2D lines) alike.
 //
-// Use: Clear (), Add () / AddStrip () as often as wanted, Render () once. The records are uploaded
-// on Render (), the buffer grows on demand. The renderer sets alpha blending and no face culling for
-// its draw and puts both back; depth test / write are the caller's - a HUD line wants them off, a
-// line in the scene wants them on.
+// Use: Clear (), Add () / AddStrip () as often as wanted, Render () once. The records are collected on
+// the CPU and uploaded on Render (), each batch of a frame behind the one before it (the GPU copies run
+// when the frame is submitted, so batches sharing a range would all show the last one); the shader
+// gets the batch's start as firstLine. The buffer grows on demand. The renderer sets alpha blending
+// and no face culling for its draw and puts both back; depth test / write are the caller's - a HUD
+// line wants them off, a line in the scene wants them on.
 //
 // Patterns: Solid, Dashed, Dotted, DashDot. The lengths are multiples of the line width (a dot is
 // the round cap alone), m_dashScale stretches them. AddStrip () keeps the pattern running across the
@@ -76,6 +78,8 @@ public:
 
 private:
     GfxArray<Line, GfxTypes::StructuredBuffer>  m_buffer;
+    AutoArray<Line>                             m_lines;
+    int                                         m_lineCapacity{ 0 };
     int                                         m_capacity{ 0 };
     int                                         m_count{ 0 };
     BaseQuadMesh                                m_quad;
@@ -83,6 +87,7 @@ private:
     bool                                        m_isAvailable{ false };
 
     bool Reserve(int count);
+    bool ReserveBuffer(int count);
     void SetupQuad(void);
 };
 

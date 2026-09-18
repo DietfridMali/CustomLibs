@@ -935,6 +935,12 @@ void RenderTarget::SelectCustomDrawBuffers(const CustomDrawBufferList& bufferInd
     m_customDrawBuffers = bufferIndices;
     m_activeBufferIndex = -1;
     m_drawBufferGroup = dbCustom;
+    // An enabled target has its buffers in the layouts and its rendering scope open with the attachments
+    // of the group that was current. The new setup has to reach both NOW, the way the OpenGL backend
+    // applies it at once (ApplyCustomDrawBuffers ()) - otherwise the pass keeps drawing into the old
+    // attachment set while the pipeline (FillPipelineKey ()) and the clears already speak of the new one.
+    if (m_cmdList and m_cmdList->IsRecording())
+        SelectDrawBuffers({ .bufferIndex = -1, .drawBufferGroup = dbCustom, .clear = false, .reactivate = true, .depthMode = m_depthMode });
 }
 
 
@@ -1067,29 +1073,80 @@ void RenderTarget::SetViewport(bool flipVertically) noexcept
 }
 
 
+// The colour attachment slots of the open rendering scope, in the order BeginRendering () binds them:
+// slots[i] is the buffer index behind slot i, -1 for a slot that was left without an image view (custom
+// setup only). vkCmdClearAttachments addresses SLOTS, and only dbAll / dbColor have slot i == buffer i -
+// dbSingle binds its one buffer to slot 0 whatever its index, dbExtra starts at the vertex buffers.
+
+static int ActiveColorSlots(RenderTarget& rt, int slots[RT_MAX_COLOR_BUFFERS])
+{
+    int count = 0;
+
+    auto AddBuffer = [&](int bufferIndex) {
+        if ((count < RT_MAX_COLOR_BUFFERS) and (rt.AttachmentView(bufferIndex) != VK_NULL_HANDLE))
+            slots[count++] = bufferIndex;
+    };
+
+    switch (rt.m_drawBufferGroup) {
+        case RenderTarget::dbDepth:
+            break;
+        case RenderTarget::dbSingle:
+            if ((rt.m_activeBufferIndex >= 0) and (rt.m_activeBufferIndex < rt.m_colorBufferCount))
+                AddBuffer(rt.m_activeBufferIndex);
+            break;
+        case RenderTarget::dbExtra:
+            for (int j = 0, i = rt.VertexBufferIndex(); j < rt.m_vertexBufferCount; ++j, ++i)
+                AddBuffer(i);
+            break;
+        case RenderTarget::dbAll:
+            for (int i = 0; i < rt.m_colorBufferCount; ++i)
+                AddBuffer(i);
+            for (int j = 0, i = rt.VertexBufferIndex(); j < rt.m_vertexBufferCount; ++j, ++i)
+                AddBuffer(i);
+            break;
+        case RenderTarget::dbCustom:
+            for (int i = 0; (i < rt.m_customDrawBuffers.Length()) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
+                int bufferIndex = rt.m_customDrawBuffers[i];
+                slots[count++] = (rt.AttachmentView(bufferIndex) != VK_NULL_HANDLE) ? bufferIndex : -1;
+            }
+            break;
+        default:
+            for (int i = 0; i < rt.m_colorBufferCount; ++i)
+                AddBuffer(i);
+            break;
+    }
+    return count;
+}
+
+
 void RenderTarget::Fill(RGBAColor color)
 {
     if (not m_cmdList or not m_isInRendering)
         return;
     VkCommandBuffer cb = m_cmdList->GfxList();
-    if (cb == VK_NULL_HANDLE or m_colorBufferCount == 0)
+    if (cb == VK_NULL_HANDLE)
         return;
 
-    AutoArray<VkClearAttachment> attachments(m_colorBufferCount);
+    int slots[RT_MAX_COLOR_BUFFERS];
+    int slotCount = ActiveColorSlots(*this, slots);
+    VkClearAttachment attachments[RT_MAX_COLOR_BUFFERS]{};
     int n = 0;
-    VkClearValue clearVal = MakeClearColor(color, IsIntegerColorFormat(m_colorFormat));
-    for (int i = 0; i < m_colorBufferCount; ++i) {
+    for (int i = 0; i < slotCount; ++i) {
+        if (slots[i] < 0)
+            continue;
         VkClearAttachment a{};
         a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
         a.colorAttachment = uint32_t(i);
-        a.clearValue      = clearVal;
+        a.clearValue      = MakeClearColor(color, IsIntegerColorBuffer(slots[i]));
         attachments[n++] = a;
     }
+    if (n == 0)
+        return;
     VkClearRect rect{};
     rect.rect.offset = { 0, 0 };
     rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
     rect.layerCount  = 1;
-    vkCmdClearAttachments(cb, uint32_t(n), attachments.Data(), 1, &rect);
+    vkCmdClearAttachments(cb, uint32_t(n), attachments, 1, &rect);
 }
 
 
@@ -1103,40 +1160,21 @@ void RenderTarget::Clear(const RTActivationParams& params)
     if (cb == VK_NULL_HANDLE)
         return;
 
-    int maxAtts = (m_customDrawBuffers.Length() > m_colorBufferCount) ? m_customDrawBuffers.Length() : m_colorBufferCount;
-    AutoArray<VkClearAttachment> atts(maxAtts + 1);
+    // Clear by ATTACHMENT SLOT (ActiveColorSlots ()): every bound slot, or the one slot that holds the
+    // buffer asked for.
+    int slots[RT_MAX_COLOR_BUFFERS];
+    int slotCount = ActiveColorSlots(*this, slots);
+    VkClearAttachment atts[RT_MAX_COLOR_BUFFERS + 1]{};
     int n = 0;
-    VkClearValue cv = MakeClearColor(m_clearColor, IsIntegerColorFormat(m_colorFormat));
-    if (params.bufferIndex < 0) {
-        // Clear by ATTACHMENT SLOT. With a custom setup the slots are the caller's list (and an unused
-        // slot has no image view, so it is skipped); otherwise slot i is colour buffer i.
-        if (m_drawBufferGroup == dbCustom) {
-            for (int i = 0; (i < m_customDrawBuffers.Length()) and (i < RT_MAX_COLOR_BUFFERS); ++i) {
-                int bufferIndex = m_customDrawBuffers[i];
-                if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
-                    continue;
-                VkClearAttachment a{};
-                a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-                a.colorAttachment = uint32_t(i);
-                a.clearValue      = MakeClearColor(m_clearColor, IsIntegerColorBuffer(bufferIndex));
-                atts[n++] = a;
-            }
-        }
-        else {
-            for (int i = 0; i < m_colorBufferCount; ++i) {
-                VkClearAttachment a{};
-                a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-                a.colorAttachment = uint32_t(i);
-                a.clearValue      = cv;
-                atts[n++] = a;
-            }
-        }
-    }
-    else if (params.bufferIndex < m_colorBufferCount) {
+    for (int i = 0; i < slotCount; ++i) {
+        if (slots[i] < 0)
+            continue;
+        if ((params.bufferIndex >= 0) and (slots[i] != params.bufferIndex))
+            continue;
         VkClearAttachment a{};
         a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-        a.colorAttachment = uint32_t(params.bufferIndex);
-        a.clearValue      = cv;
+        a.colorAttachment = uint32_t(i);
+        a.clearValue      = MakeClearColor(m_clearColor, IsIntegerColorBuffer(slots[i]));
         atts[n++] = a;
     }
     // A read-only depth activation must not clear the depth it is only allowed to test against (same rule
@@ -1153,12 +1191,13 @@ void RenderTarget::Clear(const RTActivationParams& params)
     rect.rect.offset = { 0, 0 };
     rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
     rect.layerCount  = 1;
-    vkCmdClearAttachments(cb, uint32_t(n), atts.Data(), 1, &rect);
+    vkCmdClearAttachments(cb, uint32_t(n), atts, 1, &rect);
 }
 
 
 // WBOIT per-buffer clear: clear one colour attachment to an explicit value mid-pass (accum and revealage
-// need different clears, which the single m_clearColor can't express). Attachment index = draw-buffer slot.
+// need different clears, which the single m_clearColor can't express). The buffer is looked up among the
+// bound slots (ActiveColorSlots ()); one that is not bound in the current group is left alone.
 void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
 {
     if (not m_cmdList or not m_isInRendering)
@@ -1166,10 +1205,18 @@ void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
     VkCommandBuffer cb = m_cmdList->GfxList();
     if ((cb == VK_NULL_HANDLE) or (bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
         return;
+
+    int slots[RT_MAX_COLOR_BUFFERS];
+    int slotCount = ActiveColorSlots(*this, slots);
+    int slot = 0;
+    while ((slot < slotCount) and (slots[slot] != bufferIndex))
+        ++slot;
+    if (slot == slotCount)
+        return;
     VkClearAttachment a{};
     a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
-    a.colorAttachment = uint32_t(bufferIndex);
-    a.clearValue      = MakeClearColor(color, IsIntegerColorFormat(m_colorFormat));
+    a.colorAttachment = uint32_t(slot);
+    a.clearValue      = MakeClearColor(color, IsIntegerColorBuffer(bufferIndex));
     VkClearRect rect{};
     rect.rect.offset = { 0, 0 };
     rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
@@ -1183,23 +1230,29 @@ void RenderTarget::ClearColorBuffers(void)
     if (not m_cmdList or not m_isInRendering)
         return;
     VkCommandBuffer cb = m_cmdList->GfxList();
-    if (cb == VK_NULL_HANDLE or m_colorBufferCount == 0)
+    if (cb == VK_NULL_HANDLE)
         return;
-    AutoArray<VkClearAttachment> atts(m_colorBufferCount);
+
+    int slots[RT_MAX_COLOR_BUFFERS];
+    int slotCount = ActiveColorSlots(*this, slots);
+    VkClearAttachment atts[RT_MAX_COLOR_BUFFERS]{};
     int n = 0;
-    VkClearValue cv = MakeClearColor(m_clearColor, IsIntegerColorFormat(m_colorFormat));
-    for (int i = 0; i < m_colorBufferCount; ++i) {
+    for (int i = 0; i < slotCount; ++i) {
+        if (slots[i] < 0)
+            continue;
         VkClearAttachment a{};
         a.aspectMask      = VK_IMAGE_ASPECT_COLOR_BIT;
         a.colorAttachment = uint32_t(i);
-        a.clearValue      = cv;
+        a.clearValue      = MakeClearColor(m_clearColor, IsIntegerColorBuffer(slots[i]));
         atts[n++] = a;
     }
+    if (n == 0)
+        return;
     VkClearRect rect{};
     rect.rect.offset = { 0, 0 };
     rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
     rect.layerCount  = 1;
-    vkCmdClearAttachments(cb, uint32_t(n), atts.Data(), 1, &rect);
+    vkCmdClearAttachments(cb, uint32_t(n), atts, 1, &rect);
 }
 
 
@@ -1532,6 +1585,11 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
     if (not CreateReadbackBuffer(VkDeviceSize(needed), readback))
         return false;
 
+    // The copy below runs AT ONCE, in a command buffer of its own - but the draws it is supposed to read
+    // sit in closed command lists that only go out with the frame, and so do the layout transitions the
+    // tracker already counts on. They have to be through first.
+    commandListHandler.ExecutePending();
+
     OneShotCommandBuffer cmd;
 
     if (not BeginSingleTimeCommands(cmd)) {
@@ -1653,6 +1711,10 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     }
     memcpy(staging.mapped, data, needed);
 
+    // Same as in ReadBuffer (): the copy runs at once, so whatever the closed lists still hold for this
+    // image - draws and layout transitions - has to be through first.
+    commandListHandler.ExecutePending();
+
     OneShotCommandBuffer cmd;
 
     if (not BeginSingleTimeCommands(cmd)) {
@@ -1680,8 +1742,13 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
 
     vkCmdCopyBufferToImage(cmd.cb, staging.buffer, info.m_image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    // A buffer that has never been used has no layout to go back to. It takes the one every buffer of a
+    // disabled target is in (Disable ()), because sampling it is what comes next - BindBuffer () does not
+    // transition on a target that is not enabled.
     if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
         info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore, stageBefore, accessBefore);
+    else
+        info.m_layoutTracker.ToShaderInput(cmd.cb);
 
     bool ok = EndSingleTimeCommands(cmd);
 

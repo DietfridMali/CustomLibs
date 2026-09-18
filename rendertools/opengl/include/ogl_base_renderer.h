@@ -227,6 +227,12 @@ public:
         m_screenIsAvailable = false;
     }
 
+    // The screen buffer is being drawn into by a client that activates it ITSELF, without the clear
+    // and the 2D setup of Start2DScene () - DrawScreen () only puts it on the back buffer when it knows.
+    inline void SetScreenAvailable(bool available) noexcept {
+        m_screenIsAvailable = available;
+    }
+
     template <typename T>
     inline void SetBackgroundColor(T&& backgroundColor) {
         m_backgroundColor = std::forward<T>(backgroundColor);

@@ -39,6 +39,7 @@ uniform mat4 mProjection;
 uniform mat4 mViewport;
 uniform vec2  texelSize;     // one over the TARGET BUFFER size - mClip below is in the buffer's NDC
 uniform float perspective;   // 1: pixels per unit shrink with depth; 0: orthographic projection
+uniform int   firstLine;     // index of this draw's first record in the buffer
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 texCoord;
@@ -48,7 +49,7 @@ out vec4 vColor;
 out vec2 vPattern;  // (style, phase)
 
 void main() {
-    LineInstance l = lines[uint(gl_InstanceID)];
+    LineInstance l = lines[uint(gl_InstanceID + firstLine)];
 
     vec3 vp0 = (mModelView * vec4(l.p0x, l.p0y, l.p0z, 1.0)).xyz;
     vec3 vp1 = (mModelView * vec4(l.p1x, l.p1y, l.p1z, 1.0)).xyz;

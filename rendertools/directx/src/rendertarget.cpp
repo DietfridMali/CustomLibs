@@ -692,6 +692,12 @@ void RenderTarget::SelectCustomDrawBuffers(const CustomDrawBufferList& bufferInd
     m_customDrawBuffers = bufferIndices;
     m_activeBufferIndex = -1;
     m_drawBufferGroup = dbCustom;
+    // An enabled target has the render targets of the group that was current bound on its list. The new
+    // setup has to reach the list NOW, the way the OpenGL backend applies it at once
+    // (ApplyCustomDrawBuffers ()) - otherwise the pass keeps drawing into the old set while the PSO
+    // already speaks of the new one.
+    if (m_cmdList and m_cmdList->IsRecording())
+        SelectDrawBuffers({ .bufferIndex = -1, .drawBufferGroup = dbCustom, .clear = false, .reactivate = true, .depthMode = m_depthMode });
 }
 
 
@@ -896,14 +902,48 @@ void RenderTarget::SetViewport(bool flipVertically) noexcept {
 }
 
 
+// Whether buffer i is one of the render targets SelectDrawBuffers () has bound for the current group. A
+// clear has to keep to those: ClearRenderTargetView () demands the RENDER_TARGET state, which only they
+// are in - dbSingle puts every other colour buffer into PIXEL_SHADER_RESOURCE - and OpenGL's glClear ()
+// and Vulkan's vkCmdClearAttachments () reach nothing but the draw buffers either.
+
+static bool IsDrawBuffer(RenderTarget& rt, int i)
+{
+    BufferInfo& bi = rt.m_bufferInfo[i];
+    if (not bi.RTV().Handle().IsValid())
+        return false;
+
+    bool isColor = (bi.m_type == BufferInfo::btColor);
+    bool isVertex = (bi.m_type == BufferInfo::btVertex);
+
+    switch (rt.m_drawBufferGroup) {
+        case RenderTarget::dbDepth:
+            return false;
+        case RenderTarget::dbSingle:
+            return i == rt.m_activeBufferIndex;
+        case RenderTarget::dbExtra:
+            return isVertex;
+        case RenderTarget::dbAll:
+            return isColor or isVertex;
+        case RenderTarget::dbCustom:
+            for (int j = 0; j < rt.m_customDrawBuffers.Length(); ++j)
+                if (rt.m_customDrawBuffers[j] == i)
+                    return isColor or isVertex;
+            return false;
+        default:
+            return isColor;
+    }
+}
+
+
 void RenderTarget::Fill(RGBAColor color)
 {
     auto* list = m_cmdList->GfxList();
     if (not list)
         return;
     float c[4] = { color.R(), color.G(), color.B(), color.A() };
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        if (m_bufferInfo[i].RTV().Handle().IsValid())
+    for (int i = 0; i < m_bufferCount; ++i)
+        if (IsDrawBuffer(*this, i))
             list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), c, 0, nullptr);
 }
 
@@ -921,17 +961,13 @@ void RenderTarget::Clear(const RTActivationParams& params)
         // only m_colorBufferCount left the btVertex buffers uncleared, so stale world positions
         // persisted where moving geometry (e.g. an opening door) vacated pixels - the decal pass
         // then mapped those stale positions into its volume and smeared the decal along the motion.
-        // Gate on RENDER_TARGET state so only currently-attached draw buffers are cleared
-        // (ClearRenderTargetView requires that state).
+        // Only the draw buffers of the current group (IsDrawBuffer ()).
         for (int i = 0; i < m_bufferCount; ++i) {
-            BufferInfo& bi = m_bufferInfo[i];
-            if ((bi.m_type != BufferInfo::btColor) and (bi.m_type != BufferInfo::btVertex))
-                continue;
-            if (bi.RTV().Handle().IsValid() and (bi.m_state == D3D12_RESOURCE_STATE_RENDER_TARGET))
-                list->ClearRenderTargetView(bi.RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
+            if (IsDrawBuffer(*this, i))
+                list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
         }
     }
-    else if ((params.bufferIndex < m_colorBufferCount) and m_bufferInfo[params.bufferIndex].RTV().Handle().IsValid()) {
+    else if ((params.bufferIndex < m_colorBufferCount) and IsDrawBuffer(*this, params.bufferIndex)) {
         list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
     }
     // A read-only depth activation must not clear depth: ClearDepthStencilView needs the writable DSV and
@@ -961,8 +997,8 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 
 void RenderTarget::ClearColorBuffers(void)
 {
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        if (m_bufferInfo[i].RTV().Handle().IsValid())
+    for (int i = 0; i < m_bufferCount; ++i)
+        if (IsDrawBuffer(*this, i))
             gfxStates.ClearColorBuffers(m_bufferInfo[i].RTV().CPUHandle());
 }
 
@@ -974,10 +1010,10 @@ void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
         return;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
         return;
-    BufferInfo& bi = m_bufferInfo[bufferIndex];
-    // ClearRenderTargetView requires the RENDER_TARGET state -> only clear an attached draw buffer.
-    if (bi.RTV().Handle().IsValid() and (bi.m_state == D3D12_RESOURCE_STATE_RENDER_TARGET))
-        list->ClearRenderTargetView(bi.RTV().CPUHandle(), color.Data(), 0, nullptr);
+    // Only a draw buffer of the current group (IsDrawBuffer ()) - ClearRenderTargetView () requires the
+    // RENDER_TARGET state, and only those are in it.
+    if (IsDrawBuffer(*this, bufferIndex))
+        list->ClearRenderTargetView(m_bufferInfo[bufferIndex].RTV().CPUHandle(), color.Data(), 0, nullptr);
 }
 
 
@@ -1209,9 +1245,12 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
                                                D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
         return false;
 
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("ReadBuffer"));
+    // A list of its OWN, not whatever list is current (StartOperation () would hand that out, and it keeps
+    // recording until the frame ends): the copy has to be CLOSED to go out. It closes last, so it runs
+    // after the closed lists that hold the draws it is supposed to read.
+    CommandList* cl = commandListHandler.CreateCmdList(String("ReadBuffer"), true);
 
-    if (not cl)
+    if (not (cl and cl->Open(false)))
         return false;
 
     D3D12_RESOURCE_STATES stateBefore = info.m_state;
@@ -1230,8 +1269,9 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
         list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     // Back to what it was: the caller's next pass expects the buffer in the state it left it in.
     info.SetState(cl, stateBefore);
-    // Flushed, not just closed - the map below reads what the GPU wrote, so the copy has to be done.
-    baseRenderer.FinishOperation(cl, true);
+    cl->Close(false);
+    // Submitted AND waited for - the map below reads what the GPU wrote, so the copy has to be done.
+    commandListHandler.ExecutePending();
 
     uint8_t* source = nullptr;
     D3D12_RANGE readRange{ 0, size_t(totalSize) };
@@ -1388,8 +1428,11 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     if (ID3D12GraphicsCommandList* list = cl->GfxList())
         list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     info.SetState(cl, stateBefore);
-    // Flushed: the upload buffer is a local and must not go out of scope before the copy has run.
-    baseRenderer.FinishOperation(cl, true);
+    // The upload buffer is a local, and the copy only runs when its list is submitted - with the frame, if
+    // it was recorded into the current list. The resource handler keeps it alive until that frame slot
+    // comes round again.
+    gfxResourceHandler.Track(upload);
+    baseRenderer.FinishOperation(cl);
     return true;
 }
 

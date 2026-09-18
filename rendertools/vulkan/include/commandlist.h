@@ -18,6 +18,7 @@
 #endif
 
 class Shader;
+class RenderTarget;
 
 // =================================================================================================
 // Frame protocol (Vulkan):
@@ -116,6 +117,7 @@ public:
     bool                                m_isRecording  { false };
     bool                                m_isFlushed    { false };
     bool                                m_isTemporary  { false };
+    bool                                m_isDetached   { false };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id           { 0 };
     uint64_t                            m_executionCounter { 0 };
@@ -134,7 +136,7 @@ public:
     void Destroy(void) noexcept;
     void Reset(void) noexcept;
 
-    bool Open(bool saveRenderStates = true) noexcept;
+    bool Open(bool saveRenderStates = true, bool detached = false) noexcept;
     void Close(bool restoreRenderStates = true) noexcept;
     void Flush(void) noexcept;
 
@@ -205,6 +207,7 @@ public:
     AutoArray<CommandList*>             m_recycledLists;
     AutoArray<CommandListData>          m_cmdListStack;
     CommandListData                     m_currentListData;
+    CommandList*                        m_uploadList   { nullptr };
     uint64_t                            m_cmdListId    { 1 };
     uint64_t                            m_cmdListCount { 0 };
     TracyVkCtx                          m_gpuProfilerCtx { nullptr };
@@ -277,7 +280,28 @@ public:
 
     void ExecuteAll(bool intermediate = false) noexcept;
 
+    // Submits what has been CLOSED so far, in close order, and waits for it. The lists still recording
+    // are left alone and go out with the frame as usual. For a CPU readback in mid frame: the draws it
+    // wants to read sit in closed lists that have not been submitted yet.
+    void ExecutePending(void) noexcept;
+
     CommandList* CreateCmdList(const String& name = "", bool isTemporary = true) noexcept;
+
+    bool IsInRendering(void) noexcept;
+
+    VkCommandBuffer UploadCmdBuffer(void) noexcept;
+
+    // The rendering scope open on the current command buffer, closed for commands that are illegal
+    // inside one (copies, fills) and reopened with its contents kept. For work that has to stay in
+    // recording order; what may run ahead of the frame goes through UploadCmdBuffer () instead.
+    struct RenderingScope {
+        RenderTarget*   target { nullptr };
+        bool            backBuffer { false };
+    };
+
+    RenderingScope SuspendRendering(void) noexcept;
+
+    void ResumeRendering(const RenderingScope& scope) noexcept;
 
 #ifdef _DEBUG
     inline void DrawInstanced(uint32_t vtxCount, uint32_t instCount, uint32_t startVtx, uint32_t startInst,

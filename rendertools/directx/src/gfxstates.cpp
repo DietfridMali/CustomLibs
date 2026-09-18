@@ -253,6 +253,14 @@ void GfxStates::ReleaseBuffers(void) noexcept {
 
 
 void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
+    m_viewport[0] = left;
+    m_viewport[1] = top;
+    m_viewport[2] = width;
+    m_viewport[3] = height;
+    m_scissor[0] = 0;
+    m_scissor[1] = 0;
+    m_scissor[2] = left + width;
+    m_scissor[3] = top + height;
     auto* list = commandListHandler.CurrentGfxList();
     if (list) {
         D3D12_VIEWPORT vp{};
@@ -265,14 +273,6 @@ void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, c
         list->RSSetViewports(1, &vp);
         D3D12_RECT scissorArea{ 0, 0, left + width, top + height };
         list->RSSetScissorRects(1, &scissorArea);
-        m_viewport[0] = left;
-        m_viewport[1] = top;
-        m_viewport[2] = width;
-        m_viewport[3] = height;
-        m_scissor[0] = 0;
-        m_scissor[1] = 0;
-        m_scissor[2] = left + width;
-        m_scissor[3] = top + height;
     }
 }
 
@@ -287,6 +287,15 @@ void GfxStates::SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, co
         D3D12_RECT scissorArea{ left, top, left + width, top + height };
         list->RSSetScissorRects(1, &scissorArea);
     }
+}
+
+
+void GfxStates::RestoreViewport(void) noexcept {
+    if ((m_viewport[2] <= 0) or (m_viewport[3] <= 0))
+        return;
+    GfxTypes::Int scissor[4] = { m_scissor[0], m_scissor[1], m_scissor[2], m_scissor[3] };
+    SetViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+    SetScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 }
 
 

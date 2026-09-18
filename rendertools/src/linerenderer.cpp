@@ -13,6 +13,8 @@ bool LineRenderer::Create(int capacity) {
         capacity = 1;
     if (not m_buffer.Create(capacity))
         return false;
+    m_lines.Resize(capacity);
+    m_lineCapacity = capacity;
     m_capacity = capacity;
     m_count = 0;
     m_isAvailable = true;
@@ -22,16 +24,33 @@ bool LineRenderer::Create(int capacity) {
 
 void LineRenderer::Destroy(void) {
     m_buffer.Destroy();
+    m_lines.Reset();
+    m_lineCapacity = 0;
     m_capacity = 0;
     m_count = 0;
     m_isAvailable = false;
 }
 
 // -------------------------------------------------------------------------------------------------
-// Grow on demand, doubling. GfxArray::Create () replaces the record array, so what was added so far
-// is carried across by hand.
+// Grow on demand, doubling. Reserve () is the batch being collected on the CPU, ReserveBuffer () the
+// GPU buffer all batches of a frame are appended to. GfxArray::Create () starts a new buffer (the old
+// one is released once the frames using it are through), so the append position starts over with it.
 
 bool LineRenderer::Reserve(int count) {
+    if (count <= m_lineCapacity)
+        return true;
+
+    int newCapacity = m_lineCapacity ? m_lineCapacity : 1;
+
+    while (newCapacity < count)
+        newCapacity *= 2;
+    m_lines.Resize(newCapacity);
+    m_lineCapacity = newCapacity;
+    return true;
+}
+
+
+bool LineRenderer::ReserveBuffer(int count) {
     if (count <= m_capacity)
         return true;
 
@@ -39,19 +58,10 @@ bool LineRenderer::Reserve(int count) {
 
     while (newCapacity < count)
         newCapacity *= 2;
-
-    AutoArray<Line> saved;
-
-    if (m_count > 0) {
-        saved.Resize(m_count);
-        std::memcpy(saved.Data(), m_buffer.m_data.Data(), size_t(m_count) * sizeof(Line));
-    }
-    if (not m_buffer.Create(newCapacity)) {   // recreate is release safe per backend (DX: deferred, VK: idle sync, GL: driver)
+    if (not m_buffer.Create(newCapacity)) {
         m_isAvailable = false;
         return false;
     }
-    if (m_count > 0)
-        std::memcpy(m_buffer.m_data.Data(), saved.Data(), size_t(m_count) * sizeof(Line));
     m_capacity = newCapacity;
     return true;
 }
@@ -64,7 +74,7 @@ bool LineRenderer::Add(const Vector3f& p0, const Vector3f& p1, float width, cons
     if (not Reserve(m_count + 1))
         return false;
 
-    Line& line = m_buffer.m_data[m_count++];
+    Line& line = m_lines[m_count++];
 
     line.p0 = p0;
     line.width = width;
@@ -113,8 +123,15 @@ void LineRenderer::SetupQuad(void) {
 bool LineRenderer::Render(void) {
     if (not m_isAvailable or (m_count <= 0))
         return false;
-    if (not m_buffer.UploadRange(0, m_count))
+    if (not ReserveBuffer(m_buffer.AppendBase() + m_count))
         return false;
+
+    int firstLine = m_buffer.AppendBase();
+
+    std::memcpy(m_buffer.m_data.Data() + firstLine, m_lines.Data(), size_t(m_count) * sizeof(Line));
+    if (not m_buffer.UploadRange(firstLine, m_count, false))
+        return false;
+    m_buffer.SetAppendBase(firstLine + m_count);
 
     // states feed the PSO, so they are set before the shader is activated. Alpha blending for the
     // antialiased edge; a ribbon is never culled. Depth test and write stay what the caller set.
@@ -152,6 +169,7 @@ bool LineRenderer::Render(void) {
         shader->SetVector2f("texelSize", texelSize);
         shader->SetFloat("dashScale", m_dashScale);
         shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
+        shader->SetInt("firstLine", firstLine);
         m_buffer.Bind(0);
         m_quad.GetGfxDataLayout().SetInstanceCount(uint32_t(m_count));
         ok = m_quad.Render(shader);
