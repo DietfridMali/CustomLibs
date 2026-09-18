@@ -129,7 +129,7 @@ public:
     static constexpr uint32_t kBindingB1HS = kUavBase + kUavSlots;
     static constexpr uint32_t kBindingB1DS = kBindingB1HS + 1;
     static constexpr uint32_t kSsboBase = kBindingB1DS + 1;
-    static constexpr uint32_t kSsboSlots = 17;
+    static constexpr uint32_t kSsboSlots = 19;
     static constexpr uint32_t kSsboSpace = 1;
     static constexpr uint32_t kBindingCount = kSsboBase + kSsboSlots;
 

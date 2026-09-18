@@ -95,6 +95,8 @@ static const wchar_t* const kCommonBindArgs[] = {
     L"-fvk-bind-register", L"t14", L"1", L"56", L"0",
     L"-fvk-bind-register", L"t15", L"1", L"57", L"0",
     L"-fvk-bind-register", L"t16", L"1", L"58", L"0",
+    L"-fvk-bind-register", L"t17", L"1", L"59", L"0",
+    L"-fvk-bind-register", L"t18", L"1", L"60", L"0",
 };
 static constexpr uint32_t kCommonBindArgCount = uint32_t(sizeof(kCommonBindArgs) / sizeof(kCommonBindArgs[0]));
 
