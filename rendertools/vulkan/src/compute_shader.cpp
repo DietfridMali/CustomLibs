@@ -407,6 +407,7 @@ bool ComputeShader::UploadB1(void) noexcept
         return false;
     std::memcpy(a.cpu, m_b1Staging.data(), m_b1Size);
     m_b1DynamicOffset = a.offset;
+    m_b1Buffer = a.buffer;
     m_b1Dirty = false;
     return true;
 }

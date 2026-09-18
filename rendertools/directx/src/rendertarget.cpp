@@ -355,6 +355,10 @@ bool RenderTarget::SelectCubeFace(int face, int bufferIndex)
         return false;
     m_cubeFace = face;
     m_bufferInfo[index].m_rtv = m_bufferInfo[index].m_cubeRtv[face];
+    // An enabled target has the face it was activated with bound (OMSetRenderTargets in
+    // SelectDrawBuffers ()); moving m_rtv alone leaves every later draw on that face. Bind again.
+    if (IsEnabled() and (m_drawBufferGroup == dbSingle) and (m_activeBufferIndex == index))
+        return SelectDrawBuffers({ .bufferIndex = index, .drawBufferGroup = dbSingle, .clear = false, .reactivate = true, .depthMode = m_depthMode });
     return true;
 }
 
@@ -736,8 +740,10 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     }
     if (not EnableBuffers(params))
         return false;
-    // The PSO's slot-0 RTV format follows this render target (HDR scene vs RGBA8 screen/UI).
-    baseRenderer.RenderStates().colorFormat = m_colorFormat;
+    // The PSO's slot-0 RTV format follows this render target (HDR scene vs RGBA8 screen/UI) - or the
+    // cube map, when one of its faces is the single draw buffer.
+    bool isCubeMap = (params.drawBufferGroup == dbSingle) and (m_bufferInfo[m_activeBufferIndex].m_type == BufferInfo::btCubemap);
+    baseRenderer.RenderStates().colorFormat = isCubeMap ? m_cubeMapFormat : m_colorFormat;
     // Same for the DSV format: with a stencil plane it is the combined one. A shared depth source
     // (SetDepthSource) is the buffer that actually gets bound, so it decides.
     baseRenderer.RenderStates().depthFormat = DepthFormat();
@@ -814,6 +820,8 @@ void RenderTarget::Disable(bool deactivate) noexcept {
                 m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
                 m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            for (int i = 0, j = m_cubeMapIndex; i < m_cubeMapCount; ++i, ++j)
+                m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             // The depth buffer is an RT output too: the deferred shadow (and the soft-particle / WBOIT pass)
             // sample it as an SRV to reconstruct world position. Colour + MRT above were made shader-readable
             // but the depth was missed -> a sampled depth left in DEPTH_WRITE reads as garbage on D3D12, so the
@@ -859,11 +867,28 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
 {
     if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
         return false;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    // Color and worldPos/normal MRT (btVertex) buffers must be POINT-sampled, mirroring the OGL
+    // RT buffer creation (GL_NEAREST for RGBA8 color + RGBA32F MRT buffers; LINEAR only for
+    // skymap/depth). Linear filtering interpolates world positions across geometry silhouettes,
+    // which smears decals along moving geometry. Set per bind: the wrapper behind a non colour buffer
+    // is still shared across buffer types, so this must not rely on the one-shot SetParams above.
+    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btCubemap);
+    return BindBuffer(bufferIndex, tmuIndex, pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear);
+}
+
+
+bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filtering)
+{
+    if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
+        return false;
     if (tmuIndex < 0)
         tmuIndex = bufferIndex;
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (info.SRVIndex() == UINT32_MAX)
         return false;
+    if ((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat))
+        filtering = GfxFilterMode::Nearest;
     auto* list = commandListHandler.CurrentGfxList();
     if (not list)
         return false;
@@ -880,14 +905,8 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
         texture = &m_externalTexture;
     if (not texture->m_hasParams)
         texture->SetParams(false);
-    // Color and worldPos/normal MRT (btVertex) buffers must be POINT-sampled, mirroring the OGL
-    // RT buffer creation (GL_NEAREST for RGBA8 color + RGBA32F MRT buffers; LINEAR only for
-    // skymap/depth). Linear filtering interpolates world positions across geometry silhouettes,
-    // which smears decals along moving geometry. Set per bind: the wrapper behind a non colour buffer
-    // is still shared across buffer types, so this must not rely on the one-shot SetParams above.
-    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex);
-    texture->m_sampling.minFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
-    texture->m_sampling.magFilter = pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear;
+    texture->m_sampling.minFilter = filtering;
+    texture->m_sampling.magFilter = filtering;
     auto& samplerHeap = descriptorHeaps.m_samplerHeap;
     if (samplerHeap.m_heap) {
         uint32_t slot = samplerCache.GetSlot(texture->m_sampling);

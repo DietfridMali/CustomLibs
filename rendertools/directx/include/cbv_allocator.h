@@ -3,12 +3,18 @@
 #include "dx12framework.h"
 #include "basesingleton.hpp"
 
+#include <vector>
+
 // =================================================================================================
 // CbvLinearAllocator — per-frame linear allocator for constant buffer sub-allocations.
 //
 // Solves the upload-heap aliasing problem: a single ID3D12Resource per Shader was overwritten
 // by later draws in the same frame, causing all draws of the same shader to read the last
 // CPU-written value rather than the value at record time.
+//
+// A frame that needs more than the slot's buffer holds chains further buffers on the spot
+// (FrameData::overflow), so an allocation only fails when the device is out of memory. Reset()
+// drops the chained buffers and grows the slot's own buffer up to kMaxCap.
 //
 // Usage:
 //   BeginFrame / Open  →  cbvAllocator.Reset(frameIndex)   (resets the offset to 0)
@@ -28,7 +34,14 @@ class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
 {
     static constexpr UINT kAlign       = 256;
     static constexpr UINT kInitCap     = 512u * 1024u;   // 64 KB = 256 slots per frame
-    static constexpr UINT kMaxCap      = 1024u * 1024u; // 1 MB hard ceiling
+    static constexpr UINT kMaxCap      = 1024u * 1024u; // 1 MB ceiling of the slot's own buffer
+
+    struct Chunk {
+        ComPtr<ID3D12Resource>    resource;
+        uint8_t*                  cpuBase    = nullptr;
+        D3D12_GPU_VIRTUAL_ADDRESS gpuBase    = 0;
+        UINT                      capacity   = 0;
+    };
 
     struct FrameData {
         ComPtr<ID3D12Resource>    resource;
@@ -37,12 +50,18 @@ class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
         UINT                      offset     = 0;
         UINT                      capacity   = 0;
         UINT                      peakOffset = 0;
+        std::vector<Chunk>        overflow;
+        UINT                      overflowOffset = 0;
     };
 
     FrameData  m_frames[2];   // FRAME_COUNT = 2
     UINT       m_frameIndex{ 0 };
+    ComPtr<ID3D12Device> m_device;
 
+    bool CreateBuffer(ID3D12Device* device, UINT capacity, const char* name, ComPtr<ID3D12Resource>& resource, uint8_t*& cpuBase) noexcept;
     bool AllocFrame(ID3D12Device* device, UINT frameIdx, UINT capacity) noexcept;
+    bool AddChunk(FrameData& f, UINT capacity) noexcept;
+    void DestroyChunks(FrameData& f) noexcept;
 
 public:
     bool Create(ID3D12Device* device) noexcept;
@@ -51,8 +70,8 @@ public:
     // Reset at the start of a frame (call after fence wait so GPU is done with this frame's data).
     void Reset(UINT frameIndex) noexcept;
 
-    // Allocate 'bytes' (rounded up to 256) from the current frame's buffer.
-    // Returns {nullptr, 0} on overflow (logged to stderr).
+    // Allocate 'bytes' (rounded up to 256) from the current frame's buffer, or from a chained one
+    // once that is full. Returns {nullptr, 0} only when no further buffer could be created.
     CbAlloc Allocate(UINT bytes) noexcept;
 };
 

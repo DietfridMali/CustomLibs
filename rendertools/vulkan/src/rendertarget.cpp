@@ -478,7 +478,15 @@ bool RenderTarget::SelectCubeFace(int face, int bufferIndex)
         return false;
     if (m_bufferInfo[index].m_cubeView[face] == VK_NULL_HANDLE)
         return false;
+    // The attachments of a rendering scope are fixed when it begins, so an open scope still draws into
+    // the face it began with. Close it and reopen it on the new face, contents preserved - the same way
+    // SelectDrawBuffers () reconfigures a pass in flight.
+    bool restart = m_isInRendering and (m_cubeFace != face);
+    if (restart)
+        EndRendering();
     m_cubeFace = face;
+    if (restart)
+        BeginRendering(false, false);
     return true;
 }
 
@@ -663,6 +671,16 @@ VkClearValue MakeClearDepth(float depth) {
     return v;
 }
 
+// What dbSingle may draw into: a colour buffer, or a cube map buffer (one face of it, see
+// SelectCubeFace ()). bufferIndex is a BUFFER index - a cube map target has no colour buffers at all,
+// so gating it on m_colorBufferCount alone left the cube map without an attachment, a clear slot and
+// a pipeline format.
+bool IsSingleDrawBuffer(RenderTarget& rt, int bufferIndex) {
+    if ((bufferIndex < 0) or (bufferIndex >= rt.m_bufferCount))
+        return false;
+    return (bufferIndex < rt.m_colorBufferCount) or (rt.m_bufferInfo[bufferIndex].m_type == BufferInfo::btCubemap);
+}
+
 }  // anonymous
 
 // -------------------------------------------------------------------------------------------------
@@ -701,7 +719,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
         // depth-only: no colour writes
     }
     else if (m_drawBufferGroup == dbSingle) {
-        if ((m_activeBufferIndex >= 0) and (m_activeBufferIndex < m_colorBufferCount))
+        if (IsSingleDrawBuffer(*this, m_activeBufferIndex))
             ConfigColor(m_activeBufferIndex);
     }
     else if (m_drawBufferGroup == dbExtra) {
@@ -1048,6 +1066,8 @@ void RenderTarget::Disable(bool deactivate) noexcept
             m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
         for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, true);
+        for (int j = 0, i = m_cubeMapIndex; j < m_cubeMapCount; ++j, ++i)
+            m_bufferInfo[i].SetState(cb, BufferInfo::btCubemap, true);
         if (m_depthBufferIndex >= 0)
             m_bufferInfo[m_depthBufferIndex].SetState(cb, BufferInfo::btDepth, true);
     }
@@ -1090,7 +1110,7 @@ static int ActiveColorSlots(RenderTarget& rt, int slots[RT_MAX_COLOR_BUFFERS])
         case RenderTarget::dbDepth:
             break;
         case RenderTarget::dbSingle:
-            if ((rt.m_activeBufferIndex >= 0) and (rt.m_activeBufferIndex < rt.m_colorBufferCount))
+            if (IsSingleDrawBuffer(rt, rt.m_activeBufferIndex))
                 AddBuffer(rt.m_activeBufferIndex);
             break;
         case RenderTarget::dbExtra:
@@ -1299,11 +1319,23 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
 {
     if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
         return false;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btCubemap);
+    return BindBuffer(bufferIndex, tmuIndex, pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear);
+}
+
+
+bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filtering)
+{
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
+        return false;
     if (tmuIndex < 0)
         tmuIndex = bufferIndex;
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (info.m_imageView == VK_NULL_HANDLE)
         return false;
+    if ((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat))
+        filtering = GfxFilterMode::Nearest;
     // Transition only on our own CL and only when no render-pass scope is open on it.
     // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
     // pingpong path the next Activate's DetachBuffer will issue the transition outside
@@ -1318,6 +1350,8 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
         texture = &m_externalTexture;
     if (not texture->m_hasParams)
         texture->SetParams(false);
+    texture->m_sampling.minFilter = filtering;
+    texture->m_sampling.magFilter = filtering;
     texture->m_image = info.m_image;
     texture->m_imageView = info.m_imageView;
     texture->m_handle = info.m_srvIndex;
@@ -1488,8 +1522,9 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
         case dbDepth:
             break;
         case dbSingle:
-            if ((m_activeBufferIndex >= 0) and (m_activeBufferIndex < m_colorBufferCount))
-                key.colorFormats[key.colorFormatCount++] = m_colorFormat;
+            if (IsSingleDrawBuffer(*this, m_activeBufferIndex))
+                key.colorFormats[key.colorFormatCount++] =
+                    (m_bufferInfo[m_activeBufferIndex].m_type == BufferInfo::btCubemap) ? m_cubeMapFormat : m_colorFormat;
             break;
         case dbExtra:
             for (int j = 0; j < m_vertexBufferCount; ++j)

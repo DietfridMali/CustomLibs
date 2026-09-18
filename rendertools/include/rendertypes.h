@@ -81,6 +81,14 @@ enum eColorEncoding {
     ecSRGB
 };
 
+enum eBaseMatrices {
+    bmModelView = 0,
+    bmProjection,
+    bmViewport,
+    bmLightTransform,
+    bmCount
+};
+
 // The linear twin of an sRGB format, itself for every other - what an upload uses when the sampler
 // is not to decode.
 inline constexpr GfxPixelFormat GfxLinearFormat(GfxPixelFormat f) noexcept {

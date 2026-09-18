@@ -858,7 +858,16 @@ void RenderTarget::Deactivate(void) noexcept {
 
 
 bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
-    if (bufferIndex < 0)
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
+        return false;
+    BufferInfo& info = m_bufferInfo[bufferIndex];
+    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btCubemap);
+    return BindBuffer(bufferIndex, tmuIndex, pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear);
+}
+
+
+bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filtering) {
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
         return false;
     gfxStates.ClearError();
     if (tmuIndex < 0)
@@ -870,6 +879,13 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex) {
     // would leave the sampler reading nothing.
     gfxStates.BindTexture(BufferTarget(bufferIndex), m_bufferInfo[bufferIndex].m_handle, tmuIndex);
     m_bufferInfo[bufferIndex].m_tmuIndex = tmuIndex;
+    if ((m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat))
+        filtering = GfxFilterMode::Nearest;
+    const GLenum target = BufferTarget(bufferIndex);
+    const GLint filter = (filtering == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
+    gfxStates.ActiveTexture(GL_TEXTURE0 + tmuIndex);
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
     return true;
 }
 

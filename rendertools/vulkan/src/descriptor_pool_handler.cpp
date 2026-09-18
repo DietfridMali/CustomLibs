@@ -13,8 +13,10 @@ bool DescriptorPoolHandler::Create(VkDevice device) noexcept
     }
     m_device = device;
     for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
-        if (not CreatePool(i))
+        if (not CreatePool(m_pools[i])) {
+            fprintf(stderr, "DescriptorPoolHandler::Create: no pool for frame slot %u\n", i);
             return false;
+        }
     }
     m_currentFrame = 0;
     return true;
@@ -30,6 +32,10 @@ void DescriptorPoolHandler::Destroy(void) noexcept
             vkDestroyDescriptorPool(m_device, m_pools[i], nullptr);
             m_pools[i] = VK_NULL_HANDLE;
         }
+        for (VkDescriptorPool pool : m_overflowPools[i])
+            vkDestroyDescriptorPool(m_device, pool, nullptr);
+        m_overflowPools[i].clear();
+        m_overflowUsed[i] = 0;
     }
     m_device = VK_NULL_HANDLE;
 }
@@ -48,6 +54,43 @@ void DescriptorPoolHandler::BeginFrame(uint32_t frameIndex) noexcept
     VkResult res = vkResetDescriptorPool(m_device, m_pools[m_currentFrame], 0);
     if (res != VK_SUCCESS)
         fprintf(stderr, "DescriptorPoolHandler::BeginFrame: vkResetDescriptorPool failed (%d)\n", (int)res);
+
+    std::vector<VkDescriptorPool>& overflow = m_overflowPools[m_currentFrame];
+
+    while (overflow.size() > m_overflowUsed[m_currentFrame]) {
+        vkDestroyDescriptorPool(m_device, overflow.back(), nullptr);
+        overflow.pop_back();
+    }
+    for (VkDescriptorPool pool : overflow) {
+        res = vkResetDescriptorPool(m_device, pool, 0);
+        if (res != VK_SUCCESS)
+            fprintf(stderr, "DescriptorPoolHandler::BeginFrame: vkResetDescriptorPool failed (%d)\n", (int)res);
+    }
+    m_overflowUsed[m_currentFrame] = 0;
+}
+
+
+VkDescriptorPool DescriptorPoolHandler::ActivePool(void) const noexcept
+{
+    uint32_t used = m_overflowUsed[m_currentFrame];
+
+    return used ? m_overflowPools[m_currentFrame][used - 1] : m_pools[m_currentFrame];
+}
+
+
+VkDescriptorPool DescriptorPoolHandler::NextPool(void) noexcept
+{
+    std::vector<VkDescriptorPool>& overflow = m_overflowPools[m_currentFrame];
+    uint32_t& used = m_overflowUsed[m_currentFrame];
+
+    if (used == overflow.size()) {
+        VkDescriptorPool pool = VK_NULL_HANDLE;
+
+        if (not CreatePool(pool))
+            return VK_NULL_HANDLE;
+        overflow.push_back(pool);
+    }
+    return overflow[used++];
 }
 
 
@@ -55,7 +98,7 @@ VkDescriptorSet DescriptorPoolHandler::Allocate(VkDescriptorSetLayout layout) no
 {
     if ((m_device == VK_NULL_HANDLE) or (layout == VK_NULL_HANDLE))
         return VK_NULL_HANDLE;
-    VkDescriptorPool pool = m_pools[m_currentFrame];
+    VkDescriptorPool pool = ActivePool();
     if (pool == VK_NULL_HANDLE)
         return VK_NULL_HANDLE;
 
@@ -67,16 +110,21 @@ VkDescriptorSet DescriptorPoolHandler::Allocate(VkDescriptorSetLayout layout) no
 
     VkDescriptorSet set = VK_NULL_HANDLE;
     VkResult res = vkAllocateDescriptorSets(m_device, &info, &set);
+    if ((res == VK_ERROR_OUT_OF_POOL_MEMORY) or (res == VK_ERROR_FRAGMENTED_POOL)) {
+        info.descriptorPool = NextPool();
+        if (info.descriptorPool == VK_NULL_HANDLE)
+            return VK_NULL_HANDLE;
+        res = vkAllocateDescriptorSets(m_device, &info, &set);
+    }
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "DescriptorPoolHandler::Allocate: vkAllocateDescriptorSets failed (%d) — pool exhausted?\n",
-                (int)res);
+        fprintf(stderr, "DescriptorPoolHandler::Allocate: vkAllocateDescriptorSets failed (%d)\n", (int)res);
         return VK_NULL_HANDLE;
     }
     return set;
 }
 
 
-bool DescriptorPoolHandler::CreatePool(uint32_t slot) noexcept
+bool DescriptorPoolHandler::CreatePool(VkDescriptorPool& pool) noexcept
 {
     VkDescriptorPoolSize sizes[5] { };
     sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -97,10 +145,10 @@ bool DescriptorPoolHandler::CreatePool(uint32_t slot) noexcept
     info.poolSizeCount = (uint32_t)(sizeof(sizes) / sizeof(sizes[0]));
     info.pPoolSizes = sizes;
 
-    VkResult res = vkCreateDescriptorPool(m_device, &info, nullptr, &m_pools[slot]);
+    VkResult res = vkCreateDescriptorPool(m_device, &info, nullptr, &pool);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "DescriptorPoolHandler::CreatePool: vkCreateDescriptorPool[%u] failed (%d)\n",
-                slot, (int)res);
+        fprintf(stderr, "DescriptorPoolHandler::CreatePool: vkCreateDescriptorPool failed (%d)\n", (int)res);
+        pool = VK_NULL_HANDLE;
         return false;
     }
     return true;

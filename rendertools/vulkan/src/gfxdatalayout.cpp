@@ -341,15 +341,18 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU and
     // materialize the bind table into a VkDescriptorSet for this draw.
     Shader* shader = baseShaderHandler.ActiveShader();
+    // A draw whose descriptor set or constants could not be set up is not recorded: it would run with
+    // whatever set the command buffer had bound before, or with none, and that costs the device.
+    bool hasVariables = true;
     if (shader) {
         if (CommandList* cl = commandListHandler.CurrentCmdList()) {
             cl->SetTopology(shader, m_shape);
             ResolveDrawPipeline(cl, shader);
         }
-        shader->UpdateVariables();
+        hasVariables = shader->UpdateVariables();
     }
     //gfxStates.CheckError();
-    if (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE) {
+    if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
         if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
             uint32_t count = (indexCount > 0) ? uint32_t(indexCount) : uint32_t(m_indexBuffer.m_itemCount) - uint32_t(firstIndex);
             if (count > 0) {

@@ -13,6 +13,8 @@ bool CbvLinearAllocator::AllocFrame(uint32_t frameIdx, uint32_t capacity) noexce
     auto& f = m_frames[frameIdx];
 
     f.buffer.Destroy();
+    f.offset = 0;
+    f.capacity = 0;
 
     if (not f.buffer.Create(VkDeviceSize(capacity),
                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -25,6 +27,35 @@ bool CbvLinearAllocator::AllocFrame(uint32_t frameIdx, uint32_t capacity) noexce
     f.offset = 0;
     f.capacity = capacity;
     return true;
+}
+
+
+bool CbvLinearAllocator::AddChunk(FrameData& f, uint32_t capacity) noexcept
+{
+    Chunk chunk;
+
+    if (not chunk.buffer.Create(VkDeviceSize(capacity),
+                                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                VMA_MEMORY_USAGE_AUTO,
+                                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+                              | VMA_ALLOCATION_CREATE_MAPPED_BIT)) {
+        fprintf(stderr, "CbvLinearAllocator: GfxBuffer::Create for chained buffer %u of frame %u failed (cap=%u)\n",
+                uint32_t(f.overflow.size()), m_frameIndex, capacity);
+        return false;
+    }
+    chunk.capacity = capacity;
+    f.overflow.push_back(chunk);
+    f.overflowOffset = 0;
+    return true;
+}
+
+
+void CbvLinearAllocator::DestroyChunks(FrameData& f) noexcept
+{
+    for (auto& chunk : f.overflow)
+        chunk.buffer.Destroy();
+    f.overflow.clear();
+    f.overflowOffset = 0;
 }
 
 
@@ -48,6 +79,7 @@ bool CbvLinearAllocator::Create(void) noexcept
 void CbvLinearAllocator::Destroy(void) noexcept
 {
     for (auto& f : m_frames) {
+        DestroyChunks(f);
         f.buffer.Destroy();
         f.offset = 0;
         f.capacity = 0;
@@ -61,16 +93,13 @@ void CbvLinearAllocator::Reset(uint32_t frameIndex) noexcept
     m_frameIndex = frameIndex;
     auto& f = m_frames[frameIndex];
 
-    if (f.peakOffset > f.capacity) {
+    DestroyChunks(f);
+    if ((f.peakOffset > f.capacity) and (f.capacity < kMaxCap)) {
         uint32_t newCap = f.capacity;
         while ((newCap < f.peakOffset) and (newCap < kMaxCap))
             newCap *= 2;
         newCap = std::min(newCap, kMaxCap);
-        if (newCap >= f.peakOffset)
-            AllocFrame(frameIndex, newCap);
-        else
-            fprintf(stderr, "CbvLinearAllocator: frame %u peak %u exceeds kMaxCap %u\n",
-                    frameIndex, f.peakOffset, kMaxCap);
+        AllocFrame(frameIndex, newCap);
     }
     f.peakOffset = 0;
     f.offset = 0;
@@ -82,20 +111,29 @@ CbAlloc CbvLinearAllocator::Allocate(uint32_t bytes) noexcept
     const uint32_t aligned = (bytes + m_align - 1u) & ~(m_align - 1u);
     auto& f = m_frames[m_frameIndex];
 
-    if (f.offset + aligned > f.capacity) {
-        fprintf(stderr, "CbvLinearAllocator: frame %u overflow (capacity %u, needed %u) — grow deferred to next Reset\n",
-                m_frameIndex, f.capacity, f.offset + aligned);
-        if (f.offset + aligned > f.peakOffset)
-            f.peakOffset = f.offset + aligned;
-        return { };
+    CbAlloc a;
+
+    if (f.overflow.empty() and (f.offset + aligned <= f.capacity)) {
+        a.cpu = static_cast<uint8_t*>(f.buffer.Mapped()) + f.offset;
+        a.offset = f.offset;
+        a.buffer = f.buffer.Buffer();
+        f.offset += aligned;
+        f.peakOffset += aligned;
+        return a;
     }
 
-    CbAlloc a;
-    a.cpu = static_cast<uint8_t*>(f.buffer.Mapped()) + f.offset;
-    a.offset = f.offset;
-    f.offset += aligned;
-    if (f.offset > f.peakOffset)
-        f.peakOffset = f.offset;
+    if (f.overflow.empty() or (f.overflowOffset + aligned > f.overflow.back().capacity)) {
+        if (not AddChunk(f, std::max(f.capacity, aligned)))
+            return { };
+    }
+
+    Chunk& chunk = f.overflow.back();
+
+    a.cpu = static_cast<uint8_t*>(chunk.buffer.Mapped()) + f.overflowOffset;
+    a.offset = f.overflowOffset;
+    a.buffer = chunk.buffer.Buffer();
+    f.overflowOffset += aligned;
+    f.peakOffset += aligned;
     return a;
 }
 

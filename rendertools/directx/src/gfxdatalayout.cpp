@@ -351,18 +351,21 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU.
     // Enable() uploads b1 first, then the caller sets uniforms — so we must re-upload here.
     Shader* shader = baseShaderHandler.ActiveShader();
+    // A draw whose constants could not be set up is not recorded: it would run with the constant
+    // buffers of whatever draw came before it.
+    bool hasVariables = true;
     if (shader) {
         if (CommandList* cl = commandListHandler.CurrentCmdList()) {
             cl->SetTopology(shader, m_shape);
             ResolveDrawPipeline(cl, shader);
         }
         ZoneScopedN("Shader::UpdateVariables");
-        shader->UpdateVariables();
+        hasVariables = shader->UpdateVariables();
     }
 
     {
         ZoneScopedN("Layout::DrawCall");
-        if (commandListHandler.CurrentGfxList()) {
+        if (hasVariables and commandListHandler.CurrentGfxList()) {
             commandListHandler.CurrentGfxList()->IASetPrimitiveTopology((shader and shader->IsTessellated()) ? ToD3DPatchTopology(m_shape) : ToD3DTopology(m_shape));
             if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
                 UINT count = (indexCount > 0) ? UINT(indexCount) : UINT(m_indexBuffer.m_itemCount) - UINT(firstIndex);

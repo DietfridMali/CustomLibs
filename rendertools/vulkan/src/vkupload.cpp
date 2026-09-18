@@ -10,6 +10,9 @@
 #include <cstring>
 #include <algorithm>
 
+// commandlist.cpp - ends the program with a message when res is VK_ERROR_DEVICE_LOST.
+extern void HandleDeviceLost(VkResult res, const char* where) noexcept;
+
 // =================================================================================================
 // VkStagingBuffer
 
@@ -106,14 +109,17 @@ bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept
     res = vkQueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "vkupload::EndSingleTimeCommands: vkQueueSubmit2 failed (%d)\n", (int)res);
+        HandleDeviceLost(res, "vkupload::EndSingleTimeCommands");
         vkFreeCommandBuffers(device, cmd.pool, 1, &cmd.cb);
         vkDestroyCommandPool(device, cmd.pool, nullptr);
         return false;
     }
 
     res = vkQueueWaitIdle(queue);
-    if (res != VK_SUCCESS)
+    if (res != VK_SUCCESS) {
         fprintf(stderr, "vkupload::EndSingleTimeCommands: vkQueueWaitIdle failed (%d)\n", (int)res);
+        HandleDeviceLost(res, "vkupload::EndSingleTimeCommands");
+    }
 
     vkFreeCommandBuffers(device, cmd.pool, 1, &cmd.cb);
     vkDestroyCommandPool(device, cmd.pool, nullptr);

@@ -8,6 +8,12 @@
 #include <cstdio>
 #include <cstring>
 
+// A lost device cannot be recovered from here: every later submit, wait and present fails as well, and
+// an app that keeps recording runs into the driver and the validation layers with dead handles. So the
+// first VK_ERROR_DEVICE_LOST ends the program with a message. Defined below, behind the second include
+// block; vkupload.cpp declares it extern.
+void HandleDeviceLost(VkResult res, const char* where) noexcept;
+
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL. Es gibt in dem Sinne keine verschachtelten Render-Tasks.
 // Auch bei geschachteltem open - close von CLs wird die zuerst ausgeführt, die zuerst geschlossen wird - das liegt daran,
@@ -84,6 +90,7 @@ bool CommandQueue::BeginFrame(void) noexcept
     VkResult res = vkWaitForFences(m_device, 1, &m_inFlight[m_frameIndex], VK_TRUE, UINT64_MAX);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
+        HandleDeviceLost(res, "CommandQueue::BeginFrame");
         return false;
     }
     res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
@@ -91,12 +98,12 @@ bool CommandQueue::BeginFrame(void) noexcept
         fprintf(stderr, "CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
         return false;
     }
-    if (not AcquireNextImage())
-        return false;
+    // The slot's resources hang on its fence alone, so they are reset before the image is acquired -
+    // a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
     gfxResourceHandler.Cleanup(m_frameIndex);
     descriptorPoolHandler.BeginFrame(m_frameIndex);
     cbvAllocator.Reset(m_frameIndex);
-    return true;
+    return AcquireNextImage();
 }
 
 
@@ -112,8 +119,10 @@ void CommandQueue::WaitIdle(void) noexcept
     if (m_graphicsQueue == VK_NULL_HANDLE)
         return;
     VkResult res = vkQueueWaitIdle(m_graphicsQueue);
-    if (res != VK_SUCCESS)
+    if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
+        HandleDeviceLost(res, "CommandQueue::WaitIdle");
+    }
 }
 
 
@@ -203,6 +212,7 @@ bool CommandQueue::AcquireNextImage(void) noexcept
     }
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR)) {
         fprintf(stderr, "CommandQueue::AcquireNextImage: vkAcquireNextImageKHR failed (%d)\n", (int)res);
+        HandleDeviceLost(res, "CommandQueue::AcquireNextImage");
         return false;
     }
     return true;
@@ -221,8 +231,10 @@ void CommandQueue::Present(void) noexcept
     present.pImageIndices = &m_imageIndex;
 
     VkResult res = vkQueuePresentKHR(m_presentQueue, &present);
-    if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR))
+    if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR)) {
         fprintf(stderr, "CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
+        HandleDeviceLost(res, "CommandQueue::Present");
+    }
 }
 
 // =================================================================================================
@@ -241,6 +253,22 @@ void CommandQueue::Present(void) noexcept
 #include "pipeline_cache.h"
 #include "rendertarget.h"
 #include "base_displayhandler.h"
+
+#include <cstdlib>
+
+void HandleDeviceLost(VkResult res, const char* where) noexcept
+{
+    if (res != VK_ERROR_DEVICE_LOST)
+        return;
+    fprintf(stderr, "%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating\n", where);
+    fflush(stderr);
+    // The window goes first - a message box behind a fullscreen window cannot be seen or answered.
+    if (SDL_Window* window = baseDisplayHandler.GetWindow())
+        SDL_HideWindow(window);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Internal Error", "Graphics device lost", nullptr);
+    // No exit (): static destructors and atexit handlers would walk back into Vulkan with the dead device.
+    std::_Exit(1);
+}
 
 List<RenderStates> CommandList::m_renderStateStack;
 
@@ -436,8 +464,10 @@ void CommandList::Flush(void) noexcept
     submit.pCommandBufferInfos = cbInfos;
 
     VkResult res = vkQueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
-    if (res != VK_SUCCESS)
+    if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandList::Flush: vkQueueSubmit2 failed (%d)\n", (int)res);
+        HandleDeviceLost(res, "CommandList::Flush");
+    }
 #ifdef _DEBUG
     CheckDeviceRemoved("Flush");
 #endif
@@ -717,8 +747,10 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
         {
             ZoneScopedN("vkQueueSubmit2");
             VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
-            if (res != VK_SUCCESS)
+            if (res != VK_SUCCESS) {
                 fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
+                HandleDeviceLost(res, "CommandListHandler::ExecuteAll");
+            }
         }
     }
 #ifdef _DEBUG
@@ -765,8 +797,10 @@ void CommandListHandler::ExecutePending(void) noexcept
         submit.pCommandBufferInfos = cbInfos.Data();
 
         VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
-        if (res != VK_SUCCESS)
+        if (res != VK_SUCCESS) {
             fprintf(stderr, "CommandListHandler::ExecutePending: vkQueueSubmit2 failed (%d)\n", (int)res);
+            HandleDeviceLost(res, "CommandListHandler::ExecutePending");
+        }
     }
 #ifdef _DEBUG
     gfxStates.CheckError("CommandListHandler::ExecutePending submit");

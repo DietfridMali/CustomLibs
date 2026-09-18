@@ -395,6 +395,8 @@ public:
 
     bool BindBuffer(int bufferIndex, int tmuIndex = -1);
 
+    bool BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filtering);
+
     void ReleaseBuffers(void);
 
     // Custom draw-buffer setup: bypasses the standard groups (dbAll / dbColor / dbExtra / dbSingle) so a

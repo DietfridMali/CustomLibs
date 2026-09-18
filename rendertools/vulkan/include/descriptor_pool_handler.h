@@ -3,6 +3,8 @@
 #include "vkframework.h"
 #include "basesingleton.hpp"
 
+#include <vector>
+
 // =================================================================================================
 // DescriptorPoolHandler — Vulkan equivalent of the DX12 DescriptorHeapHandler.
 //
@@ -12,6 +14,10 @@
 //
 // Allocate(layout) hands out a VkDescriptorSet from the current frame slot's pool. The set is
 // owned by the pool and is good only until the next BeginFrame on the same slot.
+//
+// A frame that needs more than one pool holds gets further pools on the spot (m_overflowPools).
+// BeginFrame resets those the slot's last frame used, so a steady load reuses them, and destroys
+// the ones it did not need.
 //
 // Pool size budget per frame slot. Numbers are upper bounds for one frame's worth of
 // shader-activates; tunable when profiling shows actual usage:
@@ -35,6 +41,8 @@ public:
 
     VkDevice         m_device       { VK_NULL_HANDLE };
     VkDescriptorPool m_pools[FRAME_COUNT] { };
+    std::vector<VkDescriptorPool> m_overflowPools[FRAME_COUNT];
+    uint32_t         m_overflowUsed[FRAME_COUNT] { };
     uint32_t         m_currentFrame { 0 };
 
     // Allocates one VkDescriptorPool per frame slot. Returns false on any vkCreateDescriptorPool failure.
@@ -46,14 +54,17 @@ public:
     // all sets allocated last cycle on this slot become invalid.
     void BeginFrame(uint32_t frameIndex) noexcept;
 
-    // Allocates one VkDescriptorSet with the given layout from the current slot's pool.
-    // Returns VK_NULL_HANDLE on pool exhaustion (caller should log + skip the activate).
+    // Allocates one VkDescriptorSet with the given layout from the current slot's pool, or from a
+    // further one once that is exhausted. Returns VK_NULL_HANDLE only when no pool could be created
+    // (caller skips the draw).
     VkDescriptorSet Allocate(VkDescriptorSetLayout layout) noexcept;
 
     inline VkDescriptorPool CurrentPool(void) const noexcept { return m_pools[m_currentFrame]; }
 
 private:
-    bool CreatePool(uint32_t slot) noexcept;
+    bool CreatePool(VkDescriptorPool& pool) noexcept;
+    VkDescriptorPool ActivePool(void) const noexcept;
+    VkDescriptorPool NextPool(void) noexcept;
 };
 
 #define descriptorPoolHandler DescriptorPoolHandler::Instance()

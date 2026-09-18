@@ -49,8 +49,10 @@ public:
     bool                                m_b1Dirty{ true };
 
     // After UploadB1 the per-frame UBO dynamic offset of the b1 binding lives here. Caller wires
-    // it into pDynamicOffsets for vkCmdBindDescriptorSets.
+    // it into pDynamicOffsets for vkCmdBindDescriptorSets, and m_b1Buffer into the descriptor - the
+    // allocator chains buffers within a frame, so the offset alone does not say where the data is.
     uint32_t                            m_b1DynamicOffset{ 0 };
+    VkBuffer                            m_b1Buffer{ VK_NULL_HANDLE };
 
     ComputeShader(String name = "")
         : m_name(std::move(name))

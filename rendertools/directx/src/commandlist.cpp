@@ -10,6 +10,9 @@
 #include <cstring>
 #include "tracy_wrapper.h"
 
+// base_displayhandler.cpp - ends the program with a message when the device has been removed.
+extern void HandleDeviceLost(const char* where) noexcept;
+
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL.Es gibt in dem Sinne keine verschachtelten Render-Tasks.
 // Auch bei geschachteltem open - close von CLs wird die zuerst ausgeführt, die zuerst geschlossen wird - das liegt daran,
@@ -114,6 +117,7 @@ void CommandQueue::WaitIdle(void) noexcept {
         m_fence->SetEventOnCompletion(value, m_fenceEvent);
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
+    HandleDeviceLost("CommandQueue::WaitIdle");
 #if DBG_DIRECTX
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
@@ -502,6 +506,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
 #endif
     if (n > 0)
         m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
+    HandleDeviceLost("CommandListHandler::ExecuteAll");
 #if DBG_DIRECTX
     gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;

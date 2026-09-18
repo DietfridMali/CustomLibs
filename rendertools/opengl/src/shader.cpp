@@ -251,12 +251,29 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 // Every shader program should have at least modelview and projection matrices.
 // Also starts location indexing by calling m_locations.Start().
 bool Shader::UpdateMatrices(void) {
-    SetMatrix4f("mModelView", baseRenderer.ModelView().AsArray(), false);
-    SetMatrix4f("mProjection", baseRenderer.Projection().AsArray(), false);
-    SetMatrix4f("mViewport", baseRenderer.ViewportTransformation().AsArray(), false);
+    SetMatrix4f(bmModelView, baseRenderer.ModelView().AsArray(), false);
+    SetMatrix4f(bmProjection, baseRenderer.Projection().AsArray(), false);
+    SetMatrix4f(bmViewport, baseRenderer.ViewportTransformation().AsArray(), false);
     if (shadowMap.IsReady())
-        SetMatrix4f("mLightTransform", shadowMap.GetTransformation().AsArray(), false);
+        SetMatrix4f(bmLightTransform, shadowMap.GetTransformation().AsArray(), false);
     return true;
+}
+
+
+static const char* baseMatrixNames[bmCount] = { "mModelView", "mProjection", "mViewport", "mLightTransform" };
+
+GLint Shader::SetMatrix4f(eBaseMatrices id, const float* data, bool transpose) noexcept {
+    GLint* location = m_baseLocations + id;
+#if CACHE_SHADER_DATA
+    if (UpdateUniform<const float*, UniformArray16f>(baseMatrixNames[id], location, data))
+        glUniformMatrix4fv(*location, 1, GLboolean(transpose), data);
+#else
+    if (*location < -1)
+        *location = GetLocation(baseMatrixNames[id]);
+    if (*location >= 0)
+        glUniformMatrix4fv(*location, 1, GLboolean(transpose), data);
+#endif
+    return *location;
 }
 
 

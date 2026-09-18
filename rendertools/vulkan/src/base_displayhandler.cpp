@@ -269,21 +269,13 @@ void BaseDisplayHandler::BeginFrame(void) {
     ZoneScoped;
     if (m_swapchain.Handle() == VK_NULL_HANDLE)
         return;
-    // CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, and
-    // vkAcquireNextImageKHR. We follow up with the per-frame resource resets that the DX12
-    // path runs implicitly inside CommandQueue::BeginFrame.
+    // CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, resets the slot's
+    // per-frame resources (deferred cleanup, descriptor pools, UBO allocator) and acquires the image.
     //gfxStates.CheckError();
     commandListHandler.CmdQueue().BeginFrame();
     //gfxStates.CheckError();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
     m_backBufferWasWritten = false;
-    const uint32_t slot = commandListHandler.CmdQueue().FrameIndex();
-    //gfxStates.CheckError();
-    descriptorPoolHandler.BeginFrame(slot);
-    //gfxStates.CheckError();
-    cbvAllocator.Reset(slot);
-    //gfxStates.CheckError();
-    gfxResourceHandler.Cleanup(slot);
     //gfxStates.CheckError();
     commandListHandler.ResetBindings();
     //gfxStates.CheckError();

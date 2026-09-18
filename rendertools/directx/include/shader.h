@@ -219,9 +219,7 @@ private:
     // record the field's b1 offset for every stage into the cache entry.
     void ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept;
 
-    // Check if 'name' is a b0 field name and write directly to m_b0Staging.
-    // Returns true if handled as a b0 field.
-    bool TrySetB0Field(const char* name, const float* data) noexcept;
+    bool TrySetB0Field(eBaseMatrices id, const float* data) noexcept;
 
 public:
     int SetFloat(const char* name, float data) noexcept;
@@ -250,6 +248,7 @@ public:
     int SetMatrix4f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {
         return SetMatrix4f(name, data.DataPtr(), transpose);
     }
+    int SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false) noexcept;
 
     int SetMatrix3f(const char* name, float* data, bool transpose = false) noexcept;
     int SetMatrix3f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {

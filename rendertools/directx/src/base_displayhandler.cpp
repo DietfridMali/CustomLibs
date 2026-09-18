@@ -17,6 +17,29 @@
 #include <cstdlib>
 
 // =================================================================================================
+// A removed device cannot be recovered from here: every later submit, wait and present fails as well.
+// So the first removal that is noticed ends the program with a message. commandlist.cpp declares this
+// extern and asks after every submit and wait.
+
+void HandleDeviceLost(const char* where) noexcept
+{
+    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : S_OK;
+    if (SUCCEEDED(removed))
+        return;
+    fprintf(stderr, "%s: device removed (0x%08X) - graphics device lost, terminating\n", where, (unsigned)removed);
+#if DBG_DIRECTX
+    dx12Context.DumpDRED();
+#endif
+    fflush(stderr);
+    // The window goes first - a message box behind a fullscreen window cannot be seen or answered.
+    if (SDL_Window* window = baseDisplayHandler.GetWindow())
+        SDL_HideWindow(window);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Internal Error", "Graphics device lost", nullptr);
+    // No exit (): static destructors and atexit handlers would walk back into D3D12 with the dead device.
+    std::_Exit(1);
+}
+
+// =================================================================================================
 
 bool BaseDisplayHandler::Init(void) {
     if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
@@ -276,8 +299,10 @@ void BaseDisplayHandler::EndFrame(void) {
     UINT syncInterval = m_vSync ? 1 : 0;
     UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
     HRESULT hr = m_swapChain->Present(syncInterval, presentFlags);
-    if (FAILED(hr))
+    if (FAILED(hr)) {
         fprintf(stderr, "BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
+        HandleDeviceLost("BaseDisplayHandler::EndFrame");
+    }
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
     m_backBufferList = nullptr;
     FrameMark;

@@ -79,6 +79,7 @@ class Shader
         bool            m_isTessellated{ false };
         AutoArray<UniformHandle*>   m_uniforms;
         ShaderLocationTable         m_locations;
+        GLint                       m_baseLocations[bmCount];
 
         using KeyType = String;
 
@@ -95,18 +96,21 @@ class Shader
             m_uniforms.SetShrinkable(false);
             // default value for automatic resizing
             m_uniforms.SetDefaultValue(nullptr);
+            ResetBaseLocations();
         }
 
         Shader(const Shader& other) {
             m_handle = other.m_handle;
             m_isTessellated = other.m_isTessellated;
             m_uniforms = other.m_uniforms;
+            std::memcpy(m_baseLocations, other.m_baseLocations, sizeof(m_baseLocations));
         }
 
         Shader (Shader&& other) noexcept {
             m_handle = std::exchange(other.m_handle, 0);
             m_isTessellated = other.m_isTessellated;
             m_uniforms = std::move(other.m_uniforms);
+            std::memcpy(m_baseLocations, other.m_baseLocations, sizeof(m_baseLocations));
         }
 
         ~Shader () {
@@ -116,6 +120,7 @@ class Shader
         Shader& operator=(Shader&& other) noexcept {
             m_handle = other.m_handle;
             m_isTessellated = other.m_isTessellated;
+            std::memcpy(m_baseLocations, other.m_baseLocations, sizeof(m_baseLocations));
             other.m_handle = 0;
             return *this;
         }
@@ -154,7 +159,14 @@ class Shader
             if (m_handle > 0) {
                 glDeleteProgram(m_handle);
                 m_handle = 0;
+                ResetBaseLocations();
             }
+        }
+
+
+        inline void ResetBaseLocations(void) noexcept {
+            for (int i = 0; i < bmCount; ++i)
+                m_baseLocations[i] = std::numeric_limits<GLint>::min();
         }
 
 
@@ -289,6 +301,8 @@ class Shader
         inline GLint SetMatrix4f(const char* name, AutoArray<GLfloat>& data, bool transpose = false) noexcept {
             return SetMatrix4f(name, data.DataPtr(), transpose);
         }
+
+        GLint SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false) noexcept;
 
         GLint SetMatrix3f(const char* name, float* data, bool transpose = false)
             noexcept;

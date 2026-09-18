@@ -768,6 +768,11 @@ bool Shader::Activate(void)
 }
 
 
+// The buffer each dynamic UBO binding of the draw being set up lies in - the allocator chains further
+// buffers within a frame, so b0 and the b1 stages need not share one. Filled by UploadB0 / UploadB1
+// and read by UpdateVariables right behind them.
+static VkBuffer dynamicBuffers[Shader::kDynamicOffsetCount] { };
+
 bool Shader::UploadB0(void) noexcept
 {
     CbAlloc a = cbvAllocator.Allocate(uint32_t(sizeof(FrameConstants)));
@@ -775,6 +780,7 @@ bool Shader::UploadB0(void) noexcept
         return false;
     std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
     m_dynamicOffsets[0] = a.offset;  // binding 0 (b0)
+    dynamicBuffers[0] = a.buffer;
     return true;
 }
 
@@ -787,13 +793,17 @@ bool Shader::UploadB1(void) noexcept
     // for those bindings so the descriptor-set update stays valid.
     for (int s = 0; s < kStageCount; ++s) {
         StageConstants& sc = m_stages[s];
-        if (sc.size == 0)
+        if (sc.size == 0) {
+            m_dynamicOffsets[1 + s] = 0;
+            dynamicBuffers[1 + s] = dynamicBuffers[0];
             continue;
+        }
         CbAlloc a = cbvAllocator.Allocate(sc.size);
         if (not a.IsValid())
             return false;
         std::memcpy(a.cpu, sc.staging.data(), sc.size);
         m_dynamicOffsets[1 + s] = a.offset;  // bindings 1 (VS), 2 (PS), 3 (GS)
+        dynamicBuffers[1 + s] = a.buffer;
         sc.dirty = false;
     }
     return true;
@@ -830,10 +840,6 @@ bool Shader::UpdateVariables(void) noexcept {
     if (set == VK_NULL_HANDLE)
         return false;
 
-    VkBuffer ubo = cbvAllocator.CurrentBuffer();
-    if (ubo == VK_NULL_HANDLE)
-        return false;
-
     // Worst-case write count: 4 dynamic UBOs + kSrvSlots images + kSamplerSlots samplers
     // + kUavSlots storage buffers + kSsboSlots read-only storage buffers.
     constexpr uint32_t kMaxWrites = kDynamicOffsetCount + CommandListHandler::kSrvSlots + CommandListHandler::kSamplerSlots
@@ -847,7 +853,7 @@ bool Shader::UpdateVariables(void) noexcept {
     uint32_t writeCount = 0;
 
     auto AddDynamicUbo = [&](uint32_t binding, uint32_t bytes, uint32_t bufSlot) {
-        bufInfos[bufSlot].buffer = ubo;
+        bufInfos[bufSlot].buffer = dynamicBuffers[bufSlot];
         bufInfos[bufSlot].offset = 0;
         bufInfos[bufSlot].range  = (bytes > 0) ? bytes : 1;
         VkWriteDescriptorSet& w = writes[writeCount++];
@@ -952,25 +958,24 @@ bool Shader::UpdateVariables(void) noexcept {
 // =================================================================================================
 // Uniform setters (1:1 from DX12 — operate purely on the CPU staging buffers)
 
-bool Shader::TrySetB0Field(const char* name, const float* data) noexcept
+bool Shader::TrySetB0Field(eBaseMatrices id, const float* data) noexcept
 {
-    if (strcmp(name, "mModelView") == 0) {
-        std::memcpy(m_b0Staging.mModelView, data, 64);
-        return true;
+    switch (id) {
+        case bmModelView:
+            std::memcpy(m_b0Staging.mModelView, data, 64);
+            return true;
+        case bmProjection:
+            std::memcpy(m_b0Staging.mProjection, data, 64);
+            return true;
+        case bmViewport:
+            std::memcpy(m_b0Staging.mViewport, data, 64);
+            return true;
+        case bmLightTransform:
+            std::memcpy(m_b0Staging.mLightTransform, data, 64);
+            return true;
+        default:
+            return false;
     }
-    if (strcmp(name, "mProjection") == 0) {
-        std::memcpy(m_b0Staging.mProjection, data, 64);
-        return true;
-    }
-    if (strcmp(name, "mViewport") == 0) {
-        std::memcpy(m_b0Staging.mViewport, data, 64);
-        return true;
-    }
-    if (strcmp(name, "mLightTransform") == 0) {
-        std::memcpy(m_b0Staging.mLightTransform, data, 64);
-        return true;
-    }
-    return false;
 }
 
 
@@ -1066,9 +1071,13 @@ int Shader::SetVector4i(const char* name, const Vector4i& data) noexcept
 
 int Shader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/) noexcept
 {
-    if (TrySetB0Field(name, data))
-        return 0;
     return SetB1Field(name, data, 16 * sizeof(float));
+}
+
+
+int Shader::SetMatrix4f(eBaseMatrices id, const float* data, bool /*transpose*/) noexcept
+{
+    return TrySetB0Field(id, data) ? 0 : -1;
 }
 
 
