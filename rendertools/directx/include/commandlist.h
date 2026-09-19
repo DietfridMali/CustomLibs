@@ -76,6 +76,8 @@ public:
     bool                                m_isRecording{ false };
     bool                                m_isFlushed{ false };
     bool                                m_isTemporary{ false };
+    uint64_t                            m_openSerial{ 0 };
+    uint64_t                            m_openQueryCount{ 0 };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id{ 0 };           // unique ID assigned once at Create (by CommandListHandler)
     uint64_t                            m_executionCounter{ 0 };  // increments on each Open()
@@ -197,6 +199,7 @@ public:
     int                                     m_frameCount{ CommandQueue::FRAME_COUNT };
     uint64_t                                m_frameNumber{ 0 };   // monotonic; ++ per BeginFrame — reliable frame-boundary signal
     TracyD3D12Ctx                           m_gpuProfilerCtx{ nullptr };   // Tracy D3D12 GPU-timestamp context; nullptr when USE_TRACY=0
+    uint64_t                                m_closedQueryCount{ 0 };
 
     bool Create(ID3D12Device* device) noexcept;
 
@@ -268,6 +271,12 @@ public:
     // are left alone and go out with the frame as usual. For a CPU readback in mid frame: the draws it
     // wants to read sit in closed lists that have not been submitted yet.
     void ExecutePending(void) noexcept;
+
+    void DrainFrameResources(void) noexcept;
+
+    uint64_t ProfilerQueryCount(void) const noexcept;
+
+    void CloseProfilerQueries(bool keepRecording) noexcept;
 
     // Returns a CommandList. If isTemporary is true, tries to reuse one from m_recycledLists
     // before allocating a new one. Temporary CLs are recycled after ExecuteAll().

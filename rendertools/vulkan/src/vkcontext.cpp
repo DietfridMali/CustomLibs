@@ -414,6 +414,9 @@ bool VKContext::CreateDevice(void) noexcept
     VkPhysicalDeviceVulkan12Features feats12 { };
     feats12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     feats12.scalarBlockLayout = VK_TRUE;
+#if USE_TRACY
+    feats12.hostQueryReset = VK_TRUE;
+#endif
     featsLocalRead.pNext = &feats12;
 
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).

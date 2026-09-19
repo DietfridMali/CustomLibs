@@ -118,6 +118,7 @@ public:
     bool                                m_isFlushed    { false };
     bool                                m_isTemporary  { false };
     bool                                m_isDetached   { false };
+    uint64_t                            m_openSerial   { 0 };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id           { 0 };
     uint64_t                            m_executionCounter { 0 };
@@ -284,6 +285,8 @@ public:
     // are left alone and go out with the frame as usual. For a CPU readback in mid frame: the draws it
     // wants to read sit in closed lists that have not been submitted yet.
     void ExecutePending(void) noexcept;
+
+    void DrainFrameResources(void) noexcept;
 
     CommandList* CreateCmdList(const String& name = "", bool isTemporary = true) noexcept;
 

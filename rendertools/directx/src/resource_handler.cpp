@@ -12,6 +12,8 @@ void GfxResourceHandler::Init(int frameCount) noexcept {
         frameCount = 1;
     m_frameResources.Resize(frameCount);
     m_frameDescriptors.Resize(frameCount);
+    m_frameResourceSerials.Resize(frameCount);
+    m_frameDescriptorSerials.Resize(frameCount);
 }
 
 
@@ -47,13 +49,16 @@ void GfxResourceHandler::Track(ComPtr<ID3D12Resource> resource) noexcept {
     if ((fi < 0) or (fi >= m_frameResources.Length()))
         return;
     m_frameResources[fi].Push(std::move(resource));
+    m_frameResourceSerials[fi].Push(NextSerial());
 }
 
 
 void GfxResourceHandler::Track(const DescriptorHandle& handle) noexcept {
     if (s_shutdown or not handle.IsValid())
         return;
-    m_frameDescriptors[commandListHandler.FrameIndex()].Push(handle);
+    const int fi = commandListHandler.FrameIndex();
+    m_frameDescriptors[fi].Push(handle);
+    m_frameDescriptorSerials[fi].Push(NextSerial());
 }
 
 
@@ -69,6 +74,40 @@ void GfxResourceHandler::Cleanup(int frameIndex, bool waitIdle) noexcept {
         h.m_heap->Free(h.index);   // each handle frees itself into its own heap (clears m_owners too)
     descriptors.Clear();
     m_frameResources[frameIndex].Clear();
+    m_frameDescriptorSerials[frameIndex].Clear();
+    m_frameResourceSerials[frameIndex].Clear();
+}
+
+
+void GfxResourceHandler::CleanupBefore(int frameIndex, uint64_t serialLimit) noexcept {
+    if (s_shutdown)
+        return;
+
+    DescriptorArray descriptors = std::move(m_frameDescriptors[frameIndex]);
+    SerialArray descriptorSerials = std::move(m_frameDescriptorSerials[frameIndex]);
+
+    m_frameDescriptors[frameIndex].Clear();
+    m_frameDescriptorSerials[frameIndex].Clear();
+    for (int32_t i = 0; i < descriptors.Length(); ++i) {
+        if (descriptorSerials[i] < serialLimit)
+            descriptors[i].m_heap->Free(descriptors[i].index);
+        else {
+            m_frameDescriptors[frameIndex].Push(descriptors[i]);
+            m_frameDescriptorSerials[frameIndex].Push(descriptorSerials[i]);
+        }
+    }
+
+    ResourceArray resources = std::move(m_frameResources[frameIndex]);
+    SerialArray resourceSerials = std::move(m_frameResourceSerials[frameIndex]);
+
+    m_frameResources[frameIndex].Clear();
+    m_frameResourceSerials[frameIndex].Clear();
+    for (int32_t i = 0; i < resources.Length(); ++i) {
+        if (resourceSerials[i] < serialLimit)
+            continue;
+        m_frameResources[frameIndex].Push(std::move(resources[i]));
+        m_frameResourceSerials[frameIndex].Push(resourceSerials[i]);
+    }
 }
 
 

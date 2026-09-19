@@ -379,6 +379,7 @@ bool CommandList::Open(bool saveRenderStates, bool detached) noexcept
     }
     m_isRecording = true;
     m_isFlushed = false;
+    m_openSerial = gfxResourceHandler.NextSerial();
     m_activePipeline = VK_NULL_HANDLE;
     ++m_executionCounter;
     if (detached)
@@ -806,11 +807,43 @@ void CommandListHandler::ExecutePending(void) noexcept
     gfxStates.CheckError("CommandListHandler::ExecutePending submit");
 #endif
     m_cmdQueue.WaitIdle();
+#if USE_TRACY
+    if (m_gpuProfilerCtx)
+        TracyVkCollectHost(m_gpuProfilerCtx);
+#endif
     for (auto l : m_pendingLists) {
         if (l->IsTemporary())
             m_recycledLists.Push(l);
     }
     m_pendingLists.Clear();
+    DrainFrameResources();
+}
+
+
+void CommandListHandler::DrainFrameResources(void) noexcept
+{
+    AutoArray<CommandList*> recordingLists;
+    uint64_t oldestOpenSerial = UINT64_MAX;
+
+    for (auto l : m_openLists) {
+        if (not l->IsRecording())
+            continue;
+        recordingLists.Push(l);
+        if (l->m_openSerial < oldestOpenSerial)
+            oldestOpenSerial = l->m_openSerial;
+    }
+    m_openLists.Clear();
+    for (auto l : recordingLists)
+        m_openLists.Push(l);
+
+    uint32_t frameIndex = m_cmdQueue.FrameIndex();
+
+    gfxResourceHandler.CleanupBefore(frameIndex, oldestOpenSerial);
+    if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial) {
+        descriptorPoolHandler.BeginFrame(frameIndex);
+        cbvAllocator.Reset(frameIndex);
+    }
+    ResetBindings();
 }
 
 

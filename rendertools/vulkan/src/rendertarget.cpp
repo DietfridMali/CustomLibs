@@ -458,7 +458,12 @@ bool RenderTarget::SelectArrayLayer(int layer)
         return false;
     // EVERY colour buffer moves with it, so an MRT pass writes the same layer of all of them - which is
     // why this is one number on the target rather than one per buffer. AttachmentView () reads it.
+    bool restart = m_isInRendering and (m_arrayLayer != layer);
+    if (restart)
+        EndRendering();
     m_arrayLayer = layer;
+    if (restart)
+        BeginRendering(false, false);
     return true;
 }
 
@@ -1621,23 +1626,19 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
     if (not CreateReadbackBuffer(VkDeviceSize(needed), readback))
         return false;
 
-    // The copy below runs AT ONCE, in a command buffer of its own - but the draws it is supposed to read
-    // sit in closed command lists that only go out with the frame, and so do the layout transitions the
-    // tracker already counts on. They have to be through first.
-    commandListHandler.ExecutePending();
+    CommandList* cl = commandListHandler.CreateCmdList(String("ReadBuffer"), true);
 
-    OneShotCommandBuffer cmd;
-
-    if (not BeginSingleTimeCommands(cmd)) {
+    if (not (cl and cl->Open(false))) {
         readback.Destroy();
         return false;
     }
 
+    VkCommandBuffer cb = cl->GfxList();
     VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
     VkPipelineStageFlags2 stageBefore = info.m_layoutTracker.Stage();
     VkAccessFlags2 accessBefore = info.m_layoutTracker.Access();
 
-    info.m_layoutTracker.ToTransferSrc(cmd.cb);
+    info.m_layoutTracker.ToTransferSrc(cb);
 
     VkBufferImageCopy copy { };
 
@@ -1651,15 +1652,13 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
     copy.imageOffset = { 0, 0, 0 };
     copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };
 
-    vkCmdCopyImageToBuffer(cmd.cb, info.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    vkCmdCopyImageToBuffer(cb, info.m_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            readback.buffer, 1, &copy);
     // Back to the layout the caller left it in - the next pass expects to find it there.
     if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
-        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore, stageBefore, accessBefore);
-    if (not EndSingleTimeCommands(cmd)) {
-        readback.Destroy();
-        return false;
-    }
+        info.m_layoutTracker.TransitionTo(cb, layoutBefore, stageBefore, accessBefore);
+    cl->Close(false);
+    commandListHandler.ExecutePending();
     if (readback.mapped == nullptr) {
         readback.Destroy();
         return false;
@@ -1747,22 +1746,19 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     }
     memcpy(staging.mapped, data, needed);
 
-    // Same as in ReadBuffer (): the copy runs at once, so whatever the closed lists still hold for this
-    // image - draws and layout transitions - has to be through first.
-    commandListHandler.ExecutePending();
+    CommandList* cl = commandListHandler.CreateCmdList(String("WriteBuffer"), true);
 
-    OneShotCommandBuffer cmd;
-
-    if (not BeginSingleTimeCommands(cmd)) {
+    if (not (cl and cl->Open(false))) {
         staging.Destroy();
         return false;
     }
 
+    VkCommandBuffer cb = cl->GfxList();
     VkImageLayout layoutBefore = info.m_layoutTracker.Layout();
     VkPipelineStageFlags2 stageBefore = info.m_layoutTracker.Stage();
     VkAccessFlags2 accessBefore = info.m_layoutTracker.Access();
 
-    info.m_layoutTracker.ToTransferDst(cmd.cb);
+    info.m_layoutTracker.ToTransferDst(cb);
 
     VkBufferImageCopy copy { };
 
@@ -1776,20 +1772,19 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     copy.imageOffset = { 0, 0, 0 };
     copy.imageExtent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)), 1 };
 
-    vkCmdCopyBufferToImage(cmd.cb, staging.buffer, info.m_image,
+    vkCmdCopyBufferToImage(cb, staging.buffer, info.m_image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
     // A buffer that has never been used has no layout to go back to. It takes the one every buffer of a
     // disabled target is in (Disable ()), because sampling it is what comes next - BindBuffer () does not
     // transition on a target that is not enabled.
     if (layoutBefore != VK_IMAGE_LAYOUT_UNDEFINED)
-        info.m_layoutTracker.TransitionTo(cmd.cb, layoutBefore, stageBefore, accessBefore);
+        info.m_layoutTracker.TransitionTo(cb, layoutBefore, stageBefore, accessBefore);
     else
-        info.m_layoutTracker.ToShaderInput(cmd.cb);
-
-    bool ok = EndSingleTimeCommands(cmd);
-
+        info.m_layoutTracker.ToShaderInput(cb);
+    cl->Close(false);
+    commandListHandler.ExecutePending();
     staging.Destroy();
-    return ok;
+    return true;
 }
 
 // =================================================================================================

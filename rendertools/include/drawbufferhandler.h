@@ -28,6 +28,8 @@ public:
 protected:
     RenderTarget*       m_activeBuffer{ nullptr };
     List<RenderTarget*> m_drawBufferStack{};
+    int                 m_suspendCount{ 0 };
+    int                 m_suspendBase{ 0 };
     int                 m_windowWidth{ 0 };
     int                 m_windowHeight{ 0 };
 
@@ -43,6 +45,10 @@ public:
     bool DeactivateDrawBuffer(RenderTarget* buffer);
 
     void ResetDrawBuffers(void);
+
+    void SuspendDrawBuffers(void);
+
+    void ResumeDrawBuffers(void);
 
     void SetActiveDrawBuffers(void);
 

@@ -1,5 +1,6 @@
 #include "cbv_allocator.h"
 #include "commandlist.h"
+#include "resource_handler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -147,6 +148,7 @@ CbAlloc CbvLinearAllocator::Allocate(UINT bytes) noexcept
         a.gpu    = f.gpuBase + f.offset;
         f.offset += aligned;
         f.peakOffset += aligned;
+        gfxResourceHandler.NoteFrameAllocation();
         return a;
     }
 
@@ -161,6 +163,7 @@ CbAlloc CbvLinearAllocator::Allocate(UINT bytes) noexcept
     a.gpu    = chunk.gpuBase + f.overflowOffset;
     f.overflowOffset += aligned;
     f.peakOffset += aligned;
+    gfxResourceHandler.NoteFrameAllocation();
     return a;
 }
 

@@ -195,11 +195,13 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     }
     m_isRecording = true;
     m_isFlushed = false;
+    m_openSerial = gfxResourceHandler.NextSerial();
     m_activePSO = nullptr;
     m_activeRootSignature = nullptr;
     m_descriptorHeapsBound = false;
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
+    m_openQueryCount = commandListHandler.ProfilerQueryCount();
 #if USE_TRACY
     // GPU timestamp zone for this command list, named after m_name. Begin timestamp is written
     // here onto the freshly reset list; the end timestamp + ResolveQueryData follow in Close().
@@ -431,7 +433,44 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
 void CommandListHandler::EndFrame(void) noexcept {
     ZoneScoped;
     m_cmdQueue.Signal(m_frameIndex);
-    TracyD3D12NewFrame(m_gpuProfilerCtx);
+    CloseProfilerQueries(false);
+}
+
+
+uint64_t CommandListHandler::ProfilerQueryCount(void) const noexcept {
+#if USE_TRACY
+    if (m_gpuProfilerCtx)
+        return m_closedQueryCount + m_gpuProfilerCtx->QueryCounter();
+#endif
+    return 0;
+}
+
+
+void CommandListHandler::CloseProfilerQueries(bool keepRecording) noexcept {
+#if USE_TRACY
+    if (not m_gpuProfilerCtx)
+        return;
+
+    uint32_t queryCounter = m_gpuProfilerCtx->QueryCounter();
+    uint64_t queryCount = m_closedQueryCount + queryCounter;
+    uint64_t oldestOpenQueryCount = queryCount;
+
+    if (keepRecording) {
+        if (m_currentListData.cmdList and m_currentListData.cmdList->IsRecording() and (m_currentListData.cmdList->m_openQueryCount < oldestOpenQueryCount))
+            oldestOpenQueryCount = m_currentListData.cmdList->m_openQueryCount;
+        for (auto& data : m_cmdListStack) {
+            if (data.cmdList and data.cmdList->IsRecording() and (data.cmdList->m_openQueryCount < oldestOpenQueryCount))
+                oldestOpenQueryCount = data.cmdList->m_openQueryCount;
+        }
+    }
+
+    uint32_t keepCount = uint32_t(queryCount - oldestOpenQueryCount);
+
+    if (keepCount > queryCounter)
+        keepCount = queryCounter;
+    m_closedQueryCount += queryCounter - keepCount;
+    m_gpuProfilerCtx->NewFrame(keepCount);
+#endif
 }
 
 
@@ -540,12 +579,30 @@ void CommandListHandler::ExecutePending(void) noexcept {
 #if DBG_DIRECTX
     gfxStates.CheckError();
 #endif
+    CloseProfilerQueries(true);
     m_cmdQueue.WaitIdle();
+    TracyD3D12Collect(m_gpuProfilerCtx);
     for (auto l : m_pendingLists) {
         if (l->m_isTemporary)
             m_recycledLists.Push(l);
     }
     m_pendingLists.Clear();
+    DrainFrameResources();
+}
+
+
+void CommandListHandler::DrainFrameResources(void) noexcept {
+    uint64_t oldestOpenSerial = UINT64_MAX;
+
+    if (m_currentListData.cmdList and m_currentListData.cmdList->IsRecording())
+        oldestOpenSerial = m_currentListData.cmdList->m_openSerial;
+    for (auto& data : m_cmdListStack) {
+        if (data.cmdList and data.cmdList->IsRecording() and (data.cmdList->m_openSerial < oldestOpenSerial))
+            oldestOpenSerial = data.cmdList->m_openSerial;
+    }
+    if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial)
+        cbvAllocator.Reset(UINT(m_frameIndex));
+    gfxResourceHandler.CleanupBefore(m_frameIndex, oldestOpenSerial);
 }
 
 

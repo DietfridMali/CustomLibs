@@ -376,6 +376,8 @@ bool RenderTarget::SelectArrayLayer(int layer)
     for (int i = 0; i < m_colorBufferCount; ++i)
         if (m_bufferInfo[i].m_isArray and (layer < m_bufferInfo[i].m_arrayRtv.Length()))
             m_bufferInfo[i].m_rtv = m_bufferInfo[i].m_arrayRtv[layer];
+    if (IsEnabled())
+        return SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = false, .reactivate = true, .depthMode = m_depthMode });
     return true;
 }
 

@@ -1,4 +1,5 @@
 #include "cbv_allocator.h"
+#include "resource_handler.h"
 #include "vkcontext.h"
 
 #include <algorithm>
@@ -119,6 +120,7 @@ CbAlloc CbvLinearAllocator::Allocate(uint32_t bytes) noexcept
         a.buffer = f.buffer.Buffer();
         f.offset += aligned;
         f.peakOffset += aligned;
+        gfxResourceHandler.NoteFrameAllocation();
         return a;
     }
 
@@ -134,6 +136,7 @@ CbAlloc CbvLinearAllocator::Allocate(uint32_t bytes) noexcept
     a.buffer = chunk.buffer.Buffer();
     f.overflowOffset += aligned;
     f.peakOffset += aligned;
+    gfxResourceHandler.NoteFrameAllocation();
     return a;
 }
 

@@ -27,8 +27,14 @@ public:
     using DescriptorArray      = AutoArray<DescriptorHandle>;
 
 private:
+    using SerialArray = AutoArray<uint64_t>;
+
     AutoArray<ResourceArray>    m_frameResources;
     AutoArray<DescriptorArray>         m_frameDescriptors;
+    AutoArray<SerialArray>      m_frameResourceSerials;
+    AutoArray<SerialArray>      m_frameDescriptorSerials;
+    uint64_t                    m_serial{ 0 };
+    uint64_t                    m_lastAllocSerial{ 0 };
 
     // Set once renderer teardown begins. From then on Track()/Cleanup() are inert: the descriptor
     // heaps are destroyed wholesale at program exit, so per-slot deferred frees during teardown are
@@ -62,6 +68,20 @@ public:
     // waitIdle=true issues a full CPU/GPU sync first — only needed when there's no fence wait
     // upstream (init phases, explicit Flush()).
     void Cleanup(int frameIndex, bool waitIdle = false) noexcept;
+
+    void CleanupBefore(int frameIndex, uint64_t serialLimit) noexcept;
+
+    inline uint64_t NextSerial(void) noexcept {
+        return ++m_serial;
+    }
+
+    inline void NoteFrameAllocation(void) noexcept {
+        m_lastAllocSerial = ++m_serial;
+    }
+
+    inline uint64_t LastAllocSerial(void) const noexcept {
+        return m_lastAllocSerial;
+    }
 };
 
 #define gfxResourceHandler GfxResourceHandler::Instance()

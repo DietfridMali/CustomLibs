@@ -278,6 +278,12 @@
     <ClInclude Include="..\include\vkupload.h">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\gpuzone.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\gfxupload.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <!-- Shared sources (rendertools/src/) -->

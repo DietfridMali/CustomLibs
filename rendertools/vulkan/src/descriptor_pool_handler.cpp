@@ -1,4 +1,5 @@
 #include "descriptor_pool_handler.h"
+#include "resource_handler.h"
 
 #include <cstdio>
 
@@ -120,6 +121,7 @@ VkDescriptorSet DescriptorPoolHandler::Allocate(VkDescriptorSetLayout layout) no
         fprintf(stderr, "DescriptorPoolHandler::Allocate: vkAllocateDescriptorSets failed (%d)\n", (int)res);
         return VK_NULL_HANDLE;
     }
+    gfxResourceHandler.NoteFrameAllocation();
     return set;
 }
 

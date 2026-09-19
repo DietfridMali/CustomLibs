@@ -35,7 +35,22 @@ public:
     static inline bool               s_isAlive { false };
 
     AutoArray<std::function<void()>> m_cleanupCallbacks[FRAME_COUNT];
+    AutoArray<uint64_t>              m_cleanupSerials[FRAME_COUNT];
     uint32_t                         m_frameIndex { 0 };
+    uint64_t                         m_serial { 0 };
+    uint64_t                         m_lastAllocSerial { 0 };
+
+    inline uint64_t NextSerial(void) noexcept {
+        return ++m_serial;
+    }
+
+    inline void NoteFrameAllocation(void) noexcept {
+        m_lastAllocSerial = ++m_serial;
+    }
+
+    inline uint64_t LastAllocSerial(void) const noexcept {
+        return m_lastAllocSerial;
+    }
 
     GfxResourceHandler() noexcept { s_isAlive = true; }
     ~GfxResourceHandler() noexcept {
@@ -57,11 +72,16 @@ public:
             return;
         }
         m_cleanupCallbacks[m_frameIndex].Append(std::move(cleanup));
+        m_cleanupSerials[m_frameIndex].Append(NextSerial());
     }
 
     // Execute all pending callbacks for the given slot, then clear the list. Called from
     // CommandQueue::BeginFrame after the slot's in-flight fence has signalled.
     inline void Cleanup(uint32_t frameIndex) noexcept {
+        CleanupBefore(frameIndex, UINT64_MAX);
+    }
+
+    inline void CleanupBefore(uint32_t frameIndex, uint64_t serialLimit) noexcept {
         if (frameIndex >= FRAME_COUNT)
             return;
         m_frameIndex = frameIndex;
@@ -70,10 +90,18 @@ public:
         // invalidate the range-for iterators. Re-entrant registrations land in the now-empty
         // member slot and fire on the next sweep.
         AutoArray<std::function<void()>> cbs = std::move(m_cleanupCallbacks[frameIndex]);
+        AutoArray<uint64_t> serials = std::move(m_cleanupSerials[frameIndex]);
         m_cleanupCallbacks[frameIndex].Clear();
-        for (auto& cb : cbs) {
-            if (cb)
-                cb();
+        m_cleanupSerials[frameIndex].Clear();
+        for (int32_t i = 0; i < cbs.Length(); ++i) {
+            if (serials[i] < serialLimit) {
+                if (cbs[i])
+                    cbs[i]();
+            }
+            else {
+                m_cleanupCallbacks[frameIndex].Append(std::move(cbs[i]));
+                m_cleanupSerials[frameIndex].Append(serials[i]);
+            }
         }
     }
 
