@@ -279,6 +279,14 @@ void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
 }
 
 
+void BaseDisplayHandler::CloseBackBufferList(void) noexcept {
+    DisableBackBuffer();
+    if (m_backBufferList and m_backBufferList->IsRecording() and (commandListHandler.CurrentCmdList() == m_backBufferList))
+        m_backBufferList->Close();
+    m_backBufferList = nullptr;
+}
+
+
 void BaseDisplayHandler::ReleaseBackBuffers(void) noexcept {
     for (UINT i = 0; i < BACK_BUFFER_COUNT; ++i)
         m_backBuffers[i].Reset();
@@ -291,9 +299,7 @@ void BaseDisplayHandler::EndFrame(void) {
         return;
     // The back buffer goes to the present from here, whoever drew on it last - not only the callers
     // that went through DrawScreen (). A no-op for an already presentable back buffer.
-    DisableBackBuffer();
-    if (m_backBufferList and m_backBufferList->IsRecording() and (commandListHandler.CurrentCmdList() == m_backBufferList))
-        m_backBufferList->Close();
+    CloseBackBufferList();
     // Close the main renderer list — registers it for submission.
     // Submit all registered lists (RenderTarget lists first, main list last — registration order).
     commandListHandler.ExecuteAll();

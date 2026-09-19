@@ -119,6 +119,7 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
 
 
 void GfxRenderer::FlushResources(void) noexcept {
+    baseDisplayHandler.CloseBackBufferList();
     commandListHandler.Flush();
 }
 

@@ -125,6 +125,8 @@ public:
     // otherwise the back buffer's own, opened here. Null only when even that fails.
     CommandList* BackBufferList(void) noexcept;
 
+    void CloseBackBufferList(void) noexcept;
+
     // Returns the current back buffer resource (set as render target before drawing).
     inline ID3D12Resource* CurrentBackBuffer(void) const noexcept {
         return m_backBuffers[m_backBufferIndex].Get();
