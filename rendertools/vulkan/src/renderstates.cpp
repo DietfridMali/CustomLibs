@@ -160,4 +160,25 @@ VkPipelineColorBlendAttachmentState& RenderStates::SetBlendAttachment(VkPipeline
     return att;
 }
 
+
+void RenderStates::SetDynamicStates(VkCommandBuffer cb) const noexcept
+{
+    vkCmdSetCullMode(cb, faceCulling ? ToVkCullMode(cullMode) : VkCullModeFlags(VK_CULL_MODE_NONE));
+    vkCmdSetFrontFace(cb, ToVkFrontFace(winding));
+    vkCmdSetDepthTestEnable(cb, depthTest ? VK_TRUE : VK_FALSE);
+    vkCmdSetDepthWriteEnable(cb, depthWrite ? VK_TRUE : VK_FALSE);
+    vkCmdSetDepthCompareOp(cb, ToVkCompareOp(depthFunc));
+    const bool hasDepthBias = (depthBias != 0) or (slopeScaledDepthBias != 0.0f);
+    vkCmdSetDepthBiasEnable(cb, hasDepthBias ? VK_TRUE : VK_FALSE);
+    vkCmdSetDepthBias(cb, float(depthBias), 0.0f, slopeScaledDepthBias);
+    vkCmdSetStencilTestEnable(cb, stencilTest ? VK_TRUE : VK_FALSE);
+    vkCmdSetStencilOp(cb, VK_STENCIL_FACE_FRONT_BIT, ToVkStencilOp(stencilSFail), ToVkStencilOp(stencilDPPass),
+                      ToVkStencilOp(stencilDPFail), ToVkCompareOp(stencilFunc));
+    vkCmdSetStencilOp(cb, VK_STENCIL_FACE_BACK_BIT, ToVkStencilOp(stencilBackSFail), ToVkStencilOp(stencilBackDPPass),
+                      ToVkStencilOp(stencilBackDPFail), ToVkCompareOp(stencilFunc));
+    vkCmdSetStencilCompareMask(cb, VK_STENCIL_FACE_FRONT_AND_BACK, stencilMask);
+    vkCmdSetStencilWriteMask(cb, VK_STENCIL_FACE_FRONT_AND_BACK, stencilWriteMask);
+    vkCmdSetStencilReference(cb, VK_STENCIL_FACE_FRONT_AND_BACK, stencilRef);
+}
+
 // =================================================================================================

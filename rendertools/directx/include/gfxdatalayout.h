@@ -132,8 +132,14 @@ public:
     inline bool ActivateTextures(std::span<Texture* const> textures = {}) noexcept {
         int tmu = 0;
         for (Texture* t : textures) {
-            if (t && not t->Activate(tmu)) 
-                return false;
+            if (t) {
+                if (not t->Activate(tmu))
+                    return false;
+            }
+            else {
+                commandListHandler.BindSampledImage(uint32_t(tmu), UINT32_MAX);
+                commandListHandler.BindSampler(uint32_t(tmu), UINT32_MAX);
+            }
             ++tmu;
         }
         return true;

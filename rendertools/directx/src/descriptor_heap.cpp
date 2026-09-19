@@ -2,8 +2,12 @@
 #include "dx12context.h"
 #include "resource_handler.h"
 #include "sampler_cache.h"
+#include "dx12upload.h"
+#include "commandlist.h"
 
 #include <cstdio>
+#include <cstring>
+#include <algorithm>
 
 // =================================================================================================
 
@@ -66,6 +70,31 @@ void DescriptorHeap::Publish(uint32_t index) noexcept {
     if (not device)
         return;
     device->CopyDescriptorsSimple(1, HeapCpuHandle(index), CpuHandle(index), m_type);
+    commandListHandler.InvalidateTables();
+}
+
+
+bool DescriptorHeap::Grow(ID3D12Device* device, uint32_t extraDescriptors) noexcept {
+    if (not (device and m_gpuVisible and m_mirror))
+        return false;
+
+    D3D12_DESCRIPTOR_HEAP_DESC desc{};
+    desc.Type = m_type;
+    desc.NumDescriptors = m_capacity + extraDescriptors;
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    desc.NodeMask = 0;
+
+    ComPtr<ID3D12DescriptorHeap> heap;
+    HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&heap));
+    if (FAILED(hr)) {
+        fprintf(stderr, "DescriptorHeap::Grow: CreateDescriptorHeap type=%d, %u descriptors failed (hr=0x%08X)\n", int(m_type), desc.NumDescriptors, unsigned(hr));
+        return false;
+    }
+    if (m_count > 0)
+        device->CopyDescriptorsSimple(m_count, heap->GetCPUDescriptorHandleForHeapStart(), m_mirror->GetCPUDescriptorHandleForHeapStart(), m_type);
+    gfxResourceHandler.Track(m_heap);
+    m_heap = std::move(heap);
+    return true;
 }
 
 
@@ -140,7 +169,7 @@ bool DescriptorHeapHandler::Create(ID3D12Device* device) noexcept {
         return false;
     if (not m_dsvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, DSV_CAPACITY, false))
         return false;
-    if (not m_srvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, SRV_CAPACITY, true, true, TABLE_FRAME_SLOTS * TABLE_CAPACITY))
+    if (not m_srvHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, SRV_CAPACITY, true, true, TABLE_FRAME_SLOTS * m_tableCapacity))
         return false;
     if (not m_samplerHeap.Create(device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, SAMPLER_CAPACITY, true))
         return false;
@@ -188,11 +217,97 @@ bool DescriptorHeapHandler::Create(ID3D12Device* device) noexcept {
 }
 
 
+static ComPtr<ID3D12Resource> CreateDefaultTexture(ID3D12Device* device, UINT16 layers, [[maybe_unused]] const char* name) noexcept {
+    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
+    D3D12_RESOURCE_DESC rd{};
+    rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    rd.Width = 1;
+    rd.Height = 1;
+    rd.DepthOrArraySize = layers;
+    rd.MipLevels = 1;
+    rd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    rd.SampleDesc.Count = 1;
+    rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    ComPtr<ID3D12Resource> resource;
+    if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resource))))
+        return nullptr;
+#if DBG_DIRECTX
+    resource->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+#endif
+    static const uint8_t white[4] = { 255, 255, 255, 255 };
+    const uint8_t* faces[6] = { white, white, white, white, white, white };
+    if (not UploadTextureData(device, resource.Get(), faces, int(layers), 1, 1, 4))
+        return nullptr;
+    return resource;
+}
+
+
+bool DescriptorHeapHandler::CreateDefaultTextures(ID3D12Device* device) noexcept {
+    static const uint8_t white[4] = { 255, 255, 255, 255 };
+
+    m_defaultFlat = CreateDefaultTexture(device, 1, "DefaultTexture 2D");
+    m_defaultCube = CreateDefaultTexture(device, 6, "DefaultTexture Cube");
+    m_defaultVolume = Upload3DTextureData(device, 1, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 4, white);
+    if (not (m_defaultFlat and m_defaultCube and m_defaultVolume)) {
+        fprintf(stderr, "DescriptorHeapHandler: default textures could not be created\n");
+        return false;
+    }
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC descs[kDefaultViewTypes]{};
+    ID3D12Resource* resources[kDefaultViewTypes] = { nullptr, m_defaultFlat.Get(), m_defaultFlat.Get(), m_defaultCube.Get(), m_defaultVolume.Get() };
+
+    for (int i = 1; i < kDefaultViewTypes; ++i) {
+        descs[i].Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        descs[i].Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    }
+    descs[1].ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    descs[1].Texture2D.MipLevels = 1;
+    descs[2].ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+    descs[2].Texture2DArray.MipLevels = 1;
+    descs[2].Texture2DArray.ArraySize = 1;
+    descs[3].ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+    descs[3].TextureCube.MipLevels = 1;
+    descs[4].ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+    descs[4].Texture3D.MipLevels = 1;
+
+    for (int i = 1; i < kDefaultViewTypes; ++i) {
+        DescriptorHandle handle = m_srvHeap.Allocate();
+        if (not handle.IsValid())
+            return false;
+        device->CreateShaderResourceView(resources[i], &descs[i], handle.cpuHandle);
+        m_srvHeap.Publish(handle.index);
+        m_defaultSrvs[i] = handle.index;
+    }
+    return true;
+}
+
+
 void DescriptorHeapHandler::ResetTables(uint32_t frameIndex) noexcept {
     m_tableFrame = frameIndex % TABLE_FRAME_SLOTS;
     m_tableOffset = 0;
     ++m_tableGeneration;
     m_tableOverflowReported = false;
+}
+
+
+bool DescriptorHeapHandler::GrowTables(ID3D12Device* device) noexcept {
+    const uint32_t maxCapacity = (MAX_SHADER_VISIBLE_DESCRIPTORS - SRV_CAPACITY) / TABLE_FRAME_SLOTS;
+
+    if (m_tableCapacity >= maxCapacity)
+        return false;
+
+    uint32_t capacity = std::min(m_tableCapacity * 2, maxCapacity);
+
+    if (not m_srvHeap.Grow(device, TABLE_FRAME_SLOTS * capacity))
+        return false;
+    fprintf(stderr, "DescriptorHeapHandler: descriptor table ring grown from %u to %u descriptors per frame\n", m_tableCapacity, capacity);
+    m_tableCapacity = capacity;
+    m_tableOffset = 0;
+    ++m_tableGeneration;
+    ++m_heapVersion;
+    commandListHandler.OnDescriptorHeapChanged();
+    return true;
 }
 
 
@@ -202,9 +317,9 @@ bool DescriptorHeapHandler::BuildTable(const uint32_t* srvIndices, uint32_t coun
     ID3D12Device* device = dx12Context.Device();
     if (not device or (count == 0) or (count > kMaxTableSize))
         return false;
-    if (m_tableOffset + count > TABLE_CAPACITY) {
+    if ((m_tableOffset + count > m_tableCapacity) and not GrowTables(device)) {
         if (not m_tableOverflowReported) {
-            fprintf(stderr, "DescriptorHeapHandler::BuildTable: descriptor table ring full (%u descriptors per frame)\n", TABLE_CAPACITY);
+            fprintf(stderr, "DescriptorHeapHandler::BuildTable: descriptor table ring full (%u descriptors per frame)\n", m_tableCapacity);
             m_tableOverflowReported = true;
         }
         return false;
@@ -217,7 +332,7 @@ bool DescriptorHeapHandler::BuildTable(const uint32_t* srvIndices, uint32_t coun
         sourceSizes[i] = 1;
     }
 
-    uint32_t first = SRV_CAPACITY + m_tableFrame * TABLE_CAPACITY + m_tableOffset;
+    uint32_t first = SRV_CAPACITY + m_tableFrame * m_tableCapacity + m_tableOffset;
     D3D12_CPU_DESCRIPTOR_HANDLE destination = m_srvHeap.HeapCpuHandle(first);
     UINT destinationSize = UINT(count);
     device->CopyDescriptors(1, &destination, &destinationSize, UINT(count), sources, sourceSizes, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

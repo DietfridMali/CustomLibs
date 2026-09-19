@@ -60,6 +60,8 @@ public:
 
     void Publish(uint32_t index) noexcept;
 
+    bool Grow(ID3D12Device* device, uint32_t extraDescriptors) noexcept;
+
     D3D12_CPU_DESCRIPTOR_HANDLE HeapCpuHandle(uint32_t index) const noexcept;
 
     // Allocates the next free slot (reuses freed slots). Returns an invalid handle if the heap is full.
@@ -101,12 +103,13 @@ class DescriptorHeapHandler
     : public BaseSingleton<DescriptorHeapHandler>
 {
 public:
-    static constexpr uint32_t RTV_CAPACITY     = 256;
+    static constexpr uint32_t RTV_CAPACITY     = 1024;
     static constexpr uint32_t DSV_CAPACITY     = 128;
     static constexpr uint32_t SRV_CAPACITY     = 16384; // CBV/SRV/UAV, GPU-visible
-    static constexpr uint32_t SAMPLER_CAPACITY = 32;   // GPU-visible sampler heap; small — only unique configurations
+    static constexpr uint32_t SAMPLER_CAPACITY = 2048;
     static constexpr uint32_t TABLE_FRAME_SLOTS = 2;
     static constexpr uint32_t TABLE_CAPACITY   = 65536;
+    static constexpr uint32_t MAX_SHADER_VISIBLE_DESCRIPTORS = 1000000;
 
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;
@@ -118,12 +121,27 @@ public:
     uint32_t       m_nullUav{ UINT32_MAX };
     uint32_t       m_defaultSampler{ UINT32_MAX };
 
+    static constexpr int kDefaultViewTypes = 5;
+
+    uint32_t                m_defaultSrvs[kDefaultViewTypes]{ UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
+    ComPtr<ID3D12Resource>  m_defaultFlat;
+    ComPtr<ID3D12Resource>  m_defaultCube;
+    ComPtr<ID3D12Resource>  m_defaultVolume;
+
     uint32_t       m_tableFrame{ 0 };
     uint32_t       m_tableOffset{ 0 };
+    uint32_t       m_tableCapacity{ TABLE_CAPACITY };
+    uint64_t       m_heapVersion{ 0 };
     uint64_t       m_tableGeneration{ 1 };
     bool           m_tableOverflowReported{ false };
 
     bool Create(ID3D12Device* device) noexcept;
+
+    bool CreateDefaultTextures(ID3D12Device* device) noexcept;
+
+    inline uint32_t DefaultSrv(uint8_t viewType) const noexcept {
+        return ((viewType > 0) and (viewType < kDefaultViewTypes) and (m_defaultSrvs[viewType] != UINT32_MAX)) ? m_defaultSrvs[viewType] : m_nullTextureSrv;
+    }
 
     void ResetTables(uint32_t frameIndex) noexcept;
 
@@ -132,6 +150,12 @@ public:
     inline uint64_t TableGeneration(void) const noexcept {
         return m_tableGeneration;
     }
+
+    inline uint64_t HeapVersion(void) const noexcept {
+        return m_heapVersion;
+    }
+
+    bool GrowTables(ID3D12Device* device) noexcept;
 
     inline DescriptorHandle AllocRTV(void) noexcept { 
         return m_rtvHeap.Allocate(); 

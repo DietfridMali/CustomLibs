@@ -75,14 +75,14 @@ struct RenderStates {
     // Polygon offset (OGL glPolygonOffset equivalent: factor -> slopeScaledDepthBias, units -> depthBias)
     int32_t     depthBias{ 0 };
     float       slopeScaledDepthBias{ 0.0f };
-    // RTV color format for slot 0; lets a PSO match the active render target (RGBA8 screen/UI vs
-    // R16G16B16A16_FLOAT HDR scene). Part of the memcmp'd PSO cache key, so the same shader gets
-    // separate PSOs per target format. Set in RenderTarget::Enable from the RT's own m_colorFormat.
+    // RTV formats of the render targets that are bound when the PSO is looked up (slot 0 in colorFormat,
+    // slots 1+ in mrtFormats), and the DSV format (UNKNOWN without a DSV). Part of the memcmp'd PSO cache
+    // key. Filled by PSO::GetPSO () from the active render target (RenderTarget::FillPipelineFormats ())
+    // or the back buffer, so the PSO names exactly what OMSetRenderTargets bound.
     DXGI_FORMAT colorFormat{ DXGI_FORMAT_R8G8B8A8_UNORM };
-    // DSV format of the active render target. A depth buffer with a stencil plane uses the combined
-    // format, and the PSO must name the SAME one as the bound DSV, or D3D12 rejects the draw. Also part
-    // of the memcmp'd PSO cache key. Set in RenderTarget::Enable from the RT's own depth buffer.
     DXGI_FORMAT depthFormat{ DXGI_FORMAT_D32_FLOAT };
+    DXGI_FORMAT mrtFormats[kColorTargets - 1]{};
+    uint8_t     colorTargetCount{ 1 };
 
     bool operator==(const RenderStates& o) const noexcept {
         return std::memcmp(this, &o, sizeof(*this)) == 0;

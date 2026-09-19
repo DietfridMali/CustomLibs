@@ -98,6 +98,8 @@ struct RenderStates {
 
     // Fills in blend factors / ops / colorWriteMask for one color attachment from the given target's entry.
     VkPipelineColorBlendAttachmentState& SetBlendAttachment(VkPipelineColorBlendAttachmentState& att, int target = 0) const noexcept;
+
+    void SetDynamicStates(VkCommandBuffer cb) const noexcept;
 };
 #pragma pack(pop)
 

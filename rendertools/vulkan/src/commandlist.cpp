@@ -710,7 +710,7 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
     if (p != VK_NULL_HANDLE) {
         SetActivePipeline(p, shader);
         if (m_isRecording)
-            vkCmdSetStencilReference(GfxList(), VK_STENCIL_FACE_FRONT_AND_BACK, uint32_t(key.states.stencilRef));
+            key.states.SetDynamicStates(GfxList());
         m_activeTopology = key.states.topology;
         lastPipelineStates = key.states;
         lastPipelineList = this;

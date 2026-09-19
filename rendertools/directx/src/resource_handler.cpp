@@ -3,6 +3,7 @@
 #include "commandlist.h"
 #include "descriptor_heap.h"
 
+#include <cstdio>
 #include <cstring>
 
 // =================================================================================================
@@ -42,14 +43,41 @@ ComPtr<ID3D12Resource> GfxResourceHandler::GetUploadResource(const char* name, s
 }
 
 
-void GfxResourceHandler::Track(ComPtr<ID3D12Resource> resource) noexcept {
+#if DBG_DIRECTX
+static void DebugName(ID3D12Object* object, char* name, UINT size) noexcept {
+    UINT nameSize = size - 1;
+
+    if (not object or FAILED(object->GetPrivateData(WKPDID_D3DDebugObjectName, &nameSize, name)))
+        std::strcpy(name, "unnamed");
+    else
+        name[nameSize] = '\0';
+}
+
+
+static bool IsWatched(const char* name) noexcept {
+    return (std::strncmp(name, "GfxArray[", 9) == 0) and (std::strstr(name, "] data") != nullptr);
+}
+#endif
+
+
+void GfxResourceHandler::Track(ComPtr<ID3D12Pageable> resource) noexcept {
     if (s_shutdown or not resource)
         return;
     const int fi = commandListHandler.FrameIndex();
     if ((fi < 0) or (fi >= m_frameResources.Length()))
         return;
+    uint64_t serial = NextSerial();
+#if DBG_DIRECTX
+    {
+        char name[160];
+
+        DebugName(resource.Get(), name, UINT(sizeof(name)));
+        if (IsWatched(name))
+            fprintf(stderr, "Track '%s' serial %llu slot %d frame %llu\n", name, (unsigned long long)serial, fi, (unsigned long long)commandListHandler.FrameNumber());
+    }
+#endif
     m_frameResources[fi].Push(std::move(resource));
-    m_frameResourceSerials[fi].Push(NextSerial());
+    m_frameResourceSerials[fi].Push(serial);
 }
 
 
@@ -57,6 +85,8 @@ void GfxResourceHandler::Track(const DescriptorHandle& handle) noexcept {
     if (s_shutdown or not handle.IsValid())
         return;
     const int fi = commandListHandler.FrameIndex();
+    if ((fi < 0) or (fi >= m_frameDescriptors.Length()))
+        return;
     m_frameDescriptors[fi].Push(handle);
     m_frameDescriptorSerials[fi].Push(NextSerial());
 }
@@ -79,7 +109,7 @@ void GfxResourceHandler::Cleanup(int frameIndex, bool waitIdle) noexcept {
 }
 
 
-void GfxResourceHandler::CleanupBefore(int frameIndex, uint64_t serialLimit) noexcept {
+void GfxResourceHandler::CleanupBefore(int frameIndex, uint64_t serialLimit, [[maybe_unused]] const char* site, [[maybe_unused]] const char* openList) noexcept {
     if (s_shutdown)
         return;
 
@@ -103,8 +133,24 @@ void GfxResourceHandler::CleanupBefore(int frameIndex, uint64_t serialLimit) noe
     m_frameResources[frameIndex].Clear();
     m_frameResourceSerials[frameIndex].Clear();
     for (int32_t i = 0; i < resources.Length(); ++i) {
-        if (resourceSerials[i] < serialLimit)
+#if DBG_DIRECTX
+        char name[160];
+
+        DebugName(resources[i].Get(), name, UINT(sizeof(name)));
+#endif
+        if (resourceSerials[i] < serialLimit) {
+#if DBG_DIRECTX
+            if (IsWatched(name))
+                fprintf(stderr, "Free '%s' serial %llu slot %d frame %llu [%s] limit %llu\n",
+                        name, (unsigned long long)resourceSerials[i], frameIndex, (unsigned long long)commandListHandler.FrameNumber(),
+                        site ? site : "?", (unsigned long long)serialLimit);
+#endif
             continue;
+        }
+#if DBG_DIRECTX
+        fprintf(stderr, "CleanupBefore [%s]: keeps '%s' (serial %llu) - '%s' records since serial %llu\n",
+                site ? site : "?", name, (unsigned long long)resourceSerials[i], openList ? openList : "?", (unsigned long long)serialLimit);
+#endif
         m_frameResources[frameIndex].Push(std::move(resources[i]));
         m_frameResourceSerials[frameIndex].Push(resourceSerials[i]);
     }

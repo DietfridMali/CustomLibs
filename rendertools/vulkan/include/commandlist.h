@@ -232,7 +232,7 @@ public:
     static constexpr uint32_t kSrvSlots     = 16;  // matches Shader::kSrvSlots
     static constexpr uint32_t kSamplerSlots = 16;  // matches Shader::kSamplerSlots
     static constexpr uint32_t kUavSlots     = 4;   // matches Shader::kUavSlots
-    static constexpr uint32_t kSsboSlots    = 19;  // matches Shader::kSsboSlots
+    static constexpr uint32_t kSsboSlots    = 20;  // matches Shader::kSsboSlots
 
     VkImageView  m_boundSrvViews         [kSrvSlots]     { };
     VkImageLayout m_boundSrvLayouts      [kSrvSlots]     { };

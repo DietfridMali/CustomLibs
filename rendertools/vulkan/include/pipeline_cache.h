@@ -37,6 +37,19 @@ struct PipelineRecord {
     uint32_t      colorFormatCount  { 0 };
     VkFormat      depthFormat       { VK_FORMAT_UNDEFINED };
 };
+struct ShaderLibraryKey {
+    Shader*       shader            { nullptr };
+    uint8_t       part              { 0 };
+    uint8_t       fillMode          { 0 };
+    uint8_t       depthClip         { 0 };
+    uint8_t       topology          { 0 };
+};
+struct OutputLibraryKey {
+    RenderStates  states;
+    VkFormat      colorFormats[8]   { };
+    uint32_t      colorFormatCount  { 0 };
+    VkFormat      depthFormat       { VK_FORMAT_UNDEFINED };
+};
 #pragma pack(pop)
 
 
@@ -53,6 +66,12 @@ public:
     // Companion lists kept in lock-step. Used for Destroy iteration and RemoveShader sweep.
     AutoArray<VkPipeline>   m_pipelines;
     AutoArray<PipelineKey>  m_keys;
+    AutoArray<uint8_t>      m_fastLinked;
+
+    AutoArray<ShaderLibraryKey> m_shaderLibraryKeys;
+    AutoArray<VkPipeline>       m_shaderLibraries;
+    AutoArray<OutputLibraryKey> m_outputLibraryKeys;
+    AutoArray<VkPipeline>       m_outputLibraries;
 
     AutoArray<String>           m_recordNames;
     AutoArray<PipelineRecord>   m_records;
@@ -73,6 +92,8 @@ public:
 
     void Precreate(void) noexcept;
 
+    void CreateShaderLibraries(Shader* shader) noexcept;
+
     // Removes (and destroys) every cached pipeline that belongs to the given shader.
     // Called from Shader::Destroy.
     void RemoveShader(Shader* shader) noexcept;
@@ -88,7 +109,21 @@ private:
 
     bool SaveRecords(void);
 
+    int FindPipeline(VkPipeline pipeline) const noexcept;
+
     VkPipeline BuildPipeline(const PipelineKey& key) noexcept;
+
+    VkPipeline LinkPipeline(const PipelineKey& key, bool optimize) noexcept;
+
+    VkPipeline CreateLibrary(VkGraphicsPipelineCreateInfo& info, VkGraphicsPipelineLibraryFlagsEXT part) noexcept;
+
+    VkPipeline VertexInputLibrary(Shader* shader, uint8_t topology) noexcept;
+
+    VkPipeline PreRasterizationLibrary(Shader* shader, uint8_t fillMode, uint8_t depthClip, uint8_t topology) noexcept;
+
+    VkPipeline FragmentShaderLibrary(Shader* shader) noexcept;
+
+    VkPipeline FragmentOutputLibrary(const PipelineKey& key) noexcept;
 };
 
 #define pipelineCache PipelineCache::Instance()

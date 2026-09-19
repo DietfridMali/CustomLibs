@@ -10,6 +10,7 @@
 #include "base_quadmesh.h"
 #include "drawbufferhandler.h"
 #include "resource_view.h"
+#include "renderstates.h"
 #include "gfxpixelformat_dx.h"	// ToNativeColorFormat () for RTCreationParams::colorFormat - backend neutral
 #ifdef _DEBUG
 #   include <source_location>
@@ -68,7 +69,7 @@ public:
     DSV                     m_dsv;
     DSV                     m_dsvReadOnly;   // read-only depth view (compare, no write) for simultaneous SRV sampling
     UAV                     m_uav;
-    D3D12_RESOURCE_STATES   m_state{ D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
+    D3D12_RESOURCE_STATES   m_state{ kShaderReadState };
     eBufferType             m_type{ btColor };
     DXGI_FORMAT             m_colorFormat{ dxColorFormat };  // per-RT color format; HDR scene/sky use R16G16B16A16_FLOAT
     // Set by RenderTarget::CreateDepthBuffer before the views are allocated: this depth buffer carries a
@@ -274,6 +275,7 @@ public:
 
     // Own command list - all rendering into this RenderTarget is recorded here.
     CommandList*        m_cmdList{ nullptr };
+    uint64_t            m_cmdListExecution{ 0 };
 
     // -------------------------------------------------------------------------
 
@@ -291,7 +293,7 @@ public:
 
     void SetName(const String& name) noexcept {
         m_name = name;
-        if (m_cmdList)
+        if (IsEnabled())
             m_cmdList->SetName(name);
     }
 
@@ -338,11 +340,11 @@ public:
     bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
 
     inline void Flush(void) noexcept {
-        if (m_cmdList)
+        if (IsEnabled())
             m_cmdList->Flush();
     }
 
-    inline CommandList* GetCmdList(void) noexcept { return m_cmdList; }
+    inline CommandList* GetCmdList(void) noexcept { return IsEnabled() ? m_cmdList : nullptr; }
 
     void SetViewport(bool flipVertically = false) noexcept;
 
@@ -488,7 +490,7 @@ public:
 
     // In DX12 there is no explicit framebuffer binding state - always report enabled.
     inline bool IsEnabled(void)  noexcept {
-        return m_cmdList and m_cmdList->IsRecording();
+        return m_cmdList and m_cmdList->IsRecording() and (m_cmdList->GetExecutionCounter() == m_cmdListExecution);
     }
 
     uint32_t& BufferHandle(int bufferIndex);
@@ -599,7 +601,7 @@ public:
     inline void SetDepthMode(eDepthBufferMode depthMode) {
         bool changed = (m_depthMode != depthMode);
         m_depthMode = depthMode;
-        if (changed and m_cmdList and m_cmdList->IsRecording())
+        if (changed and IsEnabled())
             SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = false, .reactivate = true, .depthMode = depthMode });
         if (depthMode != dbmReadOnly)
             return;
@@ -609,7 +611,13 @@ public:
             gfxStates.SetStencilWrite(0);
     }
 
+    void FillPipelineFormats(RenderStates& states) const noexcept;
+
 private:
+    DXGI_FORMAT m_boundColorFormats[RT_MAX_COLOR_BUFFERS]{};
+    int         m_boundColorCount{ 0 };
+    DXGI_FORMAT m_boundDepthFormat{ DXGI_FORMAT_UNKNOWN };
+
     // DSV format of the depth buffer that actually gets bound; a shared depth source (SetDepthSource)
     // takes precedence, exactly like ActiveDepthBufferHandle.
     inline DXGI_FORMAT DepthFormat(void) noexcept {

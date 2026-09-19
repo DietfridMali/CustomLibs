@@ -44,14 +44,7 @@ public:
 
     GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
-    void Clear(void) {
-        for (auto& r : m_resource)
-            r.Reset();
-        m_vbv = {};
-        m_ibv = {};
-        m_id  = 0;
-        m_isDynamic = true;
-    }
+    void Clear(void) noexcept;
 
     GfxDataBuffer(GfxDataBuffer const& other) { 
         Copy(other); 

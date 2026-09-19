@@ -143,9 +143,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     if (not hlslCode or not *hlslCode)
         return false;
     if (not InitDxc()) {
-#ifdef _DEBUG
         fprintf(stderr, "Shader '%s' (%s): DXC initialization failed\n", (const char*)m_name, target);
-#endif
         return false;
     }
 
@@ -184,16 +182,13 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     ComPtr<IDxcResult> result;
     HRESULT hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
     if (FAILED(hr)) {
-#ifdef _DEBUG
         fprintf(stderr, "Shader '%s' (%s): DXC Compile call failed (0x%08X)\n", (const char*)m_name, target, (unsigned)hr);
-#endif
         return false;
     }
 
     HRESULT compileStatus = E_FAIL;
     result->GetStatus(&compileStatus);
 
-#ifdef _DEBUG
     ComPtr<IDxcBlobUtf8> errors;
     if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
         if (errors and (errors->GetStringLength() > 0)) {
@@ -202,7 +197,6 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
                     errors->GetStringPointer());
         }
     }
-#endif
 
     if (FAILED(compileStatus)) {
 #ifdef _DEBUG
@@ -487,6 +481,15 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (m_dsBlob)
         UpdateStageFields(m_dsBlob.Get(), kStageDS);
 
+    UpdateStageResources(m_vsBlob.Get());
+    UpdateStageResources(m_psBlob.Get());
+    UpdateStageResources(m_gsBlob.Get());
+    UpdateStageResources(m_hsBlob.Get());
+    UpdateStageResources(m_dsBlob.Get());
+    m_srvDefaultKey = 0;
+    for (int i = 0; i < kSrvSlots; ++i)
+        m_srvDefaultKey |= uint64_t(m_srvDefaults[i]) << (3 * i);
+
     if (not CreateRootSignature())
         return false;
 
@@ -496,6 +499,37 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         m_stages[s].dirty = true;
     }
     return true;
+}
+
+
+void Shader::UpdateStageResources(ID3DBlob* blob) noexcept
+{
+    if (not blob)
+        return;
+    ComPtr<ID3D12ShaderReflection> refl;
+    if (not ReflectShader(blob, refl))
+        return;
+    D3D12_SHADER_DESC sd{};
+    refl->GetDesc(&sd);
+    for (UINT i = 0; i < sd.BoundResources; ++i) {
+        D3D12_SHADER_INPUT_BIND_DESC bd{};
+        if (FAILED(refl->GetResourceBindingDesc(i, &bd)))
+            continue;
+        if ((bd.Type != D3D_SIT_TEXTURE) or (bd.Space != 0) or (bd.BindPoint >= UINT(kSrvSlots)))
+            continue;
+        if (bd.ReturnType != D3D_RETURN_TYPE_FLOAT)
+            continue;
+        uint8_t viewType = dvNone;
+        if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE2D)
+            viewType = dv2D;
+        else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE2DARRAY)
+            viewType = dv2DArray;
+        else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURECUBE)
+            viewType = dvCube;
+        else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
+            viewType = dv3D;
+        m_srvDefaults[bd.BindPoint] = viewType;
+    }
 }
 
 
@@ -595,6 +629,9 @@ Shader& Shader::Move(Shader& other) noexcept
             m_stages[s].fields  = std::move(other.m_stages[s].fields);
         }
         m_vsInputLayout = std::move(other.m_vsInputLayout);
+        for (int i = 0; i < kSrvSlots; ++i)
+            m_srvDefaults[i] = other.m_srvDefaults[i];
+        m_srvDefaultKey = other.m_srvDefaultKey;
     }
     return *this;
 }
@@ -692,7 +729,7 @@ bool Shader::UpdateMatrices(void)
 
 // place all shader variables in CL; to be called right before the actual shader call
 bool Shader::UpdateVariables(void) noexcept {
-    return UploadB0() and UploadB1() and commandListHandler.ApplyBindings();
+    return UploadB0() and UploadB1() and commandListHandler.ApplyBindings(this);
 }
 
 // =================================================================================================

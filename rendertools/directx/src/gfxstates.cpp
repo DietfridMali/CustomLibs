@@ -222,7 +222,7 @@ void GfxStates::ClearSkyMaps(RenderTarget* rt) noexcept {
         BufferInfo& bi = rt->m_bufferInfo[rt->m_computeBufferIndex + i];
         bi.SetState(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
         list->ClearRenderTargetView(bi.m_rtv.CPUHandle(), zero, 0, nullptr);
-        bi.SetState(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        bi.SetState(cmdList, kShaderReadState);
     }
 
     if (opHandle != nullptr)

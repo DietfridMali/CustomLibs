@@ -419,6 +419,13 @@ bool VKContext::CreateDevice(void) noexcept
 #endif
     featsLocalRead.pNext = &feats12;
 
+    VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT featsPipelineLibrary { };
+    featsPipelineLibrary.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
+    featsPipelineLibrary.graphicsPipelineLibrary = VK_TRUE;
+    m_hasPipelineLibrary = SupportsPipelineLibrary();
+    if (m_hasPipelineLibrary)
+        feats12.pNext = &featsPipelineLibrary;
+
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).
     // fragmentStoresAndAtomics enables RWTexture2D + InterlockedMin in the fragment
     // stage (used by DecalShader's two-pass depth mask).
@@ -439,18 +446,23 @@ bool VKContext::CreateDevice(void) noexcept
     features.geometryShader = VK_TRUE;
     features.depthClamp = VK_TRUE;
 
-    const char* deviceExtensions[] = {
+    const char* deviceExtensions[5] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
     };
+    uint32_t deviceExtensionCount = 3;
+    if (m_hasPipelineLibrary) {
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME;
+    }
 
     VkDeviceCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     info.pNext = &feats13;
     info.queueCreateInfoCount = queueInfoCount;
     info.pQueueCreateInfos = queueInfos;
-    info.enabledExtensionCount = (uint32_t)(sizeof(deviceExtensions) / sizeof(deviceExtensions[0]));
+    info.enabledExtensionCount = deviceExtensionCount;
     info.ppEnabledExtensionNames = deviceExtensions;
     info.pEnabledFeatures = &features;
 
@@ -463,6 +475,35 @@ bool VKContext::CreateDevice(void) noexcept
     vkGetDeviceQueue(m_device, m_graphicsFamily, 0, &m_graphicsQueue);
     vkGetDeviceQueue(m_device, m_presentFamily, 0, &m_presentQueue);
     return true;
+}
+
+
+bool VKContext::SupportsPipelineLibrary(void) noexcept
+{
+    uint32_t count = 0;
+    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, nullptr) != VK_SUCCESS)
+        return false;
+    AutoArray<VkExtensionProperties> extensions;
+    extensions.Resize(int32_t(count));
+    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, extensions.Data()) != VK_SUCCESS)
+        return false;
+    bool hasPipelineLibrary = false;
+    bool hasGraphicsPipelineLibrary = false;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (std::strcmp(extensions[i].extensionName, VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) == 0)
+            hasPipelineLibrary = true;
+        else if (std::strcmp(extensions[i].extensionName, VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME) == 0)
+            hasGraphicsPipelineLibrary = true;
+    }
+    if (not (hasPipelineLibrary and hasGraphicsPipelineLibrary))
+        return false;
+    VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT pipelineLibraryFeatures { };
+    pipelineLibraryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
+    VkPhysicalDeviceFeatures2 features { };
+    features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features.pNext = &pipelineLibraryFeatures;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &features);
+    return pipelineLibraryFeatures.graphicsPipelineLibrary == VK_TRUE;
 }
 
 // =================================================================================================

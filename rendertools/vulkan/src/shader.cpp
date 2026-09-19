@@ -100,6 +100,7 @@ static const wchar_t* const kCommonBindArgs[] = {
     L"-fvk-bind-register", L"t16", L"1", L"58", L"0",
     L"-fvk-bind-register", L"t17", L"1", L"59", L"0",
     L"-fvk-bind-register", L"t18", L"1", L"60", L"0",
+    L"-fvk-bind-register", L"t19", L"1", L"61", L"0",
 };
 static constexpr uint32_t kCommonBindArgCount = uint32_t(sizeof(kCommonBindArgs) / sizeof(kCommonBindArgs[0]));
 
@@ -651,6 +652,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     m_fs = fsCode;
     m_gs = gsCode;
     VkStallEvent("shader create", stallStart, static_cast<const char*>(m_name));
+    pipelineCache.CreateShaderLibraries(this);
     return true;
 }
 

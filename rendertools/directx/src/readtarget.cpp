@@ -55,6 +55,12 @@ bool GfxReadTarget::Allocate(UINT64 totalSize) {
     if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &desc,
                                                D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource))))
         return false;
+#if DBG_DIRECTX
+    {
+        static const char name[] = "GfxReadTarget readback";
+        m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(sizeof(name) - 1), name);
+    }
+#endif
 
     void* mapped = nullptr;
 
@@ -71,13 +77,15 @@ bool GfxReadTarget::Allocate(UINT64 totalSize) {
 bool GfxReadTarget::Submit(const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout, UINT rowCount, UINT64 rowSize, int width, int height, uint64_t frame, int slot) {
     size_t size = size_t(rowSize) * size_t(rowCount);
 
+    if (size > size_t(INT32_MAX))
+        return false;
     try {
-        m_pixels.Resize(size);
+        m_pixels.Resize(int32_t(size));
     }
     catch (...) {
         return false;
     }
-    if (m_pixels.Length() < size)
+    if (size_t(m_pixels.Length()) < size)
         return false;
     m_layout = layout;
     m_rowCount = rowCount;

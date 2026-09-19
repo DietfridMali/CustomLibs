@@ -23,7 +23,7 @@ class GfxResourceHandler
     : public BaseSingleton<GfxResourceHandler>
 {
 public:
-    using ResourceArray = AutoArray<ComPtr<ID3D12Resource>>;
+    using ResourceArray = AutoArray<ComPtr<ID3D12Pageable>>;
     using DescriptorArray      = AutoArray<DescriptorHandle>;
 
 private:
@@ -60,7 +60,7 @@ public:
 
     ComPtr<ID3D12Resource> GetUploadResource(const char* name, size_t dataSize);
 
-    void Track(ComPtr<ID3D12Resource> resource) noexcept;
+    void Track(ComPtr<ID3D12Pageable> resource) noexcept;
 
     void Track(const DescriptorHandle& handle) noexcept;
 
@@ -69,7 +69,7 @@ public:
     // upstream (init phases, explicit Flush()).
     void Cleanup(int frameIndex, bool waitIdle = false) noexcept;
 
-    void CleanupBefore(int frameIndex, uint64_t serialLimit) noexcept;
+    void CleanupBefore(int frameIndex, uint64_t serialLimit, const char* site = nullptr, const char* openList = nullptr) noexcept;
 
     inline uint64_t NextSerial(void) noexcept {
         return ++m_serial;

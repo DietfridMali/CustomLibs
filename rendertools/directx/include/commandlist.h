@@ -73,7 +73,7 @@ public:
     static constexpr uint32_t kSrvSlots     = 16;
     static constexpr uint32_t kSamplerSlots = 16;
     static constexpr uint32_t kUavSlots     = 4;
-    static constexpr uint32_t kSsboSlots    = 19;
+    static constexpr uint32_t kSsboSlots    = 20;
     static constexpr int      kTableSrv     = 0;
     static constexpr int      kTableUav     = 1;
     static constexpr int      kTableSsbo    = 2;
@@ -84,6 +84,7 @@ public:
     bool                                m_isRecording{ false };
     bool                                m_isFlushed{ false };
     bool                                m_isTemporary{ false };
+    bool                                m_savedRenderStates{ false };
     uint64_t                            m_openSerial{ 0 };
     uint64_t                            m_openQueryCount{ 0 };
     AutoArray<std::function<void()>>    m_disposableResources;
@@ -143,6 +144,10 @@ public:
 
     inline void SetName(String name) noexcept {
         m_name = name;
+#if DBG_DIRECTX
+        if (m_gfxListPtr and not m_name.IsEmpty())
+            m_gfxListPtr->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(m_name.Length()), static_cast<const char*>(m_name));
+#endif
     }
 
     inline uint64_t GetExecutionCounter(void) const noexcept {
@@ -204,6 +209,7 @@ public:
     AutoArray<CommandList*>                 m_pendingLists;     // registered at Open(), cleared after ExecuteAll
     AutoArray<CommandList*>                 m_recycledLists;    // pool of temporary CLs available for reuse
     AutoArray<CommandListData>              m_cmdListStack;
+    AutoArray<CommandList*>                 m_recordingLists;
     CommandListData                         m_currentListData;
     uint64_t                                m_cmdListId{ 1 };
     uint64_t                                m_cmdListCount{ 0 };
@@ -219,12 +225,21 @@ public:
         D3D12_GPU_DESCRIPTOR_HANDLE gpu{ 0 };
     };
 
+    struct BoundBuffer {
+        ComPtr<ID3D12Resource>*     pResource{ nullptr };
+        D3D12_RESOURCE_STATES*      pState{ nullptr };
+    };
+
+    BoundBuffer                             m_storageBufferStates[CommandList::kUavSlots]{};
+    BoundBuffer                             m_readOnlyBufferStates[CommandList::kSsboSlots]{};
+
     uint32_t                                m_boundSrvs[CommandList::kSrvSlots]{};
     uint32_t                                m_boundSamplers[CommandList::kSamplerSlots]{};
     uint32_t                                m_boundStorageBuffers[CommandList::kUavSlots]{};
     uint32_t                                m_boundReadOnlyBuffers[CommandList::kSsboSlots]{};
     uint64_t                                m_bindingVersions[CommandList::kTableCount]{};
     uint64_t                                m_bindingVersionCounter{ 0 };
+    uint64_t                                m_srvDefaultKey{ 0 };
     BuiltTable                              m_builtTables[CommandList::kTableCount];
 
     bool Create(ID3D12Device* device) noexcept;
@@ -235,11 +250,22 @@ public:
 
     void BindSampler(uint32_t slot, uint32_t samplerSlot) noexcept;
 
-    void BindStorageBuffer(uint32_t slot, uint32_t uavIndex) noexcept;
+    void BindStorageBuffer(uint32_t slot, uint32_t uavIndex, ComPtr<ID3D12Resource>* pResource = nullptr, D3D12_RESOURCE_STATES* pState = nullptr) noexcept;
 
-    void BindReadOnlyBuffer(uint32_t slot, uint32_t srvIndex) noexcept;
+    void BindReadOnlyBuffer(uint32_t slot, uint32_t srvIndex, ComPtr<ID3D12Resource>* pResource = nullptr, D3D12_RESOURCE_STATES* pState = nullptr) noexcept;
 
-    bool ApplyBindings(void) noexcept;
+    void UnbindBuffer(const D3D12_RESOURCE_STATES* pState) noexcept;
+
+    void TransitionBoundBuffers(ID3D12GraphicsCommandList* list) noexcept;
+
+    bool ApplyBindings(const Shader* shader) noexcept;
+
+    void OnDescriptorHeapChanged(void) noexcept;
+
+    inline void InvalidateTables(void) noexcept {
+        for (int i = 0; i < CommandList::kTableCount; ++i)
+            m_bindingVersions[i] = ++m_bindingVersionCounter;
+    }
 
     void Destroy(void) noexcept;
 
@@ -279,7 +305,7 @@ public:
     // Signals the fence for the current slot. Call once per frame after ExecuteAll().
     void EndFrame(void) noexcept;
 
-    // Init / no-frame path: WaitIdle + drain the current slot. Reuses Cleanup with waitIdle=true.
+    // Init / no-frame path: WaitIdle + drain the current slot, except what lists still recording may reference.
     void Flush(void) noexcept;
 
     // Returns the currently recording list (top of stack), or nullptr if none is open.
@@ -311,6 +337,14 @@ public:
     void ExecutePending(void) noexcept;
 
     void DrainFrameResources(void) noexcept;
+
+    void NoteRecording(CommandList* cl) noexcept;
+
+    void NoteStopped(CommandList* cl) noexcept;
+
+    CommandList* OldestRecordingList(void) const noexcept;
+
+    void ReleaseFrameResources(const char* site) noexcept;
 
     bool UsesOrderedCopyList(void) noexcept;
 

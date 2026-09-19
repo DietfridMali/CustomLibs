@@ -55,6 +55,8 @@ bool GfxRenderer::InitGraphics(void) {
         fprintf(stderr, "Cannot begin first DX12 frame.\n");
         return false;
     }
+    if (not descriptorHeaps.CreateDefaultTextures(dx12Context.Device()))
+        return false;
     return true;
 }
 
@@ -66,8 +68,12 @@ void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
             ++(cl->m_refCounter);
         return cl;
     }
-    if (piggyback and m_temporaryList)
+    if (m_temporaryList and not (m_temporaryList->IsRecording() and (m_temporaryList->GetExecutionCounter() == m_temporaryExecution)))
+        m_temporaryList = nullptr;
+    if (piggyback and m_temporaryList) {
         ++(m_temporaryList->m_refCounter);
+        cl = m_temporaryList;
+    }
     else {
 #if LOG_OPERATIONS
         fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
@@ -79,8 +85,10 @@ void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
             return nullptr;
         }
     }
-    if (piggyback)
+    if (piggyback) {
         m_temporaryList = cl;
+        m_temporaryExecution = cl->GetExecutionCounter();
+    }
     return cl;
 }
 
@@ -239,10 +247,16 @@ bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int 
     if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
                                                D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
         return false;
+#if DBG_DIRECTX
+    {
+        static const char name[] = "GfxRenderer::ReadBuffer readback";
+        readback->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(sizeof(name) - 1), name);
+    }
+#endif
 
-    CommandList* cl = static_cast<CommandList*>(StartOperation("ReadBuffer"));
+    CommandList* cl = commandListHandler.CreateCmdList(String("GfxRenderer::ReadBuffer"), true);
 
-    if (not cl)
+    if (not (cl and cl->Open(false)))
         return false;
 
     D3D12_RESOURCE_STATES stateBefore = baseDisplayHandler.CurrentBackBufferState();
@@ -263,8 +277,8 @@ bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int 
     if (ID3D12GraphicsCommandList* list = cl->GfxList())
         list->CopyTextureRegion(&dstLoc, UINT(x), top, 0, &srcLoc, &box);
     cl->SetBarrier(backBuffer, D3D12_RESOURCE_STATE_COPY_SOURCE, stateBefore);
-    // Flushed, not just closed - the map below reads what the GPU wrote, so the copy has to be done.
-    FinishOperation(cl, true);
+    cl->Close(false);
+    commandListHandler.ExecutePending();
 
     uint8_t* source = nullptr;
     D3D12_RANGE readRange{ 0, size_t(totalSize) };

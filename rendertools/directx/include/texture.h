@@ -81,6 +81,7 @@ public:
     // Named m_handle for source-level compatibility with existing assignment sites
     // (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)).
     uint32_t                    m_handle{ UINT32_MAX };
+    uint32_t                    m_ownedHandle{ UINT32_MAX };
 
     ComPtr<ID3D12Resource>      m_resource;   // default-heap resource (D3D12_RESOURCE_DIMENSION_TEXTURE2D)
     DXGI_FORMAT                 m_dxgiFormat{ DXGI_FORMAT_R8G8B8A8_UNORM };  // GPU format of m_resource + its SRV
@@ -160,6 +161,10 @@ public:
     virtual bool Create(void) override;
 
     bool CreateHandle(void);
+
+    bool AllocateHandle(void) noexcept;
+
+    void ReleaseResource(void) noexcept;
 
     inline bool HasHandle(void) const noexcept {
         return m_handle != UINT32_MAX;

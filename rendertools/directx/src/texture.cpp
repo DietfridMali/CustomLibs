@@ -66,8 +66,9 @@ Texture& Texture::Copy(const Texture& other)
 {
     if (this != &other) {
         Destroy();
-        m_handle = other.m_handle;
-        m_resource = other.m_resource;  // shared
+        m_handle = UINT32_MAX;
+        m_ownedHandle = UINT32_MAX;
+        m_resource.Reset();
         m_name = other.m_name;
         m_buffers = other.m_buffers;
         m_filenames = other.m_filenames;
@@ -75,7 +76,7 @@ Texture& Texture::Copy(const Texture& other)
         m_wrapMode = other.m_wrapMode;
         m_useMipMaps = other.m_useMipMaps;
         m_colorEncoding = other.m_colorEncoding;
-        m_isDeployed = other.m_isDeployed;
+        m_isDeployed = false;
         m_hasParams = other.m_hasParams;
         m_isValid = other.m_isValid;
     }
@@ -88,6 +89,7 @@ Texture& Texture::Move(Texture& other) noexcept
     if (this != &other) {
         Destroy();
         m_handle = std::exchange(other.m_handle, UINT32_MAX);
+        m_ownedHandle = std::exchange(other.m_ownedHandle, UINT32_MAX);
         m_resource = std::move(other.m_resource);
         m_name = std::move(other.m_name);
         m_buffers = std::move(other.m_buffers);
@@ -113,13 +115,31 @@ bool Texture::Create(void)
 
 bool Texture::CreateHandle(void)
 {
-    // Allocate an SRV descriptor index.
-    DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-    if (not hdl.IsValid()) 
+    m_handle = m_ownedHandle;
+    if (not AllocateHandle())
         return false;
-    m_handle = hdl.index;
     m_isValid = true;
     return true;
+}
+
+
+bool Texture::AllocateHandle(void) noexcept
+{
+    if (m_handle != UINT32_MAX)
+        return true;
+    DescriptorHandle hdl = descriptorHeaps.AllocSRV();
+    if (not hdl.IsValid())
+        return false;
+    m_handle = hdl.index;
+    m_ownedHandle = hdl.index;
+    return true;
+}
+
+
+void Texture::ReleaseResource(void) noexcept
+{
+    gfxResourceHandler.Track(m_resource);
+    m_resource.Reset();
 }
 
 
@@ -141,10 +161,15 @@ void Texture::Destroy(void)
         // Left standing, SetParams () returns at once for the NEXT texture created here and that one
         // never gets its sampler set up. 1:1 to the OpenGL path.
         m_hasParams = false;
-        if (m_isDisposable)
-            gfxResourceHandler.Track(m_resource);
+        if (m_ownedHandle != UINT32_MAX) {
+            DescriptorHandle handle;
+            handle.index = m_ownedHandle;
+            handle.m_heap = &descriptorHeaps.m_srvHeap;
+            gfxResourceHandler.Track(handle);
+            m_ownedHandle = UINT32_MAX;
+        }
         m_handle = UINT32_MAX;
-        m_resource.Reset();
+        ReleaseResource();
         for (auto* p : m_buffers) {
             if (p->m_refCount) --p->m_refCount;
             else delete p;
@@ -230,6 +255,7 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, 
         fprintf(stderr, "Texture::CreateTextureResource: no D3D12 device\n");
         return false;
     }
+    ReleaseResource();
 
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd{};
@@ -270,12 +296,8 @@ bool Texture::CreateSRV(void)
     if (not device)
         return false;
 
-    if (m_handle == UINT32_MAX) {
-        DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-        if (not hdl.IsValid())
-            return false;
-        m_handle = hdl.index;
-    }
+    if (not AllocateHandle())
+        return false;
 
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
     srvDesc.Format = m_dxgiFormat;

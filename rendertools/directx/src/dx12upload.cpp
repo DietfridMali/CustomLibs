@@ -13,6 +13,23 @@
 
 // =================================================================================================
 
+static CommandList* OpenUploadList(const char* name) noexcept {
+    CommandList* cl = commandListHandler.CreateCmdList(name, true);
+    if (not (cl and cl->Open()))
+        return nullptr;
+    return cl;
+}
+
+
+static bool FinishUploadList(CommandList* cl, bool flush = false) noexcept {
+    if (flush)
+        cl->Flush();
+    else
+        cl->Close();
+    return true;
+}
+
+
 void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource,
                         D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter) {
     D3D12_RESOURCE_BARRIER barrier{};
@@ -28,7 +45,7 @@ void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resourc
 
 void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource) {
     SubresourceBarrier(list, resource, subresource,
-                       D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                       D3D12_RESOURCE_STATE_COPY_DEST, kShaderReadState);
 }
 
 
@@ -96,7 +113,7 @@ bool UploadSubresource(ID3D12Device* device, ID3D12GraphicsCommandList* list, ID
 
 bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces, int faceCount, int width, int height, int channels) noexcept
 {
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureData"));
+    CommandList* cl = OpenUploadList("UploadTextureData");
     if (not cl)
         return false;
 
@@ -105,12 +122,12 @@ bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const 
         faceCount = 6;
     for (int i = 0; i < faceCount; ++i) {
         if (not UploadSubresource(device, cl->GfxList(), dstResource, UINT(i), faces[i], width, height, channels, uploads[i], /*addBarrier=*/false)) {
-            baseRenderer.FinishOperation(cl);
+            FinishUploadList(cl);
             return false;
         }
     }
     SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    return baseRenderer.FinishOperation(cl, true);
+    return FinishUploadList(cl, true);
 }
 
 
@@ -158,7 +175,7 @@ static void Downsample2D_8bit(const uint8_t* src, int sw, int sh, int channels, 
 
 bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels, eColorEncoding colorEncoding) noexcept
 {
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureDataWithMips"));
+    CommandList* cl = OpenUploadList("UploadTextureDataWithMips");
     if (not cl)
         return false;
 
@@ -188,11 +205,11 @@ bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource
     }
 
     if (not ok) {
-        baseRenderer.FinishOperation(cl);
+        FinishUploadList(cl);
         return false;
     }
     SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    return baseRenderer.FinishOperation(cl, true);
+    return FinishUploadList(cl, true);
 }
 
 
@@ -253,7 +270,7 @@ bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, c
     if ((layerCount < 1) or (mipCount < 1) or (channels < 1) or (firstLayer < 0))
         return false;
 
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadTextureArrayData"));
+    CommandList* cl = OpenUploadList("UploadTextureArrayData");
     if (not cl)
         return false;
 
@@ -262,7 +279,7 @@ bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, c
     // below see the state they expect.
     if (isRefresh)
         SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                           D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+                           kShaderReadState, D3D12_RESOURCE_STATE_COPY_DEST);
 
     AutoArray<ComPtr<ID3D12Resource>> uploads;
     uploads.Resize(uint32_t(layerCount * mipCount));
@@ -292,12 +309,12 @@ bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, c
         // or the resource is left in COPY_DEST while everything downstream samples it.
         if (isRefresh)
             SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                               D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        baseRenderer.FinishOperation(cl);
+                               D3D12_RESOURCE_STATE_COPY_DEST, kShaderReadState);
+        FinishUploadList(cl);
         return false;
     }
     SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    return baseRenderer.FinishOperation(cl, true);
+    return FinishUploadList(cl, true);
 }
 
 
@@ -311,13 +328,13 @@ bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, con
     if (blockBytes == 0)
         return false;   // caller passed a non-block-compressed format
 
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("UploadCompressedData"));
+    CommandList* cl = OpenUploadList("UploadCompressedData");
     if (not cl)
         return false;
 
     if (isRefresh)
         SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                           D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
+                           kShaderReadState, D3D12_RESOURCE_STATE_COPY_DEST);
 
     // One staging buffer per (face, mip), kept alive until the list is flushed.
     AutoArray<ComPtr<ID3D12Resource>> uploads;
@@ -348,12 +365,12 @@ bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, con
     if (not ok) {
         if (isRefresh)
             SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                               D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        baseRenderer.FinishOperation(cl);
+                               D3D12_RESOURCE_STATE_COPY_DEST, kShaderReadState);
+        FinishUploadList(cl);
         return false;
     }
     SubresourceBarrier(cl->GfxList(), dstResource, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    return baseRenderer.FinishOperation(cl, true);
+    return FinishUploadList(cl, true);
 }
 
 // =================================================================================================
@@ -412,7 +429,7 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
                             srcRowBytes);
     upload->Unmap(0, nullptr);
 
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("Upload3DTextureData"));
+    CommandList* cl = OpenUploadList("Upload3DTextureData");
     if (not cl)
         return nullptr;
 
@@ -425,7 +442,7 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
     dstLoc.SubresourceIndex = 0;
     cl->GfxList()->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     SubresourceBarrier(cl->GfxList(), resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    baseRenderer.FinishOperation(cl);
+    FinishUploadList(cl, true);
 #ifdef _DEBUG
     if (not resource)
         return nullptr;
@@ -435,18 +452,6 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
 
 // =================================================================================================
 // Platform-neutral upload helpers
-
-static bool EnsureSRVHandle(uint32_t& handleOut) noexcept
-{
-    if (handleOut == UINT32_MAX) {
-        DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-        if (not hdl.IsValid())
-            return false;
-        handleOut = hdl.index;
-    }
-    return true;
-}
-
 
 static void CreateSRV2D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT fmt) noexcept
 {
@@ -489,7 +494,7 @@ bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, co
     if ((dxgi == DXGI_FORMAT_UNKNOWN) or (stride == 0))
         return false;
 
-    tex.m_resource.Reset();
+    tex.ReleaseResource();
 
     D3D12_HEAP_PROPERTIES hp { D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd { };
@@ -516,7 +521,7 @@ bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, co
     if (not UploadTextureData(device, tex.m_resource.Get(), src, width, height, int(stride)))
         return false;
 
-    if (not EnsureSRVHandle(tex.m_handle))
+    if (not tex.AllocateHandle())
         return false;
     CreateSRV2D(tex.m_handle, tex.m_resource.Get(), dxgi);
 
@@ -549,7 +554,7 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFor
         BuildMipChain3D(data, width, height, depth, fmt, mipChain);
     const uint32_t mipLevels = generateMips ? uint32_t(mipChain.Length()) : 1u;
 
-    tex.m_resource.Reset();
+    tex.ReleaseResource();
 
     D3D12_HEAP_PROPERTIES hp { D3D12_HEAP_TYPE_DEFAULT };
     D3D12_RESOURCE_DESC rd { };
@@ -572,7 +577,7 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFor
     tex.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
 #endif
 
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("Upload3DTextureMips"));
+    CommandList* cl = OpenUploadList("Upload3DTextureMips");
     if (not cl)
         return false;
 
@@ -602,14 +607,14 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFor
 
         ComPtr<ID3D12Resource> upload = gfxResourceHandler.GetUploadResource("", size_t(uploadSize));
         if (not upload) {
-            baseRenderer.FinishOperation(cl);
+            FinishUploadList(cl);
             return false;
         }
 
         uint8_t* mapped = nullptr;
         D3D12_RANGE mapRange { 0, 0 };
         if (FAILED(upload->Map(0, &mapRange, (void**) &mapped))) {
-            baseRenderer.FinishOperation(cl);
+            FinishUploadList(cl);
             return false;
         }
         UINT srcRowBytes = UINT(mipW) * stride;
@@ -638,9 +643,9 @@ bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFor
 
     // Transition all subresources COPY_DEST -> PIXEL_SHADER_RESOURCE.
     SubresourceBarrier(cl->GfxList(), tex.m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-    baseRenderer.FinishOperation(cl);
+    FinishUploadList(cl, true);
 
-    if (not EnsureSRVHandle(tex.m_handle))
+    if (not tex.AllocateHandle())
         return false;
     CreateSRV3D(tex.m_handle, tex.m_resource.Get(), dxgi, mipLevels);
 

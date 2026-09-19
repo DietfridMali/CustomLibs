@@ -10,6 +10,8 @@
 #include "gfxtypes.h"
 
 #include <type_traits>
+#include <cstdio>
+#include <cstring>
 
 // =================================================================================================
 
@@ -55,6 +57,16 @@ public:
         return descriptorHeaps.m_srvHeap.GpuHandle(m_uavHandle.index);
     }
 
+    void NameResource([[maybe_unused]] ID3D12Resource* resource, [[maybe_unused]] const char* role) noexcept {
+#if DBG_DIRECTX
+        if (not resource)
+            return;
+        char name[160];
+        snprintf(name, sizeof(name), "GfxArray[%s %zu B x %u x %u @%p] %s", isBuffer ? "buffer" : "texture", sizeof(DATA_T), m_width, m_height, static_cast<void*>(this), role);
+        resource->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+#endif
+    }
+
     bool Create(int width, int height = 1) {
         if constexpr (isBuffer)
             return CreateBuffer(width, height);
@@ -63,6 +75,8 @@ public:
     }
 
     void Destroy(void) {
+        if (not GfxResourceHandler::IsShuttingDown())
+            commandListHandler.UnbindBuffer(&m_state);
         if (m_resource) {
             // In-flight command lists (previous frames) may still reference the resource, the staging
             // buffers and the SRV/UAV slot, so a live destroy (e.g. grow-on-demand recreate via Create)
@@ -131,12 +145,7 @@ public:
     bool Bind(uint32_t bindingPoint) {
         if (not m_resource or not m_uavHandle.IsValid() or (bindingPoint >= uint32_t(Shader::kUavSlots)))
             return false;
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
-            return false;
-        if (m_state == kReadOnlyState)
-            SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        commandListHandler.BindStorageBuffer(bindingPoint, m_uavHandle.index);
+        commandListHandler.BindStorageBuffer(bindingPoint, m_uavHandle.index, &m_resource, &m_state);
         return true;
     }
 
@@ -148,12 +157,7 @@ public:
     bool BindReadOnly(uint32_t bindingPoint) {
         if (not isBuffer or not m_resource or not m_srvHandle.IsValid() or (bindingPoint >= uint32_t(Shader::kSsboSlots)))
             return false;
-        auto* list = commandListHandler.CurrentGfxList();
-        if (not list)
-            return false;
-        if (m_state != D3D12_RESOURCE_STATE_COMMON)
-            SetBarrier(list, kReadOnlyState);
-        commandListHandler.BindReadOnlyBuffer(bindingPoint, m_srvHandle.index);
+        commandListHandler.BindReadOnlyBuffer(bindingPoint, m_srvHandle.index, &m_resource, &m_state);
         return true;
     }
 
@@ -171,6 +175,13 @@ public:
                 return;
             UINT clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
             auto& heap = descriptorHeaps.m_srvHeap;
+            SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            {
+                D3D12_RESOURCE_BARRIER before{};
+                before.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+                before.UAV.pResource = m_resource.Get();
+                list->ResourceBarrier(1, &before);
+            }
             list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
             // ClearUnorderedAccessViewUint is not implicitly ordered against subsequent UAV
             // accesses. Without a UAV barrier the clear can run concurrently with or after the
@@ -209,6 +220,29 @@ public:
     }
 
 private:
+    CommandList* OpenCopyList(bool& close, bool& flush) {
+        close = false;
+        flush = false;
+        if (commandListHandler.UsesOrderedCopyList()) {
+            close = true;
+            return commandListHandler.OpenOrderedCopyList();
+        }
+        if (CommandList* current = commandListHandler.CurrentCmdList())
+            return current;
+        CommandList* cl = commandListHandler.CreateCmdList("GfxArray::Upload", true);
+        if (not (cl and cl->Open()))
+            return nullptr;
+        flush = true;
+        return cl;
+    }
+
+    void CloseCopyList(CommandList* cl, bool close, bool flush) {
+        if (flush)
+            cl->Flush();
+        else if (close)
+            cl->Close(false);
+    }
+
     // The frame slot's upload buffer for a copy of [offset, offset + bytes). A recorded copy runs when
     // the frame is executed, so a second upload in the same frame that overlaps a range already staged
     // would replace the data the first copy is still going to read. Such an upload gets an upload
@@ -263,6 +297,7 @@ private:
         m_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, m_state, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
+        NameResource(m_resource.Get(), "data");
 
         m_uavHandle = descriptorHeaps.AllocSRV();
         if (not m_uavHandle.IsValid()) {
@@ -322,6 +357,7 @@ private:
         m_state = D3D12_RESOURCE_STATE_COMMON;
         if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, m_state, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
+        NameResource(m_resource.Get(), "data");
 
         m_uavHandle = descriptorHeaps.AllocSRV();
         if (not m_uavHandle.IsValid()) {
@@ -385,6 +421,7 @@ private:
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
             if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
                 return false;
+            NameResource(upload.Get(), "upload");
         }
 
         void* mapped = nullptr;
@@ -399,12 +436,10 @@ private:
             std::memcpy(dst + row * footprint.Footprint.RowPitch, src + row * srcRowPitch, srcRowPitch);
         upload->Unmap(0, nullptr);
 
-        CommandList* copyList = nullptr;
-        if (commandListHandler.UsesOrderedCopyList()) {
-            if (not (copyList = commandListHandler.OpenOrderedCopyList()))
-                return false;
-        }
-        auto* list = copyList ? copyList->GfxList() : commandListHandler.CurrentGfxList();
+        bool closeCopyList = false;
+        bool flushCopyList = false;
+        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList);
+        auto* list = copyList ? copyList->GfxList() : nullptr;
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -421,8 +456,7 @@ private:
 
         list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        if (copyList)
-            copyList->Close(false);
+        CloseCopyList(copyList, closeCopyList, flushCopyList);
         return true;
     }
 
@@ -446,6 +480,7 @@ private:
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
             if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
                 return false;
+            NameResource(upload.Get(), "upload");
         }
 
         void* mapped = nullptr;
@@ -455,19 +490,16 @@ private:
         std::memcpy(mapped, m_data.Data(), byteSize);
         upload->Unmap(0, nullptr);
 
-        CommandList* copyList = nullptr;
-        if (commandListHandler.UsesOrderedCopyList()) {
-            if (not (copyList = commandListHandler.OpenOrderedCopyList()))
-                return false;
-        }
-        auto* list = copyList ? copyList->GfxList() : commandListHandler.CurrentGfxList();
+        bool closeCopyList = false;
+        bool flushCopyList = false;
+        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList);
+        auto* list = copyList ? copyList->GfxList() : nullptr;
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
         list->CopyBufferRegion(m_resource.Get(), 0, upload.Get(), 0, byteSize);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        if (copyList)
-            copyList->Close(false);
+        CloseCopyList(copyList, closeCopyList, flushCopyList);
         return true;
     }
 
@@ -496,6 +528,7 @@ private:
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
             if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
                 return false;
+            NameResource(upload.Get(), "upload");
         }
 
         void* mapped = nullptr;
@@ -505,19 +538,16 @@ private:
         std::memcpy(static_cast<uint8_t*>(mapped) + offset, reinterpret_cast<const uint8_t*>(m_data.Data()) + offset, bytes);
         upload->Unmap(0, nullptr);
 
-        CommandList* copyList = nullptr;
-        if (commandListHandler.UsesOrderedCopyList()) {
-            if (not (copyList = commandListHandler.OpenOrderedCopyList()))
-                return false;
-        }
-        auto* list = copyList ? copyList->GfxList() : commandListHandler.CurrentGfxList();
+        bool closeCopyList = false;
+        bool flushCopyList = false;
+        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList);
+        auto* list = copyList ? copyList->GfxList() : nullptr;
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
         list->CopyBufferRegion(m_resource.Get(), offset, upload.Get(), offset, bytes);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        if (copyList)
-            copyList->Close(false);
+        CloseCopyList(copyList, closeCopyList, flushCopyList);
         return true;
     }
 
@@ -544,6 +574,7 @@ private:
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
             if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_readback))))
                 return false;
+            NameResource(m_readback.Get(), "readback");
         }
 
         CommandList* cl = commandListHandler.CreateCmdList("GfxArray::DownloadTexture", true);
@@ -604,6 +635,7 @@ private:
             rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
             if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_readback))))
                 return false;
+            NameResource(m_readback.Get(), "readback");
         }
 
         CommandList* cl = commandListHandler.CreateCmdList("GfxArray::DownloadBuffer", true);

@@ -7,10 +7,12 @@
 #include "resource_view.h"
 #include "shadercache.h"
 #include "base_shaderhandler.h"
+#include "rendertarget.h"
+#include "base_displayhandler.h"
 
 #include <cwchar>
 
-static constexpr uint32_t kPipelineRecordVersion = 1;
+static constexpr uint32_t kPipelineRecordVersion = 2;
 
 
 // =================================================================================================
@@ -208,6 +210,15 @@ PSO::psoPtr_t PSO::GetPSO(Shader* shader) noexcept
         return nullptr;
 
     PSOKey key{ shader, baseRenderer.RenderStates() };
+    if (RenderTarget* renderTarget = baseRenderer.GetActiveBuffer())
+        renderTarget->FillPipelineFormats(key.states);
+    else {
+        key.states.colorTargetCount = 1;
+        key.states.colorFormat = BaseDisplayHandler::BACK_BUFFER_FORMAT;
+        for (auto& format : key.states.mrtFormats)
+            format = DXGI_FORMAT_UNKNOWN;
+        key.states.depthFormat = DXGI_FORMAT_UNKNOWN;
+    }
     NormalizeStates(key.states, shader->m_dataLayout.m_numRenderTargets);
     if (auto psoComPtr = GetCache(ComparePSOs).Find(key)) {
 #ifdef _DEBUG
@@ -238,6 +249,17 @@ void PSO::NormalizeStates(RenderStates& s, int renderTargetCount) noexcept
 
     s.stencilRef = defaults.stencilRef;
     s.scissorTest = defaults.scissorTest;
+    if (s.depthFormat == DXGI_FORMAT_UNKNOWN) {
+        s.depthTest = 0;
+        s.stencilTest = 0;
+    }
+    if (s.colorTargetCount > renderTargetCount)
+        s.colorTargetCount = uint8_t((renderTargetCount > 0) ? renderTargetCount : 0);
+    if (s.colorTargetCount == 0)
+        s.colorFormat = DXGI_FORMAT_UNKNOWN;
+    for (int i = 1; i < RenderStates::kColorTargets; ++i)
+        if (i >= s.colorTargetCount)
+            s.mrtFormats[i - 1] = DXGI_FORMAT_UNKNOWN;
     if (not s.faceCulling)
         s.cullMode = defaults.cullMode;
     if (not s.depthTest) {
@@ -256,9 +278,7 @@ void PSO::NormalizeStates(RenderStates& s, int renderTargetCount) noexcept
         s.stencilWriteMask = defaults.stencilWriteMask;
     }
     if (not (s.depthTest or s.stencilTest))
-        s.depthFormat = defaults.depthFormat;
-    if (renderTargetCount <= 0)
-        s.colorFormat = defaults.colorFormat;
+        s.depthFormat = DXGI_FORMAT_UNKNOWN;
     if (renderTargetCount <= 1)
         s.independentBlend = 0;
     int blendTargets = 0;
@@ -497,11 +517,14 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader, const RenderStates& states)
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     int nrt = shader->m_dataLayout.m_numRenderTargets;
     psoDesc.NumRenderTargets = UINT(nrt);
-    // Slot 0 (color) follows the active render target's color format (RenderStates::colorFormat, set
-    // in RenderTarget::Enable) so one shader serves both the RGBA8 screen and the HDR scene buffer.
-    // Slots 1+ (worldNormal/worldPos MRTs) keep their shader-declared formats.
-    for (int i = 0; i < nrt; ++i)
-        psoDesc.RTVFormats[i] = (i == 0) ? psoStates.colorFormat : ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
+    // The slots the render surface has bound take its formats (PSO::GetPSO () filled them in); a slot the
+    // shader writes but nothing is bound to keeps the shader-declared format.
+    for (int i = 0; i < nrt; ++i) {
+        if (i < psoStates.colorTargetCount)
+            psoDesc.RTVFormats[i] = (i == 0) ? psoStates.colorFormat : psoStates.mrtFormats[i - 1];
+        else
+            psoDesc.RTVFormats[i] = ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
+    }
     for (int i = 1; i < nrt; ++i) {
         if (IsIntegerColorFormat(psoDesc.RTVFormats[i]) and psoDesc.BlendState.RenderTarget[0].BlendEnable and not psoDesc.BlendState.IndependentBlendEnable) {
             psoDesc.BlendState.IndependentBlendEnable = TRUE;

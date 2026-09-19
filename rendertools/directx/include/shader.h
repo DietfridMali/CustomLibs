@@ -22,7 +22,7 @@
 //  - One root signature shared by all shaders: root CBV b0 (FrameConstants, ALL),
 //    root CBV b1 per stage (VS, PS, GS, HS, DS), one SRV descriptor table t0..t15,
 //    one sampler descriptor table per slot s0..s15, one UAV descriptor table u0..u3,
-//    one SRV descriptor table t0..t18 space1 (read-only structured buffers).
+//    one SRV descriptor table t0..t19 space1 (read-only structured buffers).
 //  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
 //  - b1: per-stage shader constants, layout from per-stage HLSL reflection on link
@@ -106,7 +106,7 @@ public:
     static constexpr int kUavBase       = kSamplerBase + kSamplerSlots;
     static constexpr int kUavSlots      = 4;
     static constexpr int kSsboBase      = kUavBase + 1;
-    static constexpr int kSsboSlots     = 19;
+    static constexpr int kSsboSlots     = 20;
     static constexpr int kSsboSpace     = 1;
     static constexpr int kRootParamCount = kSsboBase + 1;
 
@@ -118,6 +118,18 @@ public:
     };
 
     StageConstants m_stages[kStageCount];
+
+    enum DefaultViewType : uint8_t {
+        dvNone = 0,
+        dv2D,
+        dv2DArray,
+        dvCube,
+        dv3D,
+        dvCount
+    };
+
+    uint8_t   m_srvDefaults[kSrvSlots] { };
+    uint64_t  m_srvDefaultKey{ 0 };
 
     // Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;
@@ -209,6 +221,8 @@ public:
     void BuildInputLayout(void) noexcept;
 
     void UpdateStageFields(ID3DBlob* blob, int stage) noexcept;
+
+    void UpdateStageResources(ID3DBlob* blob) noexcept;
 
     // -----------------------------------------------------------------------------------------
     // Uniform setters — same signatures as OGL, return int (was GLint)

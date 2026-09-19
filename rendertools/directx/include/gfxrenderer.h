@@ -31,6 +31,7 @@ class GfxRenderer
 private:
     CommandList*    m_cmdList{ nullptr };
     CommandList*    m_temporaryList{ nullptr };
+    uint64_t        m_temporaryExecution{ 0 };
 
 protected:
     ::RenderStates  m_renderStates;

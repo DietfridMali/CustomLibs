@@ -11,6 +11,9 @@
 #include "resource_handler.h"
 #include "tracy_wrapper.h"
 
+#include <cstdio>
+#include <cstring>
+
 // =================================================================================================
 // DX12 RenderTarget implementation
 
@@ -66,7 +69,7 @@ void BufferInfo::Init(void)
     for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
         m_arrayRtv[layer].Handle() = {};
     m_arrayRtv.Destroy();
-    m_state = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    m_state = kShaderReadState;
     m_type = btColor;
     m_hasStencil = false;
     m_isArray = false;
@@ -286,7 +289,7 @@ bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, i
     auto* list = m_cmdList->GfxList();
 
     if (list)
-        info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        info.SetState(m_cmdList, kShaderReadState);
     return true;
 }
 
@@ -294,7 +297,7 @@ bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, i
 bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
     info.m_colorFormat = m_colorFormat;
-    info.m_isArray = m_arrayLayerCount > 0;
+    info.m_isArray = (info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0);
     D3D12_CLEAR_VALUE cv{};
     cv.Format = info.ViewFormat();
     int arraySize = info.m_isArray ? m_arrayLayerCount : 1;
@@ -309,12 +312,12 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
         if (not info.AllocArrayViews(m_arrayLayerCount))
             return false;
     }
-    else if (not info.AllocSRV())
+    else if (not (info.AllocSRV() and info.AllocRTV()))
         return false;
 
     auto* list = m_cmdList->GfxList();
     if (list)
-        info.SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        info.SetState(m_cmdList, kShaderReadState);
     return true;
 }
 
@@ -411,6 +414,13 @@ bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
             if (not CreateColorBuffer(device, info, w, h))
                 return false;
         }
+#if DBG_DIRECTX
+        if (info.m_resource) {
+            char name[160];
+            snprintf(name, sizeof(name), "RenderTarget[%s] buffer %d type %d", (const char*)m_name, bufferIndex, int(bufferType));
+            info.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+        }
+#endif
         ++m_bufferCount;
     }
     return true;
@@ -464,6 +474,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
     if (not m_cmdList or not m_cmdList->Open())
         return false;
+    m_cmdListExecution = m_cmdList->GetExecutionCounter();
 
     int attachmentIndex = 0;
     for (int i = 0; i < m_colorBufferCount; ++i)
@@ -502,7 +513,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 
 bool RenderTarget::AttachBuffer(int bufferIndex)
 {
-    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not IsEnabled())
         return false;
     auto* list = m_cmdList->GfxList();
     if (not list)
@@ -518,22 +529,21 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
 
 bool RenderTarget::DetachBuffer(int bufferIndex)
 {
-    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount))
+    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not IsEnabled())
         return false;
     auto* list = m_cmdList->GfxList();
     if (not list)
         return false;
-    m_bufferInfo[bufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    m_bufferInfo[bufferIndex].SetState(m_cmdList, kShaderReadState);
     return true;
 }
 
 
 void RenderTarget::Destroy(void)
 {
-    if (m_cmdList) {
+    if (IsEnabled())
         m_cmdList->Close();
-        m_cmdList = nullptr;
-    }
+    m_cmdList = nullptr;
     for (int i = 0; i < m_bufferCount; ++i) {
         // Out of the texture slot bookkeeping before the SRV index is handed back - see the note in
         // Texture::Destroy (). The sampling wrappers (m_renderTextures, m_externalTexture) borrow the
@@ -590,53 +600,64 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 
     const D3D12_CPU_DESCRIPTOR_HANDLE* pDSV = nullptr;
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[RT_MAX_COLOR_BUFFERS]{};
+    DXGI_FORMAT formats[RT_MAX_COLOR_BUFFERS]{};
     int count = 0;
+    auto push = [&](D3D12_CPU_DESCRIPTOR_HANDLE rtv, DXGI_FORMAT format) {
+        if (count < RT_MAX_COLOR_BUFFERS) {
+            rtvs[count] = rtv;
+            formats[count] = format;
+            ++count;
+        }
+    };
 
     if (params.drawBufferGroup == dbDepth) {
         for (int i = 0; i < m_colorBufferCount; ++i)
-            m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
         pDSV = ActiveDepthBufferHandle();
     }
     else if (params.drawBufferGroup == dbSingle) {
-        m_drawBufferGroup = dbSingle;
         if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
             return false;
+        m_drawBufferGroup = dbSingle;
         m_activeBufferIndex = params.bufferIndex;
         if (AttachBuffer(params.bufferIndex))
-            rtvs[count++] = m_bufferInfo[params.bufferIndex].RTV().CPUHandle();
+            push(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_bufferInfo[params.bufferIndex].ViewFormat());
         for (int i = 0; i < m_colorBufferCount; ++i)
             if (i != params.bufferIndex)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
+        for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
+            if (j != params.bufferIndex)
+                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
         pDSV = ActiveDepthBufferHandle();
     }
     else {
         m_activeBufferIndex = -1;
         m_drawBufferGroup = (params.drawBufferGroup == dbNone) ? dbAll : params.drawBufferGroup;
         if (m_drawBufferGroup == dbAll) {
-            for (int i = 0; i < m_bufferCount; ++i) {
-                if (m_bufferInfo[i].m_type == BufferInfo::btDepth or m_bufferInfo[i].m_type == BufferInfo::btStencil)
+            for (int i = 0; (i < m_bufferCount) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
+                if ((m_bufferInfo[i].m_type != BufferInfo::btColor) and (m_bufferInfo[i].m_type != BufferInfo::btVertex))
                     continue;
                 if (AttachBuffer(i))
-                    rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
+                    push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
             }
             pDSV = ActiveDepthBufferHandle();
         }
         else if (m_drawBufferGroup == dbColor) {
             for (int i = 0; i < m_colorBufferCount; ++i) {
                 if (AttachBuffer(i))
-                    rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
+                    push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
             }
             pDSV = ActiveDepthBufferHandle();
             for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
         }
         else if (m_drawBufferGroup == dbExtra) {
             int i = 0;
             for (; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
             for (int j = 0; j < m_vertexBufferCount; ++j, ++i) {
                 if (AttachBuffer(i))
-                    rtvs[count++] = m_bufferInfo[i].RTV().CPUHandle();
+                    push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
             }
             pDSV = ActiveDepthBufferHandle();
         }
@@ -652,16 +673,16 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
                 for (int j = 0; (j < listed) and not isTarget; ++j)
                     isTarget = (m_customDrawBuffers[j] == i);
                 if (not isTarget)
-                    m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                    m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
             }
             for (int i = 0; (i < listed) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
                 int bufferIndex = m_customDrawBuffers[i];
                 // An unused slot still occupies its position, or every later output would shift down one
                 // slot. D3D12 needs a real null RTV descriptor for that, hence NullRTV().
                 if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not AttachBuffer(bufferIndex))
-                    rtvs[count++] = NullRTV();
+                    push(NullRTV(), dxColorFormat);
                 else
-                    rtvs[count++] = m_bufferInfo[bufferIndex].RTV().CPUHandle();
+                    push(m_bufferInfo[bufferIndex].RTV().CPUHandle(), m_bufferInfo[bufferIndex].ViewFormat());
             }
             pDSV = ActiveDepthBufferHandle();
         }
@@ -677,8 +698,8 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
     RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
     if ((depthOwner->m_depthBufferIndex >= 0) and pDSV) {
         BufferInfo& di = depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex];
-        if (params.depthMode == dbmReadOnly) {
-            di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        if ((m_depthSource != nullptr) or (params.depthMode == dbmReadOnly)) {
+            di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
             pDSV = di.m_dsvReadOnly.CPUHandleAddress();
         }
         else
@@ -687,10 +708,25 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 
     if (count > 0)
         list->OMSetRenderTargets(count, rtvs, FALSE, pDSV);
-    else if (pDSV)
+    else
         list->OMSetRenderTargets(0, nullptr, FALSE, pDSV);
 
+    for (int i = 0; i < RT_MAX_COLOR_BUFFERS; ++i)
+        m_boundColorFormats[i] = (i < count) ? formats[i] : DXGI_FORMAT_UNKNOWN;
+    m_boundColorCount = count;
+    m_boundDepthFormat = pDSV ? DepthFormat() : DXGI_FORMAT_UNKNOWN;
+    m_cmdList->m_activePSO = nullptr;
     return true;
+}
+
+
+void RenderTarget::FillPipelineFormats(RenderStates& states) const noexcept
+{
+    states.colorTargetCount = uint8_t(m_boundColorCount);
+    states.colorFormat = (m_boundColorCount > 0) ? m_boundColorFormats[0] : DXGI_FORMAT_UNKNOWN;
+    for (int i = 1; i < RenderStates::kColorTargets; ++i)
+        states.mrtFormats[i - 1] = ((i < m_boundColorCount) and (i < RT_MAX_COLOR_BUFFERS)) ? m_boundColorFormats[i] : DXGI_FORMAT_UNKNOWN;
+    states.depthFormat = m_boundDepthFormat;
 }
 
 
@@ -703,7 +739,7 @@ void RenderTarget::SelectCustomDrawBuffers(const CustomDrawBufferList& bufferInd
     // setup has to reach the list NOW, the way the OpenGL backend applies it at once
     // (ApplyCustomDrawBuffers ()) - otherwise the pass keeps drawing into the old set while the PSO
     // already speaks of the new one.
-    if (m_cmdList and m_cmdList->IsRecording())
+    if (IsEnabled())
         SelectDrawBuffers({ .bufferIndex = -1, .drawBufferGroup = dbCustom, .clear = false, .reactivate = true, .depthMode = m_depthMode });
 }
 
@@ -735,20 +771,14 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
     m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
     m_drawBufferGroup = params.drawBufferGroup;
 
-    if (m_cmdList == nullptr) {
+    if (not IsEnabled()) {
         m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
         if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
             return false;
+        m_cmdListExecution = m_cmdList->GetExecutionCounter();
     }
     if (not EnableBuffers(params))
         return false;
-    // The PSO's slot-0 RTV format follows this render target (HDR scene vs RGBA8 screen/UI) - or the
-    // cube map, when one of its faces is the single draw buffer.
-    bool isCubeMap = (params.drawBufferGroup == dbSingle) and (m_bufferInfo[m_activeBufferIndex].m_type == BufferInfo::btCubemap);
-    baseRenderer.RenderStates().colorFormat = isCubeMap ? m_cubeMapFormat : m_colorFormat;
-    // Same for the DSV format: with a stencil plane it is the combined one. A shared depth source
-    // (SetDepthSource) is the buffer that actually gets bound, so it decides.
-    baseRenderer.RenderStates().depthFormat = DepthFormat();
     return true;
 }
 
@@ -819,11 +849,11 @@ void RenderTarget::Disable(bool deactivate) noexcept {
         if (list) {
             list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
             for (int i = 0; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
             for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
-                m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
             for (int i = 0, j = m_cubeMapIndex; i < m_cubeMapCount; ++i, ++j)
-                m_bufferInfo[j].SetState(m_cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
             // The depth buffer is an RT output too: the deferred shadow (and the soft-particle / WBOIT pass)
             // sample it as an SRV to reconstruct world position. Colour + MRT above were made shader-readable
             // but the depth was missed -> a sampled depth left in DEPTH_WRITE reads as garbage on D3D12, so the
@@ -831,21 +861,11 @@ void RenderTarget::Disable(bool deactivate) noexcept {
             // it to a read+sample state too; a later depth-write pass restores DEPTH_WRITE via the depthOwner
             // block in SelectDrawBuffers. (An RT with a shared depth source has m_depthBufferIndex < 0 -> skip.)
             if (m_depthBufferIndex >= 0)
-                m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        }
-        // Hand all allocated RTV slots over to GfxResourceHandler - freed once the slot's GPU
-        // work is fenced complete (at next BeginFrame for the same frame slot, or via Flush()).
-        if (deactivate) {
-            for (int i = 0; i < m_bufferCount; ++i) {
-                if (m_bufferInfo[i].RTV().IsValid()) {
-                    gfxResourceHandler.Track(m_bufferInfo[i].RTV().Handle());
-                    m_bufferInfo[i].RTV().Handle() = {};
-                }
-            }
+                m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
         }
         m_cmdList->Close(deactivate);
-        m_cmdList = nullptr;
     }
+    m_cmdList = nullptr;
 }
 
 
@@ -951,6 +971,8 @@ static bool IsDrawBuffer(RenderTarget& rt, int i)
 
 void RenderTarget::Fill(RGBAColor color)
 {
+    if (not IsEnabled())
+        return;
     auto* list = m_cmdList->GfxList();
     if (not list)
         return;
@@ -963,25 +985,20 @@ void RenderTarget::Fill(RGBAColor color)
 
 void RenderTarget::Clear(const RTActivationParams& params)
 {
-    if (not params.clear)
+    if (not params.clear or not IsEnabled())
         return;
     auto* list = m_cmdList->GfxList();
     if (not list)
         return;
-    if (params.bufferIndex < 0) {
-        // Clear color AND worldPos/normal MRT (btVertex) buffers, matching Vulkan (loadOp=CLEAR
-        // for color+vertex in dbAll) and OGL (glClear over all active draw buffers). Iterating
-        // only m_colorBufferCount left the btVertex buffers uncleared, so stale world positions
-        // persisted where moving geometry (e.g. an opening door) vacated pixels - the decal pass
-        // then mapped those stale positions into its volume and smeared the decal along the motion.
-        // Only the draw buffers of the current group (IsDrawBuffer ()).
-        for (int i = 0; i < m_bufferCount; ++i) {
-            if (IsDrawBuffer(*this, i))
-                list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
-        }
-    }
-    else if ((params.bufferIndex < m_colorBufferCount) and IsDrawBuffer(*this, params.bufferIndex)) {
-        list->ClearRenderTargetView(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
+    // Clear color AND worldPos/normal MRT (btVertex) buffers, matching Vulkan (loadOp=CLEAR
+    // for color+vertex in dbAll) and OGL (glClear over all active draw buffers). Iterating
+    // only m_colorBufferCount left the btVertex buffers uncleared, so stale world positions
+    // persisted where moving geometry (e.g. an opening door) vacated pixels - the decal pass
+    // then mapped those stale positions into its volume and smeared the decal along the motion.
+    // Only the draw buffers of the current group (IsDrawBuffer ()).
+    for (int i = 0; i < m_bufferCount; ++i) {
+        if (IsDrawBuffer(*this, i))
+            list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
     }
     // A read-only depth activation must not clear depth: ClearDepthStencilView needs the writable DSV and
     // DEPTH_WRITE state, neither of which holds in dbmReadOnly.
@@ -1010,6 +1027,8 @@ Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex
 
 void RenderTarget::ClearColorBuffers(void)
 {
+    if (not IsEnabled())
+        return;
     for (int i = 0; i < m_bufferCount; ++i)
         if (IsDrawBuffer(*this, i))
             gfxStates.ClearColorBuffers(m_bufferInfo[i].RTV().CPUHandle());
@@ -1018,7 +1037,7 @@ void RenderTarget::ClearColorBuffers(void)
 
 void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
 {
-    auto* list = m_cmdList ? m_cmdList->GfxList() : nullptr;
+    auto* list = IsEnabled() ? m_cmdList->GfxList() : nullptr;
     if (not list)
         return;
     if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
@@ -1032,7 +1051,7 @@ void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
 
 void RenderTarget::ClearDepthBuffer(float clearValue)
 {
-    if (HaveDepthBuffer(true))
+    if (IsEnabled() and HaveDepthBuffer(true) and (m_depthMode != dbmReadOnly))
         gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
 }
 
@@ -1041,7 +1060,7 @@ void RenderTarget::ClearStencilBuffer(int clearValue)
 {
     // Gated on an own stencil PLANE, not just on a depth buffer: without one the clear would address a
     // plane the DSV does not have.
-    if (HaveStencilBuffer(true))
+    if (IsEnabled() and HaveStencilBuffer(true) and (m_depthMode != dbmReadOnly))
         gfxStates.ClearStencilBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
 }
 
@@ -1084,9 +1103,10 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
         if (not hdl.IsValid())
             return nullptr;
         m_shadowTexture.m_handle = hdl.index;
+        m_shadowTexture.m_ownedHandle = hdl.index;
     }
     D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = dxDepthSRVFormat;   // R32_FLOAT view of the R32-typeless depth resource
+    srvDesc.Format = info.ViewFormat();
     srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
@@ -1260,6 +1280,13 @@ bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, 
     if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
                                                D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
         return false;
+#if DBG_DIRECTX
+    {
+        char name[160];
+        snprintf(name, sizeof(name), "RenderTarget[%s] ReadBuffer readback", (const char*)m_name);
+        readback->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+    }
+#endif
 
     // A list of its OWN, not whatever list is current (StartOperation () would hand that out, and it keeps
     // recording until the frame ends): the copy has to be CLOSED to go out. It closes last, so it runs
@@ -1407,6 +1434,13 @@ bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSiz
     if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadDesc,
                                                D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
         return false;
+#if DBG_DIRECTX
+    {
+        char name[160];
+        snprintf(name, sizeof(name), "RenderTarget[%s] WriteBuffer upload", (const char*)m_name);
+        upload->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+    }
+#endif
 
     uint8_t* dest = nullptr;
     D3D12_RANGE readRange{ 0, 0 };   // nothing is read back from this one

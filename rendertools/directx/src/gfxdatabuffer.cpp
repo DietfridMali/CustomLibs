@@ -186,10 +186,27 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
 }
 
 
+void GfxDataBuffer::Clear(void) noexcept
+{
+    for (auto& r : m_resource) {
+        if (r)
+            gfxResourceHandler.Track(r);
+        r.Reset();
+    }
+    m_vbv = {};
+    m_ibv = {};
+    m_id  = 0;
+    m_isDynamic = true;
+}
+
+
 void GfxDataBuffer::Destroy(void) noexcept
 {
-    for (auto& r : m_resource)
+    for (auto& r : m_resource) {
+        if (r)
+            gfxResourceHandler.Track(r);
         r.Reset();
+    }
     m_vbv = {};
     m_ibv = {};
     m_size = 0;

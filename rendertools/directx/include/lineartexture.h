@@ -70,7 +70,7 @@ public:
             return false;
 
         // (Re-)create a Texture2D with height=1
-        m_resource.Reset();
+        ReleaseResource();
         D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
         D3D12_RESOURCE_DESC rd{};
         rd.Dimension        = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -95,12 +95,8 @@ public:
             return false;
 
         // Create / update SRV
-        if (m_handle == UINT32_MAX) {
-            DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-            if (not hdl.IsValid())
-                return false;
-            m_handle = hdl.index;
-        }
+        if (not AllocateHandle())
+            return false;
 
         D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
         srvDesc.Format                    = GfxTexTraits<DATA_T>::format;

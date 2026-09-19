@@ -24,7 +24,7 @@
 //   kMaxSetsPerPool      — how many distinct VkDescriptorSet objects per frame
 //   kMaxUbosPerPool      — UNIFORM_BUFFER_DYNAMIC slot count (b0/b1 per stage)
 //   kMaxImagesPerPool    — COMBINED_IMAGE_SAMPLER slot count (t0..t15 per draw)
-//   kMaxStoragePerPool   — STORAGE_BUFFER slot count (u0..u3 + t0..t18 space1 per draw)
+//   kMaxStoragePerPool   — STORAGE_BUFFER slot count (u0..u3 + t0..t19 space1 per draw)
 //
 // Singleton, created from Application::InitGraphics() after VKContext is up, before BeginFrame.
 
@@ -36,7 +36,7 @@ public:
     static constexpr uint32_t kMaxUbosPerPool = kMaxSetsPerPool * 6;
     static constexpr uint32_t kMaxSampledImagesPerPool = 8192;  // t0..t15 per draw
     static constexpr uint32_t kMaxSamplersPerPool = 8192;       // s0..s15 per draw
-    static constexpr uint32_t kMaxStoragePerPool = kMaxSetsPerPool * 23;  // u0..u3 + t0..t18 space1 per set (StorageBuffer)
+    static constexpr uint32_t kMaxStoragePerPool = kMaxSetsPerPool * 24;  // u0..u3 + t0..t19 space1 per set (StorageBuffer)
     static constexpr uint32_t kMaxStorageImagesPerPool = 256;   // u0..u3 per draw (StorageImage, e.g. TSP sky-map target)
 
     VkDevice         m_device       { VK_NULL_HANDLE };
