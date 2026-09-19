@@ -303,7 +303,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target,
                                                args.data(), uint32_t(args.size()),
                                                spirvOut, error,
-                                               shaderFolder, m_name + String(".") + String(target) + String(".spv"))) {
+                                               shaderFolder, m_name + String(".") + String(target) + String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
         fprintf(stderr, "Shader '%s': compile failed (entry=%s, target=%s):\n%s\n",
                 (const char*)m_name, entryPoint, target, (const char*)error);
         return false;

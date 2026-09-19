@@ -103,7 +103,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
     if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, "cs_6_0",
                                                kComputeBindArgs, kComputeBindArgCount,
                                                spirvOut, error,
-                                               shaderFolder, m_name + String(".cs_6_0.spv"))) {
+                                               shaderFolder, m_name + String(".cs_6_0") + String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
         fprintf(stderr, "ComputeShader '%s': compile failed (entry=%s):\n%s\n",
                 (const char*)m_name, entryPoint, (const char*)error);
         return false;

@@ -64,6 +64,14 @@ std::wstring ToWide(const char* utf8) noexcept {
 
 }  // namespace
 
+#ifdef _DEBUG
+static constexpr const char* kOptimizationLevel = "-Od";
+static constexpr const wchar_t* kOptimizationArg = L"-Od";
+#else
+static constexpr const char* kOptimizationLevel = "-O3";
+static constexpr const wchar_t* kOptimizationArg = L"-O3";
+#endif
+
 
 bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const String& shaderFolder)
 {
@@ -84,14 +92,13 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
         L"-Zpc",        // column-major matrices
         L"-Wno-ignored-attributes",
 #ifdef _DEBUG
-        L"-Zi", L"-Od",
-#else
-        L"-O3",
+        L"-Zi",
 #endif
+        kOptimizationArg,
     };
 
     const bool useCache = not shaderFolder.IsEmpty();
-    const String fileName = m_name + String(".cs_6_0.dxil");
+    const String fileName = m_name + String(".cs_6_0") + String(kOptimizationLevel) + String(".dxil");
     uint64_t key = 0;
     if (useCache) {
         key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslCode);

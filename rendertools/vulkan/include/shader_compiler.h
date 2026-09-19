@@ -20,6 +20,14 @@
 
 namespace ShaderCompiler
 {
+#ifdef _DEBUG
+    inline constexpr const char* kOptimizationLevel = "-Od";
+    inline constexpr const wchar_t* kOptimizationArg = L"-Od";
+#else
+    inline constexpr const char* kOptimizationLevel = "-O3";
+    inline constexpr const wchar_t* kOptimizationArg = L"-O3";
+#endif
+
     // Loads dxcompiler.dll (delay-loaded by linker), creates IDxcUtils + IDxcCompiler3 singletons.
     // Idempotent — repeat calls are no-ops. Returns false on any error.
     bool Initialize(void) noexcept;

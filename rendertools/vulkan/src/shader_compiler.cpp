@@ -164,9 +164,7 @@ bool CompileHlslToSpirv(const char* hlslSource,
     args.push_back(entryWide.c_str());
     args.push_back(L"-T");
     args.push_back(targetWide.c_str());
-#ifndef _DEBUG
-    args.push_back(L"-O3");
-#endif
+    args.push_back(kOptimizationArg);
     for (uint32_t i = 0; i < extraArgsCount; ++i)
         args.push_back(extraArgs[i]);
 

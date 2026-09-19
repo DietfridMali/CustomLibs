@@ -130,6 +130,14 @@ static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
 
 // =================================================================================================
 
+#ifdef _DEBUG
+static constexpr const char* kOptimizationLevel = "-Od";
+static constexpr const wchar_t* kOptimizationArg = L"-Od";
+#else
+static constexpr const char* kOptimizationLevel = "-O3";
+static constexpr const wchar_t* kOptimizationArg = L"-O3";
+#endif
+
 bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut, const String& shaderFolder)
 {
     if (not hlslCode or not *hlslCode)
@@ -157,13 +165,11 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     args.push_back(L"-Wno-ignored-attributes");
 #ifdef _DEBUG
     args.push_back(L"-Zi");
-    args.push_back(L"-Od");
-#else
-    args.push_back(L"-O3");
 #endif
+    args.push_back(kOptimizationArg);
 
     const bool useCache = not shaderFolder.IsEmpty();
-    const String fileName = m_name + String(".") + String(target) + String(".dxil");
+    const String fileName = m_name + String(".") + String(target) + String(kOptimizationLevel) + String(".dxil");
     uint64_t key = 0;
     if (useCache) {
         key = CompileKey(hlslCode, args);
