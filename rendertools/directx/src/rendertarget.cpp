@@ -1153,7 +1153,7 @@ bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params
     bool deactivate = false;
     if (params.destination >= 0) {
         deactivate = not IsActive();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = params.clearBuffer, .reactivate = not deactivate }))
+        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = params.clearBuffer, .reactivate = not deactivate, .depthMode = params.depthMode }))
             return false;
         m_lastDestination = params.destination;
         //gfxStates.SetBlending(0);

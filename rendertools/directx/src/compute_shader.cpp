@@ -324,8 +324,6 @@ void ComputeShader::ReflectB1Fields(void) noexcept
             ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
             D3D12_SHADER_VARIABLE_DESC vd{};
             var->GetDesc(&vd);
-            if (not (vd.uFlags & D3D_SVF_USED))
-                continue;
             bool found = false;
             for (auto& kv : m_b1Fields)
                 if (kv.first == String(vd.Name)) {

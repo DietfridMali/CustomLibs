@@ -18,6 +18,7 @@ const ShaderSource& OutlineShader() {
             uniform sampler2D surface;
             uniform vec4 outlineColor;
             uniform float outlineWidth;
+            uniform vec2 texelSize;
             //uniform float premultiply;
             void main() {
                 vec4 color = texture(surface, fragCoord);
@@ -26,7 +27,6 @@ const ShaderSource& OutlineShader() {
                     return;
                 }
                 float alpha = 0.0;
-                vec2 texelSize = 1.0 / vec2(textureSize(surface, 0));
                 float dx = outlineWidth * texelSize.x;
                 int r = int(outlineWidth);
                 for (int x = r; x >= 0; x--, dx -= texelSize.x) {

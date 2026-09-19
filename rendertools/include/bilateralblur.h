@@ -2,6 +2,7 @@
 
 #include "shader.h"
 #include "vector.hpp"
+#include "gfxrenderer.h"
 
 // =================================================================================================
 // The parameters of the shared bilateral blur (the "bilateralBlur" shader, blur_shader.cpp).
@@ -37,22 +38,17 @@ struct BilateralBlurParams {
 // Sets everything the shader reads. The caller deploys it and binds the textures itself - the two
 // projects reach their shader handler through different types, and which target a texture sits on is
 // nothing this could know.
-//
-// The sampler units matter to OpenGL only - the HLSL sources bind their textures by register, so there
-// is no constant of that name there. Setting one all the same is what the callers have always done
-// with flipVertically, which the HLSL sources do not have either: a name the shader does not know is
-// dropped. Asking the API type instead would mean UsesOpenGL () from gfxapitype.h, and that one cannot
-// answer here - gfxApiType is declared "inline static", so every translation unit carries its OWN copy
-// and the library's is not the application's. That is why the app asks its renderer, not a free
-// function.
 
 inline void SetupBilateralBlur(Shader* pShader, const BilateralBlurParams& params) {
     if (pShader == nullptr)
         return;
-    pShader->SetInt("surface", 0);
-    pShader->SetInt("uWorldNormals", 1);
-    pShader->SetInt("uWorldPositions", 2);
-    pShader->SetInt("uSceneDepth", 3);
+    if (baseRenderer.UsesOpenGL()) {
+        pShader->SetInt("surface", 0);
+        pShader->SetInt("uWorldNormals", 1);
+        pShader->SetInt("uWorldPositions", 2);
+        pShader->SetInt("uSceneDepth", 3);
+        pShader->SetInt("flipVertically", params.flipVertically ? 1 : 0);
+    }
     pShader->SetVector2f("texelSize", params.texelSize);
     pShader->SetFloat("direction", params.direction);
     pShader->SetInt("radius", params.radius);
@@ -60,7 +56,6 @@ inline void SetupBilateralBlur(Shader* pShader, const BilateralBlurParams& param
     pShader->SetFloat("posSigma", params.posSigma);
     pShader->SetInt("distanceSource", params.distanceSource);
     pShader->SetVector2f("projDepth", params.projDepth);
-    pShader->SetInt("flipVertically", params.flipVertically ? 1 : 0);
 }
 
 // =================================================================================================

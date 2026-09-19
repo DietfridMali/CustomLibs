@@ -193,6 +193,7 @@ public:
         float rotation{ 0.0f };
         float scale{ 1.0f };
         Shader* shader{ nullptr };
+        eDepthBufferMode depthMode{ dbmWrite };
     };
 
     struct RTActivationParams {

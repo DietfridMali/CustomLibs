@@ -554,8 +554,6 @@ void Shader::UpdateStageFields(ID3DBlob* blob, int stage) noexcept
                 ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
                 D3D12_SHADER_VARIABLE_DESC vd{};
                 var->GetDesc(&vd);
-                if (not (vd.uFlags & D3D_SVF_USED))
-                    continue;
                 bool found = false;
                 for (auto& kv : sc.fields)
                     if (kv.first == String(vd.Name)) {
