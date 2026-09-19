@@ -199,6 +199,11 @@ void GfxRenderer::SavePipelineCache(void) {
     pipelineCache.Save();
 }
 
+
+void GfxRenderer::PrecreatePipelines(void) {
+    pipelineCache.Precreate();
+}
+
 // =================================================================================================
 // The current swap chain image, as DrawScreen () left it - so call this before the present. The copy
 // goes through a host visible readback buffer on a one shot command buffer, the way

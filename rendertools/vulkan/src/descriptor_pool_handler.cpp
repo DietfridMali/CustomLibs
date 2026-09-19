@@ -3,6 +3,9 @@
 
 #include <cstdio>
 
+extern double VkStallClock(void) noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+
 // =================================================================================================
 // DescriptorPoolHandler
 
@@ -87,9 +90,13 @@ VkDescriptorPool DescriptorPoolHandler::NextPool(void) noexcept
     if (used == overflow.size()) {
         VkDescriptorPool pool = VK_NULL_HANDLE;
 
+        double stallStart = VkStallClock();
         if (not CreatePool(pool))
             return VK_NULL_HANDLE;
         overflow.push_back(pool);
+        char detail[64];
+        snprintf(detail, sizeof(detail), "overflow pool %u of frame slot %u", uint32_t(overflow.size()), m_currentFrame);
+        VkStallEvent("descriptor pool create", stallStart, detail);
     }
     return overflow[used++];
 }

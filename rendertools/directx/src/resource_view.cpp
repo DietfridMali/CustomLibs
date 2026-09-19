@@ -59,6 +59,7 @@ bool SRV::CreateCube(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
     srvd.TextureCube.MipLevels = 1;
     srvd.TextureCube.ResourceMinLODClamp = 0.0f;
     dx12Context.Device()->CreateShaderResourceView(resource.Get(), &srvd, CPUHandle());
+    descriptorHeaps.m_srvHeap.Publish(GetIndex());
     return true;
 }
 
@@ -79,6 +80,7 @@ bool SRV::CreateArray(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format, int l
     srvd.Texture2DArray.PlaneSlice = 0;
     srvd.Texture2DArray.ResourceMinLODClamp = 0.0f;
     dx12Context.Device()->CreateShaderResourceView(resource.Get(), &srvd, CPUHandle());
+    descriptorHeaps.m_srvHeap.Publish(GetIndex());
     return true;
 }
 
@@ -94,6 +96,7 @@ bool SRV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
     srvd.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
     srvd.Texture2D.MipLevels = 1;
     dx12Context.Device()->CreateShaderResourceView(resource.Get(), &srvd, CPUHandle());
+    descriptorHeaps.m_srvHeap.Publish(GetIndex());
     return true;
 }
 
@@ -137,6 +140,7 @@ bool UAV::Create(ComPtr<ID3D12Resource> resource, DXGI_FORMAT format)
     uavd.Texture2D.MipSlice = 0;
     uavd.Texture2D.PlaneSlice = 0;
     dx12Context.Device()->CreateUnorderedAccessView(resource.Get(), nullptr, &uavd, CPUHandle());
+    descriptorHeaps.m_srvHeap.Publish(GetIndex());
     return true;
 }
 

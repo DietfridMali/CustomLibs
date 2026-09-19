@@ -70,6 +70,14 @@ class CommandList
 {
 public:
     static constexpr UINT FRAME_COUNT = 2;
+    static constexpr uint32_t kSrvSlots     = 16;
+    static constexpr uint32_t kSamplerSlots = 16;
+    static constexpr uint32_t kUavSlots     = 4;
+    static constexpr uint32_t kSsboSlots    = 19;
+    static constexpr int      kTableSrv     = 0;
+    static constexpr int      kTableUav     = 1;
+    static constexpr int      kTableSsbo    = 2;
+    static constexpr int      kTableCount   = 3;
 
     ComPtr<ID3D12GraphicsCommandList>   m_gfxListPtr{ nullptr };
     ComPtr<ID3D12CommandAllocator>      m_allocators[FRAME_COUNT];
@@ -87,6 +95,8 @@ public:
     ID3D12RootSignature*                m_activeRootSignature{ nullptr };
     uint8_t                             m_activeTopology{ uint8_t(MeshTopology::Triangles) };
     bool                                m_descriptorHeapsBound{ false };  // SetDescriptorHeaps issued since this list's Open()
+    uint64_t                            m_appliedTables[kTableCount]{};
+    uint32_t                            m_appliedSamplers[kSamplerSlots]{};
     tracy::D3D12ZoneScope*              m_gpuZone{ nullptr };   // per-CL GPU profiling zone; spans Open()..Close() (USE_TRACY)
 
     static List<RenderStates>           m_renderStateStack;
@@ -165,6 +175,8 @@ public:
     // state and only needs to be issued once after Open() — the flag is cleared there.
     void BindDescriptorHeaps(void) noexcept;
 
+    void ResetAppliedBindings(void) noexcept;
+
 #if DBG_DIRECTX
     void CheckDeviceRemoved(const char* context) noexcept;
 #endif
@@ -201,7 +213,33 @@ public:
     TracyD3D12Ctx                           m_gpuProfilerCtx{ nullptr };   // Tracy D3D12 GPU-timestamp context; nullptr when USE_TRACY=0
     uint64_t                                m_closedQueryCount{ 0 };
 
+    struct BuiltTable {
+        uint64_t                    version{ 0 };
+        uint64_t                    generation{ 0 };
+        D3D12_GPU_DESCRIPTOR_HANDLE gpu{ 0 };
+    };
+
+    uint32_t                                m_boundSrvs[CommandList::kSrvSlots]{};
+    uint32_t                                m_boundSamplers[CommandList::kSamplerSlots]{};
+    uint32_t                                m_boundStorageBuffers[CommandList::kUavSlots]{};
+    uint32_t                                m_boundReadOnlyBuffers[CommandList::kSsboSlots]{};
+    uint64_t                                m_bindingVersions[CommandList::kTableCount]{};
+    uint64_t                                m_bindingVersionCounter{ 0 };
+    BuiltTable                              m_builtTables[CommandList::kTableCount];
+
     bool Create(ID3D12Device* device) noexcept;
+
+    void ResetBindings(void) noexcept;
+
+    void BindSampledImage(uint32_t slot, uint32_t srvIndex) noexcept;
+
+    void BindSampler(uint32_t slot, uint32_t samplerSlot) noexcept;
+
+    void BindStorageBuffer(uint32_t slot, uint32_t uavIndex) noexcept;
+
+    void BindReadOnlyBuffer(uint32_t slot, uint32_t srvIndex) noexcept;
+
+    bool ApplyBindings(void) noexcept;
 
     void Destroy(void) noexcept;
 

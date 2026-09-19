@@ -3,10 +3,16 @@
 #include "shader.h"
 #include "vkcontext.h"
 #include "shadercache.h"
+#include "base_shaderhandler.h"
 
 #include <cstdio>
 #include <cstring>
 #include <vector>
+
+extern double VkStallClock(void) noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+
+static constexpr uint32_t kPipelineRecordVersion = 1;
 
 // =================================================================================================
 // PipelineCache
@@ -57,6 +63,7 @@ void PipelineCache::Destroy(void) noexcept
 bool PipelineCache::Load(const String& shaderFolder)
 {
     m_folder = shaderFolder;
+    LoadRecords();
     if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
         return false;
     std::vector<uint8_t> data;
@@ -89,6 +96,7 @@ bool PipelineCache::Load(const String& shaderFolder)
 
 bool PipelineCache::Save(void)
 {
+    SaveRecords();
     if (m_folder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
         return false;
     size_t size = 0;
@@ -103,11 +111,14 @@ bool PipelineCache::Save(void)
 }
 
 
-VkPipeline PipelineCache::GetOrCreate(const PipelineKey& key) noexcept
+VkPipeline PipelineCache::GetOrCreate(const PipelineKey& requestedKey) noexcept
 {
+    PipelineKey key = requestedKey;
+    NormalizeKey(key);
     if (VkPipeline* found = m_cache.Find(key))
         return *found;
 
+    double stallStart = VkStallClock();
     VkPipeline pipeline = BuildPipeline(key);
     if (pipeline == VK_NULL_HANDLE)
         return VK_NULL_HANDLE;
@@ -115,7 +126,168 @@ VkPipeline PipelineCache::GetOrCreate(const PipelineKey& key) noexcept
     m_cache.Insert(key, pipeline);
     m_pipelines.Append(pipeline);
     m_keys.Append(key);
+    Remember(key);
+    char detail[256];
+    snprintf(detail, sizeof(detail), "%sshader '%s', pipeline #%d, colors %u, blend %d, depth test %d write %d, stencil %d, cull %d",
+             m_precreating ? "precreate " : "LAZY ", static_cast<const char*>(key.shader->m_name), int(m_pipelines.Length()),
+             key.colorFormatCount, int(key.states.blendEnable[0]), int(key.states.depthTest), int(key.states.depthWrite),
+             int(key.states.stencilTest), int(key.states.faceCulling));
+    VkStallEvent("pipeline build", stallStart, detail);
     return pipeline;
+}
+
+
+void PipelineCache::NormalizeKey(PipelineKey& key) noexcept
+{
+    const RenderStates defaults { };
+    RenderStates& s = key.states;
+
+    s.stencilRef = defaults.stencilRef;
+    s.scissorTest = defaults.scissorTest;
+    if (not s.faceCulling)
+        s.cullMode = defaults.cullMode;
+    if (not s.depthTest) {
+        s.depthWrite = 0;
+        s.depthFunc = defaults.depthFunc;
+    }
+    if (not s.stencilTest) {
+        s.stencilFunc = defaults.stencilFunc;
+        s.stencilSFail = defaults.stencilSFail;
+        s.stencilDPFail = defaults.stencilDPFail;
+        s.stencilDPPass = defaults.stencilDPPass;
+        s.stencilBackSFail = defaults.stencilBackSFail;
+        s.stencilBackDPFail = defaults.stencilBackDPFail;
+        s.stencilBackDPPass = defaults.stencilBackDPPass;
+        s.stencilMask = defaults.stencilMask;
+        s.stencilWriteMask = defaults.stencilWriteMask;
+    }
+    if (key.colorFormatCount <= 1)
+        s.independentBlend = 0;
+    int blendTargets = 0;
+    if (key.colorFormatCount > 0)
+        blendTargets = s.independentBlend ? int(key.colorFormatCount) : 1;
+    for (int i = 0; i < RenderStates::kColorTargets; ++i) {
+        bool isUsed = (i < blendTargets);
+        if (not isUsed) {
+            s.blendEnable[i] = defaults.blendEnable[i];
+            s.colorMask[i] = defaults.colorMask[i];
+        }
+        if (not (isUsed and s.blendEnable[i])) {
+            s.blendSrcRGB[i] = defaults.blendSrcRGB[i];
+            s.blendDstRGB[i] = defaults.blendDstRGB[i];
+            s.blendSrcAlpha[i] = defaults.blendSrcAlpha[i];
+            s.blendDstAlpha[i] = defaults.blendDstAlpha[i];
+            s.blendOpRGB[i] = defaults.blendOpRGB[i];
+            s.blendOpAlpha[i] = defaults.blendOpAlpha[i];
+        }
+    }
+}
+
+
+void PipelineCache::Remember(const PipelineKey& key) noexcept
+{
+    PipelineRecord record { };
+    record.states = key.states;
+    std::memcpy(record.colorFormats, key.colorFormats, sizeof(record.colorFormats));
+    record.colorFormatCount = key.colorFormatCount;
+    record.depthFormat = key.depthFormat;
+    for (int i = 0; i < m_records.Length(); ++i) {
+        if ((m_recordNames[i] == key.shader->m_name) and (std::memcmp(&m_records[i], &record, sizeof(PipelineRecord)) == 0))
+            return;
+    }
+    m_recordNames.Append(key.shader->m_name);
+    m_records.Append(record);
+    m_recordsDirty = true;
+}
+
+
+static uint64_t PipelineRecordFileKey(void) noexcept
+{
+    uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, "pipelinekeys.vulkan");
+    key = ShaderCache::Hash(key, &kPipelineRecordVersion, sizeof(kPipelineRecordVersion));
+    uint64_t recordSize = uint64_t(sizeof(PipelineRecord));
+    return ShaderCache::Hash(key, &recordSize, sizeof(recordSize));
+}
+
+
+bool PipelineCache::LoadRecords(void)
+{
+    m_recordNames.Reset();
+    m_records.Reset();
+    m_recordsDirty = false;
+    if (m_folder.IsEmpty())
+        return false;
+    std::vector<uint8_t> payload;
+    uint32_t tag = 0;
+    if (not ShaderCache::Read(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), payload, tag))
+        return false;
+    size_t offset = 0;
+    while (offset + sizeof(uint32_t) <= payload.size()) {
+        uint32_t nameLength = 0;
+        std::memcpy(&nameLength, payload.data() + offset, sizeof(nameLength));
+        offset += sizeof(nameLength);
+        if (offset + size_t(nameLength) + sizeof(PipelineRecord) > payload.size())
+            break;
+        String name(reinterpret_cast<const char*>(payload.data() + offset), size_t(nameLength));
+        offset += size_t(nameLength);
+        PipelineRecord record { };
+        std::memcpy(&record, payload.data() + offset, sizeof(PipelineRecord));
+        offset += sizeof(PipelineRecord);
+        m_recordNames.Append(name);
+        m_records.Append(record);
+    }
+    return true;
+}
+
+
+bool PipelineCache::SaveRecords(void)
+{
+    if (m_folder.IsEmpty() or not m_recordsDirty)
+        return false;
+    std::vector<uint8_t> payload;
+    for (int i = 0; i < m_records.Length(); ++i) {
+        const char* name = static_cast<const char*>(m_recordNames[i]);
+        uint32_t nameLength = uint32_t(std::strlen(name));
+        const uint8_t* lengthBytes = reinterpret_cast<const uint8_t*>(&nameLength);
+        payload.insert(payload.end(), lengthBytes, lengthBytes + sizeof(nameLength));
+        payload.insert(payload.end(), reinterpret_cast<const uint8_t*>(name), reinterpret_cast<const uint8_t*>(name) + nameLength);
+        const uint8_t* recordBytes = reinterpret_cast<const uint8_t*>(&m_records[i]);
+        payload.insert(payload.end(), recordBytes, recordBytes + sizeof(PipelineRecord));
+    }
+    if (not ShaderCache::Write(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), 0, payload.data(), payload.size()))
+        return false;
+    m_recordsDirty = false;
+    return true;
+}
+
+
+void PipelineCache::Precreate(void) noexcept
+{
+    double stallStart = VkStallClock();
+    int pipelineCount = m_pipelines.Length();
+    int withoutShader = 0;
+    int failed = 0;
+    m_precreating = true;
+    for (int i = 0; i < m_records.Length(); ++i) {
+        Shader* shader = baseShaderHandler.GetShader(m_recordNames[i]);
+        if (shader == nullptr) {
+            ++withoutShader;
+            continue;
+        }
+        PipelineKey key { };
+        key.shader = shader;
+        key.states = m_records[i].states;
+        std::memcpy(key.colorFormats, m_records[i].colorFormats, sizeof(key.colorFormats));
+        key.colorFormatCount = m_records[i].colorFormatCount;
+        key.depthFormat = m_records[i].depthFormat;
+        if (GetOrCreate(key) == VK_NULL_HANDLE)
+            ++failed;
+    }
+    m_precreating = false;
+    char detail[128];
+    snprintf(detail, sizeof(detail), "%d records, %d built, %d without shader, %d failed",
+             int(m_records.Length()), int(m_pipelines.Length()) - pipelineCount, withoutShader, failed);
+    VkStallEvent("pipeline precreate", stallStart, detail);
 }
 
 

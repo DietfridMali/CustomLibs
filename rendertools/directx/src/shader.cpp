@@ -253,17 +253,18 @@ bool Shader::CreateRootSignature(void) noexcept
     if (not device)
         return false;
 
-    // Params kSrvBase..kSrvBase+15: one 1-entry descriptor table per texture slot (t0..t15).
-    // Each slot is bound independently in Texture::Bind(tmuIndex) via
-    // SetGraphicsRootDescriptorTable(kSrvBase + tmuIndex, ...).
-    D3D12_DESCRIPTOR_RANGE srvRanges[kSrvSlots]{};
-    for (int i = 0; i < kSrvSlots; ++i) {
-        srvRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        srvRanges[i].NumDescriptors = 1;
-        srvRanges[i].BaseShaderRegister = UINT(i); // t0, t1, ...
-        srvRanges[i].RegisterSpace = 0;
-        srvRanges[i].OffsetInDescriptorsFromTableStart = 0;
+    if (s_rootSignature) {
+        m_rootSignature = s_rootSignature;
+        m_rootSignatureBlob = s_rootSignatureBlob;
+        return true;
     }
+
+    D3D12_DESCRIPTOR_RANGE srvRange{};
+    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    srvRange.NumDescriptors = UINT(kSrvSlots);
+    srvRange.BaseShaderRegister = 0;
+    srvRange.RegisterSpace = 0;
+    srvRange.OffsetInDescriptorsFromTableStart = 0;
 
     // Params kSamplerBase..kSamplerBase+15: one 1-entry descriptor table per sampler
     // slot (s0..s15), parallel to the SRV slots. The bound sampler is fed by
@@ -277,24 +278,19 @@ bool Shader::CreateRootSignature(void) noexcept
         samplerRanges[i].OffsetInDescriptorsFromTableStart = 0;
     }
 
-    // Params kUavBase..kUavBase+3: one 1-entry descriptor table per UAV slot (u0..u3).
-    D3D12_DESCRIPTOR_RANGE uavRanges[kUavSlots]{};
-    for (int i = 0; i < kUavSlots; ++i) {
-        uavRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-        uavRanges[i].NumDescriptors = 1;
-        uavRanges[i].BaseShaderRegister = UINT(i); // u0, u1, ...
-        uavRanges[i].RegisterSpace = 0;
-        uavRanges[i].OffsetInDescriptorsFromTableStart = 0;
-    }
+    D3D12_DESCRIPTOR_RANGE uavRange{};
+    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    uavRange.NumDescriptors = UINT(kUavSlots);
+    uavRange.BaseShaderRegister = 0;
+    uavRange.RegisterSpace = 0;
+    uavRange.OffsetInDescriptorsFromTableStart = 0;
 
-    D3D12_DESCRIPTOR_RANGE ssboRanges[kSsboSlots]{};
-    for (int i = 0; i < kSsboSlots; ++i) {
-        ssboRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        ssboRanges[i].NumDescriptors = 1;
-        ssboRanges[i].BaseShaderRegister = UINT(i);
-        ssboRanges[i].RegisterSpace = UINT(kSsboSpace);
-        ssboRanges[i].OffsetInDescriptorsFromTableStart = 0;
-    }
+    D3D12_DESCRIPTOR_RANGE ssboRange{};
+    ssboRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    ssboRange.NumDescriptors = UINT(kSsboSlots);
+    ssboRange.BaseShaderRegister = 0;
+    ssboRange.RegisterSpace = UINT(kSsboSpace);
+    ssboRange.OffsetInDescriptorsFromTableStart = 0;
 
     D3D12_ROOT_PARAMETER params[kRootParamCount]{};
 
@@ -332,13 +328,10 @@ bool Shader::CreateRootSignature(void) noexcept
     params[5].Descriptor.RegisterSpace = 0;
     params[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_DOMAIN;
 
-    // One 1-entry descriptor table per SRV slot (t0..t15)
-    for (int i = 0; i < kSrvSlots; ++i) {
-        params[kSrvBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[kSrvBase + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[kSrvBase + i].DescriptorTable.pDescriptorRanges = &srvRanges[i];
-        params[kSrvBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    }
+    params[kSrvBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    params[kSrvBase].DescriptorTable.NumDescriptorRanges = 1;
+    params[kSrvBase].DescriptorTable.pDescriptorRanges = &srvRange;
+    params[kSrvBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // One 1-entry descriptor table per sampler slot (s0..s15)
     for (int i = 0; i < kSamplerSlots; ++i) {
@@ -348,20 +341,15 @@ bool Shader::CreateRootSignature(void) noexcept
         params[kSamplerBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
-    // One 1-entry descriptor table per UAV slot (u0..u3)
-    for (int i = 0; i < kUavSlots; ++i) {
-        params[kUavBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[kUavBase + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[kUavBase + i].DescriptorTable.pDescriptorRanges = &uavRanges[i];
-        params[kUavBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    }
+    params[kUavBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    params[kUavBase].DescriptorTable.NumDescriptorRanges = 1;
+    params[kUavBase].DescriptorTable.pDescriptorRanges = &uavRange;
+    params[kUavBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    for (int i = 0; i < kSsboSlots; ++i) {
-        params[kSsboBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[kSsboBase + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[kSsboBase + i].DescriptorTable.pDescriptorRanges = &ssboRanges[i];
-        params[kSsboBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    }
+    params[kSsboBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    params[kSsboBase].DescriptorTable.NumDescriptorRanges = 1;
+    params[kSsboBase].DescriptorTable.pDescriptorRanges = &ssboRange;
+    params[kSsboBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
     // Samplers are no longer baked into the root signature — each Texture carries
     // its own TextureSampling, resolved through SamplerCache and bound at draw
@@ -383,10 +371,19 @@ bool Shader::CreateRootSignature(void) noexcept
 #endif
         return false;
     }
-    m_rootSignatureBlob = sig;
-    return SUCCEEDED(device->CreateRootSignature(0,
-        sig->GetBufferPointer(), sig->GetBufferSize(),
-        IID_PPV_ARGS(&m_rootSignature)));
+    if (FAILED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&s_rootSignature))))
+        return false;
+    s_rootSignatureBlob = sig;
+    m_rootSignature = s_rootSignature;
+    m_rootSignatureBlob = s_rootSignatureBlob;
+    return true;
+}
+
+
+void Shader::DestroyRootSignature(void) noexcept
+{
+    s_rootSignature.Reset();
+    s_rootSignatureBlob.Reset();
 }
 
 
@@ -462,8 +459,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         return false;
     if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_psBlob, shaderFolder))
         return false;
-    if (gsCode.Length() > 0)
-        Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob, shaderFolder);  // optional — failure is non-fatal
+    if (gsCode.Length() > 0) {
+        if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob, shaderFolder))
+            return false;
+    }
     if (not tcsCode.IsEmpty()) {
         if (not Compile(static_cast<const char*>(tcsCode), "HSMain", "hs_6_0", m_hsBlob, shaderFolder))
             return false;
@@ -687,7 +686,7 @@ bool Shader::UpdateMatrices(void)
 
 // place all shader variables in CL; to be called right before the actual shader call
 bool Shader::UpdateVariables(void) noexcept {
-    return UploadB0() and UploadB1();
+    return UploadB0() and UploadB1() and commandListHandler.ApplyBindings();
 }
 
 // =================================================================================================

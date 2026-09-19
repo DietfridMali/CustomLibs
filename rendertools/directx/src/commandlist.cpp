@@ -5,6 +5,7 @@
 #include "descriptor_heap.h"
 #include "resource_handler.h"
 #include "gfxrenderer.h"
+#include "shader.h"
 
 #include <cstdio>
 #include <cstring>
@@ -23,6 +24,11 @@ extern void HandleDeviceLost(const char* where) noexcept;
 // Temporäre CLs sind für den Fall in-Frame wiederholter Render Tasks für dasselbe Renderobjekt (i.d.R. Mesh-Datenpuffer) gedacht
 // und nehmen der Objekt-Instanz die Aufgabe ab, hier eine eigene CL-Verwaltung zu implementieren, damit für jede solche Task
 // auch eine CL verfügbar ist.
+
+static_assert(CommandList::kSrvSlots == uint32_t(Shader::kSrvSlots));
+static_assert(CommandList::kSamplerSlots == uint32_t(Shader::kSamplerSlots));
+static_assert(CommandList::kUavSlots == uint32_t(Shader::kUavSlots));
+static_assert(CommandList::kSsboSlots == uint32_t(Shader::kSsboSlots));
 
 List<RenderStates> CommandList::m_renderStateStack;
 
@@ -101,10 +107,12 @@ void CommandQueue::WaitForFrame(int frameIndex) noexcept {
         HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvent);
         if (FAILED(hr)) {
             fprintf(stderr, "CommandQueue::WaitForFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
+            HandleDeviceLost("CommandQueue::WaitForFrame");
             return;
         }
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
+    HandleDeviceLost("CommandQueue::WaitForFrame");
 }
 
 
@@ -199,6 +207,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     m_activePSO = nullptr;
     m_activeRootSignature = nullptr;
     m_descriptorHeapsBound = false;
+    ResetAppliedBindings();
     ++m_executionCounter;
     commandListHandler.PushCmdList(this);
     m_openQueryCount = commandListHandler.ProfilerQueryCount();
@@ -250,6 +259,7 @@ void CommandList::Flush(void) noexcept {
 
     ID3D12CommandList* lists[] = { GfxList(true) };
     commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
+    HandleDeviceLost("CommandList::Flush");
 
 #if DBG_DIRECTX
     CheckDeviceRemoved("Flush");
@@ -316,6 +326,15 @@ void CommandList::BindDescriptorHeaps(void) noexcept {
     else
         return;
     m_descriptorHeapsBound = true;
+    ResetAppliedBindings();
+}
+
+
+void CommandList::ResetAppliedBindings(void) noexcept {
+    for (int i = 0; i < kTableCount; ++i)
+        m_appliedTables[i] = 0;
+    for (uint32_t i = 0; i < kSamplerSlots; ++i)
+        m_appliedSamplers[i] = UINT32_MAX;
 }
 
 
@@ -333,6 +352,7 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
         if (rootSignature != m_activeRootSignature) {
             m_gfxListPtr->SetGraphicsRootSignature(rootSignature);
             m_activeRootSignature = rootSignature;
+            ResetAppliedBindings();
         }
         m_activePSO = pso;
 #if DBG_DIRECTX
@@ -399,6 +419,90 @@ bool CommandListHandler::Create(ID3D12Device* device) noexcept {
         return false;
     gfxResourceHandler.Init(m_frameCount);
     m_gpuProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
+    ResetBindings();
+    return true;
+}
+
+
+void CommandListHandler::ResetBindings(void) noexcept {
+    for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i)
+        m_boundSrvs[i] = UINT32_MAX;
+    for (uint32_t i = 0; i < CommandList::kSamplerSlots; ++i)
+        m_boundSamplers[i] = UINT32_MAX;
+    for (uint32_t i = 0; i < CommandList::kUavSlots; ++i)
+        m_boundStorageBuffers[i] = UINT32_MAX;
+    for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i)
+        m_boundReadOnlyBuffers[i] = UINT32_MAX;
+    for (int i = 0; i < CommandList::kTableCount; ++i)
+        m_bindingVersions[i] = ++m_bindingVersionCounter;
+}
+
+
+void CommandListHandler::BindSampledImage(uint32_t slot, uint32_t srvIndex) noexcept {
+    if ((slot < CommandList::kSrvSlots) and (m_boundSrvs[slot] != srvIndex)) {
+        m_boundSrvs[slot] = srvIndex;
+        m_bindingVersions[CommandList::kTableSrv] = ++m_bindingVersionCounter;
+    }
+}
+
+
+void CommandListHandler::BindSampler(uint32_t slot, uint32_t samplerSlot) noexcept {
+    if (slot < CommandList::kSamplerSlots)
+        m_boundSamplers[slot] = samplerSlot;
+}
+
+
+void CommandListHandler::BindStorageBuffer(uint32_t slot, uint32_t uavIndex) noexcept {
+    if ((slot < CommandList::kUavSlots) and (m_boundStorageBuffers[slot] != uavIndex)) {
+        m_boundStorageBuffers[slot] = uavIndex;
+        m_bindingVersions[CommandList::kTableUav] = ++m_bindingVersionCounter;
+    }
+}
+
+
+void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, uint32_t srvIndex) noexcept {
+    if ((slot < CommandList::kSsboSlots) and (m_boundReadOnlyBuffers[slot] != srvIndex)) {
+        m_boundReadOnlyBuffers[slot] = srvIndex;
+        m_bindingVersions[CommandList::kTableSsbo] = ++m_bindingVersionCounter;
+    }
+}
+
+
+bool CommandListHandler::ApplyBindings(void) noexcept {
+    CommandList* cl = CurrentCmdList();
+    ID3D12GraphicsCommandList* list = CurrentGfxList();
+    if (not (cl and list))
+        return false;
+    cl->BindDescriptorHeaps();
+
+    const UINT tableParams[CommandList::kTableCount] = { UINT(Shader::kSrvBase), UINT(Shader::kUavBase), UINT(Shader::kSsboBase) };
+    const uint32_t* tableSlots[CommandList::kTableCount] = { m_boundSrvs, m_boundStorageBuffers, m_boundReadOnlyBuffers };
+    const uint32_t tableSizes[CommandList::kTableCount] = { CommandList::kSrvSlots, CommandList::kUavSlots, CommandList::kSsboSlots };
+    const uint32_t nullIndices[CommandList::kTableCount] = { descriptorHeaps.m_nullTextureSrv, descriptorHeaps.m_nullUav, descriptorHeaps.m_nullBufferSrv };
+
+    for (int t = 0; t < CommandList::kTableCount; ++t) {
+        if (cl->m_appliedTables[t] == m_bindingVersions[t])
+            continue;
+        BuiltTable& built = m_builtTables[t];
+        if ((built.version == m_bindingVersions[t]) and (built.generation == descriptorHeaps.TableGeneration()))
+            gfxResourceHandler.NoteFrameAllocation();
+        else {
+            if (not descriptorHeaps.BuildTable(tableSlots[t], tableSizes[t], nullIndices[t], built.gpu))
+                return false;
+            built.version = m_bindingVersions[t];
+            built.generation = descriptorHeaps.TableGeneration();
+        }
+        list->SetGraphicsRootDescriptorTable(tableParams[t], built.gpu);
+        cl->m_appliedTables[t] = m_bindingVersions[t];
+    }
+
+    for (uint32_t i = 0; i < CommandList::kSamplerSlots; ++i) {
+        uint32_t sampler = (m_boundSamplers[i] == UINT32_MAX) ? descriptorHeaps.m_defaultSampler : m_boundSamplers[i];
+        if (cl->m_appliedSamplers[i] == sampler)
+            continue;
+        list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase) + UINT(i), descriptorHeaps.m_samplerHeap.GpuHandle(sampler));
+        cl->m_appliedSamplers[i] = sampler;
+    }
     return true;
 }
 
@@ -417,6 +521,7 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
     {
         ZoneScopedN("cbvAllocator::Reset");
         cbvAllocator.Reset(UINT(m_frameIndex));
+        descriptorHeaps.ResetTables(uint32_t(m_frameIndex));
     }
     {
         ZoneScopedN("gfxResourceHandler::Cleanup");
@@ -600,8 +705,10 @@ void CommandListHandler::DrainFrameResources(void) noexcept {
         if (data.cmdList and data.cmdList->IsRecording() and (data.cmdList->m_openSerial < oldestOpenSerial))
             oldestOpenSerial = data.cmdList->m_openSerial;
     }
-    if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial)
+    if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial) {
         cbvAllocator.Reset(UINT(m_frameIndex));
+        descriptorHeaps.ResetTables(uint32_t(m_frameIndex));
+    }
     gfxResourceHandler.CleanupBefore(m_frameIndex, oldestOpenSerial);
 }
 

@@ -891,13 +891,9 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filte
         return false;
     if ((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat))
         filtering = GfxFilterMode::Nearest;
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
+    if (tmuIndex >= Shader::kSrvSlots)
         return false;
-    auto& srvHeap = descriptorHeaps.m_srvHeap;
-    if (not srvHeap.m_heap)
-        return false;
-    list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(info.SRVIndex()));
+    commandListHandler.BindSampledImage(uint32_t(tmuIndex), info.SRVIndex());
 
     // Bind the matching sampler from the buffer's own sampling configuration.
     // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets the
@@ -909,12 +905,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filte
         texture->SetParams(false);
     texture->m_sampling.minFilter = filtering;
     texture->m_sampling.magFilter = filtering;
-    auto& samplerHeap = descriptorHeaps.m_samplerHeap;
-    if (samplerHeap.m_heap) {
-        uint32_t slot = samplerCache.GetSlot(texture->m_sampling);
-        if (slot != UINT32_MAX)
-            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase + tmuIndex), samplerHeap.GpuHandle(slot));
-    }
+    commandListHandler.BindSampler(uint32_t(tmuIndex), samplerCache.GetSlot(texture->m_sampling));
     return true;
 }
 
@@ -1100,6 +1091,7 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
     device->CreateShaderResourceView(info.m_resource.Get(), &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_shadowTexture.m_handle));
+    descriptorHeaps.m_srvHeap.Publish(m_shadowTexture.m_handle);
     m_shadowTexture.m_resource = info.m_resource;
     m_shadowTexture.Validate();
     return &m_shadowTexture;

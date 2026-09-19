@@ -47,6 +47,7 @@ struct DescriptorHandle {
 class DescriptorHeap : public BaseDescriptorHeap {
 public:
     ComPtr<ID3D12DescriptorHeap>    m_heap;
+    ComPtr<ID3D12DescriptorHeap>    m_mirror;
     D3D12_DESCRIPTOR_HEAP_TYPE      m_type{};
     uint32_t                        m_capacity{ 0 };
     uint32_t                        m_count{ 0 };
@@ -55,7 +56,11 @@ public:
     AutoArray<uint32_t>             m_freeList;
     AutoArray<std::source_location> m_owners;   // debug: per-slot allocation site, temporary RTV-leak diagnostic
 
-    bool Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity, bool gpuVisible = false) noexcept;
+    bool Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity, bool gpuVisible = false, bool mirrored = false, uint32_t extraDescriptors = 0) noexcept;
+
+    void Publish(uint32_t index) noexcept;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE HeapCpuHandle(uint32_t index) const noexcept;
 
     // Allocates the next free slot (reuses freed slots). Returns an invalid handle if the heap is full.
     DescriptorHandle Allocate(void) noexcept;
@@ -92,21 +97,41 @@ public:
 // DescriptorHeapHandler: singleton owning one heap per descriptor type.
 // Capacity constants are intentionally generous; adjust if a project requires more.
 
-class DescriptorHeapHandler 
+class DescriptorHeapHandler
     : public BaseSingleton<DescriptorHeapHandler>
 {
 public:
     static constexpr uint32_t RTV_CAPACITY     = 256;
     static constexpr uint32_t DSV_CAPACITY     = 128;
-    static constexpr uint32_t SRV_CAPACITY     = 1024; // CBV/SRV/UAV, GPU-visible
+    static constexpr uint32_t SRV_CAPACITY     = 16384; // CBV/SRV/UAV, GPU-visible
     static constexpr uint32_t SAMPLER_CAPACITY = 32;   // GPU-visible sampler heap; small — only unique configurations
+    static constexpr uint32_t TABLE_FRAME_SLOTS = 2;
+    static constexpr uint32_t TABLE_CAPACITY   = 65536;
 
     DescriptorHeap m_rtvHeap;
     DescriptorHeap m_dsvHeap;
     DescriptorHeap m_srvHeap;
     DescriptorHeap m_samplerHeap;
 
+    uint32_t       m_nullTextureSrv{ UINT32_MAX };
+    uint32_t       m_nullBufferSrv{ UINT32_MAX };
+    uint32_t       m_nullUav{ UINT32_MAX };
+    uint32_t       m_defaultSampler{ UINT32_MAX };
+
+    uint32_t       m_tableFrame{ 0 };
+    uint32_t       m_tableOffset{ 0 };
+    uint64_t       m_tableGeneration{ 1 };
+    bool           m_tableOverflowReported{ false };
+
     bool Create(ID3D12Device* device) noexcept;
+
+    void ResetTables(uint32_t frameIndex) noexcept;
+
+    bool BuildTable(const uint32_t* srvIndices, uint32_t count, uint32_t nullIndex, D3D12_GPU_DESCRIPTOR_HANDLE& table) noexcept;
+
+    inline uint64_t TableGeneration(void) const noexcept {
+        return m_tableGeneration;
+    }
 
     inline DescriptorHandle AllocRTV(void) noexcept { 
         return m_rtvHeap.Allocate(); 

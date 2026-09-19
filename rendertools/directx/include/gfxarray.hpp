@@ -136,13 +136,14 @@ public:
             return false;
         if (m_state == kReadOnlyState)
             SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        auto& heap = descriptorHeaps.m_srvHeap;
-        if (heap.m_heap)
-            list->SetGraphicsRootDescriptorTable(UINT(Shader::kUavBase + bindingPoint), heap.GpuHandle(m_uavHandle.index));
+        commandListHandler.BindStorageBuffer(bindingPoint, m_uavHandle.index);
         return true;
     }
 
-    void Release(uint32_t /*bindingPoint*/) {}
+    void Release(uint32_t bindingPoint) {
+        if (bindingPoint < uint32_t(Shader::kUavSlots))
+            commandListHandler.BindStorageBuffer(bindingPoint, UINT32_MAX);
+    }
 
     bool BindReadOnly(uint32_t bindingPoint) {
         if (not isBuffer or not m_resource or not m_srvHandle.IsValid() or (bindingPoint >= uint32_t(Shader::kSsboSlots)))
@@ -152,13 +153,14 @@ public:
             return false;
         if (m_state != D3D12_RESOURCE_STATE_COMMON)
             SetBarrier(list, kReadOnlyState);
-        auto& heap = descriptorHeaps.m_srvHeap;
-        if (heap.m_heap)
-            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSsboBase + bindingPoint), heap.GpuHandle(m_srvHandle.index));
+        commandListHandler.BindReadOnlyBuffer(bindingPoint, m_srvHandle.index);
         return true;
     }
 
-    void ReleaseReadOnly(uint32_t /*bindingPoint*/) {}
+    void ReleaseReadOnly(uint32_t bindingPoint) {
+        if (bindingPoint < uint32_t(Shader::kSsboSlots))
+            commandListHandler.BindReadOnlyBuffer(bindingPoint, UINT32_MAX);
+    }
 
     void Clear([[maybe_unused]] DATA_T value) {
         if constexpr (not isBuffer) {
@@ -274,6 +276,7 @@ private:
         uavDesc.Texture2D.MipSlice = 0;
         uavDesc.Texture2D.PlaneSlice = 0;
         device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_uavHandle.cpuHandle);
+        descriptorHeaps.m_srvHeap.Publish(m_uavHandle.index);
 
         D3D12_DESCRIPTOR_HEAP_DESC cpuHeapDesc{};
         cpuHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
@@ -335,6 +338,7 @@ private:
         uavDesc.Buffer.CounterOffsetInBytes = 0;
         uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
         device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_uavHandle.cpuHandle);
+        descriptorHeaps.m_srvHeap.Publish(m_uavHandle.index);
 
         m_srvHandle = descriptorHeaps.AllocSRV();
         if (not m_srvHandle.IsValid()) {
@@ -353,6 +357,7 @@ private:
         srvDesc.Buffer.StructureByteStride = UINT(sizeof(DATA_T));
         srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
         device->CreateShaderResourceView(m_resource.Get(), &srvDesc, m_srvHandle.cpuHandle);
+        descriptorHeaps.m_srvHeap.Publish(m_srvHandle.index);
         return true;
     }
 

@@ -457,6 +457,7 @@ static void CreateSRV2D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT f
     srvDesc.Texture2D.MipLevels     = 1;
     dx12Context.Device()->CreateShaderResourceView(resource, &srvDesc,
         descriptorHeaps.m_srvHeap.CpuHandle(handle));
+    descriptorHeaps.m_srvHeap.Publish(handle);
 }
 
 
@@ -470,6 +471,7 @@ static void CreateSRV3D(uint32_t handle, ID3D12Resource* resource, DXGI_FORMAT f
     srvDesc.Texture3D.MipLevels     = mipLevels;
     dx12Context.Device()->CreateShaderResourceView(resource, &srvDesc,
         descriptorHeaps.m_srvHeap.CpuHandle(handle));
+    descriptorHeaps.m_srvHeap.Publish(handle);
 }
 
 

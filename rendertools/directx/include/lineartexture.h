@@ -110,6 +110,7 @@ public:
 
         D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
         device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
+        descriptorHeaps.m_srvHeap.Publish(m_handle);
 
         m_isDeployed = true;
         return true;

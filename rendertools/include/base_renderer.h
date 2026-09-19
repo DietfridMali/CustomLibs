@@ -450,6 +450,8 @@ public:
     virtual void LoadPipelineCache(const String& /*shaderFolder*/) {}
 
     virtual void SavePipelineCache(void) {}
+
+    virtual void PrecreatePipelines(void) {}
 #pragma warning(push)
 
 #include "gfxapitype.h"

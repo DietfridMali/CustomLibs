@@ -19,12 +19,10 @@
 //
 // Replaces the OGL Shader (glCreateProgram / glUniform*) with:
 //  - Compiled HLSL blobs (ID3DBlob via D3DCompile)
-//  - A fixed root signature: root CBV b0 (FrameConstants, ALL),
-//    root CBV b1 (VS ShaderConstants, VERTEX), root CBV b1 (PS ShaderConstants, PIXEL),
-//    root CBV b1 (GS ShaderConstants, GEOMETRY), one SRV descriptor table per slot
-//    t0..t15 (pixel shader), one sampler descriptor table per slot s0..s15
-//    (pixel shader, fed from SamplerCache via TextureSampling at bind time),
-//    one UAV descriptor table per slot u0..u3 (all stages).
+//  - One root signature shared by all shaders: root CBV b0 (FrameConstants, ALL),
+//    root CBV b1 per stage (VS, PS, GS, HS, DS), one SRV descriptor table t0..t15,
+//    one sampler descriptor table per slot s0..s15, one UAV descriptor table u0..u3,
+//    one SRV descriptor table t0..t18 space1 (read-only structured buffers).
 //  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
 //  - b1: per-stage shader constants, layout from per-stage HLSL reflection on link
@@ -84,6 +82,11 @@ public:
     ComPtr<ID3D12RootSignature> m_rootSignature;
     ComPtr<ID3DBlob>            m_rootSignatureBlob;
 
+    static inline ComPtr<ID3D12RootSignature> s_rootSignature;
+    static inline ComPtr<ID3DBlob>            s_rootSignatureBlob;
+
+    static void DestroyRootSignature(void) noexcept;
+
     // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
     FrameConstants          m_b0Staging{};
 
@@ -98,14 +101,14 @@ public:
     static constexpr int kStageCount    = 5;
     static constexpr int kSrvBase       = 1 + kStageCount;
     static constexpr int kSrvSlots      = 16;
-    static constexpr int kSamplerBase   = kSrvBase + kSrvSlots;
+    static constexpr int kSamplerBase   = kSrvBase + 1;
     static constexpr int kSamplerSlots  = 16;
     static constexpr int kUavBase       = kSamplerBase + kSamplerSlots;
     static constexpr int kUavSlots      = 4;
-    static constexpr int kSsboBase      = kUavBase + kUavSlots;
-    static constexpr int kSsboSlots     = 17;
+    static constexpr int kSsboBase      = kUavBase + 1;
+    static constexpr int kSsboSlots     = 19;
     static constexpr int kSsboSpace     = 1;
-    static constexpr int kRootParamCount = kSsboBase + kSsboSlots;
+    static constexpr int kRootParamCount = kSsboBase + 1;
 
     struct StageConstants {
         uint32_t size{ 0 };

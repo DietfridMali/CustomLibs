@@ -316,6 +316,7 @@ void BaseDisplayHandler::BeginFrame(void) {
     // Advance frame slot, wait fence, drain that slot's deferred resources, reset CBV allocator.
     // Active-shader tracking is invalidated because BeginFrame resets all DX12 command-list state.
     commandListHandler.BeginFrame();
+    commandListHandler.ResetBindings();
     baseShaderHandler.InvalidateActiveShader();
 }
 

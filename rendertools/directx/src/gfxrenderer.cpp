@@ -126,6 +126,7 @@ void GfxRenderer::Cleanup(void) noexcept {
     GfxResourceHandler::BeginShutdown();
     GfxDataLayout::DestroyDefaultStreams();
     meshHandler.Destroy();
+    Shader::DestroyRootSignature();
     commandListHandler.Destroy();
 }
 
@@ -137,6 +138,11 @@ void GfxRenderer::LoadPipelineCache(const String& shaderFolder) {
 
 void GfxRenderer::SavePipelineCache(void) {
     PSO::SavePipelineLibrary();
+}
+
+
+void GfxRenderer::PrecreatePipelines(void) {
+    PSO::PrecreatePSOs();
 }
 
 

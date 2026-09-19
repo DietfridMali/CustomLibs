@@ -23,6 +23,9 @@
 #include "vkupload.h"
 #include <spirv_reflect.h>
 
+extern double VkStallClock(void) noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+
 // =================================================================================================
 // Vulkan Shader implementation
 //
@@ -577,6 +580,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (IsValid())
         return true;
 
+    double stallStart = VkStallClock();
     if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
         fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
         return false;
@@ -646,6 +650,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     m_vs = vsCode;
     m_fs = fsCode;
     m_gs = gsCode;
+    VkStallEvent("shader create", stallStart, static_cast<const char*>(m_name));
     return true;
 }
 

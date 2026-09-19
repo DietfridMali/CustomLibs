@@ -6,8 +6,11 @@
 #include "gfxrenderer.h"
 #include "resource_view.h"
 #include "shadercache.h"
+#include "base_shaderhandler.h"
 
 #include <cwchar>
+
+static constexpr uint32_t kPipelineRecordVersion = 1;
 
 
 // =================================================================================================
@@ -158,7 +161,7 @@ D3D12_DEPTH_STENCIL_DESC RenderStates::SetStencilDesc(D3D12_DEPTH_STENCIL_DESC& 
 
 // =================================================================================================
 
-static uint64_t PipelineKey(const Shader* shader, const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc) noexcept
+static uint64_t PipelineKey(const Shader* shader, const RenderStates& states, const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc) noexcept
 {
     uint64_t key = ShaderCache::kHashSeed;
     key = ShaderCache::Hash(key, desc.VS.pShaderBytecode, desc.VS.BytecodeLength);
@@ -180,7 +183,6 @@ static uint64_t PipelineKey(const Shader* shader, const D3D12_GRAPHICS_PIPELINE_
         key = ShaderCache::Hash(key, &e.InputSlotClass, sizeof(e.InputSlotClass));
         key = ShaderCache::Hash(key, &e.InstanceDataStepRate, sizeof(e.InstanceDataStepRate));
     }
-    const RenderStates& states = baseRenderer.RenderStates();
     key = ShaderCache::Hash(key, &states, sizeof(RenderStates));
     key = ShaderCache::Hash(key, &desc.PrimitiveTopologyType, sizeof(desc.PrimitiveTopologyType));
     key = ShaderCache::Hash(key, &desc.NumRenderTargets, sizeof(desc.NumRenderTargets));
@@ -206,24 +208,171 @@ PSO::psoPtr_t PSO::GetPSO(Shader* shader) noexcept
         return nullptr;
 
     PSOKey key{ shader, baseRenderer.RenderStates() };
+    NormalizeStates(key.states, shader->m_dataLayout.m_numRenderTargets);
     if (auto psoComPtr = GetCache(ComparePSOs).Find(key)) {
 #ifdef _DEBUG
         GetCache(ComparePSOs).Find(key);
 #endif
         return psoComPtr->Get();
     }
-    
-    PSO::PSOComPtr psoComPtr = CreatePSO(shader);
+
+    PSO::PSOComPtr psoComPtr = CreatePSO(shader, key.states);
     if (psoComPtr) {
         psoPtr_t psoPtr = psoComPtr.Get();
 #if DBG_DIRECTX
         String psoName = String("shader:") + shader->m_name;
         psoComPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)psoName.Length(), (const char*)psoName);
 #endif
-        if (GetCache(ComparePSOs).Insert(key, psoComPtr))
+        if (GetCache(ComparePSOs).Insert(key, psoComPtr)) {
+            Remember(shader->m_name, key.states);
             return psoPtr;
+        }
     }
     return nullptr;
+}
+
+
+void PSO::NormalizeStates(RenderStates& s, int renderTargetCount) noexcept
+{
+    const RenderStates defaults{};
+
+    s.stencilRef = defaults.stencilRef;
+    s.scissorTest = defaults.scissorTest;
+    if (not s.faceCulling)
+        s.cullMode = defaults.cullMode;
+    if (not s.depthTest) {
+        s.depthWrite = 0;
+        s.depthFunc = defaults.depthFunc;
+    }
+    if (not s.stencilTest) {
+        s.stencilFunc = defaults.stencilFunc;
+        s.stencilSFail = defaults.stencilSFail;
+        s.stencilDPFail = defaults.stencilDPFail;
+        s.stencilDPPass = defaults.stencilDPPass;
+        s.stencilBackSFail = defaults.stencilBackSFail;
+        s.stencilBackDPFail = defaults.stencilBackDPFail;
+        s.stencilBackDPPass = defaults.stencilBackDPPass;
+        s.stencilMask = defaults.stencilMask;
+        s.stencilWriteMask = defaults.stencilWriteMask;
+    }
+    if (not (s.depthTest or s.stencilTest))
+        s.depthFormat = defaults.depthFormat;
+    if (renderTargetCount <= 0)
+        s.colorFormat = defaults.colorFormat;
+    if (renderTargetCount <= 1)
+        s.independentBlend = 0;
+    int blendTargets = 0;
+    if (renderTargetCount > 0)
+        blendTargets = s.independentBlend ? renderTargetCount : 1;
+    for (int i = 0; i < RenderStates::kColorTargets; ++i) {
+        bool isUsed = (i < blendTargets);
+        if (not isUsed) {
+            s.blendEnable[i] = defaults.blendEnable[i];
+            s.colorMask[i] = defaults.colorMask[i];
+        }
+        if (not (isUsed and s.blendEnable[i])) {
+            s.blendSrcRGB[i] = defaults.blendSrcRGB[i];
+            s.blendDstRGB[i] = defaults.blendDstRGB[i];
+            s.blendSrcAlpha[i] = defaults.blendSrcAlpha[i];
+            s.blendDstAlpha[i] = defaults.blendDstAlpha[i];
+            s.blendOpRGB[i] = defaults.blendOpRGB[i];
+            s.blendOpAlpha[i] = defaults.blendOpAlpha[i];
+        }
+    }
+}
+
+
+void PSO::Remember(const String& shaderName, const RenderStates& states) noexcept
+{
+    PipelineRecords& records = GetRecords();
+    for (int i = 0; i < records.names.Length(); ++i) {
+        if ((records.names[i] == shaderName) and (records.states[i] == states))
+            return;
+    }
+    records.names.Append(shaderName);
+    records.states.Append(states);
+    records.dirty = true;
+}
+
+
+static uint64_t PipelineRecordFileKey(void) noexcept
+{
+    uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, "pipelinekeys.d3d12");
+    key = ShaderCache::Hash(key, &kPipelineRecordVersion, sizeof(kPipelineRecordVersion));
+    uint64_t recordSize = uint64_t(sizeof(RenderStates));
+    return ShaderCache::Hash(key, &recordSize, sizeof(recordSize));
+}
+
+
+bool PSO::LoadRecords(const String& shaderFolder)
+{
+    PipelineRecords& records = GetRecords();
+    records.names.Reset();
+    records.states.Reset();
+    records.dirty = false;
+    if (shaderFolder.IsEmpty())
+        return false;
+    std::vector<uint8_t> payload;
+    uint32_t tag = 0;
+    if (not ShaderCache::Read(shaderFolder, String("pipelinekeys.d3d12"), PipelineRecordFileKey(), payload, tag))
+        return false;
+    size_t offset = 0;
+    while (offset + sizeof(uint32_t) <= payload.size()) {
+        uint32_t nameLength = 0;
+        std::memcpy(&nameLength, payload.data() + offset, sizeof(nameLength));
+        offset += sizeof(nameLength);
+        if (offset + size_t(nameLength) + sizeof(RenderStates) > payload.size())
+            break;
+        String name(reinterpret_cast<const char*>(payload.data() + offset), size_t(nameLength));
+        offset += size_t(nameLength);
+        RenderStates states;
+        std::memcpy(&states, payload.data() + offset, sizeof(RenderStates));
+        offset += sizeof(RenderStates);
+        records.names.Append(name);
+        records.states.Append(states);
+    }
+    return true;
+}
+
+
+bool PSO::SaveRecords(void)
+{
+    PipelineRecords& records = GetRecords();
+    PipelineLibrary& lib = GetLibrary();
+    if (lib.folder.IsEmpty() or not records.dirty)
+        return false;
+    std::vector<uint8_t> payload;
+    for (int i = 0; i < records.names.Length(); ++i) {
+        const char* name = static_cast<const char*>(records.names[i]);
+        uint32_t nameLength = uint32_t(std::strlen(name));
+        const uint8_t* lengthBytes = reinterpret_cast<const uint8_t*>(&nameLength);
+        payload.insert(payload.end(), lengthBytes, lengthBytes + sizeof(nameLength));
+        payload.insert(payload.end(), reinterpret_cast<const uint8_t*>(name), reinterpret_cast<const uint8_t*>(name) + nameLength);
+        const uint8_t* stateBytes = reinterpret_cast<const uint8_t*>(&records.states[i]);
+        payload.insert(payload.end(), stateBytes, stateBytes + sizeof(RenderStates));
+    }
+    if (not ShaderCache::Write(lib.folder, String("pipelinekeys.d3d12"), PipelineRecordFileKey(), 0, payload.data(), payload.size()))
+        return false;
+    records.dirty = false;
+    return true;
+}
+
+
+void PSO::PrecreatePSOs(void) noexcept
+{
+    PipelineRecords& records = GetRecords();
+    for (int i = 0; i < records.names.Length(); ++i) {
+        Shader* shader = baseShaderHandler.GetShader(records.names[i]);
+        if (not (shader and shader->IsValid()))
+            continue;
+        PSOKey key{ shader, records.states[i] };
+        NormalizeStates(key.states, shader->m_dataLayout.m_numRenderTargets);
+        if (GetCache(ComparePSOs).Find(key))
+            continue;
+        PSOComPtr psoComPtr = CreatePSO(shader, key.states);
+        if (psoComPtr)
+            GetCache(ComparePSOs).Insert(key, psoComPtr);
+    }
 }
 
 
@@ -266,6 +415,7 @@ bool PSO::LoadPipelineLibrary(const String& shaderFolder)
     lib.data.clear();
     lib.dirty = false;
     lib.folder = shaderFolder;
+    LoadRecords(shaderFolder);
     if (shaderFolder.IsEmpty())
         return false;
     ComPtr<ID3D12Device1> device;
@@ -281,6 +431,7 @@ bool PSO::LoadPipelineLibrary(const String& shaderFolder)
 
 bool PSO::SavePipelineLibrary(void)
 {
+    SaveRecords();
     PipelineLibrary& lib = GetLibrary();
     if (not (lib.library and lib.dirty))
         return true;
@@ -312,8 +463,9 @@ bool PSO::CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELI
 }
 
 
-PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
+PSO::PSOComPtr PSO::CreatePSO(Shader* shader, const RenderStates& states)
 {
+    RenderStates psoStates = states;
     ID3D12Device* device = dx12Context.Device();
     if (not (device and shader->m_rootSignature and shader->m_vsBlob and shader->m_psBlob))
         return nullptr;
@@ -331,15 +483,15 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
         psoDesc.DS = { shader->m_dsBlob->GetBufferPointer(), shader->m_dsBlob->GetBufferSize() };
     }
     psoDesc.InputLayout = { shader->m_vsInputLayout.data(), UINT(shader->m_vsInputLayout.size()) };
-    baseRenderer.RenderStates().SetRasterizerDesc(psoDesc.RasterizerState);
-    baseRenderer.RenderStates().SetBlendDesc(psoDesc.BlendState);
-    baseRenderer.RenderStates().SetStencilDesc(psoDesc.DepthStencilState);
+    psoStates.SetRasterizerDesc(psoDesc.RasterizerState);
+    psoStates.SetBlendDesc(psoDesc.BlendState);
+    psoStates.SetStencilDesc(psoDesc.DepthStencilState);
 
     if (shader->IsTessellated())
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
-    else if (baseRenderer.RenderStates().topology == uint8_t(MeshTopology::Lines))
+    else if (psoStates.topology == uint8_t(MeshTopology::Lines))
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
-    else if (baseRenderer.RenderStates().topology == uint8_t(MeshTopology::Points))
+    else if (psoStates.topology == uint8_t(MeshTopology::Points))
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
     else
         psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -349,7 +501,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
     // in RenderTarget::Enable) so one shader serves both the RGBA8 screen and the HDR scene buffer.
     // Slots 1+ (worldNormal/worldPos MRTs) keep their shader-declared formats.
     for (int i = 0; i < nrt; ++i)
-        psoDesc.RTVFormats[i] = (i == 0) ? baseRenderer.RenderStates().colorFormat : ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
+        psoDesc.RTVFormats[i] = (i == 0) ? psoStates.colorFormat : ToDXGIFormat(shader->m_dataLayout.m_rtvFormats[i]);
     for (int i = 1; i < nrt; ++i) {
         if (IsIntegerColorFormat(psoDesc.RTVFormats[i]) and psoDesc.BlendState.RenderTarget[0].BlendEnable and not psoDesc.BlendState.IndependentBlendEnable) {
             psoDesc.BlendState.IndependentBlendEnable = TRUE;
@@ -365,7 +517,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
     // Must match the DSV bound by the active render target, combined depth/stencil included — see
     // RenderStates::depthFormat.
     psoDesc.DSVFormat = (psoDesc.DepthStencilState.DepthEnable or psoDesc.DepthStencilState.StencilEnable)
-                      ? baseRenderer.RenderStates().depthFormat
+                      ? psoStates.depthFormat
                       : DXGI_FORMAT_UNKNOWN;
     psoDesc.SampleMask = UINT_MAX;
     psoDesc.SampleDesc.Count = 1;
@@ -374,7 +526,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader)
     PipelineLibrary& lib = GetLibrary();
     std::wstring name;
     if (lib.library) {
-        name = PipelineName(shader->m_name, PipelineKey(shader, psoDesc));
+        name = PipelineName(shader->m_name, PipelineKey(shader, psoStates, psoDesc));
         if (SUCCEEDED(lib.library->LoadGraphicsPipeline(name.c_str(), &psoDesc, IID_PPV_ARGS(&psoComPtr))))
             return psoComPtr;
     }

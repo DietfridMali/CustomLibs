@@ -9,6 +9,9 @@
 
 #include <cstdio>
 
+extern double VkStallClock(void) noexcept;
+extern void VkStallNote(const char* what, double startMs, const char* detail) noexcept;
+
 // =================================================================================================
 // TextureSlotInfo — API-neutral (slot bookkeeping only, no GPU calls).
 
@@ -87,8 +90,10 @@ bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
 // CommandList::Flush keeps using CommandQueue::WaitIdle (queue-local).
 
 void GfxStates::Finish(void) noexcept {
+    double stallStart = VkStallClock();
     if (vkContext.Device() != VK_NULL_HANDLE)
         vkDeviceWaitIdle(vkContext.Device());
+    VkStallNote("device wait idle", stallStart, nullptr);
 }
 
 // =================================================================================================

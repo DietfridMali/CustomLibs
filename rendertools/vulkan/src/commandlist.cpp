@@ -7,12 +7,131 @@
 
 #include <cstdio>
 #include <cstring>
+#include <chrono>
+#include <ctime>
+#include <string>
+#include <vector>
 
 // A lost device cannot be recovered from here: every later submit, wait and present fails as well, and
 // an app that keeps recording runs into the driver and the validation layers with dead handles. So the
 // first VK_ERROR_DEVICE_LOST ends the program with a message. Defined below, behind the second include
 // block; vkupload.cpp declares it extern.
 void HandleDeviceLost(VkResult res, const char* where) noexcept;
+
+static constexpr double kStallFrameMinMs = 20.0;
+static constexpr double kStallFrameFactor = 2.5;
+static constexpr double kStallDetailMinMs = 1.0;
+static constexpr size_t kStallDetailMaxChars = 16384;
+
+struct VkStallEntry {
+    const char* what;
+    int         count;
+    double      totalMs;
+    double      maxMs;
+};
+
+struct VkStallRecorder {
+    FILE*                       file { nullptr };
+    bool                        openFailed { false };
+    uint64_t                    frameNumber { 0 };
+    double                      frameStartMs { 0.0 };
+    double                      avgFrameMs { 0.0 };
+    std::vector<VkStallEntry>   entries;
+    std::string                 details;
+};
+
+static VkStallRecorder vkStalls;
+
+
+double VkStallClock(void) noexcept
+{
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+
+static FILE* VkStallFile(void) noexcept
+{
+    if ((vkStalls.file == nullptr) and not vkStalls.openFailed) {
+        vkStalls.file = fopen("vkstalls.log", "wt");
+        vkStalls.openFailed = (vkStalls.file == nullptr);
+        if (vkStalls.file != nullptr) {
+            std::time_t now = std::time(nullptr);
+            char stamp[64] = "?";
+            std::tm* local = std::localtime(&now);
+            if (local != nullptr)
+                std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", local);
+            fprintf(vkStalls.file, "\n==== START %s ====\n", stamp);
+            fflush(vkStalls.file);
+        }
+    }
+    return vkStalls.file;
+}
+
+
+void VkStallNote(const char* what, double startMs, const char* detail) noexcept
+{
+    double ms = VkStallClock() - startMs;
+    VkStallEntry* entry = nullptr;
+    for (auto& e : vkStalls.entries) {
+        if (std::strcmp(e.what, what) == 0) {
+            entry = &e;
+            break;
+        }
+    }
+    if (entry == nullptr) {
+        vkStalls.entries.push_back(VkStallEntry { what, 0, 0.0, 0.0 });
+        entry = &vkStalls.entries.back();
+    }
+    ++entry->count;
+    entry->totalMs += ms;
+    if (entry->maxMs < ms)
+        entry->maxMs = ms;
+    if ((ms >= kStallDetailMinMs) and (vkStalls.details.size() < kStallDetailMaxChars)) {
+        char line[256];
+        snprintf(line, sizeof(line), "      %-28s %8.2f ms  %s\n", what, ms, detail ? detail : "");
+        vkStalls.details += line;
+    }
+}
+
+
+void VkStallEvent(const char* what, double startMs, const char* detail) noexcept
+{
+    double ms = VkStallClock() - startMs;
+    VkStallNote(what, startMs, detail);
+    FILE* f = VkStallFile();
+    if (f == nullptr)
+        return;
+    fprintf(f, "frame %llu: %s %.2f ms  %s\n", (unsigned long long)vkStalls.frameNumber, what, ms, detail ? detail : "");
+    fflush(f);
+}
+
+
+static void VkStallEndFrame(uint64_t nextFrame) noexcept
+{
+    double now = VkStallClock();
+    if (vkStalls.frameStartMs > 0.0) {
+        double frameMs = now - vkStalls.frameStartMs;
+        bool isStall = (vkStalls.avgFrameMs > 0.0) and (frameMs > kStallFrameMinMs) and (frameMs > kStallFrameFactor * vkStalls.avgFrameMs);
+        if (isStall) {
+            FILE* f = VkStallFile();
+            if (f != nullptr) {
+                fprintf(f, "STALL frame %llu: %.2f ms (avg %.2f ms)\n", (unsigned long long)vkStalls.frameNumber, frameMs, vkStalls.avgFrameMs);
+                for (const auto& e : vkStalls.entries)
+                    fprintf(f, "    %-28s %5d x  total %8.2f ms  max %8.2f ms\n", e.what, e.count, e.totalMs, e.maxMs);
+                fputs(vkStalls.details.c_str(), f);
+                fflush(f);
+            }
+        }
+        else if (vkStalls.avgFrameMs == 0.0)
+            vkStalls.avgFrameMs = frameMs;
+        else
+            vkStalls.avgFrameMs = vkStalls.avgFrameMs * 0.95 + frameMs * 0.05;
+    }
+    vkStalls.entries.clear();
+    vkStalls.details.clear();
+    vkStalls.frameStartMs = now;
+    vkStalls.frameNumber = nextFrame;
+}
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL. Es gibt in dem Sinne keine verschachtelten Render-Tasks.
@@ -86,8 +205,11 @@ void CommandQueue::Destroy(void) noexcept
 bool CommandQueue::BeginFrame(void) noexcept
 {
     ++m_frameNumber;
+    VkStallEndFrame(m_frameNumber);
     // Wait until the GPU has finished using this frame slot.
+    double stallStart = VkStallClock();
     VkResult res = vkWaitForFences(m_device, 1, &m_inFlight[m_frameIndex], VK_TRUE, UINT64_MAX);
+    VkStallNote("frame fence wait", stallStart, nullptr);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::BeginFrame");
@@ -100,10 +222,17 @@ bool CommandQueue::BeginFrame(void) noexcept
     }
     // The slot's resources hang on its fence alone, so they are reset before the image is acquired -
     // a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
+    stallStart = VkStallClock();
     gfxResourceHandler.Cleanup(m_frameIndex);
+    VkStallNote("frame resource cleanup", stallStart, nullptr);
+    stallStart = VkStallClock();
     descriptorPoolHandler.BeginFrame(m_frameIndex);
+    VkStallNote("descriptor pool reset", stallStart, nullptr);
     cbvAllocator.Reset(m_frameIndex);
-    return AcquireNextImage();
+    stallStart = VkStallClock();
+    bool acquired = AcquireNextImage();
+    VkStallNote("acquire next image", stallStart, nullptr);
+    return acquired;
 }
 
 
@@ -118,7 +247,9 @@ void CommandQueue::WaitIdle(void) noexcept
 {
     if (m_graphicsQueue == VK_NULL_HANDLE)
         return;
+    double stallStart = VkStallClock();
     VkResult res = vkQueueWaitIdle(m_graphicsQueue);
+    VkStallNote("queue wait idle", stallStart, nullptr);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::WaitIdle");
@@ -230,7 +361,9 @@ void CommandQueue::Present(void) noexcept
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &m_imageIndex;
 
+    double stallStart = VkStallClock();
     VkResult res = vkQueuePresentKHR(m_presentQueue, &present);
+    VkStallNote("present", stallStart, nullptr);
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR)) {
         fprintf(stderr, "CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::Present");
@@ -441,6 +574,7 @@ void CommandList::Flush(void) noexcept
     if (m_isFlushed)
         return;
     m_isFlushed = true;
+    double stallStart = VkStallClock();
     Close();
 
     uint32_t fi = ActiveFrameIndex();
@@ -474,6 +608,8 @@ void CommandList::Flush(void) noexcept
 #endif
     commandListHandler.CmdQueue().WaitIdle();
     DisposeResources();
+    String name = GetName();
+    VkStallNote("command list flush", stallStart, static_cast<const char*>(name));
 }
 
 
@@ -573,6 +709,8 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
     VkPipeline p = pipelineCache.GetOrCreate(key);
     if (p != VK_NULL_HANDLE) {
         SetActivePipeline(p, shader);
+        if (m_isRecording)
+            vkCmdSetStencilReference(GfxList(), VK_STENCIL_FACE_FRONT_AND_BACK, uint32_t(key.states.stencilRef));
         m_activeTopology = key.states.topology;
         lastPipelineStates = key.states;
         lastPipelineList = this;
@@ -747,7 +885,9 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 
         {
             ZoneScopedN("vkQueueSubmit2");
+            double stallStart = VkStallClock();
             VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
+            VkStallNote(intermediate ? "intermediate submit" : "frame submit", stallStart, nullptr);
             if (res != VK_SUCCESS) {
                 fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
                 HandleDeviceLost(res, "CommandListHandler::ExecuteAll");
@@ -772,6 +912,7 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 void CommandListHandler::ExecutePending(void) noexcept
 {
     ZoneScopedN("ExecutePending");
+    double stallStart = VkStallClock();
     // The upload list is registered when it is opened, so that it runs ahead of the frame - it is the one
     // pending list that may still be recording. It goes out with the rest; the next upload opens a new one.
     if (m_uploadList) {
@@ -817,6 +958,7 @@ void CommandListHandler::ExecutePending(void) noexcept
     }
     m_pendingLists.Clear();
     DrainFrameResources();
+    VkStallNote("execute pending", stallStart, nullptr);
 }
 
 

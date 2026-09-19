@@ -21,6 +21,9 @@
 #include "resource_handler.h"
 #include "texture_mips.h"
 
+extern double VkStallClock(void) noexcept;
+extern void VkStallNote(const char* what, double startMs, const char* detail) noexcept;
+
 // =================================================================================================
 // Vulkan Texture implementation
 //
@@ -337,6 +340,7 @@ bool Texture::Deploy(int bufferIndex)
     if ((w <= 0) or (h <= 0))
         return false;
 
+    double stallStart = VkStallClock();
     const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
     const GfxPixelFormat gfxFmt = GfxEncodedFormat(tb->m_info.m_gfxFormat, colorEncoding);
     if (GfxIsBlockCompressed(gfxFmt)) {
@@ -364,6 +368,9 @@ bool Texture::Deploy(int bufferIndex)
         return false;
 
     m_isDeployed = true;
+    char detail[64];
+    snprintf(detail, sizeof(detail), "%dx%d", w, h);
+    VkStallNote("texture deploy", stallStart, detail);
     return true;
 }
 

@@ -31,6 +31,12 @@ struct PipelineKey {
     uint32_t      colorFormatCount  { 0 };
     VkFormat      depthFormat       { VK_FORMAT_UNDEFINED };
 };
+struct PipelineRecord {
+    RenderStates  states;
+    VkFormat      colorFormats[8]   { };
+    uint32_t      colorFormatCount  { 0 };
+    VkFormat      depthFormat       { VK_FORMAT_UNDEFINED };
+};
 #pragma pack(pop)
 
 
@@ -48,6 +54,11 @@ public:
     AutoArray<VkPipeline>   m_pipelines;
     AutoArray<PipelineKey>  m_keys;
 
+    AutoArray<String>           m_recordNames;
+    AutoArray<PipelineRecord>   m_records;
+    bool                        m_recordsDirty { false };
+    bool                        m_precreating { false };
+
     PipelineCache(void) noexcept;
 
     bool Create(VkDevice device) noexcept;
@@ -60,12 +71,22 @@ public:
     // Returns VK_NULL_HANDLE on shader/build failure.
     VkPipeline GetOrCreate(const PipelineKey& key) noexcept;
 
+    void Precreate(void) noexcept;
+
     // Removes (and destroys) every cached pipeline that belongs to the given shader.
     // Called from Shader::Destroy.
     void RemoveShader(Shader* shader) noexcept;
 
 private:
     static int CompareKeys(void* context, const PipelineKey& a, const PipelineKey& b);
+
+    static void NormalizeKey(PipelineKey& key) noexcept;
+
+    void Remember(const PipelineKey& key) noexcept;
+
+    bool LoadRecords(void);
+
+    bool SaveRecords(void);
 
     VkPipeline BuildPipeline(const PipelineKey& key) noexcept;
 };

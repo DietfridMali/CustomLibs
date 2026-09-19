@@ -177,18 +177,9 @@ bool Texture::Bind(int tmuIndex, bool)
     if (not m_hasParams)
         SetParams(false);
 
-    auto* list = commandListHandler.CurrentGfxList();
-    if (list and (m_handle != UINT32_MAX)) {
-        auto& srvHeap = descriptorHeaps.m_srvHeap;
-        if (srvHeap.m_heap)
-            list->SetGraphicsRootDescriptorTable(UINT(Shader::kSrvBase + tmuIndex), srvHeap.GpuHandle(m_handle));
-
-        auto& samplerHeap = descriptorHeaps.m_samplerHeap;
-        if (samplerHeap.m_heap) {
-            uint32_t slot = samplerCache.GetSlot(m_sampling);
-            if (slot != UINT32_MAX)
-                list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase + tmuIndex), samplerHeap.GpuHandle(slot));
-        }
+    if ((tmuIndex >= 0) and (tmuIndex < Shader::kSrvSlots) and (m_handle != UINT32_MAX)) {
+        commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_handle);
+        commandListHandler.BindSampler(uint32_t(tmuIndex), samplerCache.GetSlot(m_sampling));
     }
     return true;
 }
@@ -309,6 +300,7 @@ bool Texture::CreateSRV(void)
 
     D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
     device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
+    descriptorHeaps.m_srvHeap.Publish(m_handle);
     return true;
 }
 
