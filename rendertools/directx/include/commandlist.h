@@ -344,7 +344,7 @@ public:
 
     CommandList* OldestRecordingList(void) const noexcept;
 
-    void ReleaseFrameResources(const char* site) noexcept;
+    void ReleaseFrameResources(void) noexcept;
 
     bool UsesOrderedCopyList(void) noexcept;
 

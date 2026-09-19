@@ -1,5 +1,4 @@
 #include <cstring>
-#include <cstdio>
 
 #include "linerenderer.h"
 #include "gfxrenderer.h"
@@ -8,30 +7,12 @@
 
 // =================================================================================================
 
-#if DBG_DIRECTX
-static const void* watchedResource = nullptr;
-
-static void CheckWatchedResource(const void* resource, const char* where, int line) noexcept {
-    if (resource != watchedResource) {
-        fprintf(stderr, "line buffer resource pointer changed from %p to %p, noticed in %s at %s:%d\n", watchedResource, resource, where, __FILE__, line);
-        watchedResource = resource;
-    }
-}
-#endif
-
-
 bool LineRenderer::Create(int capacity) {
-#if DBG_DIRECTX
-    fprintf(stderr, "line renderer Create (%d) at %s:%d (LineRenderer @%p)\n", capacity, __FILE__, __LINE__, static_cast<void*>(this));
-#endif
     Destroy();
     if (capacity < 1)
         capacity = 1;
     if (not m_buffer.Create(capacity))
         return false;
-#if DBG_DIRECTX
-    watchedResource = m_buffer.m_resource.Get();
-#endif
     m_lines.Resize(capacity);
     m_lineCapacity = capacity;
     m_capacity = capacity;
@@ -42,9 +23,6 @@ bool LineRenderer::Create(int capacity) {
 
 
 void LineRenderer::Destroy(void) {
-#if DBG_DIRECTX
-    fprintf(stderr, "line renderer Destroy at %s:%d (LineRenderer @%p)\n", __FILE__, __LINE__, static_cast<void*>(this));
-#endif
     m_buffer.Destroy();
     m_lines.Reset();
     m_lineCapacity = 0;
@@ -80,16 +58,10 @@ bool LineRenderer::ReserveBuffer(int count) {
 
     while (newCapacity < count)
         newCapacity *= 2;
-#if DBG_DIRECTX
-    fprintf(stderr, "line renderer grows buffer %d -> %d at %s:%d (LineRenderer @%p)\n", m_capacity, newCapacity, __FILE__, __LINE__, static_cast<void*>(this));
-#endif
     if (not m_buffer.Create(newCapacity)) {
         m_isAvailable = false;
         return false;
     }
-#if DBG_DIRECTX
-    watchedResource = m_buffer.m_resource.Get();
-#endif
     m_capacity = newCapacity;
     return true;
 }
@@ -151,9 +123,6 @@ void LineRenderer::SetupQuad(void) {
 bool LineRenderer::Render(void) {
     if (not m_isAvailable or (m_count <= 0))
         return false;
-#if DBG_DIRECTX
-    CheckWatchedResource(m_buffer.m_resource.Get(), "Render (start)", __LINE__);
-#endif
     if (not ReserveBuffer(m_buffer.AppendBase() + m_count))
         return false;
 
@@ -211,9 +180,6 @@ bool LineRenderer::Render(void) {
     gfxStates.SetFaceCulling(prevCull);
     gfxStates.BlendFunc(prevSrc, prevDst);
     gfxStates.SetBlending(prevBlend);
-#if DBG_DIRECTX
-    CheckWatchedResource(m_buffer.m_resource.Get(), "Render (end)", __LINE__);
-#endif
     return ok;
 }
 
