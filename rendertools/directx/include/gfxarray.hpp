@@ -12,6 +12,8 @@
 #include <type_traits>
 #include <cstdio>
 #include <cstring>
+#include <source_location>
+#include <memory>
 
 // =================================================================================================
 
@@ -48,7 +50,22 @@ public:
 
     GfxArray() = default;
 
+    GfxArray(const GfxArray&) = delete;
+
+    GfxArray& operator=(const GfxArray&) = delete;
+
     ~GfxArray() { Destroy(); }
+
+    void LogClosed([[maybe_unused]] const char* what, [[maybe_unused]] const std::source_location& loc = std::source_location::current()) noexcept {
+#if DBG_DIRECTX
+        if constexpr (sizeof(DATA_T) == 64) {
+            if (m_resource)
+                fprintf(stderr, "line buffer closed: %s at %s:%u (GfxArray @%p, resource %p, %u x %u, shutdown %d)\n",
+                        what, loc.file_name(), unsigned(loc.line()), static_cast<void*>(this), static_cast<void*>(m_resource.Get()),
+                        m_width, m_height, GfxResourceHandler::IsShuttingDown() ? 1 : 0);
+        }
+#endif
+    }
 
     inline DATA_T* Data(void) { return m_data.Data(); }
     inline int DataSize(void) { return m_data.DataSize(); }
@@ -64,17 +81,22 @@ public:
         char name[160];
         snprintf(name, sizeof(name), "GfxArray[%s %zu B x %u x %u @%p] %s", isBuffer ? "buffer" : "texture", sizeof(DATA_T), m_width, m_height, static_cast<void*>(this), role);
         resource->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+        if constexpr (sizeof(DATA_T) == 64) {
+            if (std::strcmp(role, "data") == 0)
+                WatchDestruction(resource, name);
+        }
 #endif
     }
 
-    bool Create(int width, int height = 1) {
+    bool Create(int width, int height = 1, const std::source_location& loc = std::source_location::current()) {
         if constexpr (isBuffer)
-            return CreateBuffer(width, height);
+            return CreateBuffer(width, height, loc);
         else
-            return CreateTexture(width, height);
+            return CreateTexture(width, height, loc);
     }
 
-    void Destroy(void) {
+    void Destroy(const std::source_location& loc = std::source_location::current()) {
+        LogClosed("Destroy", loc);
         if (not GfxResourceHandler::IsShuttingDown())
             commandListHandler.UnbindBuffer(&m_state);
         if (m_resource) {
@@ -145,7 +167,7 @@ public:
     bool Bind(uint32_t bindingPoint) {
         if (not m_resource or not m_uavHandle.IsValid() or (bindingPoint >= uint32_t(Shader::kUavSlots)))
             return false;
-        commandListHandler.BindStorageBuffer(bindingPoint, m_uavHandle.index, &m_resource, &m_state);
+        commandListHandler.BindStorageBuffer(bindingPoint, m_uavHandle.index, std::addressof(m_resource), &m_state);
         return true;
     }
 
@@ -157,7 +179,7 @@ public:
     bool BindReadOnly(uint32_t bindingPoint) {
         if (not isBuffer or not m_resource or not m_srvHandle.IsValid() or (bindingPoint >= uint32_t(Shader::kSsboSlots)))
             return false;
-        commandListHandler.BindReadOnlyBuffer(bindingPoint, m_srvHandle.index, &m_resource, &m_state);
+        commandListHandler.BindReadOnlyBuffer(bindingPoint, m_srvHandle.index, std::addressof(m_resource), &m_state);
         return true;
     }
 
@@ -272,8 +294,8 @@ private:
         return upload;
     }
 
-    bool CreateTexture(int width, int height) {
-        Destroy();
+    bool CreateTexture(int width, int height, const std::source_location& loc = std::source_location::current()) {
+        Destroy(loc);
         m_width = UINT(width);
         m_height = UINT(height);
         int size = width * height;
@@ -295,12 +317,14 @@ private:
         rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
         m_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+        LogClosed("CreateTexture CreateCommittedResource");
         if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, m_state, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
         NameResource(m_resource.Get(), "data");
 
         m_uavHandle = descriptorHeaps.AllocSRV();
         if (not m_uavHandle.IsValid()) {
+            LogClosed("CreateTexture AllocSRV failed");
             m_resource.Reset();
             return false;
         }
@@ -320,6 +344,7 @@ private:
         if (FAILED(device->CreateDescriptorHeap(&cpuHeapDesc, IID_PPV_ARGS(&m_cpuHeap)))) {
             descriptorHeaps.FreeSRV(m_uavHandle);
             m_uavHandle = {};
+            LogClosed("CreateTexture CreateDescriptorHeap failed");
             m_resource.Reset();
             return false;
         }
@@ -328,8 +353,8 @@ private:
         return true;
     }
 
-    bool CreateBuffer(int width, int height) {
-        Destroy();
+    bool CreateBuffer(int width, int height, const std::source_location& loc = std::source_location::current()) {
+        Destroy(loc);
         m_width = UINT(width);
         m_height = UINT(height);
         int size = width * height;
@@ -355,12 +380,14 @@ private:
         // Buffers ignore a non-COMMON InitialState (D3D12 warning 1328) and are created in COMMON.
         // Track that honestly so the first SetBarrier transitions from the real state, not a phantom one.
         m_state = D3D12_RESOURCE_STATE_COMMON;
+        LogClosed("CreateBuffer CreateCommittedResource");
         if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, m_state, nullptr, IID_PPV_ARGS(&m_resource))))
             return false;
         NameResource(m_resource.Get(), "data");
 
         m_uavHandle = descriptorHeaps.AllocSRV();
         if (not m_uavHandle.IsValid()) {
+            LogClosed("CreateBuffer AllocSRV (UAV) failed");
             m_resource.Reset();
             return false;
         }
@@ -380,6 +407,7 @@ private:
         if (not m_srvHandle.IsValid()) {
             descriptorHeaps.FreeSRV(m_uavHandle);
             m_uavHandle = {};
+            LogClosed("CreateBuffer AllocSRV (SRV) failed");
             m_resource.Reset();
             return false;
         }

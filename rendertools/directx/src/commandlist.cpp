@@ -207,10 +207,6 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     m_isFlushed = false;
     m_openSerial = gfxResourceHandler.NextSerial();
     commandListHandler.NoteRecording(this);
-#if DBG_DIRECTX
-    if (std::strncmp(static_cast<const char*>(m_name), "RenderTarget:", 13) == 0)
-        fprintf(stderr, "Open '%s' serial %llu frame %llu\n", static_cast<const char*>(m_name), (unsigned long long)m_openSerial, (unsigned long long)commandListHandler.FrameNumber());
-#endif
     m_activePSO = nullptr;
     m_activeRootSignature = nullptr;
     m_descriptorHeapsBound = false;
@@ -617,7 +613,7 @@ bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
     }
     {
         ZoneScopedN("gfxResourceHandler::Cleanup");
-        ReleaseFrameResources("BeginFrame");
+        ReleaseFrameResources();
     }
     TracyD3D12Collect(m_gpuProfilerCtx);
 #if DBG_DIRECTX
@@ -675,7 +671,7 @@ void CommandListHandler::Flush(void) noexcept {
     ZoneScoped;
     ExecuteAll();
     m_cmdQueue.WaitIdle();
-    ReleaseFrameResources("Flush");
+    ReleaseFrameResources();
     ResetBindings();
 }
 
@@ -809,7 +805,7 @@ void CommandListHandler::DrainFrameResources(void) noexcept {
         cbvAllocator.Reset(UINT(m_frameIndex));
         descriptorHeaps.ResetTables(uint32_t(m_frameIndex));
     }
-    ReleaseFrameResources("DrainFrameResources");
+    ReleaseFrameResources();
     ResetBindings();
 }
 
@@ -847,21 +843,10 @@ CommandList* CommandListHandler::OldestRecordingList(void) const noexcept {
 }
 
 
-void CommandListHandler::ReleaseFrameResources(const char* site) noexcept {
+void CommandListHandler::ReleaseFrameResources(void) noexcept {
     CommandList* oldestList = OldestRecordingList();
 
-#if DBG_DIRECTX
-    static uint64_t reportedSerial = 0;
-
-    if (oldestList and (std::strcmp(site, "BeginFrame") == 0) and (oldestList->m_openSerial != reportedSerial)) {
-        reportedSerial = oldestList->m_openSerial;
-        fprintf(stderr, "ReleaseFrameResources: '%s' (open serial %llu) records across BeginFrame (frame %llu)\n",
-                (const char*)oldestList->GetName(), (unsigned long long)oldestList->m_openSerial, (unsigned long long)m_frameNumber);
-    }
-    gfxResourceHandler.CleanupBefore(m_frameIndex, oldestList ? oldestList->m_openSerial : UINT64_MAX, site, oldestList ? (const char*)oldestList->GetName() : nullptr);
-#else
     gfxResourceHandler.CleanupBefore(m_frameIndex, oldestList ? oldestList->m_openSerial : UINT64_MAX);
-#endif
 }
 
 

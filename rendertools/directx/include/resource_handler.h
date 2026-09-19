@@ -69,7 +69,7 @@ public:
     // upstream (init phases, explicit Flush()).
     void Cleanup(int frameIndex, bool waitIdle = false) noexcept;
 
-    void CleanupBefore(int frameIndex, uint64_t serialLimit, const char* site = nullptr, const char* openList = nullptr) noexcept;
+    void CleanupBefore(int frameIndex, uint64_t serialLimit) noexcept;
 
     inline uint64_t NextSerial(void) noexcept {
         return ++m_serial;
