@@ -294,6 +294,10 @@ public:
 
     VkCommandBuffer UploadCmdBuffer(void) noexcept;
 
+    bool UsesOrderedCopyList(void) noexcept;
+
+    CommandList* OpenOrderedCopyList(void) noexcept;
+
     // The rendering scope open on the current command buffer, closed for commands that are illegal
     // inside one (copies, fills) and reopened with its contents kept. For work that has to stay in
     // recording order; what may run ahead of the frame goes through UploadCmdBuffer () instead.

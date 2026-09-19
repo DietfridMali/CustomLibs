@@ -394,7 +394,12 @@ private:
             std::memcpy(dst + row * footprint.Footprint.RowPitch, src + row * srcRowPitch, srcRowPitch);
         upload->Unmap(0, nullptr);
 
-        auto* list = commandListHandler.CurrentGfxList();
+        CommandList* copyList = nullptr;
+        if (commandListHandler.UsesOrderedCopyList()) {
+            if (not (copyList = commandListHandler.OpenOrderedCopyList()))
+                return false;
+        }
+        auto* list = copyList ? copyList->GfxList() : commandListHandler.CurrentGfxList();
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -411,6 +416,8 @@ private:
 
         list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        if (copyList)
+            copyList->Close(false);
         return true;
     }
 
@@ -443,12 +450,19 @@ private:
         std::memcpy(mapped, m_data.Data(), byteSize);
         upload->Unmap(0, nullptr);
 
-        auto* list = commandListHandler.CurrentGfxList();
+        CommandList* copyList = nullptr;
+        if (commandListHandler.UsesOrderedCopyList()) {
+            if (not (copyList = commandListHandler.OpenOrderedCopyList()))
+                return false;
+        }
+        auto* list = copyList ? copyList->GfxList() : commandListHandler.CurrentGfxList();
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
         list->CopyBufferRegion(m_resource.Get(), 0, upload.Get(), 0, byteSize);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        if (copyList)
+            copyList->Close(false);
         return true;
     }
 
@@ -486,12 +500,19 @@ private:
         std::memcpy(static_cast<uint8_t*>(mapped) + offset, reinterpret_cast<const uint8_t*>(m_data.Data()) + offset, bytes);
         upload->Unmap(0, nullptr);
 
-        auto* list = commandListHandler.CurrentGfxList();
+        CommandList* copyList = nullptr;
+        if (commandListHandler.UsesOrderedCopyList()) {
+            if (not (copyList = commandListHandler.OpenOrderedCopyList()))
+                return false;
+        }
+        auto* list = copyList ? copyList->GfxList() : commandListHandler.CurrentGfxList();
         if (not list)
             return false;
         SetBarrier(list, D3D12_RESOURCE_STATE_COPY_DEST);
         list->CopyBufferRegion(m_resource.Get(), offset, upload.Get(), offset, bytes);
         SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        if (copyList)
+            copyList->Close(false);
         return true;
     }
 

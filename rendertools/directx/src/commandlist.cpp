@@ -606,6 +606,21 @@ void CommandListHandler::DrainFrameResources(void) noexcept {
 }
 
 
+bool CommandListHandler::UsesOrderedCopyList(void) noexcept {
+    return baseRenderer.DrawBuffersSuspended();
+}
+
+
+CommandList* CommandListHandler::OpenOrderedCopyList(void) noexcept {
+    if (not UsesOrderedCopyList())
+        return nullptr;
+    CommandList* cl = CreateCmdList(String("OrderedCopy"), true);
+    if (not (cl and cl->Open(false)))
+        return nullptr;
+    return cl;
+}
+
+
 CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary) noexcept {
     if (isTemporary and not m_recycledLists.IsEmpty()) {
         CommandList* cl = m_recycledLists.Pop();

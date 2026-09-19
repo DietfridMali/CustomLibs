@@ -50,6 +50,10 @@ public:
 
     void ResumeDrawBuffers(void);
 
+    inline bool DrawBuffersSuspended(void) const noexcept {
+        return (m_suspendCount > 0) and (m_activeBuffer == nullptr);
+    }
+
     void SetActiveDrawBuffers(void);
 
     inline RenderTarget* GetActiveBuffer(void) noexcept {

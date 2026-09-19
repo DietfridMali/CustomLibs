@@ -252,7 +252,7 @@ public:
             return false;
 
         uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
-        if (not AcquireStaging(fi, 0, m_bufferSize))
+        if (not AcquireStaging(fi, 0, m_bufferSize, true))
             return false;
 
         void* mapped = nullptr;
@@ -290,7 +290,7 @@ public:
         // clobber the first slot's not-yet-executed copy. Costs one full-width host-visible buffer per
         // frame slot; the per-frame rotation still guards against frames-in-flight reuse.
         uint32_t fi = commandListHandler.CmdQueue().FrameIndex();
-        if (not AcquireStaging(fi, dstOffset, bytes))
+        if (not AcquireStaging(fi, dstOffset, bytes, ordered))
             return false;
 
         void* mapped = nullptr;
@@ -349,9 +349,14 @@ private:
         region.dstOffset = dstOffset;
         region.size = bytes;
 
-        VkCommandBuffer frameCB = commandListHandler.CurrentGfxList();
+        CommandList* copyList = nullptr;
+        if (ordered and commandListHandler.UsesOrderedCopyList()) {
+            if (not (copyList = commandListHandler.OpenOrderedCopyList()))
+                return false;
+        }
+        VkCommandBuffer frameCB = copyList ? copyList->GfxList() : commandListHandler.CurrentGfxList();
         CommandListHandler::RenderingScope scope;
-        if ((frameCB != VK_NULL_HANDLE) and commandListHandler.IsInRendering()) {
+        if (not copyList and (frameCB != VK_NULL_HANDLE) and commandListHandler.IsInRendering()) {
             if (ordered)
                 scope = commandListHandler.SuspendRendering();
             else {
@@ -381,6 +386,8 @@ private:
             dep.pBufferMemoryBarriers    = &b;
             vkCmdPipelineBarrier2(frameCB, &dep);
             commandListHandler.ResumeRendering(scope);
+            if (copyList)
+                copyList->Close(false);
             return true;
         }
 
@@ -399,9 +406,9 @@ private:
     // staging buffer of its own; the old one is released once the frame is through. Disjoint ranges
     // (LineRenderer's appended batches) share the buffer. Without an open command list the copy runs at
     // once (one-shot) and nothing has to be kept apart.
-    bool AcquireStaging(uint32_t fi, VkDeviceSize offset, VkDeviceSize bytes) noexcept {
+    bool AcquireStaging(uint32_t fi, VkDeviceSize offset, VkDeviceSize bytes, bool ordered) noexcept {
         const uint64_t frame = commandListHandler.CmdQueue().FrameNumber();
-        const bool isDeferred = commandListHandler.CurrentGfxList() != VK_NULL_HANDLE;
+        const bool isDeferred = (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE) or (ordered and commandListHandler.UsesOrderedCopyList());
         bool sameFrame = isDeferred and (m_uploadBuffer[fi] != VK_NULL_HANDLE) and (m_stagedFrame[fi] == frame) and (m_stagedMax[fi] > m_stagedMin[fi]);
         if (sameFrame and (offset < m_stagedMax[fi]) and (offset + bytes > m_stagedMin[fi])) {
             VmaAllocator allocator = vkContext.Allocator();

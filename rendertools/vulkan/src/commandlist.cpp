@@ -866,6 +866,23 @@ CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTempor
 }
 
 
+bool CommandListHandler::UsesOrderedCopyList(void) noexcept
+{
+    return baseRenderer.DrawBuffersSuspended();
+}
+
+
+CommandList* CommandListHandler::OpenOrderedCopyList(void) noexcept
+{
+    if (not UsesOrderedCopyList())
+        return nullptr;
+    CommandList* cl = CreateCmdList(String("OrderedCopy"), true);
+    if (not (cl and cl->Open(false)))
+        return nullptr;
+    return cl;
+}
+
+
 bool CommandListHandler::IsInRendering(void) noexcept
 {
     VkCommandBuffer cb = CurrentGfxList();

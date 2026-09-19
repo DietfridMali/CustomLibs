@@ -274,6 +274,10 @@ public:
 
     void DrainFrameResources(void) noexcept;
 
+    bool UsesOrderedCopyList(void) noexcept;
+
+    CommandList* OpenOrderedCopyList(void) noexcept;
+
     uint64_t ProfilerQueryCount(void) const noexcept;
 
     void CloseProfilerQueries(bool keepRecording) noexcept;
