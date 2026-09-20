@@ -105,14 +105,15 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
 
 
 bool GfxDataBuffer::Create(int slot, size_t dataSize) {
+    m_resource[slot] = gfxResourceHandler.AcquireUpload(dataSize);
+    if (not m_resource[slot])
+        return false;
 #if DBG_DIRECTX
     char name[128];
     snprintf(name, sizeof(name), "GfxDataBuffer[%s/%d] slot %d", m_type, m_id, slot);
-    m_resource[slot] = gfxResourceHandler.GetUploadResource(name, dataSize);
-#else
-    m_resource[slot] = gfxResourceHandler.GetUploadResource("", dataSize);
+    m_resource[slot]->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
 #endif
-    return m_resource[slot] != nullptr;
+    return true;
 }
 
 
@@ -154,7 +155,7 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     const bool needsFreshBuffer = sameFrameReupdate or not m_isDynamic;
     if (needsFreshBuffer or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
         if (m_resource[slot])
-            gfxResourceHandler.Track(m_resource[slot]);
+            gfxResourceHandler.TrackUpload(m_resource[slot]);
         if (not Create(slot, dataSize))
             return false;
     }
@@ -190,7 +191,7 @@ void GfxDataBuffer::Clear(void) noexcept
 {
     for (auto& r : m_resource) {
         if (r)
-            gfxResourceHandler.Track(r);
+            gfxResourceHandler.TrackUpload(r);
         r.Reset();
     }
     m_vbv = {};
@@ -204,7 +205,7 @@ void GfxDataBuffer::Destroy(void) noexcept
 {
     for (auto& r : m_resource) {
         if (r)
-            gfxResourceHandler.Track(r);
+            gfxResourceHandler.TrackUpload(r);
         r.Reset();
     }
     m_vbv = {};

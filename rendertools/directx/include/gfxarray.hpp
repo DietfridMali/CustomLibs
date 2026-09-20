@@ -99,7 +99,7 @@ public:
                 gfxResourceHandler.Track(m_resource);
                 for (auto& upload : m_upload) {
                     if (upload)
-                        gfxResourceHandler.Track(upload);
+                        gfxResourceHandler.TrackUpload(upload);
                 }
                 if (m_readback)
                     gfxResourceHandler.Track(m_readback);
@@ -259,7 +259,7 @@ private:
         ComPtr<ID3D12Resource>& upload = m_upload[fi];
         bool sameFrame = upload and (m_stagedFrame[fi] == frame) and (m_stagedMax[fi] > m_stagedMin[fi]);
         if (sameFrame and (offset < m_stagedMax[fi]) and (offset + bytes > m_stagedMin[fi])) {
-            gfxResourceHandler.Track(upload);
+            gfxResourceHandler.TrackUpload(upload);
             upload.Reset();
             sameFrame = false;
         }
@@ -417,14 +417,8 @@ private:
 
         ComPtr<ID3D12Resource>& upload = AcquireUpload(0, size_t(totalBytes));
         if (not upload) {
-            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-            D3D12_RESOURCE_DESC rd{};
-            rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            rd.Width = totalBytes;
-            rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
-            rd.SampleDesc.Count = 1;
-            rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
+            upload = gfxResourceHandler.AcquireUpload(size_t(totalBytes));
+            if (not upload)
                 return false;
             NameResource(upload.Get(), "upload");
         }
@@ -476,14 +470,8 @@ private:
 
         ComPtr<ID3D12Resource>& upload = AcquireUpload(0, byteSize);
         if (not upload) {
-            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-            D3D12_RESOURCE_DESC rd{};
-            rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            rd.Width = byteSize;
-            rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
-            rd.SampleDesc.Count = 1;
-            rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
+            upload = gfxResourceHandler.AcquireUpload(byteSize);
+            if (not upload)
                 return false;
             NameResource(upload.Get(), "upload");
         }
@@ -524,14 +512,8 @@ private:
 
         ComPtr<ID3D12Resource>& upload = AcquireUpload(offset, bytes);
         if (not upload) {
-            D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_UPLOAD };
-            D3D12_RESOURCE_DESC rd{};
-            rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-            rd.Width = fullSize;
-            rd.Height = rd.DepthOrArraySize = rd.MipLevels = 1;
-            rd.SampleDesc.Count = 1;
-            rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-            if (FAILED(device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&upload))))
+            upload = gfxResourceHandler.AcquireUpload(fullSize);
+            if (not upload)
                 return false;
             NameResource(upload.Get(), "upload");
         }

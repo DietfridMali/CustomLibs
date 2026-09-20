@@ -28,10 +28,32 @@ public:
 
 private:
     using SerialArray = AutoArray<uint64_t>;
+    using UploadPool = AutoArray<ComPtr<ID3D12Resource>>;
+
+    // Upload heap buffers are handed out from a pool instead of being created and destroyed per use.
+    // Every buffer of a size class has the size class' size, so any of them serves any request of
+    // that class. D3D12 has no suballocator of its own - each committed resource is a driver
+    // allocation, and creating and releasing hundreds of them per frame costs milliseconds (the
+    // Vulkan backend gets this for free from VMA).
+    static constexpr int        kUploadBuckets = 32;
+    static constexpr int        kSmallestUploadBucket = 8;              // 256 bytes
+    static constexpr size_t     kUploadPoolLimit = size_t(512) << 20;   // bytes held in the pool
+
+    UploadPool                  m_uploadPool[kUploadBuckets];
+    size_t                      m_uploadPoolBytes{ 0 };
+    uint32_t                    m_uploadsCreated{ 0 };
+    uint32_t                    m_uploadsReused{ 0 };
+    uint32_t                    m_resourcesReleased{ 0 };
+
+    static int UploadBucket(size_t size) noexcept;
+
+    bool Recycle(ComPtr<ID3D12Pageable>& resource) noexcept;
 
     AutoArray<ResourceArray>    m_frameResources;
+    AutoArray<ResourceArray>    m_frameUploads;
     AutoArray<DescriptorArray>         m_frameDescriptors;
     AutoArray<SerialArray>      m_frameResourceSerials;
+    AutoArray<SerialArray>      m_frameUploadSerials;
     AutoArray<SerialArray>      m_frameDescriptorSerials;
     uint64_t                    m_serial{ 0 };
     uint64_t                    m_lastAllocSerial{ 0 };
@@ -58,9 +80,20 @@ public:
     // are still alive, before BeginShutdown().
     void CleanupAll(void) noexcept;
 
+    void ReleaseUploadPool(void) noexcept;
+
     ComPtr<ID3D12Resource> GetUploadResource(const char* name, size_t dataSize);
 
+    // An upload heap buffer of at least this size, from the pool when one is free. Not tracked -
+    // the caller owns it and hands it back by tracking it for deferred release.
+    ComPtr<ID3D12Resource> AcquireUpload(size_t size) noexcept;
+
     void Track(ComPtr<ID3D12Pageable> resource) noexcept;
+
+    // Hands an upload buffer BACK to the pool once the frames that may still read it are through.
+    // The caller gives up ownership here - unlike Track (), which only drops one reference and leaves
+    // the resource to whoever else holds it.
+    void TrackUpload(ComPtr<ID3D12Resource> resource) noexcept;
 
     void Track(const DescriptorHandle& handle) noexcept;
 

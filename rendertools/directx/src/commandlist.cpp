@@ -220,6 +220,7 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
     m_gpuZone = new tracy::D3D12ZoneScope(commandListHandler.m_gpuProfilerCtx,
         uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
         (const char*)m_name, size_t(m_name.Length()), m_gfxListPtr.Get(), true);
+    ++commandListHandler.m_gpuZonesOpened;
 #endif
     m_savedRenderStates = saveRenderStates;
     if (saveRenderStates)
@@ -239,6 +240,8 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
     commandListHandler.NoteStopped(this);
 #if USE_TRACY
     // End the GPU zone (writes the end timestamp + ResolveQueryData) while the list is still open.
+    if (m_gpuZone)
+        ++commandListHandler.m_gpuZonesClosed;
     delete m_gpuZone;
     m_gpuZone = nullptr;
 #endif
@@ -424,6 +427,9 @@ bool CommandListHandler::Create(ID3D12Device* device) noexcept {
         return false;
     gfxResourceHandler.Init(m_frameCount);
     m_gpuProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
+#if USE_TRACY
+    fprintf(stderr, "CommandListHandler::Create: Tracy GPU context %s\n", m_gpuProfilerCtx ? "created" : "NOT created - no GPU zones");
+#endif
     ResetBindings();
     return true;
 }
@@ -663,6 +669,17 @@ void CommandListHandler::CloseProfilerQueries(bool keepRecording) noexcept {
         keepCount = queryCounter;
     m_closedQueryCount += queryCounter - keepCount;
     m_gpuProfilerCtx->NewFrame(keepCount);
+    {
+        static uint64_t reportFrame = 0;
+
+        if (m_frameNumber >= reportFrame) {
+            reportFrame = m_frameNumber + 300;
+            fprintf(stderr, "Tracy GPU: frame %llu, zones opened %llu, closed %llu, queries %u -> %u, kept %u, connected %d\n",
+                    (unsigned long long)m_frameNumber, (unsigned long long)m_gpuZonesOpened, (unsigned long long)m_gpuZonesClosed,
+                    queryCounter, m_gpuProfilerCtx->QueryCounter(), keepCount, tracy::GetProfiler().IsConnected() ? 1 : 0);
+            fflush(stderr);
+        }
+    }
 #endif
 }
 
