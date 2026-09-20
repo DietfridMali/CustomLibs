@@ -17,6 +17,7 @@ void GfxResourceHandler::Init(int frameCount) noexcept {
     m_frameDescriptors.Resize(frameCount);
     m_frameResourceSerials.Resize(frameCount);
     m_frameUploadSerials.Resize(frameCount);
+    m_frameUploadFrames.Resize(frameCount);
     m_frameDescriptorSerials.Resize(frameCount);
 }
 
@@ -40,8 +41,19 @@ ComPtr<ID3D12Resource> GfxResourceHandler::AcquireUpload(size_t size) noexcept {
 
     if (bucketSize < size)
         return nullptr;
-    if (m_uploadPool[bucket].Length() > 0) {
-        ComPtr<ID3D12Resource> resource = m_uploadPool[bucket].Pop();
+
+    UploadPool&     pool = m_uploadPool[bucket];
+    const uint64_t  frame = commandListHandler.FrameNumber();
+    const uint64_t  framesInFlight = uint64_t(commandListHandler.FrameCount());
+
+    for (int32_t i = 0; i < pool.Length(); ++i) {
+        if (pool[i].frame + framesInFlight > frame)
+            continue;
+
+        ComPtr<ID3D12Resource> resource = pool[i].resource;
+
+        pool[i] = pool[pool.Length() - 1];
+        pool.Pop();
         m_uploadPoolBytes -= bucketSize;
         ++m_uploadsReused;
         return resource;
@@ -63,7 +75,7 @@ ComPtr<ID3D12Resource> GfxResourceHandler::AcquireUpload(size_t size) noexcept {
 }
 
 
-bool GfxResourceHandler::Recycle(ComPtr<ID3D12Pageable>& resource) noexcept {
+bool GfxResourceHandler::Recycle(ComPtr<ID3D12Pageable>& resource, uint64_t frame) noexcept {
     if (s_shutdown or not resource)
         return false;
 
@@ -89,7 +101,7 @@ bool GfxResourceHandler::Recycle(ComPtr<ID3D12Pageable>& resource) noexcept {
         return false;
     if (m_uploadPoolBytes + size_t(desc.Width) > kUploadPoolLimit)
         return false;
-    m_uploadPool[bucket].Push(buffer);
+    m_uploadPool[bucket].Push({ buffer, frame });
     m_uploadPoolBytes += size_t(desc.Width);
     return true;
 }
@@ -139,6 +151,7 @@ void GfxResourceHandler::TrackUpload(ComPtr<ID3D12Resource> resource) noexcept {
         return;
     m_frameUploads[fi].Push(std::move(resource));
     m_frameUploadSerials[fi].Push(NextSerial());
+    m_frameUploadFrames[fi].Push(commandListHandler.FrameNumber());
 }
 
 
@@ -169,6 +182,7 @@ void GfxResourceHandler::Cleanup(int frameIndex, bool waitIdle) noexcept {
     m_frameDescriptorSerials[frameIndex].Clear();
     m_frameResourceSerials[frameIndex].Clear();
     m_frameUploadSerials[frameIndex].Clear();
+    m_frameUploadFrames[frameIndex].Clear();
 }
 
 
@@ -206,17 +220,22 @@ void GfxResourceHandler::CleanupBefore(int frameIndex, uint64_t serialLimit) noe
 
     ResourceArray uploads = std::move(m_frameUploads[frameIndex]);
     SerialArray uploadSerials = std::move(m_frameUploadSerials[frameIndex]);
+    SerialArray uploadFrames = std::move(m_frameUploadFrames[frameIndex]);
 
     m_frameUploads[frameIndex].Clear();
     m_frameUploadSerials[frameIndex].Clear();
+    m_frameUploadFrames[frameIndex].Clear();
     for (int32_t i = 0; i < uploads.Length(); ++i) {
         if (uploadSerials[i] < serialLimit) {
-            if (not Recycle(uploads[i]))
+            // the frame the buffer was RELEASED in travels into the pool - that is what says when it
+            // may be handed out again (PooledUpload), not the frame this drain happens to run in
+            if (not Recycle(uploads[i], uploadFrames[i]))
                 ++m_resourcesReleased;
             continue;
         }
         m_frameUploads[frameIndex].Push(std::move(uploads[i]));
         m_frameUploadSerials[frameIndex].Push(uploadSerials[i]);
+        m_frameUploadFrames[frameIndex].Push(uploadFrames[i]);
     }
     TracyPlot("DX uploads created", int64_t(m_uploadsCreated));
     TracyPlot("DX uploads reused", int64_t(m_uploadsReused));

@@ -60,7 +60,9 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
         for (auto& b : m_buffer)
             b = GfxBuffer { };
         m_activeSlot = 0;
-        m_lastUpdateFrame = UINT64_MAX;
+        m_liveSlot = -1;
+        for (auto& frame : m_slotRetiredFrame)
+            frame = 0;
         m_size = 0;
         m_itemSize = other.m_itemSize;
         m_itemCount = 0;
@@ -88,7 +90,9 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
             other.m_buffer[i] = GfxBuffer { };
         }
         m_activeSlot = other.m_activeSlot;
-        m_lastUpdateFrame = other.m_lastUpdateFrame;
+        m_liveSlot = other.m_liveSlot;
+        for (int i = 0; i < FRAME_COUNT; ++i)
+            m_slotRetiredFrame[i] = other.m_slotRetiredFrame[i];
 
         m_size = other.m_size;
         m_itemSize = other.m_itemSize;
@@ -152,10 +156,20 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // A static buffer has no slot rotation to protect it, so ANY update of one that already holds
     // data is treated the same way: the frame before may still be in flight with a draw that reads
     // slot 0, and writing the new data into it would hand that draw the next frame's vertices.
+    //
+    // Rotation alone is NOT enough, and this is what the slot bookkeeping below is for: a buffer is
+    // read by every frame from the update that wrote it until the next one, not just by the frame it
+    // was written in. A buffer that is updated only now and then - the level mesh's index buffer is
+    // rewritten only when the batch layout changes - is therefore still being drawn from in the frame
+    // before this one, out of the very slot this frame's index picks next. The frame fence covers the
+    // frame with THIS index, never the one in between, so writing there hands a draw that is still in
+    // flight half of the next layout. A slot may be written in place only when it is not the live one
+    // and the frames in flight since it was retired are through.
     const uint64_t frameNumber = commandListHandler.CmdQueue().FrameNumber();
+    const uint64_t framesInFlight = uint64_t(FRAME_COUNT);
     const int slot = m_isDynamic ? int(commandListHandler.CmdQueue().FrameIndex()) : 0;
-    const bool sameFrameReupdate = (frameNumber == m_lastUpdateFrame);
-    const bool needsFreshBuffer = sameFrameReupdate or not m_isDynamic;
+    const bool slotIsBusy = m_buffer[slot].IsValid() and ((slot == m_liveSlot) or (m_slotRetiredFrame[slot] + framesInFlight > frameNumber));
+    const bool needsFreshBuffer = slotIsBusy or not m_isDynamic;
 
     if (needsFreshBuffer and m_buffer[slot].IsValid()) {
         gfxResourceHandler.TrackCleanup([b = m_buffer[slot]]() mutable { b.Destroy(); });
@@ -166,8 +180,10 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
         if (not Create(slot, dataSize))
             return false;
     }
+    if ((m_liveSlot >= 0) and (m_liveSlot != slot))
+        m_slotRetiredFrame[m_liveSlot] = frameNumber;
+    m_liveSlot = slot;
     m_activeSlot = slot;
-    m_lastUpdateFrame = frameNumber;
 
     return m_buffer[slot].Upload(data, VkDeviceSize(dataSize), 0);
 }

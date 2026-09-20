@@ -33,7 +33,11 @@ public:
 
     GfxBuffer           m_buffer[FRAME_COUNT];  // VkBuffer + VmaAllocation; dynamic buffers rotate slots per frame
     int                 m_activeSlot{ 0 };      // slot the last Update wrote — what Buffer() / IsValid() report
-    uint64_t            m_lastUpdateFrame{ UINT64_MAX };  // FrameNumber() of the last Update — detects same-frame re-update
+    // Which slot is drawn from, and when a slot stopped being that one. A buffer is drawn from its
+    // live slot in EVERY frame until the next Update, not only in the frame it was written in - so
+    // slot rotation alone says nothing about whether a slot is free (see Update ()).
+    int                 m_liveSlot{ -1 };
+    uint64_t            m_slotRetiredFrame[FRAME_COUNT]{};
 
     uint32_t            m_size;           // total buffer size in bytes
     size_t              m_itemSize;       // bytes per vertex element (stride)

@@ -71,7 +71,9 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
         m_componentCount = other.m_componentCount;
         m_componentType = other.m_componentType;
         m_isDynamic = other.m_isDynamic;
-        m_lastUpdateFrame = other.m_lastUpdateFrame;
+        m_liveSlot = other.m_liveSlot;
+        for (int i = 0; i < FRAME_COUNT; ++i)
+            m_slotRetiredFrame[i] = other.m_slotRetiredFrame[i];
     }
     return *this;
 }
@@ -98,7 +100,9 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
         m_componentCount = other.m_componentCount;
         m_componentType = other.m_componentType;
         m_isDynamic = other.m_isDynamic;
-        m_lastUpdateFrame = other.m_lastUpdateFrame;
+        m_liveSlot = other.m_liveSlot;
+        for (int i = 0; i < FRAME_COUNT; ++i)
+            m_slotRetiredFrame[i] = other.m_slotRetiredFrame[i];
     }
     return *this;
 }
@@ -149,17 +153,29 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // A static buffer has no slot rotation to protect it, so ANY update of one that already holds
     // data is treated the same way: the frame before may still be in flight with a draw that reads
     // slot 0, and writing the new data into it would hand that draw the next frame's vertices.
+    //
+    // Rotation alone is NOT enough, and this is what the slot bookkeeping below is for: a buffer is
+    // read by every frame from the update that wrote it until the next one, not just by the frame it
+    // was written in. A buffer that is updated only now and then - the level mesh's index buffer is
+    // rewritten only when the batch layout changes - is therefore still being drawn from in the frame
+    // before this one, out of the very slot this frame's index picks next. BeginFrame waits for the
+    // frame with THIS index, never for the one in between, so writing there hands a draw that is
+    // still in flight half of the next layout. A slot may be written in place only when it is not
+    // the live one and the frames in flight since it was retired are through.
     const uint64_t frameNumber = commandListHandler.FrameNumber();
+    const uint64_t framesInFlight = uint64_t(commandListHandler.FrameCount());
     const int slot = m_isDynamic ? commandListHandler.FrameIndex() : 0;
-    const bool sameFrameReupdate = (frameNumber == m_lastUpdateFrame);
-    const bool needsFreshBuffer = sameFrameReupdate or not m_isDynamic;
+    const bool slotIsBusy = m_resource[slot] and ((slot == m_liveSlot) or (m_slotRetiredFrame[slot] + framesInFlight > frameNumber));
+    const bool needsFreshBuffer = slotIsBusy or not m_isDynamic;
     if (needsFreshBuffer or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
         if (m_resource[slot])
             gfxResourceHandler.TrackUpload(m_resource[slot]);
         if (not Create(slot, dataSize))
             return false;
     }
-    m_lastUpdateFrame = frameNumber;
+    if ((m_liveSlot >= 0) and (m_liveSlot != slot))
+        m_slotRetiredFrame[m_liveSlot] = frameNumber;
+    m_liveSlot = slot;
     ID3D12Resource* resource = m_resource[slot].Get();
 
     // Upload data

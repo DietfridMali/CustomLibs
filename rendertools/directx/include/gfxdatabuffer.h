@@ -40,7 +40,11 @@ public:
     int                      m_componentCount;
     ComponentType            m_componentType;  // Float / UInt32 / UInt16
     bool                     m_isDynamic;
-    uint64_t                 m_lastUpdateFrame{ UINT64_MAX };  // FrameNumber() of the last Update — detects same-frame re-update
+    // Which slot the views point at, and when a slot stopped being that one. A buffer is drawn from
+    // its live slot in EVERY frame until the next Update, not only in the frame it was written in -
+    // so slot rotation alone says nothing about whether a slot is free (see Update ()).
+    int                      m_liveSlot{ -1 };
+    uint64_t                 m_slotRetiredFrame[FRAME_COUNT]{};
 
     GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 

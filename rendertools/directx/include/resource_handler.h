@@ -28,7 +28,17 @@ public:
 
 private:
     using SerialArray = AutoArray<uint64_t>;
-    using UploadPool = AutoArray<ComPtr<ID3D12Resource>>;
+
+    // A pooled buffer together with the frame it was released in. It may not be handed out again
+    // before the fence of that frame has been waited for, and BeginFrame only waits for the frame
+    // that used the SAME frame index - so the buffer is free once FrameCount () frames have passed.
+    // Handing it out earlier gives a recorded draw of a frame still in flight the next frame's data.
+    struct PooledUpload {
+        ComPtr<ID3D12Resource>  resource;
+        uint64_t                frame{ 0 };
+    };
+
+    using UploadPool = AutoArray<PooledUpload>;
 
     // Upload heap buffers are handed out from a pool instead of being created and destroyed per use.
     // Every buffer of a size class has the size class' size, so any of them serves any request of
@@ -47,13 +57,14 @@ private:
 
     static int UploadBucket(size_t size) noexcept;
 
-    bool Recycle(ComPtr<ID3D12Pageable>& resource) noexcept;
+    bool Recycle(ComPtr<ID3D12Pageable>& resource, uint64_t frame) noexcept;
 
     AutoArray<ResourceArray>    m_frameResources;
     AutoArray<ResourceArray>    m_frameUploads;
     AutoArray<DescriptorArray>         m_frameDescriptors;
     AutoArray<SerialArray>      m_frameResourceSerials;
     AutoArray<SerialArray>      m_frameUploadSerials;
+    AutoArray<SerialArray>      m_frameUploadFrames;
     AutoArray<SerialArray>      m_frameDescriptorSerials;
     uint64_t                    m_serial{ 0 };
     uint64_t                    m_lastAllocSerial{ 0 };
