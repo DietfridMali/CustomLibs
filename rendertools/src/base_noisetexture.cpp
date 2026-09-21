@@ -691,7 +691,7 @@ bool BaseBlueNoiseTexture::Allocate(void) {
         return false;
     }
     m_data.Resize(BufferSize());
-    texBuf->m_info = TextureBuffer::BufferInfo(m_gridSize.x, m_gridSize.y * 64, 1, 0, 0);
+    texBuf->m_info = TextureBuffer::BufferInfo(m_gridSize.x, m_gridSize.y * m_gridSize.z, 1, 0, 0);
     return true;
 }
 

@@ -89,7 +89,7 @@ void DetailNoiseTexture::SetParams(bool) {
 
 
 bool BlueNoiseTexture::Deploy(int) {
-    return Upload3DTexture(*this, 128, 128, 64, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.DataPtr()));
+    return Upload3DTexture(*this, m_gridSize.x, m_gridSize.y, m_gridSize.z, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.DataPtr()));
 }
 
 
