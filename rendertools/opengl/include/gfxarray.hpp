@@ -139,7 +139,7 @@ public:
 	}
 
 
-	bool Download(void) const {
+	bool Download(void) {
 		if (not m_handle)
 			return false;
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
