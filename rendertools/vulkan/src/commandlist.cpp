@@ -1137,4 +1137,17 @@ void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDe
     }
 }
 
+
+void CommandListHandler::UnbindBuffer(VkBuffer buffer) noexcept
+{
+    if (buffer == VK_NULL_HANDLE)
+        return;
+    for (uint32_t i = 0; i < kUavSlots; ++i)
+        if (m_boundStorageBuffers[i] == buffer)
+            BindStorageBuffer(i, VK_NULL_HANDLE, 0);
+    for (uint32_t i = 0; i < kSsboSlots; ++i)
+        if (m_boundReadOnlyBuffers[i] == buffer)
+            BindReadOnlyBuffer(i, VK_NULL_HANDLE, 0);
+}
+
 // =================================================================================================

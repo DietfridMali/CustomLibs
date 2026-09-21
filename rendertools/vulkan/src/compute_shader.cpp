@@ -11,6 +11,9 @@
 #include "pipeline_cache.h"
 #include "vkcontext.h"
 #include "cbv_allocator.h"
+#include "commandlist.h"
+#include "descriptor_pool_handler.h"
+#include "vkupload.h"
 #include <spirv_reflect.h>
 
 // =================================================================================================
@@ -329,6 +332,95 @@ bool ComputeShader::Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, 
     uint32_t gx = (width  + tileX - 1) / tileX;
     uint32_t gy = (height + tileY - 1) / tileY;
     return Dispatch(gx, gy, 1);
+}
+
+
+// A whole compute pass of its own, outside the frame: the per-frame path leaves descriptor set and
+// vkCmdDispatch to the caller because it has the frame's command buffer; here there is none, so this
+// takes the same route GfxArray::Download () does - a transient command buffer that is submitted and
+// waited for. The storage buffers come from what the caller bound through GfxArray::Bind (), the same
+// state the graphics path materializes from.
+
+bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+{
+    if (not IsValid())
+        return false;
+    if ((groupCountX == 0) or (groupCountY == 0) or (groupCountZ == 0))
+        return false;
+
+    VkDevice device = vkContext.Device();
+    if (device == VK_NULL_HANDLE)
+        return false;
+
+    VkDescriptorSet set = descriptorPoolHandler.Allocate(m_setLayout);
+    if (set == VK_NULL_HANDLE)
+        return false;
+
+    if ((m_b1Size > 0) and not UploadB1())
+        return false;
+
+    VkWriteDescriptorSet    writes[CommandListHandler::kUavSlots + 1]{};
+    VkDescriptorBufferInfo  bufferInfos[CommandListHandler::kUavSlots + 1]{};
+    uint32_t                writeCount = 0;
+    uint32_t                dynamicOffset = 0;
+    uint32_t                dynamicOffsetCount = 0;
+
+    // b1 - the parameters the caller set through SetFloat / SetInt before the call
+    if (m_b1Size > 0) {
+        bufferInfos[writeCount].buffer = m_b1Buffer;
+        bufferInfos[writeCount].offset = 0;
+        bufferInfos[writeCount].range = m_b1Size;
+        writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[writeCount].dstSet = set;
+        writes[writeCount].dstBinding = 1;
+        writes[writeCount].descriptorCount = 1;
+        writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        writes[writeCount].pBufferInfo = &bufferInfos[writeCount];
+        dynamicOffset = m_b1DynamicOffset;
+        dynamicOffsetCount = 1;
+        writeCount++;
+    }
+
+    // u0..u3 - HLSL register uN maps to descriptor binding 36 + N (see kComputeBindArgs)
+    for (uint32_t slot = 0; slot < CommandListHandler::kUavSlots; slot++) {
+        VkBuffer buffer = commandListHandler.m_boundStorageBuffers[slot];
+        if (buffer == VK_NULL_HANDLE)
+            continue;
+        bufferInfos[writeCount].buffer = buffer;
+        bufferInfos[writeCount].offset = 0;
+        bufferInfos[writeCount].range = commandListHandler.m_boundStorageBufferSize[slot];
+        writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[writeCount].dstSet = set;
+        writes[writeCount].dstBinding = 36 + slot;
+        writes[writeCount].descriptorCount = 1;
+        writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[writeCount].pBufferInfo = &bufferInfos[writeCount];
+        writeCount++;
+    }
+
+    if (writeCount > 0)
+        vkUpdateDescriptorSets(device, writeCount, writes, 0, nullptr);
+
+    OneShotCommandBuffer once;
+    if (not BeginSingleTimeCommands(once))
+        return false;
+
+    vkCmdBindPipeline(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
+    vkCmdBindDescriptorSets(once.cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, 1, &set,
+                            dynamicOffsetCount, dynamicOffsetCount ? &dynamicOffset : nullptr);
+    vkCmdDispatch(once.cb, groupCountX, groupCountY, groupCountZ);
+
+    // the results are read back with a one-shot copy of its own, so the shader writes have to be
+    // visible to transfer reads by then
+    VkMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_HOST_READ_BIT;
+    vkCmdPipelineBarrier(once.cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_HOST_BIT,
+                         0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+    return EndSingleTimeCommands(once);
 }
 
 

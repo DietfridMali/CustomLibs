@@ -17,6 +17,8 @@
 #include "renderstates.h"
 #include "dx12context.h"
 #include "cbv_allocator.h"
+#include "commandlist.h"
+#include "descriptor_heap.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -371,6 +373,54 @@ bool ComputeShader::Dispatch(uint32_t /*x*/, uint32_t /*y*/, uint32_t /*z*/) {
 bool ComputeShader::Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY) {
     if (tileX == 0 or tileY == 0) return false;
     return Dispatch((width + tileX - 1) / tileX, (height + tileY - 1) / tileY, 1);
+}
+
+
+// A whole compute pass of its own, outside the frame. The per-frame path leaves root binds and
+// Dispatch to the caller because it has the frame's command list; here there is none, so this opens
+// one of its own and waits for it - the same route GfxArray::Download () takes. The storage buffers
+// are the ones the caller bound through GfxArray::Bind (); an unbound slot has no resource behind it,
+// which is what tells the two apart (index 0 is a valid descriptor).
+
+bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+    if (not IsValid())
+        return false;
+    if ((groupCountX == 0) or (groupCountY == 0) or (groupCountZ == 0))
+        return false;
+
+    CommandList* cl = commandListHandler.CreateCmdList("ComputeShader::DispatchOnce", true);
+    if (not cl or not cl->Open())
+        return false;
+
+    ID3D12GraphicsCommandList* list = cl->GfxList();
+    if (not list)
+        return false;
+
+    ID3D12DescriptorHeap* heaps[] = { descriptorHeaps.SrvHeapPtr() };
+    list->SetDescriptorHeaps(1, heaps);
+    list->SetComputeRootSignature(m_rootSignature.Get());
+    list->SetPipelineState(m_pipeline.Get());
+
+    if ((m_b1Size > 0) and (m_cbvRootIndex[1] >= 0)) {
+        if (not UploadB1())
+            return false;
+        list->SetComputeRootConstantBufferView(UINT(m_cbvRootIndex[1]), m_b1GpuVA);
+    }
+
+    for (uint32_t slot = 0; slot < CommandList::kUavSlots; ++slot) {
+        if (commandListHandler.m_storageBufferStates[slot].pResource == nullptr)
+            continue;
+        if (m_uavRootIndex[slot] < 0)
+            continue;
+        list->SetComputeRootDescriptorTable(UINT(m_uavRootIndex[slot]),
+                                            descriptorHeaps.m_srvHeap.GpuHandle(commandListHandler.m_boundStorageBuffers[slot]));
+    }
+    commandListHandler.TransitionBoundBuffers(list);
+
+    list->Dispatch(groupCountX, groupCountY, groupCountZ);
+    cl->Flush();
+    commandListHandler.CmdQueue().WaitIdle();
+    return true;
 }
 
 

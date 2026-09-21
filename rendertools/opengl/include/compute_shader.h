@@ -57,6 +57,12 @@ public:
     // glDispatchCompute(x, y, z). Caller-supplied workgroup counts (already divided by local_size).
     bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
+    // One complete compute run for work outside the drawing of a frame - level load precomputations,
+    // bakes - where the caller wants the result in memory when the call returns: dispatch, barrier and
+    // wait for the GPU. The storage buffers are the ones the caller bound through GfxArray::Bind ().
+    // Mirrors vulkan/directx, which have more to do for the same thing.
+    bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
+
     // Bind a list of textures to sampler units 0..N-1 (analog Mesh::Render(textures)), then
     // dispatch. nullptr entries skip the corresponding unit.
     bool Dispatch(std::span<Texture* const> textures,

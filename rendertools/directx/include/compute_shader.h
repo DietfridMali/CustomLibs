@@ -93,6 +93,13 @@ public:
     // Dispatch on the active command list. These two helpers are mostly for symmetry with the
     // Vulkan path.
     bool Activate(void);
+
+    // One complete compute run outside the per-frame command list: opens a command list of its own,
+    // binds root signature, pipeline, the storage buffers the caller bound through GfxArray::Bind ()
+    // and the b1 cbuffer, dispatches, submits and waits. For work that happens while no frame is
+    // being drawn - level load precomputations, bakes - where the caller wants the result in memory
+    // when the call returns. Mirrors the Vulkan and OpenGL paths.
+    bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
     bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
     bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
 

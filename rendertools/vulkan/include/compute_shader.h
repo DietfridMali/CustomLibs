@@ -77,6 +77,13 @@ public:
     bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
     bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
 
+    // One complete compute run outside the per-frame command list: allocates a descriptor set,
+    // writes the storage buffers the caller bound through GfxArray::Bind () (u0..u3) plus the b1
+    // cbuffer, submits and waits. For work that happens while no frame is being drawn - level load
+    // precomputations, bakes - where the caller wants the result in memory when the call returns.
+    // The buffers are read back with GfxArray::Download (), which does its own submit.
+    bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
+
     bool BindSampledImage(uint32_t binding, Texture* texture, uint32_t arrayIndex = 0);
     bool BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex = 0);
     bool BindSampler(uint32_t binding, VkSampler sampler);

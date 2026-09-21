@@ -97,6 +97,10 @@ public:
         if (allocator == VK_NULL_HANDLE)
             return;
         if (m_buffer != VK_NULL_HANDLE) {
+            // While it still is a valid handle: a buffer that is about to be freed must not stay in a
+            // binding slot. The cleanup is deferred, the binding is not - whatever materializes a
+            // descriptor set next would write a dead buffer into it. Same as the DX12 Destroy ().
+            commandListHandler.UnbindBuffer(m_buffer);
             gfxResourceHandler.TrackCleanup([allocator, buffer = m_buffer, allocation = m_allocation]() {
                 vmaDestroyBuffer(allocator, buffer, allocation);
             });

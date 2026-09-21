@@ -248,6 +248,11 @@ public:
     void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
     void BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
 
+    // Every slot this buffer is bound to, cleared. A GfxArray that is destroyed while still bound
+    // would otherwise leave its slots pointing at memory that is being freed, and the next thing
+    // that materializes a descriptor set writes it - the DX12 path does the same in UnbindBuffer ().
+    void UnbindBuffer(VkBuffer buffer) noexcept;
+
     bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
                 uint32_t graphicsFamily, uint32_t presentFamily,
                 const String& name = "MainQueue") noexcept;

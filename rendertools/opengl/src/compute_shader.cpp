@@ -70,6 +70,20 @@ bool ComputeShader::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_
 }
 
 
+bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+    if (not Activate())
+        return false;
+    if ((groupCountX == 0) or (groupCountY == 0) or (groupCountZ == 0))
+        return false;
+    glDispatchCompute(groupCountX, groupCountY, groupCountZ);
+    // the caller reads the buffers back right away (GfxArray::Download () maps them), so the shader
+    // writes have to be complete and visible to the host
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+    glFinish();
+    return true;
+}
+
+
 bool ComputeShader::Dispatch(std::span<Texture* const> textures,
                              uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
     if (not IsValid())
