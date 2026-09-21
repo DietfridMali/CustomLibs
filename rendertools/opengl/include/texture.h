@@ -343,6 +343,15 @@ public:
         gfxStates.ActiveTexture(GL_TEXTURE0); // always reset!
     }
 
+    template <TextureType typeID>
+    inline static void Release(int tmuIndex)
+        noexcept
+    {
+        if (tmuIndex >= 0)
+            gfxStates.BindTexture(TextureTypeToGLenum(typeID), 0, tmuIndex);
+        gfxStates.ActiveTexture(GL_TEXTURE0);
+    }
+
     static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
         noexcept;
 };

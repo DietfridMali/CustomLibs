@@ -3,6 +3,8 @@
 #include "vkframework.h"
 
 #include "vkcontext.h"
+#include "shader_compiler.h"
+#include "acceleration_structure.h"
 #include "array.hpp"
 
 #include <cstdio>
@@ -426,6 +428,24 @@ bool VKContext::CreateDevice(void) noexcept
     if (m_hasPipelineLibrary)
         feats12.pNext = &featsPipelineLibrary;
 
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR featsAccelStruct { };
+    featsAccelStruct.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    featsAccelStruct.accelerationStructure = VK_TRUE;
+
+    VkPhysicalDeviceRayQueryFeaturesKHR featsRayQuery { };
+    featsRayQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    featsRayQuery.rayQuery = VK_TRUE;
+
+    m_hasRayTracing = SupportsRayTracing() and ShaderCompiler::SupportsRayQuery();
+    if (m_hasRayTracing) {
+        feats12.bufferDeviceAddress = VK_TRUE;
+        featsAccelStruct.pNext = &featsRayQuery;
+        if (m_hasPipelineLibrary)
+            featsPipelineLibrary.pNext = &featsAccelStruct;
+        else
+            feats12.pNext = &featsAccelStruct;
+    }
+
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).
     // fragmentStoresAndAtomics enables RWTexture2D + InterlockedMin in the fragment
     // stage (used by DecalShader's two-pass depth mask).
@@ -446,7 +466,7 @@ bool VKContext::CreateDevice(void) noexcept
     features.geometryShader = VK_TRUE;
     features.depthClamp = VK_TRUE;
 
-    const char* deviceExtensions[5] = {
+    const char* deviceExtensions[8] = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
@@ -455,6 +475,11 @@ bool VKContext::CreateDevice(void) noexcept
     if (m_hasPipelineLibrary) {
         deviceExtensions[deviceExtensionCount++] = VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME;
         deviceExtensions[deviceExtensionCount++] = VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME;
+    }
+    if (m_hasRayTracing) {
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_RAY_QUERY_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME;
     }
 
     VkDeviceCreateInfo info { };
@@ -474,6 +499,9 @@ bool VKContext::CreateDevice(void) noexcept
 
     vkGetDeviceQueue(m_device, m_graphicsFamily, 0, &m_graphicsQueue);
     vkGetDeviceQueue(m_device, m_presentFamily, 0, &m_presentQueue);
+    if (m_hasRayTracing and not RayTracingApi::Load(m_device, m_physicalDevice))
+        m_hasRayTracing = false;
+    fprintf(stderr, "Vulkan ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
     return true;
 }
 
@@ -506,6 +534,46 @@ bool VKContext::SupportsPipelineLibrary(void) noexcept
     return pipelineLibraryFeatures.graphicsPipelineLibrary == VK_TRUE;
 }
 
+
+bool VKContext::SupportsRayTracing(void) noexcept
+{
+    uint32_t count = 0;
+    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, nullptr) != VK_SUCCESS)
+        return false;
+    AutoArray<VkExtensionProperties> extensions;
+    extensions.Resize(int32_t(count));
+    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, extensions.Data()) != VK_SUCCESS)
+        return false;
+    bool hasAccelStruct = false;
+    bool hasRayQuery = false;
+    bool hasDeferredOps = false;
+    for (uint32_t i = 0; i < count; ++i) {
+        if (std::strcmp(extensions[i].extensionName, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) == 0)
+            hasAccelStruct = true;
+        else if (std::strcmp(extensions[i].extensionName, VK_KHR_RAY_QUERY_EXTENSION_NAME) == 0)
+            hasRayQuery = true;
+        else if (std::strcmp(extensions[i].extensionName, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) == 0)
+            hasDeferredOps = true;
+    }
+    if (not (hasAccelStruct and hasRayQuery and hasDeferredOps))
+        return false;
+
+    VkPhysicalDeviceVulkan12Features features12 { };
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures { };
+    rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    rayQueryFeatures.pNext = &features12;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelStructFeatures { };
+    accelStructFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    accelStructFeatures.pNext = &rayQueryFeatures;
+    VkPhysicalDeviceFeatures2 features { };
+    features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features.pNext = &accelStructFeatures;
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &features);
+    return (accelStructFeatures.accelerationStructure == VK_TRUE) and (rayQueryFeatures.rayQuery == VK_TRUE) and
+           (features12.bufferDeviceAddress == VK_TRUE);
+}
+
 // =================================================================================================
 // CreateAllocator: VMA configuration. Vulkan 1.3 minimum — VMA picks up the new APIs
 // (Maintenance5, host-image-copy, etc. when available).
@@ -517,6 +585,8 @@ bool VKContext::CreateAllocator(void) noexcept
     info.device = m_device;
     info.instance = m_instance;
     info.vulkanApiVersion = m_apiVersion;
+    if (m_hasRayTracing)
+        info.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 
     VkResult res = vmaCreateAllocator(&info, &m_allocator);
     if (res != VK_SUCCESS) {

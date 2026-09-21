@@ -926,6 +926,23 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             }
         }
     }
+    // DIAGNOSTIC (depth layout hunt): which branch this activation takes and what the depth tracker
+    // says going in. A handful of lines, then quiet.
+    {
+        static int nDepthDiag = 0;
+        if (nDepthDiag < 12) {
+            bool ownDepth = HaveDepthBuffer(true);
+            bool sharedDepth = (not ownDepth) and (m_depthSource != nullptr) and (m_depthSource->m_depthBufferIndex >= 0);
+            int layout = ownDepth ? int(m_bufferInfo[m_depthBufferIndex].m_layoutTracker.Layout())
+                       : sharedDepth ? int(m_depthSource->m_bufferInfo[m_depthSource->m_depthBufferIndex].m_layoutTracker.Layout())
+                       : -1;
+            fprintf(stderr, "DEPTHDIAG select '%s': own=%d shared=%d mode=%d layoutBefore=%d wasRendering=%d\n",
+                    static_cast<const char*>(m_name), int(ownDepth), int(sharedDepth), int(m_depthMode),
+                    layout, int(wasRendering));
+            ++nDepthDiag;
+        }
+    }
+
     if (HaveDepthBuffer(true)) {
         // dbmReadOnly: keep the own depth image in the read-only depth layout instead of the writable
         // attachment layout, so this pass can test against it AND sample it (soft particles / WBOIT).
@@ -1411,11 +1428,29 @@ Texture* RenderTarget::GetDepthAsTexture(void)
     // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
     // pingpong path the next Activate's DetachBuffer will issue the transition outside
     // the pass, and on a disabled RT Disable has already transitioned all buffers.
+    //
+    // Transitioning here ANYWAY - by closing the pass around the barrier - does not work: the
+    // caller may still be about to switch the target into dbmReadOnly (BindFrameDepthTexture),
+    // and the pass reopened in between would declare the attachment layout this transition just
+    // left behind. The caller has to ask for read-only depth FIRST; then this is a no-op.
     if (m_cmdList and not m_isInRendering) {
         VkCommandBuffer cb = m_cmdList->GfxList();
         if (cb != VK_NULL_HANDLE)
             info.m_layoutTracker.ToShadowInput(cb);
     }
+
+    // DIAGNOSTIC (depth layout hunt): what the tracker says when this texture is handed out, and
+    // whether a pass was open - the descriptor claims READ_ONLY either way.
+    {
+        static int nTexDiag = 0;
+        if (nTexDiag < 12) {
+            fprintf(stderr, "DEPTHDIAG texture '%s': layout=%d inRendering=%d haveCL=%d\n",
+                    static_cast<const char*>(m_name), int(info.m_layoutTracker.Layout()),
+                    int(m_isInRendering), int(m_cmdList != nullptr));
+            ++nTexDiag;
+        }
+    }
+
     m_depthTexture.m_image = info.m_image;
     m_depthTexture.m_imageView = (info.m_depthSampleView != VK_NULL_HANDLE) ? info.m_depthSampleView : info.m_imageView;
     m_depthTexture.m_sampleLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -1436,6 +1471,11 @@ Texture* RenderTarget::GetDepthAsShadowTexture(void)
     // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
     // pingpong path the next Activate's DetachBuffer will issue the transition outside
     // the pass, and on a disabled RT Disable has already transitioned all buffers.
+    //
+    // Transitioning here ANYWAY - by closing the pass around the barrier - does not work: the
+    // caller may still be about to switch the target into dbmReadOnly (BindFrameDepthTexture),
+    // and the pass reopened in between would declare the attachment layout this transition just
+    // left behind. The caller has to ask for read-only depth FIRST; then this is a no-op.
     if (m_cmdList and not m_isInRendering) {
         VkCommandBuffer cb = m_cmdList->GfxList();
         if (cb != VK_NULL_HANDLE)

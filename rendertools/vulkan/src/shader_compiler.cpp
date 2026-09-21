@@ -228,6 +228,42 @@ bool CompileHlslToSpirv(const char* hlslSource,
 }
 
 
+static bool CompileRayQueryProbe(void) noexcept
+{
+    static const char* probe = R"(
+RaytracingAccelerationStructure scene : register(t0);
+RWStructuredBuffer<uint> result : register(u0);
+
+[numthreads(1, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+	RayDesc ray;
+	ray.Origin = float3 (0.0, 0.0, 0.0);
+	ray.Direction = float3 (0.0, 0.0, 1.0);
+	ray.TMin = 0.0;
+	ray.TMax = 1.0;
+	RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> q;
+	q.TraceRayInline (scene, RAY_FLAG_NONE, 0xFFu, ray);
+	q.Proceed ();
+	result [id.x] = (q.CommittedStatus () == COMMITTED_TRIANGLE_HIT) ? 1u : 0u;
+}
+)";
+    std::vector<uint8_t> spirv;
+    String error;
+    if (CompileHlslToSpirv(probe, "CSMain", "cs_6_5", nullptr, 0, spirv, error, String(""), String("")))
+        return true;
+    fprintf(stderr, "ShaderCompiler::SupportsRayQuery: probe failed: %s\n", static_cast<const char*>(error));
+    return false;
+}
+
+
+bool SupportsRayQuery(void) noexcept
+{
+    static const bool supported = CompileRayQueryProbe();
+    return supported;
+}
+
+
 VkShaderModule CreateShaderModule(const std::vector<uint8_t>& spirv) noexcept
 {
     VkDevice device = vkContext.Device();

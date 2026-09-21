@@ -201,6 +201,7 @@
     <ClInclude Include="..\include\shader_compiler.h" />
     <ClInclude Include="..\include\compute_shader.h" />
     <ClInclude Include="..\include\gfx_buffer.h" />
+    <ClInclude Include="..\include\acceleration_structure.h" />
     <ClInclude Include="..\include\pipeline_cache.h" />
     <ClInclude Include="..\include\swapchain.h" />
   </ItemGroup>
@@ -230,6 +231,7 @@
     <ClCompile Include="..\src\shader_compiler.cpp" />
     <ClCompile Include="..\src\compute_shader.cpp" />
     <ClCompile Include="..\src\gfx_buffer.cpp" />
+    <ClCompile Include="..\src\acceleration_structure.cpp" />
     <ClCompile Include="..\src\pipeline_cache.cpp" />
     <ClCompile Include="..\src\swapchain.cpp" />
     <ClCompile Include="..\src\cubemap.cpp" />

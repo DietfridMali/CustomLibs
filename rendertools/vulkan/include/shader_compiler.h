@@ -57,6 +57,8 @@ namespace ShaderCompiler
                             const String& shaderFolder,
                             const String& fileName);
 
+    bool SupportsRayQuery(void) noexcept;
+
     // Creates a VkShaderModule from raw SPIR-V bytes (must be 4-byte-aligned multiple).
     // Returns VK_NULL_HANDLE on failure.
     VkShaderModule CreateShaderModule(const std::vector<uint8_t>& spirv) noexcept;

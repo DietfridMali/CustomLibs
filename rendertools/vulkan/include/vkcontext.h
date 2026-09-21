@@ -49,6 +49,7 @@ public:
     VkPhysicalDeviceProperties m_deviceProps  { };
     uint32_t                   m_apiVersion   { VK_API_VERSION_1_3 };
     bool                       m_hasPipelineLibrary { false };
+    bool                       m_hasRayTracing { false };
 
 #if ENABLE_VK_LOGGING
     VkDebugUtilsMessengerEXT             m_debugMessenger           { VK_NULL_HANDLE };
@@ -91,6 +92,8 @@ public:
 
     inline bool HasPipelineLibrary(void) const noexcept { return m_hasPipelineLibrary; }
 
+    inline bool HasRayTracing(void) const noexcept { return m_hasRayTracing; }
+
     // Flush the validation-layer log to stderr and return the number of error-severity entries
     // since the last call. onlyErrors=true suppresses warnings/info from the printout (counters
     // are reset either way). When ENABLE_VK_LOGGING=0 this compiles to a no-op returning 0.
@@ -104,6 +107,7 @@ private:
     bool CreateDevice(void) noexcept;
     bool CreateAllocator(void) noexcept;
     bool SupportsPipelineLibrary(void) noexcept;
+    bool SupportsRayTracing(void) noexcept;
 
 #if ENABLE_VK_LOGGING
     bool RegisterDebugMessenger(bool enableValidationLayers) noexcept;
