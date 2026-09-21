@@ -259,4 +259,13 @@ const ShaderSource& BilateralBlurShader() {
     return source;
 };
 
+
+// The name the scene depth user deploys (see the note in src/common-hlsl/blur_shader.cpp - HLSL needs
+// one shader per distance source). OpenGL does not validate a sampler the branch never reads, so here
+// it is the same program under the second name.
+const ShaderSource& BilateralBlurDepthShader() {
+    static const ShaderSource source("bilateralBlurDepth", BilateralBlurShader().m_vs, BilateralBlurShader().m_fs);
+    return source;
+}
+
 // =================================================================================================

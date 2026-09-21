@@ -54,6 +54,10 @@ public:
     uint32_t                            m_b1DynamicOffset{ 0 };
     VkBuffer                            m_b1Buffer{ VK_NULL_HANDLE };
 
+    static constexpr uint32_t           kBindingAccel = 62;
+    static constexpr uint32_t           kAccelSpace = 2;
+    bool                                m_usesAccelStructure{ false };
+
     ComputeShader(String name = "")
         : m_name(std::move(name))
     {

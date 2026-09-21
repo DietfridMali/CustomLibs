@@ -47,6 +47,13 @@ namespace {
     constexpr float   GoldenAngle = 2.39996323f;   // ~137.5 deg -> successive branches spread evenly, never bunched in one plane
     constexpr float   AnimStartSpread = 64.0f;   // random per-bolt offset range on the noise time axis, so freshly spawned bolts don't all start identical
 
+    // Ignition flash: how sharply the core contracts (higher = more of the collapse in the first few
+    // milliseconds), and the share of a strike's lifetime the flash may take at most -- a flash that
+    // outlasts the strike would never let the halo appear, which is the whole point of the effect.
+    constexpr float   CoreFlashDecay = 4.0f;
+    constexpr float   CoreFlashLifetimeShare = 0.25f;
+    const float       CoreFlashFloor = expf(-CoreFlashDecay);   // so the curve lands exactly on the resting width
+
     // segment count from a bolt length (shared by ComputeCounts and the strike's branches).
 #if VARIABLE_SEGLENGTH
     // User scheme: calibration length X = referenceSamples * boltSegmentLength. Y >= X: round(Y/X) blocks
@@ -452,6 +459,8 @@ void LightningStrike::Setup(const Vector3f& start, const Vector3f& end, const Li
     SetupCommon(start, end, params);
     m_lifetime = params.lifetime;
     m_fadeStart = params.fadeStart;
+    m_coreFlashWidth = params.coreFlashWidth;
+    m_coreFlashTime = params.coreFlashTime;
     m_branchDepth = params.branchDepth;
     m_branchChance = params.branchChance;
     m_maxBranchTestSkips = params.maxBranchTestSkips;
@@ -704,6 +713,32 @@ float LightningStrike::Fade(int64_t now) const {
     h ^= h >> 13;
     float r = float(h & 0xffffu) * (1.0f / 65535.0f);
     return decay * (look.flickerFloor + (1.0f - look.flickerFloor) * r);
+}
+
+
+// Ignition flash: the core band starts out at m_coreFlashWidth -- the halo's own reach, so the white core
+// covers the entire mantle and there is no visible glow at all -- and contracts to m_coreWidth, which is
+// what uncovers the halo. What a discharge does: one wide overbright channel first, the glow after.
+float LightningStrike::CoreWidth(int64_t now) const {
+    if ((m_coreFlashTime <= 0.0f) or (m_coreFlashWidth <= m_coreWidth))
+        return m_coreWidth;
+    float flashTime = m_coreFlashTime;
+    if (m_lifetime > 0.0f) {
+        float cap = m_lifetime * 1000.0f * CoreFlashLifetimeShare;   // lifetime is in seconds, the flash in ms
+        if (flashTime > cap)
+            flashTime = cap;
+    }
+    if (flashTime < 1e-4f)
+        return m_coreWidth;
+    float t = float(now - m_spawnTime) / flashTime;
+    if (t >= 1.0f)
+        return m_coreWidth;
+    if (t < 0.0f)
+        t = 0.0f;
+    // Exponential, normalized to reach 0 exactly at t = 1: most of the collapse happens in the first
+    // milliseconds and it settles into the resting width, where a linear slide would read as a wipe.
+    float decay = (expf(-CoreFlashDecay * t) - CoreFlashFloor) / (1.0f - CoreFlashFloor);
+    return m_coreWidth + (m_coreFlashWidth - m_coreWidth) * decay;
 }
 
 

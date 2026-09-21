@@ -120,6 +120,13 @@ static const wchar_t* const kArgsHS[] = {
 static const wchar_t* const kArgsDS[] = {
     L"-fvk-bind-register", L"b1", L"0", L"41", L"0",
 };
+static const wchar_t* const kArgsAccel[] = {
+    L"-fvk-bind-register", L"t0", L"2", L"62", L"0",
+};
+static_assert(Shader::kBindingAccel == 62, "kArgsAccel names the acceleration structure binding by number");
+static_assert(Shader::kAccelSpace == 2, "kArgsAccel names the acceleration structure register space by number");
+
+static constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
 
 static std::vector<const wchar_t*> StageArgs(int stage)
 {
@@ -300,6 +307,12 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
         stage = kStageDS;
 
     auto args = StageArgs(stage);
+    char rayQueryTarget[8] { target[0], target[1], '_', '6', '_', '5', '\0', '\0' };
+    if (std::strstr(hlslCode, kAccelTypeName) != nullptr) {
+        for (const wchar_t* arg : kArgsAccel)
+            args.push_back(arg);
+        target = rayQueryTarget;
+    }
     String error;
     if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target,
                                                args.data(), uint32_t(args.size()),
@@ -353,6 +366,9 @@ bool Shader::CreatePipelineLayout(void) noexcept
 
     for (uint32_t i = 0; i < kSsboSlots; ++i)
         addBinding(kSsboBase + i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
+
+    if (m_usesAccelStructure)
+        addBinding(kBindingAccel, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
 
     VkDescriptorSetLayoutCreateInfo setInfo { };
     setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -576,12 +592,47 @@ uint32_t Shader::ReflectPatchControlPoints(const std::vector<uint8_t>& spirv) no
 }
 
 
+static bool ReflectUsesAccelStructure(const std::vector<uint8_t>& spirv) noexcept
+{
+    if (spirv.empty())
+        return false;
+
+    SpvReflectShaderModule module { };
+    if (spvReflectCreateShaderModule(spirv.size(), spirv.data(), &module) != SPV_REFLECT_RESULT_SUCCESS)
+        return false;
+
+    uint32_t count = 0;
+    spvReflectEnumerateDescriptorBindings(&module, &count, nullptr);
+    std::vector<SpvReflectDescriptorBinding*> bindings(count);
+    spvReflectEnumerateDescriptorBindings(&module, &count, bindings.data());
+
+    bool usesAccelStructure = false;
+    for (auto* b : bindings) {
+        if (b and (b->set == 0) and (b->binding == Shader::kBindingAccel)
+            and (b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR))
+            usesAccelStructure = true;
+    }
+
+    spvReflectDestroyShaderModule(&module);
+    return usesAccelStructure;
+}
+
+
 bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder)
 {
     if (IsValid())
         return true;
 
     double stallStart = VkStallClock();
+    if (not vkContext.HasRayTracing()) {
+        const String* stageCode[] = { &vsCode, &fsCode, &gsCode, &tcsCode, &tesCode };
+        for (const String* code : stageCode) {
+            if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
+                fprintf(stderr, "Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+                return false;
+            }
+        }
+    }
     if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
         fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
         return false;
@@ -621,6 +672,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         if ((m_hsModule == VK_NULL_HANDLE) or (m_dsModule == VK_NULL_HANDLE))
             return false;
     }
+
+    m_usesAccelStructure = ReflectUsesAccelStructure(m_vsSpirv) or ReflectUsesAccelStructure(m_fsSpirv)
+                        or ReflectUsesAccelStructure(m_gsSpirv) or ReflectUsesAccelStructure(m_hsSpirv)
+                        or ReflectUsesAccelStructure(m_dsSpirv);
 
     if (not CreatePipelineLayout())
         return false;
@@ -674,6 +729,7 @@ void Shader::Destroy(void) noexcept
     m_vsInputBindings.clear();
     std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
     std::memset(m_samplerDeclared, 0, sizeof(m_samplerDeclared));
+    m_usesAccelStructure = false;
 
     if (device != VK_NULL_HANDLE) {
         if (m_pipelineLayout != VK_NULL_HANDLE) {
@@ -747,6 +803,7 @@ Shader& Shader::Move(Shader& other) noexcept
         m_vsInputBindings = std::move(other.m_vsInputBindings);
         std::memcpy(m_srvDefaults, other.m_srvDefaults, sizeof(m_srvDefaults));
         std::memcpy(m_samplerDeclared, other.m_samplerDeclared, sizeof(m_samplerDeclared));
+        m_usesAccelStructure = other.m_usesAccelStructure;
     }
     return *this;
 }
@@ -845,14 +902,20 @@ bool Shader::UpdateVariables(void) noexcept {
     if (cb == VK_NULL_HANDLE or m_pipelineLayout == VK_NULL_HANDLE or m_setLayout == VK_NULL_HANDLE)
         return false;
 
+    VkAccelerationStructureKHR accelStructure = commandListHandler.m_boundAccelStructure;
+    if (m_usesAccelStructure and (accelStructure == VK_NULL_HANDLE)) {
+        fprintf(stderr, "Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
+        return false;
+    }
+
     VkDescriptorSet set = descriptorPoolHandler.Allocate(m_setLayout);
     if (set == VK_NULL_HANDLE)
         return false;
 
     // Worst-case write count: 4 dynamic UBOs + kSrvSlots images + kSamplerSlots samplers
-    // + kUavSlots storage buffers + kSsboSlots read-only storage buffers.
+    // + kUavSlots storage buffers + kSsboSlots read-only storage buffers + the acceleration structure.
     constexpr uint32_t kMaxWrites = kDynamicOffsetCount + CommandListHandler::kSrvSlots + CommandListHandler::kSamplerSlots
-                                  + CommandListHandler::kUavSlots + CommandListHandler::kSsboSlots;
+                                  + CommandListHandler::kUavSlots + CommandListHandler::kSsboSlots + 1;
     VkWriteDescriptorSet writes[kMaxWrites] { };
     VkDescriptorBufferInfo bufInfos[kDynamicOffsetCount]            { };
     VkDescriptorImageInfo  imgInfos[CommandListHandler::kSrvSlots]  { };
@@ -953,6 +1016,21 @@ bool Shader::UpdateVariables(void) noexcept {
         w.descriptorCount = 1;
         w.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         w.pBufferInfo     = &ssboInfos[i];
+    }
+
+    VkWriteDescriptorSetAccelerationStructureKHR accelInfo { };
+    if (m_usesAccelStructure) {
+        accelInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+        accelInfo.accelerationStructureCount = 1;
+        accelInfo.pAccelerationStructures = &accelStructure;
+        VkWriteDescriptorSet& w = writes[writeCount++];
+        w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        w.pNext           = &accelInfo;
+        w.dstSet          = set;
+        w.dstBinding      = kBindingAccel;
+        w.dstArrayElement = 0;
+        w.descriptorCount = 1;
+        w.descriptorType  = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     }
 
     if (writeCount > 0)

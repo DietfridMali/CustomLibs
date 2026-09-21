@@ -1,5 +1,6 @@
 #include "descriptor_pool_handler.h"
 #include "resource_handler.h"
+#include "vkcontext.h"
 
 #include <cstdio>
 
@@ -135,7 +136,8 @@ VkDescriptorSet DescriptorPoolHandler::Allocate(VkDescriptorSetLayout layout) no
 
 bool DescriptorPoolHandler::CreatePool(VkDescriptorPool& pool) noexcept
 {
-    VkDescriptorPoolSize sizes[5] { };
+    VkDescriptorPoolSize sizes[6] { };
+    uint32_t sizeCount = 5;
     sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     sizes[0].descriptorCount = kMaxUbosPerPool;
     sizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -146,12 +148,17 @@ bool DescriptorPoolHandler::CreatePool(VkDescriptorPool& pool) noexcept
     sizes[3].descriptorCount = kMaxStoragePerPool;
     sizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     sizes[4].descriptorCount = kMaxStorageImagesPerPool;
+    if (vkContext.HasRayTracing()) {
+        sizes[5].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+        sizes[5].descriptorCount = kMaxSetsPerPool;
+        sizeCount = 6;
+    }
 
     VkDescriptorPoolCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     info.flags = 0;  // no per-set free; pool reset only
     info.maxSets = kMaxSetsPerPool;
-    info.poolSizeCount = (uint32_t)(sizeof(sizes) / sizeof(sizes[0]));
+    info.poolSizeCount = sizeCount;
     info.pPoolSizes = sizes;
 
     VkResult res = vkCreateDescriptorPool(m_device, &info, nullptr, &pool);

@@ -306,6 +306,39 @@ public:
         return CopyFromStaging(m_uploadBuffer[fi], dstOffset, dstOffset, bytes, ordered);
     }
 
+    bool UploadImmediate(void) {
+        if (m_buffer == VK_NULL_HANDLE or m_data.IsEmpty())
+            return false;
+
+        VmaAllocator allocator = vkContext.Allocator();
+        if (allocator == VK_NULL_HANDLE)
+            return false;
+
+        VkBuffer staging = VK_NULL_HANDLE;
+        VmaAllocation stagingAlloc = VK_NULL_HANDLE;
+        if (not EnsureStagingBuffer(staging, stagingAlloc, m_bufferSize,
+                                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT))
+            return false;
+
+        bool ok = false;
+        void* mapped = nullptr;
+        if (vmaMapMemory(allocator, stagingAlloc, &mapped) == VK_SUCCESS) {
+            std::memcpy(mapped, m_data.Data(), size_t(m_bufferSize));
+            vmaUnmapMemory(allocator, stagingAlloc);
+
+            OneShotCommandBuffer once;
+            if (BeginSingleTimeCommands(once)) {
+                VkBufferCopy region{};
+                region.size = m_bufferSize;
+                vkCmdCopyBuffer(once.cb, staging, m_buffer, 1, &region);
+                ok = EndSingleTimeCommands(once);
+            }
+        }
+        vmaDestroyBuffer(allocator, staging, stagingAlloc);
+        return ok;
+    }
+
     bool Download(void) {
         if (m_buffer == VK_NULL_HANDLE or m_data.IsEmpty())
             return false;

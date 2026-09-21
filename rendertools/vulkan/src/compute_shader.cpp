@@ -7,6 +7,7 @@
 
 #include "vkframework.h"
 #include "compute_shader.h"
+#include "shader.h"
 #include "shader_compiler.h"
 #include "pipeline_cache.h"
 #include "vkcontext.h"
@@ -94,6 +95,16 @@ static const wchar_t* const kComputeBindArgs[] = {
 };
 static constexpr uint32_t kComputeBindArgCount = uint32_t(sizeof(kComputeBindArgs) / sizeof(kComputeBindArgs[0]));
 
+static const wchar_t* const kComputeArgsAccel[] = {
+    L"-fvk-bind-register", L"t0", L"2", L"62", L"0",
+};
+static_assert(ComputeShader::kBindingAccel == 62, "kComputeArgsAccel names the acceleration structure binding by number");
+static_assert(ComputeShader::kAccelSpace == 2, "kComputeArgsAccel names the acceleration structure register space by number");
+static_assert(ComputeShader::kBindingAccel == Shader::kBindingAccel, "compute and graphics shaders share the HLSL declaration of the acceleration structure");
+static_assert(ComputeShader::kAccelSpace == Shader::kAccelSpace, "compute and graphics shaders share the HLSL declaration of the acceleration structure");
+
+static constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
+
 }  // namespace
 
 
@@ -102,13 +113,25 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
     if ((not hlslCode) or (not *hlslCode))
         return false;
 
+    std::vector<const wchar_t*> args;
+    args.reserve(kComputeBindArgCount + 5);
+    for (uint32_t i = 0; i < kComputeBindArgCount; ++i)
+        args.push_back(kComputeBindArgs[i]);
+
+    const char* target = "cs_6_0";
+    if (std::strstr(hlslCode, kAccelTypeName) != nullptr) {
+        for (const wchar_t* arg : kComputeArgsAccel)
+            args.push_back(arg);
+        target = "cs_6_5";
+    }
+
     String error;
-    if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, "cs_6_0",
-                                               kComputeBindArgs, kComputeBindArgCount,
+    if (not ShaderCompiler::CompileHlslToSpirv(hlslCode, entryPoint, target,
+                                               args.data(), uint32_t(args.size()),
                                                spirvOut, error,
-                                               shaderFolder, m_name + String(".cs_6_0") + String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
-        fprintf(stderr, "ComputeShader '%s': compile failed (entry=%s):\n%s\n",
-                (const char*)m_name, entryPoint, (const char*)error);
+                                               shaderFolder, m_name + String(".") + String(target) + String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
+        fprintf(stderr, "ComputeShader '%s': compile failed (entry=%s, target=%s):\n%s\n",
+                (const char*)m_name, entryPoint, target, (const char*)error);
         return false;
     }
     return true;
@@ -130,6 +153,16 @@ bool ComputeShader::CreatePipelineLayout(const AutoArray<ComputeBindingDesc>& bi
         lb.binding = b.binding;
         lb.descriptorType = ToVkDescriptorType(b.kind);
         lb.descriptorCount = b.count;
+        lb.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        lb.pImmutableSamplers = nullptr;
+        dsBindings.push_back(lb);
+    }
+
+    if (m_usesAccelStructure) {
+        VkDescriptorSetLayoutBinding lb{};
+        lb.binding = kBindingAccel;
+        lb.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+        lb.descriptorCount = 1;
         lb.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         lb.pImmutableSamplers = nullptr;
         dsBindings.push_back(lb);
@@ -190,6 +223,13 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 {
     if (IsValid())
         return true;
+
+    m_usesAccelStructure = std::strstr(static_cast<const char*>(csCode), kAccelTypeName) != nullptr;
+    if (m_usesAccelStructure and not vkContext.HasRayTracing()) {
+        fprintf(stderr, "ComputeShader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+        m_usesAccelStructure = false;
+        return false;
+    }
 
     if (not Compile((const char*)csCode, "CSMain", m_csSpirv, shaderFolder))
         return false;
@@ -290,6 +330,7 @@ void ComputeShader::Destroy(void) noexcept
     m_b1Fields.Reset();
     m_b1Size = 0;
     m_b1Dirty = true;
+    m_usesAccelStructure = false;
 }
 
 
@@ -352,6 +393,12 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
     if (device == VK_NULL_HANDLE)
         return false;
 
+    VkAccelerationStructureKHR accelStructure = commandListHandler.m_boundAccelStructure;
+    if (m_usesAccelStructure and (accelStructure == VK_NULL_HANDLE)) {
+        fprintf(stderr, "ComputeShader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
+        return false;
+    }
+
     VkDescriptorSet set = descriptorPoolHandler.Allocate(m_setLayout);
     if (set == VK_NULL_HANDLE)
         return false;
@@ -359,7 +406,7 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
     if ((m_b1Size > 0) and not UploadB1())
         return false;
 
-    VkWriteDescriptorSet    writes[CommandListHandler::kUavSlots + 1]{};
+    VkWriteDescriptorSet    writes[CommandListHandler::kUavSlots + 2]{};
     VkDescriptorBufferInfo  bufferInfos[CommandListHandler::kUavSlots + 1]{};
     uint32_t                writeCount = 0;
     uint32_t                dynamicOffset = 0;
@@ -395,6 +442,20 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
         writes[writeCount].descriptorCount = 1;
         writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         writes[writeCount].pBufferInfo = &bufferInfos[writeCount];
+        writeCount++;
+    }
+
+    VkWriteDescriptorSetAccelerationStructureKHR accelInfo{};
+    if (m_usesAccelStructure) {
+        accelInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+        accelInfo.accelerationStructureCount = 1;
+        accelInfo.pAccelerationStructures = &accelStructure;
+        writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[writeCount].pNext = &accelInfo;
+        writes[writeCount].dstSet = set;
+        writes[writeCount].dstBinding = kBindingAccel;
+        writes[writeCount].descriptorCount = 1;
+        writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
         writeCount++;
     }
 

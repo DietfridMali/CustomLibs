@@ -206,6 +206,10 @@ public:
             return UploadTexture();
     }
 
+    bool UploadImmediate(void) {
+        return Upload();
+    }
+
     bool Download(void) {
         if constexpr (isBuffer)
             return DownloadBuffer();

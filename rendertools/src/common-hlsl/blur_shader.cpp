@@ -164,12 +164,16 @@ const ShaderSource& GaussBlurShader() {
 // The bilateral (edge stopping) blur - see the note in the OpenGL source. distanceSource picks where
 // the surface distance comes from: 0 the world position G-buffer (plane distance), 1 the scene depth
 // (linearized through projDepth). Everything else is shared between the two users.
+//
+// TWO SHADERS, one per distance source: "bilateralBlur" reads the world positions, "bilateralBlurDepth"
+// the scene depth. Each declares only the texture it reads. A shader that declares both and picks one
+// at run time leaves the other slot to whatever was bound there last, and Vulkan validates every
+// declared slot - a stale texture of another view type, or a depth buffer that is a writable
+// attachment by then, is an error even if the branch never samples it. distanceSource stays in the
+// constant buffer so that SetupBilateralBlur () serves both; the shaders do not read it.
 
-const ShaderSource& BilateralBlurShader() {
-    static const ShaderSource source(
-        "bilateralBlur",
-        Standard2DVS(),
-        String(R"(
+static const String& BilateralBlurFS(bool useSceneDepth) {
+    static const String head(R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 texelSize;
                 float  direction;
@@ -181,28 +185,52 @@ const ShaderSource& BilateralBlurShader() {
             };
             Texture2D    surface         : register(t0);
             Texture2D    uWorldNormals   : register(t1);
-            Texture2D    uWorldPositions : register(t2);
-            Texture2D    uSceneDepth     : register(t3);
             SamplerState s0 : register(s0);
             SamplerState s1 : register(s1);
-            SamplerState s2 : register(s2);
-            SamplerState s3 : register(s3);
             struct PSInput {
                 float4 pos       : SV_Position;
                 float3 fragPos   : TEXCOORD0;
                 float2 fragCoord : TEXCOORD1;
             };
+    )");
+
+    // Plane distance, NOT Euclidean: how far the neighbour lies off the centre pixel's tangent plane.
+    // A grazing same-surface (floor running to the horizon) stays ~0 and is kept; only real depth
+    // steps are rejected. The old length(PC-PS) blew up on grazing surfaces (screen-adjacent pixels
+    // sit far apart in world space) -> every tap rejected -> no blur -> raw noise survived.
+    static const String positionSource(R"(
+            Texture2D    uWorldPositions : register(t2);
+            SamplerState s2 : register(s2);
+            float3 SurfaceKey(float2 uv) {
+                return uWorldPositions.SampleLevel(s2, uv, 0).xyz;
+            }
+            float SurfaceDistance(float3 keyC, float3 keyS, float3 NC) {
+                return abs(dot(keyS - keyC, NC));
+            }
+    )");
+
+    static const String depthSource(R"(
+            Texture2D    uSceneDepth     : register(t3);
+            SamplerState s3 : register(s3);
             float EyeDepth(float d) {
                 return abs(projDepth.y / (d + projDepth.x));
             }
+            float3 SurfaceKey(float2 uv) {
+                return float3(EyeDepth(uSceneDepth.SampleLevel(s3, uv, 0).r), 0.0, 0.0);
+            }
+            float SurfaceDistance(float3 keyC, float3 keyS, float3 NC) {
+                return abs(keyS.x - keyC.x);
+            }
+    )");
+
+    static const String body(R"(
             float4 PSMain(PSInput i) : SV_Target {
                 float2 uv = i.fragCoord;
                 float4 nrmC = uWorldNormals.SampleLevel(s1, uv, 0);
                 if (dot(nrmC.xyz, nrmC.xyz) < 0.25)
                     return surface.SampleLevel(s0, uv, 0);
                 float3 NC = normalize(nrmC.xyz);
-                float3 PC = (distanceSource == 0) ? uWorldPositions.SampleLevel(s2, uv, 0).xyz : float3(0.0, 0.0, 0.0);
-                float DC = (distanceSource == 0) ? 0.0 : EyeDepth(uSceneDepth.SampleLevel(s3, uv, 0).r);
+                float3 keyC = SurfaceKey(uv);
                 float2 dirStep = (direction < 0.5) ? float2(texelSize.x, 0.0) : float2(0.0, texelSize.y);
                 float sigmaS = max(float(radius) * 0.5, 1.0);
                 float4 sum = float4(0.0, 0.0, 0.0, 0.0);
@@ -215,18 +243,7 @@ const ShaderSource& BilateralBlurShader() {
                     float3 NS = normalize(nrmS.xyz);
                     float wS = exp(-float(k * k) / (2.0 * sigmaS * sigmaS));
                     float wN = pow(max(dot(NC, NS), 0.0), normalPower);
-                    float dP;
-                    if (distanceSource == 0) {
-                        // Plane distance, NOT Euclidean: how far the neighbour lies off the centre
-                        // pixel's tangent plane. A grazing same-surface (floor running to the horizon)
-                        // stays ~0 and is kept; only real depth steps are rejected. The old
-                        // length(PC-PS) blew up on grazing surfaces (screen-adjacent pixels sit far
-                        // apart in world space) -> every tap rejected -> no blur -> raw noise survived.
-                        float3 PS = uWorldPositions.SampleLevel(s2, suv, 0).xyz;
-                        dP = abs(dot(PS - PC, NC));
-                    }
-                    else
-                        dP = abs(EyeDepth(uSceneDepth.SampleLevel(s3, suv, 0).r) - DC);
+                    float dP = SurfaceDistance(keyC, SurfaceKey(suv), NC);
                     float wP = exp(-(dP * dP) / (2.0 * posSigma * posSigma));
                     float w = wS * wN * wP;
                     sum += surface.SampleLevel(s0, suv, 0) * w;
@@ -234,9 +251,23 @@ const ShaderSource& BilateralBlurShader() {
                 }
                 return (sumW > 0.0) ? sum / sumW : surface.SampleLevel(s0, uv, 0);
             }
-        )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
+    )");
+
+    static const String positionShader(head + positionSource + body);
+    static const String depthShader(head + depthSource + body);
+
+    return useSceneDepth ? depthShader : positionShader;
+}
+
+
+const ShaderSource& BilateralBlurShader() {
+    static const ShaderSource source("bilateralBlur", Standard2DVS(), BilateralBlurFS(false), ShaderDataLayout(VtxTcAttrs, 2));
+    return source;
+}
+
+
+const ShaderSource& BilateralBlurDepthShader() {
+    static const ShaderSource source("bilateralBlurDepth", Standard2DVS(), BilateralBlurFS(true), ShaderDataLayout(VtxTcAttrs, 2));
     return source;
 }
 

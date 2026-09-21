@@ -1101,6 +1101,13 @@ void CommandListHandler::ResetBindings(void) noexcept
         m_boundReadOnlyBuffers[i] = VK_NULL_HANDLE;
         m_boundReadOnlyBufferSize[i] = 0;
     }
+    m_boundAccelStructure = VK_NULL_HANDLE;
+}
+
+
+void CommandListHandler::BindAccelerationStructure(VkAccelerationStructureKHR accelStructure) noexcept
+{
+    m_boundAccelStructure = accelStructure;
 }
 
 

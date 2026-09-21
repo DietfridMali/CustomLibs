@@ -30,6 +30,7 @@ struct AccelInstance
                                      0.0f, 0.0f, 1.0f, 0.0f };
     uint32_t        customIndex  { 0 };
     uint32_t        mask         { 0xFFu };
+    bool            singleSided  { false };
     const class AccelerationStructure* blas { nullptr };
 };
 
@@ -47,7 +48,9 @@ class AccelerationStructure
 public:
     bool BuildBottomLevel(const AccelGeometryDesc*, uint32_t) noexcept { return false; }
 
-    bool BuildTopLevel(const AccelInstance*, uint32_t) noexcept { return false; }
+    bool BuildTopLevel(const AccelInstance*, uint32_t, bool = false) noexcept { return false; }
+
+    bool Bind(void) const noexcept { return false; }
 
     void Destroy(void) noexcept { }
 

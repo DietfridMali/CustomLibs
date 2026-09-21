@@ -45,6 +45,11 @@ struct AccelInstance
     // Readable in the shader as InstanceID () - what ties a hit back to the caller's own data.
     uint32_t        customIndex  { 0 };
     uint32_t        mask         { 0xFFu };
+    // A single sided instance is one a ray's RAY_FLAG_CULL_BACK/FRONT_FACING_TRIANGLES applies to:
+    // closed geometry with one winding throughout, where a hit from behind can only mean that the ray
+    // started inside it. Everything else is hit from either side whatever the ray asks for - an open
+    // model made of single polygons has to cast its shadow in every direction.
+    bool            singleSided  { false };
     const class AccelerationStructure* blas { nullptr };
 };
 
@@ -123,7 +128,12 @@ public:
 
     // Rebuilds the top level structure from scratch. The instance buffer is reused while it is
     // big enough, so a per frame rebuild allocates nothing.
-    bool BuildTopLevel (const AccelInstance* instances, uint32_t instanceCount) noexcept;
+    bool BuildTopLevel (const AccelInstance* instances, uint32_t instanceCount, bool immediate = false) noexcept;
+
+    // Puts the structure into the bind table for shaders that declare a
+    // RaytracingAccelerationStructure on register (t0, space2). To be called after BuildTopLevel ()
+    // of the same frame - the handle changes with the frame slot.
+    bool Bind (void) const noexcept;
 
     void Destroy (void) noexcept;
 

@@ -114,6 +114,11 @@ public:
 	}
 
 
+	bool UploadImmediate(void) {
+		return Upload();
+	}
+
+
 	// Upload only [first, first+count) elements; leaves the rest of the GPU buffer untouched.
 	// Used to spawn one particle system without resetting the others.
 	bool UploadRange(int first, int count, bool /*ordered*/ = true) {

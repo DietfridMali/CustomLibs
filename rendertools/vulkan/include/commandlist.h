@@ -241,8 +241,10 @@ public:
     VkDeviceSize m_boundStorageBufferSize[kUavSlots]     { };
     VkBuffer     m_boundReadOnlyBuffers   [kSsboSlots]   { };
     VkDeviceSize m_boundReadOnlyBufferSize[kSsboSlots]   { };
+    VkAccelerationStructureKHR m_boundAccelStructure     { VK_NULL_HANDLE };
 
     void ResetBindings(void) noexcept;
+    void BindAccelerationStructure(VkAccelerationStructureKHR accelStructure) noexcept;
     void BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) noexcept;
     void BindSampler(uint32_t slot, VkSampler sampler) noexcept;
     void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;

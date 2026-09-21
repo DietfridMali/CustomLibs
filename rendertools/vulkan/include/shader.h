@@ -131,7 +131,9 @@ public:
     static constexpr uint32_t kSsboBase = kBindingB1DS + 1;
     static constexpr uint32_t kSsboSlots = 20;
     static constexpr uint32_t kSsboSpace = 1;
-    static constexpr uint32_t kBindingCount = kSsboBase + kSsboSlots;
+    static constexpr uint32_t kBindingAccel = kSsboBase + kSsboSlots;
+    static constexpr uint32_t kAccelSpace = 2;
+    static constexpr uint32_t kBindingCount = kBindingAccel + 1;
 
     struct StageConstants {
         uint32_t size { 0 };
@@ -158,6 +160,7 @@ public:
 
     uint8_t   m_srvDefaults[kSrvSlots] { };
     bool      m_samplerDeclared[kSamplerSlots] { };
+    bool      m_usesAccelStructure { false };
 
     // Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
     std::vector<VkVertexInputAttributeDescription> m_vsInputAttributes;

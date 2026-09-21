@@ -346,7 +346,7 @@ bool AccelerationStructure::BuildBottomLevel(const AccelGeometryDesc* geometries
 
 // =================================================================================================
 
-bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32_t instanceCount) noexcept
+bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32_t instanceCount, bool immediate) noexcept
 {
     if (not RayTracingApi::IsLoaded())
         return false;
@@ -391,7 +391,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         dst.instanceCustomIndex = src.customIndex & 0xFFFFFFu;
         dst.mask = src.mask & 0xFFu;
         dst.instanceShaderBindingTableRecordOffset = 0;
-        dst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        dst.flags = src.singleSided ? VkGeometryInstanceFlagsKHR(0) : VkGeometryInstanceFlagsKHR(VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR);
         dst.accelerationStructureReference = uint64_t(src.blas->DeviceAddress());
         ++written;
     }
@@ -493,7 +493,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
     // are different questions, and IsInRendering () answers the second one: a build must not be
     // issued inside a vkCmdBeginRendering scope, and inside one a barrier may only name
     // framebuffer space stages. So the pass is suspended around the build and taken up again.
-    VkCommandBuffer frameBuffer = commandListHandler.CurrentGfxList();
+    VkCommandBuffer frameBuffer = immediate ? VK_NULL_HANDLE : commandListHandler.CurrentGfxList();
     if (frameBuffer != VK_NULL_HANDLE) {
         CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
 
@@ -563,6 +563,15 @@ void AccelerationStructure::Move(AccelerationStructure& other) noexcept
     other.m_address = 0;
     other.m_primitives = 0;
     other.m_slot = 0;
+}
+
+
+bool AccelerationStructure::Bind(void) const noexcept
+{
+    if (not IsValid())
+        return false;
+    commandListHandler.BindAccelerationStructure(Handle());
+    return true;
 }
 
 

@@ -7,12 +7,14 @@
 // =================================================================================================
 // The parameters of the shared bilateral blur (the "bilateralBlur" shader, blur_shader.cpp).
 //
-// The shader is one for both users; what differs is where the SURFACE DISTANCE comes from, and that is
-// what distanceSource selects:
+// What differs between the two users is where the SURFACE DISTANCE comes from, and each source has a
+// shader of its own to DEPLOY ("bilateralBlur" / "bilateralBlurDepth", see the note in
+// src/common-hlsl/blur_shader.cpp). distanceSource names the same choice and is still what the OpenGL
+// program branches on:
 //
-//   dsWorldPosition  a world position G-buffer is bound on t2, and the distance is the neighbour's
-//                    offset from the centre pixel's tangent plane
-//   dsSceneDepth     the scene's depth buffer is bound on t3, and the distance is the difference of
+//   dsWorldPosition  "bilateralBlur": a world position G-buffer is bound on t2, and the distance is
+//                    the neighbour's offset from the centre pixel's tangent plane
+//   dsSceneDepth     "bilateralBlurDepth": the scene's depth buffer is bound on t3, and the distance is the difference of
 //                    the two linearized eye space depths. projDepth carries (A, B) of the projection
 //                    matrix for that, so neither the near nor the far plane has to be passed.
 //

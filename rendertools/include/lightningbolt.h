@@ -144,6 +144,13 @@ struct LightningCreationParams {
     // here - NEGATIVE does, and yields half of the resolved start width. Arc: ignored (uniform).
     float      endWidth{ -1.0f };
     float      coreWidth{ 0.5f };   // white-core band as a fraction of the ribbon half-width; the rest is blue halo
+    // Ignition flash (strike only, an arc ignores both). A single discharge starts out as one wide,
+    // overbright channel with no glow around it at all - the halo only becomes visible as that channel
+    // contracts. coreFlashWidth is the core fraction at ignition, and it is the application's HALO reach
+    // (the core then covers the whole mantle and swallows it), decaying to coreWidth over coreFlashTime.
+    // 0 = no flash: the core keeps coreWidth from the first frame.
+    float      coreFlashWidth{ 0.0f };
+    float      coreFlashTime{ 0.0f };   // ms; capped at a share of the lifetime so a short strike still gets its halo
     Vector3f   color{ Vector3f(1.0f, 1.0f, 1.0f) };   // per-bolt tint of the halo (multiplies the shader's haloColor); white = the shader's own colour
     float      amplitudeFactor{ 0.2f };   // lateral swing as a fraction of the bolt length
     float      waveRatio{ 3.0f };   // wavelength / amplitude -> base jaggedness (coupled -> length-invariant, self-similar)
@@ -277,6 +284,10 @@ public:
     // nothing but its fade -- so this is what tells the renderer that its buffer went stale. One value, one
     // writer (the renderer), no second bookkeeping.
     float                    m_lastFade{ -1.0f };
+    // Same bookkeeping for the core width, and for the same reason: a strike's core contracts while
+    // nothing else about it changes, and the ignition flash is over in a few frames - waiting for the
+    // next flicker step or path rebuild to carry it into the buffer would show it in two or three jumps.
+    float                    m_lastCoreWidth{ -1.0f };
     AutoArray<LightningBolt> m_bolts;
 
     BaseLightning(eLightningType type) : m_type(type) { }
@@ -323,6 +334,11 @@ public:
 
     virtual float Fade(int64_t /*now*/) const { return 1.0f; } // brightness 0..1 passed to the shader
 
+    // The white core's band width at this instant, as a fraction of the ribbon half width. Constant for
+    // everything but a strike, which starts it out at the halo's reach and lets it contract (see
+    // LightningStrike::CoreWidth). The renderer hands the result to the shader per segment.
+    virtual float CoreWidth(int64_t /*now*/) const { return m_coreWidth; }
+
     // AFTERGLOW: true once the ttl fade window has begun -> the handler drops the white core (full-res
     // core pass) and leaves only the fading halo (see LightningHandler::BuildSegments).
     virtual bool IsFading(int64_t /*now*/) const { return false; }
@@ -354,6 +370,8 @@ public:
     int64_t m_spawnTime{ 0 };
     float   m_lifetime{ 1.0f };
     float   m_fadeStart{ 150.0f };   // ms before the end of lifetime at which the afterglow fade begins
+    float   m_coreFlashWidth{ 0.0f };   // core band fraction at ignition (the halo's reach); 0 = no flash
+    float   m_coreFlashTime{ 0.0f };    // ms the core takes to contract from m_coreFlashWidth to m_coreWidth
     int32_t m_branchDepth{ 2 };   // recursion depth: 0 = trunk only, 1 = trunk has branches, 2 = branches have branches, ...
     float   m_branchChance{ 1.0f };   // probability [0,1] that a sub-branch forks at each eligible node
     int32_t m_maxBranchTestSkips{ 0 };   // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
@@ -371,6 +389,8 @@ public:
     float Fade(int64_t now) const override;               // full until fadeStart ms before the end, then linear decay to 0 at lifetime end; modulated by flicker
 
     bool IsFading(int64_t now) const override;            // AFTERGLOW: inside the fade window -> halo only
+
+    float CoreWidth(int64_t now) const override;          // ignition flash: starts at m_coreFlashWidth, contracts to m_coreWidth
 
     void UpdateEndpoints(const Vector3f& start, const Vector3f& end) override;   // ignore start, re-anchor the main bolt's last node
 

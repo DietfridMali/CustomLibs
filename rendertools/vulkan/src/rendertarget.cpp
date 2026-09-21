@@ -1057,8 +1057,15 @@ bool RenderTarget::IsActive(void) noexcept
 
 bool RenderTarget::Activate(const RTActivationParams& params)
 {
-    if (/*m_wasActivated or*/ params.reactivate)
-        baseRenderer.RenderStates() = m_renderStates;
+    // m_renderStates is what Disable () saved, so it is only current for a target that comes BACK from
+    // having been disabled (the draw buffer stack popping down to it). RenderAsTexture () also passes
+    // reactivate for a target that is simply still active - its ping pong between two of its own
+    // buffers. There the saved states are those of some earlier Disable (), or the defaults on first
+    // use, and restoring them would throw away what the caller has just set for this very draw.
+    if (params.reactivate) {
+        if (not IsEnabled())
+            baseRenderer.RenderStates() = m_renderStates;
+    }
     else if (not m_wasActivated)
         baseRenderer.PushViewport();
     baseRenderer.ActivateDrawBuffer(this);

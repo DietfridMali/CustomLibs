@@ -33,6 +33,7 @@ const ShaderSource& ToneMapShader();
 const ShaderSource& FxaaShader();
 const ShaderSource& GaussBlurShader();
 const ShaderSource& BilateralBlurShader();
+const ShaderSource& BilateralBlurDepthShader();
 const ShaderSource& LightningDrawShader();
 const ShaderSource& LightningFlareShader();
 const ShaderSource& LineDrawShader();
@@ -72,6 +73,7 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
         &FxaaShader(),
         &GaussBlurShader(),
         &BilateralBlurShader(),
+        &BilateralBlurDepthShader(),
         &LightningDrawShader(),
         &LightningFlareShader(),
         &LineDrawShader(),
