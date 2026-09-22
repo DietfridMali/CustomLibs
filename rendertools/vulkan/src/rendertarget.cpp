@@ -1324,9 +1324,11 @@ void RenderTarget::ClearDepthBuffer(float clearValue)
 
 void RenderTarget::ClearStencilBuffer(int clearValue)
 {
-    // Gated on an own stencil PLANE, not just on a depth buffer: without one the clear would address an
-    // aspect the attachment does not have.
-    if (not HaveStencilBuffer(true) or not m_cmdList or not m_isInRendering)
+    // Gated on the stencil PLANE OF THE ACTIVE depth attachment - own, or a shared source's
+    // (SetDepthSource): the clear addresses what is bound, and a borrowed plane is what is bound.
+    // Without a stencil plane the clear would address an aspect the attachment does not have.
+    RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
+    if (not depthOwner->HaveStencilBuffer(true) or not m_cmdList or not m_isInRendering)
         return;
     VkCommandBuffer cb = m_cmdList->GfxList();
     if (cb == VK_NULL_HANDLE)

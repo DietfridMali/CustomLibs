@@ -582,8 +582,9 @@ private:
     }
 
     // A shared depth source (SetDepthSource) takes precedence over an own depth buffer for the
-    // bound depth attachment / pipeline depth format. The Clear*/GetDepth* paths intentionally keep
-    // using the own buffer, so the foreign depth is never cleared or written.
+    // bound depth attachment / pipeline depth format. The DEPTH Clear*/GetDepth* paths intentionally
+    // keep using the own buffer, so the foreign depth is never cleared or written. The STENCIL clear
+    // does not: a pass that borrows depth still owns the stencil plane it counts in.
     inline bool HaveActiveDepthBuffer(void) noexcept {
         return HaveDepthBuffer(true) or ((m_depthSource != nullptr) and m_depthSource->HaveDepthBuffer(true));
     }
