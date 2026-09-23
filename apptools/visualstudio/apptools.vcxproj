@@ -28,6 +28,7 @@
     <ClInclude Include="..\include\textfileloader.h" />
     <ClInclude Include="..\include\udp.h" />
     <ClInclude Include="..\include\platformhandler.h" />
+    <ClInclude Include="..\include\crashhandler.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\arghandler.cpp" />
@@ -39,6 +40,7 @@
     <ClCompile Include="..\src\textfileloader.cpp" />
     <ClCompile Include="..\src\udp.cpp" />
     <ClCompile Include="..\src\platformhandler.cpp" />
+    <ClCompile Include="..\src\crashhandler.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

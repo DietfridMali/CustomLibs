@@ -8,6 +8,7 @@ AR  := ar
 FILES := \
  arghandler \
  base_soundhandler \
+ crashhandler \
  filelist \
  internetservices \
  networkendpoint \
