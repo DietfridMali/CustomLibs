@@ -1,4 +1,5 @@
 #include "gfxstates.h"
+#include "gfxpixelformat_vk.h"
 #include "vkframework.h"
 #include "vkcontext.h"
 #include "commandlist.h"
@@ -486,6 +487,13 @@ int GfxStates::MaxTextureUnits(void) noexcept {
 
 String GfxStates::DeviceName(void) {
     return String(vkContext.DeviceProps().deviceName);
+}
+
+
+bool GfxStates::CanBlend(GfxPixelFormat format) {
+    VkFormatProperties props{};
+    vkGetPhysicalDeviceFormatProperties(vkContext.PhysicalDevice(), ToVkFormat(format), &props);
+    return (props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT) != 0;
 }
 
 // =================================================================================================

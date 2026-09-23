@@ -1,4 +1,5 @@
 #include "gfxstates.h"
+#include "gfxpixelformat_dx.h"
 #include "commandlist.h"
 #include "shader.h"
 #include "dx12context.h"
@@ -319,7 +320,15 @@ String GfxStates::DeviceName(void) {
 }
 
 
-void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) { 
+bool GfxStates::CanBlend(GfxPixelFormat format) {
+    D3D12_FEATURE_DATA_FORMAT_SUPPORT support{ .Format = ToDXGIFormat(format) };
+    if (FAILED(dx12Context.Device()->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &support, sizeof(support))))
+        return false;
+    return (support.Support1 & D3D12_FORMAT_SUPPORT1_BLENDABLE) != 0;
+}
+
+
+void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) {
     //no op
 }
 

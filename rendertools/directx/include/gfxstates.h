@@ -314,6 +314,8 @@ public:
     // Vendor and device as one printable string: the DXGI adapter description.
     String DeviceName(void);
 
+    bool CanBlend(GfxPixelFormat format);
+
     // Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
     inline int MaxTextureSize(int bytesPerPixel) const noexcept {
         if (bytesPerPixel <= 1)
@@ -498,6 +500,18 @@ public:
             s.blendOpAlpha[i] = state;
         }
         return prevState;
+    }
+
+    inline void BlendEquationSeparate(GfxOperations::BlendOp opRGB, GfxOperations::BlendOp opAlpha, int bufferIndex = -1) {
+        int first;
+        int last;
+        if (not BlendTargets(bufferIndex, first, last))
+            return;
+        auto& s = ActiveState();
+        for (int i = first; i < last; ++i) {
+            s.blendOpRGB[i] = opRGB;
+            s.blendOpAlpha[i] = opAlpha;
+        }
     }
 
     inline GfxOperations::Winding FrontFace(GfxOperations::Winding state) {

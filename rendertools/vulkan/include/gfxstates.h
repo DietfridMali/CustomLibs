@@ -321,6 +321,8 @@ public:
     // Vendor and device as one printable string: the physical device name.
     String DeviceName(void);
 
+    bool CanBlend(GfxPixelFormat format);
+
     // Format-spezifischer Cap. Cap = min(maxImageDimension2D, bit_floor(sqrt(maxAlloc / bpp))).
     // Beispiel: RGBA32F = 16 Byte/Pixel, D32_SFLOAT = 4 Byte/Pixel, R8 = 1 Byte/Pixel.
     inline int MaxTextureSize(int bytesPerPixel) const noexcept {
@@ -508,6 +510,18 @@ public:
             s.blendOpAlpha[i] = state;
         }
         return prevState;
+    }
+
+    inline void BlendEquationSeparate(GfxOperations::BlendOp opRGB, GfxOperations::BlendOp opAlpha, int bufferIndex = -1) {
+        int first;
+        int last;
+        if (not BlendTargets(bufferIndex, first, last))
+            return;
+        auto& s = ActiveState();
+        for (int i = first; i < last; ++i) {
+            s.blendOpRGB[i] = opRGB;
+            s.blendOpAlpha[i] = opAlpha;
+        }
     }
 
     inline GfxOperations::Winding FrontFace(GfxOperations::Winding state) {

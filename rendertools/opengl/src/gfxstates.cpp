@@ -2,6 +2,7 @@
 #include <cstdio>
 
 #include "gfxstates.h"
+#include "gfxpixelformat_gl.h"
 #include "array.hpp"
 
 #include "gfxrenderer.h"
@@ -175,6 +176,13 @@ String GfxStates::DeviceName(void) {
 	char buffer[256];
 	snprintf(buffer, sizeof(buffer), "%s %s", vendor ? vendor : "", renderer ? renderer : "");
 	return String(buffer);
+}
+
+
+bool GfxStates::CanBlend(GfxPixelFormat format) {
+	GLint value = GL_FALSE;
+	glGetInternalformativ(GL_TEXTURE_2D, ToGLFormat(format).internalFormat, GL_FRAMEBUFFER_BLEND, 1, &value);
+	return value != GL_FALSE;
 }
 
 

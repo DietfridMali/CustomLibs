@@ -288,6 +288,8 @@ public:
 	// GL_VENDOR plus GL_RENDERER; DX: the adapter description; Vulkan: the physical device name.
 	String DeviceName(void);
 
+	bool CanBlend(GfxPixelFormat format);
+
 	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
 	inline int MaxTextureSize(int bytesPerPixel) noexcept {
 		if (bytesPerPixel <= 1)
@@ -498,14 +500,26 @@ public:
 		return FuncState<GLenum, GL_NONE>(state, stateID, glDepthFunc);
 	}
 
-	inline GLenum BlendEquation(GLenum state, int bufferIndex = -1) {
-		static int32_t stateID = -1;
+	int32_t m_blendEquationStateID{ -1 };
+
+	inline std::tuple<GLenum, GLenum> BlendEquationSeparate(GLenum opRGB, GLenum opAlpha, int bufferIndex = -1) {
 		if (bufferIndex < 0)
-			return FuncState<GLenum, GL_NONE>(state, stateID, glBlendEquation);
-		if (stateID >= 0)
-			StateRegistry<GLenum>::list[stateID] = GL_NONE;
-		glBlendEquationi(bufferIndex, state);
-		return GLenum(-1);
+			return FuncState(m_blendEquationStateID, std::make_tuple(opRGB, opAlpha), glBlendEquationSeparate);
+		InvalidateFuncState(m_blendEquationStateID);
+		glBlendEquationSeparatei(bufferIndex, opRGB, opAlpha);
+		return std::make_tuple(GLenum(-1), GLenum(-1));
+	}
+
+	inline std::tuple<GLenum, GLenum> GetBlendEquationSeparateGL(void) {
+		if (m_blendEquationStateID < 0)
+			return std::make_tuple(GLenum(GL_FUNC_ADD), GLenum(GL_FUNC_ADD));
+		return MultiStateRegistry<GLenum, GLenum>::list[m_blendEquationStateID];
+	}
+
+	inline GLenum BlendEquation(GLenum state, int bufferIndex = -1) {
+		if (state == GL_NONE)
+			return std::get<0>(GetBlendEquationSeparateGL());
+		return std::get<0>(BlendEquationSeparate(state, state, bufferIndex));
 	}
 
 	inline GLenum FrontFace(GLenum state) {
@@ -614,6 +628,10 @@ public:
 
 	inline GfxOperations::BlendOp BlendEquation(GfxOperations::BlendOp op, int bufferIndex = -1) {
 		return GLToGfx::ToBlendOp(BlendEquation(GfxToGL::ToGLenum(op), bufferIndex));
+	}
+
+	inline void BlendEquationSeparate(GfxOperations::BlendOp opRGB, GfxOperations::BlendOp opAlpha, int bufferIndex = -1) {
+		BlendEquationSeparate(GfxToGL::ToGLenum(opRGB), GfxToGL::ToGLenum(opAlpha), bufferIndex);
 	}
 
 	// The enum state queries. The portable spelling returns the GfxOperations vocabulary and exists in
