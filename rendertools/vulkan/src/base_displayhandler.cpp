@@ -49,11 +49,8 @@ int BaseDisplayHandler::GetDisplayModes(void) {
         });
 
     m_displayModes.Reset();
-    int64_t ai = 0, aj = 0;
     for (int i = 0; i < n; ++i) {
-        aj = ai;
-        ai = int64_t(m[i].h) * int64_t(m[i].w);
-        if (ai != aj)
+        if ((i == 0) or (m[i].w != m[i - 1].w) or (m[i].h != m[i - 1].h))
             m_displayModes.Append(m[i]);
     }
     return m_displayModes.Length();
