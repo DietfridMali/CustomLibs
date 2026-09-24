@@ -125,13 +125,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>USE_TRACY=1;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;STEAM=0;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_TRACY=0;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;STEAM=0;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.30.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.1\include;$(ProjectDir)..\..\..\external\SDL2_net-2.0.1\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;$(ProjectDir)..\..\..\external\steam\sdk\public\steam;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\GameKit\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.Party.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.PartyXboxLive.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include\xsapi-c</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <DebugInformationFormat>None</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
