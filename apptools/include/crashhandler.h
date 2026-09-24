@@ -17,6 +17,8 @@ public:
 
     void SetFolder(const char* folder);
 
+    bool WriteCallStack(const char* reason, char* fileName, size_t fileNameSize);
+
 private:
     char                    m_folder[1024]{};
     char                    m_appName[64]{};
@@ -63,11 +65,11 @@ private:
 
     void WriteReport(void);
 
-    void WriteTrace(void* file);
+    void WriteTrace(void* file, const char* kind, _EXCEPTION_POINTERS* exceptionPointers, unsigned long threadId, const char* reason);
 
     void WriteDump(void* file);
 
-    bool MakeFileName(char* fileName, size_t size, const char* extension);
+    bool MakeFileName(char* fileName, size_t size, const char* kind, const char* extension);
 #endif
 };
 

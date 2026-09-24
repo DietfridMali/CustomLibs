@@ -38,6 +38,7 @@ void CrashHandler::SetFolder(const char* folder) {
 static constexpr unsigned long abortCode = 0xE0000001;
 static constexpr unsigned long pureCallCode = 0xE0000002;
 static constexpr unsigned long invalidParameterCode = 0xE0000003;
+static constexpr unsigned long callStackCode = 0xE0000004;
 static constexpr DWORD reportTimeout = 60000;
 static constexpr int maxFrames = 256;
 static constexpr DWORD symbolOptions = SYMOPT_UNDNAME | SYMOPT_LOAD_LINES | SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS;
@@ -97,6 +98,7 @@ static TraceFrame           traceFrames[maxFrames];
 static char                 textBuffer[4096];
 static char                 modulePath[MAX_PATH];
 alignas(SYMBOL_INFO) static char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME];
+static SRWLOCK              reportLock = SRWLOCK_INIT;
 
 // =================================================================================================
 
@@ -300,9 +302,49 @@ void CrashHandler::ReportCurrentThread(const char* reason, unsigned long code) {
 }
 
 
-bool CrashHandler::MakeFileName(char* fileName, size_t size, const char* extension) {
-    int length = snprintf(fileName, size, "%s%s-crash-%04u%02u%02u-%02u%02u%02u.%s",
-                          m_folder, m_appName,
+bool CrashHandler::WriteCallStack(const char* reason, char* fileName, size_t fileNameSize) {
+    if (fileName and (fileNameSize > 0))
+        fileName[0] = '\0';
+    if (not m_isInitialized)
+        return false;
+
+    CONTEXT context;
+    RtlCaptureContext(&context);
+    EXCEPTION_RECORD record;
+    memset(&record, 0, sizeof(record));
+    record.ExceptionCode = callStackCode;
+    record.ExceptionAddress = reinterpret_cast<void*>(static_cast<uintptr_t>(GetContextPC(context)));
+    EXCEPTION_POINTERS pointers;
+    pointers.ExceptionRecord = &record;
+    pointers.ContextRecord = &context;
+
+    AcquireSRWLockExclusive(&reportLock);
+    GetLocalTime(&crashTime);
+    SymSetOptions(symbolOptions);
+    if (m_haveSymbols)
+        SymRefreshModuleList(m_process);
+
+    bool isWritten = false;
+    char traceFile[sizeof(m_folder) + 128];
+    if (MakeFileName(traceFile, sizeof(traceFile), "trace", "txt")) {
+        HANDLE file = CreateFileA(traceFile, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file != INVALID_HANDLE_VALUE) {
+            WriteTrace(file, "trace", &pointers, GetCurrentThreadId(), reason ? reason : "call stack");
+            CloseHandle(file);
+            isWritten = true;
+        }
+    }
+    ReleaseSRWLockExclusive(&reportLock);
+
+    if (isWritten and fileName and (fileNameSize > 0))
+        CopyText(fileName, fileNameSize, traceFile);
+    return isWritten;
+}
+
+
+bool CrashHandler::MakeFileName(char* fileName, size_t size, const char* kind, const char* extension) {
+    int length = snprintf(fileName, size, "%s%s-%s-%04u%02u%02u-%02u%02u%02u.%s",
+                          m_folder, m_appName, kind,
                           crashTime.wYear, crashTime.wMonth, crashTime.wDay,
                           crashTime.wHour, crashTime.wMinute, crashTime.wSecond,
                           extension);
@@ -311,43 +353,45 @@ bool CrashHandler::MakeFileName(char* fileName, size_t size, const char* extensi
 
 
 void CrashHandler::WriteReport(void) {
+    AcquireSRWLockExclusive(&reportLock);
     GetLocalTime(&crashTime);
     SymSetOptions(symbolOptions);
     if (m_haveSymbols)
         SymRefreshModuleList(m_process);
 
     char fileName[sizeof(m_folder) + 128];
-    if (MakeFileName(fileName, sizeof(fileName), "txt")) {
+    if (MakeFileName(fileName, sizeof(fileName), "crash", "txt")) {
         HANDLE file = CreateFileA(fileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (file != INVALID_HANDLE_VALUE) {
-            WriteTrace(file);
+            WriteTrace(file, "crash", m_exceptionPointers, m_threadId, m_reason);
             CloseHandle(file);
         }
     }
-    if (MakeFileName(fileName, sizeof(fileName), "dmp")) {
+    if (MakeFileName(fileName, sizeof(fileName), "crash", "dmp")) {
         HANDLE file = CreateFileA(fileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
         if (file != INVALID_HANDLE_VALUE) {
             WriteDump(file);
             CloseHandle(file);
         }
     }
+    ReleaseSRWLockExclusive(&reportLock);
 }
 
 
-void CrashHandler::WriteTrace(void* file) {
-    const EXCEPTION_RECORD* record = m_exceptionPointers->ExceptionRecord;
+void CrashHandler::WriteTrace(void* file, const char* kind, _EXCEPTION_POINTERS* exceptionPointers, unsigned long threadId, const char* reason) {
+    const EXCEPTION_RECORD* record = exceptionPointers->ExceptionRecord;
     unsigned long code = record->ExceptionCode;
 
-    WriteText(file, "%s %s crash report\r\n\r\n", m_appName, m_appVersion);
+    WriteText(file, "%s %s %s report\r\n\r\n", m_appName, m_appVersion, kind);
     WriteText(file, "time:      %04u-%02u-%02u %02u:%02u:%02u\r\n",
               crashTime.wYear, crashTime.wMonth, crashTime.wDay, crashTime.wHour, crashTime.wMinute, crashTime.wSecond);
-    WriteText(file, "reason:    %s (0x%08lX)\r\n", m_reason, code);
+    WriteText(file, "reason:    %s (0x%08lX)\r\n", reason, code);
     if (((code == EXCEPTION_ACCESS_VIOLATION) or (code == EXCEPTION_IN_PAGE_ERROR)) and (record->NumberParameters >= 2)) {
         ULONG_PTR access = record->ExceptionInformation[0];
         const char* accessName = (access == 0) ? "reading" : (access == 1) ? "writing" : "executing";
         WriteText(file, "access:    %s address 0x%016llX\r\n", accessName, static_cast<unsigned long long>(record->ExceptionInformation[1]));
     }
-    WriteText(file, "thread:    %lu\r\n", m_threadId);
+    WriteText(file, "thread:    %lu\r\n", threadId);
 
     if (not m_haveSymbols)
         WriteText(file, "symbols:   dbghelp could not be initialized, only addresses available\r\n");
@@ -364,11 +408,11 @@ void CrashHandler::WriteTrace(void* file) {
 
     WriteText(file, "\r\ncall stack:\r\n");
 
-    walkContext = *m_exceptionPointers->ContextRecord;
+    walkContext = *exceptionPointers->ContextRecord;
     DWORD64 faultAddress = GetContextPC(walkContext);
     STACKFRAME_EX frame;
     InitStackFrame(frame, walkContext);
-    HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, m_threadId);
+    HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, threadId);
     int frameCount = 0;
     while (frameCount < maxFrames) {
         if (not StackWalkEx(machineType, m_process, thread, &frame, &walkContext, nullptr, SymFunctionTableAccess64, SymGetModuleBase64, nullptr, SYM_STKWALK_DEFAULT))
@@ -438,6 +482,13 @@ void CrashHandler::Init(const char* appName, const char* appVersion) {
     CopyText(m_appName, sizeof(m_appName), appName);
     CopyText(m_appVersion, sizeof(m_appVersion), appVersion);
     m_isInitialized = true;
+}
+
+
+bool CrashHandler::WriteCallStack(const char*, char* fileName, size_t fileNameSize) {
+    if (fileName and (fileNameSize > 0))
+        fileName[0] = '\0';
+    return false;
 }
 
 #endif
