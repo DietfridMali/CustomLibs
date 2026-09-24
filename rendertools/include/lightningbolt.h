@@ -455,9 +455,10 @@ struct LightningSegment {
     Vector3f prev;  float fade;
     Vector3f next;  float coreWidth;
     Vector3f color; float pad;        // halo tint of this bolt; multiplies the shader's haloColor
+    Vector3f coreColor; float pad2;
 };
 
-static_assert(sizeof(LightningSegment) == 80, "LightningSegment must stay 80 bytes (GPU StructuredBuffer layout)");
+static_assert(sizeof(LightningSegment) == 96, "LightningSegment must stay 96 bytes (GPU StructuredBuffer layout)");
 
 // One impact flare: a view-aligned billboard drawn at a bolt endpoint, nudged toward the viewer onto the
 // front face and depth-tested against the scene.

@@ -25,6 +25,7 @@ struct LightningSegment {
     float3 prev; float fade;
     float3 next; float coreWidth;
     float3 color; float pad;
+    float3 coreColor; float pad2;
 };
 
 RWStructuredBuffer<LightningSegment> segments : register(u0);

@@ -12,7 +12,7 @@
 // unit quad into a screen-space ribbon along the miter (bisector) of the two adjacent segments, so
 // neighbouring segments share an edge -> gap-/overlap-free joints. The FS draws a white core with a
 // cool-blue halo, additively into the dedicated glow buffer (HDR -> bloom). std430 inflates vec3 to a
-// 16-byte alignment, so the segment struct is declared as flat floats to match the 64-byte C++ layout.
+// 16-byte alignment, so the segment struct is declared as flat floats to match the 96-byte C++ layout.
 
 static const ShaderDataAttributes LightningQuadAttrs[] = {
     { "Vertex",   0, ShaderDataAttributes::Float3 },
@@ -26,6 +26,7 @@ struct LightningSegment {
     float prevx; float prevy; float prevz; float fade;
     float nextx; float nexty; float nextz; float coreWidth;
     float colr;  float colg;  float colb;  float pad;
+    float corer; float coreg; float coreb; float pad2;
 };
 
 layout(std430, binding = 0) buffer Segments { LightningSegment segments[]; };
