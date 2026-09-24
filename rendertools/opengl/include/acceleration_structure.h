@@ -42,9 +42,19 @@ namespace RayTracingApi
 }
 
 
+struct AccelBuildItem
+{
+    class AccelerationStructure* structure     { nullptr };
+    const AccelGeometryDesc*     geometries    { nullptr };
+    uint32_t                     geometryCount { 0 };
+};
+
+
 class AccelerationStructure
 {
 public:
+    static bool BuildBottomLevelBatch(const AccelBuildItem*, uint32_t) noexcept { return false; }
+
     bool BuildBottomLevel(const AccelGeometryDesc*, uint32_t) noexcept { return false; }
 
     bool BuildTopLevel(const AccelInstance*, uint32_t, bool = false) noexcept { return false; }

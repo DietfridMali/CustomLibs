@@ -536,9 +536,12 @@ public:
     }
 
     inline void ClearStencilBuffer(int clearValue = 0) noexcept {
-        // Gated like ClearDepthBuffer: without a stencil plane the glClear would be a no-op that still
-        // costs a state change, and on a target with no depth buffer at all it would clear the wrong FBO's.
-        if (HaveStencilBuffer(true))
+        // Gated on the stencil PLANE OF THE ACTIVE depth attachment - own, or a shared source's
+        // (SetDepthSource), which is what the FBO has attached: without a stencil plane the glClear would
+        // be a no-op that still costs a state change, and on a target with no depth buffer at all it would
+        // clear the wrong FBO's.
+        RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
+        if (depthOwner->HaveStencilBuffer(true))
             gfxStates.ClearStencilBuffer(clearValue);
     }
 

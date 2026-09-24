@@ -646,7 +646,8 @@ bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBu
 
 // Attach the source's depth texture to this FBO's depth slot (persistent FBO state, so a one-time
 // call covers all later Activates). Clear/ClearDepthBuffer keep gating on an OWN depth buffer
-// (HaveDepthBuffer), so the foreign depth is never cleared through this target.
+// (HaveDepthBuffer), so the foreign depth is never cleared through this target. ClearStencilBuffer
+// does not: a pass that borrows depth still owns the stencil plane it counts in.
 void RenderTarget::SetDepthSource(RenderTarget* source) {
     // The attachment point follows the buffer that is (or was) attached: a source whose depth carries a
     // stencil plane sits on GL_DEPTH_STENCIL_ATTACHMENT, and detaching must address the same point, or the
