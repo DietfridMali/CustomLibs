@@ -98,6 +98,7 @@ public:
     bool                                m_descriptorHeapsBound{ false };  // SetDescriptorHeaps issued since this list's Open()
     uint64_t                            m_appliedTables[kTableCount]{};
     uint32_t                            m_appliedSamplers[kSamplerSlots]{};
+    D3D12_GPU_VIRTUAL_ADDRESS           m_appliedAccelStructure{ 0 };
     tracy::D3D12ZoneScope*              m_gpuZone{ nullptr };   // per-CL GPU profiling zone; spans Open()..Close() (USE_TRACY)
 
     static List<RenderStates>           m_renderStateStack;
@@ -239,6 +240,7 @@ public:
     uint32_t                                m_boundSamplers[CommandList::kSamplerSlots]{};
     uint32_t                                m_boundStorageBuffers[CommandList::kUavSlots]{};
     uint32_t                                m_boundReadOnlyBuffers[CommandList::kSsboSlots]{};
+    D3D12_GPU_VIRTUAL_ADDRESS               m_boundAccelStructure{ 0 };
     uint64_t                                m_bindingVersions[CommandList::kTableCount]{};
     uint64_t                                m_bindingVersionCounter{ 0 };
     uint64_t                                m_srvDefaultKey{ 0 };
@@ -247,6 +249,8 @@ public:
     bool Create(ID3D12Device* device) noexcept;
 
     void ResetBindings(void) noexcept;
+
+    void BindAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS accelStructure) noexcept;
 
     void BindSampledImage(uint32_t slot, uint32_t srvIndex) noexcept;
 

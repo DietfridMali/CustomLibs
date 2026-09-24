@@ -207,7 +207,10 @@ public:
     }
 
     bool UploadImmediate(void) {
-        return Upload();
+        if constexpr (isBuffer)
+            return UploadBuffer(true);
+        else
+            return UploadTexture(true);
     }
 
     bool Download(void) {
@@ -229,15 +232,17 @@ public:
     }
 
 private:
-    CommandList* OpenCopyList(bool& close, bool& flush) {
+    CommandList* OpenCopyList(bool& close, bool& flush, bool immediate) {
         close = false;
         flush = false;
-        if (commandListHandler.UsesOrderedCopyList()) {
-            close = true;
-            return commandListHandler.OpenOrderedCopyList();
+        if (not immediate) {
+            if (commandListHandler.UsesOrderedCopyList()) {
+                close = true;
+                return commandListHandler.OpenOrderedCopyList();
+            }
+            if (CommandList* current = commandListHandler.CurrentCmdList())
+                return current;
         }
-        if (CommandList* current = commandListHandler.CurrentCmdList())
-            return current;
         CommandList* cl = commandListHandler.CreateCmdList("GfxArray::Upload", true);
         if (not (cl and cl->Open()))
             return nullptr;
@@ -406,7 +411,7 @@ private:
         return true;
     }
 
-    bool UploadTexture(void) {
+    bool UploadTexture(bool immediate = false) {
         if (not m_resource or m_data.IsEmpty())
             return false;
         ID3D12Device* device = dx12Context.Device();
@@ -441,7 +446,7 @@ private:
 
         bool closeCopyList = false;
         bool flushCopyList = false;
-        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList);
+        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList, immediate);
         auto* list = copyList ? copyList->GfxList() : nullptr;
         if (not list)
             return false;
@@ -463,7 +468,7 @@ private:
         return true;
     }
 
-    bool UploadBuffer(void) {
+    bool UploadBuffer(bool immediate = false) {
         if (not m_resource or m_data.IsEmpty())
             return false;
         ID3D12Device* device = dx12Context.Device();
@@ -489,7 +494,7 @@ private:
 
         bool closeCopyList = false;
         bool flushCopyList = false;
-        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList);
+        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList, immediate);
         auto* list = copyList ? copyList->GfxList() : nullptr;
         if (not list)
             return false;
@@ -531,7 +536,7 @@ private:
 
         bool closeCopyList = false;
         bool flushCopyList = false;
-        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList);
+        CommandList* copyList = OpenCopyList(closeCopyList, flushCopyList, false);
         auto* list = copyList ? copyList->GfxList() : nullptr;
         if (not list)
             return false;

@@ -341,6 +341,7 @@ void CommandList::ResetAppliedBindings(void) noexcept {
         m_appliedTables[i] = 0;
     for (uint32_t i = 0; i < kSamplerSlots; ++i)
         m_appliedSamplers[i] = UINT32_MAX;
+    m_appliedAccelStructure = 0;
 }
 
 
@@ -449,8 +450,14 @@ void CommandListHandler::ResetBindings(void) noexcept {
         m_boundReadOnlyBuffers[i] = UINT32_MAX;
         m_readOnlyBufferStates[i] = {};
     }
+    m_boundAccelStructure = 0;
     for (int i = 0; i < CommandList::kTableCount; ++i)
         m_bindingVersions[i] = ++m_bindingVersionCounter;
+}
+
+
+void CommandListHandler::BindAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS accelStructure) noexcept {
+    m_boundAccelStructure = accelStructure;
 }
 
 
@@ -546,6 +553,10 @@ bool CommandListHandler::ApplyBindings(const Shader* shader) noexcept {
     ID3D12GraphicsCommandList* list = CurrentGfxList();
     if (not (cl and list))
         return false;
+    if (shader and shader->m_usesAccelStructure and (m_boundAccelStructure == 0)) {
+        fprintf(stderr, "Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)shader->m_name);
+        return false;
+    }
     cl->BindDescriptorHeaps();
     TransitionBoundBuffers(list);
 
@@ -597,6 +608,11 @@ bool CommandListHandler::ApplyBindings(const Shader* shader) noexcept {
             continue;
         list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase) + UINT(i), descriptorHeaps.m_samplerHeap.GpuHandle(sampler));
         cl->m_appliedSamplers[i] = sampler;
+    }
+
+    if (shader and shader->m_usesAccelStructure and (cl->m_appliedAccelStructure != m_boundAccelStructure)) {
+        list->SetGraphicsRootShaderResourceView(UINT(Shader::kAccelBase), m_boundAccelStructure);
+        cl->m_appliedAccelStructure = m_boundAccelStructure;
     }
     return true;
 }

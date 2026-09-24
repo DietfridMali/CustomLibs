@@ -22,7 +22,8 @@
 //  - One root signature shared by all shaders: root CBV b0 (FrameConstants, ALL),
 //    root CBV b1 per stage (VS, PS, GS, HS, DS), one SRV descriptor table t0..t15,
 //    one sampler descriptor table per slot s0..s15, one UAV descriptor table u0..u3,
-//    one SRV descriptor table t0..t19 space1 (read-only structured buffers).
+//    one SRV descriptor table t0..t19 space1 (read-only structured buffers),
+//    one root SRV t0 space2 (ray tracing acceleration structure).
 //  - PSO looked up via RenderStates::GetPSO (global cache, created on demand in Enable())
 //  - b0: 4 x 4x4 matrices (mModelView, mProjection, mViewport, mLightTransform)
 //  - b1: per-stage shader constants, layout from per-stage HLSL reflection on link
@@ -87,6 +88,8 @@ public:
 
     static void DestroyRootSignature(void) noexcept;
 
+    static bool SupportsRayQuery(void) noexcept;
+
     // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
     FrameConstants          m_b0Staging{};
 
@@ -108,7 +111,9 @@ public:
     static constexpr int kSsboBase      = kUavBase + 1;
     static constexpr int kSsboSlots     = 20;
     static constexpr int kSsboSpace     = 1;
-    static constexpr int kRootParamCount = kSsboBase + 1;
+    static constexpr int kAccelBase     = kSsboBase + 1;
+    static constexpr int kAccelSpace    = 2;
+    static constexpr int kRootParamCount = kAccelBase + 1;
 
     struct StageConstants {
         uint32_t size{ 0 };
@@ -130,6 +135,7 @@ public:
 
     uint8_t   m_srvDefaults[kSrvSlots] { };
     uint64_t  m_srvDefaultKey{ 0 };
+    bool      m_usesAccelStructure{ false };
 
     // Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
     std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;

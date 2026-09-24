@@ -14,6 +14,7 @@ public:
     ComPtr<IDXGIFactory4>       m_factory;
     ComPtr<IDXGIAdapter1>       m_adapter;
     D3D_FEATURE_LEVEL           m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
+    bool                        m_hasRayTracing{ false };
 
 #if DBG_DIRECTX
     ComPtr<ID3D12Debug>         m_debugController;
@@ -25,6 +26,8 @@ public:
     bool Create(bool enableDebugLayer = false) noexcept;
 
     inline ID3D12Device* Device(void) const noexcept { return m_device.Get(); }
+
+    inline bool HasRayTracing(void) const noexcept { return m_hasRayTracing; }
 
 #if DBG_DIRECTX
     // Drains all pending D3D12 InfoQueue messages to stderr.
@@ -41,6 +44,7 @@ public:
 
 private:
     bool SelectAdapter(void) noexcept;
+    bool SupportsRayTracing(void) noexcept;
 };
 
 #define dx12Context DX12Context::Instance()

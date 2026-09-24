@@ -1,5 +1,7 @@
 #include "dx12context.h"
 #include "commandlist.h"
+#include "shader.h"
+#include "acceleration_structure.h"
 
 #include <cstdio>
 #include <memory>
@@ -70,7 +72,25 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
     }
 #endif
 
+    m_hasRayTracing = SupportsRayTracing() and Shader::SupportsRayQuery();
+    if (m_hasRayTracing and not RayTracingApi::Load(m_device.Get()))
+        m_hasRayTracing = false;
+    fprintf(stderr, "DirectX ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
     return true;
+}
+
+
+bool DX12Context::SupportsRayTracing(void) noexcept {
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5{};
+    if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5))))
+        return false;
+    if (options5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
+        return false;
+
+    D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{ D3D_SHADER_MODEL_6_5 };
+    if (FAILED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel))))
+        return false;
+    return shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5;
 }
 
 // =================================================================================================

@@ -67,6 +67,10 @@ public:
     int32_t                             m_srvRootIndex[16];            // t0..t15
     int32_t                             m_samplerRootIndex[16];        // s0..s15
     int32_t                             m_uavRootIndex[4];             // u0..u3
+    int32_t                             m_accelRootIndex{ -1 };
+
+    static constexpr uint32_t           kAccelSpace = 2;
+    bool                                m_usesAccelStructure{ false };
 
     ComputeShader(String name = "")
         : m_name(std::move(name))

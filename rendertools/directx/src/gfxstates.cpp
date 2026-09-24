@@ -114,6 +114,8 @@ int GfxStates::BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
     TextureSlotInfo* info = FindInfo(typeTag);
     if (not info)
         return -1;
+    if ((srvIndex == UINT32_MAX) and (slotIndex >= 0))
+        commandListHandler.BindSampledImage(uint32_t(slotIndex), UINT32_MAX);
     return info->Bind(srvIndex, slotIndex);
 }
 

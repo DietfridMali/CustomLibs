@@ -1,17 +1,10 @@
 #pragma once
 
+#include "dx12framework.h"
+
 #include <cstdint>
 
 // =================================================================================================
-// AccelerationStructure (DirectX 12) - stub for now.
-//
-// DXR 1.1 inline ray tracing (RayQuery in HLSL, shader model 6.5) would carry this backend the
-// same way VK_KHR_ray_query carries Vulkan, and the shader source is shared, so the effort is the
-// C++ side: ID3D12Device5::CreateRaytracingAccelerationStructure plus a D3D12_RAYTRACING_TIER_1_1
-// check on the device. Until that is built the class exists so the shared d2x-xl sources compile:
-// every Build call fails and the caller keeps its non ray traced path.
-//
-// The real implementation lives in rendertools/vulkan. Signatures must stay identical.
 
 struct AccelGeometryDesc
 {
@@ -37,26 +30,72 @@ struct AccelInstance
 
 namespace RayTracingApi
 {
-    inline bool IsLoaded(void) noexcept { return false; }
+    bool Load (ID3D12Device* device) noexcept;
 
-    inline uint32_t ScratchAlignment(void) noexcept { return 0; }
+    bool IsLoaded (void) noexcept;
+
+    uint32_t ScratchAlignment (void) noexcept;
 }
+
+
+struct AccelBuildItem
+{
+    class AccelerationStructure* structure     { nullptr };
+    const AccelGeometryDesc*     geometries    { nullptr };
+    uint32_t                     geometryCount { 0 };
+};
 
 
 class AccelerationStructure
 {
 public:
-    bool BuildBottomLevel(const AccelGeometryDesc*, uint32_t) noexcept { return false; }
+    static constexpr uint32_t   kFrameSlots = 2;
 
-    bool BuildTopLevel(const AccelInstance*, uint32_t, bool = false) noexcept { return false; }
+    ComPtr<ID3D12Resource>      m_storage [kFrameSlots];
+    UINT64                      m_storageSize [kFrameSlots] { 0, 0 };
+    ComPtr<ID3D12Resource>      m_instances [kFrameSlots];
+    uint32_t                    m_instanceCapacity [kFrameSlots] { 0, 0 };
+    ComPtr<ID3D12Resource>      m_scratch [kFrameSlots];
+    UINT64                      m_scratchSize [kFrameSlots] { 0, 0 };
+    uint32_t                    m_slot { 0 };
 
-    bool Bind(void) const noexcept { return false; }
+    ComPtr<ID3D12Resource>      m_vertices;
+    ComPtr<ID3D12Resource>      m_indices;
+    D3D12_GPU_VIRTUAL_ADDRESS   m_address { 0 };
+    uint32_t                    m_primitives { 0 };
 
-    void Destroy(void) noexcept { }
+    AccelerationStructure (void) noexcept = default;
 
-    inline uint32_t Primitives(void) const noexcept { return 0; }
+    AccelerationStructure (const AccelerationStructure&) = delete;
+    AccelerationStructure& operator= (const AccelerationStructure&) = delete;
 
-    inline bool IsValid(void) const noexcept { return false; }
+    AccelerationStructure (AccelerationStructure&& other) noexcept { Move (other); }
+
+    AccelerationStructure& operator= (AccelerationStructure&& other) noexcept {
+        if (this != &other) {
+            Destroy ();
+            Move (other);
+        }
+        return *this;
+    }
+
+    static bool BuildBottomLevelBatch (const AccelBuildItem* items, uint32_t itemCount) noexcept;
+
+    bool BuildBottomLevel (const AccelGeometryDesc* geometries, uint32_t geometryCount) noexcept;
+
+    bool BuildTopLevel (const AccelInstance* instances, uint32_t instanceCount, bool immediate = false) noexcept;
+
+    bool Bind (void) const noexcept;
+
+    void Destroy (void) noexcept;
+
+    inline D3D12_GPU_VIRTUAL_ADDRESS Handle (void) const noexcept { return m_storage [m_slot] ? m_storage [m_slot]->GetGPUVirtualAddress () : 0; }
+    inline D3D12_GPU_VIRTUAL_ADDRESS DeviceAddress (void) const noexcept { return m_address; }
+    inline uint32_t Primitives (void) const noexcept { return m_primitives; }
+    inline bool IsValid (void) const noexcept { return m_storage [m_slot] != nullptr; }
+
+private:
+    void Move (AccelerationStructure& other) noexcept;
 };
 
 // =================================================================================================

@@ -13,6 +13,7 @@
 #include <wrl/client.h>
 
 #include "compute_shader.h"
+#include "shader.h"
 #include "shadercache.h"
 #include "renderstates.h"
 #include "dx12context.h"
@@ -64,6 +65,10 @@ std::wstring ToWide(const char* utf8) noexcept {
     return s;
 }
 
+static_assert(ComputeShader::kAccelSpace == uint32_t(Shader::kAccelSpace), "compute and graphics shaders share the HLSL declaration of the acceleration structure");
+
+constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
+
 }  // namespace
 
 #ifdef _DEBUG
@@ -87,10 +92,15 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
     src.Size = std::strlen(hlslCode);
     src.Encoding = DXC_CP_ACP;
 
+    const char* target = "cs_6_0";
+    if (std::strstr(hlslCode, kAccelTypeName) != nullptr)
+        target = "cs_6_5";
+
     std::wstring wEntry = ToWide(entryPoint);
+    std::wstring wTarget = ToWide(target);
     std::vector<LPCWSTR> args = {
         L"-E", wEntry.c_str(),
-        L"-T", L"cs_6_0",
+        L"-T", wTarget.c_str(),
         L"-Zpc",        // column-major matrices
         L"-Wno-ignored-attributes",
 #ifdef _DEBUG
@@ -100,7 +110,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
     };
 
     const bool useCache = not shaderFolder.IsEmpty();
-    const String fileName = m_name + String(".cs_6_0") + String(kOptimizationLevel) + String(".dxil");
+    const String fileName = m_name + String(".") + String(target) + String(kOptimizationLevel) + String(".dxil");
     uint64_t key = 0;
     if (useCache) {
         key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslCode);
@@ -239,6 +249,16 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
         params.push_back(p);
     }
 
+    if (m_usesAccelStructure) {
+        D3D12_ROOT_PARAMETER p{};
+        p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+        p.Descriptor.ShaderRegister = 0;
+        p.Descriptor.RegisterSpace = kAccelSpace;
+        p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        m_accelRootIndex = int32_t(params.size());
+        params.push_back(p);
+    }
+
     D3D12_ROOT_SIGNATURE_DESC rsd{};
     rsd.NumParameters = UINT(params.size());
     rsd.pParameters = params.data();
@@ -281,6 +301,12 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 {
     if (IsValid())
         return true;
+    m_usesAccelStructure = std::strstr(static_cast<const char*>(csCode), kAccelTypeName) != nullptr;
+    if (m_usesAccelStructure and not dx12Context.HasRayTracing()) {
+        fprintf(stderr, "ComputeShader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+        m_usesAccelStructure = false;
+        return false;
+    }
     if (not Compile((const char*)csCode, "CSMain", shaderFolder))
         return false;
     m_bindings = bindings;
@@ -357,6 +383,8 @@ void ComputeShader::Destroy(void) noexcept
     for (int i = 0; i < 2; ++i) m_cbvRootIndex[i] = -1;
     for (int i = 0; i < 16; ++i) { m_srvRootIndex[i] = -1; m_samplerRootIndex[i] = -1; }
     for (int i = 0; i < 4; ++i) m_uavRootIndex[i] = -1;
+    m_accelRootIndex = -1;
+    m_usesAccelStructure = false;
 }
 
 
@@ -388,6 +416,16 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
     if ((groupCountX == 0) or (groupCountY == 0) or (groupCountZ == 0))
         return false;
 
+    D3D12_GPU_VIRTUAL_ADDRESS accelStructure = commandListHandler.m_boundAccelStructure;
+    if (m_usesAccelStructure and (accelStructure == 0)) {
+        fprintf(stderr, "ComputeShader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
+        return false;
+    }
+
+    const bool useB1 = (m_b1Size > 0) and (m_cbvRootIndex[1] >= 0);
+    if (useB1 and not UploadB1())
+        return false;
+
     CommandList* cl = commandListHandler.CreateCmdList("ComputeShader::DispatchOnce", true);
     if (not cl or not cl->Open())
         return false;
@@ -401,11 +439,8 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
     list->SetComputeRootSignature(m_rootSignature.Get());
     list->SetPipelineState(m_pipeline.Get());
 
-    if ((m_b1Size > 0) and (m_cbvRootIndex[1] >= 0)) {
-        if (not UploadB1())
-            return false;
+    if (useB1)
         list->SetComputeRootConstantBufferView(UINT(m_cbvRootIndex[1]), m_b1GpuVA);
-    }
 
     for (uint32_t slot = 0; slot < CommandList::kUavSlots; ++slot) {
         if (commandListHandler.m_storageBufferStates[slot].pResource == nullptr)
@@ -415,6 +450,8 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
         list->SetComputeRootDescriptorTable(UINT(m_uavRootIndex[slot]),
                                             descriptorHeaps.m_srvHeap.GpuHandle(commandListHandler.m_boundStorageBuffers[slot]));
     }
+    if (m_usesAccelStructure)
+        list->SetComputeRootShaderResourceView(UINT(m_accelRootIndex), accelStructure);
     commandListHandler.TransitionBoundBuffers(list);
 
     list->Dispatch(groupCountX, groupCountY, groupCountZ);

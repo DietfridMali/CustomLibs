@@ -818,8 +818,10 @@ bool RenderTarget::Activate(const RTActivationParams& params)
 #endif
 {
     ZoneScoped;
-    if (/*m_wasActivated or*/ params.reactivate) // -> reactivating
-        baseRenderer.RenderStates() = m_renderStates;
+    if (/*m_wasActivated or*/ params.reactivate) { // -> reactivating
+        if (not IsEnabled())
+            baseRenderer.RenderStates() = m_renderStates;
+    }
     else if (not m_wasActivated)
         baseRenderer.PushViewport(loc);
     baseRenderer.ActivateDrawBuffer(this);

@@ -266,6 +266,9 @@
     <ClInclude Include="..\include\compute_shader.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\acceleration_structure.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\gfxupload.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -455,6 +458,9 @@
     </ClCompile>
     <ClCompile Include="..\src\compute_shader.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\acceleration_structure.cpp">
+      <Filter>Source Files\DirectX</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\skybox.cpp">
       <Filter>Source Files</Filter>

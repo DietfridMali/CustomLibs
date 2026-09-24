@@ -84,6 +84,24 @@ namespace {
         reflBuf.Encoding = DXC_CP_ACP;
         return SUCCEEDED(g_dxcUtils->CreateReflection(&reflBuf, IID_PPV_ARGS(refl.GetAddressOf())));
     }
+
+    constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
+
+    bool ReflectUsesAccelStructure(ID3DBlob* blob) noexcept {
+        Microsoft::WRL::ComPtr<ID3D12ShaderReflection> refl;
+        if (not ReflectShader(blob, refl))
+            return false;
+        D3D12_SHADER_DESC sd{};
+        refl->GetDesc(&sd);
+        for (UINT i = 0; i < sd.BoundResources; ++i) {
+            D3D12_SHADER_INPUT_BIND_DESC bd{};
+            if (FAILED(refl->GetResourceBindingDesc(i, &bd)))
+                continue;
+            if ((bd.Type == D3D_SIT_RTACCELERATIONSTRUCTURE) and (bd.Space == UINT(Shader::kAccelSpace)) and (bd.BindPoint == 0))
+                return true;
+        }
+        return false;
+    }
 }
 
 // =================================================================================================
@@ -151,6 +169,10 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     source.Ptr = hlslCode;
     source.Size = std::strlen(hlslCode);
     source.Encoding = DXC_CP_UTF8;
+
+    char rayQueryTarget[8] { target[0], target[1], '_', '6', '_', '5', '\0', '\0' };
+    if (std::strstr(hlslCode, kAccelTypeName) != nullptr)
+        target = rayQueryTarget;
 
     std::wstring entryWide = ToWide(entryPoint);
     std::wstring targetWide = ToWide(target);
@@ -222,6 +244,64 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     if (useCache)
         ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(blobOut->GetBufferPointer()), blobOut->GetBufferSize());
     return true;
+}
+
+
+static bool CompileRayQueryProbe(void) noexcept
+{
+    static const char* probe = R"(
+RaytracingAccelerationStructure scene : register(t0);
+RWStructuredBuffer<uint> result : register(u0);
+
+[numthreads(1, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+	RayDesc ray;
+	ray.Origin = float3 (0.0, 0.0, 0.0);
+	ray.Direction = float3 (0.0, 0.0, 1.0);
+	ray.TMin = 0.0;
+	ray.TMax = 1.0;
+	RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> q;
+	q.TraceRayInline (scene, RAY_FLAG_NONE, 0xFFu, ray);
+	q.Proceed ();
+	result [id.x] = (q.CommittedStatus () == COMMITTED_TRIANGLE_HIT) ? 1u : 0u;
+}
+)";
+    if (not InitDxc()) {
+        fprintf(stderr, "Shader::SupportsRayQuery: DXC initialization failed\n");
+        return false;
+    }
+
+    DxcBuffer source{};
+    source.Ptr = probe;
+    source.Size = std::strlen(probe);
+    source.Encoding = DXC_CP_UTF8;
+
+    const wchar_t* args[] = { L"-E", L"CSMain", L"-T", L"cs_6_5", kOptimizationArg };
+
+    ComPtr<IDxcResult> result;
+    HRESULT hr = g_dxcCompiler->Compile(&source, args, UINT32(std::size(args)), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
+    if (FAILED(hr)) {
+        fprintf(stderr, "Shader::SupportsRayQuery: DXC Compile call failed (0x%08X)\n", unsigned(hr));
+        return false;
+    }
+
+    HRESULT compileStatus = E_FAIL;
+    result->GetStatus(&compileStatus);
+    if (SUCCEEDED(compileStatus))
+        return true;
+
+    ComPtr<IDxcBlobUtf8> errors;
+    result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr);
+    fprintf(stderr, "Shader::SupportsRayQuery: probe failed: %s\n", (errors and (errors->GetStringLength() > 0)) ? errors->GetStringPointer() : "");
+    return false;
+}
+
+
+bool Shader::SupportsRayQuery(void) noexcept
+{
+    static const bool supported = CompileRayQueryProbe();
+    return supported;
 }
 
 
@@ -351,6 +431,11 @@ bool Shader::CreateRootSignature(void) noexcept
     params[kSsboBase].DescriptorTable.pDescriptorRanges = &ssboRange;
     params[kSsboBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+    params[kAccelBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    params[kAccelBase].Descriptor.ShaderRegister = 0;
+    params[kAccelBase].Descriptor.RegisterSpace = UINT(kAccelSpace);
+    params[kAccelBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
     // Samplers are no longer baked into the root signature — each Texture carries
     // its own TextureSampling, resolved through SamplerCache and bound at draw
     // time via the per-slot sampler tables defined above.
@@ -449,6 +534,15 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (IsValid())
         return true;
 
+    if (not dx12Context.HasRayTracing()) {
+        const String* stageCode[] = { &vsCode, &fsCode, &gsCode, &tcsCode, &tesCode };
+        for (const String* code : stageCode) {
+            if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
+                fprintf(stderr, "Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+                return false;
+            }
+        }
+    }
     if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
 #ifdef _DEBUG
         fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
@@ -489,6 +583,10 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     m_srvDefaultKey = 0;
     for (int i = 0; i < kSrvSlots; ++i)
         m_srvDefaultKey |= uint64_t(m_srvDefaults[i]) << (3 * i);
+
+    m_usesAccelStructure = ReflectUsesAccelStructure(m_vsBlob.Get()) or ReflectUsesAccelStructure(m_psBlob.Get())
+                        or ReflectUsesAccelStructure(m_gsBlob.Get()) or ReflectUsesAccelStructure(m_hsBlob.Get())
+                        or ReflectUsesAccelStructure(m_dsBlob.Get());
 
     if (not CreateRootSignature())
         return false;
@@ -583,6 +681,9 @@ void Shader::Destroy(void) noexcept
     }
     m_locations.Clear();
     m_vsInputLayout.clear();
+    std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
+    m_srvDefaultKey = 0;
+    m_usesAccelStructure = false;
     m_rootSignature.Reset();
     m_rootSignatureBlob.Reset();
     m_vsBlob.Reset();
@@ -630,6 +731,7 @@ Shader& Shader::Move(Shader& other) noexcept
         for (int i = 0; i < kSrvSlots; ++i)
             m_srvDefaults[i] = other.m_srvDefaults[i];
         m_srvDefaultKey = other.m_srvDefaultKey;
+        m_usesAccelStructure = other.m_usesAccelStructure;
     }
     return *this;
 }
