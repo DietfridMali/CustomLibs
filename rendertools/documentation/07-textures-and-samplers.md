@@ -191,6 +191,4 @@ Vulkan means the image is replaced rather than overwritten, with the old one def
 - The OpenGL `Texture` stores its type and wrap mode as raw `GLenum` / `int` rather than as
   `TextureType` / `GfxWrapMode`, and converts at the boundary (`GLWrapMode`, `WrapModeFromGL`). The
   other two store the neutral enums.
-- `prerenderedtexture.h` exists in the shared `include/` **and** in the Vulkan and DirectX backends,
-  but not in OpenGL.
 - `texturehandler.cpp` exists once per backend although `texturehandler.h` is shared.
