@@ -171,7 +171,7 @@ int ArgHandler::LoadArgs(const char* fileName) {
 
 
 Argument* ArgHandler::GetArg(const char* key) {
-    return m_argList.Find(String(key));
+    return m_argList.Find(String(key).ToLowercase());
 }
 
 
