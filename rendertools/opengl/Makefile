@@ -19,6 +19,7 @@ OPENGL_FILES := \
  blur_shader \
  tonemap_shader \
  lightning_shader \
+ line_shader \
  blackhole_shader \
  skybox_shader \
  compute_shader \
@@ -57,6 +58,7 @@ COMMON_FILES := \
  lightningbolt \
  lightningemitter \
  lightningsystem \
+ linerenderer \
  linesegment \
  mesh \
  noise \

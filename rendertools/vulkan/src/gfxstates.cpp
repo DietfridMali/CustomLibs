@@ -335,6 +335,7 @@ void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
     if (image == VK_NULL_HANDLE)
         return;
 
+    commandListHandler.CurrentCmdList()->m_usesBackBuffer = true;
     ImageLayoutTracker& tracker = baseDisplayHandler.CurrentBackBufferTracker();
     tracker.ToTransferDst(cb);
 

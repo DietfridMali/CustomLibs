@@ -108,6 +108,7 @@ bool Swapchain::AcquireImages(void) noexcept
             return false;
         }
         m_layoutTrackers[i].Init(m_images[i], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+        m_layoutTrackers[i].m_stage = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
     }
     return true;
 }

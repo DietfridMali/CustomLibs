@@ -255,6 +255,8 @@ bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int 
     }
 #endif
 
+    baseDisplayHandler.CloseBackBufferList();
+
     CommandList* cl = commandListHandler.CreateCmdList(String("GfxRenderer::ReadBuffer"), true);
 
     if (not (cl and cl->Open(false)))

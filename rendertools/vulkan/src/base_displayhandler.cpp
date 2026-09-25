@@ -170,16 +170,18 @@ bool BaseDisplayHandler::SetupSwapchain(void) {
 CommandList* BaseDisplayHandler::BackBufferList(void) noexcept {
     CommandList* cl = commandListHandler.CurrentCmdList();
 
-    if (cl)
-        return cl;
-    m_backBufferList = commandListHandler.CreateCmdList(String("backBuffer"), true);
-    if (not m_backBufferList)
-        return nullptr;
-    if (not m_backBufferList->Open()) {
-        m_backBufferList = nullptr;
-        return nullptr;
+    if (not cl) {
+        m_backBufferList = commandListHandler.CreateCmdList(String("backBuffer"), true);
+        if (not m_backBufferList)
+            return nullptr;
+        if (not m_backBufferList->Open()) {
+            m_backBufferList = nullptr;
+            return nullptr;
+        }
+        cl = m_backBufferList;
     }
-    return m_backBufferList;
+    cl->m_usesBackBuffer = true;
+    return cl;
 }
 
 
@@ -242,6 +244,14 @@ void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
         return;
     m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
     TracyVkCollect(commandListHandler.m_gpuProfilerCtx, cb);
+}
+
+
+void BaseDisplayHandler::CloseBackBufferList(void) noexcept {
+    DisableBackBuffer();
+    if (m_backBufferList and m_backBufferList->IsRecording() and (commandListHandler.CurrentCmdList() == m_backBufferList))
+        m_backBufferList->Close();
+    m_backBufferList = nullptr;
 }
 
 

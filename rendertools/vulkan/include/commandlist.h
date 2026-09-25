@@ -54,6 +54,7 @@ public:
     uint32_t       m_frameIndex  { 0 };
     uint32_t       m_imageIndex  { 0 };
     uint64_t       m_frameNumber { 0 };   // monotonic; ++ per BeginFrame — reliable frame-boundary signal
+    bool           m_acquireWaitPending { false };
 
     bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
                 uint32_t graphicsFamily, uint32_t presentFamily,
@@ -77,6 +78,8 @@ public:
     inline VkSemaphore SubmitWaitSemaphore(void) const noexcept { return m_imageAvailable[m_frameIndex]; }
     inline VkSemaphore SubmitSignalSemaphore(void) const noexcept { return m_renderFinished[m_imageIndex]; }
     inline VkFence SubmitSignalFence(void) const noexcept { return m_inFlight[m_frameIndex]; }
+
+    bool TakeAcquireWait(VkSemaphoreSubmitInfo& waitInfo) noexcept;
 
     inline VkQueue GraphicsQueue(void) const noexcept { return m_graphicsQueue; }
     inline VkQueue PresentQueue(void) const noexcept { return m_presentQueue; }
@@ -118,6 +121,7 @@ public:
     bool                                m_isFlushed    { false };
     bool                                m_isTemporary  { false };
     bool                                m_isDetached   { false };
+    bool                                m_usesBackBuffer { false };
     uint64_t                            m_openSerial   { 0 };
     AutoArray<std::function<void()>>    m_disposableResources;
     uint64_t                            m_id           { 0 };

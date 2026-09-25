@@ -139,6 +139,8 @@ public:
     // otherwise the back buffer's own, opened here. Null only when even that fails.
     CommandList* BackBufferList(void) noexcept;
 
+    void CloseBackBufferList(void) noexcept;
+
     inline bool IsInRendering(void) const noexcept { return m_isInRendering; }
 
     inline VkImage CurrentBackBuffer(void) const noexcept {

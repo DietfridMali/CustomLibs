@@ -2,6 +2,9 @@
 ifeq ($(strip $(CXX)),)
   CXX := g++
 endif
+
+UNAME := $(shell uname -s)
+
 #CXX := clang++
 AR  := ar
 

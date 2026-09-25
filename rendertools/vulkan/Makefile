@@ -24,6 +24,7 @@ SRCDIR := ../src
 HLSL_SRCDIR := ../src/common-hlsl
 
 VULKAN_FILES := \
+ acceleration_structure \
  base_displayhandler \
  base_shadercode \
  cbv_allocator \
@@ -86,6 +87,7 @@ COMMON_FILES := \
  lightningbolt \
  lightningemitter \
  lightningsystem \
+ linerenderer \
  linesegment \
  mesh \
  noise \

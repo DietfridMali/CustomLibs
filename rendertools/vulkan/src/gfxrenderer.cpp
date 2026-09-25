@@ -20,7 +20,7 @@
 #include "resource_handler.h"
 #include "gfxapitype.h"
 #include "image_layout_tracker.h"
-#include "vkupload.h"	// CreateReadbackBuffer / one shot command buffer for ReadBuffer ()
+#include "vkupload.h"	// CreateReadbackBuffer for ReadBuffer ()
 
 // =================================================================================================
 // Vulkan Renderer
@@ -162,12 +162,15 @@ void GfxRenderer::FlushResources(void) noexcept {
     // without invalidating still-pending CommandBuffers. Called between Application::Setup
     // steps (analog to DX12 GfxRenderer::FlushResources → CommandListHandler::Flush).
     //
-    // ExecuteAll(true) does the plain-submit-plus-WaitIdle variant (no frame-sync semaphores
-    // or fence). Drain the deferred-cleanup lambdas for both frame slots, then clear the
+    // ExecuteAll(true) does the plain-submit-plus-WaitIdle variant (no renderFinished semaphore
+    // or fence; the acquire semaphore only when back buffer commands go along). The back buffer's
+    // own list is closed first, as in DX12 - it goes out with the drain and must not be taken for
+    // open afterwards. Drain the deferred-cleanup lambdas for both frame slots, then clear the
     // CPU-side bind table: setup-phase Texture::Bind calls left stale handles in
     // m_boundSrvViews / m_boundSamplers / m_boundStorageBuffers; after Cleanup those handles
     // point at destroyed views/buffers, and the next render's vkUpdateDescriptorSets would
     // reject them.
+    baseDisplayHandler.CloseBackBufferList();
     commandListHandler.ExecuteAll(true);
     gfxResourceHandler.Cleanup(0);
     gfxResourceHandler.Cleanup(1);
@@ -206,8 +209,9 @@ void GfxRenderer::PrecreatePipelines(void) {
 
 // =================================================================================================
 // The current swap chain image, as DrawScreen () left it - so call this before the present. The copy
-// goes through a host visible readback buffer on a one shot command buffer, the way
-// RenderTarget::ReadBuffer () does it; the image's layout is put back to what it was. Vulkan rows run
+// goes through a host visible readback buffer on a command list of its own that is submitted with the
+// closed ones (CommandListHandler::ExecutePending ()), the way RenderTarget::ReadBuffer () and the DX12
+// backend do it; the image's layout is put back to what it was. Vulkan rows run
 // top down and the swap chain is BGRA as a rule: the result is turned around to the bottom first RGBA
 // order the OpenGL backend delivers.
 
@@ -238,17 +242,21 @@ bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int 
     if (not CreateReadbackBuffer(VkDeviceSize(needed), readback))
         return false;
 
-    OneShotCommandBuffer cmd;
+    baseDisplayHandler.CloseBackBufferList();
 
-    if (not BeginSingleTimeCommands(cmd)) {
+    CommandList* cl = commandListHandler.CreateCmdList(String("GfxRenderer::ReadBuffer"), true);
+
+    if (not (cl and cl->Open(false))) {
         readback.Destroy();
         return false;
     }
+    cl->m_usesBackBuffer = true;
 
+    VkCommandBuffer cb = cl->GfxList();
     ImageLayoutTracker& tracker = baseDisplayHandler.CurrentBackBufferTracker();
     VkImageLayout layoutBefore = tracker.Layout();
 
-    tracker.ToTransferSrc(cmd.cb);
+    tracker.ToTransferSrc(cb);
 
     // Vulkan rows run top down: the rectangle's bottom left (x, y) is row h - y - height from the top
     VkBufferImageCopy copy { };
@@ -263,16 +271,14 @@ bool GfxRenderer::ReadBuffer(void* buffer, size_t bufferSize, int x, int y, int 
     copy.imageOffset = { int32_t(x), int32_t(h - y - height), 0 };
     copy.imageExtent = { uint32_t(width), uint32_t(height), 1 };
 
-    vkCmdCopyImageToBuffer(cmd.cb, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1, &copy);
+    vkCmdCopyImageToBuffer(cb, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1, &copy);
     // Back to the layout the frame left it in - the present, or the next draw, expects to find it there.
     if (layoutBefore == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-        tracker.ToPresent(cmd.cb);
+        tracker.ToPresent(cb);
     else if (layoutBefore == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
-        tracker.ToColorAttachment(cmd.cb);
-    if (not EndSingleTimeCommands(cmd)) {
-        readback.Destroy();
-        return false;
-    }
+        tracker.ToColorAttachment(cb);
+    cl->Close(false);
+    commandListHandler.ExecutePending();
     if (readback.mapped == nullptr) {
         readback.Destroy();
         return false;
