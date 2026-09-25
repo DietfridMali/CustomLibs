@@ -134,7 +134,7 @@ SoundObject& BaseSoundHandler::GetChannel(void) {
     }
     else {
         m_busyChannels[0].Stop();
-        m_idleChannels.Append(m_busyChannels.First());
+        m_busyChannels.Append(m_busyChannels.First());
         m_busyChannels.DiscardFirst();
     }
     return m_busyChannels[-1];

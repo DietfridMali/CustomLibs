@@ -176,7 +176,7 @@ Argument* ArgHandler::GetArg(const char* key) {
 
 
 const String ArgHandler::StrVal(const char* key, int i, String defVal, bool onlyDebug) {
-#ifdef RELEASE
+#ifdef NDEBUG
     if (onlyDebug)
     return defVal;
 #endif
@@ -186,7 +186,7 @@ const String ArgHandler::StrVal(const char* key, int i, String defVal, bool only
 
 
 int ArgHandler::IntVal(const char* key, int i, int defVal, bool onlyDebug) {
-#ifdef RELEASE
+#ifdef NDEBUG
     if (onlyDebug)
         return defVal;
 #endif
@@ -196,7 +196,7 @@ int ArgHandler::IntVal(const char* key, int i, int defVal, bool onlyDebug) {
 
 
 float ArgHandler::FloatVal(const char* key, int i, float defVal, bool onlyDebug) {
-#ifdef RELEASE
+#ifdef NDEBUG
     if (onlyDebug)
         return defVal;
 #endif
@@ -206,11 +206,11 @@ float ArgHandler::FloatVal(const char* key, int i, float defVal, bool onlyDebug)
 
 
 bool ArgHandler::BoolVal(const char* key, int i, bool defVal, bool onlyDebug) {
-#ifdef RELEASE
+#ifdef NDEBUG
     if (onlyDebug)
         return defVal;
 #endif
-    return bool(IntValChecked(key, i, int(defVal), 0, 1));
+    return bool(IntValChecked(key, i, int(defVal), 0, 1, onlyDebug));
 }
 
 // =================================================================================================

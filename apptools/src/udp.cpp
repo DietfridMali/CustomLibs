@@ -54,6 +54,8 @@ void UDPSocket::Unbind(void) {
 bool UDPSocket::Send(const uint8_t* data, int dataLen, const NetworkEndpoint& receiver) {
     if (not m_socket)
         return false;
+    if ((dataLen < 0) or (dataLen > MaxPacketSize))
+        return false;
 #if 1
     m_packet->channel = -1;
     m_packet->len = dataLen;
