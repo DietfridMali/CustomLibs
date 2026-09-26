@@ -40,6 +40,10 @@ public:
 
 	bool ApplyKuwaharaFilter(const KuwaharaFilter::Params& params);
 
+	inline int FaceSize(void) noexcept {
+		return (m_skyTextures[0][0] != nullptr) ? m_skyTextures[0][0]->GetWidth() : 0;
+	}
+
 	bool Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime);
 
 	inline bool IsAvailable(void) const noexcept {

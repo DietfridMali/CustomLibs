@@ -45,7 +45,11 @@ cbuffer ShaderConstants : register(b1) {   // same block as the PS
     float  dashScale;      // stretches the dash / dot pattern (PS)
     float  antialias;      // 1: analytic edge antialiasing, 0: hard edge (PS)
     int    firstLine;      // index of this draw's first record in the buffer
+    float  viewerPull;
+    float  worldWidth;
 };
+
+static const float minWorldHalfWidth = 0.375;
 
 struct VSInput {
     [[vk::location(0)]] float3 pos : POSITION;
@@ -60,11 +64,20 @@ struct PSInput {
     float2 pattern : TEXCOORD2;   // (style, phase)
 };
 
+float3 PullToViewer(float3 vp) {
+    if (viewerPull <= 0.0)
+        return vp;
+    float d = length(vp);
+    if (d <= 1e-4)
+        return vp;
+    return vp - vp * (viewerPull / (d * pow(d, 0.25)));
+}
+
 PSInput VSMain(VSInput v) {
     LineInstance l = lines[v.iid + uint(firstLine)];
 
-    float3 vp0 = mul(mModelView, float4(l.p0, 1.0)).xyz;
-    float3 vp1 = mul(mModelView, float4(l.p1, 1.0)).xyz;
+    float3 vp0 = PullToViewer(mul(mModelView, float4(l.p0, 1.0)).xyz);
+    float3 vp1 = PullToViewer(mul(mModelView, float4(l.p1, 1.0)).xyz);
 
     // The ribbon is spanned in 3D view space, not in the projection: a line running towards the viewer
     // has no projected length and would collapse there. Across the line it faces the viewer - in view
@@ -98,6 +111,8 @@ PSInput VSMain(VSInput v) {
     // the across scale, so the cap's extension in view units stays bounded
     float pxAlong = max(length(dAxisNdc * pxScale), 0.05 * pxAcross);
     float halfWidth = max(0.5 * l.width, 1e-3);   // pixels
+    if (worldWidth > 0.0)
+        halfWidth = max(min(halfWidth, 0.5 * worldWidth * pxAcross), minWorldHalfWidth);
     // one pixel of margin around the capsule, so the antialiased edge has the pixels it fades over
     float halfDraw = halfWidth + 1.0;
 
@@ -131,6 +146,8 @@ cbuffer ShaderConstants : register(b1) {
     float  dashScale;      // stretches the dash / dot pattern (1 = the lengths above)
     float  antialias;      // 1: analytic edge antialiasing, 0: hard edge
     int    firstLine;
+    float  viewerPull;
+    float  worldWidth;
 };
 
 // distance of t to the interval [s, e] along the line, 0 inside

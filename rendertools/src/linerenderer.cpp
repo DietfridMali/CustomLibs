@@ -17,6 +17,7 @@ bool LineRenderer::Create(int capacity) {
     m_lineCapacity = capacity;
     m_capacity = capacity;
     m_count = 0;
+    m_isResident = false;
     m_isAvailable = true;
     return true;
 }
@@ -28,6 +29,7 @@ void LineRenderer::Destroy(void) {
     m_lineCapacity = 0;
     m_capacity = 0;
     m_count = 0;
+    m_isResident = false;
     m_isAvailable = false;
 }
 
@@ -120,18 +122,35 @@ void LineRenderer::SetupQuad(void) {
 }
 
 
+bool LineRenderer::Upload(void) {
+    m_isResident = false;
+    if (not m_isAvailable or (m_count <= 0))
+        return false;
+    if (not ReserveBuffer(m_count))
+        return false;
+    std::memcpy(m_buffer.m_data.Data(), m_lines.Data(), size_t(m_count) * sizeof(Line));
+    if (not m_buffer.UploadRange(0, m_count, false))
+        return false;
+    m_isResident = true;
+    return true;
+}
+
+
 bool LineRenderer::Render(void) {
     if (not m_isAvailable or (m_count <= 0))
         return false;
-    if (not ReserveBuffer(m_buffer.AppendBase() + m_count))
-        return false;
 
-    int firstLine = m_buffer.AppendBase();
+    int firstLine = 0;
 
-    std::memcpy(m_buffer.m_data.Data() + firstLine, m_lines.Data(), size_t(m_count) * sizeof(Line));
-    if (not m_buffer.UploadRange(firstLine, m_count, false))
-        return false;
-    m_buffer.SetAppendBase(firstLine + m_count);
+    if (not m_isResident) {
+        if (not ReserveBuffer(m_buffer.AppendBase() + m_count))
+            return false;
+        firstLine = m_buffer.AppendBase();
+        std::memcpy(m_buffer.m_data.Data() + firstLine, m_lines.Data(), size_t(m_count) * sizeof(Line));
+        if (not m_buffer.UploadRange(firstLine, m_count, false))
+            return false;
+        m_buffer.SetAppendBase(firstLine + m_count);
+    }
 
     // states feed the PSO, so they are set before the shader is activated. Alpha blending for the
     // antialiased edge; a ribbon is never culled. Depth test and write stay what the caller set.
@@ -170,6 +189,8 @@ bool LineRenderer::Render(void) {
         shader->SetFloat("dashScale", m_dashScale);
         shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
         shader->SetInt("firstLine", firstLine);
+        shader->SetFloat("viewerPull", m_viewerPull);
+        shader->SetFloat("worldWidth", m_worldWidth);
         m_buffer.Bind(0);
         m_quad.GetGfxDataLayout().SetInstanceCount(uint32_t(m_count));
         ok = m_quad.Render(shader);

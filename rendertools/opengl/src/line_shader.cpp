@@ -40,6 +40,10 @@ uniform mat4 mViewport;
 uniform vec2  texelSize;     // one over the TARGET BUFFER size - mClip below is in the buffer's NDC
 uniform float perspective;   // 1: pixels per unit shrink with depth; 0: orthographic projection
 uniform int   firstLine;     // index of this draw's first record in the buffer
+uniform float viewerPull;
+uniform float worldWidth;
+
+const float minWorldHalfWidth = 0.375;
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 texCoord;
@@ -48,11 +52,20 @@ out vec4 vCap;      // (along, across, segLen, halfWidth) - capsule local, PIXEL
 out vec4 vColor;
 out vec2 vPattern;  // (style, phase)
 
+vec3 PullToViewer(vec3 vp) {
+    if (viewerPull <= 0.0)
+        return vp;
+    float d = length(vp);
+    if (d <= 1e-4)
+        return vp;
+    return vp - vp * (viewerPull / (d * pow(d, 0.25)));
+}
+
 void main() {
     LineInstance l = lines[uint(gl_InstanceID + firstLine)];
 
-    vec3 vp0 = (mModelView * vec4(l.p0x, l.p0y, l.p0z, 1.0)).xyz;
-    vec3 vp1 = (mModelView * vec4(l.p1x, l.p1y, l.p1z, 1.0)).xyz;
+    vec3 vp0 = PullToViewer((mModelView * vec4(l.p0x, l.p0y, l.p0z, 1.0)).xyz);
+    vec3 vp1 = PullToViewer((mModelView * vec4(l.p1x, l.p1y, l.p1z, 1.0)).xyz);
 
     // The ribbon is spanned in 3D view space, not in the projection: a line running towards the viewer
     // has no projected length and would collapse there. Across the line it faces the viewer - in view
@@ -86,6 +99,8 @@ void main() {
     // the across scale, so the cap's extension in view units stays bounded
     float pxAlong = max(length(dAxisNdc * pxScale), 0.05 * pxAcross);
     float halfWidth = max(0.5 * l.width, 1e-3);   // pixels
+    if (worldWidth > 0.0)
+        halfWidth = max(min(halfWidth, 0.5 * worldWidth * pxAcross), minWorldHalfWidth);
     // one pixel of margin around the capsule, so the antialiased edge has the pixels it fades over
     float halfDraw = halfWidth + 1.0;
 

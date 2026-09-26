@@ -346,6 +346,30 @@ const String& NoiseFuncs() {
             }
             return sum / max(norm, 1.0e-5); // [0..1]
         }
+        const float simplexSkew = 1.0 / 3.0;
+        const float simplexUnskew = 1.0 / 6.0;
+        const float simplexRadius2 = 0.6;
+        const float simplexScale = 52.0;
+        vec3 gradientHash3D(vec3 p) {
+            p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6)));
+            return fract(sin(p) * 43758.5453) * 2.0 - 1.0;
+        }
+        float simplexNoise3D(vec3 x) {
+            vec3 s = floor(x + (x.x + x.y + x.z) * simplexSkew);
+            vec3 x0 = x - s + (s.x + s.y + s.z) * simplexUnskew;
+            vec3 g = step(x0.yzx, x0);
+            vec3 l = 1.0 - g;
+            vec3 i1 = min(g, l.zxy);
+            vec3 i2 = max(g, l.zxy);
+            vec3 x1 = x0 - i1 + simplexUnskew;
+            vec3 x2 = x0 - i2 + 2.0 * simplexUnskew;
+            vec3 x3 = x0 - 1.0 + 3.0 * simplexUnskew;
+            vec4 w = max(simplexRadius2 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+            vec4 d = vec4(dot(gradientHash3D(s), x0), dot(gradientHash3D(s + i1), x1), dot(gradientHash3D(s + i2), x2), dot(gradientHash3D(s + 1.0), x3));
+            w *= w;
+            w *= w;
+            return dot(w, d) * simplexScale;
+        }
     )");
     return source;
 }

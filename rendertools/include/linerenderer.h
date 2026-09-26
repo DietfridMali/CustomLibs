@@ -53,6 +53,8 @@ public:
 
     float           m_dashScale{ 1.0f };
     bool            m_antialias{ true };
+    float           m_viewerPull{ 0.0f };
+    float           m_worldWidth{ 0.0f };
 
     LineRenderer() = default;
     ~LineRenderer() { Destroy(); }
@@ -64,7 +66,10 @@ public:
     inline int Count(void) const noexcept { return m_count; }
 
     // start a new batch
-    inline void Clear(void) noexcept { m_count = 0; }
+    inline void Clear(void) noexcept {
+        m_count = 0;
+        m_isResident = false;
+    }
 
     bool Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style = Style::Solid, float phase = 0.0f);
 
@@ -76,6 +81,8 @@ public:
     // Draws what was added since Clear () with the current matrices and viewport.
     bool Render(void);
 
+    bool Upload(void);
+
 private:
     GfxArray<Line, GfxTypes::StructuredBuffer>  m_buffer;
     AutoArray<Line>                             m_lines;
@@ -85,6 +92,7 @@ private:
     BaseQuadMesh                                m_quad;
     bool                                        m_quadReady{ false };
     bool                                        m_isAvailable{ false };
+    bool                                        m_isResident{ false };
 
     bool Reserve(int count);
     bool ReserveBuffer(int count);
