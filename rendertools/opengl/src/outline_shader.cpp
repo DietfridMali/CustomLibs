@@ -27,15 +27,12 @@ const ShaderSource& OutlineShader() {
                     return;
                 }
                 float alpha = 0.0;
-                float dx = outlineWidth * texelSize.x;
-                int r = int(outlineWidth);
-                for (int x = r; x >= 0; x--, dx -= texelSize.x) {
-                    float dy = outlineWidth * texelSize.y;
-                    for (int y = r; y >= 0; y--, dy -= texelSize.y) {
-                        alpha = max(alpha, texture(surface, fragCoord + vec2(-dx, -dy)).a);
-                        alpha = max(alpha, texture(surface, fragCoord + vec2(-dx,  dy)).a);
-                        alpha = max(alpha, texture(surface, fragCoord + vec2( dx,  dy)).a);
-                        alpha = max(alpha, texture(surface, fragCoord + vec2( dx, -dy)).a);
+                int r = int(ceil(outlineWidth));
+                for (int y = -r; y <= r; y++) {
+                    for (int x = -r; x <= r; x++) {
+                        float weight = clamp(outlineWidth + 0.5 - length(vec2(float(x), float(y))), 0.0, 1.0);
+                        if (weight > 0.0)
+                            alpha = max(alpha, weight * texture(surface, fragCoord + vec2(float(x), float(y)) * texelSize).a);
                         }
                     }
                 fragColor = (alpha > 0.0) ? vec4(outlineColor.rgb /** mix(1.0, alpha, premultiply)*/, alpha) : vec4(0.0);

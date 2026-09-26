@@ -69,8 +69,8 @@ void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& de
                 renderTarget->SetLastDestination(nextBuf);
             }
 #endif
-            shader->SetVector2f("texelSize", renderTarget->TexelSize());
-            shader->SetFloat("outlineWidth", decoration.outlineWidth);
+            shader->SetVector2f("texelSize", TexCoord(1.0f / float(renderTarget->GetWidth(true)), 1.0f / float(renderTarget->GetHeight(true))));
+            shader->SetFloat("outlineWidth", decoration.outlineWidth * float(renderTarget->GetScale()));
             shader->SetVector4f("outlineColor", decoration.outlineColor);
             shader->SetFloat("offset", 0.0f); // 0.5f);
             //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);

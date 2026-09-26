@@ -41,18 +41,17 @@ const ShaderSource& OutlineShader() {
                     return float4(lerp(outlineColor.rgb, color.rgb, color.a), 1.0);
                 }
                 float alpha = 0.0;
-                float dx = outlineWidth * texelSize.x;
-                int   r  = int(outlineWidth);
-                for (int x = r; x >= 0; x--, dx -= texelSize.x) {
-                    float dy = outlineWidth * texelSize.y;
-                    for (int y = r; y >= 0; y--, dy -= texelSize.y) {
-                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2(-dx, -dy), 0).a);
-                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2(-dx,  dy), 0).a);
-                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2( dx,  dy), 0).a);
-                        alpha = max(alpha, surface.SampleLevel(s0, i.fragCoord + float2( dx, -dy), 0).a);
+                int   r  = int(ceil(outlineWidth));
+                [loop]
+                for (int y = -r; y <= r; y++) {
+                    [loop]
+                    for (int x = -r; x <= r; x++) {
+                        float weight = saturate(outlineWidth + 0.5 - length(float2(float(x), float(y))));
+                        if (weight > 0.0)
+                            alpha = max(alpha, weight * surface.SampleLevel(s0, i.fragCoord + float2(float(x), float(y)) * texelSize, 0).a);
                     }
                 }
-                return (alpha > 0.0) ? float4(outlineColor.rgb, alpha) : (float4)0;
+                return (alpha > 0.0) ? float4(outlineColor.rgb, alpha) : float4(0.0, 0.0, 0.0, 0.0);
             }
         )",
         ShaderDataLayout(VtxTcAttrs, 2)
