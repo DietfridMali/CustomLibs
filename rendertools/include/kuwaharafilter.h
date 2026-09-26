@@ -27,6 +27,8 @@ public:
 
     bool ApplyCube(Texture* cubemap, const Params& params);
 
+    bool FilterToBuffer(Texture* source, int width, int height, float* dest, const Params& params);
+
     void Destroy(void);
 
 private:
@@ -34,21 +36,26 @@ private:
         int             width{ 0 };
         int             height{ 0 };
         int             margin{ 0 };
+        GfxPixelFormat  filterFormat{ GfxPixelFormat::RGBA8_UNorm };
         RenderTarget*   filter{ nullptr };
         RenderTarget*   tensor{ nullptr };
     };
 
     AutoArray<Targets>  m_targets;
 
-    Targets* GetTargets(int width, int height, int margin);
+    Targets* GetTargets(int width, int height, int margin, GfxPixelFormat filterFormat);
 
     Shader* SetupShader(const char* shaderId, int width, int height, bool wrapU, bool wrapV, const Params& params);
 
     void SetupCubeFace(Shader* shader, const Targets& targets, int face);
 
+    void SetPassStates(void);
+
     bool RenderTensor(Targets& targets, Texture* source, const Params& params, int face);
 
     bool RenderFilter(Targets& targets, Texture* source, const Params& params, int face);
+
+    RenderTarget* FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat, const Params& params);
 
     bool Filter(Texture* texture, const Params& params, bool isCube);
 

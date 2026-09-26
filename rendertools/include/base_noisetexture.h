@@ -3,6 +3,7 @@
 #include "texture.h"        // resolved per-backend via include path: opengl / vulkan / directx
 #include "rendertypes.h"
 #include "texturesampling.h"
+#include "kuwaharafilter.h"
 #include "noise.h"
 #include "FBM.h"
 #include "array.hpp"
@@ -415,8 +416,12 @@ public:
     void ToAvgMip(BaseCloudNoiseTexture* mipTex);
     
     BaseCloudNoiseTexture* CreateAvgMip(int destSize, String noiseFilename = "");
-    
+
     static void DownSampleAvg(float* src, int srcEdgeLen, float* dest, int destEdgeLen);
+
+    bool ToKuwahara(BaseCloudNoiseTexture* noiseTex, const KuwaharaFilter::Params& params);
+
+    BaseCloudNoiseTexture* CreateKuwahara(const KuwaharaFilter::Params& params, String noiseFilename = "");
 
     bool Deploy(int bufferIndex = 0) override = 0;
     
@@ -443,8 +448,10 @@ protected:
 
     // Factories — per-backend subclass returns its concrete mip subclass instance.
     virtual BaseCloudNoiseTexture* NewMaxMipTex(void) = 0;
-    
+
     virtual BaseCloudNoiseTexture* NewAvgMipTex(void) = 0;
+
+    virtual BaseCloudNoiseTexture* NewKuwaharaTex(void) = 0;
 };
 
 // =================================================================================================

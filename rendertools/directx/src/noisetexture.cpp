@@ -62,6 +62,11 @@ BaseCloudNoiseTexture* CloudNoiseTexture::NewAvgMipTex(void) {
 }
 
 
+BaseCloudNoiseTexture* CloudNoiseTexture::NewKuwaharaTex(void) {
+    return new CloudNoiseTexture();
+}
+
+
 void NoiseMaxMipTexture::SetParams(bool) {
     m_hasParams = true;
     ConfigureSamplingForNoise(m_sampling, GfxFilterMode::Nearest, GfxMipMode::None);

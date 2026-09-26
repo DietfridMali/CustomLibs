@@ -126,6 +126,11 @@ BaseCloudNoiseTexture* CloudNoiseTexture::NewAvgMipTex(void) {
 }
 
 
+BaseCloudNoiseTexture* CloudNoiseTexture::NewKuwaharaTex(void) {
+    return new CloudNoiseTexture();
+}
+
+
 void NoiseMaxMipTexture::SetParams(bool enforce) {
     if (enforce or not m_hasParams) {
         m_hasParams = true;

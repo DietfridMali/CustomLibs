@@ -55,6 +55,7 @@ public:
 protected:
     BaseCloudNoiseTexture* NewMaxMipTex(void) override;
     BaseCloudNoiseTexture* NewAvgMipTex(void) override;
+    BaseCloudNoiseTexture* NewKuwaharaTex(void) override;
 };
 
 // =================================================================================================

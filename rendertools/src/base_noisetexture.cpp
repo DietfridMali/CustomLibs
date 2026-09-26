@@ -605,6 +605,50 @@ BaseCloudNoiseTexture* BaseCloudNoiseTexture::CreateAvgMip(int mipSize, String n
 }
 
 
+bool BaseCloudNoiseTexture::ToKuwahara(BaseCloudNoiseTexture* noiseTex, const KuwaharaFilter::Params& params) {
+    if ((noiseTex == nullptr) or (noiseTex->m_gridSize != m_gridSize))
+        return false;
+    Texture slice;
+    if (not slice.Create())
+        return false;
+    slice.SetType(TextureType::Texture2D);
+
+    KuwaharaFilter kuwaharaFilter;
+    const size_t sliceSize = size_t(m_gridSize) * size_t(m_gridSize);
+    for (int z = 0; z < m_gridSize; ++z) {
+        float* src = m_data.DataPtr() + sliceSize * size_t(z);
+        float* dest = noiseTex->m_data.DataPtr() + sliceSize * size_t(z);
+        if (not Upload2DTexture(slice, m_gridSize, m_gridSize, GfxPixelFormat::R32_SFloat, src))
+            return false;
+        if (not kuwaharaFilter.FilterToBuffer(&slice, m_gridSize, m_gridSize, dest, params))
+            return false;
+    }
+    return true;
+}
+
+
+BaseCloudNoiseTexture* BaseCloudNoiseTexture::CreateKuwahara(const KuwaharaFilter::Params& params, String noiseFilename) {
+    BaseCloudNoiseTexture* noiseTex = NewKuwaharaTex();
+    if (noiseTex == nullptr)
+        return nullptr;
+
+    if (not noiseTex->Create(m_gridSize, m_params, noiseFilename, false)) {
+        delete noiseTex;
+        return nullptr;
+    }
+
+    if (noiseTex->IsDeployed())
+        return noiseTex;
+
+    if (not (ToKuwahara(noiseTex, params) and noiseTex->Deploy())) {
+        delete noiseTex;
+        return nullptr;
+    }
+    noiseTex->SaveToFile(noiseFilename);
+    return noiseTex;
+}
+
+
 // =================================================================================================
 // BaseDetailNoiseTexture — 64³ R8 detail Worley-FBM für Schneider-style Edge-Erosion im Shader.
 

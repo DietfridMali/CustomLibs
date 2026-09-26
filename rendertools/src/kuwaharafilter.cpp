@@ -11,9 +11,9 @@
 
 // =================================================================================================
 
-KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int margin) {
+KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int margin, GfxPixelFormat filterFormat) {
     for (Targets& targets : m_targets) {
-        if ((targets.width == width) and (targets.height == height) and (targets.margin == margin))
+        if ((targets.width == width) and (targets.height == height) and (targets.margin == margin) and (targets.filterFormat == filterFormat))
             return &targets;
     }
 
@@ -21,6 +21,7 @@ KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int m
     targets.width = width;
     targets.height = height;
     targets.margin = margin;
+    targets.filterFormat = filterFormat;
     targets.filter = new (std::nothrow) RenderTarget();
     targets.tensor = new (std::nothrow) RenderTarget();
 
@@ -28,7 +29,7 @@ KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int m
     filterParams.name = "kuwaharaFilter";
     filterParams.colorBufferCount = 1;
     filterParams.depthBufferCount = 0;
-    filterParams.colorFormat = ToNativeColorFormat(GfxPixelFormat::RGBA8_UNorm);
+    filterParams.colorFormat = ToNativeColorFormat(filterFormat);
     filterParams.hasMRTs = false;
 
     RenderTarget::RTCreationParams tensorParams;
@@ -76,6 +77,15 @@ void KuwaharaFilter::SetupCubeFace(Shader* shader, const Targets& targets, int f
     shader->SetInt("face", face);
     shader->SetInt("faceSize", targets.width);
     shader->SetInt("margin", targets.margin);
+}
+
+
+void KuwaharaFilter::SetPassStates(void) {
+    gfxStates.SetDepthTest(0);
+    gfxStates.SetDepthWrite(0);
+    gfxStates.SetBlending(0);
+    gfxStates.SetFaceCulling(0);
+    gfxStates.SetScissorTest(0);
 }
 
 
@@ -175,7 +185,7 @@ bool KuwaharaFilter::Filter(Texture* texture, const Params& params, bool isCube)
         return false;
     int margin = isCube ? int(std::ceil(3.0f * params.tensorSigma)) : 0;
     int faceCount = isCube ? 6 : 1;
-    Targets* targets = GetTargets(width, height, margin);
+    Targets* targets = GetTargets(width, height, margin, GfxPixelFormat::RGBA8_UNorm);
     if (not targets)
         return false;
 
@@ -232,6 +242,38 @@ bool KuwaharaFilter::Apply(Texture* texture, const Params& params) {
 
 bool KuwaharaFilter::ApplyCube(Texture* cubemap, const Params& params) {
     return Filter(cubemap, params, true);
+}
+
+
+RenderTarget* KuwaharaFilter::FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat, const Params& params) {
+    Targets* targets = GetTargets(width, height, 0, filterFormat);
+    if (not targets)
+        return nullptr;
+
+    SetPassStates();
+    baseRenderer.PushViewport();
+    baseRenderer.PushMatrix();
+    baseRenderer.PushMatrix(RenderMatrices::mtProjection);
+    baseRenderer.ResetTransformation();
+
+    bool ok = RenderTensor(*targets, source, params, -1) and RenderFilter(*targets, source, params, -1);
+
+    baseRenderer.PopMatrix(RenderMatrices::mtProjection);
+    baseRenderer.PopMatrix();
+    baseRenderer.PopViewport();
+    gfxStates.SetDepthWrite(1);
+    gfxStates.SetDepthTest(1);
+    gfxStates.SetFaceCulling(1);
+    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+    gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
+    gfxStates.SetBlending(0);
+    return ok ? targets->filter : nullptr;
+}
+
+
+bool KuwaharaFilter::FilterToBuffer(Texture* source, int width, int height, float* dest, const Params& params) {
+    RenderTarget* target = FilterToTarget(source, width, height, GfxPixelFormat::R32_SFloat, params);
+    return (target != nullptr) and target->ReadBuffer(0, dest, size_t(width) * size_t(height) * sizeof(float));
 }
 
 // =================================================================================================
