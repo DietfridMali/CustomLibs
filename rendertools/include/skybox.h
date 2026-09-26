@@ -7,6 +7,7 @@
 #include "noisetexture.h"
 #include "base_shaderhandler.h"
 #include "texturehandler.h"
+#include "kuwaharafilter.h"
 
 // =================================================================================================
 
@@ -36,6 +37,8 @@ public:
 	// without it a second Setup () would overwrite the pointers and leak both the textures and the mesh.
 	// The noise textures are NOT touched - they belong to whoever passed them in.
 	void Destroy(void);
+
+	bool ApplyKuwaharaFilter(const KuwaharaFilter::Params& params);
 
 	bool Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime);
 

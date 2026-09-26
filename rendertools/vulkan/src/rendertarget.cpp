@@ -514,6 +514,9 @@ void RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInf
         CreateCubemapBuffer(info, w);
     else
         CreateColorBuffer(info, w, h);
+    fprintf(stderr, "IMAGEDIAG rt '%s' buffer %d type %d image 0x%llx\n",
+            static_cast<const char*>(m_name), bufferIndex, int(bufferType),
+            static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(info.m_image)));
     ++m_bufferCount;
     (void)attachmentIndex;
 }

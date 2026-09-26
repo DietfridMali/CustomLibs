@@ -566,6 +566,8 @@ void CommandList::Close(bool restoreRenderStates) noexcept
     m_gpuZone = nullptr;
 #endif
     uint32_t fi = ActiveFrameIndex();
+    if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == m_cmdBuffers[fi]))
+        baseDisplayHandler.SuspendBackBuffer();
     VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
     if (res != VK_SUCCESS)
         fprintf(stderr, "CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);

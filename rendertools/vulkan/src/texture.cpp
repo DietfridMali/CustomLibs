@@ -289,6 +289,9 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, 
     }
 
     m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+    fprintf(stderr, "IMAGEDIAG texture '%s' image 0x%llx\n",
+            static_cast<const char*>(m_name),
+            static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_image)));
     return true;
 }
 

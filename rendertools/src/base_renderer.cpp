@@ -215,6 +215,7 @@ bool BaseRenderer::Stop2DScene(void) {
 
 void BaseRenderer::Draw3DScene(bool flipVertically) {
     ZoneScoped;
+    RenderTarget* source = RenderPostEffect();
     if (Stop3DScene() and Start2DScene()) {
         Set2DRenderStates();
         SetViewport(m_sceneViewport, 0, 0, false);
@@ -235,7 +236,7 @@ void BaseRenderer::Draw3DScene(bool flipVertically) {
 
         static bool renderScene = true;
         if (renderScene) {
-            m_renderQuad.Render(shader, { GetSceneBuffer()->GetAsTexture({})});
+            m_renderQuad.Render(shader, { source->GetAsTexture({})});
         }
         if (shader != nullptr)
             PopMatrix();

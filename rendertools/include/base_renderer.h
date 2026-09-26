@@ -222,6 +222,8 @@ public:
 
     virtual Shader* LoadPostEffectShader(void){ return nullptr; }
 
+    virtual RenderTarget* RenderPostEffect(void) { return GetSceneBuffer(); }
+
     inline int FrameIndex(void) noexcept {
         return m_frameIndex;
     }

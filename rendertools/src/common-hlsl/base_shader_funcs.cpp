@@ -187,9 +187,9 @@ const String& CelShadingFuncs() {
         }
 
         float CelQuantize(float value, int bands) {
-            float f = value * (float)bands;
+            float f = value * float(bands);
             float e = clamp(fwidth(f), 0.001, 0.5);
-            return (floor(f) + smoothstep(1.0 - e, 1.0, frac(f))) / (float)bands;
+            return (floor(f) + smoothstep(1.0 - e, 1.0, frac(f))) / float(bands);
         }
 
         float3 CelLight(float3 light, int bands) {
@@ -207,13 +207,13 @@ const String& CelShadingFuncs() {
         }
 
         float3 CelShade(float3 light, float3 normal, float3 viewDir, int bands, float rimPower, float rimStrength) {
-            return CelLight(light + (float3)RimLight(normal, viewDir, rimPower, rimStrength), bands);
+            return CelLight(light + RimLight(normal, viewDir, rimPower, rimStrength).xxx, bands);
         }
 
         float CelQuantizeRound(float value, int levels) {
-            float f = value * (float)levels;
+            float f = value * float(levels);
             float e = clamp(fwidth(f), 0.05, 0.5);
-            return (floor(f) + smoothstep(0.5 - e, 0.5 + e, frac(f))) / (float)levels;
+            return (floor(f) + smoothstep(0.5 - e, 0.5 + e, frac(f))) / float(levels);
         }
 
         float3 CelAlbedo(float3 color, int levels) {

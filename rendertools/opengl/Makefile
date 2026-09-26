@@ -54,6 +54,7 @@ COMMON_FILES := \
  framecounter \
  glbloader \
  icosphere \
+ kuwaharafilter \
  lightningnoise \
  lightningbolt \
  lightningemitter \

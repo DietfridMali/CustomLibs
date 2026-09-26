@@ -157,6 +157,7 @@
     <ClInclude Include="..\include\gfxpixelformat_vk.h" />
     <ClInclude Include="..\include\gfxstates.h" />
     <ClInclude Include="..\..\include\texteffects.h" />
+    <ClInclude Include="..\..\include\kuwaharafilter.h" />
     <ClInclude Include="..\..\include\lightningnoise.h" />
     <ClInclude Include="..\..\include\lightningbolt.h" />
     <ClInclude Include="..\..\include\linerenderer.h" />
@@ -253,6 +254,8 @@
     <ClCompile Include="..\..\src\texture_mips.cpp" />
     <ClCompile Include="..\src\gfxstates.cpp" />
     <ClCompile Include="..\..\src\texteffects.cpp" />
+    <ClCompile Include="..\..\src\kuwaharafilter.cpp" />
+    <ClCompile Include="..\..\src\common-hlsl\kuwahara_shader.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\outline_shader.cpp" />
     <ClCompile Include="..\..\src\quad.cpp" />
     <ClCompile Include="..\..\src\projector.cpp" />

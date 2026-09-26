@@ -97,6 +97,9 @@
     <ClInclude Include="..\..\include\texteffects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\kuwaharafilter.h">
+      <Filter>Header Files\Texture</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\base_quadmesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -346,6 +349,12 @@
     </ClCompile>
     <ClCompile Include="..\..\src\texteffects.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\kuwaharafilter.cpp">
+      <Filter>Source Files\Texture</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\common-hlsl\kuwahara_shader.cpp">
+      <Filter>Source Files\Vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\projector.cpp">
       <Filter>Source Files</Filter>

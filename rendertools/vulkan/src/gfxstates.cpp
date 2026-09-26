@@ -259,6 +259,7 @@ void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
         }
     }
 
+    CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
     VkClearColorValue zero{ .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } };
     VkImageSubresourceRange range = MakeColorRange();
     for (int i = 0; i < rt->m_computeBufferCount; ++i) {
@@ -267,6 +268,7 @@ void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
         vkCmdClearColorImage(cb, bi.m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
         bi.m_layoutTracker.ToShaderInput(cb);
     }
+    commandListHandler.ResumeRendering(scope);
 
     if (opHandle != nullptr)
         baseRenderer.FinishOperation(opHandle);

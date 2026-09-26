@@ -121,6 +121,17 @@ void Skybox::Destroy(void) {
 }
 
 
+bool Skybox::ApplyKuwaharaFilter(const KuwaharaFilter::Params& params) {
+	KuwaharaFilter kuwaharaFilter;
+	bool ok = true;
+	for (int i = 0; i < 3; i++) {
+		if (not kuwaharaFilter.ApplyCube(m_skyTextures[0][i], params))
+			ok = false;
+	}
+	return ok;
+}
+
+
 Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime) {
 	Shader* shader = baseShaderHandler.SetupRenderShader("blackhole");
 	if (shader) {
