@@ -52,14 +52,19 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
     if (not m_font)
         return;
     baseRenderer.Set2DRenderStates();
-    Shader* shader = LoadShader();
+    bool haveGlyphColors = HaveGlyphColors();
+    Shader* shader = haveGlyphColors ? baseShaderHandler.LoadColoredTextureShader(m_color) : LoadShader();
     if (not shader)
         return;
 
     if (flipVertically)
         y = -y;
 
-    Mesh* mesh = meshHandler.AllocMesh(Mesh::mbIndex | Mesh::mbVertex | Mesh::mbTexCoord0);
+    uint32_t meshBuffers = Mesh::mbIndex | Mesh::mbVertex | Mesh::mbTexCoord0;
+    if (haveGlyphColors)
+        meshBuffers |= Mesh::mbColor;
+    Mesh* mesh = meshHandler.AllocMesh(meshBuffers);
+    int32_t glyphIndex = 0;
     for (auto glyph : text) {
         FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
 
@@ -89,6 +94,13 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
             mesh->AddTexCoord(tc);
             tc.X() = info->atlasPosition.X();
             mesh->AddTexCoord(tc);
+
+            if (haveGlyphColors) {
+                RGBAColor& color = GlyphColor(glyphIndex);
+                for (int32_t i = 0; i < 4; ++i)
+                    mesh->AddColor(color);
+            }
+            ++glyphIndex;
         }
     }
     mesh->UpdateData(true);
@@ -113,6 +125,7 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
     if (not shader)
         return;
     BaseQuadMesh q;
+    int32_t glyphIndex = 0;
     for (auto glyph : text) {
         FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
         if (info->index < 0)
@@ -120,6 +133,9 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
         else {
             float width = float(info->glyphSize.width) * scale;
             CreateQuad(q, x, y, width, info->texture, flipVertically);
+            if (HaveGlyphColors())
+                shader = baseShaderHandler.LoadPlainTextureShader(GlyphColor(glyphIndex));
+            ++glyphIndex;
 #if 1
             q.Render(shader, info->texture, m_color);
 #else

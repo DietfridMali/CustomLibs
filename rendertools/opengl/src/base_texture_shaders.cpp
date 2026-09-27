@@ -280,6 +280,57 @@ const ShaderSource& PlainTextureShader() {
 }
 
 
+const ShaderSource& ColoredTextureShader() {
+    static const ShaderSource source(
+        "coloredTexture",
+        R"(
+            #version 330
+            layout(location = 0) in vec3 position;
+            layout(location = 1) in vec2 texCoord;
+            layout(location = 4) in vec4 color;
+            uniform mat4 mModelView;
+            uniform mat4 mProjection;
+            uniform mat4 mViewport;
+            out vec2 fragCoord;
+            out vec4 vertexColor;
+            void main() {
+                vec4 viewPos = mModelView * vec4 (position, 1.0);
+                gl_Position = mViewport * mProjection * viewPos;
+                fragCoord = texCoord;
+                vertexColor = color;
+                }
+        )",
+        R"(
+        #version 330
+        uniform sampler2D surface;
+        uniform vec4 surfaceColor;
+        uniform int bDecodeColors;
+        uniform int bDecodeTexture;
+        in vec2 fragCoord;
+        in vec4 vertexColor;
+
+        layout(location = 0) out vec4 fragColor;
+
+        vec3 SRGBToLinear(vec3 c) {
+            c = max(c, vec3(0.0));
+            return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+        }
+
+        void main() {
+            vec4 texColor = texture(surface, fragCoord);
+            if (bDecodeTexture != 0)
+                texColor.rgb = SRGBToLinear(texColor.rgb);
+            vec4 tint = vertexColor * surfaceColor;
+            vec3 color = (bDecodeColors != 0) ? SRGBToLinear(tint.rgb) : tint.rgb;
+            float a = texColor.a * tint.a;
+            if (a == 0) discard;
+            fragColor = vec4 (texColor.rgb * color, a);
+            }
+        )");
+    return source;
+}
+
+
 const ShaderSource& MovingTextureShader() {
     static const ShaderSource source(
         "movingTexture",

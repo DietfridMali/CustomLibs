@@ -328,6 +328,70 @@ const ShaderSource& PlainTextureShader() {
     return source;
 }
 
+
+static const ShaderDataAttributes VtxTcColorAttrs[] = {
+    { "Vertex",   0, ShaderDataAttributes::Float3 },
+    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+    { "Color",    0, ShaderDataAttributes::Float4 },
+};
+
+const ShaderSource& ColoredTextureShader() {
+    static const ShaderSource source(
+        "coloredTexture",
+        R"(
+            cbuffer FrameConstants : register(b0) {
+                column_major float4x4 mModelView;
+                column_major float4x4 mProjection;
+                column_major float4x4 mViewport;
+            };
+            struct VSInput { [[vk::location(0)]] float3 pos : POSITION; [[vk::location(1)]] float2 tc : TEXCOORD; [[vk::location(4)]] float4 color : COLOR; };
+            struct PSInput {
+                float4 pos         : SV_Position;
+                float2 fragCoord   : TEXCOORD0;
+                float4 vertexColor : COLOR;
+            };
+            PSInput VSMain(VSInput i) {
+                PSInput o;
+                float4 viewPos = mul(mModelView, float4(i.pos, 1.0));
+                o.pos         = mul(mViewport, mul(mProjection, viewPos));
+                o.fragCoord   = i.tc;
+                o.vertexColor = i.color;
+                return o;
+            }
+        )",
+        R"(
+            cbuffer ShaderConstants : register(b1) {
+                float4 surfaceColor;
+                int    bDecodeColors;
+                int    bDecodeTexture;
+            };
+            Texture2D    surface : register(t0);
+            SamplerState s0      : register(s0);
+            struct PSInput {
+                float4 pos         : SV_Position;
+                float2 fragCoord   : TEXCOORD0;
+                float4 vertexColor : COLOR;
+            };
+            float3 SRGBToLinear(float3 c) {
+                c = max(c, 0.0);
+                return lerp(c / 12.92, pow((c + 0.055) / 1.055, 2.4), step(0.04045, c));
+            }
+            float4 PSMain(PSInput i) : SV_Target {
+                float4 texColor = surface.Sample(s0, i.fragCoord);
+                if (bDecodeTexture != 0)
+                    texColor.rgb = SRGBToLinear(texColor.rgb);
+                float4 tint = i.vertexColor * surfaceColor;
+                float3 color = (bDecodeColors != 0) ? SRGBToLinear(tint.rgb) : tint.rgb;
+                float a = texColor.a * tint.a;
+                if (a == 0) discard;
+                return float4(texColor.rgb * color, a);
+            }
+        )",
+        ShaderDataLayout(VtxTcColorAttrs, 3)
+    );
+    return source;
+}
+
 const ShaderSource& GlyphShader() {
     static const ShaderSource source(
         "glyph",

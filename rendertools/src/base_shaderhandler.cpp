@@ -306,6 +306,17 @@ Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool f
 }
 
 
+Shader* BaseShaderHandler::LoadColoredTextureShader(const RGBAColor& color, eColorEncoding textureEncoding) {
+    Shader* shader = SetupRenderShader("coloredTexture");
+    if (shader) {
+        shader->SetVector4f("surfaceColor", color);
+        shader->SetInt("bDecodeColors", m_decodeColors ? 1 : 0);
+        shader->SetInt("bDecodeTexture", (m_decodeColors and (textureEncoding != ecSRGB)) ? 1 : 0);
+    }
+    return shader;
+}
+
+
 Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
     Shader* shader = SetupRenderShader("blurTexture");
     if (shader) {

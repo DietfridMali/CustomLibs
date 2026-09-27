@@ -152,6 +152,8 @@ public:
 
     Shader* LoadPlainTextureShader(const RGBAColor& color, bool flipVertically = false, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false, eColorEncoding textureEncoding = ecLinear);
 
+    Shader* LoadColoredTextureShader(const RGBAColor& color, eColorEncoding textureEncoding = ecLinear);
+
     Shader* LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& params = {}, bool premultiply = false);
 
     Shader* LoadGrayscaleShader(float brightness, bool invert = false, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE);

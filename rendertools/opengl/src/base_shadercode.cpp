@@ -21,6 +21,7 @@ const ShaderSource& ShadedRingShader();
 const ShaderSource& PlainColorShader();
 const ShaderSource& ColorMeshShader();
 const ShaderSource& PlainTextureShader();
+const ShaderSource& ColoredTextureShader();
 const ShaderSource& MovingTextureShader();
 const ShaderSource& BlurTextureShader();
 const ShaderSource& GrayScaleShader();
@@ -59,6 +60,7 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
         &PlainColorShader(),
         &ColorMeshShader(),
         &PlainTextureShader(),
+        &ColoredTextureShader(),
         &MovingTextureShader(),
         &BlurTextureShader(),
         &GrayScaleShader(),

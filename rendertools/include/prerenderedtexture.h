@@ -76,7 +76,7 @@ public:
         PrerenderedItem::Destroy();
     }
 
-    bool Create(String text, TextRenderer::eTextAlignments alignment = TextRenderer::taCenter, RGBAColor color = ColorData::White, const TextEffects::Decoration& decoration = {});
+    bool Create(String text, TextRenderer::eTextAlignments alignment = TextRenderer::taCenter, const AutoArray<RGBAColor>& colors = { ColorData::White }, const TextEffects::Decoration& decoration = {});
 
     inline void SetColor(RGBAColor color) noexcept {
         m_color = color;

@@ -70,17 +70,19 @@ PrerenderedText::PrerenderedText(int bufferCount, Viewport viewport, float scale
 { }
 
 
-bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignment, RGBAColor color, const TextEffects::Decoration& decoration) {
+bool PrerenderedText::Create(String text, TextRenderer::eTextAlignments alignment, const AutoArray<RGBAColor>& colors, const TextEffects::Decoration& decoration) {
     if (m_bufferCount == 0)
         m_bufferCount = 2;//  (m_outlineWidth == 0) ? 1 : 2;
     if (not PrerenderedItem::Create(m_bufferCount) and (m_text == text))
         return false;
     m_text = text;
-    m_color = color;
+    m_color = (colors.Length() == 1) ? colors[0] : ColorData::White;
     textRenderer.SetColor(m_color);
+    textRenderer.SetGlyphColors(colors);
     textRenderer.SetDecoration(decoration);
     textRenderer.SetScale(1.0f);
     textRenderer.RenderToBuffer(m_text, alignment, &m_renderTarget, m_renderTarget.m_viewport, 0, 0, /*baseRenderer.UsesOpenGL() ? -1 : */ 1); // m_outlineWidth == 0);
+    textRenderer.SetGlyphColors(AutoArray<RGBAColor>());
     /*textRenderer.SetColor();*/
     return true;
 }

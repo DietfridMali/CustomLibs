@@ -43,6 +43,7 @@ private:
     RenderTarget*       m_renderTarget{ nullptr };
     FontHandler*        m_font;
     List<RGBAColor>     m_colorStack;
+    AutoArray<RGBAColor> m_glyphColors;
 
 public:
     static int CompareRenderTargets(void* context, const int& key1, const int& key2);
@@ -80,6 +81,10 @@ public:
 
     inline RGBAColor GetColor(void) noexcept {
         return m_color;
+    }
+
+    inline void SetGlyphColors(const AutoArray<RGBAColor>& colors) {
+        m_glyphColors = colors;
     }
 
     inline bool SetAlpha(float alpha = 1.0) noexcept {
@@ -132,6 +137,14 @@ public:
     }
 
 private:
+    inline bool HaveGlyphColors(void) noexcept {
+        return m_glyphColors.Length() > 1;
+    }
+
+    inline RGBAColor& GlyphColor(int32_t glyphIndex) {
+        return m_glyphColors[glyphIndex % m_glyphColors.Length()];
+    }
+
     BaseQuadMesh& CreateQuad(BaseQuadMesh& q, float x, float y, float w, Texture* t, bool flipVertically);
 
     RenderTarget* GetRenderTarget(int scale);
