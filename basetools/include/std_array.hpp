@@ -307,6 +307,14 @@ public:
         return data;
     }
 
+
+    bool Discard(int32_t i) {
+        if ((i < 0) or (i >= Length()))
+            return false;
+        m_arrayPtr->erase(m_arrayPtr->begin() + i);
+        return true;
+    }
+
     
     template<typename... Args>
     DATA_T* Append(Args&&... args) {

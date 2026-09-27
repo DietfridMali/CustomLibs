@@ -193,7 +193,7 @@ public:
     bool Remove(const ItemType& data)
     {
         auto it = std::find(m_list.begin(), m_list.end(), data);
-        if (it != m_list.end())
+        if (it == m_list.end())
             return false;
         m_list.erase(it);
         return true;
