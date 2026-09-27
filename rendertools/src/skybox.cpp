@@ -121,17 +121,15 @@ void Skybox::Destroy(void) {
 }
 
 
-bool Skybox::ApplyKuwaharaFilter(const KuwaharaFilter::Params& params) {
+bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params) {
 	KuwaharaFilter kuwaharaFilter;
 	bool ok = true;
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			Cubemap* texture = m_skyTextures[i][j];
-			if ((texture == nullptr) or ((j > 0) and (texture == m_skyTextures[i][j - 1])))
-				continue;
-			if (not kuwaharaFilter.ApplyCube(texture, params))
-				ok = false;
-		}
+	for (int j = 0; j < 3; j++) {
+		Cubemap* texture = m_skyTextures[skyType][j];
+		if ((texture == nullptr) or ((j > 0) and (texture == m_skyTextures[skyType][j - 1])))
+			continue;
+		if (not kuwaharaFilter.ApplyCube(texture, params))
+			ok = false;
 	}
 	return ok;
 }

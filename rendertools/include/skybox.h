@@ -38,7 +38,7 @@ public:
 	// The noise textures are NOT touched - they belong to whoever passed them in.
 	void Destroy(void);
 
-	bool ApplyKuwaharaFilter(const KuwaharaFilter::Params& params);
+	bool ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params);
 
 	inline int FaceSize(void) noexcept {
 		return (m_skyTextures[0][0] != nullptr) ? m_skyTextures[0][0]->GetWidth() : 0;
@@ -55,7 +55,7 @@ public:
 	}
 
 	inline bool HasNightSky(int32_t i) noexcept {
-		return (i == 0) ? false : m_skyTextures[(i - 1) % 2][0] != nullptr; // i == 2 --> sky #0 with black hole
+		return (i == 0) ? false : m_skyTextures[(i == 3) ? 1 : i][0] != nullptr;
 	}
 
 private:
