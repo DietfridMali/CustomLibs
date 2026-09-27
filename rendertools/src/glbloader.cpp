@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #pragma warning(push)
 #pragma warning(disable:4459)
 #include <glm/gtc/quaternion.hpp>
@@ -53,6 +54,27 @@ static Vector3f TransformNormalDelta(Matrix4f m, Vector3f d) {
     return Vector3f(r.x, r.y, r.z);
 }
 
+static RGBAColor Modulate(const RGBAColor& a, const RGBAColor& b) {
+    return RGBAColor(a.R() * b.R(), a.G() * b.G(), a.B() * b.B(), a.A() * b.A());
+}
+
+static GfxWrapMode WrapMode(int wrap) {
+    return (wrap == TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE) ? GfxWrapMode::ClampToEdge : GfxWrapMode::Repeat;
+}
+
+static bool KeepImageData(tinygltf::Image* image, const int, std::string*, std::string*, int, int, const unsigned char* bytes, int size, void*) {
+    image->image.assign(bytes, bytes + size);
+    image->as_is = true;
+    return true;
+}
+
+static bool IsBinaryFile(const String& filename) {
+    std::ifstream f((const char*) filename, std::ios::binary);
+    char magic[4] = {};
+    f.read(magic, sizeof(magic));
+    return f.good() and (memcmp(magic, "glTF", sizeof(magic)) == 0);
+}
+
 // -------------------------------------------------------------------------------------------------
 
 int GLBLoader::CompareVertices(void* context, const Vector3f& v1, const Vector3f& v2) {
@@ -77,7 +99,11 @@ void GLBLoader::Reset(void) {
     m_data.vertices.Clear();
     m_data.colors.Clear();
     m_data.normals.Clear();
+    m_data.texCoords.Clear();
     m_data.shapeKeys.Clear();
+    m_data.parts.Clear();
+    m_data.materials.Clear();
+    m_data.images.Clear();
     m_isHullVertex.Clear();
     m_hullVertexMap.Clear();
 }
@@ -89,17 +115,53 @@ bool GLBLoader::Load(const String& filename, bool fixModel) {
         return true;
 
     m_fixModel = fixModel;
+    m_loadSurfaceData = false;
+    if (not ParseFile(filename + String(".glb")))
+        return false;
+    if (m_fixModel)
+        StitchPrimitives();
+	SaveToFile(filename + String(".bin"));
+    ReleaseModel();
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::LoadModel(const String& filename) {
+    m_fixModel = false;
+    m_loadSurfaceData = true;
+    if (not ParseFile(filename))
+        return false;
+    LoadMaterials();
+    LoadImages();
+    ReleaseModel();
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void GLBLoader::ReleaseModel(void) {
+    m_model = tinygltf::Model();
+    m_isHullVertex.Clear();
+    m_hullVertexMap.Clear();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::ParseFile(const String& filename) {
     Reset();
     m_hullVertexMap.SetComparator(CompareVertices);
 
     tinygltf::TinyGLTF loader;
+    loader.SetImageLoader(KeepImageData, nullptr);
     std::string errorMsg;
     std::string warningMsg;
 
-    std::string fn = filename + String(".glb");
+    std::string fn = filename;
 
-    if (not loader.LoadBinaryFromFile(&m_model, &errorMsg, &warningMsg, fn)) {
-        fprintf(stderr, "GLBLoader: LoadBinaryFromFile failed: %s\n", errorMsg.c_str());
+    bool isLoaded = IsBinaryFile(filename) ? loader.LoadBinaryFromFile(&m_model, &errorMsg, &warningMsg, fn) : loader.LoadASCIIFromFile(&m_model, &errorMsg, &warningMsg, fn);
+    if (not isLoaded) {
+        fprintf(stderr, "GLBLoader: loading '%s' failed: %s\n", (const char*) filename, errorMsg.c_str());
         return false;
     }
 
@@ -122,14 +184,41 @@ bool GLBLoader::Load(const String& filename, bool fixModel) {
             return false;
         }
     }
-    if (m_fixModel)
-        StitchPrimitives();
-	SaveToFile(filename + String(".bin"));
-
-    m_model = tinygltf::Model();
-    m_isHullVertex.Clear();
-    m_hullVertexMap.Clear();
     return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void GLBLoader::LoadMaterials(void) {
+    m_data.materials.Resize(int32_t(m_model.materials.size()));
+    for (size_t i = 0; i < m_model.materials.size(); ++i) {
+        tinygltf::Material& source = m_model.materials[i];
+        MaterialData& material = m_data.materials[int32_t(i)];
+        material.doubleSided = source.doubleSided;
+        material.alphaCutoff = (source.alphaMode == "OPAQUE") ? 0.0f : float(source.alphaCutoff);
+        int textureIndex = source.pbrMetallicRoughness.baseColorTexture.index;
+        if ((textureIndex < 0) or (textureIndex >= int(m_model.textures.size())))
+            continue;
+        tinygltf::Texture& texture = m_model.textures[size_t(textureIndex)];
+        if ((texture.source >= 0) and (texture.source < int(m_model.images.size())))
+            material.imageIndex = texture.source;
+        if ((texture.sampler >= 0) and (texture.sampler < int(m_model.samplers.size()))) {
+            material.wrapU = WrapMode(m_model.samplers[size_t(texture.sampler)].wrapS);
+            material.wrapV = WrapMode(m_model.samplers[size_t(texture.sampler)].wrapT);
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void GLBLoader::LoadImages(void) {
+    for (auto& source : m_model.images) {
+        AutoArray<uint8_t>* image = m_data.images.Append();
+        if (source.image.empty())
+            continue;
+        image->Resize(int32_t(source.image.size()));
+        memcpy(image->DataPtr(), source.image.data(), source.image.size());
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -208,7 +297,7 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
 
     PrimitiveData in;
 
-    in.baseColor = PrimitiveBaseColor(m_model, prim.material);
+    in.baseColor = PrimitiveBaseColor(m_model, prim.material, not m_loadSurfaceData);
 	in.isHull = in.baseColor.A() < 0.0f;
 
     if (not LoadVertices(prim, in))
@@ -217,6 +306,10 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
         return false;
     if (m_fixModel)
         WeldVertices(in);
+    if (not LoadTexCoords(prim, in))
+        return false;
+    if (not LoadColors(prim, in))
+        return false;
     if (not LoadMorphTargets(prim, in))
         return false;
     if (m_fixModel) {
@@ -237,10 +330,16 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     AutoArray<ShapeKeySet*> keyPtrs;
     BuildShapeKeyPointers(keyPtrs);
 
+    PartData part;
+    part.firstVertex = m_data.vertices.Length();
+    part.materialIndex = ((prim.material >= 0) and (prim.material < int(m_model.materials.size()))) ? prim.material : -1;
+
     if (not AppendTriangles(in, worldM, keyPtrs)) {
         return false;
     }
 
+    part.vertexCount = m_data.vertices.Length() - part.firstVertex;
+    m_data.parts.Append(part);
     return true;
 }
 
@@ -323,6 +422,73 @@ bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveData& in) {
         return false;
     }
     in.haveNormals = true;
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::LoadTexCoords(tinygltf::Primitive& prim, PrimitiveData& in) {
+    in.baseTexCoords.Clear();
+    in.haveTexCoords = false;
+
+    if (not m_loadSurfaceData)
+        return true;
+    int texCoordSet = 0;
+    if ((prim.material >= 0) and (prim.material < int(m_model.materials.size())))
+        texCoordSet = m_model.materials[size_t(prim.material)].pbrMetallicRoughness.baseColorTexture.texCoord;
+    auto itTexCoord = prim.attributes.find("TEXCOORD_" + std::to_string(texCoordSet));
+    if (itTexCoord == prim.attributes.end())
+        return true;
+    AutoArray<float> values;
+    int32_t componentCount;
+    if (not ReadAccessorFloats(m_model, itTexCoord->second, values, componentCount))
+        return false;
+    if (componentCount != 2) {
+        fprintf(stderr, "GLBLoader: TEXCOORD accessor is not VEC2\n");
+        return false;
+    }
+    int32_t count = values.Length() / 2;
+    if (count != in.baseVertices.Length()) {
+        fprintf(stderr, "GLBLoader: TEXCOORD count does not match POSITION count\n");
+        return false;
+    }
+    in.baseTexCoords.Resize(count);
+    for (int32_t i = 0; i < count; ++i)
+        in.baseTexCoords[i] = TexCoord(values[2 * i], values[2 * i + 1]);
+    in.haveTexCoords = true;
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::LoadColors(tinygltf::Primitive& prim, PrimitiveData& in) {
+    in.baseColors.Clear();
+    in.haveColors = false;
+
+    if (not m_loadSurfaceData)
+        return true;
+    auto itColor = prim.attributes.find("COLOR_0");
+    if (itColor == prim.attributes.end())
+        return true;
+    AutoArray<float> values;
+    int32_t componentCount;
+    if (not ReadAccessorFloats(m_model, itColor->second, values, componentCount))
+        return false;
+    if ((componentCount != 3) and (componentCount != 4)) {
+        fprintf(stderr, "GLBLoader: COLOR accessor is neither VEC3 nor VEC4\n");
+        return false;
+    }
+    int32_t count = values.Length() / componentCount;
+    if (count != in.baseVertices.Length()) {
+        fprintf(stderr, "GLBLoader: COLOR count does not match POSITION count\n");
+        return false;
+    }
+    in.baseColors.Resize(count);
+    for (int32_t i = 0; i < count; ++i) {
+        const float* c = values.DataPtr(i * componentCount);
+        in.baseColors[i] = RGBAColor(c[0], c[1], c[2], (componentCount == 4) ? c[3] : 1.0f);
+    }
+    in.haveColors = true;
     return true;
 }
 
@@ -609,6 +775,7 @@ void GLBLoader::ReserveOutput(const PrimitiveData& in) {
     m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
     m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
     m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
+    m_data.texCoords.Reserve(m_data.texCoords.Length() + addVertexCount);
 	if (m_fixModel)
         m_isHullVertex.Reserve(m_isHullVertex.Length() + addVertexCount);
 
@@ -649,7 +816,8 @@ bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<Sh
                 m_isHullVertex.Append(in.isHull);
             }
             m_data.vertices.Append(p[j]);
-            m_data.colors.Append(in.baseColor);
+            m_data.colors.Append(in.haveColors ? Modulate(in.baseColor, in.baseColors[indices[j]]) : in.baseColor);
+            m_data.texCoords.Append(in.haveTexCoords ? in.baseTexCoords[indices[j]] : TexCoord(0.0f, 0.0f));
 
             if (in.haveNormals) {
                 Vector3f n = TransformNormal(worldM, in.baseNormals[indices[j]]);
@@ -797,6 +965,104 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
 
 // -------------------------------------------------------------------------------------------------
 
+bool GLBLoader::ReadAccessorFloats(const tinygltf::Model& model, int accessorIndex, AutoArray<float>& out, int32_t& componentCount) {
+    if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
+        fprintf(stderr, "GLBLoader: accessor index out of range\n");
+        return false;
+    }
+
+    auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
+
+    if (acc.sparse.isSparse) {
+        fprintf(stderr, "GLBLoader: sparse accessors not supported\n");
+        return false;
+    }
+
+    if (acc.type == TINYGLTF_TYPE_VEC2)
+        componentCount = 2;
+    else if (acc.type == TINYGLTF_TYPE_VEC3)
+        componentCount = 3;
+    else if (acc.type == TINYGLTF_TYPE_VEC4)
+        componentCount = 4;
+    else {
+        fprintf(stderr, "GLBLoader: accessor is not VEC2, VEC3 or VEC4\n");
+        return false;
+    }
+
+    size_t elemSize = 0;
+    float normalization = 1.0f;
+    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT)
+        elemSize = 4;
+    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+        elemSize = 1;
+        normalization = acc.normalized ? 1.0f / 255.0f : 1.0f;
+    }
+    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+        elemSize = 2;
+        normalization = acc.normalized ? 1.0f / 65535.0f : 1.0f;
+    }
+    else {
+        fprintf(stderr, "GLBLoader: unsupported accessor componentType\n");
+        return false;
+    }
+
+    if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
+        fprintf(stderr, "GLBLoader: bufferView index out of range\n");
+        return false;
+    }
+
+    auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+
+    if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
+        fprintf(stderr, "GLBLoader: buffer index out of range\n");
+        return false;
+    }
+
+    auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
+
+    size_t elementSize = elemSize * static_cast<size_t>(componentCount);
+    size_t stride = static_cast<size_t>(view.byteStride);
+    if (stride == 0) {
+        stride = elementSize;
+    }
+
+    if (stride < elementSize) {
+        fprintf(stderr, "GLBLoader: invalid accessor stride\n");
+        return false;
+    }
+
+    size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
+    size_t need = base + stride * static_cast<size_t>(acc.count);
+
+    if (need > buf.data.size()) {
+        fprintf(stderr, "GLBLoader: buffer overrun in ReadAccessorFloats\n");
+        return false;
+    }
+
+    out.Resize(static_cast<int32_t>(acc.count) * componentCount);
+    float* dest = out.DataPtr();
+
+    for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
+        const uint8_t* src = buf.data.data() + base + i * stride;
+        for (int32_t c = 0; c < componentCount; ++c, src += elemSize) {
+            if (elemSize == 4)
+                std::memcpy(dest, src, sizeof(float));
+            else if (elemSize == 2) {
+                uint16_t v;
+                std::memcpy(&v, src, sizeof(v));
+                *dest = float(v) * normalization;
+            }
+            else
+                *dest = float(*src) * normalization;
+            ++dest;
+        }
+    }
+
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
 bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out) {
     if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
         fprintf(stderr, "GLBLoader: accessor index out of range\n");
@@ -886,7 +1152,7 @@ bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
 
 // -------------------------------------------------------------------------------------------------
 
-Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex) {
+Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex, bool detectHull) {
     if (materialIndex < 0 or materialIndex >= static_cast<int>(model.materials.size())) {
         return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
     }
@@ -903,7 +1169,7 @@ Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materia
         );
 
         static Conversions::FloatInterval placeholderColor{ 0.99f, 0.992f };
-        if (placeholderColor.Contains(color.R()) and placeholderColor.Contains(color.G()) and placeholderColor.Contains(color.B()))
+        if (detectHull and placeholderColor.Contains(color.R()) and placeholderColor.Contains(color.G()) and placeholderColor.Contains(color.B()))
             return RGBAColor(0.0f, 0.0f, 0.0f, -1.0f);
         return color;
         }
@@ -1048,7 +1314,11 @@ bool GLBLoader::LoadFromFile(const String& filename) {
     m_data.vertices.Clear();
     m_data.colors.Clear();
     m_data.normals.Clear();
+    m_data.texCoords.Clear();
     m_data.shapeKeys.Clear();
+    m_data.parts.Clear();
+    m_data.materials.Clear();
+    m_data.images.Clear();
     m_model = tinygltf::Model();
 
     m_data.vertices.Resize(int32_t(vertexCount));

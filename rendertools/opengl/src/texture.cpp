@@ -135,6 +135,7 @@ Texture& Texture::Copy(const Texture& other) {
         m_filenames = other.m_filenames;
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
+        m_wrapModeV = other.m_wrapModeV;
         m_useMipMaps = other.m_useMipMaps;
         m_colorEncoding = other.m_colorEncoding;
         m_mipChainLength = other.m_mipChainLength;
@@ -160,6 +161,7 @@ noexcept
         m_filenames = std::move(other.m_filenames);
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
+        m_wrapModeV = other.m_wrapModeV;
         m_useMipMaps = other.m_useMipMaps;
         m_colorEncoding = other.m_colorEncoding;
         m_mipChainLength = other.m_mipChainLength;
@@ -559,8 +561,10 @@ bool Texture::CreateFromFile(String folder, List<String>& fileNames, const Textu
 
 
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params) {
-    if (not Create())
+    if (not Create()) {
+        SDL_FreeSurface(surface);
         return false;
+    }
     m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
     m_useMipMaps = params.useMipMaps;
     m_isDisposable = params.isDisposable;

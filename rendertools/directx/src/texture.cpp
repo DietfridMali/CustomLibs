@@ -41,6 +41,7 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
     , m_type(type)
     , m_tmuIndex(-1)
     , m_wrapMode(wrap)
+    , m_wrapModeV(wrap)
     , m_name("")
 {
     SetupLUT();
@@ -74,6 +75,7 @@ Texture& Texture::Copy(const Texture& other)
         m_filenames = other.m_filenames;
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
+        m_wrapModeV = other.m_wrapModeV;
         m_useMipMaps = other.m_useMipMaps;
         m_colorEncoding = other.m_colorEncoding;
         m_isDeployed = false;
@@ -96,6 +98,7 @@ Texture& Texture::Move(Texture& other) noexcept
         m_filenames = std::move(other.m_filenames);
         m_type = other.m_type;
         m_wrapMode = other.m_wrapMode;
+        m_wrapModeV = other.m_wrapModeV;
         m_useMipMaps = other.m_useMipMaps;
         m_colorEncoding = other.m_colorEncoding;
         m_isDeployed = other.m_isDeployed;

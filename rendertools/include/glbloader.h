@@ -15,6 +15,8 @@
 #include "list.hpp"
 #include "avltree.hpp"
 #include "colordata.h"
+#include "texcoord.h"
+#include "rendertypes.h"
 
 // =================================================================================================
 
@@ -26,15 +28,35 @@ public:
         AutoArray<Vector3f> normalDeltas; // triangle soup: same length as vertices
     };
 
+    struct MaterialData {
+        int32_t     imageIndex{ -1 };
+        GfxWrapMode wrapU{ GfxWrapMode::Repeat };
+        GfxWrapMode wrapV{ GfxWrapMode::Repeat };
+        float       alphaCutoff{ 0.0f };
+        bool        doubleSided{ false };
+    };
+
+    struct PartData {
+        int32_t firstVertex{ 0 };
+        int32_t vertexCount{ 0 };
+        int32_t materialIndex{ -1 };
+    };
+
     struct MeshData {
         AutoArray<Vector3f>         vertices;   // triangle soup: 3 * triCount
         AutoArray<RGBAColor>        colors;     // 3 * triCount
         AutoArray<Vector3f>         normals;    // 1 * triCount
+        AutoArray<TexCoord>         texCoords;
         List<ShapeKeySet>           shapeKeys;  // N sets, each has 3 * triCount deltas
+        AutoArray<PartData>         parts;
+        AutoArray<MaterialData>     materials;
+        AutoArray<AutoArray<uint8_t>> images;
     };
 
 public:
     bool Load(const String& filename, bool fixModel = false);
+
+    bool LoadModel(const String& filename);
 
     inline MeshData& Data() { 
         return m_data; 
@@ -48,13 +70,17 @@ private:
     struct PrimitiveData {
         AutoArray<Vector3f>             baseVertices;
         AutoArray<Vector3f>             baseNormals;
+        AutoArray<TexCoord>             baseTexCoords;
+        AutoArray<RGBAColor>            baseColors;
         AutoArray<uint32_t>             indices;
         AutoArray<AutoArray<Vector3f>>  morphVertices; // [target][vertex]
         AutoArray<AutoArray<Vector3f>>  morphNormals;  // [target][vertex]
         RGBAColor                       baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
         int32_t                         targetCount{ 0 };
         int32_t                         triCount{ 0 };
-		bool    			            haveNormals{ false };   
+		bool    			            haveNormals{ false };
+        bool                            haveTexCoords{ false };
+        bool                            haveColors{ false };
         bool                            isHull{ false };
     };
 
@@ -63,9 +89,11 @@ private:
 
     static bool ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, AutoArray<Vector3f>& out);
 
+    static bool ReadAccessorFloats(const tinygltf::Model& model, int accessorIndex, AutoArray<float>& out, int32_t& componentCount);
+
     static bool ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out);
 
-    static Vector4f PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex);
+    static Vector4f PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex, bool detectHull);
 
     void CheckShapeKeyCount(int32_t targetCount);
 
@@ -112,7 +140,16 @@ private:
     AutoArray<uint8_t>          m_isHullVertex;
     AVLTree<Vector3f, int32_t>  m_hullVertexMap;
     bool                        m_fixModel{ false };
+    bool                        m_loadSurfaceData{ false };
 
+
+    bool ParseFile(const String& filename);
+
+    void ReleaseModel(void);
+
+    void LoadMaterials(void);
+
+    void LoadImages(void);
 
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
 
@@ -125,6 +162,10 @@ private:
     void WeldVertices(PrimitiveData& in);
 
     bool LoadNormals(tinygltf::Primitive& prim, PrimitiveData& in);
+
+    bool LoadTexCoords(tinygltf::Primitive& prim, PrimitiveData& in);
+
+    bool LoadColors(tinygltf::Primitive& prim, PrimitiveData& in);
 
     bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in);
 
