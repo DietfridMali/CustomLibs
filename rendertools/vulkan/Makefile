@@ -93,6 +93,7 @@ COMMON_FILES := \
  linesegment \
  mesh \
  noise \
+ objloader \
  prerenderedtexture \
  projector \
  quad \

@@ -148,6 +148,7 @@
     <ClInclude Include="..\..\include\fonthandler.h" />
     <ClInclude Include="..\..\include\framecounter.h" />
     <ClInclude Include="..\..\include\glbloader.h" />
+    <ClInclude Include="..\..\include\objloader.h" />
     <ClInclude Include="..\include\gputimer.h" />
     <ClInclude Include="..\include\gpuzone.h" />
     <ClInclude Include="..\..\include\skybox.h" />
@@ -235,6 +236,7 @@
     <ClCompile Include="..\..\src\fonthandler.cpp" />
     <ClCompile Include="..\..\src\framecounter.cpp" />
     <ClCompile Include="..\..\src\glbloader.cpp" />
+    <ClCompile Include="..\..\src\objloader.cpp" />
     <ClCompile Include="..\..\src\icosphere.cpp" />
     <ClCompile Include="..\..\src\linesegment.cpp" />
     <ClCompile Include="..\..\src\common-hlsl\primitive_shaders.cpp" />
