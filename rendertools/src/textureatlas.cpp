@@ -25,29 +25,39 @@ TextureAtlas::TextureAtlas()
 	: m_size(0)
 	, m_glyphSize(0)
 	, m_scale(Vector2f::ONE)
+	, m_cellScale(Vector2f::ONE)
+	, m_paddingOffset(Vector2f::ZERO)
+	, m_padding(0)
 {
 }
 
 // condition: all glyphs must fit into glyphWidth, glyphHeight - that's the grid they will be rendered into
-bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale) {
+bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale, GfxFilterMode filtering, int padding) {
 	if (m_atlas)
 		delete m_atlas;
 	m_atlas = new RenderTarget();
 	if (not m_atlas)
 		return false;
 	m_glyphSize = glyphSize;
+	m_padding = padding;
+	int cellWidth = glyphSize.width + 2 * padding;
+	int cellHeight = glyphSize.height + 2 * padding;
 	m_size.SetCols(int(ceil(sqrtf(float(glyphCount) / glyphSize.aspectRatio))));
 	m_size.SetRows(int(ceil(float(glyphCount) / float(m_size.GetCols()))));
-	if (not m_atlas->Create(m_size.GetCols() * glyphSize.width, m_size.GetRows() * glyphSize.height, scale, { .name = name })) {
+	int atlasWidth = m_size.GetCols() * cellWidth;
+	int atlasHeight = m_size.GetRows() * cellHeight;
+	if (not m_atlas->Create(atlasWidth, atlasHeight, scale, { .name = name })) {
 		m_atlas->Destroy();
 		delete m_atlas;
 		m_atlas = nullptr;
 		return false;
 	}
-	m_scale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
+	m_cellScale = Vector2f(1.0f / float(m_size.GetCols()), 1.0f / float(m_size.GetRows()));
+	m_scale = Vector2f(float(glyphSize.width) / float(atlasWidth), float(glyphSize.height) / float(atlasHeight));
+	m_paddingOffset = Vector2f(float(padding) / float(atlasWidth), float(padding) / float(atlasHeight));
 	// An atlas is an image store, not a picture: its cells sit flush against each other, so filtering
 	// it blurs every glyph and bleeds the neighbouring cells in at the edges.
-	m_atlas->SetFiltering(GfxFilterMode::Nearest);
+	m_atlas->SetFiltering(filtering);
 #if 0
 	Texture* renderTexture = GetAsTexture();
 	renderTexture->m_handle = m_atlas->BufferHandle(0);
@@ -100,8 +110,8 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 	int s = m_atlas->GetScale();
 	w = m_glyphSize.width * s;
 	h = m_glyphSize.height * s;
-	l = x * w;
-	t = y * h;
+	l = x * (w + 2 * m_padding * s) + m_padding * s;
+	t = y * (h + 2 * m_padding * s) + m_padding * s;
 #endif
 	baseRenderer.SetViewport(Viewport(l, t, int(roundf(scale.X() * w)), int(roundf(scale.Y() * h))), 0, 0, baseRenderer.UsesOpenGL());
 	Shader* shader = baseShaderHandler.LoadPlainTextureShader(ColorData::White); // , GlyphOffset(glyphIndex), m_scale);

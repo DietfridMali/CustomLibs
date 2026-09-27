@@ -158,7 +158,7 @@ float TextRenderer::XOffset(float xOffset, int textWidth, eTextAlignments alignm
 }
 
 
-void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment, int flipVertically) {
+void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment, int flipVertically, float xMargin) {
     baseRenderer.PushMatrix();
 #if !TEST_ATLAS
     baseRenderer.ResetTransformation();
@@ -168,11 +168,11 @@ void TextRenderer::RenderText(String& text, int textWidth, float xOffset, float 
     float letterScale = 2 * xOffset / float(textWidth);
     // reusing xOffset here
     if (alignment == taLeft)
-        xOffset = -0.5;
+        xOffset = -0.5f + xMargin;
     else if (alignment == taCenter)
         xOffset = -xOffset;
     else
-        xOffset = 0.5f - 2 * xOffset;
+        xOffset = 0.5f - 2 * xOffset - xMargin;
 #if USE_ATLAS
     RenderTextMesh(text, xOffset, yOffset, letterScale, flipVertically < 0);
 #else
@@ -191,6 +191,15 @@ void TextRenderer::Fill(Vector4f color) {
     RenderTarget* renderTarget = GetRenderTarget(1);
     if (renderTarget != nullptr)
         renderTarget->Fill(color);
+}
+
+
+float TextRenderer::FitScale(String text, int viewportWidth, int viewportHeight, const TextDecoration& decoration) {
+    if (not m_font)
+        return 0.0f;
+    TextDimensions td = m_font->TextSize(text);
+    float margin = float(int(4 * decoration.outlineWidth + 0.5f));
+    return std::min((float(viewportWidth) - margin) / float(td.width), (float(viewportHeight) - margin) / float(td.height));
 }
 
 
@@ -227,12 +236,16 @@ void TextRenderer::RenderToBuffer(String text, eTextAlignments alignment, Render
             renderTarget->SetClearColor(RGBAColor(1.0f, 0.8f, 0.0f, 1.0f));
 #endif
             if (renderTarget->Activate({ .clear = true })) {
+                float xMargin = 0.0f;
                 if (outlineWidth > 0) {
-                    offset.x -= outlineWidth / float(renderTarget->m_width);
-                    offset.y -= outlineWidth / float(renderTarget->m_height);
+                    int margin = int(2 * outlineWidth + 0.5f);
+                    int areaWidth = (renderAreaWidth > 0) ? renderAreaWidth : viewport.m_width;
+                    int areaHeight = (renderAreaHeight > 0) ? renderAreaHeight : viewport.m_height;
+                    offset = Texture::ComputeOffsets(td.width, td.height, viewport.m_width, viewport.m_height, areaWidth - margin, areaHeight - margin);
+                    xMargin = outlineWidth / float(viewport.m_width);
                 }
                 renderTarget->m_lastDestination = 0;
-                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically);
+                RenderText(text, td.width, offset.x, offset.y, alignment, flipVertically, xMargin);
                 uint8_t postProcess = HaveOutline() ? 1 : ApplyAA() ? 2 : 0;
 #if 0 // debug
                 postProcess = 0;

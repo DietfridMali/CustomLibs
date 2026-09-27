@@ -133,6 +133,9 @@ protected:
 	TableSize		m_size;
 	GlyphSize		m_glyphSize;
 	Vector2f		m_scale;
+	Vector2f		m_cellScale;
+	Vector2f		m_paddingOffset;
+	int				m_padding;
 
 public:
 	TextureAtlas();
@@ -141,8 +144,8 @@ public:
 
 	inline Vector2f GlyphOffset(int glyphIndex) {
 		return
-			(m_scale.X() * m_scale.Y()) // both != 0?
-			? Vector2f(m_size.Colf(glyphIndex) * m_scale.X(), m_size.Rowf(glyphIndex) * m_scale.Y())
+			(m_cellScale.X() * m_cellScale.Y()) // both != 0?
+			? Vector2f(m_size.Colf(glyphIndex) * m_cellScale.X(), m_size.Rowf(glyphIndex) * m_cellScale.Y()) + m_paddingOffset
 			: Vector2f::ZERO;
 	}
 
@@ -150,7 +153,7 @@ public:
 		return m_scale;
 	}
 
-	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1);
+	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1, GfxFilterMode filtering = GfxFilterMode::Nearest, int padding = 0);
 
 	bool RenderColored(int glyphIndex, RGBAColor color = ColorData::White);
 

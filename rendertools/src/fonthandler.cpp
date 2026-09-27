@@ -137,6 +137,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
 
 
 bool FontHandler::Create(String fontFolder, String fontName, int fontSize, String glyphs) {
+    Destroy();
     m_isAvailable = InitFont(fontFolder, fontName, fontSize, glyphs) and CreateAtlas();
     if (m_isAvailable)
         ComputeInkBand();
@@ -245,7 +246,7 @@ bool FontHandler::CreateAtlas(void) {
     int i = CreateTextures();
     m_maxGlyphSize.Update();
     int glyphCount = m_glyphs.Length() + 1;
-    if (not m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2)) {
+    if (not m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2, GfxFilterMode::Linear, 1)) {
 #ifdef _DEBUG
         fprintf(stderr, "FontHandler: Failed to create atlas.\n");
 #endif
@@ -286,6 +287,10 @@ FontHandler::TextDimensions FontHandler::TextSize(String text) {
 
 void FontHandler::Destroy(void) {
     m_atlas.Destroy();
+    m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
+    m_glyphDict.Clear();
+    m_maxGlyphSize = GlyphSize();
+    m_isAvailable = false;
     if (m_font) {
         TTF_CloseFont(m_font);
         m_font = nullptr;

@@ -105,6 +105,10 @@ public:
         return m_inkHeight;
     }
 
+    inline int FontSize(void) const noexcept {
+        return m_fontSize;
+    }
+
     TextDimensions TextSize(String text);
 
 private:

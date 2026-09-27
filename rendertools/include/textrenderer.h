@@ -52,6 +52,8 @@ public:
 
     void Fill(Vector4f color);
 
+    float FitScale(String text, int viewportWidth, int viewportHeight, const TextDecoration& decoration = {});
+
     void RenderToBuffer(String text, eTextAlignments alignment, RenderTarget* renderTarget, Viewport& viewport, int renderAreaWidth = 0, int renderAreaHeight = 0, int flipVertically = 0);
 
     void RenderToScreen(RenderTarget* renderTarget, int flipVertically = 0);
@@ -157,7 +159,7 @@ private:
 
     float XOffset(float xOffset, int textWidth, eTextAlignments alignment);
 
-    void RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment = taLeft, int flipVertically = 0);
+    void RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment = taLeft, int flipVertically = 0, float xMargin = 0.0f);
 
     int SourceBuffer(bool hasOutline, bool antiAliased);
 
