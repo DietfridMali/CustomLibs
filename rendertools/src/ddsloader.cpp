@@ -316,4 +316,36 @@ TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
     return buf;
 }
 
+
+bool ReadPNGText(const String& path, const char* keyword, std::string& text) noexcept {
+    std::ifstream f(static_cast<const char*>(path), std::ios::binary);
+    if (not f.is_open())
+        return false;
+    static constexpr uint8_t signature[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n' };
+    uint8_t head[8];
+    f.read(reinterpret_cast<char*>(head), std::streamsize(sizeof(head)));
+    if (not f or (std::memcmp(head, signature, sizeof(signature)) != 0))
+        return false;
+    const size_t keyLength = std::strlen(keyword);
+    uint8_t chunk[8];
+    while (f.read(reinterpret_cast<char*>(chunk), std::streamsize(sizeof(chunk)))) {
+        const uint32_t length = (uint32_t(chunk[0]) << 24) | (uint32_t(chunk[1]) << 16) | (uint32_t(chunk[2]) << 8) | uint32_t(chunk[3]);
+        if (std::memcmp(chunk + 4, "IEND", 4) == 0)
+            return false;
+        if ((std::memcmp(chunk + 4, "tEXt", 4) == 0) and (length > keyLength)) {
+            std::string data(length, '\0');
+            if (not f.read(data.data(), std::streamsize(length)))
+                return false;
+            if ((std::memcmp(data.data(), keyword, keyLength) == 0) and (data[keyLength] == '\0')) {
+                text = data.substr(keyLength + 1);
+                return true;
+            }
+            f.seekg(4, std::ios::cur);
+            continue;
+        }
+        f.seekg(std::streamoff(length) + 4, std::ios::cur);
+    }
+    return false;
+}
+
 // =================================================================================================

@@ -3,6 +3,7 @@
 #include "string.hpp"
 
 #include <cstring>
+#include <string>
 
 class TextureBuffer;
 
@@ -35,6 +36,8 @@ inline bool IsDDSFile(const String& path) noexcept {
 bool LoadDDS(const String& path, TextureBuffer& buf) noexcept;
 
 void SetUseFileColorEncoding(bool use) noexcept;
+
+bool ReadPNGText(const String& path, const char* keyword, std::string& text) noexcept;
 
 // =================================================================================================
 // Unified texture-file loader shared by every backend's Texture::Load, so the DDS-vs-PNG decision
