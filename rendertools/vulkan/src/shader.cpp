@@ -34,7 +34,7 @@ extern void VkStallEvent(const char* what, double startMs, const char* detail) n
 // stage-specific Vulkan binding (1/2/3 for VS/PS/GS) and DXC rejects mixing
 // -fvk-bind-register with the -fvk-{b,t,s,u}-shift options. Bindings match the layout
 // in CreatePipelineLayout: b0=0, b1=1/2/3/40/41, t0..t15=4..19, s0..s15=20..35, u0..u3=36..39,
-// t0..t16 space1=42..58.
+// t0..t23 space1=42..65.
 
 // =================================================================================================
 // Compile (HLSL -> SPIR-V via DXC)
@@ -101,6 +101,10 @@ static const wchar_t* const kCommonBindArgs[] = {
     L"-fvk-bind-register", L"t17", L"1", L"59", L"0",
     L"-fvk-bind-register", L"t18", L"1", L"60", L"0",
     L"-fvk-bind-register", L"t19", L"1", L"61", L"0",
+    L"-fvk-bind-register", L"t20", L"1", L"62", L"0",
+    L"-fvk-bind-register", L"t21", L"1", L"63", L"0",
+    L"-fvk-bind-register", L"t22", L"1", L"64", L"0",
+    L"-fvk-bind-register", L"t23", L"1", L"65", L"0",
 };
 static constexpr uint32_t kCommonBindArgCount = uint32_t(sizeof(kCommonBindArgs) / sizeof(kCommonBindArgs[0]));
 
@@ -121,9 +125,9 @@ static const wchar_t* const kArgsDS[] = {
     L"-fvk-bind-register", L"b1", L"0", L"41", L"0",
 };
 static const wchar_t* const kArgsAccel[] = {
-    L"-fvk-bind-register", L"t0", L"2", L"62", L"0",
+    L"-fvk-bind-register", L"t0", L"2", L"66", L"0",
 };
-static_assert(Shader::kBindingAccel == 62, "kArgsAccel names the acceleration structure binding by number");
+static_assert(Shader::kBindingAccel == 66, "kArgsAccel names the acceleration structure binding by number");
 static_assert(Shader::kAccelSpace == 2, "kArgsAccel names the acceleration structure register space by number");
 
 static constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";

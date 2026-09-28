@@ -96,9 +96,9 @@ static const wchar_t* const kComputeBindArgs[] = {
 static constexpr uint32_t kComputeBindArgCount = uint32_t(sizeof(kComputeBindArgs) / sizeof(kComputeBindArgs[0]));
 
 static const wchar_t* const kComputeArgsAccel[] = {
-    L"-fvk-bind-register", L"t0", L"2", L"62", L"0",
+    L"-fvk-bind-register", L"t0", L"2", L"66", L"0",
 };
-static_assert(ComputeShader::kBindingAccel == 62, "kComputeArgsAccel names the acceleration structure binding by number");
+static_assert(ComputeShader::kBindingAccel == 66, "kComputeArgsAccel names the acceleration structure binding by number");
 static_assert(ComputeShader::kAccelSpace == 2, "kComputeArgsAccel names the acceleration structure register space by number");
 static_assert(ComputeShader::kBindingAccel == Shader::kBindingAccel, "compute and graphics shaders share the HLSL declaration of the acceleration structure");
 static_assert(ComputeShader::kAccelSpace == Shader::kAccelSpace, "compute and graphics shaders share the HLSL declaration of the acceleration structure");

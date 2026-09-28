@@ -31,7 +31,7 @@
 //      36..39     STORAGE_BUFFER,        ALL_GRAPHICS     (u0..u3)
 //      40         UNIFORM_BUFFER_DYNAMIC, TESS_CONTROL    (b1-HS)
 //      41         UNIFORM_BUFFER_DYNAMIC, TESS_EVALUATION (b1-DS)
-//      42..58     STORAGE_BUFFER,        ALL_GRAPHICS     (t0..t16 space1, read-only StructuredBuffer)
+//      42..65     STORAGE_BUFFER,        ALL_GRAPHICS     (t0..t23 space1, read-only StructuredBuffer)
 //  - VkPipelineLayout from the set layout above (one pipeline layout per shader; cached
 //    pipelines built per RenderStates are looked up via the PSO-cache pendant in step 7d).
 //  - b0 — FrameConstants written per-draw to a UBO ring-buffer sub-allocation (cbv-allocator
@@ -129,7 +129,7 @@ public:
     static constexpr uint32_t kBindingB1HS = kUavBase + kUavSlots;
     static constexpr uint32_t kBindingB1DS = kBindingB1HS + 1;
     static constexpr uint32_t kSsboBase = kBindingB1DS + 1;
-    static constexpr uint32_t kSsboSlots = 20;
+    static constexpr uint32_t kSsboSlots = 24;
     static constexpr uint32_t kSsboSpace = 1;
     static constexpr uint32_t kBindingAccel = kSsboBase + kSsboSlots;
     static constexpr uint32_t kAccelSpace = 2;
