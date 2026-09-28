@@ -107,11 +107,14 @@ namespace {
 // =================================================================================================
 // DX12 Shader implementation
 //
-// Root signature layout (fixed for all shaders):
-//   Param 0: Root CBV  — b0 FrameConstants     (vertex + pixel)
-//   Param 1: Root CBV  — b1 ShaderConstants    (vertex + pixel)
-//   Param 2: Desc table — t0..t15 SRVs         (pixel)
-//   Static samplers: s0 = linear clamp, s1 = linear repeat (pixel)
+// Root signature layout (fixed for all shaders, see Shader::kSrvBase .. kAccelBase):
+//   Param 0:      Root CBV    — b0 FrameConstants                           (all stages)
+//   Param 1..5:   Root CBV    — b1 ShaderConstants, one per stage           (VS, PS, GS, HS, DS)
+//   Param 6:      Desc table  — t0..t15 SRVs                                (all stages)
+//   Param 7..22:  Desc tables — s0..s15, one sampler each                   (all stages)
+//   Param 23:     Desc table  — u0..u3 UAVs                                 (all stages)
+//   Param 24:     Desc table  — t0..t23 space1 read-only structured buffers (all stages)
+//   Param 25:     Root SRV    — t0 space2 ray tracing acceleration structure (all stages)
 //
 // PSO cache: keyed by RenderStates bitmask; created on first Enable() for that state.
 

@@ -32,6 +32,7 @@
 //      40         UNIFORM_BUFFER_DYNAMIC, TESS_CONTROL    (b1-HS)
 //      41         UNIFORM_BUFFER_DYNAMIC, TESS_EVALUATION (b1-DS)
 //      42..65     STORAGE_BUFFER,        ALL_GRAPHICS     (t0..t23 space1, read-only StructuredBuffer)
+//      66         ACCELERATION_STRUCTURE, ALL_GRAPHICS    (t0 space2, only in shaders that trace rays)
 //  - VkPipelineLayout from the set layout above (one pipeline layout per shader; cached
 //    pipelines built per RenderStates are looked up via the PSO-cache pendant in step 7d).
 //  - b0 — FrameConstants written per-draw to a UBO ring-buffer sub-allocation (cbv-allocator

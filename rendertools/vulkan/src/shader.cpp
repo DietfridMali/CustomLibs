@@ -330,7 +330,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 }
 
 // =================================================================================================
-// CreatePipelineLayout — descriptor set layout (59 bindings: see shader.h table) + pipeline layout
+// CreatePipelineLayout — descriptor set layout (67 bindings: see shader.h table) + pipeline layout
 
 bool Shader::CreatePipelineLayout(void) noexcept
 {
