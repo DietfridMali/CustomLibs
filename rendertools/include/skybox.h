@@ -59,6 +59,14 @@ public:
 		return (i == 0) ? false : m_skyTextures[(i == 3) ? 1 : i][0] != nullptr;
 	}
 
+	inline Cubemap* SkyTexture(int32_t skyType, int32_t variant) noexcept {
+		if (not HasNightSky(skyType))
+			skyType = 0;
+		else if (skyType == 3)
+			skyType = 1;
+		return m_skyTextures[skyType][variant];
+	}
+
 private:
 	Cubemap* LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size);
 
