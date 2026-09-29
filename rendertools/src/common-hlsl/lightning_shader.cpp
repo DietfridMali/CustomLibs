@@ -46,6 +46,7 @@ cbuffer ShaderConstants : register(b1) {   // same layout as the FS block (VS ne
     float  haloProfile;                // mantle falloff exponent (used by the FS)
     float2 texelSize;                  // one over the VIEWPORT size (BaseRenderer::TexelSize ())
     float  coreProfile;                // core falloff exponent (used by the FS)
+    float  coreOpacity;                // fade gain of the core pass (used by the FS)
 };
 
 struct VSInput {
@@ -136,6 +137,7 @@ cbuffer ShaderConstants : register(b1) {
     float  haloProfile;                // mantle falloff exponent: < 1 wide and full, > 1 tight around the core
     float2 texelSize;                  // one over the VIEWPORT size (BaseRenderer::TexelSize (); used by the VS)
     float  coreProfile;                // core falloff exponent: 0 = quadratic (default), < 2 flatter and wider white, > 2 tighter
+    float  coreOpacity;                // 0 = fade as is; > 0 = fade * coreOpacity clamped to 1 -> flicker no longer thins the core, only the end fade does
 };
 
 float4 PSMain(PSInput i) : SV_Target {
@@ -190,8 +192,9 @@ float4 PSMain(PSInput i) : SV_Target {
     // widthComp (< 1 where the VS widened a sub-pixel ribbon onto the minimum screen width) dims colour AND
     // coverage by the widening ratio -> constant perceived energy, continuous line.
     float widthComp = i.cap.w;
-    float3 col   = (coreColor * core + haloColor * i.col * halo) * (intensity * widthComp * fade);
-    float  alpha = (core + halo - core * halo) * fade * widthComp;
+    float shade = (coreOpacity > 0.0) ? saturate(fade * coreOpacity) : fade;
+    float3 col   = (coreColor * core + haloColor * i.col * halo) * (intensity * widthComp * shade);
+    float  alpha = (core + halo - core * halo) * shade * widthComp;
     return float4(col, alpha);
 }
 )");
