@@ -299,11 +299,12 @@ bool FontHandler::CreateAtlas(void) {
 
 FontHandler::TextDimensions FontHandler::TextSize(String text) {
     TextDimensions d;
-    for (auto glyph : text) {
-        GlyphInfo* info = FindGlyph(String(glyph));
+    for (int32_t offset = 0; offset < int32_t(text.Length()); ) {
+        String glyph = NextGlyph(text, offset);
+        GlyphInfo* info = FindGlyph(glyph);
         if ((info == nullptr) or (info->index < 0)) {
 #ifdef _DEBUG
-            fprintf(stderr, "Couldn't load texture for glyph '%c'\r\n", glyph);
+            fprintf(stderr, "Couldn't load texture for glyph '%s'\r\n", (const char*)glyph);
 #endif
             return TextDimensions();
         }

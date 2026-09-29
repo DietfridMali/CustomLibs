@@ -65,8 +65,8 @@ void TextRenderer::RenderTextMesh(String& text, float x, float y, float scale, b
         meshBuffers |= Mesh::mbColor;
     Mesh* mesh = meshHandler.AllocMesh(meshBuffers);
     int32_t glyphIndex = 0;
-    for (auto glyph : text) {
-        FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
+    for (int32_t offset = 0; offset < int32_t(text.Length()); ) {
+        FontHandler::GlyphInfo* info = m_font->FindGlyph(FontHandler::NextGlyph(text, offset));
 
         if (info) {
             // create output quad coordinates
@@ -126,10 +126,11 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
         return;
     BaseQuadMesh q;
     int32_t glyphIndex = 0;
-    for (auto glyph : text) {
-        FontHandler::GlyphInfo* info = m_font->FindGlyph(String(glyph));
-        if (info->index < 0)
-            fprintf(stderr, "TextRenderer: Texture for glyph '%c' not found.\r\n", glyph);
+    for (int32_t offset = 0; offset < int32_t(text.Length()); ) {
+        String glyph = FontHandler::NextGlyph(text, offset);
+        FontHandler::GlyphInfo* info = m_font->FindGlyph(glyph);
+        if ((info == nullptr) or (info->index < 0))
+            fprintf(stderr, "TextRenderer: Texture for glyph '%s' not found.\r\n", (const char*)glyph);
         else {
             float width = float(info->glyphSize.width) * scale;
             CreateQuad(q, x, y, width, info->texture, flipVertically);

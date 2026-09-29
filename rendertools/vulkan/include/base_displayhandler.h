@@ -87,7 +87,7 @@ public:
     int GetDisplayModes(void);
 
     void Create(String windowTitle = "", int width = 1920, int height = 1080,
-                bool useFullscreen = true, bool vSync = false);
+                bool useFullscreen = true, bool vSync = false, bool matchDisplayMode = true);
 
     // Vulkan-only: creates the swapchain after VKContext is up. Called from
     // gfxRenderer::InitGraphics once the device + surface exist.

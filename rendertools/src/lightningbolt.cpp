@@ -464,7 +464,6 @@ void LightningStrike::Setup(const Vector3f& start, const Vector3f& end, const Li
     m_branchDepth = params.branchDepth;
     m_branchChance = params.branchChance;
     m_maxBranchTestSkips = params.maxBranchTestSkips;
-    m_fadeBlinks = params.fadeBlinks;
     m_spawnTime = spawnTime;
     m_lastGenerated = spawnTime;
     m_seed = uint32_t(spawnTime) * 2654435761u + uint32_t(Random::Int(65536));
@@ -697,16 +696,6 @@ bool LightningStrike::IsAlive(int64_t now) const {
 float LightningStrike::Fade(int64_t now) const {
     const LightningLook& look = lightningLook;
     float age = float(now - m_spawnTime) * 0.001f;
-    if (m_fadeBlinks > 0) {
-        if (m_lifetime <= 0.0f)
-            return 1.0f;
-        float blinkSpan = std::min(m_fadeStart, m_lifetime);
-        float blinkBegin = m_lifetime - blinkSpan;
-        if ((blinkSpan < 1e-4f) or (age <= blinkBegin))
-            return 1.0f;
-        int32_t slice = int32_t((age - blinkBegin) / blinkSpan * float(2 * m_fadeBlinks + 1));
-        return ((slice & 1) != 0) ? 1.0f : 0.0f;
-    }
     float decay = 1.0f;
     // A lifetime of zero is a permanent strike: no end, so no fade window either - it only flickers.
     if (m_lifetime > 0.0f) {

@@ -83,6 +83,17 @@ public:
         return m_glyphDict.Find(key);
     }
 
+    static inline String NextGlyph(const String& text, int32_t& offset) {
+        int32_t length = int32_t(text.Length());
+        uint8_t c = uint8_t(text.Data()[offset]);
+        int32_t glyphLength = (c < 0xC0) ? 1 : (c < 0xE0) ? 2 : (c < 0xF0) ? 3 : 4;
+        if (glyphLength > length - offset)
+            glyphLength = length - offset;
+        String glyph = text.SubStr(offset, glyphLength);
+        offset += glyphLength;
+        return glyph;
+    }
+
     inline TextureAtlas& GetAtlas(void) noexcept {
         return m_atlas;
     }

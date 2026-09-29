@@ -81,10 +81,12 @@ int BaseDisplayHandler::FindDisplayMode(int width, int height) {
 }
 
 
-void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync) {
+void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync, bool matchDisplayMode) {
     m_activeDisplayMode = FindDisplayMode(width, height);
-    width = m_displayModes[m_activeDisplayMode].w;
-    height = m_displayModes[m_activeDisplayMode].h;
+    if (matchDisplayMode) {
+        width = m_displayModes[m_activeDisplayMode].w;
+        height = m_displayModes[m_activeDisplayMode].h;
+    }
     SDL_Rect rect;
     SDL_GetDisplayBounds(0, &rect);
     m_maxWidth = rect.w;

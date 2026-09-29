@@ -222,10 +222,10 @@ bool Texture::Bind(int tmuIndex, bool)
 
 void Texture::Release(void)
 {
-    // No-op. Tracking which texture sits in which TMU was an OpenGL state-machine pattern;
-    // already pointless in DX12, equally pointless in Vulkan (descriptor sets are written
-    // per-draw from the bind table by Shader::UpdateVariables — the next draw simply writes
-    // the slots it needs, no clearing required).
+    if (m_tmuIndex >= 0) {
+        gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
+        m_tmuIndex = -1;
+    }
 }
 
 

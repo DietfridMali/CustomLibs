@@ -52,7 +52,7 @@ public:
 
     int GetDisplayModes(void);
 
-    void Create (String windowTitle = "", int width = 1920, int height = 1080, bool useFullscreen = true, bool vSync = false);
+    void Create (String windowTitle = "", int width = 1920, int height = 1080, bool useFullscreen = true, bool vSync = false, bool matchDisplayMode = true);
 
     static BaseDisplayHandler& Instance(void) { return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance()); }
 
