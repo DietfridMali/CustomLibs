@@ -413,7 +413,13 @@ void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
     dep.memoryBarrierCount = 1;
     dep.pMemoryBarriers = &barrier;
 
-    vkCmdPipelineBarrier2(cb, &dep);
+    if (vkContext.HasFeature(GfxFeature::RenderingLocalRead)) {
+        Vk13Api::CmdPipelineBarrier2(cb, &dep);
+        return;
+    }
+    CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
+    Vk13Api::CmdPipelineBarrier2(cb, &dep);
+    commandListHandler.ResumeRendering(scope);
 }
 
 // =================================================================================================

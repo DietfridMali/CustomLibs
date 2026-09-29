@@ -79,6 +79,8 @@ protected:
     GfxOperations::CullFace m_frontFace{ GfxOperations::CullFace::None };
     GfxOperations::CullFace m_backFace{ GfxOperations::CullFace::None };
 
+    uint32_t                m_gfxFeatures{ 0 };
+
 public:
 #ifdef _DEBUG
     bool                    m_xchgSkyAndSceneBuffer{ false };
@@ -419,9 +421,22 @@ public:
 
     virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
 
-    virtual bool InitGraphics(void) {
+#pragma warning(push)
+#pragma warning(disable:4100)
+    virtual bool InitGraphics(const GfxFeatureRequest& request = {}) {
         return false;
     }
+#pragma warning(pop)
+
+    inline bool HasFeature(GfxFeature feature) const noexcept {
+        return (m_gfxFeatures & GfxFeatureBit(feature)) != 0;
+    }
+
+    inline uint32_t GfxFeatures(void) const noexcept {
+        return m_gfxFeatures;
+    }
+
+    bool ApplyFeatures(const GfxFeatureRequest& request, uint32_t available) noexcept;
 
 #pragma warning(push)
 #pragma warning(disable:4100)

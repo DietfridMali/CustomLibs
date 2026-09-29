@@ -233,7 +233,7 @@ public:
             dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
             dep.bufferMemoryBarrierCount = 1;
             dep.pBufferMemoryBarriers    = &b;
-            vkCmdPipelineBarrier2(cb, &dep);
+            Vk13Api::CmdPipelineBarrier2(cb, &dep);
         };
 
         BufferBarrier(VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
@@ -421,7 +421,7 @@ private:
             dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
             dep.bufferMemoryBarrierCount = 1;
             dep.pBufferMemoryBarriers    = &b;
-            vkCmdPipelineBarrier2(frameCB, &dep);
+            Vk13Api::CmdPipelineBarrier2(frameCB, &dep);
             commandListHandler.ResumeRendering(scope);
             if (copyList)
                 copyList->Close(false);

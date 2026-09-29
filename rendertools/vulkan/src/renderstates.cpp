@@ -1,4 +1,5 @@
 #include "renderstates.h"
+#include "vk13api.h"
 
 // =================================================================================================
 // RenderStates — Vulkan pipeline-state subobject builders.
@@ -163,18 +164,18 @@ VkPipelineColorBlendAttachmentState& RenderStates::SetBlendAttachment(VkPipeline
 
 void RenderStates::SetDynamicStates(VkCommandBuffer cb) const noexcept
 {
-    vkCmdSetCullMode(cb, faceCulling ? ToVkCullMode(cullMode) : VkCullModeFlags(VK_CULL_MODE_NONE));
-    vkCmdSetFrontFace(cb, ToVkFrontFace(winding));
-    vkCmdSetDepthTestEnable(cb, depthTest ? VK_TRUE : VK_FALSE);
-    vkCmdSetDepthWriteEnable(cb, depthWrite ? VK_TRUE : VK_FALSE);
-    vkCmdSetDepthCompareOp(cb, ToVkCompareOp(depthFunc));
+    Vk13Api::CmdSetCullMode(cb, faceCulling ? ToVkCullMode(cullMode) : VkCullModeFlags(VK_CULL_MODE_NONE));
+    Vk13Api::CmdSetFrontFace(cb, ToVkFrontFace(winding));
+    Vk13Api::CmdSetDepthTestEnable(cb, depthTest ? VK_TRUE : VK_FALSE);
+    Vk13Api::CmdSetDepthWriteEnable(cb, depthWrite ? VK_TRUE : VK_FALSE);
+    Vk13Api::CmdSetDepthCompareOp(cb, ToVkCompareOp(depthFunc));
     const bool hasDepthBias = (depthBias != 0) or (slopeScaledDepthBias != 0.0f);
-    vkCmdSetDepthBiasEnable(cb, hasDepthBias ? VK_TRUE : VK_FALSE);
+    Vk13Api::CmdSetDepthBiasEnable(cb, hasDepthBias ? VK_TRUE : VK_FALSE);
     vkCmdSetDepthBias(cb, float(depthBias), 0.0f, slopeScaledDepthBias);
-    vkCmdSetStencilTestEnable(cb, stencilTest ? VK_TRUE : VK_FALSE);
-    vkCmdSetStencilOp(cb, VK_STENCIL_FACE_FRONT_BIT, ToVkStencilOp(stencilSFail), ToVkStencilOp(stencilDPPass),
+    Vk13Api::CmdSetStencilTestEnable(cb, stencilTest ? VK_TRUE : VK_FALSE);
+    Vk13Api::CmdSetStencilOp(cb, VK_STENCIL_FACE_FRONT_BIT, ToVkStencilOp(stencilSFail), ToVkStencilOp(stencilDPPass),
                       ToVkStencilOp(stencilDPFail), ToVkCompareOp(stencilFunc));
-    vkCmdSetStencilOp(cb, VK_STENCIL_FACE_BACK_BIT, ToVkStencilOp(stencilBackSFail), ToVkStencilOp(stencilBackDPPass),
+    Vk13Api::CmdSetStencilOp(cb, VK_STENCIL_FACE_BACK_BIT, ToVkStencilOp(stencilBackSFail), ToVkStencilOp(stencilBackDPPass),
                       ToVkStencilOp(stencilBackDPFail), ToVkCompareOp(stencilFunc));
     vkCmdSetStencilCompareMask(cb, VK_STENCIL_FACE_FRONT_AND_BACK, stencilMask);
     vkCmdSetStencilWriteMask(cb, VK_STENCIL_FACE_FRONT_AND_BACK, stencilWriteMask);

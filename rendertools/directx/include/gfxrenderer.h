@@ -54,7 +54,7 @@ public:
         return dynamic_cast<GfxRenderer&>(PolymorphSingleton::Instance());
     }
 
-    virtual bool InitGraphics(void) override;
+    virtual bool InitGraphics(const GfxFeatureRequest& request = {}) override;
 
     virtual void* StartOperation(String name = "", bool piggyback = true) noexcept override;
 

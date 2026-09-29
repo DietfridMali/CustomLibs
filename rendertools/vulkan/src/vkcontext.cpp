@@ -5,6 +5,7 @@
 #include "vkcontext.h"
 #include "shader_compiler.h"
 #include "acceleration_structure.h"
+#include "vk13api.h"
 #include "array.hpp"
 
 #include <cstdio>
@@ -110,7 +111,7 @@ int VKContext::DrainMessages(bool onlyErrors) noexcept
 // =================================================================================================
 // VKContext::Create — sequencing helper. Each step has its own private method.
 
-bool VKContext::Create(SDL_Window* window, bool enableValidationLayers) noexcept
+bool VKContext::Create(SDL_Window* window, bool enableValidationLayers, const GfxFeatureRequest& request) noexcept
 {
     if (not window) {
         fprintf(stderr, "VKContext::Create: null SDL_Window\n");
@@ -124,11 +125,11 @@ bool VKContext::Create(SDL_Window* window, bool enableValidationLayers) noexcept
 #endif
     if (not CreateSurface(window))
         return false;
-    if (not SelectPhysicalDevice())
+    if (not SelectPhysicalDevice(request))
         return false;
     if (not SelectQueueFamilies())
         return false;
-    if (not CreateDevice())
+    if (not CreateDevice(request))
         return false;
     if (not CreateAllocator())
         return false;
@@ -243,7 +244,7 @@ bool VKContext::CreateSurface(SDL_Window* window) noexcept
 // SelectPhysicalDevice: enumerate, score each, pick the highest. Discrete GPU > integrated >
 // CPU/SW. Within tier: highest device-local heap size as a VRAM proxy.
 
-bool VKContext::SelectPhysicalDevice(void) noexcept
+bool VKContext::SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept
 {
     uint32_t count = 0;
     vkEnumeratePhysicalDevices(m_instance, &count, nullptr);
@@ -261,35 +262,175 @@ bool VKContext::SelectPhysicalDevice(void) noexcept
     int bestScore = -1;
     VkPhysicalDevice bestDevice = VK_NULL_HANDLE;
     for (uint32_t i = 0; i < count; ++i) {
-        int score = RatePhysicalDevice(devices[i]);
+        int score = RatePhysicalDevice(devices[i], request);
         if (score > bestScore) {
             bestScore = score;
             bestDevice = devices[i];
         }
     }
     if (bestDevice == VK_NULL_HANDLE) {
-        fprintf(stderr, "VKContext::SelectPhysicalDevice: no suitable physical device (none meets API 1.3)\n");
+        fprintf(stderr, "VKContext::SelectPhysicalDevice: no suitable physical device (API 1.2 with extensions or 1.3, plus the required features)\n");
         return false;
     }
     m_physicalDevice = bestDevice;
     vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProps);
-    fprintf(stderr, "Vulkan device: %s (api %u.%u.%u)\n",
+    DeviceSupport support = QueryDeviceSupport(m_physicalDevice);
+    m_apiVersion = support.apiVersion;
+    m_availableFeatures = support.features;
+    fprintf(stderr, "Vulkan device: %s (api %u.%u.%u, using %s)\n",
             m_deviceProps.deviceName,
             VK_VERSION_MAJOR(m_deviceProps.apiVersion),
             VK_VERSION_MINOR(m_deviceProps.apiVersion),
-            VK_VERSION_PATCH(m_deviceProps.apiVersion));
+            VK_VERSION_PATCH(m_deviceProps.apiVersion),
+            UsesCore13() ? "1.3 core" : "1.2 + extensions");
     return true;
 }
 
 
-int VKContext::RatePhysicalDevice(VkPhysicalDevice device) noexcept
+bool VKContext::QueryDeviceExtensions(VkPhysicalDevice device, AutoArray<VkExtensionProperties>& extensions) noexcept
+{
+    uint32_t count = 0;
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr) != VK_SUCCESS)
+        return false;
+    extensions.Resize(int32_t(count));
+    if (count == 0)
+        return true;
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.Data()) != VK_SUCCESS)
+        return false;
+    extensions.Resize(int32_t(count));
+    return true;
+}
+
+
+bool VKContext::HasDeviceExtension(const AutoArray<VkExtensionProperties>& extensions, const char* name) noexcept
+{
+    for (int32_t i = 0; i < extensions.Length(); ++i) {
+        if (std::strcmp(extensions[i].extensionName, name) == 0)
+            return true;
+    }
+    return false;
+}
+
+
+VKContext::DeviceSupport VKContext::QueryDeviceSupport(VkPhysicalDevice device) noexcept
+{
+    DeviceSupport support;
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(device, &props);
+    uint32_t major = VK_VERSION_MAJOR(props.apiVersion);
+    uint32_t minor = VK_VERSION_MINOR(props.apiVersion);
+    support.apiVersion = VK_MAKE_API_VERSION(0, major, minor, 0);
+    if (support.apiVersion > VK_API_VERSION_1_3)
+        support.apiVersion = VK_API_VERSION_1_3;
+    if (support.apiVersion < VK_API_VERSION_1_2)
+        return support;
+
+    AutoArray<VkExtensionProperties> extensions;
+    if (not QueryDeviceExtensions(device, extensions))
+        return support;
+    const bool core13 = support.apiVersion >= VK_API_VERSION_1_3;
+    const bool hasDynamicRenderingExt = HasDeviceExtension(extensions, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    const bool hasSync2Ext = HasDeviceExtension(extensions, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+    const bool hasDemoteExt = HasDeviceExtension(extensions, VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME);
+    const bool hasEdsExt = HasDeviceExtension(extensions, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    const bool hasEds2Ext = HasDeviceExtension(extensions, VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    const bool hasUnusedAttExt = HasDeviceExtension(extensions, VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME);
+    const bool hasLocalReadExt = HasDeviceExtension(extensions, VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME);
+    const bool hasSwapchainExt = HasDeviceExtension(extensions, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+    VkPhysicalDeviceFeatures2 features { };
+    features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    VkPhysicalDeviceVulkan12Features feats12 { };
+    feats12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    VkPhysicalDeviceVulkan13Features feats13 { };
+    feats13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR featsDynamicRendering { };
+    featsDynamicRendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+    VkPhysicalDeviceSynchronization2FeaturesKHR featsSync2 { };
+    featsSync2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+    VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT featsDemote { };
+    featsDemote.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT featsEds { };
+    featsEds.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    VkPhysicalDeviceExtendedDynamicState2FeaturesEXT featsEds2 { };
+    featsEds2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
+    VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT featsUnusedAtt { };
+    featsUnusedAtt.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_FEATURES_EXT;
+    VkPhysicalDeviceDynamicRenderingLocalReadFeaturesKHR featsLocalRead { };
+    featsLocalRead.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES_KHR;
+
+    void** chain = &features.pNext;
+    auto append = [&chain](auto& feature) {
+        *chain = &feature;
+        chain = &feature.pNext;
+    };
+    append(feats12);
+    if (core13)
+        append(feats13);
+    else {
+        if (hasDynamicRenderingExt)
+            append(featsDynamicRendering);
+        if (hasSync2Ext)
+            append(featsSync2);
+        if (hasDemoteExt)
+            append(featsDemote);
+        if (hasEdsExt)
+            append(featsEds);
+        if (hasEds2Ext)
+            append(featsEds2);
+    }
+    if (hasUnusedAttExt)
+        append(featsUnusedAtt);
+    if (hasLocalReadExt)
+        append(featsLocalRead);
+    vkGetPhysicalDeviceFeatures2(device, &features);
+
+    if (core13)
+        support.isUsable = feats13.dynamicRendering and feats13.synchronization2 and feats13.shaderDemoteToHelperInvocation;
+    else
+        support.isUsable = featsDynamicRendering.dynamicRendering and featsSync2.synchronization2 and
+                           featsDemote.shaderDemoteToHelperInvocation and featsEds.extendedDynamicState and
+                           featsEds2.extendedDynamicState2;
+    support.isUsable = support.isUsable and hasSwapchainExt;
+
+    const VkPhysicalDeviceFeatures& core = features.features;
+    auto set = [&support](GfxFeature feature, bool isAvailable) {
+        if (isAvailable)
+            support.features |= GfxFeatureBit(feature);
+    };
+    set(GfxFeature::GeometryShader, core.geometryShader);
+    set(GfxFeature::Tessellation, core.tessellationShader);
+    set(GfxFeature::BlockCompression, core.textureCompressionBC);
+    set(GfxFeature::Wireframe, core.fillModeNonSolid);
+    set(GfxFeature::DepthClamp, core.depthClamp);
+    set(GfxFeature::IndependentBlend, core.independentBlend);
+    set(GfxFeature::Anisotropy, core.samplerAnisotropy);
+    set(GfxFeature::StorageInVertexStage, core.vertexPipelineStoresAndAtomics);
+    set(GfxFeature::StorageInFragmentStage, core.fragmentStoresAndAtomics);
+    set(GfxFeature::ScalarBlockLayout, feats12.scalarBlockLayout);
+    set(GfxFeature::RenderingLocalRead, hasLocalReadExt and featsLocalRead.dynamicRenderingLocalRead);
+    set(GfxFeature::UnusedAttachments, hasUnusedAttExt and featsUnusedAtt.dynamicRenderingUnusedAttachments);
+    set(GfxFeature::RayTracing, SupportsRayTracing(device));
+    set(GfxFeature::PipelineLibrary, SupportsPipelineLibrary(device));
+    return support;
+}
+
+
+int VKContext::RatePhysicalDevice(VkPhysicalDevice device, const GfxFeatureRequest& request) noexcept
 {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(device, &props);
 
-    // Reject devices that don't support our minimum API version.
-    if (props.apiVersion < VK_API_VERSION_1_3)
+    DeviceSupport support = QueryDeviceSupport(device);
+    if (not support.isUsable)
         return -1;
+    if ((request.required & ~support.features) != 0) {
+        for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
+            if ((request.required & ~support.features) & GfxFeatureBit(GfxFeature(i)))
+                fprintf(stderr, "Vulkan device %s lacks required feature: %s\n", props.deviceName, GfxFeatureName(GfxFeature(i)));
+        }
+        return -1;
+    }
 
     int score = 0;
     if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
@@ -359,11 +500,12 @@ bool VKContext::SelectQueueFamilies(void) noexcept
 }
 
 // =================================================================================================
-// CreateDevice: requires VK_KHR_swapchain (device extension), enables Vulkan 1.3 features
-// (dynamicRendering, synchronization2, shaderDemoteToHelperInvocation). One queue per distinct
+// CreateDevice: requires VK_KHR_swapchain (device extension), enables dynamicRendering, synchronization2,
+// shaderDemoteToHelperInvocation (1.3 core, or on 1.2 the KHR/EXT extensions plus extended dynamic state 1+2)
+// and exactly the requested GfxFeatures the device has. One queue per distinct
 // family — collapse to a single queueCreateInfo when graphicsFamily == presentFamily.
 
-bool VKContext::CreateDevice(void) noexcept
+bool VKContext::CreateDevice(const GfxFeatureRequest& request) noexcept
 {
     const float queuePriority = 1.0f;
 
@@ -384,12 +526,62 @@ bool VKContext::CreateDevice(void) noexcept
         ++queueInfoCount;
     }
 
+    m_features = request.Requested() & m_availableFeatures;
+    m_hasRayTracing = HasFeature(GfxFeature::RayTracing) and ShaderCompiler::SupportsRayQuery();
+    if (not m_hasRayTracing)
+        m_features &= ~GfxFeatureBit(GfxFeature::RayTracing);
+    m_hasPipelineLibrary = HasFeature(GfxFeature::PipelineLibrary);
+    const bool core13 = UsesCore13();
+
+    void* featureChain = nullptr;
+    void** chain = &featureChain;
+    auto append = [&chain](auto& feature) {
+        *chain = &feature;
+        chain = &feature.pNext;
+    };
+
+    const char* deviceExtensions[16] = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    };
+    uint32_t deviceExtensionCount = 1;
+
     VkPhysicalDeviceVulkan13Features feats13 { };
     feats13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     feats13.dynamicRendering = VK_TRUE;
     feats13.synchronization2 = VK_TRUE;
     // Required by SPIR-V emitted from HLSL `discard` (DXC uses OpDemoteToHelperInvocation).
     feats13.shaderDemoteToHelperInvocation = VK_TRUE;
+
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR featsDynamicRendering { };
+    featsDynamicRendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+    featsDynamicRendering.dynamicRendering = VK_TRUE;
+    VkPhysicalDeviceSynchronization2FeaturesKHR featsSync2 { };
+    featsSync2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+    featsSync2.synchronization2 = VK_TRUE;
+    VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT featsDemote { };
+    featsDemote.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
+    featsDemote.shaderDemoteToHelperInvocation = VK_TRUE;
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT featsEds { };
+    featsEds.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    featsEds.extendedDynamicState = VK_TRUE;
+    VkPhysicalDeviceExtendedDynamicState2FeaturesEXT featsEds2 { };
+    featsEds2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
+    featsEds2.extendedDynamicState2 = VK_TRUE;
+
+    if (core13)
+        append(feats13);
+    else {
+        append(featsDynamicRendering);
+        append(featsSync2);
+        append(featsDemote);
+        append(featsEds);
+        append(featsEds2);
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME;
+    }
 
     // VK_EXT_dynamic_rendering_unused_attachments — relax the Vulkan strictness that
     // pipeline colorAttachmentCount must equal the active render-pass colorAttachmentCount.
@@ -398,7 +590,10 @@ bool VKContext::CreateDevice(void) noexcept
     VkPhysicalDeviceDynamicRenderingUnusedAttachmentsFeaturesEXT featsUnusedAtt { };
     featsUnusedAtt.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_FEATURES_EXT;
     featsUnusedAtt.dynamicRenderingUnusedAttachments = VK_TRUE;
-    feats13.pNext = &featsUnusedAtt;
+    if (HasFeature(GfxFeature::UnusedAttachments)) {
+        append(featsUnusedAtt);
+        deviceExtensions[deviceExtensionCount++] = VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME;
+    }
 
     // Allows vkCmdPipelineBarrier2 inside an active dynamic-rendering instance.
     // Required by DecalHandler::Render's intra-renderpass SetMemoryBarrier between
@@ -406,7 +601,10 @@ bool VKContext::CreateDevice(void) noexcept
     VkPhysicalDeviceDynamicRenderingLocalReadFeaturesKHR featsLocalRead { };
     featsLocalRead.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_LOCAL_READ_FEATURES_KHR;
     featsLocalRead.dynamicRenderingLocalRead = VK_TRUE;
-    featsUnusedAtt.pNext = &featsLocalRead;
+    if (HasFeature(GfxFeature::RenderingLocalRead)) {
+        append(featsLocalRead);
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME;
+    }
 
     // scalarBlockLayout: the particle StructuredBuffers (Particle = 36 B, ParticleSystemParams = 108 B)
     // are tightly packed to match the C++ upload structs (compiled with -fvk-use-dx-layout), so their
@@ -415,18 +613,20 @@ bool VKContext::CreateDevice(void) noexcept
     // particle sim/draw shaders. Scalar block layout permits the tight stride (= the C++ memory layout).
     VkPhysicalDeviceVulkan12Features feats12 { };
     feats12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-    feats12.scalarBlockLayout = VK_TRUE;
+    feats12.scalarBlockLayout = HasFeature(GfxFeature::ScalarBlockLayout) ? VK_TRUE : VK_FALSE;
 #if USE_TRACY
     feats12.hostQueryReset = VK_TRUE;
 #endif
-    featsLocalRead.pNext = &feats12;
+    append(feats12);
 
     VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT featsPipelineLibrary { };
     featsPipelineLibrary.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GRAPHICS_PIPELINE_LIBRARY_FEATURES_EXT;
     featsPipelineLibrary.graphicsPipelineLibrary = VK_TRUE;
-    m_hasPipelineLibrary = SupportsPipelineLibrary();
-    if (m_hasPipelineLibrary)
-        feats12.pNext = &featsPipelineLibrary;
+    if (m_hasPipelineLibrary) {
+        append(featsPipelineLibrary);
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME;
+    }
 
     VkPhysicalDeviceAccelerationStructureFeaturesKHR featsAccelStruct { };
     featsAccelStruct.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
@@ -436,14 +636,13 @@ bool VKContext::CreateDevice(void) noexcept
     featsRayQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
     featsRayQuery.rayQuery = VK_TRUE;
 
-    m_hasRayTracing = SupportsRayTracing() and ShaderCompiler::SupportsRayQuery();
     if (m_hasRayTracing) {
         feats12.bufferDeviceAddress = VK_TRUE;
-        featsAccelStruct.pNext = &featsRayQuery;
-        if (m_hasPipelineLibrary)
-            featsPipelineLibrary.pNext = &featsAccelStruct;
-        else
-            feats12.pNext = &featsAccelStruct;
+        append(featsAccelStruct);
+        append(featsRayQuery);
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_RAY_QUERY_EXTENSION_NAME;
+        deviceExtensions[deviceExtensionCount++] = VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME;
     }
 
     // Core 1.0 features. samplerAnisotropy is needed by TiledTexture (max 16).
@@ -455,36 +654,23 @@ bool VKContext::CreateDevice(void) noexcept
     // buffers are not NonWritable).
     // independentBlend allows per-attachment blend states in one pipeline — required by WBOIT,
     // whose MRT pass blends RT0 additively (accum) and RT1 multiplicatively (revealage).
-    VkPhysicalDeviceFeatures features { };
-    features.samplerAnisotropy = VK_TRUE;
-    features.textureCompressionBC = VK_TRUE;   // BC1/BC4/BC5/BC7 for skybox + material DDS textures (universal on desktop/Xbox)
-    features.fragmentStoresAndAtomics = VK_TRUE;
-    features.vertexPipelineStoresAndAtomics = VK_TRUE;
-    features.independentBlend = VK_TRUE;
-    features.fillModeNonSolid = VK_TRUE;       // VK_POLYGON_MODE_LINE for GfxStates::SetFillMode (Wireframe); universal on desktop
-    features.tessellationShader = VK_TRUE;
-    features.geometryShader = VK_TRUE;
-    features.depthClamp = VK_TRUE;
-
-    const char* deviceExtensions[8] = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_EXT_DYNAMIC_RENDERING_UNUSED_ATTACHMENTS_EXTENSION_NAME,
-        VK_KHR_DYNAMIC_RENDERING_LOCAL_READ_EXTENSION_NAME,
+    auto enable = [this](GfxFeature feature) -> VkBool32 {
+        return HasFeature(feature) ? VK_TRUE : VK_FALSE;
     };
-    uint32_t deviceExtensionCount = 3;
-    if (m_hasPipelineLibrary) {
-        deviceExtensions[deviceExtensionCount++] = VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME;
-        deviceExtensions[deviceExtensionCount++] = VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME;
-    }
-    if (m_hasRayTracing) {
-        deviceExtensions[deviceExtensionCount++] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
-        deviceExtensions[deviceExtensionCount++] = VK_KHR_RAY_QUERY_EXTENSION_NAME;
-        deviceExtensions[deviceExtensionCount++] = VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME;
-    }
+    VkPhysicalDeviceFeatures features { };
+    features.samplerAnisotropy = enable(GfxFeature::Anisotropy);
+    features.textureCompressionBC = enable(GfxFeature::BlockCompression);   // BC1/BC4/BC5/BC7 for skybox + material DDS textures (universal on desktop/Xbox)
+    features.fragmentStoresAndAtomics = enable(GfxFeature::StorageInFragmentStage);
+    features.vertexPipelineStoresAndAtomics = enable(GfxFeature::StorageInVertexStage);
+    features.independentBlend = enable(GfxFeature::IndependentBlend);
+    features.fillModeNonSolid = enable(GfxFeature::Wireframe);       // VK_POLYGON_MODE_LINE for GfxStates::SetFillMode (Wireframe); universal on desktop
+    features.tessellationShader = enable(GfxFeature::Tessellation);
+    features.geometryShader = enable(GfxFeature::GeometryShader);
+    features.depthClamp = enable(GfxFeature::DepthClamp);
 
     VkDeviceCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    info.pNext = &feats13;
+    info.pNext = featureChain;
     info.queueCreateInfoCount = queueInfoCount;
     info.pQueueCreateInfos = queueInfos;
     info.enabledExtensionCount = deviceExtensionCount;
@@ -496,24 +682,30 @@ bool VKContext::CreateDevice(void) noexcept
         fprintf(stderr, "VKContext::CreateDevice: vkCreateDevice failed (%d)\n", (int)res);
         return false;
     }
+    if (not Vk13Api::Load(m_device, core13)) {
+        fprintf(stderr, "VKContext::CreateDevice: cannot load the dynamic rendering / synchronization2 entry points\n");
+        return false;
+    }
 
     vkGetDeviceQueue(m_device, m_graphicsFamily, 0, &m_graphicsQueue);
     vkGetDeviceQueue(m_device, m_presentFamily, 0, &m_presentQueue);
-    if (m_hasRayTracing and not RayTracingApi::Load(m_device, m_physicalDevice))
+    if (m_hasRayTracing and not RayTracingApi::Load(m_device, m_physicalDevice)) {
         m_hasRayTracing = false;
+        m_features &= ~GfxFeatureBit(GfxFeature::RayTracing);
+    }
     fprintf(stderr, "Vulkan ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
     return true;
 }
 
 
-bool VKContext::SupportsPipelineLibrary(void) noexcept
+bool VKContext::SupportsPipelineLibrary(VkPhysicalDevice device) noexcept
 {
     uint32_t count = 0;
-    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, nullptr) != VK_SUCCESS)
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr) != VK_SUCCESS)
         return false;
     AutoArray<VkExtensionProperties> extensions;
     extensions.Resize(int32_t(count));
-    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, extensions.Data()) != VK_SUCCESS)
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.Data()) != VK_SUCCESS)
         return false;
     bool hasPipelineLibrary = false;
     bool hasGraphicsPipelineLibrary = false;
@@ -530,19 +722,19 @@ bool VKContext::SupportsPipelineLibrary(void) noexcept
     VkPhysicalDeviceFeatures2 features { };
     features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     features.pNext = &pipelineLibraryFeatures;
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &features);
+    vkGetPhysicalDeviceFeatures2(device, &features);
     return pipelineLibraryFeatures.graphicsPipelineLibrary == VK_TRUE;
 }
 
 
-bool VKContext::SupportsRayTracing(void) noexcept
+bool VKContext::SupportsRayTracing(VkPhysicalDevice device) noexcept
 {
     uint32_t count = 0;
-    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, nullptr) != VK_SUCCESS)
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, nullptr) != VK_SUCCESS)
         return false;
     AutoArray<VkExtensionProperties> extensions;
     extensions.Resize(int32_t(count));
-    if (vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &count, extensions.Data()) != VK_SUCCESS)
+    if (vkEnumerateDeviceExtensionProperties(device, nullptr, &count, extensions.Data()) != VK_SUCCESS)
         return false;
     bool hasAccelStruct = false;
     bool hasRayQuery = false;
@@ -569,13 +761,13 @@ bool VKContext::SupportsRayTracing(void) noexcept
     VkPhysicalDeviceFeatures2 features { };
     features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
     features.pNext = &accelStructFeatures;
-    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &features);
+    vkGetPhysicalDeviceFeatures2(device, &features);
     return (accelStructFeatures.accelerationStructure == VK_TRUE) and (rayQueryFeatures.rayQuery == VK_TRUE) and
            (features12.bufferDeviceAddress == VK_TRUE);
 }
 
 // =================================================================================================
-// CreateAllocator: VMA configuration. Vulkan 1.3 minimum — VMA picks up the new APIs
+// CreateAllocator: VMA configuration with the device's API version (1.2 or 1.3) — VMA picks up the new APIs
 // (Maintenance5, host-image-copy, etc. when available).
 
 bool VKContext::CreateAllocator(void) noexcept

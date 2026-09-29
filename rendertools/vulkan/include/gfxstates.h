@@ -2,6 +2,7 @@
 
 #include <array>
 #include <tuple>
+#include <cstdio>
 #include <cstring>
 #include <cstdint>
 #include <bit>
@@ -253,10 +254,10 @@ private:
 
 public:
     // FeatureLevel maps onto Vulkan's encoded API version (VK_MAKE_API_VERSION).
-    // MinFeatureLevel = 1.3 because the port targets dynamic rendering + synchronization2 as core.
+    // MinFeatureLevel = 1.2: dynamic rendering + synchronization2 come as core in 1.3 or as extensions on 1.2.
     // SSBOFeatureLevel stays at 1.0 — storage buffers have been core since 1.0; the call site
     // only checks "is the platform new enough at all".
-    static constexpr int MinFeatureLevel = (int)VK_API_VERSION_1_3;
+    static constexpr int MinFeatureLevel = (int)VK_API_VERSION_1_2;
     static constexpr int SSBOFeatureLevel = (int)VK_API_VERSION_1_0;
 
     GfxStates() = default;
@@ -382,10 +383,21 @@ public:
         return prevState;
     }
 
+    static inline bool FeatureAvailable(GfxFeature feature) noexcept {
+        if (vkContext.HasFeature(feature))
+            return true;
+        static uint32_t reportedFeatures = 0;
+        if (not (reportedFeatures & GfxFeatureBit(feature))) {
+            reportedFeatures |= GfxFeatureBit(feature);
+            fprintf(stderr, "GfxStates: %s is not enabled on this device - state change ignored\n", GfxFeatureName(feature));
+        }
+        return false;
+    }
+
     inline int SetDepthClip(int state) {
         auto& s = ActiveState();
         int prevState = int(s.depthClip);
-        if (state >= 0)
+        if ((state > 0) or ((state == 0) and FeatureAvailable(GfxFeature::DepthClamp)))
             s.depthClip = uint8_t(state);
         return prevState;
     }
@@ -465,7 +477,8 @@ public:
     inline GfxOperations::FillMode SetFillMode(GfxOperations::FillMode mode) {
         auto& s = ActiveState();
         auto prevState = s.fillMode;
-        s.fillMode = mode;
+        if ((mode == GfxOperations::FillMode::Solid) or FeatureAvailable(GfxFeature::Wireframe))
+            s.fillMode = mode;
         return prevState;
     }
 
@@ -579,7 +592,8 @@ public:
     inline int SetIndependentBlend(int state) {
         auto& s = ActiveState();
         int prevState = int(s.independentBlend);
-        s.independentBlend = uint8_t(state);
+        if ((state == 0) or FeatureAvailable(GfxFeature::IndependentBlend))
+            s.independentBlend = uint8_t(state);
         return prevState;
     }
 

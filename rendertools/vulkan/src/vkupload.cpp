@@ -1,5 +1,6 @@
 ﻿#include "vkupload.h"
 #include "vkcontext.h"
+#include "vk13api.h"
 #include "image_layout_tracker.h"
 #include "texture.h"
 #include "gfxpixelformat_vk.h"
@@ -108,7 +109,7 @@ bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept
     submit.commandBufferInfoCount = 1;
     submit.pCommandBufferInfos = &cbInfo;
 
-    res = vkQueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
+    res = Vk13Api::QueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "vkupload::EndSingleTimeCommands: vkQueueSubmit2 failed (%d)\n", (int)res);
         HandleDeviceLost(res, "vkupload::EndSingleTimeCommands");

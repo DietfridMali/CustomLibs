@@ -54,6 +54,7 @@ VULKAN_FILES := \
  texturearray \
  texturebuffer \
  texturehandler \
+ vk13api \
  vkcontext \
  vkupload
 

@@ -800,7 +800,7 @@ void RenderTarget::BeginRendering(bool clearColor, bool clearDepth)
         info.pStencilAttachment = &stencil;
     }
 
-    vkCmdBeginRendering(cb, &info);
+    Vk13Api::CmdBeginRendering(cb, &info);
     m_isInRendering = true;
 }
 
@@ -812,7 +812,7 @@ void RenderTarget::EndRendering(void)
     if (m_cmdList and m_cmdList->IsRecording()) {
         VkCommandBuffer cb = m_cmdList->GfxList();
         if (cb != VK_NULL_HANDLE)
-            vkCmdEndRendering(cb);
+            Vk13Api::CmdEndRendering(cb);
     }
     m_isInRendering = false;
 }

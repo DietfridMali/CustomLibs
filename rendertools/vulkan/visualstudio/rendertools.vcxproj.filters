@@ -278,6 +278,9 @@
     <ClInclude Include="..\include\vkcontext.h">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\vk13api.h">
+      <Filter>Header Files\Vulkan</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\vkframework.h">
       <Filter>Header Files\Vulkan</Filter>
     </ClInclude>
@@ -502,6 +505,9 @@
       <Filter>Source Files\Texture</Filter>
     </ClCompile>
     <ClCompile Include="..\src\vkcontext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\vk13api.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\image_layout_tracker.cpp">

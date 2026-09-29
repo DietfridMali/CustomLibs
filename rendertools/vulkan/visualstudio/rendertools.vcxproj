@@ -133,6 +133,7 @@
     <ClInclude Include="..\include\commandlist.h" />
     <ClInclude Include="..\include\meshhandler.h" />
     <ClInclude Include="..\include\vkcontext.h" />
+    <ClInclude Include="..\include\vk13api.h" />
     <ClInclude Include="..\include\cubemap.h" />
     <ClInclude Include="..\include\texturearray.h" />
     <ClInclude Include="..\include\readtarget.h" />
@@ -227,6 +228,7 @@
     <ClCompile Include="..\src\commandlist.cpp" />
     <ClCompile Include="..\src\meshhandler.cpp" />
     <ClCompile Include="..\src\vkcontext.cpp" />
+    <ClCompile Include="..\src\vk13api.cpp" />
     <ClCompile Include="..\src\image_layout_tracker.cpp" />
     <ClCompile Include="..\src\descriptor_pool_handler.cpp" />
     <ClCompile Include="..\src\vkupload.cpp" />

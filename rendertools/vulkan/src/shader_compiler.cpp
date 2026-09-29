@@ -151,10 +151,10 @@ bool CompileHlslToSpirv(const char* hlslSource,
     std::wstring entryWide = ToWide(entryPoint);
     std::wstring targetWide = ToWide(targetProfile);
 
-    // Standard args: emit SPIR-V, target Vulkan 1.3, set entry + profile.
+    // Standard args: emit SPIR-V, target the device's Vulkan version (1.2 or 1.3), set entry + profile.
     std::vector<const wchar_t*> args;
     args.push_back(L"-spirv");
-    args.push_back(L"-fspv-target-env=vulkan1.3");
+    args.push_back(vkContext.UsesCore13() ? L"-fspv-target-env=vulkan1.3" : L"-fspv-target-env=vulkan1.2");
     // DX-compatible memory layout for cbuffers and StructuredBuffers: tight packing that matches the
     // C++ upload structs (Particle = 36 B, ParticleSystemParams = 108 B; float3 + scalar packed with
     // no std430 16-byte rounding). Without this, DXC's default layout rounds the StructuredBuffer

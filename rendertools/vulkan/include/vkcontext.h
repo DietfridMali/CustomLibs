@@ -10,6 +10,8 @@
 
 #include "vkframework.h"
 #include "basesingleton.hpp"
+#include "array.hpp"
+#include "rendertypes.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -50,6 +52,14 @@ public:
     uint32_t                   m_apiVersion   { VK_API_VERSION_1_3 };
     bool                       m_hasPipelineLibrary { false };
     bool                       m_hasRayTracing { false };
+    uint32_t                   m_availableFeatures { 0 };
+    uint32_t                   m_features { 0 };
+
+    struct DeviceSupport {
+        uint32_t apiVersion { 0 };
+        bool     isUsable { false };
+        uint32_t features { 0 };
+    };
 
 #if ENABLE_VK_LOGGING
     VkDebugUtilsMessengerEXT             m_debugMessenger           { VK_NULL_HANDLE };
@@ -71,7 +81,7 @@ public:
 
     // Creates instance, surface, picks physical device, creates logical device + queues + VMA.
     // The SDL window must already exist (renderer.HasDirectX() takes the other path in InitGraphics).
-    bool Create(SDL_Window* window, bool enableValidationLayers = false) noexcept;
+    bool Create(SDL_Window* window, bool enableValidationLayers = false, const GfxFeatureRequest& request = {}) noexcept;
 
     void Destroy(void) noexcept;
 
@@ -94,6 +104,14 @@ public:
 
     inline bool HasRayTracing(void) const noexcept { return m_hasRayTracing; }
 
+    inline bool UsesCore13(void) const noexcept { return m_apiVersion >= VK_API_VERSION_1_3; }
+
+    inline bool HasFeature(GfxFeature feature) const noexcept { return (m_features & GfxFeatureBit(feature)) != 0; }
+
+    inline uint32_t Features(void) const noexcept { return m_features; }
+
+    inline uint32_t AvailableFeatures(void) const noexcept { return m_availableFeatures; }
+
     // Flush the validation-layer log to stderr and return the number of error-severity entries
     // since the last call. onlyErrors=true suppresses warnings/info from the printout (counters
     // are reset either way). When ENABLE_VK_LOGGING=0 this compiles to a no-op returning 0.
@@ -102,12 +120,17 @@ public:
 private:
     bool CreateInstance(SDL_Window* window, bool enableValidationLayers) noexcept;
     bool CreateSurface(SDL_Window* window) noexcept;
-    bool SelectPhysicalDevice(void) noexcept;
+    bool SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept;
     bool SelectQueueFamilies(void) noexcept;
-    bool CreateDevice(void) noexcept;
+    bool CreateDevice(const GfxFeatureRequest& request) noexcept;
     bool CreateAllocator(void) noexcept;
-    bool SupportsPipelineLibrary(void) noexcept;
-    bool SupportsRayTracing(void) noexcept;
+    bool SupportsPipelineLibrary(VkPhysicalDevice device) noexcept;
+    bool SupportsRayTracing(VkPhysicalDevice device) noexcept;
+    DeviceSupport QueryDeviceSupport(VkPhysicalDevice device) noexcept;
+    int RatePhysicalDevice(VkPhysicalDevice device, const GfxFeatureRequest& request) noexcept;
+
+    static bool QueryDeviceExtensions(VkPhysicalDevice device, AutoArray<VkExtensionProperties>& extensions) noexcept;
+    static bool HasDeviceExtension(const AutoArray<VkExtensionProperties>& extensions, const char* name) noexcept;
 
 #if ENABLE_VK_LOGGING
     bool RegisterDebugMessenger(bool enableValidationLayers) noexcept;
@@ -115,7 +138,6 @@ private:
 #endif
 
     static bool LayerAvailable(const char* name) noexcept;
-    static int RatePhysicalDevice(VkPhysicalDevice device) noexcept;
 };
 
 #define vkContext VKContext::Instance()

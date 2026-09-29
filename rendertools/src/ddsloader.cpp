@@ -1,6 +1,7 @@
 #include "ddsloader.h"
 #include "rendertypes.h"
 #include "texturebuffer.h"
+#include "gfxrenderer.h"
 
 #include <cstdint>
 #include <cstring>
@@ -288,11 +289,17 @@ TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
 {
     const char* folderC = (const char*) folder;
     std::string wanted  = (const char*) fileName;
-    if (allowDDS)
+    const bool haveBlockCompression = baseRenderer.HasFeature(GfxFeature::BlockCompression);
+    if (allowDDS and haveBlockCompression)
         wanted = PreferDDSName(folderC, wanted);
 
     const std::string full = JoinPath(folderC, wanted);
     const String      fullPath(full.c_str());
+
+    if (IsDDSFile(fullPath) and not haveBlockCompression) {
+        fprintf(stderr, "LoadTextureFile: '%s' is block compressed, which is not enabled on this device\n", full.c_str());
+        return nullptr;
+    }
 
     TextureBuffer* buf = new TextureBuffer();
 

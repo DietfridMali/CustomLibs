@@ -510,7 +510,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
         dependency.memoryBarrierCount = 1;
         dependency.pMemoryBarriers = &barrier;
-        vkCmdPipelineBarrier2(frameBuffer, &dependency);
+        Vk13Api::CmdPipelineBarrier2(frameBuffer, &dependency);
 
         commandListHandler.ResumeRendering(scope);
     }

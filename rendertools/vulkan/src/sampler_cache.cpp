@@ -116,9 +116,10 @@ VkSamplerCreateInfo SamplerCache::ToVulkanInfo(const TextureSampling& s) noexcep
     info.addressModeW = ToVkWrap(s.wrapW);
     info.mipLodBias = s.mipLodBias;
 
-    const bool useAniso = (s.maxAnisotropy > 1.0f);
+    const float anisoLimit = vkContext.DeviceProps().limits.maxSamplerAnisotropy;
+    const bool useAniso = (s.maxAnisotropy > 1.0f) and vkContext.HasFeature(GfxFeature::Anisotropy);
     info.anisotropyEnable = useAniso ? VK_TRUE : VK_FALSE;
-    info.maxAnisotropy = useAniso ? s.maxAnisotropy : 1.0f;
+    info.maxAnisotropy = useAniso ? ((s.maxAnisotropy < anisoLimit) ? s.maxAnisotropy : anisoLimit) : 1.0f;
 
     const bool useCompare = (s.compareFunc != GfxOperations::CompareFunc::Always);
     info.compareEnable = useCompare ? VK_TRUE : VK_FALSE;

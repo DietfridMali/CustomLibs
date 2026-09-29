@@ -26,7 +26,7 @@ static Texture* testTexture = nullptr;
 // =================================================================================================
 // DX12 Renderer
 
-bool GfxRenderer::InitGraphics(void) {
+bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
     GLint i = glewInit();
     if (i != GLEW_OK) {
         fprintf(stderr, "Smiley-Battle: Cannot initialize GLEW.\n");
@@ -37,7 +37,12 @@ bool GfxRenderer::InitGraphics(void) {
 #if USE_TRACY
     TracyGpuContext;
 #endif
-    return true;
+    uint32_t available = GfxAllFeatures() & ~(GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary));
+    if (not gfxStates.HasExtension("GL_EXT_texture_compression_s3tc"))
+        available &= ~GfxFeatureBit(GfxFeature::BlockCompression);
+    if (not (gfxStates.HasExtension("GL_EXT_texture_filter_anisotropic") or gfxStates.HasExtension("GL_ARB_texture_filter_anisotropic")))
+        available &= ~GfxFeatureBit(GfxFeature::Anisotropy);
+    return ApplyFeatures(request, available);
 }
 
 #pragma warning(push)

@@ -623,7 +623,7 @@ void CommandList::Flush(void) noexcept
         submit.pWaitSemaphoreInfos = &waitInfo;
     }
 
-    VkResult res = vkQueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
+    VkResult res = Vk13Api::QueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandList::Flush: vkQueueSubmit2 failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandList::Flush");
@@ -658,7 +658,7 @@ void CommandList::SetBarrier(const VkImageMemoryBarrier2* barriers, int count)
     dep.sType   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
     dep.imageMemoryBarrierCount = uint32_t(count);
     dep.pImageMemoryBarriers = barriers;
-    vkCmdPipelineBarrier2(GfxList(), &dep);
+    Vk13Api::CmdPipelineBarrier2(GfxList(), &dep);
 #ifdef _DEBUG
     //gfxStates.CheckError();
 #endif
@@ -689,6 +689,36 @@ void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/) noe
 static RenderStates lastPipelineStates;
 static CommandList* lastPipelineList = nullptr;
 static Shader* lastPipelineShader = nullptr;
+
+static void MaskUnwrittenAttachments(RenderStates& states, uint32_t writtenCount, uint32_t attachmentCount) noexcept
+{
+    if (not states.independentBlend) {
+        for (uint32_t i = 1; i < attachmentCount; ++i) {
+            states.blendEnable[i] = states.blendEnable[0];
+            states.blendSrcRGB[i] = states.blendSrcRGB[0];
+            states.blendDstRGB[i] = states.blendDstRGB[0];
+            states.blendSrcAlpha[i] = states.blendSrcAlpha[0];
+            states.blendDstAlpha[i] = states.blendDstAlpha[0];
+            states.blendOpRGB[i] = states.blendOpRGB[0];
+            states.blendOpAlpha[i] = states.blendOpAlpha[0];
+            states.colorMask[i] = states.colorMask[0];
+        }
+        states.independentBlend = 1;
+    }
+    for (uint32_t i = writtenCount; i < attachmentCount; ++i)
+        states.colorMask[i] = 0;
+}
+
+
+static void ReportUnwrittenAttachments(Shader* shader, uint32_t writtenCount, uint32_t attachmentCount) noexcept
+{
+    static Shader* lastReported = nullptr;
+    if (shader == lastReported)
+        return;
+    lastReported = shader;
+    fprintf(stderr, "CommandList::GetPipeline: shader '%s' writes %u of %u color attachments; the device has neither unused attachments nor independent blend, the other attachments are undefined after the draw\n",
+            static_cast<const char*>(shader->m_name), writtenCount, attachmentCount);
+}
 
 bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept
 {
@@ -724,11 +754,18 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
         key.depthFormat = VK_FORMAT_UNDEFINED;
     }
 
+    const RenderStates liveStates = key.states;
     const uint32_t numRT = uint32_t(shader->m_dataLayout.m_numRenderTargets);
     if (numRT < key.colorFormatCount) {
-        for (uint32_t i = numRT; i < key.colorFormatCount; ++i)
-            key.colorFormats[i] = VK_FORMAT_UNDEFINED;
-        key.colorFormatCount = numRT;
+        if (vkContext.HasFeature(GfxFeature::UnusedAttachments)) {
+            for (uint32_t i = numRT; i < key.colorFormatCount; ++i)
+                key.colorFormats[i] = VK_FORMAT_UNDEFINED;
+            key.colorFormatCount = numRT;
+        }
+        else if (vkContext.HasFeature(GfxFeature::IndependentBlend))
+            MaskUnwrittenAttachments(key.states, numRT, key.colorFormatCount);
+        else
+            ReportUnwrittenAttachments(shader, numRT, key.colorFormatCount);
     }
 
     VkPipeline p = pipelineCache.GetOrCreate(key);
@@ -737,7 +774,7 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
         if (m_isRecording)
             key.states.SetDynamicStates(GfxList());
         m_activeTopology = key.states.topology;
-        lastPipelineStates = key.states;
+        lastPipelineStates = liveStates;
         lastPipelineList = this;
         lastPipelineShader = shader;
     }
@@ -914,7 +951,7 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
         {
             ZoneScopedN("vkQueueSubmit2");
             double stallStart = VkStallClock();
-            VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
+            VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
             VkStallNote(intermediate ? "intermediate submit" : "frame submit", stallStart, nullptr);
             if (res != VK_SUCCESS) {
                 fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
@@ -975,7 +1012,7 @@ void CommandListHandler::ExecutePending(void) noexcept
             submit.pWaitSemaphoreInfos = &waitInfo;
         }
 
-        VkResult res = vkQueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
+        VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
         if (res != VK_SUCCESS) {
             fprintf(stderr, "CommandListHandler::ExecutePending: vkQueueSubmit2 failed (%d)\n", (int)res);
             HandleDeviceLost(res, "CommandListHandler::ExecutePending");

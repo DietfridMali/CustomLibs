@@ -25,7 +25,7 @@
 // =================================================================================================
 // Vulkan Renderer
 
-bool GfxRenderer::InitGraphics(void) {
+bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
 #   ifdef _DEBUG
     constexpr bool enableValidation = true;
 #   else
@@ -38,10 +38,12 @@ bool GfxRenderer::InitGraphics(void) {
         return false;
     }
 
-    if (not vkContext.Create(window, enableValidation)) {
+    if (not vkContext.Create(window, enableValidation, request)) {
         fprintf(stderr, "Smiley-Battle: Cannot create Vulkan context.\n");
         return false;
     }
+    if (not ApplyFeatures(request, vkContext.Features()))
+        return false;
     gfxStates.Init();
     if (not ShaderCompiler::Initialize()) {
         fprintf(stderr, "Smiley-Battle: Cannot initialize DXC shader compiler.\n");

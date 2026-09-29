@@ -641,6 +641,14 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
         return false;
     }
+    if (not gsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::GeometryShader)) {
+        fprintf(stderr, "Shader '%s': needs geometry shaders, which are not enabled on this device - not created\n", (const char*)m_name);
+        return false;
+    }
+    if (not tcsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::Tessellation)) {
+        fprintf(stderr, "Shader '%s': needs tessellation, which is not enabled on this device - not created\n", (const char*)m_name);
+        return false;
+    }
     if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsSpirv, shaderFolder))
         return false;
     if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_fsSpirv, shaderFolder))

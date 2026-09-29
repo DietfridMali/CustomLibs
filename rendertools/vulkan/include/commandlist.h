@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vkframework.h"
+#include "vk13api.h"
 #include "string.hpp"
 #include "array.hpp"
 #include "list.hpp"
@@ -374,7 +375,7 @@ public:
 #endif
         VkCommandBuffer cb = CurrentGfxList();
         if (cb != VK_NULL_HANDLE)
-            vkCmdPipelineBarrier2(cb, dep);
+            Vk13Api::CmdPipelineBarrier2(cb, dep);
     }
 };
 

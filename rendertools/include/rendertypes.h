@@ -89,6 +89,70 @@ enum eBaseMatrices {
     bmCount
 };
 
+enum class GfxFeature : uint32_t {
+    GeometryShader = 0,
+    Tessellation,
+    BlockCompression,
+    Wireframe,
+    DepthClamp,
+    IndependentBlend,
+    Anisotropy,
+    StorageInVertexStage,
+    StorageInFragmentStage,
+    ScalarBlockLayout,
+    RenderingLocalRead,
+    UnusedAttachments,
+    RayTracing,
+    PipelineLibrary,
+    Count
+};
+
+inline constexpr uint32_t GfxFeatureBit(GfxFeature feature) noexcept {
+    return 1u << uint32_t(feature);
+}
+
+inline constexpr uint32_t GfxAllFeatures(void) noexcept {
+    return GfxFeatureBit(GfxFeature::Count) - 1u;
+}
+
+inline constexpr const char* GfxFeatureName(GfxFeature feature) noexcept {
+    switch (feature) {
+        case GfxFeature::GeometryShader:         return "geometry shader";
+        case GfxFeature::Tessellation:           return "tessellation";
+        case GfxFeature::BlockCompression:       return "block compression (BCn)";
+        case GfxFeature::Wireframe:              return "wireframe fill mode";
+        case GfxFeature::DepthClamp:             return "depth clamp";
+        case GfxFeature::IndependentBlend:       return "independent blend";
+        case GfxFeature::Anisotropy:             return "anisotropic filtering";
+        case GfxFeature::StorageInVertexStage:   return "storage buffers in the vertex stage";
+        case GfxFeature::StorageInFragmentStage: return "storage buffers in the fragment stage";
+        case GfxFeature::ScalarBlockLayout:      return "scalar block layout";
+        case GfxFeature::RenderingLocalRead:     return "barriers inside a rendering scope";
+        case GfxFeature::UnusedAttachments:      return "unused rendering attachments";
+        case GfxFeature::RayTracing:             return "ray tracing";
+        case GfxFeature::PipelineLibrary:        return "pipeline library";
+        default:                                 return "unknown";
+    }
+}
+
+struct GfxFeatureRequest {
+    uint32_t required {
+        GfxFeatureBit(GfxFeature::GeometryShader) | GfxFeatureBit(GfxFeature::Tessellation) |
+        GfxFeatureBit(GfxFeature::BlockCompression) | GfxFeatureBit(GfxFeature::Wireframe) |
+        GfxFeatureBit(GfxFeature::DepthClamp) | GfxFeatureBit(GfxFeature::IndependentBlend) |
+        GfxFeatureBit(GfxFeature::Anisotropy) | GfxFeatureBit(GfxFeature::StorageInVertexStage) |
+        GfxFeatureBit(GfxFeature::StorageInFragmentStage) | GfxFeatureBit(GfxFeature::ScalarBlockLayout) |
+        GfxFeatureBit(GfxFeature::RenderingLocalRead) | GfxFeatureBit(GfxFeature::UnusedAttachments)
+    };
+    uint32_t optional {
+        GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary)
+    };
+
+    inline constexpr uint32_t Requested(void) const noexcept {
+        return required | optional;
+    }
+};
+
 // The linear twin of an sRGB format, itself for every other - what an upload uses when the sampler
 // is not to decode.
 inline constexpr GfxPixelFormat GfxLinearFormat(GfxPixelFormat f) noexcept {

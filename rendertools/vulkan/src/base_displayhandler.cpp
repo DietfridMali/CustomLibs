@@ -213,7 +213,7 @@ void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
     info.colorAttachmentCount = 1;
     info.pColorAttachments = &color;
 
-    vkCmdBeginRendering(cb, &info);
+    Vk13Api::CmdBeginRendering(cb, &info);
     m_isInRendering = true;
     m_backBufferCb = cb;
     m_backBufferWasWritten = true;
@@ -224,7 +224,7 @@ void BaseDisplayHandler::SuspendBackBuffer(void) noexcept {
     if (not m_isInRendering)
         return;
     if (m_backBufferCb != VK_NULL_HANDLE)
-        vkCmdEndRendering(m_backBufferCb);
+        Vk13Api::CmdEndRendering(m_backBufferCb);
     m_isInRendering = false;
     m_backBufferCb = VK_NULL_HANDLE;
 }

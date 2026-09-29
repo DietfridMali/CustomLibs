@@ -28,7 +28,7 @@ static Texture* testTexture = nullptr;
 // =================================================================================================
 // DX12 Renderer
 
-bool GfxRenderer::InitGraphics(void) {
+bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
 #   if DBG_DIRECTX
     constexpr bool enableDebugLayer = true;
 #   else
@@ -38,6 +38,11 @@ bool GfxRenderer::InitGraphics(void) {
         fprintf(stderr, "Cannot create DX12 device.\n");
         return false;
     }
+    uint32_t available = GfxAllFeatures();
+    if (not dx12Context.HasRayTracing())
+        available &= ~GfxFeatureBit(GfxFeature::RayTracing);
+    if (not ApplyFeatures(request, available))
+        return false;
     gfxStates.Init();
     if (not commandListHandler.Create(dx12Context.Device())) {
         fprintf(stderr, "Cannot create DX12 command queue.\n");

@@ -1,4 +1,5 @@
 #include "image_layout_tracker.h"
+#include "vk13api.h"
 
 // =================================================================================================
 // ImageLayoutTracker
@@ -43,7 +44,7 @@ void ImageLayoutTracker::TransitionTo(VkCommandBuffer cb, VkImageLayout newLayou
     dep.imageMemoryBarrierCount = 1;
     dep.pImageMemoryBarriers    = &barrier;
 
-    vkCmdPipelineBarrier2(cb, &dep);
+    Vk13Api::CmdPipelineBarrier2(cb, &dep);
 
     m_layout = newLayout;
     m_stage  = dstStage;
