@@ -5,6 +5,12 @@
 #include "gfxrenderer.h"
 #include "random.hpp"
 #include "base_renderer.h"
+#include "texturebuffer.h"
+
+#pragma warning(push)
+#pragma warning(disable:26819)
+#include "SDL_image.h"
+#pragma warning(pop)
 
 // =================================================================================================
 
@@ -47,6 +53,7 @@ int Skybox::MaxTextureSize(int maxTextureSize) {
 
 
 bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture, Texture* blueNoise, int maxTextureSize) {
+	m_textureFolder = textureFolder;
 	m_noiseTexture = noiseTexture;
 	m_blueNoise = blueNoise;
 	int textureSize = MaxTextureSize(maxTextureSize);
@@ -121,15 +128,78 @@ void Skybox::Destroy(void) {
 }
 
 
-bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params) {
+Cubemap* Skybox::LoadCubemap(const String& textureFolder, String id, List<String>& filenames) {
+	Cubemap* texture = textureHandler.GetCubemap(id);
+	if (not texture)
+		return nullptr;
+	if (not texture->CreateFromFile(textureFolder, filenames, { .isRequired = false })) {
+		delete texture;
+		return nullptr;
+	}
+	return texture;
+}
+
+
+bool Skybox::SaveFaces(Cubemap* texture, List<String>& filenames) {
+	bool ok = true;
+	int face = 0;
+	for (auto& filename : filenames) {
+		TextureBuffer* buffer = texture->m_buffers[face++];
+		String path = m_textureFolder + filename;
+		int width = buffer->m_info.m_width;
+		int height = buffer->m_info.m_height;
+		SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(buffer->DataBuffer(), width, height, 32, width * 4, SDL_PIXELFORMAT_RGBA32);
+		if (not surface) {
+			fprintf(stderr, "Skybox: cannot write '%s': %s\n", static_cast<const char*>(path), SDL_GetError());
+			ok = false;
+			continue;
+		}
+		if (IMG_SavePNG(surface, static_cast<const char*>(path)) != 0) {
+			fprintf(stderr, "Skybox: cannot write '%s': %s\n", static_cast<const char*>(path), SDL_GetError());
+			ok = false;
+		}
+		SDL_FreeSurface(surface);
+	}
+	return ok;
+}
+
+
+bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params, const String& suffix, const String& sourceFolder) {
 	KuwaharaFilter kuwaharaFilter;
+	String filteredExtension = suffix + ".png";
 	bool ok = true;
 	for (int j = 0; j < 3; j++) {
 		Cubemap* texture = m_skyTextures[skyType][j];
 		if ((texture == nullptr) or ((j > 0) and (texture == m_skyTextures[skyType][j - 1])))
 			continue;
-		if (not kuwaharaFilter.ApplyCube(texture, params))
-			ok = false;
+		List<String> filteredNames;
+		List<String> sourceNames;
+		for (auto& filename : texture->m_filenames) {
+			filteredNames.Append(filename.Replace(".DDS", static_cast<const char*>(filteredExtension)));
+			sourceNames.Append(filename.Replace(".DDS", ".png"));
+		}
+		String id = texture->m_name + suffix;
+		Cubemap* filtered = LoadCubemap(m_textureFolder, id, filteredNames);
+		if (not filtered) {
+			filtered = LoadCubemap(sourceFolder, id, sourceNames);
+			if (not filtered) {
+				fprintf(stderr, "Skybox: sources of '%s' not found in '%s', filtering the loaded sky\n", static_cast<const char*>(texture->m_name), static_cast<const char*>(sourceFolder));
+				if (not kuwaharaFilter.ApplyCube(texture, params))
+					ok = false;
+				continue;
+			}
+			if (not kuwaharaFilter.ApplyCube(filtered, params)) {
+				delete filtered;
+				ok = false;
+				continue;
+			}
+			if (not SaveFaces(filtered, filteredNames))
+				ok = false;
+		}
+		for (int k = j; k < 3; k++)
+			if (m_skyTextures[skyType][k] == texture)
+				m_skyTextures[skyType][k] = filtered;
+		delete texture;
 	}
 	return ok;
 }

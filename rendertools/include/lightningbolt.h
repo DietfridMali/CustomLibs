@@ -171,6 +171,7 @@ struct LightningCreationParams {
     // arc only
     int32_t    boltCount{ 3 };      // parallel bolts in the bundle
     float      animSpeed{ 1.0f };   // writhe speed
+    int32_t    fadeBlinks{ 0 };      // strike: 0 = smooth decay + flicker; n > 0 = no flicker, fade window = n hard on/off blinks, ends off
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -375,6 +376,7 @@ public:
     int32_t m_branchDepth{ 2 };   // recursion depth: 0 = trunk only, 1 = trunk has branches, 2 = branches have branches, ...
     float   m_branchChance{ 1.0f };   // probability [0,1] that a sub-branch forks at each eligible node
     int32_t m_maxBranchTestSkips{ 0 };   // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
+    int32_t m_fadeBlinks{ 0 };
     AutoArray<LightningRefBolt> m_refBolts;
     int32_t                     m_refIndex{ 0 };
 

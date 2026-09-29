@@ -20,6 +20,7 @@ private:
 	Texture* m_blueNoise{ nullptr };
 	Mesh* m_skybox{ nullptr };
 	int32_t	m_activationTime{ -1 };
+	String m_textureFolder;
 
 public:
 	Skybox() = default;
@@ -38,7 +39,7 @@ public:
 	// The noise textures are NOT touched - they belong to whoever passed them in.
 	void Destroy(void);
 
-	bool ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params);
+	bool ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params, const String& suffix, const String& sourceFolder);
 
 	inline int FaceSize(void) noexcept {
 		return (m_skyTextures[0][0] != nullptr) ? m_skyTextures[0][0]->GetWidth() : 0;
@@ -60,6 +61,10 @@ public:
 
 private:
 	Cubemap* LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size);
+
+	Cubemap* LoadCubemap(const String& textureFolder, String id, List<String>& filenames);
+
+	bool SaveFaces(Cubemap* texture, List<String>& filenames);
 
 	Shader* LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime);
 

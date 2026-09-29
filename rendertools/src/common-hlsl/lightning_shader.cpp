@@ -45,6 +45,9 @@ cbuffer ShaderConstants : register(b1) {   // same layout as the FS block (VS ne
     float  minWidthPx;                 // minimum on-screen CORE-band width in target pixels (0 = off)
     float  haloProfile;                // mantle falloff exponent (used by the FS)
     float2 texelSize;                  // one over the VIEWPORT size (BaseRenderer::TexelSize ())
+    float  cartoonPass;                // 0 = classic glow look; 1 = flat halo band, 2 = black outline, 3 = flat core (used by the FS)
+    float  outlineWidth;               // cartoon outline band as a fraction of the half-width, outside the core band
+    float  bandAlpha;                  // cartoon halo band opacity
 };
 
 struct VSInput {
@@ -134,6 +137,9 @@ cbuffer ShaderConstants : register(b1) {
     float  minWidthPx;                 // minimum on-screen CORE-band width in target pixels (0 = off; used by the VS)
     float  haloProfile;                // mantle falloff exponent: < 1 wide and full, > 1 tight around the core
     float2 texelSize;                  // one over the VIEWPORT size (BaseRenderer::TexelSize (); used by the VS)
+    float  cartoonPass;                // 0 = classic glow look; 1 = flat halo band, 2 = black outline, 3 = flat core
+    float  outlineWidth;               // cartoon outline band as a fraction of the half-width, outside the core band
+    float  bandAlpha;                  // cartoon halo band opacity
 };
 
 float4 PSMain(PSInput i) : SV_Target {
@@ -161,6 +167,19 @@ float4 PSMain(PSInput i) : SV_Target {
         discard;                                     // outside the capsule -> transparent
 
     float coreWidth = i.wf.w;                        // per-bolt white-core fraction (from the segment buffer)
+    if (cartoonPass > 0.5) {
+        if (abs(i.wf.z) <= 0.0)
+            discard;
+        float aa = fwidth(d);
+        if (cartoonPass < 1.5) {
+            float band = bandAlpha * (1.0 - smoothstep(1.0 - aa, 1.0, d));
+            return float4(haloColor * i.col * band, band);
+        }
+        float edge = (cartoonPass < 2.5) ? min(coreWidth + outlineWidth, 1.0) : coreWidth;
+        if (d >= edge)
+            discard;
+        return float4(coreColor, 1.0 - smoothstep(edge - aa, edge, d));
+    }
     if (corePass > 0.5 && d >= coreWidth)
         discard;                                     // core pass draws only the core band; the halo comes blurred from the glow pass
     // white hot core: soft quadratic falloff inside the core band
