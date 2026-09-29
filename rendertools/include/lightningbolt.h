@@ -171,6 +171,10 @@ struct LightningCreationParams {
     // arc only
     int32_t    boltCount{ 3 };      // parallel bolts in the bundle
     float      animSpeed{ 1.0f };   // writhe speed
+    int32_t    strokeCount{ 0 };        // strike: 0 = flicker + ttl fade; n > 0 = n return strokes, each full at once and decaying
+    float      strokeDecay{ 80.0f };    // ms a flash takes to die down to ~5 %
+    float      strokeGapMin{ 50.0f };   // ms of near darkness between two flashes, drawn per strike from its seed
+    float      strokeGapMax{ 150.0f };
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -328,7 +332,7 @@ public:
 
     // Rebuild if the regeneration interval has elapsed. Returns true when the geometry actually changed,
     // so the renderer knows whether its segment buffer is still valid.
-    bool Regenerate(int64_t now);
+    virtual bool Regenerate(int64_t now);
 
     virtual bool IsAlive(int64_t /*now*/) const { return true; }
 
@@ -375,6 +379,11 @@ public:
     int32_t m_branchDepth{ 2 };   // recursion depth: 0 = trunk only, 1 = trunk has branches, 2 = branches have branches, ...
     float   m_branchChance{ 1.0f };   // probability [0,1] that a sub-branch forks at each eligible node
     int32_t m_maxBranchTestSkips{ 0 };   // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
+    int32_t m_strokeCount{ 0 };
+    float   m_strokeDecay{ 80.0f };
+    float   m_strokeGapMin{ 50.0f };
+    float   m_strokeGapMax{ 150.0f };
+    int32_t m_builtStroke{ 0 };
     AutoArray<LightningRefBolt> m_refBolts;
     int32_t                     m_refIndex{ 0 };
 
@@ -382,7 +391,9 @@ public:
 
     void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t spawnTime);
 
-    void Generate(int64_t now) override;                  // main bolt + branches, built once
+    void Generate(int64_t now) override;                  // main bolt + branches, built once (with return strokes: once per stroke, new shape each)
+
+    bool Regenerate(int64_t now) override;
 
     bool IsAlive(int64_t now) const override;
 
@@ -420,6 +431,8 @@ public:
     bool IsAnimated(void) const override { return m_animSpeed > 0.0f; }   // animSpeed > 0 -> rebuilt over time (wabers); structure stays fixed (seeded)
 
 private:
+    int32_t LatestStroke(float ageMs, float& start) const;
+
     // branch structure is a deterministic function of `seed` (stable across frames); only `time` (the noise
     // time axis) advances, so the strike wabers in place without the branches jumping around.
     void AddBolt(const Vector3f& start, const Vector3f& end, float startWidth, float endWidth, int32_t depth, uint32_t seed, float time);

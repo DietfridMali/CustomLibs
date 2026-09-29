@@ -455,6 +455,18 @@ bool BaseLightning::Regenerate(int64_t now) {
 // =================================================================================================
 // LightningStrike
 
+bool LightningStrike::Regenerate(int64_t now) {
+    if (m_strokeCount <= 0)
+        return BaseLightning::Regenerate(now);
+    float strokeStart;
+    if (LatestStroke(float(now - m_spawnTime), strokeStart) == m_builtStroke)
+        return false;
+    m_lastGenerated = now;
+    Generate(now);
+    return true;
+}
+
+
 void LightningStrike::Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t spawnTime) {
     SetupCommon(start, end, params);
     m_lifetime = params.lifetime;
@@ -464,6 +476,10 @@ void LightningStrike::Setup(const Vector3f& start, const Vector3f& end, const Li
     m_branchDepth = params.branchDepth;
     m_branchChance = params.branchChance;
     m_maxBranchTestSkips = params.maxBranchTestSkips;
+    m_strokeCount = params.strokeCount;
+    m_strokeDecay = params.strokeDecay;
+    m_strokeGapMin = params.strokeGapMin;
+    m_strokeGapMax = params.strokeGapMax;
     m_spawnTime = spawnTime;
     m_lastGenerated = spawnTime;
     m_seed = uint32_t(spawnTime) * 2654435761u + uint32_t(Random::Int(65536));
@@ -476,7 +492,13 @@ void LightningStrike::Generate(int64_t now) {
     m_bolts.Clear();
     m_refIndex = 0;
     float time = m_timeOffset + float(now - m_spawnTime) * 0.001f * m_animSpeed;   // relative to spawn -> small noise coord (float precision)
-    AddBolt(m_start, m_end, m_startWidth, m_endWidth, 0, m_seed, time);
+    uint32_t seed = m_seed;
+    if (m_strokeCount > 0) {
+        float strokeStart;
+        m_builtStroke = LatestStroke(float(now - m_spawnTime), strokeStart);
+        seed += uint32_t(m_builtStroke) * 0x9e3779b9u;
+    }
+    AddBolt(m_start, m_end, m_startWidth, m_endWidth, 0, seed, time);
 #if TORTUOSITY
     if (now == m_spawnTime)   // once per strike, not on every animation rebuild
         MeasureTortuosity(m_bolts);
@@ -693,6 +715,19 @@ bool LightningStrike::IsAlive(int64_t now) const {
 }
 
 
+int32_t LightningStrike::LatestStroke(float ageMs, float& start) const {
+    float strokeStart = 0.0f;
+    int32_t latest = 0;
+    start = 0.0f;
+    for (int32_t k = 0; (k < m_strokeCount) and (ageMs >= strokeStart); k++) {
+        latest = k;
+        start = strokeStart;
+        strokeStart += m_strokeDecay + m_strokeGapMin + (m_strokeGapMax - m_strokeGapMin) * Hash01(m_seed ^ 0x2545f491u, uint32_t(k));
+    }
+    return latest;
+}
+
+
 float LightningStrike::Fade(int64_t now) const {
     const LightningLook& look = lightningLook;
     float age = float(now - m_spawnTime) * 0.001f;
@@ -705,6 +740,12 @@ float LightningStrike::Fade(int64_t now) const {
         float fadeBegin = m_lifetime - fadeSpan;
         if ((fadeSpan >= 1e-4f) && (age > fadeBegin))   // inside the fade window
             decay = powf(std::clamp(1.0f - (age - fadeBegin) / fadeSpan, 0.0f, 1.0f), 4.0f);
+    }
+    if (m_strokeCount > 0) {
+        float ageMs = float(now - m_spawnTime);
+        float strokeStart;
+        LatestStroke(ageMs, strokeStart);
+        return decay * expf(-3.0f * (ageMs - strokeStart) / std::max(m_strokeDecay, 1.0f));
     }
     uint32_t bucket = uint32_t(age * look.flickerRate);
     uint32_t h = (bucket + uint32_t(m_spawnTime)) * 2654435761u;
@@ -730,7 +771,13 @@ float LightningStrike::CoreWidth(int64_t now) const {
     }
     if (flashTime < 1e-4f)
         return m_coreWidth;
-    float t = float(now - m_spawnTime) / flashTime;
+    float ageMs = float(now - m_spawnTime);
+    if (m_strokeCount > 0) {
+        float strokeStart;
+        LatestStroke(ageMs, strokeStart);
+        ageMs -= strokeStart;
+    }
+    float t = ageMs / flashTime;
     if (t >= 1.0f)
         return m_coreWidth;
     if (t < 0.0f)
