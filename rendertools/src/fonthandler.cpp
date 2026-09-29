@@ -145,6 +145,40 @@ bool FontHandler::Create(String fontFolder, String fontName, int fontSize, Strin
 }
 
 
+bool FontHandler::Open(String fontFolder, String fontName, int fontSize) {
+    Destroy();
+    m_isAvailable = InitFont(fontFolder, fontName, fontSize, "");
+    return m_isAvailable;
+}
+
+
+bool FontHandler::SetShaping(bool rightToLeft, String script) {
+    if (not m_font)
+        return false;
+    if (TTF_SetFontDirection(m_font, rightToLeft ? TTF_DIRECTION_RTL : TTF_DIRECTION_LTR) != 0)
+        return false;
+    return script.IsEmpty() or (TTF_SetFontScriptName(m_font, script.Data()) == 0);
+}
+
+
+Texture* FontHandler::CreateTextTexture(const String& text) {
+    if (not m_font or text.IsEmpty())
+        return nullptr;
+    SDL_Surface* surface = TTF_RenderUTF8_Blended(m_font, text.Data(), SDL_Color(255, 255, 255, 255));
+    if (surface == nullptr)
+        return nullptr;
+    Texture* texture = new Texture();
+    void* cl = baseRenderer.StartOperation("FontHandler::CreateTextTexture");
+    bool isValid = texture->CreateFromSurface(surface, {});
+    baseRenderer.FinishOperation(cl, true);
+    if (not isValid) {
+        delete texture;
+        return nullptr;
+    }
+    return texture;
+}
+
+
 // SDL_ttf renders every glyph onto a surface of the full font height (ascent + descent), so glyphs from
 // fonts with loose vertical metrics carry a lot of empty padding around the actual ink. That padding would
 // be scaled into the target viewport and make the text appear too small. Measure the real ink band of the

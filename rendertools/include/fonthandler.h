@@ -73,6 +73,12 @@ public:
 
     bool Create(String fontFolder, String fontName, int fontSize = 127, String glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-=.,*/: _?!%");
 
+    bool Open(String fontFolder, String fontName, int fontSize);
+
+    bool SetShaping(bool rightToLeft, String script = "");
+
+    Texture* CreateTextTexture(const String& text);
+
     inline GlyphInfo* FindGlyph(String key) {
         return m_glyphDict.Find(key);
     }

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include "basesingleton.hpp"
+#include "string.hpp"
 
 // =================================================================================================
 
@@ -24,6 +25,8 @@ public:
     virtual void Update(void) {};
     
     virtual uint64_t GetUserID(void) const { return 0; }
+
+    virtual String GetLanguage(void) const { return String(""); }
 };
 
 // =================================================================================================
@@ -47,7 +50,13 @@ public:
 
     uint64_t GetUserID(void) const;
 
-    PlatformInterface* GetInterface(void) noexcept { 
+    String GetLanguage(void) const;
+
+    static String SystemLanguage(void);
+
+    static String SteamLanguageTag(const char* steamLanguage);
+
+    PlatformInterface* GetInterface(void) noexcept {
         return m_activeInterface; 
     }
 
