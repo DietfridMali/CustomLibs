@@ -404,13 +404,16 @@ private:
         }
         if (frameCB != VK_NULL_HANDLE) {
             vkCmdCopyBuffer(frameCB, staging, m_buffer, 1, &region);
+            VkPipelineStageFlags2 dstStage = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            if (vkContext.HasFeature(GfxFeature::Tessellation))
+                dstStage |= VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT;
+            if (vkContext.HasFeature(GfxFeature::GeometryShader))
+                dstStage |= VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
             VkBufferMemoryBarrier2 b{};
             b.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
             b.srcStageMask        = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             b.srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT;
-            b.dstStageMask        = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT
-                                  | VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT
-                                  | VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+            b.dstStageMask        = dstStage;
             b.dstAccessMask       = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
             b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;

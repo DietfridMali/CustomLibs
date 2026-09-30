@@ -8,7 +8,7 @@
 // an application wants to look different is a uniform, not a second copy of the source.
 //
 // Lightning ribbon shader (DX). Each polyline segment is one instance; the VS pulls the segment from
-// the structured buffer (u0) and expands the unit quad into a screen-space ribbon. The width offset is
+// the structured buffer (t0 space1) and expands the unit quad into a screen-space ribbon. The width offset is
 // laid along the miter (bisector) of the two adjacent segments in view space, so neighbouring segments
 // that share a node emit the SAME edge and the strip stays gap-/overlap-free at the joints. The FS
 // draws a white core with a cool-blue halo, additively into the dedicated glow buffer (HDR -> bloom).
@@ -28,7 +28,7 @@ struct LightningSegment {
     float3 coreColor; float pad2;
 };
 
-RWStructuredBuffer<LightningSegment> segments : register(u0);
+StructuredBuffer<LightningSegment> segments : register(t0, space1);
 
 cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;
@@ -221,7 +221,7 @@ struct LightningFlare {
     float  width;    float3 color;
 };
 
-RWStructuredBuffer<LightningFlare> flares : register(u0);
+StructuredBuffer<LightningFlare> flares : register(t0, space1);
 
 cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;

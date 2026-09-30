@@ -246,11 +246,11 @@ bool LineRenderer::Render(void) {
         shader->SetInt("firstLine", firstLine);
         shader->SetFloat("viewerPull", m_viewerPull);
         shader->SetFloat("worldWidth", m_worldWidth);
-        m_buffer.Bind(0);
+        m_buffer.BindReadOnly(0);
         m_quad.GetGfxDataLayout().SetInstanceCount(uint32_t(m_count));
         ok = m_quad.Render(shader);
         m_quad.GetGfxDataLayout().SetInstanceCount(1);
-        m_buffer.Release(0);
+        m_buffer.ReleaseReadOnly(0);
     }
 
     gfxStates.SetFaceCulling(prevCull);

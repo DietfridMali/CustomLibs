@@ -4,7 +4,7 @@
 
 // =================================================================================================
 // Line ribbon shader (DX). The general purpose line drawer of the library (LineRenderer,
-// include/linerenderer.h): one line per instance, pulled from the structured buffer (u0) and expanded
+// include/linerenderer.h): one line per instance, pulled from the structured buffer (t0 space1) and expanded
 // from the unit quad into a ribbon in VIEW space, the way the lightning ribbon does it. The width is
 // given in TARGET PIXELS and converted into view units at the line's depth - DX12 has no line width
 // of its own, and OpenGL's was at the driver's mercy. The FS draws a capsule distance field (round
@@ -31,7 +31,7 @@ struct LineInstance {
     float  phase; float3 pad;    // pattern offset at p0 (view units) - strip continuity
 };
 
-RWStructuredBuffer<LineInstance> lines : register(u0);
+StructuredBuffer<LineInstance> lines : register(t0, space1);
 
 cbuffer FrameConstants : register(b0) {
     column_major float4x4 mModelView;
