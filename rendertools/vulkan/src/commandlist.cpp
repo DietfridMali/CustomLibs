@@ -7,16 +7,20 @@
 
 #include <cstdio>
 #include <cstring>
+#if VK_STALL_DIAG
 #include <chrono>
 #include <ctime>
 #include <string>
 #include <vector>
+#endif
 
 // A lost device cannot be recovered from here: every later submit, wait and present fails as well, and
 // an app that keeps recording runs into the driver and the validation layers with dead handles. So the
 // first VK_ERROR_DEVICE_LOST ends the program with a message. Defined below, behind the second include
 // block; vkupload.cpp declares it extern.
 void HandleDeviceLost(VkResult res, const char* where) noexcept;
+
+#if VK_STALL_DIAG
 
 static constexpr double kStallFrameMinMs = 20.0;
 static constexpr double kStallFrameFactor = 2.5;
@@ -133,6 +137,8 @@ static void VkStallEndFrame(uint64_t nextFrame) noexcept
     vkStalls.frameNumber = nextFrame;
 }
 
+#endif
+
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL. Es gibt in dem Sinne keine verschachtelten Render-Tasks.
 // Auch bei geschachteltem open - close von CLs wird die zuerst ausgeführt, die zuerst geschlossen wird - das liegt daran,
@@ -205,11 +211,15 @@ void CommandQueue::Destroy(void) noexcept
 bool CommandQueue::BeginFrame(void) noexcept
 {
     ++m_frameNumber;
+#if VK_STALL_DIAG
     VkStallEndFrame(m_frameNumber);
-    // Wait until the GPU has finished using this frame slot.
     double stallStart = VkStallClock();
+#endif
+    // Wait until the GPU has finished using this frame slot.
     VkResult res = vkWaitForFences(m_device, 1, &m_inFlight[m_frameIndex], VK_TRUE, UINT64_MAX);
+#if VK_STALL_DIAG
     VkStallNote("frame fence wait", stallStart, nullptr);
+#endif
     if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::BeginFrame");
@@ -222,6 +232,7 @@ bool CommandQueue::BeginFrame(void) noexcept
     }
     // The slot's resources hang on its fence alone, so they are reset before the image is acquired -
     // a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
+#if VK_STALL_DIAG
     stallStart = VkStallClock();
     gfxResourceHandler.Cleanup(m_frameIndex);
     VkStallNote("frame resource cleanup", stallStart, nullptr);
@@ -233,6 +244,12 @@ bool CommandQueue::BeginFrame(void) noexcept
     bool acquired = AcquireNextImage();
     VkStallNote("acquire next image", stallStart, nullptr);
     return acquired;
+#else
+    gfxResourceHandler.Cleanup(m_frameIndex);
+    descriptorPoolHandler.BeginFrame(m_frameIndex);
+    cbvAllocator.Reset(m_frameIndex);
+    return AcquireNextImage();
+#endif
 }
 
 
@@ -247,9 +264,13 @@ void CommandQueue::WaitIdle(void) noexcept
 {
     if (m_graphicsQueue == VK_NULL_HANDLE)
         return;
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     VkResult res = vkQueueWaitIdle(m_graphicsQueue);
+#if VK_STALL_DIAG
     VkStallNote("queue wait idle", stallStart, nullptr);
+#endif
     if (res != VK_SUCCESS) {
         fprintf(stderr, "CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::WaitIdle");
@@ -339,7 +360,9 @@ bool CommandQueue::AcquireNextImage(void) noexcept
     if (res == VK_ERROR_OUT_OF_DATE_KHR) {
         // Swapchain is stale (e.g. window resized). Caller is BaseDisplayHandler;
         // it owns the swapchain and is expected to recreate it. Phase B.
+#ifdef _DEBUG
         fprintf(stderr, "CommandQueue::AcquireNextImage: VK_ERROR_OUT_OF_DATE_KHR\n");
+#endif
         return false;
     }
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR)) {
@@ -376,9 +399,13 @@ void CommandQueue::Present(void) noexcept
     present.pSwapchains = &m_swapchain;
     present.pImageIndices = &m_imageIndex;
 
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     VkResult res = vkQueuePresentKHR(m_presentQueue, &present);
+#if VK_STALL_DIAG
     VkStallNote("present", stallStart, nullptr);
+#endif
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR)) {
         fprintf(stderr, "CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::Present");
@@ -592,7 +619,9 @@ void CommandList::Flush(void) noexcept
     if (m_isFlushed)
         return;
     m_isFlushed = true;
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     Close();
 
     uint32_t fi = ActiveFrameIndex();
@@ -633,8 +662,10 @@ void CommandList::Flush(void) noexcept
 #endif
     commandListHandler.CmdQueue().WaitIdle();
     DisposeResources();
+#if VK_STALL_DIAG
     String name = GetName();
     VkStallNote("command list flush", stallStart, static_cast<const char*>(name));
+#endif
 }
 
 
@@ -712,12 +743,14 @@ static void MaskUnwrittenAttachments(RenderStates& states, uint32_t writtenCount
 
 static void ReportUnwrittenAttachments(Shader* shader, uint32_t writtenCount, uint32_t attachmentCount) noexcept
 {
+#ifdef _DEBUG
     static Shader* lastReported = nullptr;
     if (shader == lastReported)
         return;
     lastReported = shader;
     fprintf(stderr, "CommandList::GetPipeline: shader '%s' writes %u of %u color attachments; the device has neither unused attachments nor independent blend, the other attachments are undefined after the draw\n",
             static_cast<const char*>(shader->m_name), writtenCount, attachmentCount);
+#endif
 }
 
 bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept
@@ -950,9 +983,13 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 
         {
             ZoneScopedN("vkQueueSubmit2");
+#if VK_STALL_DIAG
             double stallStart = VkStallClock();
+#endif
             VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
+#if VK_STALL_DIAG
             VkStallNote(intermediate ? "intermediate submit" : "frame submit", stallStart, nullptr);
+#endif
             if (res != VK_SUCCESS) {
                 fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
                 HandleDeviceLost(res, "CommandListHandler::ExecuteAll");
@@ -977,7 +1014,9 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
 void CommandListHandler::ExecutePending(void) noexcept
 {
     ZoneScopedN("ExecutePending");
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     // The upload list is registered when it is opened, so that it runs ahead of the frame - it is the one
     // pending list that may still be recording. It goes out with the rest; the next upload opens a new one.
     if (m_uploadList) {
@@ -1032,7 +1071,9 @@ void CommandListHandler::ExecutePending(void) noexcept
     }
     m_pendingLists.Clear();
     DrainFrameResources();
+#if VK_STALL_DIAG
     VkStallNote("execute pending", stallStart, nullptr);
+#endif
 }
 
 

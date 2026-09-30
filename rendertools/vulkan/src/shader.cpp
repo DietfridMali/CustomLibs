@@ -23,8 +23,10 @@
 #include "vkupload.h"
 #include <spirv_reflect.h>
 
+#if VK_STALL_DIAG
 extern double VkStallClock(void) noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+#endif
 
 // =================================================================================================
 // Vulkan Shader implementation
@@ -627,12 +629,16 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     if (IsValid())
         return true;
 
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     if (not vkContext.HasRayTracing()) {
         const String* stageCode[] = { &vsCode, &fsCode, &gsCode, &tcsCode, &tesCode };
         for (const String* code : stageCode) {
             if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
+#ifdef _DEBUG
                 fprintf(stderr, "Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+#endif
                 return false;
             }
         }
@@ -642,11 +648,15 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         return false;
     }
     if (not gsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::GeometryShader)) {
+#ifdef _DEBUG
         fprintf(stderr, "Shader '%s': needs geometry shaders, which are not enabled on this device - not created\n", (const char*)m_name);
+#endif
         return false;
     }
     if (not tcsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::Tessellation)) {
+#ifdef _DEBUG
         fprintf(stderr, "Shader '%s': needs tessellation, which is not enabled on this device - not created\n", (const char*)m_name);
+#endif
         return false;
     }
     if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsSpirv, shaderFolder))
@@ -718,7 +728,9 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     m_vs = vsCode;
     m_fs = fsCode;
     m_gs = gsCode;
+#if VK_STALL_DIAG
     VkStallEvent("shader create", stallStart, static_cast<const char*>(m_name));
+#endif
     pipelineCache.CreateShaderLibraries(this);
     return true;
 }
@@ -1117,10 +1129,12 @@ int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
                 result = offset;
         }
     }
+#ifdef _DEBUG
     if ((result < 0) and not loc->m_warned) {
         loc->m_warned = true;
         fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
     }
+#endif
     return result;
 }
 

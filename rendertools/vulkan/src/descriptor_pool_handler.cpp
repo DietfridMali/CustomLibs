@@ -4,8 +4,10 @@
 
 #include <cstdio>
 
+#if VK_STALL_DIAG
 extern double VkStallClock(void) noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+#endif
 
 // =================================================================================================
 // DescriptorPoolHandler
@@ -91,13 +93,17 @@ VkDescriptorPool DescriptorPoolHandler::NextPool(void) noexcept
     if (used == overflow.size()) {
         VkDescriptorPool pool = VK_NULL_HANDLE;
 
+#if VK_STALL_DIAG
         double stallStart = VkStallClock();
+#endif
         if (not CreatePool(pool))
             return VK_NULL_HANDLE;
         overflow.push_back(pool);
+#if VK_STALL_DIAG
         char detail[64];
         snprintf(detail, sizeof(detail), "overflow pool %u of frame slot %u", uint32_t(overflow.size()), m_currentFrame);
         VkStallEvent("descriptor pool create", stallStart, detail);
+#endif
     }
     return overflow[used++];
 }

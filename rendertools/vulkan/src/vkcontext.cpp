@@ -253,7 +253,9 @@ bool VKContext::SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept
         return false;
     }
     if (count > kMaxPhysicalDevices) {
+#ifdef _DEBUG
         fprintf(stderr, "VKContext::SelectPhysicalDevice: too many devices (%u; max %u), truncating\n", count, kMaxPhysicalDevices);
+#endif
         count = kMaxPhysicalDevices;
     }
     StaticArray<VkPhysicalDevice, kMaxPhysicalDevices> devices { };
@@ -277,12 +279,14 @@ bool VKContext::SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept
     DeviceSupport support = QueryDeviceSupport(m_physicalDevice);
     m_apiVersion = support.apiVersion;
     m_availableFeatures = support.features;
+#ifdef _DEBUG
     fprintf(stderr, "Vulkan device: %s (api %u.%u.%u, using %s)\n",
             m_deviceProps.deviceName,
             VK_VERSION_MAJOR(m_deviceProps.apiVersion),
             VK_VERSION_MINOR(m_deviceProps.apiVersion),
             VK_VERSION_PATCH(m_deviceProps.apiVersion),
             UsesCore13() ? "1.3 core" : "1.2 + extensions");
+#endif
     return true;
 }
 
@@ -466,7 +470,9 @@ bool VKContext::SelectQueueFamilies(void) noexcept
         return false;
     }
     if (count > kMaxQueueFamilies) {
+#ifdef _DEBUG
         fprintf(stderr, "VKContext::SelectQueueFamilies: too many queue families (%u; max %u), truncating\n", count, kMaxQueueFamilies);
+#endif
         count = kMaxQueueFamilies;
     }
     StaticArray<VkQueueFamilyProperties, kMaxQueueFamilies> props { };
@@ -693,7 +699,9 @@ bool VKContext::CreateDevice(const GfxFeatureRequest& request) noexcept
         m_hasRayTracing = false;
         m_features &= ~GfxFeatureBit(GfxFeature::RayTracing);
     }
+#ifdef _DEBUG
     fprintf(stderr, "Vulkan ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
+#endif
     return true;
 }
 
@@ -845,7 +853,9 @@ bool VKContext::LayerAvailable(const char* name) noexcept
     if (count == 0)
         return false;
     if (count > kMaxLayers) {
+#ifdef _DEBUG
         fprintf(stderr, "VKContext::LayerAvailable: too many layers (%u; max %u), truncating\n", count, kMaxLayers);
+#endif
         count = kMaxLayers;
     }
     StaticArray<VkLayerProperties, kMaxLayers> layers { };

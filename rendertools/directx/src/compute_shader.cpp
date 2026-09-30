@@ -303,7 +303,9 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
         return true;
     m_usesAccelStructure = std::strstr(static_cast<const char*>(csCode), kAccelTypeName) != nullptr;
     if (m_usesAccelStructure and not dx12Context.HasRayTracing()) {
+#ifdef _DEBUG
         fprintf(stderr, "ComputeShader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+#endif
         m_usesAccelStructure = false;
         return false;
     }

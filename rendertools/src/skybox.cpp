@@ -183,7 +183,9 @@ bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& 
 		if (not filtered) {
 			filtered = LoadCubemap(sourceFolder, id, sourceNames);
 			if (not filtered) {
+#ifdef _DEBUG
 				fprintf(stderr, "Skybox: sources of '%s' not found in '%s', filtering the loaded sky\n", static_cast<const char*>(texture->m_name), static_cast<const char*>(sourceFolder));
+#endif
 				if (not kuwaharaFilter.ApplyCube(texture, params))
 					ok = false;
 				continue;

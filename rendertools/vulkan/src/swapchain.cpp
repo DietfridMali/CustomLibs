@@ -83,8 +83,10 @@ bool Swapchain::AcquireImages(void) noexcept
         return false;
     }
     if (count > MAX_BACK_BUFFERS) {
+#ifdef _DEBUG
         fprintf(stderr, "Swapchain::AcquireImages: %u images > MAX_BACK_BUFFERS %u — truncating\n",
                 count, MAX_BACK_BUFFERS);
+#endif
         count = MAX_BACK_BUFFERS;
     }
     m_imageCount = count;

@@ -216,7 +216,11 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 
     ComPtr<IDxcBlobUtf8> errors;
     if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
+#ifdef _DEBUG
         if (errors and (errors->GetStringLength() > 0)) {
+#else
+        if (FAILED(compileStatus) and errors and (errors->GetStringLength() > 0)) {
+#endif
             fprintf(stderr, "Shader '%s' (%s) compile output:\n%s\n",
                     (const char*)m_name, target,
                     errors->GetStringPointer());
@@ -541,7 +545,9 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         const String* stageCode[] = { &vsCode, &fsCode, &gsCode, &tcsCode, &tesCode };
         for (const String* code : stageCode) {
             if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
+#ifdef _DEBUG
                 fprintf(stderr, "Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+#endif
                 return false;
             }
         }
@@ -898,10 +904,12 @@ int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
                 result = offset;
         }
     }
+#ifdef _DEBUG
     if ((result < 0) and not loc->m_warned) {
         loc->m_warned = true;
         fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
     }
+#endif
     return result;
 }
 

@@ -438,8 +438,10 @@ void ObjLoader::BuildMaterials(void) {
         material.doubleSided = false;
         if (not source.texture.empty())
             material.imageIndex = ImageIndex(source.texture);
+#ifdef _DEBUG
         if ((not source.alphaTexture.empty()) and (source.alphaTexture != source.texture))
             fprintf(stderr, "ObjLoader: material '%s': separate alpha map '%s' not supported, using the alpha channel of map_Kd\n", source.name.c_str(), source.alphaTexture.string().c_str());
+#endif
     }
 }
 

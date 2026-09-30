@@ -386,11 +386,13 @@ public:
     static inline bool FeatureAvailable(GfxFeature feature) noexcept {
         if (vkContext.HasFeature(feature))
             return true;
+#ifdef _DEBUG
         static uint32_t reportedFeatures = 0;
         if (not (reportedFeatures & GfxFeatureBit(feature))) {
             reportedFeatures |= GfxFeatureBit(feature);
             fprintf(stderr, "GfxStates: %s is not enabled on this device - state change ignored\n", GfxFeatureName(feature));
         }
+#endif
         return false;
     }
 

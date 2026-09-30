@@ -75,7 +75,9 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
     m_hasRayTracing = SupportsRayTracing() and Shader::SupportsRayQuery();
     if (m_hasRayTracing and not RayTracingApi::Load(m_device.Get()))
         m_hasRayTracing = false;
+#ifdef _DEBUG
     fprintf(stderr, "DirectX ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
+#endif
     return true;
 }
 

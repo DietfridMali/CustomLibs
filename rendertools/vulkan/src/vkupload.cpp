@@ -13,8 +13,10 @@
 
 // commandlist.cpp - ends the program with a message when res is VK_ERROR_DEVICE_LOST.
 extern void HandleDeviceLost(VkResult res, const char* where) noexcept;
+#if VK_STALL_DIAG
 extern double VkStallClock(void) noexcept;
 extern void VkStallNote(const char* what, double startMs, const char* detail) noexcept;
+#endif
 
 // =================================================================================================
 // VkStagingBuffer
@@ -118,9 +120,13 @@ bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept
         return false;
     }
 
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     res = vkQueueWaitIdle(queue);
+#if VK_STALL_DIAG
     VkStallNote("one-shot submit wait idle", stallStart, nullptr);
+#endif
     if (res != VK_SUCCESS) {
         fprintf(stderr, "vkupload::EndSingleTimeCommands: vkQueueWaitIdle failed (%d)\n", (int)res);
         HandleDeviceLost(res, "vkupload::EndSingleTimeCommands");

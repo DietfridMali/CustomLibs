@@ -5,7 +5,11 @@
 // 0 to compile the logging path out entirely. Useful for diagnosing release-build crashes
 // without flipping the whole _DEBUG flag.
 #ifndef ENABLE_VK_LOGGING
-#define ENABLE_VK_LOGGING 1
+#   ifdef _DEBUG
+#       define ENABLE_VK_LOGGING 1
+#   else
+#       define ENABLE_VK_LOGGING 0
+#   endif
 #endif
 
 #include "vkframework.h"

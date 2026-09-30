@@ -21,8 +21,10 @@
 #include "resource_handler.h"
 #include "texture_mips.h"
 
+#if VK_STALL_DIAG
 extern double VkStallClock(void) noexcept;
 extern void VkStallNote(const char* what, double startMs, const char* detail) noexcept;
+#endif
 
 // =================================================================================================
 // Vulkan Texture implementation
@@ -292,9 +294,6 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, 
     }
 
     m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
-    fprintf(stderr, "IMAGEDIAG texture '%s' image 0x%llx\n",
-            static_cast<const char*>(m_name),
-            static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(m_image)));
     return true;
 }
 
@@ -346,7 +345,9 @@ bool Texture::Deploy(int bufferIndex)
     if ((w <= 0) or (h <= 0))
         return false;
 
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
     const GfxPixelFormat gfxFmt = GfxEncodedFormat(tb->m_info.m_gfxFormat, colorEncoding);
     if (GfxIsBlockCompressed(gfxFmt)) {
@@ -374,9 +375,11 @@ bool Texture::Deploy(int bufferIndex)
         return false;
 
     m_isDeployed = true;
+#if VK_STALL_DIAG
     char detail[64];
     snprintf(detail, sizeof(detail), "%dx%d", w, h);
     VkStallNote("texture deploy", stallStart, detail);
+#endif
     return true;
 }
 

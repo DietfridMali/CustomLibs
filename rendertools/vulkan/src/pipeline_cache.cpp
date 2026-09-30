@@ -10,8 +10,10 @@
 #include <cstring>
 #include <vector>
 
+#if VK_STALL_DIAG
 extern double VkStallClock(void) noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+#endif
 
 static constexpr uint32_t kPipelineRecordVersion = 1;
 
@@ -162,7 +164,9 @@ bool PipelineCache::Create(VkDevice device) noexcept
         fprintf(stderr, "PipelineCache::Create: vkCreatePipelineCache failed (%d)\n", (int)res);
         return false;
     }
+#if VK_STALL_DIAG
     VkStallEvent("pipeline library", VkStallClock(), vkContext.HasPipelineLibrary() ? "available" : "NOT available, monolithic pipelines");
+#endif
     return true;
 }
 
@@ -275,7 +279,9 @@ VkPipeline PipelineCache::GetOrCreate(const PipelineKey& requestedKey) noexcept
             return *found;
     }
 
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     const bool optimize = m_precreating;
     VkPipeline pipeline = usesLibraries ? LinkPipeline(key, optimize) : BuildPipeline(key);
     if (pipeline == VK_NULL_HANDLE)
@@ -299,12 +305,14 @@ VkPipeline PipelineCache::GetOrCreate(const PipelineKey& requestedKey) noexcept
         m_fastLinked.Append(isFastLinked);
     }
     Remember(key);
+#if VK_STALL_DIAG
     const char* buildType = usesLibraries ? (optimize ? "optimized link" : "fast link") : "monolithic";
     char detail[256];
     snprintf(detail, sizeof(detail), "%s%s, shader '%s', pipeline #%d, colors %u, blend %d, fill %d",
              m_precreating ? "precreate " : "LAZY ", buildType, static_cast<const char*>(key.shader->m_name), int(m_pipelines.Length()),
              key.colorFormatCount, int(key.states.blendEnable[0]), int(key.states.fillMode));
     VkStallEvent("pipeline build", stallStart, detail);
+#endif
     return pipeline;
 }
 
@@ -436,15 +444,19 @@ bool PipelineCache::SaveRecords(void)
 
 void PipelineCache::Precreate(void) noexcept
 {
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
     int pipelineCount = m_pipelines.Length();
     int withoutShader = 0;
     int failed = 0;
+#endif
     m_precreating = true;
     for (int i = 0; i < m_records.Length(); ++i) {
         Shader* shader = baseShaderHandler.GetShader(m_recordNames[i]);
         if (shader == nullptr) {
+#if VK_STALL_DIAG
             ++withoutShader;
+#endif
             continue;
         }
         PipelineKey key { };
@@ -453,14 +465,20 @@ void PipelineCache::Precreate(void) noexcept
         std::memcpy(key.colorFormats, m_records[i].colorFormats, sizeof(key.colorFormats));
         key.colorFormatCount = m_records[i].colorFormatCount;
         key.depthFormat = m_records[i].depthFormat;
+#if VK_STALL_DIAG
         if (GetOrCreate(key) == VK_NULL_HANDLE)
             ++failed;
+#else
+        GetOrCreate(key);
+#endif
     }
     m_precreating = false;
+#if VK_STALL_DIAG
     char detail[128];
     snprintf(detail, sizeof(detail), "%d records, %d new, %d without shader, %d failed",
              int(m_records.Length()), int(m_pipelines.Length()) - pipelineCount, withoutShader, failed);
     VkStallEvent("pipeline precreate", stallStart, detail);
+#endif
 }
 
 
@@ -468,13 +486,17 @@ void PipelineCache::CreateShaderLibraries(Shader* shader) noexcept
 {
     if ((not vkContext.HasPipelineLibrary()) or (not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
         return;
+#if VK_STALL_DIAG
     double stallStart = VkStallClock();
+#endif
     const RenderStates defaults { };
     const uint8_t topology = shader->IsTessellated() ? TopologyForPatchControlPoints(shader->m_patchControlPoints) : uint8_t(MeshTopology::Triangles);
     VertexInputLibrary(shader, topology);
     PreRasterizationLibrary(shader, uint8_t(defaults.fillMode), defaults.depthClip, topology);
     FragmentShaderLibrary(shader);
+#if VK_STALL_DIAG
     VkStallEvent("shader libraries", stallStart, static_cast<const char*>(shader->m_name));
+#endif
 }
 
 

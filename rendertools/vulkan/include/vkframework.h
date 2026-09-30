@@ -24,3 +24,7 @@
 // On Linux/macOS the loader is linked via the Makefile (-lvulkan).
 #pragma comment(lib, "vulkan-1.lib")
 #endif
+
+#ifndef VK_STALL_DIAG
+#   define VK_STALL_DIAG 0
+#endif

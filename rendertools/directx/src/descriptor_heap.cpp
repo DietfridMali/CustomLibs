@@ -301,7 +301,9 @@ bool DescriptorHeapHandler::GrowTables(ID3D12Device* device) noexcept {
 
     if (not m_srvHeap.Grow(device, TABLE_FRAME_SLOTS * capacity))
         return false;
+#ifdef _DEBUG
     fprintf(stderr, "DescriptorHeapHandler: descriptor table ring grown from %u to %u descriptors per frame\n", m_tableCapacity, capacity);
+#endif
     m_tableCapacity = capacity;
     m_tableOffset = 0;
     ++m_tableGeneration;
