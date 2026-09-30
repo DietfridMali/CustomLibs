@@ -1,4 +1,5 @@
-﻿#include "shadowmap.h"
+﻿#include <new>
+#include "shadowmap.h"
 
 #define APPLY_POLYGON_OFFSET 1
 
@@ -404,6 +405,88 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 	else
 		CreateOrthoTransformation(mapCenter, lightDirection, lightOffset, worldSize, worldMin, worldMax);
 #endif
+	return true;
+}
+
+// =================================================================================================
+
+bool ShadowAtlas::Create(int size, int maxTileSize, int minTileSize) {
+	Destroy();
+	if ((size <= 0) or (minTileSize <= 0) or (maxTileSize < minTileSize) or (maxTileSize > size))
+		return false;
+	m_map = new (std::nothrow) RenderTarget();
+	if (not m_map)
+		return false;
+	RenderTarget::RTCreationParams params;
+	params.name = "shadow atlas";
+	params.colorBufferCount = 0;
+	params.depthBufferCount = 1;
+	params.stencilBufferCount = 0;
+	params.vertexBufferCount = 0;
+	params.hasMRTs = false;
+	if (not m_map->Create(size, size, 1, params)) {
+		Destroy();
+		return false;
+	}
+	m_size = size;
+	m_minTileSize = minTileSize;
+	m_maxTileSize = maxTileSize;
+	Layout(1);
+	return true;
+}
+
+
+void ShadowAtlas::Destroy(void) noexcept {
+	if (m_map) {
+		delete m_map;
+		m_map = nullptr;
+	}
+	m_size = 0;
+	m_minTileSize = 0;
+	m_maxTileSize = 0;
+	m_tileSize = 0;
+	m_tilesPerRow = 0;
+}
+
+
+int ShadowAtlas::Layout(int tileCount) noexcept {
+	if (m_size <= 0)
+		return 0;
+	int tileSize = m_maxTileSize;
+	while ((tileSize > m_minTileSize) and ((m_size / tileSize) * (m_size / tileSize) < tileCount))
+		tileSize /= 2;
+	if (tileSize < m_minTileSize)
+		tileSize = m_minTileSize;
+	m_tileSize = tileSize;
+	m_tilesPerRow = m_size / tileSize;
+	return TileCount();
+}
+
+
+Viewport ShadowAtlas::TileViewport(int tile) const noexcept {
+	if ((m_tilesPerRow <= 0) or (tile < 0) or (tile >= m_tilesPerRow * m_tilesPerRow))
+		return Viewport(0, 0, 0, 0);
+	int col = tile % m_tilesPerRow;
+	int row = tile / m_tilesPerRow;
+	return Viewport(col * m_tileSize, row * m_tileSize, m_tileSize, m_tileSize);
+}
+
+
+bool ShadowAtlas::PointLightTransformation(const Vector3f& lightPosition, const Vector3f& center, float radius, float zFar, float margin, PointLightFrustum& frustum) {
+	Vector3f direction = center - lightPosition;
+	float distance = direction.Length();
+	float extent = radius * (1.0f + margin);
+	if ((radius <= 0.0f) or (distance <= extent))
+		return false;
+	direction /= distance;
+	Vector3f up = (std::fabs(direction.Y()) < 0.9f) ? Vector3f(0.0f, 1.0f, 0.0f) : Vector3f(1.0f, 0.0f, 0.0f);
+	frustum.tanHalfFov = extent / std::sqrt(distance * distance - extent * extent);
+	frustum.zNear = distance - extent;
+	frustum.zFar = std::max(zFar, distance + extent);
+	frustum.view.LookAt(lightPosition, center, up);
+	Projector projector(1.0f, Conversions::RadToDeg(2.0f * std::atan(frustum.tanHalfFov)), frustum.zNear, frustum.zFar);
+	frustum.projection = projector.Compute3DProjection();
+	frustum.viewProjection = frustum.projection * frustum.view;
 	return true;
 }
 
