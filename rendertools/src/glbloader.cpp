@@ -897,11 +897,6 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
 
     auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
 
-    if (acc.sparse.isSparse) {
-        fprintf(stderr, "GLBLoader: sparse accessors not supported\n");
-        return false;
-    }
-
     if (acc.type != TINYGLTF_TYPE_VEC3) {
         fprintf(stderr, "GLBLoader: accessor is not VEC3\n");
         return false;
@@ -912,52 +907,71 @@ bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessor
         return false;
     }
 
-    if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-        fprintf(stderr, "GLBLoader: bufferView index out of range\n");
-        return false;
-    }
-
-    auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
-
-    if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-        fprintf(stderr, "GLBLoader: buffer index out of range\n");
-        return false;
-    }
-
-    auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
-
-    size_t stride = static_cast<size_t>(view.byteStride);
-    if (stride == 0) {
-        stride = sizeof(float) * 3;
-    }
-
-    if (stride < sizeof(float) * 3) {
-        fprintf(stderr, "GLBLoader: invalid stride for VEC3\n");
-        return false;
-    }
-
-    size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
-    size_t need = base + stride * static_cast<size_t>(acc.count);
-
-    if (need > buf.data.size()) {
-        fprintf(stderr, "GLBLoader: buffer overrun in ReadAccessorVec3Float\n");
-        return false;
-    }
-
-    out.Resize(static_cast<int32_t>(acc.count));
-
-    for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
-        size_t off = base + i * stride;
-
+    auto readElement = [](const uint8_t* src) -> Vector3f {
         float fx;
         float fy;
         float fz;
 
-        std::memcpy(&fx, buf.data.data() + off + 0, sizeof(float));
-        std::memcpy(&fy, buf.data.data() + off + 4, sizeof(float));
-        std::memcpy(&fz, buf.data.data() + off + 8, sizeof(float));
+        std::memcpy(&fx, src + 0, sizeof(float));
+        std::memcpy(&fy, src + 4, sizeof(float));
+        std::memcpy(&fz, src + 8, sizeof(float));
 
-        out[static_cast<int32_t>(i)] = Vector3f(fx, fy, fz);
+        return Vector3f(fx, fy, fz);
+        };
+
+    out.Resize(static_cast<int32_t>(acc.count));
+
+    if (acc.bufferView < 0) {
+        if (not acc.sparse.isSparse) {
+            fprintf(stderr, "GLBLoader: bufferView index out of range\n");
+            return false;
+        }
+        out.Fill(Vector3f(0.0f, 0.0f, 0.0f));
+    }
+    else {
+        if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
+            fprintf(stderr, "GLBLoader: bufferView index out of range\n");
+            return false;
+        }
+
+        auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+
+        if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
+            fprintf(stderr, "GLBLoader: buffer index out of range\n");
+            return false;
+        }
+
+        auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
+
+        size_t stride = static_cast<size_t>(view.byteStride);
+        if (stride == 0) {
+            stride = sizeof(float) * 3;
+        }
+
+        if (stride < sizeof(float) * 3) {
+            fprintf(stderr, "GLBLoader: invalid stride for VEC3\n");
+            return false;
+        }
+
+        size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
+        size_t need = base + stride * static_cast<size_t>(acc.count);
+
+        if (need > buf.data.size()) {
+            fprintf(stderr, "GLBLoader: buffer overrun in ReadAccessorVec3Float\n");
+            return false;
+        }
+
+        for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
+            out[static_cast<int32_t>(i)] = readElement(buf.data.data() + base + i * stride);
+    }
+
+    if (acc.sparse.isSparse) {
+        AutoArray<uint32_t> sparseIndices;
+        const uint8_t* sparseValues = nullptr;
+        if (not ReadSparseAccessor(model, acc, sizeof(float) * 3, sparseIndices, sparseValues))
+            return false;
+        for (int32_t s = 0; s < sparseIndices.Length(); ++s)
+            out[static_cast<int32_t>(sparseIndices[s])] = readElement(sparseValues + static_cast<size_t>(s) * sizeof(float) * 3);
     }
 
     return true;
@@ -972,11 +986,6 @@ bool GLBLoader::ReadAccessorFloats(const tinygltf::Model& model, int accessorInd
     }
 
     auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
-
-    if (acc.sparse.isSparse) {
-        fprintf(stderr, "GLBLoader: sparse accessors not supported\n");
-        return false;
-    }
 
     if (acc.type == TINYGLTF_TYPE_VEC2)
         componentCount = 2;
@@ -1006,44 +1015,9 @@ bool GLBLoader::ReadAccessorFloats(const tinygltf::Model& model, int accessorInd
         return false;
     }
 
-    if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-        fprintf(stderr, "GLBLoader: bufferView index out of range\n");
-        return false;
-    }
-
-    auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
-
-    if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-        fprintf(stderr, "GLBLoader: buffer index out of range\n");
-        return false;
-    }
-
-    auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
-
     size_t elementSize = elemSize * static_cast<size_t>(componentCount);
-    size_t stride = static_cast<size_t>(view.byteStride);
-    if (stride == 0) {
-        stride = elementSize;
-    }
 
-    if (stride < elementSize) {
-        fprintf(stderr, "GLBLoader: invalid accessor stride\n");
-        return false;
-    }
-
-    size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
-    size_t need = base + stride * static_cast<size_t>(acc.count);
-
-    if (need > buf.data.size()) {
-        fprintf(stderr, "GLBLoader: buffer overrun in ReadAccessorFloats\n");
-        return false;
-    }
-
-    out.Resize(static_cast<int32_t>(acc.count) * componentCount);
-    float* dest = out.DataPtr();
-
-    for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
-        const uint8_t* src = buf.data.data() + base + i * stride;
+    auto readElement = [&](const uint8_t* src, float* dest) {
         for (int32_t c = 0; c < componentCount; ++c, src += elemSize) {
             if (elemSize == 4)
                 std::memcpy(dest, src, sizeof(float));
@@ -1056,6 +1030,61 @@ bool GLBLoader::ReadAccessorFloats(const tinygltf::Model& model, int accessorInd
                 *dest = float(*src) * normalization;
             ++dest;
         }
+        };
+
+    out.Resize(static_cast<int32_t>(acc.count) * componentCount);
+
+    if (acc.bufferView < 0) {
+        if (not acc.sparse.isSparse) {
+            fprintf(stderr, "GLBLoader: bufferView index out of range\n");
+            return false;
+        }
+        out.Fill(0.0f);
+    }
+    else {
+        if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
+            fprintf(stderr, "GLBLoader: bufferView index out of range\n");
+            return false;
+        }
+
+        auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+
+        if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
+            fprintf(stderr, "GLBLoader: buffer index out of range\n");
+            return false;
+        }
+
+        auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
+
+        size_t stride = static_cast<size_t>(view.byteStride);
+        if (stride == 0) {
+            stride = elementSize;
+        }
+
+        if (stride < elementSize) {
+            fprintf(stderr, "GLBLoader: invalid accessor stride\n");
+            return false;
+        }
+
+        size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
+        size_t need = base + stride * static_cast<size_t>(acc.count);
+
+        if (need > buf.data.size()) {
+            fprintf(stderr, "GLBLoader: buffer overrun in ReadAccessorFloats\n");
+            return false;
+        }
+
+        for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
+            readElement(buf.data.data() + base + i * stride, out.DataPtr(static_cast<int32_t>(i) * componentCount));
+    }
+
+    if (acc.sparse.isSparse) {
+        AutoArray<uint32_t> sparseIndices;
+        const uint8_t* sparseValues = nullptr;
+        if (not ReadSparseAccessor(model, acc, elementSize, sparseIndices, sparseValues))
+            return false;
+        for (int32_t s = 0; s < sparseIndices.Length(); ++s)
+            readElement(sparseValues + static_cast<size_t>(s) * elementSize, out.DataPtr(static_cast<int32_t>(sparseIndices[s]) * componentCount));
     }
 
     return true;
@@ -1071,82 +1100,176 @@ bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accesso
 
     auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
 
-    if (acc.sparse.isSparse) {
-        fprintf(stderr, "GLBLoader: sparse accessors not supported\n");
-        return false;
-    }
-
     if (acc.type != TINYGLTF_TYPE_SCALAR) {
         fprintf(stderr, "GLBLoader: indices accessor is not SCALAR\n");
         return false;
     }
 
-    if (acc.bufferView < 0 or acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-        fprintf(stderr, "GLBLoader: bufferView index out of range\n");
-        return false;
-    }
-
-    auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
-
-    if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-        fprintf(stderr, "GLBLoader: buffer index out of range\n");
-        return false;
-    }
-
-    auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
-
     size_t elemSize = 0;
-    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) 
+    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
         elemSize = 1;
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) 
+    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
         elemSize = 2;
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) 
+    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
         elemSize = 4;
     else {
         fprintf(stderr, "GLBLoader: unsupported index componentType\n");
         return false;
     }
 
-    size_t stride = static_cast<size_t>(view.byteStride);
-    if (stride == 0) {
-        stride = elemSize;
-    }
-
-    if (stride < elemSize) {
-        fprintf(stderr, "GLBLoader: invalid stride for indices\n");
-        return false;
-    }
-
-    size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
-    size_t need = base + stride * static_cast<size_t>(acc.count);
-
-    if (need > buf.data.size()) {
-        fprintf(stderr, "GLBLoader: buffer overrun in ReadAccessorIndicesU32\n");
-        return false;
-    }
+    auto readElement = [elemSize](const uint8_t* src) -> uint32_t {
+        if (elemSize == 1) {
+            uint8_t v;
+            std::memcpy(&v, src, 1);
+            return static_cast<uint32_t>(v);
+        }
+        if (elemSize == 2) {
+            uint16_t v;
+            std::memcpy(&v, src, 2);
+            return static_cast<uint32_t>(v);
+        }
+        uint32_t v;
+        std::memcpy(&v, src, 4);
+        return v;
+        };
 
     out.Resize(static_cast<int32_t>(acc.count));
 
-    for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i) {
-        size_t off = base + i * stride;
+    if (acc.bufferView < 0) {
+        if (not acc.sparse.isSparse) {
+            fprintf(stderr, "GLBLoader: bufferView index out of range\n");
+            return false;
+        }
+        out.Fill(0u);
+    }
+    else {
+        if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
+            fprintf(stderr, "GLBLoader: bufferView index out of range\n");
+            return false;
+        }
 
-        if (elemSize == 1) {
-            uint8_t v;
-            std::memcpy(&v, buf.data.data() + off, 1);
-            out[static_cast<int32_t>(i)] = static_cast<uint32_t>(v);
+        auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+
+        if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
+            fprintf(stderr, "GLBLoader: buffer index out of range\n");
+            return false;
         }
-        else if (elemSize == 2) {
-            uint16_t v;
-            std::memcpy(&v, buf.data.data() + off, 2);
-            out[static_cast<int32_t>(i)] = static_cast<uint32_t>(v);
+
+        auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
+
+        size_t stride = static_cast<size_t>(view.byteStride);
+        if (stride == 0) {
+            stride = elemSize;
         }
-        else {
-            uint32_t v;
-            std::memcpy(&v, buf.data.data() + off, 4);
-            out[static_cast<int32_t>(i)] = v;
+
+        if (stride < elemSize) {
+            fprintf(stderr, "GLBLoader: invalid stride for indices\n");
+            return false;
         }
+
+        size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
+        size_t need = base + stride * static_cast<size_t>(acc.count);
+
+        if (need > buf.data.size()) {
+            fprintf(stderr, "GLBLoader: buffer overrun in ReadAccessorIndicesU32\n");
+            return false;
+        }
+
+        for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
+            out[static_cast<int32_t>(i)] = readElement(buf.data.data() + base + i * stride);
     }
 
+    if (acc.sparse.isSparse) {
+        AutoArray<uint32_t> sparseIndices;
+        const uint8_t* sparseValues = nullptr;
+        if (not ReadSparseAccessor(model, acc, elemSize, sparseIndices, sparseValues))
+            return false;
+        for (int32_t s = 0; s < sparseIndices.Length(); ++s)
+            out[static_cast<int32_t>(sparseIndices[s])] = readElement(sparseValues + static_cast<size_t>(s) * elemSize);
+    }
+
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::ReadSparseAccessor(const tinygltf::Model& model, const tinygltf::Accessor& acc, size_t elementSize, AutoArray<uint32_t>& indices, const uint8_t*& values) {
+    auto& sparse = acc.sparse;
+
+    if (sparse.count < 0 or static_cast<size_t>(sparse.count) > acc.count) {
+        fprintf(stderr, "GLBLoader: sparse count out of range\n");
+        return false;
+    }
+
+    if (sparse.indices.bufferView < 0 or sparse.indices.bufferView >= static_cast<int>(model.bufferViews.size())) {
+        fprintf(stderr, "GLBLoader: sparse indices bufferView index out of range\n");
+        return false;
+    }
+
+    if (sparse.values.bufferView < 0 or sparse.values.bufferView >= static_cast<int>(model.bufferViews.size())) {
+        fprintf(stderr, "GLBLoader: sparse values bufferView index out of range\n");
+        return false;
+    }
+
+    size_t indexSize = 0;
+    if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+        indexSize = 1;
+    else if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+        indexSize = 2;
+    else if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+        indexSize = 4;
+    else {
+        fprintf(stderr, "GLBLoader: unsupported sparse index componentType\n");
+        return false;
+    }
+
+    auto& indexView = model.bufferViews[static_cast<size_t>(sparse.indices.bufferView)];
+    auto& valueView = model.bufferViews[static_cast<size_t>(sparse.values.bufferView)];
+
+    if (indexView.buffer < 0 or indexView.buffer >= static_cast<int>(model.buffers.size()) or valueView.buffer < 0 or valueView.buffer >= static_cast<int>(model.buffers.size())) {
+        fprintf(stderr, "GLBLoader: sparse buffer index out of range\n");
+        return false;
+    }
+
+    auto& indexBuf = model.buffers[static_cast<size_t>(indexView.buffer)];
+    auto& valueBuf = model.buffers[static_cast<size_t>(valueView.buffer)];
+
+    size_t count = static_cast<size_t>(sparse.count);
+    size_t indexBase = static_cast<size_t>(indexView.byteOffset) + sparse.indices.byteOffset;
+    size_t valueBase = static_cast<size_t>(valueView.byteOffset) + sparse.values.byteOffset;
+
+    if (indexBase + indexSize * count > indexBuf.data.size()) {
+        fprintf(stderr, "GLBLoader: buffer overrun in sparse indices\n");
+        return false;
+    }
+
+    if (valueBase + elementSize * count > valueBuf.data.size()) {
+        fprintf(stderr, "GLBLoader: buffer overrun in sparse values\n");
+        return false;
+    }
+
+    indices.Resize(static_cast<int32_t>(count));
+
+    for (size_t i = 0; i < count; ++i) {
+        const uint8_t* src = indexBuf.data.data() + indexBase + i * indexSize;
+        uint32_t index;
+        if (indexSize == 1)
+            index = static_cast<uint32_t>(*src);
+        else if (indexSize == 2) {
+            uint16_t v;
+            std::memcpy(&v, src, 2);
+            index = static_cast<uint32_t>(v);
+        }
+        else
+            std::memcpy(&index, src, 4);
+        if (static_cast<size_t>(index) >= acc.count) {
+            fprintf(stderr, "GLBLoader: sparse index out of range\n");
+            return false;
+        }
+        indices[static_cast<int32_t>(i)] = index;
+    }
+
+    values = valueBuf.data.data() + valueBase;
     return true;
 }
 

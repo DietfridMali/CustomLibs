@@ -93,6 +93,8 @@ private:
 
     static bool ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out);
 
+    static bool ReadSparseAccessor(const tinygltf::Model& model, const tinygltf::Accessor& acc, size_t elementSize, AutoArray<uint32_t>& indices, const uint8_t*& values);
+
     static Vector4f PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex, bool detectHull);
 
     void CheckShapeKeyCount(int32_t targetCount);
