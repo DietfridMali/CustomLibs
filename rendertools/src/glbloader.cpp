@@ -104,6 +104,8 @@ void GLBLoader::Reset(void) {
     m_data.parts.Clear();
     m_data.materials.Clear();
     m_data.images.Clear();
+    m_data.jointIndices.Clear();
+    m_data.jointNames.Clear();
     m_isHullVertex.Clear();
     m_hullVertexMap.Clear();
 }
@@ -253,7 +255,7 @@ bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
     Matrix4f worldM = parentM * localM;
 
     if (node.mesh >= 0) {
-        if (not AppendMesh(node.mesh, worldM)) {
+        if (not AppendMesh(node.mesh, worldM, node.skin)) {
             return false;
         }
     }
@@ -270,7 +272,7 @@ bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM) {
+bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM, int skinIndex) {
     if (meshIndex < 0 or meshIndex >= static_cast<int>(m_model.meshes.size())) {
         fprintf(stderr, "GLBLoader: mesh index out of range\n");
         return false;
@@ -280,7 +282,7 @@ bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM) {
 
     for (size_t p = 0; p < mesh.primitives.size(); ++p) {
         auto& prim = mesh.primitives[p];
-        if (not AppendPrimitive(prim, worldM)) {
+        if (not AppendPrimitive(prim, worldM, skinIndex)) {
             return false;
         }
     }
@@ -290,7 +292,7 @@ bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
+bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM, int skinIndex) {
     if (not ValidateTriangles(prim)) {
         return false;
     }
@@ -309,6 +311,8 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM) {
     if (not LoadTexCoords(prim, in))
         return false;
     if (not LoadColors(prim, in))
+        return false;
+    if (not LoadJoints(prim, in, skinIndex))
         return false;
     if (not LoadMorphTargets(prim, in))
         return false;
@@ -490,6 +494,93 @@ bool GLBLoader::LoadColors(tinygltf::Primitive& prim, PrimitiveData& in) {
     }
     in.haveColors = true;
     return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::LoadJoints(tinygltf::Primitive& prim, PrimitiveData& in, int skinIndex) {
+    in.baseJoints.Clear();
+    in.haveJoints = false;
+
+    if ((skinIndex < 0) or (skinIndex >= static_cast<int>(m_model.skins.size())))
+        return true;
+    auto itJoints = prim.attributes.find("JOINTS_0");
+    if (itJoints == prim.attributes.end())
+        return true;
+
+    auto& skin = m_model.skins[static_cast<size_t>(skinIndex)];
+    int32_t skinJointCount = static_cast<int32_t>(skin.joints.size());
+    AutoArray<int32_t> jointIds;
+    jointIds.Resize(skinJointCount);
+    for (int32_t j = 0; j < skinJointCount; ++j) {
+        int nodeIndex = skin.joints[static_cast<size_t>(j)];
+        if ((nodeIndex < 0) or (nodeIndex >= static_cast<int>(m_model.nodes.size()))) {
+            fprintf(stderr, "GLBLoader: skin joint node index out of range\n");
+            return false;
+        }
+        jointIds[j] = JointId(String(m_model.nodes[static_cast<size_t>(nodeIndex)].name.c_str()));
+    }
+
+    AutoArray<float> joints;
+    int32_t jointComponents;
+    if (not ReadAccessorFloats(m_model, itJoints->second, joints, jointComponents))
+        return false;
+    int32_t count = joints.Length() / jointComponents;
+    if (count != in.baseVertices.Length()) {
+        fprintf(stderr, "GLBLoader: JOINTS count does not match POSITION count\n");
+        return false;
+    }
+
+    AutoArray<float> weights;
+    int32_t weightComponents = 0;
+    auto itWeights = prim.attributes.find("WEIGHTS_0");
+    if (itWeights != prim.attributes.end()) {
+        if (not ReadAccessorFloats(m_model, itWeights->second, weights, weightComponents))
+            return false;
+        if ((weightComponents != jointComponents) or (weights.Length() != joints.Length())) {
+            fprintf(stderr, "GLBLoader: WEIGHTS layout does not match JOINTS layout\n");
+            return false;
+        }
+    }
+
+    in.baseJoints.Resize(count);
+    for (int32_t i = 0; i < count; ++i) {
+        int32_t dominant = 0;
+        for (int32_t c = 1; c < weightComponents; ++c) {
+            if (weights[i * weightComponents + c] > weights[i * weightComponents + dominant])
+                dominant = c;
+        }
+        int32_t joint = static_cast<int32_t>(joints[i * jointComponents + dominant]);
+        if ((joint < 0) or (joint >= skinJointCount)) {
+            fprintf(stderr, "GLBLoader: joint index out of range\n");
+            return false;
+        }
+        in.baseJoints[i] = jointIds[joint];
+    }
+    in.haveJoints = true;
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+int32_t GLBLoader::JointId(const String& name) {
+    int32_t id = FindJoint(name);
+    if (id >= 0)
+        return id;
+    m_data.jointNames.Append(String(name));
+    return m_data.jointNames.Length() - 1;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+int32_t GLBLoader::FindJoint(const String& name) noexcept {
+    int32_t id = 0;
+    for (auto& jointName : m_data.jointNames) {
+        if (jointName == name)
+            return id;
+        ++id;
+    }
+    return -1;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -776,6 +867,7 @@ void GLBLoader::ReserveOutput(const PrimitiveData& in) {
     m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
     m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
     m_data.texCoords.Reserve(m_data.texCoords.Length() + addVertexCount);
+    m_data.jointIndices.Reserve(m_data.jointIndices.Length() + addVertexCount);
 	if (m_fixModel)
         m_isHullVertex.Reserve(m_isHullVertex.Length() + addVertexCount);
 
@@ -818,6 +910,7 @@ bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<Sh
             m_data.vertices.Append(p[j]);
             m_data.colors.Append(in.haveColors ? Modulate(in.baseColor, in.baseColors[indices[j]]) : in.baseColor);
             m_data.texCoords.Append(in.haveTexCoords ? in.baseTexCoords[indices[j]] : TexCoord(0.0f, 0.0f));
+            m_data.jointIndices.Append(in.haveJoints ? in.baseJoints[indices[j]] : -1);
 
             if (in.haveNormals) {
                 Vector3f n = TransformNormal(worldM, in.baseNormals[indices[j]]);
@@ -1398,6 +1491,24 @@ bool GLBLoader::SaveToFile(const String& filename) const {
             return false;
     }
 
+    uint32_t jointNameCount = uint32_t(m_data.jointNames.Length());
+    if (not writeU32(jointNameCount))
+        return false;
+    for (auto& jointName : m_data.jointNames) {
+        std::string name = jointName;
+        uint32_t nameLen = uint32_t(name.size());
+        if (not writeU32(nameLen))
+            return false;
+        if (not writeBuffer(name.data(), size_t(nameLen)))
+            return false;
+    }
+
+    uint32_t jointIndexCount = uint32_t(m_data.jointIndices.Length());
+    if (not writeU32(jointIndexCount))
+        return false;
+    if (not writeBuffer(m_data.jointIndices.DataPtr(), size_t(jointIndexCount) * sizeof(int32_t)))
+        return false;
+
     return f.good();
 }
 
@@ -1442,6 +1553,8 @@ bool GLBLoader::LoadFromFile(const String& filename) {
     m_data.parts.Clear();
     m_data.materials.Clear();
     m_data.images.Clear();
+    m_data.jointIndices.Clear();
+    m_data.jointNames.Clear();
     m_model = tinygltf::Model();
 
     m_data.vertices.Resize(int32_t(vertexCount));
@@ -1494,6 +1607,29 @@ bool GLBLoader::LoadFromFile(const String& filename) {
 
         m_data.shapeKeys.Append(std::move(sk));
     }
+
+    uint32_t jointNameCount;
+    if (not readU32(jointNameCount))
+        return false;
+    for (uint32_t k = 0; k < jointNameCount; ++k) {
+        uint32_t nameLen;
+        if (not readU32(nameLen))
+            return false;
+        std::string name;
+        name.resize(size_t(nameLen));
+        if (not readBuffer(name.data(), size_t(nameLen)))
+            return false;
+        m_data.jointNames.Append(String(name.c_str()));
+    }
+
+    uint32_t jointIndexCount;
+    if (not readU32(jointIndexCount))
+        return false;
+    if (jointIndexCount != uint32_t(m_data.vertices.Length()))
+        return false;
+    m_data.jointIndices.Resize(int32_t(jointIndexCount));
+    if (not readBuffer(m_data.jointIndices.DataPtr(), size_t(jointIndexCount) * sizeof(int32_t)))
+        return false;
 
     return f.good();
 }

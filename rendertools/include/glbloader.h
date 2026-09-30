@@ -51,6 +51,8 @@ public:
         AutoArray<PartData>         parts;
         AutoArray<MaterialData>     materials;
         AutoArray<AutoArray<uint8_t>> images;
+        AutoArray<int32_t>          jointIndices;
+        List<String>                jointNames;
     };
 
 public:
@@ -72,6 +74,7 @@ private:
         AutoArray<Vector3f>             baseNormals;
         AutoArray<TexCoord>             baseTexCoords;
         AutoArray<RGBAColor>            baseColors;
+        AutoArray<int32_t>              baseJoints;
         AutoArray<uint32_t>             indices;
         AutoArray<AutoArray<Vector3f>>  morphVertices; // [target][vertex]
         AutoArray<AutoArray<Vector3f>>  morphNormals;  // [target][vertex]
@@ -81,6 +84,7 @@ private:
 		bool    			            haveNormals{ false };
         bool                            haveTexCoords{ false };
         bool                            haveColors{ false };
+        bool                            haveJoints{ false };
         bool                            isHull{ false };
     };
 
@@ -101,7 +105,7 @@ private:
 
     bool AppendFromNode(int nodeIndex, Matrix4f parentM);
 
-    bool AppendMesh(int meshIndex, Matrix4f worldM);
+    bool AppendMesh(int meshIndex, Matrix4f worldM, int skinIndex);
 
     static int CompareVertices(void* context, const Vector3f& v1, const Vector3f& v2);
 
@@ -130,6 +134,12 @@ public:
         return m_data.shapeKeys[i].normalDeltas;
     }
 
+    inline AutoArray<int32_t>& GetJointIndices(void) noexcept {
+        return m_data.jointIndices;
+    }
+
+    int32_t FindJoint(const String& name) noexcept;
+
     void Reset(void);
 
     ~GLBLoader() {
@@ -153,7 +163,7 @@ private:
 
     void LoadImages(void);
 
-    bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM);
+    bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM, int skinIndex);
 
     bool ValidateTriangles(tinygltf::Primitive& prim);
 
@@ -168,6 +178,10 @@ private:
     bool LoadTexCoords(tinygltf::Primitive& prim, PrimitiveData& in);
 
     bool LoadColors(tinygltf::Primitive& prim, PrimitiveData& in);
+
+    bool LoadJoints(tinygltf::Primitive& prim, PrimitiveData& in, int skinIndex);
+
+    int32_t JointId(const String& name);
 
     bool LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in);
 
