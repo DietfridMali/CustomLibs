@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cmath>
 
 #include "linerenderer.h"
 #include "gfxrenderer.h"
@@ -70,7 +71,12 @@ bool LineRenderer::ReserveBuffer(int count) {
 
 // -------------------------------------------------------------------------------------------------
 
-bool LineRenderer::Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style, float phase) {
+static int CapFlags(LineRenderer::Cap cap, int flatFlag, int miterFlag) {
+    return (cap == LineRenderer::Cap::Flat) ? flatFlag : (cap == LineRenderer::Cap::Miter) ? miterFlag : 0;
+}
+
+
+bool LineRenderer::Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style, float phase, Cap startCap, float startValue, Cap endCap, float endValue) {
     if (not m_isAvailable)
         return false;
     if (not Reserve(m_count + 1))
@@ -84,8 +90,57 @@ bool LineRenderer::Add(const Vector3f& p0, const Vector3f& p1, float width, cons
     line.style = float(int(style));
     line.color = color;
     line.phase = phase;
-    line.pad[0] = line.pad[1] = line.pad[2] = 0.0f;
+    line.pad[0] = float(CapFlags(startCap, 1, 4) + CapFlags(endCap, 2, 8));
+    line.pad[1] = startValue;
+    line.pad[2] = endValue;
     return true;
+}
+
+
+float LineRenderer::MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other) {
+    const float* m = baseRenderer.ModelView().AsArray();
+
+    auto ToView = [m](const Vector3f& p) {
+        return Vector3f(m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12],
+                        m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13],
+                        m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14]);
+    };
+
+    Vector3f v0 = ToView(p0);
+    Vector3f v1 = ToView(p1);
+    Vector3f joint = atEnd ? v1 : v0;
+    Vector3f seg = v1 - v0;
+    float segLen = seg.Length();
+
+    if (segLen < 1e-6f)
+        return 0.0f;
+
+    Vector3f axis = seg * (1.0f / segLen);
+    bool perspective = (baseRenderer.Projection().AsArray()[11] != 0.0f);
+    Vector3f toEye = perspective ? (v0 + v1) * -0.5f : Vector3f(0.0f, 0.0f, 1.0f);
+
+    toEye.Normalize();
+
+    Vector3f perp = axis.Cross(toEye);
+    float perpLen = perp.Length();
+
+    if (perpLen < 1e-4f)
+        return 0.0f;
+    perp = perp * (1.0f / perpLen);
+
+    Vector3f toOther = ToView(other) - joint;
+    float otherLen = toOther.Length();
+
+    if (otherLen < 1e-6f)
+        return 0.0f;
+    toOther = toOther * (1.0f / otherLen);
+
+    float ox = toOther.Dot(axis) + (atEnd ? -1.0f : 1.0f);
+    float oy = toOther.Dot(perp);
+
+    if (std::fabs(oy) < 1e-4f)
+        return 0.0f;
+    return atEnd ? ox / oy : -ox / oy;
 }
 
 

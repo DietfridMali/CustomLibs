@@ -39,6 +39,12 @@ public:
         DashDot = 3
     };
 
+    enum class Cap : uint8_t {
+        Round = 0,
+        Flat = 1,
+        Miter = 2
+    };
+
     // One line as the shader reads it (GPU structured buffer, 64 bytes). Position vectors are in
     // whatever space the current model view maps to view space.
     struct Line {
@@ -71,7 +77,9 @@ public:
         m_isResident = false;
     }
 
-    bool Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style = Style::Solid, float phase = 0.0f);
+    bool Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style = Style::Solid, float phase = 0.0f, Cap startCap = Cap::Round, float startValue = 0.0f, Cap endCap = Cap::Round, float endValue = 0.0f);
+
+    static float MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other);
 
     // A polyline through count points (closed: last back to first), the pattern continuous over the
     // joints. The phase is accumulated from the point distances, i.e. in the caller's units - equal to

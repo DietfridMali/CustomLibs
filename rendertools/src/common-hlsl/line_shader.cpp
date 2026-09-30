@@ -61,7 +61,8 @@ struct PSInput {
     float4 pos     : SV_Position;
     float4 cap     : TEXCOORD0;   // (along, across, segLen, halfWidth) - capsule local, PIXELS
     float4 color   : TEXCOORD1;
-    float2 pattern : TEXCOORD2;   // (style, phase)
+    float4 pattern : TEXCOORD2;   // (style, phase, caps, 0)
+    float2 ends    : TEXCOORD3;   // flat end: overhang, miter end: cut slope - PIXELS
 };
 
 float3 PullToViewer(float3 vp) {
@@ -118,8 +119,15 @@ PSInput VSMain(VSInput v) {
 
     // capsule bounding box: x along the line (round cap before p0 .. round cap after p1), y across -
     // spanned in view units, so the pixel margins go back through the scale of their direction
-    float capLen = halfDraw / pxAlong;
-    float along  = (v.pos.x + 0.5) * (segLen + 2.0 * capLen) - capLen;
+    int caps = int(l.pad.x + 0.5);
+    float slopeScale = pxAlong / pxAcross;
+    float startValue = ((caps & 4) != 0) ? clamp(l.pad.y * slopeScale, -8.0, 8.0) : l.pad.y;
+    float endValue = ((caps & 8) != 0) ? clamp(l.pad.z * slopeScale, -8.0, 8.0) : l.pad.z;
+    float startReach = ((caps & 4) != 0) ? max(halfDraw, halfWidth * abs(startValue) + 1.0) : ((caps & 1) != 0) ? max(halfDraw, startValue + 1.0) : halfDraw;
+    float endReach = ((caps & 8) != 0) ? max(halfDraw, halfWidth * abs(endValue) + 1.0) : ((caps & 2) != 0) ? max(halfDraw, endValue + 1.0) : halfDraw;
+    float capStart = startReach / pxAlong;
+    float capEnd = endReach / pxAlong;
+    float along  = (v.pos.x + 0.5) * (segLen + capStart + capEnd) - capStart;
     float across = v.pos.y * 2.0 * halfDraw / pxAcross;
     float3 node = vp0 + axis * along + perp * across;
 
@@ -127,7 +135,8 @@ PSInput VSMain(VSInput v) {
     o.pos = mul(mViewport, mul(mProjection, float4(node, 1.0)));
     o.cap = float4(along * pxAlong, across * pxAcross, segLen * pxAlong, halfWidth);
     o.color = l.color;
-    o.pattern = float2(l.style, l.phase * pxAlong);
+    o.pattern = float4(l.style, l.phase * pxAlong, l.pad.x, 0.0);
+    o.ends = float2(startValue, endValue);
     return o;
 }
 )");
@@ -137,7 +146,8 @@ struct PSInput {
     float4 pos     : SV_Position;
     float4 cap     : TEXCOORD0;
     float4 color   : TEXCOORD1;
-    float2 pattern : TEXCOORD2;
+    float4 pattern : TEXCOORD2;
+    float2 ends    : TEXCOORD3;
 };
 
 cbuffer ShaderConstants : register(b1) {
@@ -161,8 +171,14 @@ float4 PSMain(PSInput i) : SV_Target {
     float segLen = i.cap.z;
     float hw     = i.cap.w;
 
+    int caps = int(i.pattern.z + 0.5);
+    bool flatStart = (caps & 1) != 0;
+    bool flatEnd = (caps & 2) != 0;
+    bool miterStart = (caps & 4) != 0;
+    bool miterEnd = (caps & 8) != 0;
+
     // the line's own ends: outside [0, segLen] the distance grows and the caps come out round
-    float dAlong = IntervalDist(along, 0.0, segLen);
+    float dAlong = IntervalDist(along, (flatStart || miterStart) ? -1e20 : 0.0, (flatEnd || miterEnd) ? 1e20 : segLen);
 
     int style = int(i.pattern.x + 0.5);
     if (style != 0) {
@@ -187,6 +203,15 @@ float4 PSMain(PSInput i) : SV_Target {
     // the distance alone gave a line on a pixel boundary 37 % per row where it covers 87 %.
     float fw = max(fwidth(dist), 1e-6);
     float alpha = (antialias > 0.5) ? saturate((hw - dist) / fw + 0.5) : ((dist <= hw) ? 1.0 : 0.0);
+    float fa = max(fwidth(along), 1e-6);
+    if (flatStart || flatEnd) {
+        float dEnd = max(flatStart ? -i.ends.x - along : -1e20, flatEnd ? along - segLen - i.ends.y : -1e20);
+        alpha *= (antialias > 0.5) ? saturate(0.5 - dEnd / fa) : ((dEnd <= 0.0) ? 1.0 : 0.0);
+    }
+    if (miterStart && (along < -i.ends.x * across - 0.25))
+        discard;
+    if (miterEnd && (along > segLen + i.ends.y * across + 0.25))
+        discard;
     if (alpha <= 0.0)
         discard;
     return float4(i.color.rgb, i.color.a * alpha);

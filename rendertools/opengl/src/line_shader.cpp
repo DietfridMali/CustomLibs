@@ -50,7 +50,8 @@ layout(location = 1) in vec2 texCoord;
 
 out vec4 vCap;      // (along, across, segLen, halfWidth) - capsule local, PIXELS
 out vec4 vColor;
-out vec2 vPattern;  // (style, phase)
+out vec4 vPattern;  // (style, phase, caps, 0)
+out vec2 vEnds;     // flat end: overhang, miter end: cut slope - PIXELS
 
 vec3 PullToViewer(vec3 vp) {
     if (viewerPull <= 0.0)
@@ -106,22 +107,31 @@ void main() {
 
     // capsule bounding box: x along the line (round cap before p0 .. round cap after p1), y across -
     // spanned in view units, so the pixel margins go back through the scale of their direction
-    float capLen = halfDraw / pxAlong;
-    float along  = (position.x + 0.5) * (segLen + 2.0 * capLen) - capLen;
+    int caps = int(l.pad0 + 0.5);
+    float slopeScale = pxAlong / pxAcross;
+    float startValue = ((caps & 4) != 0) ? clamp(l.pad1 * slopeScale, -8.0, 8.0) : l.pad1;
+    float endValue = ((caps & 8) != 0) ? clamp(l.pad2 * slopeScale, -8.0, 8.0) : l.pad2;
+    float startReach = ((caps & 4) != 0) ? max(halfDraw, halfWidth * abs(startValue) + 1.0) : ((caps & 1) != 0) ? max(halfDraw, startValue + 1.0) : halfDraw;
+    float endReach = ((caps & 8) != 0) ? max(halfDraw, halfWidth * abs(endValue) + 1.0) : ((caps & 2) != 0) ? max(halfDraw, endValue + 1.0) : halfDraw;
+    float capStart = startReach / pxAlong;
+    float capEnd = endReach / pxAlong;
+    float along  = (position.x + 0.5) * (segLen + capStart + capEnd) - capStart;
     float across = position.y * 2.0 * halfDraw / pxAcross;
     vec3 node = vp0 + axis * along + perp * across;
 
     gl_Position = mViewport * (mProjection * vec4(node, 1.0));
     vCap = vec4(along * pxAlong, across * pxAcross, segLen * pxAlong, halfWidth);
     vColor = vec4(l.colr, l.colg, l.colb, l.cola);
-    vPattern = vec2(l.style, l.phase * pxAlong);
+    vPattern = vec4(l.style, l.phase * pxAlong, l.pad0, 0.0);
+    vEnds = vec2(startValue, endValue);
 }
 )");
 
 static const String LineDrawFS = String(R"(#version 430 core
 in  vec4 vCap;
 in  vec4 vColor;
-in  vec2 vPattern;
+in  vec4 vPattern;
+in  vec2 vEnds;
 out vec4 fragColor;
 
 uniform float dashScale;   // stretches the dash / dot pattern (1 = the lengths above)
@@ -138,8 +148,14 @@ void main() {
     float segLen = vCap.z;
     float hw     = vCap.w;
 
+    int caps = int(vPattern.z + 0.5);
+    bool flatStart = (caps & 1) != 0;
+    bool flatEnd = (caps & 2) != 0;
+    bool miterStart = (caps & 4) != 0;
+    bool miterEnd = (caps & 8) != 0;
+
     // the line's own ends: outside [0, segLen] the distance grows and the caps come out round
-    float dAlong = IntervalDist(along, 0.0, segLen);
+    float dAlong = IntervalDist(along, (flatStart || miterStart) ? -1e20 : 0.0, (flatEnd || miterEnd) ? 1e20 : segLen);
 
     int style = int(vPattern.x + 0.5);
     if (style != 0) {
@@ -164,6 +180,15 @@ void main() {
     // the distance alone gave a line on a pixel boundary 37 % per row where it covers 87 %.
     float fw = max(fwidth(dist), 1e-6);
     float alpha = (antialias > 0.5) ? clamp((hw - dist) / fw + 0.5, 0.0, 1.0) : ((dist <= hw) ? 1.0 : 0.0);
+    float fa = max(fwidth(along), 1e-6);
+    if (flatStart || flatEnd) {
+        float dEnd = max(flatStart ? -vEnds.x - along : -1e20, flatEnd ? along - segLen - vEnds.y : -1e20);
+        alpha *= (antialias > 0.5) ? clamp(0.5 - dEnd / fa, 0.0, 1.0) : ((dEnd <= 0.0) ? 1.0 : 0.0);
+    }
+    if (miterStart && (along < -vEnds.x * across - 0.25))
+        discard;
+    if (miterEnd && (along > segLen + vEnds.y * across + 0.25))
+        discard;
     if (alpha <= 0.0)
         discard;
     fragColor = vec4(vColor.rgb, vColor.a * alpha);
