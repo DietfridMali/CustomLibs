@@ -84,6 +84,8 @@ DXGI_FORMAT BufferInfo::ViewFormat(void)
             return m_hasStencil ? dxDepthStencilSRVFormat : dxDepthSRVFormat;
         case BufferInfo::btVertex:
             return dxVertexFormat;
+        case BufferInfo::btId:
+            return dxIdFormat;
         case BufferInfo::btSkyMap:
             return dxSkyMapFormat;
         default:
@@ -205,6 +207,8 @@ void RenderTarget::Init(void)
     m_scale = 1;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
     m_extraBufferIndex = -1;
+    m_idBufferCount = 0;
+    m_idBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
     m_hasStencil = false;
@@ -462,7 +466,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // for stencil without depth still yields one combined buffer.
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
-    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.cubeMapCount);
+    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.idBufferCount + depthBufferCount + params.cubeMapCount);
     // One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
     m_renderTextures.Resize(m_colorBufferCount);
     for (int i = 0; i < m_renderTextures.Length(); i++)
@@ -483,6 +487,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     m_vertexBufferCount = params.vertexBufferCount;
     // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
+    m_idBufferCount = params.idBufferCount;
+    m_idBufferIndex = CreateSpecialBuffers(BufferInfo::btId, attachmentIndex, params.idBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, depthBufferCount);
     m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
     // Compute buffers come last so the existing color/vertex/depth-buffer iterations
@@ -559,8 +565,8 @@ void RenderTarget::Destroy(void)
         gfxStates.CheckError();
     }
     m_isAvailable = false;
-    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
-    m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
+    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = m_idBufferCount = 0;
+    m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = m_idBufferIndex = -1;
     m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
@@ -628,6 +634,9 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
         for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
             if (j != params.bufferIndex)
                 m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
+        for (int i = 0, j = IdBufferIndex(); i < m_idBufferCount; ++i, ++j)
+            if (j != params.bufferIndex)
+                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
         pDSV = ActiveDepthBufferHandle();
     }
     else {
@@ -667,7 +676,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             int listed = m_customDrawBuffers.Length();
             for (int i = 0; i < m_bufferCount; ++i) {
                 BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
-                if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex))
+                if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex) and (type != BufferInfo::btId))
                     continue;
                 bool isTarget = false;
                 for (int j = 0; (j < listed) and not isTarget; ++j)
@@ -854,6 +863,8 @@ void RenderTarget::Disable(bool deactivate) noexcept {
                 m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
             for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
                 m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
+            for (int i = 0, j = IdBufferIndex(); i < m_idBufferCount; ++i, ++j)
+                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
             for (int i = 0, j = m_cubeMapIndex; i < m_cubeMapCount; ++i, ++j)
                 m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
             // The depth buffer is an RT output too: the deferred shadow (and the soft-particle / WBOIT pass)
@@ -897,7 +908,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     // skymap/depth). Linear filtering interpolates world positions across geometry silhouettes,
     // which smears decals along moving geometry. Set per bind: the wrapper behind a non colour buffer
     // is still shared across buffer types, so this must not rely on the one-shot SetParams above.
-    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btCubemap);
+    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btId) or (info.m_type == BufferInfo::btCubemap);
     return BindBuffer(bufferIndex, tmuIndex, pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear);
 }
 
@@ -911,7 +922,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filte
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (info.SRVIndex() == UINT32_MAX)
         return false;
-    if ((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat))
+    if (((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat)) or (info.m_type == BufferInfo::btId))
         filtering = GfxFilterMode::Nearest;
     if (tmuIndex >= Shader::kSrvSlots)
         return false;
@@ -950,6 +961,7 @@ static bool IsDrawBuffer(RenderTarget& rt, int i)
 
     bool isColor = (bi.m_type == BufferInfo::btColor);
     bool isVertex = (bi.m_type == BufferInfo::btVertex);
+    bool isId = (bi.m_type == BufferInfo::btId);
 
     switch (rt.m_drawBufferGroup) {
         case RenderTarget::dbDepth:
@@ -963,7 +975,7 @@ static bool IsDrawBuffer(RenderTarget& rt, int i)
         case RenderTarget::dbCustom:
             for (int j = 0; j < rt.m_customDrawBuffers.Length(); ++j)
                 if (rt.m_customDrawBuffers[j] == i)
-                    return isColor or isVertex;
+                    return isColor or isVertex or isId;
             return false;
         default:
             return isColor;

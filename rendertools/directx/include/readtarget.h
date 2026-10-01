@@ -40,6 +40,8 @@ public:
 
     bool Submit(const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout, UINT rowCount, UINT64 rowSize, int width, int height, uint64_t frame, int slot);
 
+    bool Submit(size_t size, int width, int height, uint64_t frame, int slot);
+
     inline ID3D12Resource* Resource(void) const noexcept {
         return m_resource.Get();
     }

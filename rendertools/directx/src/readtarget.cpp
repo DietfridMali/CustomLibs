@@ -95,6 +95,17 @@ bool GfxReadTarget::Submit(const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout, UIN
 }
 
 
+bool GfxReadTarget::Submit(size_t size, int width, int height, uint64_t frame, int slot) {
+    if (size > size_t(INT32_MAX))
+        return false;
+
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
+
+    layout.Footprint.RowPitch = UINT(size);
+    return Submit(layout, 1, UINT64(size), width, height, frame, slot);
+}
+
+
 bool GfxReadTarget::IsComplete(void) noexcept {
     uint64_t frame = commandListHandler.FrameNumber();
 

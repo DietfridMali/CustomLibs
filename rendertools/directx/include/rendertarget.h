@@ -50,7 +50,8 @@ public:
         // A cube map rendered INTO, one face at a time - see SelectCubeFace (). One resource with six
         // array slices and D3D12_SRV_DIMENSION_TEXTURECUBE on the SRV, so a shader samples it by
         // direction; one RTV per slice, because a render target view addresses a single slice.
-        btCubemap
+        btCubemap,
+        btId
     } eBufferType;
 
     ComPtr<ID3D12Resource>  m_resource;
@@ -172,6 +173,7 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
+        int idBufferCount{ 0 };
         int skyMapCount{ 0 };  // Compute-only storage textures (R16G16B16A16_FLOAT), UAV+SRV+RTV.
         // Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
         // square by definition. The format is separate from colorFormat: a shadow cube map holds one
@@ -221,6 +223,8 @@ public:
     DXGI_FORMAT         m_cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
+    int                 m_idBufferCount{ 0 };
+    int                 m_idBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
     // Stencil is never a buffer of its own: DXGI has no pure stencil format, both planes always share one
     // resource. stencilBufferCount > 0 therefore gives the DEPTH buffer a stencil plane (R32G8X24_TYPELESS
@@ -560,6 +564,10 @@ public:
 
     inline int VertexBufferIndex(int i = 0) noexcept {
         return ExtraBufferIndex(i);
+    }
+
+    inline int IdBufferIndex(int i = 0) noexcept {
+        return m_idBufferCount ? m_idBufferIndex + i : -1;
     }
 
     inline DrawBufferList& DrawBuffers(void) noexcept {

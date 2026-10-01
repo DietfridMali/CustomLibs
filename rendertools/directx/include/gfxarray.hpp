@@ -8,6 +8,7 @@
 #include "shader.h"
 #include "array.hpp"
 #include "gfxtypes.h"
+#include "readtarget.h"
 
 #include <type_traits>
 #include <cstdio>
@@ -171,32 +172,34 @@ public:
             commandListHandler.BindReadOnlyBuffer(bindingPoint, UINT32_MAX);
     }
 
-    void Clear([[maybe_unused]] DATA_T value) {
-        if constexpr (not isBuffer) {
-            if (not m_resource or not m_uavHandle.IsValid())
-                return;
-            auto* list = commandListHandler.CurrentGfxList();
-            if (not list)
-                return;
-            UINT clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
-            auto& heap = descriptorHeaps.m_srvHeap;
-            SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            {
-                D3D12_RESOURCE_BARRIER before{};
-                before.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                before.UAV.pResource = m_resource.Get();
-                list->ResourceBarrier(1, &before);
-            }
-            list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
-            // ClearUnorderedAccessViewUint is not implicitly ordered against subsequent UAV
-            // accesses. Without a UAV barrier the clear can run concurrently with or after the
-            // following shader pass (e.g. the decal mask's InterlockedMin), corrupting the data.
-            // (OpenGL serializes glClearNamedBufferData before SSBO access implicitly; DX12 does not.)
-            D3D12_RESOURCE_BARRIER b{};
-            b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-            b.UAV.pResource = m_resource.Get();
-            list->ResourceBarrier(1, &b);
+    void Clear(DATA_T value) {
+        if (not m_resource or not m_uavHandle.IsValid())
+            return;
+        CommandList* cl = commandListHandler.CurrentCmdList();
+        auto* list = commandListHandler.CurrentGfxList();
+        if (not (cl and list))
+            return;
+        static_assert(sizeof(DATA_T) == sizeof(uint32_t),
+                      "GfxArray::Clear assumes 32-bit elements; widen the fill path for other sizes.");
+        UINT clearValues[4] = { UINT(value), UINT(value), UINT(value), UINT(value) };
+        auto& heap = descriptorHeaps.m_srvHeap;
+        cl->BindDescriptorHeaps();
+        SetBarrier(list, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        {
+            D3D12_RESOURCE_BARRIER before{};
+            before.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+            before.UAV.pResource = m_resource.Get();
+            list->ResourceBarrier(1, &before);
         }
+        list->ClearUnorderedAccessViewUint(heap.GpuHandle(m_uavHandle.index), m_cpuUavHandle, m_resource.Get(), clearValues, 0, nullptr);
+        // ClearUnorderedAccessViewUint is not implicitly ordered against subsequent UAV
+        // accesses. Without a UAV barrier the clear can run concurrently with or after the
+        // following shader pass (e.g. the decal mask's InterlockedMin), corrupting the data.
+        // (OpenGL serializes glClearNamedBufferData before SSBO access implicitly; DX12 does not.)
+        D3D12_RESOURCE_BARRIER b{};
+        b.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        b.UAV.pResource = m_resource.Get();
+        list->ResourceBarrier(1, &b);
     }
 
     bool Upload(void) {
@@ -218,6 +221,57 @@ public:
             return DownloadBuffer();
         else
             return DownloadTexture();
+    }
+
+    bool DownloadAsync(GfxReadTarget& readTarget) {
+        if (not m_resource or not readTarget.IsIdle())
+            return false;
+
+        ID3D12Device* device = dx12Context.Device();
+        auto* list = commandListHandler.CurrentGfxList();
+        if (not (device and list))
+            return false;
+
+        if constexpr (isBuffer) {
+            size_t byteSize = size_t(m_width) * size_t(m_height) * sizeof(DATA_T);
+            if (not readTarget.Allocate(UINT64(byteSize)))
+                return false;
+
+            D3D12_RESOURCE_STATES stateBefore = m_state;
+
+            SetBarrier(list, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            list->CopyBufferRegion(readTarget.Resource(), 0, m_resource.Get(), 0, UINT64(byteSize));
+            SetBarrier(list, stateBefore);
+            return readTarget.Submit(byteSize, int(m_width), int(m_height), commandListHandler.FrameNumber(), commandListHandler.FrameIndex());
+        }
+        else {
+            D3D12_RESOURCE_DESC resDesc = m_resource->GetDesc();
+            D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+            UINT numRows = 0;
+            UINT64 rowSizeInBytes = 0;
+            UINT64 totalBytes = 0;
+            device->GetCopyableFootprints(&resDesc, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalBytes);
+            if (not readTarget.Allocate(totalBytes))
+                return false;
+
+            D3D12_RESOURCE_STATES stateBefore = m_state;
+
+            SetBarrier(list, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+            D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+            srcLoc.pResource = m_resource.Get();
+            srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            srcLoc.SubresourceIndex = 0;
+
+            D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+            dstLoc.pResource = readTarget.Resource();
+            dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+            dstLoc.PlacedFootprint = footprint;
+
+            list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+            SetBarrier(list, stateBefore);
+            return readTarget.Submit(footprint, numRows, rowSizeInBytes, int(m_width), int(m_height), commandListHandler.FrameNumber(), commandListHandler.FrameIndex());
+        }
     }
 
     // Upload only [first, first+count) elements (structured-buffer path); leaves the rest of the
@@ -408,6 +462,21 @@ private:
         srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
         device->CreateShaderResourceView(m_resource.Get(), &srvDesc, m_srvHandle.cpuHandle);
         descriptorHeaps.m_srvHeap.Publish(m_srvHandle.index);
+
+        D3D12_DESCRIPTOR_HEAP_DESC cpuHeapDesc{};
+        cpuHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        cpuHeapDesc.NumDescriptors = 1;
+        cpuHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+        if (FAILED(device->CreateDescriptorHeap(&cpuHeapDesc, IID_PPV_ARGS(&m_cpuHeap)))) {
+            descriptorHeaps.FreeSRV(m_uavHandle);
+            descriptorHeaps.FreeSRV(m_srvHandle);
+            m_uavHandle = {};
+            m_srvHandle = {};
+            m_resource.Reset();
+            return false;
+        }
+        m_cpuUavHandle = m_cpuHeap->GetCPUDescriptorHandleForHeapStart();
+        device->CreateUnorderedAccessView(m_resource.Get(), nullptr, &uavDesc, m_cpuUavHandle);
         return true;
     }
 

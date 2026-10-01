@@ -853,6 +853,10 @@ bool Shader::Activate(void)
     CommandList* cl = commandListHandler.CurrentCmdList();
     if (cl == nullptr)
         return false;
+    if (IsTessellated())
+        baseRenderer.RenderStates().topology = uint8_t((m_patchControlPoints == 2) ? MeshTopology::Lines
+                                                       : (m_patchControlPoints == 1) ? MeshTopology::Points
+                                                       : MeshTopology::Triangles);
     VkPipeline pipeline = cl->GetPipeline(this);
     return pipeline != VK_NULL_HANDLE;
 }

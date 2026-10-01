@@ -7,6 +7,7 @@
 
 static constexpr DXGI_FORMAT dxColorFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 static constexpr DXGI_FORMAT dxVertexFormat = DXGI_FORMAT_R32G32B32A32_FLOAT;
+static constexpr DXGI_FORMAT dxIdFormat = DXGI_FORMAT_R32_UINT;
 // Single-channel D32_FLOAT statt D24_UNORM_S8_UINT: kein Stencil, kein Treiber-Padding-Overhead.
 // Typeless-Resource ist R32_TYPELESS, DSV ist D32_FLOAT, SRV ist R32_FLOAT.
 static constexpr DXGI_FORMAT dxTypelessDepthFormat = DXGI_FORMAT_R32_TYPELESS;
