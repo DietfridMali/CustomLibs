@@ -367,6 +367,8 @@ public:
     // The buffer must be currently attached (RENDER_TARGET state) -- call right after Activate.
     void ClearColorBuffer(int bufferIndex, RGBAColor color);
 
+    void ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area);
+
     void ClearDepthBuffer(float clearValue = 1.0f);
 
     void ClearStencilBuffer(int clearValue = 0);

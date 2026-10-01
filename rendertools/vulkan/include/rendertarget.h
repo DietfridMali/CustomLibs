@@ -306,6 +306,8 @@ public:
     // own value (accum -> 0, revealage -> 1). Call right after Activate (inside the render scope).
     void ClearColorBuffer(int bufferIndex, RGBAColor color);
 
+    void ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area);
+
     void ClearDepthBuffer(float clearValue = 1.0f);
 
     void ClearStencilBuffer(int clearValue = 0);

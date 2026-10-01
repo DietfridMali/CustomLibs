@@ -501,6 +501,13 @@ public:
             glClearBufferfv(GL_COLOR, bufferIndex, color.Data());
     }
 
+    inline void ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area) {
+        int scissorTest = gfxStates.SetScissorTest(1);
+        gfxStates.SetScissor(area.Left(), GetHeight(true) - area.Top() - area.Height(), area.Width(), area.Height());
+        ClearColorBuffer(bufferIndex, color);
+        gfxStates.SetScissorTest(scissorTest);
+    }
+
     void ClearIntegerColorBuffers(const RGBAColor& color);
 
     bool IsColorBufferAttachment(GLenum attachment);

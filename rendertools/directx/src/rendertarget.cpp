@@ -1063,6 +1063,31 @@ void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
 }
 
 
+void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area)
+{
+    auto* list = IsEnabled() ? m_cmdList->GfxList() : nullptr;
+    if (not list)
+        return;
+    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return;
+
+    int left = (area.Left() < 0) ? 0 : area.Left();
+    int top = (area.Top() < 0) ? 0 : area.Top();
+    int right = area.Left() + area.Width();
+    int bottom = area.Top() + area.Height();
+    if (right > GetWidth(true))
+        right = GetWidth(true);
+    if (bottom > GetHeight(true))
+        bottom = GetHeight(true);
+    if ((right <= left) or (bottom <= top))
+        return;
+
+    D3D12_RECT rect{ left, top, right, bottom };
+    if (IsDrawBuffer(*this, bufferIndex))
+        list->ClearRenderTargetView(m_bufferInfo[bufferIndex].RTV().CPUHandle(), color.Data(), 1, &rect);
+}
+
+
 void RenderTarget::ClearDepthBuffer(float clearValue)
 {
     if (IsEnabled() and HaveDepthBuffer(true) and (m_depthMode != dbmReadOnly))

@@ -1242,10 +1242,27 @@ void RenderTarget::Clear(const RTActivationParams& params)
 // bound slots (ActiveColorSlots ()); one that is not bound in the current group is left alone.
 void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
 {
+    ClearColorBuffer(bufferIndex, color, Viewport(0, 0, GetWidth(true), GetHeight(true)));
+}
+
+
+void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area)
+{
     if (not m_cmdList or not m_isInRendering)
         return;
     VkCommandBuffer cb = m_cmdList->GfxList();
     if ((cb == VK_NULL_HANDLE) or (bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+        return;
+
+    int left = (area.Left() < 0) ? 0 : area.Left();
+    int top = (area.Top() < 0) ? 0 : area.Top();
+    int right = area.Left() + area.Width();
+    int bottom = area.Top() + area.Height();
+    if (right > GetWidth(true))
+        right = GetWidth(true);
+    if (bottom > GetHeight(true))
+        bottom = GetHeight(true);
+    if ((right <= left) or (bottom <= top))
         return;
 
     int slots[RT_MAX_COLOR_BUFFERS];
@@ -1260,8 +1277,8 @@ void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
     a.colorAttachment = uint32_t(slot);
     a.clearValue      = MakeClearColor(color, IsIntegerColorBuffer(bufferIndex));
     VkClearRect rect{};
-    rect.rect.offset = { 0, 0 };
-    rect.rect.extent = { uint32_t(GetWidth(true)), uint32_t(GetHeight(true)) };
+    rect.rect.offset = { left, top };
+    rect.rect.extent = { uint32_t(right - left), uint32_t(bottom - top) };
     rect.layerCount  = 1;
     vkCmdClearAttachments(cb, 1, &a, 1, &rect);
 }
