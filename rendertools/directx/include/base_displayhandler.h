@@ -109,6 +109,8 @@ public:
     // Recreates the back buffers for the current dimensions and vertical sync setting.
     bool ResizeSwapChain(void);
 
+    void WaitWhileMinimized(void);
+
     // Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
     void EnableBackBuffer(void) noexcept;
 

@@ -281,7 +281,13 @@ void BaseDisplayHandler::BeginFrame(void) {
     // CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, resets the slot's
     // per-frame resources (deferred cleanup, descriptor pools, UBO allocator) and acquires the image.
     //gfxStates.CheckError();
-    commandListHandler.CmdQueue().BeginFrame();
+    CommandQueue& cmdQueue = commandListHandler.CmdQueue();
+    WaitWhileMinimized();
+    if (cmdQueue.SwapchainIsOutOfDate() and not RestoreSwapchain())
+        return;
+    bool hasImage = cmdQueue.BeginFrame();
+    while (not hasImage and cmdQueue.SwapchainIsOutOfDate() and RestoreSwapchain())
+        hasImage = cmdQueue.ReacquireImage();
     //gfxStates.CheckError();
     m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
     m_backBufferWasWritten = false;
@@ -348,6 +354,7 @@ bool BaseDisplayHandler::RecreateSwapchain(void) {
     m_backBufferIndex = 0;
     // The cached swapchain handle inside CommandQueue is stale — refresh it.
     commandListHandler.CmdQueue().m_swapchain = m_swapchain.Handle();
+    commandListHandler.CmdQueue().m_swapchainIsOutOfDate = false;
     // The per-slot binary semaphores were last used as present-wait for images of the
     // destroyed swapchain. Those images can never be re-acquired, so the semaphores stay
     // "in use by VkSwapchainKHR" from the validator's point of view — re-signaling them
@@ -357,6 +364,31 @@ bool BaseDisplayHandler::RecreateSwapchain(void) {
         return false;
     }
     return true;
+}
+
+
+bool BaseDisplayHandler::RestoreSwapchain(void) {
+    SDL_PumpEvents();
+    WaitWhileMinimized();
+    if (not RecreateSwapchain())
+        return false;
+    VkExtent2D extent = m_swapchain.Extent();
+    if ((extent.width != uint32_t(m_width)) or (extent.height != uint32_t(m_height)))
+        fprintf(stderr, "BaseDisplayHandler::RestoreSwapchain: swapchain is %ux%u, display mode is %dx%d\n", extent.width, extent.height, m_width, m_height);
+    return true;
+}
+
+
+void BaseDisplayHandler::WaitWhileMinimized(void) {
+    bool restoreRequested = false;
+    while ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0) {
+        SDL_PumpEvents();
+        if (not restoreRequested and (SDL_HasEvent(SDL_QUIT) == SDL_TRUE)) {
+            SDL_RestoreWindow(m_window);
+            restoreRequested = true;
+        }
+        SDL_Delay(10);
+    }
 }
 
 

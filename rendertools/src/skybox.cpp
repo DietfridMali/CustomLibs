@@ -62,8 +62,10 @@ bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture,
 
 	for (int i = 0; i < 3; i++) {
 		if (not (m_skyTextures[0][i] = LoadTextures(textureFolder, "sky", skyTextureTypes[i], skyTextureSizes[textureSize]))) {
-			while (--i >= 0)
+			while (--i >= 0) {
 				delete m_skyTextures[0][i];
+				m_skyTextures[0][i] = nullptr;
+			}
 			return false;
 		}
 	}

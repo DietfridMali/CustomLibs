@@ -122,6 +122,10 @@ public:
     // Recreates the swapchain for the current dimensions and vertical sync setting.
     bool RecreateSwapchain(void);
 
+    bool RestoreSwapchain(void);
+
+    void WaitWhileMinimized(void);
+
     // Transition current back buffer PRESENT/UNDEFINED → COLOR_ATTACHMENT and open a
     // vkCmdBeginRendering scope (loadOp = DONT_CARE; clears go through ClearBackBuffer).
     void EnableBackBuffer(void) noexcept;

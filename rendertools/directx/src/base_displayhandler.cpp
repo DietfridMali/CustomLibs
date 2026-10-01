@@ -322,9 +322,23 @@ void BaseDisplayHandler::BeginFrame(void) {
         return;
     // Advance frame slot, wait fence, drain that slot's deferred resources, reset CBV allocator.
     // Active-shader tracking is invalidated because BeginFrame resets all DX12 command-list state.
+    WaitWhileMinimized();
     commandListHandler.BeginFrame();
     commandListHandler.ResetBindings();
     baseShaderHandler.InvalidateActiveShader();
+}
+
+
+void BaseDisplayHandler::WaitWhileMinimized(void) {
+    bool restoreRequested = false;
+    while ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0) {
+        SDL_PumpEvents();
+        if (not restoreRequested and (SDL_HasEvent(SDL_QUIT) == SDL_TRUE)) {
+            SDL_RestoreWindow(m_window);
+            restoreRequested = true;
+        }
+        SDL_Delay(10);
+    }
 }
 
 

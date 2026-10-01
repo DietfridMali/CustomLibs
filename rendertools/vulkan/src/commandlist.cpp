@@ -254,6 +254,17 @@ bool CommandQueue::BeginFrame(void) noexcept
 }
 
 
+bool CommandQueue::ReacquireImage(void) noexcept
+{
+    VkResult res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "CommandQueue::ReacquireImage: vkResetFences failed (%d)\n", int(res));
+        return false;
+    }
+    return AcquireNextImage();
+}
+
+
 void CommandQueue::EndFrame(void) noexcept
 {
     Present();
@@ -364,6 +375,7 @@ bool CommandQueue::AcquireNextImage(void) noexcept
 #ifdef _DEBUG
         fprintf(stderr, "CommandQueue::AcquireNextImage: VK_ERROR_OUT_OF_DATE_KHR\n");
 #endif
+        m_swapchainIsOutOfDate = true;
         return false;
     }
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR)) {
@@ -407,6 +419,8 @@ void CommandQueue::Present(void) noexcept
 #if VK_STALL_DIAG
     VkStallNote("present", stallStart, nullptr);
 #endif
+    if ((res == VK_ERROR_OUT_OF_DATE_KHR) or (res == VK_SUBOPTIMAL_KHR))
+        m_swapchainIsOutOfDate = true;
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR)) {
         fprintf(stderr, "CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::Present");

@@ -56,6 +56,7 @@ public:
     uint32_t       m_imageIndex  { 0 };
     uint64_t       m_frameNumber { 0 };   // monotonic; ++ per BeginFrame — reliable frame-boundary signal
     bool           m_acquireWaitPending { false };
+    bool           m_swapchainIsOutOfDate { false };
 
     bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
                 uint32_t graphicsFamily, uint32_t presentFamily,
@@ -66,6 +67,7 @@ public:
     void Destroy(void) noexcept;
 
     bool BeginFrame(void) noexcept;
+    bool ReacquireImage(void) noexcept;
     void EndFrame(void) noexcept;
 
     // Destroy + re-create the per-slot binary semaphores and the in-flight fences.
@@ -89,6 +91,7 @@ public:
     inline uint32_t FrameIndex(void) const noexcept { return m_frameIndex; }
     inline uint64_t FrameNumber(void) const noexcept { return m_frameNumber; }
     inline uint32_t ImageIndex(void) const noexcept { return m_imageIndex; }
+    inline bool SwapchainIsOutOfDate(void) const noexcept { return m_swapchainIsOutOfDate; }
 
     VkCommandBuffer CmdBuffer(void) const noexcept;
 
