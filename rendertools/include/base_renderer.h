@@ -80,6 +80,7 @@ protected:
     GfxOperations::CullFace m_backFace{ GfxOperations::CullFace::None };
 
     uint32_t                m_gfxFeatures{ 0 };
+    bool                    m_coverageAlpha{ false };
 
 public:
 #ifdef _DEBUG
@@ -211,6 +212,12 @@ public:
     // (GfxOperations). What differs between them is what they DO with it - OpenGL sets it immediately,
     // Vulkan folds it into the pipeline key - and none of that belongs here or at a call site.
     void SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::BlendOp op = GfxOperations::BlendOp::Add) noexcept;
+
+    inline bool SetCoverageAlpha(bool coverageAlpha) noexcept {
+        bool previous = m_coverageAlpha;
+        m_coverageAlpha = coverageAlpha;
+        return previous;
+    }
 
     virtual bool Start3DScene(void);
 

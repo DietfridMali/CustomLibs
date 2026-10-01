@@ -163,7 +163,10 @@ void BaseRenderer::SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::Bl
 
     GfxOperations::BlendFactors(mode, src, dst);
     gfxStates.SetBlending(mode != GfxOperations::BlendMode::Replace);
-    gfxStates.BlendFunc(src, dst);
+    if (m_coverageAlpha and (mode == GfxOperations::BlendMode::Alpha))
+        gfxStates.BlendFuncSeparate(src, dst, GfxOperations::BlendFactor::One, dst);
+    else
+        gfxStates.BlendFunc(src, dst);
     gfxStates.BlendEquation(op);
 }
 
