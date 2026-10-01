@@ -92,6 +92,7 @@ const ShaderSource& RingShader() {
                 float  dashCount;    // dashes over the full ring (or over the segment); 0 = solid
                 float  dashRatio;    // dash length as a fraction of one dash period
                 float  dashOffset;   // phase shift in dash periods
+                int    roundDashCaps;
             };
             struct PSInput {
                 float4 pos       : SV_Position;
@@ -129,9 +130,9 @@ const ShaderSource& RingShader() {
                     discard;
                 float dOuter =  EllipseDist(pxDelta, pxRadius);
                 float dInner = -EllipseDist(pxDelta, pxRadius - pxStrength);
+                float pxWidth = 0.5 * fwidth(dOuter);
                 float alpha;
                 if (antialias != 0) {
-                    float pxWidth = 0.5 * fwidth(dOuter);
                     if (dOuter > pxWidth || dInner > pxWidth) discard;
                     float aOuter = 1.0 - smoothstep(0.0, pxWidth, dOuter);
                     float aInner = 1.0 - smoothstep(0.0, pxWidth, dInner);
@@ -147,14 +148,40 @@ const ShaderSource& RingShader() {
                     float span  = renderSegment ? (endAngle - startAngle) : 360.0;
                     float rel   = renderSegment ? (a - startAngle) : a;
                     float f     = frac(rel / span * dashCount + dashOffset);
-                    float sd    = max(-f, f - dashRatio);   // < 0 inside a dash
-                    if (antialias != 0) {
-                        float pxPerPeriod = (span / max(dashCount, 1e-6)) * (PI / 180.0) * 0.5 * (pxRadius.x + pxRadius.y);
-                        float dPx = sd * max(pxPerPeriod, 1e-6);
-                        alpha *= 1.0 - smoothstep(-0.5, 0.5, dPx);
+                    if (roundDashCaps != 0) {
+                        float  pxHalf       = 0.5 * pxStrength;
+                        float2 pxMid        = max(pxRadius - pxHalf, float2(1e-6, 1e-6));
+                        float  degPerPeriod = span / max(dashCount, 1e-6);
+                        float  pxPerPeriod  = degPerPeriod * (PI / 180.0) * 0.5 * (pxMid.x + pxMid.y);
+                        float  inset        = min(pxHalf / max(pxPerPeriod, 1e-6), 0.5 * dashRatio);
+                        float  fStart       = inset;
+                        float  fEnd         = dashRatio - inset;
+                        if (f < fStart || f > fEnd) {
+                            float  fCap;
+                            if (f < fStart)
+                                fCap = (fStart - f < f - (fEnd - 1.0)) ? fStart : fEnd - 1.0;
+                            else
+                                fCap = (f - fEnd < 1.0 + fStart - f) ? fEnd : 1.0 + fStart;
+                            float  aCap  = (a + (fCap - f) * degPerPeriod) * (PI / 180.0);
+                            float2 dir   = float2(sin(aCap), -cos(aCap));
+                            float2 pxCap = dir / max(length(dir / pxMid), 1e-6);
+                            float  dCap  = length(pxDelta - pxCap) - pxHalf;
+                            if (antialias != 0)
+                                alpha = min(alpha, 1.0 - smoothstep(0.0, pxWidth, dCap));
+                            else if (dCap > 0.0)
+                                discard;
+                        }
                     }
-                    else if (sd > 0.0)
-                        discard;
+                    else {
+                        float sd    = max(-f, f - dashRatio);   // < 0 inside a dash
+                        if (antialias != 0) {
+                            float pxPerPeriod = (span / max(dashCount, 1e-6)) * (PI / 180.0) * 0.5 * (pxRadius.x + pxRadius.y);
+                            float dPx = sd * max(pxPerPeriod, 1e-6);
+                            alpha *= 1.0 - smoothstep(-0.5, 0.5, dPx);
+                        }
+                        else if (sd > 0.0)
+                            discard;
+                    }
                 }
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }

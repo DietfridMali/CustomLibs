@@ -81,6 +81,7 @@ const ShaderSource& RingShader() {
             uniform float dashCount;       // dashes over the full ring (or over the segment); 0 = solid
             uniform float dashRatio;       // dash length as a fraction of one dash period
             uniform float dashOffset;      // phase shift in dash periods
+            uniform bool  roundDashCaps;
 
             in vec2 fragCoord;             // [0..1] UV
             out vec4 fragColor;
@@ -152,14 +153,41 @@ const ShaderSource& RingShader() {
                     float span = renderSegment ? (endAngle - startAngle) : 360.0;
                     float rel  = renderSegment ? (a - startAngle) : a;
                     float f    = fract(rel / span * dashCount + dashOffset);
-                    float sd   = max(-f, f - dashRatio);   // < 0 inside a dash
-                    if (antialias) {
-                        float pxPerPeriod = (span / max(dashCount, 1e-6)) * (PI / 180.0) * 0.5 * (pxRadius.x + pxRadius.y);
-                        float dPx = sd * max(pxPerPeriod, 1e-6);
-                        alpha *= 1.0 - smoothstep(-0.5, 0.5, dPx);
+                    if (roundDashCaps) {
+                        float pxCapWidth   = 0.5 * fwidth(dOuter);
+                        float pxHalf       = 0.5 * pxStrength;
+                        vec2  pxMid        = max(pxRadius - vec2(pxHalf), vec2(1e-6));
+                        float degPerPeriod = span / max(dashCount, 1e-6);
+                        float pxPerPeriod  = degPerPeriod * (PI / 180.0) * 0.5 * (pxMid.x + pxMid.y);
+                        float inset        = min(pxHalf / max(pxPerPeriod, 1e-6), 0.5 * dashRatio);
+                        float fStart       = inset;
+                        float fEnd         = dashRatio - inset;
+                        if (f < fStart || f > fEnd) {
+                            float fCap;
+                            if (f < fStart)
+                                fCap = (fStart - f < f - (fEnd - 1.0)) ? fStart : fEnd - 1.0;
+                            else
+                                fCap = (f - fEnd < 1.0 + fStart - f) ? fEnd : 1.0 + fStart;
+                            float aCap  = (a + (fCap - f) * degPerPeriod) * (PI / 180.0);
+                            vec2  dir   = vec2(sin(aCap), -cos(aCap));
+                            vec2  pxCap = dir / max(length(dir / pxMid), 1e-6);
+                            float dCap  = length(pxDelta - pxCap) - pxHalf;
+                            if (antialias)
+                                alpha = min(alpha, 1.0 - smoothstep(0.0, pxCapWidth, dCap));
+                            else if (dCap > 0.0)
+                                discard;
+                        }
                     }
-                    else if (sd > 0.0)
-                        discard;
+                    else {
+                        float sd   = max(-f, f - dashRatio);   // < 0 inside a dash
+                        if (antialias) {
+                            float pxPerPeriod = (span / max(dashCount, 1e-6)) * (PI / 180.0) * 0.5 * (pxRadius.x + pxRadius.y);
+                            float dPx = sd * max(pxPerPeriod, 1e-6);
+                            alpha *= 1.0 - smoothstep(-0.5, 0.5, dPx);
+                        }
+                        else if (sd > 0.0)
+                            discard;
+                    }
                 }
 
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
