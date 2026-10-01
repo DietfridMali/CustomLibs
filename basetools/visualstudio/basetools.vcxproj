@@ -64,6 +64,7 @@
     <ClInclude Include="..\include\tristate.h" />
     <ClInclude Include="..\include\type_helper.hpp" />
     <ClInclude Include="..\include\vector.hpp" />
+    <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\custom_matrix.cpp" />
@@ -76,6 +77,9 @@
     <ClCompile Include="..\src\std_string.cpp" />
     <ClCompile Include="..\src\string.cpp" />
     <ClCompile Include="..\src\vector.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -165,8 +169,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>USE_TRACY=0;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_CRT_SECURE_NO_WARNINGS;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\..\external\glm</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -187,8 +192,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>USE_TRACY=0;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\..\external\glm</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>

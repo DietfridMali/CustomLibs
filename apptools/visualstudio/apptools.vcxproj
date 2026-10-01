@@ -29,6 +29,7 @@
     <ClInclude Include="..\include\udp.h" />
     <ClInclude Include="..\include\platformhandler.h" />
     <ClInclude Include="..\include\crashhandler.h" />
+    <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\arghandler.cpp" />
@@ -41,6 +42,9 @@
     <ClCompile Include="..\src\udp.cpp" />
     <ClCompile Include="..\src\platformhandler.cpp" />
     <ClCompile Include="..\src\crashhandler.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader>Create</PrecompiledHeader>
+    </ClCompile>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -105,8 +109,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>USE_TRACY=0;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;STEAM=0;_CRT_SECURE_NO_WARNINGS;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.32.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.2\include;$(ProjectDir)..\..\..\external\SDL2_net-2.4.0\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;$(ProjectDir)..\..\..\external\steam\sdk\public\steam;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\GameKit\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.Party.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.PartyXboxLive.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include\xsapi-c</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -127,8 +132,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>USE_TRACY=0;FMT_UNICODE=0;USE_STD=1;USE_GLM=1;STEAM=0;_CRT_SECURE_NO_WARNINGS;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>$(ProjectDir)pch.h</PrecompiledHeaderFile>
+      <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir)..\..\basetools\include;..\include;$(ProjectDir)..\..\..\external\SDL2-2.32.10\include;$(ProjectDir)..\..\..\external\SDL2_mixer-2.8.2\include;$(ProjectDir)..\..\..\external\SDL2_net-2.4.0\include;$(ProjectDir)..\..\..\external\glm;$(ProjectDir)..\..\..\external\glew-2.2.0\include\GL;$(ProjectDir)..\..\..\external\steam\sdk\public\steam;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\GameKit\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.Party.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\PlayFab.PartyXboxLive.Cpp\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include;$(ProjectDir)..\..\..\external\Microsoft\GDK\GRDK\ExtensionLibraries\Xbox.Services.API.C\Include\xsapi-c</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
