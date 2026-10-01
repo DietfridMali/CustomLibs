@@ -330,6 +330,9 @@ void BaseDisplayHandler::BeginFrame(void) {
 
 
 void BaseDisplayHandler::WaitWhileMinimized(void) {
+    if ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) == 0)
+        return;
+    OnMinimized();
     bool restoreRequested = false;
     while ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0) {
         SDL_PumpEvents();
@@ -339,6 +342,7 @@ void BaseDisplayHandler::WaitWhileMinimized(void) {
         }
         SDL_Delay(10);
     }
+    OnRestored();
 }
 
 

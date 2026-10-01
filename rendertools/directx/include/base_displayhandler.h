@@ -111,6 +111,10 @@ public:
 
     void WaitWhileMinimized(void);
 
+    virtual void OnMinimized(void) {}
+
+    virtual void OnRestored(void) {}
+
     // Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
     void EnableBackBuffer(void) noexcept;
 

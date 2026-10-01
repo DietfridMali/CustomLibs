@@ -126,6 +126,10 @@ public:
 
     void WaitWhileMinimized(void);
 
+    virtual void OnMinimized(void) {}
+
+    virtual void OnRestored(void) {}
+
     // Transition current back buffer PRESENT/UNDEFINED → COLOR_ATTACHMENT and open a
     // vkCmdBeginRendering scope (loadOp = DONT_CARE; clears go through ClearBackBuffer).
     void EnableBackBuffer(void) noexcept;
