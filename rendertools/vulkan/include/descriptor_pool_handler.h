@@ -44,6 +44,9 @@ public:
     std::vector<VkDescriptorPool> m_overflowPools[FRAME_COUNT];
     uint32_t         m_overflowUsed[FRAME_COUNT] { };
     uint32_t         m_currentFrame { 0 };
+    uint64_t         m_generation   { 1 };
+
+    inline uint64_t Generation(void) const noexcept { return m_generation; }
 
     // Allocates one VkDescriptorPool per frame slot. Returns false on any vkCreateDescriptorPool failure.
     bool Create(VkDevice device) noexcept;

@@ -7,6 +7,7 @@
 
 #include "vkframework.h"
 #include "shader.h"
+#include "shader_loading.h"
 #include "shader_compiler.h"
 #include "pipeline_cache.h"
 #include "cbv_allocator.h"
@@ -15,6 +16,9 @@
 #include "gfxstates.h"
 #include "commandlist.h"
 #include "descriptor_pool_handler.h"
+#if OPTIMIZE_SHADER_LOADING
+#include "resource_handler.h"
+#endif
 #include "gfxrenderer.h"
 #include "base_displayhandler.h"
 #include "image_layout_tracker.h"
@@ -28,6 +32,15 @@ extern double VkStallClock(void) noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
 #endif
 
+#if OPTIMIZE_SHADER_LOADING
+extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
+
+static_assert(Shader::kSrvSlots == CommandListHandler::kSrvSlots, "Shader and CommandListHandler must agree on the sampled image slot count");
+static_assert(Shader::kSamplerSlots == CommandListHandler::kSamplerSlots, "Shader and CommandListHandler must agree on the sampler slot count");
+static_assert(Shader::kUavSlots == CommandListHandler::kUavSlots, "Shader and CommandListHandler must agree on the storage buffer slot count");
+static_assert(Shader::kSsboSlots == CommandListHandler::kSsboSlots, "Shader and CommandListHandler must agree on the read only buffer slot count");
+
+#endif
 // =================================================================================================
 // Vulkan Shader implementation
 //
@@ -554,6 +567,10 @@ void Shader::UpdateStageResources(const std::vector<uint8_t>& spirv) noexcept
     for (auto* b : bindings) {
         if (not b or (b->set != 0))
             continue;
+#if OPTIMIZE_SHADER_LOADING
+        if (b->binding < kBindingCount)
+            m_bindingDeclared[b->binding] = true;
+#endif
         if ((b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER) and (b->binding >= kSamplerBase) and (b->binding < kSamplerBase + kSamplerSlots)) {
             m_samplerDeclared[b->binding - kSamplerBase] = true;
             continue;
@@ -747,12 +764,22 @@ void Shader::Destroy(void) noexcept
         m_stages[s].staging.clear();
         m_stages[s].size = 0;
         m_stages[s].dirty = true;
+#if OPTIMIZE_SHADER_LOADING
+        m_stages[s].generation = 0;
+#endif
     }
+#if OPTIMIZE_SHADER_LOADING
+    m_b0Generation = 0;
+    m_descriptorSet = VK_NULL_HANDLE;
+#endif
     m_locations.Clear();
     m_vsInputAttributes.clear();
     m_vsInputBindings.clear();
     std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
     std::memset(m_samplerDeclared, 0, sizeof(m_samplerDeclared));
+#if OPTIMIZE_SHADER_LOADING
+    std::memset(m_bindingDeclared, 0, sizeof(m_bindingDeclared));
+#endif
     m_usesAccelStructure = false;
 
     if (device != VK_NULL_HANDLE) {
@@ -827,6 +854,9 @@ Shader& Shader::Move(Shader& other) noexcept
         m_vsInputBindings = std::move(other.m_vsInputBindings);
         std::memcpy(m_srvDefaults, other.m_srvDefaults, sizeof(m_srvDefaults));
         std::memcpy(m_samplerDeclared, other.m_samplerDeclared, sizeof(m_samplerDeclared));
+#if OPTIMIZE_SHADER_LOADING
+        std::memcpy(m_bindingDeclared, other.m_bindingDeclared, sizeof(m_bindingDeclared));
+#endif
         m_usesAccelStructure = other.m_usesAccelStructure;
     }
     return *this;
@@ -857,24 +887,41 @@ bool Shader::Activate(void)
         baseRenderer.RenderStates().topology = uint8_t((m_patchControlPoints == 2) ? MeshTopology::Lines
                                                        : (m_patchControlPoints == 1) ? MeshTopology::Points
                                                        : MeshTopology::Triangles);
+#if OPTIMIZE_SHADER_LOADING
+    return ResolveDrawPipeline(cl, this);
+#else
     VkPipeline pipeline = cl->GetPipeline(this);
     return pipeline != VK_NULL_HANDLE;
+#endif
 }
 
 
+#if !OPTIMIZE_SHADER_LOADING
 // The buffer each dynamic UBO binding of the draw being set up lies in - the allocator chains further
 // buffers within a frame, so b0 and the b1 stages need not share one. Filled by UploadB0 / UploadB1
 // and read by UpdateVariables right behind them.
 static VkBuffer dynamicBuffers[Shader::kDynamicOffsetCount] { };
 
+#endif
 bool Shader::UploadB0(void) noexcept
 {
+#if OPTIMIZE_SHADER_LOADING
+    const uint64_t generation = cbvAllocator.Generation();
+    if ((m_b0Generation == generation) and (std::memcmp(&m_b0Uploaded, &m_b0Staging, sizeof(FrameConstants)) == 0))
+        return true;
+#endif
     CbAlloc a = cbvAllocator.Allocate(uint32_t(sizeof(FrameConstants)));
     if (not a.IsValid())
         return false;
     std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
     m_dynamicOffsets[0] = a.offset;  // binding 0 (b0)
+#if OPTIMIZE_SHADER_LOADING
+    m_dynamicBuffers[0] = a.buffer;
+    m_b0Uploaded = m_b0Staging;
+    m_b0Generation = generation;
+#else
     dynamicBuffers[0] = a.buffer;
+#endif
     return true;
 }
 
@@ -885,20 +932,38 @@ bool Shader::UploadB1(void) noexcept
     // store the dynamic offset at the matching m_dynamicOffsets slot. Stages with size == 0
     // are skipped (mirror DX12 behaviour); UpdateVariables writes a 1-byte placeholder range
     // for those bindings so the descriptor-set update stays valid.
+#if OPTIMIZE_SHADER_LOADING
+    const uint64_t generation = cbvAllocator.Generation();
+#endif
     for (int s = 0; s < kStageCount; ++s) {
         StageConstants& sc = m_stages[s];
         if (sc.size == 0) {
             m_dynamicOffsets[1 + s] = 0;
+#if OPTIMIZE_SHADER_LOADING
+            m_dynamicBuffers[1 + s] = m_dynamicBuffers[0];
+#else
             dynamicBuffers[1 + s] = dynamicBuffers[0];
+#endif
             continue;
         }
+#if OPTIMIZE_SHADER_LOADING
+        if ((not sc.dirty) and (sc.generation == generation))
+            continue;
+#endif
         CbAlloc a = cbvAllocator.Allocate(sc.size);
         if (not a.IsValid())
             return false;
         std::memcpy(a.cpu, sc.staging.data(), sc.size);
         m_dynamicOffsets[1 + s] = a.offset;  // bindings 1 (VS), 2 (PS), 3 (GS)
+#if OPTIMIZE_SHADER_LOADING
+        m_dynamicBuffers[1 + s] = a.buffer;
+#else
         dynamicBuffers[1 + s] = a.buffer;
+#endif
         sc.dirty = false;
+#if OPTIMIZE_SHADER_LOADING
+        sc.generation = generation;
+#endif
     }
     return true;
 }
@@ -936,10 +1001,83 @@ bool Shader::UpdateVariables(void) noexcept {
         return false;
     }
 
+#if OPTIMIZE_SHADER_LOADING
+    DescriptorContents contents;
+    for (uint32_t i = 0; i < kDynamicOffsetCount; ++i)
+        contents.uniformBuffers[i] = m_dynamicBuffers[i];
+    // Sampled images (t-slots). A slot the shader declares but nobody bound gets the default image of
+    // the declared view type (m_srvDefaults, reflected in UpdateStageResources ()); every other
+    // unbound slot is left unwritten.
+    for (uint32_t i = 0; i < kSrvSlots; ++i) {
+        if (not m_bindingDeclared[kSrvBase + i])
+            continue;
+        VkImageView v = commandListHandler.m_boundSrvViews[i];
+        VkImageLayout layout = commandListHandler.m_boundSrvLayouts[i];
+        if (v == VK_NULL_HANDLE) {
+            v = DefaultView(m_srvDefaults[i]);
+            layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
+        if (v == VK_NULL_HANDLE)
+            continue;
+        contents.views[i] = v;
+        contents.layouts[i] = layout;
+    }
+    for (uint32_t i = 0; i < kSamplerSlots; ++i) {
+        if (not m_samplerDeclared[i])
+            continue;
+        VkSampler s = commandListHandler.m_boundSamplers[i];
+        if (s == VK_NULL_HANDLE)
+            s = samplerCache.GetSampler(TextureSampling { });
+        contents.samplers[i] = s;
+    }
+    for (uint32_t i = 0; i < kUavSlots; ++i) {
+        VkBuffer b = commandListHandler.m_boundStorageBuffers[i];
+        if ((b == VK_NULL_HANDLE) or not m_bindingDeclared[kUavBase + i])
+            continue;
+        contents.storageBuffers[i] = b;
+        contents.storageBufferSizes[i] = commandListHandler.m_boundStorageBufferSize[i];
+    }
+    for (uint32_t i = 0; i < kSsboSlots; ++i) {
+        VkBuffer b = commandListHandler.m_boundReadOnlyBuffers[i];
+        if ((b == VK_NULL_HANDLE) or not m_bindingDeclared[kSsboBase + i])
+            continue;
+        contents.readOnlyBuffers[i] = b;
+        contents.readOnlyBufferSizes[i] = commandListHandler.m_boundReadOnlyBufferSize[i];
+    }
+    if (m_usesAccelStructure)
+        contents.accelStructure = accelStructure;
+
+    const uint64_t poolGeneration = descriptorPoolHandler.Generation();
+    const uint64_t cleanupGeneration = gfxResourceHandler.CleanupGeneration();
+    const bool isReusable = (m_descriptorSet != VK_NULL_HANDLE) and (m_descriptorPoolGeneration == poolGeneration)
+                         and (m_descriptorCleanupGeneration == cleanupGeneration) and (m_descriptorContents == contents);
+
+    if (not isReusable) {
+        VkDescriptorSet set = descriptorPoolHandler.Allocate(m_setLayout);
+        if (set == VK_NULL_HANDLE)
+            return false;
+        WriteDescriptorSet(set, contents);
+        m_descriptorSet = set;
+        m_descriptorContents = contents;
+        m_descriptorPoolGeneration = poolGeneration;
+        m_descriptorCleanupGeneration = cleanupGeneration;
+    }
+    gfxResourceHandler.NoteFrameAllocation();
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
+                            0, 1, &m_descriptorSet,
+                            kDynamicOffsetCount, m_dynamicOffsets);
+    return true;
+}
+
+
+void Shader::WriteDescriptorSet(VkDescriptorSet set, const DescriptorContents& contents) noexcept
+{
+#else
     VkDescriptorSet set = descriptorPoolHandler.Allocate(m_setLayout);
     if (set == VK_NULL_HANDLE)
         return false;
 
+#endif
     // Worst-case write count: 4 dynamic UBOs + kSrvSlots images + kSamplerSlots samplers
     // + kUavSlots storage buffers + kSsboSlots read-only storage buffers + the acceleration structure.
     constexpr uint32_t kMaxWrites = kDynamicOffsetCount + CommandListHandler::kSrvSlots + CommandListHandler::kSamplerSlots
@@ -953,7 +1091,11 @@ bool Shader::UpdateVariables(void) noexcept {
     uint32_t writeCount = 0;
 
     auto AddDynamicUbo = [&](uint32_t binding, uint32_t bytes, uint32_t bufSlot) {
+#if OPTIMIZE_SHADER_LOADING
+        bufInfos[bufSlot].buffer = contents.uniformBuffers[bufSlot];
+#else
         bufInfos[bufSlot].buffer = dynamicBuffers[bufSlot];
+#endif
         bufInfos[bufSlot].offset = 0;
         bufInfos[bufSlot].range  = (bytes > 0) ? bytes : 1;
         VkWriteDescriptorSet& w = writes[writeCount++];
@@ -973,10 +1115,18 @@ bool Shader::UpdateVariables(void) noexcept {
     AddDynamicUbo(kBindingB1HS,  m_stages[kStageHS].size,             4);
     AddDynamicUbo(kBindingB1DS,  m_stages[kStageDS].size,             5);
 
+#if !OPTIMIZE_SHADER_LOADING
     // Sampled images (t-slots). A slot the shader declares but nobody bound gets the default image of
     // the declared view type (m_srvDefaults, reflected in UpdateStageResources ()); every other
     // unbound slot is left unwritten.
+#endif
     for (uint32_t i = 0; i < CommandListHandler::kSrvSlots; ++i) {
+#if OPTIMIZE_SHADER_LOADING
+        if (contents.views[i] == VK_NULL_HANDLE)
+            continue;
+        imgInfos[i].imageView   = contents.views[i];
+        imgInfos[i].imageLayout = contents.layouts[i];
+#else
         VkImageView v = commandListHandler.m_boundSrvViews[i];
         VkImageLayout layout = commandListHandler.m_boundSrvLayouts[i];
         if (v == VK_NULL_HANDLE) {
@@ -987,6 +1137,7 @@ bool Shader::UpdateVariables(void) noexcept {
             continue;
         imgInfos[i].imageView   = v;
         imgInfos[i].imageLayout = layout;
+#endif
         imgInfos[i].sampler     = VK_NULL_HANDLE;
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -998,12 +1149,18 @@ bool Shader::UpdateVariables(void) noexcept {
         w.pImageInfo      = &imgInfos[i];
     }
     for (uint32_t i = 0; i < CommandListHandler::kSamplerSlots; ++i) {
+#if OPTIMIZE_SHADER_LOADING
+        if (contents.samplers[i] == VK_NULL_HANDLE)
+            continue;
+        smpInfos[i].sampler = contents.samplers[i];
+#else
         VkSampler s = commandListHandler.m_boundSamplers[i];
         if ((s == VK_NULL_HANDLE) and m_samplerDeclared[i])
             s = samplerCache.GetSampler(TextureSampling { });
         if (s == VK_NULL_HANDLE)
             continue;
         smpInfos[i].sampler = s;
+#endif
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w.dstSet          = set;
@@ -1014,12 +1171,20 @@ bool Shader::UpdateVariables(void) noexcept {
         w.pImageInfo      = &smpInfos[i];
     }
     for (uint32_t i = 0; i < CommandListHandler::kUavSlots; ++i) {
+#if OPTIMIZE_SHADER_LOADING
+        if (contents.storageBuffers[i] == VK_NULL_HANDLE)
+            continue;
+        stoInfos[i].buffer = contents.storageBuffers[i];
+        stoInfos[i].offset = 0;
+        stoInfos[i].range  = contents.storageBufferSizes[i];
+#else
         VkBuffer b = commandListHandler.m_boundStorageBuffers[i];
         if (b == VK_NULL_HANDLE)
             continue;
         stoInfos[i].buffer = b;
         stoInfos[i].offset = 0;
         stoInfos[i].range  = commandListHandler.m_boundStorageBufferSize[i];
+#endif
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w.dstSet          = set;
@@ -1030,12 +1195,20 @@ bool Shader::UpdateVariables(void) noexcept {
         w.pBufferInfo     = &stoInfos[i];
     }
     for (uint32_t i = 0; i < CommandListHandler::kSsboSlots; ++i) {
+#if OPTIMIZE_SHADER_LOADING
+        if (contents.readOnlyBuffers[i] == VK_NULL_HANDLE)
+            continue;
+        ssboInfos[i].buffer = contents.readOnlyBuffers[i];
+        ssboInfos[i].offset = 0;
+        ssboInfos[i].range  = contents.readOnlyBufferSizes[i];
+#else
         VkBuffer b = commandListHandler.m_boundReadOnlyBuffers[i];
         if (b == VK_NULL_HANDLE)
             continue;
         ssboInfos[i].buffer = b;
         ssboInfos[i].offset = 0;
         ssboInfos[i].range  = commandListHandler.m_boundReadOnlyBufferSize[i];
+#endif
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w.dstSet          = set;
@@ -1050,7 +1223,11 @@ bool Shader::UpdateVariables(void) noexcept {
     if (m_usesAccelStructure) {
         accelInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
         accelInfo.accelerationStructureCount = 1;
+#if OPTIMIZE_SHADER_LOADING
+        accelInfo.pAccelerationStructures = &contents.accelStructure;
+#else
         accelInfo.pAccelerationStructures = &accelStructure;
+#endif
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w.pNext           = &accelInfo;
@@ -1063,11 +1240,13 @@ bool Shader::UpdateVariables(void) noexcept {
 
     if (writeCount > 0)
         vkUpdateDescriptorSets(vkContext.Device(), writeCount, writes, 0, nullptr);
+#if !OPTIMIZE_SHADER_LOADING
 
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout,
                             0, 1, &set,
                             kDynamicOffsetCount, m_dynamicOffsets);
     return true;
+#endif
 }
 
 // =================================================================================================
@@ -1127,8 +1306,15 @@ int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
             continue;
         StageConstants& sc = m_stages[s];
         if (size_t(offset) + size <= sc.staging.size()) {
+#if OPTIMIZE_SHADER_LOADING
+            if (std::memcmp(sc.staging.data() + offset, data, size) != 0) {
+                std::memcpy(sc.staging.data() + offset, data, size);
+                sc.dirty = true;
+            }
+#else
             std::memcpy(sc.staging.data() + offset, data, size);
             sc.dirty = true;
+#endif
             if (result < 0)
                 result = offset;
         }

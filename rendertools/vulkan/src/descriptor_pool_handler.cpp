@@ -56,6 +56,7 @@ void DescriptorPoolHandler::BeginFrame(uint32_t frameIndex) noexcept
         return;
     }
     m_currentFrame = frameIndex;
+    ++m_generation;
     if (m_pools[m_currentFrame] == VK_NULL_HANDLE)
         return;
     VkResult res = vkResetDescriptorPool(m_device, m_pools[m_currentFrame], 0);

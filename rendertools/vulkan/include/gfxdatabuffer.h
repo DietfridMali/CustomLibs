@@ -38,6 +38,8 @@ public:
     // slot rotation alone says nothing about whether a slot is free (see Update ()).
     int                 m_liveSlot{ -1 };
     uint64_t            m_slotRetiredFrame[FRAME_COUNT]{};
+    uint64_t            m_slotBoundFrame[FRAME_COUNT]{};
+    bool                m_slotWasBound[FRAME_COUNT]{};
 
     uint32_t            m_size;           // total buffer size in bytes
     size_t              m_itemSize;       // bytes per vertex element (stride)
@@ -111,6 +113,11 @@ public:
 
     inline VkBuffer Buffer() const noexcept {
         return m_buffer[m_activeSlot].Buffer();
+    }
+
+    inline void MarkBound(uint64_t frameNumber) noexcept {
+        m_slotBoundFrame[m_activeSlot] = frameNumber;
+        m_slotWasBound[m_activeSlot] = true;
     }
 
     // For index buffers: the matching VkIndexType (UINT16 or UINT32).

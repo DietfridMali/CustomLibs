@@ -180,6 +180,7 @@
     <ClInclude Include="..\include\sampler_cache.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
+    <ClInclude Include="..\include\shader_loading.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />
     <ClInclude Include="..\include\shaderdata.h" />
     <ClInclude Include="..\..\include\shadowmap.h" />

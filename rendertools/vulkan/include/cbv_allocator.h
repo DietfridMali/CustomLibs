@@ -55,6 +55,7 @@ class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
     FrameData  m_frames[2];   // FRAME_COUNT = 2
     uint32_t   m_frameIndex   { 0 };
     uint32_t   m_align        { 256 };  // queried from device limits at Create
+    uint64_t   m_generation   { 1 };
 
     bool AllocFrame(uint32_t frameIdx, uint32_t capacity) noexcept;
     bool AddChunk(FrameData& f, uint32_t capacity) noexcept;
@@ -77,6 +78,8 @@ public:
     inline VkBuffer CurrentBuffer(void) const noexcept {
         return m_frames[m_frameIndex].buffer.Buffer();
     }
+
+    inline uint64_t Generation(void) const noexcept { return m_generation; }
 
     inline uint32_t CurrentFrame(void) const noexcept { return m_frameIndex; }
     inline uint32_t Alignment(void) const noexcept { return m_align; }

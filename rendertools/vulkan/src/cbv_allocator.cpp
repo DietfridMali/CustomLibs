@@ -92,6 +92,7 @@ void CbvLinearAllocator::Destroy(void) noexcept
 void CbvLinearAllocator::Reset(uint32_t frameIndex) noexcept
 {
     m_frameIndex = frameIndex;
+    ++m_generation;
     auto& f = m_frames[frameIndex];
 
     DestroyChunks(f);

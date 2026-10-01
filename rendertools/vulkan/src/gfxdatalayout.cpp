@@ -6,6 +6,7 @@
 #include "gfxrenderer.h"
 #include "commandlist.h"
 #include "gfxstates.h"
+#include "shader_loading.h"
 
 #include <cassert>
 #include <cstring>
@@ -176,7 +177,11 @@ struct DefaultVertexStreams {
 static DefaultVertexStreams* defaultStreams = nullptr;
 
 
+#if OPTIMIZE_BUFFER_REUSE
+static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::Format format, uint64_t frameNumber) noexcept
+#else
 static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::Format format) noexcept
+#endif
 {
     if (not defaultStreams) {
         defaultStreams = new (std::nothrow) DefaultVertexStreams;
@@ -195,7 +200,15 @@ static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::
             return VK_NULL_HANDLE;
         streams.capacity = capacity;
     }
+#if OPTIMIZE_BUFFER_REUSE
+
+    GfxDataBuffer& stream = (format == ShaderDataAttributes::Float4) ? streams.unitW : streams.zeros;
+
+    stream.MarkBound(frameNumber);
+    return stream.Buffer();
+#else
     return (format == ShaderDataAttributes::Float4) ? streams.unitW.Buffer() : streams.zeros.Buffer();
+#endif
 }
 
 
@@ -226,6 +239,9 @@ bool GfxDataLayout::Enable(void) noexcept
         return true;
 
     constexpr int kMaxStreams = 16;
+#if OPTIMIZE_BUFFER_REUSE
+    const uint64_t frameNumber = commandListHandler.CmdQueue().FrameNumber();
+#endif
     VkBuffer     buffers[kMaxStreams] { };
     VkDeviceSize offsets[kMaxStreams] { };
     bool         filled[kMaxStreams]  { };
@@ -237,6 +253,9 @@ bool GfxDataLayout::Enable(void) noexcept
         if (slot >= kMaxStreams)
             continue;
         buffers[slot] = gdb->Buffer();
+#if OPTIMIZE_BUFFER_REUSE
+        gdb->MarkBound(frameNumber);
+#endif
         offsets[slot] = 0;
         filled[slot] = true;
         if (slot >= maxSlot)
@@ -254,7 +273,11 @@ bool GfxDataLayout::Enable(void) noexcept
             int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
             if ((slot < 0) or (slot >= kMaxStreams) or filled[slot])
                 continue;
+#if OPTIMIZE_BUFFER_REUSE
+            VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format, frameNumber);
+#else
             VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format);
+#endif
             if (buffer == VK_NULL_HANDLE)
                 continue;
             buffers[slot] = buffer;
@@ -280,8 +303,15 @@ bool GfxDataLayout::Enable(void) noexcept
         i = j;
     }
 
+#if OPTIMIZE_BUFFER_REUSE
+    if (m_indexBuffer.IsValid()) {
+        vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
+        m_indexBuffer.MarkBound(frameNumber);
+    }
+#else
     if (m_indexBuffer.IsValid())
         vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
+#endif
 
     // Primitive topology is baked into the VkPipeline (no IASetPrimitiveTopology equivalent
     // in dynamic rendering). Render () feeds m_shape into the PipelineKey via CommandList::SetTopology ().

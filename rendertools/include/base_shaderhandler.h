@@ -58,7 +58,9 @@ public:
 
     Shader* SelectShader(Texture* texture);
 
-    Shader* SetupRenderShader(String shaderId, String depthShaderId = "surfaceShadowShader");
+    static const String& DefaultDepthShaderId(void);
+
+    Shader* SetupRenderShader(const String& shaderId, const String& depthShaderId = DefaultDepthShaderId());
 
     void StopShader(bool needLegacyMatrices = false);
 
@@ -75,7 +77,7 @@ public:
 
     inline Shader* ActiveShader(void) const noexcept { return m_activeShader; }
 
-    inline Shader* GetShader(String shaderId) {
+    inline Shader* GetShader(const String& shaderId) {
         return m_shaderCode->GetShader(shaderId);
     }
 

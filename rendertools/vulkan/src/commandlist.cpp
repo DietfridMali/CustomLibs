@@ -4,6 +4,7 @@
 #include "cbv_allocator.h"
 #include "resource_handler.h"
 #include "gfxstates.h"
+#include "shader_loading.h"
 
 #include <cstdio>
 #include <cstring>
@@ -717,9 +718,44 @@ void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/) noe
 }
 
 
+#if OPTIMIZE_SHADER_LOADING
+struct PipelineTarget {
+    VkFormat    colorFormats[8] { };
+    uint32_t    colorFormatCount { 0 };
+    VkFormat    depthFormat { VK_FORMAT_UNDEFINED };
+
+    bool operator==(const PipelineTarget& other) const noexcept = default;
+};
+
+#endif
 static RenderStates lastPipelineStates;
 static CommandList* lastPipelineList = nullptr;
 static Shader* lastPipelineShader = nullptr;
+#if OPTIMIZE_SHADER_LOADING
+static PipelineTarget lastPipelineTarget;
+
+
+static void FillPipelineTarget(PipelineKey& key) noexcept
+{
+    if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
+        rt->FillPipelineKey(key);
+    else if (baseDisplayHandler.IsInRendering()) {
+        key.colorFormats[0] = baseDisplayHandler.m_swapchain.Format();
+        key.colorFormatCount = 1;
+        key.depthFormat = VK_FORMAT_UNDEFINED;
+    }
+}
+
+
+static PipelineTarget GetPipelineTarget(const PipelineKey& key) noexcept
+{
+    PipelineTarget target;
+    std::memcpy(target.colorFormats, key.colorFormats, sizeof(target.colorFormats));
+    target.colorFormatCount = key.colorFormatCount;
+    target.depthFormat = key.depthFormat;
+    return target;
+}
+#endif
 
 static void MaskUnwrittenAttachments(RenderStates& states, uint32_t writtenCount, uint32_t attachmentCount) noexcept
 {
@@ -756,8 +792,17 @@ static void ReportUnwrittenAttachments(Shader* shader, uint32_t writtenCount, ui
 bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept
 {
     if ((cl->m_activePipeline != VK_NULL_HANDLE) and (cl == lastPipelineList) and (shader == lastPipelineShader)
+#if OPTIMIZE_SHADER_LOADING
+        and (baseRenderer.RenderStates() == lastPipelineStates)) {
+        PipelineKey key { };
+        FillPipelineTarget(key);
+        if (GetPipelineTarget(key) == lastPipelineTarget)
+            return true;
+    }
+#else
         and (baseRenderer.RenderStates() == lastPipelineStates))
         return true;
+#endif
     return cl->GetPipeline(shader) != VK_NULL_HANDLE;
 }
 
@@ -779,6 +824,11 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
     PipelineKey key{};
     key.shader = shader;
     key.states = baseRenderer.RenderStates();
+#if OPTIMIZE_SHADER_LOADING
+    FillPipelineTarget(key);
+
+    const PipelineTarget target = GetPipelineTarget(key);
+#else
     if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
         rt->FillPipelineKey(key);
     else if (baseDisplayHandler.IsInRendering()) {
@@ -787,6 +837,7 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
         key.depthFormat = VK_FORMAT_UNDEFINED;
     }
 
+#endif
     const RenderStates liveStates = key.states;
     const uint32_t numRT = uint32_t(shader->m_dataLayout.m_numRenderTargets);
     if (numRT < key.colorFormatCount) {
@@ -810,6 +861,9 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
         lastPipelineStates = liveStates;
         lastPipelineList = this;
         lastPipelineShader = shader;
+#if OPTIMIZE_SHADER_LOADING
+        lastPipelineTarget = target;
+#endif
     }
     return p;
 }

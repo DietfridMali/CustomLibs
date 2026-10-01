@@ -91,29 +91,34 @@ Shader* BaseShaderHandler::SelectShader(Texture* texture) {
 }
 
 
-Shader* BaseShaderHandler::SetupRenderShader(String shaderId, String depthShaderId) {
-    Shader* shader;
-    if (baseRenderer.IsShadowPass())
-        shaderId = depthShaderId; // override all shaders with simplest possible shader during depth pass
-    // In OpenGL the program binding persists across draw calls, so skip re-enabling
-    // if the same shader is already active.
-    if (baseRenderer.UsesOpenGL() and (m_activeShaderId == shaderId) and (m_activeShader != nullptr)) {
-        shader = m_activeShader;
-    }
-    else {
-        // In DX12 / Vulkan the command list is reset each frame, so pipeline state
-        // (root signature, PSO, descriptor heaps) must be re-established on every use.
-        shader = GetShader(shaderId);
+const String& BaseShaderHandler::DefaultDepthShaderId(void) {
+    static const String shaderId("surfaceShadowShader");
+    return shaderId;
+}
+
+
+Shader* BaseShaderHandler::SetupRenderShader(const String& shaderId, const String& depthShaderId) {
+    const String& renderShaderId = baseRenderer.IsShadowPass() ? depthShaderId : shaderId; // override all shaders with simplest possible shader during depth pass
+    const bool isActive = (m_activeShader != nullptr) and (m_activeShaderId == renderShaderId);
+    Shader* shader = m_activeShader;
+    if (not isActive) {
+        shader = GetShader(renderShaderId);
         if (shader == nullptr)
             return nullptr;
         if (not shader->IsValid()) {
 #ifdef _DEBUG
-            fprintf(stderr, "*** shader'%s' is not available\r\n", (char*)shaderId);
+            fprintf(stderr, "*** shader'%s' is not available\r\n", (const char*)renderShaderId);
 #endif
             return nullptr;
         }
         m_activeShader = shader;
-        m_activeShaderId = shaderId;
+        m_activeShaderId = renderShaderId;
+    }
+    // In OpenGL the program binding persists across draw calls, so skip re-enabling
+    // if the same shader is already active.
+    // In DX12 / Vulkan the command list is reset each frame, so pipeline state
+    // (root signature, PSO, descriptor heaps) must be re-established on every use.
+    if (not (isActive and baseRenderer.UsesOpenGL())) {
         if (not shader->Activate()) {
             //gfxStates.CheckError();
             return nullptr;

@@ -4,6 +4,7 @@
 #include "vkcontext.h"
 #include "commandlist.h"
 #include "resource_handler.h"
+#include "shader_loading.h"
 
 #include <cstdio>
 #include <cstring>
@@ -60,9 +61,16 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
         for (auto& b : m_buffer)
             b = GfxBuffer { };
         m_activeSlot = 0;
+#if OPTIMIZE_BUFFER_REUSE
+        for (int i = 0; i < FRAME_COUNT; ++i) {
+            m_slotBoundFrame[i] = 0;
+            m_slotWasBound[i] = false;
+        }
+#else
         m_liveSlot = -1;
         for (auto& frame : m_slotRetiredFrame)
             frame = 0;
+#endif
         m_size = 0;
         m_itemSize = other.m_itemSize;
         m_itemCount = 0;
@@ -90,9 +98,16 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
             other.m_buffer[i] = GfxBuffer { };
         }
         m_activeSlot = other.m_activeSlot;
+#if OPTIMIZE_BUFFER_REUSE
+        for (int i = 0; i < FRAME_COUNT; ++i) {
+            m_slotBoundFrame[i] = other.m_slotBoundFrame[i];
+            m_slotWasBound[i] = other.m_slotWasBound[i];
+        }
+#else
         m_liveSlot = other.m_liveSlot;
         for (int i = 0; i < FRAME_COUNT; ++i)
             m_slotRetiredFrame[i] = other.m_slotRetiredFrame[i];
+#endif
 
         m_size = other.m_size;
         m_itemSize = other.m_itemSize;
@@ -152,6 +167,7 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // layout during init, with no frame boundary between them) would overwrite a slot still
     // referenced by an already-recorded draw — so a same-frame re-update takes a fresh buffer
     // and defers the old one's destruction by one frame slot via gfxResourceHandler.
+#if !OPTIMIZE_BUFFER_REUSE
     //
     // A static buffer has no slot rotation to protect it, so ANY update of one that already holds
     // data is treated the same way: the frame before may still be in flight with a draw that reads
@@ -165,13 +181,20 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // frame with THIS index, never the one in between, so writing there hands a draw that is still in
     // flight half of the next layout. A slot may be written in place only when it is not the live one
     // and the frames in flight since it was retired are through.
+#endif
     const uint64_t frameNumber = commandListHandler.CmdQueue().FrameNumber();
     const uint64_t framesInFlight = uint64_t(FRAME_COUNT);
     const int slot = m_isDynamic ? int(commandListHandler.CmdQueue().FrameIndex()) : 0;
+#if OPTIMIZE_BUFFER_REUSE
+    const bool slotIsBusy = m_buffer[slot].IsValid() and m_slotWasBound[slot] and (m_slotBoundFrame[slot] + framesInFlight > frameNumber);
+
+    if (slotIsBusy) {
+#else
     const bool slotIsBusy = m_buffer[slot].IsValid() and ((slot == m_liveSlot) or (m_slotRetiredFrame[slot] + framesInFlight > frameNumber));
     const bool needsFreshBuffer = slotIsBusy or not m_isDynamic;
 
     if (needsFreshBuffer and m_buffer[slot].IsValid()) {
+#endif
         gfxResourceHandler.TrackCleanup([b = m_buffer[slot]]() mutable { b.Destroy(); });
         m_buffer[slot] = GfxBuffer { };
     }
@@ -179,10 +202,15 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
         m_buffer[slot].Destroy();
         if (not Create(slot, dataSize))
             return false;
+#if OPTIMIZE_BUFFER_REUSE
+        m_slotWasBound[slot] = false;
+#endif
     }
+#if !OPTIMIZE_BUFFER_REUSE
     if ((m_liveSlot >= 0) and (m_liveSlot != slot))
         m_slotRetiredFrame[m_liveSlot] = frameNumber;
     m_liveSlot = slot;
+#endif
     m_activeSlot = slot;
 
     return m_buffer[slot].Upload(data, VkDeviceSize(dataSize), 0);

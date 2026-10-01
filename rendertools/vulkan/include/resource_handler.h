@@ -39,6 +39,11 @@ public:
     uint32_t                         m_frameIndex { 0 };
     uint64_t                         m_serial { 0 };
     uint64_t                         m_lastAllocSerial { 0 };
+    uint64_t                         m_cleanupGeneration { 0 };
+
+    inline uint64_t CleanupGeneration(void) const noexcept {
+        return m_cleanupGeneration;
+    }
 
     inline uint64_t NextSerial(void) noexcept {
         return ++m_serial;
@@ -95,8 +100,10 @@ public:
         m_cleanupSerials[frameIndex].Clear();
         for (int32_t i = 0; i < cbs.Length(); ++i) {
             if (serials[i] < serialLimit) {
-                if (cbs[i])
+                if (cbs[i]) {
+                    ++m_cleanupGeneration;
                     cbs[i]();
+                }
             }
             else {
                 m_cleanupCallbacks[frameIndex].Append(std::move(cbs[i]));

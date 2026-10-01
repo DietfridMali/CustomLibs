@@ -229,7 +229,7 @@ public:
 
     void CreateShaders(const AutoArray<String>& shaderIds);
 
-    inline Shader* GetShader(String shaderId) {
+    inline Shader* GetShader(const String& shaderId) {
         Shader** shader = m_shaders.Find(shaderId);
         return shader ? *shader : nullptr;
     }

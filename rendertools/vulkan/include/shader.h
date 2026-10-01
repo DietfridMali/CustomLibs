@@ -35,7 +35,7 @@
 //      66         ACCELERATION_STRUCTURE, ALL_GRAPHICS    (t0 space2, only in shaders that trace rays)
 //  - VkPipelineLayout from the set layout above (one pipeline layout per shader; cached
 //    pipelines built per RenderStates are looked up via the PSO-cache pendant in step 7d).
-//  - b0 — FrameConstants written per-draw to a UBO ring-buffer sub-allocation (cbv-allocator
+//  - b0 — FrameConstants written when changed to a UBO ring-buffer sub-allocation (cbv-allocator
 //    pendant, step 10).
 //  - b1 — per-stage shader constants, layout reflected from SPIR-V on link.
 //  - Same public API as OGL/DX12 Shader (SetFloat, SetInt, SetVector2f, SetMatrix4f,
@@ -103,7 +103,7 @@ public:
     VkPipelineLayout       m_pipelineLayout { VK_NULL_HANDLE };
     VkDescriptorSetLayout  m_setLayout      { VK_NULL_HANDLE };
 
-    // b0 — FrameConstants (matrices); written per-draw to a UBO ring-buffer sub-allocation
+    // b0 — FrameConstants (matrices); written when changed to a UBO ring-buffer sub-allocation
     FrameConstants  m_b0Staging { };
 
     // Per-stage shader constants (VS/PS/GS), each uploaded to its own UBO binding (1/2/3)
@@ -140,6 +140,7 @@ public:
         uint32_t size { 0 };
         std::vector<uint8_t> staging;
         bool dirty { true };
+        uint64_t generation { 0 };
         AutoArray<std::pair<String, FieldInfo>> fields;
     };
 
@@ -150,6 +151,29 @@ public:
     // vkCmdBindDescriptorSets via pDynamicOffsets in Shader::UpdateVariables.
     static constexpr uint32_t kDynamicOffsetCount = 1 + kStageCount;
     uint32_t  m_dynamicOffsets[kDynamicOffsetCount] { };
+    VkBuffer  m_dynamicBuffers[kDynamicOffsetCount] { };
+
+    FrameConstants  m_b0Uploaded { };
+    uint64_t        m_b0Generation { 0 };
+
+    struct DescriptorContents {
+        VkBuffer                    uniformBuffers[kDynamicOffsetCount] { };
+        VkImageView                 views[kSrvSlots] { };
+        VkImageLayout               layouts[kSrvSlots] { };
+        VkSampler                   samplers[kSamplerSlots] { };
+        VkBuffer                    storageBuffers[kUavSlots] { };
+        VkDeviceSize                storageBufferSizes[kUavSlots] { };
+        VkBuffer                    readOnlyBuffers[kSsboSlots] { };
+        VkDeviceSize                readOnlyBufferSizes[kSsboSlots] { };
+        VkAccelerationStructureKHR  accelStructure { VK_NULL_HANDLE };
+
+        bool operator==(const DescriptorContents& other) const noexcept = default;
+    };
+
+    VkDescriptorSet     m_descriptorSet { VK_NULL_HANDLE };
+    DescriptorContents  m_descriptorContents;
+    uint64_t            m_descriptorPoolGeneration { 0 };
+    uint64_t            m_descriptorCleanupGeneration { 0 };
 
     enum DefaultViewType : uint8_t {
         dvNone = 0,
@@ -161,6 +185,7 @@ public:
 
     uint8_t   m_srvDefaults[kSrvSlots] { };
     bool      m_samplerDeclared[kSamplerSlots] { };
+    bool      m_bindingDeclared[kBindingCount] { };
     bool      m_usesAccelStructure { false };
 
     // Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
@@ -282,6 +307,8 @@ private:
     void ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept;
 
     bool TrySetB0Field(eBaseMatrices id, const float* data) noexcept;
+
+    void WriteDescriptorSet(VkDescriptorSet set, const DescriptorContents& contents) noexcept;
 
 public:
     int SetFloat(const char* name, float data) noexcept;
