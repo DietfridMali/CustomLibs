@@ -51,7 +51,8 @@ public:
         // array layers and VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, sampled through a
         // VK_IMAGE_VIEW_TYPE_CUBE view; one view per layer to render into, because an attachment
         // addresses a single layer.
-        btCubemap
+        btCubemap,
+        btId
     } eBufferType;
 
     VkImage             m_image       { VK_NULL_HANDLE };
@@ -122,6 +123,7 @@ public:
         int depthBufferCount{ 0 };
         int stencilBufferCount{ 0 };
         int vertexBufferCount{ 0 };
+        int idBufferCount{ 0 };
         // Compute-only storage textures (R16G16B16A16_SFLOAT, COLOR+SAMPLED+STORAGE usage).
         // Occupy m_bufferInfo[m_computeBufferIndex..] - caller addresses them via that offset.
         int skyMapCount{ 0 };
@@ -173,6 +175,8 @@ public:
     VkFormat            m_colorFormat{ VK_FORMAT_R8G8B8A8_UNORM };
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
+    int                 m_idBufferCount{ 0 };
+    int                 m_idBufferIndex{ -1 };
     int                 m_depthBufferIndex{ -1 };
     // Stencil is never a buffer of its own: the hardware interleaves both planes, and VK_FORMAT_S8_UINT is
     // an optional format hardly any driver exposes. stencilBufferCount > 0 therefore gives the DEPTH buffer
@@ -335,6 +339,8 @@ public:
     bool ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice = 0);
 
     inline bool IsIntegerColorBuffer(int bufferIndex) const noexcept {
+        if ((m_idBufferCount > 0) and (bufferIndex >= m_idBufferIndex) and (bufferIndex < m_idBufferIndex + m_idBufferCount))
+            return true;
         return (bufferIndex >= 0) and (bufferIndex < m_colorBufferCount) and IsIntegerColorFormat(m_colorFormat);
     }
 
@@ -507,6 +513,10 @@ public:
 
     inline int VertexBufferIndex(int i = 0) noexcept {
         return ExtraBufferIndex(i);
+    }
+
+    inline int IdBufferIndex(int i = 0) noexcept {
+        return m_idBufferCount ? m_idBufferIndex + i : -1;
     }
 
     inline DrawBufferList& DrawBuffers(void) noexcept {

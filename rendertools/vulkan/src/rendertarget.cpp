@@ -30,6 +30,7 @@
 
 static constexpr VkFormat kColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
 static constexpr VkFormat kVertexFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+static constexpr VkFormat kIdFormat = VK_FORMAT_R32_UINT;
 // HDR sky-map format (TSP). RGBA16F = 8 Byte/Pixel, supports HDR cumulus + alpha for premultiplied
 // composit. Sampled+Storage usage so compute can imageStore() and graphics can sampler-read.
 static constexpr VkFormat kSkyMapFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -52,6 +53,8 @@ static VkFormat FormatForType(BufferInfo::eBufferType type)
         return kDepthFormat;
     case BufferInfo::btVertex:
         return kVertexFormat;
+    case BufferInfo::btId:
+        return kIdFormat;
     case BufferInfo::btSkyMap:
         return kSkyMapFormat;
     default:
@@ -237,6 +240,8 @@ void RenderTarget::Init(void)
     m_arrayLayerCount = 0;
     m_arrayLayer = 0;
     m_extraBufferIndex = -1;
+    m_idBufferCount = 0;
+    m_idBufferIndex = -1;
     m_depthBufferIndex = -1;
     m_stencilBufferIndex = -1;
     m_hasStencil = false;
@@ -553,7 +558,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     // for stencil without depth still yields one combined buffer.
     m_hasStencil = params.stencilBufferCount > 0;
     int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
-    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + depthBufferCount + params.cubeMapCount);
+    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.idBufferCount + depthBufferCount + params.cubeMapCount);
     // One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
     m_renderTextures.Resize(m_colorBufferCount);
     for (int i = 0; i < m_renderTextures.Length(); i++)
@@ -571,6 +576,8 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 
     m_vertexBufferCount = params.vertexBufferCount;
     m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
+    m_idBufferCount = params.idBufferCount;
+    m_idBufferIndex = CreateSpecialBuffers(BufferInfo::btId, attachmentIndex, params.idBufferCount);
     m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, depthBufferCount);
     m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
 
@@ -607,8 +614,8 @@ void RenderTarget::Destroy(void)
     for (int i = 0; i < m_bufferCount; ++i)
         m_bufferInfo[i].Release();
     m_isAvailable = false;
-    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
-    m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = -1;
+    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = m_idBufferCount = 0;
+    m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = m_idBufferIndex = -1;
     m_hasStencil = false;
     m_computeBufferIndex = -1;
     m_computeBufferCount = 0;
@@ -885,6 +892,8 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
         // them (wetSplats) needs them in a readable layout.
         for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             DetachBuffer(i);
+        for (int j = 0, i = IdBufferIndex(); j < m_idBufferCount; ++j, ++i)
+            DetachBuffer(i);
     }
     else {
         m_activeBufferIndex = -1;
@@ -914,7 +923,7 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             int listed = m_customDrawBuffers.Length();
             for (int i = 0; i < m_bufferCount; ++i) {
                 BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
-                if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex))
+                if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex) and (type != BufferInfo::btId))
                     continue;
                 bool isTarget = false;
                 for (int j = 0; (j < listed) and not isTarget; ++j)
@@ -1078,6 +1087,8 @@ void RenderTarget::Disable(bool deactivate) noexcept
             m_bufferInfo[i].SetState(cb, BufferInfo::btColor, true);
         for (int j = 0, i = VertexBufferIndex(); j < m_vertexBufferCount; ++j, ++i)
             m_bufferInfo[i].SetState(cb, BufferInfo::btVertex, true);
+        for (int j = 0, i = IdBufferIndex(); j < m_idBufferCount; ++j, ++i)
+            m_bufferInfo[i].SetState(cb, BufferInfo::btId, true);
         for (int j = 0, i = m_cubeMapIndex; j < m_cubeMapCount; ++j, ++i)
             m_bufferInfo[i].SetState(cb, BufferInfo::btCubemap, true);
         if (m_depthBufferIndex >= 0)
@@ -1334,7 +1345,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
     if ((bufferIndex < 0) or (bufferIndex >= m_bufferInfo.Length()))
         return false;
     BufferInfo& info = m_bufferInfo[bufferIndex];
-    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btCubemap);
+    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btId) or (info.m_type == BufferInfo::btCubemap);
     return BindBuffer(bufferIndex, tmuIndex, pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear);
 }
 
@@ -1348,7 +1359,7 @@ bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filte
     BufferInfo& info = m_bufferInfo[bufferIndex];
     if (info.m_imageView == VK_NULL_HANDLE)
         return false;
-    if ((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat))
+    if (((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat)) or (info.m_type == BufferInfo::btId))
         filtering = GfxFilterMode::Nearest;
     // Transition only on our own CL and only when no render-pass scope is open on it.
     // Foreign-CL barriers or barriers inside vkCmdBeginRendering are forbidden; in the
@@ -1568,7 +1579,9 @@ void RenderTarget::FillPipelineKey(PipelineKey& key) noexcept
                 int bufferIndex = m_customDrawBuffers[i];
                 key.colorFormats[key.colorFormatCount++] =
                     ((bufferIndex >= 0) and (bufferIndex < m_bufferCount))
-                    ? ((m_bufferInfo[bufferIndex].m_type == BufferInfo::btVertex) ? kVertexFormat : m_colorFormat)
+                    ? ((m_bufferInfo[bufferIndex].m_type == BufferInfo::btVertex) ? kVertexFormat
+                       : (m_bufferInfo[bufferIndex].m_type == BufferInfo::btId) ? kIdFormat
+                       : m_colorFormat)
                     : VK_FORMAT_UNDEFINED;
             }
             break;

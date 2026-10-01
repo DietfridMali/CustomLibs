@@ -8,6 +8,7 @@
 #include "shader.h"
 #include "array.hpp"
 #include "gfxtypes.h"
+#include "readtarget.h"
 
 #include <cstdio>
 #include <cstring>
@@ -369,6 +370,68 @@ public:
         std::memcpy(m_data.Data(), mapped, size_t(m_bufferSize));
         vmaUnmapMemory(allocator, m_readbackAlloc);
         return true;
+    }
+
+    bool DownloadAsync(GfxReadTarget& readTarget) {
+        if ((m_buffer == VK_NULL_HANDLE) or not readTarget.IsIdle())
+            return false;
+
+        VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+        if (cb == VK_NULL_HANDLE)
+            return false;
+        if (not readTarget.Allocate(size_t(m_bufferSize)))
+            return false;
+
+        VkPipelineStageFlags2 shaderStages = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+        if (vkContext.HasFeature(GfxFeature::Tessellation))
+            shaderStages |= VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT;
+        if (vkContext.HasFeature(GfxFeature::GeometryShader))
+            shaderStages |= VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
+
+        auto BufferBarrier = [&](VkBuffer buffer, VkDeviceSize size,
+                                 VkPipelineStageFlags2 srcStage, VkAccessFlags2 srcAccess,
+                                 VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess) {
+            VkBufferMemoryBarrier2 b{};
+            b.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+            b.srcStageMask        = srcStage;
+            b.srcAccessMask       = srcAccess;
+            b.dstStageMask        = dstStage;
+            b.dstAccessMask       = dstAccess;
+            b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+            b.buffer              = buffer;
+            b.offset              = 0;
+            b.size                = size;
+            VkDependencyInfo dep{};
+            dep.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+            dep.bufferMemoryBarrierCount = 1;
+            dep.pBufferMemoryBarriers    = &b;
+            Vk13Api::CmdPipelineBarrier2(cb, &dep);
+        };
+
+        CommandListHandler::RenderingScope scope;
+        if (commandListHandler.IsInRendering())
+            scope = commandListHandler.SuspendRendering();
+
+        BufferBarrier(m_buffer, m_bufferSize,
+                      shaderStages, VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
+                      VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
+
+        VkBufferCopy region{};
+        region.size = m_bufferSize;
+        vkCmdCopyBuffer(cb, m_buffer, readTarget.Buffer(), 1, &region);
+
+        BufferBarrier(m_buffer, m_bufferSize,
+                      VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_NONE,
+                      VK_PIPELINE_STAGE_2_TRANSFER_BIT | shaderStages, VK_ACCESS_2_TRANSFER_WRITE_BIT | VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+        BufferBarrier(readTarget.Buffer(), m_bufferSize,
+                      VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                      VK_PIPELINE_STAGE_2_HOST_BIT, VK_ACCESS_2_HOST_READ_BIT);
+
+        commandListHandler.ResumeRendering(scope);
+
+        CommandQueue& queue = commandListHandler.CmdQueue();
+        return readTarget.Submit(size_t(m_bufferSize), int(m_width), int(m_height), queue.FrameNumber(), int(queue.FrameIndex()));
     }
 
 private:
