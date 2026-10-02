@@ -159,7 +159,7 @@ void BufferInfo::FreeUAV(void) {
 }
 
 
-void BufferInfo::Release(void) {
+void BufferInfo::Release(bool immediate) {
     // During graphics teardown the descriptor heaps are destroyed wholesale and the
     // gfxResourceHandler singleton may already be gone (RenderTargets die at static
     // destruction). Skip deferred tracking entirely - Init() drops the resource ref
@@ -169,27 +169,36 @@ void BufferInfo::Release(void) {
         Init();
         return;
     }
+
+    auto release = [immediate](const DescriptorHandle& handle) {
+        if (not immediate)
+            gfxResourceHandler.Track(handle);
+        else if (handle.IsValid())
+            handle.m_heap->Free(handle.index);
+    };
+
     // All descriptors and the resource go through deferred release - in-flight command lists
     // may still reference them; gfxResourceHandler frees them once the frame fence has signalled.
     // On a cube map buffer m_rtv is an ALIAS of m_cubeRtv[m_cubeFace] (see SelectCubeFace), so tracking
     // both would hand the same descriptor slot back twice. The six face views are tracked instead.
     if (m_type == btCubemap) {
         for (int face = 0; face < 6; ++face)
-            gfxResourceHandler.Track(m_cubeRtv[face].Handle());
+            release(m_cubeRtv[face].Handle());
     }
     // Same on an array buffer: m_rtv is an ALIAS of m_arrayRtv[m_arrayLayer], so tracking both would
     // hand the same descriptor slot back twice. The per layer views are tracked instead.
     else if (m_isArray) {
         for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
-            gfxResourceHandler.Track(m_arrayRtv[layer].Handle());
+            release(m_arrayRtv[layer].Handle());
     }
     else
-        gfxResourceHandler.Track(m_rtv.Handle());
-    gfxResourceHandler.Track(m_srv.Handle());
-    gfxResourceHandler.Track(m_dsv.Handle());
-    gfxResourceHandler.Track(m_dsvReadOnly.Handle());
-    gfxResourceHandler.Track(m_uav.Handle());
-    gfxResourceHandler.Track(m_resource);
+        release(m_rtv.Handle());
+    release(m_srv.Handle());
+    release(m_dsv.Handle());
+    release(m_dsvReadOnly.Handle());
+    release(m_uav.Handle());
+    if (not immediate)
+        gfxResourceHandler.Track(m_resource);
     Init();
 }
 
@@ -546,11 +555,15 @@ bool RenderTarget::DetachBuffer(int bufferIndex)
 }
 
 
-void RenderTarget::Destroy(void)
+void RenderTarget::Destroy(bool immediate)
 {
     if (IsEnabled())
         m_cmdList->Close();
     m_cmdList = nullptr;
+    if (immediate and (m_bufferCount > 0)) {
+        commandListHandler.ExecutePending();
+        commandListHandler.CmdQueue().WaitIdle();
+    }
     for (int i = 0; i < m_bufferCount; ++i) {
         // Out of the texture slot bookkeeping before the SRV index is handed back - see the note in
         // Texture::Destroy (). The sampling wrappers (m_renderTextures, m_externalTexture) borrow the
@@ -562,7 +575,9 @@ void RenderTarget::Destroy(void)
         const uint32_t srvIndex = m_bufferInfo[i].SRVIndex();
         if (srvIndex != UINT32_MAX)
             gfxStates.ReleaseTexture(GL_TEXTURE_2D, srvIndex);
-        m_bufferInfo[i].Release();
+        if (immediate)
+            commandListHandler.UnbindImage(srvIndex);
+        m_bufferInfo[i].Release(immediate);
         gfxStates.CheckError();
     }
     m_isAvailable = false;

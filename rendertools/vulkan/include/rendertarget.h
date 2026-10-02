@@ -85,7 +85,7 @@ public:
     // hint to the right Vulkan layout/stage/access via the tracker.
     void SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShaderRead);
 
-    void Release(void);
+    void Release(bool immediate = false);
 };
 
 // =================================================================================================
@@ -245,7 +245,7 @@ public:
 
     bool Create(int width, int height, int scale, const RTCreationParams& params);
 
-    void Destroy(void);
+    void Destroy(bool immediate = false);
 
     void SetName(const String& name) noexcept {
         m_name = name;

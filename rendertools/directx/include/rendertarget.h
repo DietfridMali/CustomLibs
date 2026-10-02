@@ -111,7 +111,7 @@ public:
 
     void FreeUAV(void);
 
-    void Release(void);
+    void Release(bool immediate = false);
 
     inline bool IsValid(void) noexcept {
         return m_rtv.IsValid();
@@ -294,7 +294,7 @@ public:
 
     bool Create(int width, int height, int scale, const RTCreationParams& params);
 
-    void Destroy(void);
+    void Destroy(bool immediate = false);
 
     void SetName(const String& name) noexcept {
         m_name = name;

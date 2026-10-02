@@ -475,7 +475,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 }
 
 
-void RenderTarget::Destroy(void) {
+void RenderTarget::Destroy(bool) {
     // The wrappers hold references to the buffer handles, so they go before the buffers do.
     m_renderTextures.Destroy();
     for (int i = 0; i < m_bufferCount; i++) {

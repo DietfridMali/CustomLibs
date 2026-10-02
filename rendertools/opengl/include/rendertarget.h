@@ -214,7 +214,7 @@ public:
 
     bool Create(int width, int height, int scale, const RTCreationParams& params);
 
-    void Destroy(void);
+    void Destroy(bool immediate = false);
 
     bool IsActive(void) noexcept;
 

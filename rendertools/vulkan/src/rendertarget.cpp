@@ -162,18 +162,29 @@ void BufferInfo::SetState(VkCommandBuffer cb, eBufferType usageHint, bool asShad
 }
 
 
-void BufferInfo::Release(void)
+void BufferInfo::Release(bool immediate)
 {
     VkDevice device = vkContext.Device();
     VmaAllocator allocator = vkContext.Allocator();
 
+    auto cleanup = [immediate](std::function<void()> callback) {
+        if (immediate)
+            gfxResourceHandler.CleanupNow(std::move(callback));
+        else
+            gfxResourceHandler.TrackCleanup(std::move(callback));
+    };
+
+    if (immediate) {
+        commandListHandler.UnbindImage(m_imageView);
+        commandListHandler.UnbindImage(m_depthSampleView);
+    }
     // Defer GPU-resource teardown by one frame slot - in-flight command buffers may still
     // reference the image/view. Same pattern as Texture::Destroy(). Safe in the
     // app-shutdown path as long as gfxResourceHandler.Cleanup() processes both frame slots
     // before the handler itself is torn down.
     if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
         VkImageView view = m_imageView;
-        gfxResourceHandler.TrackCleanup([device, view]() {
+        cleanup([device, view]() {
             vkDestroyImageView(device, view, nullptr);
         });
         m_imageView = VK_NULL_HANDLE;
@@ -186,7 +197,7 @@ void BufferInfo::Release(void)
 
         VkImageView view = m_cubeView[face];
 
-        gfxResourceHandler.TrackCleanup([device, view]() {
+        cleanup([device, view]() {
             vkDestroyImageView(device, view, nullptr);
         });
         m_cubeView[face] = VK_NULL_HANDLE;
@@ -199,14 +210,14 @@ void BufferInfo::Release(void)
 
         VkImageView view = m_layerView[layer];
 
-        gfxResourceHandler.TrackCleanup([device, view]() {
+        cleanup([device, view]() {
             vkDestroyImageView(device, view, nullptr);
         });
         m_layerView[layer] = VK_NULL_HANDLE;
     }
     if ((m_depthSampleView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
         VkImageView view = m_depthSampleView;
-        gfxResourceHandler.TrackCleanup([device, view]() {
+        cleanup([device, view]() {
             vkDestroyImageView(device, view, nullptr);
         });
         m_depthSampleView = VK_NULL_HANDLE;
@@ -214,7 +225,7 @@ void BufferInfo::Release(void)
     if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
         VkImage image = m_image;
         VmaAllocation alloc = m_allocation;
-        gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
+        cleanup([allocator, image, alloc]() {
             vmaDestroyImage(allocator, image, alloc);
         });
         m_image = VK_NULL_HANDLE;
@@ -605,14 +616,18 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
 }
 
 
-void RenderTarget::Destroy(void)
+void RenderTarget::Destroy(bool immediate)
 {
     if (m_cmdList)
         m_cmdList->Close();
     m_cmdList = nullptr;
 
+    if (immediate and (m_bufferCount > 0)) {
+        commandListHandler.ExecutePending();
+        commandListHandler.CmdQueue().WaitIdle();
+    }
     for (int i = 0; i < m_bufferCount; ++i)
-        m_bufferInfo[i].Release();
+        m_bufferInfo[i].Release(immediate);
     m_isAvailable = false;
     m_bufferCount = m_colorBufferCount = m_vertexBufferCount = m_idBufferCount = 0;
     m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = m_idBufferIndex = -1;

@@ -80,6 +80,13 @@ public:
         m_cleanupSerials[m_frameIndex].Append(NextSerial());
     }
 
+    inline void CleanupNow(std::function<void()> cleanup) noexcept {
+        if (not cleanup)
+            return;
+        ++m_cleanupGeneration;
+        cleanup();
+    }
+
     // Execute all pending callbacks for the given slot, then clear the list. Called from
     // CommandQueue::BeginFrame after the slot's in-flight fence has signalled.
     inline void Cleanup(uint32_t frameIndex) noexcept {
