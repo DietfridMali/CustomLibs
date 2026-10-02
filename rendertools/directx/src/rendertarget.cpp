@@ -529,6 +529,7 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
         if (not info.AllocRTV())
             return false;
     info.SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    commandListHandler.UnbindImage(info.SRVIndex());
     return true;
 }
 
@@ -711,8 +712,11 @@ bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
             di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
             pDSV = di.m_dsvReadOnly.CPUHandleAddress();
         }
-        else
+        else {
             di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+            commandListHandler.UnbindImage(di.SRVIndex());
+            commandListHandler.UnbindImage(m_shadowTexture.m_handle);
+        }
     }
 
     if (count > 0)

@@ -833,6 +833,8 @@ bool RenderTarget::AttachBuffer(int bufferIndex)
         return false;
     BufferInfo::eBufferType usage = m_bufferInfo[bufferIndex].m_type;
     m_bufferInfo[bufferIndex].SetState(cb, usage, false);
+    commandListHandler.UnbindImage(m_bufferInfo[bufferIndex].m_imageView);
+    commandListHandler.UnbindImage(m_bufferInfo[bufferIndex].m_depthSampleView);
     return true;
 }
 

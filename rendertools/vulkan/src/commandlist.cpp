@@ -858,7 +858,6 @@ VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
         if (vkContext.HasFeature(GfxFeature::UnusedAttachments)) {
             for (uint32_t i = numRT; i < key.colorFormatCount; ++i)
                 key.colorFormats[i] = VK_FORMAT_UNDEFINED;
-            key.colorFormatCount = numRT;
         }
         else if (vkContext.HasFeature(GfxFeature::IndependentBlend))
             MaskUnwrittenAttachments(key.states, numRT, key.colorFormatCount);
@@ -1338,6 +1337,16 @@ void CommandListHandler::UnbindBuffer(VkBuffer buffer) noexcept
     for (uint32_t i = 0; i < kSsboSlots; ++i)
         if (m_boundReadOnlyBuffers[i] == buffer)
             BindReadOnlyBuffer(i, VK_NULL_HANDLE, 0);
+}
+
+
+void CommandListHandler::UnbindImage(VkImageView view) noexcept
+{
+    if (view == VK_NULL_HANDLE)
+        return;
+    for (uint32_t i = 0; i < kSrvSlots; ++i)
+        if (m_boundSrvViews[i] == view)
+            BindSampledImage(i, VK_NULL_HANDLE);
 }
 
 // =================================================================================================

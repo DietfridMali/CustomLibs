@@ -138,6 +138,10 @@ static void FillBlendAttachments(const PipelineKey& key, VkPipelineColorBlendAtt
     for (uint32_t i = 0; i < key.colorFormatCount; ++i) {
         if (IsIntegerColorFormat(key.colorFormats[i]))
             attachments[i].blendEnable = VK_FALSE;
+        if (key.colorFormats[i] == VK_FORMAT_UNDEFINED) {
+            attachments[i].blendEnable = VK_FALSE;
+            attachments[i].colorWriteMask = 0;
+        }
     }
 }
 

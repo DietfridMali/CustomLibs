@@ -262,6 +262,8 @@ public:
 
     void UnbindBuffer(const D3D12_RESOURCE_STATES* pState) noexcept;
 
+    void UnbindImage(uint32_t srvIndex) noexcept;
+
     void TransitionBoundBuffers(ID3D12GraphicsCommandList* list) noexcept;
 
     bool ApplyBindings(const Shader* shader) noexcept;

@@ -263,6 +263,8 @@ public:
     // that materializes a descriptor set writes it - the DX12 path does the same in UnbindBuffer ().
     void UnbindBuffer(VkBuffer buffer) noexcept;
 
+    void UnbindImage(VkImageView view) noexcept;
+
     bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
                 uint32_t graphicsFamily, uint32_t presentFamily,
                 const String& name = "MainQueue") noexcept;

@@ -511,6 +511,16 @@ void CommandListHandler::UnbindBuffer(const D3D12_RESOURCE_STATES* pState) noexc
 }
 
 
+void CommandListHandler::UnbindImage(uint32_t srvIndex) noexcept {
+    if (srvIndex == UINT32_MAX)
+        return;
+    for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i) {
+        if (m_boundSrvs[i] == srvIndex)
+            BindSampledImage(i, UINT32_MAX);
+    }
+}
+
+
 static void TransitionBoundBuffer(ID3D12GraphicsCommandList* list, const CommandListHandler::BoundBuffer& buffer, D3D12_RESOURCE_STATES after) noexcept {
     if (not (buffer.pResource and buffer.pState and *buffer.pResource) or (*buffer.pState == after))
         return;
