@@ -204,9 +204,9 @@ bool Mesh::UpdateData(bool createVertexIndex, bool createTangents, bool forceUpd
     for (int i = 0; (i < m_floatBuffers.Length()) and (i < 2); ++i)
         if (m_floatBuffers[i].HaveData())
             m_meshBufferMask |= (uint32_t(mbFloat0) << i);
-    for (int i = 0; (i < m_offsetBuffers.Length()) and (i < 4); ++i)
+    for (int i = 0; i < m_offsetBuffers.Length(); ++i)
         if (m_offsetBuffers[i].HaveData())
-            m_meshBufferMask |= (uint32_t(mbOffset0) << i);
+            m_meshBufferMask |= MeshBufferBit("Offset", i);
     for (int i = 0; (i < m_uintBuffers.Length()) and (i < 2); ++i)
         if (m_uintBuffers[i].HaveData())
             m_meshBufferMask |= (uint32_t(mbUint0) << i);

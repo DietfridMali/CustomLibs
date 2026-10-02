@@ -63,7 +63,8 @@ class Mesh
 {
 public:
     // Buffer-composition bitmask: one bit per potential mesh data buffer, ordered as Mesh::UpdateData
-    // processes them. Mesh::m_meshBufferMask carries the composition of a concrete mesh; MeshHandler
+    // processes them (mbOffset4 and mbOffset5 are appended at the end, so the older bits keep their
+    // values). Mesh::m_meshBufferMask carries the composition of a concrete mesh; MeshHandler
     // matches pooled meshes on it, so a recycled mesh always has exactly the requested buffer set.
     enum eMeshBufferBits : uint32_t {
         mbIndex     = 1u << 0,
@@ -81,7 +82,9 @@ public:
         mbFloat0    = 1u << 12,
         mbFloat1    = 1u << 13,
         mbUint0     = 1u << 14,
-        mbUint1     = 1u << 15
+        mbUint1     = 1u << 15,
+        mbOffset4   = 1u << 16,
+        mbOffset5   = 1u << 17
     };
 
     // Maps a GfxDataBuffer's (type, id) tag to its eMeshBufferBits bit; 0 if unknown.
@@ -100,8 +103,11 @@ public:
             return mbTangent;
         if (not strcmp(type, "Float"))
             return ((id >= 0) and (id <= 1)) ? (uint32_t(mbFloat0) << id) : 0u;
-        if (not strcmp(type, "Offset"))
-            return ((id >= 0) and (id <= 3)) ? (uint32_t(mbOffset0) << id) : 0u;
+        if (not strcmp(type, "Offset")) {
+            if ((id >= 0) and (id <= 3))
+                return uint32_t(mbOffset0) << id;
+            return ((id >= 4) and (id <= 5)) ? (uint32_t(mbOffset4) << (id - 4)) : 0u;
+        }
         if (not strcmp(type, "Uint"))
             return ((id >= 0) and (id <= 1)) ? (uint32_t(mbUint0) << id) : 0u;
         return 0u;

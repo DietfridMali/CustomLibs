@@ -32,9 +32,13 @@ The `index` parameter is the **attribute slot**, and that is where the shared re
 | --- | --- | --- | --- | --- |
 | 0 | Vertex | | 7-10 | Offset/0-3 |
 | 1-3 | TexCoord/0-2 | | 11-12 | Float/0-1 |
-| 4 | Color | | 13-14 | Uint/0-1 |
+| 4 | Color | | 13-14 | Uint/0-1 or Offset/4-5 |
 | 5 | Normal | | | |
 | 6 | Tangent | | | |
+
+Slots 13-14 are shared: a mesh and its shader use them either for `Uint/0-1` or for `Offset/4-5`,
+never for both. Slots are bound per mesh and declared per shader, so two consumers that use the same
+slot for different attributes do not get in each other's way.
 
 The slot means the same thing in each backend: a GLSL `layout(location = N)`, a Vulkan
 `VkVertexInputAttributeDescription` location (HLSL `[[vk::location(N)]]`), and a DX12 input assembler
@@ -180,7 +184,8 @@ moving what is already in it.
 
 ### The buffer composition mask
 
-`eMeshBufferBits` is a bit per potential mesh buffer, ordered as `UpdateData` processes them.
+`eMeshBufferBits` is a bit per potential mesh buffer, ordered as `UpdateData` processes them
+(`mbOffset4` and `mbOffset5` are appended at the end, so the older bits keep their values).
 `m_meshBufferMask` records what a concrete mesh actually has.
 
 It exists for `MeshHandler`, which pools meshes that are rebuilt every frame (text meshes above all).

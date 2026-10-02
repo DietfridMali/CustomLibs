@@ -14,7 +14,9 @@
 // so shaders address buffers by slot, independently of the order in which a mesh's buffers
 // were created.
 //   slot 0: Vertex, slot 1-3: TexCoord/0-2, slot 4: Color, slot 5: Normal, slot 6: Tangent,
-//   slot 7-10: Offset/0-3, slot 11-12: Float/0-1, slot 13-14: Uint/0-1
+//   slot 7-10: Offset/0-3, slot 11-12: Float/0-1, slot 13-14: Uint/0-1 or Offset/4-5
+// Slots 13-14 are shared: a mesh and its shader use them either for Uint/0-1 or for Offset/4-5,
+// never for both.
 // 15 slots total - OpenGL and Vulkan only guarantee 16 vertex attributes/bindings, so any
 // extension of this table must stay below that limit.
 // Returns -1 for unknown (datatype, id) tags; callers skip such buffers.
@@ -31,8 +33,11 @@ inline int GfxAttributeSlot(const char* datatype, int id) noexcept
         return 5;
     if (strcmp(datatype, "Tangent") == 0)
         return 6;
-    if (strcmp(datatype, "Offset") == 0)
-        return ((id >= 0) and (id <= 3)) ? 7 + id : -1;
+    if (strcmp(datatype, "Offset") == 0) {
+        if ((id >= 0) and (id <= 3))
+            return 7 + id;
+        return ((id >= 4) and (id <= 5)) ? 13 + (id - 4) : -1;
+    }
     if (strcmp(datatype, "Float") == 0)
         return ((id >= 0) and (id <= 1)) ? 11 + id : -1;
     if (strcmp(datatype, "Uint") == 0)
