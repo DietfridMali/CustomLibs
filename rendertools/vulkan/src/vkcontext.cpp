@@ -53,12 +53,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VkContextDebugCallback(
     else if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
         kind = "VAL";
 
-    char header[64];
-    snprintf(header, sizeof(header), "Vulkan %s/%s: ", sev, kind);
+    char header[160];
 
     VKContext& ctx = vkContext;
     {
         std::lock_guard<std::mutex> lock(ctx.m_validationMutex);
+        if (ctx.m_validationShader[0] != '\0')
+            snprintf(header, sizeof(header), "Vulkan %s/%s [shader '%s']: ", sev, kind, ctx.m_validationShader);
+        else
+            snprintf(header, sizeof(header), "Vulkan %s/%s: ", sev, kind);
         VKContext::ValidationMessage msg;
         msg.text = header;
         msg.text += data ? data->pMessage : "(no msg)";
@@ -105,6 +108,21 @@ int VKContext::DrainMessages(bool onlyErrors) noexcept
 #else
     (void)onlyErrors;
     return 0;
+#endif
+}
+
+
+void VKContext::SetValidationShader(const char* name) noexcept
+{
+#if ENABLE_VK_LOGGING
+    if (name == nullptr)
+        name = "";
+    if (std::strcmp(m_validationShader, name) == 0)
+        return;
+    std::lock_guard<std::mutex> lock(m_validationMutex);
+    snprintf(m_validationShader, sizeof(m_validationShader), "%s", name);
+#else
+    (void)name;
 #endif
 }
 

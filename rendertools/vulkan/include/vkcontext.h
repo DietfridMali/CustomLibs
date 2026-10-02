@@ -81,6 +81,7 @@ public:
     std::vector<ValidationMessage> m_validationLog;
     int                           m_validationErrorCount    { 0 };
     int                           m_validationWarningCount  { 0 };
+    char                          m_validationShader[64]    { };
 #endif
 
     // Creates instance, surface, picks physical device, creates logical device + queues + VMA.
@@ -120,6 +121,8 @@ public:
     // since the last call. onlyErrors=true suppresses warnings/info from the printout (counters
     // are reset either way). When ENABLE_VK_LOGGING=0 this compiles to a no-op returning 0.
     int DrainMessages(bool onlyErrors = false) noexcept;
+
+    void SetValidationShader(const char* name) noexcept;
 
 private:
     bool CreateInstance(SDL_Window* window, bool enableValidationLayers) noexcept;

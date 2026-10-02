@@ -379,6 +379,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
             cl->SetTopology(shader, m_shape);
             ResolveDrawPipeline(cl, shader);
         }
+        vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
         hasVariables = shader->UpdateVariables();
     }
     //gfxStates.CheckError();
@@ -401,6 +402,7 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
         }
     }
     gfxStates.CheckError("GfxDataLayout::Render draw");
+    vkContext.SetValidationShader(nullptr);
     // The textures stay bound. GfxStates::BindTexture () returns at once when the same texture is
     // already on the same unit, so a batch that keeps using them costs nothing after the first draw -
     // releasing them here threw that away and made every draw bind again, plus two calls for the

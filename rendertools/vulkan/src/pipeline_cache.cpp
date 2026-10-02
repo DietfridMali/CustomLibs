@@ -287,7 +287,9 @@ VkPipeline PipelineCache::GetOrCreate(const PipelineKey& requestedKey) noexcept
     double stallStart = VkStallClock();
 #endif
     const bool optimize = m_precreating;
+    vkContext.SetValidationShader(static_cast<const char*>(key.shader->m_name));
     VkPipeline pipeline = usesLibraries ? LinkPipeline(key, optimize) : BuildPipeline(key);
+    vkContext.SetValidationShader(nullptr);
     if (pipeline == VK_NULL_HANDLE)
         return (found != nullptr) ? *found : VK_NULL_HANDLE;
 
@@ -495,9 +497,11 @@ void PipelineCache::CreateShaderLibraries(Shader* shader) noexcept
 #endif
     const RenderStates defaults { };
     const uint8_t topology = shader->IsTessellated() ? TopologyForPatchControlPoints(shader->m_patchControlPoints) : uint8_t(MeshTopology::Triangles);
+    vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
     VertexInputLibrary(shader, topology);
     PreRasterizationLibrary(shader, uint8_t(defaults.fillMode), defaults.depthClip, topology);
     FragmentShaderLibrary(shader);
+    vkContext.SetValidationShader(nullptr);
 #if VK_STALL_DIAG
     VkStallEvent("shader libraries", stallStart, static_cast<const char*>(shader->m_name));
 #endif

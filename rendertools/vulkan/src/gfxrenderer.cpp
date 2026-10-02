@@ -26,7 +26,7 @@
 // Vulkan Renderer
 
 bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
-#   ifdef _DEBUG
+#   ifdef ENABLE_VK_LOGGING
     constexpr bool enableValidation = true;
 #   else
     constexpr bool enableValidation = false;
