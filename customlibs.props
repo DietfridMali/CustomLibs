@@ -5,7 +5,7 @@
     <ExternalLibs>$(ProjectDir)..\..\..\..\External\</ExternalLibs>
     <CustomLibs>$(ProjectDir)\..\..\..\..\Custom\</CustomLibs>
     <SteamSDK>$(ExternalLibs)steam\sdk\public\steam</SteamSDK>
-    <VulkanSDK>$(ExternalLibs)VulkanSDK\1.4.341.1</VulkanSDK>
+    <VulkanSDK>$(ExternalLibs)VulkanSDK\</VulkanSDK>
     <VULKAN_SDK>$(VulkanSDK)</VULKAN_SDK>
     <MS_GRDK>$(ExternalLibs)Microsoft\GRD\GRDK</MS_GRDK>
     <TracyDir>$(ExternalLibs)..\..\Tools\Tracy\public\</TracyDir>
