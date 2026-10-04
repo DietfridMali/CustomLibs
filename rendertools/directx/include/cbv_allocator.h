@@ -56,6 +56,7 @@ class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
 
     FrameData  m_frames[2];   // FRAME_COUNT = 2
     UINT       m_frameIndex{ 0 };
+    uint64_t   m_generation{ 1 };
     ComPtr<ID3D12Device> m_device;
 
     bool CreateBuffer(ID3D12Device* device, UINT capacity, const char* name, ComPtr<ID3D12Resource>& resource, uint8_t*& cpuBase) noexcept;
@@ -73,6 +74,8 @@ public:
     // Allocate 'bytes' (rounded up to 256) from the current frame's buffer, or from a chained one
     // once that is full. Returns {nullptr, 0} only when no further buffer could be created.
     CbAlloc Allocate(UINT bytes) noexcept;
+
+    inline uint64_t Generation(void) const noexcept { return m_generation; }
 };
 
 #define cbvAllocator CbvLinearAllocator::Instance()

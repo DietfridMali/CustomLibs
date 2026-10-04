@@ -119,10 +119,17 @@ public:
         uint32_t size{ 0 };
         std::vector<uint8_t> staging;
         bool dirty{ true };
+        uint64_t generation{ 0 };
         AutoArray<std::pair<String, FieldInfo>> fields;
     };
 
     StageConstants m_stages[kStageCount];
+
+    static constexpr int kRootCbvCount = 1 + kStageCount;
+    D3D12_GPU_VIRTUAL_ADDRESS m_rootCbvAddresses[kRootCbvCount]{};
+
+    FrameConstants  m_b0Uploaded{};
+    uint64_t        m_b0Generation{ 0 };
 
     enum DefaultViewType : uint8_t {
         dvNone = 0,

@@ -4,6 +4,7 @@
 #include "commandlist.h"
 #include "dx12context.h"
 #include "resource_handler.h"
+#include "shader_loading.h"
 #include <cstdio>
 #include <cstring>
 
@@ -72,8 +73,12 @@ GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
         m_componentType = other.m_componentType;
         m_isDynamic = other.m_isDynamic;
         m_liveSlot = other.m_liveSlot;
-        for (int i = 0; i < FRAME_COUNT; ++i)
+        m_activeSlot = other.m_activeSlot;
+        for (int i = 0; i < FRAME_COUNT; ++i) {
             m_slotRetiredFrame[i] = other.m_slotRetiredFrame[i];
+            m_slotBoundFrame[i] = other.m_slotBoundFrame[i];
+            m_slotWasBound[i] = other.m_slotWasBound[i];
+        }
     }
     return *this;
 }
@@ -101,8 +106,12 @@ GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other) noexcept
         m_componentType = other.m_componentType;
         m_isDynamic = other.m_isDynamic;
         m_liveSlot = other.m_liveSlot;
-        for (int i = 0; i < FRAME_COUNT; ++i)
+        m_activeSlot = other.m_activeSlot;
+        for (int i = 0; i < FRAME_COUNT; ++i) {
             m_slotRetiredFrame[i] = other.m_slotRetiredFrame[i];
+            m_slotBoundFrame[i] = other.m_slotBoundFrame[i];
+            m_slotWasBound[i] = other.m_slotWasBound[i];
+        }
     }
     return *this;
 }
@@ -149,6 +158,7 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // slot still referenced by an already-recorded draw — so a same-frame re-update takes a
     // fresh resource. The previous one stays alive via gfxResourceHandler's per-frame tracking
     // until the next Cleanup / FlushResources.
+#if !OPTIMIZE_BUFFER_REUSE
     //
     // A static buffer has no slot rotation to protect it, so ANY update of one that already holds
     // data is treated the same way: the frame before may still be in flight with a draw that reads
@@ -162,9 +172,20 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     // frame with THIS index, never for the one in between, so writing there hands a draw that is
     // still in flight half of the next layout. A slot may be written in place only when it is not
     // the live one and the frames in flight since it was retired are through.
+#endif
     const uint64_t frameNumber = commandListHandler.FrameNumber();
     const uint64_t framesInFlight = uint64_t(commandListHandler.FrameCount());
     const int slot = m_isDynamic ? commandListHandler.FrameIndex() : 0;
+#if OPTIMIZE_BUFFER_REUSE
+    const bool slotIsBusy = m_resource[slot] and m_slotWasBound[slot] and (m_slotBoundFrame[slot] + framesInFlight > frameNumber);
+    if (slotIsBusy or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
+        if (m_resource[slot])
+            gfxResourceHandler.TrackUpload(m_resource[slot]);
+        if (not Create(slot, dataSize))
+            return false;
+        m_slotWasBound[slot] = false;
+    }
+#else
     const bool slotIsBusy = m_resource[slot] and ((slot == m_liveSlot) or (m_slotRetiredFrame[slot] + framesInFlight > frameNumber));
     const bool needsFreshBuffer = slotIsBusy or not m_isDynamic;
     if (needsFreshBuffer or not m_resource[slot] or (m_resource[slot]->GetDesc().Width < dataSize)) {
@@ -176,6 +197,8 @@ bool GfxDataBuffer::Update(const char* type, GfxBufferTarget bufferType, int ind
     if ((m_liveSlot >= 0) and (m_liveSlot != slot))
         m_slotRetiredFrame[m_liveSlot] = frameNumber;
     m_liveSlot = slot;
+#endif
+    m_activeSlot = slot;
     ID3D12Resource* resource = m_resource[slot].Get();
 
     // Upload data

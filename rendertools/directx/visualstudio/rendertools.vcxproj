@@ -88,7 +88,7 @@
       <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -110,12 +110,10 @@
       <ForcedIncludeFiles>$(ProjectDir)pch.h</ForcedIncludeFiles>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>..\..\src;..\..\include;..\include;$(VULKAN_SDK)\Include;$(ExternalLibs)SDL2_ttf-2.24.0\include;$(ExternalLibs)SDL2-2.32.10\include;$(ExternalLibs)SDL2_image-2.8.12\include;$(ExternalLibs)glm;$(CustomLibs)basetools\include;$(TracyDir)</AdditionalIncludeDirectories>
-      <DebugInformationFormat>None</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <CallingConvention>FastCall</CallingConvention>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>
@@ -172,7 +170,7 @@
     <ClInclude Include="..\..\include\lightningemitter.h" />
     <ClInclude Include="..\..\include\lightningsystem.h" />
     <ClInclude Include="..\..\include\noise.h" />
-    <ClInclude Include="..\..\include\coplanar_rectangle.h" />
+    <ClInclude Include="..\..\include\quad.h" />
     <ClInclude Include="..\..\include\projector.h" />
     <ClInclude Include="..\..\include\base_quadmesh.h" />
     <ClInclude Include="..\..\include\base_texturearray.h" />
@@ -187,6 +185,7 @@
     <ClInclude Include="..\include\sampler_cache.h" />
     <ClInclude Include="..\include\sdlhandler.h" />
     <ClInclude Include="..\include\shader.h" />
+    <ClInclude Include="..\include\shader_loading.h" />
     <ClInclude Include="..\include\compute_shader.h" />
     <ClInclude Include="..\include\acceleration_structure.h" />
     <ClInclude Include="..\..\include\base_shaderhandler.h" />

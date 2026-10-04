@@ -15,6 +15,21 @@
 
 static constexpr uint32_t kPipelineRecordVersion = 2;
 
+namespace {
+
+struct BuildContext {
+    BuildContext(const char* format, const String& shaderName) noexcept
+    {
+        logHandler.SetContext(format, static_cast<const char*>(shaderName));
+    }
+
+    ~BuildContext()
+    {
+        logHandler.ClearContext();
+    }
+};
+
+}
 
 // =================================================================================================
 // RenderStates::GetPSO — PSO creation helpers
@@ -470,6 +485,7 @@ bool PSO::SavePipelineLibrary(void)
 bool PSO::CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc, const String& shaderName, ID3DBlob* rootSignatureBlob, PSOComPtr& pso)
 {
     PipelineLibrary& lib = GetLibrary();
+    BuildContext context("compute shader '%s': pipeline", shaderName);
     if (not lib.library)
         return SUCCEEDED(device->CreateComputePipelineState(&desc, IID_PPV_ARGS(pso.ReleaseAndGetAddressOf())));
     uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, desc.CS.pShaderBytecode, desc.CS.BytecodeLength);
@@ -549,6 +565,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader, const RenderStates& states)
     PSOComPtr psoComPtr;
     PipelineLibrary& lib = GetLibrary();
     std::wstring name;
+    BuildContext context("shader '%s': pipeline state", shader->m_name);
     if (lib.library) {
         name = PipelineName(shader->m_name, PipelineKey(shader, psoStates, psoDesc));
         if (SUCCEEDED(lib.library->LoadGraphicsPipeline(name.c_str(), &psoDesc, IID_PPV_ARGS(&psoComPtr))))

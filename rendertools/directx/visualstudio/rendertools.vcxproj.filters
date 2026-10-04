@@ -46,7 +46,7 @@
     <ClInclude Include="..\..\include\colordata.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\coplanar_rectangle.h">
+    <ClInclude Include="..\..\include\quad.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\cube.h">
@@ -215,6 +215,9 @@
     <ClInclude Include="..\include\shader.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\shader_loading.h">
+      <Filter>Header Files\DirectX</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\shaderdata.h">
       <Filter>Header Files\DirectX</Filter>
     </ClInclude>
@@ -279,6 +282,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\gpuzone.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -509,6 +515,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\common-hlsl\primitive_shaders.cpp">
       <Filter>Source Files\Shader</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

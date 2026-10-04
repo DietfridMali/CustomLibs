@@ -5,6 +5,7 @@
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "commandlist.h"
+#include "shader_loading.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
 
@@ -210,7 +211,11 @@ static size_t AttributeStride(ShaderDataAttributes::Format format) noexcept
 }
 
 
+#if OPTIMIZE_BUFFER_REUSE
+static const D3D12_VERTEX_BUFFER_VIEW* DefaultVertexView(uint32_t vertexCount, ShaderDataAttributes::Format format, uint64_t frameNumber) noexcept
+#else
 static const D3D12_VERTEX_BUFFER_VIEW* DefaultVertexView(uint32_t vertexCount, ShaderDataAttributes::Format format) noexcept
+#endif
 {
     if (not defaultStreams) {
         defaultStreams = new (std::nothrow) DefaultVertexStreams;
@@ -229,7 +234,15 @@ static const D3D12_VERTEX_BUFFER_VIEW* DefaultVertexView(uint32_t vertexCount, S
             return nullptr;
         streams.capacity = capacity;
     }
+#if OPTIMIZE_BUFFER_REUSE
+
+    GfxDataBuffer& stream = (format == ShaderDataAttributes::Float4) ? streams.unitW : streams.zeros;
+
+    stream.MarkBound(frameNumber);
+    return &stream.m_vbv;
+#else
     return (format == ShaderDataAttributes::Float4) ? &streams.unitW.m_vbv : &streams.zeros.m_vbv;
+#endif
 }
 
 
@@ -254,6 +267,10 @@ bool GfxDataLayout::Enable(void) noexcept
     if (not list) 
         return true;
 
+#if OPTIMIZE_BUFFER_REUSE
+    const uint64_t frameNumber = commandListHandler.FrameNumber();
+
+#endif
     // Bind all vertex buffer streams
     int vbCount = m_dataBuffers.Length();
     if (vbCount > 0) {
@@ -267,6 +284,9 @@ bool GfxDataLayout::Enable(void) noexcept
             int slot = (GfxDataBuffer->m_index >= 0) ? GfxDataBuffer->m_index : maxSlot;
             if (slot < kMaxStreams) {
                 views[slot] = GfxDataBuffer->m_vbv;
+#if OPTIMIZE_BUFFER_REUSE
+                GfxDataBuffer->MarkBound(frameNumber);
+#endif
                 if (slot >= maxSlot)
                     maxSlot = slot + 1;
             }
@@ -283,7 +303,11 @@ bool GfxDataLayout::Enable(void) noexcept
                 int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
                 if ((slot < 0) or (slot >= kMaxStreams) or (views[slot].BufferLocation != 0))
                     continue;
+#if OPTIMIZE_BUFFER_REUSE
+                const D3D12_VERTEX_BUFFER_VIEW* pView = DefaultVertexView(vertexCount, layout.m_attrs[i].format, frameNumber);
+#else
                 const D3D12_VERTEX_BUFFER_VIEW* pView = DefaultVertexView(vertexCount, layout.m_attrs[i].format);
+#endif
                 if (not pView)
                     continue;
                 views[slot] = *pView;
@@ -306,8 +330,15 @@ bool GfxDataLayout::Enable(void) noexcept
     }
 
     // Bind index buffer if present
+#if OPTIMIZE_BUFFER_REUSE
+    if (m_indexBuffer.IsValid()) {
+        list->IASetIndexBuffer(&m_indexBuffer.m_ibv);
+        m_indexBuffer.MarkBound(frameNumber);
+    }
+#else
     if (m_indexBuffer.IsValid())
         list->IASetIndexBuffer(&m_indexBuffer.m_ibv);
+#endif
     list->IASetPrimitiveTopology(ToD3DTopology(m_shape));
     return true;
 }

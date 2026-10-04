@@ -6,6 +6,10 @@
 #include "resource_handler.h"
 #include "gfxrenderer.h"
 #include "shader.h"
+#include "shader_loading.h"
+#if OPTIMIZE_SHADER_LOADING
+#include "base_displayhandler.h"
+#endif
 
 #include <cstdio>
 #include <cstring>
@@ -369,13 +373,58 @@ void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcep
 }
 
 
+#if OPTIMIZE_SHADER_LOADING
+struct PipelineTarget {
+    DXGI_FORMAT colorFormats[RenderStates::kColorTargets]{};
+    uint8_t     colorFormatCount{ 0 };
+    DXGI_FORMAT depthFormat{ DXGI_FORMAT_UNKNOWN };
+
+    bool operator==(const PipelineTarget& other) const noexcept = default;
+};
+
+#endif
 static RenderStates lastPipelineStates;
 static CommandList* lastPipelineList = nullptr;
 static Shader* lastPipelineShader = nullptr;
+#if OPTIMIZE_SHADER_LOADING
+static PipelineTarget lastPipelineTarget;
+
+
+static void FillPipelineTarget(RenderStates& states) noexcept
+{
+    if (RenderTarget* renderTarget = baseRenderer.GetActiveBuffer())
+        renderTarget->FillPipelineFormats(states);
+    else {
+        states.colorTargetCount = 1;
+        states.colorFormat = BaseDisplayHandler::BACK_BUFFER_FORMAT;
+        for (auto& format : states.mrtFormats)
+            format = DXGI_FORMAT_UNKNOWN;
+        states.depthFormat = DXGI_FORMAT_UNKNOWN;
+    }
+}
+
+
+static PipelineTarget GetPipelineTarget(void) noexcept
+{
+    RenderStates states;
+    FillPipelineTarget(states);
+    PipelineTarget target;
+    target.colorFormats[0] = states.colorFormat;
+    for (int i = 1; i < RenderStates::kColorTargets; ++i)
+        target.colorFormats[i] = states.mrtFormats[i - 1];
+    target.colorFormatCount = states.colorTargetCount;
+    target.depthFormat = states.depthFormat;
+    return target;
+}
+#endif
 
 bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept {
     if ((cl->m_activePSO != nullptr) and (cl == lastPipelineList) and (shader == lastPipelineShader)
+#if OPTIMIZE_SHADER_LOADING
+        and (baseRenderer.RenderStates() == lastPipelineStates) and (GetPipelineTarget() == lastPipelineTarget))
+#else
         and (baseRenderer.RenderStates() == lastPipelineStates))
+#endif
         return true;
     return cl->GetPSO(shader) != nullptr;
 }
@@ -391,6 +440,9 @@ ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
         lastPipelineStates = baseRenderer.RenderStates();
         lastPipelineList = this;
         lastPipelineShader = shader;
+#if OPTIMIZE_SHADER_LOADING
+        lastPipelineTarget = GetPipelineTarget();
+#endif
     }
     return pso;
 }

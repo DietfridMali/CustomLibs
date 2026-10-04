@@ -123,6 +123,7 @@ void CbvLinearAllocator::Destroy(void) noexcept
 void CbvLinearAllocator::Reset(UINT frameIndex) noexcept
 {
     m_frameIndex = frameIndex;
+    ++m_generation;
     auto& f = m_frames[frameIndex];
     DestroyChunks(f);
     if ((f.peakOffset > f.capacity) and (f.capacity < kMaxCap)) {

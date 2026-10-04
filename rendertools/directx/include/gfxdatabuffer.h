@@ -45,6 +45,9 @@ public:
     // so slot rotation alone says nothing about whether a slot is free (see Update ()).
     int                      m_liveSlot{ -1 };
     uint64_t                 m_slotRetiredFrame[FRAME_COUNT]{};
+    int                      m_activeSlot{ 0 };
+    uint64_t                 m_slotBoundFrame[FRAME_COUNT]{};
+    bool                     m_slotWasBound[FRAME_COUNT]{};
 
     GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
 
@@ -103,7 +106,12 @@ public:
 
     // Returns stride (bytes per vertex element) — used by GfxDataLayout when building VBVs.
     inline UINT Stride() const noexcept { 
-        return UINT(m_itemSize); 
+        return UINT(m_itemSize);
+    }
+
+    inline void MarkBound(uint64_t frameNumber) noexcept {
+        m_slotBoundFrame[m_activeSlot] = frameNumber;
+        m_slotWasBound[m_activeSlot] = true;
     }
 
     // Returns true when at least one upload-resource slot has been created.

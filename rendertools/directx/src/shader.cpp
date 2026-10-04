@@ -15,6 +15,7 @@
 #include <wrl/client.h>
 
 #include "shader.h"
+#include "shader_loading.h"
 #include "shadercache.h"
 #include "cbv_allocator.h"
 #include "shadowmap.h"
@@ -22,6 +23,9 @@
 #include "base_displayhandler.h"
 #include "commandlist.h"
 #include "descriptor_heap.h"
+#if OPTIMIZE_SHADER_LOADING
+#include "resource_handler.h"
+#endif
 #include "dx12context.h"
 #include "gfxstates.h"
 #include "tracy_wrapper.h"
@@ -29,6 +33,11 @@
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
+
+#if OPTIMIZE_SHADER_LOADING
+extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
+
+#endif
 
 // =================================================================================================
 // DXC singleton — modern HLSL compiler (SM 6.0+). Lazy-initialized on first Compile.
@@ -688,7 +697,13 @@ void Shader::Destroy(void) noexcept
         m_stages[s].staging.clear();
         m_stages[s].size = 0;
         m_stages[s].dirty = true;
+#if OPTIMIZE_SHADER_LOADING
+        m_stages[s].generation = 0;
+#endif
     }
+#if OPTIMIZE_SHADER_LOADING
+    m_b0Generation = 0;
+#endif
     m_locations.Clear();
     m_vsInputLayout.clear();
     std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
@@ -754,12 +769,26 @@ bool Shader::UploadB0(void) noexcept {
     if (not list)
         return false;
 
+#if OPTIMIZE_SHADER_LOADING
+    const uint64_t generation = cbvAllocator.Generation();
+    if ((m_b0Generation != generation) or (std::memcmp(&m_b0Uploaded, &m_b0Staging, sizeof(FrameConstants)) != 0)) {
+        CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
+        if (not a.IsValid())
+            return false;
+        std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
+        m_rootCbvAddresses[0] = a.gpu;
+        m_b0Uploaded = m_b0Staging;
+        m_b0Generation = generation;
+    }
+    list->SetGraphicsRootConstantBufferView(0, m_rootCbvAddresses[0]);
+#else
     CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
     if (not a.IsValid())
         return false;
 
     std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
     list->SetGraphicsRootConstantBufferView(0, a.gpu);
+#endif
     return true;
 }
 
@@ -771,16 +800,32 @@ bool Shader::UploadB1(void) noexcept
     if (not list)
         return false;
 
+#if OPTIMIZE_SHADER_LOADING
+    const uint64_t generation = cbvAllocator.Generation();
+#endif
     for (int s = 0; s < kStageCount; ++s) {
         StageConstants& sc = m_stages[s];
         if (sc.size == 0)
             continue;
+#if OPTIMIZE_SHADER_LOADING
+        if (sc.dirty or (sc.generation != generation)) {
+            CbAlloc a = cbvAllocator.Allocate(sc.size);
+            if (not a.IsValid())
+                return false;
+            std::memcpy(a.cpu, sc.staging.data(), sc.size);
+            m_rootCbvAddresses[1 + s] = a.gpu;
+            sc.dirty = false;
+            sc.generation = generation;
+        }
+        list->SetGraphicsRootConstantBufferView(UINT(1 + s), m_rootCbvAddresses[1 + s]);
+#else
         CbAlloc a = cbvAllocator.Allocate(sc.size);
         if (not a.IsValid())
             return false;
         std::memcpy(a.cpu, sc.staging.data(), sc.size);
         list->SetGraphicsRootConstantBufferView(UINT(1 + s), a.gpu);
         sc.dirty = false;
+#endif
     }
     return true;
 }
@@ -807,6 +852,19 @@ bool Shader::Activate(void) {
     if (not cl)
         return false;
 
+#if OPTIMIZE_SHADER_LOADING
+    bool hasPipeline;
+    {
+        ZoneScopedN("Shader::GetPSO");
+        hasPipeline = ResolveDrawPipeline(cl, this);
+    }
+    if (not hasPipeline) {
+#ifdef _DEBUG
+        hasPipeline = ResolveDrawPipeline(cl, this);
+#endif
+        return false;
+    }
+#else
     ID3D12PipelineState* pso;
     {
         ZoneScopedN("Shader::GetPSO");
@@ -818,6 +876,7 @@ bool Shader::Activate(void) {
 #endif
         return false;
     }
+#endif
 
     list->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
 
@@ -839,7 +898,14 @@ bool Shader::UpdateMatrices(void)
 
 // place all shader variables in CL; to be called right before the actual shader call
 bool Shader::UpdateVariables(void) noexcept {
+#if OPTIMIZE_SHADER_LOADING
+    if (not (UploadB0() and UploadB1()))
+        return false;
+    gfxResourceHandler.NoteFrameAllocation();
+    return commandListHandler.ApplyBindings(this);
+#else
     return UploadB0() and UploadB1() and commandListHandler.ApplyBindings(this);
+#endif
 }
 
 // =================================================================================================
@@ -899,8 +965,15 @@ int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
             continue;
         StageConstants& sc = m_stages[s];
         if (size_t(offset) + size <= sc.staging.size()) {
+#if OPTIMIZE_SHADER_LOADING
+            if (std::memcmp(sc.staging.data() + offset, data, size) != 0) {
+                std::memcpy(sc.staging.data() + offset, data, size);
+                sc.dirty = true;
+            }
+#else
             std::memcpy(sc.staging.data() + offset, data, size);
             sc.dirty = true;
+#endif
             if (result < 0)
                 result = offset;
         }
