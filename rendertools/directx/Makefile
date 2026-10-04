@@ -48,6 +48,7 @@ HLSL_FILES := \
  base_texture_shaders \
  blackhole_shader \
  blur_shader \
+ kuwahara_shader \
  lightning_shader \
  line_shader \
  outline_shader \

@@ -42,6 +42,11 @@ const ShaderSource& LightningFlareShader();
 const ShaderSource& LineDrawShader();
 const ShaderSource& SkyboxShader();
 const ShaderSource& BlackholeShader();
+const ShaderSource& KuwaharaTensorShader();
+const ShaderSource& KuwaharaTensorBlurShader();
+const ShaderSource& KuwaharaFilterShader();
+const ShaderSource& KuwaharaCubeTensorShader();
+const ShaderSource& KuwaharaCubeFilterShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -82,7 +87,12 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
         &LightningFlareShader(),
         &LineDrawShader(),
         &SkyboxShader(),
-        &BlackholeShader()
+        &BlackholeShader(),
+        &KuwaharaTensorShader(),
+        &KuwaharaTensorBlurShader(),
+        &KuwaharaFilterShader(),
+        &KuwaharaCubeTensorShader(),
+        &KuwaharaCubeFilterShader()
     };
     AddShaders(shaderSource);
 }
