@@ -18,9 +18,20 @@ namespace {
         return value * (1.0f - jitter + Random::Float(2.0f * jitter));
     }
 
+    float RadicalInverse(uint32_t index) {
+        float result = 0.0f;
+        float digit = 0.5f;
+        for (; index != 0; index >>= 1) {
+            if (index & 1)
+                result += digit;
+            digit *= 0.5f;
+        }
+        return result;
+    }
+
     // Uniform random direction inside a cone of half-angle coneAngle (deg) around axis. 180 deg = the whole
     // sphere, and then the draw is a proper uniform sphere sample (cos theta uniform in [-1, 1]).
-    Vector3f RandomDirection(const Vector3f& axis, float coneAngle) {
+    Vector3f RandomDirection(const Vector3f& axis, float coneAngleMin, float coneAngle, float phiStart, float phiRange, float zStart, float zRange) {
         Vector3f a = axis;
         float l = a.Length();
         if (l > 1e-4f)
@@ -31,11 +42,16 @@ namespace {
             coneAngle = 180.0f;
         else if (coneAngle < 0.0f)
             coneAngle = 0.0f;
+        if (coneAngleMin > coneAngle)
+            coneAngleMin = coneAngle;
+        else if (coneAngleMin < 0.0f)
+            coneAngleMin = 0.0f;
         float cosCone = std::cos(coneAngle * DegToRad);
-        float z = 1.0f - Random::Float(1.0f) * (1.0f - cosCone);   // cos(theta) uniform in [cosCone, 1]
+        float cosMin = std::cos(coneAngleMin * DegToRad);
+        float z = cosMin - (zStart + Random::Float(zRange)) * (cosMin - cosCone);   // cos(theta) uniform in [cosCone, cosMin]
         float r = 1.0f - z * z;
         r = (r > 0.0f) ? std::sqrt(r) : 0.0f;
-        float phi = Random::Float(TwoPi);
+        float phi = phiStart + Random::Float(phiRange);
         Vector3f ref = (std::fabs(a.y) > 0.9f) ? Vector3f(1.0f, 0.0f, 0.0f) : Vector3f(0.0f, 1.0f, 0.0f);
         Vector3f u = ref.Cross(a);
         float ul = u.Length();
@@ -59,13 +75,17 @@ void LightningEmitter::Setup(const Vector3f& start, const Vector3f& end, const L
 }
 
 
-void LightningEmitter::DrawEndpoints(Vector3f& start, Vector3f& end) const {
+void LightningEmitter::DrawEndpoints(int32_t index, int32_t count, Vector3f& start, Vector3f& end) const {
     start = m_start;
     if (m_emitterParams.endpointMode == epRandomDirection) {
         Vector3f reference = m_end - m_start;
         if (reference.Length() < 1e-4f)
             reference = Vector3f(0.0f, 1.0f, 0.0f);
-        Vector3f dir = RandomDirection(reference, m_emitterParams.coneAngle);
+        float phiRange = m_emitterParams.evenSpread ? TwoPi / float(count) : TwoPi;
+        float phiStart = m_emitterParams.evenSpread ? phiRange * float(index) : 0.0f;
+        float zRange = m_emitterParams.evenSpread ? 1.0f / float(count) : 1.0f;
+        float zStart = m_emitterParams.evenSpread ? RadicalInverse(uint32_t(index)) : 0.0f;
+        Vector3f dir = RandomDirection(reference, m_emitterParams.coneAngleMin, m_emitterParams.coneAngle, phiStart, phiRange, zStart, zRange);
         end = start + dir * Jitter(m_emitterParams.radius, m_emitterParams.radiusJitter);
     }
     else
@@ -75,10 +95,11 @@ void LightningEmitter::DrawEndpoints(Vector3f& start, Vector3f& end) const {
         Vector3f delta = end - start;
         float length = delta.Length();
         if (length > 1e-4f) {
-            float offset = m_emitterParams.startOffset * 0.5f + Random::Float(m_emitterParams.startOffset * 0.5f);
+            float offset = m_emitterParams.startOffset * (1.0f - m_emitterParams.startOffsetJitter) + Random::Float(m_emitterParams.startOffset * m_emitterParams.startOffsetJitter);
             Vector3f step = delta * (offset / length);
             start += step;
-            end += step;
+            if (not m_emitterParams.startOffsetOnly)
+                end += step;
         }
     }
 }
@@ -97,7 +118,7 @@ void LightningEmitter::Ignite(int64_t now, LightningSystem& system) {
     int32_t count = (m_emitterParams.count < 1) ? 1 : m_emitterParams.count;
     for (int32_t i = 0; i < count; i++) {
         Vector3f start, end;
-        DrawEndpoints(start, end);
+        DrawEndpoints(i, count, start, end);
         if (m_emitterParams.kind == lkArc)
             system.AddArc(start, end, params);
         else

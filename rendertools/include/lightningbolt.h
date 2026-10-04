@@ -161,6 +161,7 @@ struct LightningCreationParams {
     Vector3f   planeNormal{ Vector3f::ZERO };  // smPlane only: normal of the plane the bolt has to stay in
     bool       useElevationCap{ true };   // gravity world: cap how much steeper upward a branch may point than its parent
     float      tailFraction{ 0.0f };   // build this much of the length BEYOND the end and do not draw it -> the visible tip is not pinned and dances
+    float      sampleScale{ 1.0f };
     float      regenInterval{ 33.0f };  // ms between path rebuilds of an animated lightning (0 = every frame)
     // strike only
     float      lifetime{ 1.0f };   // seconds the strike stays (ttl-faded); 0 = until it is destroyed
@@ -273,6 +274,7 @@ public:
     }
 
     float                    m_tailFraction{ 0.0f };
+    float                    m_sampleScale{ 1.0f };
     int32_t                  m_segments{ 8 };             // fixed intermediate-point count (from the base length)
     int32_t                  m_waveCount{ 1 };            // fixed wiggle count (from the base length)
     uint32_t                 m_seed{ 0 };

@@ -43,7 +43,11 @@ struct LightningEmitterParams {
     float          radius{ 0.0f };    // epRandomDirection: distance of the drawn end from the start
     float          radiusJitter{ 0.25f };  // +/- fraction on the radius
     float          coneAngle{ 180.0f };  // epRandomDirection: max angle (deg) off the reference direction; 180 = full sphere
-    float          startOffset{ 0.0f };  // push both endpoints out along the bolt direction by [offset/2, offset] (keeps bolts off an object's centre)
+    float          coneAngleMin{ 0.0f };
+    bool           evenSpread{ false };
+    float          startOffset{ 0.0f };  // push both endpoints out along the bolt direction by [offset * (1 - startOffsetJitter), offset] (keeps bolts off an object's centre)
+    float          startOffsetJitter{ 0.5f };
+    bool           startOffsetOnly{ false };
     int64_t        ttl{ 0 };          // safety net in ms: 0 = lives until Destroy (); > 0 = the system is reaped anyway
 };
 
@@ -90,7 +94,7 @@ private:
     void Ignite(int64_t now, LightningSystem& system);
 
     // One pair of endpoints for a single lightning of this ignition (per-lightning random draw).
-    void DrawEndpoints(Vector3f& start, Vector3f& end) const;
+    void DrawEndpoints(int32_t index, int32_t count, Vector3f& start, Vector3f& end) const;
 };
 
 // =================================================================================================

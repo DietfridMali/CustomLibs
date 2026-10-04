@@ -423,6 +423,7 @@ void BaseLightning::SetupCommon(const Vector3f& start, const Vector3f& end, cons
     m_planeNormal = params.planeNormal;
     m_useElevationCap = params.useElevationCap;
     m_tailFraction = params.tailFraction;
+    m_sampleScale = (params.sampleScale > 1e-4f) ? params.sampleScale : 1.0f;
     m_regenInterval = params.regenInterval;
     m_animSpeed = params.animSpeed;
     m_timeOffset = Random::Float(AnimStartSpread);
@@ -433,7 +434,7 @@ void BaseLightning::ComputeCounts(void) {
     float length = CurrentLength();
     if (length < 1e-4f)
         length = 1.0f;
-    m_segments = SegmentCount(length);
+    m_segments = SegmentCount(length / m_sampleScale);
     // wavelength is coupled to the amplitude (= waveRatio * amplitude). Since amplitude = length * factor,
     // the base wave count is length-invariant -> trunk and every branch share it (self-similar look).
     float denom = m_waveRatio * m_amplitudeFactor;
@@ -516,7 +517,7 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
     // of its branches, would come out NaN. Phrased this way the test fails closed.
     if (not (length >= 1e-4f))
         return;
-    int32_t segments = SegmentCount(length);
+    int32_t segments = SegmentCount(length / m_sampleScale);
     int32_t waveCount = m_waveCount;   // coupled + length-invariant -> same base wiggle count for trunk & branches
     float amplitude = length * m_amplitudeFactor;
 
