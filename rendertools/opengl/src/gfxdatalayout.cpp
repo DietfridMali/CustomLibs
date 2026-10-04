@@ -4,6 +4,7 @@
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "shaderdatalayout.h"
+#include "loghandler.h"
 
 #include <cassert>
 
@@ -258,7 +259,7 @@ noexcept
 bool checkLayout = false;
 
 static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label) {
-    std::cout << "=== gfxDataBufferId Dump: " << label << " (ID: " << gfxDataBufferId << ") ===" << std::endl;
+    logHandler.Print("=== gfxDataBufferId Dump: %s (ID: %u) ===\n", label, gfxDataBufferId);
 
     glBindBuffer(GL_ARRAY_BUFFER, gfxDataBufferId);
     GLint bufSize;
@@ -267,7 +268,7 @@ static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label)
     // gfxDataBufferId Gr��e checken
     GLint size;
     glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-    std::cout << "Buffer size: " << size << " bytes" << std::endl;
+    logHandler.Print("Buffer size: %d bytes\n", size);
 
     // Daten auslesen (z.B. erste 'count' floats)
     int count = bufSize / elemSize;
@@ -275,7 +276,7 @@ static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label)
     glGetBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(float), data.data());
 
     for (int i = 0; i < count; i++) {
-        std::cout << "  [" << i << "] = " << data[i] << std::endl;
+        logHandler.Print("  [%d] = %g\n", i, data[i]);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -284,7 +285,7 @@ static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label)
 
 static void CheckLayout(GLuint handle, const char* label = "") {
 #if 1
-    std::cout << "=== GfxDataLayout Check: " << label << " (ID: " << handle << ") ===" << std::endl;
+    logHandler.Print("=== GfxDataLayout Check: %s (ID: %u) ===\n", label, handle);
 #endif
     glBindVertexArray(handle);
 
@@ -292,13 +293,13 @@ static void CheckLayout(GLuint handle, const char* label = "") {
     GLint arrayBuffer;
     glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
 #if 1
-    std::cout << "GL_ARRAY_BUFFER_BINDING: " << arrayBuffer << std::endl;
+    logHandler.Print("GL_ARRAY_BUFFER_BINDING: %d\n", arrayBuffer);
 #endif
     // Element Buffer (wichtig f�r indexed drawing)
     GLint elementBuffer;
     glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementBuffer);
 #if 1
-    std::cout << "GL_ELEMENT_ARRAY_BUFFER_BINDING: " << elementBuffer << std::endl;
+    logHandler.Print("GL_ELEMENT_ARRAY_BUFFER_BINDING: %d\n", elementBuffer);
 #endif
     // alle Registry-Slots checken (0-15, siehe GfxAttributeSlot)
     for (int i = 0; i < 16; i++) {
@@ -313,17 +314,14 @@ static void CheckLayout(GLuint handle, const char* label = "") {
             glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &bufferBinding);
             glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &pointer);
 #if 1
-            std::cout << "  Attr " << i << ": enabled, size=" << size
-                << ", type=0x" << std::hex << type << std::dec
-                << ", stride=" << stride
-                << ", gfxDataBufferId=" << bufferBinding
-                << ", offset=" << (size_t)pointer << std::endl;
+            logHandler.Print("  Attr %d: enabled, size=%d, type=0x%x, stride=%d, gfxDataBufferId=%d, offset=%zu\n",
+                             i, size, type, stride, bufferBinding, reinterpret_cast<size_t>(pointer));
             DumpGfxData(bufferBinding, size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
 #endif
             }
     #if 1
             else {
-                std::cout << "  Attr " << i << ": DISABLED" << std::endl;
+                logHandler.Print("  Attr %d: DISABLED\n", i);
             }
     #endif
     }

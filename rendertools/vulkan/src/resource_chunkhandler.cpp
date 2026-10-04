@@ -1,4 +1,5 @@
 #include "resource_chunkhandler.h"
+#include "loghandler.h"
 
 #include <cstdio>
 
@@ -23,7 +24,7 @@ GfxBuffer* GfxDataChunkList::Update(size_t dataSize, const char* ownerName, cons
     else if (m_chunks[m_usedChunks]->Size() < VkDeviceSize(dataSize)) {
         // Existing chunk too small — destroy and reallocate in place.
 #ifdef _DEBUG
-        fprintf(stderr, "GfxDataChunkList::Update: chunk %d for command '%s' (execId=%llu) too small (%llu bytes), reallocating to %zu\n",
+        logHandler.Print("GfxDataChunkList::Update: chunk %d for command '%s' (execId=%llu) too small (%llu bytes), reallocating to %zu\n",
                 m_usedChunks, ownerName ? ownerName : "?", (unsigned long long)execId,
                 (unsigned long long)m_chunks[m_usedChunks]->Size(), dataSize);
 #endif
@@ -45,7 +46,7 @@ GfxBuffer* GfxDataChunkList::Update(size_t dataSize, const char* ownerName, cons
                               VMA_MEMORY_USAGE_AUTO,
                               VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                             | VMA_ALLOCATION_CREATE_MAPPED_BIT)) {
-            fprintf(stderr, "GfxDataChunkList::Update: GfxBuffer::Create failed (size=%zu)\n", dataSize);
+            logHandler.Print("GfxDataChunkList::Update: GfxBuffer::Create failed (size=%zu)\n", dataSize);
             return nullptr;
         }
         (void)ownerName; (void)type; (void)execId;  // names are debug-only on Vulkan path

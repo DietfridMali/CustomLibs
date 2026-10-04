@@ -1,6 +1,7 @@
 #include "gfx_buffer.h"
 #include "vkcontext.h"
 #include "resource_handler.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -31,7 +32,7 @@ bool GfxBuffer::Create(VkDeviceSize size, VkBufferUsageFlags usage,
     VkResult res = vmaCreateBuffer(allocator, &bufInfo, &allocInfo,
                                    &m_buffer, &m_allocation, &allocResult);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "GfxBuffer::Create: vmaCreateBuffer failed (%d, size=%llu)\n",
+        logHandler.Print("GfxBuffer::Create: vmaCreateBuffer failed (%d, size=%llu)\n",
                 (int)res, (unsigned long long)size);
         m_buffer = VK_NULL_HANDLE;
         m_allocation = VK_NULL_HANDLE;

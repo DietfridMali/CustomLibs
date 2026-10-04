@@ -1,6 +1,7 @@
 #include "cbv_allocator.h"
 #include "commandlist.h"
 #include "resource_handler.h"
+#include "loghandler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -20,7 +21,7 @@ bool CbvLinearAllocator::CreateBuffer(ID3D12Device* device, UINT capacity, const
 
     HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource));
     if (FAILED(hr)) {
-        fprintf(stderr, "%s: CreateCommittedResource failed (cap=%u, hr=0x%08X)\n", name, capacity, (unsigned)hr);
+        logHandler.Print("%s: CreateCommittedResource failed (cap=%u, hr=0x%08X)\n", name, capacity, (unsigned)hr);
         return false;
     }
 #if DBG_DIRECTX
@@ -30,7 +31,7 @@ bool CbvLinearAllocator::CreateBuffer(ID3D12Device* device, UINT capacity, const
     D3D12_RANGE readRange{ 0, 0 };
     hr = resource->Map(0, &readRange, reinterpret_cast<void**>(&cpuBase));
     if (FAILED(hr)) {
-        fprintf(stderr, "%s: Map failed (hr=0x%08X)\n", name, (unsigned)hr);
+        logHandler.Print("%s: Map failed (hr=0x%08X)\n", name, (unsigned)hr);
         resource.Reset();
         cpuBase = nullptr;
         return false;

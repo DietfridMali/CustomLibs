@@ -17,6 +17,7 @@
 #include "list.hpp"
 #include "basesingleton.hpp"
 #include "colordata.h"
+#include "loghandler.h"
 
 #define ENFORCE_STATE false
 
@@ -213,7 +214,7 @@ public:
 	GfxStates() {
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
 #if 0//def _DEBUG
-		fprintf(stderr, "Max. texture size: %d\n", m_maxTextureSize);
+		logHandler.Print("Max. texture size: %d\n", m_maxTextureSize);
 #endif
 		// OGL hat keine dynamische "max single resource allocation"-Abfrage. Konservative
 		// 4-GB-Konstante, damit MaxTextureSize(bytesPerPixel) konsistent zu Vulkan/DX12 rechnet.

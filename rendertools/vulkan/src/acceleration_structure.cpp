@@ -5,6 +5,7 @@
 #include "vkupload.h"
 #include "commandlist.h"
 #include "resource_handler.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -66,7 +67,7 @@ bool RayTracingApi::Load(VkDevice device, VkPhysicalDevice physicalDevice) noexc
     if (not (pfnCreateAccelerationStructure and pfnDestroyAccelerationStructure and
              pfnGetAccelerationStructureBuildSizes and pfnCmdBuildAccelerationStructures and
              pfnGetAccelerationStructureDeviceAddress)) {
-        fprintf(stderr, "RayTracingApi::Load: acceleration structure entry points missing\n");
+        logHandler.Print("RayTracingApi::Load: acceleration structure entry points missing\n");
         return false;
     }
 
@@ -136,13 +137,13 @@ bool PrepareBottomLevel(AccelerationStructure& as, const AccelGeometryDesc* geom
 
     if (not as.m_vertices.Create(VkDeviceSize(totalVertices) * 3 * sizeof(float), kBuildInputUsage,
                                  VMA_MEMORY_USAGE_AUTO, kHostWrite)) {
-        fprintf(stderr, "AccelerationStructure: vertex buffer allocation failed\n");
+        logHandler.Print("AccelerationStructure: vertex buffer allocation failed\n");
         as.Destroy();
         return false;
     }
     if (not as.m_indices.Create(VkDeviceSize(totalIndices) * sizeof(uint32_t), kBuildInputUsage,
                                 VMA_MEMORY_USAGE_AUTO, kHostWrite)) {
-        fprintf(stderr, "AccelerationStructure: index buffer allocation failed\n");
+        logHandler.Print("AccelerationStructure: index buffer allocation failed\n");
         as.Destroy();
         return false;
     }
@@ -150,7 +151,7 @@ bool PrepareBottomLevel(AccelerationStructure& as, const AccelGeometryDesc* geom
     float* pVertex = static_cast<float*>(as.m_vertices.Mapped());
     uint32_t* pIndex = static_cast<uint32_t*>(as.m_indices.Mapped());
     if ((not pVertex) or (not pIndex)) {
-        fprintf(stderr, "AccelerationStructure: build input buffers are not mapped\n");
+        logHandler.Print("AccelerationStructure: build input buffers are not mapped\n");
         as.Destroy();
         return false;
     }
@@ -219,13 +220,13 @@ bool PrepareBottomLevel(AccelerationStructure& as, const AccelGeometryDesc* geom
     pfnGetAccelerationStructureBuildSizes(device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
                                           &out.buildInfo, primitiveCounts.data(), &sizes);
     if (sizes.accelerationStructureSize == 0) {
-        fprintf(stderr, "AccelerationStructure: build size is zero\n");
+        logHandler.Print("AccelerationStructure: build size is zero\n");
         as.Destroy();
         return false;
     }
 
     if (not as.m_storage[0].Create(sizes.accelerationStructureSize, kStorageUsage, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE)) {
-        fprintf(stderr, "AccelerationStructure: storage buffer allocation failed (%llu bytes)\n",
+        logHandler.Print("AccelerationStructure: storage buffer allocation failed (%llu bytes)\n",
                 static_cast<unsigned long long>(sizes.accelerationStructureSize));
         as.Destroy();
         return false;
@@ -239,7 +240,7 @@ bool PrepareBottomLevel(AccelerationStructure& as, const AccelGeometryDesc* geom
     createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
     VkResult res = pfnCreateAccelerationStructure(device, &createInfo, nullptr, &as.m_handles[0]);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "AccelerationStructure: vkCreateAccelerationStructureKHR failed (%d)\n", int(res));
+        logHandler.Print("AccelerationStructure: vkCreateAccelerationStructureKHR failed (%d)\n", int(res));
         as.m_handles[0] = VK_NULL_HANDLE;
         as.Destroy();
         return false;
@@ -282,7 +283,7 @@ bool AccelerationStructure::BuildBottomLevelBatch(const AccelBuildItem* items, u
 
     GfxBuffer scratch;
     if (not scratch.Create(scratchTotal + alignment, kScratchUsage, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE)) {
-        fprintf(stderr, "AccelerationStructure: scratch allocation failed (%llu bytes)\n",
+        logHandler.Print("AccelerationStructure: scratch allocation failed (%llu bytes)\n",
                 static_cast<unsigned long long>(scratchTotal));
         for (uint32_t i = 0; i < nPrepared; ++i)
             prepared[i].target->Destroy();
@@ -367,7 +368,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         instanceBuffer.Destroy();
         if (not instanceBuffer.Create(VkDeviceSize(instanceCount) * sizeof(VkAccelerationStructureInstanceKHR),
                                       kBuildInputUsage, VMA_MEMORY_USAGE_AUTO, kHostWrite)) {
-            fprintf(stderr, "AccelerationStructure::BuildTopLevel: instance buffer allocation failed (%u)\n", instanceCount);
+            logHandler.Print("AccelerationStructure::BuildTopLevel: instance buffer allocation failed (%u)\n", instanceCount);
             m_instanceCapacity[m_slot] = 0;
             return false;
         }
@@ -377,7 +378,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
     VkAccelerationStructureInstanceKHR* pInstance =
         static_cast<VkAccelerationStructureInstanceKHR*>(instanceBuffer.Mapped());
     if (not pInstance) {
-        fprintf(stderr, "AccelerationStructure::BuildTopLevel: instance buffer is not mapped\n");
+        logHandler.Print("AccelerationStructure::BuildTopLevel: instance buffer is not mapped\n");
         return false;
     }
 
@@ -425,7 +426,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
     pfnGetAccelerationStructureBuildSizes(device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
                                           &buildInfo, &written, &sizes);
     if (sizes.accelerationStructureSize == 0) {
-        fprintf(stderr, "AccelerationStructure::BuildTopLevel: build size is zero\n");
+        logHandler.Print("AccelerationStructure::BuildTopLevel: build size is zero\n");
         return false;
     }
 
@@ -444,7 +445,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         m_storage[m_slot].Destroy();
         m_storageSize[m_slot] = 0;
         if (not m_storage[m_slot].Create(sizes.accelerationStructureSize, kStorageUsage, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE)) {
-            fprintf(stderr, "AccelerationStructure::BuildTopLevel: storage allocation failed (%llu bytes)\n",
+            logHandler.Print("AccelerationStructure::BuildTopLevel: storage allocation failed (%llu bytes)\n",
                     static_cast<unsigned long long>(sizes.accelerationStructureSize));
             return false;
         }
@@ -457,7 +458,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
         VkResult res = pfnCreateAccelerationStructure(device, &createInfo, nullptr, &m_handles[m_slot]);
         if (res != VK_SUCCESS) {
-            fprintf(stderr, "AccelerationStructure::BuildTopLevel: vkCreateAccelerationStructureKHR failed (%d)\n", int(res));
+            logHandler.Print("AccelerationStructure::BuildTopLevel: vkCreateAccelerationStructureKHR failed (%d)\n", int(res));
             m_handles[m_slot] = VK_NULL_HANDLE;
             m_storage[m_slot].Destroy();
             return false;
@@ -474,7 +475,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         m_scratch[m_slot].Destroy();
         m_scratchSize[m_slot] = 0;
         if (not m_scratch[m_slot].Create(scratchNeeded, kScratchUsage, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE)) {
-            fprintf(stderr, "AccelerationStructure::BuildTopLevel: scratch allocation failed (%llu bytes)\n",
+            logHandler.Print("AccelerationStructure::BuildTopLevel: scratch allocation failed (%llu bytes)\n",
                     static_cast<unsigned long long>(scratchNeeded));
             return false;
         }

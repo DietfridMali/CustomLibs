@@ -6,6 +6,7 @@
 #include "gfxpixelformat_vk.h"
 #include "texture_mips.h"
 #include "resource_handler.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -52,7 +53,7 @@ bool BeginSingleTimeCommands(OneShotCommandBuffer& out) noexcept
 
     VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &out.pool);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::BeginSingleTimeCommands: vkCreateCommandPool failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::BeginSingleTimeCommands: vkCreateCommandPool failed (%d)\n", (int)res);
         return false;
     }
 
@@ -64,7 +65,7 @@ bool BeginSingleTimeCommands(OneShotCommandBuffer& out) noexcept
 
     res = vkAllocateCommandBuffers(device, &allocInfo, &out.cb);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::BeginSingleTimeCommands: vkAllocateCommandBuffers failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::BeginSingleTimeCommands: vkAllocateCommandBuffers failed (%d)\n", (int)res);
         vkDestroyCommandPool(device, out.pool, nullptr);
         out.pool = VK_NULL_HANDLE;
         return false;
@@ -76,7 +77,7 @@ bool BeginSingleTimeCommands(OneShotCommandBuffer& out) noexcept
 
     res = vkBeginCommandBuffer(out.cb, &beginInfo);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::BeginSingleTimeCommands: vkBeginCommandBuffer failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::BeginSingleTimeCommands: vkBeginCommandBuffer failed (%d)\n", (int)res);
         vkFreeCommandBuffers(device, out.pool, 1, &out.cb);
         vkDestroyCommandPool(device, out.pool, nullptr);
         out.pool = VK_NULL_HANDLE;
@@ -96,7 +97,7 @@ bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept
 
     VkResult res = vkEndCommandBuffer(cmd.cb);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::EndSingleTimeCommands: vkEndCommandBuffer failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::EndSingleTimeCommands: vkEndCommandBuffer failed (%d)\n", (int)res);
         vkFreeCommandBuffers(device, cmd.pool, 1, &cmd.cb);
         vkDestroyCommandPool(device, cmd.pool, nullptr);
         return false;
@@ -113,7 +114,7 @@ bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept
 
     res = Vk13Api::QueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::EndSingleTimeCommands: vkQueueSubmit2 failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::EndSingleTimeCommands: vkQueueSubmit2 failed (%d)\n", (int)res);
         HandleDeviceLost(res, "vkupload::EndSingleTimeCommands");
         vkFreeCommandBuffers(device, cmd.pool, 1, &cmd.cb);
         vkDestroyCommandPool(device, cmd.pool, nullptr);
@@ -128,7 +129,7 @@ bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept
     VkStallNote("one-shot submit wait idle", stallStart, nullptr);
 #endif
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::EndSingleTimeCommands: vkQueueWaitIdle failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::EndSingleTimeCommands: vkQueueWaitIdle failed (%d)\n", (int)res);
         HandleDeviceLost(res, "vkupload::EndSingleTimeCommands");
     }
 
@@ -159,7 +160,7 @@ bool CreateStagingBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) noe
     VkResult res = vmaCreateBuffer(allocator, &bufInfo, &allocInfo,
                                    &outStaging.buffer, &outStaging.allocation, &allocResult);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::CreateStagingBuffer: vmaCreateBuffer failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::CreateStagingBuffer: vmaCreateBuffer failed (%d)\n", (int)res);
         return false;
     }
     outStaging.mapped = allocResult.pMappedData;
@@ -190,7 +191,7 @@ bool CreateReadbackBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) no
     VkResult res = vmaCreateBuffer(allocator, &bufInfo, &allocInfo,
                                    &outStaging.buffer, &outStaging.allocation, &allocResult);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "vkupload::CreateReadbackBuffer: vmaCreateBuffer failed (%d)\n", (int)res);
+        logHandler.Print("vkupload::CreateReadbackBuffer: vmaCreateBuffer failed (%d)\n", (int)res);
         return false;
     }
     outStaging.mapped = allocResult.pMappedData;
@@ -551,7 +552,7 @@ bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStr
     VkResult res = vmaCreateImage(allocator, &info, &allocInfo,
                                   &outImage, &outAllocation, nullptr);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Upload3DTextureData: vmaCreateImage failed (%d)\n", (int)res);
+        logHandler.Print("Upload3DTextureData: vmaCreateImage failed (%d)\n", (int)res);
         return false;
     }
     outTracker.Init(outImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);

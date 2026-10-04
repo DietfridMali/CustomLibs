@@ -24,6 +24,7 @@
 #include "shader_compiler.h"
 #include "shadercache.h"
 #include "vkcontext.h"
+#include "loghandler.h"
 
 #ifndef LINUX
 // dxc/dxcapi.h pulls in BSTR / IStream / IUnknown - Windows COM types that live in windows.h.
@@ -72,6 +73,29 @@ namespace
     bool                  g_initialized = false;
 }
 
+#if VK_STALL_DIAG
+extern double VkStallClock(void) noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+
+static const char* CacheMissReason(const String& shaderFolder, const String& fileName, uint64_t key)
+{
+    std::vector<uint8_t> data;
+    if (not ShaderCache::ReadFile(shaderFolder, fileName, data))
+        return "no file";
+    if (data.size() <= sizeof(ShaderCache::Header))
+        return "file too small";
+    ShaderCache::Header header;
+    std::memcpy(&header, data.data(), sizeof(header));
+    if (header.magic != ShaderCache::kMagic)
+        return "magic differs";
+    if (header.key != key)
+        return "key differs";
+    if (header.size != uint64_t(data.size() - sizeof(ShaderCache::Header)))
+        return "size differs";
+    return "odd size";
+}
+#endif
+
 namespace ShaderCompiler
 {
 
@@ -82,12 +106,12 @@ bool Initialize(void) noexcept
 
     HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(g_dxcUtils.GetAddressOf()));
     if (FAILED(hr)) {
-        fprintf(stderr, "ShaderCompiler::Initialize: DxcCreateInstance(IDxcUtils) failed (0x%08X)\n", (unsigned)hr);
+        logHandler.Print("ShaderCompiler::Initialize: DxcCreateInstance(IDxcUtils) failed (0x%08X)\n", (unsigned)hr);
         return false;
     }
     hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(g_dxcCompiler.GetAddressOf()));
     if (FAILED(hr)) {
-        fprintf(stderr, "ShaderCompiler::Initialize: DxcCreateInstance(IDxcCompiler3) failed (0x%08X)\n", (unsigned)hr);
+        logHandler.Print("ShaderCompiler::Initialize: DxcCreateInstance(IDxcCompiler3) failed (0x%08X)\n", (unsigned)hr);
         g_dxcUtils.Reset();
         return false;
     }
@@ -170,6 +194,11 @@ bool CompileHlslToSpirv(const char* hlslSource,
 
     const bool useCache = not shaderFolder.IsEmpty();
     uint64_t key = 0;
+#if VK_STALL_DIAG
+    double stallStart = VkStallClock();
+    const char* missReason = "";
+    char detail[512];
+#endif
     if (useCache) {
         key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslSource);
         key = ShaderCache::Hash(key, args.data(), args.size());
@@ -182,7 +211,16 @@ bool CompileHlslToSpirv(const char* hlslSource,
             key = ShaderCache::Hash(key, &minor, sizeof(minor));
         }
         uint32_t tag = 0;
-        if (ShaderCache::Read(shaderFolder, fileName, key, outSpirv, tag) and ((outSpirv.size() % 4) == 0))
+        const bool isCached = ShaderCache::Read(shaderFolder, fileName, key, outSpirv, tag) and ((outSpirv.size() % 4) == 0);
+#if VK_STALL_DIAG
+        if (isCached) {
+            snprintf(detail, sizeof(detail), "%s: from cache, %zu bytes", static_cast<const char*>(fileName), outSpirv.size());
+            VkStallEvent("spirv", VkStallClock(), detail);
+        }
+        else
+            missReason = CacheMissReason(shaderFolder, fileName, key);
+#endif
+        if (isCached)
             return true;
         outSpirv.clear();
     }
@@ -222,8 +260,13 @@ bool CompileHlslToSpirv(const char* hlslSource,
     const uint8_t* src = static_cast<const uint8_t*>(objectBlob->GetBufferPointer());
     size_t bytes = size_t(objectBlob->GetBufferSize());
     outSpirv.assign(src, src + bytes);
-    if (useCache)
-        ShaderCache::Write(shaderFolder, fileName, key, 0, outSpirv.data(), outSpirv.size());
+    [[maybe_unused]] const bool isStored = useCache and ShaderCache::Write(shaderFolder, fileName, key, 0, outSpirv.data(), outSpirv.size());
+#if VK_STALL_DIAG
+    if (useCache) {
+        snprintf(detail, sizeof(detail), "%s: compiled (cache: %s), %zu bytes, %s", static_cast<const char*>(fileName), missReason, bytes, isStored ? "stored" : "NOT stored");
+        VkStallEvent("spirv", stallStart, detail);
+    }
+#endif
     return true;
 }
 
@@ -252,7 +295,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     String error;
     if (CompileHlslToSpirv(probe, "CSMain", "cs_6_5", nullptr, 0, spirv, error, String(""), String("")))
         return true;
-    fprintf(stderr, "ShaderCompiler::SupportsRayQuery: probe failed: %s\n", static_cast<const char*>(error));
+    logHandler.Print("ShaderCompiler::SupportsRayQuery: probe failed: %s\n", static_cast<const char*>(error));
     return false;
 }
 
@@ -278,7 +321,7 @@ VkShaderModule CreateShaderModule(const std::vector<uint8_t>& spirv) noexcept
     VkShaderModule module = VK_NULL_HANDLE;
     VkResult res = vkCreateShaderModule(device, &info, nullptr, &module);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "ShaderCompiler::CreateShaderModule: vkCreateShaderModule failed (%d)\n", (int)res);
+        logHandler.Print("ShaderCompiler::CreateShaderModule: vkCreateShaderModule failed (%d)\n", (int)res);
         return VK_NULL_HANDLE;
     }
     return module;

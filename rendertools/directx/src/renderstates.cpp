@@ -9,6 +9,7 @@
 #include "base_shaderhandler.h"
 #include "rendertarget.h"
 #include "base_displayhandler.h"
+#include "loghandler.h"
 
 #include <cwchar>
 
@@ -556,7 +557,7 @@ PSO::PSOComPtr PSO::CreatePSO(Shader* shader, const RenderStates& states)
     HRESULT hr = device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&psoComPtr));
     if (FAILED(hr)) {
 #ifdef _DEBUG
-        fprintf(stderr, "RenderStates::CreatePSO '%s': PSO creation failed (hr=0x%08X)\n", (const char*)shader->m_name, (unsigned)hr);
+        logHandler.Print("RenderStates::CreatePSO '%s': PSO creation failed (hr=0x%08X)\n", (const char*)shader->m_name, (unsigned)hr);
 #endif
         return nullptr;
     }

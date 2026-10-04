@@ -35,12 +35,14 @@
 
 #include <cstdio>
 
+#include "loghandler.h"
+
 #ifdef LOG
 #   undef LOG
 #endif
 
 #if 1 //def _DEBUG
-#   define LOG(msg, ...) fprintf(stderr, msg, ##__VA_ARGS__)
+#   define LOG(msg, ...) logHandler.Print(msg, ##__VA_ARGS__)
 #else
 #   define LOG(msg, ...) {}
 #endif

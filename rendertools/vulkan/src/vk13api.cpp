@@ -1,6 +1,7 @@
 #include "vkframework.h"
 
 #include "vk13api.h"
+#include "loghandler.h"
 
 #include <cstdio>
 
@@ -30,7 +31,7 @@ namespace
         pfn = reinterpret_cast<PFN_T>(vkGetDeviceProcAddr(device, name));
         if (pfn != nullptr)
             return true;
-        fprintf(stderr, "Vk13Api::Load: entry point %s missing\n", name);
+        logHandler.Print("Vk13Api::Load: entry point %s missing\n", name);
         return false;
     }
 }

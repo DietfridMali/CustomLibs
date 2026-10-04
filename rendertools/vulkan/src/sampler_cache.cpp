@@ -3,6 +3,7 @@
 
 #include "sampler_cache.h"
 #include "vkcontext.h"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -36,7 +37,7 @@ VkSampler SamplerCache::GetSampler(const TextureSampling& s) noexcept {
     VkSampler sampler = VK_NULL_HANDLE;
     VkResult res = vkCreateSampler(device, &info, nullptr, &sampler);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "SamplerCache::GetSampler: vkCreateSampler failed (%d)\n", (int)res);
+        logHandler.Print("SamplerCache::GetSampler: vkCreateSampler failed (%d)\n", (int)res);
         return VK_NULL_HANDLE;
     }
 

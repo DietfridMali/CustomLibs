@@ -16,6 +16,7 @@
 #include "texture_mips.h"
 #include "gfxstates.h"
 #include "gfxrenderer.h"
+#include "loghandler.h"
 
 #define USE_TEXTURE_LUT 1
 
@@ -491,16 +492,17 @@ static void CheckFileOpen(const std::string& path) {
     errno = 0;
     FILE* f = std::fopen(path.c_str(), "rb");
     if (!f) {
-        std::cerr << "fopen failed for \"" << path << "\"\n";
-        std::cerr << "errno=" << errno << " (" << std::strerror(errno) << ")\n";
-        std::cerr << "bytes:";
+        const int error = errno;
+        logHandler.Print("fopen failed for \"%s\"\n", path.c_str());
+        logHandler.Print("errno=%d (%s)\n", error, std::strerror(error));
+        logHandler.Print("bytes:");
         for (auto c : path) {
-            std::cerr << " " << std::hex << int(c);
+            logHandler.Print(" %x", int(c));
         }
-        std::cerr << std::dec << "\n";
+        logHandler.Print("\n");
     }
     else {
-        std::cout << "fopen OK for \"" << path << "\"\n";
+        logHandler.Print("fopen OK for \"%s\"\n", path.c_str());
         std::fclose(f);
     }
 }

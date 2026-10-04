@@ -4,6 +4,7 @@
 #include "sampler_cache.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -27,7 +28,7 @@ uint32_t SamplerCache::GetSlot(const TextureSampling& s) noexcept {
 
     DescriptorHandle h = descriptorHeaps.AllocSampler();
     if (not h.IsValid()) {
-        fprintf(stderr, "SamplerCache: sampler heap full, cannot create sampler\n");
+        logHandler.Print("SamplerCache: sampler heap full, cannot create sampler\n");
         return UINT32_MAX;
     }
 

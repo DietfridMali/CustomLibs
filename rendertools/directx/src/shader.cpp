@@ -25,6 +25,7 @@
 #include "dx12context.h"
 #include "gfxstates.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -164,7 +165,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     if (not hlslCode or not *hlslCode)
         return false;
     if (not InitDxc()) {
-        fprintf(stderr, "Shader '%s' (%s): DXC initialization failed\n", (const char*)m_name, target);
+        logHandler.Print("Shader '%s' (%s): DXC initialization failed\n", (const char*)m_name, target);
         return false;
     }
 
@@ -207,7 +208,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     ComPtr<IDxcResult> result;
     HRESULT hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
     if (FAILED(hr)) {
-        fprintf(stderr, "Shader '%s' (%s): DXC Compile call failed (0x%08X)\n", (const char*)m_name, target, (unsigned)hr);
+        logHandler.Print("Shader '%s' (%s): DXC Compile call failed (0x%08X)\n", (const char*)m_name, target, (unsigned)hr);
         return false;
     }
 
@@ -221,7 +222,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 #else
         if (FAILED(compileStatus) and errors and (errors->GetStringLength() > 0)) {
 #endif
-            fprintf(stderr, "Shader '%s' (%s) compile output:\n%s\n",
+            logHandler.Print("Shader '%s' (%s) compile output:\n%s\n",
                     (const char*)m_name, target,
                     errors->GetStringPointer());
         }
@@ -238,7 +239,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
     if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(dxilBlob.GetAddressOf()), nullptr))
         or (not dxilBlob) or (dxilBlob->GetBufferSize() == 0)) {
 #ifdef _DEBUG
-        fprintf(stderr, "Shader '%s' (%s): no DXIL output\n", (const char*)m_name, target);
+        logHandler.Print("Shader '%s' (%s): no DXIL output\n", (const char*)m_name, target);
 #endif
         return false;
     }
@@ -275,7 +276,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 }
 )";
     if (not InitDxc()) {
-        fprintf(stderr, "Shader::SupportsRayQuery: DXC initialization failed\n");
+        logHandler.Print("Shader::SupportsRayQuery: DXC initialization failed\n");
         return false;
     }
 
@@ -289,7 +290,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     ComPtr<IDxcResult> result;
     HRESULT hr = g_dxcCompiler->Compile(&source, args, UINT32(std::size(args)), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
     if (FAILED(hr)) {
-        fprintf(stderr, "Shader::SupportsRayQuery: DXC Compile call failed (0x%08X)\n", unsigned(hr));
+        logHandler.Print("Shader::SupportsRayQuery: DXC Compile call failed (0x%08X)\n", unsigned(hr));
         return false;
     }
 
@@ -300,7 +301,7 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 
     ComPtr<IDxcBlobUtf8> errors;
     result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr);
-    fprintf(stderr, "Shader::SupportsRayQuery: probe failed: %s\n", (errors and (errors->GetStringLength() > 0)) ? errors->GetStringPointer() : "");
+    logHandler.Print("Shader::SupportsRayQuery: probe failed: %s\n", (errors and (errors->GetStringLength() > 0)) ? errors->GetStringPointer() : "");
     return false;
 }
 
@@ -320,16 +321,16 @@ void Shader::PrintShaderSource(const char* hlslCode, const char* title) noexcept
     const std::string_view src(hlslCode);
     const size_t lineCount = std::ranges::count(src, '\n') + 1;
     const int width = static_cast<int>(std::to_string(lineCount).size());
-    fprintf(stderr, "\n%s\n", title);
+    logHandler.Print("\n%s\n", title);
     int lineNo = 0;
     for (auto&& chunk : src | std::views::split('\n')) {
         std::string_view line(chunk.begin(), chunk.end());
         if (not line.empty() and line.back() == '\r')
             line.remove_suffix(1);
-        fprintf(stderr, "%*d: %.*s\n", width, ++lineNo,
+        logHandler.Print("%*d: %.*s\n", width, ++lineNo,
                 static_cast<int>(line.size()), line.data());
     }
-    fprintf(stderr, "\n");
+    logHandler.Print("\n");
 }
 #endif
 
@@ -457,7 +458,7 @@ bool Shader::CreateRootSignature(void) noexcept
     if (FAILED(D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
 #ifdef _DEBUG
         if (err)
-            fprintf(stderr, "Shader '%s': root signature serialization error:\n%s\n",
+            logHandler.Print("Shader '%s': root signature serialization error:\n%s\n",
                     (const char*)m_name,
                     static_cast<const char*>(err->GetBufferPointer()));
 #endif
@@ -546,7 +547,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         for (const String* code : stageCode) {
             if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
 #ifdef _DEBUG
-                fprintf(stderr, "Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+                logHandler.Print("Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
 #endif
                 return false;
             }
@@ -554,7 +555,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     }
     if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
 #ifdef _DEBUG
-        fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
+        logHandler.Print("Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
 #endif
         return false;
     }
@@ -907,7 +908,7 @@ int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
 #ifdef _DEBUG
     if ((result < 0) and not loc->m_warned) {
         loc->m_warned = true;
-        fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+        logHandler.Print("Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
     }
 #endif
     return result;

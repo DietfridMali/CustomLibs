@@ -1,6 +1,7 @@
 #include "descriptor_pool_handler.h"
 #include "resource_handler.h"
 #include "vkcontext.h"
+#include "loghandler.h"
 
 #include <cstdio>
 
@@ -15,13 +16,13 @@ extern void VkStallEvent(const char* what, double startMs, const char* detail) n
 bool DescriptorPoolHandler::Create(VkDevice device) noexcept
 {
     if (device == VK_NULL_HANDLE) {
-        fprintf(stderr, "DescriptorPoolHandler::Create: null device\n");
+        logHandler.Print("DescriptorPoolHandler::Create: null device\n");
         return false;
     }
     m_device = device;
     for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
         if (not CreatePool(m_pools[i])) {
-            fprintf(stderr, "DescriptorPoolHandler::Create: no pool for frame slot %u\n", i);
+            logHandler.Print("DescriptorPoolHandler::Create: no pool for frame slot %u\n", i);
             return false;
         }
     }
@@ -51,7 +52,7 @@ void DescriptorPoolHandler::Destroy(void) noexcept
 void DescriptorPoolHandler::BeginFrame(uint32_t frameIndex) noexcept
 {
     if (frameIndex >= FRAME_COUNT) {
-        fprintf(stderr, "DescriptorPoolHandler::BeginFrame: frameIndex %u out of range (max %u)\n",
+        logHandler.Print("DescriptorPoolHandler::BeginFrame: frameIndex %u out of range (max %u)\n",
                 frameIndex, FRAME_COUNT - 1);
         return;
     }
@@ -61,7 +62,7 @@ void DescriptorPoolHandler::BeginFrame(uint32_t frameIndex) noexcept
         return;
     VkResult res = vkResetDescriptorPool(m_device, m_pools[m_currentFrame], 0);
     if (res != VK_SUCCESS)
-        fprintf(stderr, "DescriptorPoolHandler::BeginFrame: vkResetDescriptorPool failed (%d)\n", (int)res);
+        logHandler.Print("DescriptorPoolHandler::BeginFrame: vkResetDescriptorPool failed (%d)\n", (int)res);
 
     std::vector<VkDescriptorPool>& overflow = m_overflowPools[m_currentFrame];
 
@@ -72,7 +73,7 @@ void DescriptorPoolHandler::BeginFrame(uint32_t frameIndex) noexcept
     for (VkDescriptorPool pool : overflow) {
         res = vkResetDescriptorPool(m_device, pool, 0);
         if (res != VK_SUCCESS)
-            fprintf(stderr, "DescriptorPoolHandler::BeginFrame: vkResetDescriptorPool failed (%d)\n", (int)res);
+            logHandler.Print("DescriptorPoolHandler::BeginFrame: vkResetDescriptorPool failed (%d)\n", (int)res);
     }
     m_overflowUsed[m_currentFrame] = 0;
 }
@@ -133,7 +134,7 @@ VkDescriptorSet DescriptorPoolHandler::Allocate(VkDescriptorSetLayout layout) no
         res = vkAllocateDescriptorSets(m_device, &info, &set);
     }
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "DescriptorPoolHandler::Allocate: vkAllocateDescriptorSets failed (%d)\n", (int)res);
+        logHandler.Print("DescriptorPoolHandler::Allocate: vkAllocateDescriptorSets failed (%d)\n", (int)res);
         return VK_NULL_HANDLE;
     }
     gfxResourceHandler.NoteFrameAllocation();
@@ -170,7 +171,7 @@ bool DescriptorPoolHandler::CreatePool(VkDescriptorPool& pool) noexcept
 
     VkResult res = vkCreateDescriptorPool(m_device, &info, nullptr, &pool);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "DescriptorPoolHandler::CreatePool: vkCreateDescriptorPool failed (%d)\n", (int)res);
+        logHandler.Print("DescriptorPoolHandler::CreatePool: vkCreateDescriptorPool failed (%d)\n", (int)res);
         pool = VK_NULL_HANDLE;
         return false;
     }

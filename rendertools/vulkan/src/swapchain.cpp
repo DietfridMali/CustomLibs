@@ -1,5 +1,6 @@
 #include "swapchain.h"
 #include "vkcontext.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <algorithm>
@@ -79,12 +80,12 @@ bool Swapchain::AcquireImages(void) noexcept
     uint32_t count = 0;
     vkGetSwapchainImagesKHR(device, m_swapchain, &count, nullptr);
     if (count == 0) {
-        fprintf(stderr, "Swapchain::AcquireImages: vkGetSwapchainImagesKHR returned 0\n");
+        logHandler.Print("Swapchain::AcquireImages: vkGetSwapchainImagesKHR returned 0\n");
         return false;
     }
     if (count > MAX_BACK_BUFFERS) {
 #ifdef _DEBUG
-        fprintf(stderr, "Swapchain::AcquireImages: %u images > MAX_BACK_BUFFERS %u — truncating\n",
+        logHandler.Print("Swapchain::AcquireImages: %u images > MAX_BACK_BUFFERS %u — truncating\n",
                 count, MAX_BACK_BUFFERS);
 #endif
         count = MAX_BACK_BUFFERS;
@@ -106,7 +107,7 @@ bool Swapchain::AcquireImages(void) noexcept
 
         VkResult res = vkCreateImageView(device, &info, nullptr, &m_imageViews[i]);
         if (res != VK_SUCCESS) {
-            fprintf(stderr, "Swapchain::AcquireImages: vkCreateImageView[%u] failed (%d)\n", i, (int)res);
+            logHandler.Print("Swapchain::AcquireImages: vkCreateImageView[%u] failed (%d)\n", i, (int)res);
             return false;
         }
         m_layoutTrackers[i].Init(m_images[i], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -176,7 +177,7 @@ bool Swapchain::Create(VkSurfaceKHR surface, uint32_t width, uint32_t height, bo
 
     VkResult res = vkCreateSwapchainKHR(vkContext.Device(), &info, nullptr, &m_swapchain);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Swapchain::Create: vkCreateSwapchainKHR failed (%d)\n", (int)res);
+        logHandler.Print("Swapchain::Create: vkCreateSwapchainKHR failed (%d)\n", (int)res);
         return false;
     }
     return AcquireImages();

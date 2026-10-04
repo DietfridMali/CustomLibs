@@ -2,6 +2,7 @@
 #include "commandlist.h"
 #include "shader.h"
 #include "acceleration_structure.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <memory>
@@ -47,18 +48,18 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
 
     HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&m_factory));
     if (FAILED(hr)) {
-        fprintf(stderr, "DX12Context: Failed to create DXGI factory (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("DX12Context: Failed to create DXGI factory (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
 
     if (not SelectAdapter()) {
-        fprintf(stderr, "DX12Context: No suitable DX12 adapter found\n");
+        logHandler.Print("DX12Context: No suitable DX12 adapter found\n");
         return false;
     }
 
     hr = D3D12CreateDevice(m_adapter.Get(), m_featureLevel, IID_PPV_ARGS(&m_device));
     if (FAILED(hr)) {
-        fprintf(stderr, "DX12Context: Failed to create D3D12 device (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("DX12Context: Failed to create D3D12 device (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
 
@@ -76,7 +77,7 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
     if (m_hasRayTracing and not RayTracingApi::Load(m_device.Get()))
         m_hasRayTracing = false;
 #ifdef _DEBUG
-    fprintf(stderr, "DirectX ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
+    logHandler.Print("DirectX ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
 #endif
     return true;
 }
@@ -112,21 +113,19 @@ void DX12Context::DumpDRED(void) noexcept {
             const char* clName = node->pCommandListDebugNameA ? node->pCommandListDebugNameA : "(unnamed)";
             const char* cqName = node->pCommandQueueDebugNameA ? node->pCommandQueueDebugNameA : "(unnamed)";
             UINT last = node->pLastBreadcrumbValue ? *node->pLastBreadcrumbValue : 0;
-            fprintf(stderr, "DRED node %d: CL=%s CQ=%s  ops=%u last=%u\n",
+            logHandler.Print("DRED node %d: CL=%s CQ=%s  ops=%u last=%u\n",
                 n, clName, cqName, node->BreadcrumbCount, last);
             UINT from = (last > 3 ? last - 3 : 0);
             UINT to   = std::min(last + 10, node->BreadcrumbCount - 1);
             for (UINT i = from; i <= to; ++i)
-                fprintf(stderr, "  [%u] op=%u%s\n", i, (unsigned)node->pCommandHistory[i],
+                logHandler.Print("  [%u] op=%u%s\n", i, (unsigned)node->pCommandHistory[i],
                     i == last ? " <-- last completed" : (i > last ? " <-- pending/hung" : ""));
         }
     }
 
     D3D12_DRED_PAGE_FAULT_OUTPUT pf{};
     if (SUCCEEDED(dred->GetPageFaultAllocationOutput(&pf)) && pf.PageFaultVA != 0)
-        fprintf(stderr, "DRED page fault VA=0x%llX\n", (unsigned long long)pf.PageFaultVA);
-
-    fflush(stderr);
+        logHandler.Print("DRED page fault VA=0x%llX\n", (unsigned long long)pf.PageFaultVA);
 }
 
 
@@ -147,7 +146,7 @@ void DX12Context::QueryVRAM(void) noexcept {
     adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &nonLocal);
     lastPrint = now;
     const double toMB = 1.0 / (1024.0 * 1024.0);
-    fprintf(stderr, "VRAM local: usage=%.0f / budget=%.0f MB%s | nonlocal usage=%.0f MB\n",
+    logHandler.Print("VRAM local: usage=%.0f / budget=%.0f MB%s | nonlocal usage=%.0f MB\n",
         double(local.CurrentUsage) * toMB, double(local.Budget) * toMB,
         (local.CurrentUsage > local.Budget) ? "  <-- OVER BUDGET" : "",
         double(nonLocal.CurrentUsage) * toMB);
@@ -186,14 +185,13 @@ int DX12Context::DrainMessages(bool onlyErrors) noexcept {
 #if DBG_DIRECTX
         if ((msg->Severity == D3D12_MESSAGE_SEVERITY_INFO) or (msg->Severity == D3D12_MESSAGE_SEVERITY_WARNING)) {
             if (not onlyErrors and (unsigned)msg->ID != 820)
-                fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
+                logHandler.Print("D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
         }
         else
-            fprintf(stderr, "D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
+            logHandler.Print("D3D12 %s (id=%u) [CL: %s]: %s\n", sev, (unsigned)msg->ID, cl ? (const char*)cl->GetName() : "(none)", msg->pDescription);
 #endif
     }
     m_infoQueue->ClearStoredMessages();
-    fflush(stderr);
     return errorCount;
 }
 #endif

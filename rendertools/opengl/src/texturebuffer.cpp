@@ -10,6 +10,7 @@
 #pragma warning(pop)
 
 #include "gfxstates.h"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -147,7 +148,7 @@ TextureBuffer& TextureBuffer::Create(SDL_Surface* source, bool premultiply, bool
         SDL_FreeSurface(h);
     }
     if (not Allocate(source->w, source->h, source->pitch / source->w))
-        fprintf(stderr, "%s (%d): Memory allocation for texture clone failed\n", __FILE__, __LINE__);
+        logHandler.Print("%s (%d): Memory allocation for texture clone failed\n", __FILE__, __LINE__);
     else {
 #if 0
         if (flipVertically)

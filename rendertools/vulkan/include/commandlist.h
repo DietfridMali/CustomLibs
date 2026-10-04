@@ -10,6 +10,7 @@
 #include "image_layout_tracker.h"
 #include "swapchain.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 #include <functional>
 
@@ -331,7 +332,7 @@ public:
     inline void DrawInstanced(uint32_t vtxCount, uint32_t instCount, uint32_t startVtx, uint32_t startInst,
                               std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
-            fprintf(stderr, "[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), (unsigned)loc.line());
+            logHandler.Print("[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), (unsigned)loc.line());
 #else
     inline void DrawInstanced(uint32_t vtxCount, uint32_t instCount, uint32_t startVtx, uint32_t startInst) noexcept {
 #endif
@@ -345,7 +346,7 @@ public:
                                      std::source_location loc = std::source_location::current()) noexcept {
 #if 0
         if (s_logCalls)
-            fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), (unsigned)loc.line());
+            logHandler.Print("[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), (unsigned)loc.line());
 #endif
 #else
     inline void DrawIndexedInstanced(uint32_t idxCount, uint32_t instCount, uint32_t startIdx, int32_t baseVtx, uint32_t startInst) noexcept {
@@ -360,7 +361,7 @@ public:
                           uint32_t regionCount, const VkImageCopy* regions,
                           std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
-            fprintf(stderr, "[CI]  %s:%u\n", loc.file_name(), (unsigned)loc.line());
+            logHandler.Print("[CI]  %s:%u\n", loc.file_name(), (unsigned)loc.line());
 #else
     inline void CopyImage(VkImage src, VkImageLayout srcLayout, VkImage dst, VkImageLayout dstLayout,
                           uint32_t regionCount, const VkImageCopy* regions) noexcept {
@@ -374,7 +375,7 @@ public:
     inline void PipelineBarrier2(const VkDependencyInfo* dep,
                                  std::source_location loc = std::source_location::current()) noexcept {
         if (s_logCalls)
-            fprintf(stderr, "[PB2] %s:%u\n", loc.file_name(), (unsigned)loc.line());
+            logHandler.Print("[PB2] %s:%u\n", loc.file_name(), (unsigned)loc.line());
 #else
     inline void PipelineBarrier2(const VkDependencyInfo* dep) noexcept {
 #endif

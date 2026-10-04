@@ -21,6 +21,7 @@
 #include "gfxapitype.h"
 #include "image_layout_tracker.h"
 #include "vkupload.h"	// CreateReadbackBuffer for ReadBuffer ()
+#include "loghandler.h"
 
 // =================================================================================================
 // Vulkan Renderer
@@ -34,47 +35,47 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
 
     SDL_Window* window = baseDisplayHandler.GetWindow();
     if (not window) {
-        fprintf(stderr, "GfxRenderer::InitGraphics: SDL window not yet created. Vulkan path expects window-first init order\n");
+        logHandler.Print("GfxRenderer::InitGraphics: SDL window not yet created. Vulkan path expects window-first init order\n");
         return false;
     }
 
     if (not vkContext.Create(window, enableValidation, request)) {
-        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan context.\n");
+        logHandler.Print("Smiley-Battle: Cannot create Vulkan context.\n");
         return false;
     }
     if (not ApplyFeatures(request, vkContext.Features()))
         return false;
     gfxStates.Init();
     if (not ShaderCompiler::Initialize()) {
-        fprintf(stderr, "Smiley-Battle: Cannot initialize DXC shader compiler.\n");
+        logHandler.Print("Smiley-Battle: Cannot initialize DXC shader compiler.\n");
         return false;
     }
     if (not pipelineCache.Create(vkContext.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan pipeline cache.\n");
+        logHandler.Print("Smiley-Battle: Cannot create Vulkan pipeline cache.\n");
         return false;
     }
     if (not descriptorPoolHandler.Create(vkContext.Device())) {
-        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan descriptor pools.\n");
+        logHandler.Print("Smiley-Battle: Cannot create Vulkan descriptor pools.\n");
         return false;
     }
     if (not cbvAllocator.Create()) {
-        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan UBO ring allocator.\n");
+        logHandler.Print("Smiley-Battle: Cannot create Vulkan UBO ring allocator.\n");
         return false;
     }
     if (not commandListHandler.Create(vkContext.Device(),
                                       vkContext.GraphicsQueue(), vkContext.PresentQueue(),
                                       vkContext.GraphicsFamily(), vkContext.PresentFamily(),
                                       "MainQueue")) {
-        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan CommandQueue.\n");
+        logHandler.Print("Smiley-Battle: Cannot create Vulkan CommandQueue.\n");
         return false;
     }
     if (not baseDisplayHandler.SetupSwapchain()) {
-        fprintf(stderr, "Smiley-Battle: Cannot create Vulkan swapchain.\n");
+        logHandler.Print("Smiley-Battle: Cannot create Vulkan swapchain.\n");
         return false;
     }
     // Arm the first frame slot so subsequent BeginFrame paths have a valid sync state.
     if (not commandListHandler.CmdQueue().BeginFrame()) {
-        fprintf(stderr, "Smiley-Battle: Cannot begin first Vulkan frame.\n");
+        logHandler.Print("Smiley-Battle: Cannot begin first Vulkan frame.\n");
         return false;
     }
     return true;
@@ -113,7 +114,7 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
         return true;
 #ifdef _DEBUG
     if (list->m_refCounter == 0)
-        fprintf(stderr, "Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
+        logHandler.Print("Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
 #endif
     if (--(list->m_refCounter) == 0) {
         if (flush)

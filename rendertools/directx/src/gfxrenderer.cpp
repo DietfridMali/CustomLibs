@@ -18,6 +18,7 @@
 #include "resource_handler.h"
 #include "renderstates.h"
 #include "gfxrenderer.h"
+#include "loghandler.h"
 
 #ifdef _DEBUG
 static Texture* testTexture = nullptr;
@@ -35,7 +36,7 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
     constexpr bool enableDebugLayer = false;
 #   endif
     if (not dx12Context.Create(enableDebugLayer)) {
-        fprintf(stderr, "Cannot create DX12 device.\n");
+        logHandler.Print("Cannot create DX12 device.\n");
         return false;
     }
     uint32_t available = GfxAllFeatures();
@@ -45,11 +46,11 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
         return false;
     gfxStates.Init();
     if (not commandListHandler.Create(dx12Context.Device())) {
-        fprintf(stderr, "Cannot create DX12 command queue.\n");
+        logHandler.Print("Cannot create DX12 command queue.\n");
         return false;
     }
     if (not DescriptorHeapHandler::Instance().Create(dx12Context.Device())) {
-        fprintf(stderr, "Cannot create DX12 descriptor heaps.\n");
+        logHandler.Print("Cannot create DX12 descriptor heaps.\n");
         return false;
     }
     // Open the command list so displayHandler.Create() and renderer.Create()
@@ -57,7 +58,7 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
     // Init runs in slot 0 — all deferred RTV / resource pushes during setup land here and are
     // drained by the explicit Flush() calls between setup phases.
     if (not commandListHandler.BeginFrame(0)) {
-        fprintf(stderr, "Cannot begin first DX12 frame.\n");
+        logHandler.Print("Cannot begin first DX12 frame.\n");
         return false;
     }
     if (not descriptorHeaps.CreateDefaultTextures(dx12Context.Device()))
@@ -81,7 +82,7 @@ void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
     }
     else {
 #if LOG_OPERATIONS
-        fprintf(stderr, "Opening temp. CL '%s'\n", (const char*)name);
+        logHandler.Print("Opening temp. CL '%s'\n", (const char*)name);
 #endif
         cl = commandListHandler.CreateCmdList(name, true);
         if (not cl)
@@ -106,11 +107,11 @@ bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
         return true;
 #ifdef _DEBUG
     if (list->m_refCounter == 0)
-        fprintf(stderr, "Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
+        logHandler.Print("Invalid CL ref counter ('%s')\n", (const char*)list->GetName());
 #endif
     if (--(list->m_refCounter) == 0) {
 #if LOG_OPERATIONS
-        fprintf(stderr, "Closing temp. CL '%s'\n", (const char*)list->GetName());
+        logHandler.Print("Closing temp. CL '%s'\n", (const char*)list->GetName());
 #endif
         if (flush)
             list->Flush();

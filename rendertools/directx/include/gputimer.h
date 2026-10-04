@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "loghandler.h"
+
 // GLEW/GLAD vorher initialisieren
 
 // =================================================================================================
@@ -36,7 +38,7 @@ struct GpuTimer {
             if (not s.q) continue;
             GLuint64 ns = 0;
             glGetQueryObjectui64v(s.q, GL_QUERY_RESULT, &ns); // blockt jetzt i. d. R. nicht
-            printf("[GPU] %-24s : %.3f ms\n", s.label ? s.label : "(unnamed)", ns / 1e6);
+            logHandler.Print("[GPU] %-24s : %.3f ms\n", s.label ? s.label : "(unnamed)", ns / 1e6);
             glDeleteQueries(1, &s.q);
         }
         slots[readIdx].clear();

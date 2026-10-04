@@ -5,7 +5,7 @@ endif
 #CXX := clang++
 AR  := ar
 
-FILES := std_string glm_matrix format
+FILES := std_string glm_matrix format loghandler
 
 INCDIRS := \
 	./include \

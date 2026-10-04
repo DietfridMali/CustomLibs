@@ -7,6 +7,7 @@
 #include "acceleration_structure.h"
 #include "vk13api.h"
 #include "array.hpp"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -76,8 +77,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL VkContextDebugCallback(
     // DrainMessages is not called in the render path. Synchronous on the offending call's thread,
     // so the message lands right at the bad vkCmd. The buffer stays intact for DrainMessages.
     if (isError or isWarning) {
-        fprintf(stderr, "%s%s\n", header, data ? data->pMessage : "(no msg)");
-        fflush(stderr);
+        logHandler.Print("%s%s\n", header, data ? data->pMessage : "(no msg)");
     }
     return VK_FALSE;  // never abort the offending Vulkan call
 }
@@ -99,11 +99,9 @@ int VKContext::DrainMessages(bool onlyErrors) noexcept
     for (const ValidationMessage& msg : drained) {
         if (onlyErrors and not msg.isError)
             continue;
-        fprintf(stderr, "%s\n", msg.text.c_str());
+        logHandler.Print("%s\n", msg.text.c_str());
         ++errors;
     }
-    if (not drained.empty())
-        fflush(stderr);
     return errors;
 #else
     (void)onlyErrors;
@@ -132,7 +130,7 @@ void VKContext::SetValidationShader(const char* name) noexcept
 bool VKContext::Create(SDL_Window* window, bool enableValidationLayers, const GfxFeatureRequest& request) noexcept
 {
     if (not window) {
-        fprintf(stderr, "VKContext::Create: null SDL_Window\n");
+        logHandler.Print("VKContext::Create: null SDL_Window\n");
         return false;
     }
     if (not CreateInstance(window, enableValidationLayers))
@@ -190,16 +188,16 @@ bool VKContext::CreateInstance(SDL_Window* window, bool enableValidationLayers) 
     // Required instance extensions for the SDL Vulkan surface (e.g. VK_KHR_surface, VK_KHR_win32_surface)
     uint32_t sdlExtCount = 0;
     if (SDL_Vulkan_GetInstanceExtensions(window, &sdlExtCount, nullptr) == SDL_FALSE) {
-        fprintf(stderr, "VKContext::CreateInstance: SDL_Vulkan_GetInstanceExtensions(count) failed: %s\n", SDL_GetError());
+        logHandler.Print("VKContext::CreateInstance: SDL_Vulkan_GetInstanceExtensions(count) failed: %s\n", SDL_GetError());
         return false;
     }
     if (sdlExtCount + 1 > kMaxInstanceExts) {
-        fprintf(stderr, "VKContext::CreateInstance: too many SDL instance extensions (%u; max %u)\n", sdlExtCount, kMaxInstanceExts);
+        logHandler.Print("VKContext::CreateInstance: too many SDL instance extensions (%u; max %u)\n", sdlExtCount, kMaxInstanceExts);
         return false;
     }
     StaticArray<const char*, kMaxInstanceExts> extensions { };
     if (SDL_Vulkan_GetInstanceExtensions(window, &sdlExtCount, extensions.data()) == SDL_FALSE) {
-        fprintf(stderr, "VKContext::CreateInstance: SDL_Vulkan_GetInstanceExtensions(list) failed: %s\n", SDL_GetError());
+        logHandler.Print("VKContext::CreateInstance: SDL_Vulkan_GetInstanceExtensions(list) failed: %s\n", SDL_GetError());
         return false;
     }
     uint32_t extCount = sdlExtCount;
@@ -238,7 +236,7 @@ bool VKContext::CreateInstance(SDL_Window* window, bool enableValidationLayers) 
 
     VkResult res = vkCreateInstance(&info, nullptr, &m_instance);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "VKContext::CreateInstance: vkCreateInstance failed (%d)\n", (int)res);
+        logHandler.Print("VKContext::CreateInstance: vkCreateInstance failed (%d)\n", (int)res);
         return false;
     }
     return true;
@@ -252,7 +250,7 @@ bool VKContext::CreateInstance(SDL_Window* window, bool enableValidationLayers) 
 bool VKContext::CreateSurface(SDL_Window* window) noexcept
 {
     if (SDL_Vulkan_CreateSurface(window, m_instance, &m_surface) == SDL_FALSE) {
-        fprintf(stderr, "VKContext::CreateSurface: SDL_Vulkan_CreateSurface failed: %s\n", SDL_GetError());
+        logHandler.Print("VKContext::CreateSurface: SDL_Vulkan_CreateSurface failed: %s\n", SDL_GetError());
         return false;
     }
     return true;
@@ -267,12 +265,12 @@ bool VKContext::SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept
     uint32_t count = 0;
     vkEnumeratePhysicalDevices(m_instance, &count, nullptr);
     if (count == 0) {
-        fprintf(stderr, "VKContext::SelectPhysicalDevice: no Vulkan-capable physical device\n");
+        logHandler.Print("VKContext::SelectPhysicalDevice: no Vulkan-capable physical device\n");
         return false;
     }
     if (count > kMaxPhysicalDevices) {
 #ifdef _DEBUG
-        fprintf(stderr, "VKContext::SelectPhysicalDevice: too many devices (%u; max %u), truncating\n", count, kMaxPhysicalDevices);
+        logHandler.Print("VKContext::SelectPhysicalDevice: too many devices (%u; max %u), truncating\n", count, kMaxPhysicalDevices);
 #endif
         count = kMaxPhysicalDevices;
     }
@@ -289,7 +287,7 @@ bool VKContext::SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept
         }
     }
     if (bestDevice == VK_NULL_HANDLE) {
-        fprintf(stderr, "VKContext::SelectPhysicalDevice: no suitable physical device (API 1.2 with extensions or 1.3, plus the required features)\n");
+        logHandler.Print("VKContext::SelectPhysicalDevice: no suitable physical device (API 1.2 with extensions or 1.3, plus the required features)\n");
         return false;
     }
     m_physicalDevice = bestDevice;
@@ -298,7 +296,7 @@ bool VKContext::SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept
     m_apiVersion = support.apiVersion;
     m_availableFeatures = support.features;
 #ifdef _DEBUG
-    fprintf(stderr, "Vulkan device: %s (api %u.%u.%u, using %s)\n",
+    logHandler.Print("Vulkan device: %s (api %u.%u.%u, using %s)\n",
             m_deviceProps.deviceName,
             VK_VERSION_MAJOR(m_deviceProps.apiVersion),
             VK_VERSION_MINOR(m_deviceProps.apiVersion),
@@ -449,7 +447,7 @@ int VKContext::RatePhysicalDevice(VkPhysicalDevice device, const GfxFeatureReque
     if ((request.required & ~support.features) != 0) {
         for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
             if ((request.required & ~support.features) & GfxFeatureBit(GfxFeature(i)))
-                fprintf(stderr, "Vulkan device %s lacks required feature: %s\n", props.deviceName, GfxFeatureName(GfxFeature(i)));
+                logHandler.Print("Vulkan device %s lacks required feature: %s\n", props.deviceName, GfxFeatureName(GfxFeature(i)));
         }
         return -1;
     }
@@ -484,12 +482,12 @@ bool VKContext::SelectQueueFamilies(void) noexcept
     uint32_t count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &count, nullptr);
     if (count == 0) {
-        fprintf(stderr, "VKContext::SelectQueueFamilies: device reports zero queue families\n");
+        logHandler.Print("VKContext::SelectQueueFamilies: device reports zero queue families\n");
         return false;
     }
     if (count > kMaxQueueFamilies) {
 #ifdef _DEBUG
-        fprintf(stderr, "VKContext::SelectQueueFamilies: too many queue families (%u; max %u), truncating\n", count, kMaxQueueFamilies);
+        logHandler.Print("VKContext::SelectQueueFamilies: too many queue families (%u; max %u), truncating\n", count, kMaxQueueFamilies);
 #endif
         count = kMaxQueueFamilies;
     }
@@ -513,11 +511,11 @@ bool VKContext::SelectQueueFamilies(void) noexcept
             break;
     }
     if (not gfxFound) {
-        fprintf(stderr, "VKContext::SelectQueueFamilies: no graphics queue family\n");
+        logHandler.Print("VKContext::SelectQueueFamilies: no graphics queue family\n");
         return false;
     }
     if (not presentFound) {
-        fprintf(stderr, "VKContext::SelectQueueFamilies: no present-capable queue family\n");
+        logHandler.Print("VKContext::SelectQueueFamilies: no present-capable queue family\n");
         return false;
     }
     return true;
@@ -703,11 +701,11 @@ bool VKContext::CreateDevice(const GfxFeatureRequest& request) noexcept
 
     VkResult res = vkCreateDevice(m_physicalDevice, &info, nullptr, &m_device);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "VKContext::CreateDevice: vkCreateDevice failed (%d)\n", (int)res);
+        logHandler.Print("VKContext::CreateDevice: vkCreateDevice failed (%d)\n", (int)res);
         return false;
     }
     if (not Vk13Api::Load(m_device, core13)) {
-        fprintf(stderr, "VKContext::CreateDevice: cannot load the dynamic rendering / synchronization2 entry points\n");
+        logHandler.Print("VKContext::CreateDevice: cannot load the dynamic rendering / synchronization2 entry points\n");
         return false;
     }
 
@@ -718,7 +716,7 @@ bool VKContext::CreateDevice(const GfxFeatureRequest& request) noexcept
         m_features &= ~GfxFeatureBit(GfxFeature::RayTracing);
     }
 #ifdef _DEBUG
-    fprintf(stderr, "Vulkan ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
+    logHandler.Print("Vulkan ray tracing: %s\n", m_hasRayTracing ? "available (ray query)" : "not available");
 #endif
     return true;
 }
@@ -808,7 +806,7 @@ bool VKContext::CreateAllocator(void) noexcept
 
     VkResult res = vmaCreateAllocator(&info, &m_allocator);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "VKContext::CreateAllocator: vmaCreateAllocator failed (%d)\n", (int)res);
+        logHandler.Print("VKContext::CreateAllocator: vmaCreateAllocator failed (%d)\n", (int)res);
         return false;
     }
     return true;
@@ -828,7 +826,7 @@ bool VKContext::RegisterDebugMessenger(bool enableValidationLayers) noexcept
     m_pfnCreateDebugMessenger = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT");
     m_pfnDestroyDebugMessenger = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_instance, "vkDestroyDebugUtilsMessengerEXT");
     if (not m_pfnCreateDebugMessenger or not m_pfnDestroyDebugMessenger) {
-        fprintf(stderr, "VKContext::RegisterDebugMessenger: VK_EXT_debug_utils entry points not found\n");
+        logHandler.Print("VKContext::RegisterDebugMessenger: VK_EXT_debug_utils entry points not found\n");
         return true;  // not fatal — instance is up, we just won't get callbacks
     }
 
@@ -842,7 +840,7 @@ bool VKContext::RegisterDebugMessenger(bool enableValidationLayers) noexcept
 
     VkResult res = m_pfnCreateDebugMessenger(m_instance, &info, nullptr, &m_debugMessenger);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "VKContext::RegisterDebugMessenger: create failed (%d)\n", (int)res);
+        logHandler.Print("VKContext::RegisterDebugMessenger: create failed (%d)\n", (int)res);
         return true;  // not fatal
     }
     return true;
@@ -872,7 +870,7 @@ bool VKContext::LayerAvailable(const char* name) noexcept
         return false;
     if (count > kMaxLayers) {
 #ifdef _DEBUG
-        fprintf(stderr, "VKContext::LayerAvailable: too many layers (%u; max %u), truncating\n", count, kMaxLayers);
+        logHandler.Print("VKContext::LayerAvailable: too many layers (%u; max %u), truncating\n", count, kMaxLayers);
 #endif
         count = kMaxLayers;
     }

@@ -16,6 +16,7 @@
 #include "gfxrenderer.h"
 #include "gfxapitype.h"
 #include "gfxrenderer.h"
+#include "loghandler.h"
 
 #ifdef _DEBUG
 static Texture* testTexture = nullptr;
@@ -29,7 +30,7 @@ static Texture* testTexture = nullptr;
 bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
     GLint i = glewInit();
     if (i != GLEW_OK) {
-        fprintf(stderr, "Smiley-Battle: Cannot initialize GLEW.\n");
+        logHandler.Print("Smiley-Battle: Cannot initialize GLEW.\n");
         return false;
     }
     glGetIntegerv(GL_MAJOR_VERSION, &m_glVersion.major);

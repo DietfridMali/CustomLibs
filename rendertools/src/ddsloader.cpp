@@ -2,6 +2,7 @@
 #include "rendertypes.h"
 #include "texturebuffer.h"
 #include "gfxrenderer.h"
+#include "loghandler.h"
 
 #include <cstdint>
 #include <cstring>
@@ -73,12 +74,12 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
 
     std::ifstream f(name, std::ios::binary | std::ios::ate);
     if (not f.is_open()) {
-        fprintf(stderr, "LoadDDS: cannot open '%s'\n", name);
+        logHandler.Print("LoadDDS: cannot open '%s'\n", name);
         return false;
     }
     const std::streamoff fileSize = f.tellg();
     if (fileSize < std::streamoff(4 + 124)) {
-        fprintf(stderr, "LoadDDS: '%s' is too small to be a DDS file\n", name);
+        logHandler.Print("LoadDDS: '%s' is too small to be a DDS file\n", name);
         return false;
     }
     f.seekg(0, std::ios::beg);
@@ -87,11 +88,11 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
     uint8_t header[4 + 124];
     f.read(reinterpret_cast<char*>(header), std::streamsize(sizeof(header)));
     if (not f) {
-        fprintf(stderr, "LoadDDS: '%s' header read failed\n", name);
+        logHandler.Print("LoadDDS: '%s' header read failed\n", name);
         return false;
     }
     if (ReadU32(header) != kDDSMagic) {
-        fprintf(stderr, "LoadDDS: '%s' is not a DDS file (bad magic)\n", name);
+        logHandler.Print("LoadDDS: '%s' is not a DDS file (bad magic)\n", name);
         return false;
     }
 
@@ -103,11 +104,11 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
     const uint32_t fourCC     = ReadU32(hdr + kOffFourCC);
 
     if ((pfFlags & kDDPF_FOURCC) == 0) {
-        fprintf(stderr, "LoadDDS: '%s' is uncompressed; only BC1/BC7 DDS are supported\n", name);
+        logHandler.Print("LoadDDS: '%s' is uncompressed; only BC1/BC7 DDS are supported\n", name);
         return false;
     }
     if ((width == 0) or (height == 0)) {
-        fprintf(stderr, "LoadDDS: '%s' has zero dimensions\n", name);
+        logHandler.Print("LoadDDS: '%s' has zero dimensions\n", name);
         return false;
     }
 
@@ -130,7 +131,7 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
         uint8_t dx10[20];
         f.read(reinterpret_cast<char*>(dx10), std::streamsize(sizeof(dx10)));
         if (not f) {
-            fprintf(stderr, "LoadDDS: '%s' DX10 header read failed\n", name);
+            logHandler.Print("LoadDDS: '%s' DX10 header read failed\n", name);
             return false;
         }
         const uint32_t dxgiFormat = ReadU32(dx10);
@@ -152,12 +153,12 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
         else if (dxgiFormat == kDXGI_BC5_UNORM)
             format = GfxPixelFormat::BC5_UNorm;
         else {
-            fprintf(stderr, "LoadDDS: '%s' has unsupported DXGI format %u (need BC1/BC4/BC5/BC7)\n", name, dxgiFormat);
+            logHandler.Print("LoadDDS: '%s' has unsupported DXGI format %u (need BC1/BC4/BC5/BC7)\n", name, dxgiFormat);
             return false;
         }
     }
     else {
-        fprintf(stderr, "LoadDDS: '%s' has unsupported FourCC 0x%08X (need DXT1 or DX10 BC7)\n", name, fourCC);
+        logHandler.Print("LoadDDS: '%s' has unsupported FourCC 0x%08X (need DXT1 or DX10 BC7)\n", name, fourCC);
         return false;
     }
 
@@ -179,7 +180,7 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
     const std::streamoff payloadOffset = std::streamoff(4 + 124) + std::streamoff(extraHeader);
     const size_t         available     = size_t(fileSize - payloadOffset);
     if (available < expected) {
-        fprintf(stderr, "LoadDDS: '%s' payload too small (%llu < %llu bytes)\n",
+        logHandler.Print("LoadDDS: '%s' payload too small (%llu < %llu bytes)\n",
                 name, (unsigned long long) available, (unsigned long long) expected);
         return false;
     }
@@ -198,14 +199,14 @@ bool LoadDDS(const String& path, TextureBuffer& buf) noexcept {
 
     buf.m_data.Resize(uint32_t(expected));
     if (uint32_t(buf.m_data.Length()) < uint32_t(expected)) {
-        fprintf(stderr, "LoadDDS: '%s' out of memory for %llu bytes\n", name, (unsigned long long) expected);
+        logHandler.Print("LoadDDS: '%s' out of memory for %llu bytes\n", name, (unsigned long long) expected);
         return false;
     }
 
     f.seekg(payloadOffset, std::ios::beg);
     f.read(reinterpret_cast<char*>(buf.m_data.Data()), std::streamsize(expected));
     if (not f) {
-        fprintf(stderr, "LoadDDS: '%s' payload read failed\n", name);
+        logHandler.Print("LoadDDS: '%s' payload read failed\n", name);
         return false;
     }
 
@@ -297,7 +298,7 @@ TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
     const String      fullPath(full.c_str());
 
     if (IsDDSFile(fullPath) and not haveBlockCompression) {
-        fprintf(stderr, "LoadTextureFile: '%s' is block compressed, which is not enabled on this device\n", full.c_str());
+        logHandler.Print("LoadTextureFile: '%s' is block compressed, which is not enabled on this device\n", full.c_str());
         return nullptr;
     }
 
@@ -314,7 +315,7 @@ TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
     SDL_Surface* image = IMG_Load(full.c_str());
     if (not image) {
         if (isRequired)
-            fprintf(stderr, "LoadTextureFile: failed to load '%s'\n", full.c_str());
+            logHandler.Print("LoadTextureFile: failed to load '%s'\n", full.c_str());
         delete buf;
         return nullptr;
     }

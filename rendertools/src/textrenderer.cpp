@@ -9,6 +9,7 @@
 #include "meshhandler.h"
 #include "gfxrenderer.h"
 #include "tristate.h"
+#include "loghandler.h"
 
 #ifndef _WIN32
 #   include <locale>
@@ -130,7 +131,7 @@ void TextRenderer::RenderGlyphs(String& text, float x, float y, float scale, boo
         String glyph = FontHandler::NextGlyph(text, offset);
         FontHandler::GlyphInfo* info = m_font->FindGlyph(glyph);
         if ((info == nullptr) or (info->index < 0))
-            fprintf(stderr, "TextRenderer: Texture for glyph '%s' not found.\r\n", (const char*)glyph);
+            logHandler.Print("TextRenderer: Texture for glyph '%s' not found.\r\n", (const char*)glyph);
         else {
             float width = float(info->glyphSize.width) * scale;
             CreateQuad(q, x, y, width, info->texture, flipVertically);

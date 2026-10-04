@@ -16,10 +16,11 @@
 #include "list.hpp"
 #include "dictionary.hpp"
 #include "basesingleton.hpp"
+#include "loghandler.h"
 
 // =================================================================================================
 
-class SoundObject 
+class SoundObject
 {
     public:
         int         m_id;
@@ -238,7 +239,7 @@ private:
                 else {
 #ifdef _DEBUG
                     if (owner and (c.m_owner != owner))
-                        fprintf(stderr, "stopped other owner's sound\n");
+                        logHandler.Print("stopped other owner's sound\n");
 #endif
                     m_idleChannels.Append(c);
                     // Achtung: erase mit reverse_iterator!

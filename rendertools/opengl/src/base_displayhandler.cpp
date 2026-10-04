@@ -11,6 +11,7 @@
 
 #include "base_displayhandler.h"
 #include "gfxstates.h"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -150,7 +151,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         m_window = nullptr;
     }
     if (not m_window) {
-        fprintf(stderr, "Smiley-Battle: Couldn't set screen mode (%d x %d) (error '%s')\n", m_width, m_height, SDL_GetError());
+        logHandler.Print("Smiley-Battle: Couldn't set screen mode (%d x %d) (error '%s')\n", m_width, m_height, SDL_GetError());
         exit(1);
     }
     try {
@@ -160,7 +161,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         m_context = nullptr;
     }
     if (not m_context) {
-        fprintf(stderr, "Smiley-Battle: Couldn't get OpenGL context (error '%s')\n", SDL_GetError());
+        logHandler.Print("Smiley-Battle: Couldn't get OpenGL context (error '%s')\n", SDL_GetError());
         exit(1);
     }
     SetVSync(m_vSync);
@@ -238,7 +239,7 @@ void BaseDisplayHandler::SwitchDisplayMode(int direction) {
 
 void BaseDisplayHandler::ToggleFullscreen(void) {
 #ifdef _DEBUG
-    fprintf(stderr, "Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
+    logHandler.Print("Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
     RequestDisplayChange(-1, not m_isFullscreen);
 }

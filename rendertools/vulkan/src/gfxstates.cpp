@@ -7,6 +7,7 @@
 #include "base_displayhandler.h"
 #include "rendertarget.h"
 #include "base_renderer.h"
+#include "loghandler.h"
 
 #include <cstdio>
 
@@ -521,10 +522,9 @@ bool GfxStates::CheckError(const char* operation) noexcept {
     int errors = vkContext.DrainMessages(true);
     if (errors > 0) {
         if (operation and *operation)
-            fprintf(stderr, "GfxStates::CheckError: %d Vulkan validation error(s) at '%s'\n", errors, operation);
+            logHandler.Print("GfxStates::CheckError: %d Vulkan validation error(s) at '%s'\n", errors, operation);
         else
-            fprintf(stderr, "GfxStates::CheckError: %d Vulkan validation error(s)\n", errors);
-        fflush(stderr);
+            logHandler.Print("GfxStates::CheckError: %d Vulkan validation error(s)\n", errors);
         return false;
     }
 #else

@@ -20,6 +20,7 @@
 #include "gfxstates.h"
 #include "resource_handler.h"
 #include "texture_mips.h"
+#include "loghandler.h"
 
 #if VK_STALL_DIAG
 extern double VkStallClock(void) noexcept;
@@ -289,7 +290,7 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, 
 
     VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &m_image, &m_allocation, nullptr);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Texture::CreateTextureResource: vmaCreateImage failed (%d)\n", (int)res);
+        logHandler.Print("Texture::CreateTextureResource: vmaCreateImage failed (%d)\n", (int)res);
         return false;
     }
 
@@ -323,7 +324,7 @@ bool Texture::CreateSRV(void)
 
     VkResult res = vkCreateImageView(device, &info, nullptr, &m_imageView);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Texture::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
+        logHandler.Print("Texture::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
         return false;
     }
     return true;

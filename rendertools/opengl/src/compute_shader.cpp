@@ -2,6 +2,7 @@
 #include "compute_shader.h"
 #include "texture.h"
 #include "rendertarget.h"
+#include "loghandler.h"
 
 // =================================================================================================
 // OpenGL ComputeShader — see compute_shader.h for the binding model and rationale.
@@ -38,7 +39,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
     if (linked != GL_TRUE) {
 #ifdef _DEBUG
         String infoLog = GetInfoLog(program, true);
-        fprintf(stderr, "\n***** GLSL linker error in %s compute shader: *****\n\n", (char*)m_name);
+        logHandler.Print("\n***** GLSL linker error in %s compute shader: *****\n\n", (char*)m_name);
         PrintShaderSource(csHandle, String("Compute shader:"));
 #endif
         glDeleteShader(csHandle);

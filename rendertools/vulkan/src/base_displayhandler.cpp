@@ -14,6 +14,7 @@
 #include "SDL.h"
 #include "SDL_vulkan.h"
 #pragma warning(pop)
+#include "loghandler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -121,7 +122,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     SetContextAttributes();
     m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, windowFlags);
     if (not m_window) {
-        fprintf(stderr, "BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
+        logHandler.Print("BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
         exit(1);
     }
     // Swapchain creation is deferred to SetupSwapchain (called from gfxRenderer::InitGraphics
@@ -132,15 +133,15 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
 bool BaseDisplayHandler::SetupSwapchain(void) {
     VkSurfaceKHR surface = vkContext.Surface();
     if (surface == VK_NULL_HANDLE) {
-        fprintf(stderr, "BaseDisplayHandler::SetupSwapchain: VKContext has no surface\n");
+        logHandler.Print("BaseDisplayHandler::SetupSwapchain: VKContext has no surface\n");
         return false;
     }
     if (not m_swapchain.Create(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
-        fprintf(stderr, "BaseDisplayHandler::SetupSwapchain: Swapchain::Create failed\n");
+        logHandler.Print("BaseDisplayHandler::SetupSwapchain: Swapchain::Create failed\n");
         return false;
     }
     if (not commandListHandler.CmdQueue().InitSyncObjects(m_swapchain.Handle())) {
-        fprintf(stderr, "BaseDisplayHandler::SetupSwapchain: InitSyncObjects failed\n");
+        logHandler.Print("BaseDisplayHandler::SetupSwapchain: InitSyncObjects failed\n");
         return false;
     }
     m_backBufferIndex = 0;
@@ -348,7 +349,7 @@ bool BaseDisplayHandler::RecreateSwapchain(void) {
         return true;
     VkSurfaceKHR surface = vkContext.Surface();
     if (not m_swapchain.Recreate(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
-        fprintf(stderr, "BaseDisplayHandler::RecreateSwapchain: Swapchain::Recreate failed\n");
+        logHandler.Print("BaseDisplayHandler::RecreateSwapchain: Swapchain::Recreate failed\n");
         return false;
     }
     m_backBufferIndex = 0;
@@ -360,7 +361,7 @@ bool BaseDisplayHandler::RecreateSwapchain(void) {
     // "in use by VkSwapchainKHR" from the validator's point of view — re-signaling them
     // would trip VUID-vkQueueSubmit2-semaphore-03868. Destroy and re-create them.
     if (not commandListHandler.CmdQueue().RecreateSyncObjects()) {
-        fprintf(stderr, "BaseDisplayHandler::RecreateSwapchain: RecreateSyncObjects failed\n");
+        logHandler.Print("BaseDisplayHandler::RecreateSwapchain: RecreateSyncObjects failed\n");
         return false;
     }
     return true;
@@ -374,7 +375,7 @@ bool BaseDisplayHandler::RestoreSwapchain(void) {
         return false;
     VkExtent2D extent = m_swapchain.Extent();
     if ((extent.width != uint32_t(m_width)) or (extent.height != uint32_t(m_height)))
-        fprintf(stderr, "BaseDisplayHandler::RestoreSwapchain: swapchain is %ux%u, display mode is %dx%d\n", extent.width, extent.height, m_width, m_height);
+        logHandler.Print("BaseDisplayHandler::RestoreSwapchain: swapchain is %ux%u, display mode is %dx%d\n", extent.width, extent.height, m_width, m_height);
     return true;
 }
 
@@ -413,7 +414,7 @@ void BaseDisplayHandler::SwitchDisplayMode(int direction) {
 
 void BaseDisplayHandler::ToggleFullscreen(void) {
 #ifdef _DEBUG
-    fprintf(stderr, "Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
+    logHandler.Print("Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
     RequestDisplayChange(-1, !m_isFullscreen);
 }

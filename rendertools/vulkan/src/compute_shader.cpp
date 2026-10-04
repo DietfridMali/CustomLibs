@@ -15,7 +15,13 @@
 #include "commandlist.h"
 #include "descriptor_pool_handler.h"
 #include "vkupload.h"
+#include "loghandler.h"
 #include <spirv_reflect.h>
+
+#if VK_STALL_DIAG
+extern double VkStallClock(void) noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+#endif
 
 // =================================================================================================
 // Vulkan ComputeShader implementation (2026-05-18)
@@ -130,7 +136,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
                                                args.data(), uint32_t(args.size()),
                                                spirvOut, error,
                                                shaderFolder, m_name + String(".") + String(target) + String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
-        fprintf(stderr, "ComputeShader '%s': compile failed (entry=%s, target=%s):\n%s\n",
+        logHandler.Print("ComputeShader '%s': compile failed (entry=%s, target=%s):\n%s\n",
                 (const char*)m_name, entryPoint, target, (const char*)error);
         return false;
     }
@@ -175,7 +181,7 @@ bool ComputeShader::CreatePipelineLayout(const AutoArray<ComputeBindingDesc>& bi
 
     VkResult res = vkCreateDescriptorSetLayout(device, &setInfo, nullptr, &m_setLayout);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "ComputeShader '%s': vkCreateDescriptorSetLayout failed (%d)\n", (const char*)m_name, (int)res);
+        logHandler.Print("ComputeShader '%s': vkCreateDescriptorSetLayout failed (%d)\n", (const char*)m_name, (int)res);
         return false;
     }
 
@@ -186,7 +192,7 @@ bool ComputeShader::CreatePipelineLayout(const AutoArray<ComputeBindingDesc>& bi
 
     res = vkCreatePipelineLayout(device, &plInfo, nullptr, &m_pipelineLayout);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "ComputeShader '%s': vkCreatePipelineLayout failed (%d)\n", (const char*)m_name, (int)res);
+        logHandler.Print("ComputeShader '%s': vkCreatePipelineLayout failed (%d)\n", (const char*)m_name, (int)res);
         return false;
     }
     return true;
@@ -210,9 +216,14 @@ bool ComputeShader::CreatePipeline(void) noexcept
     info.stage = stage;
     info.layout = m_pipelineLayout;
 
+    logHandler.SetContext("compute shader '%s': pipeline", static_cast<const char*>(m_name));
+#if VK_STALL_DIAG
+    VkStallEvent("build", VkStallClock(), logHandler.Context());
+#endif
     VkResult res = vkCreateComputePipelines(device, pipelineCache.m_pipelineCache, 1, &info, nullptr, &m_pipeline);
+    logHandler.ClearContext();
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "ComputeShader '%s': vkCreateComputePipelines failed (%d)\n", (const char*)m_name, (int)res);
+        logHandler.Print("ComputeShader '%s': vkCreateComputePipelines failed (%d)\n", (const char*)m_name, (int)res);
         return false;
     }
     return true;
@@ -227,7 +238,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
     m_usesAccelStructure = std::strstr(static_cast<const char*>(csCode), kAccelTypeName) != nullptr;
     if (m_usesAccelStructure and not vkContext.HasRayTracing()) {
 #ifdef _DEBUG
-        fprintf(stderr, "ComputeShader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+        logHandler.Print("ComputeShader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
 #endif
         m_usesAccelStructure = false;
         return false;
@@ -397,7 +408,7 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 
     VkAccelerationStructureKHR accelStructure = commandListHandler.m_boundAccelStructure;
     if (m_usesAccelStructure and (accelStructure == VK_NULL_HANDLE)) {
-        fprintf(stderr, "ComputeShader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
+        logHandler.Print("ComputeShader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
         return false;
     }
 
@@ -535,7 +546,7 @@ int ComputeShader::SetB1Field(const char* name, const void* data, size_t size) n
         }
     }
 #ifdef _DEBUG
-    fprintf(stderr, "ComputeShader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+    logHandler.Print("ComputeShader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
 #endif
     return -1;
 }

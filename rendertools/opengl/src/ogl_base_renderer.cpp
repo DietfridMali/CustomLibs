@@ -11,6 +11,7 @@
 #include "base_shaderhandler.h"
 #include "shadowmap.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 List<::Viewport> BaseRenderer::m_viewportStack;
 
@@ -74,7 +75,7 @@ bool BaseRenderer::Create(int width, int height, float fov, float zNear, float z
 bool BaseRenderer::InitGraphics(void) noexcept {
     GLint i = glewInit();
     if (i != GLEW_OK) {
-        fprintf(stderr, "Smiley-Battle: Cannot initialize GLEW.\n");
+        logHandler.Print("Smiley-Battle: Cannot initialize GLEW.\n");
         return false;
     }
     glGetIntegerv(GL_MAJOR_VERSION, &m_glVersion.major);

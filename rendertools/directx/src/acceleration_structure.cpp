@@ -4,6 +4,7 @@
 #include "dx12context.h"
 #include "commandlist.h"
 #include "resource_handler.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -86,7 +87,7 @@ bool RayTracingApi::Load(ID3D12Device* device) noexcept
 
     ComPtr<ID3D12Device5> rayTracingDevice;
     if (FAILED(device->QueryInterface(IID_PPV_ARGS(rayTracingDevice.GetAddressOf())))) {
-        fprintf(stderr, "RayTracingApi::Load: ID3D12Device5 is not available\n");
+        logHandler.Print("RayTracingApi::Load: ID3D12Device5 is not available\n");
         return false;
     }
 
@@ -142,13 +143,13 @@ bool PrepareBottomLevel(AccelerationStructure& as, const AccelGeometryDesc* geom
 
     as.m_vertices = gfxResourceHandler.AcquireUpload(size_t(totalVertices) * 3 * sizeof(float));
     if (not as.m_vertices) {
-        fprintf(stderr, "AccelerationStructure: vertex buffer allocation failed\n");
+        logHandler.Print("AccelerationStructure: vertex buffer allocation failed\n");
         as.Destroy();
         return false;
     }
     as.m_indices = gfxResourceHandler.AcquireUpload(size_t(totalIndices) * sizeof(uint32_t));
     if (not as.m_indices) {
-        fprintf(stderr, "AccelerationStructure: index buffer allocation failed\n");
+        logHandler.Print("AccelerationStructure: index buffer allocation failed\n");
         as.Destroy();
         return false;
     }
@@ -157,12 +158,12 @@ bool PrepareBottomLevel(AccelerationStructure& as, const AccelGeometryDesc* geom
     void* vertexData = nullptr;
     void* indexData = nullptr;
     if (FAILED(as.m_vertices->Map(0, &readRange, &vertexData)) or not vertexData) {
-        fprintf(stderr, "AccelerationStructure: build input buffers could not be mapped\n");
+        logHandler.Print("AccelerationStructure: build input buffers could not be mapped\n");
         as.Destroy();
         return false;
     }
     if (FAILED(as.m_indices->Map(0, &readRange, &indexData)) or not indexData) {
-        fprintf(stderr, "AccelerationStructure: build input buffers could not be mapped\n");
+        logHandler.Print("AccelerationStructure: build input buffers could not be mapped\n");
         as.m_vertices->Unmap(0, nullptr);
         as.Destroy();
         return false;
@@ -224,13 +225,13 @@ bool PrepareBottomLevel(AccelerationStructure& as, const AccelGeometryDesc* geom
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO sizes { };
     device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &sizes);
     if (sizes.ResultDataMaxSizeInBytes == 0) {
-        fprintf(stderr, "AccelerationStructure: build size is zero\n");
+        logHandler.Print("AccelerationStructure: build size is zero\n");
         as.Destroy();
         return false;
     }
 
     if (not CreateDefaultBuffer(as.m_storage[0], sizes.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, "AccelerationStructure bottom level")) {
-        fprintf(stderr, "AccelerationStructure: storage buffer allocation failed (%llu bytes)\n",
+        logHandler.Print("AccelerationStructure: storage buffer allocation failed (%llu bytes)\n",
                 static_cast<unsigned long long>(sizes.ResultDataMaxSizeInBytes));
         as.Destroy();
         return false;
@@ -273,7 +274,7 @@ bool AccelerationStructure::BuildBottomLevelBatch(const AccelBuildItem* items, u
 
     ComPtr<ID3D12Resource> scratch;
     if (not CreateDefaultBuffer(scratch, scratchTotal + alignment, D3D12_RESOURCE_STATE_COMMON, "AccelerationStructure scratch")) {
-        fprintf(stderr, "AccelerationStructure: scratch allocation failed (%llu bytes)\n",
+        logHandler.Print("AccelerationStructure: scratch allocation failed (%llu bytes)\n",
                 static_cast<unsigned long long>(scratchTotal));
         for (uint32_t i = 0; i < nPrepared; ++i)
             prepared[i].target->Destroy();
@@ -349,7 +350,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         ReleaseUpload(instanceBuffer);
         instanceBuffer = gfxResourceHandler.AcquireUpload(size_t(instanceCount) * sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
         if (not instanceBuffer) {
-            fprintf(stderr, "AccelerationStructure::BuildTopLevel: instance buffer allocation failed (%u)\n", instanceCount);
+            logHandler.Print("AccelerationStructure::BuildTopLevel: instance buffer allocation failed (%u)\n", instanceCount);
             m_instanceCapacity[m_slot] = 0;
             return false;
         }
@@ -359,7 +360,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
     D3D12_RANGE readRange{ 0, 0 };
     void* instanceData = nullptr;
     if (FAILED(instanceBuffer->Map(0, &readRange, &instanceData)) or not instanceData) {
-        fprintf(stderr, "AccelerationStructure::BuildTopLevel: instance buffer could not be mapped\n");
+        logHandler.Print("AccelerationStructure::BuildTopLevel: instance buffer could not be mapped\n");
         return false;
     }
     D3D12_RAYTRACING_INSTANCE_DESC* pInstance = static_cast<D3D12_RAYTRACING_INSTANCE_DESC*>(instanceData);
@@ -395,7 +396,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO sizes { };
     device->GetRaytracingAccelerationStructurePrebuildInfo(&inputs, &sizes);
     if (sizes.ResultDataMaxSizeInBytes == 0) {
-        fprintf(stderr, "AccelerationStructure::BuildTopLevel: build size is zero\n");
+        logHandler.Print("AccelerationStructure::BuildTopLevel: build size is zero\n");
         return false;
     }
 
@@ -403,7 +404,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         ReleaseBuffer(m_storage[m_slot]);
         m_storageSize[m_slot] = 0;
         if (not CreateDefaultBuffer(m_storage[m_slot], sizes.ResultDataMaxSizeInBytes, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE, "AccelerationStructure top level")) {
-            fprintf(stderr, "AccelerationStructure::BuildTopLevel: storage allocation failed (%llu bytes)\n",
+            logHandler.Print("AccelerationStructure::BuildTopLevel: storage allocation failed (%llu bytes)\n",
                     static_cast<unsigned long long>(sizes.ResultDataMaxSizeInBytes));
             return false;
         }
@@ -417,7 +418,7 @@ bool AccelerationStructure::BuildTopLevel(const AccelInstance* instances, uint32
         ReleaseBuffer(m_scratch[m_slot]);
         m_scratchSize[m_slot] = 0;
         if (not CreateDefaultBuffer(m_scratch[m_slot], scratchNeeded, D3D12_RESOURCE_STATE_COMMON, "AccelerationStructure scratch")) {
-            fprintf(stderr, "AccelerationStructure::BuildTopLevel: scratch allocation failed (%llu bytes)\n",
+            logHandler.Print("AccelerationStructure::BuildTopLevel: scratch allocation failed (%llu bytes)\n",
                     static_cast<unsigned long long>(scratchNeeded));
             return false;
         }

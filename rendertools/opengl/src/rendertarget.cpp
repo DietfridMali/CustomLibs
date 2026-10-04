@@ -5,6 +5,7 @@
 #include "gfxrenderer.h"
 #include "base_shaderhandler.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 GLint RenderTarget::m_activeHandle = GL_NONE;
 
@@ -767,7 +768,7 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
         return false;
     m_isAvailable = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
     if (not m_isAvailable)
-        fprintf(stderr, "RenderTarget::Enable: Render target is incomplete\n");
+        logHandler.Print("RenderTarget::Enable: Render target is incomplete\n");
     return true;
 }
 

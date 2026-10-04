@@ -8,6 +8,7 @@
 #include "shadercache.h"
 #include "shadowmap.h"
 #include "gfxrenderer.h"
+#include "loghandler.h"
 
 #define PASSTHROUGH_MODE 0
 
@@ -20,16 +21,16 @@ void Shader::PrintLog(String infoLog, String title) {
     const size_t lineCount = std::ranges::count(infoLog, '\n') + 1;
     const int width = static_cast<int>(std::to_string(lineCount).size());
 
-    fprintf(stderr, "\n%s\n", (char*) title);
+    logHandler.Print("\n%s\n", (char*) title);
 
     int lineNo = 0;
     for (auto&& chunk : infoLog | std::views::split('\n')) {
         std::string_view line(chunk.begin(), chunk.end());
         if (!line.empty() && line.back() == '\r')
             line.remove_suffix(1);
-        fprintf(stderr, "%3d: %.*s\n", ++lineNo, static_cast<int>(line.size()), line.data());
+        logHandler.Print("%3d: %.*s\n", ++lineNo, static_cast<int>(line.size()), line.data());
     }
-    fprintf(stderr, "\n\n");
+    logHandler.Print("\n\n");
 #endif
 }
 
@@ -79,7 +80,7 @@ GLuint Shader::Compile(const char* code, GLuint type) {
         return handle;
 #ifdef _DEBUG
     String shaderLog = GetInfoLog(handle);
-    fprintf(stderr, "\n***** GLSL compiler error in %s shader: *****\n\n", (char*)m_name);
+    logHandler.Print("\n***** GLSL compiler error in %s shader: *****\n\n", (char*)m_name);
     PrintShaderSource(handle, String("Shader source:"));
 #endif
     glDeleteShader(handle);
@@ -103,7 +104,7 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle, GLuint tc
     // the tessellation stages come as a pair; a program with only one of them does not link
     if ((tcsHandle != 0) != (tesHandle != 0)) {
 #ifdef _DEBUG
-        fprintf(stderr, "\n***** %s shader: tessellation control and evaluation shader must both be present *****\n\n", (char*)m_name);
+        logHandler.Print("\n***** %s shader: tessellation control and evaluation shader must both be present *****\n\n", (char*)m_name);
 #endif
         DeleteShaders({ vsHandle, fsHandle, gsHandle, tcsHandle, tesHandle });
         return 0;
@@ -140,7 +141,7 @@ GLuint Shader::Link(GLuint vsHandle, GLuint fsHandle, GLuint gsHandle, GLuint tc
     }
 #ifdef _DEBUG
     String shaderLog = GetInfoLog(handle, true);
-    fprintf(stderr, "\n***** GLSL linker error in %s shader: *****\n\n", (char*)m_name);
+    logHandler.Print("\n***** GLSL linker error in %s shader: *****\n\n", (char*)m_name);
     PrintShaderSource(vsHandle, String("Vertex shader:"));
     if (tcsHandle) {
         PrintShaderSource(tcsHandle, String("Tessellation control shader:"));

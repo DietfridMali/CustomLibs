@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 // base_displayhandler.cpp - ends the program with a message when the device has been removed.
 extern void HandleDeviceLost(const char* where) noexcept;
@@ -51,19 +52,19 @@ bool CommandQueue::Create(ID3D12Device* device, const String& name) noexcept {
 
     HRESULT hr = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
     if (FAILED(hr)) {
-        fprintf(stderr, "CommandQueue: CreateCommandQueue failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandQueue: CreateCommandQueue failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
 
     hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
     if (FAILED(hr)) {
-        fprintf(stderr, "CommandQueue: CreateFence failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandQueue: CreateFence failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
 
     m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     if (not m_fenceEvent) {
-        fprintf(stderr, "CommandQueue: CreateEvent failed\n");
+        logHandler.Print("CommandQueue: CreateEvent failed\n");
         return false;
     }
 
@@ -106,7 +107,7 @@ void CommandQueue::WaitForFrame(int frameIndex) noexcept {
     if (m_fence->GetCompletedValue() < m_fenceValues[frameIndex]) {
         HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvent);
         if (FAILED(hr)) {
-            fprintf(stderr, "CommandQueue::WaitForFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
+            logHandler.Print("CommandQueue::WaitForFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
             HandleDeviceLost("CommandQueue::WaitForFrame");
             return;
         }
@@ -129,10 +130,9 @@ void CommandQueue::WaitIdle(void) noexcept {
 #if DBG_DIRECTX
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
-        fprintf(stderr, "CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
+        logHandler.Print("CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
         gfxStates.CheckError();
         dx12Context.DumpDRED();
-        fflush(stderr);
     }
 #endif
 }
@@ -148,13 +148,13 @@ bool CommandList::Create(ID3D12Device* device, const String& name, bool isTempor
     for (UINT i = 0; i < FRAME_COUNT; ++i) {
         HRESULT hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
         if (FAILED(hr)) {
-            fprintf(stderr, "CommandList::Create: CreateCommandAllocator[%u] failed (hr=0x%08X)\n", i, (unsigned)hr);
+            logHandler.Print("CommandList::Create: CreateCommandAllocator[%u] failed (hr=0x%08X)\n", i, (unsigned)hr);
             return false;
         }
     }
     HRESULT hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_gfxListPtr));
     if (FAILED(hr)) {
-        fprintf(stderr, "CommandList::Create: CreateCommandList failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandList::Create: CreateCommandList failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
     m_gfxListPtr->Close();
@@ -195,12 +195,12 @@ bool CommandList::Open(bool saveRenderStates) noexcept {
         return false;
     HRESULT hr = m_allocators[frameIndex]->Reset();
     if (FAILED(hr)) {
-        fprintf(stderr, "CommandList::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandList::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
     hr = m_gfxListPtr->Reset(m_allocators[frameIndex].Get(), nullptr);
     if (FAILED(hr)) {
-        fprintf(stderr, "CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
     m_isRecording = true;
@@ -247,7 +247,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept {
 #endif
     HRESULT hr = m_gfxListPtr->Close();
     if (FAILED(hr))
-        fprintf(stderr, "CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
 #if DBG_DIRECTX
     gfxStates.CheckError();
 #endif
@@ -279,10 +279,10 @@ void CommandList::Flush(void) noexcept {
     UINT fi = UINT(commandListHandler.FrameIndex());
     HRESULT hr = m_allocators[fi]->Reset();
     if (FAILED(hr))
-        fprintf(stderr, "CommandList::Flush: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandList::Flush: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
     hr = m_gfxListPtr->Reset(m_allocators[fi].Get(), nullptr);
     if (FAILED(hr))
-        fprintf(stderr, "CommandList::Flush: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("CommandList::Flush: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
     else
         m_gfxListPtr->Close();
 #endif
@@ -409,9 +409,8 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept {
     gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
-        fprintf(stderr, "CommandList::%s: device removed (0x%08X)\n", context, (unsigned)removed);
+        logHandler.Print("CommandList::%s: device removed (0x%08X)\n", context, (unsigned)removed);
         dx12Context.DumpDRED();
-        fflush(stderr);
     }
 }
 #endif
@@ -429,7 +428,7 @@ bool CommandListHandler::Create(ID3D12Device* device) noexcept {
     gfxResourceHandler.Init(m_frameCount);
     m_gpuProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
 #if USE_TRACY
-    fprintf(stderr, "CommandListHandler::Create: Tracy GPU context %s, id %u (255 = constructor bailed out)\n",
+    logHandler.Print("CommandListHandler::Create: Tracy GPU context %s, id %u (255 = constructor bailed out)\n",
             m_gpuProfilerCtx ? "created" : "NOT created - no GPU zones", m_gpuProfilerCtx ? unsigned(m_gpuProfilerCtx->GetId()) : 255u);
 #endif
     ResetBindings();
@@ -564,7 +563,7 @@ bool CommandListHandler::ApplyBindings(const Shader* shader) noexcept {
     if (not (cl and list))
         return false;
     if (shader and shader->m_usesAccelStructure and (m_boundAccelStructure == 0)) {
-        fprintf(stderr, "Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)shader->m_name);
+        logHandler.Print("Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)shader->m_name);
         return false;
     }
     cl->BindDescriptorHeaps();
@@ -701,14 +700,13 @@ void CommandListHandler::CloseProfilerQueries(bool keepRecording) noexcept {
 
         if (m_frameNumber >= reportFrame) {
             reportFrame = m_frameNumber + 300;
-            fprintf(stderr, "Tracy GPU: frame %llu, zones opened %llu, closed %llu, queries %u -> %u, kept %u, connected %d, ctx id %u, collects %llu, timestamps %llu, payloads pending %llu, active %llu, completed %llu\n",
+            logHandler.Print("Tracy GPU: frame %llu, zones opened %llu, closed %llu, queries %u -> %u, kept %u, connected %d, ctx id %u, collects %llu, timestamps %llu, payloads pending %llu, active %llu, completed %llu\n",
                     (unsigned long long)m_frameNumber, (unsigned long long)m_gpuZonesOpened, (unsigned long long)m_gpuZonesClosed,
                     queryCounter, m_gpuProfilerCtx->QueryCounter(), keepCount, tracy::GetProfiler().IsConnected() ? 1 : 0,
                     unsigned(m_gpuProfilerCtx->GetId()),
                     (unsigned long long)m_gpuProfilerCtx->CollectCalls(), (unsigned long long)m_gpuProfilerCtx->CollectedTimestamps(),
                     (unsigned long long)m_gpuProfilerCtx->PendingPayloads(), (unsigned long long)m_gpuProfilerCtx->ActivePayload(),
                     (unsigned long long)m_gpuProfilerCtx->CompletedPayload());
-            fflush(stderr);
         }
     }
 #endif
@@ -753,7 +751,7 @@ void CommandListHandler::Register(CommandList* cl) noexcept {
         return;
 #if DBG_DIRECTX
 	if (cl->m_name.IsEmpty())
-        fprintf(stderr, "CommandListHandler::Register: Unnamed command list\n");
+        logHandler.Print("CommandListHandler::Register: Unnamed command list\n");
 #endif
     for (auto l : m_pendingLists)
         if (cl == l)
@@ -768,7 +766,7 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     while (m_recordingLists.Length() > 0) {
         CommandList* l = m_recordingLists[m_recordingLists.Length() - 1];
 #if DBG_DIRECTX
-        fprintf(stderr, "ExecuteAll: closing '%s' (open serial %llu, frame %llu), still recording at the frame end\n",
+        logHandler.Print("ExecuteAll: closing '%s' (open serial %llu, frame %llu), still recording at the frame end\n",
                 (const char*)l->GetName(), (unsigned long long)l->m_openSerial, (unsigned long long)m_frameNumber);
 #endif
         if (l->IsRecording())
@@ -781,21 +779,21 @@ void CommandListHandler::ExecuteAll(void) noexcept {
 	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
     int n = 0;
 #if LOG_EXECUTION//def _DEBUG
-    fprintf(stderr, "\nCommandListHandler::ExecuteAll: executing %u command lists.\n", (unsigned)m_pendingLists.Length());
+    logHandler.Print("\nCommandListHandler::ExecuteAll: executing %u command lists.\n", (unsigned)m_pendingLists.Length());
 #endif
     for (auto l : m_pendingLists) {
 #if LOG_EXECUTION//def _DEBUG
         if (l->m_isRecording) {
-            fprintf(stderr, "   '%s' still open; closing it now.\n", (const char*)l->GetName());
+            logHandler.Print("   '%s' still open; closing it now.\n", (const char*)l->GetName());
             l->Close();
         }
-        fprintf(stderr, "   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
+        logHandler.Print("   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
 #endif
         if (not l->IsFlushed())
             execList[n++] = l->GfxList(true);
     }
 #if LOG_EXECUTION//def _DEBUG
-    fprintf(stderr, "\n");
+    logHandler.Print("\n");
 #endif
     if (n > 0)
         m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
@@ -804,10 +802,9 @@ void CommandListHandler::ExecuteAll(void) noexcept {
     gfxStates.CheckError();
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
     if (FAILED(removed)) {
-        fprintf(stderr, "CommandListHandler::ExecuteAll: device removed (0x%08X)\n", (unsigned)removed);
+        logHandler.Print("CommandListHandler::ExecuteAll: device removed (0x%08X)\n", (unsigned)removed);
         dx12Context.DumpDRED();
     }
-    fflush(stderr);
 #endif
     for (auto l : m_pendingLists) {
         if (l->m_isTemporary)

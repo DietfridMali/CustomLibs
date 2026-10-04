@@ -12,6 +12,7 @@
 #include <iostream>
 #include <type_traits>
 #include "array.hpp"
+#include "loghandler.h"
 #include <fmt/format.h>
 
 // =================================================================================================
@@ -316,7 +317,7 @@ inline String::operator char*() noexcept {
 inline void String::LogError(std::string caller) const {
     std::string msg = "String::" + caller + "(): Invalid argument '" + m_str + "'\n";
     if (m_logErrors)
-        std::cerr << msg;
+        logHandler.Print("%s", msg.c_str());
     else
         throw std::invalid_argument(msg);
 }

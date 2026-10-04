@@ -1,6 +1,7 @@
 #include "cbv_allocator.h"
 #include "resource_handler.h"
 #include "vkcontext.h"
+#include "loghandler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -22,7 +23,7 @@ bool CbvLinearAllocator::AllocFrame(uint32_t frameIdx, uint32_t capacity) noexce
                             VMA_MEMORY_USAGE_AUTO,
                             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                           | VMA_ALLOCATION_CREATE_MAPPED_BIT)) {
-        fprintf(stderr, "CbvLinearAllocator: GfxBuffer::Create[%u] failed (cap=%u)\n", frameIdx, capacity);
+        logHandler.Print("CbvLinearAllocator: GfxBuffer::Create[%u] failed (cap=%u)\n", frameIdx, capacity);
         return false;
     }
     f.offset = 0;
@@ -40,7 +41,7 @@ bool CbvLinearAllocator::AddChunk(FrameData& f, uint32_t capacity) noexcept
                                 VMA_MEMORY_USAGE_AUTO,
                                 VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                               | VMA_ALLOCATION_CREATE_MAPPED_BIT)) {
-        fprintf(stderr, "CbvLinearAllocator: GfxBuffer::Create for chained buffer %u of frame %u failed (cap=%u)\n",
+        logHandler.Print("CbvLinearAllocator: GfxBuffer::Create for chained buffer %u of frame %u failed (cap=%u)\n",
                 uint32_t(f.overflow.size()), m_frameIndex, capacity);
         return false;
     }

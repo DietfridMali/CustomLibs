@@ -6,6 +6,7 @@
 #include "image_layout_tracker.h"
 #include "vkupload.h"	// CreateReadbackBuffer / one-shot command buffer for ReadBuffer ()
 #include "resource_handler.h"
+#include "loghandler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -116,7 +117,7 @@ static bool CreateRTImage(int w, int h, VkFormat format, VkImageUsageFlags usage
 
     VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &outImage, &outAllocation, nullptr);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "RenderTarget::CreateRTImage: vmaCreateImage failed (%d)\n", (int)res);
+        logHandler.Print("RenderTarget::CreateRTImage: vmaCreateImage failed (%d)\n", (int)res);
         return false;
     }
     return true;
@@ -293,7 +294,7 @@ bool RenderTarget::CreateSRV(BufferInfo& info, VkFormat viewFormat, VkImageAspec
 
     VkResult res = vkCreateImageView(device, &vci, nullptr, &info.m_imageView);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "RenderTarget::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
+        logHandler.Print("RenderTarget::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
         return false;
     }
     info.m_srvIndex = uint32_t(uintptr_t(info.m_imageView) & 0xFFFFFFFFu);  // logical id (low 32 bits of handle)
@@ -328,7 +329,7 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
     vci.subresourceRange.levelCount = 1;
     vci.subresourceRange.layerCount = 1;
     if (vkCreateImageView(device, &vci, nullptr, &info.m_depthSampleView) != VK_SUCCESS)
-        fprintf(stderr, "RenderTarget::CreateDepthBuffer: depth-sample view creation failed\n");
+        logHandler.Print("RenderTarget::CreateDepthBuffer: depth-sample view creation failed\n");
 }
 
 
@@ -380,7 +381,7 @@ void RenderTarget::CreateCubemapBuffer(BufferInfo& info, int edge)
         vci.subresourceRange.baseArrayLayer = uint32_t(face);
         vci.subresourceRange.layerCount = 1;
         if (vkCreateImageView(device, &vci, nullptr, &info.m_cubeView[face]) != VK_SUCCESS) {
-            fprintf(stderr, "RenderTarget::CreateCubemapBuffer: vkCreateImageView failed for face %d\n", face);
+            logHandler.Print("RenderTarget::CreateCubemapBuffer: vkCreateImageView failed for face %d\n", face);
             return;
         }
     }
@@ -396,7 +397,7 @@ void RenderTarget::CreateCubemapBuffer(BufferInfo& info, int edge)
     cubeView.subresourceRange.baseArrayLayer = 0;
     cubeView.subresourceRange.layerCount = 6;
     if (vkCreateImageView(device, &cubeView, nullptr, &info.m_imageView) != VK_SUCCESS)
-        fprintf(stderr, "RenderTarget::CreateCubemapBuffer: cube view creation failed\n");
+        logHandler.Print("RenderTarget::CreateCubemapBuffer: cube view creation failed\n");
 }
 
 
@@ -426,7 +427,7 @@ void RenderTarget::CreateArrayBuffer(BufferInfo& info, int w, int h, VkFormat fm
         vci.subresourceRange.baseArrayLayer = uint32_t(layer);
         vci.subresourceRange.layerCount = 1;
         if (vkCreateImageView(device, &vci, nullptr, &info.m_layerView[layer]) != VK_SUCCESS) {
-            fprintf(stderr, "RenderTarget::CreateArrayBuffer: vkCreateImageView failed for layer %d\n", layer);
+            logHandler.Print("RenderTarget::CreateArrayBuffer: vkCreateImageView failed for layer %d\n", layer);
             return;
         }
     }
@@ -442,7 +443,7 @@ void RenderTarget::CreateArrayBuffer(BufferInfo& info, int w, int h, VkFormat fm
     arrayView.subresourceRange.baseArrayLayer = 0;
     arrayView.subresourceRange.layerCount = uint32_t(m_arrayLayerCount);
     if (vkCreateImageView(device, &arrayView, nullptr, &info.m_imageView) != VK_SUCCESS) {
-        fprintf(stderr, "RenderTarget::CreateArrayBuffer: array view creation failed\n");
+        logHandler.Print("RenderTarget::CreateArrayBuffer: array view creation failed\n");
         return;
     }
     // The same logical id CreateSRV () derives - GetAsTexture () and everything downstream identify a

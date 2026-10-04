@@ -12,6 +12,7 @@
 #include "gfxapitype.h"
 #include "shadowmap.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 List<::Viewport> BaseRenderer::m_viewportStack;
 
@@ -63,7 +64,7 @@ bool BaseRenderer::ApplyFeatures(const GfxFeatureRequest& request, uint32_t avai
     uint32_t missing = request.required & ~available;
     for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
         if (missing & GfxFeatureBit(GfxFeature(i)))
-            fprintf(stderr, "Graphics device lacks required feature: %s\n", GfxFeatureName(GfxFeature(i)));
+            logHandler.Print("Graphics device lacks required feature: %s\n", GfxFeatureName(GfxFeature(i)));
     }
     m_gfxFeatures = request.Requested() & available;
     return missing == 0;

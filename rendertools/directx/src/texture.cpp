@@ -23,6 +23,7 @@
 #include "texture_mips.h"
 #include "gfxpixelformat_dx.h"
 #include "ddsloader.h"
+#include "loghandler.h"
 
 // =================================================================================================
 // DX12 Texture implementation
@@ -255,7 +256,7 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, 
 {
     ID3D12Device* device = dx12Context.Device();
     if (not device) {
-        fprintf(stderr, "Texture::CreateTextureResource: no D3D12 device\n");
+        logHandler.Print("Texture::CreateTextureResource: no D3D12 device\n");
         return false;
     }
     ReleaseResource();
@@ -274,10 +275,10 @@ bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, 
 
     HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource));
     if (FAILED(hr)) {
-        fprintf(stderr, "Texture::CreateTextureResource: CreateCommittedResource failed" " (name='%s', %dx%d, arraySize=%d, DXGI_FORMAT=%u, hr=0x%08X)\n", (const char*)m_name, w, h, arraySize, (unsigned)m_dxgiFormat, (unsigned)hr);
+        logHandler.Print("Texture::CreateTextureResource: CreateCommittedResource failed" " (name='%s', %dx%d, arraySize=%d, DXGI_FORMAT=%u, hr=0x%08X)\n", (const char*)m_name, w, h, arraySize, (unsigned)m_dxgiFormat, (unsigned)hr);
         HRESULT removed = device->GetDeviceRemovedReason();
         if (FAILED(removed)) {
-            fprintf(stderr, "  device removed (reason=0x%08X) - earlier GPU work faulted\n", (unsigned)removed);
+            logHandler.Print("  device removed (reason=0x%08X) - earlier GPU work faulted\n", (unsigned)removed);
 #if DBG_DIRECTX
             dx12Context.DumpDRED();
 #endif

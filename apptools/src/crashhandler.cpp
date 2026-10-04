@@ -1,4 +1,5 @@
 #include "crashhandler.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -392,6 +393,9 @@ void CrashHandler::WriteTrace(void* file, const char* kind, _EXCEPTION_POINTERS*
         WriteText(file, "access:    %s address 0x%016llX\r\n", accessName, static_cast<unsigned long long>(record->ExceptionInformation[1]));
     }
     WriteText(file, "thread:    %lu\r\n", threadId);
+    const char* context = logHandler.Context();
+    if (*context)
+        WriteText(file, "context:   %s\r\n", context);
 
     if (not m_haveSymbols)
         WriteText(file, "symbols:   dbghelp could not be initialized, only addresses available\r\n");

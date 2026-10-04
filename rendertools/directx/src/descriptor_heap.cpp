@@ -4,6 +4,7 @@
 #include "sampler_cache.h"
 #include "dx12upload.h"
 #include "commandlist.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -26,7 +27,7 @@ bool DescriptorHeap::Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE typ
 
     HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap));
     if (FAILED(hr)) {
-        fprintf(stderr, "DescriptorHeap: CreateDescriptorHeap type=%d failed (hr=0x%08X)\n", (int)type, (unsigned)hr);
+        logHandler.Print("DescriptorHeap: CreateDescriptorHeap type=%d failed (hr=0x%08X)\n", (int)type, (unsigned)hr);
         return false;
     }
     m_descriptorSize = device->GetDescriptorHandleIncrementSize(type);
@@ -40,7 +41,7 @@ bool DescriptorHeap::Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE typ
         mirrorDesc.NodeMask = 0;
         hr = device->CreateDescriptorHeap(&mirrorDesc, IID_PPV_ARGS(&m_mirror));
         if (FAILED(hr)) {
-            fprintf(stderr, "DescriptorHeap: CreateDescriptorHeap (mirror) type=%d failed (hr=0x%08X)\n", int(type), unsigned(hr));
+            logHandler.Print("DescriptorHeap: CreateDescriptorHeap (mirror) type=%d failed (hr=0x%08X)\n", int(type), unsigned(hr));
             return false;
         }
     }
@@ -87,7 +88,7 @@ bool DescriptorHeap::Grow(ID3D12Device* device, uint32_t extraDescriptors) noexc
     ComPtr<ID3D12DescriptorHeap> heap;
     HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&heap));
     if (FAILED(hr)) {
-        fprintf(stderr, "DescriptorHeap::Grow: CreateDescriptorHeap type=%d, %u descriptors failed (hr=0x%08X)\n", int(m_type), desc.NumDescriptors, unsigned(hr));
+        logHandler.Print("DescriptorHeap::Grow: CreateDescriptorHeap type=%d, %u descriptors failed (hr=0x%08X)\n", int(m_type), desc.NumDescriptors, unsigned(hr));
         return false;
     }
     if (m_count > 0)
@@ -112,7 +113,7 @@ DescriptorHandle DescriptorHeap::Allocate(void) noexcept {
     } else {
         if (m_count >= m_capacity) {
 #ifdef _DEBUG
-            fprintf(stderr, "DescriptorHeap: heap full (capacity=%u, type=%d)\n", m_capacity, (int)m_type);
+            logHandler.Print("DescriptorHeap: heap full (capacity=%u, type=%d)\n", m_capacity, (int)m_type);
             DumpOwners();
 #endif
             return {};
@@ -147,7 +148,7 @@ void DescriptorHeap::SetOwner(uint32_t index, const std::source_location& loc) n
 
 void DescriptorHeap::DumpOwners(void) noexcept {
     uint32_t inUse = m_count - uint32_t(m_freeList.Length());
-    fprintf(stderr, "--- DescriptorHeap type=%d: %u/%u slots in use ---\n", (int)m_type, inUse, m_capacity);
+    logHandler.Print("--- DescriptorHeap type=%d: %u/%u slots in use ---\n", (int)m_type, inUse, m_capacity);
     for (uint32_t i = 0; i < m_count; ++i) {
         bool isFree = false;
         for (uint32_t j = 0; j < uint32_t(m_freeList.Length()); ++j) {
@@ -159,7 +160,7 @@ void DescriptorHeap::DumpOwners(void) noexcept {
         if (isFree)
             continue;
         const std::source_location& loc = m_owners[i];
-        fprintf(stderr, "  [%u] %s:%u  %s\n", i, loc.file_name(), (unsigned)loc.line(), loc.function_name());
+        logHandler.Print("  [%u] %s:%u  %s\n", i, loc.file_name(), (unsigned)loc.line(), loc.function_name());
     }
 }
 #endif
@@ -250,7 +251,7 @@ bool DescriptorHeapHandler::CreateDefaultTextures(ID3D12Device* device) noexcept
     m_defaultCube = CreateDefaultTexture(device, 6, "DefaultTexture Cube");
     m_defaultVolume = Upload3DTextureData(device, 1, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, 4, white);
     if (not (m_defaultFlat and m_defaultCube and m_defaultVolume)) {
-        fprintf(stderr, "DescriptorHeapHandler: default textures could not be created\n");
+        logHandler.Print("DescriptorHeapHandler: default textures could not be created\n");
         return false;
     }
 
@@ -302,7 +303,7 @@ bool DescriptorHeapHandler::GrowTables(ID3D12Device* device) noexcept {
     if (not m_srvHeap.Grow(device, TABLE_FRAME_SLOTS * capacity))
         return false;
 #ifdef _DEBUG
-    fprintf(stderr, "DescriptorHeapHandler: descriptor table ring grown from %u to %u descriptors per frame\n", m_tableCapacity, capacity);
+    logHandler.Print("DescriptorHeapHandler: descriptor table ring grown from %u to %u descriptors per frame\n", m_tableCapacity, capacity);
 #endif
     m_tableCapacity = capacity;
     m_tableOffset = 0;
@@ -321,7 +322,7 @@ bool DescriptorHeapHandler::BuildTable(const uint32_t* srvIndices, uint32_t coun
         return false;
     if ((m_tableOffset + count > m_tableCapacity) and not GrowTables(device)) {
         if (not m_tableOverflowReported) {
-            fprintf(stderr, "DescriptorHeapHandler::BuildTable: descriptor table ring full (%u descriptors per frame)\n", m_tableCapacity);
+            logHandler.Print("DescriptorHeapHandler::BuildTable: descriptor table ring full (%u descriptors per frame)\n", m_tableCapacity);
             m_tableOverflowReported = true;
         }
         return false;

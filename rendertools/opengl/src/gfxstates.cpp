@@ -7,6 +7,7 @@
 
 #include "gfxrenderer.h"
 #include "rendertarget.h"
+#include "loghandler.h"
 
 #define TRACK_TMU_USAGE 1
 
@@ -226,7 +227,7 @@ bool GfxStates::CheckError(const char* operation) noexcept {
 	GLenum glError = glGetError();
 	if (not glError)
 		return true;
-	fprintf(stderr, "Graphics Error %d (%s)\n", glError, operation);
+	logHandler.Print("Graphics Error %d (%s)\n", glError, operation);
 	ClearError();
 	return false;
 #endif

@@ -5,6 +5,7 @@
 #include "string.hpp"
 #include "list.hpp"
 #include "vector.hpp"
+#include "loghandler.h"
 #include "networkendpoint.h"
 
 // =================================================================================================
@@ -145,7 +146,7 @@ class NetworkMessage {
 
         inline bool InvalidDataError(const String caller, const String valueName, const String value) {
             m_valueError = true;
-            fprintf(stderr, "%s (%s): value '%s' out of range\n", (const char*) caller, (const char*) valueName, (const char*)value);
+            logHandler.Print("%s (%s): value '%s' out of range\n", (const char*) caller, (const char*) valueName, (const char*)value);
             return false;
         }
 
@@ -174,7 +175,7 @@ class NetworkMessage {
             if (valueIndex < m_values.Length())
                 return true;
             m_valueError = true;
-            fprintf(stderr, "%s (%s): invalid field index '%d'\n", (const char*)caller, (const char*)valueName, valueIndex);
+            logHandler.Print("%s (%s): invalid field index '%d'\n", (const char*)caller, (const char*)valueName, valueIndex);
             return false;
         }
 

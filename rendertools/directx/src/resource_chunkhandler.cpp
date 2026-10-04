@@ -1,5 +1,6 @@
 
 #include "resource_chunkhandler.h"
+#include "loghandler.h"
 #include <cstdio>
 #include <cstring>
 
@@ -25,7 +26,7 @@ ComPtr<ID3D12Resource> GfxDataChunkList::Update(size_t dataSize, const char* own
     else if (m_chunks[m_usedChunks]->GetDesc().Width < dataSize) {
         updateResource = 2;
 #if DBG_DIRECTX
-		fprintf(stderr, "GfxDataChunkList::Update: chunk %d for command '%s' (execId=%llu) is too small (%llu bytes), reallocating\n",
+		logHandler.Print("GfxDataChunkList::Update: chunk %d for command '%s' (execId=%llu) is too small (%llu bytes), reallocating\n",
 			m_usedChunks, ownerName, execId, (unsigned long long)m_chunks[m_usedChunks]->GetDesc().Width);
 #endif
         // existing chunk too small — reallocate in place
@@ -47,7 +48,7 @@ ComPtr<ID3D12Resource> GfxDataChunkList::Update(size_t dataSize, const char* own
         snprintf(name, sizeof(name), "GfxDataChunk[%s, %s, %llu]", ownerName, type, execId);
         m_chunks[m_usedChunks]->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
         if (!strcmp((char*)type, "Vertex") and (execId > 500))
-            fprintf(stderr, "Bingo!\n");
+            logHandler.Print("Bingo!\n");
 #endif
     }
     return m_chunks[m_usedChunks++];

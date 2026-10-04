@@ -1,4 +1,5 @@
 #include "objloader.h"
+#include "loghandler.h"
 
 #include <algorithm>
 #include <cctype>
@@ -201,7 +202,7 @@ bool ObjLoader::Load(const String& filename) {
 bool ObjLoader::ParseFile(const std::filesystem::path& filename) {
     std::ifstream file(filename);
     if (not file) {
-        fprintf(stderr, "ObjLoader: cannot open '%s'\n", filename.string().c_str());
+        logHandler.Print("ObjLoader: cannot open '%s'\n", filename.string().c_str());
         return false;
     }
     std::filesystem::path folder = filename.parent_path();
@@ -226,7 +227,7 @@ bool ObjLoader::ParseFile(const std::filesystem::path& filename) {
         else if (keyword == "mtllib")
             LoadMaterialLibraries(folder, arguments);
         if (not isValid) {
-            fprintf(stderr, "ObjLoader: %s (%d): invalid '%s' statement\n", filename.string().c_str(), lineNumber, keyword.c_str());
+            logHandler.Print("ObjLoader: %s (%d): invalid '%s' statement\n", filename.string().c_str(), lineNumber, keyword.c_str());
             return false;
         }
     }
@@ -251,7 +252,7 @@ void ObjLoader::LoadMaterialLibraries(const std::filesystem::path& folder, const
 void ObjLoader::LoadMaterials(const std::filesystem::path& filename) {
     std::ifstream file(filename);
     if (not file) {
-        fprintf(stderr, "ObjLoader: cannot open material library '%s'\n", filename.string().c_str());
+        logHandler.Print("ObjLoader: cannot open material library '%s'\n", filename.string().c_str());
         return;
     }
     std::filesystem::path folder = filename.parent_path();
@@ -295,12 +296,12 @@ void ObjLoader::LoadMaterials(const std::filesystem::path& filename) {
         }
         else if (keyword == "map_kd") {
             if (not ParseTextureStatement(arguments, folder, material.texture, material.wrap))
-                fprintf(stderr, "ObjLoader: %s (%d): invalid 'map_Kd' statement\n", filename.string().c_str(), lineNumber);
+                logHandler.Print("ObjLoader: %s (%d): invalid 'map_Kd' statement\n", filename.string().c_str(), lineNumber);
         }
         else if (keyword == "map_d") {
             GfxWrapMode alphaWrap = material.wrap;
             if (not ParseTextureStatement(arguments, folder, material.alphaTexture, alphaWrap))
-                fprintf(stderr, "ObjLoader: %s (%d): invalid 'map_d' statement\n", filename.string().c_str(), lineNumber);
+                logHandler.Print("ObjLoader: %s (%d): invalid 'map_d' statement\n", filename.string().c_str(), lineNumber);
         }
     }
 }
@@ -317,7 +318,7 @@ int32_t ObjLoader::FindMaterial(const std::string& name) const {
 void ObjLoader::UseMaterial(const std::string& name) {
     int32_t material = FindMaterial(name);
     if (material < 0)
-        fprintf(stderr, "ObjLoader: unknown material '%s'\n", name.c_str());
+        logHandler.Print("ObjLoader: unknown material '%s'\n", name.c_str());
     if (material == m_part.materialIndex)
         return;
     FinishPart();
@@ -440,7 +441,7 @@ void ObjLoader::BuildMaterials(void) {
             material.imageIndex = ImageIndex(source.texture);
 #ifdef _DEBUG
         if ((not source.alphaTexture.empty()) and (source.alphaTexture != source.texture))
-            fprintf(stderr, "ObjLoader: material '%s': separate alpha map '%s' not supported, using the alpha channel of map_Kd\n", source.name.c_str(), source.alphaTexture.string().c_str());
+            logHandler.Print("ObjLoader: material '%s': separate alpha map '%s' not supported, using the alpha channel of map_Kd\n", source.name.c_str(), source.alphaTexture.string().c_str());
 #endif
     }
 }
@@ -454,14 +455,14 @@ int32_t ObjLoader::ImageIndex(const std::filesystem::path& filename) {
     AutoArray<uint8_t>* image = m_data.images.Append();
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (not file) {
-        fprintf(stderr, "ObjLoader: cannot open texture '%s'\n", filename.string().c_str());
+        logHandler.Print("ObjLoader: cannot open texture '%s'\n", filename.string().c_str());
         return m_imageFiles.Length() - 1;
     }
     std::streamoff size = file.tellg();
     file.seekg(0);
     image->Resize(int32_t(size));
     if ((size > 0) and not file.read(reinterpret_cast<char*>(image->DataPtr()), size)) {
-        fprintf(stderr, "ObjLoader: cannot read texture '%s'\n", filename.string().c_str());
+        logHandler.Print("ObjLoader: cannot read texture '%s'\n", filename.string().c_str());
         image->Clear();
     }
     return m_imageFiles.Length() - 1;

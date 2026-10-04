@@ -6,6 +6,7 @@
 #include "gfxrenderer.h"
 #include "commandlist.h"
 #include "tracy_wrapper.h"
+#include "loghandler.h"
 
 #include <cassert>
 #include <algorithm>
@@ -293,13 +294,13 @@ bool GfxDataLayout::Enable(void) noexcept
         }
         list->IASetVertexBuffers(0, maxSlot, views);
 #if 0//def _DEBUG
-        fprintf(stderr, "GfxDataLayout::Enable — %d buffers, maxSlot=%d\n", vbCount, maxSlot);
+        logHandler.Print("GfxDataLayout::Enable — %d buffers, maxSlot=%d\n", vbCount, maxSlot);
         for (int s = 0; s < maxSlot; ++s) {
             if (views[s].BufferLocation)
-                fprintf(stderr, "  slot %d: addr=0x%llx stride=%u size=%u\n",
+                logHandler.Print("  slot %d: addr=0x%llx stride=%u size=%u\n",
                     s, views[s].BufferLocation, views[s].StrideInBytes, views[s].SizeInBytes);
             else
-                fprintf(stderr, "  slot %d: <empty>\n", s);
+                logHandler.Print("  slot %d: <empty>\n", s);
         }
 #endif
     }
@@ -336,7 +337,7 @@ bool GfxDataLayout::FinishUpdate(void) noexcept {
 void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstIndex, uint32_t indexCount) noexcept
 {
 #if 0 //def _DEBUG
-    fprintf(stderr, "GfxDataLayout::Render on list %p, indexCount=%u, vertCount=%u\n",
+    logHandler.Print("GfxDataLayout::Render on list %p, indexCount=%u, vertCount=%u\n",
         (void*)commandListHandler.CurrentGfxList(),
         m_indexBuffer.IsValid() ? UINT(m_indexBuffer.m_itemCount) : 0,
         (m_dataBuffers.Length() > 0 && m_dataBuffers[0]) ? UINT(m_dataBuffers[0]->m_itemCount) : 0); 

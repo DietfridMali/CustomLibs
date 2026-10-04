@@ -1,5 +1,6 @@
 #include <cstdio>
 #include "networkendpoint.h"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -53,20 +54,20 @@ bool NetworkEndpoint::UpdateSocketAddress(const String& ipAddress, int32_t port)
         // packed host address. Both are rejected now, and the message names the offending input rather
         // than the previously stored address.
         if (l > 4) {
-            fprintf(stderr, "invalid ip address '%s'\n", (const char*) ipAddress);
+            logHandler.Print("invalid ip address '%s'\n", (const char*) ipAddress);
             return false;
         }
         for (int i = 0; i < l; ++i) {
             try {
                 unsigned value = fields[i].IsEmpty() ? 0 : unsigned(uint16_t(fields[i]));
                 if (value > 255) {
-                    fprintf(stderr, "invalid ip address '%s'\n", (const char*) ipAddress);
+                    logHandler.Print("invalid ip address '%s'\n", (const char*) ipAddress);
                     return false;
                 }
                 fieldValues[i] = value;
             }
             catch (...) {
-                fprintf(stderr, "invalid ip address '%s'\n", (const char*) ipAddress);
+                logHandler.Print("invalid ip address '%s'\n", (const char*) ipAddress);
                 return false;
             }
         }

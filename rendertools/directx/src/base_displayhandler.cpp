@@ -11,6 +11,7 @@
 #include "SDL.h"
 #include "SDL_syswm.h"
 #pragma warning(pop)
+#include "loghandler.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -26,11 +27,10 @@ void HandleDeviceLost(const char* where) noexcept
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : S_OK;
     if (SUCCEEDED(removed))
         return;
-    fprintf(stderr, "%s: device removed (0x%08X) - graphics device lost, terminating\n", where, (unsigned)removed);
+    logHandler.Print("%s: device removed (0x%08X) - graphics device lost, terminating\n", where, (unsigned)removed);
 #if DBG_DIRECTX
     dx12Context.DumpDRED();
 #endif
-    fflush(stderr);
     // The window goes first - a message box behind a fullscreen window cannot be seen or answered.
     if (SDL_Window* window = baseDisplayHandler.GetWindow())
         SDL_HideWindow(window);
@@ -154,7 +154,7 @@ bool BaseDisplayHandler::CreateSwapChain(void) {
 
     HRESULT hr = factory->CreateSwapChainForHwnd(queue, m_hwnd, &scDesc, nullptr, nullptr, &swapChain1);
     if (FAILED(hr)) {
-        fprintf(stderr, "BaseDisplayHandler: CreateSwapChainForHwnd failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("BaseDisplayHandler: CreateSwapChainForHwnd failed (hr=0x%08X)\n", (unsigned)hr);
         exit(1);
     }
 
@@ -163,12 +163,12 @@ bool BaseDisplayHandler::CreateSwapChain(void) {
 
     hr = swapChain1.As(&m_swapChain);
     if (FAILED(hr)) {
-        fprintf(stderr, "BaseDisplayHandler: IDXGISwapChain1 -> IDXGISwapChain3 failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("BaseDisplayHandler: IDXGISwapChain1 -> IDXGISwapChain3 failed (hr=0x%08X)\n", (unsigned)hr);
         exit(1);
     }
 
     if (not AcquireBackBuffers()) {
-        fprintf(stderr, "BaseDisplayHandler: AcquireBackBuffers failed\n");
+        logHandler.Print("BaseDisplayHandler: AcquireBackBuffers failed\n");
         exit(1);
     }
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
@@ -185,7 +185,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     SetContextAttributes();
     m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, windowFlags);
     if (not m_window) {
-        fprintf(stderr, "BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
+        logHandler.Print("BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
         exit(1);
     }
 
@@ -193,7 +193,7 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
     SDL_SysWMinfo wmInfo{};
     SDL_VERSION(&wmInfo.version);
     if (not SDL_GetWindowWMInfo(m_window, &wmInfo)) {
-        fprintf(stderr, "BaseDisplayHandler: SDL_GetWindowWMInfo failed (%s)\n", SDL_GetError());
+        logHandler.Print("BaseDisplayHandler: SDL_GetWindowWMInfo failed (%s)\n", SDL_GetError());
         exit(1);
     }
     m_hwnd = wmInfo.info.win.window;
@@ -207,7 +207,7 @@ bool BaseDisplayHandler::AcquireBackBuffers(void) noexcept {
     for (UINT i = 0; i < BACK_BUFFER_COUNT; ++i) {
         HRESULT hr = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]));
         if (FAILED(hr)) {
-            fprintf(stderr, "BaseDisplayHandler: GetBuffer(%u) failed (hr=0x%08X)\n", i, (unsigned)hr);
+            logHandler.Print("BaseDisplayHandler: GetBuffer(%u) failed (hr=0x%08X)\n", i, (unsigned)hr);
             return false;
         }
         RTV& rtv = m_rtvs[i];
@@ -307,7 +307,7 @@ void BaseDisplayHandler::EndFrame(void) {
     UINT presentFlags = m_vSync ? 0 : DXGI_PRESENT_ALLOW_TEARING;
     HRESULT hr = m_swapChain->Present(syncInterval, presentFlags);
     if (FAILED(hr)) {
-        fprintf(stderr, "BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("BaseDisplayHandler::EndFrame: Present failed (hr=0x%08X)\n", (unsigned)hr);
         HandleDeviceLost("BaseDisplayHandler::EndFrame");
     }
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
@@ -398,7 +398,7 @@ bool BaseDisplayHandler::ResizeSwapChain(void) {
     ReleaseBackBuffers();
     HRESULT hr = m_swapChain->ResizeBuffers(BACK_BUFFER_COUNT, UINT(m_width), UINT(m_height), BACK_BUFFER_FORMAT, m_vSync ? 0 : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING);
     if (FAILED(hr)) {
-        fprintf(stderr, "BaseDisplayHandler::ResizeSwapChain: ResizeBuffers failed (hr=0x%08X)\n", (unsigned)hr);
+        logHandler.Print("BaseDisplayHandler::ResizeSwapChain: ResizeBuffers failed (hr=0x%08X)\n", (unsigned)hr);
         return false;
     }
     AcquireBackBuffers();
@@ -425,7 +425,7 @@ void BaseDisplayHandler::SwitchDisplayMode(int direction) {
 
 void BaseDisplayHandler::ToggleFullscreen(void) {
 #ifdef _DEBUG
-    fprintf(stderr, "Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
+    logHandler.Print("Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
     RequestDisplayChange(-1, !m_isFullscreen);
 }

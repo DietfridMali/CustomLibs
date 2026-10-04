@@ -6,6 +6,7 @@
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "conversions.hpp"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -107,7 +108,7 @@ Shader* BaseShaderHandler::SetupRenderShader(const String& shaderId, const Strin
             return nullptr;
         if (not shader->IsValid()) {
 #ifdef _DEBUG
-            fprintf(stderr, "*** shader'%s' is not available\r\n", (const char*)renderShaderId);
+            logHandler.Print("*** shader'%s' is not available\r\n", (const char*)renderShaderId);
 #endif
             return nullptr;
         }

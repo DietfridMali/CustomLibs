@@ -7,6 +7,7 @@
 #include "gfxstates.h"
 #include "tracy_wrapper.h"
 #include "dx12framework.h"
+#include "loghandler.h"
 #include <functional>
 
 #if DBG_DIRECTX
@@ -373,7 +374,7 @@ public:
 #if DBG_DIRECTX
     inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
-            fprintf(stderr, "[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), loc.line());
+            logHandler.Print("[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), loc.line());
 #else
     inline void DrawInstanced(UINT vtxCount, UINT instCount, UINT startVtx, UINT startInst) noexcept {
 #endif
@@ -384,7 +385,7 @@ public:
 #if DBG_DIRECTX
     inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
-            fprintf(stderr, "[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), loc.line());
+            logHandler.Print("[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), loc.line());
 #else
     inline void DrawIndexedInstanced(UINT idxCount, UINT instCount, UINT startIdx, INT baseVtx, UINT startInst) noexcept {
 #endif
@@ -395,7 +396,7 @@ public:
 #if DBG_DIRECTX
     inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION * dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION * src, const D3D12_BOX * srcBox, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
-            fprintf(stderr, "[CTR] %s:%u\n", loc.file_name(), loc.line());
+            logHandler.Print("[CTR] %s:%u\n", loc.file_name(), loc.line());
 #else
     inline void CopyTextureRegion(const D3D12_TEXTURE_COPY_LOCATION * dst, UINT dstX, UINT dstY, UINT dstZ, const D3D12_TEXTURE_COPY_LOCATION * src, const D3D12_BOX * srcBox) noexcept {
 #endif
@@ -406,7 +407,7 @@ public:
 #if DBG_DIRECTX
     inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER* barriers, std::source_location loc = std::source_location::current()) noexcept {
         if (m_logCalls)
-            fprintf(stderr, "[RB]  n=%u  %s:%u\n", numBarriers, loc.file_name(), loc.line());
+            logHandler.Print("[RB]  n=%u  %s:%u\n", numBarriers, loc.file_name(), loc.line());
 #else
     inline void ResourceBarrier(UINT numBarriers, const D3D12_RESOURCE_BARRIER * barriers) noexcept {
 #endif

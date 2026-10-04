@@ -18,6 +18,7 @@
 #include "basesingleton.hpp"
 #include "colordata.h"
 #include "renderstates.h"
+#include "loghandler.h"
 
 // =================================================================================================
 // GL compatibility type — defined here so code that uses Tristate<GLenum> compiles unchanged.
@@ -390,7 +391,7 @@ public:
         static uint32_t reportedFeatures = 0;
         if (not (reportedFeatures & GfxFeatureBit(feature))) {
             reportedFeatures |= GfxFeatureBit(feature);
-            fprintf(stderr, "GfxStates: %s is not enabled on this device - state change ignored\n", GfxFeatureName(feature));
+            logHandler.Print("GfxStates: %s is not enabled on this device - state change ignored\n", GfxFeatureName(feature));
         }
 #endif
         return false;

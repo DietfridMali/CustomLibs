@@ -25,6 +25,7 @@
 #include "sampler_cache.h"
 #include "texturesampling.h"
 #include "vkupload.h"
+#include "loghandler.h"
 #include <spirv_reflect.h>
 
 #if VK_STALL_DIAG
@@ -216,7 +217,7 @@ static bool CreateDefaultImage(DefaultImage& target, uint32_t layers, VkImageCre
 
     VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &target.image, &target.allocation, nullptr);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Shader: default image creation failed (%d)\n", int(res));
+        logHandler.Print("Shader: default image creation failed (%d)\n", int(res));
         return false;
     }
     target.tracker.Init(target.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -250,7 +251,7 @@ static VkImageView CreateDefaultView(VkImage image, VkImageViewType viewType) no
     VkImageView view = VK_NULL_HANDLE;
     VkResult res = vkCreateImageView(device, &info, nullptr, &view);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Shader: default image view creation failed (%d)\n", int(res));
+        logHandler.Print("Shader: default image view creation failed (%d)\n", int(res));
         return VK_NULL_HANDLE;
     }
     return view;
@@ -337,7 +338,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
                                                args.data(), uint32_t(args.size()),
                                                spirvOut, error,
                                                shaderFolder, m_name + String(".") + String(target) + String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
-        fprintf(stderr, "Shader '%s': compile failed (entry=%s, target=%s):\n%s\n",
+        logHandler.Print("Shader '%s': compile failed (entry=%s, target=%s):\n%s\n",
                 (const char*)m_name, entryPoint, target, (const char*)error);
         return false;
     }
@@ -396,7 +397,7 @@ bool Shader::CreatePipelineLayout(void) noexcept
 
     VkResult res = vkCreateDescriptorSetLayout(device, &setInfo, nullptr, &m_setLayout);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Shader '%s': vkCreateDescriptorSetLayout failed (%d)\n", (const char*)m_name, (int)res);
+        logHandler.Print("Shader '%s': vkCreateDescriptorSetLayout failed (%d)\n", (const char*)m_name, (int)res);
         return false;
     }
 
@@ -407,7 +408,7 @@ bool Shader::CreatePipelineLayout(void) noexcept
 
     res = vkCreatePipelineLayout(device, &plInfo, nullptr, &m_pipelineLayout);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "Shader '%s': vkCreatePipelineLayout failed (%d)\n", (const char*)m_name, (int)res);
+        logHandler.Print("Shader '%s': vkCreatePipelineLayout failed (%d)\n", (const char*)m_name, (int)res);
         return false;
     }
     return true;
@@ -654,25 +655,25 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
         for (const String* code : stageCode) {
             if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
 #ifdef _DEBUG
-                fprintf(stderr, "Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+                logHandler.Print("Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
 #endif
                 return false;
             }
         }
     }
     if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
-        fprintf(stderr, "Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
+        logHandler.Print("Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
         return false;
     }
     if (not gsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::GeometryShader)) {
 #ifdef _DEBUG
-        fprintf(stderr, "Shader '%s': needs geometry shaders, which are not enabled on this device - not created\n", (const char*)m_name);
+        logHandler.Print("Shader '%s': needs geometry shaders, which are not enabled on this device - not created\n", (const char*)m_name);
 #endif
         return false;
     }
     if (not tcsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::Tessellation)) {
 #ifdef _DEBUG
-        fprintf(stderr, "Shader '%s': needs tessellation, which is not enabled on this device - not created\n", (const char*)m_name);
+        logHandler.Print("Shader '%s': needs tessellation, which is not enabled on this device - not created\n", (const char*)m_name);
 #endif
         return false;
     }
@@ -691,7 +692,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
             return false;
         m_patchControlPoints = ReflectPatchControlPoints(m_hsSpirv);
         if (m_patchControlPoints == 0) {
-            fprintf(stderr, "Shader '%s': hull shader input patch size not found\n", (const char*)m_name);
+            logHandler.Print("Shader '%s': hull shader input patch size not found\n", (const char*)m_name);
             return false;
         }
     }
@@ -997,7 +998,7 @@ bool Shader::UpdateVariables(void) noexcept {
 
     VkAccelerationStructureKHR accelStructure = commandListHandler.m_boundAccelStructure;
     if (m_usesAccelStructure and (accelStructure == VK_NULL_HANDLE)) {
-        fprintf(stderr, "Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
+        logHandler.Print("Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
         return false;
     }
 
@@ -1322,7 +1323,7 @@ int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
 #ifdef _DEBUG
     if ((result < 0) and not loc->m_warned) {
         loc->m_warned = true;
-        fprintf(stderr, "Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+        logHandler.Print("Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
     }
 #endif
     return result;

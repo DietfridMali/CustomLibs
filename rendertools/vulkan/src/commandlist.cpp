@@ -5,12 +5,12 @@
 #include "resource_handler.h"
 #include "gfxstates.h"
 #include "shader_loading.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
 #if VK_STALL_DIAG
 #include <chrono>
-#include <ctime>
 #include <string>
 #include <vector>
 #endif
@@ -36,8 +36,6 @@ struct VkStallEntry {
 };
 
 struct VkStallRecorder {
-    FILE*                       file { nullptr };
-    bool                        openFailed { false };
     uint64_t                    frameNumber { 0 };
     double                      frameStartMs { 0.0 };
     double                      avgFrameMs { 0.0 };
@@ -51,25 +49,6 @@ static VkStallRecorder vkStalls;
 double VkStallClock(void) noexcept
 {
     return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-
-
-static FILE* VkStallFile(void) noexcept
-{
-    if ((vkStalls.file == nullptr) and not vkStalls.openFailed) {
-        vkStalls.file = fopen("vkstalls.log", "wt");
-        vkStalls.openFailed = (vkStalls.file == nullptr);
-        if (vkStalls.file != nullptr) {
-            std::time_t now = std::time(nullptr);
-            char stamp[64] = "?";
-            std::tm* local = std::localtime(&now);
-            if (local != nullptr)
-                std::strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", local);
-            fprintf(vkStalls.file, "\n==== START %s ====\n", stamp);
-            fflush(vkStalls.file);
-        }
-    }
-    return vkStalls.file;
 }
 
 
@@ -103,11 +82,7 @@ void VkStallEvent(const char* what, double startMs, const char* detail) noexcept
 {
     double ms = VkStallClock() - startMs;
     VkStallNote(what, startMs, detail);
-    FILE* f = VkStallFile();
-    if (f == nullptr)
-        return;
-    fprintf(f, "frame %llu: %s %.2f ms  %s\n", (unsigned long long)vkStalls.frameNumber, what, ms, detail ? detail : "");
-    fflush(f);
+    logHandler.Print("frame %llu: %s %.2f ms  %s\n", static_cast<unsigned long long>(vkStalls.frameNumber), what, ms, detail ? detail : "");
 }
 
 
@@ -118,14 +93,10 @@ static void VkStallEndFrame(uint64_t nextFrame) noexcept
         double frameMs = now - vkStalls.frameStartMs;
         bool isStall = (vkStalls.avgFrameMs > 0.0) and (frameMs > kStallFrameMinMs) and (frameMs > kStallFrameFactor * vkStalls.avgFrameMs);
         if (isStall) {
-            FILE* f = VkStallFile();
-            if (f != nullptr) {
-                fprintf(f, "STALL frame %llu: %.2f ms (avg %.2f ms)\n", (unsigned long long)vkStalls.frameNumber, frameMs, vkStalls.avgFrameMs);
-                for (const auto& e : vkStalls.entries)
-                    fprintf(f, "    %-28s %5d x  total %8.2f ms  max %8.2f ms\n", e.what, e.count, e.totalMs, e.maxMs);
-                fputs(vkStalls.details.c_str(), f);
-                fflush(f);
-            }
+            logHandler.Print("STALL frame %llu: %.2f ms (avg %.2f ms)\n", static_cast<unsigned long long>(vkStalls.frameNumber), frameMs, vkStalls.avgFrameMs);
+            for (const auto& e : vkStalls.entries)
+                logHandler.Print("    %-28s %5d x  total %8.2f ms  max %8.2f ms\n", e.what, e.count, e.totalMs, e.maxMs);
+            logHandler.Print("%s", vkStalls.details.c_str());
         }
         else if (vkStalls.avgFrameMs == 0.0)
             vkStalls.avgFrameMs = frameMs;
@@ -170,7 +141,7 @@ bool CommandQueue::Create(VkDevice device, VkQueue graphicsQueue, VkQueue presen
                           const String& name) noexcept
 {
     if ((device == VK_NULL_HANDLE) or (graphicsQueue == VK_NULL_HANDLE) or (presentQueue == VK_NULL_HANDLE)) {
-        fprintf(stderr, "CommandQueue::Create: null device or queue handle\n");
+        logHandler.Print("CommandQueue::Create: null device or queue handle\n");
         return false;
     }
     m_device = device;
@@ -186,11 +157,11 @@ bool CommandQueue::Create(VkDevice device, VkQueue graphicsQueue, VkQueue presen
 bool CommandQueue::InitSyncObjects(VkSwapchainKHR swapchain) noexcept
 {
     if (m_device == VK_NULL_HANDLE) {
-        fprintf(stderr, "CommandQueue::InitSyncObjects: device not set, call Create first\n");
+        logHandler.Print("CommandQueue::InitSyncObjects: device not set, call Create first\n");
         return false;
     }
     if (swapchain == VK_NULL_HANDLE) {
-        fprintf(stderr, "CommandQueue::InitSyncObjects: null swapchain\n");
+        logHandler.Print("CommandQueue::InitSyncObjects: null swapchain\n");
         return false;
     }
     m_swapchain = swapchain;
@@ -222,13 +193,13 @@ bool CommandQueue::BeginFrame(void) noexcept
     VkStallNote("frame fence wait", stallStart, nullptr);
 #endif
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
+        logHandler.Print("CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::BeginFrame");
         return false;
     }
     res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
+        logHandler.Print("CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
         return false;
     }
     // The slot's resources hang on its fence alone, so they are reset before the image is acquired -
@@ -258,7 +229,7 @@ bool CommandQueue::ReacquireImage(void) noexcept
 {
     VkResult res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "CommandQueue::ReacquireImage: vkResetFences failed (%d)\n", int(res));
+        logHandler.Print("CommandQueue::ReacquireImage: vkResetFences failed (%d)\n", int(res));
         return false;
     }
     return AcquireNextImage();
@@ -284,7 +255,7 @@ void CommandQueue::WaitIdle(void) noexcept
     VkStallNote("queue wait idle", stallStart, nullptr);
 #endif
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
+        logHandler.Print("CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::WaitIdle");
     }
 }
@@ -311,7 +282,7 @@ bool CommandQueue::CreateSyncObjects(void) noexcept
         VkResult r1 = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_imageAvailable[i]);
         VkResult r2 = vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlight[i]);
         if ((r1 != VK_SUCCESS) or (r2 != VK_SUCCESS)) {
-            fprintf(stderr, "CommandQueue::CreateSyncObjects: failed at slot %u (sem=%d fence=%d)\n",
+            logHandler.Print("CommandQueue::CreateSyncObjects: failed at slot %u (sem=%d fence=%d)\n",
                     i, (int)r1, (int)r2);
             return false;
         }
@@ -322,7 +293,7 @@ bool CommandQueue::CreateSyncObjects(void) noexcept
     for (uint32_t i = 0; i < Swapchain::MAX_BACK_BUFFERS; ++i) {
         VkResult r = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_renderFinished[i]);
         if (r != VK_SUCCESS) {
-            fprintf(stderr, "CommandQueue::CreateSyncObjects: vkCreateSemaphore(renderFinished[%u]) failed (%d)\n",
+            logHandler.Print("CommandQueue::CreateSyncObjects: vkCreateSemaphore(renderFinished[%u]) failed (%d)\n",
                     i, (int)r);
             return false;
         }
@@ -373,13 +344,13 @@ bool CommandQueue::AcquireNextImage(void) noexcept
         // Swapchain is stale (e.g. window resized). Caller is BaseDisplayHandler;
         // it owns the swapchain and is expected to recreate it. Phase B.
 #ifdef _DEBUG
-        fprintf(stderr, "CommandQueue::AcquireNextImage: VK_ERROR_OUT_OF_DATE_KHR\n");
+        logHandler.Print("CommandQueue::AcquireNextImage: VK_ERROR_OUT_OF_DATE_KHR\n");
 #endif
         m_swapchainIsOutOfDate = true;
         return false;
     }
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR)) {
-        fprintf(stderr, "CommandQueue::AcquireNextImage: vkAcquireNextImageKHR failed (%d)\n", (int)res);
+        logHandler.Print("CommandQueue::AcquireNextImage: vkAcquireNextImageKHR failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::AcquireNextImage");
         return false;
     }
@@ -422,7 +393,7 @@ void CommandQueue::Present(void) noexcept
     if ((res == VK_ERROR_OUT_OF_DATE_KHR) or (res == VK_SUBOPTIMAL_KHR))
         m_swapchainIsOutOfDate = true;
     if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR)) {
-        fprintf(stderr, "CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
+        logHandler.Print("CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandQueue::Present");
     }
 }
@@ -450,8 +421,7 @@ void HandleDeviceLost(VkResult res, const char* where) noexcept
 {
     if (res != VK_ERROR_DEVICE_LOST)
         return;
-    fprintf(stderr, "%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating\n", where);
-    fflush(stderr);
+    logHandler.Print("%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating\n", where);
     // The window goes first - a message box behind a fullscreen window cannot be seen or answered.
     if (SDL_Window* window = baseDisplayHandler.GetWindow())
         SDL_HideWindow(window);
@@ -501,7 +471,7 @@ bool CommandList::Create(const String& name, bool isTemporary) noexcept
     for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
         VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &m_pools[i]);
         if (res != VK_SUCCESS) {
-            fprintf(stderr, "CommandList::Create: vkCreateCommandPool[%u] failed (%d)\n", i, (int)res);
+            logHandler.Print("CommandList::Create: vkCreateCommandPool[%u] failed (%d)\n", i, (int)res);
             return false;
         }
         VkCommandBufferAllocateInfo allocInfo{};
@@ -511,7 +481,7 @@ bool CommandList::Create(const String& name, bool isTemporary) noexcept
         allocInfo.commandBufferCount = 1;
         res = vkAllocateCommandBuffers(device, &allocInfo, &m_cmdBuffers[i]);
         if (res != VK_SUCCESS) {
-            fprintf(stderr, "CommandList::Create: vkAllocateCommandBuffers[%u] failed (%d)\n", i, (int)res);
+            logHandler.Print("CommandList::Create: vkAllocateCommandBuffers[%u] failed (%d)\n", i, (int)res);
             return false;
         }
     }
@@ -556,7 +526,7 @@ bool CommandList::Open(bool saveRenderStates, bool detached) noexcept
         return false;
     VkResult res = vkResetCommandPool(vkContext.Device(), m_pools[fi], 0);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "CommandList::Open: vkResetCommandPool failed (%d)\n", (int)res);
+        logHandler.Print("CommandList::Open: vkResetCommandPool failed (%d)\n", (int)res);
         return false;
     }
     VkCommandBufferBeginInfo bi{};
@@ -564,7 +534,7 @@ bool CommandList::Open(bool saveRenderStates, bool detached) noexcept
     bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     res = vkBeginCommandBuffer(m_cmdBuffers[fi], &bi);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "CommandList::Open: vkBeginCommandBuffer failed (%d)\n", (int)res);
+        logHandler.Print("CommandList::Open: vkBeginCommandBuffer failed (%d)\n", (int)res);
         return false;
     }
     m_isRecording = true;
@@ -612,7 +582,7 @@ void CommandList::Close(bool restoreRenderStates) noexcept
         baseDisplayHandler.SuspendBackBuffer();
     VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
     if (res != VK_SUCCESS)
-        fprintf(stderr, "CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
+        logHandler.Print("CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
 #ifdef _DEBUG
     gfxStates.CheckError((const char*)m_name);
 #endif
@@ -669,7 +639,7 @@ void CommandList::Flush(void) noexcept
 
     VkResult res = Vk13Api::QueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "CommandList::Flush: vkQueueSubmit2 failed (%d)\n", (int)res);
+        logHandler.Print("CommandList::Flush: vkQueueSubmit2 failed (%d)\n", (int)res);
         HandleDeviceLost(res, "CommandList::Flush");
     }
 #ifdef _DEBUG
@@ -798,7 +768,7 @@ static void ReportUnwrittenAttachments(Shader* shader, uint32_t writtenCount, ui
     if (shader == lastReported)
         return;
     lastReported = shader;
-    fprintf(stderr, "CommandList::GetPipeline: shader '%s' writes %u of %u color attachments; the device has neither unused attachments nor independent blend, the other attachments are undefined after the draw\n",
+    logHandler.Print("CommandList::GetPipeline: shader '%s' writes %u of %u color attachments; the device has neither unused attachments nor independent blend, the other attachments are undefined after the draw\n",
             static_cast<const char*>(shader->m_name), writtenCount, attachmentCount);
 #endif
 }
@@ -972,7 +942,7 @@ void CommandListHandler::Register(CommandList* cl) noexcept
         return;
 #ifdef _DEBUG
     if (cl->m_name.IsEmpty())
-        fprintf(stderr, "CommandListHandler::Register: Unnamed command list\n");
+        logHandler.Print("CommandListHandler::Register: Unnamed command list\n");
 #endif
     for (auto l : m_pendingLists)
         if (cl == l)
@@ -1058,7 +1028,7 @@ void CommandListHandler::ExecuteAll(bool intermediate) noexcept
             VkStallNote(intermediate ? "intermediate submit" : "frame submit", stallStart, nullptr);
 #endif
             if (res != VK_SUCCESS) {
-                fprintf(stderr, "CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
+                logHandler.Print("CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
                 HandleDeviceLost(res, "CommandListHandler::ExecuteAll");
             }
         }
@@ -1120,7 +1090,7 @@ void CommandListHandler::ExecutePending(void) noexcept
 
         VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
         if (res != VK_SUCCESS) {
-            fprintf(stderr, "CommandListHandler::ExecutePending: vkQueueSubmit2 failed (%d)\n", (int)res);
+            logHandler.Print("CommandListHandler::ExecutePending: vkQueueSubmit2 failed (%d)\n", (int)res);
             HandleDeviceLost(res, "CommandListHandler::ExecutePending");
         }
     }

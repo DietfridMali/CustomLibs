@@ -3,6 +3,7 @@
 #include "string.hpp"
 #include "base_shadercode.h"
 #include "compute_shader.h"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -128,7 +129,7 @@ void BaseShaderCode::CreateShader(const ShaderSource* source) {
             m_computeShaders[source->m_name] = nullptr;
             delete shader;
 #ifdef _DEBUG
-            fprintf(stderr, "creating compute shader '%s' failed\n", (const char*)source->m_name);
+            logHandler.Print("creating compute shader '%s' failed\n", (const char*)source->m_name);
 #endif
         }
     }
@@ -140,7 +141,7 @@ void BaseShaderCode::CreateShader(const ShaderSource* source) {
             m_shaders[source->m_name] = nullptr;
             delete shader;
 #ifdef _DEBUG
-            fprintf(stderr, "creating shader '%s' failed\n", (const char*)source->m_name);
+            logHandler.Print("creating shader '%s' failed\n", (const char*)source->m_name);
 #endif
         }
     }

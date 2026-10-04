@@ -2,6 +2,7 @@
 #include "texturehandler.h"
 #include "list.hpp"
 #include "noisetexture.h"
+#include "loghandler.h"
 #include <format>
 
 // =================================================================================================
@@ -59,7 +60,7 @@ TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& t
                 }
                 if (params.isRequired) {
 #ifdef _DEBUG
-                    fprintf(stderr, "TextureHandler: Couldn't load texture '%s'.\n", (char*)(textureFolder + name));
+                    logHandler.Print("TextureHandler: Couldn't load texture '%s'.\n", (char*)(textureFolder + name));
 #endif
                     for (auto& h : textures)
                         delete h;

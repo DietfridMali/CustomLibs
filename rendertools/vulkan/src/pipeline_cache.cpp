@@ -5,6 +5,7 @@
 #include "shadercache.h"
 #include "base_shaderhandler.h"
 #include "resource_handler.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -14,6 +15,25 @@
 extern double VkStallClock(void) noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
 #endif
+
+namespace {
+
+struct BuildContext {
+    BuildContext(Shader* shader, const char* step) noexcept
+    {
+        logHandler.SetContext("shader '%s': %s", static_cast<const char*>(shader->m_name), step);
+#if VK_STALL_DIAG
+        VkStallEvent("build", VkStallClock(), logHandler.Context());
+#endif
+    }
+
+    ~BuildContext()
+    {
+        logHandler.ClearContext();
+    }
+};
+
+}
 
 static constexpr uint32_t kPipelineRecordVersion = 1;
 
@@ -96,7 +116,7 @@ static uint32_t PatchControlPoints(Shader* shader, uint8_t topology) noexcept
     else if (MeshTopology(topology) == MeshTopology::Points)
         patchControlPoints = 1;
     if (patchControlPoints != shader->m_patchControlPoints)
-        fprintf(stderr, "PipelineCache: shader '%s' expects %u patch control points, the mesh delivers %u\n",
+        logHandler.Print("PipelineCache: shader '%s' expects %u patch control points, the mesh delivers %u\n",
                 (const char*)shader->m_name, shader->m_patchControlPoints, patchControlPoints);
     return patchControlPoints;
 }
@@ -165,10 +185,21 @@ bool PipelineCache::Create(VkDevice device) noexcept
 
     VkResult res = vkCreatePipelineCache(device, &info, nullptr, &m_pipelineCache);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "PipelineCache::Create: vkCreatePipelineCache failed (%d)\n", (int)res);
+        logHandler.Print("PipelineCache::Create: vkCreatePipelineCache failed (%d)\n", (int)res);
         return false;
     }
 #if VK_STALL_DIAG
+    VkPhysicalDeviceDriverProperties driver { };
+    driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+    VkPhysicalDeviceProperties2 deviceInfo { };
+    deviceInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    deviceInfo.pNext = &driver;
+    vkGetPhysicalDeviceProperties2(vkContext.PhysicalDevice(), &deviceInfo);
+    const VkPhysicalDeviceProperties& props = deviceInfo.properties;
+    char deviceText[1024];
+    snprintf(deviceText, sizeof(deviceText), "%s, vendor 0x%04X, device 0x%04X, driver 0x%08X (%s, %s)",
+             props.deviceName, props.vendorID, props.deviceID, props.driverVersion, driver.driverName, driver.driverInfo);
+    VkStallEvent("device", VkStallClock(), deviceText);
     VkStallEvent("pipeline library", VkStallClock(), vkContext.HasPipelineLibrary() ? "available" : "NOT available, monolithic pipelines");
 #endif
     return true;
@@ -207,37 +238,72 @@ void PipelineCache::Destroy(void) noexcept
 }
 
 
-bool PipelineCache::Load(const String& shaderFolder)
+static const char* CacheHeaderMismatch(const VkPipelineCacheHeaderVersionOne& header, const VkPhysicalDeviceProperties& props) noexcept
 {
-    m_folder = shaderFolder;
-    LoadRecords();
-    if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
-        return false;
+    if (header.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE)
+        return "header version differs";
+    if (header.headerSize < sizeof(header))
+        return "header size too small";
+    if (header.vendorID != props.vendorID)
+        return "vendor id differs";
+    if (header.deviceID != props.deviceID)
+        return "device id differs";
+    if (std::memcmp(header.pipelineCacheUUID, props.pipelineCacheUUID, VK_UUID_SIZE) != 0)
+        return "pipeline cache uuid differs";
+    return nullptr;
+}
+
+
+static const char* MergeStoredCache(VkDevice device, VkPipelineCache target, const String& shaderFolder, size_t& size)
+{
     std::vector<uint8_t> data;
     if (not ShaderCache::ReadFile(shaderFolder, String("pipelines.vulkan"), data))
-        return false;
+        return "no file";
+    size = data.size();
     VkPipelineCacheHeaderVersionOne header { };
     if (data.size() < sizeof(header))
-        return false;
+        return "file too small";
     std::memcpy(&header, data.data(), sizeof(header));
-    const VkPhysicalDeviceProperties& props = vkContext.DeviceProps();
-    if ((header.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE)
-        or (header.headerSize < sizeof(header))
-        or (header.vendorID != props.vendorID)
-        or (header.deviceID != props.deviceID)
-        or (std::memcmp(header.pipelineCacheUUID, props.pipelineCacheUUID, VK_UUID_SIZE) != 0))
-        return false;
+    const char* mismatch = CacheHeaderMismatch(header, vkContext.DeviceProps());
+    if (mismatch != nullptr)
+        return mismatch;
 
     VkPipelineCacheCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
     info.initialDataSize = data.size();
     info.pInitialData = data.data();
     VkPipelineCache loaded = VK_NULL_HANDLE;
-    if (vkCreatePipelineCache(m_device, &info, nullptr, &loaded) != VK_SUCCESS)
+    if (vkCreatePipelineCache(device, &info, nullptr, &loaded) != VK_SUCCESS)
+        return "rejected by the driver";
+    VkResult res = vkMergePipelineCaches(device, target, 1, &loaded);
+    vkDestroyPipelineCache(device, loaded, nullptr);
+    return (res == VK_SUCCESS) ? nullptr : "merge failed";
+}
+
+
+bool PipelineCache::Load(const String& shaderFolder)
+{
+    m_folder = shaderFolder;
+    LoadRecords();
+#if VK_STALL_DIAG
+    char detail[1200];
+    snprintf(detail, sizeof(detail), "'%s'", static_cast<const char*>(shaderFolder));
+    VkStallEvent("shader folder", VkStallClock(), detail);
+    snprintf(detail, sizeof(detail), "pipelinekeys.vulkan: %d records", int(m_records.Length()));
+    VkStallEvent("pipeline cache", VkStallClock(), detail);
+#endif
+    if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
         return false;
-    VkResult res = vkMergePipelineCaches(m_device, m_pipelineCache, 1, &loaded);
-    vkDestroyPipelineCache(m_device, loaded, nullptr);
-    return res == VK_SUCCESS;
+    size_t size = 0;
+    const char* failure = MergeStoredCache(m_device, m_pipelineCache, shaderFolder, size);
+#if VK_STALL_DIAG
+    if (failure == nullptr)
+        snprintf(detail, sizeof(detail), "pipelines.vulkan: merged, %zu bytes", size);
+    else
+        snprintf(detail, sizeof(detail), "pipelines.vulkan: not used, %s", failure);
+    VkStallEvent("pipeline cache", VkStallClock(), detail);
+#endif
+    return failure == nullptr;
 }
 
 
@@ -562,7 +628,7 @@ VkPipeline PipelineCache::CreateLibrary(VkGraphicsPipelineCreateInfo& info, VkGr
     VkPipeline library = VK_NULL_HANDLE;
     VkResult res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &library);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "PipelineCache::CreateLibrary: vkCreateGraphicsPipelines failed (%d, part 0x%x)\n", (int)res, unsigned(part));
+        logHandler.Print("PipelineCache::CreateLibrary: vkCreateGraphicsPipelines failed (%d, part 0x%x)\n", (int)res, unsigned(part));
         return VK_NULL_HANDLE;
     }
     return library;
@@ -596,6 +662,7 @@ VkPipeline PipelineCache::VertexInputLibrary(Shader* shader, uint8_t topology) n
     info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     info.pVertexInputState = &vertexInput;
     info.pInputAssemblyState = &inputAssembly;
+    BuildContext context(shader, "vertex input library");
     VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT);
     if (library != VK_NULL_HANDLE) {
         m_shaderLibraryKeys.Append(key);
@@ -649,6 +716,7 @@ VkPipeline PipelineCache::PreRasterizationLibrary(Shader* shader, uint8_t fillMo
     info.pViewportState = &viewport;
     info.pRasterizationState = &rasterization;
     info.layout = shader->m_pipelineLayout;
+    BuildContext context(shader, "pre-rasterization library");
     VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT);
     if (library != VK_NULL_HANDLE) {
         m_shaderLibraryKeys.Append(key);
@@ -689,6 +757,7 @@ VkPipeline PipelineCache::FragmentShaderLibrary(Shader* shader) noexcept
     info.pMultisampleState = &multisample;
     info.pDepthStencilState = &depthStencil;
     info.layout = shader->m_pipelineLayout;
+    BuildContext context(shader, "fragment shader library");
     VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT);
     if (library != VK_NULL_HANDLE) {
         m_shaderLibraryKeys.Append(key);
@@ -739,6 +808,7 @@ VkPipeline PipelineCache::FragmentOutputLibrary(const PipelineKey& pipelineKey) 
     info.pNext = &renderingInfo;
     info.pColorBlendState = &colorBlend;
     info.pMultisampleState = &multisample;
+    BuildContext context(pipelineKey.shader, "fragment output library");
     VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT);
     if (library != VK_NULL_HANDLE) {
         m_outputLibraryKeys.Append(key);
@@ -778,10 +848,11 @@ VkPipeline PipelineCache::LinkPipeline(const PipelineKey& key, bool optimize) no
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
 
+    BuildContext context(shader, optimize ? "pipeline link, optimized" : "pipeline link, fast");
     VkPipeline pipeline = VK_NULL_HANDLE;
     VkResult res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "PipelineCache::LinkPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
+        logHandler.Print("PipelineCache::LinkPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
         return VK_NULL_HANDLE;
     }
     return pipeline;
@@ -872,10 +943,11 @@ VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
     info.renderPass = VK_NULL_HANDLE;  // dynamic rendering — no render pass
     info.subpass = 0;
 
+    BuildContext context(shader, "monolithic pipeline");
     VkPipeline pipeline = VK_NULL_HANDLE;
     VkResult res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
     if (res != VK_SUCCESS) {
-        fprintf(stderr, "PipelineCache::BuildPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
+        logHandler.Print("PipelineCache::BuildPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
         return VK_NULL_HANDLE;
     }
     return pipeline;

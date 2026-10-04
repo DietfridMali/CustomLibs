@@ -8,6 +8,7 @@
 #include "base_shaderhandler.h"
 #include "texturebuffer.h"
 #include "kuwaharafilter.h"
+#include "loghandler.h"
 
 // =================================================================================================
 
@@ -228,7 +229,7 @@ bool KuwaharaFilter::Filter(Texture* texture, const Params& params, bool isCube)
         baseShaderHandler.StopShader();
 
     if (not (ok and ReplaceTexture(texture, pixels, width, height, faceCount))) {
-        fprintf(stderr, "KuwaharaFilter: filtering '%s' failed (%d x %d x %d)\n", static_cast<const char*>(texture->GetName()), width, height, faceCount);
+        logHandler.Print("KuwaharaFilter: filtering '%s' failed (%d x %d x %d)\n", static_cast<const char*>(texture->GetName()), width, height, faceCount);
         return false;
     }
     return true;

@@ -6,6 +6,7 @@
 #include "fonthandler.h"
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
+#include "loghandler.h"
 
 #ifndef _WIN32
 #   include <locale>
@@ -61,7 +62,7 @@ bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
     }
 #ifdef _DEBUG
     else
-        fprintf(stderr, "unknown glyph\n");
+        logHandler.Print("unknown glyph\n");
 #endif
     return true;
 }
@@ -106,7 +107,7 @@ bool FontHandler::InitTTF(void) {
     if (not haveTTF) {
         haveTTF = (0 > TTF_Init()) ? -1 : 1;
         if (haveTTF < 0) 
-            fprintf(stderr, "Paintjob-Rampage: Cannot initialize font system.\n");
+            logHandler.Print("Paintjob-Rampage: Cannot initialize font system.\n");
     }
     return haveTTF > 0;
 }
@@ -125,7 +126,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
 
     String fontFile = fontFolder + fontName;
     if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
-        fprintf(stderr, "Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*) fontName, TTF_GetError());
+        logHandler.Print("Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*) fontName, TTF_GetError());
         return false;
     }
     //SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
@@ -282,14 +283,14 @@ bool FontHandler::CreateAtlas(void) {
     int glyphCount = m_glyphs.Length() + 1;
     if (not m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2, GfxFilterMode::Linear, 1)) {
 #ifdef _DEBUG
-        fprintf(stderr, "FontHandler: Failed to create atlas.\n");
+        logHandler.Print("FontHandler: Failed to create atlas.\n");
 #endif
         return false;
     }
 #ifdef _DEBUG
     if (BuildAtlas() == int(glyphCount))
         return true;
-    fprintf(stderr, "FontHandler: Failed to create all glyphs.\n");
+    logHandler.Print("FontHandler: Failed to create all glyphs.\n");
     return false;
 #else
     return BuildAtlas() == int(glyphCount);
@@ -304,7 +305,7 @@ FontHandler::TextDimensions FontHandler::TextSize(String text) {
         GlyphInfo* info = FindGlyph(glyph);
         if ((info == nullptr) or (info->index < 0)) {
 #ifdef _DEBUG
-            fprintf(stderr, "Couldn't load texture for glyph '%s'\r\n", (const char*)glyph);
+            logHandler.Print("Couldn't load texture for glyph '%s'\r\n", (const char*)glyph);
 #endif
             return TextDimensions();
         }

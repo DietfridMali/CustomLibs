@@ -5,6 +5,7 @@
 #include "commandlist.h"
 #include "resource_handler.h"
 #include "shader_loading.h"
+#include "loghandler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -131,7 +132,7 @@ bool GfxDataBuffer::Create(int slot, size_t dataSize)
                                   VMA_MEMORY_USAGE_AUTO,
                                   VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
                                 | VMA_ALLOCATION_CREATE_MAPPED_BIT)) {
-        fprintf(stderr, "GfxDataBuffer::Create: GfxBuffer::Create failed (size=%zu, type=%s/%d slot %d)\n",
+        logHandler.Print("GfxDataBuffer::Create: GfxBuffer::Create failed (size=%zu, type=%s/%d slot %d)\n",
                 dataSize, m_type ? m_type : "?", m_id, slot);
         return false;
     }

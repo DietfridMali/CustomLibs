@@ -3,6 +3,7 @@
 #include "lightningbolt.h"
 #include "lightningnoise.h"
 #include "random.hpp"
+#include "loghandler.h"
 
 // Y-fork look (2026-07-23): 1 = forks sit preferentially at the parent's bends and the branch leaves to
 // the OPPOSITE side of the bend (Y opening like real lightning); needs a reference build at the fixed
@@ -259,18 +260,18 @@ namespace {
         int32_t below30 = 0;
         for (int32_t deg = 0; deg < 30; deg++)
             below30 += histogram[deg];
-        fprintf(stderr, "tortuosity: n=%d mean=%.1f p50=%d p70=%d p90=%d below30=%.1f%% (target: p70<30, right-skewed)\n",
+        logHandler.Print("tortuosity: n=%d mean=%.1f p50=%d p70=%d p90=%d below30=%.1f%% (target: p70<30, right-skewed)\n",
                 n, sum / float(n), percentile(0.5f), percentile(0.7f), percentile(0.9f), float(below30) * 100.0f / float(n));
-        fprintf(stderr, "  deg:");
+        logHandler.Print("  deg:");
         int32_t above90 = n;
         for (int32_t b0 = 0; b0 < 90; b0 += 10) {
             int32_t c = 0;
             for (int32_t deg = b0; deg < b0 + 10; deg++)
                 c += histogram[deg];
             above90 -= c;
-            fprintf(stderr, " %d-%d=%.1f%%", b0, b0 + 10, float(c) * 100.0f / float(n));
+            logHandler.Print(" %d-%d=%.1f%%", b0, b0 + 10, float(c) * 100.0f / float(n));
         }
-        fprintf(stderr, " 90+=%.1f%%\n", float(above90) * 100.0f / float(n));
+        logHandler.Print(" 90+=%.1f%%\n", float(above90) * 100.0f / float(n));
     }
 #endif
 }

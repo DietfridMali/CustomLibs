@@ -20,6 +20,7 @@
 #include "cbv_allocator.h"
 #include "commandlist.h"
 #include "descriptor_heap.h"
+#include "loghandler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dxcompiler.lib")
@@ -139,7 +140,7 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
     ComPtr<IDxcBlobUtf8> errors;
     result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr);
     if (errors and errors->GetStringLength() > 0)
-        fprintf(stderr, "ComputeShader '%s': %s\n", (const char*)m_name, errors->GetStringPointer());
+        logHandler.Print("ComputeShader '%s': %s\n", (const char*)m_name, errors->GetStringPointer());
 
     HRESULT status = E_FAIL;
     result->GetStatus(&status);
@@ -270,7 +271,7 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
     HRESULT hr = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, sig.GetAddressOf(), err.GetAddressOf());
     if (FAILED(hr)) {
         if (err)
-            fprintf(stderr, "ComputeShader '%s': root sig serialize: %s\n",
+            logHandler.Print("ComputeShader '%s': root sig serialize: %s\n",
                     (const char*)m_name, (const char*)err->GetBufferPointer());
         return false;
     }
@@ -304,7 +305,7 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
     m_usesAccelStructure = std::strstr(static_cast<const char*>(csCode), kAccelTypeName) != nullptr;
     if (m_usesAccelStructure and not dx12Context.HasRayTracing()) {
 #ifdef _DEBUG
-        fprintf(stderr, "ComputeShader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+        logHandler.Print("ComputeShader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
 #endif
         m_usesAccelStructure = false;
         return false;
@@ -420,7 +421,7 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 
     D3D12_GPU_VIRTUAL_ADDRESS accelStructure = commandListHandler.m_boundAccelStructure;
     if (m_usesAccelStructure and (accelStructure == 0)) {
-        fprintf(stderr, "ComputeShader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
+        logHandler.Print("ComputeShader '%s': declares an acceleration structure, but none is bound\n", (const char*)m_name);
         return false;
     }
 
@@ -486,7 +487,7 @@ int ComputeShader::SetB1Field(const char* name, const void* data, size_t size) n
         }
     }
 #ifdef _DEBUG
-    fprintf(stderr, "ComputeShader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+    logHandler.Print("ComputeShader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
 #endif
     return -1;
 }
