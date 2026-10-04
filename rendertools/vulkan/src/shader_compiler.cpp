@@ -42,6 +42,8 @@
 #include <cstdio>
 #include <cstring>
 
+#include <spirv_reflect.h>
+
 #ifndef LINUX
 // On Linux dxcompiler is linked via the Makefile (-ldxcompiler).
 #pragma comment(lib, "dxcompiler.lib")
@@ -142,6 +144,40 @@ static std::wstring ToWide(const char* utf8) noexcept
 }
 
 
+static constexpr uint32_t kSpirvPatchVersion = 1;
+static constexpr size_t kSpirvHeaderWords = 5;
+static constexpr size_t kSpirvBoundWord = 3;
+
+static void DeclareRayCullingCapability(std::vector<uint8_t>& spirv)
+{
+    const uint32_t* words = reinterpret_cast<const uint32_t*>(spirv.data());
+    const size_t wordCount = spirv.size() / sizeof(uint32_t);
+    const uint32_t cullFlags = uint32_t(SpvRayFlagsSkipTrianglesKHRMask) | uint32_t(SpvRayFlagsSkipAABBsKHRMask);
+    std::vector<uint32_t> knownBits(words[kSpirvBoundWord], 0);
+    bool isDeclared = false;
+    bool isNeeded = false;
+    size_t i = kSpirvHeaderWords;
+    while (i < wordCount) {
+        const SpvOp opcode = SpvOp(words[i] & SpvOpCodeMask);
+        if (opcode == SpvOpCapability)
+            isDeclared = isDeclared or (words[i + 1] == uint32_t(SpvCapabilityRayTraversalPrimitiveCullingKHR));
+        else if (opcode == SpvOpConstant)
+            knownBits[words[i + 2]] = words[i + 3];
+        else if (opcode == SpvOpBitwiseOr)
+            knownBits[words[i + 2]] = knownBits[words[i + 3]] | knownBits[words[i + 4]];
+        else if (opcode == SpvOpRayQueryInitializeKHR)
+            isNeeded = isNeeded or ((knownBits[words[i + 3]] & cullFlags) != 0);
+        i += words[i] >> SpvWordCountShift;
+    }
+    if (isDeclared or not isNeeded)
+        return;
+
+    const uint32_t capability[] = { (2u << SpvWordCountShift) | uint32_t(SpvOpCapability), uint32_t(SpvCapabilityRayTraversalPrimitiveCullingKHR) };
+    const uint8_t* capabilityBytes = reinterpret_cast<const uint8_t*>(capability);
+    spirv.insert(spirv.begin() + kSpirvHeaderWords * sizeof(uint32_t), capabilityBytes, capabilityBytes + sizeof(capability));
+}
+
+
 bool CompileHlslToSpirv(const char* hlslSource,
                         const char* entryPoint,
                         const char* targetProfile,
@@ -202,6 +238,7 @@ bool CompileHlslToSpirv(const char* hlslSource,
     if (useCache) {
         key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslSource);
         key = ShaderCache::Hash(key, args.data(), args.size());
+        key = ShaderCache::Hash(key, &kSpirvPatchVersion, sizeof(kSpirvPatchVersion));
         ComPtr<IDxcVersionInfo> versionInfo;
         if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
             UINT32 major = 0;
@@ -260,10 +297,11 @@ bool CompileHlslToSpirv(const char* hlslSource,
     const uint8_t* src = static_cast<const uint8_t*>(objectBlob->GetBufferPointer());
     size_t bytes = size_t(objectBlob->GetBufferSize());
     outSpirv.assign(src, src + bytes);
+    DeclareRayCullingCapability(outSpirv);
     [[maybe_unused]] const bool isStored = useCache and ShaderCache::Write(shaderFolder, fileName, key, 0, outSpirv.data(), outSpirv.size());
 #if VK_STALL_DIAG
     if (useCache) {
-        snprintf(detail, sizeof(detail), "%s: compiled (cache: %s), %zu bytes, %s", static_cast<const char*>(fileName), missReason, bytes, isStored ? "stored" : "NOT stored");
+        snprintf(detail, sizeof(detail), "%s: compiled (cache: %s), %zu bytes, %s", static_cast<const char*>(fileName), missReason, outSpirv.size(), isStored ? "stored" : "NOT stored");
         VkStallEvent("spirv", stallStart, detail);
     }
 #endif
