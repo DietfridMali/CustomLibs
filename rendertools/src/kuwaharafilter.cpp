@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -11,6 +12,11 @@
 #include "loghandler.h"
 
 // =================================================================================================
+
+static int TensorMargin(const KuwaharaFilter::Params& params) {
+    return int(std::ceil(3.0f * params.tensorSigma));
+}
+
 
 KuwaharaFilter::Targets* KuwaharaFilter::GetTargets(int width, int height, int margin, GfxPixelFormat filterFormat) {
     for (Targets& targets : m_targets) {
@@ -90,14 +96,35 @@ void KuwaharaFilter::SetPassStates(void) {
 }
 
 
-bool KuwaharaFilter::RenderTensor(Targets& targets, Texture* source, const Params& params, int face) {
+void KuwaharaFilter::SetPassArea(const Viewport* area, int margin, int width, int height) {
+    if (not area)
+        return;
+    int left = std::max(area->Left() - margin, 0);
+    int top = std::max(area->Top() - margin, 0);
+    int right = std::min(area->Left() + area->Width() + margin, width);
+    int bottom = std::min(area->Top() + area->Height() + margin, height);
+    int areaWidth = std::max(right - left, 0);
+    int areaHeight = std::max(bottom - top, 0);
+    gfxStates.SetScissor(left, baseRenderer.UsesOpenGL() ? height - top - areaHeight : top, areaWidth, areaHeight);
+    gfxStates.SetScissorTest(1);
+}
+
+
+int KuwaharaFilter::SourceMargin(const Params& params) {
+    return std::max(2 * params.radius, TensorMargin(params) + 1);
+}
+
+
+bool KuwaharaFilter::RenderTensor(Targets& targets, Texture* source, const Params& params, int face, const Viewport* area) {
     bool isCube = (face >= 0);
     bool wrapU = params.wrapU and not isCube;
     bool wrapV = params.wrapV and not isCube;
     int tensorWidth = targets.width + 2 * targets.margin;
     int tensorHeight = targets.height + 2 * targets.margin;
-    if (not targets.tensor->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+    int areaMargin = TensorMargin(params);
+    if (not targets.tensor->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = (area == nullptr) }))
         return false;
+    SetPassArea(area, areaMargin, tensorWidth, tensorHeight);
     Shader* shader = SetupShader(isCube ? "kuwaharaCubeTensor" : "kuwaharaTensor", tensorWidth, tensorHeight, wrapU, wrapV, params);
     bool ok = (shader != nullptr);
     if (ok) {
@@ -116,7 +143,16 @@ bool KuwaharaFilter::RenderTensor(Targets& targets, Texture* source, const Param
             shader->SetInt("directionX", (pass == 0) ? 1 : 0);
             shader->SetInt("directionY", (pass == 0) ? 0 : 1);
             shader->SetFloat("sigma", params.tensorSigma);
-            ok = targets.tensor->Render({ .source = pass, .destination = 1 - pass, .clearBuffer = true, .shader = shader });
+            if (area) {
+                Texture* tensor = targets.tensor->GetAsTexture({ .source = pass });
+                ok = (tensor != nullptr) and targets.tensor->Activate({ .bufferIndex = 1 - pass, .drawBufferGroup = RenderTarget::dbSingle, .clear = false, .reactivate = true });
+                if (ok) {
+                    SetPassArea(area, areaMargin, tensorWidth, tensorHeight);
+                    ok = targets.tensor->RenderAsTexture(tensor, { .destination = -1, .clearBuffer = false, .shader = shader });
+                }
+            }
+            else
+                ok = targets.tensor->Render({ .source = pass, .destination = 1 - pass, .clearBuffer = true, .shader = shader });
         }
     }
     targets.tensor->Deactivate();
@@ -124,10 +160,11 @@ bool KuwaharaFilter::RenderTensor(Targets& targets, Texture* source, const Param
 }
 
 
-bool KuwaharaFilter::RenderFilter(Targets& targets, Texture* source, const Params& params, int face) {
+bool KuwaharaFilter::RenderFilter(Targets& targets, Texture* source, const Params& params, int face, const Viewport* area) {
     bool isCube = (face >= 0);
-    if (not targets.filter->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+    if (not targets.filter->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = (area == nullptr) }))
         return false;
+    SetPassArea(area, 0, targets.width, targets.height);
     Shader* shader = SetupShader(isCube ? "kuwaharaCubeFilter" : "kuwaharaFilter", targets.width, targets.height,
                                  params.wrapU and not isCube, params.wrapV and not isCube, params);
     bool ok = (shader != nullptr) and targets.tensor->BindBuffer(0, 1);
@@ -246,7 +283,7 @@ bool KuwaharaFilter::ApplyCube(Texture* cubemap, const Params& params) {
 }
 
 
-RenderTarget* KuwaharaFilter::FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat, const Params& params) {
+RenderTarget* KuwaharaFilter::FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat, const Params& params, const Viewport* area) {
     Targets* targets = GetTargets(width, height, 0, filterFormat);
     if (not targets)
         return nullptr;
@@ -257,11 +294,12 @@ RenderTarget* KuwaharaFilter::FilterToTarget(Texture* source, int width, int hei
     baseRenderer.PushMatrix(RenderMatrices::mtProjection);
     baseRenderer.ResetTransformation();
 
-    bool ok = RenderTensor(*targets, source, params, -1) and RenderFilter(*targets, source, params, -1);
+    bool ok = RenderTensor(*targets, source, params, -1, area) and RenderFilter(*targets, source, params, -1, area);
 
     baseRenderer.PopMatrix(RenderMatrices::mtProjection);
     baseRenderer.PopMatrix();
     baseRenderer.PopViewport();
+    gfxStates.SetScissorTest(0);
     gfxStates.SetDepthWrite(1);
     gfxStates.SetDepthTest(1);
     gfxStates.SetFaceCulling(1);

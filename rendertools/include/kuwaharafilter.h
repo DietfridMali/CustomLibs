@@ -29,9 +29,11 @@ public:
 
     bool FilterToBuffer(Texture* source, int width, int height, float* dest, const Params& params);
 
-    RenderTarget* FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat, const Params& params);
+    RenderTarget* FilterToTarget(Texture* source, int width, int height, GfxPixelFormat filterFormat, const Params& params, const Viewport* area = nullptr);
 
     bool Prepare(int width, int height, GfxPixelFormat filterFormat);
+
+    static int SourceMargin(const Params& params);
 
     void Destroy(void);
 
@@ -55,9 +57,11 @@ private:
 
     void SetPassStates(void);
 
-    bool RenderTensor(Targets& targets, Texture* source, const Params& params, int face);
+    void SetPassArea(const Viewport* area, int margin, int width, int height);
 
-    bool RenderFilter(Targets& targets, Texture* source, const Params& params, int face);
+    bool RenderTensor(Targets& targets, Texture* source, const Params& params, int face, const Viewport* area = nullptr);
+
+    bool RenderFilter(Targets& targets, Texture* source, const Params& params, int face, const Viewport* area = nullptr);
 
     bool Filter(Texture* texture, const Params& params, bool isCube);
 
