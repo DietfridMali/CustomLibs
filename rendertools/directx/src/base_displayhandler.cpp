@@ -27,7 +27,7 @@ void HandleDeviceLost(const char* where) noexcept
     HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : S_OK;
     if (SUCCEEDED(removed))
         return;
-    logHandler.Print("%s: device removed (0x%08X) - graphics device lost, terminating\n", where, (unsigned)removed);
+    logHandler.Print("%s: device removed (0x%08X) - graphics device lost, terminating (build %s)\n", where, (unsigned)removed, logHandler.BuildStamp());
 #if DBG_DIRECTX
     dx12Context.DumpDRED();
 #endif

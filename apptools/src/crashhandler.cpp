@@ -344,11 +344,7 @@ bool CrashHandler::WriteCallStack(const char* reason, char* fileName, size_t fil
 
 
 bool CrashHandler::MakeFileName(char* fileName, size_t size, const char* kind, const char* extension) {
-    int length = snprintf(fileName, size, "%s%s-%s-%04u%02u%02u-%02u%02u%02u.%s",
-                          m_folder, m_appName, kind,
-                          crashTime.wYear, crashTime.wMonth, crashTime.wDay,
-                          crashTime.wHour, crashTime.wMinute, crashTime.wSecond,
-                          extension);
+    int length = snprintf(fileName, size, "%s%s-%s.%s", m_folder, m_appName, kind, extension);
     return (length > 0) and (static_cast<size_t>(length) < size);
 }
 
@@ -386,6 +382,7 @@ void CrashHandler::WriteTrace(void* file, const char* kind, _EXCEPTION_POINTERS*
     WriteText(file, "%s %s %s report\r\n\r\n", m_appName, m_appVersion, kind);
     WriteText(file, "time:      %04u-%02u-%02u %02u:%02u:%02u\r\n",
               crashTime.wYear, crashTime.wMonth, crashTime.wDay, crashTime.wHour, crashTime.wMinute, crashTime.wSecond);
+    WriteText(file, "build:     %s\r\n", logHandler.BuildStamp());
     WriteText(file, "reason:    %s (0x%08lX)\r\n", reason, code);
     if (((code == EXCEPTION_ACCESS_VIOLATION) or (code == EXCEPTION_IN_PAGE_ERROR)) and (record->NumberParameters >= 2)) {
         ULONG_PTR access = record->ExceptionInformation[0];

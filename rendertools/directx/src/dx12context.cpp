@@ -31,7 +31,7 @@ bool DX12Context::SelectAdapter(void) noexcept {
 }
 
 
-bool DX12Context::Create(bool enableDebugLayer) noexcept {
+bool DX12Context::Create(bool enableDebugLayer, const GfxFeatureRequest& request) noexcept {
 #if DBG_DIRECTX
     if (enableDebugLayer) {
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&m_debugController))))
@@ -73,7 +73,7 @@ bool DX12Context::Create(bool enableDebugLayer) noexcept {
     }
 #endif
 
-    m_hasRayTracing = SupportsRayTracing() and Shader::SupportsRayQuery();
+    m_hasRayTracing = ((request.Requested() & GfxFeatureBit(GfxFeature::RayTracing)) != 0) and SupportsRayTracing() and Shader::SupportsRayQuery();
     if (m_hasRayTracing and not RayTracingApi::Load(m_device.Get()))
         m_hasRayTracing = false;
 #ifdef _DEBUG

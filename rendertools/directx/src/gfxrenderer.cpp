@@ -35,7 +35,7 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
 #   else
     constexpr bool enableDebugLayer = false;
 #   endif
-    if (not dx12Context.Create(enableDebugLayer)) {
+    if (not dx12Context.Create(enableDebugLayer, request)) {
         logHandler.Print("Cannot create DX12 device.\n");
         return false;
     }

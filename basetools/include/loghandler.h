@@ -17,6 +17,9 @@ public:
     static constexpr size_t kLineSize = 100000;
     static constexpr size_t kContextSize = 256;
     static constexpr size_t kPathSize = 1024;
+    static constexpr size_t kBuildStampSize = 32;
+
+    LogHandler() noexcept;
 
     ~LogHandler();
 
@@ -44,6 +47,8 @@ public:
 
     inline const char* Context(void) const noexcept { return m_context; }
 
+    inline const char* BuildStamp(void) const noexcept { return m_buildStamp; }
+
 private:
     std::mutex  m_mutex;
     FILE*       m_file { nullptr };
@@ -52,6 +57,7 @@ private:
     bool        m_isLineStart { true };
     char        m_path[kPathSize] { };
     char        m_context[kContextSize] { };
+    char        m_buildStamp[kBuildStampSize] { };
     char        m_lines[2][kLineSize] { };
 
     void CloseFile(void) noexcept;

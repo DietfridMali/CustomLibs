@@ -2,6 +2,7 @@
 
 #include "dx12framework.h"
 #include "basesingleton.hpp"
+#include "rendertypes.h"
 
 // =================================================================================================
 // DX12Context: Singleton managing the D3D12 device, DXGI factory and selected adapter.
@@ -23,7 +24,7 @@ public:
 
     // Creates the DXGI factory, selects the best adapter (highest VRAM, non-software),
     // and creates the D3D12 device. Returns false on any failure.
-    bool Create(bool enableDebugLayer = false) noexcept;
+    bool Create(bool enableDebugLayer = false, const GfxFeatureRequest& request = {}) noexcept;
 
     inline ID3D12Device* Device(void) const noexcept { return m_device.Get(); }
 

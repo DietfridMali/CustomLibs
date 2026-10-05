@@ -292,7 +292,7 @@ bool VKContext::SelectPhysicalDevice(const GfxFeatureRequest& request) noexcept
     }
     m_physicalDevice = bestDevice;
     vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProps);
-    DeviceSupport support = QueryDeviceSupport(m_physicalDevice);
+    DeviceSupport support = QueryDeviceSupport(m_physicalDevice, request);
     m_apiVersion = support.apiVersion;
     m_availableFeatures = support.features;
 #ifdef _DEBUG
@@ -332,7 +332,7 @@ bool VKContext::HasDeviceExtension(const AutoArray<VkExtensionProperties>& exten
 }
 
 
-VKContext::DeviceSupport VKContext::QueryDeviceSupport(VkPhysicalDevice device) noexcept
+VKContext::DeviceSupport VKContext::QueryDeviceSupport(VkPhysicalDevice device, const GfxFeatureRequest& request) noexcept
 {
     DeviceSupport support;
     VkPhysicalDeviceProperties props;
@@ -430,7 +430,7 @@ VKContext::DeviceSupport VKContext::QueryDeviceSupport(VkPhysicalDevice device) 
     set(GfxFeature::ScalarBlockLayout, feats12.scalarBlockLayout);
     set(GfxFeature::RenderingLocalRead, hasLocalReadExt and featsLocalRead.dynamicRenderingLocalRead);
     set(GfxFeature::UnusedAttachments, hasUnusedAttExt and featsUnusedAtt.dynamicRenderingUnusedAttachments);
-    set(GfxFeature::RayTracing, SupportsRayTracing(device));
+    set(GfxFeature::RayTracing, ((request.Requested() & GfxFeatureBit(GfxFeature::RayTracing)) != 0) and SupportsRayTracing(device));
     set(GfxFeature::PipelineLibrary, SupportsPipelineLibrary(device));
     return support;
 }
@@ -441,7 +441,7 @@ int VKContext::RatePhysicalDevice(VkPhysicalDevice device, const GfxFeatureReque
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(device, &props);
 
-    DeviceSupport support = QueryDeviceSupport(device);
+    DeviceSupport support = QueryDeviceSupport(device, request);
     if (not support.isUsable)
         return -1;
     if ((request.required & ~support.features) != 0) {

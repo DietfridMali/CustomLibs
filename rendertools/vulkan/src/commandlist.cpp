@@ -421,7 +421,7 @@ void HandleDeviceLost(VkResult res, const char* where) noexcept
 {
     if (res != VK_ERROR_DEVICE_LOST)
         return;
-    logHandler.Print("%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating\n", where);
+    logHandler.Print("%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating (build %s)\n", where, logHandler.BuildStamp());
     // The window goes first - a message box behind a fullscreen window cannot be seen or answered.
     if (SDL_Window* window = baseDisplayHandler.GetWindow())
         SDL_HideWindow(window);

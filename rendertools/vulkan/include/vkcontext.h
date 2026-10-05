@@ -133,7 +133,7 @@ private:
     bool CreateAllocator(void) noexcept;
     bool SupportsPipelineLibrary(VkPhysicalDevice device) noexcept;
     bool SupportsRayTracing(VkPhysicalDevice device) noexcept;
-    DeviceSupport QueryDeviceSupport(VkPhysicalDevice device) noexcept;
+    DeviceSupport QueryDeviceSupport(VkPhysicalDevice device, const GfxFeatureRequest& request) noexcept;
     int RatePhysicalDevice(VkPhysicalDevice device, const GfxFeatureRequest& request) noexcept;
 
     static bool QueryDeviceExtensions(VkPhysicalDevice device, AutoArray<VkExtensionProperties>& extensions) noexcept;

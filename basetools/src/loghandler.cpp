@@ -1,9 +1,20 @@
 #include "loghandler.h"
 
+#include <cstdint>
 #include <cstring>
+#include <ctime>
 
 #ifdef _WIN32
+#   ifndef NOMINMAX
+#       define NOMINMAX
+#   endif
+#   include <windows.h>
 #   include <share.h>
+#else
+#   include <sys/stat.h>
+#   ifdef __APPLE__
+#       include <mach-o/dyld.h>
+#   endif
 #endif
 
 // =================================================================================================
@@ -13,6 +24,41 @@ static constexpr bool kEchoToConsole = true;
 #else
 static constexpr bool kEchoToConsole = false;
 #endif
+
+
+static time_t ProgramBuildTime(void) noexcept
+{
+#ifdef _WIN32
+    const uint8_t* image = reinterpret_cast<const uint8_t*>(GetModuleHandleA(nullptr));
+    const IMAGE_DOS_HEADER* dosHeader = reinterpret_cast<const IMAGE_DOS_HEADER*>(image);
+    const IMAGE_NT_HEADERS* ntHeaders = reinterpret_cast<const IMAGE_NT_HEADERS*>(image + dosHeader->e_lfanew);
+    return time_t(ntHeaders->FileHeader.TimeDateStamp);
+#else
+    struct stat info { };
+#   ifdef __APPLE__
+    char path[4096] { };
+    uint32_t size = uint32_t(sizeof(path));
+    _NSGetExecutablePath(path, &size);
+    stat(path, &info);
+#   else
+    stat("/proc/self/exe", &info);
+#   endif
+    return info.st_mtime;
+#endif
+}
+
+
+LogHandler::LogHandler() noexcept
+{
+    const time_t buildTime = ProgramBuildTime();
+    struct tm utc { };
+#ifdef _WIN32
+    gmtime_s(&utc, &buildTime);
+#else
+    gmtime_r(&buildTime, &utc);
+#endif
+    strftime(m_buildStamp, sizeof(m_buildStamp), "%Y-%m-%d %H:%M:%S UTC", &utc);
+}
 
 
 LogHandler::~LogHandler()
