@@ -272,6 +272,11 @@ RenderTarget* KuwaharaFilter::FilterToTarget(Texture* source, int width, int hei
 }
 
 
+bool KuwaharaFilter::Prepare(int width, int height, GfxPixelFormat filterFormat) {
+    return GetTargets(width, height, 0, filterFormat) != nullptr;
+}
+
+
 bool KuwaharaFilter::FilterToBuffer(Texture* source, int width, int height, float* dest, const Params& params) {
     RenderTarget* target = FilterToTarget(source, width, height, GfxPixelFormat::R32_SFloat, params);
     return (target != nullptr) and target->ReadBuffer(0, dest, size_t(width) * size_t(height) * sizeof(float));
