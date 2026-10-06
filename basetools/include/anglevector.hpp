@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <algorithm>
 #include <initializer_list>
 
 #include "vector.hpp"
@@ -91,6 +92,8 @@ public:
         return AngleVector(Conversions::RadToDeg(rad.X()), Conversions::RadToDeg(rad.Y()), Conversions::RadToDeg(rad.Z()));
     }
 
+    static AngleVector FromMatrix(const Matrix4f& m, bool transpose = false) noexcept;
+
     // ===== arithmetics =====
     // The base class operators return Vector3f and do not normalize, so the full set has to be
     // redeclared here - declaring one of them hides all base overloads of the same name anyway.
@@ -180,6 +183,25 @@ inline Matrix4f& Matrix4f::Rotation(Matrix4f& rotation, const AngleVector& angle
 inline Matrix4f Matrix4f::Rotation(const AngleVector& angles, bool transpose) noexcept {
     Matrix4f rotation;
     return Rotation(rotation, angles.P(), angles.H(), angles.B(), transpose);
+}
+
+inline AngleVector AngleVector::FromMatrix(const Matrix4f& m, bool transpose) noexcept {
+    const Matrix4f orientation = transpose ? m.Transpose() : m;
+    const Vector4f& r = orientation.R();
+    const Vector4f& u = orientation.U();
+    const Vector4f& f = orientation.F();
+    float pitch = std::asin(std::clamp(-f.Y(), -1.0f, 1.0f));
+    float heading;
+    float bank;
+    if (f.X() * f.X() + f.Z() * f.Z() > Conversions::NumericTolerance) {
+        heading = std::atan2(f.X(), f.Z());
+        bank = std::atan2(r.Y(), u.Y());
+    }
+    else {
+        heading = std::atan2(-r.Z(), r.X());
+        bank = 0.0f;
+    }
+    return FromRadians(Vector3f(pitch, heading, bank));
 }
 
 #endif // USE_GLM
