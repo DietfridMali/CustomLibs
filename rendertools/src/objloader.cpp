@@ -168,9 +168,11 @@ void ObjLoader::Reset(void) {
     m_data.normals.Clear();
     m_data.texCoords.Clear();
     m_data.shapeKeys.Clear();
+    m_data.indices.Clear();
     m_data.parts.Clear();
     m_data.materials.Clear();
     m_data.images.Clear();
+    m_data.imageNames.Clear();
     ReleaseSource();
 }
 
@@ -183,6 +185,7 @@ void ObjLoader::ReleaseSource(void) {
     m_materials.Clear();
     m_imageFiles.Clear();
     m_corners.Clear();
+    m_cornerVertices.clear();
     m_part = GLBLoader::PartData();
 }
 
@@ -401,30 +404,53 @@ void ObjLoader::AddTriangle(const Corner& c0, const Corner& c1, const Corner& c2
     const Corner* corners[3] = { &c0, &c1, &c2 };
     bool haveNormals = true;
     for (const Corner* corner : corners) {
-        m_data.vertices.Append(m_positions[corner->position]);
-        m_data.colors.Append(Modulate(materialColor, m_positionColors[corner->position]));
-        m_data.texCoords.Append((corner->texCoord < 0) ? TexCoord(0.0f, 0.0f) : m_texCoords[corner->texCoord]);
         if (corner->normal < 0)
             haveNormals = false;
     }
     if (haveNormals) {
         for (const Corner* corner : corners)
-            m_data.normals.Append(m_normals[corner->normal]);
+            m_data.indices.Append(uint32_t(CornerVertex(*corner, materialColor)));
         return;
     }
-    int32_t l = m_data.vertices.Length();
-    Vector3f normal = Vector3f::Normal(m_data.vertices[l - 3], m_data.vertices[l - 2], m_data.vertices[l - 1]);
-    for (int32_t i = 0; i < 3; ++i)
+    int32_t first = m_data.vertices.Length();
+    for (const Corner* corner : corners) {
+        m_data.vertices.Append(m_positions[corner->position]);
+        m_data.colors.Append(Modulate(materialColor, m_positionColors[corner->position]));
+        m_data.texCoords.Append((corner->texCoord < 0) ? TexCoord(0.0f, 0.0f) : m_texCoords[corner->texCoord]);
+    }
+    Vector3f normal = Vector3f::Normal(m_data.vertices[first], m_data.vertices[first + 1], m_data.vertices[first + 2]);
+    for (int32_t i = 0; i < 3; ++i) {
         m_data.normals.Append(normal);
+        m_data.indices.Append(uint32_t(first + i));
+    }
+}
+
+
+int32_t ObjLoader::CornerVertex(const Corner& corner, const RGBAColor& materialColor) {
+    std::tuple<int32_t, int32_t, int32_t> key(corner.position, corner.texCoord, corner.normal);
+    auto found = m_cornerVertices.find(key);
+    if (found != m_cornerVertices.end())
+        return found->second;
+    int32_t index = m_data.vertices.Length();
+    m_data.vertices.Append(m_positions[corner.position]);
+    m_data.colors.Append(Modulate(materialColor, m_positionColors[corner.position]));
+    m_data.texCoords.Append((corner.texCoord < 0) ? TexCoord(0.0f, 0.0f) : m_texCoords[corner.texCoord]);
+    m_data.normals.Append(m_normals[corner.normal]);
+    m_cornerVertices.emplace(key, index);
+    return index;
 }
 
 
 void ObjLoader::FinishPart(void) {
     m_part.vertexCount = m_data.vertices.Length() - m_part.firstVertex;
+    m_part.indexCount = m_data.indices.Length() - m_part.firstIndex;
     if (m_part.vertexCount > 0)
         m_data.parts.Append(m_part);
     m_part.firstVertex = m_data.vertices.Length();
+    m_part.firstIndex = m_data.indices.Length();
     m_part.vertexCount = 0;
+    m_part.indexCount = 0;
+    m_cornerVertices.clear();
 }
 
 
@@ -453,6 +479,7 @@ int32_t ObjLoader::ImageIndex(const std::filesystem::path& filename) {
             return i;
     m_imageFiles.Append(filename);
     AutoArray<uint8_t>* image = m_data.images.Append();
+    m_data.imageNames.Append(String(filename.generic_string().c_str()));
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (not file) {
         logHandler.Print("ObjLoader: cannot open texture '%s'\n", filename.string().c_str());

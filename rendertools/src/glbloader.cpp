@@ -102,9 +102,11 @@ void GLBLoader::Reset(void) {
     m_data.normals.Clear();
     m_data.texCoords.Clear();
     m_data.shapeKeys.Clear();
+    m_data.indices.Clear();
     m_data.parts.Clear();
     m_data.materials.Clear();
     m_data.images.Clear();
+    m_data.imageNames.Clear();
     m_data.jointIndices.Clear();
     m_data.jointNames.Clear();
     m_isHullVertex.Clear();
@@ -136,7 +138,7 @@ bool GLBLoader::LoadModel(const String& filename) {
     if (not ParseFile(filename))
         return false;
     LoadMaterials();
-    LoadImages();
+    LoadImages(std::filesystem::path(static_cast<const char*>(filename)).parent_path());
     ReleaseModel();
     return true;
 }
@@ -214,9 +216,10 @@ void GLBLoader::LoadMaterials(void) {
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::LoadImages(void) {
+void GLBLoader::LoadImages(const std::filesystem::path& folder) {
     for (auto& source : m_model.images) {
         AutoArray<uint8_t>* image = m_data.images.Append();
+        m_data.imageNames.Append(source.uri.empty() ? String("") : String((folder / std::filesystem::path(source.uri)).generic_string().c_str()));
         if (source.image.empty())
             continue;
         image->Resize(int32_t(source.image.size()));
@@ -337,13 +340,15 @@ bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM, int 
 
     PartData part;
     part.firstVertex = m_data.vertices.Length();
+    part.firstIndex = m_data.indices.Length();
     part.materialIndex = ((prim.material >= 0) and (prim.material < int(m_model.materials.size()))) ? prim.material : -1;
 
-    if (not AppendTriangles(in, worldM, keyPtrs)) {
+    if (not (m_loadSurfaceData ? AppendIndexedTriangles(in, worldM, keyPtrs) : AppendTriangles(in, worldM, keyPtrs))) {
         return false;
     }
 
     part.vertexCount = m_data.vertices.Length() - part.firstVertex;
+    part.indexCount = m_data.indices.Length() - part.firstIndex;
     m_data.parts.Append(part);
     return true;
 }
@@ -937,6 +942,50 @@ bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<Sh
                 keyPtrs[k]->normalDeltas.Append(dn);
             }
         }
+    }
+    return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::AppendIndexedTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
+    if (not in.haveNormals) {
+        int32_t firstVertex = m_data.vertices.Length();
+        if (not AppendTriangles(in, worldM, keyPtrs))
+            return false;
+        for (int32_t i = firstVertex, l = m_data.vertices.Length(); i < l; ++i)
+            m_data.indices.Append(uint32_t(i));
+        return true;
+    }
+
+    int32_t globalKeyCount = keyPtrs.Length();
+
+    AutoArray<int32_t> vertexMap;
+    vertexMap.Resize(in.baseVertices.Length());
+    std::fill(vertexMap.begin(), vertexMap.end(), -1);
+
+    for (int32_t i = 0, l = in.triCount * 3; i < l; ++i) {
+        int32_t source = int32_t(in.indices[i]);
+        if (vertexMap[source] < 0) {
+            vertexMap[source] = m_data.vertices.Length();
+            m_data.vertices.Append(TransformPosition(worldM, in.baseVertices[source]));
+            m_data.colors.Append(in.haveColors ? Modulate(in.baseColor, in.baseColors[source]) : in.baseColor);
+            m_data.texCoords.Append(in.haveTexCoords ? in.baseTexCoords[source] : TexCoord(0.0f, 0.0f));
+            m_data.jointIndices.Append(in.haveJoints ? in.baseJoints[source] : -1);
+            m_data.normals.Append(TransformNormal(worldM, in.baseNormals[source]));
+
+            for (int32_t k = 0; k < globalKeyCount; ++k) {
+                Vector3f d(0.0f, 0.0f, 0.0f);
+                Vector3f dn(0.0f, 0.0f, 0.0f);
+                if (k < in.targetCount) {
+                    d = TransformDelta(worldM, in.morphVertices[k][source]);
+                    dn = TransformNormalDelta(worldM, in.morphNormals[k][source]);
+                }
+                keyPtrs[k]->deltas.Append(d);
+                keyPtrs[k]->normalDeltas.Append(dn);
+            }
+        }
+        m_data.indices.Append(uint32_t(vertexMap[source]));
     }
     return true;
 }
@@ -1551,9 +1600,11 @@ bool GLBLoader::LoadFromFile(const String& filename) {
     m_data.normals.Clear();
     m_data.texCoords.Clear();
     m_data.shapeKeys.Clear();
+    m_data.indices.Clear();
     m_data.parts.Clear();
     m_data.materials.Clear();
     m_data.images.Clear();
+    m_data.imageNames.Clear();
     m_data.jointIndices.Clear();
     m_data.jointNames.Clear();
     m_model = tinygltf::Model();

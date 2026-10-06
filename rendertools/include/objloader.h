@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <string>
+#include <tuple>
 
 #include "string.hpp"
 #include "vector.hpp"
@@ -62,6 +64,8 @@ private:
     AutoArray<Corner>                   m_corners;
     GLBLoader::PartData                 m_part;
 
+    std::map<std::tuple<int32_t, int32_t, int32_t>, int32_t> m_cornerVertices;
+
     void ReleaseSource(void);
 
     bool ParseFile(const std::filesystem::path& filename);
@@ -85,6 +89,8 @@ private:
     bool ParseCorner(const std::string& token, Corner& corner) const;
 
     void AddTriangle(const Corner& c0, const Corner& c1, const Corner& c2);
+
+    int32_t CornerVertex(const Corner& corner, const RGBAColor& materialColor);
 
     void FinishPart(void);
 

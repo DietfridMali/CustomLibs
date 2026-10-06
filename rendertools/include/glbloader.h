@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 
 
 #define TINYGLTF_NO_STB_IMAGE
@@ -39,6 +40,8 @@ public:
     struct PartData {
         int32_t firstVertex{ 0 };
         int32_t vertexCount{ 0 };
+        int32_t firstIndex{ 0 };
+        int32_t indexCount{ 0 };
         int32_t materialIndex{ -1 };
     };
 
@@ -48,9 +51,11 @@ public:
         AutoArray<Vector3f>         normals;    // 1 * triCount
         AutoArray<TexCoord>         texCoords;
         List<ShapeKeySet>           shapeKeys;  // N sets, each has 3 * triCount deltas
+        AutoArray<uint32_t>         indices;
         AutoArray<PartData>         parts;
         AutoArray<MaterialData>     materials;
         AutoArray<AutoArray<uint8_t>> images;
+        AutoArray<String>           imageNames;
         AutoArray<int32_t>          jointIndices;
         List<String>                jointNames;
     };
@@ -161,7 +166,7 @@ private:
 
     void LoadMaterials(void);
 
-    void LoadImages(void);
+    void LoadImages(const std::filesystem::path& folder);
 
     bool AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM, int skinIndex);
 
@@ -196,6 +201,8 @@ private:
     void BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs);
 
     bool AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
+
+    bool AppendIndexedTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs);
 
     void RecomputeMorphDeltas(ShapeKeySet& sk, const AutoArray<Vector3f>& morphedVertices);
 
