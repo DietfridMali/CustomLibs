@@ -70,6 +70,10 @@ public:
     int32_t                             m_accelRootIndex{ -1 };
 
     static constexpr uint32_t           kAccelSpace = 2;
+    static constexpr uint32_t           kReadOnlyBase = 42;
+    static constexpr uint32_t           kReadOnlySlots = 24;
+    static constexpr uint32_t           kReadOnlySpace = 1;
+    int32_t                             m_readOnlyRootIndex[kReadOnlySlots];
     bool                                m_usesAccelStructure{ false };
 
     ComputeShader(String name = "")
@@ -77,6 +81,8 @@ public:
     {
         for (int i = 0; i < 16; ++i) { m_srvRootIndex[i] = -1; m_samplerRootIndex[i] = -1; }
         for (int i = 0; i < 4; ++i) m_uavRootIndex[i] = -1;
+        for (uint32_t i = 0; i < kReadOnlySlots; ++i)
+            m_readOnlyRootIndex[i] = -1;
     }
 
     ~ComputeShader() {

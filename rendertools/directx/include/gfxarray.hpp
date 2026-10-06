@@ -63,6 +63,10 @@ public:
         return descriptorHeaps.m_srvHeap.GpuHandle(m_uavHandle.index);
     }
 
+    inline D3D12_GPU_DESCRIPTOR_HANDLE ReadOnlyGPUHandle(void) {
+        return descriptorHeaps.m_srvHeap.GpuHandle(m_srvHandle.index);
+    }
+
     void NameResource([[maybe_unused]] ID3D12Resource* resource, [[maybe_unused]] const char* role) noexcept {
 #if DBG_DIRECTX
         if (not resource)

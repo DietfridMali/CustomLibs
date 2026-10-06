@@ -52,6 +52,7 @@ static VkDescriptorType ToVkDescriptorType(ComputeBindingDesc::Kind kind) {
         case ComputeBindingDesc::Kind::StorageBuffer:        return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         case ComputeBindingDesc::Kind::Sampler:              return VK_DESCRIPTOR_TYPE_SAMPLER;
         case ComputeBindingDesc::Kind::CombinedImageSampler: return VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        case ComputeBindingDesc::Kind::ReadOnlyBuffer:       return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     }
     return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 }
@@ -98,8 +99,35 @@ static const wchar_t* const kComputeBindArgs[] = {
     L"-fvk-bind-register", L"u1", L"0", L"37", L"0",
     L"-fvk-bind-register", L"u2", L"0", L"38", L"0",
     L"-fvk-bind-register", L"u3", L"0", L"39", L"0",
+    L"-fvk-bind-register", L"t0", L"1", L"42", L"0",
+    L"-fvk-bind-register", L"t1", L"1", L"43", L"0",
+    L"-fvk-bind-register", L"t2", L"1", L"44", L"0",
+    L"-fvk-bind-register", L"t3", L"1", L"45", L"0",
+    L"-fvk-bind-register", L"t4", L"1", L"46", L"0",
+    L"-fvk-bind-register", L"t5", L"1", L"47", L"0",
+    L"-fvk-bind-register", L"t6", L"1", L"48", L"0",
+    L"-fvk-bind-register", L"t7", L"1", L"49", L"0",
+    L"-fvk-bind-register", L"t8", L"1", L"50", L"0",
+    L"-fvk-bind-register", L"t9", L"1", L"51", L"0",
+    L"-fvk-bind-register", L"t10", L"1", L"52", L"0",
+    L"-fvk-bind-register", L"t11", L"1", L"53", L"0",
+    L"-fvk-bind-register", L"t12", L"1", L"54", L"0",
+    L"-fvk-bind-register", L"t13", L"1", L"55", L"0",
+    L"-fvk-bind-register", L"t14", L"1", L"56", L"0",
+    L"-fvk-bind-register", L"t15", L"1", L"57", L"0",
+    L"-fvk-bind-register", L"t16", L"1", L"58", L"0",
+    L"-fvk-bind-register", L"t17", L"1", L"59", L"0",
+    L"-fvk-bind-register", L"t18", L"1", L"60", L"0",
+    L"-fvk-bind-register", L"t19", L"1", L"61", L"0",
+    L"-fvk-bind-register", L"t20", L"1", L"62", L"0",
+    L"-fvk-bind-register", L"t21", L"1", L"63", L"0",
+    L"-fvk-bind-register", L"t22", L"1", L"64", L"0",
+    L"-fvk-bind-register", L"t23", L"1", L"65", L"0",
 };
 static constexpr uint32_t kComputeBindArgCount = uint32_t(sizeof(kComputeBindArgs) / sizeof(kComputeBindArgs[0]));
+static_assert(Shader::kSsboBase == 42, "kComputeBindArgs names the read only buffer bindings by number");
+static_assert(Shader::kSsboSlots == 24, "kComputeBindArgs lists one entry per read only buffer slot");
+static_assert(Shader::kSsboSpace == 1, "kComputeBindArgs names the read only buffer register space by number");
 
 static const wchar_t* const kComputeArgsAccel[] = {
     L"-fvk-bind-register", L"t0", L"2", L"66", L"0",
@@ -419,8 +447,8 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
     if ((m_b1Size > 0) and not UploadB1())
         return false;
 
-    VkWriteDescriptorSet    writes[CommandListHandler::kUavSlots + 2]{};
-    VkDescriptorBufferInfo  bufferInfos[CommandListHandler::kUavSlots + 1]{};
+    VkWriteDescriptorSet    writes[CommandListHandler::kUavSlots + CommandListHandler::kSsboSlots + 2]{};
+    VkDescriptorBufferInfo  bufferInfos[CommandListHandler::kUavSlots + CommandListHandler::kSsboSlots + 1]{};
     uint32_t                writeCount = 0;
     uint32_t                dynamicOffset = 0;
     uint32_t                dynamicOffsetCount = 0;
@@ -452,6 +480,28 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
         writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[writeCount].dstSet = set;
         writes[writeCount].dstBinding = 36 + slot;
+        writes[writeCount].descriptorCount = 1;
+        writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        writes[writeCount].pBufferInfo = &bufferInfos[writeCount];
+        writeCount++;
+    }
+
+    for (int i = 0; i < m_bindings.Length(); ++i) {
+        const ComputeBindingDesc& binding = m_bindings[i];
+        if (binding.kind != ComputeBindingDesc::Kind::ReadOnlyBuffer)
+            continue;
+        uint32_t slot = binding.binding - Shader::kSsboBase;
+        if (slot >= CommandListHandler::kSsboSlots)
+            continue;
+        VkBuffer buffer = commandListHandler.m_boundReadOnlyBuffers[slot];
+        if (buffer == VK_NULL_HANDLE)
+            continue;
+        bufferInfos[writeCount].buffer = buffer;
+        bufferInfos[writeCount].offset = 0;
+        bufferInfos[writeCount].range = commandListHandler.m_boundReadOnlyBufferSize[slot];
+        writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[writeCount].dstSet = set;
+        writes[writeCount].dstBinding = binding.binding;
         writes[writeCount].descriptorCount = 1;
         writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         writes[writeCount].pBufferInfo = &bufferInfos[writeCount];

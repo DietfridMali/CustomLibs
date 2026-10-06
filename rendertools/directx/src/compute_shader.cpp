@@ -67,6 +67,9 @@ std::wstring ToWide(const char* utf8) noexcept {
 }
 
 static_assert(ComputeShader::kAccelSpace == uint32_t(Shader::kAccelSpace), "compute and graphics shaders share the HLSL declaration of the acceleration structure");
+static_assert(ComputeShader::kReadOnlySlots == uint32_t(Shader::kSsboSlots), "compute and graphics shaders share the HLSL declaration of the read only buffers");
+static_assert(ComputeShader::kReadOnlySpace == uint32_t(Shader::kSsboSpace), "compute and graphics shaders share the HLSL declaration of the read only buffers");
+static_assert(ComputeShader::kReadOnlySlots == CommandList::kSsboSlots, "ComputeShader and CommandList must agree on the read only buffer slot count");
 
 constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
 
@@ -183,6 +186,7 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
             case ComputeBindingDesc::Kind::Sampler:       return binding - 20u;    // s0..
             case ComputeBindingDesc::Kind::StorageImage:  return binding - 36u;    // u0..
             case ComputeBindingDesc::Kind::StorageBuffer: return binding - 36u;    // u0..
+            case ComputeBindingDesc::Kind::ReadOnlyBuffer: return binding - kReadOnlyBase;
             default: return binding;
         }
     };
@@ -199,6 +203,8 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
     srvRanges.reserve(16);
     samplerRanges.reserve(16);
     uavRanges.reserve(4);
+    std::vector<D3D12_DESCRIPTOR_RANGE> readOnlyRanges;
+    readOnlyRanges.reserve(kReadOnlySlots);
 
     for (size_t i = 0; i < orderedBindings.size(); ++i) {
         uint32_t binding = orderedBindings[i].first;
@@ -241,6 +247,16 @@ bool ComputeShader::CreateRootSignature(const AutoArray<ComputeBindingDesc>& bin
                 p.DescriptorTable.NumDescriptorRanges = 1;
                 p.DescriptorTable.pDescriptorRanges = &uavRanges.back();
                 if (reg < 4) m_uavRootIndex[reg] = int32_t(params.size());
+            }
+            else if (kind == ComputeBindingDesc::Kind::ReadOnlyBuffer) {
+                if (reg >= kReadOnlySlots)
+                    continue;
+                r.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                r.RegisterSpace = kReadOnlySpace;
+                readOnlyRanges.push_back(r);
+                p.DescriptorTable.NumDescriptorRanges = 1;
+                p.DescriptorTable.pDescriptorRanges = &readOnlyRanges.back();
+                m_readOnlyRootIndex[reg] = int32_t(params.size());
             }
             else {
                 continue;  // unsupported kind
@@ -386,6 +402,8 @@ void ComputeShader::Destroy(void) noexcept
     for (int i = 0; i < 2; ++i) m_cbvRootIndex[i] = -1;
     for (int i = 0; i < 16; ++i) { m_srvRootIndex[i] = -1; m_samplerRootIndex[i] = -1; }
     for (int i = 0; i < 4; ++i) m_uavRootIndex[i] = -1;
+    for (uint32_t i = 0; i < kReadOnlySlots; ++i)
+        m_readOnlyRootIndex[i] = -1;
     m_accelRootIndex = -1;
     m_usesAccelStructure = false;
 }
@@ -452,6 +470,13 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
             continue;
         list->SetComputeRootDescriptorTable(UINT(m_uavRootIndex[slot]),
                                             descriptorHeaps.m_srvHeap.GpuHandle(commandListHandler.m_boundStorageBuffers[slot]));
+    }
+    for (uint32_t slot = 0; slot < kReadOnlySlots; ++slot) {
+        if (commandListHandler.m_readOnlyBufferStates[slot].pResource == nullptr)
+            continue;
+        if (m_readOnlyRootIndex[slot] < 0)
+            continue;
+        list->SetComputeRootDescriptorTable(UINT(m_readOnlyRootIndex[slot]), descriptorHeaps.m_srvHeap.GpuHandle(commandListHandler.m_boundReadOnlyBuffers[slot]));
     }
     if (m_usesAccelStructure)
         list->SetComputeRootShaderResourceView(UINT(m_accelRootIndex), accelStructure);

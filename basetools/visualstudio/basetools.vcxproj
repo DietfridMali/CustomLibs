@@ -26,6 +26,7 @@
     <ClInclude Include="..\include\avltree.hpp" />
     <ClInclude Include="..\include\avltreetraits.h" />
     <ClInclude Include="..\include\basicdatapool.hpp" />
+    <ClInclude Include="..\include\bvh.hpp" />
     <ClInclude Include="..\include\conversions.hpp" />
     <ClInclude Include="..\include\datacontainer.hpp" />
     <ClInclude Include="..\include\dictionary.hpp" />

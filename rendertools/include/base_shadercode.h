@@ -41,7 +41,8 @@ struct ComputeBindingDesc {
         StorageImage,
         StorageBuffer,
         Sampler,
-        CombinedImageSampler
+        CombinedImageSampler,
+        ReadOnlyBuffer
     };
     uint32_t    binding{ 0 };
     Kind        kind{ Kind::UniformBuffer };
