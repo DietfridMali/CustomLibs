@@ -5,6 +5,7 @@
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "commandlist.h"
+#include "gfxarray.hpp"
 #include "shader_loading.h"
 #include "tracy_wrapper.h"
 #include "loghandler.h"
@@ -303,6 +304,11 @@ bool GfxDataLayout::Enable(void) noexcept
                 int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
                 if ((slot < 0) or (slot >= kMaxStreams) or (views[slot].BufferLocation != 0))
                     continue;
+                if (layout.m_attrs[i].perInstance) {
+                    if (commandListHandler.InstanceStreamView(list, uint32_t(slot), views[slot]) and (slot >= maxSlot))
+                        maxSlot = slot + 1;
+                    continue;
+                }
 #if OPTIMIZE_BUFFER_REUSE
                 const D3D12_VERTEX_BUFFER_VIEW* pView = DefaultVertexView(vertexCount, layout.m_attrs[i].format, frameNumber);
 #else
@@ -431,6 +437,36 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
         ZoneScopedN("Layout::CheckError");
         gfxStates.CheckError();
     }
+}
+
+
+void GfxDataLayout::RenderIndirect(std::span<Texture* const> textures, GfxDrawCommandBuffer& commands, uint32_t firstCommand, uint32_t commandCount) noexcept
+{
+    if ((commandCount == 0) or not m_indexBuffer.IsValid())
+        return;
+    if (not StartRender())
+        return;
+    ActivateTextures(textures);
+    Shader* shader = baseShaderHandler.ActiveShader();
+    bool hasVariables = true;
+    if (shader) {
+        if (CommandList* cl = commandListHandler.CurrentCmdList()) {
+            cl->SetTopology(shader, m_shape);
+            ResolveDrawPipeline(cl, shader);
+        }
+        hasVariables = shader->UpdateVariables();
+    }
+    auto* list = commandListHandler.CurrentGfxList();
+    if (hasVariables and list) {
+        ID3D12Resource* arguments = commands.IndirectArguments(list);
+        if (arguments) {
+            list->IASetPrimitiveTopology((shader and shader->IsTessellated()) ? ToD3DPatchTopology(m_shape) : ToD3DTopology(m_shape));
+            commandListHandler.DrawIndexedIndirect(arguments, UINT64(firstCommand) * UINT64(sizeof(GfxDrawCommand)), UINT(commandCount));
+            gfxStates.CountDraw();
+        }
+    }
+    FinishRender();
+    gfxStates.CheckError();
 }
 
 // =================================================================================================

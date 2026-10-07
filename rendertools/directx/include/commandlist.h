@@ -234,8 +234,19 @@ public:
         D3D12_RESOURCE_STATES*      pState{ nullptr };
     };
 
+    struct BoundInstanceStream {
+        ComPtr<ID3D12Resource>*     pResource{ nullptr };
+        D3D12_RESOURCE_STATES*      pState{ nullptr };
+        UINT                        size{ 0 };
+        UINT                        stride{ 0 };
+    };
+
+    static constexpr uint32_t               kVertexSlots = 16;
+
     BoundBuffer                             m_storageBufferStates[CommandList::kUavSlots]{};
     BoundBuffer                             m_readOnlyBufferStates[CommandList::kSsboSlots]{};
+    BoundInstanceStream                     m_instanceStreams[kVertexSlots]{};
+    ComPtr<ID3D12CommandSignature>          m_drawIndexedSignature;
 
     uint32_t                                m_boundSrvs[CommandList::kSrvSlots]{};
     uint32_t                                m_boundSamplers[CommandList::kSamplerSlots]{};
@@ -260,6 +271,10 @@ public:
     void BindStorageBuffer(uint32_t slot, uint32_t uavIndex, ComPtr<ID3D12Resource>* pResource = nullptr, D3D12_RESOURCE_STATES* pState = nullptr) noexcept;
 
     void BindReadOnlyBuffer(uint32_t slot, uint32_t srvIndex, ComPtr<ID3D12Resource>* pResource = nullptr, D3D12_RESOURCE_STATES* pState = nullptr) noexcept;
+
+    void BindInstanceStream(uint32_t slot, ComPtr<ID3D12Resource>* pResource = nullptr, D3D12_RESOURCE_STATES* pState = nullptr, UINT size = 0, UINT stride = 0) noexcept;
+
+    bool InstanceStreamView(ID3D12GraphicsCommandList* list, uint32_t slot, D3D12_VERTEX_BUFFER_VIEW& view) noexcept;
 
     void UnbindBuffer(const D3D12_RESOURCE_STATES* pState) noexcept;
 
@@ -391,6 +406,11 @@ public:
 #endif
         if (CurrentGfxList())
             CurrentGfxList()->DrawIndexedInstanced(idxCount, instCount, startIdx, baseVtx, startInst);
+    }
+
+    inline void DrawIndexedIndirect(ID3D12Resource* commands, UINT64 offset, UINT commandCount) noexcept {
+        if (CurrentGfxList())
+            CurrentGfxList()->ExecuteIndirect(m_drawIndexedSignature.Get(), commandCount, commands, offset, nullptr, 0);
     }
 
 #if DBG_DIRECTX

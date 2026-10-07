@@ -104,6 +104,7 @@ enum class GfxFeature : uint32_t {
     UnusedAttachments,
     RayTracing,
     PipelineLibrary,
+    MultiDrawIndirect,
     Count
 };
 
@@ -131,6 +132,7 @@ inline constexpr const char* GfxFeatureName(GfxFeature feature) noexcept {
         case GfxFeature::UnusedAttachments:      return "unused rendering attachments";
         case GfxFeature::RayTracing:             return "ray tracing";
         case GfxFeature::PipelineLibrary:        return "pipeline library";
+        case GfxFeature::MultiDrawIndirect:      return "indirect multi draw";
         default:                                 return "unknown";
     }
 }
@@ -142,7 +144,8 @@ struct GfxFeatureRequest {
         GfxFeatureBit(GfxFeature::DepthClamp) | GfxFeatureBit(GfxFeature::IndependentBlend) |
         GfxFeatureBit(GfxFeature::Anisotropy) | GfxFeatureBit(GfxFeature::StorageInVertexStage) |
         GfxFeatureBit(GfxFeature::StorageInFragmentStage) | GfxFeatureBit(GfxFeature::ScalarBlockLayout) |
-        GfxFeatureBit(GfxFeature::RenderingLocalRead) | GfxFeatureBit(GfxFeature::UnusedAttachments)
+        GfxFeatureBit(GfxFeature::RenderingLocalRead) | GfxFeatureBit(GfxFeature::UnusedAttachments) |
+        GfxFeatureBit(GfxFeature::MultiDrawIndirect)
     };
     uint32_t optional {
         GfxFeatureBit(GfxFeature::RayTracing) | GfxFeatureBit(GfxFeature::PipelineLibrary)
@@ -151,6 +154,14 @@ struct GfxFeatureRequest {
     inline constexpr uint32_t Requested(void) const noexcept {
         return required | optional;
     }
+};
+
+struct GfxDrawCommand {
+    uint32_t    indexCount { 0 };
+    uint32_t    instanceCount { 0 };
+    uint32_t    firstIndex { 0 };
+    int32_t     baseVertex { 0 };
+    uint32_t    firstInstance { 0 };
 };
 
 // The linear twin of an sRGB format, itself for every other - what an upload uses when the sampler

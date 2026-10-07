@@ -507,8 +507,8 @@ void Shader::BuildInputLayout(void) noexcept
             desc.Format = DxgiFormatForAttr(attr.format);
             desc.InputSlot = UINT(slot);
             desc.AlignedByteOffset = 0;
-            desc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-            desc.InstanceDataStepRate = 0;
+            desc.InputSlotClass = attr.perInstance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+            desc.InstanceDataStepRate = attr.perInstance ? 1 : 0;
             m_vsInputLayout.push_back(desc);
         }
     }

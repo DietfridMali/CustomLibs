@@ -1253,6 +1253,8 @@ void CommandListHandler::ResetBindings(void) noexcept
         m_boundReadOnlyBuffers[i] = VK_NULL_HANDLE;
         m_boundReadOnlyBufferSize[i] = 0;
     }
+    for (uint32_t i = 0; i < kVertexSlots; ++i)
+        m_boundInstanceStreams[i] = VK_NULL_HANDLE;
     m_boundAccelStructure = VK_NULL_HANDLE;
 }
 
@@ -1297,6 +1299,13 @@ void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDe
 }
 
 
+void CommandListHandler::BindInstanceStream(uint32_t slot, VkBuffer buffer) noexcept
+{
+    if (slot < kVertexSlots)
+        m_boundInstanceStreams[slot] = buffer;
+}
+
+
 void CommandListHandler::UnbindBuffer(VkBuffer buffer) noexcept
 {
     if (buffer == VK_NULL_HANDLE)
@@ -1307,6 +1316,9 @@ void CommandListHandler::UnbindBuffer(VkBuffer buffer) noexcept
     for (uint32_t i = 0; i < kSsboSlots; ++i)
         if (m_boundReadOnlyBuffers[i] == buffer)
             BindReadOnlyBuffer(i, VK_NULL_HANDLE, 0);
+    for (uint32_t i = 0; i < kVertexSlots; ++i)
+        if (m_boundInstanceStreams[i] == buffer)
+            BindInstanceStream(i, VK_NULL_HANDLE);
 }
 
 

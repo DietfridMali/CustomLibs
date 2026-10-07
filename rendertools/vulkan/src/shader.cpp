@@ -484,7 +484,7 @@ void Shader::BuildVertexInput(void) noexcept
         VkVertexInputBindingDescription b { };
         b.binding = uint32_t(slot);
         b.stride = StrideForFormat(attr.format);
-        b.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        b.inputRate = attr.perInstance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
         m_vsInputBindings.push_back(b);
     }
 }

@@ -9,6 +9,11 @@
 #include "texture.h"
 #include "shader.h"
 #include "commandlist.h"
+#include "gfxtypes.h"
+
+template <typename DATA_T, typename STORAGE_T> class GfxArray;
+
+using GfxDrawCommandBuffer = GfxArray<GfxDrawCommand, GfxTypes::IndirectBuffer>;
 
 // =================================================================================================
 // DX12 GfxDataLayout
@@ -175,6 +180,8 @@ public:
     inline void Render(Texture* texture) {
         Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{});
     }
+
+    void RenderIndirect(std::span<Texture* const> textures, GfxDrawCommandBuffer& commands, uint32_t firstCommand, uint32_t commandCount) noexcept;
 
 protected:
     bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0, bool forceUpdate = false) noexcept;  // componentType cast to ComponentType internally

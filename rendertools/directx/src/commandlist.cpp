@@ -483,6 +483,16 @@ bool CommandListHandler::Create(ID3D12Device* device) noexcept {
     logHandler.Print("CommandListHandler::Create: Tracy GPU context %s, id %u (255 = constructor bailed out)\n",
             m_gpuProfilerCtx ? "created" : "NOT created - no GPU zones", m_gpuProfilerCtx ? unsigned(m_gpuProfilerCtx->GetId()) : 255u);
 #endif
+    D3D12_INDIRECT_ARGUMENT_DESC argument{};
+    argument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+    D3D12_COMMAND_SIGNATURE_DESC signature{};
+    signature.ByteStride = UINT(sizeof(GfxDrawCommand));
+    signature.NumArgumentDescs = 1;
+    signature.pArgumentDescs = &argument;
+    if (FAILED(device->CreateCommandSignature(&signature, nullptr, IID_PPV_ARGS(&m_drawIndexedSignature)))) {
+        logHandler.Print("CommandListHandler::Create: cannot create the command signature for indirect draws\n");
+        return false;
+    }
     ResetBindings();
     return true;
 }
@@ -501,6 +511,8 @@ void CommandListHandler::ResetBindings(void) noexcept {
         m_boundReadOnlyBuffers[i] = UINT32_MAX;
         m_readOnlyBufferStates[i] = {};
     }
+    for (uint32_t i = 0; i < kVertexSlots; ++i)
+        m_instanceStreams[i] = {};
     m_boundAccelStructure = 0;
     for (int i = 0; i < CommandList::kTableCount; ++i)
         m_bindingVersions[i] = ++m_bindingVersionCounter;
@@ -559,6 +571,39 @@ void CommandListHandler::UnbindBuffer(const D3D12_RESOURCE_STATES* pState) noexc
         if (m_readOnlyBufferStates[i].pState == pState)
             BindReadOnlyBuffer(i, UINT32_MAX);
     }
+    for (uint32_t i = 0; i < kVertexSlots; ++i) {
+        if (m_instanceStreams[i].pState == pState)
+            BindInstanceStream(i);
+    }
+}
+
+
+void CommandListHandler::BindInstanceStream(uint32_t slot, ComPtr<ID3D12Resource>* pResource, D3D12_RESOURCE_STATES* pState, UINT size, UINT stride) noexcept {
+    if (slot < kVertexSlots)
+        m_instanceStreams[slot] = { pResource, pState, size, stride };
+}
+
+
+bool CommandListHandler::InstanceStreamView(ID3D12GraphicsCommandList* list, uint32_t slot, D3D12_VERTEX_BUFFER_VIEW& view) noexcept {
+    if (slot >= kVertexSlots)
+        return false;
+    const BoundInstanceStream& stream = m_instanceStreams[slot];
+    if (not (list and stream.pResource and stream.pState and stream.pResource->Get()))
+        return false;
+    if (*stream.pState != D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER) {
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Transition.pResource = stream.pResource->Get();
+        barrier.Transition.StateBefore = *stream.pState;
+        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        list->ResourceBarrier(1, &barrier);
+        *stream.pState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    }
+    view.BufferLocation = stream.pResource->Get()->GetGPUVirtualAddress();
+    view.SizeInBytes = stream.size;
+    view.StrideInBytes = stream.stride;
+    return true;
 }
 
 
@@ -782,6 +827,7 @@ void CommandListHandler::Destroy(void) noexcept {
         delete cl;
     }
     m_recycledLists.Clear();
+    m_drawIndexedSignature.Reset();
     m_cmdQueue.Destroy();
 }
 

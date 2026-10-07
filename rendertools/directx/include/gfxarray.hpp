@@ -26,7 +26,7 @@ template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
 class GfxArray : public BaseGfxArray
 {
 public:
-    static constexpr bool isBuffer = std::is_same_v<STORAGE_T, GfxTypes::StructuredBuffer>;
+    static constexpr bool isBuffer = std::is_same_v<STORAGE_T, GfxTypes::StructuredBuffer> or std::is_same_v<STORAGE_T, GfxTypes::InstanceBuffer> or std::is_same_v<STORAGE_T, GfxTypes::IndirectBuffer>;
     static constexpr D3D12_RESOURCE_STATES kReadOnlyState = D3D12_RESOURCE_STATES(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
     AutoArray<DATA_T>                   m_data;
@@ -174,6 +174,27 @@ public:
     void ReleaseReadOnly(uint32_t bindingPoint) {
         if (bindingPoint < uint32_t(Shader::kSsboSlots))
             commandListHandler.BindReadOnlyBuffer(bindingPoint, UINT32_MAX);
+    }
+
+    bool BindInstanceStream(const char* type, int id) {
+        int slot = GfxAttributeSlot(type, id);
+        if (not isBuffer or not m_resource or (slot < 0))
+            return false;
+        commandListHandler.BindInstanceStream(uint32_t(slot), std::addressof(m_resource), &m_state, UINT(DataSize()), UINT(sizeof(DATA_T)));
+        return true;
+    }
+
+    void ReleaseInstanceStream(const char* type, int id) {
+        int slot = GfxAttributeSlot(type, id);
+        if (slot >= 0)
+            commandListHandler.BindInstanceStream(uint32_t(slot));
+    }
+
+    ID3D12Resource* IndirectArguments(ID3D12GraphicsCommandList* list) {
+        if (not (isBuffer and m_resource))
+            return nullptr;
+        SetBarrier(list, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
+        return m_resource.Get();
     }
 
     void Clear(DATA_T value) {

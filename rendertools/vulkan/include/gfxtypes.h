@@ -20,6 +20,8 @@ namespace GfxTypes {
 
     struct UavTexture {};
     struct StructuredBuffer {};
+    struct InstanceBuffer {};
+    struct IndirectBuffer {};
 }
 
 // =================================================================================================

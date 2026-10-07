@@ -12,6 +12,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <type_traits>
 
 // =================================================================================================
 // Vulkan GfxArray — flat R32_UINT storage buffer (analogue of the DX12 UAV-style Texture2D used by
@@ -42,6 +43,9 @@ template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
 class GfxArray : public BaseGfxArray
 {
 public:
+    static constexpr bool isInstanceBuffer = std::is_same_v<STORAGE_T, GfxTypes::InstanceBuffer>;
+    static constexpr bool isIndirectBuffer = std::is_same_v<STORAGE_T, GfxTypes::IndirectBuffer>;
+
     AutoArray<DATA_T>      m_data;
 
     VkBuffer               m_buffer         { VK_NULL_HANDLE };
@@ -146,6 +150,10 @@ public:
         bi.usage       = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
                        | VK_BUFFER_USAGE_TRANSFER_DST_BIT
                        | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        if constexpr (isInstanceBuffer)
+            bi.usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+        if constexpr (isIndirectBuffer)
+            bi.usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
         bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         VmaAllocationCreateInfo ai{};
@@ -190,6 +198,20 @@ public:
     void ReleaseReadOnly(uint32_t bindingPoint) {
         if (bindingPoint < CommandListHandler::kSsboSlots)
             commandListHandler.BindReadOnlyBuffer(bindingPoint, VK_NULL_HANDLE, 0);
+    }
+
+    bool BindInstanceStream(const char* type, int id) {
+        int slot = GfxAttributeSlot(type, id);
+        if ((m_buffer == VK_NULL_HANDLE) or (slot < 0))
+            return false;
+        commandListHandler.BindInstanceStream(uint32_t(slot), m_buffer);
+        return true;
+    }
+
+    void ReleaseInstanceStream(const char* type, int id) {
+        int slot = GfxAttributeSlot(type, id);
+        if (slot >= 0)
+            commandListHandler.BindInstanceStream(uint32_t(slot), VK_NULL_HANDLE);
     }
 
     // Writes vkCmdFillBuffer onto the currently active CommandList's CB. Contract: caller ensures
@@ -472,12 +494,21 @@ private:
                 dstStage |= VK_PIPELINE_STAGE_2_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_2_TESSELLATION_EVALUATION_SHADER_BIT;
             if (vkContext.HasFeature(GfxFeature::GeometryShader))
                 dstStage |= VK_PIPELINE_STAGE_2_GEOMETRY_SHADER_BIT;
+            VkAccessFlags2 dstAccess = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+            if constexpr (isInstanceBuffer) {
+                dstStage |= VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT;
+                dstAccess |= VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+            }
+            if constexpr (isIndirectBuffer) {
+                dstStage |= VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT;
+                dstAccess |= VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT;
+            }
             VkBufferMemoryBarrier2 b{};
             b.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
             b.srcStageMask        = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             b.srcAccessMask       = VK_ACCESS_2_TRANSFER_WRITE_BIT;
             b.dstStageMask        = dstStage;
-            b.dstAccessMask       = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+            b.dstAccessMask       = dstAccess;
             b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             b.buffer              = m_buffer;

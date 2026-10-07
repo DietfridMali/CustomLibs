@@ -6,6 +6,7 @@
 #include "gfxrenderer.h"
 #include "commandlist.h"
 #include "gfxstates.h"
+#include "gfxarray.hpp"
 #include "shader_loading.h"
 
 #include <cassert>
@@ -273,6 +274,17 @@ bool GfxDataLayout::Enable(void) noexcept
             int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
             if ((slot < 0) or (slot >= kMaxStreams) or filled[slot])
                 continue;
+            if (layout.m_attrs[i].perInstance) {
+                VkBuffer stream = commandListHandler.InstanceStream(uint32_t(slot));
+                if (stream == VK_NULL_HANDLE)
+                    continue;
+                buffers[slot] = stream;
+                offsets[slot] = 0;
+                filled[slot] = true;
+                if (slot >= maxSlot)
+                    maxSlot = slot + 1;
+                continue;
+            }
 #if OPTIMIZE_BUFFER_REUSE
             VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format, frameNumber);
 #else
@@ -411,6 +423,33 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
     //gfxStates.CheckError();
     FinishRender();
     //gfxStates.CheckError();
+}
+
+
+void GfxDataLayout::RenderIndirect(std::span<Texture* const> textures, GfxDrawCommandBuffer& commands, uint32_t firstCommand, uint32_t commandCount) noexcept
+{
+    if ((commandCount == 0) or (commands.m_buffer == VK_NULL_HANDLE) or not m_indexBuffer.IsValid())
+        return;
+    if (not StartRender())
+        return;
+    ActivateTextures(textures);
+    Shader* shader = baseShaderHandler.ActiveShader();
+    bool hasVariables = true;
+    if (shader) {
+        if (CommandList* cl = commandListHandler.CurrentCmdList()) {
+            cl->SetTopology(shader, m_shape);
+            ResolveDrawPipeline(cl, shader);
+        }
+        vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
+        hasVariables = shader->UpdateVariables();
+    }
+    if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
+        commandListHandler.DrawIndexedIndirect(commands.m_buffer, VkDeviceSize(firstCommand) * VkDeviceSize(sizeof(GfxDrawCommand)), commandCount, uint32_t(sizeof(GfxDrawCommand)));
+        gfxStates.CountDraw();
+    }
+    gfxStates.CheckError("GfxDataLayout::RenderIndirect draw");
+    vkContext.SetValidationShader(nullptr);
+    FinishRender();
 }
 
 // =================================================================================================

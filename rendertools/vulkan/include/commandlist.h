@@ -242,7 +242,9 @@ public:
     static constexpr uint32_t kSamplerSlots = 16;  // matches Shader::kSamplerSlots
     static constexpr uint32_t kUavSlots     = 4;   // matches Shader::kUavSlots
     static constexpr uint32_t kSsboSlots    = 24;  // matches Shader::kSsboSlots
+    static constexpr uint32_t kVertexSlots  = 16;
 
+    VkBuffer     m_boundInstanceStreams  [kVertexSlots]  { };
     VkImageView  m_boundSrvViews         [kSrvSlots]     { };
     VkImageLayout m_boundSrvLayouts      [kSrvSlots]     { };
     VkSampler    m_boundSamplers         [kSamplerSlots] { };
@@ -258,6 +260,11 @@ public:
     void BindSampler(uint32_t slot, VkSampler sampler) noexcept;
     void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
     void BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
+    void BindInstanceStream(uint32_t slot, VkBuffer buffer) noexcept;
+
+    inline VkBuffer InstanceStream(uint32_t slot) const noexcept {
+        return (slot < kVertexSlots) ? m_boundInstanceStreams[slot] : VK_NULL_HANDLE;
+    }
 
     // Every slot this buffer is bound to, cleared. A GfxArray that is destroyed while still bound
     // would otherwise leave its slots pointing at memory that is being freed, and the next thing
@@ -354,6 +361,12 @@ public:
         VkCommandBuffer cb = CurrentGfxList();
         if (cb != VK_NULL_HANDLE)
             vkCmdDrawIndexed(cb, idxCount, instCount, startIdx, baseVtx, startInst);
+    }
+
+    inline void DrawIndexedIndirect(VkBuffer commands, VkDeviceSize offset, uint32_t commandCount, uint32_t stride) noexcept {
+        VkCommandBuffer cb = CurrentGfxList();
+        if (cb != VK_NULL_HANDLE)
+            vkCmdDrawIndexedIndirect(cb, commands, offset, commandCount, stride);
     }
 
 #ifdef _DEBUG

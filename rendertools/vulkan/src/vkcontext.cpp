@@ -427,6 +427,7 @@ VKContext::DeviceSupport VKContext::QueryDeviceSupport(VkPhysicalDevice device, 
     set(GfxFeature::Anisotropy, core.samplerAnisotropy);
     set(GfxFeature::StorageInVertexStage, core.vertexPipelineStoresAndAtomics);
     set(GfxFeature::StorageInFragmentStage, core.fragmentStoresAndAtomics);
+    set(GfxFeature::MultiDrawIndirect, core.multiDrawIndirect and core.drawIndirectFirstInstance);
     set(GfxFeature::ScalarBlockLayout, feats12.scalarBlockLayout);
     set(GfxFeature::RenderingLocalRead, hasLocalReadExt and featsLocalRead.dynamicRenderingLocalRead);
     set(GfxFeature::UnusedAttachments, hasUnusedAttExt and featsUnusedAtt.dynamicRenderingUnusedAttachments);
@@ -689,6 +690,8 @@ bool VKContext::CreateDevice(const GfxFeatureRequest& request) noexcept
     features.tessellationShader = enable(GfxFeature::Tessellation);
     features.geometryShader = enable(GfxFeature::GeometryShader);
     features.depthClamp = enable(GfxFeature::DepthClamp);
+    features.multiDrawIndirect = enable(GfxFeature::MultiDrawIndirect);
+    features.drawIndirectFirstInstance = enable(GfxFeature::MultiDrawIndirect);
 
     VkDeviceCreateInfo info { };
     info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

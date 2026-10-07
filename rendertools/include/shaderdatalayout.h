@@ -106,6 +106,7 @@ struct ShaderDataAttributes {
     int         id;         // index for multi-instance types (TexCoord/0, Offset/2, ...)
     // Uint* reaches the shader as an integer, not as a float - see UintDataBuffer.
     enum Format { Float1, Float2, Float3, Float4, Uint1, Uint2, Uint3, Uint4 } format;
+    bool        perInstance { false };
 };
 
 static constexpr int MaxRenderTargets = 8;
