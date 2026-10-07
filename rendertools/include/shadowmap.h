@@ -18,10 +18,13 @@ private:
 	Matrix4f					m_lightTransform;
 	Matrix4f					m_modelViewTransform;
 	RenderTarget*				m_map{ nullptr };
+	RenderTarget*				m_dynamicMap{ nullptr };
+	RenderTarget*				m_activeMap{ nullptr };
 	float						m_maxLightRadius{ 15.0f };
 	int							m_status{ 0 };
 	bool						m_renderShadows{ true };
 	bool						m_applyShadows{ false };
+	bool						m_hasStaticCasters{ false };
 	Vector3f					m_lightPosition{ Vector3f::ZERO };
 
 public:
@@ -47,13 +50,28 @@ public:
 		return forClipSpace ? m_modelViewTransform : m_lightTransform;
 	}
 
-	bool StartRender(void) noexcept;
+	bool StartRender(bool dynamicCasters = false) noexcept;
 
 	bool StopRender(void) noexcept;
 
 	inline void MakeReadable(void) noexcept {
 		if (m_map and m_map->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth }))
 			m_map->Deactivate();
+		if (m_dynamicMap and m_dynamicMap->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth }))
+			m_dynamicMap->Deactivate();
+		m_hasStaticCasters = false;
+	}
+
+	inline bool IsDynamicPass(void) noexcept {
+		return (m_activeMap != nullptr) and (m_activeMap == m_dynamicMap);
+	}
+
+	inline bool HasStaticCasters(void) noexcept {
+		return m_hasStaticCasters;
+	}
+
+	inline void Invalidate(void) noexcept {
+		m_hasStaticCasters = false;
 	}
 
 	inline RenderTarget* GetMap(void) noexcept {
@@ -66,6 +84,10 @@ public:
 
 	inline Texture* ShadowTexture(void) noexcept {
 		return m_map ? m_map->GetDepthAsShadowTexture() : nullptr;
+	}
+
+	inline Texture* DynamicShadowTexture(void) noexcept {
+		return m_dynamicMap ? m_dynamicMap->GetDepthAsShadowTexture() : nullptr;
 	}
 
 	inline void ActivateCamera(void) noexcept {

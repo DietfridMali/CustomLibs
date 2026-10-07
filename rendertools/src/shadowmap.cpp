@@ -36,6 +36,8 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 #if !DEMO
 	if (not (m_map = new RenderTarget()))
 		return false;
+	if (not (m_dynamicMap = new RenderTarget()))
+		return false;
 	// ShadowMap-Format ist D32_FLOAT (4 Byte/Pixel, single-channel, kein Stencil) — siehe
 	// rendertarget.cpp/resource_view.h. Start bei 8K (industry-typische ShadowMap-Aufloesung),
 	// halbieren bei Fehlschlag bis 1024. Cap zusaetzlich gegen die Hardware-Allocation-Grenze
@@ -45,8 +47,11 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	int startSize = std::min<int>(maxSize, 8192);
 	for (int size = startSize; size >= 1024; size /= 2) {
 		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
-			m_status = 1;
-			return true;
+			if (m_dynamicMap->Create(size, size, 1, { .name = "dynamic shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
+				m_status = 1;
+				return true;
+			}
+			m_map->Destroy();
 		}
 		//m_maxLightRadius *= 0.9f;
 	}
@@ -61,14 +66,21 @@ void ShadowMap::Destroy(void) noexcept {
 		m_map = nullptr;
 		m_status = 0;
 	}
+	if (m_dynamicMap) {
+		delete m_dynamicMap;
+		m_dynamicMap = nullptr;
+	}
+	m_activeMap = nullptr;
+	m_hasStaticCasters = false;
 }
 
 
-bool ShadowMap::StartRender(void) noexcept {
+bool ShadowMap::StartRender(bool dynamicCasters) noexcept {
 	if (not IsReady())
 		return false;
 	baseRenderer.StartShadowPass();
-	m_map->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth });
+	m_activeMap = dynamicCasters ? m_dynamicMap : m_map;
+	m_activeMap->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbDepth });
 	// DX12: depth clear is handled by RenderTarget::Enable / OMSetRenderTargets + ClearDepthStencilView
 	ActivateCamera();
 	gfxStates.SetDepthTest(1);
@@ -90,7 +102,10 @@ bool ShadowMap::StopRender(void) noexcept {
 #if APPLY_POLYGON_OFFSET
 	gfxStates.SetPolygonOffset(0.0f, 0.0f);
 #endif
-	m_map->Deactivate();
+	m_activeMap->Deactivate();
+	if (m_activeMap == m_map)
+		m_hasStaticCasters = true;
+	m_activeMap = nullptr;
 	return true;
 }
 
