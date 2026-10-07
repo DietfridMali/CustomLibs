@@ -66,6 +66,7 @@
     <ClInclude Include="..\include\tristate.h" />
     <ClInclude Include="..\include\type_helper.hpp" />
     <ClInclude Include="..\include\vector.hpp" />
+    <ClInclude Include="..\include\viewfrustum.hpp" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>

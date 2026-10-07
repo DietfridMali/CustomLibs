@@ -108,6 +108,9 @@
     <ClInclude Include="..\include\vector.hpp">
       <Filter>Header Files\general</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\viewfrustum.hpp">
+      <Filter>Header Files\general</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\matrix.hpp">
       <Filter>Header Files\general</Filter>
     </ClInclude>

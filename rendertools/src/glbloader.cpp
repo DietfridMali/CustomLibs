@@ -2,6 +2,7 @@
 #include "glbloader.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <fstream>
 #pragma warning(push)
@@ -67,6 +68,38 @@ static bool KeepImageData(tinygltf::Image* image, const int, std::string*, std::
     image->image.assign(bytes, bytes + size);
     image->as_is = true;
     return true;
+}
+
+static bool IsImageFile(const std::string& filepath) {
+    std::string extension = std::filesystem::path(filepath).extension().string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+    for (const char* imageExtension : { ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".dds", ".ktx", ".ktx2", ".webp" }) {
+        if (extension == imageExtension)
+            return true;
+    }
+    return false;
+}
+
+static bool ReadModelFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void* userData) {
+    if (IsImageFile(filepath))
+        return false;
+    return tinygltf::ReadWholeFile(out, err, filepath, userData);
+}
+
+static bool ReadImageFile(const std::filesystem::path& path, AutoArray<uint8_t>& image) {
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (not file)
+        return false;
+    std::streamsize size = file.tellg();
+    if (size <= 0)
+        return false;
+    image.Resize(int32_t(size));
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(image.DataPtr()), size);
+    if (file.good())
+        return true;
+    image.Clear();
+    return false;
 }
 
 static bool IsBinaryFile(const String& filename) {
@@ -159,6 +192,10 @@ bool GLBLoader::ParseFile(const String& filename) {
 
     tinygltf::TinyGLTF loader;
     loader.SetImageLoader(KeepImageData, nullptr);
+    if (m_loadSurfaceData) {
+        tinygltf::FsCallbacks callbacks{ &tinygltf::FileExists, &tinygltf::ExpandFilePath, &ReadModelFile, &tinygltf::WriteWholeFile, &tinygltf::GetFileSizeInBytes, nullptr };
+        loader.SetFsCallbacks(callbacks);
+    }
     std::string errorMsg;
     std::string warningMsg;
 
@@ -217,13 +254,26 @@ void GLBLoader::LoadMaterials(void) {
 // -------------------------------------------------------------------------------------------------
 
 void GLBLoader::LoadImages(const std::filesystem::path& folder) {
+    AutoArray<uint8_t> isUsed;
+    isUsed.Resize(int32_t(m_model.images.size()));
+    isUsed.Fill(0);
+    for (auto& material : m_data.materials) {
+        if (material.imageIndex >= 0)
+            isUsed[material.imageIndex] = 1;
+    }
+    int32_t imageIndex = 0;
     for (auto& source : m_model.images) {
         AutoArray<uint8_t>* image = m_data.images.Append();
-        m_data.imageNames.Append(source.uri.empty() ? String("") : String((folder / std::filesystem::path(source.uri)).generic_string().c_str()));
-        if (source.image.empty())
+        std::filesystem::path path = folder / std::filesystem::path(source.uri);
+        m_data.imageNames.Append(source.uri.empty() ? String("") : String(path.generic_string().c_str()));
+        if (not isUsed[imageIndex++])
             continue;
-        image->Resize(int32_t(source.image.size()));
-        memcpy(image->DataPtr(), source.image.data(), source.image.size());
+        if (not source.image.empty()) {
+            image->Resize(int32_t(source.image.size()));
+            memcpy(image->DataPtr(), source.image.data(), source.image.size());
+        }
+        else if (not source.uri.empty() and not ReadImageFile(path, *image))
+            logHandler.Print("GLBLoader: cannot read image '%s'\n", path.generic_string().c_str());
     }
 }
 
