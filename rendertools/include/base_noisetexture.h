@@ -57,6 +57,7 @@ namespace NoiseTextureUtil {
 struct ValueNoiseR32F {};
 struct PerlinNoiseR32F {};
 struct FbmNoiseR32F {};
+struct FoamNoiseR32F {};
 struct HashNoiseRGBA8 {};
 struct WeatherNoiseRG8 {};
 struct BlueNoiseR8 {};
@@ -166,6 +167,54 @@ template<> struct NoiseTraits<FbmNoiseR32F> {
                 *dataPtr++ = fbm.Value(p);
             }
         }
+    }
+};
+
+// -------------------------------------------------------------------------------------------------
+
+template<> struct NoiseTraits<FoamNoiseR32F> {
+    using PixelT = float;
+    static constexpr GfxPixelFormat format = GfxPixelFormat::R32_SFloat;
+    static constexpr int Components = 1;
+
+    static void ConfigureSampling(TextureSampling& s) noexcept {
+        s.minFilter     = GfxFilterMode::Linear;
+        s.magFilter     = GfxFilterMode::Linear;
+        s.mipMode       = GfxMipMode::None;
+        s.wrapU = s.wrapV = s.wrapW = GfxWrapMode::Repeat;
+        s.compareFunc   = GfxOperations::CompareFunc::Always;
+        s.maxAnisotropy = 1.0f;
+    }
+
+    static void Compute(AutoArray<float>& data, int gridSize, int yPeriod, int xPeriod,
+                        int octaves, uint32_t seed)
+    {
+        data.Resize(gridSize * gridSize);
+        const int basePeriod = std::max(2, std::max(xPeriod, yPeriod));
+        const int octaveCount = std::max(1, octaves);
+        float* dataPtr = data.DataPtr();
+        const float invGrid = 1.0f / float(gridSize);
+        float vMin = 1.0e30f;
+        float vMax = -1.0e30f;
+        for (int y = 0; y < gridSize; ++y) {
+            for (int x = 0; x < gridSize; ++x) {
+                float value = 0.0f;
+                float weight = 1.0f;
+                int period = basePeriod;
+                for (int o = 0; o < octaveCount; ++o) {
+                    Vector3f p(float(x) * invGrid * float(period), float(y) * invGrid * float(period), 0.5f);
+                    value += weight * Noise::Worley(p, period, seed + uint32_t(o) * 0x9E3779B1u);
+                    weight *= 0.5f;
+                    period *= 2;
+                }
+                dataPtr[y * gridSize + x] = value;
+                vMin = std::min(vMin, value);
+                vMax = std::max(vMax, value);
+            }
+        }
+        const float scale = (vMax > vMin) ? 1.0f / (vMax - vMin) : 0.0f;
+        for (int i = 0; i < gridSize * gridSize; ++i)
+            dataPtr[i] = (dataPtr[i] - vMin) * scale;
     }
 };
 

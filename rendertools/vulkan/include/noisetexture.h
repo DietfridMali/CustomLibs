@@ -29,6 +29,7 @@ public:
 using ValueNoiseTexture   = NoiseTexture<ValueNoiseR32F>;
 using PerlinNoiseTexture  = NoiseTexture<PerlinNoiseR32F>;
 using FbmNoiseTexture     = NoiseTexture<FbmNoiseR32F>;
+using FoamNoiseTexture    = NoiseTexture<FoamNoiseR32F>;
 using HashNoiseTexture    = NoiseTexture<HashNoiseRGBA8>;
 using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
