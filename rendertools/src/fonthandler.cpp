@@ -7,6 +7,7 @@
 #include "base_shaderhandler.h"
 #include "gfxrenderer.h"
 #include "loghandler.h"
+#include "missingfiles.h"
 
 #ifndef _WIN32
 #   include <locale>
@@ -127,6 +128,7 @@ bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, Str
     String fontFile = fontFolder + fontName;
     if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
         logHandler.Print("Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*) fontName, TTF_GetError());
+        missingFiles.Report(fontFile.Data());
         return false;
     }
     //SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));

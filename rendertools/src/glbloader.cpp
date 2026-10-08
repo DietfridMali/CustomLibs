@@ -12,6 +12,7 @@
 #pragma warning(pop)
 #include "conversions.hpp"
 #include "loghandler.h"
+#include "missingfiles.h"
 
 #define ANGLE_WEIGHTED_NORMALS  1
 
@@ -204,6 +205,7 @@ bool GLBLoader::ParseFile(const String& filename) {
     bool isLoaded = IsBinaryFile(filename) ? loader.LoadBinaryFromFile(&m_model, &errorMsg, &warningMsg, fn) : loader.LoadASCIIFromFile(&m_model, &errorMsg, &warningMsg, fn);
     if (not isLoaded) {
         logHandler.Print("GLBLoader: loading '%s' failed: %s\n", (const char*) filename, errorMsg.c_str());
+        missingFiles.Report((const char*) filename);
         return false;
     }
 
@@ -272,8 +274,10 @@ void GLBLoader::LoadImages(const std::filesystem::path& folder) {
             image->Resize(int32_t(source.image.size()));
             memcpy(image->DataPtr(), source.image.data(), source.image.size());
         }
-        else if (not source.uri.empty() and not ReadImageFile(path, *image))
+        else if (not source.uri.empty() and not ReadImageFile(path, *image)) {
             logHandler.Print("GLBLoader: cannot read image '%s'\n", path.generic_string().c_str());
+            missingFiles.Report(path.generic_string().c_str());
+        }
     }
 }
 

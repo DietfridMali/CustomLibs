@@ -1,5 +1,6 @@
 #include "objloader.h"
 #include "loghandler.h"
+#include "missingfiles.h"
 
 #include <algorithm>
 #include <cctype>
@@ -206,6 +207,7 @@ bool ObjLoader::ParseFile(const std::filesystem::path& filename) {
     std::ifstream file(filename);
     if (not file) {
         logHandler.Print("ObjLoader: cannot open '%s'\n", filename.string().c_str());
+        missingFiles.Report(filename.string().c_str());
         return false;
     }
     std::filesystem::path folder = filename.parent_path();
@@ -256,6 +258,7 @@ void ObjLoader::LoadMaterials(const std::filesystem::path& filename) {
     std::ifstream file(filename);
     if (not file) {
         logHandler.Print("ObjLoader: cannot open material library '%s'\n", filename.string().c_str());
+        missingFiles.Report(filename.string().c_str());
         return;
     }
     std::filesystem::path folder = filename.parent_path();
@@ -483,6 +486,7 @@ int32_t ObjLoader::ImageIndex(const std::filesystem::path& filename) {
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (not file) {
         logHandler.Print("ObjLoader: cannot open texture '%s'\n", filename.string().c_str());
+        missingFiles.Report(filename.string().c_str());
         return m_imageFiles.Length() - 1;
     }
     std::streamoff size = file.tellg();

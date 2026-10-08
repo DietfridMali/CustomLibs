@@ -3,6 +3,7 @@
 #include "texturebuffer.h"
 #include "gfxrenderer.h"
 #include "loghandler.h"
+#include "missingfiles.h"
 
 #include <cstdint>
 #include <cstring>
@@ -306,6 +307,8 @@ TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
 
     if (IsDDSFile(fullPath)) {
         if (not LoadDDS(fullPath, *buf)) {
+            if (isRequired)
+                missingFiles.Report(full.c_str());
             delete buf;
             return nullptr;
         }
@@ -314,8 +317,10 @@ TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
 
     SDL_Surface* image = IMG_Load(full.c_str());
     if (not image) {
-        if (isRequired)
+        if (isRequired) {
             logHandler.Print("LoadTextureFile: failed to load '%s'\n", full.c_str());
+            missingFiles.Report(full.c_str());
+        }
         delete buf;
         return nullptr;
     }

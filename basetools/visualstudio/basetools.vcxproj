@@ -39,6 +39,7 @@
     <ClInclude Include="..\include\list.hpp" />
     <ClInclude Include="..\include\list_helpers.h" />
     <ClInclude Include="..\include\loghandler.h" />
+    <ClInclude Include="..\include\missingfiles.h" />
     <ClInclude Include="..\include\matrix.hpp" />
     <ClInclude Include="..\include\noise.hpp" />
     <ClInclude Include="..\include\random.hpp" />
@@ -77,6 +78,7 @@
     <ClCompile Include="..\src\glm_matrix.cpp" />
     <ClCompile Include="..\src\glm_vector.cpp" />
     <ClCompile Include="..\src\loghandler.cpp" />
+    <ClCompile Include="..\src\missingfiles.cpp" />
     <ClCompile Include="..\src\matrix.cpp" />
     <ClCompile Include="..\src\std_string.cpp" />
     <ClCompile Include="..\src\string.cpp" />

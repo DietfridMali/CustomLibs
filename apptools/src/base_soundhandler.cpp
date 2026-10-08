@@ -3,6 +3,7 @@
 
 #include "arghandler.h"
 #include "base_soundhandler.h"
+#include "missingfiles.h"
 
 // =================================================================================================
 
@@ -93,6 +94,7 @@ bool BaseSoundHandler::LoadSounds(String soundFolder) {
         else {
             isComplete = false;
             logHandler.Print("Couldn't load sound '%s' (%s)\n", name.Data(), Mix_GetError());
+            missingFiles.Report(fileName.Data());
         }
     }
     return isComplete;
@@ -255,8 +257,10 @@ bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
     if (not m_playMusic or songName.IsEmpty())
         return false;
     m_lastSong = songName;
-    if (not (m_song = Mix_LoadMUS((const char*)songName)))
+    if (not (m_song = Mix_LoadMUS((const char*)songName))) {
+        missingFiles.Report(songName.Data());
         return false;
+    }
     if (0 == ((fadeTime > 0) ? Mix_FadeInMusic(m_song, loops, fadeTime) : Mix_PlayMusic(m_song, loops)))
         return true;
     Mix_FreeMusic(m_song);
