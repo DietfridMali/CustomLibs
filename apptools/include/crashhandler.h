@@ -6,6 +6,8 @@
 
 #ifdef _WIN32
 struct _EXCEPTION_POINTERS;
+#elif defined(__linux__)
+#   include <signal.h>
 #endif
 
 // =================================================================================================
@@ -68,6 +70,14 @@ private:
     void WriteTrace(void* file, const char* kind, _EXCEPTION_POINTERS* exceptionPointers, unsigned long threadId, const char* reason);
 
     void WriteDump(void* file);
+
+    bool MakeFileName(char* fileName, size_t size, const char* kind, const char* extension);
+#elif defined(__linux__)
+    static void OnSignal(int signalNumber, siginfo_t* signalInfo, void* context);
+
+    static void* WatcherThread(void* param);
+
+    void WriteReport(void);
 
     bool MakeFileName(char* fileName, size_t size, const char* kind, const char* extension);
 #endif

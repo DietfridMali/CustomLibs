@@ -14,6 +14,22 @@
 #   include <stdlib.h>
 #   include <cstdarg>
 #   pragma comment(lib, "dbghelp.lib")
+#elif defined(__linux__)
+#   include <atomic>
+#   include <cerrno>
+#   include <cstdarg>
+#   include <cstdlib>
+#   include <ctime>
+#   include <backtrace.h>
+#   include <cxxabi.h>
+#   include <dlfcn.h>
+#   include <fcntl.h>
+#   include <pthread.h>
+#   include <semaphore.h>
+#   include <sys/syscall.h>
+#   include <ucontext.h>
+#   include <unistd.h>
+#   include <unwind.h>
 #endif
 
 // =================================================================================================
@@ -473,6 +489,419 @@ void CrashHandler::WriteDump(void* file) {
     exceptionInfo.ClientPointers = FALSE;
     MINIDUMP_TYPE dumpType = static_cast<MINIDUMP_TYPE>(MiniDumpNormal | MiniDumpWithThreadInfo | MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithUnloadedModules);
     MiniDumpWriteDump(m_process, GetCurrentProcessId(), file, dumpType, &exceptionInfo, nullptr, nullptr);
+}
+
+#elif defined(__linux__)
+
+// =================================================================================================
+
+static constexpr int maxFrames = 256;
+static constexpr time_t reportTimeout = 60;
+static constexpr size_t signalStackSize = 64 * 1024;
+static constexpr int crashSignals[] = { SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT };
+static constexpr int crashSignalCount = static_cast<int>(sizeof(crashSignals) / sizeof(crashSignals[0]));
+#if defined(__x86_64__) or defined(__i386__)
+static constexpr unsigned long pageFaultWrite = 0x02;
+static constexpr unsigned long pageFaultExecute = 0x10;
+#endif
+
+struct SignalName {
+    int         signalNumber;
+    int         code;
+    const char* name;
+};
+
+static const SignalName signalNames[] = {
+    { SIGSEGV, SEGV_MAPERR, "segmentation fault, address not mapped" },
+    { SIGSEGV, SEGV_ACCERR, "segmentation fault, access not permitted" },
+    { SIGSEGV, 0,           "segmentation fault" },
+    { SIGBUS,  BUS_ADRALN,  "bus error, invalid address alignment" },
+    { SIGBUS,  BUS_ADRERR,  "bus error, nonexistent physical address" },
+    { SIGBUS,  0,           "bus error" },
+    { SIGFPE,  FPE_INTDIV,  "integer division by zero" },
+    { SIGFPE,  FPE_INTOVF,  "integer overflow" },
+    { SIGFPE,  FPE_FLTDIV,  "floating point division by zero" },
+    { SIGFPE,  FPE_FLTOVF,  "floating point overflow" },
+    { SIGFPE,  FPE_FLTUND,  "floating point underflow" },
+    { SIGFPE,  FPE_FLTRES,  "floating point inexact result" },
+    { SIGFPE,  FPE_FLTINV,  "floating point invalid operation" },
+    { SIGFPE,  0,           "arithmetic exception" },
+    { SIGILL,  0,           "illegal instruction" },
+    { SIGABRT, 0,           "abort" },
+};
+
+struct TraceInfo {
+    const char* reason;
+    int         signalNumber;
+    int         signalCode;
+    bool        hasAccess;
+    const char* accessName;
+    uintptr_t   accessAddress;
+    long        threadId;
+    int         frameCount;
+    int         firstFrame;
+    uintptr_t   frames[maxFrames];
+};
+
+struct FrameWriter {
+    int         file;
+    int         lineIndex;
+    const char* moduleName;
+    bool        isWritten;
+};
+
+static TraceInfo            crashInfo;
+static struct sigaction     previousActions[crashSignalCount];
+static char                 signalStack[signalStackSize];
+static char                 textBuffer[4096];
+static backtrace_state*     backtraceState = nullptr;
+static sem_t                crashEvent;
+static sem_t                doneEvent;
+static pthread_t            watcherThread;
+static pthread_mutex_t      reportLock = PTHREAD_MUTEX_INITIALIZER;
+static std::atomic_flag     isReporting = ATOMIC_FLAG_INIT;
+
+// =================================================================================================
+
+static const char* GetSignalName(int signalNumber, int code) {
+    for (const SignalName& entry : signalNames) {
+        if ((entry.signalNumber == signalNumber) and ((entry.code == code) or (entry.code == 0)))
+            return entry.name;
+    }
+    return "unknown signal";
+}
+
+
+static uintptr_t GetContextPC(const ucontext_t& context) {
+#if defined(__x86_64__)
+    return static_cast<uintptr_t>(context.uc_mcontext.gregs[REG_RIP]);
+#elif defined(__i386__)
+    return static_cast<uintptr_t>(context.uc_mcontext.gregs[REG_EIP]);
+#elif defined(__aarch64__)
+    return static_cast<uintptr_t>(context.uc_mcontext.pc);
+#endif
+}
+
+
+static const char* GetAccessName(const ucontext_t& context) {
+#if defined(__x86_64__) or defined(__i386__)
+    unsigned long faultFlags = static_cast<unsigned long>(context.uc_mcontext.gregs[REG_ERR]);
+    if (faultFlags & pageFaultExecute)
+        return "executing";
+    if (faultFlags & pageFaultWrite)
+        return "writing";
+    return "reading";
+#else
+    return "accessing";
+#endif
+}
+
+
+static void WriteText(int file, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    int length = vsnprintf(textBuffer, sizeof(textBuffer), format, args);
+    va_end(args);
+    if (length <= 0)
+        return;
+    if (length >= static_cast<int>(sizeof(textBuffer)))
+        length = static_cast<int>(sizeof(textBuffer)) - 1;
+    const char* text = textBuffer;
+    while (length > 0) {
+        ssize_t written = write(file, text, static_cast<size_t>(length));
+        if (written <= 0) {
+            if ((written < 0) and (errno == EINTR))
+                continue;
+            return;
+        }
+        text += written;
+        length -= static_cast<int>(written);
+    }
+}
+
+
+static const char* GetModuleName(uintptr_t address, uintptr_t& moduleBase) {
+    moduleBase = 0;
+    Dl_info moduleInfo;
+    if (not dladdr(reinterpret_cast<void*>(address), &moduleInfo))
+        return nullptr;
+    if (not moduleInfo.dli_fname)
+        return nullptr;
+    moduleBase = reinterpret_cast<uintptr_t>(moduleInfo.dli_fbase);
+    const char* separator = strrchr(moduleInfo.dli_fname, '/');
+    return separator ? separator + 1 : moduleInfo.dli_fname;
+}
+
+
+static _Unwind_Reason_Code CollectFrame(struct _Unwind_Context* context, void* data) {
+    TraceInfo* info = static_cast<TraceInfo*>(data);
+    if (info->frameCount == maxFrames)
+        return _URC_END_OF_STACK;
+    int isBeforeInstruction = 0;
+    uintptr_t address = static_cast<uintptr_t>(_Unwind_GetIPInfo(context, &isBeforeInstruction));
+    if (address == 0)
+        return _URC_END_OF_STACK;
+    if (not isBeforeInstruction)
+        --address;
+    info->frames[info->frameCount] = address;
+    ++info->frameCount;
+    return _URC_NO_REASON;
+}
+
+
+static void IgnoreError(void*, const char*, int) {
+}
+
+
+static void WriteFrameHead(FrameWriter& writer, const char* function) {
+    char* demangled = abi::__cxa_demangle(function, nullptr, nullptr, nullptr);
+    WriteText(writer.file, "  #%02d  %s!%s", writer.lineIndex, writer.moduleName, demangled ? demangled : function);
+    free(demangled);
+    ++writer.lineIndex;
+}
+
+
+static int WriteLineInfo(void* data, uintptr_t, const char* fileName, int lineNumber, const char* function) {
+    FrameWriter* writer = static_cast<FrameWriter*>(data);
+    if (not function)
+        return 0;
+    WriteFrameHead(*writer, function);
+    if (fileName)
+        WriteText(writer->file, "  %s(%d)", fileName, lineNumber);
+    WriteText(writer->file, "\n");
+    writer->isWritten = true;
+    return 0;
+}
+
+
+static void WriteSymbolInfo(void* data, uintptr_t address, const char* name, uintptr_t value, uintptr_t) {
+    FrameWriter* writer = static_cast<FrameWriter*>(data);
+    if (not name)
+        return;
+    WriteFrameHead(*writer, name);
+    WriteText(writer->file, " + 0x%llX\n", static_cast<unsigned long long>(address - value));
+    writer->isWritten = true;
+}
+
+
+static int ProbeLineInfo(void* data, uintptr_t, const char* fileName, int, const char*) {
+    if (fileName)
+        *static_cast<bool*>(data) = true;
+    return 0;
+}
+
+
+static void WriteTrace(int file, const char* appName, const char* appVersion, const char* kind, const TraceInfo& info) {
+    time_t now = time(nullptr);
+    struct tm localTime;
+    localtime_r(&now, &localTime);
+
+    WriteText(file, "%s %s %s report\n\n", appName, appVersion, kind);
+    WriteText(file, "time:      %04d-%02d-%02d %02d:%02d:%02d\n",
+              localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec);
+    WriteText(file, "build:     %s\n", logHandler.BuildStamp());
+    if (info.signalNumber != 0)
+        WriteText(file, "reason:    %s (signal %d, code %d)\n", info.reason, info.signalNumber, info.signalCode);
+    else
+        WriteText(file, "reason:    %s\n", info.reason);
+    if (info.hasAccess)
+        WriteText(file, "access:    %s address 0x%016llX\n", info.accessName, static_cast<unsigned long long>(info.accessAddress));
+    WriteText(file, "thread:    %ld\n", info.threadId);
+    const char* context = logHandler.Context();
+    if (*context)
+        WriteText(file, "context:   %s\n", context);
+
+    if (not backtraceState)
+        WriteText(file, "symbols:   libbacktrace could not be initialized, only addresses available\n");
+    else {
+        bool hasLineInfo = false;
+        backtrace_pcinfo(backtraceState, reinterpret_cast<uintptr_t>(&WriteTrace), ProbeLineInfo, IgnoreError, &hasLineInfo);
+        if (hasLineInfo)
+            WriteText(file, "symbols:   debug info of the executable\n");
+        else
+            WriteText(file, "symbols:   no debug info found in the executable, only function names available\n");
+    }
+
+    WriteText(file, "\ncall stack:\n");
+
+    FrameWriter writer;
+    writer.file = file;
+    writer.lineIndex = 0;
+    for (int i = info.firstFrame; i < info.frameCount; ++i) {
+        uintptr_t address = info.frames[i];
+        uintptr_t moduleBase = 0;
+        const char* moduleName = GetModuleName(address, moduleBase);
+        writer.moduleName = moduleName ? moduleName : "?";
+        writer.isWritten = false;
+        if (backtraceState) {
+            backtrace_pcinfo(backtraceState, address, WriteLineInfo, IgnoreError, &writer);
+            if (not writer.isWritten)
+                backtrace_syminfo(backtraceState, address, WriteSymbolInfo, IgnoreError, &writer);
+        }
+        if (not writer.isWritten) {
+            if (moduleName)
+                WriteText(file, "  #%02d  %s+0x%llX\n", writer.lineIndex, moduleName, static_cast<unsigned long long>(address - moduleBase));
+            else
+                WriteText(file, "  #%02d  0x%016llX\n", writer.lineIndex, static_cast<unsigned long long>(address));
+            ++writer.lineIndex;
+        }
+    }
+    if (info.frameCount == maxFrames)
+        WriteText(file, "  ... truncated after %d frames\n", maxFrames);
+}
+
+
+static void WaitForReport(void) {
+    struct timespec deadline;
+    clock_gettime(CLOCK_REALTIME, &deadline);
+    deadline.tv_sec += reportTimeout;
+    int result = 0;
+    do {
+        result = sem_timedwait(&doneEvent, &deadline);
+    } while ((result != 0) and (errno == EINTR));
+    if (result == 0)
+        sem_post(&doneEvent);
+}
+
+// =================================================================================================
+// CrashHandler
+
+void CrashHandler::Init(const char* appName, const char* appVersion) {
+    if (m_isInitialized)
+        return;
+    CopyText(m_appName, sizeof(m_appName), appName);
+    CopyText(m_appVersion, sizeof(m_appVersion), appVersion);
+
+    if (not *m_folder) {
+        char exeFolder[sizeof(m_folder)];
+        ssize_t length = readlink("/proc/self/exe", exeFolder, sizeof(exeFolder) - 1);
+        if (length > 0) {
+            exeFolder[length] = '\0';
+            char* separator = strrchr(exeFolder, '/');
+            if (separator)
+                separator[1] = '\0';
+            SetFolder(exeFolder);
+        }
+    }
+
+    backtraceState = backtrace_create_state(nullptr, 1, IgnoreError, nullptr);
+
+    sem_init(&crashEvent, 0, 0);
+    sem_init(&doneEvent, 0, 0);
+    pthread_create(&watcherThread, nullptr, WatcherThread, this);
+    pthread_detach(watcherThread);
+
+    stack_t stackInfo;
+    stackInfo.ss_sp = signalStack;
+    stackInfo.ss_size = sizeof(signalStack);
+    stackInfo.ss_flags = 0;
+    sigaltstack(&stackInfo, nullptr);
+
+    struct sigaction action;
+    memset(&action, 0, sizeof(action));
+    action.sa_sigaction = OnSignal;
+    action.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&action.sa_mask);
+    for (int signalNumber : crashSignals)
+        sigaddset(&action.sa_mask, signalNumber);
+    for (int i = 0; i < crashSignalCount; ++i)
+        sigaction(crashSignals[i], &action, &previousActions[i]);
+    m_isInitialized = true;
+}
+
+
+void CrashHandler::OnSignal(int signalNumber, siginfo_t* signalInfo, void* context) {
+    if (not isReporting.test_and_set()) {
+        const ucontext_t* signalContext = static_cast<const ucontext_t*>(context);
+        uintptr_t faultAddress = GetContextPC(*signalContext);
+        crashInfo.reason = GetSignalName(signalNumber, signalInfo->si_code);
+        crashInfo.signalNumber = signalNumber;
+        crashInfo.signalCode = signalInfo->si_code;
+        crashInfo.hasAccess = (signalInfo->si_code > 0) and ((signalNumber == SIGSEGV) or (signalNumber == SIGBUS));
+        crashInfo.accessName = GetAccessName(*signalContext);
+        crashInfo.accessAddress = reinterpret_cast<uintptr_t>(signalInfo->si_addr);
+        crashInfo.threadId = static_cast<long>(syscall(SYS_gettid));
+        crashInfo.frameCount = 0;
+        _Unwind_Backtrace(CollectFrame, &crashInfo);
+        crashInfo.firstFrame = 0;
+        for (int i = 0; i < crashInfo.frameCount; ++i) {
+            if (crashInfo.frames[i] == faultAddress) {
+                crashInfo.firstFrame = i;
+                break;
+            }
+        }
+        sem_post(&crashEvent);
+        WaitForReport();
+    }
+    else if (not pthread_equal(pthread_self(), watcherThread))
+        WaitForReport();
+
+    for (int i = 0; i < crashSignalCount; ++i)
+        sigaction(crashSignals[i], &previousActions[i], nullptr);
+    if (signalInfo->si_code <= 0)
+        raise(signalNumber);
+}
+
+
+void* CrashHandler::WatcherThread(void* param) {
+    CrashHandler* self = static_cast<CrashHandler*>(param);
+    int result = 0;
+    do {
+        result = sem_wait(&crashEvent);
+    } while ((result != 0) and (errno == EINTR));
+    self->WriteReport();
+    sem_post(&doneEvent);
+    return nullptr;
+}
+
+
+bool CrashHandler::WriteCallStack(const char* reason, char* fileName, size_t fileNameSize) {
+    if (fileName and (fileNameSize > 0))
+        fileName[0] = '\0';
+    if (not m_isInitialized)
+        return false;
+
+    TraceInfo info{};
+    info.reason = reason ? reason : "call stack";
+    info.threadId = static_cast<long>(syscall(SYS_gettid));
+    _Unwind_Backtrace(CollectFrame, &info);
+
+    pthread_mutex_lock(&reportLock);
+    bool isWritten = false;
+    char traceFile[sizeof(m_folder) + 128];
+    if (MakeFileName(traceFile, sizeof(traceFile), "trace", "txt")) {
+        int file = open(traceFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (file >= 0) {
+            WriteTrace(file, m_appName, m_appVersion, "trace", info);
+            close(file);
+            isWritten = true;
+        }
+    }
+    pthread_mutex_unlock(&reportLock);
+
+    if (isWritten and fileName and (fileNameSize > 0))
+        CopyText(fileName, fileNameSize, traceFile);
+    return isWritten;
+}
+
+
+bool CrashHandler::MakeFileName(char* fileName, size_t size, const char* kind, const char* extension) {
+    int length = snprintf(fileName, size, "%s%s-%s.%s", m_folder, m_appName, kind, extension);
+    return (length > 0) and (static_cast<size_t>(length) < size);
+}
+
+
+void CrashHandler::WriteReport(void) {
+    pthread_mutex_lock(&reportLock);
+    char fileName[sizeof(m_folder) + 128];
+    if (MakeFileName(fileName, sizeof(fileName), "crash", "txt")) {
+        int file = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (file >= 0) {
+            WriteTrace(file, m_appName, m_appVersion, "crash", crashInfo);
+            close(file);
+        }
+    }
+    pthread_mutex_unlock(&reportLock);
 }
 
 #else
