@@ -170,6 +170,14 @@ class BaseSoundHandler
             return m_playMusic;
         }
 
+        inline bool CanPlayMusic(void) noexcept {
+            return m_haveAudio and m_playMusic and (m_musicVolume > 0.0f);
+        }
+
+        inline bool IsPlayingMusic(void) {
+            return Mix_PlayingMusic() != 0;
+        }
+
         inline float GetMasterVolume(void) noexcept {
             return m_masterVolume;
         }

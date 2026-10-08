@@ -2,6 +2,7 @@
 
 #include "cubemap.h"
 #include "texturebuffer.h"
+#include "texture_mips.h"
 #include "descriptor_heap.h"
 #include "dx12context.h"
 #include "dx12upload.h"
@@ -14,7 +15,7 @@ void Cubemap::SetParams(void) {
     m_hasParams = true;
     m_sampling.minFilter     = GfxFilterMode::Linear;
     m_sampling.magFilter     = GfxFilterMode::Linear;
-    m_sampling.mipMode       = GfxMipMode::None;
+    m_sampling.mipMode       = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
     m_sampling.wrapU         = GfxWrapMode::ClampToEdge;
     m_sampling.wrapV         = GfxWrapMode::ClampToEdge;
     m_sampling.wrapW         = GfxWrapMode::ClampToEdge;
@@ -53,9 +54,20 @@ bool Cubemap::Deploy(int /*bufferIndex*/)
             return false;
     }
     else {
-        if (not CreateTextureResource(w, h, 6, 1, ToDXGIFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
+        const int mipCount = m_useMipMaps ? CalcMipLevels(w, h, 1) : 1;
+        if (not CreateTextureResource(w, h, 6, mipCount, ToDXGIFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
             return false;
-        if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), faces, 6, w, h, 4))
+        if (mipCount > 1) {
+            AutoArray<uint8_t> chains[6];
+            const uint8_t* layers[6];
+            for (int i = 0; i < 6; ++i) {
+                BuildMipChain2D(faces[i], w, h, 4, mipCount, colorEncoding, chains[i]);
+                layers[i] = chains[i].Data();
+            }
+            if (not UploadTextureArrayData(dx12Context.Device(), m_resource.Get(), layers, 6, w, h, 4, mipCount))
+                return false;
+        }
+        else if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), faces, 6, w, h, 4))
             return false;
     }
 

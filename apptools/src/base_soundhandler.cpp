@@ -52,6 +52,7 @@ bool BaseSoundHandler::Setup(String soundFolder) {
     m_soundLevel = argHandler.IntVal("soundlevel", 0, 0);
 #endif
     SetMasterVolume(float(argHandler.IntValChecked("soundvolume", 0, 100, 0, 100, false)) * 0.01f);
+    SetMusicVolume(float(argHandler.IntValChecked("musicvolume", 0, 100, 0, 100, false)) * 0.01f);
     SetSoundPlayback(argHandler.BoolVal("playsound", 0, 1, false));
     SetMusicPlayback(argHandler.BoolVal("playmusic", 0, 1, false));
     m_maxAudibleDistance = 30.0f;
@@ -59,14 +60,12 @@ bool BaseSoundHandler::Setup(String soundFolder) {
 #if 1
     m_supportsMP3 = (Mix_Init(MIX_INIT_MP3) & MIX_INIT_MP3) != 0;
 #endif
-    if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512)) {
-#ifdef _DEBUG
+    if (0 > Mix_OpenAudioDevice(48000, AUDIO_S16SYS, 2, 512, nullptr, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE)) {
         logHandler.Print("Couldn't initialize sound system (%s)\n", Mix_GetError());
-#endif
-        return false;
+        return true;
     }
     m_haveAudio = true;
-    SetMusicVolume(float(argHandler.IntValChecked("musicvolume", 0, 100, 0, 100, false)) * 0.01f);
+    SetMusicVolume(m_musicVolume);
 #if 0
     int frequency, channels;
     Uint16 format;
@@ -93,9 +92,7 @@ bool BaseSoundHandler::LoadSounds(String soundFolder) {
             m_sounds.Insert(name, sound);
         else {
             isComplete = false;
-#ifdef _DEBUG
             logHandler.Print("Couldn't load sound '%s' (%s)\n", name.Data(), Mix_GetError());
-#endif
         }
     }
     return isComplete;
@@ -249,7 +246,7 @@ void BaseSoundHandler::StopMusic(void) {
 }
 
 bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
-    if (m_musicVolume == 0.0f)
+    if (not m_haveAudio or (m_musicVolume == 0.0f))
         return false;
     String s = songName.ToLowercase();
     if ((s.Find(".mp3") != -1) and not m_supportsMP3)
@@ -260,10 +257,8 @@ bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
     m_lastSong = songName;
     if (not (m_song = Mix_LoadMUS((const char*)songName)))
         return false;
-    if (0 == ((fadeTime > 0) ? Mix_FadeInMusic(m_song, loops, fadeTime) : Mix_PlayMusic(m_song, loops))) {
-        Mix_VolumeMusic((int(round(MIX_MAX_VOLUME * m_musicVolume))));
+    if (0 == ((fadeTime > 0) ? Mix_FadeInMusic(m_song, loops, fadeTime) : Mix_PlayMusic(m_song, loops)))
         return true;
-    }
     Mix_FreeMusic(m_song);
     m_song = nullptr;
     return false;

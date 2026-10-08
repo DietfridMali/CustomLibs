@@ -56,6 +56,57 @@ void Downsample2D_SRGB8(const uint8_t* src, int sw, int sh, int channels, uint8_
     }
 }
 
+
+static void Downsample2D_Linear8(const uint8_t* src, int sw, int sh, int channels, uint8_t* dst, int dw, int dh) noexcept
+{
+    for (int yd = 0; yd < dh; ++yd) {
+        int ys0 = yd * 2;
+        int ys1 = std::min(ys0 + 1, sh - 1);
+        for (int xd = 0; xd < dw; ++xd) {
+            int xs0 = xd * 2;
+            int xs1 = std::min(xs0 + 1, sw - 1);
+            const uint8_t* p00 = src + (size_t(ys0) * sw + xs0) * channels;
+            const uint8_t* p01 = src + (size_t(ys0) * sw + xs1) * channels;
+            const uint8_t* p10 = src + (size_t(ys1) * sw + xs0) * channels;
+            const uint8_t* p11 = src + (size_t(ys1) * sw + xs1) * channels;
+            uint8_t* o = dst + (size_t(yd) * dw + xd) * channels;
+            for (int c = 0; c < channels; ++c)
+                o[c] = uint8_t((int(p00[c]) + int(p01[c]) + int(p10[c]) + int(p11[c]) + 2) / 4);
+        }
+    }
+}
+
+
+void BuildMipChain2D(const uint8_t* src, int width, int height, int channels, int mipCount, eColorEncoding colorEncoding, AutoArray<uint8_t>& outChain) noexcept
+{
+    size_t chainSize = 0;
+    int w = width;
+    int h = height;
+    for (int mip = 0; mip < mipCount; ++mip) {
+        chainSize += size_t(w) * size_t(h) * size_t(channels);
+        w = std::max(1, w / 2);
+        h = std::max(1, h / 2);
+    }
+    outChain.Resize(uint32_t(chainSize));
+
+    uint8_t* level = outChain.Data();
+    std::memcpy(level, src, size_t(width) * size_t(height) * size_t(channels));
+    w = width;
+    h = height;
+    for (int mip = 1; mip < mipCount; ++mip) {
+        int nextW = std::max(1, w / 2);
+        int nextH = std::max(1, h / 2);
+        uint8_t* next = level + size_t(w) * size_t(h) * size_t(channels);
+        if (colorEncoding == ecSRGB)
+            Downsample2D_SRGB8(level, w, h, channels, next, nextW, nextH);
+        else
+            Downsample2D_Linear8(level, w, h, channels, next, nextW, nextH);
+        level = next;
+        w = nextW;
+        h = nextH;
+    }
+}
+
 // =================================================================================================
 
 int CalcMipLevels(int w, int h, int d) noexcept
