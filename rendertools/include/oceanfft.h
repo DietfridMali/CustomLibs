@@ -28,12 +28,12 @@ public:
 
     struct Params {
         float       tileSizes[cCascadeCount]{ 1009.0f, 97.0f, 11.0f };
-        Wave        swell{ 57.0f, 0.6f, 4.0f, 5.0f, 10.0f };
-        Wave        windSea{ 20.0f, 1.1f, 1.5f, 0.9f, 3.3f };
+        Wave        swell{ 57.0f, 0.6f, 4.0f, 3.1f, 10.0f };
+        Wave        windSea{ 20.0f, 1.1f, 1.5f, 0.56f, 3.3f };
         float       shortestWave{ 0.35f };
         float       gravity{ 9.81f };
         float       choppiness{ 1.0f };
-        float       foamBias{ 0.55f };
+        float       foamBias{ 0.9f };
         float       foamScale{ 2.5f };
         float       foamDecay{ 0.4f };
         uint32_t    seed{ 20261008u };
