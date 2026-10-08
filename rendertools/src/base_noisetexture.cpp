@@ -18,6 +18,7 @@
                                    // instance that BaseCloudNoiseTexture::Compute uses to source the
                                    // intermediate RGBA cloud noise.
 #include "conversions.hpp"
+#include "missingfiles.h"
 
 #pragma warning(push)
 #pragma warning(disable:26819)
@@ -747,9 +748,8 @@ bool BaseBlueNoiseTexture::Create(String noiseFilename) {
     if (not Allocate())
         return false;
     if (not LoadFromFile(noiseFilename)) {
-        std::filesystem::path _p{ noiseFilename.GetStr() };
-        Compute(_p.parent_path().string());
-        SaveToFile(noiseFilename);
+        missingFiles.Report(noiseFilename.Data());
+        return false;
     }
     return Deploy();
 }
