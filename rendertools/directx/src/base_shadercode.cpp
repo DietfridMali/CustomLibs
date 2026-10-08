@@ -47,6 +47,9 @@ const ShaderSource& KuwaharaTensorBlurShader();
 const ShaderSource& KuwaharaFilterShader();
 const ShaderSource& KuwaharaCubeTensorShader();
 const ShaderSource& KuwaharaCubeFilterShader();
+const ShaderSource& KuwaharaSourceShader();
+const ShaderSource& KuwaharaCubeSourceShader();
+const ShaderSource& KuwaharaGaussShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -92,7 +95,10 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
         &KuwaharaTensorBlurShader(),
         &KuwaharaFilterShader(),
         &KuwaharaCubeTensorShader(),
-        &KuwaharaCubeFilterShader()
+        &KuwaharaCubeFilterShader(),
+        &KuwaharaSourceShader(),
+        &KuwaharaCubeSourceShader(),
+        &KuwaharaGaussShader()
     };
     AddShaders(shaderSource);
 }

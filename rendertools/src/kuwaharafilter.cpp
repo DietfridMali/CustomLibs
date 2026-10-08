@@ -216,12 +216,95 @@ bool KuwaharaFilter::ReplaceTexture(Texture* texture, AutoArray<uint8_t>& pixels
 }
 
 
+bool KuwaharaFilter::RenderBlur(Targets& targets, Texture* source, const Params& params, int face) {
+    bool isCube = (face >= 0);
+    bool wrapU = params.wrapU and not isCube;
+    bool wrapV = params.wrapV and not isCube;
+    int blurWidth = targets.width + 2 * targets.margin;
+    int blurHeight = targets.height + 2 * targets.margin;
+    float sigma = float(params.blurRadius) / 1.6f;
+    if (not targets.tensor->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+        return false;
+    Shader* shader = SetupShader(isCube ? "kuwaharaCubeSource" : "kuwaharaSource", blurWidth, blurHeight, wrapU, wrapV, params);
+    bool ok = (shader != nullptr);
+    if (ok) {
+        if (baseRenderer.UsesOpenGL())
+            shader->SetInt("srcTex", 0);
+        if (isCube)
+            SetupCubeFace(shader, targets, face);
+        ok = targets.tensor->RenderAsTexture(source, { .destination = -1, .shader = shader });
+    }
+    if (ok) {
+        shader = SetupShader("kuwaharaGauss", blurWidth, blurHeight, wrapU, wrapV, params);
+        ok = (shader != nullptr);
+        if (ok) {
+            if (baseRenderer.UsesOpenGL())
+                shader->SetInt("tensorTex", 0);
+            shader->SetInt("directionX", 1);
+            shader->SetInt("directionY", 0);
+            shader->SetInt("blurRadius", params.blurRadius);
+            shader->SetInt("offset", 0);
+            shader->SetFloat("sigma", sigma);
+            ok = targets.tensor->Render({ .source = 0, .destination = 1, .clearBuffer = true, .shader = shader });
+        }
+    }
+    targets.tensor->Deactivate();
+    if (not ok)
+        return false;
+
+    if (not targets.filter->Activate({ .bufferIndex = 0, .drawBufferGroup = RenderTarget::dbSingle, .clear = true }))
+        return false;
+    Texture* blurred = targets.tensor->GetAsTexture({ .source = 1 });
+    shader = SetupShader("kuwaharaGauss", blurWidth, blurHeight, wrapU, wrapV, params);
+    ok = (shader != nullptr) and (blurred != nullptr);
+    if (ok) {
+        if (baseRenderer.UsesOpenGL())
+            shader->SetInt("tensorTex", 0);
+        shader->SetInt("directionX", 0);
+        shader->SetInt("directionY", 1);
+        shader->SetInt("blurRadius", params.blurRadius);
+        shader->SetInt("offset", targets.margin);
+        shader->SetFloat("sigma", sigma);
+        ok = targets.filter->RenderAsTexture(blurred, { .destination = -1, .shader = shader });
+    }
+    targets.filter->Deactivate();
+    return ok;
+}
+
+
+bool KuwaharaFilter::RenderFaces(Targets& targets, Texture* texture, const Params& params, bool isCube, bool isBlur, AutoArray<uint8_t>& pixels) {
+    int faceCount = isCube ? 6 : 1;
+    size_t faceBytes = size_t(targets.width) * size_t(targets.height) * 4u;
+    bool ok = true;
+    for (int face = 0; ok and (face < faceCount); ++face) {
+        int cubeFace = isCube ? face : -1;
+        baseRenderer.PushViewport();
+        baseRenderer.PushMatrix();
+        baseRenderer.PushMatrix(RenderMatrices::mtProjection);
+        baseRenderer.ResetTransformation();
+
+        if (isBlur)
+            ok = RenderBlur(targets, texture, params, cubeFace);
+        else
+            ok = RenderTensor(targets, texture, params, cubeFace) and RenderFilter(targets, texture, params, cubeFace);
+
+        baseRenderer.PopMatrix(RenderMatrices::mtProjection);
+        baseRenderer.PopMatrix();
+        baseRenderer.PopViewport();
+
+        if (ok)
+            ok = targets.filter->ReadBuffer(0, pixels.Data() + faceBytes * size_t(face), faceBytes);
+    }
+    return ok;
+}
+
+
 bool KuwaharaFilter::Filter(Texture* texture, const Params& params, bool isCube) {
     int width = texture->GetWidth();
     int height = texture->GetHeight();
     if ((width <= 0) or (height <= 0))
         return false;
-    int margin = isCube ? int(std::ceil(3.0f * params.tensorSigma)) : 0;
+    int margin = isCube ? std::max(int(std::ceil(3.0f * params.tensorSigma)), params.blurRadius) : 0;
     int faceCount = isCube ? 6 : 1;
     Targets* targets = GetTargets(width, height, margin, GfxPixelFormat::RGBA8_UNorm);
     if (not targets)
@@ -238,22 +321,10 @@ bool KuwaharaFilter::Filter(Texture* texture, const Params& params, bool isCube)
     size_t faceBytes = size_t(width) * size_t(height) * 4u;
     AutoArray<uint8_t> pixels;
     bool ok = (pixels.Resize(int32_t(faceBytes * size_t(faceCount))) != nullptr);
-    for (int face = 0; ok and (face < faceCount); ++face) {
-        int cubeFace = isCube ? face : -1;
-        baseRenderer.PushViewport();
-        baseRenderer.PushMatrix();
-        baseRenderer.PushMatrix(RenderMatrices::mtProjection);
-        baseRenderer.ResetTransformation();
-
-        ok = RenderTensor(*targets, texture, params, cubeFace) and RenderFilter(*targets, texture, params, cubeFace);
-
-        baseRenderer.PopMatrix(RenderMatrices::mtProjection);
-        baseRenderer.PopMatrix();
-        baseRenderer.PopViewport();
-
-        if (ok)
-            ok = targets->filter->ReadBuffer(0, pixels.Data() + faceBytes * size_t(face), faceBytes);
-    }
+    if (ok)
+        ok = RenderFaces(*targets, texture, params, isCube, false, pixels);
+    if (ok and (params.blurRadius > 0))
+        ok = ReplaceTexture(texture, pixels, width, height, faceCount) and RenderFaces(*targets, texture, params, isCube, true, pixels);
 
     gfxStates.SetScissorTest(scissorTest);
     gfxStates.SetFaceCulling(faceCulling);

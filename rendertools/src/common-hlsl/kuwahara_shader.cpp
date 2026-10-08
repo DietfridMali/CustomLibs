@@ -413,4 +413,89 @@ const ShaderSource& KuwaharaCubeFilterShader() {
     return source;
 }
 
+// -------------------------------------------------------------------------------------------------
+
+static const String& KuwaharaSourceBody() {
+    static const String source(R"(
+        float4 PSMain(PSInput i) : SV_Target {
+            return SourceTexel(TensorOrigin(i.pos));
+        }
+    )");
+    return source;
+}
+
+
+const ShaderSource& KuwaharaSourceShader() {
+    static const ShaderSource source(
+        "kuwaharaSource",
+        Standard2DVS(),
+        KuwaharaConstants() +
+        String(R"(
+        };
+        Texture2D srcTex : register(t0);
+        )") +
+        KuwaharaFuncs() +
+        KuwaharaPlaneSource() +
+        KuwaharaSourceBody(),
+        ShaderDataLayout(VtxTcAttrs, 2)
+    );
+    return source;
+}
+
+
+const ShaderSource& KuwaharaCubeSourceShader() {
+    static const ShaderSource source(
+        "kuwaharaCubeSource",
+        Standard2DVS(),
+        KuwaharaConstants() +
+        KuwaharaCubeConstants() +
+        String(R"(
+        };
+        TextureCube  srcTex : register(t0);
+        SamplerState s0     : register(s0);
+        )") +
+        KuwaharaFuncs() +
+        KuwaharaCubeSource() +
+        KuwaharaSourceBody(),
+        ShaderDataLayout(VtxTcAttrs, 2)
+    );
+    return source;
+}
+
+
+const ShaderSource& KuwaharaGaussShader() {
+    static const ShaderSource source(
+        "kuwaharaGauss",
+        Standard2DVS(),
+        KuwaharaConstants() +
+        String(R"(
+            int    directionX;
+            int    directionY;
+            int    blurRadius;
+            int    offset;
+            float  sigma;
+        };
+        Texture2D tensorTex : register(t0);
+        )") +
+        KuwaharaFuncs() +
+        String(R"(
+        float4 PSMain(PSInput i) : SV_Target {
+            int2 p = int2(i.pos.xy) + int2(offset, offset);
+            int2 direction = int2(directionX, directionY);
+            float twoSigma2 = 2.0 * sigma * sigma;
+            float4 sum = float4(0.0, 0.0, 0.0, 0.0);
+            float weightSum = 0.0;
+            for (int k = -blurRadius; k <= blurRadius; k++) {
+                float w = exp(-float(k * k) / twoSigma2);
+                sum += w * tensorTex.Load(int3(FilterTexel(p + k * direction), 0));
+                weightSum += w;
+            }
+            return sum / weightSum;
+        }
+        )"),
+        ShaderDataLayout(VtxTcAttrs, 2)
+    );
+    return source;
+}
+
 // =================================================================================================

@@ -17,6 +17,7 @@ public:
         float   alphaThreshold{ 0.5f };
         bool    wrapU{ true };
         bool    wrapV{ true };
+        int     blurRadius{ 0 };
     };
 
     ~KuwaharaFilter() {
@@ -62,6 +63,10 @@ private:
     bool RenderTensor(Targets& targets, Texture* source, const Params& params, int face, const Viewport* area = nullptr);
 
     bool RenderFilter(Targets& targets, Texture* source, const Params& params, int face, const Viewport* area = nullptr);
+
+    bool RenderBlur(Targets& targets, Texture* source, const Params& params, int face);
+
+    bool RenderFaces(Targets& targets, Texture* texture, const Params& params, bool isCube, bool isBlur, AutoArray<uint8_t>& pixels);
 
     bool Filter(Texture* texture, const Params& params, bool isCube);
 
