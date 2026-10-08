@@ -74,6 +74,10 @@ public:
     void EndFrame(void);
     void BeginFrame(void);
 
+    virtual void OnMinimized(void) {}
+
+    virtual void OnRestored(void) {}
+
     // Applies the swap interval to the current context. Returns false if the driver refused
     // (SDL_GL_SetSwapInterval () fails without a context, and for adaptive vsync it may not
     // be supported at all).

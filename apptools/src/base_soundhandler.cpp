@@ -1,5 +1,6 @@
 
-#include "timer.hpp"
+#include <limits>
+
 #include "arghandler.h"
 #include "base_soundhandler.h"
 
@@ -12,12 +13,10 @@ bool SoundObject::Play (int loops) {
 #endif
         return false;
     }
-    m_startTime = Timer::GetTime();
     return true;
 }
 
 void SoundObject::FadeOut(int fadeTime) {
-    m_endTime = Timer::GetTime() + fadeTime;
     Mix_FadeOutChannel(m_channel, fadeTime);
 }
 
@@ -38,18 +37,12 @@ bool SoundObject::Busy (void) const {
     return bool (Mix_Playing (m_channel));
 }
 
-bool SoundObject::IsSilent(void) const {
-    return (m_endTime > 0) and (m_endTime < Timer::GetTime());
-}
-
 // =================================================================================================
 // The sound handler class handles sound creation and sound channel management
-// It tries to provide 128 sound channels. They are preinitialized and are kept in m_idleChannels
-// (list of available channels) and busyChannels (list of channels currently used for playing back sound)
-// When a new sound is to played, a channel is picked from the idleChannels list. If there are no idle
-// channels available, the oldest playing channel from busyChannels will be reused. Since channels are 
-// append to busyChannels in the temporal sequence they are deployed, the first channel in busyChannels
-// will always be the oldest one.
+// It tries to provide 128 sound channels. Each channel has a sound object in m_channels, indexed
+// by the channel number. A channel is busy while the mixer plays a sound on it. When a new sound
+// is to be played, the first idle channel is picked. If there are no idle channels available, the
+// channel that has been playing for the longest time will be reused. 
 
 bool BaseSoundHandler::Setup(String soundFolder) {
 #if !(USE_STD || USE_STD_MAP)
@@ -59,14 +52,12 @@ bool BaseSoundHandler::Setup(String soundFolder) {
     m_soundLevel = argHandler.IntVal("soundlevel", 0, 0);
 #endif
     SetMasterVolume(float(argHandler.IntValChecked("soundvolume", 0, 100, 0, 100, false)) * 0.01f);
-    SetMusicVolume(float(argHandler.IntValChecked("musicvolume", 0, 100, 0, 100, false)) * 0.01f);
     SetSoundPlayback(argHandler.BoolVal("playsound", 0, 1, false));
     SetMusicPlayback(argHandler.BoolVal("playmusic", 0, 1, false));
     m_maxAudibleDistance = 30.0f;
     Destroy();
 #if 1
-    m_supportsMP3 = Mix_Init(MIX_INIT_MP3) == MIX_INIT_MP3;
-    m_supportsOGG = Mix_Init(MIX_INIT_OGG) == MIX_INIT_OGG;
+    m_supportsMP3 = (Mix_Init(MIX_INIT_MP3) & MIX_INIT_MP3) != 0;
 #endif
     if (0 > Mix_OpenAudio(48000, AUDIO_S16SYS, 2, 512)) {
 #ifdef _DEBUG
@@ -75,16 +66,16 @@ bool BaseSoundHandler::Setup(String soundFolder) {
         return false;
     }
     m_haveAudio = true;
+    SetMusicVolume(float(argHandler.IntValChecked("musicvolume", 0, 100, 0, 100, false)) * 0.01f);
 #if 0
     int frequency, channels;
     Uint16 format;
     Mix_QuerySpec(&frequency, &format, &channels);
 #endif
-    Mix_Volume(-1, MIX_MAX_VOLUME);
-    Mix_AllocateChannels(128);
-    m_channelCount = Mix_AllocateChannels(-1);
+    m_channelCount = Mix_AllocateChannels(128);
+    m_channels.Resize(m_channelCount);
     for (int i = 0; i < m_channelCount; i++)
-        m_idleChannels.Append(SoundObject(i, String(""), i));
+        m_channels[i] = SoundObject(-1, String(""), i);
     return LoadSounds(soundFolder);
 }
 
@@ -117,7 +108,7 @@ void BaseSoundHandler::UpdateVolume(SoundObject& soundObject, float distance) {
     else {
         float volume = (m_maxAudibleDistance - distance) / m_maxAudibleDistance;
         // use half of the angle for stereo panning. Always let the remote ear hear something, too. Pan effect the weaker the further away the sound is.
-        float pan = Pan(soundObject.m_position) * 0.5f * 0.9f * volume;   
+        float pan = (distance < Conversions::NumericTolerance) ? 0.0f : Pan(soundObject.m_position) * 0.5f * 0.9f * volume;   
         volume *= volume * soundObject.m_volume * m_masterVolume;
         soundObject.SetVolume(volume);
         soundObject.SetPanning(abs(-0.5f + pan), 0.5f + pan);
@@ -128,23 +119,29 @@ void BaseSoundHandler::UpdateVolume(SoundObject& soundObject, float distance) {
 // get a channel for playing back a new sound
 // if all channels are busy, pick the oldest busy one
 SoundObject& BaseSoundHandler::GetChannel(void) {
-    if (not m_idleChannels.IsEmpty()) {
-        m_busyChannels.Append(m_idleChannels.Last());
-        m_idleChannels.DiscardLast();
+    int channel = Mix_GroupAvailable(-1);
+    if (channel < 0) {
+        channel = Mix_GroupOldest(-1);
+        m_channels[channel].Stop();
     }
-    else {
-        m_busyChannels[0].Stop();
-        m_busyChannels.Append(m_busyChannels.First());
-        m_busyChannels.DiscardFirst();
-    }
-    return m_busyChannels[-1];
+    SoundObject& so = m_channels[channel];
+    so.m_id = ((so.m_id < 0) or (so.m_id > (std::numeric_limits<int>::max)() - m_channelCount)) ? channel : so.m_id + m_channelCount;
+    return so;
+}
+
+
+SoundObject* BaseSoundHandler::FindSound(int id) {
+    if ((id < 0) or (m_channelCount == 0))
+        return nullptr;
+    SoundObject& so = m_channels[id % m_channelCount];
+    return ((so.m_id == id) and so.Busy()) ? &so : nullptr;
 }
 
 
 SoundObject* BaseSoundHandler::FindSoundByOwner(const void* owner, const String& soundName) {
     if (owner != nullptr) {
-        for (auto& so : m_busyChannels) {
-            if ((so.m_owner == owner) and (so.m_name == soundName)) 
+        for (auto& so : m_channels) {
+            if ((so.m_owner == owner) and (so.m_name == soundName) and so.Busy()) 
                 return &so;
         }
     }
@@ -154,7 +151,7 @@ SoundObject* BaseSoundHandler::FindSoundByOwner(const void* owner, const String&
 
 // play back the sound with the soundName 'soundName'. Position, viewer and DistFunc serve for computing the sound volume
 // depending on the distance of the viewer to the sound position
-SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams& params, size_t startTime, const Vector3f position, const void* owner) {
+SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams& params, const Vector3f position, const void* owner) {
     //return -1;
     if (not m_playSound)
         return nullptr;
@@ -178,47 +175,50 @@ SoundObject* BaseSoundHandler::Start(const String& soundName, const SoundParams&
     newSound.SetVolume(params.volume);
     newSound.m_volume = params.volume;
     newSound.m_position = position;
-    newSound.m_startTime = startTime;
     newSound.m_owner = const_cast<void*>(owner);
     if (not newSound.Play(params.loops))
         return nullptr;
     UpdateSound(newSound);
-    SetMusicVolume(m_musicVolume);
     return &newSound;
 }
 
 
-void BaseSoundHandler::Stop(int id, void* owner) {
-    ConditionalStop([id, owner](const SoundObject& so) { return (so.m_id == id) and (not owner or (so.m_owner == owner)); }, owner);
+void BaseSoundHandler::Stop(int id) {
+    SoundObject* so = FindSound(id);
+    if (so)
+        so->Stop();
 }
 
 
 void BaseSoundHandler::StopSoundsByOwner(void* owner) {
-    if (owner != nullptr)
-        ConditionalStop([owner](const SoundObject& so) { return so.m_owner == owner; });
-}
-
-
-// move all channels that are not playing back sound anymore from the busyChannels to the idleChannels list
-void BaseSoundHandler::Cleanup(void) {
-    ConditionalStop([](const SoundObject& so) { return not so.Busy(); });
+    if (owner != nullptr) {
+        for (auto& so : m_channels) {
+            if ((so.m_owner == owner) and so.Busy())
+                so.Stop();
+        }
+    }
 }
 
 
 void BaseSoundHandler::FadeOut(int id, int fadeTime) {
-    for (auto& so : m_busyChannels)
-        if ((so.m_id == id) and so.Busy()) {
-            so.FadeOut(fadeTime);
-            break;
-        }
+    SoundObject* so = FindSound(id);
+    if (so)
+        so->FadeOut(fadeTime);
 }
 
 
-// cleanup expired channels and update sound volumes
+// update sound volumes
 void BaseSoundHandler::Update(void) {
-    Cleanup();
-    for (auto& so : m_busyChannels)
-        UpdateSound(so);
+    for (auto& so : m_channels) {
+        if (so.Busy())
+            UpdateSound(so);
+    }
+}
+
+
+void BaseSoundHandler::PauseAudio(bool pause) {
+    if (m_haveAudio)
+        Mix_PauseAudio(pause ? 1 : 0);
 }
 
 
@@ -227,9 +227,10 @@ void BaseSoundHandler::Destroy(void) {
         m_haveAudio = false;
         for (auto& sound : m_sounds)
 			Mix_FreeChunk(sound.second);
-        for (auto& so : m_busyChannels)
-            so.Stop();
+        m_sounds.Destroy();
         Mix_CloseAudio();
+        m_channels.Reset();
+        m_channelCount = 0;
         if (m_song) {
             Mix_FreeMusic(m_song);
             m_song = nullptr;
@@ -252,8 +253,6 @@ bool BaseSoundHandler::PlayMusic(String songName, int loops, int fadeTime) {
         return false;
     String s = songName.ToLowercase();
     if ((s.Find(".mp3") != -1) and not m_supportsMP3)
-        return false;
-    if ((s.Find(".ogg") != -1) and not m_supportsOGG)
         return false;
     StopMusic();
     if (not m_playMusic or songName.IsEmpty())
@@ -283,7 +282,5 @@ void BaseSoundHandler::SetMusicPlayback(bool play) {
     }
 }
 
-
-BaseSoundHandler* baseSoundHandler = nullptr;
 
 // =================================================================================================

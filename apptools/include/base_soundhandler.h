@@ -30,8 +30,6 @@ class SoundObject
         float       m_volume;
         Vector3f    m_position;
         void*       m_owner;
-        size_t      m_startTime;
-        size_t      m_endTime;
 
         SoundObject(int id = -1, String name = String(""), int channel = -1, Mix_Chunk * sound = nullptr, Vector4f position = {0, 0, 0}, float volume = 1.0f)
             : m_id(id)
@@ -41,14 +39,7 @@ class SoundObject
             , m_position(position)
             , m_owner (nullptr)
             , m_volume(volume)
-            , m_startTime (0)
-            , m_endTime(0)
         {}
-
-        ~SoundObject () {
-            if (Busy ())
-                Stop ();
-        }
 
         bool Play (int loops = 0);
 
@@ -61,26 +52,21 @@ class SoundObject
         void SetVolume (float volume);
 
         bool Busy (void) const;
-
-        bool IsSilent(void) const;
     };
 
     // =================================================================================================
 // The sound handler class handles sound creation and sound channel management
-// It tries to provide 128 sound channels. They are preinitialized and are kept in m_idleChannels
-// (list of available channels) and busyChannels (list of channels currently used for playing back sound)
-// When a new sound is to played, a channel is picked from the idleChannels list. If there are no idle
-// channels available, the oldest playing channel from busyChannels will be reused. Since channels are 
-// append to busyChannels in the temporal sequence they are deployed, the first channel in busyChannels
-// will always be the oldest one.
+// It tries to provide 128 sound channels. Each channel has a sound object in m_channels, indexed
+// by the channel number. A channel is busy while the mixer plays a sound on it. When a new sound
+// is to be played, the first idle channel is picked. If there are no idle channels available, the
+// channel that has been playing for the longest time will be reused. 
 
 class BaseSoundHandler 
     : public PolymorphSingleton<BaseSoundHandler>
 {
     public:
         Dictionary<String, Mix_Chunk*>  m_sounds;
-        List<SoundObject>               m_idleChannels;
-        List<SoundObject>               m_busyChannels;
+        AutoArray<SoundObject>          m_channels;
         Mix_Music*                      m_song{ nullptr };
         int                             m_soundLevel{ 0 }; // maximum
         float                           m_masterVolume{ 1.0f };
@@ -91,7 +77,6 @@ class BaseSoundHandler
         bool                            m_playSound{ true };
         bool                            m_playMusic{ true };
         bool                            m_supportsMP3 { false };
-        bool                            m_supportsOGG { false };
         String                          m_lastSong{ "" };
 
         struct SoundParams {
@@ -129,6 +114,8 @@ class BaseSoundHandler
             return FindSoundByOwner(owner, static_cast<const String&>(soundName));
         }
 
+        SoundObject* FindSound(int id);
+
         // update all sound volumes depending on application specific cirumstances (e.g. listener or sound source have been moving)
 #pragma warning(push)
 #pragma warning(disable:4100)
@@ -138,29 +125,28 @@ class BaseSoundHandler
 
         // play back the sound with the name 'name'. Position, viewer and DistFunc serve for computing the sound volume
         // depending on the distance of the viewer to the sound position
-        SoundObject* Start(const String& soundName, const SoundParams& params, size_t startTime, const Vector3f position = Vector3f::NONE, const void* owner = nullptr);
+        SoundObject* Start(const String& soundName, const SoundParams& params, const Vector3f position = Vector3f::NONE, const void* owner = nullptr);
 
         template <typename T>
-        inline int Play(T&& soundName, const SoundParams& params, size_t startTime, const Vector3f position = Vector3f::NONE, const void* owner = nullptr) {
-            SoundObject* activeSound = Start(std::forward<T>(soundName), params, startTime, position, owner);
+        inline int Play(T&& soundName, const SoundParams& params, const Vector3f position = Vector3f::NONE, const void* owner = nullptr) {
+            SoundObject* activeSound = Start(std::forward<T>(soundName), params, position, owner);
             return (activeSound == nullptr) ? -1 : activeSound->m_id;
         }
 
         void FadeOut(int id, int fadeTime);
             
-        void Stop(int id, void* owner = nullptr);
+        void Stop(int id);
 
         inline bool IsPlaying(int id) {
-            return (id >= 0) and Mix_Playing(id);
+            return FindSound(id) != nullptr;
         }
 
         void StopSoundsByOwner(void* owner);
 
-        // move all channels that are not playing back sound anymore from the busyChannels to the idleChannels list
-        void Cleanup(void);
-
-        // cleanup expired channels and update sound volumes
+        // update sound volumes
         void Update(void);
+
+        void PauseAudio(bool pause);
 
         bool PlayMusic(String songName, int loops = 0, int fadeTime = 0);
 
@@ -194,8 +180,10 @@ class BaseSoundHandler
 
         void SetMasterVolume(float volume) {
             m_masterVolume = volume;
-            for (auto& so : m_busyChannels)
-                UpdateSound(so);
+            for (auto& so : m_channels) {
+                if (so.Busy())
+                    UpdateSound(so);
+            }
         }
 
         void SetMusicVolume(float volume) {
@@ -211,9 +199,8 @@ class BaseSoundHandler
             return m_supportsMP3;
         }
 
-        inline bool SupportsOGG(void) noexcept {
-            return m_supportsOGG;
-        }
+protected:
+        void UpdateVolume(SoundObject& soundObject, float distance);
 
 private:
         // compute stereo panning from the angle between the viewer direction and the vector from the viewer to the sound source
@@ -222,31 +209,9 @@ private:
     virtual float Pan(Vector3f& position) { return 0.0f; }
 #pragma warning(pop)
 
-        void UpdateVolume(SoundObject& soundObject, float distance);
-
         // get a channel for playing back a new sound
         // if all channels are busy, pick the oldest busy one
         SoundObject& GetChannel(void);
-
-        template <typename Predicate>
-        void ConditionalStop(Predicate condition, void* owner = nullptr)
-        {
-            for (auto it = m_busyChannels.begin(); it != m_busyChannels.end(); )
-            {
-                SoundObject& c = *it;
-                if (not (condition(c) and c.Stop()))
-                    ++it;
-                else {
-#ifdef _DEBUG
-                    if (owner and (c.m_owner != owner))
-                        logHandler.Print("stopped other owner's sound\n");
-#endif
-                    m_idleChannels.Append(c);
-                    // Achtung: erase mit reverse_iterator!
-                    it = m_busyChannels.Discard(it);
-                }
-            }
-        }
 };
 
 // =================================================================================================
