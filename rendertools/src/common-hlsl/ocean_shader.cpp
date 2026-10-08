@@ -12,8 +12,6 @@ static const String& OceanConstants() {
             float  deltaTime;
             float  gravity;
             float  choppiness;
-            float  foamBias;
-            float  foamScale;
             float  foamDecay;
             int    gridSize;
             int    logSize;
@@ -199,8 +197,8 @@ static const String OceanAssembleMain = String(R"(
         float dxz = choppiness * a.w;
         float jacobian = (1.0 + dxx) * (1.0 + dzz) - dxz * dxz;
         float previous = source2.Load(int3(id.xy, 0)).a;
-        float foam = max(previous * exp(-foamDecay * deltaTime), saturate((foamBias - jacobian) * foamScale));
-        target0[id.xy] = float4(choppiness * a.x, a.z, choppiness * a.y, foam);
+        float compression = max(1.0 - jacobian, previous - foamDecay * deltaTime / max(jacobian, 0.5));
+        target0[id.xy] = float4(choppiness * a.x, a.z, choppiness * a.y, compression);
         target1[id.xy] = float4(b.x, b.y, dxx, dzz);
     }
 )");

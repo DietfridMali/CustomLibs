@@ -32,10 +32,8 @@ public:
         Wave        windSea{ 20.0f, 1.1f, 1.5f, 0.56f, 3.3f };
         float       shortestWave{ 0.35f };
         float       gravity{ 9.81f };
-        float       choppiness{ 1.0f };
-        float       foamBias{ 0.9f };
-        float       foamScale{ 2.5f };
-        float       foamDecay{ 0.4f };
+        float       choppiness{ 1.4f };
+        float       foamDecay{ 0.15f };
         uint32_t    seed{ 20261008u };
     };
 

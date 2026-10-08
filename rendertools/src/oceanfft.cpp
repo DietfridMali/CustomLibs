@@ -155,8 +155,6 @@ void OceanFFT::SetConstants(ComputeShader* shader, float time, float deltaTime) 
     shader->SetFloat("deltaTime", deltaTime);
     shader->SetFloat("gravity", m_params.gravity);
     shader->SetFloat("choppiness", m_params.choppiness);
-    shader->SetFloat("foamBias", m_params.foamBias);
-    shader->SetFloat("foamScale", m_params.foamScale);
     shader->SetFloat("foamDecay", m_params.foamDecay);
     shader->SetInt("gridSize", cGridSize);
     shader->SetInt("logSize", cLogSize);
