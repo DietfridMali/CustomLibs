@@ -59,6 +59,14 @@ void ImageLayoutTracker::ToShaderInput(VkCommandBuffer cb) noexcept
 }
 
 
+void ImageLayoutTracker::ToAnyShaderInput(VkCommandBuffer cb) noexcept
+{
+    TransitionTo(cb, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                 VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                 VK_ACCESS_2_SHADER_READ_BIT);
+}
+
+
 void ImageLayoutTracker::ToShadowInput(VkCommandBuffer cb) noexcept
 {
     TransitionTo(cb, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,

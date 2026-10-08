@@ -20,6 +20,8 @@
 #include "cbv_allocator.h"
 #include "commandlist.h"
 #include "descriptor_heap.h"
+#include "rendertarget.h"
+#include "gfxrenderer.h"
 #include "loghandler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -414,8 +416,138 @@ bool ComputeShader::Activate(void) {
 }
 
 
-bool ComputeShader::Dispatch(uint32_t /*x*/, uint32_t /*y*/, uint32_t /*z*/) {
-    return IsValid();
+void ComputeShader::ResetImageBindings(void) noexcept {
+    for (ImageBinding& image : m_sampledImages)
+        image = ImageBinding{};
+    for (ImageBinding& image : m_storageImages)
+        image = ImageBinding{};
+}
+
+
+bool ComputeShader::BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex) {
+    if ((binding < kSampledBase) or (binding >= kSampledBase + kSampledSlots))
+        return false;
+    m_sampledImages[binding - kSampledBase] = ImageBinding{ target, bufferIndex };
+    return true;
+}
+
+
+bool ComputeShader::BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex) {
+    (void)arrayIndex;
+    if ((binding < kStorageBase) or (binding >= kStorageBase + kStorageSlots))
+        return false;
+    m_storageImages[binding - kStorageBase] = ImageBinding{ target, bufferIndex };
+    return true;
+}
+
+
+bool ComputeShader::Record(CommandList* cmdList, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+    ID3D12GraphicsCommandList* list = cmdList->GfxList();
+    if (not list)
+        return false;
+
+    D3D12_GPU_VIRTUAL_ADDRESS accelStructure = commandListHandler.m_boundAccelStructure;
+    if (m_usesAccelStructure and (accelStructure == 0)) {
+        logHandler.Print("ComputeShader '%s': declares an acceleration structure, but none is bound\n", static_cast<const char*>(m_name));
+        return false;
+    }
+
+    ID3D12DescriptorHeap* heaps[] = { descriptorHeaps.SrvHeapPtr(), descriptorHeaps.m_samplerHeap.Ptr() };
+    list->SetDescriptorHeaps(2, heaps);
+    list->SetComputeRootSignature(m_rootSignature.Get());
+    list->SetPipelineState(m_pipeline.Get());
+
+    if (m_cbvRootIndex[0] >= 0) {
+        CbAlloc b0a = cbvAllocator.Allocate(UINT(sizeof(FrameConstants)));
+        if (not b0a.IsValid())
+            return false;
+        FrameConstants fc{};
+        std::memcpy(fc.mModelView, baseRenderer.ModelView().AsArray(), 64);
+        std::memcpy(fc.mProjection, baseRenderer.Projection().AsArray(), 64);
+        std::memcpy(fc.mViewport, baseRenderer.ViewportTransformation().AsArray(), 64);
+        std::memcpy(b0a.cpu, &fc, sizeof(FrameConstants));
+        list->SetComputeRootConstantBufferView(UINT(m_cbvRootIndex[0]), b0a.gpu);
+    }
+
+    if (m_cbvRootIndex[1] >= 0) {
+        if ((m_b1Size == 0) or not UploadB1())
+            return false;
+        list->SetComputeRootConstantBufferView(UINT(m_cbvRootIndex[1]), m_b1GpuVA);
+    }
+
+    for (uint32_t slot = 0; slot < kSampledSlots; ++slot) {
+        if (m_srvRootIndex[slot] < 0)
+            continue;
+        const ImageBinding& image = m_sampledImages[slot];
+        if ((image.target == nullptr) or (image.bufferIndex < 0) or (image.bufferIndex >= image.target->m_bufferCount)) {
+            logHandler.Print("ComputeShader '%s': no image bound to register t%u\n", static_cast<const char*>(m_name), slot);
+            return false;
+        }
+        BufferInfo& info = image.target->m_bufferInfo[image.bufferIndex];
+        info.SetState(cmdList, kShaderReadState);
+        list->SetComputeRootDescriptorTable(UINT(m_srvRootIndex[slot]), info.m_srv.GPUHandle());
+    }
+
+    for (uint32_t slot = 0; slot < kStorageSlots; ++slot) {
+        if (m_uavRootIndex[slot] < 0)
+            continue;
+        const ImageBinding& image = m_storageImages[slot];
+        if (image.target != nullptr) {
+            if ((image.bufferIndex < 0) or (image.bufferIndex >= image.target->m_bufferCount))
+                return false;
+            BufferInfo& info = image.target->m_bufferInfo[image.bufferIndex];
+            if (info.m_type != BufferInfo::btSkyMap) {
+                logHandler.Print("ComputeShader '%s': the image bound to register u%u is not a compute buffer\n", static_cast<const char*>(m_name), slot);
+                return false;
+            }
+            info.SetState(cmdList, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            list->SetComputeRootDescriptorTable(UINT(m_uavRootIndex[slot]), info.m_uav.GPUHandle());
+        }
+        else if (commandListHandler.m_storageBufferStates[slot].pResource != nullptr)
+            list->SetComputeRootDescriptorTable(UINT(m_uavRootIndex[slot]), descriptorHeaps.m_srvHeap.GpuHandle(commandListHandler.m_boundStorageBuffers[slot]));
+        else {
+            logHandler.Print("ComputeShader '%s': nothing bound to register u%u\n", static_cast<const char*>(m_name), slot);
+            return false;
+        }
+    }
+
+    for (uint32_t slot = 0; slot < kReadOnlySlots; ++slot) {
+        if (m_readOnlyRootIndex[slot] < 0)
+            continue;
+        if (commandListHandler.m_readOnlyBufferStates[slot].pResource == nullptr) {
+            logHandler.Print("ComputeShader '%s': no buffer bound to read only slot %u\n", static_cast<const char*>(m_name), slot);
+            return false;
+        }
+        list->SetComputeRootDescriptorTable(UINT(m_readOnlyRootIndex[slot]), descriptorHeaps.m_srvHeap.GpuHandle(commandListHandler.m_boundReadOnlyBuffers[slot]));
+    }
+    if (m_usesAccelStructure)
+        list->SetComputeRootShaderResourceView(UINT(m_accelRootIndex), accelStructure);
+    commandListHandler.TransitionBoundBuffers(list);
+
+    list->Dispatch(groupCountX, groupCountY, groupCountZ);
+
+    for (ImageBinding& image : m_storageImages) {
+        if ((image.target != nullptr) and (image.bufferIndex >= 0) and (image.bufferIndex < image.target->m_bufferCount))
+            image.target->m_bufferInfo[image.bufferIndex].SetState(cmdList, kShaderReadState);
+    }
+    return true;
+}
+
+
+bool ComputeShader::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
+    if (not IsValid())
+        return false;
+    if ((groupCountX == 0) or (groupCountY == 0) or (groupCountZ == 0))
+        return false;
+
+    void* opHandle = baseRenderer.StartOperation(m_name, false);
+    if (opHandle == nullptr)
+        return false;
+    CommandList* cmdList = commandListHandler.CurrentCmdList();
+    bool ok = (cmdList != nullptr) and Record(cmdList, groupCountX, groupCountY, groupCountZ);
+    baseRenderer.FinishOperation(opHandle);
+    ResetImageBindings();
+    return ok;
 }
 
 

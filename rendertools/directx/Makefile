@@ -51,6 +51,7 @@ HLSL_FILES := \
  kuwahara_shader \
  lightning_shader \
  line_shader \
+ ocean_shader \
  outline_shader \
  primitive_shaders \
  skybox_shader \
@@ -80,6 +81,7 @@ COMMON_FILES := \
  mesh \
  noise \
  objloader \
+ oceanfft \
  prerenderedtexture \
  projector \
  quad \

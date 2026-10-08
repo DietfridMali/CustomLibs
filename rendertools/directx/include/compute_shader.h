@@ -34,6 +34,7 @@
 
 class Texture;
 class RenderTarget;
+class CommandList;
 
 // =================================================================================================
 
@@ -76,6 +77,18 @@ public:
     int32_t                             m_readOnlyRootIndex[kReadOnlySlots];
     bool                                m_usesAccelStructure{ false };
 
+    struct ImageBinding {
+        RenderTarget*   target{ nullptr };
+        int             bufferIndex{ -1 };
+    };
+
+    static constexpr uint32_t           kSampledBase = 4;
+    static constexpr uint32_t           kSampledSlots = 16;
+    static constexpr uint32_t           kStorageBase = 36;
+    static constexpr uint32_t           kStorageSlots = 4;
+    ImageBinding                        m_sampledImages[kSampledSlots];
+    ImageBinding                        m_storageImages[kStorageSlots];
+
     ComputeShader(String name = "")
         : m_name(std::move(name))
     {
@@ -113,6 +126,9 @@ public:
     bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
     bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
 
+    bool BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex);
+    bool BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex = 0);
+
     // b1 — per-pass constants. Name-based setters resolve to reflected offsets in the cbuffer.
     int SetB1Field(const char* name, const void* data, size_t size) noexcept;
     int SetB1(uint32_t offset, const void* data, size_t size) noexcept;
@@ -133,6 +149,10 @@ public:
     bool UploadB1(void) noexcept;
 
 private:
+    bool Record(CommandList* cmdList, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+
+    void ResetImageBindings(void) noexcept;
+
     bool CreateRootSignature(const AutoArray<ComputeBindingDesc>& bindings) noexcept;
     bool CreatePipeline(void) noexcept;
     void ReflectB1Fields(void) noexcept;

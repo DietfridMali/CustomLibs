@@ -15,6 +15,8 @@
 #include "commandlist.h"
 #include "descriptor_pool_handler.h"
 #include "vkupload.h"
+#include "rendertarget.h"
+#include "gfxrenderer.h"
 #include "loghandler.h"
 #include <spirv_reflect.h>
 
@@ -396,14 +398,201 @@ bool ComputeShader::Activate(void)
 }
 
 
+bool ComputeShader::HasBinding(uint32_t binding, ComputeBindingDesc::Kind kind) const noexcept
+{
+    for (int i = 0; i < m_bindings.Length(); ++i) {
+        if ((m_bindings[i].binding == binding) and (m_bindings[i].kind == kind))
+            return true;
+    }
+    return false;
+}
+
+
+void ComputeShader::ResetImageBindings(void) noexcept
+{
+    for (ImageBinding& image : m_sampledImages)
+        image = ImageBinding{};
+    for (ImageBinding& image : m_storageImages)
+        image = ImageBinding{};
+}
+
+
+bool ComputeShader::Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+{
+    static constexpr uint32_t cMaxBufferWrites = CommandListHandler::kUavSlots + CommandListHandler::kSsboSlots + 2;
+    static constexpr uint32_t cMaxImageWrites = kSampledSlots + kStorageSlots;
+
+    VkDevice device = vkContext.Device();
+    VkAccelerationStructureKHR accelStructure = commandListHandler.m_boundAccelStructure;
+    if (m_usesAccelStructure and (accelStructure == VK_NULL_HANDLE)) {
+        logHandler.Print("ComputeShader '%s': declares an acceleration structure, but none is bound\n", static_cast<const char*>(m_name));
+        return false;
+    }
+
+    VkDescriptorSet set = descriptorPoolHandler.Allocate(m_setLayout);
+    if (set == VK_NULL_HANDLE)
+        return false;
+
+    VkWriteDescriptorSet    writes[cMaxBufferWrites + cMaxImageWrites + 1]{};
+    VkDescriptorBufferInfo  bufferInfos[cMaxBufferWrites]{};
+    VkDescriptorImageInfo   imageInfos[cMaxImageWrites]{};
+    uint32_t                writeCount = 0;
+    uint32_t                bufferCount = 0;
+    uint32_t                imageCount = 0;
+    uint32_t                dynamicOffsets[2]{};
+    uint32_t                dynamicOffsetCount = 0;
+
+    if (HasBinding(0, ComputeBindingDesc::Kind::UniformBuffer)) {
+        CbAlloc b0a = cbvAllocator.Allocate(uint32_t(sizeof(FrameConstants)));
+        if (not b0a.IsValid())
+            return false;
+        FrameConstants fc{};
+        std::memcpy(fc.mModelView, baseRenderer.ModelView().AsArray(), 64);
+        std::memcpy(fc.mProjection, baseRenderer.Projection().AsArray(), 64);
+        std::memcpy(fc.mViewport, baseRenderer.ViewportTransformation().AsArray(), 64);
+        std::memcpy(b0a.cpu, &fc, sizeof(FrameConstants));
+        bufferInfos[bufferCount].buffer = b0a.buffer;
+        bufferInfos[bufferCount].offset = 0;
+        bufferInfos[bufferCount].range = sizeof(FrameConstants);
+        writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[writeCount].dstSet = set;
+        writes[writeCount].dstBinding = 0;
+        writes[writeCount].descriptorCount = 1;
+        writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        writes[writeCount].pBufferInfo = &bufferInfos[bufferCount];
+        dynamicOffsets[dynamicOffsetCount++] = b0a.offset;
+        bufferCount++;
+        writeCount++;
+    }
+
+    if (HasBinding(1, ComputeBindingDesc::Kind::UniformBuffer)) {
+        if ((m_b1Size == 0) or not UploadB1())
+            return false;
+        bufferInfos[bufferCount].buffer = m_b1Buffer;
+        bufferInfos[bufferCount].offset = 0;
+        bufferInfos[bufferCount].range = m_b1Size;
+        writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[writeCount].dstSet = set;
+        writes[writeCount].dstBinding = 1;
+        writes[writeCount].descriptorCount = 1;
+        writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        writes[writeCount].pBufferInfo = &bufferInfos[bufferCount];
+        dynamicOffsets[dynamicOffsetCount++] = m_b1DynamicOffset;
+        bufferCount++;
+        writeCount++;
+    }
+
+    for (int i = 0; i < m_bindings.Length(); ++i) {
+        const ComputeBindingDesc& binding = m_bindings[i];
+        if (binding.kind == ComputeBindingDesc::Kind::UniformBuffer)
+            continue;
+
+        if ((binding.kind == ComputeBindingDesc::Kind::SampledImage) or (binding.kind == ComputeBindingDesc::Kind::StorageImage)) {
+            bool isStorage = (binding.kind == ComputeBindingDesc::Kind::StorageImage);
+            uint32_t slot = binding.binding - (isStorage ? kStorageBase : kSampledBase);
+            if (slot >= (isStorage ? kStorageSlots : kSampledSlots))
+                return false;
+            const ImageBinding& image = isStorage ? m_storageImages[slot] : m_sampledImages[slot];
+            if ((image.target == nullptr) or (image.bufferIndex < 0) or (image.bufferIndex >= image.target->m_bufferCount)) {
+                logHandler.Print("ComputeShader '%s': no image bound to binding %u\n", static_cast<const char*>(m_name), binding.binding);
+                return false;
+            }
+            BufferInfo& info = image.target->m_bufferInfo[image.bufferIndex];
+            if (isStorage)
+                info.m_layoutTracker.ToGeneral(cb);
+            else
+                info.m_layoutTracker.ToAnyShaderInput(cb);
+            imageInfos[imageCount].sampler = VK_NULL_HANDLE;
+            imageInfos[imageCount].imageView = info.m_imageView;
+            imageInfos[imageCount].imageLayout = isStorage ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[writeCount].dstSet = set;
+            writes[writeCount].dstBinding = binding.binding;
+            writes[writeCount].descriptorCount = 1;
+            writes[writeCount].descriptorType = isStorage ? VK_DESCRIPTOR_TYPE_STORAGE_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            writes[writeCount].pImageInfo = &imageInfos[imageCount];
+            imageCount++;
+            writeCount++;
+            continue;
+        }
+
+        if ((binding.kind == ComputeBindingDesc::Kind::StorageBuffer) or (binding.kind == ComputeBindingDesc::Kind::ReadOnlyBuffer)) {
+            bool isReadOnly = (binding.kind == ComputeBindingDesc::Kind::ReadOnlyBuffer);
+            uint32_t slot = binding.binding - (isReadOnly ? uint32_t(Shader::kSsboBase) : kStorageBase);
+            if (slot >= (isReadOnly ? CommandListHandler::kSsboSlots : CommandListHandler::kUavSlots))
+                return false;
+            VkBuffer buffer = isReadOnly ? commandListHandler.m_boundReadOnlyBuffers[slot] : commandListHandler.m_boundStorageBuffers[slot];
+            if (buffer == VK_NULL_HANDLE) {
+                logHandler.Print("ComputeShader '%s': no buffer bound to binding %u\n", static_cast<const char*>(m_name), binding.binding);
+                return false;
+            }
+            bufferInfos[bufferCount].buffer = buffer;
+            bufferInfos[bufferCount].offset = 0;
+            bufferInfos[bufferCount].range = isReadOnly ? commandListHandler.m_boundReadOnlyBufferSize[slot] : commandListHandler.m_boundStorageBufferSize[slot];
+            writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[writeCount].dstSet = set;
+            writes[writeCount].dstBinding = binding.binding;
+            writes[writeCount].descriptorCount = 1;
+            writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            writes[writeCount].pBufferInfo = &bufferInfos[bufferCount];
+            bufferCount++;
+            writeCount++;
+            continue;
+        }
+
+        logHandler.Print("ComputeShader '%s': binding %u has a kind Dispatch () does not bind\n", static_cast<const char*>(m_name), binding.binding);
+        return false;
+    }
+
+    VkWriteDescriptorSetAccelerationStructureKHR accelInfo{};
+    if (m_usesAccelStructure) {
+        accelInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+        accelInfo.accelerationStructureCount = 1;
+        accelInfo.pAccelerationStructures = &accelStructure;
+        writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[writeCount].pNext = &accelInfo;
+        writes[writeCount].dstSet = set;
+        writes[writeCount].dstBinding = kBindingAccel;
+        writes[writeCount].descriptorCount = 1;
+        writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+        writeCount++;
+    }
+
+    if (writeCount > 0)
+        vkUpdateDescriptorSets(device, writeCount, writes, 0, nullptr);
+
+    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
+    vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, 1, &set,
+                            dynamicOffsetCount, dynamicOffsetCount ? dynamicOffsets : nullptr);
+    vkCmdDispatch(cb, groupCountX, groupCountY, groupCountZ);
+
+    for (ImageBinding& image : m_storageImages) {
+        if ((image.target != nullptr) and (image.bufferIndex >= 0) and (image.bufferIndex < image.target->m_bufferCount))
+            image.target->m_bufferInfo[image.bufferIndex].m_layoutTracker.ToAnyShaderInput(cb);
+    }
+    return true;
+}
+
+
 bool ComputeShader::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
 {
     if (not IsValid())
         return false;
-    // Caller issues vkCmdDispatch(cb, groupCountX, groupCountY, groupCountZ) after Activate +
-    // descriptor-set bind. See cloudrenderer.cpp TSP path for usage.
-    (void)groupCountX; (void)groupCountY; (void)groupCountZ;
-    return true;
+    if ((groupCountX == 0) or (groupCountY == 0) or (groupCountZ == 0))
+        return false;
+    if (vkContext.Device() == VK_NULL_HANDLE)
+        return false;
+
+    void* opHandle = baseRenderer.StartOperation(m_name, false);
+    if (opHandle == nullptr)
+        return false;
+    VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+    CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
+    bool ok = (cb != VK_NULL_HANDLE) and Record(cb, groupCountX, groupCountY, groupCountZ);
+    commandListHandler.ResumeRendering(scope);
+    baseRenderer.FinishOperation(opHandle);
+    ResetImageBindings();
+    return ok;
 }
 
 
@@ -556,11 +745,21 @@ bool ComputeShader::BindSampledImage(uint32_t binding, Texture* texture, uint32_
 }
 
 
+bool ComputeShader::BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex)
+{
+    if ((binding < kSampledBase) or (binding >= kSampledBase + kSampledSlots))
+        return false;
+    m_sampledImages[binding - kSampledBase] = ImageBinding{ target, bufferIndex };
+    return true;
+}
+
+
 bool ComputeShader::BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex)
 {
-    (void)binding; (void)target; (void)bufferIndex; (void)arrayIndex;
-    // Caller writes a VK_DESCRIPTOR_TYPE_STORAGE_IMAGE write into its per-pass descriptor set.
-    // The target's color buffer must be transitioned to VK_IMAGE_LAYOUT_GENERAL before dispatch.
+    (void)arrayIndex;
+    if ((binding < kStorageBase) or (binding >= kStorageBase + kStorageSlots))
+        return false;
+    m_storageImages[binding - kStorageBase] = ImageBinding{ target, bufferIndex };
     return true;
 }
 

@@ -27,10 +27,6 @@ static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 }
 
 
-// Format for TSP sky-map ping-pong buffers (mirrors vulkan/rendertarget.cpp kSkyMapFormat).
-static constexpr DXGI_FORMAT dxSkyMapFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
-
-
 static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt, D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal, D3D12_RESOURCE_FLAGS flags, int arraySize = 1) noexcept
 {
     D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
@@ -87,7 +83,7 @@ DXGI_FORMAT BufferInfo::ViewFormat(void)
         case BufferInfo::btId:
             return dxIdFormat;
         case BufferInfo::btSkyMap:
-            return dxSkyMapFormat;
+            return m_colorFormat;
         default:
             return m_colorFormat;
     }
@@ -340,7 +336,8 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 // is a regular state transition.
 bool RenderTarget::CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
-    info.m_resource = CreateRTResource(device, w, h, dxSkyMapFormat, D3D12_RESOURCE_STATE_COMMON, nullptr, ResourceFlagsForType(info.m_type));
+    info.m_colorFormat = m_skyMapFormat;
+    info.m_resource = CreateRTResource(device, w, h, m_skyMapFormat, D3D12_RESOURCE_STATE_COMMON, nullptr, ResourceFlagsForType(info.m_type));
     if (not info.m_resource)
         return false;
     info.m_state = D3D12_RESOURCE_STATE_COMMON;
@@ -467,6 +464,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     if (IsIntegerColorFormat(m_colorFormat))
         m_filtering = GfxFilterMode::Nearest;
     m_cubeMapFormat = params.cubeMapFormat;
+    m_skyMapFormat = params.skyMapFormat;
     // Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of resource to
     // allocate, and SelectArrayLayer () bounds against it.
     m_arrayLayerCount = params.arrayLayerCount;

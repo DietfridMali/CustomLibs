@@ -175,6 +175,7 @@ public:
         int vertexBufferCount{ 0 };
         int idBufferCount{ 0 };
         int skyMapCount{ 0 };  // Compute-only storage textures (R16G16B16A16_FLOAT), UAV+SRV+RTV.
+        DXGI_FORMAT skyMapFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
         // Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
         // square by definition. The format is separate from colorFormat: a shadow cube map holds one
         // distance per texel, a colour target holds RGBA.
@@ -221,6 +222,7 @@ public:
     int                 m_colorBufferCount{ 0 };
     DXGI_FORMAT         m_colorFormat{ dxColorFormat };
     DXGI_FORMAT         m_cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
+    DXGI_FORMAT         m_skyMapFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
     int                 m_idBufferCount{ 0 };

@@ -58,6 +58,18 @@ public:
     static constexpr uint32_t           kAccelSpace = 2;
     bool                                m_usesAccelStructure{ false };
 
+    struct ImageBinding {
+        RenderTarget*   target{ nullptr };
+        int             bufferIndex{ -1 };
+    };
+
+    static constexpr uint32_t           kSampledBase = 4;
+    static constexpr uint32_t           kSampledSlots = 16;
+    static constexpr uint32_t           kStorageBase = 36;
+    static constexpr uint32_t           kStorageSlots = 4;
+    ImageBinding                        m_sampledImages[kSampledSlots];
+    ImageBinding                        m_storageImages[kStorageSlots];
+
     ComputeShader(String name = "")
         : m_name(std::move(name))
     {
@@ -89,6 +101,7 @@ public:
     bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
 
     bool BindSampledImage(uint32_t binding, Texture* texture, uint32_t arrayIndex = 0);
+    bool BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex);
     bool BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex = 0);
     bool BindSampler(uint32_t binding, VkSampler sampler);
 
@@ -119,6 +132,12 @@ public:
     bool UploadB1(void) noexcept;
 
 private:
+    bool Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+
+    bool HasBinding(uint32_t binding, ComputeBindingDesc::Kind kind) const noexcept;
+
+    void ResetImageBindings(void) noexcept;
+
     bool CreatePipelineLayout(const AutoArray<ComputeBindingDesc>& bindings) noexcept;
     bool CreatePipeline(void) noexcept;
 

@@ -50,6 +50,10 @@ const ShaderSource& KuwaharaCubeFilterShader();
 const ShaderSource& KuwaharaSourceShader();
 const ShaderSource& KuwaharaCubeSourceShader();
 const ShaderSource& KuwaharaGaussShader();
+const ShaderSource& OceanInitShader();
+const ShaderSource& OceanSpectrumShader();
+const ShaderSource& OceanTransformShader();
+const ShaderSource& OceanAssembleShader();
 
 // -------------------------------------------------------------------------------------------------
 
@@ -98,7 +102,11 @@ BaseShaderCode::BaseShaderCode(const String& shaderFolder)
         &KuwaharaCubeFilterShader(),
         &KuwaharaSourceShader(),
         &KuwaharaCubeSourceShader(),
-        &KuwaharaGaussShader()
+        &KuwaharaGaussShader(),
+        &OceanInitShader(),
+        &OceanSpectrumShader(),
+        &OceanTransformShader(),
+        &OceanAssembleShader()
     };
     AddShaders(shaderSource);
 }

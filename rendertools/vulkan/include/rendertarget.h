@@ -127,6 +127,7 @@ public:
         // Compute-only storage textures (R16G16B16A16_SFLOAT, COLOR+SAMPLED+STORAGE usage).
         // Occupy m_bufferInfo[m_computeBufferIndex..] - caller addresses them via that offset.
         int skyMapCount{ 0 };
+        VkFormat skyMapFormat{ VK_FORMAT_R16G16B16A16_SFLOAT };
         // Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
         // square by definition. Its format is separate from colorFormat: a shadow cube map holds one
         // distance per texel, a colour target holds RGBA.
@@ -173,6 +174,7 @@ public:
     int                 m_colorBufferCount{ 0 };
     VkFormat            m_cubeMapFormat { VK_FORMAT_R32_SFLOAT };
     VkFormat            m_colorFormat{ VK_FORMAT_R8G8B8A8_UNORM };
+    VkFormat            m_skyMapFormat{ VK_FORMAT_R16G16B16A16_SFLOAT };
     int                 m_vertexBufferCount{ 0 };
     int                 m_extraBufferIndex{ -1 };
     int                 m_idBufferCount{ 0 };

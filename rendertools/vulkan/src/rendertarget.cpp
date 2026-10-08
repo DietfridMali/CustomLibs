@@ -335,7 +335,7 @@ void RenderTarget::CreateDepthBuffer(BufferInfo& info, int w, int h)
 
 void RenderTarget::CreateColorBuffer(BufferInfo& info, int w, int h)
 {
-    VkFormat fmt = (info.m_type == BufferInfo::btColor) ? info.m_colorFormat : FormatForType(info.m_type);
+    VkFormat fmt = (info.m_type == BufferInfo::btColor) ? info.m_colorFormat : (info.m_type == BufferInfo::btSkyMap) ? m_skyMapFormat : FormatForType(info.m_type);
     info.m_isArray = (info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0);
     if (info.m_isArray) {
         CreateArrayBuffer(info, w, h, fmt);
@@ -562,6 +562,7 @@ bool RenderTarget::Create(int width, int height, int scale, const RTCreationPara
     if (IsIntegerColorFormat(m_colorFormat))
         m_filtering = GfxFilterMode::Nearest;
     m_cubeMapFormat = params.cubeMapFormat;
+    m_skyMapFormat = params.skyMapFormat;
     // Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of image to
     // allocate, and SelectArrayLayer () bounds against it.
     m_arrayLayerCount = params.arrayLayerCount;
