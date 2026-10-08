@@ -20,13 +20,14 @@
 #   include <cstdarg>
 #   include <cstdlib>
 #   include <ctime>
-#   include <backtrace.h>
 #   include <cxxabi.h>
 #   include <dlfcn.h>
 #   include <fcntl.h>
+#   include <link.h>
 #   include <pthread.h>
 #   include <semaphore.h>
 #   include <sys/syscall.h>
+#   include <sys/wait.h>
 #   include <ucontext.h>
 #   include <unistd.h>
 #   include <unwind.h>
@@ -500,6 +501,10 @@ static constexpr time_t reportTimeout = 60;
 static constexpr size_t signalStackSize = 64 * 1024;
 static constexpr int crashSignals[] = { SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT };
 static constexpr int crashSignalCount = static_cast<int>(sizeof(crashSignals) / sizeof(crashSignals[0]));
+static constexpr int lineToolOptionCount = 7;
+static constexpr int lineToolMissing = 127;
+static constexpr size_t lineToolOutputSize = 64 * 1024;
+static constexpr size_t addressTextSize = 20;
 #if defined(__x86_64__) or defined(__i386__)
 static constexpr unsigned long pageFaultWrite = 0x02;
 static constexpr unsigned long pageFaultExecute = 0x10;
@@ -543,18 +548,28 @@ struct TraceInfo {
     uintptr_t   frames[maxFrames];
 };
 
-struct FrameWriter {
-    int         file;
-    int         lineIndex;
+struct FrameInfo {
     const char* moduleName;
-    bool        isWritten;
+    char*       modulePath;
+    uintptr_t   moduleOffset;
+    const char* symbolName;
+    uintptr_t   symbolOffset;
+    char*       lines;
+    bool        isResolved;
 };
 
 static TraceInfo            crashInfo;
 static struct sigaction     previousActions[crashSignalCount];
 static char                 signalStack[signalStackSize];
 static char                 textBuffer[4096];
-static backtrace_state*     backtraceState = nullptr;
+static char                 exePath[1024];
+static FrameInfo            frameInfos[maxFrames];
+static int                  moduleFrames[maxFrames];
+static char                 addressTexts[maxFrames][addressTextSize];
+static char*                lineToolArguments[maxFrames + lineToolOptionCount + 1];
+static char*                lineToolOutputs[maxFrames];
+static char                 lineToolName[] = "addr2line";
+static char                 lineToolOptions[][3] = { "-a", "-C", "-f", "-i", "-e" };
 static sem_t                crashEvent;
 static sem_t                doneEvent;
 static pthread_t            watcherThread;
@@ -620,16 +635,20 @@ static void WriteText(int file, const char* format, ...) {
 }
 
 
-static const char* GetModuleName(uintptr_t address, uintptr_t& moduleBase) {
-    moduleBase = 0;
-    Dl_info moduleInfo;
-    if (not dladdr(reinterpret_cast<void*>(address), &moduleInfo))
-        return nullptr;
-    if (not moduleInfo.dli_fname)
-        return nullptr;
-    moduleBase = reinterpret_cast<uintptr_t>(moduleInfo.dli_fbase);
-    const char* separator = strrchr(moduleInfo.dli_fname, '/');
-    return separator ? separator + 1 : moduleInfo.dli_fname;
+static void GetFrameInfo(uintptr_t address, FrameInfo& frame) {
+    frame = FrameInfo();
+    Dl_info symbolInfo;
+    struct link_map* module = nullptr;
+    if (not dladdr1(reinterpret_cast<void*>(address), &symbolInfo, reinterpret_cast<void**>(&module), RTLD_DL_LINKMAP))
+        return;
+    frame.modulePath = *module->l_name ? module->l_name : exePath;
+    const char* separator = strrchr(frame.modulePath, '/');
+    frame.moduleName = separator ? separator + 1 : frame.modulePath;
+    frame.moduleOffset = address - static_cast<uintptr_t>(module->l_addr);
+    if (symbolInfo.dli_sname) {
+        frame.symbolName = symbolInfo.dli_sname;
+        frame.symbolOffset = address - reinterpret_cast<uintptr_t>(symbolInfo.dli_saddr);
+    }
 }
 
 
@@ -649,45 +668,143 @@ static _Unwind_Reason_Code CollectFrame(struct _Unwind_Context* context, void* d
 }
 
 
-static void IgnoreError(void*, const char*, int) {
+static char* RunLineTool(int& exitCode) {
+    exitCode = -1;
+    int pipeEnds[2];
+    if (pipe(pipeEnds) != 0)
+        return nullptr;
+    pid_t child = fork();
+    if (child < 0) {
+        close(pipeEnds[0]);
+        close(pipeEnds[1]);
+        return nullptr;
+    }
+    if (child == 0) {
+        int nullFile = open("/dev/null", O_WRONLY);
+        dup2(pipeEnds[1], STDOUT_FILENO);
+        dup2(nullFile, STDERR_FILENO);
+        close(pipeEnds[0]);
+        close(pipeEnds[1]);
+        execvp(lineToolName, lineToolArguments);
+        _exit(lineToolMissing);
+    }
+    close(pipeEnds[1]);
+    size_t capacity = lineToolOutputSize;
+    size_t length = 0;
+    char* output = static_cast<char*>(malloc(capacity));
+    while (output) {
+        if (length + 1 == capacity) {
+            capacity *= 2;
+            char* resized = static_cast<char*>(realloc(output, capacity));
+            if (not resized)
+                break;
+            output = resized;
+        }
+        ssize_t count = read(pipeEnds[0], output + length, capacity - 1 - length);
+        if (count > 0)
+            length += static_cast<size_t>(count);
+        else if ((count == 0) or (errno != EINTR))
+            break;
+    }
+    if (output)
+        output[length] = '\0';
+    close(pipeEnds[0]);
+    int status = 0;
+    pid_t result = 0;
+    do {
+        result = waitpid(child, &status, 0);
+    } while ((result < 0) and (errno == EINTR));
+    if ((result == child) and WIFEXITED(status))
+        exitCode = WEXITSTATUS(status);
+    return output;
 }
 
 
-static void WriteFrameHead(FrameWriter& writer, const char* function) {
-    char* demangled = abi::__cxa_demangle(function, nullptr, nullptr, nullptr);
-    WriteText(writer.file, "  #%02d  %s!%s", writer.lineIndex, writer.moduleName, demangled ? demangled : function);
-    free(demangled);
-    ++writer.lineIndex;
+static void AssignLines(char* output, int frameCount) {
+    int frameIndex = 0;
+    char* text = output;
+    while (*text) {
+        char* end = strchr(text, '\n');
+        if ((text[0] == '0') and (text[1] == 'x')) {
+            *text = '\0';
+            if (frameIndex == frameCount)
+                return;
+            frameInfos[moduleFrames[frameIndex]].lines = end ? end + 1 : text;
+            ++frameIndex;
+        }
+        if (not end)
+            return;
+        text = end + 1;
+    }
 }
 
 
-static int WriteLineInfo(void* data, uintptr_t, const char* fileName, int lineNumber, const char* function) {
-    FrameWriter* writer = static_cast<FrameWriter*>(data);
-    if (not function)
-        return 0;
-    WriteFrameHead(*writer, function);
-    if (fileName)
-        WriteText(writer->file, "  %s(%d)", fileName, lineNumber);
-    WriteText(writer->file, "\n");
-    writer->isWritten = true;
-    return 0;
+static bool ResolveFrames(const TraceInfo& info, int& outputCount) {
+    outputCount = 0;
+    for (int i = info.firstFrame; i < info.frameCount; ++i)
+        GetFrameInfo(info.frames[i], frameInfos[i]);
+    bool haveLineTool = false;
+    lineToolArguments[0] = lineToolName;
+    for (int i = 0; i < lineToolOptionCount - 2; ++i)
+        lineToolArguments[i + 1] = lineToolOptions[i];
+    for (int i = info.firstFrame; i < info.frameCount; ++i) {
+        FrameInfo& frame = frameInfos[i];
+        if (frame.isResolved or not frame.modulePath)
+            continue;
+        int frameCount = 0;
+        for (int j = i; j < info.frameCount; ++j) {
+            FrameInfo& other = frameInfos[j];
+            if (other.isResolved or not other.modulePath or (strcmp(other.modulePath, frame.modulePath) != 0))
+                continue;
+            other.isResolved = true;
+            snprintf(addressTexts[frameCount], addressTextSize, "0x%llx", static_cast<unsigned long long>(other.moduleOffset));
+            lineToolArguments[lineToolOptionCount + frameCount] = addressTexts[frameCount];
+            moduleFrames[frameCount] = j;
+            ++frameCount;
+        }
+        lineToolArguments[lineToolOptionCount - 1] = frame.modulePath;
+        lineToolArguments[lineToolOptionCount + frameCount] = nullptr;
+        int exitCode = 0;
+        char* output = RunLineTool(exitCode);
+        if (not output)
+            return haveLineTool;
+        lineToolOutputs[outputCount] = output;
+        ++outputCount;
+        if (exitCode == lineToolMissing)
+            return haveLineTool;
+        if (exitCode == 0) {
+            haveLineTool = true;
+            AssignLines(output, frameCount);
+        }
+    }
+    return haveLineTool;
 }
 
 
-static void WriteSymbolInfo(void* data, uintptr_t address, const char* name, uintptr_t value, uintptr_t) {
-    FrameWriter* writer = static_cast<FrameWriter*>(data);
-    if (not name)
-        return;
-    WriteFrameHead(*writer, name);
-    WriteText(writer->file, " + 0x%llX\n", static_cast<unsigned long long>(address - value));
-    writer->isWritten = true;
-}
-
-
-static int ProbeLineInfo(void* data, uintptr_t, const char* fileName, int, const char*) {
-    if (fileName)
-        *static_cast<bool*>(data) = true;
-    return 0;
+static bool WriteResolvedFrame(int file, const FrameInfo& frame, int& lineIndex) {
+    bool isWritten = false;
+    char* text = frame.lines;
+    while (text and *text) {
+        char* function = text;
+        char* end = strchr(text, '\n');
+        if (not end)
+            break;
+        *end = '\0';
+        char* location = end + 1;
+        end = strchr(location, '\n');
+        text = end ? end + 1 : nullptr;
+        if (end)
+            *end = '\0';
+        if (function[0] == '?')
+            continue;
+        WriteText(file, "  #%02d  %s!%s", lineIndex, frame.moduleName, function);
+        if (location[0] != '?')
+            WriteText(file, "  %s", location);
+        WriteText(file, "\n");
+        ++lineIndex;
+        isWritten = true;
+    }
+    return isWritten;
 }
 
 
@@ -695,6 +812,8 @@ static void WriteTrace(int file, const char* appName, const char* appVersion, co
     time_t now = time(nullptr);
     struct tm localTime;
     localtime_r(&now, &localTime);
+    int outputCount = 0;
+    bool haveLineTool = ResolveFrames(info, outputCount);
 
     WriteText(file, "%s %s %s report\n\n", appName, appVersion, kind);
     WriteText(file, "time:      %04d-%02d-%02d %02d:%02d:%02d\n",
@@ -711,43 +830,33 @@ static void WriteTrace(int file, const char* appName, const char* appVersion, co
     if (*context)
         WriteText(file, "context:   %s\n", context);
 
-    if (not backtraceState)
-        WriteText(file, "symbols:   libbacktrace could not be initialized, only addresses available\n");
-    else {
-        bool hasLineInfo = false;
-        backtrace_pcinfo(backtraceState, reinterpret_cast<uintptr_t>(&WriteTrace), ProbeLineInfo, IgnoreError, &hasLineInfo);
-        if (hasLineInfo)
-            WriteText(file, "symbols:   debug info of the executable\n");
-        else
-            WriteText(file, "symbols:   no debug info found in the executable, only function names available\n");
-    }
+    if (haveLineTool)
+        WriteText(file, "symbols:   resolved with addr2line\n");
+    else
+        WriteText(file, "symbols:   addr2line not available, only exported function names\n");
 
     WriteText(file, "\ncall stack:\n");
 
-    FrameWriter writer;
-    writer.file = file;
-    writer.lineIndex = 0;
+    int lineIndex = 0;
     for (int i = info.firstFrame; i < info.frameCount; ++i) {
-        uintptr_t address = info.frames[i];
-        uintptr_t moduleBase = 0;
-        const char* moduleName = GetModuleName(address, moduleBase);
-        writer.moduleName = moduleName ? moduleName : "?";
-        writer.isWritten = false;
-        if (backtraceState) {
-            backtrace_pcinfo(backtraceState, address, WriteLineInfo, IgnoreError, &writer);
-            if (not writer.isWritten)
-                backtrace_syminfo(backtraceState, address, WriteSymbolInfo, IgnoreError, &writer);
+        const FrameInfo& frame = frameInfos[i];
+        if (WriteResolvedFrame(file, frame, lineIndex))
+            continue;
+        if (frame.symbolName) {
+            char* demangled = abi::__cxa_demangle(frame.symbolName, nullptr, nullptr, nullptr);
+            WriteText(file, "  #%02d  %s!%s + 0x%llX\n", lineIndex, frame.moduleName, demangled ? demangled : frame.symbolName, static_cast<unsigned long long>(frame.symbolOffset));
+            free(demangled);
         }
-        if (not writer.isWritten) {
-            if (moduleName)
-                WriteText(file, "  #%02d  %s+0x%llX\n", writer.lineIndex, moduleName, static_cast<unsigned long long>(address - moduleBase));
-            else
-                WriteText(file, "  #%02d  0x%016llX\n", writer.lineIndex, static_cast<unsigned long long>(address));
-            ++writer.lineIndex;
-        }
+        else if (frame.moduleName)
+            WriteText(file, "  #%02d  %s+0x%llX\n", lineIndex, frame.moduleName, static_cast<unsigned long long>(frame.moduleOffset));
+        else
+            WriteText(file, "  #%02d  0x%016llX\n", lineIndex, static_cast<unsigned long long>(info.frames[i]));
+        ++lineIndex;
     }
     if (info.frameCount == maxFrames)
         WriteText(file, "  ... truncated after %d frames\n", maxFrames);
+    for (int i = 0; i < outputCount; ++i)
+        free(lineToolOutputs[i]);
 }
 
 
@@ -772,19 +881,17 @@ void CrashHandler::Init(const char* appName, const char* appVersion) {
     CopyText(m_appName, sizeof(m_appName), appName);
     CopyText(m_appVersion, sizeof(m_appVersion), appVersion);
 
+    ssize_t length = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+    exePath[(length > 0) ? length : 0] = '\0';
     if (not *m_folder) {
-        char exeFolder[sizeof(m_folder)];
-        ssize_t length = readlink("/proc/self/exe", exeFolder, sizeof(exeFolder) - 1);
-        if (length > 0) {
-            exeFolder[length] = '\0';
-            char* separator = strrchr(exeFolder, '/');
-            if (separator)
-                separator[1] = '\0';
+        char exeFolder[sizeof(exePath)];
+        CopyText(exeFolder, sizeof(exeFolder), exePath);
+        char* separator = strrchr(exeFolder, '/');
+        if (separator) {
+            separator[1] = '\0';
             SetFolder(exeFolder);
         }
     }
-
-    backtraceState = backtrace_create_state(nullptr, 1, IgnoreError, nullptr);
 
     sem_init(&crashEvent, 0, 0);
     sem_init(&doneEvent, 0, 0);
