@@ -238,8 +238,8 @@ public:
     // remain null at materialize time are simply not written, which mirrors the DX12 path
     // (unbound slots stay at whatever the previous draw left in the descriptor heap).
 
-    static constexpr uint32_t kSrvSlots     = 16;  // matches Shader::kSrvSlots
-    static constexpr uint32_t kSamplerSlots = 16;  // matches Shader::kSamplerSlots
+    static constexpr uint32_t kSrvSlots     = 24;  // matches Shader::kSrvSlots
+    static constexpr uint32_t kSamplerSlots = 24;  // matches Shader::kSamplerSlots
     static constexpr uint32_t kUavSlots     = 4;   // matches Shader::kUavSlots
     static constexpr uint32_t kSsboSlots    = 24;  // matches Shader::kSsboSlots
     static constexpr uint32_t kVertexSlots  = 16;

@@ -71,8 +71,8 @@ class CommandList
 {
 public:
     static constexpr UINT FRAME_COUNT = 2;
-    static constexpr uint32_t kSrvSlots     = 16;
-    static constexpr uint32_t kSamplerSlots = 16;
+    static constexpr uint32_t kSrvSlots     = 24;
+    static constexpr uint32_t kSamplerSlots = 24;
     static constexpr uint32_t kUavSlots     = 4;
     static constexpr uint32_t kSsboSlots    = 24;
     static constexpr int      kTableSrv     = 0;

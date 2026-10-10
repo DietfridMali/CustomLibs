@@ -120,11 +120,11 @@ namespace {
 // Root signature layout (fixed for all shaders, see Shader::kSrvBase .. kAccelBase):
 //   Param 0:      Root CBV    — b0 FrameConstants                           (all stages)
 //   Param 1..5:   Root CBV    — b1 ShaderConstants, one per stage           (VS, PS, GS, HS, DS)
-//   Param 6:      Desc table  — t0..t15 SRVs                                (all stages)
-//   Param 7..22:  Desc tables — s0..s15, one sampler each                   (all stages)
-//   Param 23:     Desc table  — u0..u3 UAVs                                 (all stages)
-//   Param 24:     Desc table  — t0..t23 space1 read-only structured buffers (all stages)
-//   Param 25:     Root SRV    — t0 space2 ray tracing acceleration structure (all stages)
+//   Param 6:      Desc table  — t0..t23 SRVs                                (all stages)
+//   Param 7..30:  Desc tables — s0..s23, one sampler each                   (all stages)
+//   Param 31:     Desc table  — u0..u3 UAVs                                 (all stages)
+//   Param 32:     Desc table  — t0..t23 space1 read-only structured buffers (all stages)
+//   Param 33:     Root SRV    — t0 space2 ray tracing acceleration structure (all stages)
 //
 // PSO cache: keyed by RenderStates bitmask; created on first Enable() for that state.
 
@@ -363,8 +363,8 @@ bool Shader::CreateRootSignature(void) noexcept
     srvRange.RegisterSpace = 0;
     srvRange.OffsetInDescriptorsFromTableStart = 0;
 
-    // Params kSamplerBase..kSamplerBase+15: one 1-entry descriptor table per sampler
-    // slot (s0..s15), parallel to the SRV slots. The bound sampler is fed by
+    // Params kSamplerBase..kSamplerBase+23: one 1-entry descriptor table per sampler
+    // slot (s0..s23), parallel to the SRV slots. The bound sampler is fed by
     // SamplerCache from the texture's TextureSampling at Texture::Bind() time.
     D3D12_DESCRIPTOR_RANGE samplerRanges[kSamplerSlots]{};
     for (int i = 0; i < kSamplerSlots; ++i) {
@@ -601,7 +601,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
     UpdateStageResources(m_dsBlob.Get());
     m_srvDefaultKey = 0;
     for (int i = 0; i < kSrvSlots; ++i)
-        m_srvDefaultKey |= uint64_t(m_srvDefaults[i]) << (3 * i);
+        m_srvDefaultKey = m_srvDefaultKey * uint64_t(dvCount) + uint64_t(m_srvDefaults[i]);
 
     m_usesAccelStructure = ReflectUsesAccelStructure(m_vsBlob.Get()) or ReflectUsesAccelStructure(m_psBlob.Get())
                         or ReflectUsesAccelStructure(m_gsBlob.Get()) or ReflectUsesAccelStructure(m_hsBlob.Get())

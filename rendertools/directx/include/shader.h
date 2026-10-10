@@ -103,9 +103,9 @@ public:
     static constexpr int kStageDS       = 4;
     static constexpr int kStageCount    = 5;
     static constexpr int kSrvBase       = 1 + kStageCount;
-    static constexpr int kSrvSlots      = 16;
+    static constexpr int kSrvSlots      = 24;
     static constexpr int kSamplerBase   = kSrvBase + 1;
-    static constexpr int kSamplerSlots  = 16;
+    static constexpr int kSamplerSlots  = 24;
     static constexpr int kUavBase       = kSamplerBase + kSamplerSlots;
     static constexpr int kUavSlots      = 4;
     static constexpr int kSsboBase      = kUavBase + 1;

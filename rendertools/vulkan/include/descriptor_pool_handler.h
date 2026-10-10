@@ -34,8 +34,8 @@ public:
     static constexpr uint32_t FRAME_COUNT = 2;
     static constexpr uint32_t kMaxSetsPerPool = 1024;
     static constexpr uint32_t kMaxUbosPerPool = kMaxSetsPerPool * 6;
-    static constexpr uint32_t kMaxSampledImagesPerPool = 8192;  // t0..t15 per draw
-    static constexpr uint32_t kMaxSamplersPerPool = 8192;       // s0..s15 per draw
+    static constexpr uint32_t kMaxSampledImagesPerPool = 12288;  // t0..t23 per draw
+    static constexpr uint32_t kMaxSamplersPerPool = 12288;       // s0..s23 per draw
     static constexpr uint32_t kMaxStoragePerPool = kMaxSetsPerPool * 28;  // u0..u3 + t0..t23 space1 per set (StorageBuffer)
     static constexpr uint32_t kMaxStorageImagesPerPool = 256;   // u0..u3 per draw (StorageImage, e.g. TSP sky-map target)
 

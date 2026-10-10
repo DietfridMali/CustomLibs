@@ -191,7 +191,7 @@ inline GLenum TextureTypeToGLenum(TextureType t) noexcept {
 // TextureSlotInfo: tracks the SRV descriptor-heap index (uint32_t) bound to each texture slot.
 
 class TextureSlotInfo {
-    static constexpr int MAX_SLOTS = 16;
+    static constexpr int MAX_SLOTS = 24;
 
     std::array<uint32_t, MAX_SLOTS> m_srvIndices{};
     int                          m_maxUsed{ 0 };

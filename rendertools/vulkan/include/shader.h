@@ -33,6 +33,8 @@
 //      41         UNIFORM_BUFFER_DYNAMIC, TESS_EVALUATION (b1-DS)
 //      42..65     STORAGE_BUFFER,        ALL_GRAPHICS     (t0..t23 space1, read-only StructuredBuffer)
 //      66         ACCELERATION_STRUCTURE, ALL_GRAPHICS    (t0 space2, only in shaders that trace rays)
+//      67..74     SAMPLED_IMAGE,         ALL_GRAPHICS     (t16..t23)
+//      75..82     SAMPLER,               ALL_GRAPHICS     (s16..s23) — paired 1:1 with t-slots
 //  - VkPipelineLayout from the set layout above (one pipeline layout per shader; cached
 //    pipelines built per RenderStates are looked up via the PSO-cache pendant in step 7d).
 //  - b0 — FrameConstants written when changed to a UBO ring-buffer sub-allocation (cbv-allocator
@@ -122,10 +124,12 @@ public:
     static constexpr uint32_t kBindingB1PS = 2;
     static constexpr uint32_t kBindingB1GS = 3;
     static constexpr uint32_t kSrvBase = 4;     // t0..t15 -> bindings 4..19
-    static constexpr uint32_t kSrvSlots = 16;
-    static constexpr uint32_t kSamplerBase = kSrvBase + kSrvSlots;   // s0..s15 -> bindings 20..35
-    static constexpr uint32_t kSamplerSlots = 16;
-    static constexpr uint32_t kUavBase = kSamplerBase + kSamplerSlots;  // u0..u3 -> bindings 36..39
+    static constexpr uint32_t kSrvLowSlots = 16;
+    static constexpr uint32_t kSrvSlots = 24;
+    static constexpr uint32_t kSamplerBase = kSrvBase + kSrvLowSlots;   // s0..s15 -> bindings 20..35
+    static constexpr uint32_t kSamplerLowSlots = 16;
+    static constexpr uint32_t kSamplerSlots = 24;
+    static constexpr uint32_t kUavBase = kSamplerBase + kSamplerLowSlots;  // u0..u3 -> bindings 36..39
     static constexpr uint32_t kUavSlots = 4;
     static constexpr uint32_t kBindingB1HS = kUavBase + kUavSlots;
     static constexpr uint32_t kBindingB1DS = kBindingB1HS + 1;
@@ -134,7 +138,41 @@ public:
     static constexpr uint32_t kSsboSpace = 1;
     static constexpr uint32_t kBindingAccel = kSsboBase + kSsboSlots;
     static constexpr uint32_t kAccelSpace = 2;
-    static constexpr uint32_t kBindingCount = kBindingAccel + 1;
+    static constexpr uint32_t kSrvHighBase = kBindingAccel + 1;     // t16..t23 -> bindings 67..74
+    static constexpr uint32_t kSamplerHighBase = kSrvHighBase + (kSrvSlots - kSrvLowSlots);   // s16..s23 -> bindings 75..82
+    static constexpr uint32_t kBindingCount = kSamplerHighBase + (kSamplerSlots - kSamplerLowSlots);
+
+    static constexpr uint32_t SrvBinding(uint32_t slot) noexcept {
+        return (slot < kSrvLowSlots) ? kSrvBase + slot : kSrvHighBase + (slot - kSrvLowSlots);
+    }
+
+    static constexpr uint32_t SamplerBinding(uint32_t slot) noexcept {
+        return (slot < kSamplerLowSlots) ? kSamplerBase + slot : kSamplerHighBase + (slot - kSamplerLowSlots);
+    }
+
+    static constexpr bool SrvSlotOfBinding(uint32_t binding, uint32_t& slot) noexcept {
+        if ((binding >= kSrvBase) and (binding < kSrvBase + kSrvLowSlots)) {
+            slot = binding - kSrvBase;
+            return true;
+        }
+        if ((binding >= kSrvHighBase) and (binding < kSrvHighBase + (kSrvSlots - kSrvLowSlots))) {
+            slot = kSrvLowSlots + (binding - kSrvHighBase);
+            return true;
+        }
+        return false;
+    }
+
+    static constexpr bool SamplerSlotOfBinding(uint32_t binding, uint32_t& slot) noexcept {
+        if ((binding >= kSamplerBase) and (binding < kSamplerBase + kSamplerLowSlots)) {
+            slot = binding - kSamplerBase;
+            return true;
+        }
+        if ((binding >= kSamplerHighBase) and (binding < kSamplerHighBase + (kSamplerSlots - kSamplerLowSlots))) {
+            slot = kSamplerLowSlots + (binding - kSamplerHighBase);
+            return true;
+        }
+        return false;
+    }
 
     struct StageConstants {
         uint32_t size { 0 };

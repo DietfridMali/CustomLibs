@@ -50,14 +50,14 @@ static_assert(Shader::kSsboSlots == CommandListHandler::kSsboSlots, "Shader and 
 // stage-specific Vulkan binding (1/2/3 for VS/PS/GS) and DXC rejects mixing
 // -fvk-bind-register with the -fvk-{b,t,s,u}-shift options. Bindings match the layout
 // in CreatePipelineLayout: b0=0, b1=1/2/3/40/41, t0..t15=4..19, s0..s15=20..35, u0..u3=36..39,
-// t0..t23 space1=42..65.
+// t0..t23 space1=42..65, t16..t23=67..74, s16..s23=75..82.
 
 // =================================================================================================
 // Compile (HLSL -> SPIR-V via DXC)
 
 namespace {
 
-// Stage-independent bindings: b0, t0..t15, s0..s15, u0..u3.
+// Stage-independent bindings: b0, t0..t23, s0..s23, u0..u3.
 // b1 is stage-specific and appended in StageArgs().
 static const wchar_t* const kCommonBindArgs[] = {
     L"-fvk-bind-register", L"b0", L"0", L"0", L"0",
@@ -121,7 +121,27 @@ static const wchar_t* const kCommonBindArgs[] = {
     L"-fvk-bind-register", L"t21", L"1", L"63", L"0",
     L"-fvk-bind-register", L"t22", L"1", L"64", L"0",
     L"-fvk-bind-register", L"t23", L"1", L"65", L"0",
+    L"-fvk-bind-register", L"t16", L"0", L"67", L"0",
+    L"-fvk-bind-register", L"t17", L"0", L"68", L"0",
+    L"-fvk-bind-register", L"t18", L"0", L"69", L"0",
+    L"-fvk-bind-register", L"t19", L"0", L"70", L"0",
+    L"-fvk-bind-register", L"t20", L"0", L"71", L"0",
+    L"-fvk-bind-register", L"t21", L"0", L"72", L"0",
+    L"-fvk-bind-register", L"t22", L"0", L"73", L"0",
+    L"-fvk-bind-register", L"t23", L"0", L"74", L"0",
+    L"-fvk-bind-register", L"s16", L"0", L"75", L"0",
+    L"-fvk-bind-register", L"s17", L"0", L"76", L"0",
+    L"-fvk-bind-register", L"s18", L"0", L"77", L"0",
+    L"-fvk-bind-register", L"s19", L"0", L"78", L"0",
+    L"-fvk-bind-register", L"s20", L"0", L"79", L"0",
+    L"-fvk-bind-register", L"s21", L"0", L"80", L"0",
+    L"-fvk-bind-register", L"s22", L"0", L"81", L"0",
+    L"-fvk-bind-register", L"s23", L"0", L"82", L"0",
 };
+static_assert(Shader::kSrvBase == 4, "kCommonBindArgs names the sampled image bindings by number");
+static_assert(Shader::kSamplerBase == 20, "kCommonBindArgs names the sampler bindings by number");
+static_assert(Shader::kSrvHighBase == 67, "kCommonBindArgs names the sampled image bindings by number");
+static_assert(Shader::kSamplerHighBase == 75, "kCommonBindArgs names the sampler bindings by number");
 static constexpr uint32_t kCommonBindArgCount = uint32_t(sizeof(kCommonBindArgs) / sizeof(kCommonBindArgs[0]));
 
 // Per-stage b1 binding (binding 1 for VS, 2 for PS, 3 for GS).
@@ -346,7 +366,7 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 }
 
 // =================================================================================================
-// CreatePipelineLayout — descriptor set layout (67 bindings: see shader.h table) + pipeline layout
+// CreatePipelineLayout — descriptor set layout (83 bindings: see shader.h table) + pipeline layout
 
 bool Shader::CreatePipelineLayout(void) noexcept
 {
@@ -373,10 +393,10 @@ bool Shader::CreatePipelineLayout(void) noexcept
     addBinding(kBindingB1GS, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_GEOMETRY_BIT);
 
     for (uint32_t i = 0; i < kSrvSlots; ++i)
-        addBinding(kSrvBase + i, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
+        addBinding(SrvBinding(i), VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
 
     for (uint32_t i = 0; i < kSamplerSlots; ++i)
-        addBinding(kSamplerBase + i, VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
+        addBinding(SamplerBinding(i), VK_DESCRIPTOR_TYPE_SAMPLER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
 
     for (uint32_t i = 0; i < kUavSlots; ++i)
         addBinding(kUavBase + i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_ALL_GRAPHICS);
@@ -572,11 +592,12 @@ void Shader::UpdateStageResources(const std::vector<uint8_t>& spirv) noexcept
         if (b->binding < kBindingCount)
             m_bindingDeclared[b->binding] = true;
 #endif
-        if ((b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER) and (b->binding >= kSamplerBase) and (b->binding < kSamplerBase + kSamplerSlots)) {
-            m_samplerDeclared[b->binding - kSamplerBase] = true;
+        uint32_t slot = 0;
+        if ((b->descriptor_type == SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER) and SamplerSlotOfBinding(b->binding, slot)) {
+            m_samplerDeclared[slot] = true;
             continue;
         }
-        if ((b->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE) or (b->binding < kSrvBase) or (b->binding >= kSrvBase + kSrvSlots))
+        if ((b->descriptor_type != SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE) or not SrvSlotOfBinding(b->binding, slot))
             continue;
         if (not b->type_description or not (b->type_description->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT))
             continue;
@@ -590,7 +611,7 @@ void Shader::UpdateStageResources(const std::vector<uint8_t>& spirv) noexcept
             viewType = dvCube;
         else if (b->image.dim == SpvDim3D)
             viewType = dv3D;
-        m_srvDefaults[b->binding - kSrvBase] = viewType;
+        m_srvDefaults[slot] = viewType;
     }
 
     spvReflectDestroyShaderModule(&module);
@@ -1010,7 +1031,7 @@ bool Shader::UpdateVariables(void) noexcept {
     // the declared view type (m_srvDefaults, reflected in UpdateStageResources ()); every other
     // unbound slot is left unwritten.
     for (uint32_t i = 0; i < kSrvSlots; ++i) {
-        if (not m_bindingDeclared[kSrvBase + i])
+        if (not m_bindingDeclared[SrvBinding(i)])
             continue;
         VkImageView v = commandListHandler.m_boundSrvViews[i];
         VkImageLayout layout = commandListHandler.m_boundSrvLayouts[i];
@@ -1143,7 +1164,7 @@ void Shader::WriteDescriptorSet(VkDescriptorSet set, const DescriptorContents& c
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w.dstSet          = set;
-        w.dstBinding      = kSrvBase + i;
+        w.dstBinding      = SrvBinding(i);
         w.dstArrayElement = 0;
         w.descriptorCount = 1;
         w.descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -1165,7 +1186,7 @@ void Shader::WriteDescriptorSet(VkDescriptorSet set, const DescriptorContents& c
         VkWriteDescriptorSet& w = writes[writeCount++];
         w.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w.dstSet          = set;
-        w.dstBinding      = kSamplerBase + i;
+        w.dstBinding      = SamplerBinding(i);
         w.dstArrayElement = 0;
         w.descriptorCount = 1;
         w.descriptorType  = VK_DESCRIPTOR_TYPE_SAMPLER;
