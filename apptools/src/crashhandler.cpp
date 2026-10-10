@@ -20,7 +20,6 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
-#include <cxxabi.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <link.h>
@@ -532,7 +531,7 @@ static constexpr int	crashSignals[] = { SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT
 static constexpr int	crashSignalCount = static_cast<int>(sizeof(crashSignals) / sizeof(crashSignals[0]));
 static constexpr int	lineToolOptionCount = 7;
 static constexpr int	lineToolMissing = 127;
-static constexpr size_t	lineToolOutputSize = 64 * 1024;
+static constexpr size_t	lineToolOutputSize = 256 * 1024;
 static constexpr size_t	addressTextSize = 20;
 #if defined(__x86_64__) or defined(__i386__)
 static constexpr unsigned long pageFaultWrite = 0x02;
@@ -596,7 +595,8 @@ static FrameInfo		frameInfos[maxFrames];
 static int				moduleFrames[maxFrames];
 static char				addressTexts[maxFrames][addressTextSize];
 static char*			lineToolArguments[maxFrames + lineToolOptionCount + 1];
-static char*			lineToolOutputs[maxFrames];
+static char				lineToolOutput[lineToolOutputSize];
+static size_t			lineToolOutputLength;
 static char				lineToolName[] = "addr2line";
 static char				lineToolOptions[][3] = { "-a", "-C", "-f", "-i", "-e" };
 static sem_t			crashEvent;
@@ -706,51 +706,52 @@ static _Unwind_Reason_Code CollectFrame(struct _Unwind_Context* context, void* d
 static char* RunLineTool(int& exitCode)
 {
 	exitCode = -1;
+	if (lineToolOutputLength + 1 >= lineToolOutputSize)
+		return nullptr;
 	int pipeEnds[2];
 	if (pipe(pipeEnds) != 0)
 		return nullptr;
-	pid_t child = fork();
+	int		nullFile = open("/dev/null", O_WRONLY);
+	pid_t	child = vfork();
 	if (child < 0) {
 		close(pipeEnds[0]);
 		close(pipeEnds[1]);
+		close(nullFile);
 		return nullptr;
 	}
 	if (child == 0) {
-		int nullFile = open("/dev/null", O_WRONLY);
 		dup2(pipeEnds[1], STDOUT_FILENO);
 		dup2(nullFile, STDERR_FILENO);
 		close(pipeEnds[0]);
 		close(pipeEnds[1]);
+		close(nullFile);
 		execvp(lineToolName, lineToolArguments);
 		_exit(lineToolMissing);
 	}
 	close(pipeEnds[1]);
-	size_t	capacity = lineToolOutputSize;
+	close(nullFile);
+	char*	output = lineToolOutput + lineToolOutputLength;
+	size_t	capacity = lineToolOutputSize - lineToolOutputLength;
 	size_t	length = 0;
-	char*	output = static_cast<char*>(malloc(capacity));
-	while (output) {
-		if (length + 1 == capacity) {
-			capacity *= 2;
-			char* resized = static_cast<char*>(realloc(output, capacity));
-			if (not resized)
-				break;
-			output = resized;
-		}
+	while (length + 1 < capacity) {
 		ssize_t count = read(pipeEnds[0], output + length, capacity - 1 - length);
 		if (count > 0)
 			length += static_cast<size_t>(count);
 		else if ((count == 0) or (errno != EINTR))
 			break;
 	}
-	if (output)
-		output[length] = '\0';
+	bool isTruncated = (length + 1 == capacity);
+	output[length] = '\0';
+	lineToolOutputLength += length + 1;
 	close(pipeEnds[0]);
 	int		status = 0;
 	pid_t	result = 0;
 	do {
 		result = waitpid(child, &status, 0);
 	} while ((result < 0) and (errno == EINTR));
-	if ((result == child) and WIFEXITED(status))
+	if (isTruncated)
+		exitCode = 0;
+	else if ((result == child) and WIFEXITED(status))
 		exitCode = WEXITSTATUS(status);
 	return output;
 }
@@ -776,11 +777,9 @@ static void AssignLines(char* output, int frameCount)
 }
 
 
-static bool ResolveFrames(const TraceInfo& info, int& outputCount)
+static bool ResolveFrames(const TraceInfo& info)
 {
-	outputCount = 0;
-	for (int i = info.firstFrame; i < info.frameCount; ++i)
-		GetFrameInfo(info.frames[i], frameInfos[i]);
+	lineToolOutputLength = 0;
 	bool haveLineTool = false;
 	lineToolArguments[0] = lineToolName;
 	for (int i = 0; i < lineToolOptionCount - 2; ++i)
@@ -806,8 +805,6 @@ static bool ResolveFrames(const TraceInfo& info, int& outputCount)
 		char*	output = RunLineTool(exitCode);
 		if (not output)
 			return haveLineTool;
-		lineToolOutputs[outputCount] = output;
-		++outputCount;
 		if (exitCode == lineToolMissing)
 			return haveLineTool;
 		if (exitCode == 0) {
@@ -847,17 +844,22 @@ static bool WriteResolvedFrame(int file, const FrameInfo& frame, int& lineIndex)
 }
 
 
+static void WriteRawFrame(int file, int lineIndex, const FrameInfo& frame, uintptr_t address)
+{
+	if (not frame.moduleName)
+		WriteText(file, "  #%02d  0x%016llX\n", lineIndex, static_cast<unsigned long long>(address));
+	else if (frame.symbolName)
+		WriteText(file, "  #%02d  %s+0x%llX  %s + 0x%llX\n", lineIndex, frame.moduleName,
+				  static_cast<unsigned long long>(frame.moduleOffset), frame.symbolName,
+				  static_cast<unsigned long long>(frame.symbolOffset));
+	else
+		WriteText(file, "  #%02d  %s+0x%llX\n", lineIndex, frame.moduleName, static_cast<unsigned long long>(frame.moduleOffset));
+}
+
+
 static void WriteTrace(int file, const char* appName, const char* appVersion, const char* kind, const TraceInfo& info)
 {
-	time_t		now = time(nullptr);
-	struct tm	localTime;
-	localtime_r(&now, &localTime);
-	int		outputCount = 0;
-	bool	haveLineTool = ResolveFrames(info, outputCount);
-
 	WriteText(file, "%s %s %s report\n\n", appName, appVersion, kind);
-	WriteText(file, "time:      %04d-%02d-%02d %02d:%02d:%02d\n",
-			  localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec);
 	WriteText(file, "build:     %s\n", logHandler.BuildStamp());
 	if (info.signalNumber != 0)
 		WriteText(file, "reason:    %s (signal %d, code %d)\n", info.reason, info.signalNumber, info.signalCode);
@@ -870,7 +872,22 @@ static void WriteTrace(int file, const char* appName, const char* appVersion, co
 	if (*context)
 		WriteText(file, "context:   %s\n", context);
 
-	if (haveLineTool)
+	WriteText(file, "\nraw call stack:\n");
+
+	for (int i = info.firstFrame; i < info.frameCount; ++i) {
+		GetFrameInfo(info.frames[i], frameInfos[i]);
+		WriteRawFrame(file, i - info.firstFrame, frameInfos[i], info.frames[i]);
+	}
+	if (info.frameCount == maxFrames)
+		WriteText(file, "  ... truncated after %d frames\n", maxFrames);
+
+	time_t		now = time(nullptr);
+	struct tm	localTime;
+	localtime_r(&now, &localTime);
+	WriteText(file, "\ntime:      %04d-%02d-%02d %02d:%02d:%02d\n",
+			  localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec);
+
+	if (ResolveFrames(info))
 		WriteText(file, "symbols:   resolved with addr2line\n");
 	else
 		WriteText(file, "symbols:   addr2line not available, only exported function names\n");
@@ -882,22 +899,11 @@ static void WriteTrace(int file, const char* appName, const char* appVersion, co
 		const FrameInfo& frame = frameInfos[i];
 		if (WriteResolvedFrame(file, frame, lineIndex))
 			continue;
-		if (frame.symbolName) {
-			char* demangled = abi::__cxa_demangle(frame.symbolName, nullptr, nullptr, nullptr);
-			WriteText(file, "  #%02d  %s!%s + 0x%llX\n", lineIndex, frame.moduleName, demangled ? demangled : frame.symbolName,
-					  static_cast<unsigned long long>(frame.symbolOffset));
-			free(demangled);
-		}
-		else if (frame.moduleName)
-			WriteText(file, "  #%02d  %s+0x%llX\n", lineIndex, frame.moduleName, static_cast<unsigned long long>(frame.moduleOffset));
-		else
-			WriteText(file, "  #%02d  0x%016llX\n", lineIndex, static_cast<unsigned long long>(info.frames[i]));
+		WriteRawFrame(file, lineIndex, frame, info.frames[i]);
 		++lineIndex;
 	}
 	if (info.frameCount == maxFrames)
 		WriteText(file, "  ... truncated after %d frames\n", maxFrames);
-	for (int i = 0; i < outputCount; ++i)
-		free(lineToolOutputs[i]);
 }
 
 
