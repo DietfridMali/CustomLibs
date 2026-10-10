@@ -75,7 +75,7 @@ inline float Normalize(float v, float vMin, float vMax) {
 }
 
 // pulls everything below the middle towards the min value, everything above the middle towards the max value
-static float Stretch(float v, float vMin, float vMax)
+inline float Stretch(float v, float vMin, float vMax)
 {
 	float m = vMin + (vMax - vMin) * 0.5f;
 #ifdef _DEBUG
