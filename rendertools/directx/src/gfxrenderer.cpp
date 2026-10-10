@@ -167,9 +167,9 @@ void GfxRenderer::SavePipelineCache(void)
 }
 
 
-void GfxRenderer::PrecreatePipelines(void)
+void GfxRenderer::PrecreatePipelines(void (*progress)(int, int))
 {
-	PSO::PrecreatePSOs();
+	PSO::PrecreatePSOs(progress);
 }
 
 

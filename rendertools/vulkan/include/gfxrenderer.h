@@ -75,7 +75,7 @@ public:
 
 	virtual void SavePipelineCache(void) override;
 
-	virtual void PrecreatePipelines(void) override;
+	virtual void PrecreatePipelines(void (*progress)(int, int) = nullptr) override;
 
 	virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 

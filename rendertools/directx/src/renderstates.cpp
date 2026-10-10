@@ -414,11 +414,13 @@ bool PSO::SaveRecords(void)
 }
 
 
-void PSO::PrecreatePSOs(void)
+void PSO::PrecreatePSOs(void (*progress)(int, int))
 noexcept
 {
 	PipelineRecords& records = GetRecords();
 	for (int i = 0; i < records.names.Length(); ++i) {
+		if (progress)
+			progress(i, records.names.Length());
 		Shader* shader = baseShaderHandler.GetShader(records.names[i]);
 		if (not (shader and shader->IsValid()))
 			continue;

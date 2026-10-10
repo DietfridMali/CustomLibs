@@ -603,7 +603,7 @@ public:
 
 	virtual void SavePipelineCache(void) {}
 
-	virtual void PrecreatePipelines(void) {}
+	virtual void PrecreatePipelines(void (* /*progress*/)(int, int) = nullptr) {}
 
 #include "gfxapitype.h"
 };

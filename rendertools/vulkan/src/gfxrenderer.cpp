@@ -219,9 +219,9 @@ void GfxRenderer::SavePipelineCache(void)
 }
 
 
-void GfxRenderer::PrecreatePipelines(void)
+void GfxRenderer::PrecreatePipelines(void (*progress)(int, int))
 {
-	pipelineCache.Precreate();
+	pipelineCache.Precreate(progress);
 }
 
 // =================================================================================================

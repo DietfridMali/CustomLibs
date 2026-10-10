@@ -208,7 +208,7 @@ public:
 
 	static bool SavePipelineLibrary(void);
 
-	static void PrecreatePSOs(void)
+	static void PrecreatePSOs(void (*progress)(int, int) = nullptr)
 	noexcept;
 
 	static bool CreateComputePipeline(ID3D12Device* device, const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc,

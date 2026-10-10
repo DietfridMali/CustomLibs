@@ -93,7 +93,7 @@ public:
 	VkPipeline GetOrCreate(const PipelineKey& key)
 	noexcept;
 
-	void Precreate(void)
+	void Precreate(void (*progress)(int, int) = nullptr)
 	noexcept;
 
 	void CreateShaderLibraries(Shader* shader)

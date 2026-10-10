@@ -534,7 +534,7 @@ bool PipelineCache::SaveRecords(void)
 }
 
 
-void PipelineCache::Precreate(void)
+void PipelineCache::Precreate(void (*progress)(int, int))
 noexcept
 {
 #if VK_STALL_DIAG
@@ -545,6 +545,11 @@ noexcept
 #endif
 	m_precreating = true;
 	for (int i = 0; i < m_records.Length(); ++i) {
+		if (progress) {
+			m_precreating = false;
+			progress(i, m_records.Length());
+			m_precreating = true;
+		}
 		Shader* shader = baseShaderHandler.GetShader(m_recordNames[i]);
 		if (shader == nullptr) {
 #if VK_STALL_DIAG
