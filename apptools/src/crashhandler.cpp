@@ -418,7 +418,7 @@ void CrashHandler::WriteTrace(void* file, const char* kind, _EXCEPTION_POINTERS*
 	const EXCEPTION_RECORD*	record = exceptionPointers->ExceptionRecord;
 	unsigned long			code = record->ExceptionCode;
 
-	WriteText(file, "%s %s %s report\r\n\r\n", m_appName, m_appVersion, kind);
+	WriteText(file, "%s %s report\r\n\r\n", m_appVersion, kind);
 	WriteText(file, "time:      %04u-%02u-%02u %02u:%02u:%02u\r\n",
 			  crashTime.wYear, crashTime.wMonth, crashTime.wDay, crashTime.wHour, crashTime.wMinute, crashTime.wSecond);
 	WriteText(file, "build:     %s\r\n", logHandler.BuildStamp());
@@ -857,9 +857,9 @@ static void WriteRawFrame(int file, int lineIndex, const FrameInfo& frame, uintp
 }
 
 
-static void WriteTrace(int file, const char* appName, const char* appVersion, const char* kind, const TraceInfo& info)
+static void WriteTrace(int file, const char* appVersion, const char* kind, const TraceInfo& info)
 {
-	WriteText(file, "%s %s %s report\n\n", appName, appVersion, kind);
+	WriteText(file, "%s %s report\n\n", appVersion, kind);
 	WriteText(file, "build:     %s\n", logHandler.BuildStamp());
 	if (info.signalNumber != 0)
 		WriteText(file, "reason:    %s (signal %d, code %d)\n", info.reason, info.signalNumber, info.signalCode);
@@ -1031,7 +1031,7 @@ bool CrashHandler::WriteCallStack(const char* reason, char* fileName, size_t fil
 	if (MakeFileName(traceFile, sizeof(traceFile), "trace", "txt")) {
 		int file = open(traceFile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (file >= 0) {
-			WriteTrace(file, m_appName, m_appVersion, "trace", info);
+			WriteTrace(file, m_appVersion, "trace", info);
 			close(file);
 			isWritten = true;
 		}
@@ -1058,7 +1058,7 @@ void CrashHandler::WriteReport(void)
 	if (MakeFileName(fileName, sizeof(fileName), "crash", "txt")) {
 		int file = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (file >= 0) {
-			WriteTrace(file, m_appName, m_appVersion, "crash", crashInfo);
+			WriteTrace(file, m_appVersion, "crash", crashInfo);
 			close(file);
 		}
 	}
