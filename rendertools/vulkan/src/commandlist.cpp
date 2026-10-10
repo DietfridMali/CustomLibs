@@ -116,6 +116,16 @@ noexcept
 	vkStalls.frameNumber = nextFrame;
 }
 
+
+static void VkGpuPassResolve(VkDevice device, uint32_t slotIndex, uint64_t frameNumber)
+noexcept;
+
+static void VkGpuPassAdvance(uint32_t slotIndex)
+noexcept;
+
+static void VkGpuPassDestroy(VkDevice device)
+noexcept;
+
 #endif
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
@@ -182,6 +192,9 @@ void CommandQueue::Destroy(void)
 noexcept
 {
 	WaitIdle();
+#if VK_STALL_DIAG
+	VkGpuPassDestroy(m_device);
+#endif
 	DestroySyncObjects();
 	m_swapchain = VK_NULL_HANDLE;
 	m_graphicsQueue = VK_NULL_HANDLE;
@@ -216,6 +229,7 @@ noexcept
 	// The slot's resources hang on its fence alone, so they are reset before the image is acquired -
 	// a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
 #if VK_STALL_DIAG
+	VkGpuPassResolve(m_device, m_frameIndex, m_frameNumber);
 	stallStart = VkStallClock();
 	gfxResourceHandler.Cleanup(m_frameIndex);
 	VkStallNote("frame resource cleanup", stallStart, nullptr);
@@ -253,6 +267,9 @@ noexcept
 {
 	Present();
 	m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
+#if VK_STALL_DIAG
+	VkGpuPassAdvance(m_frameIndex);
+#endif
 }
 
 
@@ -452,6 +469,189 @@ noexcept
 	std::_Exit(1);
 }
 
+#if VK_STALL_DIAG
+
+static constexpr uint32_t	kGpuPassSlotSize = 256;
+static constexpr uint32_t	kGpuPassCycleMax = kGpuPassSlotSize / 2;
+static constexpr size_t		kGpuPassNameSize = 48;
+
+struct VkGpuPassRecord {
+	const CommandList*	list;
+	char				name[kGpuPassNameSize];
+	bool				isEnded;
+};
+
+struct VkGpuPassSlot {
+	uint32_t		first{ 0 };
+	uint32_t		count{ 0 };
+	uint32_t		dropped{ 0 };
+	uint64_t		frameNumber{ 0 };
+	uint32_t		previousFirst{ 0 };
+	uint32_t		previousCount{ 0 };
+	uint32_t		previousDropped{ 0 };
+	uint64_t		previousFrameNumber{ 0 };
+	VkGpuPassRecord	passes[kGpuPassSlotSize]{};
+};
+
+static VkQueryPool		vkGpuPassPool = VK_NULL_HANDLE;
+static bool				vkGpuPassUnavailable = false;
+static double			vkGpuPassPeriodMs = 0.0;
+static VkGpuPassSlot	vkGpuPassSlots[CommandQueue::FRAME_COUNT];
+static double			vkGpuPassTimes[kGpuPassCycleMax];
+
+
+static bool VkGpuPassCreate(void)
+noexcept
+{
+	if (vkGpuPassPool != VK_NULL_HANDLE)
+		return true;
+	if (vkGpuPassUnavailable)
+		return false;
+	VkDevice			device = vkContext.Device();
+	VkPhysicalDevice	physicalDevice = vkContext.PhysicalDevice();
+	uint32_t			familyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, nullptr);
+	std::vector<VkQueueFamilyProperties> families(familyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &familyCount, families.data());
+	uint32_t family = vkContext.GraphicsFamily();
+	if ((family >= familyCount) or (families[family].timestampValidBits == 0)) {
+		logHandler.Print("gpu pass timing: the graphics queue has no timestamps\n");
+		vkGpuPassUnavailable = true;
+		return false;
+	}
+	VkQueryPoolCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+	info.queryCount = CommandQueue::FRAME_COUNT * kGpuPassSlotSize * 2;
+	VkResult res = vkCreateQueryPool(device, &info, nullptr, &vkGpuPassPool);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("gpu pass timing: vkCreateQueryPool failed (%d)\n", int(res));
+		vkGpuPassPool = VK_NULL_HANDLE;
+		vkGpuPassUnavailable = true;
+		return false;
+	}
+	vkGpuPassPeriodMs = double(vkContext.DeviceProps().limits.timestampPeriod) * 1e-6;
+	return true;
+}
+
+
+static void VkGpuPassBegin(const CommandList* list, const char* name, VkCommandBuffer cb, uint32_t slotIndex)
+noexcept
+{
+	if (not VkGpuPassCreate())
+		return;
+	VkGpuPassSlot& slot = vkGpuPassSlots[slotIndex];
+	if (slot.count >= kGpuPassCycleMax) {
+		++slot.dropped;
+		return;
+	}
+	uint32_t index = (slot.first + slot.count) % kGpuPassSlotSize;
+	++slot.count;
+	VkGpuPassRecord& pass = slot.passes[index];
+	pass.list = list;
+	pass.isEnded = false;
+	snprintf(pass.name, sizeof(pass.name), "%s", name);
+	uint32_t query = (slotIndex * kGpuPassSlotSize + index) * 2;
+	vkCmdResetQueryPool(cb, vkGpuPassPool, query, 2);
+	vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuPassPool, query);
+}
+
+
+static void VkGpuPassEnd(const CommandList* list, VkCommandBuffer cb, uint32_t slotIndex)
+noexcept
+{
+	if (vkGpuPassPool == VK_NULL_HANDLE)
+		return;
+	VkGpuPassSlot& slot = vkGpuPassSlots[slotIndex];
+	for (uint32_t i = slot.count; i > 0; --i) {
+		uint32_t			index = (slot.first + i - 1) % kGpuPassSlotSize;
+		VkGpuPassRecord&	pass = slot.passes[index];
+		if ((pass.list != list) or pass.isEnded)
+			continue;
+		pass.isEnded = true;
+		vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuPassPool, (slotIndex * kGpuPassSlotSize + index) * 2 + 1);
+		return;
+	}
+}
+
+
+static void VkGpuPassAdvance(uint32_t slotIndex)
+noexcept
+{
+	VkGpuPassSlot& slot = vkGpuPassSlots[slotIndex];
+	slot.previousFirst = slot.first;
+	slot.previousCount = slot.count;
+	slot.previousDropped = slot.dropped;
+	slot.previousFrameNumber = slot.frameNumber;
+	slot.first = (slot.first + slot.count) % kGpuPassSlotSize;
+	slot.count = 0;
+	slot.dropped = 0;
+}
+
+
+static void VkGpuPassResolve(VkDevice device, uint32_t slotIndex, uint64_t frameNumber)
+noexcept
+{
+	VkGpuPassSlot&	slot = vkGpuPassSlots[slotIndex];
+	uint32_t		first = slot.previousFirst;
+	uint32_t		count = slot.previousCount;
+	uint32_t		dropped = slot.previousDropped;
+	uint64_t		passFrame = slot.previousFrameNumber;
+	slot.previousCount = 0;
+	slot.previousDropped = 0;
+	slot.frameNumber = frameNumber;
+	if ((vkGpuPassPool == VK_NULL_HANDLE) or (count == 0))
+		return;
+
+	uint64_t	firstBegin = UINT64_MAX;
+	uint64_t	lastEnd = 0;
+	double		totalMs = 0.0;
+	uint32_t	timed = 0;
+	for (uint32_t i = 0; i < count; ++i) {
+		uint32_t index = (first + i) % kGpuPassSlotSize;
+		uint64_t data[4]{};
+		vkGpuPassTimes[i] = -1.0;
+		if (not slot.passes[index].isEnded)
+			continue;
+		VkResult res = vkGetQueryPoolResults(device, vkGpuPassPool, (slotIndex * kGpuPassSlotSize + index) * 2, 2, sizeof(data), data,
+											 2 * sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WITH_AVAILABILITY_BIT);
+		if (((res != VK_SUCCESS) and (res != VK_NOT_READY)) or (data[1] == 0) or (data[3] == 0) or (data[2] < data[0]))
+			continue;
+		vkGpuPassTimes[i] = double(data[2] - data[0]) * vkGpuPassPeriodMs;
+		totalMs += vkGpuPassTimes[i];
+		++timed;
+		if (firstBegin > data[0])
+			firstBegin = data[0];
+		if (lastEnd < data[2])
+			lastEnd = data[2];
+	}
+	if (timed == 0)
+		return;
+	double spanMs = double(lastEnd - firstBegin) * vkGpuPassPeriodMs;
+	if (spanMs < kStallFrameMinMs)
+		return;
+	logHandler.Print("GPU frame %llu: span %.2f ms, passes %.2f ms, %u of %u passes timed, %u not recorded\n",
+					 static_cast<unsigned long long>(passFrame), spanMs, totalMs, timed, count, dropped);
+	for (uint32_t i = 0; i < count; ++i) {
+		if (vkGpuPassTimes[i] < kStallDetailMinMs)
+			continue;
+		logHandler.Print("      %-28s %8.2f ms\n", slot.passes[(first + i) % kGpuPassSlotSize].name, vkGpuPassTimes[i]);
+	}
+}
+
+
+static void VkGpuPassDestroy(VkDevice device)
+noexcept
+{
+	if ((vkGpuPassPool != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
+		vkDestroyQueryPool(device, vkGpuPassPool, nullptr);
+	vkGpuPassPool = VK_NULL_HANDLE;
+	for (VkGpuPassSlot& slot : vkGpuPassSlots)
+		slot = VkGpuPassSlot{};
+}
+
+#endif
+
 List<RenderStates> CommandList::m_renderStateStack;
 
 
@@ -566,6 +766,9 @@ noexcept
 		logHandler.Print("CommandList::Open: vkBeginCommandBuffer failed (%d)\n", (int)res);
 		return false;
 	}
+#if VK_STALL_DIAG
+	VkGpuPassBegin(this, static_cast<const char*>(m_name), m_cmdBuffers[fi], fi);
+#endif
 	m_isRecording = true;
 	m_isFlushed = false;
 	m_usesBackBuffer = false;
@@ -610,6 +813,9 @@ noexcept
 	uint32_t fi = ActiveFrameIndex();
 	if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == m_cmdBuffers[fi]))
 		baseDisplayHandler.SuspendBackBuffer();
+#if VK_STALL_DIAG
+	VkGpuPassEnd(this, m_cmdBuffers[fi], fi);
+#endif
 	VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
 	if (res != VK_SUCCESS)
 		logHandler.Print("CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
