@@ -66,6 +66,7 @@ template <typename T>
 constexpr bool OutOfBounds(T val, T minVal, T maxVal)
 	requires requires(T a, T b) { a < b; a > b; }
 {
+
 	return (val < minVal) or (val > maxVal);
 }
 

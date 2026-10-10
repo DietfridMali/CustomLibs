@@ -650,6 +650,7 @@ void LightningStrike::SetupStrike(const LightningCreationParams& params, int64_t
 	m_branchDepth = params.branchDepth;
 	m_branchChance = params.branchChance;
 	m_maxBranchTestSkips = params.maxBranchTestSkips;
+	m_branchLengthFactor = params.branchLengthFactor;
 	m_strokeCount = params.strokeCount;
 	m_strokeDecay = params.strokeDecay;
 	m_strokeGapMin = params.strokeGapMin;
@@ -801,7 +802,7 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
 		// length variation from a seeded hash (own stream via seed xor -- the i*3u streams below stay
 		// untouched), NOT the global Random: an animated strike regenerates every frame, so the lengths
 		// must be as deterministic as the branch structure or the branches jitter/flicker per frame.
-		float branchLength = remaining * (look.branchLengthFactor + float(int32_t(Hash01(seed ^ 0x9e3779b9u, uint32_t(i)) * 4.0f)) * 0.1f);
+		float branchLength = remaining * (BranchLengthFactor() + float(int32_t(Hash01(seed ^ 0x9e3779b9u, uint32_t(i)) * 4.0f)) * 0.1f);
 		if (branchLength < look.minBranchLength)
 			continue;
 		// accumulate branchChance at every node and only test once the skip window has run out; on a hit,
@@ -958,7 +959,7 @@ void LightningStrike::AddSurfaceBolt(const AutoArray<LightningPathNode>& path, L
 	for (int32_t i = 1; i < nodeCount - 1; i++) {
 		const LightningGuideNode&	guideNode = guide[i];
 		float						remaining = length - guideNode.arc;
-		float branchLength = remaining * (look.branchLengthFactor + float(int32_t(Hash01(seed ^ 0x9e3779b9u, uint32_t(i)) * 4.0f)) * 0.1f);
+		float branchLength = remaining * (BranchLengthFactor() + float(int32_t(Hash01(seed ^ 0x9e3779b9u, uint32_t(i)) * 4.0f)) * 0.1f);
 		if (branchLength < look.minBranchLength)
 			continue;
 		accumChance += m_branchChance * (kinks[i] / meanKink);

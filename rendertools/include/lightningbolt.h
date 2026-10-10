@@ -177,6 +177,7 @@ struct LightningCreationParams {
 	int32_t	branchDepth{ 2 }; // 0 = trunk only, 1 = trunk branches, 2 = branches branch, ...
 	float	branchChance{ 0.2f }; // per-node fork probability [0,1]
 	int32_t	maxBranchTestSkips{ 2 }; // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
+	float	branchLengthFactor{ -1.0f };
 	// arc only
 	int32_t	boltCount{ 3 }; // parallel bolts in the bundle
 	float	animSpeed{ 1.0f }; // writhe speed
@@ -447,6 +448,7 @@ public:
 	int32_t m_branchDepth{ 2 }; // recursion depth: 0 = trunk only, 1 = trunk has branches, 2 = branches have branches, ...
 	float						m_branchChance{ 1.0f }; // probability [0,1] that a sub-branch forks at each eligible node
 	int32_t m_maxBranchTestSkips{ 0 }; // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
+	float						m_branchLengthFactor{ -1.0f };
 	int32_t						m_strokeCount{ 0 };
 	float						m_strokeDecay{ 80.0f };
 	float						m_strokeGapMin{ 50.0f };
@@ -525,6 +527,10 @@ public:
 
 private:
 	int32_t LatestStroke(float ageMs, float& start) const;
+
+	inline float BranchLengthFactor(void) const {
+		return (m_branchLengthFactor >= 0.0f) ? m_branchLengthFactor : lightningLook.branchLengthFactor;
+	}
 
 	// branch structure is a deterministic function of `seed` (stable across frames); only `time` (the noise
 	// time axis) advances, so the strike wabers in place without the branches jumping around.
