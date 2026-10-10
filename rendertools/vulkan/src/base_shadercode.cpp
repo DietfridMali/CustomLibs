@@ -155,6 +155,7 @@ void BaseShaderCode::CreateShaders(const AutoArray<String>& shaderIds)
 
 void BaseShaderCode::CreateShader(const ShaderSource* source)
 {
+	logHandler.Print("compiling shader %s\n", static_cast<const char*>(source->m_name));
 	String prefix = FormatCompilerArgs(source->m_compilerArgs);
 	if (source->IsCompute()) {
 		String			cs = prefix + source->m_cs;

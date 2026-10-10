@@ -354,12 +354,16 @@ noexcept
 	support.apiVersion = VK_MAKE_API_VERSION(0, major, minor, 0);
 	if (support.apiVersion > VK_API_VERSION_1_3)
 		support.apiVersion = VK_API_VERSION_1_3;
-	if (support.apiVersion < VK_API_VERSION_1_2)
+	if (support.apiVersion < VK_API_VERSION_1_2) {
+		logHandler.Print("Vulkan device %s lacks required feature: Vulkan 1.2 (device has %u.%u)\n", props.deviceName, major, minor);
 		return support;
+	}
 
 	AutoArray<VkExtensionProperties> extensions;
-	if (not QueryDeviceExtensions(device, extensions))
+	if (not QueryDeviceExtensions(device, extensions)) {
+		logHandler.Print("Vulkan device %s: cannot read the list of device extensions\n", props.deviceName);
 		return support;
+	}
 	const bool core13 = support.apiVersion >= VK_API_VERSION_1_3;
 	const bool hasDynamicRenderingExt = HasDeviceExtension(extensions, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
 	const bool hasSync2Ext = HasDeviceExtension(extensions, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
@@ -417,13 +421,30 @@ noexcept
 		append(featsLocalRead);
 	vkGetPhysicalDeviceFeatures2(device, &features);
 
-	if (core13)
-		support.isUsable = feats13.dynamicRendering and feats13.synchronization2 and feats13.shaderDemoteToHelperInvocation;
-	else
-		support.isUsable = featsDynamicRendering.dynamicRendering and featsSync2.synchronization2 and
-			featsDemote.shaderDemoteToHelperInvocation and featsEds.extendedDynamicState and
-			featsEds2.extendedDynamicState2;
-	support.isUsable = support.isUsable and hasSwapchainExt;
+	auto require = [&props](bool isAvailable, const char* name) {
+		if (not isAvailable)
+			logHandler.Print("Vulkan device %s lacks required feature: %s\n", props.deviceName, name);
+		return isAvailable;
+	};
+	support.isUsable = require(hasSwapchainExt, VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+	if (core13) {
+		support.isUsable = require(feats13.dynamicRendering, "dynamicRendering") and support.isUsable;
+		support.isUsable = require(feats13.synchronization2, "synchronization2") and support.isUsable;
+		support.isUsable = require(feats13.shaderDemoteToHelperInvocation, "shaderDemoteToHelperInvocation") and support.isUsable;
+	}
+	else {
+		support.isUsable = require(featsDynamicRendering.dynamicRendering,
+								   "dynamicRendering (" VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME ")") and support.isUsable;
+		support.isUsable = require(featsSync2.synchronization2,
+								   "synchronization2 (" VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME ")") and support.isUsable;
+		support.isUsable = require(featsDemote.shaderDemoteToHelperInvocation,
+								   "shaderDemoteToHelperInvocation (" VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME ")") and
+			support.isUsable;
+		support.isUsable = require(featsEds.extendedDynamicState,
+								   "extendedDynamicState (" VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME ")") and support.isUsable;
+		support.isUsable = require(featsEds2.extendedDynamicState2,
+								   "extendedDynamicState2 (" VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME ")") and support.isUsable;
+	}
 
 	const VkPhysicalDeviceFeatures&	core = features.features;
 	auto							set = [&support](GfxFeature feature, bool isAvailable) {
@@ -445,6 +466,10 @@ noexcept
 	set(GfxFeature::UnusedAttachments, hasUnusedAttExt and featsUnusedAtt.dynamicRenderingUnusedAttachments);
 	set(GfxFeature::RayTracing, ((request.Requested() & GfxFeatureBit(GfxFeature::RayTracing)) != 0) and SupportsRayTracing(device));
 	set(GfxFeature::PipelineLibrary, SupportsPipelineLibrary(device));
+	for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
+		if ((request.required & ~support.features) & GfxFeatureBit(GfxFeature(i)))
+			logHandler.Print("Vulkan device %s lacks required feature: %s\n", props.deviceName, GfxFeatureName(GfxFeature(i)));
+	}
 	return support;
 }
 
@@ -458,13 +483,8 @@ noexcept
 	DeviceSupport support = QueryDeviceSupport(device, request);
 	if (not support.isUsable)
 		return -1;
-	if ((request.required & ~support.features) != 0) {
-		for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
-			if ((request.required & ~support.features) & GfxFeatureBit(GfxFeature(i)))
-				logHandler.Print("Vulkan device %s lacks required feature: %s\n", props.deviceName, GfxFeatureName(GfxFeature(i)));
-		}
+	if ((request.required & ~support.features) != 0)
 		return -1;
-	}
 
 	int score = 0;
 	if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
