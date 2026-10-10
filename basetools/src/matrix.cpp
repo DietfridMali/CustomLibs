@@ -1,6 +1,6 @@
 #define COMPILE_MATRIX
 #if USE_GLM
-#   include "glm_matrix.cpp"
+#include "glm_matrix.cpp"
 #else
-#	include "custom_matrix.cpp"
+#include "custom_matrix.cpp"
 #endif

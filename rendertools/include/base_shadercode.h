@@ -19,14 +19,14 @@
 // (hlslbridge.inl) share one definition.
 
 inline String GLSLVersion(const char* value = "430 core") {
-    return (value and *value) ? String("#version ") + String(value) + String("\n") : String("");
+	return (value and *value) ? String("#version ") + String(value) + String("\n") : String("");
 }
 
 // =================================================================================================
 
 struct ShaderMacro {
-    String  m_name{ "" };
-    String  m_value{ "" };
+	String m_name{ "" };
+	String m_value{ "" };
 };
 
 // =================================================================================================
@@ -35,129 +35,131 @@ struct ShaderMacro {
 // VkDescriptorSetLayout / D3D12 root signature.
 
 struct ComputeBindingDesc {
-    enum class Kind {
-        UniformBuffer,
-        SampledImage,
-        StorageImage,
-        StorageBuffer,
-        Sampler,
-        CombinedImageSampler,
-        ReadOnlyBuffer
-    };
-    uint32_t    binding{ 0 };
-    Kind        kind{ Kind::UniformBuffer };
-    uint32_t    count{ 1 };
+	enum class Kind {
+		UniformBuffer,
+		SampledImage,
+		StorageImage,
+		StorageBuffer,
+		Sampler,
+		CombinedImageSampler,
+		ReadOnlyBuffer
+	};
+	uint32_t	binding{ 0 };
+	Kind		kind{ Kind::UniformBuffer };
+	uint32_t	count{ 1 };
 };
 
 // =================================================================================================
 
 struct ShaderSourceParams {
-    String                          vs{ "" };
-    String                          fs{ "" };
-    String                          gs{ "" };
-    // Tessellation control and evaluation source - both or neither. A program with them is drawn
-    // with patches (OpenGL: GfxDataLayout::Render ()).
-    String                          tcs{ "" };
-    String                          tes{ "" };
-    // Compute source — when non-empty, the shader is treated as a compute shader (vs/fs/gs
-    // should be empty in that case). Target profile is cs_6_0 (DXC). Compute shaders skip the
-    // graphics PSO / vertex-input setup; instead the backend builds a compute pipeline using
-    // computeBindings as the descriptor-set layout source.
-    String                          cs{ "" };
-    AutoArray<ComputeBindingDesc>   computeBindings{};
-    AutoArray<ShaderMacro>          compilerArgs;
-    ShaderDataLayout                dataLayout;
-    int                             featureLevel{ 0 };
+	String vs{ "" };
+	String fs{ "" };
+	String gs{ "" };
+	// Tessellation control and evaluation source - both or neither. A program with them is drawn
+	// with patches (OpenGL: GfxDataLayout::Render ()).
+	String tcs{ "" };
+	String tes{ "" };
+	// Compute source — when non-empty, the shader is treated as a compute shader (vs/fs/gs
+	// should be empty in that case). Target profile is cs_6_0 (DXC). Compute shaders skip the
+	// graphics PSO / vertex-input setup; instead the backend builds a compute pipeline using
+	// computeBindings as the descriptor-set layout source.
+	String							cs{ "" };
+	AutoArray<ComputeBindingDesc>	computeBindings{};
+	AutoArray<ShaderMacro>			compilerArgs;
+	ShaderDataLayout				dataLayout;
+	int								featureLevel{ 0 };
 };
 
 // =================================================================================================
 
 class ShaderSource {
 public:
-    using KeyType = String;
+	using KeyType = String;
 
-    String                          m_name{ "" };
-    String                          m_vs{ "" };
-    String                          m_fs{ "" };
-    String                          m_gs{ "" };
-    String                          m_tcs{ "" };
-    String                          m_tes{ "" };
-    String                          m_cs{ "" };
-    AutoArray<ComputeBindingDesc>   m_computeBindings{};
-    mutable AutoArray<ShaderMacro>  m_compilerArgs{};
-    int                             m_featureLevel{ 0 };
-    ShaderDataLayout                m_dataLayout;
+	String							m_name{ "" };
+	String							m_vs{ "" };
+	String							m_fs{ "" };
+	String							m_gs{ "" };
+	String							m_tcs{ "" };
+	String							m_tes{ "" };
+	String							m_cs{ "" };
+	AutoArray<ComputeBindingDesc>	m_computeBindings{};
+	mutable AutoArray<ShaderMacro>	m_compilerArgs{};
+	int								m_featureLevel{ 0 };
+	ShaderDataLayout				m_dataLayout;
 
-    ShaderSource() = default;
+	ShaderSource() = default;
 
-    explicit ShaderSource(String name, const ShaderSourceParams& params)
-        : m_name(name)
-        , m_vs(params.vs)
-        , m_fs(params.fs)
-        , m_gs(params.gs)
-        , m_tcs(params.tcs)
-        , m_tes(params.tes)
-        , m_cs(params.cs)
-        , m_computeBindings(params.computeBindings)
-        , m_compilerArgs(params.compilerArgs)
-        , m_featureLevel(params.featureLevel)
-        , m_dataLayout(params.dataLayout)
-    { }
+	explicit ShaderSource(String name, const ShaderSourceParams& params)
+		: m_name(name)
+		, m_vs(params.vs)
+		, m_fs(params.fs)
+		, m_gs(params.gs)
+		, m_tcs(params.tcs)
+		, m_tes(params.tes)
+		, m_cs(params.cs)
+		, m_computeBindings(params.computeBindings)
+		, m_compilerArgs(params.compilerArgs)
+		, m_featureLevel(params.featureLevel)
+		, m_dataLayout(params.dataLayout)
+	{}
 
-    explicit ShaderSource(String name, String vs, String fs, String gs = "", AutoArray<ShaderMacro> compilerArgs = {}, int featureLevel = 0)
-        : m_name(name)
-        , m_vs(vs)
-        , m_fs(fs)
-        , m_gs(gs)
-        , m_compilerArgs(compilerArgs)
-        , m_featureLevel(featureLevel)
-    { }
+	explicit ShaderSource(String name, String vs, String fs, String gs = "", AutoArray<ShaderMacro> compilerArgs = {}, int featureLevel = 0)
+		: m_name(name)
+		, m_vs(vs)
+		, m_fs(fs)
+		, m_gs(gs)
+		, m_compilerArgs(compilerArgs)
+		, m_featureLevel(featureLevel)
+	{}
 
-    explicit ShaderSource(String name, String vs, String fs, ShaderDataLayout layout, AutoArray<ShaderMacro> compilerArgs = {}, int featureLevel = 0)
-        : m_name(name)
-        , m_vs(vs)
-        , m_fs(fs)
-        , m_compilerArgs(compilerArgs)
-        , m_featureLevel(featureLevel)
-        , m_dataLayout(layout)
-    { }
+	explicit ShaderSource(String name, String vs, String fs, ShaderDataLayout layout, AutoArray<ShaderMacro> compilerArgs = {},
+						  int featureLevel = 0)
+		: m_name(name)
+		, m_vs(vs)
+		, m_fs(fs)
+		, m_compilerArgs(compilerArgs)
+		, m_featureLevel(featureLevel)
+		, m_dataLayout(layout)
+	{}
 
-    explicit ShaderSource(String name, String vs, String fs, String gs, ShaderDataLayout layout, AutoArray<ShaderMacro> compilerArgs = {}, int featureLevel = 0)
-        : m_name(name)
-        , m_vs(vs)
-        , m_fs(fs)
-        , m_gs(gs)
-        , m_compilerArgs(compilerArgs)
-        , m_featureLevel(featureLevel)
-        , m_dataLayout(layout)
-    { }
+	explicit ShaderSource(String name, String vs, String fs, String gs, ShaderDataLayout layout,
+						  AutoArray<ShaderMacro> compilerArgs = {}, int featureLevel = 0)
+		: m_name(name)
+		, m_vs(vs)
+		, m_fs(fs)
+		, m_gs(gs)
+		, m_compilerArgs(compilerArgs)
+		, m_featureLevel(featureLevel)
+		, m_dataLayout(layout)
+	{}
 
-    ShaderSource(const ShaderSource& other)
-        : m_name(other.m_name)
-        , m_vs(other.m_vs)
-        , m_fs(other.m_fs)
-        , m_gs(other.m_gs)
-        , m_tcs(other.m_tcs)
-        , m_tes(other.m_tes)
-        , m_cs(other.m_cs)
-        , m_computeBindings(other.m_computeBindings)
-        , m_compilerArgs(other.m_compilerArgs)
-        , m_featureLevel(other.m_featureLevel)
-        , m_dataLayout(other.m_dataLayout)
-    {
-    }
+	ShaderSource(const ShaderSource& other)
+		: m_name(other.m_name)
+		, m_vs(other.m_vs)
+		, m_fs(other.m_fs)
+		, m_gs(other.m_gs)
+		, m_tcs(other.m_tcs)
+		, m_tes(other.m_tes)
+		, m_cs(other.m_cs)
+		, m_computeBindings(other.m_computeBindings)
+		, m_compilerArgs(other.m_compilerArgs)
+		, m_featureLevel(other.m_featureLevel)
+		, m_dataLayout(other.m_dataLayout)
+	{
+	}
 
-    inline String& GetKey(void) {
-        return m_name;
-    }
+	inline String& GetKey(void) {
+		return m_name;
+	}
 
-    inline bool IsCompute(void) const {
-        return not m_cs.IsEmpty();
-    }
+	inline bool IsCompute(void) const {
+		return not m_cs.IsEmpty();
+	}
 
-    inline void SetCompilerArgs(const AutoArray<ShaderMacro>& args) const {
-        m_compilerArgs = args;
-    }
+	inline void SetCompilerArgs(const AutoArray<ShaderMacro>& args) const {
+		m_compilerArgs = args;
+	}
 #if 0    
     inline const bool operator< (ShaderSource const& other) {
         return m_name < other.m_name;
@@ -210,36 +212,34 @@ const String& VignetteFunc();
 class ComputeShader;
 
 class BaseShaderCode
-    : public Shader
-{
+	: public Shader {
 protected:
-    Dictionary<String, Shader*>         m_shaders;
-    Dictionary<String, ComputeShader*>  m_computeShaders;
-    AutoArray<const ShaderSource*>      m_shaderSources;
-    String                              m_shaderFolder;
+	Dictionary<String, Shader*>			m_shaders;
+	Dictionary<String, ComputeShader*>	m_computeShaders;
+	AutoArray<const ShaderSource*>		m_shaderSources;
+	String								m_shaderFolder;
 
-    void CreateShader(const ShaderSource* source);
+	void CreateShader(const ShaderSource* source);
 
 public:
-    BaseShaderCode(const String& shaderFolder);
-    ~BaseShaderCode() = default;
+	BaseShaderCode(const String& shaderFolder);
+	~BaseShaderCode() = default;
 
-    void AddShaders(AutoArray<const ShaderSource*>& shaderSource);
+	void AddShaders(AutoArray<const ShaderSource*>& shaderSource);
 
-    void CreateShaders(void);
+	void CreateShaders(void);
 
-    void CreateShaders(const AutoArray<String>& shaderIds);
+	void CreateShaders(const AutoArray<String>& shaderIds);
 
-    inline Shader* GetShader(const String& shaderId) {
-        Shader** shader = m_shaders.Find(shaderId);
-        return shader ? *shader : nullptr;
-    }
+	inline Shader* GetShader(const String& shaderId) {
+		Shader** shader = m_shaders.Find(shaderId);
+		return shader ? *shader : nullptr;
+	}
 
-    inline ComputeShader* SetupComputeShader(String shaderId) {
-        ComputeShader** shader = m_computeShaders.Find(shaderId);
-        return shader ? *shader : nullptr;
-    }
+	inline ComputeShader* SetupComputeShader(String shaderId) {
+		ComputeShader** shader = m_computeShaders.Find(shaderId);
+		return shader ? *shader : nullptr;
+	}
 };
 
 // =================================================================================================
-

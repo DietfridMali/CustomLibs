@@ -25,76 +25,87 @@ class LightningSystem;
 //                       within coneAngle of the reference direction (end - start), times radius. coneAngle
 //                       180 = the full sphere -> ends land anywhere on a sphere of that radius.
 
-enum eLightningKind { lkStrike, lkArc };
+enum eLightningKind { lkStrike,
+					  lkArc };
 
-enum eLightningMode { lmOneShot, lmRepeating, lmPersistent };
+enum eLightningMode { lmOneShot,
+					  lmRepeating,
+					  lmPersistent };
 
-enum eEndpointMode { epFixed, epRandomDirection };
+enum eEndpointMode { epFixed,
+					 epRandomDirection };
 
 // -------------------------------------------------------------------------------------------------
 
 struct LightningEmitterParams {
-    eLightningKind kind{ lkStrike };
-    eLightningMode mode{ lmRepeating };
-    int32_t        count{ 1 };        // lightnings created per ignition (explosion rods: many)
-    float          offTime{ 0.0f };   // seconds of darkness between one discharge and the next
-    float          timeJitter{ 0.25f };  // +/- fraction applied to burn time and off time, so emitters don't pulse in lockstep
-    eEndpointMode  endpointMode{ epFixed };
-    float          radius{ 0.0f };    // epRandomDirection: distance of the drawn end from the start
-    float          radiusJitter{ 0.25f };  // +/- fraction on the radius
-    float          coneAngle{ 180.0f };  // epRandomDirection: max angle (deg) off the reference direction; 180 = full sphere
-    float          coneAngleMin{ 0.0f };
-    bool           evenSpread{ false };
-    float          startOffset{ 0.0f };  // push both endpoints out along the bolt direction by [offset * (1 - startOffsetJitter), offset] (keeps bolts off an object's centre)
-    float          startOffsetJitter{ 0.5f };
-    bool           startOffsetOnly{ false };
-    int64_t        ttl{ 0 };          // safety net in ms: 0 = lives until Destroy (); > 0 = the system is reaped anyway
+	eLightningKind	kind{ lkStrike };
+	eLightningMode	mode{ lmRepeating };
+	int32_t			count{ 1 }; // lightnings created per ignition (explosion rods: many)
+	float			offTime{ 0.0f }; // seconds of darkness between one discharge and the next
+	float			timeJitter{ 0.25f }; // +/- fraction applied to burn time and off time, so emitters don't pulse in lockstep
+	eEndpointMode	endpointMode{ epFixed };
+	float			radius{ 0.0f }; // epRandomDirection: distance of the drawn end from the start
+	float			radiusJitter{ 0.25f }; // +/- fraction on the radius
+	float			coneAngle{ 180.0f }; // epRandomDirection: max angle (deg) off the reference direction; 180 = full sphere
+	float			coneAngleMin{ 0.0f };
+	bool			evenSpread{ false };
+	float			startOffset{
+		 0.0f
+	}; // push both endpoints out along the bolt direction by [offset * (1 - startOffsetJitter), offset] (keeps bolts off an object's centre)
+	float	startOffsetJitter{ 0.5f };
+	bool	startOffsetOnly{ false };
+	int64_t	ttl{ 0 }; // safety net in ms: 0 = lives until Destroy (); > 0 = the system is reaped anyway
 };
 
 // -------------------------------------------------------------------------------------------------
 
 class LightningEmitter {
 public:
-    LightningCreationParams m_params;                 // handed to every lightning it ignites
-    LightningEmitterParams  m_emitterParams;
-    Vector3f                m_start{ Vector3f::ZERO };
-    Vector3f                m_end{ Vector3f::ZERO };
-    int64_t                 m_burnUntil{ 0 };         // end of the current discharge
-    int64_t                 m_nextIgnition{ 0 };      // start of the next one
-    bool                    m_burning{ false };
-    bool                    m_ignited{ false };       // has fired at least once (lmOneShot / lmPersistent)
+	LightningCreationParams	m_params; // handed to every lightning it ignites
+	LightningEmitterParams	m_emitterParams;
+	Vector3f				m_start{ Vector3f::ZERO };
+	Vector3f				m_end{ Vector3f::ZERO };
+	int64_t					m_burnUntil{ 0 }; // end of the current discharge
+	int64_t					m_nextIgnition{ 0 }; // start of the next one
+	bool					m_burning{ false };
+	bool					m_ignited{ false }; // has fired at least once (lmOneShot / lmPersistent)
 
-    LightningEmitter() = default;
+	LightningEmitter() = default;
 
-    void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, const LightningEmitterParams& emitterParams, int64_t now);
+	void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params,
+			   const LightningEmitterParams& emitterParams, int64_t now);
 
-    // Moves the source. The running discharge is NOT re-aimed here -- the system does that for its
-    // lightnings; this only decides where the NEXT ignition happens.
-    inline void SetEndpoints(const Vector3f& start, const Vector3f& end) noexcept {
-        m_start = start;
-        m_end = end;
-    }
+	// Moves the source. The running discharge is NOT re-aimed here -- the system does that for its
+	// lightnings; this only decides where the NEXT ignition happens.
+	inline void SetEndpoints(const Vector3f& start, const Vector3f& end)
+	noexcept
+	{
+		m_start = start;
+		m_end = end;
+	}
 
-    // Carry the source along without re-aiming it - see BaseLightning::Translate.
-    inline void Translate(const Vector3f& offset) noexcept {
-        m_start += offset;
-        m_end += offset;
-    }
+	// Carry the source along without re-aiming it - see BaseLightning::Translate.
+	inline void Translate(const Vector3f& offset)
+	noexcept
+	{
+		m_start += offset;
+		m_end += offset;
+	}
 
-    inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
-        m_start = newPivot + rotation * (m_start - pivot);
-        m_end = newPivot + rotation * (m_end - pivot);
-    }
+	inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
+		m_start = newPivot + rotation * (m_start - pivot);
+		m_end = newPivot + rotation * (m_end - pivot);
+	}
 
-    // Ignite / extinguish as the clock demands. Returns true if the system's content changed (something
-    // was created or removed), so the renderer knows its segment buffer is stale.
-    bool Update(int64_t now, LightningSystem& system);
+	// Ignite / extinguish as the clock demands. Returns true if the system's content changed (something
+	// was created or removed), so the renderer knows its segment buffer is stale.
+	bool Update(int64_t now, LightningSystem& system);
 
 private:
-    void Ignite(int64_t now, LightningSystem& system);
+	void Ignite(int64_t now, LightningSystem& system);
 
-    // One pair of endpoints for a single lightning of this ignition (per-lightning random draw).
-    void DrawEndpoints(int32_t index, int32_t count, Vector3f& start, Vector3f& end) const;
+	// One pair of endpoints for a single lightning of this ignition (per-lightning random draw).
+	void DrawEndpoints(int32_t index, int32_t count, Vector3f& start, Vector3f& end) const;
 };
 
 // =================================================================================================

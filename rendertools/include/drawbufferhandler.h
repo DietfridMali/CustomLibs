@@ -12,57 +12,62 @@
 
 class RenderTarget;
 
-class DrawBufferHandler
-{
+class DrawBufferHandler {
 public:
-    using DrawBufferList = AutoArray <GfxTypes::Uint>;
+	using DrawBufferList = AutoArray<GfxTypes::Uint>;
 
-    // Custom draw-buffer setup (RenderTarget::SelectCustomDrawBuffers). Entry i is the BUFFER INDEX of the
-    // render target's buffer bound to fragment output slot i, or CUSTOM_DRAW_BUFFER_NONE for a slot that is
-    // left unwritten. API-neutral on purpose: the OpenGL backend translates the indices into attachment
-    // points, DX and Vulkan into RTVs / colour attachments, so one and the same list works everywhere.
-    using CustomDrawBufferList = AutoArray <int>;
+	// Custom draw-buffer setup (RenderTarget::SelectCustomDrawBuffers). Entry i is the BUFFER INDEX of the
+	// render target's buffer bound to fragment output slot i, or CUSTOM_DRAW_BUFFER_NONE for a slot that is
+	// left unwritten. API-neutral on purpose: the OpenGL backend translates the indices into attachment
+	// points, DX and Vulkan into RTVs / colour attachments, so one and the same list works everywhere.
+	using CustomDrawBufferList = AutoArray<int>;
 
-    static constexpr int CUSTOM_DRAW_BUFFER_NONE = -1;
+	static constexpr int CUSTOM_DRAW_BUFFER_NONE = -1;
 
 protected:
-    RenderTarget*       m_activeBuffer{ nullptr };
-    List<RenderTarget*> m_drawBufferStack{};
-    int                 m_suspendCount{ 0 };
-    int                 m_suspendBase{ 0 };
-    int                 m_windowWidth{ 0 };
-    int                 m_windowHeight{ 0 };
+	RenderTarget*		m_activeBuffer{ nullptr };
+	List<RenderTarget*>	m_drawBufferStack{};
+	int					m_suspendCount{ 0 };
+	int					m_suspendBase{ 0 };
+	int					m_windowWidth{ 0 };
+	int					m_windowHeight{ 0 };
 
 public:
-    DrawBufferHandler() = default;
+	DrawBufferHandler() = default;
 
-    ~DrawBufferHandler() = default;
+	~DrawBufferHandler() = default;
 
-    void Setup(int windowWidth, int windowHeight);
+	void Setup(int windowWidth, int windowHeight);
 
-    void ActivateDrawBuffer(RenderTarget* buffer);
+	void ActivateDrawBuffer(RenderTarget* buffer);
 
-    bool DeactivateDrawBuffer(RenderTarget* buffer);
+	bool DeactivateDrawBuffer(RenderTarget* buffer);
 
-    void ResetDrawBuffers(void);
+	void ResetDrawBuffers(void);
 
-    void SuspendDrawBuffers(void);
+	void SuspendDrawBuffers(void);
 
-    void ResumeDrawBuffers(void);
+	void ResumeDrawBuffers(void);
 
-    inline bool DrawBuffersSuspended(void) const noexcept {
-        return (m_suspendCount > 0) and (m_activeBuffer == nullptr);
-    }
+	inline bool DrawBuffersSuspended(void) const
+	noexcept
+	{
+		return (m_suspendCount > 0) and (m_activeBuffer == nullptr);
+	}
 
-    void SetActiveDrawBuffers(void);
+	void SetActiveDrawBuffers(void);
 
-    inline RenderTarget* GetActiveBuffer(void) noexcept {
-        return m_activeBuffer;
-    }
+	inline RenderTarget* GetActiveBuffer(void)
+	noexcept
+	{
+		return m_activeBuffer;
+	}
 
-    inline bool IsActiveDrawBuffer(RenderTarget* buffer) noexcept {
-        return (buffer != nullptr) and (buffer == m_activeBuffer);
-    }
+	inline bool IsActiveDrawBuffer(RenderTarget* buffer)
+	noexcept
+	{
+		return (buffer != nullptr) and (buffer == m_activeBuffer);
+	}
 };
 
 // =================================================================================================

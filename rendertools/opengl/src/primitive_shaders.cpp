@@ -5,11 +5,12 @@
 
 // =================================================================================================
 
-const ShaderSource& LineShader() {
-    static const ShaderSource source(
-        "lineShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& LineShader()
+{
+	static const ShaderSource source(
+		"lineShader",
+		Standard2DVS(),
+		R"(
             #version 330
 
             uniform vec2 viewportSize;   // Pixel
@@ -57,15 +58,16 @@ const ShaderSource& LineShader() {
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
             )");
-    return source;
+	return source;
 }
 
 
-const ShaderSource& RingShader() {
-    static const ShaderSource source(
-        "ringShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& RingShader()
+{
+	static const ShaderSource source(
+		"ringShader",
+		Standard2DVS(),
+		R"(
             #version 330
 
             uniform vec2  center;          // [0..1] UV
@@ -193,15 +195,16 @@ const ShaderSource& RingShader() {
                 fragColor = vec4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
         )");
-    return source;
+	return source;
 }
 
 
 // render a b/w mask with color applied.
-const ShaderSource& CircleShader() {
-    static const ShaderSource source(
-        "circleShader",
-        R"(
+const ShaderSource& CircleShader()
+{
+	static const ShaderSource source(
+		"circleShader",
+		R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -221,7 +224,7 @@ const ShaderSource& CircleShader() {
                 vertexY = position.y;
                 }
         )",
-        R"(
+		R"(
             #version 330
             
             uniform vec2 viewportSize;   // Pixel
@@ -272,15 +275,16 @@ const ShaderSource& CircleShader() {
 #endif
             }
         )");
-    return source;
+	return source;
 }
 
 // render a b/w mask with color applied.
-const ShaderSource& CircleMaskShader() {
-    static const ShaderSource source(
-        "circleMaskShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& CircleMaskShader()
+{
+	static const ShaderSource source(
+		"circleMaskShader",
+		Standard2DVS(),
+		R"(
             #version 330
 
             uniform sampler2D surface;
@@ -338,16 +342,17 @@ const ShaderSource& CircleMaskShader() {
 #endif
             }
         )");
-    return source;
+	return source;
 }
 
 
 // render a b/w mask with color applied.
-const ShaderSource& RectangleShader() {
-    static const ShaderSource source(
-        "rectangleShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& RectangleShader()
+{
+	static const ShaderSource source(
+		"rectangleShader",
+		Standard2DVS(),
+		R"(
             #version 330
 
             in vec2 fragCoord;         // UV [0..1]
@@ -407,7 +412,7 @@ const ShaderSource& RectangleShader() {
             }
         )");
 
-    return source;
+	return source;
 }
 
 
@@ -417,11 +422,12 @@ const ShaderSource& RectangleShader() {
 //   innerColor / outerColor - base-colour brightness multiplier at the inner / outer edge (1,1 = none).
 // To grade the whole rectangle instead of just the border, set strength = half the rect size.
 // Only affects the stroke (strength > 0); the filled branch is unchanged.
-const ShaderSource& ShadedRectangleShader() {
-    static const ShaderSource source(
-        "shadedRectangleShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& ShadedRectangleShader()
+{
+	static const ShaderSource source(
+		"shadedRectangleShader",
+		Standard2DVS(),
+		R"(
             #version 330
 
             in vec2 fragCoord;
@@ -479,16 +485,17 @@ const ShaderSource& ShadedRectangleShader() {
             }
         )");
 
-    return source;
+	return source;
 }
 
 
 // ring / arc with an independent alpha/colour gradient across the ring band (see shadedRectangleShader).
-const ShaderSource& ShadedRingShader() {
-    static const ShaderSource source(
-        "shadedRingShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& ShadedRingShader()
+{
+	static const ShaderSource source(
+		"shadedRingShader",
+		Standard2DVS(),
+		R"(
             #version 330
 
             uniform vec2  center;
@@ -569,7 +576,7 @@ const ShaderSource& ShadedRingShader() {
             }
         )");
 
-    return source;
+	return source;
 }
 
 // =================================================================================================

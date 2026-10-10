@@ -16,8 +16,10 @@ class Texture;
 // The functions are no-ops if the texture is already deployed.
 
 bool Upload2DTexture(Texture& tex, int width, int height,
-                     GfxPixelFormat fmt, const void* data) noexcept;
+					 GfxPixelFormat fmt, const void* data)
+noexcept;
 
-bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips) noexcept;
+bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips)
+noexcept;
 
 // =================================================================================================

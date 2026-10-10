@@ -34,28 +34,29 @@
 // how many there may be and what they cost.
 
 class VariableTextureAtlas
-	: public BaseTextureAtlas
-{
+	: public BaseTextureAtlas {
 public:
 	// Place of one tile, in texels of the unscaled atlas.
 	struct Tile {
-		int	x{ 0 };
-		int	y{ 0 };
-		int	w{ 0 };
-		int	h{ 0 };
+		int x{ 0 };
+		int y{ 0 };
+		int w{ 0 };
+		int h{ 0 };
 
-		inline bool IsValid(void) const noexcept {
+		inline bool IsValid(void) const
+		noexcept
+		{
 			return (w > 0) and (h > 0);
 		}
 	};
 
 protected:
-	List<Tile>			m_tiles;
-	int					m_tileCount{ 0 };
-	int					m_layers{ 1 };
+	List<Tile>	m_tiles;
+	int			m_tileCount{ 0 };
+	int			m_layers{ 1 };
 	// The packing itself knows nothing about textures - see skylinepacker.h. Keeping it separate is
 	// what lets a caller try a packing without creating a single render target.
-	SkylinePacker		m_packer;
+	SkylinePacker m_packer;
 
 public:
 	VariableTextureAtlas() = default;
@@ -66,7 +67,7 @@ public:
 	// and no mip maps, like every atlas: the cells sit flush against each other, so filtering bleeds
 	// a neighbour in at the edges and a mip level mixes cells that have nothing to do with each other.
 	bool Create(String name, int width, int height, int layers = 1,
-					GfxPixelFormat format = GfxPixelFormat::RGBA8_UNorm, int scale = 1);
+				GfxPixelFormat format = GfxPixelFormat::RGBA8_UNorm, int scale = 1);
 
 	// Reserves width x height texels and returns the tile's INDEX, or -1 when the atlas is full.
 	// Tiles are handed out in call order, so the index is the caller's to use as it likes.
@@ -89,39 +90,50 @@ public:
 	// all of them are reachable through a single binding and a layer index. The caller owns the target
 	// that comes back and has to outlive every page attached to it.
 	static RenderTarget* CreateShared(String name, int width, int height, int pages, int layers = 1,
-												 GfxPixelFormat format = GfxPixelFormat::RGBA8_UNorm, int scale = 1);
+									  GfxPixelFormat format = GfxPixelFormat::RGBA8_UNorm, int scale = 1);
 
 	// This atlas becomes page `layer` of a shared target. It does not own the target: Destroy () only
 	// drops the pointer, and the packing state is reset as Create () leaves it.
 	bool Attach(RenderTarget* target, int layer);
 
-	void Reset(void) noexcept;
+	void Reset(void)
+	noexcept;
 
-	inline int TileCount(void) noexcept {
+	inline int TileCount(void)
+	noexcept
+	{
 		return m_tileCount;
 	}
 
-	inline int LayerCount(void) noexcept {
+	inline int LayerCount(void)
+	noexcept
+	{
 		return m_layers;
 	}
 
-	inline const Tile* GetTile(int index) noexcept {
+	inline const Tile* GetTile(int index)
+	noexcept
+	{
 		return ((index >= 0) and (index < m_tileCount)) ? &m_tiles[index] : nullptr;
 	}
 
 	// Where the tile sits in the atlas, as texture coordinates in [0,1]. Offset is its lower left
 	// corner, scale its size - together they map a unit square onto the tile.
-	Vector2f TileOffset(int index) noexcept;
+	Vector2f TileOffset(int index)
+	noexcept;
 
-	Vector2f TileScale(int index) noexcept;
+	Vector2f TileScale(int index)
+	noexcept;
 
 	// One layer as a sampleable texture. Layer 0 is what GetAsTexture () hands out.
-	uint32_t LayerHandle(int layer) noexcept;
+	uint32_t LayerHandle(int layer)
+	noexcept;
 
 	// One layer as a Texture object, for a draw that hands its textures over as a list (Mesh::Render (),
 	// where the position in the list IS the texture unit). The render target keeps one wrapper per
 	// colour buffer, so two layers can be held at the same time.
-	Texture* LayerTexture(int layer) noexcept;
+	Texture* LayerTexture(int layer)
+	noexcept;
 
 	// One layer's texels into a CPU buffer. bufferSize is the size of that buffer in BYTES and is
 	// checked against what the layer actually holds, so a buffer that is too small is refused rather
@@ -138,7 +150,8 @@ public:
 	bool WriteLayer(int layer, const void* data, size_t dataSize);
 
 	// How many bytes ReadLayer () needs for one layer, and WriteLayer () expects.
-	size_t LayerSize(void) noexcept;
+	size_t LayerSize(void)
+	noexcept;
 };
 
 // =================================================================================================

@@ -13,18 +13,19 @@
 // source assembly (same pattern as the other shared shader-snippet .inl files).
 // =================================================================================================
 
-#include "base_shadercode.h"   // GLSLVersion now lives here (shared with the OpenGL shader sources)
+#include "base_shadercode.h" // GLSLVersion now lives here (shared with the OpenGL shader sources)
 
 static String DefineHDR(String value) {
-    return String("#define HDR ") + value + String("\n");
+	return String("#define HDR ") + value + String("\n");
 }
 
 #ifdef OPENGL
 
-static String HLSLBridge(const char* glslVersion = nullptr) {
-    String source =
-        GLSLVersion(glslVersion) +
-        String(R"(
+static String HLSLBridge(const char* glslVersion = nullptr)
+{
+	String source =
+		GLSLVersion(glslVersion) +
+		String(R"(
             #ifndef _HLSL_BRIDGE_
             #   define _HLSL_BRIDGE_
             // HLSL → GLSL type aliases
@@ -59,22 +60,22 @@ static String HLSLBridge(const char* glslVersion = nullptr) {
             #   define TextureSize(tex, samp, dim)    (dim) = vec2(textureSize((tex), 0))
             #endif //_HLSL_BRIDGE_
         )");
-    return source;
+	return source;
 }
 
 #else
 
-static String HLSLBridge(const char* /*glslVersion*/ = nullptr) {
-    String source =
-        String(R"(
+static String HLSLBridge(const char* /*glslVersion*/ = nullptr)
+{
+	String source =
+		String(R"(
             #ifndef _HLSL_BRIDGE_
             #   define _HLSL_BRIDGE_
             #   define SampleLod(tex, samp, uvw, lod) (tex).SampleLevel(samp, uvw, lod)
             #   define TextureSize(tex, samp, dim)    (tex).GetDimensions((dim).x, (dim).y)
             #endif //_HLSL_BRIDGE_
         )");
-    return source;
+	return source;
 }
 
 #endif
-

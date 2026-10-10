@@ -10,7 +10,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL_image.h"
 #ifdef _MSC_VER
@@ -19,31 +19,33 @@
 
 // =================================================================================================
 
-static List<String> skyboxDirections = { "-rt", "-lf", "-up", "-dn", "-ft", "-bk" }; 
+static List<String> skyboxDirections = { "-rt", "-lf", "-up", "-dn", "-ft", "-bk" };
 static List<String> skyTextureSizes = { "-4k", "-2k", "-1k" };
 static List<String> skyTextureTypes = { "-bright", "-medium", "-dark" };
 
 
-Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size) {
-	String id = baseName + type;
-	Cubemap* texture = textureHandler.GetCubemap(id);
+Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size)
+{
+	String		id = baseName + type;
+	Cubemap*	texture = textureHandler.GetCubemap(id);
 	if (not texture)
 		return nullptr;
 
 	List<String> filenames;
-	for (int i = 0; i < skyboxDirections.Length(); i++) 
+	for (int i = 0; i < skyboxDirections.Length(); i++)
 		filenames.Append(String::Concat(baseName, type, skyboxDirections[i], size, ".DDS"));
-	
+
 	//texture = new Cubemap();
 	if (not texture->CreateFromFile(textureFolder, filenames, {})) {
 		delete texture;
 		return nullptr;
 	}
-    return texture;
+	return texture;
 }
 
 
-int Skybox::MaxTextureSize(int maxTextureSize) {
+int Skybox::MaxTextureSize(int maxTextureSize)
+{
 	int maxSize = gfxStates.MaxTextureSize();
 	if ((maxTextureSize > 0) and (maxTextureSize < maxSize))
 		maxSize = maxTextureSize;
@@ -57,7 +59,8 @@ int Skybox::MaxTextureSize(int maxTextureSize) {
 }
 
 
-bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture, Texture* blueNoise, int maxTextureSize) {
+bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture, Texture* blueNoise, int maxTextureSize)
+{
 	m_textureFolder = textureFolder;
 	m_noiseTexture = noiseTexture;
 	m_blueNoise = blueNoise;
@@ -95,7 +98,7 @@ bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture,
 
 	m_skybox->SetDynamic(false);
 	m_skybox->Init(MeshTopology::Triangles, 1);
-	
+
 	Vector3f offset({ 0.5f, 0.5f, 0.5f }), v;
 	for (int i = 0; i < Cube::vertexCount; i++) {
 		v = Cube::vertices[i] - offset;
@@ -115,7 +118,8 @@ bool Skybox::Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture,
 // straight loop over the array would delete the same object three times - collect what is there and
 // clear every reference to it first.
 
-void Skybox::Destroy(void) {
+void Skybox::Destroy(void)
+{
 	for (int i = 0; i < 3; i++) {
 		for (int j = 0; j < 3; j++) {
 			Cubemap* texture = m_skyTextures[i][j];
@@ -135,7 +139,8 @@ void Skybox::Destroy(void) {
 }
 
 
-Cubemap* Skybox::LoadCubemap(const String& textureFolder, String id, List<String>& filenames) {
+Cubemap* Skybox::LoadCubemap(const String& textureFolder, String id, List<String>& filenames)
+{
 	Cubemap* texture = textureHandler.GetCubemap(id);
 	if (not texture)
 		return nullptr;
@@ -147,15 +152,17 @@ Cubemap* Skybox::LoadCubemap(const String& textureFolder, String id, List<String
 }
 
 
-bool Skybox::SaveFaces(Cubemap* texture, List<String>& filenames) {
-	bool ok = true;
-	int face = 0;
+bool Skybox::SaveFaces(Cubemap* texture, List<String>& filenames)
+{
+	bool	ok = true;
+	int		face = 0;
 	for (auto& filename : filenames) {
-		TextureBuffer* buffer = texture->m_buffers[face++];
-		String path = m_textureFolder + filename;
-		int width = buffer->m_info.m_width;
-		int height = buffer->m_info.m_height;
-		SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(buffer->DataBuffer(), width, height, 32, width * 4, SDL_PIXELFORMAT_RGBA32);
+		TextureBuffer*	buffer = texture->m_buffers[face++];
+		String			path = m_textureFolder + filename;
+		int				width = buffer->m_info.m_width;
+		int				height = buffer->m_info.m_height;
+		SDL_Surface*	surface =
+			SDL_CreateRGBSurfaceWithFormatFrom(buffer->DataBuffer(), width, height, 32, width * 4, SDL_PIXELFORMAT_RGBA32);
 		if (not surface) {
 			logHandler.Print("Skybox: cannot write '%s': %s\n", static_cast<const char*>(path), SDL_GetError());
 			ok = false;
@@ -171,10 +178,11 @@ bool Skybox::SaveFaces(Cubemap* texture, List<String>& filenames) {
 }
 
 
-bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params, const String& suffix, const String& sourceFolder) {
-	KuwaharaFilter kuwaharaFilter;
-	String filteredExtension = suffix + ".png";
-	bool ok = true;
+bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params, const String& suffix, const String& sourceFolder)
+{
+	KuwaharaFilter	kuwaharaFilter;
+	String			filteredExtension = suffix + ".png";
+	bool			ok = true;
 	for (int j = 0; j < 3; j++) {
 		Cubemap* texture = m_skyTextures[skyType][j];
 		if ((texture == nullptr) or ((j > 0) and (texture == m_skyTextures[skyType][j - 1])))
@@ -185,13 +193,14 @@ bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& 
 			filteredNames.Append(filename.Replace(".DDS", static_cast<const char*>(filteredExtension)));
 			sourceNames.Append(filename.Replace(".DDS", ".png"));
 		}
-		String id = texture->m_name + suffix;
-		Cubemap* filtered = LoadCubemap(m_textureFolder, id, filteredNames);
+		String		id = texture->m_name + suffix;
+		Cubemap*	filtered = LoadCubemap(m_textureFolder, id, filteredNames);
 		if (not filtered) {
 			filtered = LoadCubemap(sourceFolder, id, sourceNames);
 			if (not filtered) {
 #ifdef _DEBUG
-				logHandler.Print("Skybox: sources of '%s' not found in '%s', filtering the loaded sky\n", static_cast<const char*>(texture->m_name), static_cast<const char*>(sourceFolder));
+				logHandler.Print("Skybox: sources of '%s' not found in '%s', filtering the loaded sky\n",
+								 static_cast<const char*>(texture->m_name), static_cast<const char*>(sourceFolder));
 #endif
 				if (not kuwaharaFilter.ApplyCube(texture, params))
 					ok = false;
@@ -214,7 +223,8 @@ bool Skybox::ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& 
 }
 
 
-Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime) {
+Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime)
+{
 	Shader* shader = baseShaderHandler.SetupRenderShader("blackhole");
 	if (shader) {
 		shader->SetMatrix4f("mView", view.AsArray(), false);
@@ -224,7 +234,7 @@ Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, flo
 			shader->SetInt("blueNoiseTex", 2);
 		}
 		shader->SetMatrix4f("mView", view.AsArray(), false);
-		shader->SetVector3f("direction", Vector3f({ 0.0f, 0.20f, -0.99f }));   // normalisiert, horizontnah
+		shader->SetVector3f("direction", Vector3f({ 0.0f, 0.20f, -0.99f })); // normalisiert, horizontnah
 #ifdef _DEBUG
 		shader->SetFloat("distance", 20.0f + 10.0f * sinf(currentTime / 1.8e4f));
 #else
@@ -232,7 +242,7 @@ Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, flo
 #endif
 		shader->SetVector3f("diskNormal", Vector3f({ -0.2f, 0.8f, 0.0f }));
 		shader->SetFloat("gravity", 0.95f);
-		shader->SetFloat("time", float(currentTime) / 1000.0f);   // currentTime durchreichen
+		shader->SetFloat("time", float(currentTime) / 1000.0f); // currentTime durchreichen
 		shader->SetFloat("horizon", 1.0f);
 		shader->SetFloat("innerDiskRad", 2.6f);
 		shader->SetFloat("outerDiskRad", 9.0f);
@@ -243,11 +253,12 @@ Shader* Skybox::LoadBlackholeShader(Matrix4f& view, Vector3f lightDirection, flo
 		shader->SetFloat("brightness", brightness * 6.0f);
 		shader->SetFloat("alpha", alpha);
 	}
-    return shader;
+	return shader;
 }
 
 
-Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime) {
+Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float brightness, float alpha, int32_t currentTime)
+{
 	Shader* shader = baseShaderHandler.SetupRenderShader("skybox");
 	if (shader) {
 		shader->SetMatrix4f("mView", view.AsArray(), false);
@@ -264,7 +275,8 @@ Shader* Skybox::LoadShader(Matrix4f& view, Vector3f lightDirection, float bright
 }
 
 
-bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime) {
+bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime)
+{
 	if (not m_skybox)
 		return false;
 
@@ -310,4 +322,3 @@ bool Skybox::Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, fl
 };
 
 // =================================================================================================
-

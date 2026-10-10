@@ -37,10 +37,10 @@ class Texture;
 
 #pragma pack(push, 4)
 struct FrameConstants {
-    float mModelView[16]{};
-    float mProjection[16]{};
-    float mViewport[16]{};
-    float mLightTransform[16]{};
+	float mModelView[16]{};
+	float mProjection[16]{};
+	float mViewport[16]{};
+	float mLightTransform[16]{};
 };
 static_assert(sizeof(FrameConstants) == 256, "FrameConstants must be 256 bytes");
 #pragma pack(pop)
@@ -49,13 +49,13 @@ static_assert(sizeof(FrameConstants) == 256, "FrameConstants must be 256 bytes")
 
 template <typename T, typename = void>
 struct ScalarTraits {
-    using scalarType = std::remove_cv_t<T>;
-    static constexpr int componentCount = 1;
+	using scalarType = std::remove_cv_t<T>;
+	static constexpr int componentCount = 1;
 };
 template <typename T>
 struct ScalarTraits<T, std::void_t<typename T::value_type>> {
-    using scalarType = std::remove_cv_t<typename T::value_type>;
-    static constexpr int componentCount = int(sizeof(T) / sizeof(typename T::value_type));
+	using scalarType = std::remove_cv_t<typename T::value_type>;
+	static constexpr int componentCount = int(sizeof(T) / sizeof(typename T::value_type));
 };
 template <typename T>
 using ScalarBaseType = typename ScalarTraits<std::remove_cv_t<T>>::scalarType;
@@ -64,271 +64,398 @@ inline constexpr int ComponentCount = ScalarTraits<std::remove_cv_t<T>>::compone
 
 // =================================================================================================
 
-class Shader
-{
+class Shader {
 public:
-    String  m_name;
-    String  m_vs;     // VS source (for reference / reload)
-    String  m_fs;     // PS source (for reference / reload)
-    String  m_gs;     // GS source (optional)
+	String m_name;
+	String m_vs; // VS source (for reference / reload)
+	String m_fs; // PS source (for reference / reload)
+	String m_gs; // GS source (optional)
 
-    // HLSL bytecodes
-    ComPtr<ID3DBlob>  m_vsBlob;
-    ComPtr<ID3DBlob>  m_psBlob;
-    ComPtr<ID3DBlob>  m_gsBlob;  // optional
-    ComPtr<ID3DBlob>  m_hsBlob;
-    ComPtr<ID3DBlob>  m_dsBlob;
+	// HLSL bytecodes
+	ComPtr<ID3DBlob> m_vsBlob;
+	ComPtr<ID3DBlob> m_psBlob;
+	ComPtr<ID3DBlob> m_gsBlob; // optional
+	ComPtr<ID3DBlob> m_hsBlob;
+	ComPtr<ID3DBlob> m_dsBlob;
 
-    // Shared root signature (fixed layout, created once per shader)
-    ComPtr<ID3D12RootSignature> m_rootSignature;
-    ComPtr<ID3DBlob>            m_rootSignatureBlob;
+	// Shared root signature (fixed layout, created once per shader)
+	ComPtr<ID3D12RootSignature>	m_rootSignature;
+	ComPtr<ID3DBlob>			m_rootSignatureBlob;
 
-    static inline ComPtr<ID3D12RootSignature> s_rootSignature;
-    static inline ComPtr<ID3DBlob>            s_rootSignatureBlob;
+	static inline ComPtr<ID3D12RootSignature>	s_rootSignature;
+	static inline ComPtr<ID3DBlob>				s_rootSignatureBlob;
 
-    static void DestroyRootSignature(void) noexcept;
+	static void DestroyRootSignature(void)
+	noexcept;
 
-    static bool SupportsRayQuery(void) noexcept;
+	static bool SupportsRayQuery(void)
+	noexcept;
 
-    // b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
-    FrameConstants          m_b0Staging{};
+	// b0 — FrameConstants (matrices); written per-draw to a cbvAllocator sub-allocation
+	FrameConstants m_b0Staging{};
 
-    // Per-stage shader constants (VS/PS/GS), each uploaded to its own root CBV
-    struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
+	// Per-stage shader constants (VS/PS/GS), each uploaded to its own root CBV
+	struct FieldInfo {
+		uint32_t offset{ 0 };
+		uint32_t size{ 0 };
+	};
 
-    static constexpr int kStageVS       = 0;
-    static constexpr int kStagePS       = 1;
-    static constexpr int kStageGS       = 2;
-    static constexpr int kStageHS       = 3;
-    static constexpr int kStageDS       = 4;
-    static constexpr int kStageCount    = 5;
-    static constexpr int kSrvBase       = 1 + kStageCount;
-    static constexpr int kSrvSlots      = 24;
-    static constexpr int kSamplerBase   = kSrvBase + 1;
-    static constexpr int kSamplerSlots  = 24;
-    static constexpr int kUavBase       = kSamplerBase + kSamplerSlots;
-    static constexpr int kUavSlots      = 4;
-    static constexpr int kSsboBase      = kUavBase + 1;
-    static constexpr int kSsboSlots     = 24;
-    static constexpr int kSsboSpace     = 1;
-    static constexpr int kAccelBase     = kSsboBase + 1;
-    static constexpr int kAccelSpace    = 2;
-    static constexpr int kRootParamCount = kAccelBase + 1;
+	static constexpr int kStageVS = 0;
+	static constexpr int kStagePS = 1;
+	static constexpr int kStageGS = 2;
+	static constexpr int kStageHS = 3;
+	static constexpr int kStageDS = 4;
+	static constexpr int kStageCount = 5;
+	static constexpr int kSrvBase = 1 + kStageCount;
+	static constexpr int kSrvSlots = 24;
+	static constexpr int kSamplerBase = kSrvBase + 1;
+	static constexpr int kSamplerSlots = 24;
+	static constexpr int kUavBase = kSamplerBase + kSamplerSlots;
+	static constexpr int kUavSlots = 4;
+	static constexpr int kSsboBase = kUavBase + 1;
+	static constexpr int kSsboSlots = 24;
+	static constexpr int kSsboSpace = 1;
+	static constexpr int kAccelBase = kSsboBase + 1;
+	static constexpr int kAccelSpace = 2;
+	static constexpr int kRootParamCount = kAccelBase + 1;
 
-    struct StageConstants {
-        uint32_t size{ 0 };
-        std::vector<uint8_t> staging;
-        bool dirty{ true };
-        uint64_t generation{ 0 };
-        AutoArray<std::pair<String, FieldInfo>> fields;
-    };
+	struct StageConstants {
+		uint32_t								size{ 0 };
+		std::vector<uint8_t>					staging;
+		bool									dirty{ true };
+		uint64_t								generation{ 0 };
+		AutoArray<std::pair<String, FieldInfo>>	fields;
+	};
 
-    StageConstants m_stages[kStageCount];
+	StageConstants m_stages[kStageCount];
 
-    static constexpr int kRootCbvCount = 1 + kStageCount;
-    D3D12_GPU_VIRTUAL_ADDRESS m_rootCbvAddresses[kRootCbvCount]{};
+	static constexpr int		kRootCbvCount = 1 + kStageCount;
+	D3D12_GPU_VIRTUAL_ADDRESS	m_rootCbvAddresses[kRootCbvCount]{};
 
-    FrameConstants  m_b0Uploaded{};
-    uint64_t        m_b0Generation{ 0 };
+	FrameConstants	m_b0Uploaded{};
+	uint64_t		m_b0Generation{ 0 };
 
-    enum DefaultViewType : uint8_t {
-        dvNone = 0,
-        dv2D,
-        dv2DArray,
-        dvCube,
-        dv3D,
-        dvCount
-    };
+	enum DefaultViewType : uint8_t {
+		dvNone = 0,
+		dv2D,
+		dv2DArray,
+		dvCube,
+		dv3D,
+		dvCount
+	};
 
-    uint8_t   m_srvDefaults[kSrvSlots] { };
-    uint64_t  m_srvDefaultKey{ 0 };
-    bool      m_usesAccelStructure{ false };
+	uint8_t		m_srvDefaults[kSrvSlots]{};
+	uint64_t	m_srvDefaultKey{ 0 };
+	bool		m_usesAccelStructure{ false };
 
-    // Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
-    std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;
+	// Per-shader input layout — built from m_dataLayout on Create(), or via reflection fallback.
+	std::vector<D3D12_INPUT_ELEMENT_DESC> m_vsInputLayout;
 
-    // Vertex data layout: describes which C++ buffers feed which shader inputs.
-    ShaderDataLayout m_dataLayout;
+	// Vertex data layout: describes which C++ buffers feed which shader inputs.
+	ShaderDataLayout m_dataLayout;
 
-    AutoArray<UniformHandle*>  m_uniforms;
-    // Per-shader cache of resolved uniform b1 offsets — see SetB1Field / ResolveB1Location.
-    ShaderLocationTable        m_locations;
+	AutoArray<UniformHandle*> m_uniforms;
+	// Per-shader cache of resolved uniform b1 offsets — see SetB1Field / ResolveB1Location.
+	ShaderLocationTable m_locations;
 
-    using KeyType = String;
+	using KeyType = String;
 
-    Shader(String name = "", String vs = "", String fs = "", String gs = "")
-        : m_name(std::move(name)), m_vs(std::move(vs)), m_fs(std::move(fs)), m_gs(std::move(gs))
-    {
-        m_uniforms.SetAutoFit(true);
-        m_uniforms.SetShrinkable(false);
-        m_uniforms.SetDefaultValue(nullptr);
-    }
+	Shader(String name = "", String vs = "", String fs = "", String gs = "")
+		: m_name(std::move(name))
+		, m_vs(std::move(vs))
+		, m_fs(std::move(fs))
+		, m_gs(std::move(gs))
+	{
+		m_uniforms.SetAutoFit(true);
+		m_uniforms.SetShrinkable(false);
+		m_uniforms.SetDefaultValue(nullptr);
+	}
 
-    Shader(const Shader& other)  { 
-        Copy(other); 
-    }
+	Shader(const Shader& other) {
+		Copy(other);
+	}
 
-    Shader(Shader&& other) noexcept { 
-        Move(other); 
-    }
+	Shader(Shader&& other)
+	noexcept
+	{
+		Move(other);
+	}
 
-    ~Shader() { Destroy(); }
+	~Shader() {
+		Destroy();
+	}
 
-    Shader& operator=(Shader&& other) noexcept { 
-        return Move(other); 
-    }
+	Shader& operator=(Shader&& other)
+	noexcept
+	{
+		return Move(other);
+	}
 
-    String& GetKey(void) noexcept { 
-        return m_name; 
-    }
+	String& GetKey(void)
+	noexcept
+	{
+		return m_name;
+	}
 
-    inline ComPtr<ID3D12RootSignature> GetRootSignature(void) noexcept {
-        return m_rootSignature;
-    }
+	inline ComPtr<ID3D12RootSignature> GetRootSignature(void)
+	noexcept
+	{
+		return m_rootSignature;
+	}
 
-    // -----------------------------------------------------------------------------------------
-    // Creation / destruction
+	// -----------------------------------------------------------------------------------------
+	// Creation / destruction
 
-    // Compile a single HLSL stage.  entryPoint: "VSMain" or "PSMain"; target: "vs_5_1"/"ps_5_1"
-    bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
-                 ComPtr<ID3DBlob>& blobOut, const String& shaderFolder);
+	// Compile a single HLSL stage.  entryPoint: "VSMain" or "PSMain"; target: "vs_5_1"/"ps_5_1"
+	bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
+				 ComPtr<ID3DBlob>& blobOut, const String& shaderFolder);
 
-    // Link: build root signature, build input layout from m_dataLayout (or reflection fallback),
-    // reflect b1 fields. gsCode is optional.
-    bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder);
+	// Link: build root signature, build input layout from m_dataLayout (or reflection fallback),
+	// reflect b1 fields. gsCode is optional.
+	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode,
+				const String& shaderFolder);
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    inline bool IsValid(void) const noexcept { return m_vsBlob && m_psBlob; }  // GS is optional
+	inline bool IsValid(void) const
+	noexcept
+	{
+		return m_vsBlob && m_psBlob;
+	} // GS is optional
 
-    inline bool IsTessellated(void) const noexcept {
-        return m_hsBlob and m_dsBlob;
-    }
+	inline bool IsTessellated(void) const
+	noexcept
+	{
+		return m_hsBlob and m_dsBlob;
+	}
 
-    // -----------------------------------------------------------------------------------------
-    // Runtime
+	// -----------------------------------------------------------------------------------------
+	// Runtime
 
-    // Activate this shader: select / create PSO, bind root sig, upload CBs, bind descriptor table.
-    bool Activate(void);
+	// Activate this shader: select / create PSO, bind root sig, upload CBs, bind descriptor table.
+	bool Activate(void);
 
-    // No-op in DX12 (PSO changes are driven by RenderStates changes in the next Enable call).
-    inline void Deactivate(void) noexcept {}
+	// No-op in DX12 (PSO changes are driven by RenderStates changes in the next Enable call).
+	inline void Deactivate(void)
+	noexcept
+	{}
 
-    bool UploadB0(void) noexcept;
+	bool UploadB0(void)
+	noexcept;
 
-    // Upload per-stage constant buffers to their root CBV slots (1=VS, 2=PS, 3=GS).
-    // Called from GfxDataLayout::Render() just before each draw.
-    bool UploadB1(void) noexcept;
+	// Upload per-stage constant buffers to their root CBV slots (1=VS, 2=PS, 3=GS).
+	// Called from GfxDataLayout::Render() just before each draw.
+	bool UploadB1(void)
+	noexcept;
 
-    // Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).
-    // Reads from baseRenderer / shadowMap, same as OGL.
-    bool UpdateMatrices(void);
+	// Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).
+	// Reads from baseRenderer / shadowMap, same as OGL.
+	bool UpdateMatrices(void);
 
-    bool UpdateVariables(void) noexcept;
+	bool UpdateVariables(void)
+	noexcept;
 
-    // -----------------------------------------------------------------------------------------
-    // PSO helpers (internal)
+	// -----------------------------------------------------------------------------------------
+	// PSO helpers (internal)
 
-    bool CreateRootSignature(void) noexcept;
-    
-    void BuildInputLayout(void) noexcept;
+	bool CreateRootSignature(void)
+	noexcept;
 
-    void UpdateStageFields(ID3DBlob* blob, int stage) noexcept;
+	void BuildInputLayout(void)
+	noexcept;
 
-    void UpdateStageResources(ID3DBlob* blob) noexcept;
+	void UpdateStageFields(ID3DBlob* blob, int stage)
+	noexcept;
 
-    // -----------------------------------------------------------------------------------------
-    // Uniform setters — same signatures as OGL, return int (was GLint)
+	void UpdateStageResources(ID3DBlob* blob)
+	noexcept;
+
+	// -----------------------------------------------------------------------------------------
+	// Uniform setters — same signatures as OGL, return int (was GLint)
 
 private:
-    // Write 'size' bytes to all stage buffers that contain the field 'name'.
-    // Returns the offset in the first matching stage, or -1 if not found in any stage.
-    int SetB1Field(const char* name, const void* data, size_t size) noexcept;
+	// Write 'size' bytes to all stage buffers that contain the field 'name'.
+	// Returns the offset in the first matching stage, or -1 if not found in any stage.
+	int SetB1Field(const char* name, const void* data, size_t size)
+	noexcept;
 
-    // Cache-miss path for SetB1Field: scan the reflected per-stage field tables once and
-    // record the field's b1 offset for every stage into the cache entry.
-    void ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept;
+	// Cache-miss path for SetB1Field: scan the reflected per-stage field tables once and
+	// record the field's b1 offset for every stage into the cache entry.
+	void ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name)
+	noexcept;
 
-    bool TrySetB0Field(eBaseMatrices id, const float* data) noexcept;
+	bool TrySetB0Field(eBaseMatrices id, const float* data)
+	noexcept;
 
 public:
-    int SetFloat(const char* name, float data) noexcept;
-    int SetInt(const char* name, int data) noexcept;
+	int SetFloat(const char* name, float data)
+	noexcept;
+	int SetInt(const char* name, int data)
+	noexcept;
 
-    int SetVector2f(const char* name, const Vector2f& data) noexcept;
-    int SetVector2f(const char* name, Vector2f&& data) noexcept { return SetVector2f(name, static_cast<const Vector2f&>(data)); }
-    int SetVector2f(const char* name, float x, float y) noexcept { return SetVector2f(name, Vector2f(x, y)); }
+	int SetVector2f(const char* name, const Vector2f& data)
+	noexcept;
+	int SetVector2f(const char* name, Vector2f&& data)
+	noexcept
+	{
+		return SetVector2f(name, static_cast<const Vector2f&>(data));
+	}
+	int SetVector2f(const char* name, float x, float y)
+	noexcept
+	{
+		return SetVector2f(name, Vector2f(x, y));
+	}
 
-    int SetVector3f(const char* name, const Vector3f& data) noexcept;
-    int SetVector3f(const char* name, Vector3f&& data) noexcept { return SetVector3f(name, static_cast<const Vector3f&>(data)); }
+	int SetVector3f(const char* name, const Vector3f& data)
+	noexcept;
+	int SetVector3f(const char* name, Vector3f&& data)
+	noexcept
+	{
+		return SetVector3f(name, static_cast<const Vector3f&>(data));
+	}
 
-    int SetVector4f(const char* name, const Vector4f& data) noexcept;
-    int SetVector4f(const char* name, Vector4f&& data) noexcept { return SetVector4f(name, static_cast<const Vector4f&>(data)); }
+	int SetVector4f(const char* name, const Vector4f& data)
+	noexcept;
+	int SetVector4f(const char* name, Vector4f&& data)
+	noexcept
+	{
+		return SetVector4f(name, static_cast<const Vector4f&>(data));
+	}
 
-    int SetVector2i(const char* name, const Vector2i& data) noexcept;
-    int SetVector2i(const char* name, Vector2i&& data) noexcept { return SetVector2i(name, static_cast<const Vector2i&>(data)); }
+	int SetVector2i(const char* name, const Vector2i& data)
+	noexcept;
+	int SetVector2i(const char* name, Vector2i&& data)
+	noexcept
+	{
+		return SetVector2i(name, static_cast<const Vector2i&>(data));
+	}
 
-    int SetVector3i(const char* name, const Vector3i& data) noexcept;
-    int SetVector3i(const char* name, Vector3i&& data) noexcept { return SetVector3i(name, static_cast<const Vector3i&>(data)); }
+	int SetVector3i(const char* name, const Vector3i& data)
+	noexcept;
+	int SetVector3i(const char* name, Vector3i&& data)
+	noexcept
+	{
+		return SetVector3i(name, static_cast<const Vector3i&>(data));
+	}
 
-    int SetVector4i(const char* name, const Vector4i& data) noexcept;
-    int SetVector4i(const char* name, Vector4i&& data) noexcept { return SetVector4i(name, static_cast<const Vector4i&>(data)); }
+	int SetVector4i(const char* name, const Vector4i& data)
+	noexcept;
+	int SetVector4i(const char* name, Vector4i&& data)
+	noexcept
+	{
+		return SetVector4i(name, static_cast<const Vector4i&>(data));
+	}
 
-    int SetMatrix4f(const char* name, const float* data, bool transpose = false) noexcept;
-    int SetMatrix4f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {
-        return SetMatrix4f(name, data.DataPtr(), transpose);
-    }
-    int SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false) noexcept;
+	int SetMatrix4f(const char* name, const float* data, bool transpose = false)
+	noexcept;
+	int SetMatrix4f(const char* name, AutoArray<float>& data, bool transpose = false)
+	noexcept
+	{
+		return SetMatrix4f(name, data.DataPtr(), transpose);
+	}
+	int SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false)
+	noexcept;
 
-    int SetMatrix3f(const char* name, float* data, bool transpose = false) noexcept;
-    int SetMatrix3f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {
-        return SetMatrix3f(name, data.DataPtr(), transpose);
-    }
+	int SetMatrix3f(const char* name, float* data, bool transpose = false)
+	noexcept;
+	int SetMatrix3f(const char* name, AutoArray<float>& data, bool transpose = false)
+	noexcept
+	{
+		return SetMatrix3f(name, data.DataPtr(), transpose);
+	}
 
-    int SetFloatArray(const char* name, const float* data, size_t length) noexcept;
-    int SetIntArray(const char* name, const int* data, size_t length) noexcept;
-    int SetFloatArray(const char* name, const AutoArray<float>& data) noexcept {
-        return SetFloatArray(name, data.DataPtr(), data.Length());
-    }
+	int SetFloatArray(const char* name, const float* data, size_t length)
+	noexcept;
+	int SetIntArray(const char* name, const int* data, size_t length)
+	noexcept;
+	int SetFloatArray(const char* name, const AutoArray<float>& data)
+	noexcept
+	{
+		return SetFloatArray(name, data.DataPtr(), data.Length());
+	}
 
-    int SetVector2fArray(const char* name, const Vector2f* data, int length) noexcept;
-    int SetVector3fArray(const char* name, const Vector3f* data, int length) noexcept;
-    int SetVector4fArray(const char* name, const Vector4f* data, int length) noexcept;
+	int SetVector2fArray(const char* name, const Vector2f* data, int length)
+	noexcept;
+	int SetVector3fArray(const char* name, const Vector3f* data, int length)
+	noexcept;
+	int SetVector4fArray(const char* name, const Vector4f* data, int length)
+	noexcept;
 
-    // -----------------------------------------------------------------------------------------
-    // Debug helpers
+	// -----------------------------------------------------------------------------------------
+	// Debug helpers
 #ifdef _DEBUG
-    static void PrintShaderSource(const char* hlslCode, const char* title) noexcept;
+	static void PrintShaderSource(const char* hlslCode, const char* title)
+	noexcept;
 #endif
 
-    // Source-compat stubs (no-ops in DX12)
-    static void ClearGfxError() noexcept {}
+	// Source-compat stubs (no-ops in DX12)
+	static void ClearGfxError()
+	noexcept
+	{}
 
-    static bool CheckGfxError(const char* = "") noexcept { return true; }
+	static bool CheckGfxError(const char* = "")
+	noexcept
+	{
+		return true;
+	}
 
-    // GetFloatData — OGL-specific, kept as no-op stubs
-    static inline float* GetFloatData(GLenum /*id*/, int32_t /*size*/, float* data) noexcept { return data; }
+	// GetFloatData — OGL-specific, kept as no-op stubs
+	static inline float* GetFloatData(GLenum /*id*/, int32_t /*size*/, float* data)
+	noexcept
+	{
+		return data;
+	}
 
-    static inline AutoArray<float>& GetFloatData(GLenum /*id*/, int32_t /*size*/, AutoArray<float>& d) noexcept { return d; }
+	static inline AutoArray<float>& GetFloatData(GLenum /*id*/, int32_t /*size*/, AutoArray<float>& d)
+	noexcept
+	{
+		return d;
+	}
 
-    // -----------------------------------------------------------------------------------------
-    // Comparison operators (same as OGL)
-    bool operator<(const String& name)  const { return m_name < name; }
-    bool operator>(const String& name)  const { return m_name > name; }
-    bool operator<=(const String& name) const { return m_name <= name; }
-    bool operator>=(const String& name) const { return m_name >= name; }
-    bool operator!=(const String& name) const { return m_name != name; }
-    bool operator==(const String& name) const { return m_name == name; }
-    bool operator<(const Shader& o)  const { return m_name < o.m_name; }
-    bool operator>(const Shader& o)  const { return m_name > o.m_name; }
-    bool operator<=(const Shader& o) const { return m_name <= o.m_name; }
-    bool operator>=(const Shader& o) const { return m_name >= o.m_name; }
-    bool operator!=(const Shader& o) const { return m_name != o.m_name; }
-    bool operator==(const Shader& o) const { return m_name == o.m_name; }
+	// -----------------------------------------------------------------------------------------
+	// Comparison operators (same as OGL)
+	bool operator<(const String& name) const {
+		return m_name < name;
+	}
+	bool operator>(const String& name) const {
+		return m_name > name;
+	}
+	bool operator<=(const String& name) const {
+		return m_name <= name;
+	}
+	bool operator>=(const String& name) const {
+		return m_name >= name;
+	}
+	bool operator!=(const String& name) const {
+		return m_name != name;
+	}
+	bool operator==(const String& name) const {
+		return m_name == name;
+	}
+	bool operator<(const Shader& o) const {
+		return m_name < o.m_name;
+	}
+	bool operator>(const Shader& o) const {
+		return m_name > o.m_name;
+	}
+	bool operator<=(const Shader& o) const {
+		return m_name <= o.m_name;
+	}
+	bool operator>=(const Shader& o) const {
+		return m_name >= o.m_name;
+	}
+	bool operator!=(const Shader& o) const {
+		return m_name != o.m_name;
+	}
+	bool operator==(const Shader& o) const {
+		return m_name == o.m_name;
+	}
 
 private:
-    Shader& Copy(const Shader& other);
-    Shader& Move(Shader& other) noexcept;
+	Shader& Copy(const Shader& other);
+	Shader& Move(Shader& other)
+	noexcept;
 };
 
 // =================================================================================================

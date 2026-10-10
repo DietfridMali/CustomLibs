@@ -19,7 +19,8 @@
 // an app that keeps recording runs into the driver and the validation layers with dead handles. So the
 // first VK_ERROR_DEVICE_LOST ends the program with a message. Defined below, behind the second include
 // block; vkupload.cpp declares it extern.
-void HandleDeviceLost(VkResult res, const char* where) noexcept;
+void HandleDeviceLost(VkResult res, const char* where)
+noexcept;
 
 #if VK_STALL_DIAG
 
@@ -29,84 +30,90 @@ static constexpr double kStallDetailMinMs = 1.0;
 static constexpr size_t kStallDetailMaxChars = 16384;
 
 struct VkStallEntry {
-    const char* what;
-    int         count;
-    double      totalMs;
-    double      maxMs;
+	const char*	what;
+	int			count;
+	double		totalMs;
+	double		maxMs;
 };
 
 struct VkStallRecorder {
-    uint64_t                    frameNumber { 0 };
-    double                      frameStartMs { 0.0 };
-    double                      avgFrameMs { 0.0 };
-    std::vector<VkStallEntry>   entries;
-    std::string                 details;
+	uint64_t					frameNumber{ 0 };
+	double						frameStartMs{ 0.0 };
+	double						avgFrameMs{ 0.0 };
+	std::vector<VkStallEntry>	entries;
+	std::string					details;
 };
 
 static VkStallRecorder vkStalls;
 
 
-double VkStallClock(void) noexcept
+double VkStallClock(void)
+noexcept
 {
-    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 
-void VkStallNote(const char* what, double startMs, const char* detail) noexcept
+void VkStallNote(const char* what, double startMs, const char* detail)
+noexcept
 {
-    double ms = VkStallClock() - startMs;
-    VkStallEntry* entry = nullptr;
-    for (auto& e : vkStalls.entries) {
-        if (std::strcmp(e.what, what) == 0) {
-            entry = &e;
-            break;
-        }
-    }
-    if (entry == nullptr) {
-        vkStalls.entries.push_back(VkStallEntry { what, 0, 0.0, 0.0 });
-        entry = &vkStalls.entries.back();
-    }
-    ++entry->count;
-    entry->totalMs += ms;
-    if (entry->maxMs < ms)
-        entry->maxMs = ms;
-    if ((ms >= kStallDetailMinMs) and (vkStalls.details.size() < kStallDetailMaxChars)) {
-        char line[256];
-        snprintf(line, sizeof(line), "      %-28s %8.2f ms  %s\n", what, ms, detail ? detail : "");
-        vkStalls.details += line;
-    }
+	double			ms = VkStallClock() - startMs;
+	VkStallEntry*	entry = nullptr;
+	for (auto& e : vkStalls.entries) {
+		if (std::strcmp(e.what, what) == 0) {
+			entry = &e;
+			break;
+		}
+	}
+	if (entry == nullptr) {
+		vkStalls.entries.push_back(VkStallEntry{ what, 0, 0.0, 0.0 });
+		entry = &vkStalls.entries.back();
+	}
+	++entry->count;
+	entry->totalMs += ms;
+	if (entry->maxMs < ms)
+		entry->maxMs = ms;
+	if ((ms >= kStallDetailMinMs) and (vkStalls.details.size() < kStallDetailMaxChars)) {
+		char line[256];
+		snprintf(line, sizeof(line), "      %-28s %8.2f ms  %s\n", what, ms, detail ? detail : "");
+		vkStalls.details += line;
+	}
 }
 
 
-void VkStallEvent(const char* what, double startMs, const char* detail) noexcept
+void VkStallEvent(const char* what, double startMs, const char* detail)
+noexcept
 {
-    double ms = VkStallClock() - startMs;
-    VkStallNote(what, startMs, detail);
-    logHandler.Print("frame %llu: %s %.2f ms  %s\n", static_cast<unsigned long long>(vkStalls.frameNumber), what, ms, detail ? detail : "");
+	double ms = VkStallClock() - startMs;
+	VkStallNote(what, startMs, detail);
+	logHandler.Print("frame %llu: %s %.2f ms  %s\n", static_cast<unsigned long long>(vkStalls.frameNumber), what, ms, detail ? detail : "");
 }
 
 
-static void VkStallEndFrame(uint64_t nextFrame) noexcept
+static void VkStallEndFrame(uint64_t nextFrame)
+noexcept
 {
-    double now = VkStallClock();
-    if (vkStalls.frameStartMs > 0.0) {
-        double frameMs = now - vkStalls.frameStartMs;
-        bool isStall = (vkStalls.avgFrameMs > 0.0) and (frameMs > kStallFrameMinMs) and (frameMs > kStallFrameFactor * vkStalls.avgFrameMs);
-        if (isStall) {
-            logHandler.Print("STALL frame %llu: %.2f ms (avg %.2f ms)\n", static_cast<unsigned long long>(vkStalls.frameNumber), frameMs, vkStalls.avgFrameMs);
-            for (const auto& e : vkStalls.entries)
-                logHandler.Print("    %-28s %5d x  total %8.2f ms  max %8.2f ms\n", e.what, e.count, e.totalMs, e.maxMs);
-            logHandler.Print("%s", vkStalls.details.c_str());
-        }
-        else if (vkStalls.avgFrameMs == 0.0)
-            vkStalls.avgFrameMs = frameMs;
-        else
-            vkStalls.avgFrameMs = vkStalls.avgFrameMs * 0.95 + frameMs * 0.05;
-    }
-    vkStalls.entries.clear();
-    vkStalls.details.clear();
-    vkStalls.frameStartMs = now;
-    vkStalls.frameNumber = nextFrame;
+	double now = VkStallClock();
+	if (vkStalls.frameStartMs > 0.0) {
+		double	frameMs = now - vkStalls.frameStartMs;
+		bool	isStall =
+			(vkStalls.avgFrameMs > 0.0) and (frameMs > kStallFrameMinMs) and (frameMs > kStallFrameFactor * vkStalls.avgFrameMs);
+		if (isStall) {
+			logHandler.Print("STALL frame %llu: %.2f ms (avg %.2f ms)\n", static_cast<unsigned long long>(vkStalls.frameNumber),
+							 frameMs, vkStalls.avgFrameMs);
+			for (const auto& e : vkStalls.entries)
+				logHandler.Print("    %-28s %5d x  total %8.2f ms  max %8.2f ms\n", e.what, e.count, e.totalMs, e.maxMs);
+			logHandler.Print("%s", vkStalls.details.c_str());
+		}
+		else if (vkStalls.avgFrameMs == 0.0)
+			vkStalls.avgFrameMs = frameMs;
+		else
+			vkStalls.avgFrameMs = vkStalls.avgFrameMs * 0.95 + frameMs * 0.05;
+	}
+	vkStalls.entries.clear();
+	vkStalls.details.clear();
+	vkStalls.frameStartMs = now;
+	vkStalls.frameNumber = nextFrame;
 }
 
 #endif
@@ -137,265 +144,279 @@ static void VkStallEndFrame(uint64_t nextFrame) noexcept
 //   Destroy           — WaitIdle + destroy sync objects
 
 bool CommandQueue::Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
-                          uint32_t graphicsFamily, uint32_t presentFamily,
-                          const String& name) noexcept
+						  uint32_t graphicsFamily, uint32_t presentFamily,
+						  const String& name)
+noexcept
 {
-    if ((device == VK_NULL_HANDLE) or (graphicsQueue == VK_NULL_HANDLE) or (presentQueue == VK_NULL_HANDLE)) {
-        logHandler.Print("CommandQueue::Create: null device or queue handle\n");
-        return false;
-    }
-    m_device = device;
-    m_graphicsQueue = graphicsQueue;
-    m_presentQueue = presentQueue;
-    m_graphicsFamily = graphicsFamily;
-    m_presentFamily = presentFamily;
-    (void)name;  // TODO: VK_EXT_debug_utils — vkSetDebugUtilsObjectNameEXT for queue handles
-    return true;
+	if ((device == VK_NULL_HANDLE) or (graphicsQueue == VK_NULL_HANDLE) or (presentQueue == VK_NULL_HANDLE)) {
+		logHandler.Print("CommandQueue::Create: null device or queue handle\n");
+		return false;
+	}
+	m_device = device;
+	m_graphicsQueue = graphicsQueue;
+	m_presentQueue = presentQueue;
+	m_graphicsFamily = graphicsFamily;
+	m_presentFamily = presentFamily;
+	(void)name; // TODO: VK_EXT_debug_utils — vkSetDebugUtilsObjectNameEXT for queue handles
+	return true;
 }
 
 
-bool CommandQueue::InitSyncObjects(VkSwapchainKHR swapchain) noexcept
+bool CommandQueue::InitSyncObjects(VkSwapchainKHR swapchain)
+noexcept
 {
-    if (m_device == VK_NULL_HANDLE) {
-        logHandler.Print("CommandQueue::InitSyncObjects: device not set, call Create first\n");
-        return false;
-    }
-    if (swapchain == VK_NULL_HANDLE) {
-        logHandler.Print("CommandQueue::InitSyncObjects: null swapchain\n");
-        return false;
-    }
-    m_swapchain = swapchain;
-    return CreateSyncObjects();
+	if (m_device == VK_NULL_HANDLE) {
+		logHandler.Print("CommandQueue::InitSyncObjects: device not set, call Create first\n");
+		return false;
+	}
+	if (swapchain == VK_NULL_HANDLE) {
+		logHandler.Print("CommandQueue::InitSyncObjects: null swapchain\n");
+		return false;
+	}
+	m_swapchain = swapchain;
+	return CreateSyncObjects();
 }
 
 
-void CommandQueue::Destroy(void) noexcept
+void CommandQueue::Destroy(void)
+noexcept
 {
-    WaitIdle();
-    DestroySyncObjects();
-    m_swapchain = VK_NULL_HANDLE;
-    m_graphicsQueue = VK_NULL_HANDLE;
-    m_presentQueue = VK_NULL_HANDLE;
-    m_device = VK_NULL_HANDLE;
+	WaitIdle();
+	DestroySyncObjects();
+	m_swapchain = VK_NULL_HANDLE;
+	m_graphicsQueue = VK_NULL_HANDLE;
+	m_presentQueue = VK_NULL_HANDLE;
+	m_device = VK_NULL_HANDLE;
 }
 
 
-bool CommandQueue::BeginFrame(void) noexcept
+bool CommandQueue::BeginFrame(void)
+noexcept
 {
-    ++m_frameNumber;
+	++m_frameNumber;
 #if VK_STALL_DIAG
-    VkStallEndFrame(m_frameNumber);
-    double stallStart = VkStallClock();
+	VkStallEndFrame(m_frameNumber);
+	double stallStart = VkStallClock();
 #endif
-    // Wait until the GPU has finished using this frame slot.
-    VkResult res = vkWaitForFences(m_device, 1, &m_inFlight[m_frameIndex], VK_TRUE, UINT64_MAX);
+	// Wait until the GPU has finished using this frame slot.
+	VkResult res = vkWaitForFences(m_device, 1, &m_inFlight[m_frameIndex], VK_TRUE, UINT64_MAX);
 #if VK_STALL_DIAG
-    VkStallNote("frame fence wait", stallStart, nullptr);
+	VkStallNote("frame fence wait", stallStart, nullptr);
 #endif
-    if (res != VK_SUCCESS) {
-        logHandler.Print("CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
-        HandleDeviceLost(res, "CommandQueue::BeginFrame");
-        return false;
-    }
-    res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
-        return false;
-    }
-    // The slot's resources hang on its fence alone, so they are reset before the image is acquired -
-    // a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
+	if (res != VK_SUCCESS) {
+		logHandler.Print("CommandQueue::BeginFrame: vkWaitForFences failed (%d)\n", (int)res);
+		HandleDeviceLost(res, "CommandQueue::BeginFrame");
+		return false;
+	}
+	res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("CommandQueue::BeginFrame: vkResetFences failed (%d)\n", (int)res);
+		return false;
+	}
+	// The slot's resources hang on its fence alone, so they are reset before the image is acquired -
+	// a frame whose acquire fails still records, and must not do so on top of the slot's last cycle.
 #if VK_STALL_DIAG
-    stallStart = VkStallClock();
-    gfxResourceHandler.Cleanup(m_frameIndex);
-    VkStallNote("frame resource cleanup", stallStart, nullptr);
-    stallStart = VkStallClock();
-    descriptorPoolHandler.BeginFrame(m_frameIndex);
-    VkStallNote("descriptor pool reset", stallStart, nullptr);
-    cbvAllocator.Reset(m_frameIndex);
-    stallStart = VkStallClock();
-    bool acquired = AcquireNextImage();
-    VkStallNote("acquire next image", stallStart, nullptr);
-    return acquired;
+	stallStart = VkStallClock();
+	gfxResourceHandler.Cleanup(m_frameIndex);
+	VkStallNote("frame resource cleanup", stallStart, nullptr);
+	stallStart = VkStallClock();
+	descriptorPoolHandler.BeginFrame(m_frameIndex);
+	VkStallNote("descriptor pool reset", stallStart, nullptr);
+	cbvAllocator.Reset(m_frameIndex);
+	stallStart = VkStallClock();
+	bool acquired = AcquireNextImage();
+	VkStallNote("acquire next image", stallStart, nullptr);
+	return acquired;
 #else
-    gfxResourceHandler.Cleanup(m_frameIndex);
-    descriptorPoolHandler.BeginFrame(m_frameIndex);
-    cbvAllocator.Reset(m_frameIndex);
-    return AcquireNextImage();
+	gfxResourceHandler.Cleanup(m_frameIndex);
+	descriptorPoolHandler.BeginFrame(m_frameIndex);
+	cbvAllocator.Reset(m_frameIndex);
+	return AcquireNextImage();
 #endif
 }
 
 
-bool CommandQueue::ReacquireImage(void) noexcept
+bool CommandQueue::ReacquireImage(void)
+noexcept
 {
-    VkResult res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("CommandQueue::ReacquireImage: vkResetFences failed (%d)\n", int(res));
-        return false;
-    }
-    return AcquireNextImage();
+	VkResult res = vkResetFences(m_device, 1, &m_inFlight[m_frameIndex]);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("CommandQueue::ReacquireImage: vkResetFences failed (%d)\n", int(res));
+		return false;
+	}
+	return AcquireNextImage();
 }
 
 
-void CommandQueue::EndFrame(void) noexcept
+void CommandQueue::EndFrame(void)
+noexcept
 {
-    Present();
-    m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
+	Present();
+	m_frameIndex = (m_frameIndex + 1) % FRAME_COUNT;
 }
 
 
-void CommandQueue::WaitIdle(void) noexcept
+void CommandQueue::WaitIdle(void)
+noexcept
 {
-    if (m_graphicsQueue == VK_NULL_HANDLE)
-        return;
+	if (m_graphicsQueue == VK_NULL_HANDLE)
+		return;
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    VkResult res = vkQueueWaitIdle(m_graphicsQueue);
+	VkResult res = vkQueueWaitIdle(m_graphicsQueue);
 #if VK_STALL_DIAG
-    VkStallNote("queue wait idle", stallStart, nullptr);
+	VkStallNote("queue wait idle", stallStart, nullptr);
 #endif
-    if (res != VK_SUCCESS) {
-        logHandler.Print("CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
-        HandleDeviceLost(res, "CommandQueue::WaitIdle");
-    }
+	if (res != VK_SUCCESS) {
+		logHandler.Print("CommandQueue::WaitIdle: vkQueueWaitIdle failed (%d)\n", (int)res);
+		HandleDeviceLost(res, "CommandQueue::WaitIdle");
+	}
 }
 
 
-VkCommandBuffer CommandQueue::CmdBuffer(void) const noexcept
+VkCommandBuffer CommandQueue::CmdBuffer(void) const
+noexcept
 {
-    return commandListHandler.CurrentGfxList();
+	return commandListHandler.CurrentGfxList();
 }
 
 // =================================================================================================
 // CommandQueue — private helpers
 
-bool CommandQueue::CreateSyncObjects(void) noexcept
+bool CommandQueue::CreateSyncObjects(void)
+noexcept
 {
-    VkSemaphoreCreateInfo semInfo{ };
-    semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	VkSemaphoreCreateInfo semInfo{};
+	semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    VkFenceCreateInfo fenceInfo{ };
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  // first BeginFrame must not deadlock on the wait
+	VkFenceCreateInfo fenceInfo{};
+	fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // first BeginFrame must not deadlock on the wait
 
-    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
-        VkResult r1 = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_imageAvailable[i]);
-        VkResult r2 = vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlight[i]);
-        if ((r1 != VK_SUCCESS) or (r2 != VK_SUCCESS)) {
-            logHandler.Print("CommandQueue::CreateSyncObjects: failed at slot %u (sem=%d fence=%d)\n",
-                    i, (int)r1, (int)r2);
-            return false;
-        }
-    }
-    // renderFinished is per swapchain image, not per frame slot. Allocate up to the static
-    // upper bound MAX_BACK_BUFFERS — extra slots beyond the swapchain's actual ImageCount are
-    // harmless since the present/submit paths only ever index by m_imageIndex < ImageCount.
-    for (uint32_t i = 0; i < Swapchain::MAX_BACK_BUFFERS; ++i) {
-        VkResult r = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_renderFinished[i]);
-        if (r != VK_SUCCESS) {
-            logHandler.Print("CommandQueue::CreateSyncObjects: vkCreateSemaphore(renderFinished[%u]) failed (%d)\n",
-                    i, (int)r);
-            return false;
-        }
-    }
-    return true;
+	for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+		VkResult r1 = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_imageAvailable[i]);
+		VkResult r2 = vkCreateFence(m_device, &fenceInfo, nullptr, &m_inFlight[i]);
+		if ((r1 != VK_SUCCESS) or (r2 != VK_SUCCESS)) {
+			logHandler.Print("CommandQueue::CreateSyncObjects: failed at slot %u (sem=%d fence=%d)\n",
+							 i, (int)r1, (int)r2);
+			return false;
+		}
+	}
+	// renderFinished is per swapchain image, not per frame slot. Allocate up to the static
+	// upper bound MAX_BACK_BUFFERS — extra slots beyond the swapchain's actual ImageCount are
+	// harmless since the present/submit paths only ever index by m_imageIndex < ImageCount.
+	for (uint32_t i = 0; i < Swapchain::MAX_BACK_BUFFERS; ++i) {
+		VkResult r = vkCreateSemaphore(m_device, &semInfo, nullptr, &m_renderFinished[i]);
+		if (r != VK_SUCCESS) {
+			logHandler.Print("CommandQueue::CreateSyncObjects: vkCreateSemaphore(renderFinished[%u]) failed (%d)\n",
+							 i, (int)r);
+			return false;
+		}
+	}
+	return true;
 }
 
 
-void CommandQueue::DestroySyncObjects(void) noexcept
+void CommandQueue::DestroySyncObjects(void)
+noexcept
 {
-    if (m_device == VK_NULL_HANDLE)
-        return;
-    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
-        if (m_imageAvailable[i] != VK_NULL_HANDLE) {
-            vkDestroySemaphore(m_device, m_imageAvailable[i], nullptr);
-            m_imageAvailable[i] = VK_NULL_HANDLE;
-        }
-        if (m_inFlight[i] != VK_NULL_HANDLE) {
-            vkDestroyFence(m_device, m_inFlight[i], nullptr);
-            m_inFlight[i] = VK_NULL_HANDLE;
-        }
-    }
-    for (uint32_t i = 0; i < Swapchain::MAX_BACK_BUFFERS; ++i) {
-        if (m_renderFinished[i] != VK_NULL_HANDLE) {
-            vkDestroySemaphore(m_device, m_renderFinished[i], nullptr);
-            m_renderFinished[i] = VK_NULL_HANDLE;
-        }
-    }
-    m_acquireWaitPending = false;
+	if (m_device == VK_NULL_HANDLE)
+		return;
+	for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+		if (m_imageAvailable[i] != VK_NULL_HANDLE) {
+			vkDestroySemaphore(m_device, m_imageAvailable[i], nullptr);
+			m_imageAvailable[i] = VK_NULL_HANDLE;
+		}
+		if (m_inFlight[i] != VK_NULL_HANDLE) {
+			vkDestroyFence(m_device, m_inFlight[i], nullptr);
+			m_inFlight[i] = VK_NULL_HANDLE;
+		}
+	}
+	for (uint32_t i = 0; i < Swapchain::MAX_BACK_BUFFERS; ++i) {
+		if (m_renderFinished[i] != VK_NULL_HANDLE) {
+			vkDestroySemaphore(m_device, m_renderFinished[i], nullptr);
+			m_renderFinished[i] = VK_NULL_HANDLE;
+		}
+	}
+	m_acquireWaitPending = false;
 }
 
 
-bool CommandQueue::RecreateSyncObjects(void) noexcept
+bool CommandQueue::RecreateSyncObjects(void)
+noexcept
 {
-    if (m_device == VK_NULL_HANDLE)
-        return false;
-    DestroySyncObjects();
-    return CreateSyncObjects();
+	if (m_device == VK_NULL_HANDLE)
+		return false;
+	DestroySyncObjects();
+	return CreateSyncObjects();
 }
 
 
-bool CommandQueue::AcquireNextImage(void) noexcept
+bool CommandQueue::AcquireNextImage(void)
+noexcept
 {
-    VkResult res = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX,
-                                         m_imageAvailable[m_frameIndex], VK_NULL_HANDLE,
-                                         &m_imageIndex);
-    if (res == VK_ERROR_OUT_OF_DATE_KHR) {
-        // Swapchain is stale (e.g. window resized). Caller is BaseDisplayHandler;
-        // it owns the swapchain and is expected to recreate it. Phase B.
+	VkResult res = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX,
+										 m_imageAvailable[m_frameIndex], VK_NULL_HANDLE,
+										 &m_imageIndex);
+	if (res == VK_ERROR_OUT_OF_DATE_KHR) {
+		// Swapchain is stale (e.g. window resized). Caller is BaseDisplayHandler;
+		// it owns the swapchain and is expected to recreate it. Phase B.
 #ifdef _DEBUG
-        logHandler.Print("CommandQueue::AcquireNextImage: VK_ERROR_OUT_OF_DATE_KHR\n");
+		logHandler.Print("CommandQueue::AcquireNextImage: VK_ERROR_OUT_OF_DATE_KHR\n");
 #endif
-        m_swapchainIsOutOfDate = true;
-        return false;
-    }
-    if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR)) {
-        logHandler.Print("CommandQueue::AcquireNextImage: vkAcquireNextImageKHR failed (%d)\n", (int)res);
-        HandleDeviceLost(res, "CommandQueue::AcquireNextImage");
-        return false;
-    }
-    m_acquireWaitPending = true;
-    return true;
+		m_swapchainIsOutOfDate = true;
+		return false;
+	}
+	if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR)) {
+		logHandler.Print("CommandQueue::AcquireNextImage: vkAcquireNextImageKHR failed (%d)\n", (int)res);
+		HandleDeviceLost(res, "CommandQueue::AcquireNextImage");
+		return false;
+	}
+	m_acquireWaitPending = true;
+	return true;
 }
 
 
-bool CommandQueue::TakeAcquireWait(VkSemaphoreSubmitInfo& waitInfo) noexcept
+bool CommandQueue::TakeAcquireWait(VkSemaphoreSubmitInfo& waitInfo)
+noexcept
 {
-    if (not m_acquireWaitPending)
-        return false;
-    m_acquireWaitPending = false;
-    waitInfo = VkSemaphoreSubmitInfo { };
-    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-    waitInfo.semaphore = SubmitWaitSemaphore();
-    waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
-    return true;
+	if (not m_acquireWaitPending)
+		return false;
+	m_acquireWaitPending = false;
+	waitInfo = VkSemaphoreSubmitInfo{};
+	waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+	waitInfo.semaphore = SubmitWaitSemaphore();
+	waitInfo.stageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+	return true;
 }
 
 
-void CommandQueue::Present(void) noexcept
+void CommandQueue::Present(void)
+noexcept
 {
-    ZoneScopedN("CmdQueue::Present");
-    VkPresentInfoKHR present { };
-    present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &m_renderFinished[m_imageIndex];
-    present.swapchainCount = 1;
-    present.pSwapchains = &m_swapchain;
-    present.pImageIndices = &m_imageIndex;
+	ZoneScopedN("CmdQueue::Present");
+	VkPresentInfoKHR present{};
+	present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	present.waitSemaphoreCount = 1;
+	present.pWaitSemaphores = &m_renderFinished[m_imageIndex];
+	present.swapchainCount = 1;
+	present.pSwapchains = &m_swapchain;
+	present.pImageIndices = &m_imageIndex;
 
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    VkResult res = vkQueuePresentKHR(m_presentQueue, &present);
+	VkResult res = vkQueuePresentKHR(m_presentQueue, &present);
 #if VK_STALL_DIAG
-    VkStallNote("present", stallStart, nullptr);
+	VkStallNote("present", stallStart, nullptr);
 #endif
-    if ((res == VK_ERROR_OUT_OF_DATE_KHR) or (res == VK_SUBOPTIMAL_KHR))
-        m_swapchainIsOutOfDate = true;
-    if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR)) {
-        logHandler.Print("CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
-        HandleDeviceLost(res, "CommandQueue::Present");
-    }
+	if ((res == VK_ERROR_OUT_OF_DATE_KHR) or (res == VK_SUBOPTIMAL_KHR))
+		m_swapchainIsOutOfDate = true;
+	if ((res != VK_SUCCESS) and (res != VK_SUBOPTIMAL_KHR) and (res != VK_ERROR_OUT_OF_DATE_KHR)) {
+		logHandler.Print("CommandQueue::Present: vkQueuePresentKHR failed (%d)\n", (int)res);
+		HandleDeviceLost(res, "CommandQueue::Present");
+	}
 }
 
 // =================================================================================================
@@ -417,454 +438,476 @@ void CommandQueue::Present(void) noexcept
 
 #include <cstdlib>
 
-void HandleDeviceLost(VkResult res, const char* where) noexcept
+void HandleDeviceLost(VkResult res, const char* where)
+noexcept
 {
-    if (res != VK_ERROR_DEVICE_LOST)
-        return;
-    logHandler.Print("%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating (build %s)\n", where, logHandler.BuildStamp());
-    // The window goes first - a message box behind a fullscreen window cannot be seen or answered.
-    if (SDL_Window* window = baseDisplayHandler.GetWindow())
-        SDL_HideWindow(window);
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Internal Error", "Graphics device lost", nullptr);
-    // No exit (): static destructors and atexit handlers would walk back into Vulkan with the dead device.
-    std::_Exit(1);
+	if (res != VK_ERROR_DEVICE_LOST)
+		return;
+	logHandler.Print("%s: VK_ERROR_DEVICE_LOST - graphics device lost, terminating (build %s)\n", where, logHandler.BuildStamp());
+	// The window goes first - a message box behind a fullscreen window cannot be seen or answered.
+	if (SDL_Window* window = baseDisplayHandler.GetWindow())
+		SDL_HideWindow(window);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Internal Error", "Graphics device lost", nullptr);
+	// No exit (): static destructors and atexit handlers would walk back into Vulkan with the dead device.
+	std::_Exit(1);
 }
 
 List<RenderStates> CommandList::m_renderStateStack;
 
 
-uint32_t CommandList::ActiveFrameIndex(void) noexcept
+uint32_t CommandList::ActiveFrameIndex(void)
+noexcept
 {
-    return commandListHandler.CmdQueue().FrameIndex();
+	return commandListHandler.CmdQueue().FrameIndex();
 }
 
 
-void CommandList::PushRenderStates(void) noexcept
+void CommandList::PushRenderStates(void)
+noexcept
 {
-    m_renderStateStack.Push(baseRenderer.RenderStates());
+	m_renderStateStack.Push(baseRenderer.RenderStates());
 }
 
 
-void CommandList::PopRenderStates(void) noexcept
+void CommandList::PopRenderStates(void)
+noexcept
 {
-    if (m_renderStateStack.Length() > 0)
-        baseRenderer.RenderStates() = m_renderStateStack.Pop();
+	if (m_renderStateStack.Length() > 0)
+		baseRenderer.RenderStates() = m_renderStateStack.Pop();
 }
 
 
-bool CommandList::Create(const String& name, bool isTemporary) noexcept
+bool CommandList::Create(const String& name, bool isTemporary)
+noexcept
 {
-    VkDevice device = vkContext.Device();
-    if (device == VK_NULL_HANDLE)
-        return false;
+	VkDevice device = vkContext.Device();
+	if (device == VK_NULL_HANDLE)
+		return false;
 
-    VkCommandPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = vkContext.GraphicsFamily();
-    // RESET_COMMAND_BUFFER_BIT: these per-frame / temporary command buffers are re-recorded every
-    // frame (ONE_TIME_SUBMIT, so they become invalid after execution). Open() resets the whole pool
-    // via vkResetCommandPool, but a recycled/temporary list can reach vkBeginCommandBuffer with its CB
-    // not in the initial state — the bit makes that (implicit) per-buffer reset legal instead of a
-    // validation error. TRANSIENT_BIT stays as the short-lived-buffers allocator hint.
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	VkCommandPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	poolInfo.queueFamilyIndex = vkContext.GraphicsFamily();
+	// RESET_COMMAND_BUFFER_BIT: these per-frame / temporary command buffers are re-recorded every
+	// frame (ONE_TIME_SUBMIT, so they become invalid after execution). Open() resets the whole pool
+	// via vkResetCommandPool, but a recycled/temporary list can reach vkBeginCommandBuffer with its CB
+	// not in the initial state — the bit makes that (implicit) per-buffer reset legal instead of a
+	// validation error. TRANSIENT_BIT stays as the short-lived-buffers allocator hint.
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
-        VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &m_pools[i]);
-        if (res != VK_SUCCESS) {
-            logHandler.Print("CommandList::Create: vkCreateCommandPool[%u] failed (%d)\n", i, (int)res);
-            return false;
-        }
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = m_pools[i];
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
-        res = vkAllocateCommandBuffers(device, &allocInfo, &m_cmdBuffers[i]);
-        if (res != VK_SUCCESS) {
-            logHandler.Print("CommandList::Create: vkAllocateCommandBuffers[%u] failed (%d)\n", i, (int)res);
-            return false;
-        }
-    }
-    m_id = commandListHandler.m_cmdListId++;
-    m_name = name;
-    m_isTemporary = isTemporary;
-    return true;
+	for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+		VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &m_pools[i]);
+		if (res != VK_SUCCESS) {
+			logHandler.Print("CommandList::Create: vkCreateCommandPool[%u] failed (%d)\n", i, (int)res);
+			return false;
+		}
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandPool = m_pools[i];
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+		res = vkAllocateCommandBuffers(device, &allocInfo, &m_cmdBuffers[i]);
+		if (res != VK_SUCCESS) {
+			logHandler.Print("CommandList::Create: vkAllocateCommandBuffers[%u] failed (%d)\n", i, (int)res);
+			return false;
+		}
+	}
+	m_id = commandListHandler.m_cmdListId++;
+	m_name = name;
+	m_isTemporary = isTemporary;
+	return true;
 }
 
 
-void CommandList::Destroy(void) noexcept
+void CommandList::Destroy(void)
+noexcept
 {
-    m_isRecording = false;
-    VkDevice device = vkContext.Device();
-    if (device == VK_NULL_HANDLE)
-        return;
-    for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
-        if (m_pools[i] != VK_NULL_HANDLE) {
-            vkDestroyCommandPool(device, m_pools[i], nullptr);
-            m_pools[i] = VK_NULL_HANDLE;
-            m_cmdBuffers[i] = VK_NULL_HANDLE;
-        }
-    }
+	m_isRecording = false;
+	VkDevice device = vkContext.Device();
+	if (device == VK_NULL_HANDLE)
+		return;
+	for (uint32_t i = 0; i < FRAME_COUNT; ++i) {
+		if (m_pools[i] != VK_NULL_HANDLE) {
+			vkDestroyCommandPool(device, m_pools[i], nullptr);
+			m_pools[i] = VK_NULL_HANDLE;
+			m_cmdBuffers[i] = VK_NULL_HANDLE;
+		}
+	}
 }
 
 
-void CommandList::Reset(void) noexcept
+void CommandList::Reset(void)
+noexcept
 {
-    m_refCounter = 1;
-    m_isFlushed = false;
-    m_isRecording = false;
+	m_refCounter = 1;
+	m_isFlushed = false;
+	m_isRecording = false;
 }
 
 
-bool CommandList::Open(bool saveRenderStates, bool detached) noexcept
+bool CommandList::Open(bool saveRenderStates, bool detached)
+noexcept
 {
-    if (m_isRecording)
-        return true;
-    m_isDetached = detached;
-    uint32_t fi = ActiveFrameIndex();
-    if ((m_pools[fi] == VK_NULL_HANDLE) or (m_cmdBuffers[fi] == VK_NULL_HANDLE))
-        return false;
-    VkResult res = vkResetCommandPool(vkContext.Device(), m_pools[fi], 0);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("CommandList::Open: vkResetCommandPool failed (%d)\n", (int)res);
-        return false;
-    }
-    VkCommandBufferBeginInfo bi{};
-    bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    res = vkBeginCommandBuffer(m_cmdBuffers[fi], &bi);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("CommandList::Open: vkBeginCommandBuffer failed (%d)\n", (int)res);
-        return false;
-    }
-    m_isRecording = true;
-    m_isFlushed = false;
-    m_usesBackBuffer = false;
-    m_openSerial = gfxResourceHandler.NextSerial();
-    m_activePipeline = VK_NULL_HANDLE;
-    ++m_executionCounter;
-    if (detached)
-        commandListHandler.Register(this);
-    else
-        commandListHandler.PushCmdList(this);
-    // Track as open. Close() will register the CL in m_pendingLists at close-order,
-    // which is what the submit sequence uses. ExecuteAll forces a Close on anything
-    // still in m_openLists at frame end.
-    commandListHandler.m_openLists.Push(this);
+	if (m_isRecording)
+		return true;
+	m_isDetached = detached;
+	uint32_t fi = ActiveFrameIndex();
+	if ((m_pools[fi] == VK_NULL_HANDLE) or (m_cmdBuffers[fi] == VK_NULL_HANDLE))
+		return false;
+	VkResult res = vkResetCommandPool(vkContext.Device(), m_pools[fi], 0);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("CommandList::Open: vkResetCommandPool failed (%d)\n", (int)res);
+		return false;
+	}
+	VkCommandBufferBeginInfo bi{};
+	bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	res = vkBeginCommandBuffer(m_cmdBuffers[fi], &bi);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("CommandList::Open: vkBeginCommandBuffer failed (%d)\n", (int)res);
+		return false;
+	}
+	m_isRecording = true;
+	m_isFlushed = false;
+	m_usesBackBuffer = false;
+	m_openSerial = gfxResourceHandler.NextSerial();
+	m_activePipeline = VK_NULL_HANDLE;
+	++m_executionCounter;
+	if (detached)
+		commandListHandler.Register(this);
+	else
+		commandListHandler.PushCmdList(this);
+	// Track as open. Close() will register the CL in m_pendingLists at close-order,
+	// which is what the submit sequence uses. ExecuteAll forces a Close on anything
+	// still in m_openLists at frame end.
+	commandListHandler.m_openLists.Push(this);
 #if USE_TRACY
-    m_gpuZone = new tracy::VkCtxScope(commandListHandler.m_gpuProfilerCtx,
-        uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
-        (const char*)m_name, size_t(m_name.Length()), m_cmdBuffers[fi], true);
+	m_gpuZone = new tracy::VkCtxScope(commandListHandler.m_gpuProfilerCtx,
+									  uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
+									  (const char*)m_name, size_t(m_name.Length()), m_cmdBuffers[fi], true);
 #endif
-    if (detached)
-        return true;
-    if (saveRenderStates)
-        PushRenderStates();
-    gfxStates.RestoreViewport();
+	if (detached)
+		return true;
+	if (saveRenderStates)
+		PushRenderStates();
+	gfxStates.RestoreViewport();
 #ifdef _DEBUG
-    //gfxStates.CheckError();
+	//gfxStates.CheckError();
 #endif
-    return true;
+	return true;
 }
 
 
-void CommandList::Close(bool restoreRenderStates) noexcept
+void CommandList::Close(bool restoreRenderStates)
+noexcept
 {
-    if (not m_isRecording)
-        return;
-    m_isRecording = false;
+	if (not m_isRecording)
+		return;
+	m_isRecording = false;
 #if USE_TRACY
-    delete m_gpuZone;
-    m_gpuZone = nullptr;
+	delete m_gpuZone;
+	m_gpuZone = nullptr;
 #endif
-    uint32_t fi = ActiveFrameIndex();
-    if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == m_cmdBuffers[fi]))
-        baseDisplayHandler.SuspendBackBuffer();
-    VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
-    if (res != VK_SUCCESS)
-        logHandler.Print("CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
+	uint32_t fi = ActiveFrameIndex();
+	if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == m_cmdBuffers[fi]))
+		baseDisplayHandler.SuspendBackBuffer();
+	VkResult res = vkEndCommandBuffer(m_cmdBuffers[fi]);
+	if (res != VK_SUCCESS)
+		logHandler.Print("CommandList::Close: vkEndCommandBuffer failed (%d)\n", (int)res);
 #ifdef _DEBUG
-    gfxStates.CheckError((const char*)m_name);
+	gfxStates.CheckError((const char*)m_name);
 #endif
-    if (m_isDetached) {
-        commandListHandler.Register(this);
-        return;
-    }
-    commandListHandler.PopCmdList();
-    // Register in pendingLists in close-order. ExecuteAll iterates pendingLists in
-    // this order, so the CL whose Close() ran first is submitted first.
-    commandListHandler.Register(this);
-    if (restoreRenderStates)
-        PopRenderStates();
+	if (m_isDetached) {
+		commandListHandler.Register(this);
+		return;
+	}
+	commandListHandler.PopCmdList();
+	// Register in pendingLists in close-order. ExecuteAll iterates pendingLists in
+	// this order, so the CL whose Close() ran first is submitted first.
+	commandListHandler.Register(this);
+	if (restoreRenderStates)
+		PopRenderStates();
 }
 
 
-void CommandList::Flush(void) noexcept
+void CommandList::Flush(void)
+noexcept
 {
-    if (m_isFlushed)
-        return;
-    m_isFlushed = true;
+	if (m_isFlushed)
+		return;
+	m_isFlushed = true;
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    Close();
+	Close();
 
-    uint32_t fi = ActiveFrameIndex();
-    VkCommandBufferSubmitInfo cbInfos[2]{};
-    uint32_t cbCount = 0;
-    CommandList* uploadList = commandListHandler.m_uploadList;
-    if (uploadList and (uploadList != this)) {
-        uploadList->m_isFlushed = true;
-        uploadList->Close();
-        commandListHandler.m_uploadList = nullptr;
-        cbInfos[cbCount].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        cbInfos[cbCount].commandBuffer = uploadList->m_cmdBuffers[fi];
-        ++cbCount;
-    }
-    cbInfos[cbCount].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-    cbInfos[cbCount].commandBuffer = m_cmdBuffers[fi];
-    ++cbCount;
+	uint32_t					fi = ActiveFrameIndex();
+	VkCommandBufferSubmitInfo	cbInfos[2]{};
+	uint32_t					cbCount = 0;
+	CommandList*				uploadList = commandListHandler.m_uploadList;
+	if (uploadList and (uploadList != this)) {
+		uploadList->m_isFlushed = true;
+		uploadList->Close();
+		commandListHandler.m_uploadList = nullptr;
+		cbInfos[cbCount].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+		cbInfos[cbCount].commandBuffer = uploadList->m_cmdBuffers[fi];
+		++cbCount;
+	}
+	cbInfos[cbCount].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+	cbInfos[cbCount].commandBuffer = m_cmdBuffers[fi];
+	++cbCount;
 
-    VkSubmitInfo2 submit{};
-    submit.sType  = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-    submit.commandBufferInfoCount = cbCount;
-    submit.pCommandBufferInfos = cbInfos;
+	VkSubmitInfo2 submit{};
+	submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+	submit.commandBufferInfoCount = cbCount;
+	submit.pCommandBufferInfos = cbInfos;
 
-    VkSemaphoreSubmitInfo waitInfo{};
-    bool usesBackBuffer = m_usesBackBuffer or (uploadList and (uploadList != this) and uploadList->m_usesBackBuffer);
-    if (usesBackBuffer and commandListHandler.CmdQueue().TakeAcquireWait(waitInfo)) {
-        submit.waitSemaphoreInfoCount = 1;
-        submit.pWaitSemaphoreInfos = &waitInfo;
-    }
+	VkSemaphoreSubmitInfo	waitInfo{};
+	bool					usesBackBuffer = m_usesBackBuffer or (uploadList and (uploadList != this) and uploadList->m_usesBackBuffer);
+	if (usesBackBuffer and commandListHandler.CmdQueue().TakeAcquireWait(waitInfo)) {
+		submit.waitSemaphoreInfoCount = 1;
+		submit.pWaitSemaphoreInfos = &waitInfo;
+	}
 
-    VkResult res = Vk13Api::QueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("CommandList::Flush: vkQueueSubmit2 failed (%d)\n", (int)res);
-        HandleDeviceLost(res, "CommandList::Flush");
-    }
+	VkResult res = Vk13Api::QueueSubmit2(commandListHandler.GetQueue(), 1, &submit, VK_NULL_HANDLE);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("CommandList::Flush: vkQueueSubmit2 failed (%d)\n", (int)res);
+		HandleDeviceLost(res, "CommandList::Flush");
+	}
 #ifdef _DEBUG
-    CheckDeviceRemoved("Flush");
+	CheckDeviceRemoved("Flush");
 #endif
-    commandListHandler.CmdQueue().WaitIdle();
-    DisposeResources();
+	commandListHandler.CmdQueue().WaitIdle();
+	DisposeResources();
 #if VK_STALL_DIAG
-    String name = GetName();
-    VkStallNote("command list flush", stallStart, static_cast<const char*>(name));
+	String name = GetName();
+	VkStallNote("command list flush", stallStart, static_cast<const char*>(name));
 #endif
 }
 
 
 void CommandList::SetBarrier(VkImage image, ImageLayoutTracker& tracker, VkImageLayout newLayout,
-                             VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
+							 VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess)
 {
-    if (not m_isRecording or (image == VK_NULL_HANDLE))
-        return;
-    tracker.TransitionTo(GfxList(), newLayout, dstStage, dstAccess);
+	if (not m_isRecording or (image == VK_NULL_HANDLE))
+		return;
+	tracker.TransitionTo(GfxList(), newLayout, dstStage, dstAccess);
 #ifdef _DEBUG
-    //gfxStates.CheckError();
+	//gfxStates.CheckError();
 #endif
 }
 
 
 void CommandList::SetBarrier(const VkImageMemoryBarrier2* barriers, int count)
 {
-    if (not m_isRecording or not barriers or (count <= 0))
-        return;
-    VkDependencyInfo dep{};
-    dep.sType   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    dep.imageMemoryBarrierCount = uint32_t(count);
-    dep.pImageMemoryBarriers = barriers;
-    Vk13Api::CmdPipelineBarrier2(GfxList(), &dep);
+	if (not m_isRecording or not barriers or (count <= 0))
+		return;
+	VkDependencyInfo dep{};
+	dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	dep.imageMemoryBarrierCount = uint32_t(count);
+	dep.pImageMemoryBarriers = barriers;
+	Vk13Api::CmdPipelineBarrier2(GfxList(), &dep);
 #ifdef _DEBUG
-    //gfxStates.CheckError();
+	//gfxStates.CheckError();
 #endif
 }
 
 
-void CommandList::DisposeResources(void) noexcept
+void CommandList::DisposeResources(void)
+noexcept
 {
-    for (auto& fn : m_disposableResources)
-        fn();
-    m_disposableResources.Clear();
+	for (auto& fn : m_disposableResources)
+		fn();
+	m_disposableResources.Clear();
 }
 
 
-void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/) noexcept
+void CommandList::SetActivePipeline(VkPipeline pipeline, Shader* /*shader*/)
+noexcept
 {
-    if (pipeline != m_activePipeline) {
-        if (m_isRecording and pipeline != VK_NULL_HANDLE)
-            vkCmdBindPipeline(GfxList(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-        m_activePipeline = pipeline;
+	if (pipeline != m_activePipeline) {
+		if (m_isRecording and pipeline != VK_NULL_HANDLE)
+			vkCmdBindPipeline(GfxList(), VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+		m_activePipeline = pipeline;
 #ifdef _DEBUG
-        //gfxStates.CheckError();
+		//gfxStates.CheckError();
 #endif
-    }
+	}
 }
 
 
 #if OPTIMIZE_SHADER_LOADING
 struct PipelineTarget {
-    VkFormat    colorFormats[8] { };
-    uint32_t    colorFormatCount { 0 };
-    VkFormat    depthFormat { VK_FORMAT_UNDEFINED };
+	VkFormat colorFormats[8]{};
+	uint32_t colorFormatCount{ 0 };
+	VkFormat depthFormat{ VK_FORMAT_UNDEFINED };
 
-    bool operator==(const PipelineTarget& other) const noexcept = default;
+	bool operator==(const PipelineTarget& other) const
+	noexcept = default;
 };
 
 #endif
-static RenderStates lastPipelineStates;
-static CommandList* lastPipelineList = nullptr;
-static Shader* lastPipelineShader = nullptr;
+static RenderStates	lastPipelineStates;
+static CommandList*	lastPipelineList = nullptr;
+static Shader*		lastPipelineShader = nullptr;
 #if OPTIMIZE_SHADER_LOADING
 static PipelineTarget lastPipelineTarget;
 
 
-static void FillPipelineTarget(PipelineKey& key) noexcept
+static void FillPipelineTarget(PipelineKey& key)
+noexcept
 {
-    if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
-        rt->FillPipelineKey(key);
-    else if (baseDisplayHandler.IsInRendering()) {
-        key.colorFormats[0] = baseDisplayHandler.m_swapchain.Format();
-        key.colorFormatCount = 1;
-        key.depthFormat = VK_FORMAT_UNDEFINED;
-    }
+	if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
+		rt->FillPipelineKey(key);
+	else if (baseDisplayHandler.IsInRendering()) {
+		key.colorFormats[0] = baseDisplayHandler.m_swapchain.Format();
+		key.colorFormatCount = 1;
+		key.depthFormat = VK_FORMAT_UNDEFINED;
+	}
 }
 
 
-static PipelineTarget GetPipelineTarget(const PipelineKey& key) noexcept
+static PipelineTarget GetPipelineTarget(const PipelineKey& key)
+noexcept
 {
-    PipelineTarget target;
-    std::memcpy(target.colorFormats, key.colorFormats, sizeof(target.colorFormats));
-    target.colorFormatCount = key.colorFormatCount;
-    target.depthFormat = key.depthFormat;
-    return target;
+	PipelineTarget target;
+	std::memcpy(target.colorFormats, key.colorFormats, sizeof(target.colorFormats));
+	target.colorFormatCount = key.colorFormatCount;
+	target.depthFormat = key.depthFormat;
+	return target;
 }
 #endif
 
-static void MaskUnwrittenAttachments(RenderStates& states, uint32_t writtenCount, uint32_t attachmentCount) noexcept
+static void MaskUnwrittenAttachments(RenderStates& states, uint32_t writtenCount, uint32_t attachmentCount)
+noexcept
 {
-    if (not states.independentBlend) {
-        for (uint32_t i = 1; i < attachmentCount; ++i) {
-            states.blendEnable[i] = states.blendEnable[0];
-            states.blendSrcRGB[i] = states.blendSrcRGB[0];
-            states.blendDstRGB[i] = states.blendDstRGB[0];
-            states.blendSrcAlpha[i] = states.blendSrcAlpha[0];
-            states.blendDstAlpha[i] = states.blendDstAlpha[0];
-            states.blendOpRGB[i] = states.blendOpRGB[0];
-            states.blendOpAlpha[i] = states.blendOpAlpha[0];
-            states.colorMask[i] = states.colorMask[0];
-        }
-        states.independentBlend = 1;
-    }
-    for (uint32_t i = writtenCount; i < attachmentCount; ++i)
-        states.colorMask[i] = 0;
+	if (not states.independentBlend) {
+		for (uint32_t i = 1; i < attachmentCount; ++i) {
+			states.blendEnable[i] = states.blendEnable[0];
+			states.blendSrcRGB[i] = states.blendSrcRGB[0];
+			states.blendDstRGB[i] = states.blendDstRGB[0];
+			states.blendSrcAlpha[i] = states.blendSrcAlpha[0];
+			states.blendDstAlpha[i] = states.blendDstAlpha[0];
+			states.blendOpRGB[i] = states.blendOpRGB[0];
+			states.blendOpAlpha[i] = states.blendOpAlpha[0];
+			states.colorMask[i] = states.colorMask[0];
+		}
+		states.independentBlend = 1;
+	}
+	for (uint32_t i = writtenCount; i < attachmentCount; ++i)
+		states.colorMask[i] = 0;
 }
 
 
-static void ReportUnwrittenAttachments(Shader* shader, uint32_t writtenCount, uint32_t attachmentCount) noexcept
+static void ReportUnwrittenAttachments(Shader* shader, uint32_t writtenCount, uint32_t attachmentCount)
+noexcept
 {
 #ifdef _DEBUG
-    static Shader* lastReported = nullptr;
-    if (shader == lastReported)
-        return;
-    lastReported = shader;
-    logHandler.Print("CommandList::GetPipeline: shader '%s' writes %u of %u color attachments; the device has neither unused attachments nor independent blend, the other attachments are undefined after the draw\n",
-            static_cast<const char*>(shader->m_name), writtenCount, attachmentCount);
+	static Shader* lastReported = nullptr;
+	if (shader == lastReported)
+		return;
+	lastReported = shader;
+	logHandler.Print(
+		"CommandList::GetPipeline: shader '%s' writes %u of %u color attachments; the device has neither unused attachments nor independent blend, the other attachments are undefined after the draw\n",
+		static_cast<const char*>(shader->m_name), writtenCount, attachmentCount);
 #endif
 }
 
-bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept
+bool ResolveDrawPipeline(CommandList* cl, Shader* shader)
+noexcept
 {
-    if ((cl->m_activePipeline != VK_NULL_HANDLE) and (cl == lastPipelineList) and (shader == lastPipelineShader)
+	if ((cl->m_activePipeline != VK_NULL_HANDLE) and (cl == lastPipelineList) and (shader == lastPipelineShader)
 #if OPTIMIZE_SHADER_LOADING
-        and (baseRenderer.RenderStates() == lastPipelineStates)) {
-        PipelineKey key { };
-        FillPipelineTarget(key);
-        if (GetPipelineTarget(key) == lastPipelineTarget)
-            return true;
-    }
+		and (baseRenderer.RenderStates() == lastPipelineStates)) {
+		PipelineKey key{};
+		FillPipelineTarget(key);
+		if (GetPipelineTarget(key) == lastPipelineTarget)
+			return true;
+	}
 #else
-        and (baseRenderer.RenderStates() == lastPipelineStates))
-        return true;
+		and (baseRenderer.RenderStates() == lastPipelineStates))
+		return true;
 #endif
-    return cl->GetPipeline(shader) != VK_NULL_HANDLE;
+	return cl->GetPipeline(shader) != VK_NULL_HANDLE;
 }
 
 
-VkPipeline CommandList::GetPipeline(Shader* shader) noexcept
+VkPipeline CommandList::GetPipeline(Shader* shader)
+noexcept
 {
-    // PipelineKey {shader, RenderStates, colour/depth formats}.
-    //
-    // Source of truth for colorAttachmentCount is shader->m_dataLayout.m_numRenderTargets
-    // (= number of SV_Target outputs the pixel shader writes), matching DX12 PSO behaviour.
-    // The render-pass scope may have more color attachments than the shader writes; the
-    // VK_EXT_dynamic_rendering_unused_attachments feature (enabled in VKContext::CreateDevice)
-    // makes that mismatch legal.
-    //
-    // Color formats come from the active render surface — the active RenderTarget when one is
-    // bound (RT::FillPipelineKey), or the swapchain back buffer in DrawScreen-style passes.
-    // Whichever it is, we then truncate the format list to numRenderTargets so the pipeline
-    // is built with exactly the slots the shader actually writes.
-    PipelineKey key{};
-    key.shader = shader;
-    key.states = baseRenderer.RenderStates();
+	// PipelineKey {shader, RenderStates, colour/depth formats}.
+	//
+	// Source of truth for colorAttachmentCount is shader->m_dataLayout.m_numRenderTargets
+	// (= number of SV_Target outputs the pixel shader writes), matching DX12 PSO behaviour.
+	// The render-pass scope may have more color attachments than the shader writes; the
+	// VK_EXT_dynamic_rendering_unused_attachments feature (enabled in VKContext::CreateDevice)
+	// makes that mismatch legal.
+	//
+	// Color formats come from the active render surface — the active RenderTarget when one is
+	// bound (RT::FillPipelineKey), or the swapchain back buffer in DrawScreen-style passes.
+	// Whichever it is, we then truncate the format list to numRenderTargets so the pipeline
+	// is built with exactly the slots the shader actually writes.
+	PipelineKey key{};
+	key.shader = shader;
+	key.states = baseRenderer.RenderStates();
 #if OPTIMIZE_SHADER_LOADING
-    FillPipelineTarget(key);
+	FillPipelineTarget(key);
 
-    const PipelineTarget target = GetPipelineTarget(key);
+	const PipelineTarget target = GetPipelineTarget(key);
 #else
-    if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
-        rt->FillPipelineKey(key);
-    else if (baseDisplayHandler.IsInRendering()) {
-        key.colorFormats[0] = baseDisplayHandler.m_swapchain.Format();
-        key.colorFormatCount = 1;
-        key.depthFormat = VK_FORMAT_UNDEFINED;
-    }
+	if (RenderTarget* rt = baseRenderer.GetActiveBuffer())
+		rt->FillPipelineKey(key);
+	else if (baseDisplayHandler.IsInRendering()) {
+		key.colorFormats[0] = baseDisplayHandler.m_swapchain.Format();
+		key.colorFormatCount = 1;
+		key.depthFormat = VK_FORMAT_UNDEFINED;
+	}
 
 #endif
-    const RenderStates liveStates = key.states;
-    const uint32_t numRT = uint32_t(shader->m_dataLayout.m_numRenderTargets);
-    if (numRT < key.colorFormatCount) {
-        if (vkContext.HasFeature(GfxFeature::UnusedAttachments)) {
-            for (uint32_t i = numRT; i < key.colorFormatCount; ++i)
-                key.colorFormats[i] = VK_FORMAT_UNDEFINED;
-        }
-        else if (vkContext.HasFeature(GfxFeature::IndependentBlend))
-            MaskUnwrittenAttachments(key.states, numRT, key.colorFormatCount);
-        else
-            ReportUnwrittenAttachments(shader, numRT, key.colorFormatCount);
-    }
+	const RenderStates	liveStates = key.states;
+	const uint32_t		numRT = uint32_t(shader->m_dataLayout.m_numRenderTargets);
+	if (numRT < key.colorFormatCount) {
+		if (vkContext.HasFeature(GfxFeature::UnusedAttachments)) {
+			for (uint32_t i = numRT; i < key.colorFormatCount; ++i)
+				key.colorFormats[i] = VK_FORMAT_UNDEFINED;
+		}
+		else if (vkContext.HasFeature(GfxFeature::IndependentBlend))
+			MaskUnwrittenAttachments(key.states, numRT, key.colorFormatCount);
+		else
+			ReportUnwrittenAttachments(shader, numRT, key.colorFormatCount);
+	}
 
-    VkPipeline p = pipelineCache.GetOrCreate(key);
-    if (p != VK_NULL_HANDLE) {
-        SetActivePipeline(p, shader);
-        if (m_isRecording)
-            key.states.SetDynamicStates(GfxList());
-        m_activeTopology = key.states.topology;
-        lastPipelineStates = liveStates;
-        lastPipelineList = this;
-        lastPipelineShader = shader;
+	VkPipeline p = pipelineCache.GetOrCreate(key);
+	if (p != VK_NULL_HANDLE) {
+		SetActivePipeline(p, shader);
+		if (m_isRecording)
+			key.states.SetDynamicStates(GfxList());
+		m_activeTopology = key.states.topology;
+		lastPipelineStates = liveStates;
+		lastPipelineList = this;
+		lastPipelineShader = shader;
 #if OPTIMIZE_SHADER_LOADING
-        lastPipelineTarget = target;
+		lastPipelineTarget = target;
 #endif
-    }
-    return p;
+	}
+	return p;
 }
 
 
-bool CommandList::SetTopology(Shader* shader, MeshTopology topology) noexcept
+bool CommandList::SetTopology(Shader* shader, MeshTopology topology)
+noexcept
 {
-    if (m_activeTopology == uint8_t(topology))
-        return true;
-    baseRenderer.RenderStates().topology = uint8_t(topology);
-    return GetPipeline(shader) != VK_NULL_HANDLE;
+	if (m_activeTopology == uint8_t(topology))
+		return true;
+	baseRenderer.RenderStates().topology = uint8_t(topology);
+	return GetPipeline(shader) != VK_NULL_HANDLE;
 }
 
 
 #ifdef _DEBUG
-void CommandList::CheckDeviceRemoved(const char* context) noexcept
+void CommandList::CheckDeviceRemoved(const char* context)
+noexcept
 {
-    //gfxStates.CheckError();
+	//gfxStates.CheckError();
 }
 #endif
 
@@ -877,458 +920,482 @@ bool CommandListHandler::s_logCalls = false;
 
 
 bool CommandListHandler::Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
-                                uint32_t graphicsFamily, uint32_t presentFamily,
-                                const String& name) noexcept
+								uint32_t graphicsFamily, uint32_t presentFamily,
+								const String& name)
+noexcept
 {
-    if (not m_cmdQueue.Create(device, graphicsQueue, presentQueue, graphicsFamily, presentFamily, name))
-        return false;
+	if (not m_cmdQueue.Create(device, graphicsQueue, presentQueue, graphicsFamily, presentFamily, name))
+		return false;
 #if USE_TRACY
-    VkCommandPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    // RESET_COMMAND_BUFFER_BIT: TracyVkContext's VkCtx constructor calibrates by re-recording the
-    // SAME cmdbuf three times (begin/end/submit/wait), without resetting it between begins. Begins #2
-    // and #3 are implicit per-buffer resets, which need this bit (else VUID-vkBeginCommandBuffer-00050).
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolInfo.queueFamilyIndex = graphicsFamily;
-    VkCommandPool tracyPool = VK_NULL_HANDLE;
-    if (vkCreateCommandPool(device, &poolInfo, nullptr, &tracyPool) == VK_SUCCESS) {
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.commandPool = tracyPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
-        VkCommandBuffer tracyCb = VK_NULL_HANDLE;
-        if (vkAllocateCommandBuffers(device, &allocInfo, &tracyCb) == VK_SUCCESS)
-            m_gpuProfilerCtx = TracyVkContext(vkContext.PhysicalDevice(), device, graphicsQueue, tracyCb);
-        vkDestroyCommandPool(device, tracyPool, nullptr);
-    }
+	VkCommandPoolCreateInfo poolInfo{};
+	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	// RESET_COMMAND_BUFFER_BIT: TracyVkContext's VkCtx constructor calibrates by re-recording the
+	// SAME cmdbuf three times (begin/end/submit/wait), without resetting it between begins. Begins #2
+	// and #3 are implicit per-buffer resets, which need this bit (else VUID-vkBeginCommandBuffer-00050).
+	poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	poolInfo.queueFamilyIndex = graphicsFamily;
+	VkCommandPool tracyPool = VK_NULL_HANDLE;
+	if (vkCreateCommandPool(device, &poolInfo, nullptr, &tracyPool) == VK_SUCCESS) {
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		allocInfo.commandPool = tracyPool;
+		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+		allocInfo.commandBufferCount = 1;
+		VkCommandBuffer tracyCb = VK_NULL_HANDLE;
+		if (vkAllocateCommandBuffers(device, &allocInfo, &tracyCb) == VK_SUCCESS)
+			m_gpuProfilerCtx = TracyVkContext(vkContext.PhysicalDevice(), device, graphicsQueue, tracyCb);
+		vkDestroyCommandPool(device, tracyPool, nullptr);
+	}
 #endif
-    return true;
+	return true;
 }
 
 
-void CommandListHandler::Destroy(void) noexcept
+void CommandListHandler::Destroy(void)
+noexcept
 {
-    if (m_gpuProfilerCtx) {
-        TracyVkDestroy(m_gpuProfilerCtx);
-        m_gpuProfilerCtx = nullptr;
-    }
-    for (auto cl : m_recycledLists) {
-        cl->Destroy();
-        delete cl;
-    }
-    m_recycledLists.Clear();
-    m_cmdQueue.Destroy();
+	if (m_gpuProfilerCtx) {
+		TracyVkDestroy(m_gpuProfilerCtx);
+		m_gpuProfilerCtx = nullptr;
+	}
+	for (auto cl : m_recycledLists) {
+		cl->Destroy();
+		delete cl;
+	}
+	m_recycledLists.Clear();
+	m_cmdQueue.Destroy();
 }
 
 
-void CommandListHandler::PushCmdList(CommandList* cl) noexcept
+void CommandListHandler::PushCmdList(CommandList* cl)
+noexcept
 {
-    if (m_currentListData.cmdList)
-        m_cmdListStack.Push(m_currentListData);
-    m_currentListData = CommandListData{ cl, cl->GfxList() };
+	if (m_currentListData.cmdList)
+		m_cmdListStack.Push(m_currentListData);
+	m_currentListData = CommandListData{ cl, cl->GfxList() };
 }
 
 
-void CommandListHandler::PopCmdList(void) noexcept
+void CommandListHandler::PopCmdList(void)
+noexcept
 {
-    m_currentListData = (m_cmdListStack.Length() > 0) ? m_cmdListStack.Pop() : CommandListData();
+	m_currentListData = (m_cmdListStack.Length() > 0) ? m_cmdListStack.Pop() : CommandListData();
 }
 
 
-void CommandListHandler::Register(CommandList* cl) noexcept
+void CommandListHandler::Register(CommandList* cl)
+noexcept
 {
-    if (not cl)
-        return;
+	if (not cl)
+		return;
 #ifdef _DEBUG
-    if (cl->m_name.IsEmpty())
-        logHandler.Print("CommandListHandler::Register: Unnamed command list\n");
+	if (cl->m_name.IsEmpty())
+		logHandler.Print("CommandListHandler::Register: Unnamed command list\n");
 #endif
-    for (auto l : m_pendingLists)
-        if (cl == l)
-            return;
-    m_pendingLists.Push(cl);
+	for (auto l : m_pendingLists)
+		if (cl == l)
+			return;
+	m_pendingLists.Push(cl);
 }
 
 
-void CommandListHandler::ExecuteAll(bool intermediate) noexcept
+void CommandListHandler::ExecuteAll(bool intermediate)
+noexcept
 {
-    ZoneScopedN("ExecuteAll");
-    // No command buffer may be submitted with an open rendering scope, and the back buffer's belongs
-    // to nobody in particular - it is opened where the draw buffer stack runs empty
-    // (DrawBufferHandler::SetActiveDrawBuffers ()) and would otherwise still stand here in a setup
-    // phase drain. Closing it is free when there is none.
-    baseDisplayHandler.SuspendBackBuffer();
-    // intermediate=false (default): frame-end submit — binds the swapchain frame-sync triplet
-    //   (imageAvailable wait unless an earlier submit of this frame has taken it, renderFinished
-    //   signal, inFlight fence). Must be called between a
-    //   prior BeginFrame (which signaled imageAvailable via vkAcquireNextImageKHR and reset the
-    //   inFlight fence) and a subsequent Present (which waits on renderFinished).
-    // intermediate=true: setup-phase or mid-init drain — plain submit without renderFinished and
-    //   inFlight, waiting on imageAvailable only when it carries back buffer commands,
-    //   followed by vkQueueWaitIdle. Lets setup-phase CommandLists go to the GPU and finish
-    //   before the first BeginFrame resets cbvAllocator / drains gfxResourceHandler.
-    // Force-close any CLs still recording. Their Close() registers them at the end of
-    // m_pendingLists, so they get submitted last — which matches the architectural
-    // contract that the outermost (last-to-close) CL runs after all the inner ones
-    // whose Close() already happened during frame rendering.
-    while (m_openLists.Length() > 0) {
-        CommandList* l = m_openLists.Pop();
-        if (l->IsRecording())
-            l->Close();
-    }
-    m_uploadList = nullptr;
+	ZoneScopedN("ExecuteAll");
+	// No command buffer may be submitted with an open rendering scope, and the back buffer's belongs
+	// to nobody in particular - it is opened where the draw buffer stack runs empty
+	// (DrawBufferHandler::SetActiveDrawBuffers ()) and would otherwise still stand here in a setup
+	// phase drain. Closing it is free when there is none.
+	baseDisplayHandler.SuspendBackBuffer();
+	// intermediate=false (default): frame-end submit — binds the swapchain frame-sync triplet
+	//   (imageAvailable wait unless an earlier submit of this frame has taken it, renderFinished
+	//   signal, inFlight fence). Must be called between a
+	//   prior BeginFrame (which signaled imageAvailable via vkAcquireNextImageKHR and reset the
+	//   inFlight fence) and a subsequent Present (which waits on renderFinished).
+	// intermediate=true: setup-phase or mid-init drain — plain submit without renderFinished and
+	//   inFlight, waiting on imageAvailable only when it carries back buffer commands,
+	//   followed by vkQueueWaitIdle. Lets setup-phase CommandLists go to the GPU and finish
+	//   before the first BeginFrame resets cbvAllocator / drains gfxResourceHandler.
+	// Force-close any CLs still recording. Their Close() registers them at the end of
+	// m_pendingLists, so they get submitted last — which matches the architectural
+	// contract that the outermost (last-to-close) CL runs after all the inner ones
+	// whose Close() already happened during frame rendering.
+	while (m_openLists.Length() > 0) {
+		CommandList* l = m_openLists.Pop();
+		if (l->IsRecording())
+			l->Close();
+	}
+	m_uploadList = nullptr;
 
-    if (m_pendingLists.IsEmpty())
-        return;
+	if (m_pendingLists.IsEmpty())
+		return;
 
-    AutoArray<VkCommandBufferSubmitInfo> cbInfos(m_pendingLists.Length());
-    int n = 0;
-    bool usesBackBuffer = false;
-    for (auto l : m_pendingLists) {
-        if (l->IsFlushed())
-            continue;
-        VkCommandBufferSubmitInfo info{};
-        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        info.commandBuffer = l->GfxList(true);
-        cbInfos[n++] = info;
-        if (l->m_usesBackBuffer)
-            usesBackBuffer = true;
-    }
-    if (n > 0) {
-        VkSubmitInfo2 submit{};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submit.commandBufferInfoCount = uint32_t(n);
-        submit.pCommandBufferInfos = cbInfos.Data();
+	AutoArray<VkCommandBufferSubmitInfo>	cbInfos(m_pendingLists.Length());
+	int										n = 0;
+	bool									usesBackBuffer = false;
+	for (auto l : m_pendingLists) {
+		if (l->IsFlushed())
+			continue;
+		VkCommandBufferSubmitInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+		info.commandBuffer = l->GfxList(true);
+		cbInfos[n++] = info;
+		if (l->m_usesBackBuffer)
+			usesBackBuffer = true;
+	}
+	if (n > 0) {
+		VkSubmitInfo2 submit{};
+		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+		submit.commandBufferInfoCount = uint32_t(n);
+		submit.pCommandBufferInfos = cbInfos.Data();
 
-        VkSemaphoreSubmitInfo waitInfo{};
-        VkSemaphoreSubmitInfo signalInfo{};
-        VkFence fence = VK_NULL_HANDLE;
-        if ((usesBackBuffer or not intermediate) and m_cmdQueue.TakeAcquireWait(waitInfo)) {
-            submit.waitSemaphoreInfoCount = 1;
-            submit.pWaitSemaphoreInfos = &waitInfo;
-        }
-        if (not intermediate) {
-            signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-            signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
-            signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+		VkSemaphoreSubmitInfo	waitInfo{};
+		VkSemaphoreSubmitInfo	signalInfo{};
+		VkFence					fence = VK_NULL_HANDLE;
+		if ((usesBackBuffer or not intermediate) and m_cmdQueue.TakeAcquireWait(waitInfo)) {
+			submit.waitSemaphoreInfoCount = 1;
+			submit.pWaitSemaphoreInfos = &waitInfo;
+		}
+		if (not intermediate) {
+			signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+			signalInfo.semaphore = m_cmdQueue.SubmitSignalSemaphore();
+			signalInfo.stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 
-            submit.signalSemaphoreInfoCount = 1;
-            submit.pSignalSemaphoreInfos = &signalInfo;
-            fence = m_cmdQueue.SubmitSignalFence();
-        }
+			submit.signalSemaphoreInfoCount = 1;
+			submit.pSignalSemaphoreInfos = &signalInfo;
+			fence = m_cmdQueue.SubmitSignalFence();
+		}
 
-        {
-            ZoneScopedN("vkQueueSubmit2");
+		{
+			ZoneScopedN("vkQueueSubmit2");
 #if VK_STALL_DIAG
-            double stallStart = VkStallClock();
+			double stallStart = VkStallClock();
 #endif
-            VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
+			VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, fence);
 #if VK_STALL_DIAG
-            VkStallNote(intermediate ? "intermediate submit" : "frame submit", stallStart, nullptr);
+			VkStallNote(intermediate ? "intermediate submit" : "frame submit", stallStart, nullptr);
 #endif
-            if (res != VK_SUCCESS) {
-                logHandler.Print("CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
-                HandleDeviceLost(res, "CommandListHandler::ExecuteAll");
-            }
-        }
-    }
+			if (res != VK_SUCCESS) {
+				logHandler.Print("CommandListHandler::ExecuteAll: vkQueueSubmit2 failed (%d)\n", (int)res);
+				HandleDeviceLost(res, "CommandListHandler::ExecuteAll");
+			}
+		}
+	}
 #ifdef _DEBUG
-    gfxStates.CheckError("CommandListHandler::ExecuteAll submit");
+	gfxStates.CheckError("CommandListHandler::ExecuteAll submit");
 #endif
-    for (auto l : m_pendingLists) {
-        if (l->IsTemporary())
-            m_recycledLists.Push(l);
-    }
-    m_pendingLists.Clear();
-    m_cmdListStack.Clear();
+	for (auto l : m_pendingLists) {
+		if (l->IsTemporary())
+			m_recycledLists.Push(l);
+	}
+	m_pendingLists.Clear();
+	m_cmdListStack.Clear();
 
-    if (intermediate)
-        m_cmdQueue.WaitIdle();
+	if (intermediate)
+		m_cmdQueue.WaitIdle();
 }
 
 
-void CommandListHandler::ExecutePending(void) noexcept
+void CommandListHandler::ExecutePending(void)
+noexcept
 {
-    ZoneScopedN("ExecutePending");
+	ZoneScopedN("ExecutePending");
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    // The upload list is registered when it is opened, so that it runs ahead of the frame - it is the one
-    // pending list that may still be recording. It goes out with the rest; the next upload opens a new one.
-    if (m_uploadList) {
-        m_uploadList->Close();
-        m_uploadList = nullptr;
-    }
-    if (m_pendingLists.IsEmpty())
-        return;
+	// The upload list is registered when it is opened, so that it runs ahead of the frame - it is the one
+	// pending list that may still be recording. It goes out with the rest; the next upload opens a new one.
+	if (m_uploadList) {
+		m_uploadList->Close();
+		m_uploadList = nullptr;
+	}
+	if (m_pendingLists.IsEmpty())
+		return;
 
-    AutoArray<VkCommandBufferSubmitInfo> cbInfos(m_pendingLists.Length());
-    int n = 0;
-    bool usesBackBuffer = false;
-    for (auto l : m_pendingLists) {
-        if (l->IsFlushed())
-            continue;
-        VkCommandBufferSubmitInfo info{};
-        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        info.commandBuffer = l->GfxList(true);
-        cbInfos[n++] = info;
-        if (l->m_usesBackBuffer)
-            usesBackBuffer = true;
-    }
-    if (n > 0) {
-        VkSubmitInfo2 submit{};
-        submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submit.commandBufferInfoCount = uint32_t(n);
-        submit.pCommandBufferInfos = cbInfos.Data();
+	AutoArray<VkCommandBufferSubmitInfo>	cbInfos(m_pendingLists.Length());
+	int										n = 0;
+	bool									usesBackBuffer = false;
+	for (auto l : m_pendingLists) {
+		if (l->IsFlushed())
+			continue;
+		VkCommandBufferSubmitInfo info{};
+		info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+		info.commandBuffer = l->GfxList(true);
+		cbInfos[n++] = info;
+		if (l->m_usesBackBuffer)
+			usesBackBuffer = true;
+	}
+	if (n > 0) {
+		VkSubmitInfo2 submit{};
+		submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+		submit.commandBufferInfoCount = uint32_t(n);
+		submit.pCommandBufferInfos = cbInfos.Data();
 
-        VkSemaphoreSubmitInfo waitInfo{};
-        if (usesBackBuffer and m_cmdQueue.TakeAcquireWait(waitInfo)) {
-            submit.waitSemaphoreInfoCount = 1;
-            submit.pWaitSemaphoreInfos = &waitInfo;
-        }
+		VkSemaphoreSubmitInfo waitInfo{};
+		if (usesBackBuffer and m_cmdQueue.TakeAcquireWait(waitInfo)) {
+			submit.waitSemaphoreInfoCount = 1;
+			submit.pWaitSemaphoreInfos = &waitInfo;
+		}
 
-        VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
-        if (res != VK_SUCCESS) {
-            logHandler.Print("CommandListHandler::ExecutePending: vkQueueSubmit2 failed (%d)\n", (int)res);
-            HandleDeviceLost(res, "CommandListHandler::ExecutePending");
-        }
-    }
+		VkResult res = Vk13Api::QueueSubmit2(m_cmdQueue.GraphicsQueue(), 1, &submit, VK_NULL_HANDLE);
+		if (res != VK_SUCCESS) {
+			logHandler.Print("CommandListHandler::ExecutePending: vkQueueSubmit2 failed (%d)\n", (int)res);
+			HandleDeviceLost(res, "CommandListHandler::ExecutePending");
+		}
+	}
 #ifdef _DEBUG
-    gfxStates.CheckError("CommandListHandler::ExecutePending submit");
+	gfxStates.CheckError("CommandListHandler::ExecutePending submit");
 #endif
-    m_cmdQueue.WaitIdle();
+	m_cmdQueue.WaitIdle();
 #if USE_TRACY
-    if (m_gpuProfilerCtx)
-        TracyVkCollectHost(m_gpuProfilerCtx);
+	if (m_gpuProfilerCtx)
+		TracyVkCollectHost(m_gpuProfilerCtx);
 #endif
-    for (auto l : m_pendingLists) {
-        if (l->IsTemporary())
-            m_recycledLists.Push(l);
-    }
-    m_pendingLists.Clear();
-    DrainFrameResources();
+	for (auto l : m_pendingLists) {
+		if (l->IsTemporary())
+			m_recycledLists.Push(l);
+	}
+	m_pendingLists.Clear();
+	DrainFrameResources();
 #if VK_STALL_DIAG
-    VkStallNote("execute pending", stallStart, nullptr);
+	VkStallNote("execute pending", stallStart, nullptr);
 #endif
 }
 
 
-void CommandListHandler::DrainFrameResources(void) noexcept
+void CommandListHandler::DrainFrameResources(void)
+noexcept
 {
-    AutoArray<CommandList*> recordingLists;
-    uint64_t oldestOpenSerial = UINT64_MAX;
+	AutoArray<CommandList*>	recordingLists;
+	uint64_t				oldestOpenSerial = UINT64_MAX;
 
-    for (auto l : m_openLists) {
-        if (not l->IsRecording())
-            continue;
-        recordingLists.Push(l);
-        if (l->m_openSerial < oldestOpenSerial)
-            oldestOpenSerial = l->m_openSerial;
-    }
-    m_openLists.Clear();
-    for (auto l : recordingLists)
-        m_openLists.Push(l);
+	for (auto l : m_openLists) {
+		if (not l->IsRecording())
+			continue;
+		recordingLists.Push(l);
+		if (l->m_openSerial < oldestOpenSerial)
+			oldestOpenSerial = l->m_openSerial;
+	}
+	m_openLists.Clear();
+	for (auto l : recordingLists)
+		m_openLists.Push(l);
 
-    uint32_t frameIndex = m_cmdQueue.FrameIndex();
+	uint32_t frameIndex = m_cmdQueue.FrameIndex();
 
-    gfxResourceHandler.CleanupBefore(frameIndex, oldestOpenSerial);
-    if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial) {
-        descriptorPoolHandler.BeginFrame(frameIndex);
-        cbvAllocator.Reset(frameIndex);
-    }
-    ResetBindings();
+	gfxResourceHandler.CleanupBefore(frameIndex, oldestOpenSerial);
+	if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial) {
+		descriptorPoolHandler.BeginFrame(frameIndex);
+		cbvAllocator.Reset(frameIndex);
+	}
+	ResetBindings();
 }
 
 
-CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary) noexcept
+CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary)
+noexcept
 {
-    if (isTemporary and not m_recycledLists.IsEmpty()) {
-        CommandList* cl = m_recycledLists.Pop();
-        cl->SetName(name);
-        cl->Reset();
-        return cl;
-    }
-    CommandList* cl = new CommandList();
-    if (not cl->Create(name, isTemporary)) {
-        delete cl;
-        return nullptr;
-    }
-    cl->Reset();
-    ++m_cmdListCount;
-    return cl;
+	if (isTemporary and not m_recycledLists.IsEmpty()) {
+		CommandList* cl = m_recycledLists.Pop();
+		cl->SetName(name);
+		cl->Reset();
+		return cl;
+	}
+	CommandList* cl = new CommandList();
+	if (not cl->Create(name, isTemporary)) {
+		delete cl;
+		return nullptr;
+	}
+	cl->Reset();
+	++m_cmdListCount;
+	return cl;
 }
 
 
-bool CommandListHandler::UsesOrderedCopyList(void) noexcept
+bool CommandListHandler::UsesOrderedCopyList(void)
+noexcept
 {
-    return baseRenderer.DrawBuffersSuspended();
+	return baseRenderer.DrawBuffersSuspended();
 }
 
 
-CommandList* CommandListHandler::OpenOrderedCopyList(void) noexcept
+CommandList* CommandListHandler::OpenOrderedCopyList(void)
+noexcept
 {
-    if (not UsesOrderedCopyList())
-        return nullptr;
-    CommandList* cl = CreateCmdList(String("OrderedCopy"), true);
-    if (not (cl and cl->Open(false)))
-        return nullptr;
-    return cl;
+	if (not UsesOrderedCopyList())
+		return nullptr;
+	CommandList* cl = CreateCmdList(String("OrderedCopy"), true);
+	if (not (cl and cl->Open(false)))
+		return nullptr;
+	return cl;
 }
 
 
-bool CommandListHandler::IsInRendering(void) noexcept
+bool CommandListHandler::IsInRendering(void)
+noexcept
 {
-    VkCommandBuffer cb = CurrentGfxList();
-    if (cb == VK_NULL_HANDLE)
-        return false;
-    if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == cb))
-        return true;
-    RenderTarget* rt = baseRenderer.GetActiveBuffer();
-    return rt and rt->m_isInRendering and rt->m_cmdList and (rt->m_cmdList->GfxList() == cb);
+	VkCommandBuffer cb = CurrentGfxList();
+	if (cb == VK_NULL_HANDLE)
+		return false;
+	if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == cb))
+		return true;
+	RenderTarget* rt = baseRenderer.GetActiveBuffer();
+	return rt and rt->m_isInRendering and rt->m_cmdList and (rt->m_cmdList->GfxList() == cb);
 }
 
 
-CommandListHandler::RenderingScope CommandListHandler::SuspendRendering(void) noexcept
+CommandListHandler::RenderingScope CommandListHandler::SuspendRendering(void)
+noexcept
 {
-    RenderingScope scope;
-    VkCommandBuffer cb = CurrentGfxList();
-    if (cb == VK_NULL_HANDLE)
-        return scope;
-    if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == cb)) {
-        baseDisplayHandler.SuspendBackBuffer();
-        scope.backBuffer = true;
-        return scope;
-    }
-    RenderTarget* rt = baseRenderer.GetActiveBuffer();
-    if (rt and rt->m_isInRendering and rt->m_cmdList and (rt->m_cmdList->GfxList() == cb)) {
-        rt->EndRendering();
-        scope.target = rt;
-    }
-    return scope;
+	RenderingScope	scope;
+	VkCommandBuffer	cb = CurrentGfxList();
+	if (cb == VK_NULL_HANDLE)
+		return scope;
+	if (baseDisplayHandler.IsInRendering() and (baseDisplayHandler.m_backBufferCb == cb)) {
+		baseDisplayHandler.SuspendBackBuffer();
+		scope.backBuffer = true;
+		return scope;
+	}
+	RenderTarget* rt = baseRenderer.GetActiveBuffer();
+	if (rt and rt->m_isInRendering and rt->m_cmdList and (rt->m_cmdList->GfxList() == cb)) {
+		rt->EndRendering();
+		scope.target = rt;
+	}
+	return scope;
 }
 
 
-void CommandListHandler::ResumeRendering(const RenderingScope& scope) noexcept
+void CommandListHandler::ResumeRendering(const RenderingScope& scope)
+noexcept
 {
-    if (scope.backBuffer)
-        baseDisplayHandler.EnableBackBuffer();
-    else if (scope.target)
-        scope.target->BeginRendering(false, false);
+	if (scope.backBuffer)
+		baseDisplayHandler.EnableBackBuffer();
+	else if (scope.target)
+		scope.target->BeginRendering(false, false);
 }
 
 
-VkCommandBuffer CommandListHandler::UploadCmdBuffer(void) noexcept
+VkCommandBuffer CommandListHandler::UploadCmdBuffer(void)
+noexcept
 {
-    if (not m_uploadList) {
-        CommandList* cl = CreateCmdList(String("Upload"), true);
-        if (not cl)
-            return VK_NULL_HANDLE;
-        if (not cl->Open(false, true)) {
-            m_recycledLists.Push(cl);
-            return VK_NULL_HANDLE;
-        }
-        m_uploadList = cl;
-    }
-    return m_uploadList->GfxList();
+	if (not m_uploadList) {
+		CommandList* cl = CreateCmdList(String("Upload"), true);
+		if (not cl)
+			return VK_NULL_HANDLE;
+		if (not cl->Open(false, true)) {
+			m_recycledLists.Push(cl);
+			return VK_NULL_HANDLE;
+		}
+		m_uploadList = cl;
+	}
+	return m_uploadList->GfxList();
 }
 
 // =================================================================================================
 // =================================================================================================
 // Bind-table state (CPU-side staging of per-draw shader resource bindings).
 
-void CommandListHandler::ResetBindings(void) noexcept
+void CommandListHandler::ResetBindings(void)
+noexcept
 {
-    for (uint32_t i = 0; i < kSrvSlots; ++i) {
-        m_boundSrvViews[i] = VK_NULL_HANDLE;
-        m_boundSrvLayouts[i] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    }
-    for (uint32_t i = 0; i < kSamplerSlots; ++i)
-        m_boundSamplers[i] = VK_NULL_HANDLE;
-    for (uint32_t i = 0; i < kUavSlots; ++i) {
-        m_boundStorageBuffers[i] = VK_NULL_HANDLE;
-        m_boundStorageBufferSize[i] = 0;
-    }
-    for (uint32_t i = 0; i < kSsboSlots; ++i) {
-        m_boundReadOnlyBuffers[i] = VK_NULL_HANDLE;
-        m_boundReadOnlyBufferSize[i] = 0;
-    }
-    for (uint32_t i = 0; i < kVertexSlots; ++i)
-        m_boundInstanceStreams[i] = VK_NULL_HANDLE;
-    m_boundAccelStructure = VK_NULL_HANDLE;
+	for (uint32_t i = 0; i < kSrvSlots; ++i) {
+		m_boundSrvViews[i] = VK_NULL_HANDLE;
+		m_boundSrvLayouts[i] = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	for (uint32_t i = 0; i < kSamplerSlots; ++i)
+		m_boundSamplers[i] = VK_NULL_HANDLE;
+	for (uint32_t i = 0; i < kUavSlots; ++i) {
+		m_boundStorageBuffers[i] = VK_NULL_HANDLE;
+		m_boundStorageBufferSize[i] = 0;
+	}
+	for (uint32_t i = 0; i < kSsboSlots; ++i) {
+		m_boundReadOnlyBuffers[i] = VK_NULL_HANDLE;
+		m_boundReadOnlyBufferSize[i] = 0;
+	}
+	for (uint32_t i = 0; i < kVertexSlots; ++i)
+		m_boundInstanceStreams[i] = VK_NULL_HANDLE;
+	m_boundAccelStructure = VK_NULL_HANDLE;
 }
 
 
-void CommandListHandler::BindAccelerationStructure(VkAccelerationStructureKHR accelStructure) noexcept
+void CommandListHandler::BindAccelerationStructure(VkAccelerationStructureKHR accelStructure)
+noexcept
 {
-    m_boundAccelStructure = accelStructure;
+	m_boundAccelStructure = accelStructure;
 }
 
 
-void CommandListHandler::BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout) noexcept
+void CommandListHandler::BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout)
+noexcept
 {
-    if (slot < kSrvSlots) {
-        m_boundSrvViews[slot] = view;
-        m_boundSrvLayouts[slot] = layout;
-    }
+	if (slot < kSrvSlots) {
+		m_boundSrvViews[slot] = view;
+		m_boundSrvLayouts[slot] = layout;
+	}
 }
 
 
-void CommandListHandler::BindSampler(uint32_t slot, VkSampler sampler) noexcept
+void CommandListHandler::BindSampler(uint32_t slot, VkSampler sampler)
+noexcept
 {
-    if (slot < kSamplerSlots)
-        m_boundSamplers[slot] = sampler;
+	if (slot < kSamplerSlots)
+		m_boundSamplers[slot] = sampler;
 }
 
 
-void CommandListHandler::BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept
+void CommandListHandler::BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range)
+noexcept
 {
-    if (slot < kUavSlots) {
-        m_boundStorageBuffers[slot] = buffer;
-        m_boundStorageBufferSize[slot] = range;
-    }
+	if (slot < kUavSlots) {
+		m_boundStorageBuffers[slot] = buffer;
+		m_boundStorageBufferSize[slot] = range;
+	}
 }
 
 
-void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept
+void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range)
+noexcept
 {
-    if (slot < kSsboSlots) {
-        m_boundReadOnlyBuffers[slot] = buffer;
-        m_boundReadOnlyBufferSize[slot] = range;
-    }
+	if (slot < kSsboSlots) {
+		m_boundReadOnlyBuffers[slot] = buffer;
+		m_boundReadOnlyBufferSize[slot] = range;
+	}
 }
 
 
-void CommandListHandler::BindInstanceStream(uint32_t slot, VkBuffer buffer) noexcept
+void CommandListHandler::BindInstanceStream(uint32_t slot, VkBuffer buffer)
+noexcept
 {
-    if (slot < kVertexSlots)
-        m_boundInstanceStreams[slot] = buffer;
+	if (slot < kVertexSlots)
+		m_boundInstanceStreams[slot] = buffer;
 }
 
 
-void CommandListHandler::UnbindBuffer(VkBuffer buffer) noexcept
+void CommandListHandler::UnbindBuffer(VkBuffer buffer)
+noexcept
 {
-    if (buffer == VK_NULL_HANDLE)
-        return;
-    for (uint32_t i = 0; i < kUavSlots; ++i)
-        if (m_boundStorageBuffers[i] == buffer)
-            BindStorageBuffer(i, VK_NULL_HANDLE, 0);
-    for (uint32_t i = 0; i < kSsboSlots; ++i)
-        if (m_boundReadOnlyBuffers[i] == buffer)
-            BindReadOnlyBuffer(i, VK_NULL_HANDLE, 0);
-    for (uint32_t i = 0; i < kVertexSlots; ++i)
-        if (m_boundInstanceStreams[i] == buffer)
-            BindInstanceStream(i, VK_NULL_HANDLE);
+	if (buffer == VK_NULL_HANDLE)
+		return;
+	for (uint32_t i = 0; i < kUavSlots; ++i)
+		if (m_boundStorageBuffers[i] == buffer)
+			BindStorageBuffer(i, VK_NULL_HANDLE, 0);
+	for (uint32_t i = 0; i < kSsboSlots; ++i)
+		if (m_boundReadOnlyBuffers[i] == buffer)
+			BindReadOnlyBuffer(i, VK_NULL_HANDLE, 0);
+	for (uint32_t i = 0; i < kVertexSlots; ++i)
+		if (m_boundInstanceStreams[i] == buffer)
+			BindInstanceStream(i, VK_NULL_HANDLE);
 }
 
 
-void CommandListHandler::UnbindImage(VkImageView view) noexcept
+void CommandListHandler::UnbindImage(VkImageView view)
+noexcept
 {
-    if (view == VK_NULL_HANDLE)
-        return;
-    for (uint32_t i = 0; i < kSrvSlots; ++i)
-        if (m_boundSrvViews[i] == view)
-            BindSampledImage(i, VK_NULL_HANDLE);
+	if (view == VK_NULL_HANDLE)
+		return;
+	for (uint32_t i = 0; i < kSrvSlots; ++i)
+		if (m_boundSrvViews[i] == view)
+			BindSampledImage(i, VK_NULL_HANDLE);
 }
 
 // =================================================================================================

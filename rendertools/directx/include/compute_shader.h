@@ -27,7 +27,7 @@
 #include "string.hpp"
 #include "array.hpp"
 #include "vector.hpp"
-#include "base_shadercode.h"   // ComputeBindingDesc
+#include "base_shadercode.h" // ComputeBindingDesc
 
 #include <d3d12.h>
 #include <wrl/client.h>
@@ -38,124 +38,150 @@ class CommandList;
 
 // =================================================================================================
 
-class ComputeShader
-{
+class ComputeShader {
 public:
-    String                              m_name;
-    String                              m_cs;
-    Microsoft::WRL::ComPtr<ID3DBlob>    m_csBytecode;
-    Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
-    Microsoft::WRL::ComPtr<ID3DBlob>    m_rootSignatureBlob;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_pipeline;
-    AutoArray<ComputeBindingDesc>       m_bindings;
+	String										m_name;
+	String										m_cs;
+	Microsoft::WRL::ComPtr<ID3DBlob>			m_csBytecode;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature>	m_rootSignature;
+	Microsoft::WRL::ComPtr<ID3DBlob>			m_rootSignatureBlob;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState>	m_pipeline;
+	AutoArray<ComputeBindingDesc>				m_bindings;
 
-    // Reflected b1 cbuffer layout — { fieldName -> {offset, size} } populated from DXIL reflection
-    // on Create. Backed by m_b1Staging (sized to the reflected block size). SetB1Field looks up
-    // the name and writes into the staging buffer. UploadB1 flushes to a CBV sub-allocation.
-    struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
-    uint32_t                            m_b1Size{ 0 };
-    AutoArray<std::pair<String, FieldInfo>> m_b1Fields;
-    std::vector<uint8_t>                m_b1Staging;
-    bool                                m_b1Dirty{ true };
+	// Reflected b1 cbuffer layout — { fieldName -> {offset, size} } populated from DXIL reflection
+	// on Create. Backed by m_b1Staging (sized to the reflected block size). SetB1Field looks up
+	// the name and writes into the staging buffer. UploadB1 flushes to a CBV sub-allocation.
+	struct FieldInfo {
+		uint32_t offset{ 0 };
+		uint32_t size{ 0 };
+	};
+	uint32_t								m_b1Size{ 0 };
+	AutoArray<std::pair<String, FieldInfo>>	m_b1Fields;
+	std::vector<uint8_t>					m_b1Staging;
+	bool									m_b1Dirty{ true };
 
-    // After UploadB1 the per-frame CBV GPU virtual address lives here. Caller passes it to
-    // SetComputeRootConstantBufferView(m_cbvRootIndex[1], m_b1GpuVA).
-    D3D12_GPU_VIRTUAL_ADDRESS           m_b1GpuVA{ 0 };
+	// After UploadB1 the per-frame CBV GPU virtual address lives here. Caller passes it to
+	// SetComputeRootConstantBufferView(m_cbvRootIndex[1], m_b1GpuVA).
+	D3D12_GPU_VIRTUAL_ADDRESS m_b1GpuVA{ 0 };
 
-    // Slot maps populated by CreateRootSignature, indexed by HLSL register number.
-    // Root parameter index for each binding kind, or -1 if not in the layout.
-    int32_t                             m_cbvRootIndex[2]{ -1, -1 };   // b0, b1
-    int32_t                             m_srvRootIndex[16];            // t0..t15
-    int32_t                             m_samplerRootIndex[16];        // s0..s15
-    int32_t                             m_uavRootIndex[4];             // u0..u3
-    int32_t                             m_accelRootIndex{ -1 };
+	// Slot maps populated by CreateRootSignature, indexed by HLSL register number.
+	// Root parameter index for each binding kind, or -1 if not in the layout.
+	int32_t m_cbvRootIndex[2]{ -1, -1 }; // b0, b1
+	int32_t m_srvRootIndex[16]; // t0..t15
+	int32_t m_samplerRootIndex[16]; // s0..s15
+	int32_t m_uavRootIndex[4]; // u0..u3
+	int32_t m_accelRootIndex{ -1 };
 
-    static constexpr uint32_t           kAccelSpace = 2;
-    static constexpr uint32_t           kReadOnlyBase = 42;
-    static constexpr uint32_t           kReadOnlySlots = 24;
-    static constexpr uint32_t           kReadOnlySpace = 1;
-    int32_t                             m_readOnlyRootIndex[kReadOnlySlots];
-    bool                                m_usesAccelStructure{ false };
+	static constexpr uint32_t	kAccelSpace = 2;
+	static constexpr uint32_t	kReadOnlyBase = 42;
+	static constexpr uint32_t	kReadOnlySlots = 24;
+	static constexpr uint32_t	kReadOnlySpace = 1;
+	int32_t						m_readOnlyRootIndex[kReadOnlySlots];
+	bool						m_usesAccelStructure{ false };
 
-    struct ImageBinding {
-        RenderTarget*   target{ nullptr };
-        int             bufferIndex{ -1 };
-    };
+	struct ImageBinding {
+		RenderTarget*	target{ nullptr };
+		int				bufferIndex{ -1 };
+	};
 
-    static constexpr uint32_t           kSampledBase = 4;
-    static constexpr uint32_t           kSampledSlots = 16;
-    static constexpr uint32_t           kStorageBase = 36;
-    static constexpr uint32_t           kStorageSlots = 4;
-    ImageBinding                        m_sampledImages[kSampledSlots];
-    ImageBinding                        m_storageImages[kStorageSlots];
+	static constexpr uint32_t	kSampledBase = 4;
+	static constexpr uint32_t	kSampledSlots = 16;
+	static constexpr uint32_t	kStorageBase = 36;
+	static constexpr uint32_t	kStorageSlots = 4;
+	ImageBinding				m_sampledImages[kSampledSlots];
+	ImageBinding				m_storageImages[kStorageSlots];
 
-    ComputeShader(String name = "")
-        : m_name(std::move(name))
-    {
-        for (int i = 0; i < 16; ++i) { m_srvRootIndex[i] = -1; m_samplerRootIndex[i] = -1; }
-        for (int i = 0; i < 4; ++i) m_uavRootIndex[i] = -1;
-        for (uint32_t i = 0; i < kReadOnlySlots; ++i)
-            m_readOnlyRootIndex[i] = -1;
-    }
+	ComputeShader(String name = "")
+		: m_name(std::move(name))
+	{
+		for (int i = 0; i < 16; ++i) {
+			m_srvRootIndex[i] = -1;
+			m_samplerRootIndex[i] = -1;
+		}
+		for (int i = 0; i < 4; ++i)
+			m_uavRootIndex[i] = -1;
+		for (uint32_t i = 0; i < kReadOnlySlots; ++i)
+			m_readOnlyRootIndex[i] = -1;
+	}
 
-    ~ComputeShader() {
-        Destroy();
-    }
+	~ComputeShader() {
+		Destroy();
+	}
 
-    bool Compile(const char* hlslCode, const char* entryPoint, const String& shaderFolder);
+	bool Compile(const char* hlslCode, const char* entryPoint, const String& shaderFolder);
 
-    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
+	bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    inline bool IsValid(void) const noexcept {
-        return m_csBytecode and m_pipeline and m_rootSignature;
-    }
+	inline bool IsValid(void) const
+	noexcept
+	{
+		return m_csBytecode and m_pipeline and m_rootSignature;
+	}
 
-    // Caller is responsible for SetComputeRootSignature + SetPipelineState + table binds +
-    // Dispatch on the active command list. These two helpers are mostly for symmetry with the
-    // Vulkan path.
-    bool Activate(void);
+	// Caller is responsible for SetComputeRootSignature + SetPipelineState + table binds +
+	// Dispatch on the active command list. These two helpers are mostly for symmetry with the
+	// Vulkan path.
+	bool Activate(void);
 
-    // One complete compute run outside the per-frame command list: opens a command list of its own,
-    // binds root signature, pipeline, the storage buffers the caller bound through GfxArray::Bind ()
-    // and the b1 cbuffer, dispatches, submits and waits. For work that happens while no frame is
-    // being drawn - level load precomputations, bakes - where the caller wants the result in memory
-    // when the call returns. Mirrors the Vulkan and OpenGL paths.
-    bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
-    bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
-    bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
+	// One complete compute run outside the per-frame command list: opens a command list of its own,
+	// binds root signature, pipeline, the storage buffers the caller bound through GfxArray::Bind ()
+	// and the b1 cbuffer, dispatches, submits and waits. For work that happens while no frame is
+	// being drawn - level load precomputations, bakes - where the caller wants the result in memory
+	// when the call returns. Mirrors the Vulkan and OpenGL paths.
+	bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
+	bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+	bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
 
-    bool BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex);
-    bool BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex = 0);
+	bool BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex);
+	bool BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex = 0);
 
-    // b1 — per-pass constants. Name-based setters resolve to reflected offsets in the cbuffer.
-    int SetB1Field(const char* name, const void* data, size_t size) noexcept;
-    int SetB1(uint32_t offset, const void* data, size_t size) noexcept;
+	// b1 — per-pass constants. Name-based setters resolve to reflected offsets in the cbuffer.
+	int SetB1Field(const char* name, const void* data, size_t size)
+	noexcept;
+	int SetB1(uint32_t offset, const void* data, size_t size)
+	noexcept;
 
-    int SetFloat   (const char* name, float data)            noexcept;
-    int SetInt     (const char* name, int data)              noexcept;
-    int SetVector2f(const char* name, const Vector2f& data)  noexcept;
-    int SetVector3f(const char* name, const Vector3f& data)  noexcept;
-    int SetVector4f(const char* name, const Vector4f& data)  noexcept;
-    int SetVector2i(const char* name, const Vector2i& data)  noexcept;
-    int SetVector3i(const char* name, const Vector3i& data)  noexcept;
-    int SetVector4i(const char* name, const Vector4i& data)  noexcept;
-    int SetMatrix4f(const char* name, const float* data, bool transpose = false) noexcept;
-    int SetMatrix3f(const char* name, const float* data, bool transpose = false) noexcept;
+	int SetFloat(const char* name, float data)
+	noexcept;
+	int SetInt(const char* name, int data)
+	noexcept;
+	int SetVector2f(const char* name, const Vector2f& data)
+	noexcept;
+	int SetVector3f(const char* name, const Vector3f& data)
+	noexcept;
+	int SetVector4f(const char* name, const Vector4f& data)
+	noexcept;
+	int SetVector2i(const char* name, const Vector2i& data)
+	noexcept;
+	int SetVector3i(const char* name, const Vector3i& data)
+	noexcept;
+	int SetVector4i(const char* name, const Vector4i& data)
+	noexcept;
+	int SetMatrix4f(const char* name, const float* data, bool transpose = false)
+	noexcept;
+	int SetMatrix3f(const char* name, const float* data, bool transpose = false)
+	noexcept;
 
-    // Sub-allocate m_b1Size bytes from cbvAllocator, memcpy m_b1Staging into it, stash the GPU
-    // virtual address in m_b1GpuVA for the next SetComputeRootConstantBufferView call.
-    bool UploadB1(void) noexcept;
+	// Sub-allocate m_b1Size bytes from cbvAllocator, memcpy m_b1Staging into it, stash the GPU
+	// virtual address in m_b1GpuVA for the next SetComputeRootConstantBufferView call.
+	bool UploadB1(void)
+	noexcept;
 
 private:
-    bool Record(CommandList* cmdList, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+	bool Record(CommandList* cmdList, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
-    void ResetImageBindings(void) noexcept;
+	void ResetImageBindings(void)
+	noexcept;
 
-    bool CreateRootSignature(const AutoArray<ComputeBindingDesc>& bindings) noexcept;
-    bool CreatePipeline(void) noexcept;
-    void ReflectB1Fields(void) noexcept;
+	bool CreateRootSignature(const AutoArray<ComputeBindingDesc>& bindings)
+	noexcept;
+	bool CreatePipeline(void)
+	noexcept;
+	void ReflectB1Fields(void)
+	noexcept;
 };
 
 // =================================================================================================

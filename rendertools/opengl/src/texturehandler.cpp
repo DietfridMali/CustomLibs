@@ -11,84 +11,95 @@
 // textures at a dozen places in the game
 
 
-bool TextureHandler::DeleteTextures(const String& key, Texture** texture) {
-    if (texture and *texture) {
-        delete *texture;
-        *texture = nullptr;
-    }
-    return true;
+bool TextureHandler::DeleteTextures(const String& key, Texture** texture)
+{
+	if (texture and *texture) {
+		delete *texture;
+		*texture = nullptr;
+	}
+	return true;
 }
 
 
-bool TextureHandler::RedeployTextures(const String& key, Texture** texture) {
-    if (texture and *texture)
-        (*texture)->Redeploy();
-    return true;
+bool TextureHandler::RedeployTextures(const String& key, Texture** texture)
+{
+	if (texture and *texture)
+		(*texture)->Redeploy();
+	return true;
 }
 
 
-void TextureHandler::Destroy(void) noexcept {
-    Texture::UpdateLUT(false);
-    Texture::textureLUT.Walk(&TextureHandler::DeleteTextures, this);
+void TextureHandler::Destroy(void)
+noexcept
+{
+	Texture::UpdateLUT(false);
+	Texture::textureLUT.Walk(&TextureHandler::DeleteTextures, this);
 }
 
 
-void TextureHandler::Redeploy(void) noexcept {
-    Texture::textureLUT.Walk(&TextureHandler::RedeployTextures, this);
+void TextureHandler::Redeploy(void)
+noexcept
+{
+	Texture::textureLUT.Walk(&TextureHandler::RedeployTextures, this);
 }
 
 
-Texture* TextureHandler::FindTexture(String& name) {
-    Texture** t = Texture::textureLUT.Find(name);
-    return t ? *t : nullptr;
+Texture* TextureHandler::FindTexture(String& name)
+{
+	Texture** t = Texture::textureLUT.Find(name);
+	return t ? *t : nullptr;
 }
 
 
-TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture, const TextureCreationParams& params) {
-    GetTextureFolder(textureFolder);
-    TextureList textures;
-    for (auto& name : textureNames) {
-        List<String> fileNames; // must be local here so it gets reset every loop iteration
-        Texture* t = FindTexture(name);
-        if (not t) {
-            fileNames.Append(name);
-            if (not ((t = getTexture(name)) and t->CreateFromFile(textureFolder, fileNames, params))) {
-                if (t) {
-                    delete t;
-                    t = nullptr;
-                }
-                if (params.isRequired) {
+TextureList TextureHandler::CreateTextures(String textureFolder, List<String>& textureNames, TextureGetter getTexture,
+										   const TextureCreationParams& params)
+{
+	GetTextureFolder(textureFolder);
+	TextureList textures;
+	for (auto& name : textureNames) {
+		List<String>	fileNames; // must be local here so it gets reset every loop iteration
+		Texture*		t = FindTexture(name);
+		if (not t) {
+			fileNames.Append(name);
+			if (not ((t = getTexture(name)) and t->CreateFromFile(textureFolder, fileNames, params))) {
+				if (t) {
+					delete t;
+					t = nullptr;
+				}
+				if (params.isRequired) {
 #ifdef _DEBUG
-                    logHandler.Print("TextureHandler: Couldn't load texture '%s'.\n", (char*)(textureFolder + name));
+					logHandler.Print("TextureHandler: Couldn't load texture '%s'.\n", (char*)(textureFolder + name));
 #endif
-                    for (auto& h : textures)
-                        delete h;
-                    textures.Clear();
-                    break;
-                }
-            }
-        }
-        //t->m_id.name = n.Split('.')[0];
-        textures.Append(t);
-    }
-    return textures;
+					for (auto& h : textures)
+						delete h;
+					textures.Clear();
+					break;
+				}
+			}
+		}
+		//t->m_id.name = n.Split('.')[0];
+		textures.Append(t);
+	}
+	return textures;
 }
 
 
-TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, TextureType textureType, const TextureCreationParams& params) {
-    TextureGetter getter;
-    switch (textureType) {
-        case TextureType::CubeMap:   
-            getter = [&](String& name) { return GetCubemap(name); }; 
-            break;
-        case TextureType::Texture3D: 
-            getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); }; 
-            break;
-        default:                     
-            getter = [&](String& name) { return GetStandardTexture(name); }; 
-            break;
-    }
-    return CreateTextures(textureFolder, textureNames, getter, params);
+TextureList TextureHandler::CreateByType(String textureFolder, List<String>& textureNames, TextureType textureType,
+										 const TextureCreationParams& params)
+{
+	TextureGetter getter;
+	switch (textureType) {
+		case TextureType::CubeMap:
+			getter = [&](String& name) { return GetCubemap(name); };
+			break;
+		case TextureType::Texture3D:
+			getter = [&](String& name) { return GetTexture<NoiseTexture3D>(name); };
+			break;
+		default:
+			getter = [&](String& name) { return GetStandardTexture(name); };
+			break;
+	}
+	return CreateTextures(textureFolder, textureNames, getter, params);
 }
 
 // =================================================================================================

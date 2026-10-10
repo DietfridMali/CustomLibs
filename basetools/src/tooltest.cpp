@@ -3,27 +3,32 @@
 #include "cstring.h"
 #include "cavltree.h"
 
-int intCompare(int const & i, int const & j) {
-    return (i < j) ? -1 : (i > j) ? 1 : 0;
+int intCompare(int const& i, int const& j)
+{
+	return (i < j) ? -1 : (i > j) ? 1
+								  : 0;
 }
 
-int strCompare(char* const & i, char* const & j) {
-    return strcmp(i, j);
+int strCompare(char* const& i, char* const& j)
+{
+	return strcmp(i, j);
 }
 
 
-bool NodeProcessor(int const & data) {
-    int x = data;
-    return true;
+bool NodeProcessor(int const& data)
+{
+	int x = data;
+	return true;
 }
 
-int main() {
-    int x;
-    CString s;
-    s= "a ; b ; c ; d ; e ; f";
-    //CString t = s.Replace("; ", "=").Replace(" =", "=");
-    CList<CString> values = s.Split(';');
-    /*
+int main()
+{
+	int		x;
+	CString	s;
+	s = "a ; b ; c ; d ; e ; f";
+	//CString t = s.Replace("; ", "=").Replace(" =", "=");
+	CList<CString> values = s.Split(';');
+	/*
     CArray<int> a;
     CList<int> l;
     CAvlTree<int, int> t; 
@@ -50,11 +55,11 @@ int main() {
     for (const auto [i, p] : l)
         x = *p;
     */
-    char* ps;
-//    CString v;
-    for (const auto [i, p] : values) {
-        CString v = *p;
-        ps = (char*)v;
-    }
-    x = 0;
+	char* ps;
+	//    CString v;
+	for (const auto [i, p] : values) {
+		CString v = *p;
+		ps = (char*)v;
+	}
+	x = 0;
 }

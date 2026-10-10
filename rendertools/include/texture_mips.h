@@ -16,23 +16,28 @@
 // zero-filled chain (the half-precision variants are OGL-only and never reach this path).
 
 struct MipLevel3D {
-    int                  width  { 0 };
-    int                  height { 0 };
-    int                  depth  { 0 };
-    AutoArray<uint8_t>   data;
+	int					width{ 0 };
+	int					height{ 0 };
+	int					depth{ 0 };
+	AutoArray<uint8_t>	data;
 };
 
 // Floor(log2(max(w, h, d))) + 1. The standard mip-count formula.
-int CalcMipLevels(int width, int height, int depth) noexcept;
+int CalcMipLevels(int width, int height, int depth)
+noexcept;
 
 // On return outChain has CalcMipLevels(w,h,d) entries: level 0 is a copy of src, levels 1..N-1
 // are successively halved (each dimension max(1, prev/2)) with channel-wise averaging.
 void BuildMipChain3D(const void* src, int width, int height, int depth,
-                     GfxPixelFormat fmt,
-                     AutoArray<MipLevel3D>& outChain) noexcept;
+					 GfxPixelFormat			fmt,
+					 AutoArray<MipLevel3D>&	outChain)
+noexcept;
 
-void Downsample2D_SRGB8(const uint8_t* src, int sw, int sh, int channels, uint8_t* dst, int dw, int dh) noexcept;
+void Downsample2D_SRGB8(const uint8_t* src, int sw, int sh, int channels, uint8_t* dst, int dw, int dh)
+noexcept;
 
-void BuildMipChain2D(const uint8_t* src, int width, int height, int channels, int mipCount, eColorEncoding colorEncoding, AutoArray<uint8_t>& outChain) noexcept;
+void BuildMipChain2D(const uint8_t* src, int width, int height, int channels, int mipCount, eColorEncoding colorEncoding,
+					 AutoArray<uint8_t>& outChain)
+noexcept;
 
 // =================================================================================================

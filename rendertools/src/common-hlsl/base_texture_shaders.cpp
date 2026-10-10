@@ -13,20 +13,21 @@
 // =================================================================================================
 
 static const ShaderDataAttributes VtxAttrs[] = {
-    { "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
 };
 
 static const ShaderDataAttributes VtxTcAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 // -------------------------------------------------------------------------------------------------
 // Hardcoded-triangle test: no vertex buffer needed, just SV_VertexID.
-const ShaderSource& TestShader() {
-    static const ShaderSource source(
-        "testShader",
-        R"(
+const ShaderSource& TestShader()
+{
+	static const ShaderSource source(
+		"testShader",
+		R"(
             struct PSInput { float4 pos : SV_Position; };
             PSInput VSMain(uint vertexID : SV_VertexID) {
                 float2 positions[3];
@@ -38,24 +39,24 @@ const ShaderSource& TestShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             struct PSInput { float4 pos : SV_Position; };
             float4 PSMain(PSInput i) : SV_Target {
                 return float4(1.0, 0.0, 1.0, 1.0);
             }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Stencil pass: transforms position through viewport*projection, PS discards everything
 // (depth/stencil write only).
-const ShaderSource& StencilShader() {
-    static const ShaderSource source(
-        "stencilShader",
-        R"(
+const ShaderSource& StencilShader()
+{
+	static const ShaderSource source(
+		"stencilShader",
+		R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -69,24 +70,24 @@ const ShaderSource& StencilShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             struct PSInput { float4 pos : SV_Position; };
             void PSMain(PSInput i) {
                 discard;
             }
         )",
-        ShaderDataLayout(VtxAttrs, 1, 0)
-    );
-    return source;
+		ShaderDataLayout(VtxAttrs, 1, 0));
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Shadow/depth pass: projects through light transform, PS does alpha-cutout test.
-const ShaderSource& SurfaceShadowShader() {
-    static const ShaderSource source(
-        "surfaceShadowShader",
-        R"(
+const ShaderSource& SurfaceShadowShader()
+{
+	static const ShaderSource source(
+		"surfaceShadowShader",
+		R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -105,7 +106,7 @@ const ShaderSource& SurfaceShadowShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             cbuffer ShaderConstants : register(b1) { float4 surfaceColor; };
             Texture2D    surface : register(t0);
             SamplerState s0      : register(s0);
@@ -118,18 +119,18 @@ const ShaderSource& SurfaceShadowShader() {
                     discard;
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2, 0)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2, 0));
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Sphere shadow pass: projects sphere vertex through light transform (no face culling active).
-const ShaderSource& SphereShadowShader() {
-    static const ShaderSource source(
-        "sphereShadowShader",
-        R"(
+const ShaderSource& SphereShadowShader()
+{
+	static const ShaderSource source(
+		"sphereShadowShader",
+		R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -144,24 +145,24 @@ const ShaderSource& SphereShadowShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             struct PSInput { float4 pos : SV_Position; };
             void PSMain(PSInput i) {
             }
         )",
-        ShaderDataLayout(VtxAttrs, 1, 0)
-    );
-    return source;
+		ShaderDataLayout(VtxAttrs, 1, 0));
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Debug visualiser: renders a depth texture as a linearised greyscale image.
-const ShaderSource& DepthRenderer() {
-    static const ShaderSource source(
-        "depthRenderer",
-        Standard2DVS(),
-        R"(
+const ShaderSource& DepthRenderer()
+{
+	static const ShaderSource source(
+		"depthRenderer",
+		Standard2DVS(),
+		R"(
             Texture2D    surface : register(t0);
             SamplerState s0      : register(s0);
             struct PSInput {
@@ -175,23 +176,23 @@ const ShaderSource& DepthRenderer() {
                 return float4(d, d, d, 1.0);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Solid colour fill (no texture).
 static const ShaderDataAttributes VtxColorAttrs[] = {
-    { "Vertex", 0, ShaderDataAttributes::Float3 },
-    { "Color",  0, ShaderDataAttributes::Float4 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "Color", 0, ShaderDataAttributes::Float4 },
 };
 
-const ShaderSource& ColorMeshShader() {
-    static const ShaderSource source(
-        "colorMesh",
-        R"(
+const ShaderSource& ColorMeshShader()
+{
+	static const ShaderSource source(
+		"colorMesh",
+		R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -210,7 +211,7 @@ const ShaderSource& ColorMeshShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             cbuffer ShaderConstants : register(b1) { int premultiply; };
             struct PSInput {
                 float4 pos          : SV_Position;
@@ -220,17 +221,17 @@ const ShaderSource& ColorMeshShader() {
                 return i.surfaceColor;
             }
         )",
-        ShaderDataLayout(VtxColorAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxColorAttrs, 2));
+	return source;
 }
 
 
-const ShaderSource& PlainColorShader() {
-    static const ShaderSource source(
-        "plainColor",
-        Standard2DVS(),
-        R"(
+const ShaderSource& PlainColorShader()
+{
+	static const ShaderSource source(
+		"plainColor",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) { float4 surfaceColor; };
             struct PSInput {
                 float4 pos       : SV_Position;
@@ -241,19 +242,19 @@ const ShaderSource& PlainColorShader() {
                 return surfaceColor;
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Greyscale conversion with brightness and optional invert.
-const ShaderSource& GrayScaleShader() {
-    static const ShaderSource source(
-        "grayScale",
-        Standard2DVS(),
-        R"(
+const ShaderSource& GrayScaleShader()
+{
+	static const ShaderSource source(
+		"grayScale",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 tcOffset;
                 float2 tcScale;
@@ -276,18 +277,18 @@ const ShaderSource& GrayScaleShader() {
                 return float4(rgb, texColor.a);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 // Textured quad with per-fragment tint colour; alpha zero → discard.
-const ShaderSource& PlainTextureShader() {
-    static const ShaderSource source(
-        "plainTexture",
-        Standard2DVS(),
-        R"(
+const ShaderSource& PlainTextureShader()
+{
+	static const ShaderSource source(
+		"plainTexture",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float4 surfaceColor;
                 float2 tcOffset;
@@ -323,22 +324,21 @@ const ShaderSource& PlainTextureShader() {
                 return float4(texColor.rgb * color, a);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
 static const ShaderDataAttributes VtxTcColorAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
-    { "Color",    0, ShaderDataAttributes::Float4 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Color", 0, ShaderDataAttributes::Float4 },
 };
 
-const ShaderSource& ColoredTextureShader() {
-    static const ShaderSource source(
-        "coloredTexture",
-        R"(
+const ShaderSource& ColoredTextureShader()
+{
+	static const ShaderSource source("coloredTexture",
+									 R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -359,7 +359,7 @@ const ShaderSource& ColoredTextureShader() {
                 return o;
             }
         )",
-        R"(
+									 R"(
             cbuffer ShaderConstants : register(b1) {
                 float4 surfaceColor;
                 int    bDecodeColors;
@@ -387,16 +387,16 @@ const ShaderSource& ColoredTextureShader() {
                 return float4(texColor.rgb * color, a);
             }
         )",
-        ShaderDataLayout(VtxTcColorAttrs, 3)
-    );
-    return source;
+									 ShaderDataLayout(VtxTcColorAttrs, 3));
+	return source;
 }
 
-const ShaderSource& GlyphShader() {
-    static const ShaderSource source(
-        "glyph",
-        Standard2DVS(),
-        R"(
+const ShaderSource& GlyphShader()
+{
+	static const ShaderSource source(
+		"glyph",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float4 surfaceColor;
                 float2 tcOffset;
@@ -422,19 +422,19 @@ const ShaderSource& GlyphShader() {
                 return float4(texColor.rgb * surfaceColor.rgb, a);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 // Scrolling / animated texture with SmoothBoost contrast enhancement.
 // ShaderConstants: surfaceColor, direction (scroll dir), speed, time.
-const ShaderSource& MovingTextureShader() {
-    static const ShaderSource source(
-        "movingTexture",
-        Standard2DVS(),
-        String(R"(
+const ShaderSource& MovingTextureShader()
+{
+	static const ShaderSource source(
+		"movingTexture",
+		Standard2DVS(),
+		String(R"(
             cbuffer ShaderConstants : register(b1) {
                 float4 surfaceColor;
                 float2 direction;
@@ -449,28 +449,28 @@ const ShaderSource& MovingTextureShader() {
                 float2 fragCoord : TEXCOORD1;
             };
         )") +
-        BoostFuncs() +
-        String(R"(
+			BoostFuncs() +
+			String(R"(
             float4 PSMain(PSInput i) : SV_Target {
                 float4 texColor = surface.Sample(s0, i.fragCoord + direction * (time * speed));
                 float3 rgbColor = texColor.rgb * surfaceColor.rgb;
                 return float4(SmoothBoost(rgbColor, 2.0), 1.0);
             }
         )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Gaussian-blurred texture with tint colour; alpha zero → discard.
 // ShaderConstants: surfaceColor, texelSize, blurStrength, blurSpread.
-const ShaderSource& BlurTextureShader() {
-    static const ShaderSource source(
-        "blurTexture",
-        Standard2DVS(),
-        String(R"(
+const ShaderSource& BlurTextureShader()
+{
+	static const ShaderSource source(
+		"blurTexture",
+		Standard2DVS(),
+		String(R"(
             cbuffer ShaderConstants : register(b1) {
                 float4 surfaceColor;
                 float2 texelSize;
@@ -485,8 +485,8 @@ const ShaderSource& BlurTextureShader() {
                 float2 fragCoord : TEXCOORD1;
             };
         )") +
-        GaussBlurFuncs() +
-        String(R"(
+			GaussBlurFuncs() +
+			String(R"(
             float4 PSMain(PSInput i) : SV_Target {
                 float4 texColor = GaussBlur(i.fragCoord, -1, -1);
                 float a = texColor.a * surfaceColor.a;
@@ -494,20 +494,20 @@ const ShaderSource& BlurTextureShader() {
                 return float4(texColor.rgb * surfaceColor.rgb, a);
             }
         )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Gaussian blur + greyscale conversion + contrast/gamma/brightness + optional tint/invert.
 // ShaderConstants: texelSize, blurStrength, blurSpread, brightness, contrast, gamma, invert, tint.
-const ShaderSource& TintAndBlurShader() {
-    static const ShaderSource source(
-        "tintAndBlur",
-        Standard2DVS(),
-        String(R"(
+const ShaderSource& TintAndBlurShader()
+{
+	static const ShaderSource source(
+		"tintAndBlur",
+		Standard2DVS(),
+		String(R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 texelSize;
                 int    blurStrength;
@@ -526,9 +526,9 @@ const ShaderSource& TintAndBlurShader() {
                 float2 fragCoord : TEXCOORD1;
             };
         )") +
-        GaussBlurFuncs() +
-        TintFuncs() +
-        String(R"(
+			GaussBlurFuncs() +
+			TintFuncs() +
+			String(R"(
             float4 PSMain(PSInput i) : SV_Target {
                 float4 texColor = GaussBlur(i.fragCoord, -1, -1);
                 // Rec.601 luma in gamma space
@@ -542,9 +542,8 @@ const ShaderSource& TintAndBlurShader() {
                 return float4(rgb, texColor.a);
             }
         )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

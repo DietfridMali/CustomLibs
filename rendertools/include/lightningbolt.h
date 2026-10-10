@@ -36,10 +36,10 @@
 //                     out of it can only move further away from the surface, never into it.
 
 enum eSwingMode {
-    smHorizontal,
-    smPerpendicular,
-    smPlane,
-    smSurface
+	smHorizontal,
+	smPerpendicular,
+	smPlane,
+	smSurface
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -59,55 +59,57 @@ enum eSwingMode {
 // kinks read as hard corners. Node count scales with the bolt length (branch/fork density too).
 
 struct LightningLook {
-    float   boltSegmentLength{ 0.25f };  // segment count from the bolt length = finest kink cell size (wu); the step at the calibration length
-    float   minSegmentLength{ 0.1f };    // step floor for short branches
-    int32_t referenceSamples{ 48 };      // samples per calibration length (calibration length = referenceSamples * boltSegmentLength)
+	float boltSegmentLength{
+		0.25f
+	}; // segment count from the bolt length = finest kink cell size (wu); the step at the calibration length
+	float	minSegmentLength{ 0.1f }; // step floor for short branches
+	int32_t	referenceSamples{ 48 }; // samples per calibration length (calibration length = referenceSamples * boltSegmentLength)
 
-    int32_t octaves{ 3 };                // PATH layer fbm octaves: the slow self-similar swing
-    float   gain{ 0.6f };                // fbm amplitude falloff per octave (both layers)
-    float   lacunarity{ 2.0f };          // fbm frequency growth per octave (both layers)
+	int32_t	octaves{ 3 }; // PATH layer fbm octaves: the slow self-similar swing
+	float	gain{ 0.6f }; // fbm amplitude falloff per octave (both layers)
+	float	lacunarity{ 2.0f }; // fbm frequency growth per octave (both layers)
 
-    int32_t kinkOctaves{ 2 };            // KINK layer octaves
-    float   kinkAmplitude{ 0.4f };       // world-fixed peak of the kink layer (wu) -- the corner sharpness knob
-    // How much of the swing may leave the bolt's own plane, as a share of the in-plane swing. 0 = a
-    // strictly flat bolt, 1 = the plane means nothing. A small share keeps a bolt from collapsing to
-    // a straight line when it is seen edge on, without letting the path circle its axis again.
-    float   planeDistTolerance{ 0.5f };
+	int32_t	kinkOctaves{ 2 }; // KINK layer octaves
+	float	kinkAmplitude{ 0.4f }; // world-fixed peak of the kink layer (wu) -- the corner sharpness knob
+	// How much of the swing may leave the bolt's own plane, as a share of the in-plane swing. 0 = a
+	// strictly flat bolt, 1 = the plane means nothing. A small share keeps a bolt from collapsing to
+	// a straight line when it is seen edge on, without letting the path circle its axis again.
+	float planeDistTolerance{ 0.5f };
 
-    // Branch deflection off the parent's local tangent: normal distribution (high-speed camera statistics:
-    // weak branches deflect ~40-45 deg, normally distributed, sigma 14-24 deg -- the values are 2D projections,
-    // so only the distribution SHAPE is authoritative, not the exact degrees), clamped to [min,max].
-    float   branchAngleMean{ 45.0f };
-    float   branchAngleSigma{ 18.0f };
-    float   minBranchAngle{ 15.0f };
-    float   maxBranchAngle{ 80.0f };
-    // Elevation cap (only evaluated when BaseLightning::m_useElevationCap is set - a gravity world),
-    // measured against the parent's AXIS (end-start, a stable design quantity, NOT the wobbling local
-    // tangent): a branch may point at most maxBranchElevationRise steeper UPWARD than its parent axis,
-    // and never above maxBranchElevation absolute. No downward cap.
-    float   maxBranchElevationRise{ 55.0f };
-    float   maxBranchElevation{ 25.0f };
-    float   branchAzimuthJitter{ 30.0f };   // +/- jitter on the Y-fork azimuth so forks don't look machined
-    float   branchLengthFactor{ 0.55f };    // branch length as a fraction of the parent's remaining length past the fork node
-    float   minBranchLength{ 0.2f };
-    // Branch start width, as a fraction of the parent's width at the fork node. Real lightning drops hard
-    // from trunk to secondary branch, then barely thins further -- so the factor GROWS with depth.
-    float   firstBranchWidthFactor{ 0.3f };
-    float   deepBranchWidthFactor{ 0.9f };
+	// Branch deflection off the parent's local tangent: normal distribution (high-speed camera statistics:
+	// weak branches deflect ~40-45 deg, normally distributed, sigma 14-24 deg -- the values are 2D projections,
+	// so only the distribution SHAPE is authoritative, not the exact degrees), clamped to [min,max].
+	float branchAngleMean{ 45.0f };
+	float branchAngleSigma{ 18.0f };
+	float minBranchAngle{ 15.0f };
+	float maxBranchAngle{ 80.0f };
+	// Elevation cap (only evaluated when BaseLightning::m_useElevationCap is set - a gravity world),
+	// measured against the parent's AXIS (end-start, a stable design quantity, NOT the wobbling local
+	// tangent): a branch may point at most maxBranchElevationRise steeper UPWARD than its parent axis,
+	// and never above maxBranchElevation absolute. No downward cap.
+	float maxBranchElevationRise{ 55.0f };
+	float maxBranchElevation{ 25.0f };
+	float branchAzimuthJitter{ 30.0f }; // +/- jitter on the Y-fork azimuth so forks don't look machined
+	float branchLengthFactor{ 0.55f }; // branch length as a fraction of the parent's remaining length past the fork node
+	float minBranchLength{ 0.2f };
+	// Branch start width, as a fraction of the parent's width at the fork node. Real lightning drops hard
+	// from trunk to secondary branch, then barely thins further -- so the factor GROWS with depth.
+	float firstBranchWidthFactor{ 0.3f };
+	float deepBranchWidthFactor{ 0.9f };
 
-    // The DEFAULT ribbon width, and it is a RATIO rather than a width: half width per unit of bolt
-    // length. A width in world units cannot serve as a default across effects, because one number
-    // would have to fit a 2 unit discharge around a small object AND a 20 unit bolt across a room -
-    // which is exactly what went wrong before. A ratio is scale free: it survives a change of world
-    // scale and it is the same number in both applications. 1 : 60 is where Paintjob Rampage's bolts
-    // sit (half width 0.5 over a 30 unit strike), and that is the look this was calibrated against.
-    // A bundle that states a startWidth of its own never consults this.
-    float   widthRatio{ 1.0f / 60.0f };
+	// The DEFAULT ribbon width, and it is a RATIO rather than a width: half width per unit of bolt
+	// length. A width in world units cannot serve as a default across effects, because one number
+	// would have to fit a 2 unit discharge around a small object AND a 20 unit bolt across a room -
+	// which is exactly what went wrong before. A ratio is scale free: it survives a change of world
+	// scale and it is the same number in both applications. 1 : 60 is where Paintjob Rampage's bolts
+	// sit (half width 0.5 over a 30 unit strike), and that is the look this was calibrated against.
+	// A bundle that states a startWidth of its own never consults this.
+	float widthRatio{ 1.0f / 60.0f };
 
-    float   flickerRate{ 18.0f };        // strike: pseudo-random brightness levels per second
-    float   flickerFloor{ 0.3f };
+	float flickerRate{ 18.0f }; // strike: pseudo-random brightness levels per second
+	float flickerFloor{ 0.3f };
 
-    static LightningLook& Instance(void);
+	static LightningLook& Instance(void);
 };
 
 #define lightningLook LightningLook::Instance()
@@ -124,65 +126,71 @@ struct LightningLook {
 // at it (LightningSystem::m_fbm). Changing it there changes every bolt of that bundle, including the
 // ones its emitter ignites later. Out of range = fall back to the application wide LightningLook.
 struct LightningFbmParams {
-    float   kinkAmplitude{ -1.0f };   // world-fixed peak of the KINK layer (wu) - corner sharpness
-    int32_t octaves{ -1 };            // PATH layer fbm octaves - how much fine detail rides on the swing
-    float   gain{ -1.0f };            // fbm amplitude falloff per octave; BOTH layers use it
-    float   lacunarity{ -1.0f };      // fbm frequency growth per octave; BOTH layers use it
-    int32_t kinkOctaves{ -1 };        // KINK layer octaves - detail of the fine jaggedness
-    float   planeDistTolerance{ -1.0f };      // share of the swing that may leave the plane; negative = the look default
+	float	kinkAmplitude{ -1.0f }; // world-fixed peak of the KINK layer (wu) - corner sharpness
+	int32_t	octaves{ -1 }; // PATH layer fbm octaves - how much fine detail rides on the swing
+	float	gain{ -1.0f }; // fbm amplitude falloff per octave; BOTH layers use it
+	float	lacunarity{ -1.0f }; // fbm frequency growth per octave; BOTH layers use it
+	int32_t	kinkOctaves{ -1 }; // KINK layer octaves - detail of the fine jaggedness
+	float	planeDistTolerance{ -1.0f }; // share of the swing that may leave the plane; negative = the look default
 };
 
 // -------------------------------------------------------------------------------------------------
 
 struct LightningCreationParams {
-    // shape (strike + arc)
-    // Half width at the source end, in world units. 0 - the default - means DERIVE IT: the bolt takes
-    // its own length times LightningLook::widthRatio, so an effect that has no opinion about width
-    // still scales correctly with whatever length it happens to have.
-    float      startWidth{ 0.0f };
-    // Strike: half width at the tip. 0 runs to a point and is a real value, so 0 cannot mean "derive"
-    // here - NEGATIVE does, and yields half of the resolved start width. Arc: ignored (uniform).
-    float      endWidth{ -1.0f };
-    float      coreWidth{ 0.5f };   // white-core band as a fraction of the ribbon half-width; the rest is blue halo
-    // Ignition flash (strike only, an arc ignores both). A single discharge starts out as one wide,
-    // overbright channel with no glow around it at all - the halo only becomes visible as that channel
-    // contracts. coreFlashWidth is the core fraction at ignition, and it is the application's HALO reach
-    // (the core then covers the whole mantle and swallows it), decaying to coreWidth over coreFlashTime.
-    // 0 = no flash: the core keeps coreWidth from the first frame.
-    float      coreFlashWidth{ 0.0f };
-    float      coreFlashTime{ 0.0f };   // ms; capped at a share of the lifetime so a short strike still gets its halo
-    Vector3f   color{ Vector3f(1.0f, 1.0f, 1.0f) };   // per-bolt tint of the halo (multiplies the shader's haloColor); white = the shader's own colour
-    float      amplitudeFactor{ 0.2f };   // lateral swing as a fraction of the bolt length
-    float      waveRatio{ 3.0f };   // wavelength / amplitude -> base jaggedness (coupled -> length-invariant, self-similar)
-    // Noise properties. They belong to the BUNDLE, not to the single bolt - the system copies them
-    // into its own LightningFbmParams and every discharge it holds reads them from there.
-    LightningFbmParams fbm;
-    eSwingMode swingMode{ smHorizontal };  // see eSwingMode; 6DoF worlds want smPerpendicular
-    Vector3f   planeNormal{ Vector3f::ZERO };  // smPlane only: normal of the plane the bolt has to stay in
-    bool       useElevationCap{ true };   // gravity world: cap how much steeper upward a branch may point than its parent
-    float      tailFraction{ 0.0f };   // build this much of the length BEYOND the end and do not draw it -> the visible tip is not pinned and dances
-    float      sampleScale{ 1.0f };
-    float      regenInterval{ 33.0f };  // ms between path rebuilds of an animated lightning (0 = every frame)
-    // strike only
-    float      lifetime{ 1.0f };   // seconds the strike stays (ttl-faded); 0 = until it is destroyed
-    float      fadeStart{ 150.0f }; // ms before the end of lifetime at which the brightness starts falling off (afterglow); full brightness before
-    int32_t    branchDepth{ 2 };      // 0 = trunk only, 1 = trunk branches, 2 = branches branch, ...
-    float      branchChance{ 0.2f };   // per-node fork probability [0,1]
-    int32_t    maxBranchTestSkips{ 2 };      // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
-    // arc only
-    int32_t    boltCount{ 3 };      // parallel bolts in the bundle
-    float      animSpeed{ 1.0f };   // writhe speed
-    int32_t    strokeCount{ 0 };        // strike: 0 = flicker + ttl fade; n > 0 = n return strokes, each full at once and decaying
-    float      strokeDecay{ 80.0f };    // ms a flash takes to die down to ~5 %
-    float      strokeGapMin{ 50.0f };   // ms of near darkness between two flashes, drawn per strike from its seed
-    float      strokeGapMax{ 150.0f };
+	// shape (strike + arc)
+	// Half width at the source end, in world units. 0 - the default - means DERIVE IT: the bolt takes
+	// its own length times LightningLook::widthRatio, so an effect that has no opinion about width
+	// still scales correctly with whatever length it happens to have.
+	float startWidth{ 0.0f };
+	// Strike: half width at the tip. 0 runs to a point and is a real value, so 0 cannot mean "derive"
+	// here - NEGATIVE does, and yields half of the resolved start width. Arc: ignored (uniform).
+	float endWidth{ -1.0f };
+	float coreWidth{ 0.5f }; // white-core band as a fraction of the ribbon half-width; the rest is blue halo
+	// Ignition flash (strike only, an arc ignores both). A single discharge starts out as one wide,
+	// overbright channel with no glow around it at all - the halo only becomes visible as that channel
+	// contracts. coreFlashWidth is the core fraction at ignition, and it is the application's HALO reach
+	// (the core then covers the whole mantle and swallows it), decaying to coreWidth over coreFlashTime.
+	// 0 = no flash: the core keeps coreWidth from the first frame.
+	float		coreFlashWidth{ 0.0f };
+	float		coreFlashTime{ 0.0f }; // ms; capped at a share of the lifetime so a short strike still gets its halo
+	Vector3f	color{
+		Vector3f(1.0f, 1.0f, 1.0f)
+	}; // per-bolt tint of the halo (multiplies the shader's haloColor); white = the shader's own colour
+	float amplitudeFactor{ 0.2f }; // lateral swing as a fraction of the bolt length
+	float waveRatio{ 3.0f }; // wavelength / amplitude -> base jaggedness (coupled -> length-invariant, self-similar)
+	// Noise properties. They belong to the BUNDLE, not to the single bolt - the system copies them
+	// into its own LightningFbmParams and every discharge it holds reads them from there.
+	LightningFbmParams	fbm;
+	eSwingMode			swingMode{ smHorizontal }; // see eSwingMode; 6DoF worlds want smPerpendicular
+	Vector3f			planeNormal{ Vector3f::ZERO }; // smPlane only: normal of the plane the bolt has to stay in
+	bool				useElevationCap{ true }; // gravity world: cap how much steeper upward a branch may point than its parent
+	float				tailFraction{
+		 0.0f
+	}; // build this much of the length BEYOND the end and do not draw it -> the visible tip is not pinned and dances
+	float sampleScale{ 1.0f };
+	float regenInterval{ 33.0f }; // ms between path rebuilds of an animated lightning (0 = every frame)
+	// strike only
+	float lifetime{ 1.0f }; // seconds the strike stays (ttl-faded); 0 = until it is destroyed
+	float fadeStart{
+		150.0f
+	}; // ms before the end of lifetime at which the brightness starts falling off (afterglow); full brightness before
+	int32_t	branchDepth{ 2 }; // 0 = trunk only, 1 = trunk branches, 2 = branches branch, ...
+	float	branchChance{ 0.2f }; // per-node fork probability [0,1]
+	int32_t	maxBranchTestSkips{ 2 }; // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
+	// arc only
+	int32_t	boltCount{ 3 }; // parallel bolts in the bundle
+	float	animSpeed{ 1.0f }; // writhe speed
+	int32_t	strokeCount{ 0 }; // strike: 0 = flicker + ttl fade; n > 0 = n return strokes, each full at once and decaying
+	float	strokeDecay{ 80.0f }; // ms a flash takes to die down to ~5 %
+	float	strokeGapMin{ 50.0f }; // ms of near darkness between two flashes, drawn per strike from its seed
+	float	strokeGapMax{ 150.0f };
 };
 
 // -------------------------------------------------------------------------------------------------
 
 struct LightningNode {
-    Vector3f position;
-    float    width;
+	Vector3f	position;
+	float		width;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -193,266 +201,300 @@ struct LightningNode {
 // `waveCount` = base wiggle count (finer detail comes from the octaves and the kink layer).
 
 struct LightningBoltParams {
-    Vector3f   start{ Vector3f::ZERO };
-    Vector3f   end{ Vector3f::ZERO };
-    int32_t    segments{ 8 };
-    int32_t    waveCount{ 1 };
-    float      startWidth{ 0.1f };
-    float      endWidth{ 0.0f };
-    float      amplitude{ 1.0f };
-    uint32_t   seed{ 0 };
-    float      time{ 0.0f };
-    // The noise time the STRUCTURE is decided at - the spawn phase, which does not move while the bolt
-    // animates. The swing plane is derived at this phase (see Build), so it stays put instead of
-    // rotating along with the writhing.
-    float      basePhase{ 0.0f };
-    eSwingMode swingMode{ smHorizontal };
-    Vector3f   planeNormal{ Vector3f::ZERO };
-    float      tailFraction{ 0.0f };
-    LightningFbmParams fbm;              // the bundle's noise properties, see LightningFbmParams
+	Vector3f	start{ Vector3f::ZERO };
+	Vector3f	end{ Vector3f::ZERO };
+	int32_t		segments{ 8 };
+	int32_t		waveCount{ 1 };
+	float		startWidth{ 0.1f };
+	float		endWidth{ 0.0f };
+	float		amplitude{ 1.0f };
+	uint32_t	seed{ 0 };
+	float		time{ 0.0f };
+	// The noise time the STRUCTURE is decided at - the spawn phase, which does not move while the bolt
+	// animates. The swing plane is derived at this phase (see Build), so it stays put instead of
+	// rotating along with the writhing.
+	float				basePhase{ 0.0f };
+	eSwingMode			swingMode{ smHorizontal };
+	Vector3f			planeNormal{ Vector3f::ZERO };
+	float				tailFraction{ 0.0f };
+	LightningFbmParams	fbm; // the bundle's noise properties, see LightningFbmParams
 };
 
 // -------------------------------------------------------------------------------------------------
 
 class LightningBolt {
 public:
-    AutoArray<LightningNode> m_nodes;
-    // Nodes that are actually drawn. Everything past it is the free tail (tailFraction): it is built so
-    // the sin window does NOT close at the visible end, which leaves the tip displaced and dancing
-    // instead of pinned. 0 = whole polyline visible.
-    int32_t                  m_visibleNodes{ 0 };
+	AutoArray<LightningNode> m_nodes;
+	// Nodes that are actually drawn. Everything past it is the free tail (tailFraction): it is built so
+	// the sin window does NOT close at the visible end, which leaves the tip displaced and dancing
+	// instead of pinned. 0 = whole polyline visible.
+	int32_t m_visibleNodes{ 0 };
 
-    void Build(const LightningBoltParams& params);
+	void Build(const LightningBoltParams& params);
 
-    void Clear(void);
+	void Clear(void);
 
-    inline void Translate(const Vector3f& offset) {
-        for (int32_t i = 0; i < m_nodes.Length(); i++)
-            m_nodes[i].position += offset;
-    }
+	inline void Translate(const Vector3f& offset) {
+		for (int32_t i = 0; i < m_nodes.Length(); i++)
+			m_nodes[i].position += offset;
+	}
 
-    inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
-        for (int32_t i = 0; i < m_nodes.Length(); i++)
-            m_nodes[i].position = newPivot + rotation * (m_nodes[i].position - pivot);
-    }
+	inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
+		for (int32_t i = 0; i < m_nodes.Length(); i++)
+			m_nodes[i].position = newPivot + rotation * (m_nodes[i].position - pivot);
+	}
 
-    inline int32_t VisibleNodes(void) const {
-        int32_t n = m_nodes.Length();
-        return ((m_visibleNodes > 0) and (m_visibleNodes < n)) ? m_visibleNodes : n;
-    }
+	inline int32_t VisibleNodes(void) const {
+		int32_t n = m_nodes.Length();
+		return ((m_visibleNodes > 0) and (m_visibleNodes < n)) ? m_visibleNodes : n;
+	}
 };
 
 // -------------------------------------------------------------------------------------------------
 
-enum eLightningType { ltStrike, ltArc };
+enum eLightningType { ltStrike,
+					  ltArc };
 
 class BaseLightning {
 public:
-    eLightningType           m_type;
-    Vector3f                 m_start{ Vector3f::ZERO };
-    Vector3f                 m_end{ Vector3f::ZERO };
-    float                    m_startWidth{ 0.05f };
-    float                    m_endWidth{ 0.0f };
-    float                    m_amplitudeFactor{ 0.1f };   // amplitude as a fraction of the current |end-start|
-    float                    m_waveRatio{ 3.0f };         // wavelength / amplitude -> base jaggedness (coupled to amplitude)
-    float                    m_coreWidth{ 0.5f };         // white-core band fraction; per-bolt, handed to the shader via the segment buffer
-    Vector3f                 m_color{ Vector3f(1.0f, 1.0f, 1.0f) };   // per-bolt halo tint, likewise through the segment buffer
-    eSwingMode               m_swingMode{ smHorizontal }; // see eSwingMode
-    Vector3f                 m_planeNormal{ Vector3f::ZERO };
-    bool                     m_useElevationCap{ true };
-    // Not owned: this points at the LightningFbmParams of the system this lightning belongs to, which
-    // outlives it (the system owns its lightnings). nullptr only for a lightning built outside a
-    // system - Fbm () then answers with the neutral defaults.
-    const LightningFbmParams* m_fbm{ nullptr };
+	eLightningType	m_type;
+	Vector3f		m_start{ Vector3f::ZERO };
+	Vector3f		m_end{ Vector3f::ZERO };
+	float			m_startWidth{ 0.05f };
+	float			m_endWidth{ 0.0f };
+	float			m_amplitudeFactor{ 0.1f }; // amplitude as a fraction of the current |end-start|
+	float			m_waveRatio{ 3.0f }; // wavelength / amplitude -> base jaggedness (coupled to amplitude)
+	float			m_coreWidth{ 0.5f }; // white-core band fraction; per-bolt, handed to the shader via the segment buffer
+	Vector3f		m_color{ Vector3f(1.0f, 1.0f, 1.0f) }; // per-bolt halo tint, likewise through the segment buffer
+	eSwingMode		m_swingMode{ smHorizontal }; // see eSwingMode
+	Vector3f		m_planeNormal{ Vector3f::ZERO };
+	bool			m_useElevationCap{ true };
+	// Not owned: this points at the LightningFbmParams of the system this lightning belongs to, which
+	// outlives it (the system owns its lightnings). nullptr only for a lightning built outside a
+	// system - Fbm () then answers with the neutral defaults.
+	const LightningFbmParams* m_fbm{ nullptr };
 
-    // The system hands its own instance over when it takes the lightning in (AddStrike / AddArc).
-    inline void SetFbm(const LightningFbmParams* fbm) { m_fbm = fbm; }
+	// The system hands its own instance over when it takes the lightning in (AddStrike / AddArc).
+	inline void SetFbm(const LightningFbmParams* fbm) {
+		m_fbm = fbm;
+	}
 
-    inline const LightningFbmParams& Fbm(void) const {
-        static const LightningFbmParams defaults;
-        return m_fbm ? *m_fbm : defaults;
-    }
+	inline const LightningFbmParams& Fbm(void) const {
+		static const LightningFbmParams defaults;
+		return m_fbm ? *m_fbm : defaults;
+	}
 
-    float                    m_tailFraction{ 0.0f };
-    float                    m_sampleScale{ 1.0f };
-    int32_t                  m_segments{ 8 };             // fixed intermediate-point count (from the base length)
-    int32_t                  m_waveCount{ 1 };            // fixed wiggle count (from the base length)
-    uint32_t                 m_seed{ 0 };
-    float                    m_animSpeed{ 0.0f };         // animation speed; 0 = static (built once). Arc + animated strike both use it.
-    float                    m_timeOffset{ 0.0f };        // random start on the noise time axis so different bolts don't look identical
-    // Path rebuild rate. The noise time axis is continuous (quintic fade), so two builds a few tens of ms
-    // apart already sit close together -- there is no need to interpolate node positions between them,
-    // only to not rebuild more often than necessary. 0 = rebuild on every Update.
-    float                    m_regenInterval{ 33.0f };
-    int64_t                  m_lastGenerated{ 0 };
-    // The brightness that was written into the renderer's segment buffer the last time it was built. The
-    // renderer only rebuilds when something actually changed, and a static (non-animated) lightning changes
-    // nothing but its fade -- so this is what tells the renderer that its buffer went stale. One value, one
-    // writer (the renderer), no second bookkeeping.
-    float                    m_lastFade{ -1.0f };
-    // Same bookkeeping for the core width, and for the same reason: a strike's core contracts while
-    // nothing else about it changes, and the ignition flash is over in a few frames - waiting for the
-    // next flicker step or path rebuild to carry it into the buffer would show it in two or three jumps.
-    float                    m_lastCoreWidth{ -1.0f };
-    AutoArray<LightningBolt> m_bolts;
+	float		m_tailFraction{ 0.0f };
+	float		m_sampleScale{ 1.0f };
+	int32_t		m_segments{ 8 }; // fixed intermediate-point count (from the base length)
+	int32_t		m_waveCount{ 1 }; // fixed wiggle count (from the base length)
+	uint32_t	m_seed{ 0 };
+	float		m_animSpeed{ 0.0f }; // animation speed; 0 = static (built once). Arc + animated strike both use it.
+	float		m_timeOffset{ 0.0f }; // random start on the noise time axis so different bolts don't look identical
+	// Path rebuild rate. The noise time axis is continuous (quintic fade), so two builds a few tens of ms
+	// apart already sit close together -- there is no need to interpolate node positions between them,
+	// only to not rebuild more often than necessary. 0 = rebuild on every Update.
+	float	m_regenInterval{ 33.0f };
+	int64_t	m_lastGenerated{ 0 };
+	// The brightness that was written into the renderer's segment buffer the last time it was built. The
+	// renderer only rebuilds when something actually changed, and a static (non-animated) lightning changes
+	// nothing but its fade -- so this is what tells the renderer that its buffer went stale. One value, one
+	// writer (the renderer), no second bookkeeping.
+	float m_lastFade{ -1.0f };
+	// Same bookkeeping for the core width, and for the same reason: a strike's core contracts while
+	// nothing else about it changes, and the ignition flash is over in a few frames - waiting for the
+	// next flicker step or path rebuild to carry it into the buffer would show it in two or three jumps.
+	float						m_lastCoreWidth{ -1.0f };
+	AutoArray<LightningBolt>	m_bolts;
 
-    BaseLightning(eLightningType type) : m_type(type) { }
+	BaseLightning(eLightningType type)
+		: m_type(type)
+	{}
 
-    virtual ~BaseLightning() = default;
+	virtual ~BaseLightning() = default;
 
-    // Move both endpoints (whole buschel follows on the next Generate). No-op geometry change until then.
-    inline void SetEndpoints(const Vector3f& start, const Vector3f& end) noexcept {
-        m_start = start;
-        m_end = end;
-    }
+	// Move both endpoints (whole buschel follows on the next Generate). No-op geometry change until then.
+	inline void SetEndpoints(const Vector3f& start, const Vector3f& end)
+	noexcept
+	{
+		m_start = start;
+		m_end = end;
+	}
 
-    // Follow a moved endpoint on the already-built geometry. Default just re-sets the endpoints (the arc
-    // rebuilds every frame anyway); the strike overrides to re-anchor only its end segment (start ignored)
-    // so the branches stay put while the tip tracks a slightly swinging target.
-    virtual void UpdateEndpoints(const Vector3f& start, const Vector3f& end) { SetEndpoints(start, end); }
+	// Follow a moved endpoint on the already-built geometry. Default just re-sets the endpoints (the arc
+	// rebuilds every frame anyway); the strike overrides to re-anchor only its end segment (start ignored)
+	// so the branches stay put while the tip tracks a slightly swinging target.
+	virtual void UpdateEndpoints(const Vector3f& start, const Vector3f& end) {
+		SetEndpoints(start, end);
+	}
 
-    // Carry the lightning along - endpoints AND the geometry already built from them. Both are rigid
-    // motions and therefore keep a bundle whose members sit on endpoints of their own: SetEndpoints would
-    // put all of them on the SAME pair (an emitter in epRandomDirection mode draws one pair per member)
-    // and the bundle would collapse into a single bolt on the next Generate.
-    virtual void Translate(const Vector3f& offset) {
-        m_start += offset;
-        m_end += offset;
-        for (int32_t i = 0; i < m_bolts.Length(); i++)
-            m_bolts[i].Translate(offset);
-    }
+	// Carry the lightning along - endpoints AND the geometry already built from them. Both are rigid
+	// motions and therefore keep a bundle whose members sit on endpoints of their own: SetEndpoints would
+	// put all of them on the SAME pair (an emitter in epRandomDirection mode draws one pair per member)
+	// and the bundle would collapse into a single bolt on the next Generate.
+	virtual void Translate(const Vector3f& offset)
+	{
+		m_start += offset;
+		m_end += offset;
+		for (int32_t i = 0; i < m_bolts.Length(); i++)
+			m_bolts[i].Translate(offset);
+	}
 
-    virtual void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
-        m_start = newPivot + rotation * (m_start - pivot);
-        m_end = newPivot + rotation * (m_end - pivot);
-        m_planeNormal = rotation * m_planeNormal;
-        for (int32_t i = 0; i < m_bolts.Length(); i++)
-            m_bolts[i].Transform(pivot, rotation, newPivot);
-    }
+	virtual void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot)
+	{
+		m_start = newPivot + rotation * (m_start - pivot);
+		m_end = newPivot + rotation * (m_end - pivot);
+		m_planeNormal = rotation * m_planeNormal;
+		for (int32_t i = 0; i < m_bolts.Length(); i++)
+			m_bolts[i].Transform(pivot, rotation, newPivot);
+	}
 
-    virtual void Generate(int64_t now) = 0;               // (re)build the bolt(s) for the current params/time
+	virtual void Generate(int64_t now) = 0; // (re)build the bolt(s) for the current params/time
 
-    // Rebuild if the regeneration interval has elapsed. Returns true when the geometry actually changed,
-    // so the renderer knows whether its segment buffer is still valid.
-    virtual bool Regenerate(int64_t now);
+	// Rebuild if the regeneration interval has elapsed. Returns true when the geometry actually changed,
+	// so the renderer knows whether its segment buffer is still valid.
+	virtual bool Regenerate(int64_t now);
 
-    virtual bool IsAlive(int64_t /*now*/) const { return true; }
+	virtual bool IsAlive(int64_t /*now*/) const {
+		return true;
+	}
 
-    virtual float Fade(int64_t /*now*/) const { return 1.0f; } // brightness 0..1 passed to the shader
+	virtual float Fade(int64_t /*now*/) const {
+		return 1.0f;
+	} // brightness 0..1 passed to the shader
 
-    // The white core's band width at this instant, as a fraction of the ribbon half width. Constant for
-    // everything but a strike, which starts it out at the halo's reach and lets it contract (see
-    // LightningStrike::CoreWidth). The renderer hands the result to the shader per segment.
-    virtual float CoreWidth(int64_t /*now*/) const { return m_coreWidth; }
+	// The white core's band width at this instant, as a fraction of the ribbon half width. Constant for
+	// everything but a strike, which starts it out at the halo's reach and lets it contract (see
+	// LightningStrike::CoreWidth). The renderer hands the result to the shader per segment.
+	virtual float CoreWidth(int64_t /*now*/) const {
+		return m_coreWidth;
+	}
 
-    // AFTERGLOW: true once the ttl fade window has begun -> the handler drops the white core (full-res
-    // core pass) and leaves only the fading halo (see LightningHandler::BuildSegments).
-    virtual bool IsFading(int64_t /*now*/) const { return false; }
+	// AFTERGLOW: true once the ttl fade window has begun -> the handler drops the white core (full-res
+	// core pass) and leaves only the fading halo (see LightningHandler::BuildSegments).
+	virtual bool IsFading(int64_t /*now*/) const {
+		return false;
+	}
 
-    virtual bool IsAnimated(void) const { return false; }  // arcs rebuild over time; strikes do not
+	virtual bool IsAnimated(void) const {
+		return false;
+	} // arcs rebuild over time; strikes do not
 
 protected:
-    // Copy everything that is common to both kinds out of the creation params.
-    void SetupCommon(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params);
+	// Copy everything that is common to both kinds out of the creation params.
+	void SetupCommon(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params);
 
-    // segments + waveCount from the current endpoint distance (fixed at setup -> self-similar scaling).
-    void ComputeCounts(void);
+	// segments + waveCount from the current endpoint distance (fixed at setup -> self-similar scaling).
+	void ComputeCounts(void);
 
-    inline float CurrentLength(void) const { return (m_end - m_start).Length(); }
+	inline float CurrentLength(void) const {
+		return (m_end - m_start).Length();
+	}
 };
 
 // -------------------------------------------------------------------------------------------------
 
 struct LightningRefBolt {
-    LightningBoltParams params;
-    LightningBolt       bolt;
-    bool                valid{ false };
+	LightningBoltParams	params;
+	LightningBolt		bolt;
+	bool				valid{ false };
 };
 
 // -------------------------------------------------------------------------------------------------
 
 class LightningStrike : public BaseLightning {
 public:
-    int64_t m_spawnTime{ 0 };
-    float   m_lifetime{ 1.0f };
-    float   m_fadeStart{ 150.0f };   // ms before the end of lifetime at which the afterglow fade begins
-    float   m_coreFlashWidth{ 0.0f };   // core band fraction at ignition (the halo's reach); 0 = no flash
-    float   m_coreFlashTime{ 0.0f };    // ms the core takes to contract from m_coreFlashWidth to m_coreWidth
-    int32_t m_branchDepth{ 2 };   // recursion depth: 0 = trunk only, 1 = trunk has branches, 2 = branches have branches, ...
-    float   m_branchChance{ 1.0f };   // probability [0,1] that a sub-branch forks at each eligible node
-    int32_t m_maxBranchTestSkips{ 0 };   // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
-    int32_t m_strokeCount{ 0 };
-    float   m_strokeDecay{ 80.0f };
-    float   m_strokeGapMin{ 50.0f };
-    float   m_strokeGapMax{ 150.0f };
-    int32_t m_builtStroke{ 0 };
-    AutoArray<LightningRefBolt> m_refBolts;
-    int32_t                     m_refIndex{ 0 };
+	int64_t						m_spawnTime{ 0 };
+	float						m_lifetime{ 1.0f };
+	float						m_fadeStart{ 150.0f }; // ms before the end of lifetime at which the afterglow fade begins
+	float						m_coreFlashWidth{ 0.0f }; // core band fraction at ignition (the halo's reach); 0 = no flash
+	float						m_coreFlashTime{ 0.0f }; // ms the core takes to contract from m_coreFlashWidth to m_coreWidth
+	int32_t m_branchDepth{ 2 }; // recursion depth: 0 = trunk only, 1 = trunk has branches, 2 = branches have branches, ...
+	float						m_branchChance{ 1.0f }; // probability [0,1] that a sub-branch forks at each eligible node
+	int32_t m_maxBranchTestSkips{ 0 }; // after a fork, skip Random::Int(this) nodes before testing again (0 = never skip)
+	int32_t						m_strokeCount{ 0 };
+	float						m_strokeDecay{ 80.0f };
+	float						m_strokeGapMin{ 50.0f };
+	float						m_strokeGapMax{ 150.0f };
+	int32_t						m_builtStroke{ 0 };
+	AutoArray<LightningRefBolt>	m_refBolts;
+	int32_t						m_refIndex{ 0 };
 
-    LightningStrike() : BaseLightning(ltStrike) { }
+	LightningStrike()
+		: BaseLightning(ltStrike)
+	{}
 
-    void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t spawnTime);
+	void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t spawnTime);
 
-    void Generate(int64_t now) override;                  // main bolt + branches, built once (with return strokes: once per stroke, new shape each)
+	void Generate(int64_t now) override; // main bolt + branches, built once (with return strokes: once per stroke, new shape each)
 
-    bool Regenerate(int64_t now) override;
+	bool Regenerate(int64_t now) override;
 
-    bool IsAlive(int64_t now) const override;
+	bool IsAlive(int64_t now) const override;
 
-    float Fade(int64_t now) const override;               // full until fadeStart ms before the end, then linear decay to 0 at lifetime end; modulated by flicker
+	float Fade(int64_t now)
+		const override; // full until fadeStart ms before the end, then linear decay to 0 at lifetime end; modulated by flicker
 
-    bool IsFading(int64_t now) const override;            // AFTERGLOW: inside the fade window -> halo only
+	bool IsFading(int64_t now) const override; // AFTERGLOW: inside the fade window -> halo only
 
-    float CoreWidth(int64_t now) const override;          // ignition flash: starts at m_coreFlashWidth, contracts to m_coreWidth
+	float CoreWidth(int64_t now) const override; // ignition flash: starts at m_coreFlashWidth, contracts to m_coreWidth
 
-    void UpdateEndpoints(const Vector3f& start, const Vector3f& end) override;   // ignore start, re-anchor the main bolt's last node
+	void UpdateEndpoints(const Vector3f& start, const Vector3f& end) override; // ignore start, re-anchor the main bolt's last node
 
-    void Translate(const Vector3f& offset) override {
-        BaseLightning::Translate(offset);
-        for (int32_t i = 0; i < m_refBolts.Length(); i++) {
-            if (not m_refBolts[i].valid)
-                continue;
-            m_refBolts[i].bolt.Translate(offset);
-            m_refBolts[i].params.start += offset;
-            m_refBolts[i].params.end += offset;
-        }
-    }
+	void Translate(const Vector3f& offset) override
+	{
+		BaseLightning::Translate(offset);
+		for (int32_t i = 0; i < m_refBolts.Length(); i++) {
+			if (not m_refBolts[i].valid)
+				continue;
+			m_refBolts[i].bolt.Translate(offset);
+			m_refBolts[i].params.start += offset;
+			m_refBolts[i].params.end += offset;
+		}
+	}
 
-    void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) override {
-        BaseLightning::Transform(pivot, rotation, newPivot);
-        for (int32_t i = 0; i < m_refBolts.Length(); i++) {
-            if (not m_refBolts[i].valid)
-                continue;
-            m_refBolts[i].bolt.Transform(pivot, rotation, newPivot);
-            m_refBolts[i].params.start = newPivot + rotation * (m_refBolts[i].params.start - pivot);
-            m_refBolts[i].params.end = newPivot + rotation * (m_refBolts[i].params.end - pivot);
-            m_refBolts[i].params.planeNormal = rotation * m_refBolts[i].params.planeNormal;
-        }
-    }
+	void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) override
+	{
+		BaseLightning::Transform(pivot, rotation, newPivot);
+		for (int32_t i = 0; i < m_refBolts.Length(); i++) {
+			if (not m_refBolts[i].valid)
+				continue;
+			m_refBolts[i].bolt.Transform(pivot, rotation, newPivot);
+			m_refBolts[i].params.start = newPivot + rotation * (m_refBolts[i].params.start - pivot);
+			m_refBolts[i].params.end = newPivot + rotation * (m_refBolts[i].params.end - pivot);
+			m_refBolts[i].params.planeNormal = rotation * m_refBolts[i].params.planeNormal;
+		}
+	}
 
-    bool IsAnimated(void) const override { return m_animSpeed > 0.0f; }   // animSpeed > 0 -> rebuilt over time (wabers); structure stays fixed (seeded)
+	bool IsAnimated(void) const override {
+		return m_animSpeed > 0.0f;
+	} // animSpeed > 0 -> rebuilt over time (wabers); structure stays fixed (seeded)
 
 private:
-    int32_t LatestStroke(float ageMs, float& start) const;
+	int32_t LatestStroke(float ageMs, float& start) const;
 
-    // branch structure is a deterministic function of `seed` (stable across frames); only `time` (the noise
-    // time axis) advances, so the strike wabers in place without the branches jumping around.
-    void AddBolt(const Vector3f& start, const Vector3f& end, float startWidth, float endWidth, int32_t depth, uint32_t seed, float time);
+	// branch structure is a deterministic function of `seed` (stable across frames); only `time` (the noise
+	// time axis) advances, so the strike wabers in place without the branches jumping around.
+	void AddBolt(const Vector3f& start, const Vector3f& end, float startWidth, float endWidth, int32_t depth, uint32_t seed, float time);
 };
 
 // -------------------------------------------------------------------------------------------------
 
 class LightningArc : public BaseLightning {
 public:
-    int32_t m_boltCount{ 1 };
+	int32_t m_boltCount{ 1 };
 
-    LightningArc() : BaseLightning(ltArc) { }
+	LightningArc()
+		: BaseLightning(ltArc)
+	{}
 
-    void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params);
+	void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params);
 
-    void Generate(int64_t now) override;                  // rebuild the n-bolt bundle at the current time phase
+	void Generate(int64_t now) override; // rebuild the n-bolt bundle at the current time phase
 
-    bool IsAnimated(void) const override { return true; }
+	bool IsAnimated(void) const override {
+		return true;
+	}
 };
 
 // =================================================================================================
@@ -465,12 +507,18 @@ public:
 // values that ride along per segment (a draw covers bolts of different appearance).
 
 struct LightningSegment {
-    Vector3f p0;    float w0;
-    Vector3f p1;    float w1;
-    Vector3f prev;  float fade;
-    Vector3f next;  float coreWidth;
-    Vector3f color; float pad;        // halo tint of this bolt; multiplies the shader's haloColor
-    Vector3f coreColor; float pad2;
+	Vector3f	p0;
+	float		w0;
+	Vector3f	p1;
+	float		w1;
+	Vector3f	prev;
+	float		fade;
+	Vector3f	next;
+	float		coreWidth;
+	Vector3f	color;
+	float		pad; // halo tint of this bolt; multiplies the shader's haloColor
+	Vector3f	coreColor;
+	float		pad2;
 };
 
 static_assert(sizeof(LightningSegment) == 96, "LightningSegment must stay 96 bytes (GPU StructuredBuffer layout)");
@@ -479,8 +527,10 @@ static_assert(sizeof(LightningSegment) == 96, "LightningSegment must stay 96 byt
 // front face and depth-tested against the scene.
 
 struct LightningFlare {
-    Vector3f position;  float fade;
-    float    width;     Vector3f color;   // width = the bolt's half-width at this endpoint -> the flare scales with the tip
+	Vector3f	position;
+	float		fade;
+	float		width;
+	Vector3f	color; // width = the bolt's half-width at this endpoint -> the flare scales with the tip
 };
 
 static_assert(sizeof(LightningFlare) == 32, "LightningFlare must stay 32 bytes (GPU StructuredBuffer layout)");

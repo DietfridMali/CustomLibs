@@ -19,108 +19,137 @@
 // emitted by GfxDataLayout::Enable().
 
 class GfxDataBuffer
-	: public ResourceDescriptor
-{
+	: public ResourceDescriptor {
 public:
-    int                      m_index;          // vertex attribute slot (layout location)
-    const char*              m_type;           // debug tag ("vertices", "normals", …)
-    int                      m_id;
-    GfxBufferTarget          m_bufferType;     // Vertex or Index
-    char*                    m_data;           // system-memory mirror (not used in DX12)
+	int				m_index; // vertex attribute slot (layout location)
+	const char*		m_type; // debug tag ("vertices", "normals", …)
+	int				m_id;
+	GfxBufferTarget	m_bufferType; // Vertex or Index
+	char*			m_data; // system-memory mirror (not used in DX12)
 
-    static constexpr int     FRAME_COUNT = 2;  // upload-resource slots, rotated per frame-in-flight
+	static constexpr int FRAME_COUNT = 2; // upload-resource slots, rotated per frame-in-flight
 
-    ComPtr<ID3D12Resource>   m_resource[FRAME_COUNT];  // upload-heap buffers; dynamic buffers rotate slots per frame
-    D3D12_VERTEX_BUFFER_VIEW m_vbv{};          // valid when m_bufferType == GfxBufferTarget::Vertex
-    D3D12_INDEX_BUFFER_VIEW  m_ibv{};          // valid when m_bufferType == GfxBufferTarget::Index
+	ComPtr<ID3D12Resource>		m_resource[FRAME_COUNT]; // upload-heap buffers; dynamic buffers rotate slots per frame
+	D3D12_VERTEX_BUFFER_VIEW	m_vbv{}; // valid when m_bufferType == GfxBufferTarget::Vertex
+	D3D12_INDEX_BUFFER_VIEW		m_ibv{}; // valid when m_bufferType == GfxBufferTarget::Index
 
-    uint32_t                 m_size;           // total buffer size in bytes
-    size_t                   m_itemSize;       // bytes per vertex element (stride)
-    uint32_t                 m_itemCount;
-    int                      m_componentCount;
-    ComponentType            m_componentType;  // Float / UInt32 / UInt16
-    bool                     m_isDynamic;
-    // Which slot the views point at, and when a slot stopped being that one. A buffer is drawn from
-    // its live slot in EVERY frame until the next Update, not only in the frame it was written in -
-    // so slot rotation alone says nothing about whether a slot is free (see Update ()).
-    int                      m_liveSlot{ -1 };
-    uint64_t                 m_slotRetiredFrame[FRAME_COUNT]{};
-    int                      m_activeSlot{ 0 };
-    uint64_t                 m_slotBoundFrame[FRAME_COUNT]{};
-    bool                     m_slotWasBound[FRAME_COUNT]{};
+	uint32_t		m_size; // total buffer size in bytes
+	size_t			m_itemSize; // bytes per vertex element (stride)
+	uint32_t		m_itemCount;
+	int				m_componentCount;
+	ComponentType	m_componentType; // Float / UInt32 / UInt16
+	bool			m_isDynamic;
+	// Which slot the views point at, and when a slot stopped being that one. A buffer is drawn from
+	// its live slot in EVERY frame until the next Update, not only in the frame it was written in -
+	// so slot rotation alone says nothing about whether a slot is free (see Update ()).
+	int			m_liveSlot{ -1 };
+	uint64_t	m_slotRetiredFrame[FRAME_COUNT]{};
+	int			m_activeSlot{ 0 };
+	uint64_t	m_slotBoundFrame[FRAME_COUNT]{};
+	bool		m_slotWasBound[FRAME_COUNT]{};
 
-    GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
+	GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true)
+	noexcept;
 
-    void Clear(void) noexcept;
+	void Clear(void)
+	noexcept;
 
-    GfxDataBuffer(GfxDataBuffer const& other) { 
-        Copy(other); 
-    }
-    
-    GfxDataBuffer& operator=(GfxDataBuffer const& other) { 
-        Copy(other); 
-        return *this; 
-    }
-    
-    GfxDataBuffer& operator=(GfxDataBuffer&& other) noexcept { 
-        Move(other); 
-        return *this; 
-    }
+	GfxDataBuffer(GfxDataBuffer const& other) {
+		Copy(other);
+	}
 
-    GfxDataBuffer& Copy(GfxDataBuffer const& other);
+	GfxDataBuffer& operator=(GfxDataBuffer const& other) {
+		Copy(other);
+		return *this;
+	}
 
-    GfxDataBuffer& Move(GfxDataBuffer& other) noexcept;
+	GfxDataBuffer& operator=(GfxDataBuffer&& other)
+	noexcept
+	{
+		Move(other);
+		return *this;
+	}
 
-    // No-ops — binding handled by GfxDataLayout::Enable() in DX12.
-    inline void Bind(void) noexcept {}
-    inline void Release(void) noexcept {}
-    inline void EnableAttribs(void) noexcept {}
-    inline void DisableAttribs(void) noexcept {}
-    inline void Describe(void) noexcept {}
+	GfxDataBuffer& Copy(GfxDataBuffer const& other);
 
-    bool Create(int slot, size_t dataSize);
+	GfxDataBuffer& Move(GfxDataBuffer& other)
+	noexcept;
+
+	// No-ops — binding handled by GfxDataLayout::Enable() in DX12.
+	inline void Bind(void)
+	noexcept
+	{}
+	inline void Release(void)
+	noexcept
+	{}
+	inline void EnableAttribs(void)
+	noexcept
+	{}
+	inline void DisableAttribs(void)
+	noexcept
+	{}
+	inline void Describe(void)
+	noexcept
+	{}
+
+	bool Create(int slot, size_t dataSize);
 
 
-    // Upload new data and (re-)create the GPU resource if needed.
-    // componentCount: components per vertex element (e.g. 3 for float3)
-    bool Update(const char* type, GfxBufferTarget bufferType, int index,
-                void* data, size_t dataSize,
-                ComponentType componentType, size_t componentCount,
-                bool forceUpdate = false) noexcept;
+	// Upload new data and (re-)create the GPU resource if needed.
+	// componentCount: components per vertex element (e.g. 3 for float3)
+	bool Update(const char* type, GfxBufferTarget bufferType, int index,
+				void* data, size_t dataSize,
+				ComponentType componentType, size_t componentCount,
+				bool forceUpdate = false)
+	noexcept;
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    size_t ComponentSize(size_t componentType) noexcept;
+	size_t ComponentSize(size_t componentType)
+	noexcept;
 
-    inline bool IsType(const char* type) noexcept { 
-        return !strcmp(m_type, type); 
-    }
+	inline bool IsType(const char* type)
+	noexcept
+	{
+		return !strcmp(m_type, type);
+	}
 
-    inline bool HasID(int id) noexcept { 
-        return m_id == id; 
-    }
+	inline bool HasID(int id)
+	noexcept
+	{
+		return m_id == id;
+	}
 
-    inline void SetDynamic(bool d) noexcept { 
-        m_isDynamic = d; 
-    }
+	inline void SetDynamic(bool d)
+	noexcept
+	{
+		m_isDynamic = d;
+	}
 
-    // Returns stride (bytes per vertex element) — used by GfxDataLayout when building VBVs.
-    inline UINT Stride() const noexcept { 
-        return UINT(m_itemSize);
-    }
+	// Returns stride (bytes per vertex element) — used by GfxDataLayout when building VBVs.
+	inline UINT Stride() const
+	noexcept
+	{
+		return UINT(m_itemSize);
+	}
 
-    inline void MarkBound(uint64_t frameNumber) noexcept {
-        m_slotBoundFrame[m_activeSlot] = frameNumber;
-        m_slotWasBound[m_activeSlot] = true;
-    }
+	inline void MarkBound(uint64_t frameNumber)
+	noexcept
+	{
+		m_slotBoundFrame[m_activeSlot] = frameNumber;
+		m_slotWasBound[m_activeSlot] = true;
+	}
 
-    // Returns true when at least one upload-resource slot has been created.
-    inline bool IsValid() const noexcept {
-        for (auto& r : m_resource)
-            if (r)
-                return true;
-        return false;
-    }
+	// Returns true when at least one upload-resource slot has been created.
+	inline bool IsValid() const
+	noexcept
+	{
+		for (auto& r : m_resource)
+			if (r)
+				return true;
+		return false;
+	}
 };
 
 // =================================================================================================

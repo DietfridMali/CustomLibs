@@ -72,63 +72,88 @@ public:
 
 	bool SetCompressedSlot(int slotIndex, const uint8_t* data, size_t dataSize, int width, int height, GfxPixelFormat format, int mipCount);
 
-	static size_t CompressedChainBytes(int width, int height, GfxPixelFormat format, int mipCount) noexcept;
+	static size_t CompressedChainBytes(int width, int height, GfxPixelFormat format, int mipCount)
+	noexcept;
 
 	// The smallest power of two that holds n. Slot sizes should be rounded up with this so that the
 	// scale factor between a source image and its slot is itself a power of two: sprite sheets are
 	// grids, and a fractional factor walks the cell boundaries off the grid the texture coordinates
 	// assume.
-	static int NextPowerOfTwo(int n) noexcept;
+	static int NextPowerOfTwo(int n)
+	noexcept;
 
-	inline int SlotCount(void) const noexcept {
+	inline int SlotCount(void) const
+	noexcept
+	{
 		return m_slotCount;
 	}
 
-	inline int SlotWidth(void) const noexcept {
+	inline int SlotWidth(void) const
+	noexcept
+	{
 		return m_slotWidth;
 	}
 
-	inline int SlotHeight(void) const noexcept {
+	inline int SlotHeight(void) const
+	noexcept
+	{
 		return m_slotHeight;
 	}
 
-	inline int SlotComponents(void) const noexcept {
+	inline int SlotComponents(void) const
+	noexcept
+	{
 		return m_components;
 	}
 
-	inline int SlotSize(void) const noexcept {
+	inline int SlotSize(void) const
+	noexcept
+	{
 		return IsCompressed() ? int(m_slotBytes) : m_slotWidth * m_slotHeight * m_components;
 	}
 
-	inline bool IsCompressed(void) const noexcept {
+	inline bool IsCompressed(void) const
+	noexcept
+	{
 		return GfxIsBlockCompressed(m_format);
 	}
 
-	inline GfxPixelFormat SlotFormat(void) const noexcept {
+	inline GfxPixelFormat SlotFormat(void) const
+	noexcept
+	{
 		return m_format;
 	}
 
-	inline int SlotMipCount(void) const noexcept {
+	inline int SlotMipCount(void) const
+	noexcept
+	{
 		return m_mipCount;
 	}
 
-	inline bool HasSlots(void) noexcept {
+	inline bool HasSlots(void)
+	noexcept
+	{
 		return (m_slotCount > 0) and (m_pixels.Length() > 0);
 	}
 
 	bool SlotPointers(AutoArray<const uint8_t*>& slotPtrs);
 
 	// The whole stack, slot after slot - what a 3D upload call reads.
-	inline uint8_t* SlotData(void) noexcept {
+	inline uint8_t* SlotData(void)
+	noexcept
+	{
 		return m_pixels.DataPtr();
 	}
 
-	inline uint8_t* SlotData(int slotIndex) noexcept {
+	inline uint8_t* SlotData(int slotIndex)
+	noexcept
+	{
 		return m_pixels.DataPtr() + size_t(slotIndex) * size_t(SlotSize());
 	}
 
 	// floor(log2(max(w, h))) + 1, or 1 when mip maps are off.
-	int MipCount(bool useMipMaps) const noexcept;
+	int MipCount(bool useMipMaps) const
+	noexcept;
 
 	// Builds a mip chain PER SLOT, 2x2 box filtered and edge clamped, and hands out one pointer per
 	// slot into `chains` - each pointing at that slot's levels packed tightly, level 0 first. That is

@@ -11,17 +11,17 @@
 // DX12 API calls use these directly (LONG = int32_t, UINT = uint32_t, FLOAT = float, etc.)
 
 namespace GfxTypes {
-    using Int = int32_t;   // signed integer parameter (viewport coords, etc.)
-    using Uint = uint32_t;  // unsigned integer (descriptor indices, counts, …)
-    using Float = float;     // floating-point parameter (matrices, colors)
-    using Enum = uint32_t;  // enumeration token (mapped from GL compat values or DX12 enums)
-    using Handle = uint32_t;  // GPU resource handle (SRV/RTV/DSV descriptor-heap index)
-    using Bitfield = uint32_t;
+using Int = int32_t; // signed integer parameter (viewport coords, etc.)
+using Uint = uint32_t; // unsigned integer (descriptor indices, counts, …)
+using Float = float; // floating-point parameter (matrices, colors)
+using Enum = uint32_t; // enumeration token (mapped from GL compat values or DX12 enums)
+using Handle = uint32_t; // GPU resource handle (SRV/RTV/DSV descriptor-heap index)
+using Bitfield = uint32_t;
 
-    struct UavTexture {};
-    struct StructuredBuffer {};
-    struct InstanceBuffer {};
-    struct IndirectBuffer {};
+struct UavTexture {};
+struct StructuredBuffer {};
+struct InstanceBuffer {};
+struct IndirectBuffer {};
 }
 
 // =================================================================================================

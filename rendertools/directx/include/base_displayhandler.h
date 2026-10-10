@@ -24,192 +24,244 @@ class CommandList;
 //   4. BaseDisplayHandler::Create()
 
 class BaseDisplayHandler
-    : public PolymorphSingleton<BaseDisplayHandler>
-{
+	: public PolymorphSingleton<BaseDisplayHandler> {
 public:
-    static constexpr UINT BACK_BUFFER_COUNT = 2;
-    static constexpr DXGI_FORMAT BACK_BUFFER_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
+	static constexpr UINT			BACK_BUFFER_COUNT = 2;
+	static constexpr DXGI_FORMAT	BACK_BUFFER_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-    int             m_width;
-    int             m_height;
-    int             m_maxWidth;
-    int             m_maxHeight;
-    bool            m_isFullscreen;
-    bool            m_vSync;
-    bool            m_isLandscape;
-    float           m_aspectRatio;
+	int		m_width;
+	int		m_height;
+	int		m_maxWidth;
+	int		m_maxHeight;
+	bool	m_isFullscreen;
+	bool	m_vSync;
+	bool	m_isLandscape;
+	float	m_aspectRatio;
 
-    SDL_Window*                     m_window;
-    HWND                            m_hwnd;
-    ComPtr<IDXGISwapChain3>         m_swapChain;
-    ComPtr<ID3D12Resource>          m_backBuffers[BACK_BUFFER_COUNT];
-    RTV                             m_rtvs[BACK_BUFFER_COUNT];
-    D3D12_RESOURCE_STATES           m_backBufferStates[BACK_BUFFER_COUNT]{};
-    UINT                            m_backBufferIndex{ 0 };
-    // The list the back buffer brings along when nobody else has one open. A render target creates its
-    // own (RenderTarget::Enable ()); the back buffer is the bottom of that stack and needs the same,
-    // or its barrier, its binding and its draws are recorded nowhere at all.
-    CommandList*                    m_backBufferList{ nullptr };
+	SDL_Window*				m_window;
+	HWND					m_hwnd;
+	ComPtr<IDXGISwapChain3>	m_swapChain;
+	ComPtr<ID3D12Resource>	m_backBuffers[BACK_BUFFER_COUNT];
+	RTV						m_rtvs[BACK_BUFFER_COUNT];
+	D3D12_RESOURCE_STATES	m_backBufferStates[BACK_BUFFER_COUNT]{};
+	UINT					m_backBufferIndex{ 0 };
+	// The list the back buffer brings along when nobody else has one open. A render target creates its
+	// own (RenderTarget::Enable ()); the back buffer is the bottom of that stack and needs the same,
+	// or its barrier, its binding and its draws are recorded nowhere at all.
+	CommandList* m_backBufferList{ nullptr };
 
-    AutoArray<SDL_DisplayMode>      m_displayModes;
-    int                             m_activeDisplayMode{ 0 };
+	AutoArray<SDL_DisplayMode>	m_displayModes;
+	int							m_activeDisplayMode{ 0 };
 
-    BaseDisplayHandler()
-        : m_width(0)
-        , m_height(0)
-        , m_maxWidth(0)
-        , m_maxHeight(0)
-        , m_isFullscreen(false)
-        , m_vSync(true)
-        , m_isLandscape(false)
-        , m_aspectRatio(1.0f)
-        , m_window(nullptr)
-        , m_hwnd(nullptr)
-        , m_backBufferIndex(0)
-        , m_activeDisplayMode(0)
-    {
-        _instance = this;
-    }
+	BaseDisplayHandler()
+		: m_width(0)
+		, m_height(0)
+		, m_maxWidth(0)
+		, m_maxHeight(0)
+		, m_isFullscreen(false)
+		, m_vSync(true)
+		, m_isLandscape(false)
+		, m_aspectRatio(1.0f)
+		, m_window(nullptr)
+		, m_hwnd(nullptr)
+		, m_backBufferIndex(0)
+		, m_activeDisplayMode(0)
+	{
+		_instance = this;
+	}
 
-    virtual ~BaseDisplayHandler();
+	virtual ~BaseDisplayHandler();
 
-    bool Init(void);
+	bool Init(void);
 
-    int GetDisplayModes(void);
+	int GetDisplayModes(void);
 
-    void Create(String windowTitle = "", int width = 1920, int height = 1080,
-                bool useFullscreen = true, bool vSync = false, bool matchDisplayMode = true);
+	void Create(String windowTitle = "", int width = 1920, int height = 1080,
+				bool useFullscreen = true, bool vSync = false, bool matchDisplayMode = true);
 
-    static BaseDisplayHandler& Instance(void) {
-        return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance());
-    }
+	static BaseDisplayHandler& Instance(void) {
+		return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance());
+	}
 
-    int FindDisplayMode(int width, int height);
+	int FindDisplayMode(int width, int height);
 
-    virtual void ComputeDimensions(int width, int height, bool useFullscreen) noexcept;
+	virtual void ComputeDimensions(int width, int height, bool useFullscreen)
+	noexcept;
 
-    virtual void SetContextAttributes(void) {}
+	virtual void SetContextAttributes(void) {}
 
-    virtual void SetupDisplay(String windowTitle);
+	virtual void SetupDisplay(String windowTitle);
 
-    // Present the current back buffer, advance to the next one.
-    virtual void Update(void);
+	// Present the current back buffer, advance to the next one.
+	virtual void Update(void);
 
-    void EndFrame(void);
-    void BeginFrame(void);
+	void EndFrame(void);
+	void BeginFrame(void);
 
-    // Applies vertical sync. The tearing flag is a swap chain creation flag, so this rebuilds the
-    // back buffers - like UpdateDisplayMode () it has to run between two frames, not inside one.
-    bool SetVSync(bool vSync);
+	// Applies vertical sync. The tearing flag is a swap chain creation flag, so this rebuilds the
+	// back buffers - like UpdateDisplayMode () it has to run between two frames, not inside one.
+	bool SetVSync(bool vSync);
 
-    inline bool VSync(void) noexcept {
-        return m_vSync;
-    }
+	inline bool VSync(void)
+	noexcept
+	{
+		return m_vSync;
+	}
 
-    // Recreates the back buffers for the current dimensions and vertical sync setting.
-    bool ResizeSwapChain(void);
+	// Recreates the back buffers for the current dimensions and vertical sync setting.
+	bool ResizeSwapChain(void);
 
-    void WaitWhileMinimized(void);
+	void WaitWhileMinimized(void);
 
-    virtual void OnMinimized(void) {}
+	virtual void OnMinimized(void) {}
 
-    virtual void OnRestored(void) {}
+	virtual void OnRestored(void) {}
 
-    // Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
-    void EnableBackBuffer(void) noexcept;
+	// Transition current back buffer PRESENT → RENDER_TARGET and bind as render target.
+	void EnableBackBuffer(void)
+	noexcept;
 
-    // Transition current back buffer RENDER_TARGET → PRESENT. Call before Present().
-    void DisableBackBuffer(void) noexcept;
+	// Transition current back buffer RENDER_TARGET → PRESENT. Call before Present().
+	void DisableBackBuffer(void)
+	noexcept;
 
-    // The counterpart of Vulkan's SuspendBackBuffer (): there, a render target becoming the draw
-    // buffer has to close the back buffer's rendering scope first. DX12 has no such scope - the
-    // target's own OMSetRenderTargets () replaces the binding - so there is nothing to do, and the
-    // resource stays in RENDER_TARGET state for the draws that follow on it.
-    inline void SuspendBackBuffer(void) noexcept { }
+	// The counterpart of Vulkan's SuspendBackBuffer (): there, a render target becoming the draw
+	// buffer has to close the back buffer's rendering scope first. DX12 has no such scope - the
+	// target's own OMSetRenderTargets () replaces the binding - so there is nothing to do, and the
+	// resource stays in RENDER_TARGET state for the draws that follow on it.
+	inline void SuspendBackBuffer(void)
+	noexcept
+	{}
 
-    // The list everything on the back buffer is recorded into: the current one when there is one,
-    // otherwise the back buffer's own, opened here. Null only when even that fails.
-    CommandList* BackBufferList(void) noexcept;
+	// The list everything on the back buffer is recorded into: the current one when there is one,
+	// otherwise the back buffer's own, opened here. Null only when even that fails.
+	CommandList* BackBufferList(void)
+	noexcept;
 
-    void CloseBackBufferList(void) noexcept;
+	void CloseBackBufferList(void)
+	noexcept;
 
-    // Returns the current back buffer resource (set as render target before drawing).
-    inline ID3D12Resource* CurrentBackBuffer(void) const noexcept {
-        return m_backBuffers[m_backBufferIndex].Get();
-    }
+	// Returns the current back buffer resource (set as render target before drawing).
+	inline ID3D12Resource* CurrentBackBuffer(void) const
+	noexcept
+	{
+		return m_backBuffers[m_backBufferIndex].Get();
+	}
 
-    // The resource state the current back buffer is tracked in (PRESENT or RENDER_TARGET) - what a
-    // pass that borrows it for a copy (GfxRenderer::ReadBuffer ()) has to put back afterwards.
-    inline D3D12_RESOURCE_STATES CurrentBackBufferState(void) const noexcept {
-        return m_backBufferStates[m_backBufferIndex];
-    }
+	// The resource state the current back buffer is tracked in (PRESENT or RENDER_TARGET) - what a
+	// pass that borrows it for a copy (GfxRenderer::ReadBuffer ()) has to put back afterwards.
+	inline D3D12_RESOURCE_STATES CurrentBackBufferState(void) const
+	noexcept
+	{
+		return m_backBufferStates[m_backBufferIndex];
+	}
 
-    // Returns the CPU-side RTV handle for the current back buffer.
-    inline D3D12_CPU_DESCRIPTOR_HANDLE CurrentRTV(void) const noexcept {
-        return m_rtvs[m_backBufferIndex].CPUHandle();
-    }
+	// Returns the CPU-side RTV handle for the current back buffer.
+	inline D3D12_CPU_DESCRIPTOR_HANDLE CurrentRTV(void) const
+	noexcept
+	{
+		return m_rtvs[m_backBufferIndex].CPUHandle();
+	}
 
-    inline int GetWidth(void) noexcept { return m_width; }
-    
-    inline int GetHeight(void) noexcept { return m_height; }
-    
-    inline float GetAspectRatio(void) noexcept { return m_aspectRatio; }
-    
-    inline SDL_Window* GetWindow(void) noexcept { return m_window; }
-    
-    inline HWND GetHwnd(void) noexcept { return m_hwnd; }
+	inline int GetWidth(void)
+	noexcept
+	{
+		return m_width;
+	}
 
-    inline IDXGISwapChain3* SwapChain(void) noexcept { 
-        return m_swapChain.Get(); 
-    }
+	inline int GetHeight(void)
+	noexcept
+	{
+		return m_height;
+	}
 
-    inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
-        return m_displayModes;
-    }
+	inline float GetAspectRatio(void)
+	noexcept
+	{
+		return m_aspectRatio;
+	}
 
-    inline const SDL_DisplayMode& GetDisplayMode(int i = -1) const noexcept {
-        return m_displayModes[((i < 0) || (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
-    }
+	inline SDL_Window* GetWindow(void)
+	noexcept
+	{
+		return m_window;
+	}
 
-    inline int  SelectedDisplayMode(void) noexcept { 
-        return m_activeDisplayMode; 
-    }
-    
-    inline void SelectDisplayMode(int displayMode) noexcept { 
-        m_activeDisplayMode = displayMode; 
-    }
+	inline HWND GetHwnd(void)
+	noexcept
+	{
+		return m_hwnd;
+	}
 
-    inline bool IsFullScreen(void) noexcept { 
-        return m_isFullscreen; 
-    }
-    
-    inline void SetFullScreen(bool useFullscreen) noexcept { 
-        m_isFullscreen = useFullscreen; 
-    }
+	inline IDXGISwapChain3* SwapChain(void)
+	noexcept
+	{
+		return m_swapChain.Get();
+	}
 
-    void SwitchDisplayMode(int direction);
+	inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const
+	noexcept
+	{
+		return m_displayModes;
+	}
 
-    void ToggleFullscreen(void);
+	inline const SDL_DisplayMode& GetDisplayMode(int i = -1) const
+	noexcept
+	{
+		return m_displayModes[((i < 0) || (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
+	}
 
-    inline bool DisplayModeHasChanged(int& lastDisplayMode) noexcept {
-        if (lastDisplayMode == m_activeDisplayMode) 
-            return false;
-        lastDisplayMode = m_activeDisplayMode;
-        return true;
-    }
+	inline int SelectedDisplayMode(void)
+	noexcept
+	{
+		return m_activeDisplayMode;
+	}
 
-    bool UpdateDisplayMode(int displayMode, bool useFullscreen);
+	inline void SelectDisplayMode(int displayMode)
+	noexcept
+	{
+		m_activeDisplayMode = displayMode;
+	}
 
-    virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
+	inline bool IsFullScreen(void)
+	noexcept
+	{
+		return m_isFullscreen;
+	}
+
+	inline void SetFullScreen(bool useFullscreen)
+	noexcept
+	{
+		m_isFullscreen = useFullscreen;
+	}
+
+	void SwitchDisplayMode(int direction);
+
+	void ToggleFullscreen(void);
+
+	inline bool DisplayModeHasChanged(int& lastDisplayMode)
+	noexcept
+	{
+		if (lastDisplayMode == m_activeDisplayMode)
+			return false;
+		lastDisplayMode = m_activeDisplayMode;
+		return true;
+	}
+
+	bool UpdateDisplayMode(int displayMode, bool useFullscreen);
+
+	virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
 
 private:
-    bool CreateSwapChain(void);
+	bool CreateSwapChain(void);
 
-    // Acquires back buffer resources from the swap chain and creates RTVs.
-    bool AcquireBackBuffers(void) noexcept;
+	// Acquires back buffer resources from the swap chain and creates RTVs.
+	bool AcquireBackBuffers(void)
+	noexcept;
 
-    // Releases back buffer references (required before ResizeBuffers).
-    void ReleaseBackBuffers(void) noexcept;
+	// Releases back buffer references (required before ResizeBuffers).
+	void ReleaseBackBuffers(void)
+	noexcept;
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()

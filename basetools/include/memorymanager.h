@@ -18,8 +18,10 @@ public:
 	bool	isManaged;
 
 	MemoryDescriptor()
-		: address(nullptr), size(0), isManaged(true)
-	{ }
+		: address(nullptr)
+		, size(0)
+		, isManaged(true)
+	{}
 };
 
 // =================================================================================================
@@ -30,18 +32,18 @@ public:
 	using Key = ptrdiff_t;
 
 	//DataPool<Address, MemoryDescriptor>	m_memoryDescriptors;
-	Address		memoryPool = nullptr;
-	Address		memoryStart = nullptr, memoryEnd = nullptr;
-	bool		allocFromStart = false;
-	Key			m_key;
+	Address	memoryPool = nullptr;
+	Address	memoryStart = nullptr, memoryEnd = nullptr;
+	bool	allocFromStart = false;
+	Key		m_key;
 
-	DataPool<Key, MemoryDescriptor>	m_memoryDescriptors;
+	DataPool<Key, MemoryDescriptor> m_memoryDescriptors;
 
 public:
 #if 1
 	MemoryManager()
 		: m_memoryDescriptors()
-	{ 
+	{
 		InitializeAnyType(m_key);
 	}
 
@@ -53,7 +55,8 @@ public:
 	Address Reserve(uint32_t size);
 
 	static int KeyComparer(void* context, const Key& searchKey, const Key& dataKey) {
-		return (searchKey < dataKey) ? -1 : (searchKey > dataKey) ? 1 : 0;
+		return (searchKey < dataKey) ? -1 : (searchKey > dataKey) ? 1
+																  : 0;
 	}
 
 	bool Create(int capacity, bool createOnce = true);
@@ -67,7 +70,7 @@ public:
 	bool IsAddress(int itemIndex);
 
 	static bool ItemProcessor(void* context, const Key& key, const int& itemIndex);
-		
+
 	static bool ItemFinder(void* context, const Key& key, const int& itemIndex);
 
 	bool CheckIntegrity(void);

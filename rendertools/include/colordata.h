@@ -5,190 +5,211 @@
 
 class RGBAColor;
 
-class RGBColor 
-    : public Vector3f {
+class RGBColor
+	: public Vector3f {
 public:
-    static RGBColor Grayscale(const RGBColor& color) {
-        static const Vector3f luma(0.299, 0.587, 0.114);
-        float gray = color.Dot (luma);
-        return RGBColor(gray, gray, gray);
-    }
+	static RGBColor Grayscale(const RGBColor& color) {
+		static const Vector3f	luma(0.299, 0.587, 0.114);
+		float					gray = color.Dot(luma);
+		return RGBColor(gray, gray, gray);
+	}
 
-    RGBColor(float r = 1.0f, float g = 1.0f, float b = 1.0f)
-        : Vector3f({ r, g, b })
-    {
-    }
+	RGBColor(float r = 1.0f, float g = 1.0f, float b = 1.0f)
+		: Vector3f({ r, g, b })
+	{
+	}
 
-    RGBColor(const RGBColor& v)
-        : Vector3f(v)
-    {
-    }
+	RGBColor(const RGBColor& v)
+		: Vector3f(v)
+	{
+	}
 
-    explicit RGBColor(const Vector3f& v)
-        : Vector3f(v)
-    {
-    }
+	explicit RGBColor(const Vector3f& v)
+		: Vector3f(v)
+	{
+	}
 
-    explicit operator RGBAColor() const;
+	explicit operator RGBAColor() const;
 };
 
 
-class RGBAColor 
-    : public Vector4f {
+class RGBAColor
+	: public Vector4f {
 public:
-    RGBAColor(float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f)
-        : Vector4f({ r, g, b, a })
-    {
-    }
+	RGBAColor(float r = 1.0f, float g = 1.0f, float b = 1.0f, float a = 1.0f)
+		: Vector4f({ r, g, b, a })
+	{
+	}
 
-    RGBAColor(const Vector4f& v)
-        : Vector4f(v)
-    {
-    }
+	RGBAColor(const Vector4f& v)
+		: Vector4f(v)
+	{
+	}
 
-    RGBAColor(const RGBColor& rgb, float alpha = 1.0f)
-        : Vector4f({ rgb.R(), rgb.G(), rgb.B(), alpha })
-    {
-    }
+	RGBAColor(const RGBColor& rgb, float alpha = 1.0f)
+		: Vector4f({ rgb.R(), rgb.G(), rgb.B(), alpha })
+	{
+	}
 
-    RGBAColor& operator=(const RGBColor& rgb) {
-        this->R() = rgb.R();
-        this->G() = rgb.G();
-        this->B() = rgb.B();
-        this->A() = 1.0f;
-        return *this;
-    }
+	RGBAColor& operator=(const RGBColor& rgb)
+	{
+		this->R() = rgb.R();
+		this->G() = rgb.G();
+		this->B() = rgb.B();
+		this->A() = 1.0f;
+		return *this;
+	}
 
-    inline RGBAColor& operator*=(float n) {
-        this->R() *= n;
-        this->G() *= n;
-        this->B() *= n;
-        return *this;
-    }
+	inline RGBAColor& operator*=(float n)
+	{
+		this->R() *= n;
+		this->G() *= n;
+		this->B() *= n;
+		return *this;
+	}
 
-    inline RGBAColor operator*(float n) const {
-        return RGBAColor(this->R() * n, this->G() * n, this->B() * n, this->A());
-    }
-
-
-    explicit operator RGBColor() const {
-        return RGBColor(this->X(), this->Y(), this->Z());
-    }
-
-    inline bool IsVisible(void) {
-        return A() > 0.0f;
-    }
-
-    RGBAColor Mix(const RGBAColor& other, float gradient) const noexcept {
-        gradient = std::clamp(gradient, 0.0f, 1.0f);
-        return RGBAColor(std::lerp(R(), other.R(), gradient), std::lerp(G(), other.G(), gradient), std::lerp(B(), other.B(), gradient), std::lerp(A(), other.A(), gradient));
-    }
-
-    RGBAColor Premultiplied(void) const {
-        return (A() < 1.0f) ? RGBAColor (R() * A(), G() * A(), B() * A(), A()) : *this;
-    }
-
-    static RGBAColor& Premultiply(RGBAColor& color) {
-        if (color.A() < 1.0f) {
-            color.R() *= color.A();
-            color.G() *= color.A();
-            color.B() *= color.A();
-        }
-        return color;
-    }
-
-    float GrayValue(bool perceptive = true) const noexcept {
-        static Vector3f luminance[2]{ { 0.299f, 0.587f, 0.114f }, { 0.2126f,0.7152f,0.0722f } };
-        return Vector3f(*this).Dot(luminance[perceptive]);
-    }
-
-    inline float Average(void) noexcept {
-        return (R() + B() + G()) / 3.0f;
-    }
+	inline RGBAColor operator*(float n) const {
+		return RGBAColor(this->R() * n, this->G() * n, this->B() * n, this->A());
+	}
 
 
-    inline const bool IsInvisible(void) const noexcept {
-        return R() + B() + G() + A() == 0.0f;
-    }
+	explicit operator RGBColor() const {
+		return RGBColor(this->X(), this->Y(), this->Z());
+	}
+
+	inline bool IsVisible(void) {
+		return A() > 0.0f;
+	}
+
+	RGBAColor Mix(const RGBAColor& other, float gradient) const
+	noexcept
+	{
+		gradient = std::clamp(gradient, 0.0f, 1.0f);
+		return RGBAColor(std::lerp(R(), other.R(), gradient), std::lerp(G(), other.G(), gradient),
+						 std::lerp(B(), other.B(), gradient), std::lerp(A(), other.A(), gradient));
+	}
+
+	RGBAColor Premultiplied(void) const {
+		return (A() < 1.0f) ? RGBAColor(R() * A(), G() * A(), B() * A(), A()) : *this;
+	}
+
+	static RGBAColor& Premultiply(RGBAColor& color)
+	{
+		if (color.A() < 1.0f) {
+			color.R() *= color.A();
+			color.G() *= color.A();
+			color.B() *= color.A();
+		}
+		return color;
+	}
+
+	float GrayValue(bool perceptive = true) const
+	noexcept
+	{
+		static Vector3f luminance[2]{ { 0.299f, 0.587f, 0.114f }, { 0.2126f, 0.7152f, 0.0722f } };
+		return Vector3f(*this).Dot(luminance[perceptive]);
+	}
+
+	inline float Average(void)
+	noexcept
+	{
+		return (R() + B() + G()) / 3.0f;
+	}
 
 
-    inline RGBAColor& SetAlpha(float alpha) {
-        A() = alpha;
-        return *this;
-    }
+	inline const bool IsInvisible(void) const
+	noexcept
+	{
+		return R() + B() + G() + A() == 0.0f;
+	}
 
-    // Liefert die MULTIPLIKATIVE Skalen-"Farbe" (RGB um 1.0 herum),
-// die aus der Tint-Grundfarbe (*this) berechnet wird.
-// strength in [0,1], keepLuminance = L(scale) auf 1 normieren.
-    RGBAColor Tint(float strength = 1.0f, bool perceptive = true) const noexcept  {
-        float pivot = GrayValue(perceptive);
-        if (pivot < Conversions::NumericTolerance)
-            return *this;
-        RGBColor scale = RGBColor(*this);
-        scale -= RGBColor(pivot, pivot, pivot);
-        scale *= std::clamp(strength, 0.0f, 1.0f);
-        scale += Vector3f::ONE;                              // um 1.0 herum -> reine Multiplikation
-        return RGBAColor(scale.R(), scale.G(), scale.B(), 1.0f);
-    }
 
-    inline float PosterizeComponent(float c, uint16_t gradient = 15) noexcept {
-        uint16_t i = uint16_t(round(c * 255.0f));
-        return float(std::max<uint32_t>(0, ((i / gradient + gradient / 2) * gradient - gradient))) / 255.0f;
-    }
+	inline RGBAColor& SetAlpha(float alpha) {
+		A() = alpha;
+		return *this;
+	}
 
-    inline RGBAColor& Posterize(uint8_t gradients = 15) noexcept {
-        if (gradients > 0) {
-            R() = PosterizeComponent(R(), gradients);
-            G() = PosterizeComponent(G(), gradients);
-            B() = PosterizeComponent(B(), gradients);
-        }
-        return *this;
-    }
+	// Liefert die MULTIPLIKATIVE Skalen-"Farbe" (RGB um 1.0 herum),
+	// die aus der Tint-Grundfarbe (*this) berechnet wird.
+	// strength in [0,1], keepLuminance = L(scale) auf 1 normieren.
+	RGBAColor Tint(float strength = 1.0f, bool perceptive = true) const
+	noexcept
+	{
+		float pivot = GrayValue(perceptive);
+		if (pivot < Conversions::NumericTolerance)
+			return *this;
+		RGBColor scale = RGBColor(*this);
+		scale -= RGBColor(pivot, pivot, pivot);
+		scale *= std::clamp(strength, 0.0f, 1.0f);
+		scale += Vector3f::ONE; // um 1.0 herum -> reine Multiplikation
+		return RGBAColor(scale.R(), scale.G(), scale.B(), 1.0f);
+	}
 
-    inline RGBAColor Posterized(uint8_t gradients = 15) noexcept {
-        RGBAColor color = *this;
-        return color.Posterized(gradients);
-    }
+	inline float PosterizeComponent(float c, uint16_t gradient = 15)
+	noexcept
+	{
+		uint16_t i = uint16_t(round(c * 255.0f));
+		return float(std::max<uint32_t>(0, ((i / gradient + gradient / 2) * gradient - gradient))) / 255.0f;
+	}
+
+	inline RGBAColor& Posterize(uint8_t gradients = 15)
+	noexcept
+	{
+		if (gradients > 0) {
+			R() = PosterizeComponent(R(), gradients);
+			G() = PosterizeComponent(G(), gradients);
+			B() = PosterizeComponent(B(), gradients);
+		}
+		return *this;
+	}
+
+	inline RGBAColor Posterized(uint8_t gradients = 15)
+	noexcept
+	{
+		RGBAColor color = *this;
+		return color.Posterized(gradients);
+	}
 };
 
 
 // Definition nach RGBAColor-Klasse
 inline RGBColor::operator RGBAColor() const {
-    return RGBAColor(*this);
+	return RGBAColor(*this);
 }
 
 class ColorData {
 public:
-    inline static const RGBAColor   Invisible = RGBAColor{ 0, 0, 0, 0 };
-    inline static const RGBAColor   Black = RGBAColor{ 0, 0, 0, 1 };
-    inline static const RGBAColor   White = RGBAColor{ 1, 1, 1, 1 };
-    inline static const RGBAColor   Gray = RGBAColor{ 0.5f, 0.5f, 0.5f, 1 };
-    inline static const RGBAColor   LightGray = RGBAColor{ 0.75f, 0.75f, 0.75f, 1 };
-    inline static const RGBAColor   DarkGray = RGBAColor{ 0.25f, 0.25f, 0.25f, 1 };
-    inline static const RGBAColor   Gold = RGBAColor{ 1.0f, 0.8f, 0.0f, 1 };
-    inline static const RGBAColor   Yellow = RGBAColor{ 1.0f, 1.0f, 0.0f, 1 };
-    inline static const RGBAColor   Orange = RGBAColor{1.0f, 0.5f, 0.0f, 1 };
-    inline static const RGBAColor   Red = RGBAColor{ 0.8f, 0.0f, 0.0f, 1 };
-    inline static const RGBAColor   DarkRed = RGBAColor{ 0.4f, 0.0f, 0.0f, 1 };
-    inline static const RGBAColor   Green = RGBAColor{ 0.0f, 0.8f, 0.2f, 1 };
-    inline static const RGBAColor   DarkGreen = RGBAColor{ 0.0f, 0.4f, 0.1f, 1 };
-    inline static const RGBAColor   Blue = RGBAColor{ 0.0f, 0.2f, 0.8f, 1 };
-    inline static const RGBAColor   LightBlue = RGBAColor{ 0.0f, 0.8f, 1.0f, 1 };
-    inline static const RGBAColor   MediumBlue = RGBAColor{ 0.0f, 0.5f, 1.0f, 1 };
-    inline static const RGBAColor   MediumGreen = RGBAColor{ 0.0f, 1.0f, 0.5f, 1 };
-    inline static const RGBAColor   LightGreen = RGBAColor{ 0.0f, 0.8f, 0.1f, 1 };
-    inline static const RGBAColor   Magenta = RGBAColor{ 1.0f, 0.0f, 1.0f, 1 };
-    inline static const RGBAColor   Purple = RGBAColor{ 0.5f, 0.0f, 0.5f, 1 };
-    inline static const RGBAColor   Brown = RGBAColor{ 0.45f, 0.25f, 0.1f, 1 };
+	inline static const RGBAColor Invisible = RGBAColor{ 0, 0, 0, 0 };
+	inline static const RGBAColor Black = RGBAColor{ 0, 0, 0, 1 };
+	inline static const RGBAColor White = RGBAColor{ 1, 1, 1, 1 };
+	inline static const RGBAColor Gray = RGBAColor{ 0.5f, 0.5f, 0.5f, 1 };
+	inline static const RGBAColor LightGray = RGBAColor{ 0.75f, 0.75f, 0.75f, 1 };
+	inline static const RGBAColor DarkGray = RGBAColor{ 0.25f, 0.25f, 0.25f, 1 };
+	inline static const RGBAColor Gold = RGBAColor{ 1.0f, 0.8f, 0.0f, 1 };
+	inline static const RGBAColor Yellow = RGBAColor{ 1.0f, 1.0f, 0.0f, 1 };
+	inline static const RGBAColor Orange = RGBAColor{ 1.0f, 0.5f, 0.0f, 1 };
+	inline static const RGBAColor Red = RGBAColor{ 0.8f, 0.0f, 0.0f, 1 };
+	inline static const RGBAColor DarkRed = RGBAColor{ 0.4f, 0.0f, 0.0f, 1 };
+	inline static const RGBAColor Green = RGBAColor{ 0.0f, 0.8f, 0.2f, 1 };
+	inline static const RGBAColor DarkGreen = RGBAColor{ 0.0f, 0.4f, 0.1f, 1 };
+	inline static const RGBAColor Blue = RGBAColor{ 0.0f, 0.2f, 0.8f, 1 };
+	inline static const RGBAColor LightBlue = RGBAColor{ 0.0f, 0.8f, 1.0f, 1 };
+	inline static const RGBAColor MediumBlue = RGBAColor{ 0.0f, 0.5f, 1.0f, 1 };
+	inline static const RGBAColor MediumGreen = RGBAColor{ 0.0f, 1.0f, 0.5f, 1 };
+	inline static const RGBAColor LightGreen = RGBAColor{ 0.0f, 0.8f, 0.1f, 1 };
+	inline static const RGBAColor Magenta = RGBAColor{ 1.0f, 0.0f, 1.0f, 1 };
+	inline static const RGBAColor Purple = RGBAColor{ 0.5f, 0.0f, 0.5f, 1 };
+	inline static const RGBAColor Brown = RGBAColor{ 0.45f, 0.25f, 0.1f, 1 };
 
-    static inline const RGBAColor& Get(const RGBAColor& color, float alpha) {
-        if (alpha == 1.0f)
-            return color;
-        else {
-            thread_local RGBAColor m_color;
-            m_color = color;
-            m_color.A() = alpha;
-            return m_color;
-        }
-    }
+	static inline const RGBAColor& Get(const RGBAColor& color, float alpha)
+	{
+		if (alpha == 1.0f)
+			return color;
+		else {
+			thread_local RGBAColor m_color;
+			m_color = color;
+			m_color.A() = alpha;
+			return m_color;
+		}
+	}
 };

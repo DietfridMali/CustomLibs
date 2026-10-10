@@ -6,7 +6,7 @@
 #include "std_defines.h"
 
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #include "SDL_image.h"
 #pragma warning(pop)
 
@@ -30,22 +30,24 @@
 
 uint32_t Texture::nullHandle = UINT32_MAX;
 
-int Texture::CompareTextures(void* context, const String& k1, const String& k2) {
-    int i = String::Compare(nullptr, k1, k2);
-    return (i < 0) ? -1 : (i > 0) ? 1 : 0;
+int Texture::CompareTextures(void* context, const String& k1, const String& k2)
+{
+	int i = String::Compare(nullptr, k1, k2);
+	return (i < 0) ? -1 : (i > 0) ? 1
+								  : 0;
 }
 
 // =================================================================================================
 
 Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
-    : m_handle(handle)
-    , m_type(type)
-    , m_tmuIndex(-1)
-    , m_wrapMode(wrap)
-    , m_wrapModeV(wrap)
-    , m_name("")
+	: m_handle(handle)
+	, m_type(type)
+	, m_tmuIndex(-1)
+	, m_wrapMode(wrap)
+	, m_wrapModeV(wrap)
+	, m_name("")
 {
-    SetupLUT();
+	SetupLUT();
 }
 
 
@@ -53,498 +55,511 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
 // the registration happens in TextureHandler::GetTexture () BEFORE the texture is loaded, so a load
 // that fails is deleted while the LUT still points at it (Skybox::LoadTextures () does exactly that).
 // Tying the removal to m_isValid left that dangling pointer behind.
-Texture::~Texture() noexcept
+Texture::~Texture()
+noexcept
 {
-    if (UpdateLUT() and (m_name.Length() > 0)) {
-        textureLUT.Remove(m_name);
-        m_name = "";
-    }
-    if (m_isValid)
-        Destroy();
+	if (UpdateLUT() and (m_name.Length() > 0)) {
+		textureLUT.Remove(m_name);
+		m_name = "";
+	}
+	if (m_isValid)
+		Destroy();
 }
 
 
 Texture& Texture::Copy(const Texture& other)
 {
-    if (this != &other) {
-        Destroy();
-        m_handle = UINT32_MAX;
-        m_ownedHandle = UINT32_MAX;
-        m_resource.Reset();
-        m_name = other.m_name;
-        m_buffers = other.m_buffers;
-        m_filenames = other.m_filenames;
-        m_type = other.m_type;
-        m_wrapMode = other.m_wrapMode;
-        m_wrapModeV = other.m_wrapModeV;
-        m_useMipMaps = other.m_useMipMaps;
-        m_colorEncoding = other.m_colorEncoding;
-        m_isDeployed = false;
-        m_hasParams = other.m_hasParams;
-        m_isValid = other.m_isValid;
-    }
-    return *this;
+	if (this != &other) {
+		Destroy();
+		m_handle = UINT32_MAX;
+		m_ownedHandle = UINT32_MAX;
+		m_resource.Reset();
+		m_name = other.m_name;
+		m_buffers = other.m_buffers;
+		m_filenames = other.m_filenames;
+		m_type = other.m_type;
+		m_wrapMode = other.m_wrapMode;
+		m_wrapModeV = other.m_wrapModeV;
+		m_useMipMaps = other.m_useMipMaps;
+		m_colorEncoding = other.m_colorEncoding;
+		m_isDeployed = false;
+		m_hasParams = other.m_hasParams;
+		m_isValid = other.m_isValid;
+	}
+	return *this;
 }
 
 
-Texture& Texture::Move(Texture& other) noexcept
+Texture& Texture::Move(Texture& other)
+noexcept
 {
-    if (this != &other) {
-        Destroy();
-        m_handle = std::exchange(other.m_handle, UINT32_MAX);
-        m_ownedHandle = std::exchange(other.m_ownedHandle, UINT32_MAX);
-        m_resource = std::move(other.m_resource);
-        m_name = std::move(other.m_name);
-        m_buffers = std::move(other.m_buffers);
-        m_filenames = std::move(other.m_filenames);
-        m_type = other.m_type;
-        m_wrapMode = other.m_wrapMode;
-        m_wrapModeV = other.m_wrapModeV;
-        m_useMipMaps = other.m_useMipMaps;
-        m_colorEncoding = other.m_colorEncoding;
-        m_isDeployed = other.m_isDeployed;
-        m_hasParams = other.m_hasParams;
-        m_isValid = std::exchange(other.m_isValid, false);
-    }
-    return *this;
+	if (this != &other) {
+		Destroy();
+		m_handle = std::exchange(other.m_handle, UINT32_MAX);
+		m_ownedHandle = std::exchange(other.m_ownedHandle, UINT32_MAX);
+		m_resource = std::move(other.m_resource);
+		m_name = std::move(other.m_name);
+		m_buffers = std::move(other.m_buffers);
+		m_filenames = std::move(other.m_filenames);
+		m_type = other.m_type;
+		m_wrapMode = other.m_wrapMode;
+		m_wrapModeV = other.m_wrapModeV;
+		m_useMipMaps = other.m_useMipMaps;
+		m_colorEncoding = other.m_colorEncoding;
+		m_isDeployed = other.m_isDeployed;
+		m_hasParams = other.m_hasParams;
+		m_isValid = std::exchange(other.m_isValid, false);
+	}
+	return *this;
 }
 
 
 bool Texture::Create(void)
 {
-    Destroy();
-    return CreateHandle();
+	Destroy();
+	return CreateHandle();
 }
 
 
 bool Texture::CreateHandle(void)
 {
-    m_handle = m_ownedHandle;
-    if (not AllocateHandle())
-        return false;
-    m_isValid = true;
-    return true;
+	m_handle = m_ownedHandle;
+	if (not AllocateHandle())
+		return false;
+	m_isValid = true;
+	return true;
 }
 
 
-bool Texture::AllocateHandle(void) noexcept
+bool Texture::AllocateHandle(void)
+noexcept
 {
-    if (m_handle != UINT32_MAX)
-        return true;
-    DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-    if (not hdl.IsValid())
-        return false;
-    m_handle = hdl.index;
-    m_ownedHandle = hdl.index;
-    return true;
+	if (m_handle != UINT32_MAX)
+		return true;
+	DescriptorHandle hdl = descriptorHeaps.AllocSRV();
+	if (not hdl.IsValid())
+		return false;
+	m_handle = hdl.index;
+	m_ownedHandle = hdl.index;
+	return true;
 }
 
 
-void Texture::ReleaseResource(void) noexcept
+void Texture::ReleaseResource(void)
+noexcept
 {
-    gfxResourceHandler.Track(m_resource);
-    m_resource.Reset();
+	gfxResourceHandler.Track(m_resource);
+	m_resource.Reset();
 }
 
 
 void Texture::Destroy(void)
 {
-    if (m_isValid) {
-        m_isValid = false;
-        // OUT of the texture slot bookkeeping BEFORE the descriptor index goes back. GfxStates keys
-        // a slot on that index, and the heap hands freed indices out again (DescriptorHeap::m_freeList,
-        // fed by BufferInfo::Release ()). Left standing, the entry claims the next texture that gets
-        // this index is already sitting on that slot - BoundTMU () and GetBoundTexture () then answer
-        // for a texture that is long gone. 1:1 to the OpenGL path.
-        // Only for a handle that is one: Texture::Release () writes UINT32_MAX into a slot as its
-        // "nothing here" marker, so releasing UINT32_MAX would sweep every already empty slot.
-        if (m_handle != UINT32_MAX)
-            gfxStates.ReleaseTexture(TextureTypeToGLenum(m_type), m_handle);
-        m_isDeployed = false;
-        // The sampler/filter state belongs to the resource that is going away, not to this object.
-        // Left standing, SetParams () returns at once for the NEXT texture created here and that one
-        // never gets its sampler set up. 1:1 to the OpenGL path.
-        m_hasParams = false;
-        if (m_ownedHandle != UINT32_MAX) {
-            DescriptorHandle handle;
-            handle.index = m_ownedHandle;
-            handle.m_heap = &descriptorHeaps.m_srvHeap;
-            gfxResourceHandler.Track(handle);
-            m_ownedHandle = UINT32_MAX;
-        }
-        m_handle = UINT32_MAX;
-        ReleaseResource();
-        for (auto* p : m_buffers) {
-            if (p->m_refCount) --p->m_refCount;
-            else delete p;
-        }
-        m_buffers.Clear();
-    }
+	if (m_isValid) {
+		m_isValid = false;
+		// OUT of the texture slot bookkeeping BEFORE the descriptor index goes back. GfxStates keys
+		// a slot on that index, and the heap hands freed indices out again (DescriptorHeap::m_freeList,
+		// fed by BufferInfo::Release ()). Left standing, the entry claims the next texture that gets
+		// this index is already sitting on that slot - BoundTMU () and GetBoundTexture () then answer
+		// for a texture that is long gone. 1:1 to the OpenGL path.
+		// Only for a handle that is one: Texture::Release () writes UINT32_MAX into a slot as its
+		// "nothing here" marker, so releasing UINT32_MAX would sweep every already empty slot.
+		if (m_handle != UINT32_MAX)
+			gfxStates.ReleaseTexture(TextureTypeToGLenum(m_type), m_handle);
+		m_isDeployed = false;
+		// The sampler/filter state belongs to the resource that is going away, not to this object.
+		// Left standing, SetParams () returns at once for the NEXT texture created here and that one
+		// never gets its sampler set up. 1:1 to the OpenGL path.
+		m_hasParams = false;
+		if (m_ownedHandle != UINT32_MAX) {
+			DescriptorHandle handle;
+			handle.index = m_ownedHandle;
+			handle.m_heap = &descriptorHeaps.m_srvHeap;
+			gfxResourceHandler.Track(handle);
+			m_ownedHandle = UINT32_MAX;
+		}
+		m_handle = UINT32_MAX;
+		ReleaseResource();
+		for (auto* p : m_buffers) {
+			if (p->m_refCount)
+				--p->m_refCount;
+			else
+				delete p;
+		}
+		m_buffers.Clear();
+	}
 }
 
 
 bool Texture::IsAvailable(void)
 {
-    if (not m_isValid)
-        return false;
-    if (m_isDeployed)
-        return true;
-    return false;
+	if (not m_isValid)
+		return false;
+	if (m_isDeployed)
+		return true;
+	return false;
 }
 
 
 bool Texture::Bind(int tmuIndex, bool)
 {
-    if (not IsAvailable())
-        return false;
-    m_tmuIndex = tmuIndex;
-    gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
+	if (not IsAvailable())
+		return false;
+	m_tmuIndex = tmuIndex;
+	gfxStates.BindTexture(TextureTypeToGLenum(m_type), m_handle, tmuIndex);
 
-    // Lazily populate the per-texture sampler configuration on first bind.
-    // Virtual dispatch picks up the most-derived SetParams (Cubemap, Tiled,
-    // RenderTarget, Shadow, Noise* etc.); after this call m_sampling is valid.
-    if (not m_hasParams)
-        SetParams(false);
+	// Lazily populate the per-texture sampler configuration on first bind.
+	// Virtual dispatch picks up the most-derived SetParams (Cubemap, Tiled,
+	// RenderTarget, Shadow, Noise* etc.); after this call m_sampling is valid.
+	if (not m_hasParams)
+		SetParams(false);
 
-    if ((tmuIndex >= 0) and (tmuIndex < Shader::kSrvSlots) and (m_handle != UINT32_MAX)) {
-        commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_handle);
-        commandListHandler.BindSampler(uint32_t(tmuIndex), samplerCache.GetSlot(m_sampling));
-    }
-    return true;
+	if ((tmuIndex >= 0) and (tmuIndex < Shader::kSrvSlots) and (m_handle != UINT32_MAX)) {
+		commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_handle);
+		commandListHandler.BindSampler(uint32_t(tmuIndex), samplerCache.GetSlot(m_sampling));
+	}
+	return true;
 }
 
 
 void Texture::Release(void)
 {
-    if (m_tmuIndex >= 0) {
-        gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
-        m_tmuIndex = -1;
-    }
+	if (m_tmuIndex >= 0) {
+		gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
+		m_tmuIndex = -1;
+	}
 }
 
 
 void Texture::SetParams(bool forceUpdate)
 {
-    if (m_hasParams and not forceUpdate)
-        return;
-    m_hasParams = true;
-    DefaultSampling();
-    ApplySampling();
+	if (m_hasParams and not forceUpdate)
+		return;
+	m_hasParams = true;
+	DefaultSampling();
+	ApplySampling();
 }
 
 
-void Texture::DefaultSampling(void) noexcept
+void Texture::DefaultSampling(void)
+noexcept
 {
-    // Default: linear filter, repeat wrap (most textures in this app are tile/wrap-style).
-    // Subclasses that need clamp (RenderTargetTexture, ShadowTexture, Cubemap) override this.
-    // With mipmaps: linear mip filter; without: mip filter disabled and LOD clamped to base level.
-    m_sampling.minFilter = GfxFilterMode::Linear;
-    m_sampling.magFilter = GfxFilterMode::Linear;
-    m_sampling.mipMode = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
-    // What SetWrapping () asked for, not a fixed Repeat - a texture created to clamp used to have that
-    // overwritten here on its first use. TiledTexture::SetParams () sets Repeat on purpose.
-    m_sampling.wrapU = m_wrapMode;
-    m_sampling.wrapV = m_wrapModeV;
-    m_sampling.wrapW = m_wrapModeV;
-    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
-    // Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
-    m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;
+	// Default: linear filter, repeat wrap (most textures in this app are tile/wrap-style).
+	// Subclasses that need clamp (RenderTargetTexture, ShadowTexture, Cubemap) override this.
+	// With mipmaps: linear mip filter; without: mip filter disabled and LOD clamped to base level.
+	m_sampling.minFilter = GfxFilterMode::Linear;
+	m_sampling.magFilter = GfxFilterMode::Linear;
+	m_sampling.mipMode = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
+	// What SetWrapping () asked for, not a fixed Repeat - a texture created to clamp used to have that
+	// overwritten here on its first use. TiledTexture::SetParams () sets Repeat on purpose.
+	m_sampling.wrapU = m_wrapMode;
+	m_sampling.wrapV = m_wrapModeV;
+	m_sampling.wrapW = m_wrapModeV;
+	m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+	// Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
+	m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;
 }
 
 
 bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, DXGI_FORMAT format)
 {
-    ID3D12Device* device = dx12Context.Device();
-    if (not device) {
-        logHandler.Print("Texture::CreateTextureResource: no D3D12 device\n");
-        return false;
-    }
-    ReleaseResource();
+	ID3D12Device* device = dx12Context.Device();
+	if (not device) {
+		logHandler.Print("Texture::CreateTextureResource: no D3D12 device\n");
+		return false;
+	}
+	ReleaseResource();
 
-    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
-    D3D12_RESOURCE_DESC rd{};
-    rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    rd.Width = UINT(w);
-    rd.Height = UINT(h);
-    rd.DepthOrArraySize = UINT16(arraySize);
-    rd.MipLevels = UINT16(mipLevels);
-    m_dxgiFormat = format;
-    rd.Format = m_dxgiFormat;
-    rd.SampleDesc.Count = 1;
-    rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	D3D12_HEAP_PROPERTIES	hp{ D3D12_HEAP_TYPE_DEFAULT };
+	D3D12_RESOURCE_DESC		rd{};
+	rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	rd.Width = UINT(w);
+	rd.Height = UINT(h);
+	rd.DepthOrArraySize = UINT16(arraySize);
+	rd.MipLevels = UINT16(mipLevels);
+	m_dxgiFormat = format;
+	rd.Format = m_dxgiFormat;
+	rd.SampleDesc.Count = 1;
+	rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-    HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resource));
-    if (FAILED(hr)) {
-        logHandler.Print("Texture::CreateTextureResource: CreateCommittedResource failed" " (name='%s', %dx%d, arraySize=%d, DXGI_FORMAT=%u, hr=0x%08X)\n", (const char*)m_name, w, h, arraySize, (unsigned)m_dxgiFormat, (unsigned)hr);
-        HRESULT removed = device->GetDeviceRemovedReason();
-        if (FAILED(removed)) {
-            logHandler.Print("  device removed (reason=0x%08X) - earlier GPU work faulted\n", (unsigned)removed);
+	HRESULT hr = device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+												 IID_PPV_ARGS(&m_resource));
+	if (FAILED(hr)) {
+		logHandler.Print("Texture::CreateTextureResource: CreateCommittedResource failed"
+						 " (name='%s', %dx%d, arraySize=%d, DXGI_FORMAT=%u, hr=0x%08X)\n",
+						 (const char*)m_name, w, h, arraySize, (unsigned)m_dxgiFormat, (unsigned)hr);
+		HRESULT removed = device->GetDeviceRemovedReason();
+		if (FAILED(removed)) {
+			logHandler.Print("  device removed (reason=0x%08X) - earlier GPU work faulted\n", (unsigned)removed);
 #if DBG_DIRECTX
-            dx12Context.DumpDRED();
+			dx12Context.DumpDRED();
 #endif
-        }
-        return false;
-    }
+		}
+		return false;
+	}
 #if DBG_DIRECTX
-    char name[128];
-    snprintf(name, sizeof(name), "Texture[%s]", (const char*)m_name);
-    m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
+	char name[128];
+	snprintf(name, sizeof(name), "Texture[%s]", (const char*)m_name);
+	m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)strlen(name), name);
 #endif
-    return true;
+	return true;
 }
 
 
 bool Texture::CreateSRV(void)
 {
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return false;
+	ID3D12Device* device = dx12Context.Device();
+	if (not device)
+		return false;
 
-    if (not AllocateHandle())
-        return false;
+	if (not AllocateHandle())
+		return false;
 
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = m_dxgiFormat;
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    if (m_type == TextureType::CubeMap) {
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
-        // Expose the full mip chain (1 for the uncompressed cubemaps, N for BC skyboxes with mips).
-        srvDesc.TextureCube.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
-    }
-    else if (m_type == TextureType::Texture2DArray) {
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-        srvDesc.Texture2DArray.MostDetailedMip = 0;
-        srvDesc.Texture2DArray.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
-        srvDesc.Texture2DArray.FirstArraySlice = 0;
-        srvDesc.Texture2DArray.ArraySize = m_resource ? m_resource->GetDesc().DepthOrArraySize : 1;
-    }
-    else {
-        srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-        // Expose the full mip chain that was created (1 when mip-mapping is disabled).
-        srvDesc.Texture2D.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
-    }
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = m_dxgiFormat;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	if (m_type == TextureType::CubeMap) {
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+		// Expose the full mip chain (1 for the uncompressed cubemaps, N for BC skyboxes with mips).
+		srvDesc.TextureCube.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
+	}
+	else if (m_type == TextureType::Texture2DArray) {
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+		srvDesc.Texture2DArray.MostDetailedMip = 0;
+		srvDesc.Texture2DArray.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
+		srvDesc.Texture2DArray.FirstArraySlice = 0;
+		srvDesc.Texture2DArray.ArraySize = m_resource ? m_resource->GetDesc().DepthOrArraySize : 1;
+	}
+	else {
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		// Expose the full mip chain that was created (1 when mip-mapping is disabled).
+		srvDesc.Texture2D.MipLevels = m_resource ? m_resource->GetDesc().MipLevels : 1;
+	}
 
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
-    device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
-    descriptorHeaps.m_srvHeap.Publish(m_handle);
-    return true;
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = descriptorHeaps.m_srvHeap.CpuHandle(m_handle);
+	device->CreateShaderResourceView(m_resource.Get(), &srvDesc, cpuHandle);
+	descriptorHeaps.m_srvHeap.Publish(m_handle);
+	return true;
 }
 
 
 bool Texture::Deploy(int bufferIndex)
 {
-    if (m_isDeployed)
-        return true;
-    if (bufferIndex >= m_buffers.Length())
-        return false;
-    TextureBuffer* tb = m_buffers[bufferIndex];
-    if (not tb)
-        return false;
+	if (m_isDeployed)
+		return true;
+	if (bufferIndex >= m_buffers.Length())
+		return false;
+	TextureBuffer* tb = m_buffers[bufferIndex];
+	if (not tb)
+		return false;
 
-    int w = tb->m_info.m_width;
-    int h = tb->m_info.m_height;
-    if (w <= 0 or h <= 0)
-        return false;
+	int w = tb->m_info.m_width;
+	int h = tb->m_info.m_height;
+	if (w <= 0 or h <= 0)
+		return false;
 
-    const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
-    const GfxPixelFormat gfxFmt = GfxEncodedFormat(tb->m_info.m_gfxFormat, colorEncoding);
-    if (GfxIsBlockCompressed(gfxFmt)) {
-        const int mipCount = tb->m_info.m_mipCount;
-        if (not CreateTextureResource(w, h, 1, mipCount, ToDXGIFormat(gfxFmt)))
-            return false;
-        const uint8_t* face = static_cast<const uint8_t*>(tb->DataBuffer());
-        if (not UploadCompressedData(dx12Context.Device(), m_resource.Get(), &face, 1, w, h, gfxFmt, mipCount))
-            return false;
-    }
-    else {
-        const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
-        if (not CreateTextureResource(w, h, 1, int(mipLevels), ToDXGIFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
-            return false;
-        const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-        const int channels = tb->m_info.m_componentCount;
-        if (mipLevels > 1) {
-            if (not UploadTextureDataWithMips(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels, mipLevels, colorEncoding))
-                return false;
-        }
-        else if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels))
-            return false;
-    }
-    if (not CreateSRV())
-        return false;
-    SetParams();
-    m_isDeployed = true;
-    return true;
+	const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
+	const GfxPixelFormat gfxFmt = GfxEncodedFormat(tb->m_info.m_gfxFormat, colorEncoding);
+	if (GfxIsBlockCompressed(gfxFmt)) {
+		const int mipCount = tb->m_info.m_mipCount;
+		if (not CreateTextureResource(w, h, 1, mipCount, ToDXGIFormat(gfxFmt)))
+			return false;
+		const uint8_t* face = static_cast<const uint8_t*>(tb->DataBuffer());
+		if (not UploadCompressedData(dx12Context.Device(), m_resource.Get(), &face, 1, w, h, gfxFmt, mipCount))
+			return false;
+	}
+	else {
+		const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
+		if (not CreateTextureResource(w, h, 1, int(mipLevels), ToDXGIFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
+			return false;
+		const uint8_t*	pixels = static_cast<const uint8_t*>(tb->DataBuffer());
+		const int		channels = tb->m_info.m_componentCount;
+		if (mipLevels > 1) {
+			if (not UploadTextureDataWithMips(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels, mipLevels, colorEncoding))
+				return false;
+		}
+		else if (not UploadTextureData(dx12Context.Device(), m_resource.Get(), pixels, w, h, channels))
+			return false;
+	}
+	if (not CreateSRV())
+		return false;
+	SetParams();
+	m_isDeployed = true;
+	return true;
 }
 
 
 bool Texture::Redeploy(void)
 {
-    m_isDeployed = false;
-    return Deploy(0);
+	m_isDeployed = false;
+	return Deploy(0);
 }
 
 
 bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params)
 {
-    m_filenames = fileNames;
-    // The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
-    // replaced by the file name here: the destructor removes the entry under m_name, and with the
-    // key overwritten the LUT kept a dangling pointer under the registration key while removing a
-    // key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
-    if (m_name.Length() == 0)
-        m_name = fileNames.First();
-    TextureBuffer* texBuf = nullptr;
-    for (auto& fileName : fileNames) {
-        if (fileName.IsEmpty()) {
-            if (not texBuf)
-                return false;
-            ++(texBuf->m_refCount);
-            m_buffers.Append(texBuf);
-        }
-        else {
-            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
-            if (not texBuf)
-                return false;
-            m_buffers.Append(texBuf);
-        }
-    }
-    return true;
+	m_filenames = fileNames;
+	// The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
+	// replaced by the file name here: the destructor removes the entry under m_name, and with the
+	// key overwritten the LUT kept a dangling pointer under the registration key while removing a
+	// key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
+	if (m_name.Length() == 0)
+		m_name = fileNames.First();
+	TextureBuffer* texBuf = nullptr;
+	for (auto& fileName : fileNames) {
+		if (fileName.IsEmpty()) {
+			if (not texBuf)
+				return false;
+			++(texBuf->m_refCount);
+			m_buffers.Append(texBuf);
+		}
+		else {
+			texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
+			if (not texBuf)
+				return false;
+			m_buffers.Append(texBuf);
+		}
+	}
+	return true;
 }
 
 
 bool Texture::CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params)
 {
-    if (not Create())
-        return false;
-    if (fileNames.IsEmpty())
-        return true;
-    if (not Load(folder, fileNames, params))
-        return false;
-    if (not m_buffers.IsEmpty())
-        m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
-    if (params.cartoonize)
-        Cartoonize(params.blur, params.gradients, params.outline);
-    m_useMipMaps = params.useMipMaps;
-    m_isDisposable = params.isDisposable;
-    m_colorEncoding = params.colorEncoding;
-    return Deploy();
+	if (not Create())
+		return false;
+	if (fileNames.IsEmpty())
+		return true;
+	if (not Load(folder, fileNames, params))
+		return false;
+	if (not m_buffers.IsEmpty())
+		m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
+	if (params.cartoonize)
+		Cartoonize(params.blur, params.gradients, params.outline);
+	m_useMipMaps = params.useMipMaps;
+	m_isDisposable = params.isDisposable;
+	m_colorEncoding = params.colorEncoding;
+	return Deploy();
 }
 
 
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
 {
-    if (not Create()) {
-        SDL_FreeSurface(surface);
-        return false;
-    }
-    m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
-    m_useMipMaps = params.useMipMaps;
-    m_isDisposable = params.isDisposable;
-    m_colorEncoding = params.colorEncoding;
-    return Deploy();
+	if (not Create()) {
+		SDL_FreeSurface(surface);
+		return false;
+	}
+	m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
+	m_useMipMaps = params.useMipMaps;
+	m_isDisposable = params.isDisposable;
+	m_colorEncoding = params.colorEncoding;
+	return Deploy();
 }
 
 
 void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses)
 {
-    for (auto& b : m_buffers)
-        b->Cartoonize(blurStrength, gradients, outlinePasses);
+	for (auto& b : m_buffers)
+		b->Cartoonize(blurStrength, gradients, outlinePasses);
 }
 
 
-void Texture::SetWrapping(GfxWrapMode wrapMode) noexcept
-{
-    SetWrapping(wrapMode, wrapMode);
-}
-
-
-void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept
-{
-    if ((m_wrapMode == wrapU) and (m_wrapModeV == wrapV))
-        return;   // nothing changes, so nothing has to be written again
-    m_wrapMode = wrapU;
-    m_wrapModeV = wrapV;
-    m_sampling.wrapU = wrapU;
-    m_sampling.wrapV = wrapV;
-    m_sampling.wrapW = wrapV;
-    m_hasParams = false;   // SetParams () writes them on the next use
-}
-
-
-RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
+void Texture::SetWrapping(GfxWrapMode wrapMode)
 noexcept
 {
-    if (renderAreaWidth == 0)
-        renderAreaWidth = viewportWidth;
-    if (renderAreaHeight == 0)
-        renderAreaHeight = viewportHeight;
-    float xScale = float(renderAreaWidth) / float(viewportWidth);
-    float yScale = float(renderAreaHeight) / float(viewportHeight);
-    float wRatio = float(renderAreaWidth) / float(w);
-    float hRatio = float(renderAreaHeight) / float(h);
-    RenderOffsets offsets = { 0.5f * xScale, 0.5f * yScale };
-    if (wRatio > hRatio)
-        offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
-    else if (wRatio < hRatio)
-        offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
-    return offsets;
+	SetWrapping(wrapMode, wrapMode);
+}
+
+
+void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
+noexcept
+{
+	if ((m_wrapMode == wrapU) and (m_wrapModeV == wrapV))
+		return; // nothing changes, so nothing has to be written again
+	m_wrapMode = wrapU;
+	m_wrapModeV = wrapV;
+	m_sampling.wrapU = wrapU;
+	m_sampling.wrapV = wrapV;
+	m_sampling.wrapW = wrapV;
+	m_hasParams = false; // SetParams () writes them on the next use
+}
+
+
+RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,
+									  int renderAreaHeight)
+noexcept
+{
+	if (renderAreaWidth == 0)
+		renderAreaWidth = viewportWidth;
+	if (renderAreaHeight == 0)
+		renderAreaHeight = viewportHeight;
+	float			xScale = float(renderAreaWidth) / float(viewportWidth);
+	float			yScale = float(renderAreaHeight) / float(viewportHeight);
+	float			wRatio = float(renderAreaWidth) / float(w);
+	float			hRatio = float(renderAreaHeight) / float(h);
+	RenderOffsets	offsets = { 0.5f * xScale, 0.5f * yScale };
+	if (wRatio > hRatio)
+		offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
+	else if (wRatio < hRatio)
+		offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
+	return offsets;
 }
 
 // =================================================================================================
 
 void TiledTexture::SetParams(bool forceUpdate)
 {
-    if (m_hasParams and not forceUpdate)
-        return;
-    Texture::SetParams(forceUpdate);
-    m_sampling.wrapU = GfxWrapMode::Repeat;
-    m_sampling.wrapV = GfxWrapMode::Repeat;
-    m_sampling.wrapW = GfxWrapMode::Repeat;
-    // Mip-mapped, max anisotropy (matches OGL TiledTexture::SetParams which queries
-    // GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT and applies it; we use the spec's maximum).
-    m_sampling.mipMode       = GfxMipMode::Linear;
-    m_sampling.maxAnisotropy = 16.0f;
+	if (m_hasParams and not forceUpdate)
+		return;
+	Texture::SetParams(forceUpdate);
+	m_sampling.wrapU = GfxWrapMode::Repeat;
+	m_sampling.wrapV = GfxWrapMode::Repeat;
+	m_sampling.wrapW = GfxWrapMode::Repeat;
+	// Mip-mapped, max anisotropy (matches OGL TiledTexture::SetParams which queries
+	// GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT and applies it; we use the spec's maximum).
+	m_sampling.mipMode = GfxMipMode::Linear;
+	m_sampling.maxAnisotropy = 16.0f;
 }
 
 
 void RenderTargetTexture::SetParams(bool forceUpdate)
 {
-    if (m_hasParams and not forceUpdate)
-        return;
-    m_hasParams = true;
-    m_sampling.minFilter   = m_filtering;
-    m_sampling.magFilter   = m_filtering;
-    m_sampling.mipMode     = GfxMipMode::None;
-    m_sampling.wrapU       = GfxWrapMode::ClampToEdge;
-    m_sampling.wrapV       = GfxWrapMode::ClampToEdge;
-    m_sampling.wrapW       = GfxWrapMode::ClampToEdge;
-    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;  // explicit: no compare sampler
-    m_sampling.maxAnisotropy = 1.0f;
+	if (m_hasParams and not forceUpdate)
+		return;
+	m_hasParams = true;
+	m_sampling.minFilter = m_filtering;
+	m_sampling.magFilter = m_filtering;
+	m_sampling.mipMode = GfxMipMode::None;
+	m_sampling.wrapU = GfxWrapMode::ClampToEdge;
+	m_sampling.wrapV = GfxWrapMode::ClampToEdge;
+	m_sampling.wrapW = GfxWrapMode::ClampToEdge;
+	m_sampling.compareFunc = GfxOperations::CompareFunc::Always; // explicit: no compare sampler
+	m_sampling.maxAnisotropy = 1.0f;
 }
 
 
 void ShadowTexture::SetParams(bool forceUpdate)
 {
-    if (m_hasParams and not forceUpdate)
-        return;
-    m_hasParams = true;
-    // OGL: GL_TEXTURE_COMPARE_MODE = GL_COMPARE_REF_TO_TEXTURE,
-    //      GL_TEXTURE_COMPARE_FUNC = GL_LESS — i.e. HW PCF compare sampler.
-    m_sampling.minFilter   = GfxFilterMode::Linear;
-    m_sampling.magFilter   = GfxFilterMode::Linear;
-    m_sampling.mipMode     = GfxMipMode::None;
-    // Outside the shadow map there is no shadow: clamp to a WHITE border (depth 1 = farthest) instead of
-    // repeating the edge texel, which smeared the border shadow across everything beyond the map. This is
-    // what the OpenGL backend has always done (GL_CLAMP_TO_BORDER + white border colour).
-    m_sampling.wrapU       = GfxWrapMode::ClampToBorder;
-    m_sampling.wrapV       = GfxWrapMode::ClampToBorder;
-    m_sampling.wrapW       = GfxWrapMode::ClampToBorder;
-    m_sampling.borderColor[0] = 1.0f;
-    m_sampling.borderColor[1] = 1.0f;
-    m_sampling.borderColor[2] = 1.0f;
-    m_sampling.borderColor[3] = 1.0f;
-    m_sampling.compareFunc = GfxOperations::CompareFunc::Less;
-    m_sampling.maxAnisotropy = 1.0f;
+	if (m_hasParams and not forceUpdate)
+		return;
+	m_hasParams = true;
+	// OGL: GL_TEXTURE_COMPARE_MODE = GL_COMPARE_REF_TO_TEXTURE,
+	//      GL_TEXTURE_COMPARE_FUNC = GL_LESS — i.e. HW PCF compare sampler.
+	m_sampling.minFilter = GfxFilterMode::Linear;
+	m_sampling.magFilter = GfxFilterMode::Linear;
+	m_sampling.mipMode = GfxMipMode::None;
+	// Outside the shadow map there is no shadow: clamp to a WHITE border (depth 1 = farthest) instead of
+	// repeating the edge texel, which smeared the border shadow across everything beyond the map. This is
+	// what the OpenGL backend has always done (GL_CLAMP_TO_BORDER + white border colour).
+	m_sampling.wrapU = GfxWrapMode::ClampToBorder;
+	m_sampling.wrapV = GfxWrapMode::ClampToBorder;
+	m_sampling.wrapW = GfxWrapMode::ClampToBorder;
+	m_sampling.borderColor[0] = 1.0f;
+	m_sampling.borderColor[1] = 1.0f;
+	m_sampling.borderColor[2] = 1.0f;
+	m_sampling.borderColor[3] = 1.0f;
+	m_sampling.compareFunc = GfxOperations::CompareFunc::Less;
+	m_sampling.maxAnisotropy = 1.0f;
 }
 
 
@@ -555,31 +570,31 @@ void ShadowTexture::SetParams(bool forceUpdate)
 
 void RenderTargetTexture::Destroy(void)
 {
-    m_handle = UINT32_MAX;
-    m_resource.Reset();
-    Texture::Destroy();
+	m_handle = UINT32_MAX;
+	m_resource.Reset();
+	Texture::Destroy();
 }
 
 
 RenderTargetTexture::~RenderTargetTexture()
 {
-    m_handle = UINT32_MAX;
-    m_resource.Reset();
+	m_handle = UINT32_MAX;
+	m_resource.Reset();
 }
 
 
 void ShadowTexture::Destroy(void)
 {
-    m_handle = UINT32_MAX;
-    m_resource.Reset();
-    Texture::Destroy();
+	m_handle = UINT32_MAX;
+	m_resource.Reset();
+	Texture::Destroy();
 }
 
 
 ShadowTexture::~ShadowTexture()
 {
-    m_handle = UINT32_MAX;
-    m_resource.Reset();
+	m_handle = UINT32_MAX;
+	m_resource.Reset();
 }
 
 // =================================================================================================

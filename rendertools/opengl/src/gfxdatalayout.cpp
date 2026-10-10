@@ -10,45 +10,63 @@
 
 // =================================================================================================
 
-static GLenum ToGLenum(MeshTopology topology) noexcept {
-    switch (topology) {
-        case MeshTopology::Triangles: return GL_TRIANGLES;
-        case MeshTopology::Lines:     return GL_LINES;
-        case MeshTopology::Points:    return GL_POINTS;
-        case MeshTopology::Quads:     return GL_QUADS; // should not reach glDraw* — quads are converted to triangles in mesh.cpp
-        default:                      return GL_TRIANGLES;
-    }
+static GLenum ToGLenum(MeshTopology topology)
+noexcept
+{
+	switch (topology) {
+		case MeshTopology::Triangles:
+			return GL_TRIANGLES;
+		case MeshTopology::Lines:
+			return GL_LINES;
+		case MeshTopology::Points:
+			return GL_POINTS;
+		case MeshTopology::Quads:
+			return GL_QUADS; // should not reach glDraw* — quads are converted to triangles in mesh.cpp
+		default:
+			return GL_TRIANGLES;
+	}
 }
 
 // A tessellated program (Shader::IsTessellated ()) takes its primitives as patches; the patch is the
 // topology's primitive, so the index buffer needs no change for it.
-static GLint PatchVertices(MeshTopology topology) noexcept {
-    switch (topology) {
-        case MeshTopology::Triangles: return 3;
-        case MeshTopology::Lines:     return 2;
-        case MeshTopology::Points:    return 1;
-        case MeshTopology::Quads:     return 4;
-        default:                      return 3;
-    }
+static GLint PatchVertices(MeshTopology topology)
+noexcept
+{
+	switch (topology) {
+		case MeshTopology::Triangles:
+			return 3;
+		case MeshTopology::Lines:
+			return 2;
+		case MeshTopology::Points:
+			return 1;
+		case MeshTopology::Quads:
+			return 4;
+		default:
+			return 3;
+	}
 }
 
-static GLenum DrawMode(MeshTopology topology) noexcept {
-    Shader* shader = baseShaderHandler.ActiveShader();
-    if (shader and shader->IsTessellated()) {
-        glPatchParameteri(GL_PATCH_VERTICES, PatchVertices(topology));
-        return GL_PATCHES;
-    }
-    return ToGLenum(topology);
+static GLenum DrawMode(MeshTopology topology)
+noexcept
+{
+	Shader* shader = baseShaderHandler.ActiveShader();
+	if (shader and shader->IsTessellated()) {
+		glPatchParameteri(GL_PATCH_VERTICES, PatchVertices(topology));
+		return GL_PATCHES;
+	}
+	return ToGLenum(topology);
 }
 
-static GLenum ToGLenum(ComponentType ct) noexcept {
-    return ct == ComponentType::UInt32 ? GL_UNSIGNED_INT : GL_FLOAT;
+static GLenum ToGLenum(ComponentType ct)
+noexcept
+{
+	return ct == ComponentType::UInt32 ? GL_UNSIGNED_INT : GL_FLOAT;
 }
 
 // =================================================================================================
 
-GfxDataLayout* GfxDataLayout::activeLayout = 0;
-List<GfxDataLayout*> GfxDataLayout::layoutStack;
+GfxDataLayout*			GfxDataLayout::activeLayout = 0;
+List<GfxDataLayout*>	GfxDataLayout::layoutStack;
 
 // =================================================================================================
 // Interface to OpenGL VAOs
@@ -56,20 +74,20 @@ List<GfxDataLayout*> GfxDataLayout::layoutStack;
 bool GfxDataLayout::Create(MeshTopology shape, uint32_t dynamicBuffers)
 noexcept
 {
-    m_shape = shape;
-    SetDynamic(dynamicBuffers);
+	m_shape = shape;
+	SetDynamic(dynamicBuffers);
 #if USE_SHARED_HANDLES
-    if (m_handle.IsAvailable())
-        return true;
-    m_handle = SharedGfxHandle(0, glGenVertexArrays, glDeleteVertexArrays); // need to set allocate and release functions
-    if (m_handle.Claim() == 0)
-        return false;
-    return true;
+	if (m_handle.IsAvailable())
+		return true;
+	m_handle = SharedGfxHandle(0, glGenVertexArrays, glDeleteVertexArrays); // need to set allocate and release functions
+	if (m_handle.Claim() == 0)
+		return false;
+	return true;
 #else
-    if (m_handle)
-        return true;
-    glGenVertexArrays(1, &m_handle);
-    return m_handle != 0;
+	if (m_handle)
+		return true;
+	glGenVertexArrays(1, &m_handle);
+	return m_handle != 0;
 #endif
 }
 
@@ -77,257 +95,269 @@ noexcept
 void GfxDataLayout::SetDynamic(uint32_t dynamicBuffers)
 noexcept
 {
-    m_dynamicBuffers = dynamicBuffers;
-    for (auto gfxDataBuffer : m_dataBuffers)
-        gfxDataBuffer->SetDynamic((dynamicBuffers & Mesh::MeshBufferBit(gfxDataBuffer->m_type, gfxDataBuffer->m_id)) != 0);
-    m_indexBuffer.SetDynamic((dynamicBuffers & Mesh::mbIndex) != 0);
+	m_dynamicBuffers = dynamicBuffers;
+	for (auto gfxDataBuffer : m_dataBuffers)
+		gfxDataBuffer->SetDynamic((dynamicBuffers & Mesh::MeshBufferBit(gfxDataBuffer->m_type, gfxDataBuffer->m_id)) != 0);
+	m_indexBuffer.SetDynamic((dynamicBuffers & Mesh::mbIndex) != 0);
 }
 
 
 void GfxDataLayout::Destroy(void)
 noexcept
 {
-    Disable();
-    for (auto& gfxDataBuffer : m_dataBuffers) {
-        gfxDataBuffer->Destroy();
-        delete gfxDataBuffer;
-    }
-    m_indexBuffer.Destroy();
-    m_dataBuffers.Clear();
+	Disable();
+	for (auto& gfxDataBuffer : m_dataBuffers) {
+		gfxDataBuffer->Destroy();
+		delete gfxDataBuffer;
+	}
+	m_indexBuffer.Destroy();
+	m_dataBuffers.Clear();
 #if USE_SHARED_HANDLES
-    if (m_handle.IsAvailable())
-        m_handle.Release();
+	if (m_handle.IsAvailable())
+		m_handle.Release();
 #else
-    if (m_handle) {
-        glDeleteVertexArrays(1, &m_handle);
-        m_handle = 0;
-    }
+	if (m_handle) {
+		glDeleteVertexArrays(1, &m_handle);
+		m_handle = 0;
+	}
 #endif
 }
 
 
-GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other) {
-    if (this != &other) {
-        Destroy();
-        m_dataBuffers = other.m_dataBuffers;
-        m_indexBuffer = other.m_indexBuffer;
-        m_handle = other.m_handle;
-        m_shape = other.m_shape;
-        m_instanceCount = other.m_instanceCount;
-    }
-    return *this;
+GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other)
+{
+	if (this != &other) {
+		Destroy();
+		m_dataBuffers = other.m_dataBuffers;
+		m_indexBuffer = other.m_indexBuffer;
+		m_handle = other.m_handle;
+		m_shape = other.m_shape;
+		m_instanceCount = other.m_instanceCount;
+	}
+	return *this;
 }
 
 
 GfxDataLayout& GfxDataLayout::Move(GfxDataLayout& other)
 noexcept
 {
-    if (this != &other) {
-        Destroy();
-        m_dataBuffers = std::move(other.m_dataBuffers);
-        m_indexBuffer = std::move(other.m_indexBuffer);
+	if (this != &other) {
+		Destroy();
+		m_dataBuffers = std::move(other.m_dataBuffers);
+		m_indexBuffer = std::move(other.m_indexBuffer);
 #if USE_SHARED_HANDLES
-        m_handle = std::move(other.m_handle);
+		m_handle = std::move(other.m_handle);
 #else
-        m_handle = other.m_handle;
-        other.m_handle = 0;
+		m_handle = other.m_handle;
+		other.m_handle = 0;
 #endif
-        m_shape = other.m_shape;
-        m_instanceCount = other.m_instanceCount;
-    }
-    return *this;
+		m_shape = other.m_shape;
+		m_instanceCount = other.m_instanceCount;
+	}
+	return *this;
 }
 
 
 GfxDataBuffer* GfxDataLayout::FindBuffer(const char* type, int id, int& index)
 noexcept
 {
-    int i = 0;
-    for (auto gfxDataBuffer : m_dataBuffers) {
-        if (gfxDataBuffer->IsType(type) and gfxDataBuffer->HasID(id)) {
-            index = i;
-            return gfxDataBuffer;
-        }
-        ++i;
-    }
-    return nullptr;
+	int i = 0;
+	for (auto gfxDataBuffer : m_dataBuffers) {
+		if (gfxDataBuffer->IsType(type) and gfxDataBuffer->HasID(id)) {
+			index = i;
+			return gfxDataBuffer;
+		}
+		++i;
+	}
+	return nullptr;
 }
 
-bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
-    if (forceUpdate or buffer.IsDirty()) {
-        if (not UpdateDataBuffer(type, id, buffer.GfxDataBuffer(), buffer.GfxDataSize(), ToGLenum(componentType), size_t(buffer.ComponentCount()), forceUpdate))
-            return false;
-        buffer.SetDirty(false);
-    }
-    return true;
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType,
+									 bool forceUpdate)
+noexcept
+{
+	if (forceUpdate or buffer.IsDirty()) {
+		if (not UpdateDataBuffer(type, id, buffer.GfxDataBuffer(), buffer.GfxDataSize(), ToGLenum(componentType),
+								 size_t(buffer.ComponentCount()), forceUpdate))
+			return false;
+		buffer.SetDirty(false);
+	}
+	return true;
 }
 
-void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept {
-    if (forceUpdate or buffer.IsDirty()) {
-        UpdateIndexBuffer(buffer.GfxDataBuffer(), buffer.GfxDataSize(), ToGLenum(componentType), forceUpdate);
-        buffer.SetDirty(false);
-    }
+void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate)
+noexcept
+{
+	if (forceUpdate or buffer.IsDirty()) {
+		UpdateIndexBuffer(buffer.GfxDataBuffer(), buffer.GfxDataSize(), ToGLenum(componentType), forceUpdate);
+		buffer.SetDirty(false);
+	}
 }
 
 // add a vertex or index data buffer
-bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
+bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType,
+								 size_t componentCount, bool forceUpdate)
 noexcept
 {
-    if (strcmp(type, "Index"))
-        return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
-    UpdateIndexBuffer(data, dataSize, componentType);
-    return true;
+	if (strcmp(type, "Index"))
+		return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
+	UpdateIndexBuffer(data, dataSize, componentType);
+	return true;
 }
 
 
-bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType,
+									 size_t componentCount, bool forceUpdate)
 noexcept
 {
-    if (dataSize == 0)
-        return false;
-    bool disabled = not IsActive() or not IsBound();
-    if (disabled)
-        Enable();
+	if (dataSize == 0)
+		return false;
+	bool disabled = not IsActive() or not IsBound();
+	if (disabled)
+		Enable();
 
-    int index;
-    GfxDataBuffer* buffer = FindBuffer(type, id, index);
-    if (not buffer and (buffer = new GfxDataBuffer(type, id))) {
-        m_dataBuffers.Append(buffer);
-        buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
-    }
-    // attribute location comes from the central vertex attribute registry, not from the
-    // buffer's position in m_dataBuffers — GLSL shaders declare layout(location = N) accordingly
-    int slot = GfxAttributeSlot(type, id);
-    assert(slot >= 0);  // unknown buffer tags are not part of the attribute registry
-    if (slot < 0) {
-        if (disabled)
-            Disable();
-        return false;
-    }
-    if (buffer)
-        buffer->Update(type, GL_ARRAY_BUFFER, slot, data, dataSize, componentType, componentCount, forceUpdate);
+	int				index;
+	GfxDataBuffer*	buffer = FindBuffer(type, id, index);
+	if (not buffer and (buffer = new GfxDataBuffer(type, id))) {
+		m_dataBuffers.Append(buffer);
+		buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
+	}
+	// attribute location comes from the central vertex attribute registry, not from the
+	// buffer's position in m_dataBuffers — GLSL shaders declare layout(location = N) accordingly
+	int slot = GfxAttributeSlot(type, id);
+	assert(slot >= 0); // unknown buffer tags are not part of the attribute registry
+	if (slot < 0) {
+		if (disabled)
+			Disable();
+		return false;
+	}
+	if (buffer)
+		buffer->Update(type, GL_ARRAY_BUFFER, slot, data, dataSize, componentType, componentCount, forceUpdate);
 
-    if (disabled)
-        Disable();
-    return buffer != nullptr;
+	if (disabled)
+		Disable();
+	return buffer != nullptr;
 }
 
 
 void GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate)
 noexcept
 {
-    bool disabled = not IsActive() or not IsBound();
-    if (disabled)
-        Enable();
-    m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize, componentType, 1, forceUpdate);
-    if (disabled)
-        Disable();
+	bool disabled = not IsActive() or not IsBound();
+	if (disabled)
+		Enable();
+	m_indexBuffer.Update("Index", GL_ELEMENT_ARRAY_BUFFER, -1, data, dataSize, componentType, 1, forceUpdate);
+	if (disabled)
+		Disable();
 }
 
 
 bool GfxDataLayout::Enable(void)
 noexcept
 {
-    if (not m_handle.IsAvailable())
-        return false;
-    Activate();
-    if (not IsBound()) {
+	if (not m_handle.IsAvailable())
+		return false;
+	Activate();
+	if (not IsBound()) {
 #if USE_SHARED_HANDLES
-        glBindVertexArray(m_handle);
-        m_isBound = true;
+		glBindVertexArray(m_handle);
+		m_isBound = true;
 #else
-        glBindVertexArray(m_handle);
-        m_isBound = true; // BUGFIX: m_isBound wurde im !USE_SHARED_HANDLES-Zweig nicht gesetzt
+		glBindVertexArray(m_handle);
+		m_isBound = true; // BUGFIX: m_isBound wurde im !USE_SHARED_HANDLES-Zweig nicht gesetzt
 #endif
-    }
-    return true;
+	}
+	return true;
 }
 
 
 void GfxDataLayout::Disable(void)
 noexcept
 {
-    Deactivate();
-    if (IsBound()) {
-        glBindVertexArray(0);
-        m_isBound = false;
-    }
+	Deactivate();
+	if (IsBound()) {
+		glBindVertexArray(0);
+		m_isBound = false;
+	}
 }
 
 #ifdef _DEBUG
 
 bool checkLayout = false;
 
-static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label) {
-    logHandler.Print("=== gfxDataBufferId Dump: %s (ID: %u) ===\n", label, gfxDataBufferId);
+static void DumpGfxData(GLuint gfxDataBufferId, int elemSize, const char* label)
+{
+	logHandler.Print("=== gfxDataBufferId Dump: %s (ID: %u) ===\n", label, gfxDataBufferId);
 
-    glBindBuffer(GL_ARRAY_BUFFER, gfxDataBufferId);
-    GLint bufSize;
-    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufSize);
+	glBindBuffer(GL_ARRAY_BUFFER, gfxDataBufferId);
+	GLint bufSize;
+	glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &bufSize);
 
-    // gfxDataBufferId Gr��e checken
-    GLint size;
-    glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-    logHandler.Print("Buffer size: %d bytes\n", size);
+	// gfxDataBufferId Gr��e checken
+	GLint size;
+	glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+	logHandler.Print("Buffer size: %d bytes\n", size);
 
-    // Daten auslesen (z.B. erste 'count' floats)
-    int count = bufSize / elemSize;
-    std::vector<float> data(count);
-    glGetBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(float), data.data());
+	// Daten auslesen (z.B. erste 'count' floats)
+	int					count = bufSize / elemSize;
+	std::vector<float>	data(count);
+	glGetBufferSubData(GL_ARRAY_BUFFER, 0, count * sizeof(float), data.data());
 
-    for (int i = 0; i < count; i++) {
-        logHandler.Print("  [%d] = %g\n", i, data[i]);
-    }
+	for (int i = 0; i < count; i++) {
+		logHandler.Print("  [%d] = %g\n", i, data[i]);
+	}
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
-static void CheckLayout(GLuint handle, const char* label = "") {
+static void CheckLayout(GLuint handle, const char* label = "")
+{
 #if 1
-    logHandler.Print("=== GfxDataLayout Check: %s (ID: %u) ===\n", label, handle);
+	logHandler.Print("=== GfxDataLayout Check: %s (ID: %u) ===\n", label, handle);
 #endif
-    glBindVertexArray(handle);
+	glBindVertexArray(handle);
 
-    // Array Buffer Binding (sollte normalerweise 0 sein wenn GfxDataLayout korrekt setup)
-    GLint arrayBuffer;
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
+	// Array Buffer Binding (sollte normalerweise 0 sein wenn GfxDataLayout korrekt setup)
+	GLint arrayBuffer;
+	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
 #if 1
-    logHandler.Print("GL_ARRAY_BUFFER_BINDING: %d\n", arrayBuffer);
+	logHandler.Print("GL_ARRAY_BUFFER_BINDING: %d\n", arrayBuffer);
 #endif
-    // Element Buffer (wichtig f�r indexed drawing)
-    GLint elementBuffer;
-    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementBuffer);
+	// Element Buffer (wichtig f�r indexed drawing)
+	GLint elementBuffer;
+	glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementBuffer);
 #if 1
-    logHandler.Print("GL_ELEMENT_ARRAY_BUFFER_BINDING: %d\n", elementBuffer);
+	logHandler.Print("GL_ELEMENT_ARRAY_BUFFER_BINDING: %d\n", elementBuffer);
 #endif
-    // alle Registry-Slots checken (0-15, siehe GfxAttributeSlot)
-    for (int i = 0; i < 16; i++) {
-        GLint enabled, size, type, stride, bufferBinding;
-        GLvoid* pointer;
+	// alle Registry-Slots checken (0-15, siehe GfxAttributeSlot)
+	for (int i = 0; i < 16; i++) {
+		GLint	enabled, size, type, stride, bufferBinding;
+		GLvoid*	pointer;
 
-        glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
-        if (enabled) {
-            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &size);
-            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_TYPE, &type);
-            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &stride);
-            glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &bufferBinding);
-            glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &pointer);
+		glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
+		if (enabled) {
+			glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &size);
+			glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_TYPE, &type);
+			glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &stride);
+			glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &bufferBinding);
+			glGetVertexAttribPointerv(i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &pointer);
 #if 1
-            logHandler.Print("  Attr %d: enabled, size=%d, type=0x%x, stride=%d, gfxDataBufferId=%d, offset=%zu\n",
-                             i, size, type, stride, bufferBinding, reinterpret_cast<size_t>(pointer));
-            DumpGfxData(bufferBinding, size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices" : "texCoord");
+			logHandler.Print("  Attr %d: enabled, size=%d, type=0x%x, stride=%d, gfxDataBufferId=%d, offset=%zu\n",
+							 i, size, type, stride, bufferBinding, reinterpret_cast<size_t>(pointer));
+			DumpGfxData(bufferBinding, size, (size == 4) ? "color/tangents" : (size == 3) ? "vertices"
+																						  : "texCoord");
 #endif
-            }
-    #if 1
-            else {
-                logHandler.Print("  Attr %d: DISABLED\n", i);
-            }
-    #endif
-    }
+		}
+#if 1
+		else {
+			logHandler.Print("  Attr %d: DISABLED\n", i);
+		}
+#endif
+	}
 
-    glBindVertexArray(0);
-    gfxStates.ClearError();
+	glBindVertexArray(0);
+	gfxStates.ClearError();
 }
 
 #endif
@@ -336,38 +366,38 @@ void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstInd
 noexcept
 {
 #ifdef _DEBUG
-    float* data = (float*)(m_dataBuffers[0]->m_data);
-     if (checkLayout)
-        CheckLayout(m_handle);
+	float* data = (float*)(m_dataBuffers[0]->m_data);
+	if (checkLayout)
+		CheckLayout(m_handle);
 #endif
-    if (not StartRender())
-        return;
+	if (not StartRender())
+		return;
 #if 1
-    if (baseShaderHandler.ShaderIsActive() and (textures.size() > 0) and not EnableTextures(textures))
-        return;
+	if (baseShaderHandler.ShaderIsActive() and (textures.size() > 0) and not EnableTextures(textures))
+		return;
 #endif
 #if 1
-    if (m_indexBuffer.m_data) {
-        // the range to draw; glDrawElements takes a BYTE offset into the bound index buffer
-        GLsizei count = (indexCount > 0) ? GLsizei(indexCount) : (m_indexBuffer.m_itemCount - GLsizei(firstIndex));
-        size_t componentSize = (m_indexBuffer.m_componentType == GL_UNSIGNED_INT) ? sizeof(uint32_t) : sizeof(uint16_t);
-        if (count > 0) {
-            glDrawElementsInstanced(DrawMode(m_shape), count, m_indexBuffer.m_componentType,
-                                    reinterpret_cast<const void*>(size_t(firstIndex) * componentSize), m_instanceCount);
-            gfxStates.CountDraw();
-        }
-    }
-    else {
-        glDrawArraysInstanced(DrawMode(m_shape), 0, m_dataBuffers[0]->m_itemCount, m_instanceCount); // draw non indexed arrays
-        gfxStates.CountDraw();
-    }
+	if (m_indexBuffer.m_data) {
+		// the range to draw; glDrawElements takes a BYTE offset into the bound index buffer
+		GLsizei	count = (indexCount > 0) ? GLsizei(indexCount) : (m_indexBuffer.m_itemCount - GLsizei(firstIndex));
+		size_t	componentSize = (m_indexBuffer.m_componentType == GL_UNSIGNED_INT) ? sizeof(uint32_t) : sizeof(uint16_t);
+		if (count > 0) {
+			glDrawElementsInstanced(DrawMode(m_shape), count, m_indexBuffer.m_componentType,
+									reinterpret_cast<const void*>(size_t(firstIndex) * componentSize), m_instanceCount);
+			gfxStates.CountDraw();
+		}
+	}
+	else {
+		glDrawArraysInstanced(DrawMode(m_shape), 0, m_dataBuffers[0]->m_itemCount, m_instanceCount); // draw non indexed arrays
+		gfxStates.CountDraw();
+	}
 #endif
-    // The textures stay bound. GfxStates::BindTexture () returns at once when the same texture is
-    // already on the same unit, so a batch that keeps using them costs nothing after the first draw -
-    // releasing them here threw that away and made every draw bind again, plus two calls for the
-    // release itself. Nor did it protect anything: a slot a later draw does not assign is a fault in
-    // that draw's shader setup, and one that is better seen than papered over.
-    FinishRender();
+	// The textures stay bound. GfxStates::BindTexture () returns at once when the same texture is
+	// already on the same unit, so a batch that keeps using them costs nothing after the first draw -
+	// releasing them here threw that away and made every draw bind again, plus two calls for the
+	// release itself. Nor did it protect anything: a slot a later draw does not assign is a fault in
+	// that draw's shader setup, and one that is better seen than papered over.
+	FinishRender();
 }
 
 // =================================================================================================

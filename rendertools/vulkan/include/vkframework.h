@@ -5,10 +5,10 @@
 // which references BSTR / IStream / IUnknown from the OLE/COM portion of <windows.h>. With
 // lean-and-mean those typedefs are stripped and DXC stops compiling.
 #ifndef NOMINMAX
-#   define NOMINMAX
+#define NOMINMAX
 #endif
 #ifndef NOGDI
-#   define NOGDI    // suppress GDI declarations (Rectangle, Ellipse, ...) — not needed
+#define NOGDI // suppress GDI declarations (Rectangle, Ellipse, ...) — not needed
 #endif
 #include <windows.h>
 #endif
@@ -26,5 +26,5 @@
 #endif
 
 #ifndef VK_STALL_DIAG
-#   define VK_STALL_DIAG 0
+#define VK_STALL_DIAG 0
 #endif

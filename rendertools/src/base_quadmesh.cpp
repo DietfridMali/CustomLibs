@@ -13,160 +13,168 @@
 #include "tracy_wrapper.h"
 
 // caution: the GfxDataLayout shared handle needs glGenVertexArrays and glDeleteVertexArrays, which usually are not yet available when this gfxDataLayout is initialized.
-// GfxDataLayout::Init takes care of that by first assigning a handle-less shared gl handle 
+// GfxDataLayout::Init takes care of that by first assigning a handle-less shared gl handle
 // GfxDataLayout* BaseQuadMesh::m_gfxDataLayout = nullptr;
 
-#if USE_STATIC_GFX_DATA 
+#if USE_STATIC_GFX_DATA
 GfxDataLayout BaseQuadMesh::staticGfxDataLayout;
 #endif
 
 // =================================================================================================
 
 std::initializer_list<Vector3f> BaseQuadMesh::defaultVertices[3] = {
-    { Vector3f{-0.5f, -0.5f, 0.0f}, Vector3f{-0.5f, 0.5f, 0.0f}, Vector3f{0.5f, 0.5f, 0.0f}, Vector3f{0.5f, -0.5f, 0.0f} },
-    { Vector3f{0.0f, 0.0f, 0.0f}, Vector3f{0.0f, 1.0f, 0.0f}, Vector3f{1.0f, 1.0f, 0.0f}, Vector3f{1.0f, 0.0f, 0.0f} },
-    { Vector3f{-0.5f, -0.5f, -1.0f}, Vector3f{-0.5f, 0.5f, -1.0f}, Vector3f{0.5f, 0.5f, -1.0f}, Vector3f{0.5f, -0.5f, -1.0f} }
+	{ Vector3f{ -0.5f, -0.5f, 0.0f }, Vector3f{ -0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, 0.5f, 0.0f }, Vector3f{ 0.5f, -0.5f, 0.0f } },
+	{ Vector3f{ 0.0f, 0.0f, 0.0f }, Vector3f{ 0.0f, 1.0f, 0.0f }, Vector3f{ 1.0f, 1.0f, 0.0f }, Vector3f{ 1.0f, 0.0f, 0.0f } },
+	{ Vector3f{ -0.5f, -0.5f, -1.0f }, Vector3f{ -0.5f, 0.5f, -1.0f }, Vector3f{ 0.5f, 0.5f, -1.0f }, Vector3f{ 0.5f, -0.5f, -1.0f } }
 };
 
 std::initializer_list<TexCoord> BaseQuadMesh::defaultTexCoords[6] = {
 #if 1
-    { TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1} }, // regular
-    { TexCoord{0, 0}, TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0} }, // v flip
-    { TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0}, TexCoord{0, 1} }, // h flip
-    { TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0} }, // v + h flip
-    { TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1} }, // rotate left (ccw) 90 deg
-    { TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0} }, // rotate right (cw) 90 deg
+	{ TexCoord{ 0, 1 }, TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 } }, // regular
+	{ TexCoord{ 0, 0 }, TexCoord{ 0, 1 }, TexCoord{ 1, 1 }, TexCoord{ 1, 0 } }, // v flip
+	{ TexCoord{ 1, 1 }, TexCoord{ 1, 0 }, TexCoord{ 0, 0 }, TexCoord{ 0, 1 } }, // h flip
+	{ TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 }, TexCoord{ 0, 0 } }, // v + h flip
+	{ TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } }, // rotate left (ccw) 90 deg
+	{ TexCoord{ 1, 1 }, TexCoord{ 0, 1 }, TexCoord{ 0, 0 }, TexCoord{ 1, 0 } }, // rotate right (cw) 90 deg
 #else
-    { TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1} }, // regular
-    { TexCoord{0, 0}, TexCoord{0, 1}, TexCoord{1, 1}, TexCoord{1, 0} }, // v flip
-    { TexCoord{1, 1}, TexCoord{1, 0}, TexCoord{0, 0}, TexCoord{0, 1} }, // h flip
-    { TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0} }, // v + h flip
-    { TexCoord{0, 0}, TexCoord{1, 0}, TexCoord{1, 1}, TexCoord{0, 1} }, // rotate left (ccw) 90 deg
-    { TexCoord{1, 1}, TexCoord{0, 1}, TexCoord{0, 0}, TexCoord{1, 0} }, // rotate right (cw) 90 deg
+	{ TexCoord{ 0, 1 }, TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 } }, // regular
+	{ TexCoord{ 0, 0 }, TexCoord{ 0, 1 }, TexCoord{ 1, 1 }, TexCoord{ 1, 0 } }, // v flip
+	{ TexCoord{ 1, 1 }, TexCoord{ 1, 0 }, TexCoord{ 0, 0 }, TexCoord{ 0, 1 } }, // h flip
+	{ TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 }, TexCoord{ 0, 0 } }, // v + h flip
+	{ TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } }, // rotate left (ccw) 90 deg
+	{ TexCoord{ 1, 1 }, TexCoord{ 0, 1 }, TexCoord{ 0, 0 }, TexCoord{ 1, 0 } }, // rotate right (cw) 90 deg
 #endif
 };
 
 // =================================================================================================
 
-void BaseQuadMesh::Init(void) {
-    // just create the gfxDataLayout and its GfxDataBuffers
-    Setup(defaultVertices[0], defaultTexCoords[0]);
+void BaseQuadMesh::Init(void)
+{
+	// just create the gfxDataLayout and its GfxDataBuffers
+	Setup(defaultVertices[0], defaultTexCoords[0]);
 }
 
 
-BaseQuadMesh& BaseQuadMesh::Copy(const BaseQuadMesh& other) {
-    if (this != &other) {
-        if (m_privateGfxData)
-            m_gfxDataLayout->Copy(*other.m_gfxDataLayout);
-        m_vertices = other.m_vertices;
-        m_texCoords[0] = other.m_texCoords[0];
-        m_aspectRatio = other.m_aspectRatio;
-        m_isAvailable = other.m_isAvailable;
-    }
-    return *this;
+BaseQuadMesh& BaseQuadMesh::Copy(const BaseQuadMesh& other)
+{
+	if (this != &other) {
+		if (m_privateGfxData)
+			m_gfxDataLayout->Copy(*other.m_gfxDataLayout);
+		m_vertices = other.m_vertices;
+		m_texCoords[0] = other.m_texCoords[0];
+		m_aspectRatio = other.m_aspectRatio;
+		m_isAvailable = other.m_isAvailable;
+	}
+	return *this;
 }
 
 
 BaseQuadMesh& BaseQuadMesh::Move(BaseQuadMesh& other)
 noexcept
 {
-    if (this != &other) {
-        m_gfxDataLayout = other.m_gfxDataLayout;
-        if ((m_privateGfxData = other.m_privateGfxData))
-            other.m_gfxDataLayout = nullptr;
-        m_vertices = std::move(other.m_vertices);
-        m_texCoords[0] = std::move(other.m_texCoords[0]);
-        m_aspectRatio = other.m_aspectRatio;
-        m_isAvailable = other.m_isAvailable;
-    }
-    return *this;
+	if (this != &other) {
+		m_gfxDataLayout = other.m_gfxDataLayout;
+		if ((m_privateGfxData = other.m_privateGfxData))
+			other.m_gfxDataLayout = nullptr;
+		m_vertices = std::move(other.m_vertices);
+		m_texCoords[0] = std::move(other.m_texCoords[0]);
+		m_aspectRatio = other.m_aspectRatio;
+		m_isAvailable = other.m_isAvailable;
+	}
+	return *this;
 }
 
 
-void BaseQuadMesh::UpdateTexCoords(void) {
-    if (m_texCoords[0].AppDataLength() > 0) {
-        for (auto& tc : m_texCoords[0].AppData())
-            m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
-    }
+void BaseQuadMesh::UpdateTexCoords(void)
+{
+	if (m_texCoords[0].AppDataLength() > 0) {
+		for (auto& tc : m_texCoords[0].AppData())
+			m_maxTexCoord = TexCoord({ std::max(m_maxTexCoord.U(), tc.U()), std::max(m_maxTexCoord.V(), tc.V()) });
+	}
 }
 
 
-bool BaseQuadMesh::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords, bool privateGfxData) {
+bool BaseQuadMesh::Setup(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords, bool privateGfxData)
+{
 
-    auto equals = [](auto const& c, std::initializer_list<typename std::decay_t<decltype(*c.begin())>> il) {
-        return c.size() == il.size() && std::equal(c.begin(), c.end(), il.begin());
-        };
+	auto equals = [](auto const& c, std::initializer_list<typename std::decay_t<decltype(*c.begin())>> il) {
+		return c.size() == il.size() && std::equal(c.begin(), c.end(), il.begin());
+	};
 
-    if (vertices.size() and not equals(m_vertices.AppData().StdList(), vertices)) {
-        Quad::Init(vertices);
-        m_vertices.AppData() = vertices;
-        m_vertices.SetDirty(true);
-    }
+	if (vertices.size() and not equals(m_vertices.AppData().StdList(), vertices)) {
+		Quad::Init(vertices);
+		m_vertices.AppData() = vertices;
+		m_vertices.SetDirty(true);
+	}
 
-    if (texCoords.size() == 0)
-        texCoords = defaultTexCoords[tcRegular];
-    if (not equals(m_texCoords[0].AppData().StdList(), texCoords)) {
-        m_texCoords[0].AppData() = texCoords;
-        //m_texCoords.Setup();
-        m_texCoords[0].SetDirty(true);
-    }
-    UpdateTexCoords();
+	if (texCoords.size() == 0)
+		texCoords = defaultTexCoords[tcRegular];
+	if (not equals(m_texCoords[0].AppData().StdList(), texCoords)) {
+		m_texCoords[0].AppData() = texCoords;
+		//m_texCoords.Setup();
+		m_texCoords[0].SetDirty(true);
+	}
+	UpdateTexCoords();
 
-    if (not CreateLayout())
-        return false;
-    //SetShape(GL_TRIANGLES); // trigger building of triangle index everytime new vertices are loaded
-    UpdateData();
-    //SetShape(GL_QUADS); // trigger building of triangle index everytime new vertices are loaded
-    m_aspectRatio = ComputeAspectRatio();
-    return true;
+	if (not CreateLayout())
+		return false;
+	//SetShape(GL_TRIANGLES); // trigger building of triangle index everytime new vertices are loaded
+	UpdateData();
+	//SetShape(GL_QUADS); // trigger building of triangle index everytime new vertices are loaded
+	m_aspectRatio = ComputeAspectRatio();
+	return true;
 }
 
 
 float BaseQuadMesh::ComputeAspectRatio(void)
 noexcept
 {
-    Vector3f vMin = Vector3f{ 1e6, 1e6, 1e6 };
-    Vector3f vMax = Vector3f{ -1e6, -1e6, -1e6 };
-    for (auto& v : m_vertices.AppData()) {
-        vMin.Minimize(v);
-        vMax.Maximize(v);
-    }
-    return (vMax.Y() - vMin.Y()) / (vMax.X() - vMin.X());
+	Vector3f vMin = Vector3f{ 1e6, 1e6, 1e6 };
+	Vector3f vMax = Vector3f{ -1e6, -1e6, -1e6 };
+	for (auto& v : m_vertices.AppData()) {
+		vMin.Minimize(v);
+		vMax.Maximize(v);
+	}
+	return (vMax.Y() - vMin.Y()) / (vMax.X() - vMin.X());
 }
 
 
-Shader* BaseQuadMesh::LoadShader(std::span<Texture* const> textures, const RGBAColor& color) {
-    UpdateTransformation();
-    if (textures.size() == 0)
-        return baseShaderHandler.LoadPlainColorShader(color, m_premultiply);
-    if (textures.size() > 1)
-        return baseShaderHandler.LoadPlainTextureShader(color, false, Vector2f::ZERO, Vector2f::ONE, m_premultiply);
-    return baseShaderHandler.LoadPlainTextureShader(color, textures[0]->IsRenderTarget(), Vector2f::ZERO, Vector2f::ONE, m_premultiply, textures[0]->ColorEncoding());
+Shader* BaseQuadMesh::LoadShader(std::span<Texture* const> textures, const RGBAColor& color)
+{
+	UpdateTransformation();
+	if (textures.size() == 0)
+		return baseShaderHandler.LoadPlainColorShader(color, m_premultiply);
+	if (textures.size() > 1)
+		return baseShaderHandler.LoadPlainTextureShader(color, false, Vector2f::ZERO, Vector2f::ONE, m_premultiply);
+	return baseShaderHandler.LoadPlainTextureShader(color, textures[0]->IsRenderTarget(), Vector2f::ZERO, Vector2f::ONE,
+													m_premultiply, textures[0]->ColorEncoding());
 }
-        
 
 
-void BaseQuadMesh::UpdateTransformation(void) {
-    if (HaveTransformations()) {
-        baseRenderer.PushMatrix();
-        if (m_transformations.centerOrigin)
-            baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-        if (m_transformations.rotation != 0.0f)
-            baseRenderer.Rotate(m_transformations.rotation, 0, 0, 1);
+
+void BaseQuadMesh::UpdateTransformation(void)
+{
+	if (HaveTransformations()) {
+		baseRenderer.PushMatrix();
+		if (m_transformations.centerOrigin)
+			baseRenderer.Translate(0.5f, 0.5f, 0.0f);
+		if (m_transformations.rotation != 0.0f)
+			baseRenderer.Rotate(m_transformations.rotation, 0, 0, 1);
 #if 1
-        if (m_transformations.flipVertically)
-            baseRenderer.Scale(1.0f, -1.0f, 1.0f);
+		if (m_transformations.flipVertically)
+			baseRenderer.Scale(1.0f, -1.0f, 1.0f);
 #endif
-    }
+	}
 }
 
 
-void BaseQuadMesh::ResetTransformation(void) {
-    if (HaveTransformations()) {
-        baseRenderer.PopMatrix();
-        if (m_transformations.autoClear)
-            ClearTransformations();
-    }
+void BaseQuadMesh::ResetTransformation(void)
+{
+	if (HaveTransformations()) {
+		baseRenderer.PopMatrix();
+		if (m_transformations.autoClear)
+			ClearTransformations();
+	}
 }
 
 
@@ -177,37 +185,39 @@ void BaseQuadMesh::ResetTransformation(void) {
 // (MatrixStack::m_stack), so such a pop takes whatever another bracket had pushed and writes it into the
 // model view. The two early exits leaked the push the other way round. Push here, once, for both paths,
 // and unwind it on every exit.
-bool BaseQuadMesh::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
-    ZoneScoped;
-    //gfxStates.CheckError();
-    if (shader) {
-        UpdateTransformation();
-        // the caller set its shader up before the quad's own transformation went onto the stack
-        if (HaveTransformations())
-            shader->UpdateMatrices();
-    }
-    else if (not (shader = LoadShader(textures, color))) {   // LoadShader () pushes on this path
-        ResetTransformation();
-        //gfxStates.CheckError();
-        return false;
-    }
-    //gfxStates.CheckError();
-    if (not UpdateData()) {
-        ResetTransformation();
-        //gfxStates.CheckError();
-        return false;
-    }
-    //gfxStates.CheckError();
-    m_gfxDataLayout->Render(textures);
-    //gfxStates.CheckError();
-    ResetTransformation();
-    return true;
+bool BaseQuadMesh::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color)
+{
+	ZoneScoped;
+	//gfxStates.CheckError();
+	if (shader) {
+		UpdateTransformation();
+		// the caller set its shader up before the quad's own transformation went onto the stack
+		if (HaveTransformations())
+			shader->UpdateMatrices();
+	}
+	else if (not (shader = LoadShader(textures, color))) { // LoadShader () pushes on this path
+		ResetTransformation();
+		//gfxStates.CheckError();
+		return false;
+	}
+	//gfxStates.CheckError();
+	if (not UpdateData()) {
+		ResetTransformation();
+		//gfxStates.CheckError();
+		return false;
+	}
+	//gfxStates.CheckError();
+	m_gfxDataLayout->Render(textures);
+	//gfxStates.CheckError();
+	ResetTransformation();
+	return true;
 }
 
 
 // fill 2D area defined by x and y components of vertices with color color
-bool BaseQuadMesh::Fill(const RGBAColor& color) {
-    return Render(nullptr, {}, color);
+bool BaseQuadMesh::Fill(const RGBAColor& color)
+{
+	return Render(nullptr, {}, color);
 }
 
 // =================================================================================================

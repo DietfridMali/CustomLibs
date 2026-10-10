@@ -14,7 +14,8 @@ public:
 #if DEBUG_MALLOC
 	static void* operator new(std::size_t size);
 
-	static void operator delete(void* ptr) noexcept;
+	static void operator delete(void* ptr)
+	noexcept;
 
 	static void* operator new[](std::size_t size);
 

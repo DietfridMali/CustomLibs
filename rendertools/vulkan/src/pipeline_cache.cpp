@@ -12,25 +12,28 @@
 #include <vector>
 
 #if VK_STALL_DIAG
-extern double VkStallClock(void) noexcept;
-extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+extern double VkStallClock(void)
+noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail)
+noexcept;
 #endif
 
 namespace {
 
 struct BuildContext {
-    BuildContext(Shader* shader, const char* step) noexcept
-    {
-        logHandler.SetContext("shader '%s': %s", static_cast<const char*>(shader->m_name), step);
+	BuildContext(Shader* shader, const char* step)
+	noexcept
+	{
+		logHandler.SetContext("shader '%s': %s", static_cast<const char*>(shader->m_name), step);
 #if VK_STALL_DIAG
-        VkStallEvent("build", VkStallClock(), logHandler.Context());
+		VkStallEvent("build", VkStallClock(), logHandler.Context());
 #endif
-    }
+	}
 
-    ~BuildContext()
-    {
-        logHandler.ClearContext();
-    }
+	~BuildContext()
+	{
+		logHandler.ClearContext();
+	}
 };
 
 }
@@ -41,916 +44,945 @@ static constexpr uint8_t kVertexInputPart = 0;
 static constexpr uint8_t kPreRasterizationPart = 1;
 static constexpr uint8_t kFragmentShaderPart = 2;
 
-static constexpr VkPipelineCreateFlags kLibraryFlags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR
-                                                     | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
+static constexpr VkPipelineCreateFlags kLibraryFlags =
+	VK_PIPELINE_CREATE_LIBRARY_BIT_KHR | VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
 
 static const VkDynamicState kDynamicStates[] = {
-    VK_DYNAMIC_STATE_VIEWPORT,
-    VK_DYNAMIC_STATE_SCISSOR,
-    VK_DYNAMIC_STATE_STENCIL_REFERENCE,
-    VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
-    VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
-    VK_DYNAMIC_STATE_CULL_MODE,
-    VK_DYNAMIC_STATE_FRONT_FACE,
-    VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
-    VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
-    VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,
-    VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE,
-    VK_DYNAMIC_STATE_DEPTH_BIAS,
-    VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE,
-    VK_DYNAMIC_STATE_STENCIL_OP,
+	VK_DYNAMIC_STATE_VIEWPORT,
+	VK_DYNAMIC_STATE_SCISSOR,
+	VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+	VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
+	VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
+	VK_DYNAMIC_STATE_CULL_MODE,
+	VK_DYNAMIC_STATE_FRONT_FACE,
+	VK_DYNAMIC_STATE_DEPTH_TEST_ENABLE,
+	VK_DYNAMIC_STATE_DEPTH_WRITE_ENABLE,
+	VK_DYNAMIC_STATE_DEPTH_COMPARE_OP,
+	VK_DYNAMIC_STATE_DEPTH_BIAS_ENABLE,
+	VK_DYNAMIC_STATE_DEPTH_BIAS,
+	VK_DYNAMIC_STATE_STENCIL_TEST_ENABLE,
+	VK_DYNAMIC_STATE_STENCIL_OP,
 };
 
 
-static VkPipelineDynamicStateCreateInfo DynamicStateInfo(void) noexcept
+static VkPipelineDynamicStateCreateInfo DynamicStateInfo(void)
+noexcept
 {
-    VkPipelineDynamicStateCreateInfo dynamic { };
-    dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamic.dynamicStateCount = uint32_t(sizeof(kDynamicStates) / sizeof(kDynamicStates[0]));
-    dynamic.pDynamicStates = kDynamicStates;
-    return dynamic;
+	VkPipelineDynamicStateCreateInfo dynamic{};
+	dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic.dynamicStateCount = uint32_t(sizeof(kDynamicStates) / sizeof(kDynamicStates[0]));
+	dynamic.pDynamicStates = kDynamicStates;
+	return dynamic;
 }
 
 
 static uint32_t AddStage(VkPipelineShaderStageCreateInfo* stages, uint32_t stageCount, VkShaderStageFlagBits stage,
-                         VkShaderModule module, const char* entryPoint) noexcept
+						 VkShaderModule module, const char* entryPoint)
+noexcept
 {
-    stages[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[stageCount].stage = stage;
-    stages[stageCount].module = module;
-    stages[stageCount].pName = entryPoint;
-    return stageCount + 1;
+	stages[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	stages[stageCount].stage = stage;
+	stages[stageCount].module = module;
+	stages[stageCount].pName = entryPoint;
+	return stageCount + 1;
 }
 
 
-static uint32_t AddPreRasterizationStages(Shader* shader, VkPipelineShaderStageCreateInfo* stages, uint32_t stageCount) noexcept
+static uint32_t AddPreRasterizationStages(Shader* shader, VkPipelineShaderStageCreateInfo* stages, uint32_t stageCount)
+noexcept
 {
-    stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_VERTEX_BIT, shader->m_vsModule, "VSMain");
-    if (shader->m_gsModule != VK_NULL_HANDLE)
-        stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_GEOMETRY_BIT, shader->m_gsModule, "GSMain");
-    if (shader->IsTessellated()) {
-        stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, shader->m_hsModule, "HSMain");
-        stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, shader->m_dsModule, "DSMain");
-    }
-    return stageCount;
+	stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_VERTEX_BIT, shader->m_vsModule, "VSMain");
+	if (shader->m_gsModule != VK_NULL_HANDLE)
+		stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_GEOMETRY_BIT, shader->m_gsModule, "GSMain");
+	if (shader->IsTessellated()) {
+		stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, shader->m_hsModule, "HSMain");
+		stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, shader->m_dsModule, "DSMain");
+	}
+	return stageCount;
 }
 
 
-static VkPrimitiveTopology ToVkTopology(Shader* shader, uint8_t topology) noexcept
+static VkPrimitiveTopology ToVkTopology(Shader* shader, uint8_t topology)
+noexcept
 {
-    if (shader->IsTessellated())
-        return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
-    if (MeshTopology(topology) == MeshTopology::Lines)
-        return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-    if (MeshTopology(topology) == MeshTopology::Points)
-        return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-    return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	if (shader->IsTessellated())
+		return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+	if (MeshTopology(topology) == MeshTopology::Lines)
+		return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+	if (MeshTopology(topology) == MeshTopology::Points)
+		return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+	return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 }
 
 
-static uint32_t PatchControlPoints(Shader* shader, uint8_t topology) noexcept
+static uint32_t PatchControlPoints(Shader* shader, uint8_t topology)
+noexcept
 {
-    uint32_t patchControlPoints = 3;
-    if (MeshTopology(topology) == MeshTopology::Lines)
-        patchControlPoints = 2;
-    else if (MeshTopology(topology) == MeshTopology::Points)
-        patchControlPoints = 1;
-    if (patchControlPoints != shader->m_patchControlPoints)
-        logHandler.Print("PipelineCache: shader '%s' expects %u patch control points, the mesh delivers %u\n",
-                (const char*)shader->m_name, shader->m_patchControlPoints, patchControlPoints);
-    return patchControlPoints;
+	uint32_t patchControlPoints = 3;
+	if (MeshTopology(topology) == MeshTopology::Lines)
+		patchControlPoints = 2;
+	else if (MeshTopology(topology) == MeshTopology::Points)
+		patchControlPoints = 1;
+	if (patchControlPoints != shader->m_patchControlPoints)
+		logHandler.Print("PipelineCache: shader '%s' expects %u patch control points, the mesh delivers %u\n",
+						 (const char*)shader->m_name, shader->m_patchControlPoints, patchControlPoints);
+	return patchControlPoints;
 }
 
 
-static uint8_t TopologyForPatchControlPoints(uint32_t patchControlPoints) noexcept
+static uint8_t TopologyForPatchControlPoints(uint32_t patchControlPoints)
+noexcept
 {
-    if (patchControlPoints == 2)
-        return uint8_t(MeshTopology::Lines);
-    if (patchControlPoints == 1)
-        return uint8_t(MeshTopology::Points);
-    return uint8_t(MeshTopology::Triangles);
+	if (patchControlPoints == 2)
+		return uint8_t(MeshTopology::Lines);
+	if (patchControlPoints == 1)
+		return uint8_t(MeshTopology::Points);
+	return uint8_t(MeshTopology::Triangles);
 }
 
 
-static VkPipelineRenderingCreateInfo RenderingInfo(const VkFormat* colorFormats, uint32_t colorFormatCount, VkFormat depthFormat) noexcept
+static VkPipelineRenderingCreateInfo RenderingInfo(const VkFormat* colorFormats, uint32_t colorFormatCount, VkFormat depthFormat)
+noexcept
 {
-    VkPipelineRenderingCreateInfo renderingInfo { };
-    renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    renderingInfo.colorAttachmentCount = colorFormatCount;
-    renderingInfo.pColorAttachmentFormats = colorFormats;
-    renderingInfo.depthAttachmentFormat = depthFormat;
-    // A combined depth/stencil format has to be named on BOTH attachment slots, or the stencil test is
-    // silently dead: the pipeline would carry no stencil attachment for vkCmdBeginRendering to match.
-    bool hasStencilPlane = (depthFormat == VK_FORMAT_D24_UNORM_S8_UINT)
-                        or (depthFormat == VK_FORMAT_D32_SFLOAT_S8_UINT)
-                        or (depthFormat == VK_FORMAT_D16_UNORM_S8_UINT);
-    renderingInfo.stencilAttachmentFormat = hasStencilPlane ? depthFormat : VK_FORMAT_UNDEFINED;
-    return renderingInfo;
+	VkPipelineRenderingCreateInfo renderingInfo{};
+	renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+	renderingInfo.colorAttachmentCount = colorFormatCount;
+	renderingInfo.pColorAttachmentFormats = colorFormats;
+	renderingInfo.depthAttachmentFormat = depthFormat;
+	// A combined depth/stencil format has to be named on BOTH attachment slots, or the stencil test is
+	// silently dead: the pipeline would carry no stencil attachment for vkCmdBeginRendering to match.
+	bool hasStencilPlane = (depthFormat == VK_FORMAT_D24_UNORM_S8_UINT) or (depthFormat == VK_FORMAT_D32_SFLOAT_S8_UINT) or
+		(depthFormat == VK_FORMAT_D16_UNORM_S8_UINT);
+	renderingInfo.stencilAttachmentFormat = hasStencilPlane ? depthFormat : VK_FORMAT_UNDEFINED;
+	return renderingInfo;
 }
 
 
-static void FillBlendAttachments(const PipelineKey& key, VkPipelineColorBlendAttachmentState* attachments) noexcept
+static void FillBlendAttachments(const PipelineKey& key, VkPipelineColorBlendAttachmentState* attachments)
+noexcept
 {
-    // Color blend — RT0's config applied to every color attachment, or each target's own config when
-    // independent blending is requested (WBOIT: RT0 additive accum, RT1 multiplicative revealage).
-    for (uint32_t i = 0; i < key.colorFormatCount; ++i)
-        key.states.SetBlendAttachment(attachments[i], key.states.independentBlend ? int(i) : 0);
-    for (uint32_t i = 0; i < key.colorFormatCount; ++i) {
-        if (IsIntegerColorFormat(key.colorFormats[i]))
-            attachments[i].blendEnable = VK_FALSE;
-        if (key.colorFormats[i] == VK_FORMAT_UNDEFINED) {
-            attachments[i].blendEnable = VK_FALSE;
-            attachments[i].colorWriteMask = 0;
-        }
-    }
+	// Color blend — RT0's config applied to every color attachment, or each target's own config when
+	// independent blending is requested (WBOIT: RT0 additive accum, RT1 multiplicative revealage).
+	for (uint32_t i = 0; i < key.colorFormatCount; ++i)
+		key.states.SetBlendAttachment(attachments[i], key.states.independentBlend ? int(i) : 0);
+	for (uint32_t i = 0; i < key.colorFormatCount; ++i) {
+		if (IsIntegerColorFormat(key.colorFormats[i]))
+			attachments[i].blendEnable = VK_FALSE;
+		if (key.colorFormats[i] == VK_FORMAT_UNDEFINED) {
+			attachments[i].blendEnable = VK_FALSE;
+			attachments[i].colorWriteMask = 0;
+		}
+	}
 }
 
 // =================================================================================================
 // PipelineCache
 
-PipelineCache::PipelineCache(void) noexcept {
-    m_cache.SetComparator(&PipelineCache::CompareKeys);
+PipelineCache::PipelineCache(void)
+noexcept
+{
+	m_cache.SetComparator(&PipelineCache::CompareKeys);
 }
 
 
-bool PipelineCache::Create(VkDevice device) noexcept
+bool PipelineCache::Create(VkDevice device)
+noexcept
 {
-    if (device == VK_NULL_HANDLE)
-        return false;
-    m_device = device;
+	if (device == VK_NULL_HANDLE)
+		return false;
+	m_device = device;
 
-    VkPipelineCacheCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-    // initialDataSize / pInitialData stay zero — could be loaded from disk for warm-start.
+	VkPipelineCacheCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+	// initialDataSize / pInitialData stay zero — could be loaded from disk for warm-start.
 
-    VkResult res = vkCreatePipelineCache(device, &info, nullptr, &m_pipelineCache);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("PipelineCache::Create: vkCreatePipelineCache failed (%d)\n", (int)res);
-        return false;
-    }
+	VkResult res = vkCreatePipelineCache(device, &info, nullptr, &m_pipelineCache);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("PipelineCache::Create: vkCreatePipelineCache failed (%d)\n", (int)res);
+		return false;
+	}
 #if VK_STALL_DIAG
-    VkPhysicalDeviceDriverProperties driver { };
-    driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
-    VkPhysicalDeviceProperties2 deviceInfo { };
-    deviceInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    deviceInfo.pNext = &driver;
-    vkGetPhysicalDeviceProperties2(vkContext.PhysicalDevice(), &deviceInfo);
-    const VkPhysicalDeviceProperties& props = deviceInfo.properties;
-    char deviceText[1024];
-    snprintf(deviceText, sizeof(deviceText), "%s, vendor 0x%04X, device 0x%04X, driver 0x%08X (%s, %s)",
-             props.deviceName, props.vendorID, props.deviceID, props.driverVersion, driver.driverName, driver.driverInfo);
-    VkStallEvent("device", VkStallClock(), deviceText);
-    VkStallEvent("pipeline library", VkStallClock(), vkContext.HasPipelineLibrary() ? "available" : "NOT available, monolithic pipelines");
+	VkPhysicalDeviceDriverProperties driver{};
+	driver.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+	VkPhysicalDeviceProperties2 deviceInfo{};
+	deviceInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+	deviceInfo.pNext = &driver;
+	vkGetPhysicalDeviceProperties2(vkContext.PhysicalDevice(), &deviceInfo);
+	const VkPhysicalDeviceProperties&	props = deviceInfo.properties;
+	char								deviceText[1024];
+	snprintf(deviceText, sizeof(deviceText), "%s, vendor 0x%04X, device 0x%04X, driver 0x%08X (%s, %s)",
+			 props.deviceName, props.vendorID, props.deviceID, props.driverVersion, driver.driverName, driver.driverInfo);
+	VkStallEvent("device", VkStallClock(), deviceText);
+	VkStallEvent("pipeline library", VkStallClock(), vkContext.HasPipelineLibrary() ? "available" : "NOT available, monolithic pipelines");
 #endif
-    return true;
+	return true;
 }
 
 
-void PipelineCache::Destroy(void) noexcept
+void PipelineCache::Destroy(void)
+noexcept
 {
-    if (m_device != VK_NULL_HANDLE) {
-        for (auto& p : m_pipelines) {
-            if (p != VK_NULL_HANDLE)
-                vkDestroyPipeline(m_device, p, nullptr);
-        }
-        for (auto& p : m_shaderLibraries) {
-            if (p != VK_NULL_HANDLE)
-                vkDestroyPipeline(m_device, p, nullptr);
-        }
-        for (auto& p : m_outputLibraries) {
-            if (p != VK_NULL_HANDLE)
-                vkDestroyPipeline(m_device, p, nullptr);
-        }
-        if (m_pipelineCache != VK_NULL_HANDLE) {
-            vkDestroyPipelineCache(m_device, m_pipelineCache, nullptr);
-            m_pipelineCache = VK_NULL_HANDLE;
-        }
-    }
-    m_pipelines.Reset();
-    m_keys.Reset();
-    m_fastLinked.Reset();
-    m_shaderLibraryKeys.Reset();
-    m_shaderLibraries.Reset();
-    m_outputLibraryKeys.Reset();
-    m_outputLibraries.Reset();
-    m_cache.Clear();
-    m_device = VK_NULL_HANDLE;
+	if (m_device != VK_NULL_HANDLE) {
+		for (auto& p : m_pipelines) {
+			if (p != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, p, nullptr);
+		}
+		for (auto& p : m_shaderLibraries) {
+			if (p != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, p, nullptr);
+		}
+		for (auto& p : m_outputLibraries) {
+			if (p != VK_NULL_HANDLE)
+				vkDestroyPipeline(m_device, p, nullptr);
+		}
+		if (m_pipelineCache != VK_NULL_HANDLE) {
+			vkDestroyPipelineCache(m_device, m_pipelineCache, nullptr);
+			m_pipelineCache = VK_NULL_HANDLE;
+		}
+	}
+	m_pipelines.Reset();
+	m_keys.Reset();
+	m_fastLinked.Reset();
+	m_shaderLibraryKeys.Reset();
+	m_shaderLibraries.Reset();
+	m_outputLibraryKeys.Reset();
+	m_outputLibraries.Reset();
+	m_cache.Clear();
+	m_device = VK_NULL_HANDLE;
 }
 
 
-static const char* CacheHeaderMismatch(const VkPipelineCacheHeaderVersionOne& header, const VkPhysicalDeviceProperties& props) noexcept
+static const char* CacheHeaderMismatch(const VkPipelineCacheHeaderVersionOne& header, const VkPhysicalDeviceProperties& props)
+noexcept
 {
-    if (header.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE)
-        return "header version differs";
-    if (header.headerSize < sizeof(header))
-        return "header size too small";
-    if (header.vendorID != props.vendorID)
-        return "vendor id differs";
-    if (header.deviceID != props.deviceID)
-        return "device id differs";
-    if (std::memcmp(header.pipelineCacheUUID, props.pipelineCacheUUID, VK_UUID_SIZE) != 0)
-        return "pipeline cache uuid differs";
-    return nullptr;
+	if (header.headerVersion != VK_PIPELINE_CACHE_HEADER_VERSION_ONE)
+		return "header version differs";
+	if (header.headerSize < sizeof(header))
+		return "header size too small";
+	if (header.vendorID != props.vendorID)
+		return "vendor id differs";
+	if (header.deviceID != props.deviceID)
+		return "device id differs";
+	if (std::memcmp(header.pipelineCacheUUID, props.pipelineCacheUUID, VK_UUID_SIZE) != 0)
+		return "pipeline cache uuid differs";
+	return nullptr;
 }
 
 
 static const char* MergeStoredCache(VkDevice device, VkPipelineCache target, const String& shaderFolder, size_t& size)
 {
-    std::vector<uint8_t> data;
-    if (not ShaderCache::ReadFile(shaderFolder, String("pipelines.vulkan"), data))
-        return "no file";
-    size = data.size();
-    VkPipelineCacheHeaderVersionOne header { };
-    if (data.size() < sizeof(header))
-        return "file too small";
-    std::memcpy(&header, data.data(), sizeof(header));
-    const char* mismatch = CacheHeaderMismatch(header, vkContext.DeviceProps());
-    if (mismatch != nullptr)
-        return mismatch;
+	std::vector<uint8_t> data;
+	if (not ShaderCache::ReadFile(shaderFolder, String("pipelines.vulkan"), data))
+		return "no file";
+	size = data.size();
+	VkPipelineCacheHeaderVersionOne header{};
+	if (data.size() < sizeof(header))
+		return "file too small";
+	std::memcpy(&header, data.data(), sizeof(header));
+	const char* mismatch = CacheHeaderMismatch(header, vkContext.DeviceProps());
+	if (mismatch != nullptr)
+		return mismatch;
 
-    VkPipelineCacheCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-    info.initialDataSize = data.size();
-    info.pInitialData = data.data();
-    VkPipelineCache loaded = VK_NULL_HANDLE;
-    if (vkCreatePipelineCache(device, &info, nullptr, &loaded) != VK_SUCCESS)
-        return "rejected by the driver";
-    VkResult res = vkMergePipelineCaches(device, target, 1, &loaded);
-    vkDestroyPipelineCache(device, loaded, nullptr);
-    return (res == VK_SUCCESS) ? nullptr : "merge failed";
+	VkPipelineCacheCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+	info.initialDataSize = data.size();
+	info.pInitialData = data.data();
+	VkPipelineCache loaded = VK_NULL_HANDLE;
+	if (vkCreatePipelineCache(device, &info, nullptr, &loaded) != VK_SUCCESS)
+		return "rejected by the driver";
+	VkResult res = vkMergePipelineCaches(device, target, 1, &loaded);
+	vkDestroyPipelineCache(device, loaded, nullptr);
+	return (res == VK_SUCCESS) ? nullptr : "merge failed";
 }
 
 
 bool PipelineCache::Load(const String& shaderFolder)
 {
-    m_folder = shaderFolder;
-    LoadRecords();
+	m_folder = shaderFolder;
+	LoadRecords();
 #if VK_STALL_DIAG
-    char detail[1200];
-    snprintf(detail, sizeof(detail), "'%s'", static_cast<const char*>(shaderFolder));
-    VkStallEvent("shader folder", VkStallClock(), detail);
-    snprintf(detail, sizeof(detail), "pipelinekeys.vulkan: %d records", int(m_records.Length()));
-    VkStallEvent("pipeline cache", VkStallClock(), detail);
+	char detail[1200];
+	snprintf(detail, sizeof(detail), "'%s'", static_cast<const char*>(shaderFolder));
+	VkStallEvent("shader folder", VkStallClock(), detail);
+	snprintf(detail, sizeof(detail), "pipelinekeys.vulkan: %d records", int(m_records.Length()));
+	VkStallEvent("pipeline cache", VkStallClock(), detail);
 #endif
-    if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
-        return false;
-    size_t size = 0;
-    const char* failure = MergeStoredCache(m_device, m_pipelineCache, shaderFolder, size);
+	if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
+		return false;
+	size_t		size = 0;
+	const char*	failure = MergeStoredCache(m_device, m_pipelineCache, shaderFolder, size);
 #if VK_STALL_DIAG
-    if (failure == nullptr)
-        snprintf(detail, sizeof(detail), "pipelines.vulkan: merged, %zu bytes", size);
-    else
-        snprintf(detail, sizeof(detail), "pipelines.vulkan: not used, %s", failure);
-    VkStallEvent("pipeline cache", VkStallClock(), detail);
+	if (failure == nullptr)
+		snprintf(detail, sizeof(detail), "pipelines.vulkan: merged, %zu bytes", size);
+	else
+		snprintf(detail, sizeof(detail), "pipelines.vulkan: not used, %s", failure);
+	VkStallEvent("pipeline cache", VkStallClock(), detail);
 #endif
-    return failure == nullptr;
+	return failure == nullptr;
 }
 
 
 bool PipelineCache::Save(void)
 {
-    SaveRecords();
-    if (m_folder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
-        return false;
-    size_t size = 0;
-    if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, nullptr) != VK_SUCCESS)
-        return false;
-    if (size == 0)
-        return false;
-    std::vector<uint8_t> data(size, 0);
-    if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, data.data()) != VK_SUCCESS)
-        return false;
-    return ShaderCache::WriteFile(m_folder, String("pipelines.vulkan"), data.data(), size);
+	SaveRecords();
+	if (m_folder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
+		return false;
+	size_t size = 0;
+	if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, nullptr) != VK_SUCCESS)
+		return false;
+	if (size == 0)
+		return false;
+	std::vector<uint8_t> data(size, 0);
+	if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, data.data()) != VK_SUCCESS)
+		return false;
+	return ShaderCache::WriteFile(m_folder, String("pipelines.vulkan"), data.data(), size);
 }
 
 
-int PipelineCache::FindPipeline(VkPipeline pipeline) const noexcept
+int PipelineCache::FindPipeline(VkPipeline pipeline) const
+noexcept
 {
-    for (int i = 0; i < m_pipelines.Length(); ++i) {
-        if (m_pipelines[i] == pipeline)
-            return i;
-    }
-    return -1;
+	for (int i = 0; i < m_pipelines.Length(); ++i) {
+		if (m_pipelines[i] == pipeline)
+			return i;
+	}
+	return -1;
 }
 
 
-VkPipeline PipelineCache::GetOrCreate(const PipelineKey& requestedKey) noexcept
+VkPipeline PipelineCache::GetOrCreate(const PipelineKey& requestedKey)
+noexcept
 {
-    PipelineKey key = requestedKey;
-    NormalizeKey(key);
-    const bool usesLibraries = vkContext.HasPipelineLibrary();
-    VkPipeline* found = m_cache.Find(key);
-    int foundIndex = -1;
-    if (found != nullptr) {
-        if (not (m_precreating and usesLibraries))
-            return *found;
-        foundIndex = FindPipeline(*found);
-        if ((foundIndex < 0) or not m_fastLinked[foundIndex])
-            return *found;
-    }
+	PipelineKey key = requestedKey;
+	NormalizeKey(key);
+	const bool	usesLibraries = vkContext.HasPipelineLibrary();
+	VkPipeline*	found = m_cache.Find(key);
+	int			foundIndex = -1;
+	if (found != nullptr) {
+		if (not (m_precreating and usesLibraries))
+			return *found;
+		foundIndex = FindPipeline(*found);
+		if ((foundIndex < 0) or not m_fastLinked[foundIndex])
+			return *found;
+	}
 
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    const bool optimize = m_precreating;
-    vkContext.SetValidationShader(static_cast<const char*>(key.shader->m_name));
-    VkPipeline pipeline = usesLibraries ? LinkPipeline(key, optimize) : BuildPipeline(key);
-    vkContext.SetValidationShader(nullptr);
-    if (pipeline == VK_NULL_HANDLE)
-        return (found != nullptr) ? *found : VK_NULL_HANDLE;
+	const bool optimize = m_precreating;
+	vkContext.SetValidationShader(static_cast<const char*>(key.shader->m_name));
+	VkPipeline pipeline = usesLibraries ? LinkPipeline(key, optimize) : BuildPipeline(key);
+	vkContext.SetValidationShader(nullptr);
+	if (pipeline == VK_NULL_HANDLE)
+		return (found != nullptr) ? *found : VK_NULL_HANDLE;
 
-    const uint8_t isFastLinked = (usesLibraries and not optimize) ? 1 : 0;
-    if (found != nullptr) {
-        VkPipeline replaced = *found;
-        VkDevice device = m_device;
-        gfxResourceHandler.TrackCleanup([device, replaced]() {
-            vkDestroyPipeline(device, replaced, nullptr);
-        });
-        *found = pipeline;
-        m_pipelines[foundIndex] = pipeline;
-        m_fastLinked[foundIndex] = isFastLinked;
-    }
-    else {
-        m_cache.Insert(key, pipeline);
-        m_pipelines.Append(pipeline);
-        m_keys.Append(key);
-        m_fastLinked.Append(isFastLinked);
-    }
-    Remember(key);
+	const uint8_t isFastLinked = (usesLibraries and not optimize) ? 1 : 0;
+	if (found != nullptr) {
+		VkPipeline	replaced = *found;
+		VkDevice	device = m_device;
+		gfxResourceHandler.TrackCleanup([device, replaced]() {
+			vkDestroyPipeline(device, replaced, nullptr);
+		});
+		*found = pipeline;
+		m_pipelines[foundIndex] = pipeline;
+		m_fastLinked[foundIndex] = isFastLinked;
+	}
+	else {
+		m_cache.Insert(key, pipeline);
+		m_pipelines.Append(pipeline);
+		m_keys.Append(key);
+		m_fastLinked.Append(isFastLinked);
+	}
+	Remember(key);
 #if VK_STALL_DIAG
-    const char* buildType = usesLibraries ? (optimize ? "optimized link" : "fast link") : "monolithic";
-    char detail[256];
-    snprintf(detail, sizeof(detail), "%s%s, shader '%s', pipeline #%d, colors %u, blend %d, fill %d",
-             m_precreating ? "precreate " : "LAZY ", buildType, static_cast<const char*>(key.shader->m_name), int(m_pipelines.Length()),
-             key.colorFormatCount, int(key.states.blendEnable[0]), int(key.states.fillMode));
-    VkStallEvent("pipeline build", stallStart, detail);
+	const char*	buildType = usesLibraries ? (optimize ? "optimized link" : "fast link") : "monolithic";
+	char		detail[256];
+	snprintf(detail, sizeof(detail), "%s%s, shader '%s', pipeline #%d, colors %u, blend %d, fill %d",
+			 m_precreating ? "precreate " : "LAZY ", buildType, static_cast<const char*>(key.shader->m_name), int(m_pipelines.Length()),
+			 key.colorFormatCount, int(key.states.blendEnable[0]), int(key.states.fillMode));
+	VkStallEvent("pipeline build", stallStart, detail);
 #endif
-    return pipeline;
+	return pipeline;
 }
 
 
-void PipelineCache::NormalizeKey(PipelineKey& key) noexcept
+void PipelineCache::NormalizeKey(PipelineKey& key)
+noexcept
 {
-    const RenderStates defaults { };
-    RenderStates& s = key.states;
+	const RenderStates	defaults{};
+	RenderStates&		s = key.states;
 
-    s.stencilRef = defaults.stencilRef;
-    s.scissorTest = defaults.scissorTest;
-    s.cullMode = defaults.cullMode;
-    s.faceCulling = defaults.faceCulling;
-    s.winding = defaults.winding;
-    s.depthTest = defaults.depthTest;
-    s.depthWrite = defaults.depthWrite;
-    s.depthFunc = defaults.depthFunc;
-    s.depthBias = defaults.depthBias;
-    s.slopeScaledDepthBias = defaults.slopeScaledDepthBias;
-    s.stencilTest = defaults.stencilTest;
-    s.stencilFunc = defaults.stencilFunc;
-    s.stencilSFail = defaults.stencilSFail;
-    s.stencilDPFail = defaults.stencilDPFail;
-    s.stencilDPPass = defaults.stencilDPPass;
-    s.stencilBackSFail = defaults.stencilBackSFail;
-    s.stencilBackDPFail = defaults.stencilBackDPFail;
-    s.stencilBackDPPass = defaults.stencilBackDPPass;
-    s.stencilMask = defaults.stencilMask;
-    s.stencilWriteMask = defaults.stencilWriteMask;
-    if (key.colorFormatCount <= 1)
-        s.independentBlend = 0;
-    int blendTargets = 0;
-    if (key.colorFormatCount > 0)
-        blendTargets = s.independentBlend ? int(key.colorFormatCount) : 1;
-    for (int i = 0; i < RenderStates::kColorTargets; ++i) {
-        bool isUsed = (i < blendTargets);
-        if (not isUsed) {
-            s.blendEnable[i] = defaults.blendEnable[i];
-            s.colorMask[i] = defaults.colorMask[i];
-        }
-        if (not (isUsed and s.blendEnable[i])) {
-            s.blendSrcRGB[i] = defaults.blendSrcRGB[i];
-            s.blendDstRGB[i] = defaults.blendDstRGB[i];
-            s.blendSrcAlpha[i] = defaults.blendSrcAlpha[i];
-            s.blendDstAlpha[i] = defaults.blendDstAlpha[i];
-            s.blendOpRGB[i] = defaults.blendOpRGB[i];
-            s.blendOpAlpha[i] = defaults.blendOpAlpha[i];
-        }
-    }
+	s.stencilRef = defaults.stencilRef;
+	s.scissorTest = defaults.scissorTest;
+	s.cullMode = defaults.cullMode;
+	s.faceCulling = defaults.faceCulling;
+	s.winding = defaults.winding;
+	s.depthTest = defaults.depthTest;
+	s.depthWrite = defaults.depthWrite;
+	s.depthFunc = defaults.depthFunc;
+	s.depthBias = defaults.depthBias;
+	s.slopeScaledDepthBias = defaults.slopeScaledDepthBias;
+	s.stencilTest = defaults.stencilTest;
+	s.stencilFunc = defaults.stencilFunc;
+	s.stencilSFail = defaults.stencilSFail;
+	s.stencilDPFail = defaults.stencilDPFail;
+	s.stencilDPPass = defaults.stencilDPPass;
+	s.stencilBackSFail = defaults.stencilBackSFail;
+	s.stencilBackDPFail = defaults.stencilBackDPFail;
+	s.stencilBackDPPass = defaults.stencilBackDPPass;
+	s.stencilMask = defaults.stencilMask;
+	s.stencilWriteMask = defaults.stencilWriteMask;
+	if (key.colorFormatCount <= 1)
+		s.independentBlend = 0;
+	int blendTargets = 0;
+	if (key.colorFormatCount > 0)
+		blendTargets = s.independentBlend ? int(key.colorFormatCount) : 1;
+	for (int i = 0; i < RenderStates::kColorTargets; ++i) {
+		bool isUsed = (i < blendTargets);
+		if (not isUsed) {
+			s.blendEnable[i] = defaults.blendEnable[i];
+			s.colorMask[i] = defaults.colorMask[i];
+		}
+		if (not (isUsed and s.blendEnable[i])) {
+			s.blendSrcRGB[i] = defaults.blendSrcRGB[i];
+			s.blendDstRGB[i] = defaults.blendDstRGB[i];
+			s.blendSrcAlpha[i] = defaults.blendSrcAlpha[i];
+			s.blendDstAlpha[i] = defaults.blendDstAlpha[i];
+			s.blendOpRGB[i] = defaults.blendOpRGB[i];
+			s.blendOpAlpha[i] = defaults.blendOpAlpha[i];
+		}
+	}
 }
 
 
-void PipelineCache::Remember(const PipelineKey& key) noexcept
+void PipelineCache::Remember(const PipelineKey& key)
+noexcept
 {
-    PipelineRecord record { };
-    record.states = key.states;
-    std::memcpy(record.colorFormats, key.colorFormats, sizeof(record.colorFormats));
-    record.colorFormatCount = key.colorFormatCount;
-    record.depthFormat = key.depthFormat;
-    for (int i = 0; i < m_records.Length(); ++i) {
-        if ((m_recordNames[i] == key.shader->m_name) and (std::memcmp(&m_records[i], &record, sizeof(PipelineRecord)) == 0))
-            return;
-    }
-    m_recordNames.Append(key.shader->m_name);
-    m_records.Append(record);
-    m_recordsDirty = true;
+	PipelineRecord record{};
+	record.states = key.states;
+	std::memcpy(record.colorFormats, key.colorFormats, sizeof(record.colorFormats));
+	record.colorFormatCount = key.colorFormatCount;
+	record.depthFormat = key.depthFormat;
+	for (int i = 0; i < m_records.Length(); ++i) {
+		if ((m_recordNames[i] == key.shader->m_name) and (std::memcmp(&m_records[i], &record, sizeof(PipelineRecord)) == 0))
+			return;
+	}
+	m_recordNames.Append(key.shader->m_name);
+	m_records.Append(record);
+	m_recordsDirty = true;
 }
 
 
-static uint64_t PipelineRecordFileKey(void) noexcept
+static uint64_t PipelineRecordFileKey(void)
+noexcept
 {
-    uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, "pipelinekeys.vulkan");
-    key = ShaderCache::Hash(key, &kPipelineRecordVersion, sizeof(kPipelineRecordVersion));
-    uint64_t recordSize = uint64_t(sizeof(PipelineRecord));
-    return ShaderCache::Hash(key, &recordSize, sizeof(recordSize));
+	uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, "pipelinekeys.vulkan");
+	key = ShaderCache::Hash(key, &kPipelineRecordVersion, sizeof(kPipelineRecordVersion));
+	uint64_t recordSize = uint64_t(sizeof(PipelineRecord));
+	return ShaderCache::Hash(key, &recordSize, sizeof(recordSize));
 }
 
 
 bool PipelineCache::LoadRecords(void)
 {
-    m_recordNames.Reset();
-    m_records.Reset();
-    m_recordsDirty = false;
-    if (m_folder.IsEmpty())
-        return false;
-    std::vector<uint8_t> payload;
-    uint32_t tag = 0;
-    if (not ShaderCache::Read(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), payload, tag))
-        return false;
-    size_t offset = 0;
-    while (offset + sizeof(uint32_t) <= payload.size()) {
-        uint32_t nameLength = 0;
-        std::memcpy(&nameLength, payload.data() + offset, sizeof(nameLength));
-        offset += sizeof(nameLength);
-        if (offset + size_t(nameLength) + sizeof(PipelineRecord) > payload.size())
-            break;
-        String name(reinterpret_cast<const char*>(payload.data() + offset), size_t(nameLength));
-        offset += size_t(nameLength);
-        PipelineRecord record { };
-        std::memcpy(&record, payload.data() + offset, sizeof(PipelineRecord));
-        offset += sizeof(PipelineRecord);
-        m_recordNames.Append(name);
-        m_records.Append(record);
-    }
-    return true;
+	m_recordNames.Reset();
+	m_records.Reset();
+	m_recordsDirty = false;
+	if (m_folder.IsEmpty())
+		return false;
+	std::vector<uint8_t>	payload;
+	uint32_t				tag = 0;
+	if (not ShaderCache::Read(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), payload, tag))
+		return false;
+	size_t offset = 0;
+	while (offset + sizeof(uint32_t) <= payload.size()) {
+		uint32_t nameLength = 0;
+		std::memcpy(&nameLength, payload.data() + offset, sizeof(nameLength));
+		offset += sizeof(nameLength);
+		if (offset + size_t(nameLength) + sizeof(PipelineRecord) > payload.size())
+			break;
+		String name(reinterpret_cast<const char*>(payload.data() + offset), size_t(nameLength));
+		offset += size_t(nameLength);
+		PipelineRecord record{};
+		std::memcpy(&record, payload.data() + offset, sizeof(PipelineRecord));
+		offset += sizeof(PipelineRecord);
+		m_recordNames.Append(name);
+		m_records.Append(record);
+	}
+	return true;
 }
 
 
 bool PipelineCache::SaveRecords(void)
 {
-    if (m_folder.IsEmpty() or not m_recordsDirty)
-        return false;
-    std::vector<uint8_t> payload;
-    for (int i = 0; i < m_records.Length(); ++i) {
-        const char* name = static_cast<const char*>(m_recordNames[i]);
-        uint32_t nameLength = uint32_t(std::strlen(name));
-        const uint8_t* lengthBytes = reinterpret_cast<const uint8_t*>(&nameLength);
-        payload.insert(payload.end(), lengthBytes, lengthBytes + sizeof(nameLength));
-        payload.insert(payload.end(), reinterpret_cast<const uint8_t*>(name), reinterpret_cast<const uint8_t*>(name) + nameLength);
-        const uint8_t* recordBytes = reinterpret_cast<const uint8_t*>(&m_records[i]);
-        payload.insert(payload.end(), recordBytes, recordBytes + sizeof(PipelineRecord));
-    }
-    if (not ShaderCache::Write(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), 0, payload.data(), payload.size()))
-        return false;
-    m_recordsDirty = false;
-    return true;
+	if (m_folder.IsEmpty() or not m_recordsDirty)
+		return false;
+	std::vector<uint8_t> payload;
+	for (int i = 0; i < m_records.Length(); ++i) {
+		const char*		name = static_cast<const char*>(m_recordNames[i]);
+		uint32_t		nameLength = uint32_t(std::strlen(name));
+		const uint8_t*	lengthBytes = reinterpret_cast<const uint8_t*>(&nameLength);
+		payload.insert(payload.end(), lengthBytes, lengthBytes + sizeof(nameLength));
+		payload.insert(payload.end(), reinterpret_cast<const uint8_t*>(name), reinterpret_cast<const uint8_t*>(name) + nameLength);
+		const uint8_t* recordBytes = reinterpret_cast<const uint8_t*>(&m_records[i]);
+		payload.insert(payload.end(), recordBytes, recordBytes + sizeof(PipelineRecord));
+	}
+	if (not ShaderCache::Write(m_folder, String("pipelinekeys.vulkan"), PipelineRecordFileKey(), 0, payload.data(), payload.size()))
+		return false;
+	m_recordsDirty = false;
+	return true;
 }
 
 
-void PipelineCache::Precreate(void) noexcept
+void PipelineCache::Precreate(void)
+noexcept
 {
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
-    int pipelineCount = m_pipelines.Length();
-    int withoutShader = 0;
-    int failed = 0;
+	double	stallStart = VkStallClock();
+	int		pipelineCount = m_pipelines.Length();
+	int		withoutShader = 0;
+	int		failed = 0;
 #endif
-    m_precreating = true;
-    for (int i = 0; i < m_records.Length(); ++i) {
-        Shader* shader = baseShaderHandler.GetShader(m_recordNames[i]);
-        if (shader == nullptr) {
+	m_precreating = true;
+	for (int i = 0; i < m_records.Length(); ++i) {
+		Shader* shader = baseShaderHandler.GetShader(m_recordNames[i]);
+		if (shader == nullptr) {
 #if VK_STALL_DIAG
-            ++withoutShader;
+			++withoutShader;
 #endif
-            continue;
-        }
-        PipelineKey key { };
-        key.shader = shader;
-        key.states = m_records[i].states;
-        std::memcpy(key.colorFormats, m_records[i].colorFormats, sizeof(key.colorFormats));
-        key.colorFormatCount = m_records[i].colorFormatCount;
-        key.depthFormat = m_records[i].depthFormat;
+			continue;
+		}
+		PipelineKey key{};
+		key.shader = shader;
+		key.states = m_records[i].states;
+		std::memcpy(key.colorFormats, m_records[i].colorFormats, sizeof(key.colorFormats));
+		key.colorFormatCount = m_records[i].colorFormatCount;
+		key.depthFormat = m_records[i].depthFormat;
 #if VK_STALL_DIAG
-        if (GetOrCreate(key) == VK_NULL_HANDLE)
-            ++failed;
+		if (GetOrCreate(key) == VK_NULL_HANDLE)
+			++failed;
 #else
-        GetOrCreate(key);
+		GetOrCreate(key);
 #endif
-    }
-    m_precreating = false;
+	}
+	m_precreating = false;
 #if VK_STALL_DIAG
-    char detail[128];
-    snprintf(detail, sizeof(detail), "%d records, %d new, %d without shader, %d failed",
-             int(m_records.Length()), int(m_pipelines.Length()) - pipelineCount, withoutShader, failed);
-    VkStallEvent("pipeline precreate", stallStart, detail);
+	char detail[128];
+	snprintf(detail, sizeof(detail), "%d records, %d new, %d without shader, %d failed",
+			 int(m_records.Length()), int(m_pipelines.Length()) - pipelineCount, withoutShader, failed);
+	VkStallEvent("pipeline precreate", stallStart, detail);
 #endif
 }
 
 
-void PipelineCache::CreateShaderLibraries(Shader* shader) noexcept
+void PipelineCache::CreateShaderLibraries(Shader* shader)
+noexcept
 {
-    if ((not vkContext.HasPipelineLibrary()) or (not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
-        return;
+	if ((not vkContext.HasPipelineLibrary()) or (not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
+		return;
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    const RenderStates defaults { };
-    const uint8_t topology = shader->IsTessellated() ? TopologyForPatchControlPoints(shader->m_patchControlPoints) : uint8_t(MeshTopology::Triangles);
-    vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
-    VertexInputLibrary(shader, topology);
-    PreRasterizationLibrary(shader, uint8_t(defaults.fillMode), defaults.depthClip, topology);
-    FragmentShaderLibrary(shader);
-    vkContext.SetValidationShader(nullptr);
+	const RenderStates	defaults{};
+	const uint8_t		topology =
+		 shader->IsTessellated() ? TopologyForPatchControlPoints(shader->m_patchControlPoints) : uint8_t(MeshTopology::Triangles);
+	vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
+	VertexInputLibrary(shader, topology);
+	PreRasterizationLibrary(shader, uint8_t(defaults.fillMode), defaults.depthClip, topology);
+	FragmentShaderLibrary(shader);
+	vkContext.SetValidationShader(nullptr);
 #if VK_STALL_DIAG
-    VkStallEvent("shader libraries", stallStart, static_cast<const char*>(shader->m_name));
+	VkStallEvent("shader libraries", stallStart, static_cast<const char*>(shader->m_name));
 #endif
 }
 
 
-void PipelineCache::RemoveShader(Shader* shader) noexcept
+void PipelineCache::RemoveShader(Shader* shader)
+noexcept
 {
-    if (m_device == VK_NULL_HANDLE)
-        return;
+	if (m_device == VK_NULL_HANDLE)
+		return;
 
-    // Walk the companion key list. For every entry whose shader matches, destroy the pipeline
-    // and remove it from the cache. Slot stays in the parallel arrays as VK_NULL_HANDLE — it
-    // is reaped at Destroy(); the cost of compacting on every RemoveShader is not worth it
-    // (rare path, app shutdown / shader hot-reload).
-    for (int i = 0; i < m_keys.Length(); ++i) {
-        if (m_keys[i].shader != shader)
-            continue;
-        VkPipeline p = m_pipelines[i];
-        if (p != VK_NULL_HANDLE)
-            vkDestroyPipeline(m_device, p, nullptr);
-        m_cache.Remove(m_keys[i]);
-        m_pipelines[i] = VK_NULL_HANDLE;
-        m_keys[i] = PipelineKey { };
-        m_fastLinked[i] = 0;
-    }
-    for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
-        if (m_shaderLibraryKeys[i].shader != shader)
-            continue;
-        if (m_shaderLibraries[i] != VK_NULL_HANDLE)
-            vkDestroyPipeline(m_device, m_shaderLibraries[i], nullptr);
-        m_shaderLibraries[i] = VK_NULL_HANDLE;
-        m_shaderLibraryKeys[i] = ShaderLibraryKey { };
-    }
+	// Walk the companion key list. For every entry whose shader matches, destroy the pipeline
+	// and remove it from the cache. Slot stays in the parallel arrays as VK_NULL_HANDLE — it
+	// is reaped at Destroy(); the cost of compacting on every RemoveShader is not worth it
+	// (rare path, app shutdown / shader hot-reload).
+	for (int i = 0; i < m_keys.Length(); ++i) {
+		if (m_keys[i].shader != shader)
+			continue;
+		VkPipeline p = m_pipelines[i];
+		if (p != VK_NULL_HANDLE)
+			vkDestroyPipeline(m_device, p, nullptr);
+		m_cache.Remove(m_keys[i]);
+		m_pipelines[i] = VK_NULL_HANDLE;
+		m_keys[i] = PipelineKey{};
+		m_fastLinked[i] = 0;
+	}
+	for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
+		if (m_shaderLibraryKeys[i].shader != shader)
+			continue;
+		if (m_shaderLibraries[i] != VK_NULL_HANDLE)
+			vkDestroyPipeline(m_device, m_shaderLibraries[i], nullptr);
+		m_shaderLibraries[i] = VK_NULL_HANDLE;
+		m_shaderLibraryKeys[i] = ShaderLibraryKey{};
+	}
 }
 
 
 int PipelineCache::CompareKeys(void* /*context*/, const PipelineKey& a, const PipelineKey& b)
 {
-    return std::memcmp(&a, &b, sizeof(PipelineKey));
+	return std::memcmp(&a, &b, sizeof(PipelineKey));
 }
 
 // =================================================================================================
 
-VkPipeline PipelineCache::CreateLibrary(VkGraphicsPipelineCreateInfo& info, VkGraphicsPipelineLibraryFlagsEXT part) noexcept
+VkPipeline PipelineCache::CreateLibrary(VkGraphicsPipelineCreateInfo& info, VkGraphicsPipelineLibraryFlagsEXT part)
+noexcept
 {
-    VkGraphicsPipelineLibraryCreateInfoEXT libraryInfo { };
-    libraryInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT;
-    libraryInfo.pNext = info.pNext;
-    libraryInfo.flags = part;
-    info.pNext = &libraryInfo;
-    info.flags = kLibraryFlags;
-    info.renderPass = VK_NULL_HANDLE;
-    info.subpass = 0;
-    VkPipelineDynamicStateCreateInfo dynamic = DynamicStateInfo();
-    info.pDynamicState = &dynamic;
+	VkGraphicsPipelineLibraryCreateInfoEXT libraryInfo{};
+	libraryInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_LIBRARY_CREATE_INFO_EXT;
+	libraryInfo.pNext = info.pNext;
+	libraryInfo.flags = part;
+	info.pNext = &libraryInfo;
+	info.flags = kLibraryFlags;
+	info.renderPass = VK_NULL_HANDLE;
+	info.subpass = 0;
+	VkPipelineDynamicStateCreateInfo dynamic = DynamicStateInfo();
+	info.pDynamicState = &dynamic;
 
-    VkPipeline library = VK_NULL_HANDLE;
-    VkResult res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &library);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("PipelineCache::CreateLibrary: vkCreateGraphicsPipelines failed (%d, part 0x%x)\n", (int)res, unsigned(part));
-        return VK_NULL_HANDLE;
-    }
-    return library;
+	VkPipeline	library = VK_NULL_HANDLE;
+	VkResult	res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &library);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("PipelineCache::CreateLibrary: vkCreateGraphicsPipelines failed (%d, part 0x%x)\n", (int)res, unsigned(part));
+		return VK_NULL_HANDLE;
+	}
+	return library;
 }
 
 
-VkPipeline PipelineCache::VertexInputLibrary(Shader* shader, uint8_t topology) noexcept
+VkPipeline PipelineCache::VertexInputLibrary(Shader* shader, uint8_t topology)
+noexcept
 {
-    ShaderLibraryKey key { };
-    key.shader = shader;
-    key.part = kVertexInputPart;
-    key.topology = topology;
-    for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
-        if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
-            return m_shaderLibraries[i];
-    }
+	ShaderLibraryKey key{};
+	key.shader = shader;
+	key.part = kVertexInputPart;
+	key.topology = topology;
+	for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
+		if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
+			return m_shaderLibraries[i];
+	}
 
-    VkPipelineVertexInputStateCreateInfo vertexInput { };
-    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInput.vertexBindingDescriptionCount = uint32_t(shader->m_vsInputBindings.size());
-    vertexInput.pVertexBindingDescriptions = shader->m_vsInputBindings.data();
-    vertexInput.vertexAttributeDescriptionCount = uint32_t(shader->m_vsInputAttributes.size());
-    vertexInput.pVertexAttributeDescriptions = shader->m_vsInputAttributes.data();
+	VkPipelineVertexInputStateCreateInfo vertexInput{};
+	vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInput.vertexBindingDescriptionCount = uint32_t(shader->m_vsInputBindings.size());
+	vertexInput.pVertexBindingDescriptions = shader->m_vsInputBindings.data();
+	vertexInput.vertexAttributeDescriptionCount = uint32_t(shader->m_vsInputAttributes.size());
+	vertexInput.pVertexAttributeDescriptions = shader->m_vsInputAttributes.data();
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly { };
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = ToVkTopology(shader, topology);
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = ToVkTopology(shader, topology);
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    VkGraphicsPipelineCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    info.pVertexInputState = &vertexInput;
-    info.pInputAssemblyState = &inputAssembly;
-    BuildContext context(shader, "vertex input library");
-    VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT);
-    if (library != VK_NULL_HANDLE) {
-        m_shaderLibraryKeys.Append(key);
-        m_shaderLibraries.Append(library);
-    }
-    return library;
+	VkGraphicsPipelineCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.pVertexInputState = &vertexInput;
+	info.pInputAssemblyState = &inputAssembly;
+	BuildContext	context(shader, "vertex input library");
+	VkPipeline		library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT);
+	if (library != VK_NULL_HANDLE) {
+		m_shaderLibraryKeys.Append(key);
+		m_shaderLibraries.Append(library);
+	}
+	return library;
 }
 
 
-VkPipeline PipelineCache::PreRasterizationLibrary(Shader* shader, uint8_t fillMode, uint8_t depthClip, uint8_t topology) noexcept
+VkPipeline PipelineCache::PreRasterizationLibrary(Shader* shader, uint8_t fillMode, uint8_t depthClip, uint8_t topology)
+noexcept
 {
-    const bool isTessellated = shader->IsTessellated();
-    ShaderLibraryKey key { };
-    key.shader = shader;
-    key.part = kPreRasterizationPart;
-    key.fillMode = fillMode;
-    key.depthClip = depthClip;
-    key.topology = isTessellated ? topology : 0;
-    for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
-        if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
-            return m_shaderLibraries[i];
-    }
+	const bool			isTessellated = shader->IsTessellated();
+	ShaderLibraryKey	key{};
+	key.shader = shader;
+	key.part = kPreRasterizationPart;
+	key.fillMode = fillMode;
+	key.depthClip = depthClip;
+	key.topology = isTessellated ? topology : 0;
+	for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
+		if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
+			return m_shaderLibraries[i];
+	}
 
-    VkPipelineShaderStageCreateInfo stages[4] { };
-    uint32_t stageCount = AddPreRasterizationStages(shader, stages, 0);
+	VkPipelineShaderStageCreateInfo	stages[4]{};
+	uint32_t						stageCount = AddPreRasterizationStages(shader, stages, 0);
 
-    VkPipelineTessellationStateCreateInfo tessellation { };
-    tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
-    if (isTessellated)
-        tessellation.patchControlPoints = PatchControlPoints(shader, topology);
+	VkPipelineTessellationStateCreateInfo tessellation{};
+	tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+	if (isTessellated)
+		tessellation.patchControlPoints = PatchControlPoints(shader, topology);
 
-    VkPipelineViewportStateCreateInfo viewport { };
-    viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewport.viewportCount = 1;
-    viewport.scissorCount = 1;
+	VkPipelineViewportStateCreateInfo viewport{};
+	viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport.viewportCount = 1;
+	viewport.scissorCount = 1;
 
-    RenderStates states { };
-    states.fillMode = GfxOperations::FillMode(fillMode);
-    states.depthClip = depthClip;
-    VkPipelineRasterizationStateCreateInfo rasterization { };
-    states.SetRasterizationInfo(rasterization);
+	RenderStates states{};
+	states.fillMode = GfxOperations::FillMode(fillMode);
+	states.depthClip = depthClip;
+	VkPipelineRasterizationStateCreateInfo rasterization{};
+	states.SetRasterizationInfo(rasterization);
 
-    VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED);
+	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED);
 
-    VkGraphicsPipelineCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    info.pNext = &renderingInfo;
-    info.stageCount = stageCount;
-    info.pStages = stages;
-    info.pTessellationState = isTessellated ? &tessellation : nullptr;
-    info.pViewportState = &viewport;
-    info.pRasterizationState = &rasterization;
-    info.layout = shader->m_pipelineLayout;
-    BuildContext context(shader, "pre-rasterization library");
-    VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT);
-    if (library != VK_NULL_HANDLE) {
-        m_shaderLibraryKeys.Append(key);
-        m_shaderLibraries.Append(library);
-    }
-    return library;
+	VkGraphicsPipelineCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.pNext = &renderingInfo;
+	info.stageCount = stageCount;
+	info.pStages = stages;
+	info.pTessellationState = isTessellated ? &tessellation : nullptr;
+	info.pViewportState = &viewport;
+	info.pRasterizationState = &rasterization;
+	info.layout = shader->m_pipelineLayout;
+	BuildContext	context(shader, "pre-rasterization library");
+	VkPipeline		library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT);
+	if (library != VK_NULL_HANDLE) {
+		m_shaderLibraryKeys.Append(key);
+		m_shaderLibraries.Append(library);
+	}
+	return library;
 }
 
 
-VkPipeline PipelineCache::FragmentShaderLibrary(Shader* shader) noexcept
+VkPipeline PipelineCache::FragmentShaderLibrary(Shader* shader)
+noexcept
 {
-    ShaderLibraryKey key { };
-    key.shader = shader;
-    key.part = kFragmentShaderPart;
-    for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
-        if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
-            return m_shaderLibraries[i];
-    }
+	ShaderLibraryKey key{};
+	key.shader = shader;
+	key.part = kFragmentShaderPart;
+	for (int i = 0; i < m_shaderLibraryKeys.Length(); ++i) {
+		if (std::memcmp(&m_shaderLibraryKeys[i], &key, sizeof(ShaderLibraryKey)) == 0)
+			return m_shaderLibraries[i];
+	}
 
-    VkPipelineShaderStageCreateInfo stage { };
-    AddStage(&stage, 0, VK_SHADER_STAGE_FRAGMENT_BIT, shader->m_fsModule, "PSMain");
+	VkPipelineShaderStageCreateInfo stage{};
+	AddStage(&stage, 0, VK_SHADER_STAGE_FRAGMENT_BIT, shader->m_fsModule, "PSMain");
 
-    VkPipelineMultisampleStateCreateInfo multisample { };
-    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	VkPipelineMultisampleStateCreateInfo multisample{};
+	multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    const RenderStates states { };
-    VkPipelineDepthStencilStateCreateInfo depthStencil { };
-    states.SetDepthStencilInfo(depthStencil);
+	const RenderStates						states{};
+	VkPipelineDepthStencilStateCreateInfo	depthStencil{};
+	states.SetDepthStencilInfo(depthStencil);
 
-    VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED);
+	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(nullptr, 0, VK_FORMAT_UNDEFINED);
 
-    VkGraphicsPipelineCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    info.pNext = &renderingInfo;
-    info.stageCount = 1;
-    info.pStages = &stage;
-    info.pMultisampleState = &multisample;
-    info.pDepthStencilState = &depthStencil;
-    info.layout = shader->m_pipelineLayout;
-    BuildContext context(shader, "fragment shader library");
-    VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT);
-    if (library != VK_NULL_HANDLE) {
-        m_shaderLibraryKeys.Append(key);
-        m_shaderLibraries.Append(library);
-    }
-    return library;
+	VkGraphicsPipelineCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.pNext = &renderingInfo;
+	info.stageCount = 1;
+	info.pStages = &stage;
+	info.pMultisampleState = &multisample;
+	info.pDepthStencilState = &depthStencil;
+	info.layout = shader->m_pipelineLayout;
+	BuildContext	context(shader, "fragment shader library");
+	VkPipeline		library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT);
+	if (library != VK_NULL_HANDLE) {
+		m_shaderLibraryKeys.Append(key);
+		m_shaderLibraries.Append(library);
+	}
+	return library;
 }
 
 
-VkPipeline PipelineCache::FragmentOutputLibrary(const PipelineKey& pipelineKey) noexcept
+VkPipeline PipelineCache::FragmentOutputLibrary(const PipelineKey& pipelineKey)
+noexcept
 {
-    OutputLibraryKey key { };
-    const RenderStates& s = pipelineKey.states;
-    key.states.independentBlend = s.independentBlend;
-    std::memcpy(key.states.blendEnable, s.blendEnable, sizeof(s.blendEnable));
-    std::memcpy(key.states.blendSrcRGB, s.blendSrcRGB, sizeof(s.blendSrcRGB));
-    std::memcpy(key.states.blendDstRGB, s.blendDstRGB, sizeof(s.blendDstRGB));
-    std::memcpy(key.states.blendSrcAlpha, s.blendSrcAlpha, sizeof(s.blendSrcAlpha));
-    std::memcpy(key.states.blendDstAlpha, s.blendDstAlpha, sizeof(s.blendDstAlpha));
-    std::memcpy(key.states.blendOpRGB, s.blendOpRGB, sizeof(s.blendOpRGB));
-    std::memcpy(key.states.blendOpAlpha, s.blendOpAlpha, sizeof(s.blendOpAlpha));
-    std::memcpy(key.states.colorMask, s.colorMask, sizeof(s.colorMask));
-    std::memcpy(key.colorFormats, pipelineKey.colorFormats, sizeof(key.colorFormats));
-    key.colorFormatCount = pipelineKey.colorFormatCount;
-    key.depthFormat = pipelineKey.depthFormat;
-    for (int i = 0; i < m_outputLibraryKeys.Length(); ++i) {
-        if (std::memcmp(&m_outputLibraryKeys[i], &key, sizeof(OutputLibraryKey)) == 0)
-            return m_outputLibraries[i];
-    }
+	OutputLibraryKey	key{};
+	const RenderStates&	s = pipelineKey.states;
+	key.states.independentBlend = s.independentBlend;
+	std::memcpy(key.states.blendEnable, s.blendEnable, sizeof(s.blendEnable));
+	std::memcpy(key.states.blendSrcRGB, s.blendSrcRGB, sizeof(s.blendSrcRGB));
+	std::memcpy(key.states.blendDstRGB, s.blendDstRGB, sizeof(s.blendDstRGB));
+	std::memcpy(key.states.blendSrcAlpha, s.blendSrcAlpha, sizeof(s.blendSrcAlpha));
+	std::memcpy(key.states.blendDstAlpha, s.blendDstAlpha, sizeof(s.blendDstAlpha));
+	std::memcpy(key.states.blendOpRGB, s.blendOpRGB, sizeof(s.blendOpRGB));
+	std::memcpy(key.states.blendOpAlpha, s.blendOpAlpha, sizeof(s.blendOpAlpha));
+	std::memcpy(key.states.colorMask, s.colorMask, sizeof(s.colorMask));
+	std::memcpy(key.colorFormats, pipelineKey.colorFormats, sizeof(key.colorFormats));
+	key.colorFormatCount = pipelineKey.colorFormatCount;
+	key.depthFormat = pipelineKey.depthFormat;
+	for (int i = 0; i < m_outputLibraryKeys.Length(); ++i) {
+		if (std::memcmp(&m_outputLibraryKeys[i], &key, sizeof(OutputLibraryKey)) == 0)
+			return m_outputLibraries[i];
+	}
 
-    VkPipelineColorBlendAttachmentState attachments[RenderStates::kColorTargets] { };
-    FillBlendAttachments(pipelineKey, attachments);
+	VkPipelineColorBlendAttachmentState attachments[RenderStates::kColorTargets]{};
+	FillBlendAttachments(pipelineKey, attachments);
 
-    VkPipelineColorBlendStateCreateInfo colorBlend { };
-    colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlend.attachmentCount = pipelineKey.colorFormatCount;
-    colorBlend.pAttachments = attachments;
-    colorBlend.logicOpEnable = VK_FALSE;
+	VkPipelineColorBlendStateCreateInfo colorBlend{};
+	colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlend.attachmentCount = pipelineKey.colorFormatCount;
+	colorBlend.pAttachments = attachments;
+	colorBlend.logicOpEnable = VK_FALSE;
 
-    VkPipelineMultisampleStateCreateInfo multisample { };
-    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	VkPipelineMultisampleStateCreateInfo multisample{};
+	multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(pipelineKey.colorFormats, pipelineKey.colorFormatCount, pipelineKey.depthFormat);
+	VkPipelineRenderingCreateInfo renderingInfo =
+		RenderingInfo(pipelineKey.colorFormats, pipelineKey.colorFormatCount, pipelineKey.depthFormat);
 
-    VkGraphicsPipelineCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    info.pNext = &renderingInfo;
-    info.pColorBlendState = &colorBlend;
-    info.pMultisampleState = &multisample;
-    BuildContext context(pipelineKey.shader, "fragment output library");
-    VkPipeline library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT);
-    if (library != VK_NULL_HANDLE) {
-        m_outputLibraryKeys.Append(key);
-        m_outputLibraries.Append(library);
-    }
-    return library;
+	VkGraphicsPipelineCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.pNext = &renderingInfo;
+	info.pColorBlendState = &colorBlend;
+	info.pMultisampleState = &multisample;
+	BuildContext	context(pipelineKey.shader, "fragment output library");
+	VkPipeline		library = CreateLibrary(info, VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT);
+	if (library != VK_NULL_HANDLE) {
+		m_outputLibraryKeys.Append(key);
+		m_outputLibraries.Append(library);
+	}
+	return library;
 }
 
 
-VkPipeline PipelineCache::LinkPipeline(const PipelineKey& key, bool optimize) noexcept
+VkPipeline PipelineCache::LinkPipeline(const PipelineKey& key, bool optimize)
+noexcept
 {
-    Shader* shader = key.shader;
-    if ((not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
-        return VK_NULL_HANDLE;
+	Shader* shader = key.shader;
+	if ((not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
+		return VK_NULL_HANDLE;
 
-    VkPipeline libraries[4] = {
-        VertexInputLibrary(shader, key.states.topology),
-        PreRasterizationLibrary(shader, uint8_t(key.states.fillMode), key.states.depthClip, key.states.topology),
-        FragmentShaderLibrary(shader),
-        FragmentOutputLibrary(key)
-    };
-    for (VkPipeline library : libraries) {
-        if (library == VK_NULL_HANDLE)
-            return VK_NULL_HANDLE;
-    }
+	VkPipeline libraries[4] = {
+		VertexInputLibrary(shader, key.states.topology),
+		PreRasterizationLibrary(shader, uint8_t(key.states.fillMode), key.states.depthClip, key.states.topology),
+		FragmentShaderLibrary(shader),
+		FragmentOutputLibrary(key)
+	};
+	for (VkPipeline library : libraries) {
+		if (library == VK_NULL_HANDLE)
+			return VK_NULL_HANDLE;
+	}
 
-    VkPipelineLibraryCreateInfoKHR linkInfo { };
-    linkInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR;
-    linkInfo.libraryCount = 4;
-    linkInfo.pLibraries = libraries;
+	VkPipelineLibraryCreateInfoKHR linkInfo{};
+	linkInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR;
+	linkInfo.libraryCount = 4;
+	linkInfo.pLibraries = libraries;
 
-    VkGraphicsPipelineCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    info.pNext = &linkInfo;
-    info.flags = optimize ? VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT : 0;
-    info.layout = shader->m_pipelineLayout;
-    info.renderPass = VK_NULL_HANDLE;
-    info.subpass = 0;
+	VkGraphicsPipelineCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.pNext = &linkInfo;
+	info.flags = optimize ? VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT : 0;
+	info.layout = shader->m_pipelineLayout;
+	info.renderPass = VK_NULL_HANDLE;
+	info.subpass = 0;
 
-    BuildContext context(shader, optimize ? "pipeline link, optimized" : "pipeline link, fast");
-    VkPipeline pipeline = VK_NULL_HANDLE;
-    VkResult res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("PipelineCache::LinkPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
-        return VK_NULL_HANDLE;
-    }
-    return pipeline;
+	BuildContext	context(shader, optimize ? "pipeline link, optimized" : "pipeline link, fast");
+	VkPipeline		pipeline = VK_NULL_HANDLE;
+	VkResult		res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("PipelineCache::LinkPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
+		return VK_NULL_HANDLE;
+	}
+	return pipeline;
 }
 
 // =================================================================================================
 // BuildPipeline — full VkGraphicsPipelineCreateInfo from RenderStates + Shader + attachment formats
 
-VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key) noexcept
+VkPipeline PipelineCache::BuildPipeline(const PipelineKey& key)
+noexcept
 {
-    Shader* shader = key.shader;
-    if ((not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
-        return VK_NULL_HANDLE;
+	Shader* shader = key.shader;
+	if ((not shader) or (not shader->IsValid()) or (m_device == VK_NULL_HANDLE))
+		return VK_NULL_HANDLE;
 
-    // Stages: VS + PS (+ optional GS, HS + DS).
-    VkPipelineShaderStageCreateInfo stages[5] { };
-    uint32_t stageCount = AddPreRasterizationStages(shader, stages, 0);
-    stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_FRAGMENT_BIT, shader->m_fsModule, "PSMain");
+	// Stages: VS + PS (+ optional GS, HS + DS).
+	VkPipelineShaderStageCreateInfo	stages[5]{};
+	uint32_t						stageCount = AddPreRasterizationStages(shader, stages, 0);
+	stageCount = AddStage(stages, stageCount, VK_SHADER_STAGE_FRAGMENT_BIT, shader->m_fsModule, "PSMain");
 
-    // Vertex input
-    VkPipelineVertexInputStateCreateInfo vertexInput { };
-    vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInput.vertexBindingDescriptionCount = uint32_t(shader->m_vsInputBindings.size());
-    vertexInput.pVertexBindingDescriptions = shader->m_vsInputBindings.data();
-    vertexInput.vertexAttributeDescriptionCount = uint32_t(shader->m_vsInputAttributes.size());
-    vertexInput.pVertexAttributeDescriptions = shader->m_vsInputAttributes.data();
+	// Vertex input
+	VkPipelineVertexInputStateCreateInfo vertexInput{};
+	vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInput.vertexBindingDescriptionCount = uint32_t(shader->m_vsInputBindings.size());
+	vertexInput.pVertexBindingDescriptions = shader->m_vsInputBindings.data();
+	vertexInput.vertexAttributeDescriptionCount = uint32_t(shader->m_vsInputAttributes.size());
+	vertexInput.pVertexAttributeDescriptions = shader->m_vsInputAttributes.data();
 
-    // Input assembly: the mesh topology from RenderStates (set per draw by CommandList::SetTopology).
-    const bool isTessellated = shader->IsTessellated();
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly { };
-    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = ToVkTopology(shader, key.states.topology);
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
+	// Input assembly: the mesh topology from RenderStates (set per draw by CommandList::SetTopology).
+	const bool								isTessellated = shader->IsTessellated();
+	VkPipelineInputAssemblyStateCreateInfo	inputAssembly{};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = ToVkTopology(shader, key.states.topology);
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    VkPipelineTessellationStateCreateInfo tessellation { };
-    tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
-    if (isTessellated)
-        tessellation.patchControlPoints = PatchControlPoints(shader, key.states.topology);
+	VkPipelineTessellationStateCreateInfo tessellation{};
+	tessellation.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
+	if (isTessellated)
+		tessellation.patchControlPoints = PatchControlPoints(shader, key.states.topology);
 
-    // Viewport / scissor: counts only — actual values set dynamically per draw.
-    VkPipelineViewportStateCreateInfo viewport { };
-    viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewport.viewportCount = 1;
-    viewport.scissorCount = 1;
+	// Viewport / scissor: counts only — actual values set dynamically per draw.
+	VkPipelineViewportStateCreateInfo viewport{};
+	viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport.viewportCount = 1;
+	viewport.scissorCount = 1;
 
-    // Rasterization (depth-clamp / cull / front-face / depth-bias)
-    VkPipelineRasterizationStateCreateInfo rasterization { };
-    key.states.SetRasterizationInfo(rasterization);
+	// Rasterization (depth-clamp / cull / front-face / depth-bias)
+	VkPipelineRasterizationStateCreateInfo rasterization{};
+	key.states.SetRasterizationInfo(rasterization);
 
-    // Multisample: 1 sample (no MSAA).
-    VkPipelineMultisampleStateCreateInfo multisample { };
-    multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	// Multisample: 1 sample (no MSAA).
+	VkPipelineMultisampleStateCreateInfo multisample{};
+	multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    // Depth / stencil
-    VkPipelineDepthStencilStateCreateInfo depthStencil { };
-    key.states.SetDepthStencilInfo(depthStencil);
+	// Depth / stencil
+	VkPipelineDepthStencilStateCreateInfo depthStencil{};
+	key.states.SetDepthStencilInfo(depthStencil);
 
-    VkPipelineColorBlendAttachmentState attachments[RenderStates::kColorTargets] { };
-    FillBlendAttachments(key, attachments);
+	VkPipelineColorBlendAttachmentState attachments[RenderStates::kColorTargets]{};
+	FillBlendAttachments(key, attachments);
 
-    VkPipelineColorBlendStateCreateInfo colorBlend { };
-    colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlend.attachmentCount = key.colorFormatCount;
-    colorBlend.pAttachments = attachments;
-    colorBlend.logicOpEnable = VK_FALSE;
+	VkPipelineColorBlendStateCreateInfo colorBlend{};
+	colorBlend.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlend.attachmentCount = key.colorFormatCount;
+	colorBlend.pAttachments = attachments;
+	colorBlend.logicOpEnable = VK_FALSE;
 
-    VkPipelineDynamicStateCreateInfo dynamic = DynamicStateInfo();
+	VkPipelineDynamicStateCreateInfo dynamic = DynamicStateInfo();
 
-    // Dynamic Rendering — Vulkan 1.3 Core. Replaces classic VkRenderPass binding.
-    VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(key.colorFormats, key.colorFormatCount, key.depthFormat);
+	// Dynamic Rendering — Vulkan 1.3 Core. Replaces classic VkRenderPass binding.
+	VkPipelineRenderingCreateInfo renderingInfo = RenderingInfo(key.colorFormats, key.colorFormatCount, key.depthFormat);
 
-    VkGraphicsPipelineCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    info.pNext = &renderingInfo;
-    info.stageCount = stageCount;
-    info.pStages = stages;
-    info.pVertexInputState = &vertexInput;
-    info.pInputAssemblyState = &inputAssembly;
-    info.pTessellationState = isTessellated ? &tessellation : nullptr;
-    info.pViewportState = &viewport;
-    info.pRasterizationState = &rasterization;
-    info.pMultisampleState = &multisample;
-    info.pDepthStencilState = &depthStencil;
-    info.pColorBlendState = &colorBlend;
-    info.pDynamicState = &dynamic;
-    info.layout = shader->m_pipelineLayout;
-    info.renderPass = VK_NULL_HANDLE;  // dynamic rendering — no render pass
-    info.subpass = 0;
+	VkGraphicsPipelineCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.pNext = &renderingInfo;
+	info.stageCount = stageCount;
+	info.pStages = stages;
+	info.pVertexInputState = &vertexInput;
+	info.pInputAssemblyState = &inputAssembly;
+	info.pTessellationState = isTessellated ? &tessellation : nullptr;
+	info.pViewportState = &viewport;
+	info.pRasterizationState = &rasterization;
+	info.pMultisampleState = &multisample;
+	info.pDepthStencilState = &depthStencil;
+	info.pColorBlendState = &colorBlend;
+	info.pDynamicState = &dynamic;
+	info.layout = shader->m_pipelineLayout;
+	info.renderPass = VK_NULL_HANDLE; // dynamic rendering — no render pass
+	info.subpass = 0;
 
-    BuildContext context(shader, "monolithic pipeline");
-    VkPipeline pipeline = VK_NULL_HANDLE;
-    VkResult res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("PipelineCache::BuildPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
-        return VK_NULL_HANDLE;
-    }
-    return pipeline;
+	BuildContext	context(shader, "monolithic pipeline");
+	VkPipeline		pipeline = VK_NULL_HANDLE;
+	VkResult		res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("PipelineCache::BuildPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
+		return VK_NULL_HANDLE;
+	}
+	return pipeline;
 }
 
 // =================================================================================================

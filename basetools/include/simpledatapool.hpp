@@ -13,7 +13,7 @@ class AVLTree;
 
 // =================================================================================================
 // list of data buffers for other data containers
-// Provide a pool of data items of type _T to avoid having to frequently 
+// Provide a pool of data items of type _T to avoid having to frequently
 // call the OS's memory allocator to allocate each data item.
 // Use DataPool if you know you will have to allocate a huge number of data items.
 
@@ -25,7 +25,7 @@ public:
 	int		m_pred;
 	int		m_succ;
 
-	ITEM_T& operator& () {
+	ITEM_T& operator&() {
 		return m_data;
 	}
 
@@ -55,64 +55,68 @@ class DataPool {
 
 	using Comparator = typename AVLTreeTraits<KEY_T, int>::Comparator;
 
-	using ItemProcessor = bool(*)(const ITEM_T&);
+	using ItemProcessor = bool (*)(const ITEM_T&);
 
 private:
-		ITEM_T*					m_itemPool;
-		int*					m_freeItems;
-		int						m_freeItemCount;
-		bool					m_isCreated;
-		AVLTree<KEY_T, int>*	m_usedItems;
-		ItemProcessor			m_itemProcessor;
+	ITEM_T*					m_itemPool;
+	int*					m_freeItems;
+	int						m_freeItemCount;
+	bool					m_isCreated;
+	AVLTree<KEY_T, int>*	m_usedItems;
+	ItemProcessor			m_itemProcessor;
 
-	public:
-		DataPool() 
-			: m_itemPool(nullptr), m_freeItems(nullptr), m_usedItems(nullptr), m_freeItemCount(0), m_isCreated(false)
-		{ }
-
-
-		~DataPool() { 
-			Destroy (); 
-		}
-
-
-		bool Setup(int capacity, bool createOnce, Comparator comparator = nullptr);
+public:
+	DataPool()
+		: m_itemPool(nullptr)
+		, m_freeItems(nullptr)
+		, m_usedItems(nullptr)
+		, m_freeItemCount(0)
+		, m_isCreated(false)
+	{}
 
 
-		inline bool Create(int capacity, bool createOnce = true, Comparator comparator = nullptr) {
-			return m_isCreated = Setup (capacity, createOnce);
-		}
+	~DataPool() {
+		Destroy();
+	}
 
 
-		void Destroy(void);
+	bool Setup(int capacity, bool createOnce, Comparator comparator = nullptr);
 
 
-		ITEM_T* FindItem(KEY_T key);
+	inline bool Create(int capacity, bool createOnce = true, Comparator comparator = nullptr) {
+		return m_isCreated = Setup(capacity, createOnce);
+	}
 
 
-		ITEM_T* Claim(const KEY_T& key);
+	void Destroy(void);
 
 
-		inline void ReleaseByIndex(int i) {
-			m_freeItems[m_freeItemCount++] = i;
-			}
+	ITEM_T* FindItem(KEY_T key);
 
 
-		inline void Release(ITEM_T* item) {
-			m_freeItems[m_freeItemCount++] = int (item - m_itemPool);
-		}
+	ITEM_T* Claim(const KEY_T& key);
 
 
-		bool AvlNodeProcessor(const int& i) {
-			m_itemProcessor(m_itemPool[i]);
-		}
+	inline void ReleaseByIndex(int i) {
+		m_freeItems[m_freeItemCount++] = i;
+	}
 
 
-		bool WalkItems(ItemProcessor processor);
+	inline void Release(ITEM_T* item) {
+		m_freeItems[m_freeItemCount++] = int(item - m_itemPool);
+	}
 
 
-		void Release(const KEY_T& key);
-	};
+	bool AvlNodeProcessor(const int& i) {
+		m_itemProcessor(m_itemPool[i]);
+	}
 
 
-	// =================================================================================================
+	bool WalkItems(ItemProcessor processor);
+
+
+	void Release(const KEY_T& key);
+};
+
+
+// =================================================================================================

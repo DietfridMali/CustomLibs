@@ -10,163 +10,217 @@
 // =================================================================================================
 
 struct GaussBlurParams {
-    int strength = 3;
-    float spread = 3.0f;
+	int		strength = 3;
+	float	spread = 3.0f;
 };
 
 class BaseShaderHandler
-    : public PolymorphSingleton<BaseShaderHandler>
-{
+	: public PolymorphSingleton<BaseShaderHandler> {
 public:
-    AutoArray<FloatArray*>  m_kernels;
-    Shader*                 m_activeShader;
-    String                  m_activeShaderId;
-    Texture                 m_grayNoise;
-    BaseShaderCode*         m_shaderCode;
-    bool                    m_encodeSRGBTextures{ false };
-    bool                    m_decodeColors{ false };
+	AutoArray<FloatArray*>	m_kernels;
+	Shader*					m_activeShader;
+	String					m_activeShaderId;
+	Texture					m_grayNoise;
+	BaseShaderCode*			m_shaderCode;
+	bool					m_encodeSRGBTextures{ false };
+	bool					m_decodeColors{ false };
 
-    BaseShaderHandler()
-        : m_kernels(16), m_shaderCode(nullptr), m_activeShader(nullptr), m_activeShaderId("")
-    {
-        _instance = this;
+	BaseShaderHandler()
+		: m_kernels(16)
+		, m_shaderCode(nullptr)
+		, m_activeShader(nullptr)
+		, m_activeShaderId("")
+	{
+		_instance = this;
 #if 0
         List<String> filenames = { appData->textureFolder + "graynoise.png" };
         m_grayNoise.CreateFromFile(filenames, false, appData->flipImagesVertically);
 #endif
-        ComputeGaussKernels(); // kann allozieren -> nicht noexcept markieren
-    }
+		ComputeGaussKernels(); // kann allozieren -> nicht noexcept markieren
+	}
 
-    virtual ~BaseShaderHandler() noexcept {
-        if (m_shaderCode)
-            delete m_shaderCode;
-    }
+	virtual ~BaseShaderHandler()
+	noexcept
+	{
+		if (m_shaderCode)
+			delete m_shaderCode;
+	}
 
-    static BaseShaderHandler& Instance(void) { 
-        return dynamic_cast<BaseShaderHandler&>(PolymorphSingleton::Instance()); 
-    }
+	static BaseShaderHandler& Instance(void) {
+		return dynamic_cast<BaseShaderHandler&>(PolymorphSingleton::Instance());
+	}
 
 protected:
-    virtual void CreateShaderCode(const String& shaderFolder) {
-        m_shaderCode = new BaseShaderCode(shaderFolder);
-    } // allokiert -> nicht noexcept
+	virtual void CreateShaderCode(const String& shaderFolder) {
+		m_shaderCode = new BaseShaderCode(shaderFolder);
+	} // allokiert -> nicht noexcept
 
 public:
-    void CreateShaders(const String& shaderFolder);
+	void CreateShaders(const String& shaderFolder);
 
-    void CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds);
+	void CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds);
 
-    Shader* SelectShader(Texture* texture);
+	Shader* SelectShader(Texture* texture);
 
-    static const String& DefaultDepthShaderId(void);
+	static const String& DefaultDepthShaderId(void);
 
-    Shader* SetupRenderShader(const String& shaderId, const String& depthShaderId = DefaultDepthShaderId());
+	Shader* SetupRenderShader(const String& shaderId, const String& depthShaderId = DefaultDepthShaderId());
 
-    void StopShader(bool needLegacyMatrices = false);
+	void StopShader(bool needLegacyMatrices = false);
 
-    // Reset active-shader tracking so the next SetupRenderShader() call forces a full Activate().
-    // Must be called after a DX12 BeginFrame() (new command list clears all pipeline state).
-    inline void InvalidateActiveShader(void) noexcept {
-        m_activeShader = nullptr;
-        m_activeShaderId = "";
-    }
+	// Reset active-shader tracking so the next SetupRenderShader() call forces a full Activate().
+	// Must be called after a DX12 BeginFrame() (new command list clears all pipeline state).
+	inline void InvalidateActiveShader(void)
+	noexcept
+	{
+		m_activeShader = nullptr;
+		m_activeShaderId = "";
+	}
 
-    inline bool ShaderIsActive(Shader* shader = nullptr) const noexcept {
-        return (shader == nullptr) ? m_activeShader != nullptr : m_activeShader == shader;
-    }
+	inline bool ShaderIsActive(Shader* shader = nullptr) const
+	noexcept
+	{
+		return (shader == nullptr) ? m_activeShader != nullptr : m_activeShader == shader;
+	}
 
-    inline Shader* ActiveShader(void) const noexcept { return m_activeShader; }
+	inline Shader* ActiveShader(void) const
+	noexcept
+	{
+		return m_activeShader;
+	}
 
-    inline Shader* GetShader(const String& shaderId) {
-        return m_shaderCode->GetShader(shaderId);
-    }
+	inline Shader* GetShader(const String& shaderId) {
+		return m_shaderCode->GetShader(shaderId);
+	}
 
-    inline ComputeShader* SetupComputeShader(String shaderId) {
-        return m_shaderCode->SetupComputeShader(shaderId);
-    }
+	inline ComputeShader* SetupComputeShader(String shaderId) {
+		return m_shaderCode->SetupComputeShader(shaderId);
+	}
 
-    inline FloatArray* GetKernel(int radius) noexcept {
-        return ((radius < 1) or (radius > m_kernels.Length())) ? nullptr : m_kernels[radius - 1];
-    }
+	inline FloatArray* GetKernel(int radius)
+	noexcept
+	{
+		return ((radius < 1) or (radius > m_kernels.Length())) ? nullptr : m_kernels[radius - 1];
+	}
 
-    Shader* LoadLineShader(const RGBAColor& color, const Vector2f& start, const Vector2f& end, float strength, bool antialias);
+	Shader* LoadLineShader(const RGBAColor& color, const Vector2f& start, const Vector2f& end, float strength, bool antialias);
 
-    inline Shader* LoadLineShader(RGBAColor&& color, Vector2f&& start, Vector2f&& end, float strength, bool antialias) {
-        return LoadLineShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(start), static_cast<const Vector2f&>(end), strength, antialias);
-    }
+	inline Shader* LoadLineShader(RGBAColor&& color, Vector2f&& start, Vector2f&& end, float strength, bool antialias) {
+		return LoadLineShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(start),
+							  static_cast<const Vector2f&>(end), strength, antialias);
+	}
 
-    // dashCount = 0 draws a solid ring. Otherwise the ring (or, with startAngle != endAngle, the segment)
-    // is divided into dashCount periods and the first dashRatio of each period is drawn; dashOffset shifts
-    // the pattern in whole periods.
-    Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true, float dashCount = 0.0f, float dashRatio = 0.5f, float dashOffset = 0.0f, bool roundDashCaps = false);
+	// dashCount = 0 draws a solid ring. Otherwise the ring (or, with startAngle != endAngle, the segment)
+	// is divided into dashCount periods and the first dashRatio of each period is drawn; dashOffset shifts
+	// the pattern in whole periods.
+	Shader* LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength,
+						   float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true, float dashCount = 0.0f,
+						   float dashRatio = 0.5f, float dashOffset = 0.0f, bool roundDashCaps = false);
 
-    Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, bool antialias = true, float dashCount = 0.0f, float dashRatio = 0.5f, float dashOffset = 0.0f, bool roundDashCaps = false) {
-        return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, antialias, dashCount, dashRatio, dashOffset, roundDashCaps);
-    }
+	Shader* LoadRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength, float startAngle = 0.0f,
+						   float endAngle = 0.0f, bool antialias = true, float dashCount = 0.0f, float dashRatio = 0.5f,
+						   float dashOffset = 0.0f, bool roundDashCaps = false)
+	{
+		return LoadRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength,
+							  startAngle, endAngle, antialias, dashCount, dashRatio, dashOffset, roundDashCaps);
+	}
 
-    Shader* LoadCircleShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float fillLevel = 1.0f, float brightness = 1.0f, bool antialias = true);
+	Shader* LoadCircleShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float fillLevel = 1.0f,
+							 float brightness = 1.0f, bool antialias = true);
 
-    Shader* LoadCircleShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float fillLevel = 1.0f, float brightness = 1.0f, bool antialias = true) {
-        return LoadCircleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, fillLevel, brightness, antialias);
-    }
+	Shader* LoadCircleShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float fillLevel = 1.0f,
+							 float brightness = 1.0f, bool antialias = true)
+	{
+		return LoadCircleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, fillLevel,
+								brightness, antialias);
+	}
 
-    Shader* LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, const Vector2f& radius, float maskScale = 1.0f, bool antialias = true);
+	Shader* LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center,
+								 const Vector2f& radius, float maskScale = 1.0f, bool antialias = true);
 
-    Shader* LoadCircleMaskShader(RGBAColor&& color, RGBAColor&& maskColor, Vector2f&& center, const Vector2f& radius, float maskScale = 1.0f, bool antialias = true) {
-        return LoadCircleMaskShader(static_cast<const RGBAColor&>(color), static_cast<const RGBAColor&>(maskColor), static_cast<const Vector2f&>(center), radius, maskScale, antialias);
-    }
+	Shader* LoadCircleMaskShader(RGBAColor&& color, RGBAColor&& maskColor, Vector2f&& center, const Vector2f& radius,
+								 float maskScale = 1.0f, bool antialias = true)
+	{
+		return LoadCircleMaskShader(static_cast<const RGBAColor&>(color), static_cast<const RGBAColor&>(maskColor),
+									static_cast<const Vector2f&>(center), radius, maskScale, antialias);
+	}
 
-    Shader* LoadRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height, float strength, float radius = 0.0f, bool antialias = true);
+	Shader* LoadRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height, float strength,
+								float radius = 0.0f, bool antialias = true);
 
-    Shader* LoadRectangleShader(RGBAColor&& color, Vector2f&& center, float width, float height, float strength, float radius = 0.0f, bool antialias = true) {
-        return LoadRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width, height, strength, radius, antialias);
-    }
+	Shader* LoadRectangleShader(RGBAColor&& color, Vector2f&& center, float width, float height, float strength,
+								float radius = 0.0f, bool antialias = true)
+	{
+		return LoadRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width, height,
+								   strength, radius, antialias);
+	}
 
-    Shader* LoadShadedRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height, float strength, float radius = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
+	Shader* LoadShadedRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height, float strength,
+									  float radius = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f,
+									  float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
 
-    Shader* LoadShadedRectangleShader(RGBAColor&& color, Vector2f&& center, float width, float height, float strength, float radius = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true) {
-        return LoadShadedRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width, height, strength, radius, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
-    }
+	Shader* LoadShadedRectangleShader(RGBAColor&& color, Vector2f&& center, float width, float height, float strength,
+									  float radius = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f,
+									  float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true)
+	{
+		return LoadShadedRectangleShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), width,
+										 height, strength, radius, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
+	}
 
-    Shader* LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
+	Shader* LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength,
+								 float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f,
+								 float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true);
 
-    Shader* LoadShadedRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength, float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f, float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true) {
-        return LoadShadedRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength, startAngle, endAngle, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
-    }
+	Shader* LoadShadedRingShader(RGBAColor&& color, Vector2f&& center, const Vector2f& radius, float strength,
+								 float startAngle = 0.0f, float endAngle = 0.0f, float innerAlpha = 1.0f, float outerAlpha = 1.0f,
+								 float innerColor = 1.0f, float outerColor = 1.0f, bool antialias = true)
+	{
+		return LoadShadedRingShader(static_cast<const RGBAColor&>(color), static_cast<const Vector2f&>(center), radius, strength,
+									startAngle, endAngle, innerAlpha, outerAlpha, innerColor, outerColor, antialias);
+	}
 
-    Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
+	Shader* LoadPlainColorShader(const RGBAColor& color, bool premultiply = false);
 
-    Shader* LoadColorMeshShader(bool premultiply = false);
+	Shader* LoadColorMeshShader(bool premultiply = false);
 
-    inline void SetEncodeSRGBTextures(bool encode) noexcept {
-        m_encodeSRGBTextures = encode;
-    }
+	inline void SetEncodeSRGBTextures(bool encode)
+	noexcept
+	{
+		m_encodeSRGBTextures = encode;
+	}
 
-    inline bool SetDecodeColors(bool decode) noexcept {
-        bool decodeSave = m_decodeColors;
-        m_decodeColors = decode;
-        return decodeSave;
-    }
+	inline bool SetDecodeColors(bool decode)
+	noexcept
+	{
+		bool decodeSave = m_decodeColors;
+		m_decodeColors = decode;
+		return decodeSave;
+	}
 
-    inline bool DecodeColors(void) const noexcept {
-        return m_decodeColors;
-    }
+	inline bool DecodeColors(void) const
+	noexcept
+	{
+		return m_decodeColors;
+	}
 
-    Shader* LoadPlainTextureShader(const RGBAColor& color, bool flipVertically = false, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false, eColorEncoding textureEncoding = ecLinear);
+	Shader* LoadPlainTextureShader(const RGBAColor& color, bool flipVertically = false, const Vector2f& tcOffset = Vector2f::ZERO,
+								   const Vector2f& tcScale = Vector2f::ONE, bool premultiply = false,
+								   eColorEncoding textureEncoding = ecLinear);
 
-    Shader* LoadColoredTextureShader(const RGBAColor& color, eColorEncoding textureEncoding = ecLinear);
+	Shader* LoadColoredTextureShader(const RGBAColor& color, eColorEncoding textureEncoding = ecLinear);
 
-    Shader* LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& params = {}, bool premultiply = false);
+	Shader* LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& params = {}, bool premultiply = false);
 
-    Shader* LoadGrayscaleShader(float brightness, bool invert = false, const Vector2f& tcOffset = Vector2f::ZERO, const Vector2f& tcScale = Vector2f::ONE);
+	Shader* LoadGrayscaleShader(float brightness, bool invert = false, const Vector2f& tcOffset = Vector2f::ZERO,
+								const Vector2f& tcScale = Vector2f::ONE);
 
-    Shader* SetGaussBlurParams(Shader* shader, const GaussBlurParams& params = {});
+	Shader* SetGaussBlurParams(Shader* shader, const GaussBlurParams& params = {});
 
-    Shader* SetChromAbParams(Shader* shader, float aberration = 0.1f, int offsetType = 1);
+	Shader* SetChromAbParams(Shader* shader, float aberration = 0.1f, int offsetType = 1);
 
 private:
-    FloatArray* ComputeGaussKernel1D(int radius); // allokiert -> nicht noexcept
-    void ComputeGaussKernels(void);               // allokiert -> nicht noexcept
+	FloatArray* ComputeGaussKernel1D(int radius); // allokiert -> nicht noexcept
+	void ComputeGaussKernels(void); // allokiert -> nicht noexcept
 };
 
 #define baseShaderHandler BaseShaderHandler::Instance()

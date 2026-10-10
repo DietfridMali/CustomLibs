@@ -12,15 +12,19 @@
 template <typename ITEM_T>
 class BasicDataPool {
 protected:
-	ITEM_T*			m_itemPool;
-	int*			m_freeItems;
-	int				m_capacity;
-	int				m_freeItemCount;
-	bool			m_isCreated;
+	ITEM_T*	m_itemPool;
+	int*	m_freeItems;
+	int		m_capacity;
+	int		m_freeItemCount;
+	bool	m_isCreated;
 
 public:
 	BasicDataPool()
-		: m_itemPool(nullptr), m_freeItems(nullptr), m_capacity(0), m_freeItemCount(0), m_isCreated(false)
+		: m_itemPool(nullptr)
+		, m_freeItems(nullptr)
+		, m_capacity(0)
+		, m_freeItemCount(0)
+		, m_isCreated(false)
 	{
 	}
 
@@ -35,7 +39,8 @@ public:
 	}
 
 
-	bool Setup(int capacity, bool createOnce) {
+	bool Setup(int capacity, bool createOnce)
+	{
 		if (capacity <= 0)
 			return false;
 		if (createOnce and m_isCreated)
@@ -56,18 +61,19 @@ public:
 		}
 		else {
 			for (int i = 0; i < m_capacity; i++)
-				new(m_itemPool + i) ITEM_T();
+				new (m_itemPool + i) ITEM_T();
 		}
 		for (int i = 0; i < capacity; i++)
 			m_freeItems[i] = capacity - i - 1;
 
 		m_capacity =
-		m_freeItemCount = capacity;
+			m_freeItemCount = capacity;
 		return true;
 	}
 
 
-	void Destroy(void) {
+	void Destroy(void)
+	{
 		m_freeItemCount = 0;
 		if (m_itemPool) {
 			if constexpr (not std::is_trivially_destructible<ITEM_T>::value) {
@@ -85,7 +91,8 @@ public:
 	}
 
 
-	ITEM_T* Claim(int& itemIndex) {
+	ITEM_T* Claim(int& itemIndex)
+	{
 		if (not m_freeItemCount)
 			return nullptr;
 		itemIndex = m_freeItems[--m_freeItemCount];
@@ -94,7 +101,7 @@ public:
 #endif
 		ITEM_T* item = m_itemPool + itemIndex;
 		if constexpr (not std::is_trivially_constructible<ITEM_T>::value) {
-			new(item) ITEM_T();
+			new (item) ITEM_T();
 		}
 		//m_freeItems[m_freeItemCount] = -1;
 		return item;
@@ -133,7 +140,6 @@ public:
 	inline ITEM_T* GetDataPool() {
 		return m_itemPool;
 	}
-
 };
 
 // =================================================================================================

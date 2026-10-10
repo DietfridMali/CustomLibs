@@ -11,7 +11,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL.h"
 #include "SDL_vulkan.h"
@@ -27,129 +27,137 @@
 // =================================================================================================
 // Vulkan BaseDisplayHandler
 
-bool BaseDisplayHandler::Init(void) {
-    if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
-        return false;
-    return GetDisplayModes() > 0;
+bool BaseDisplayHandler::Init(void)
+{
+	if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
+		return false;
+	return GetDisplayModes() > 0;
 }
 
 
-int BaseDisplayHandler::GetDisplayModes(void) {
-    int n = SDL_GetNumDisplayModes(0);
-    AutoArray<SDL_DisplayMode> m(n);
-    for (int i = 0; i < n; ++i)
-        SDL_GetDisplayMode(0, i, &m[i]);
+int BaseDisplayHandler::GetDisplayModes(void)
+{
+	int							n = SDL_GetNumDisplayModes(0);
+	AutoArray<SDL_DisplayMode>	m(n);
+	for (int i = 0; i < n; ++i)
+		SDL_GetDisplayMode(0, i, &m[i]);
 
-    std::sort(m.begin(), m.end(),
-        [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
-            int64_t areaA = int64_t(a.w) * int64_t(a.h);
-            int64_t areaB = int64_t(b.w) * int64_t(b.h);
-            if (areaA != areaB)
-                return areaA > areaB;
-            if (a.w != b.w)
-                return a.w > b.w;
-            if (a.refresh_rate != b.refresh_rate)
-                return a.refresh_rate > b.refresh_rate;
-            return a.format > b.format;
-        });
+	std::sort(m.begin(), m.end(),
+			  [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
+				  int64_t areaA = int64_t(a.w) * int64_t(a.h);
+				  int64_t areaB = int64_t(b.w) * int64_t(b.h);
+				  if (areaA != areaB)
+					  return areaA > areaB;
+				  if (a.w != b.w)
+					  return a.w > b.w;
+				  if (a.refresh_rate != b.refresh_rate)
+					  return a.refresh_rate > b.refresh_rate;
+				  return a.format > b.format;
+			  });
 
-    m_displayModes.Reset();
-    for (int i = 0; i < n; ++i) {
-        if ((i == 0) or (m[i].w != m[i - 1].w) or (m[i].h != m[i - 1].h))
-            m_displayModes.Append(m[i]);
-    }
-    return m_displayModes.Length();
+	m_displayModes.Reset();
+	for (int i = 0; i < n; ++i) {
+		if ((i == 0) or (m[i].w != m[i - 1].w) or (m[i].h != m[i - 1].h))
+			m_displayModes.Append(m[i]);
+	}
+	return m_displayModes.Length();
 }
 
 
-int BaseDisplayHandler::FindDisplayMode(int width, int height) {
-    float aspectRatio = float(width) / float(height);
-    int64_t size = int64_t(width) * int64_t(height);
-    int bestMode = -1;
-    float daMin = 1e6f;
-    int64_t dsMin = std::numeric_limits<int64_t>::max();
-    for (int i = 0; i < m_displayModes.Length(); ++i) {
-        SDL_DisplayMode& mode = m_displayModes[i];
-        float da = fabsf(float(mode.w) / float(mode.h) - aspectRatio);
-        int64_t ds = static_cast<int64_t>(std::llabs(int64_t(mode.w) * int64_t(mode.h) - size));
-        if (da < daMin) {
-            daMin = da;
-            dsMin = ds;
-            bestMode = i;
-        }
-        else if (da == daMin && ds < dsMin) {
-            dsMin = ds;
-            bestMode = i;
-        }
-    }
-    return bestMode;
+int BaseDisplayHandler::FindDisplayMode(int width, int height)
+{
+	float	aspectRatio = float(width) / float(height);
+	int64_t	size = int64_t(width) * int64_t(height);
+	int		bestMode = -1;
+	float	daMin = 1e6f;
+	int64_t	dsMin = std::numeric_limits<int64_t>::max();
+	for (int i = 0; i < m_displayModes.Length(); ++i) {
+		SDL_DisplayMode&	mode = m_displayModes[i];
+		float				da = fabsf(float(mode.w) / float(mode.h) - aspectRatio);
+		int64_t				ds = static_cast<int64_t>(std::llabs(int64_t(mode.w) * int64_t(mode.h) - size));
+		if (da < daMin) {
+			daMin = da;
+			dsMin = ds;
+			bestMode = i;
+		}
+		else if (da == daMin && ds < dsMin) {
+			dsMin = ds;
+			bestMode = i;
+		}
+	}
+	return bestMode;
 }
 
 
-void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync, bool matchDisplayMode) {
-    m_activeDisplayMode = FindDisplayMode(width, height);
-    if (matchDisplayMode) {
-        width = m_displayModes[m_activeDisplayMode].w;
-        height = m_displayModes[m_activeDisplayMode].h;
-    }
-    SDL_Rect rect;
-    SDL_GetDisplayBounds(0, &rect);
-    m_maxWidth = rect.w;
-    m_maxHeight = rect.h;
-    ComputeDimensions(width, height, useFullscreen);
-    m_aspectRatio = float(m_width) / float(m_height);
-    m_isLandscape = m_width > m_height;
-    m_vSync = vSync;
-    SetupDisplay(windowTitle);
+void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync, bool matchDisplayMode)
+{
+	m_activeDisplayMode = FindDisplayMode(width, height);
+	if (matchDisplayMode) {
+		width = m_displayModes[m_activeDisplayMode].w;
+		height = m_displayModes[m_activeDisplayMode].h;
+	}
+	SDL_Rect rect;
+	SDL_GetDisplayBounds(0, &rect);
+	m_maxWidth = rect.w;
+	m_maxHeight = rect.h;
+	ComputeDimensions(width, height, useFullscreen);
+	m_aspectRatio = float(m_width) / float(m_height);
+	m_isLandscape = m_width > m_height;
+	m_vSync = vSync;
+	SetupDisplay(windowTitle);
 }
 
 
-void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullscreen) noexcept {
-    if (width * height == 0) {
-        m_width = m_maxWidth;
-        m_height = m_maxHeight;
-        m_isFullscreen = true;
-    }
-    else {
-        m_width = std::min(width, m_maxWidth);
-        m_height = std::min(height, m_maxHeight);
-        m_isFullscreen = useFullscreen;
-    }
+void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullscreen)
+noexcept
+{
+	if (width * height == 0) {
+		m_width = m_maxWidth;
+		m_height = m_maxHeight;
+		m_isFullscreen = true;
+	}
+	else {
+		m_width = std::min(width, m_maxWidth);
+		m_height = std::min(height, m_maxHeight);
+		m_isFullscreen = useFullscreen;
+	}
 }
 
 
-void BaseDisplayHandler::SetupDisplay(String windowTitle) {
-    Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN;
-    if (m_isFullscreen)
-        windowFlags |= SDL_WINDOW_FULLSCREEN;
+void BaseDisplayHandler::SetupDisplay(String windowTitle)
+{
+	Uint32 windowFlags = SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN;
+	if (m_isFullscreen)
+		windowFlags |= SDL_WINDOW_FULLSCREEN;
 
-    SetContextAttributes();
-    m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, windowFlags);
-    if (not m_window) {
-        logHandler.Print("BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
-        exit(1);
-    }
-    // Swapchain creation is deferred to SetupSwapchain (called from gfxRenderer::InitGraphics
-    // after VKContext + Device + Surface are up).
+	SetContextAttributes();
+	m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, windowFlags);
+	if (not m_window) {
+		logHandler.Print("BaseDisplayHandler: SDL_CreateWindow failed (%s)\n", SDL_GetError());
+		exit(1);
+	}
+	// Swapchain creation is deferred to SetupSwapchain (called from gfxRenderer::InitGraphics
+	// after VKContext + Device + Surface are up).
 }
 
 
-bool BaseDisplayHandler::SetupSwapchain(void) {
-    VkSurfaceKHR surface = vkContext.Surface();
-    if (surface == VK_NULL_HANDLE) {
-        logHandler.Print("BaseDisplayHandler::SetupSwapchain: VKContext has no surface\n");
-        return false;
-    }
-    if (not m_swapchain.Create(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
-        logHandler.Print("BaseDisplayHandler::SetupSwapchain: Swapchain::Create failed\n");
-        return false;
-    }
-    if (not commandListHandler.CmdQueue().InitSyncObjects(m_swapchain.Handle())) {
-        logHandler.Print("BaseDisplayHandler::SetupSwapchain: InitSyncObjects failed\n");
-        return false;
-    }
-    m_backBufferIndex = 0;
-    return true;
+bool BaseDisplayHandler::SetupSwapchain(void)
+{
+	VkSurfaceKHR surface = vkContext.Surface();
+	if (surface == VK_NULL_HANDLE) {
+		logHandler.Print("BaseDisplayHandler::SetupSwapchain: VKContext has no surface\n");
+		return false;
+	}
+	if (not m_swapchain.Create(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
+		logHandler.Print("BaseDisplayHandler::SetupSwapchain: Swapchain::Create failed\n");
+		return false;
+	}
+	if (not commandListHandler.CmdQueue().InitSyncObjects(m_swapchain.Handle())) {
+		logHandler.Print("BaseDisplayHandler::SetupSwapchain: InitSyncObjects failed\n");
+		return false;
+	}
+	m_backBufferIndex = 0;
+	return true;
 }
 
 
@@ -174,253 +182,275 @@ bool BaseDisplayHandler::SetupSwapchain(void) {
 // Opening it makes it the current list, so the draws that follow land in it, and ExecuteAll () closes
 // and submits whatever is still open at the end of the frame.
 
-CommandList* BaseDisplayHandler::BackBufferList(void) noexcept {
-    CommandList* cl = commandListHandler.CurrentCmdList();
+CommandList* BaseDisplayHandler::BackBufferList(void)
+noexcept
+{
+	CommandList* cl = commandListHandler.CurrentCmdList();
 
-    if (not cl) {
-        m_backBufferList = commandListHandler.CreateCmdList(String("backBuffer"), true);
-        if (not m_backBufferList)
-            return nullptr;
-        if (not m_backBufferList->Open()) {
-            m_backBufferList = nullptr;
-            return nullptr;
-        }
-        cl = m_backBufferList;
-    }
-    cl->m_usesBackBuffer = true;
-    return cl;
+	if (not cl) {
+		m_backBufferList = commandListHandler.CreateCmdList(String("backBuffer"), true);
+		if (not m_backBufferList)
+			return nullptr;
+		if (not m_backBufferList->Open()) {
+			m_backBufferList = nullptr;
+			return nullptr;
+		}
+		cl = m_backBufferList;
+	}
+	cl->m_usesBackBuffer = true;
+	return cl;
 }
 
 
-void BaseDisplayHandler::EnableBackBuffer(void) noexcept {
-    if (not BackBufferList())
-        return;
+void BaseDisplayHandler::EnableBackBuffer(void)
+noexcept
+{
+	if (not BackBufferList())
+		return;
 
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
 
-    if (cb == VK_NULL_HANDLE)
-        return;
-    m_swapchain.LayoutTracker(m_backBufferIndex).ToColorAttachment(cb);
+	if (cb == VK_NULL_HANDLE)
+		return;
+	m_swapchain.LayoutTracker(m_backBufferIndex).ToColorAttachment(cb);
 
-    if (m_isInRendering)
-        return;
+	if (m_isInRendering)
+		return;
 
-    VkRenderingAttachmentInfo color{};
-    color.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    color.imageView = m_swapchain.ImageView(m_backBufferIndex);
-    color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color.loadOp = m_backBufferWasWritten ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	VkRenderingAttachmentInfo color{};
+	color.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+	color.imageView = m_swapchain.ImageView(m_backBufferIndex);
+	color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	color.loadOp = m_backBufferWasWritten ? VK_ATTACHMENT_LOAD_OP_LOAD : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	color.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-    VkRenderingInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    info.renderArea.offset = { 0, 0 };
-    info.renderArea.extent = m_swapchain.Extent();
-    info.layerCount = 1;
-    info.colorAttachmentCount = 1;
-    info.pColorAttachments = &color;
+	VkRenderingInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+	info.renderArea.offset = { 0, 0 };
+	info.renderArea.extent = m_swapchain.Extent();
+	info.layerCount = 1;
+	info.colorAttachmentCount = 1;
+	info.pColorAttachments = &color;
 
-    Vk13Api::CmdBeginRendering(cb, &info);
-    m_isInRendering = true;
-    m_backBufferCb = cb;
-    m_backBufferWasWritten = true;
+	Vk13Api::CmdBeginRendering(cb, &info);
+	m_isInRendering = true;
+	m_backBufferCb = cb;
+	m_backBufferWasWritten = true;
 }
 
 
-void BaseDisplayHandler::SuspendBackBuffer(void) noexcept {
-    if (not m_isInRendering)
-        return;
-    if (m_backBufferCb != VK_NULL_HANDLE)
-        Vk13Api::CmdEndRendering(m_backBufferCb);
-    m_isInRendering = false;
-    m_backBufferCb = VK_NULL_HANDLE;
+void BaseDisplayHandler::SuspendBackBuffer(void)
+noexcept
+{
+	if (not m_isInRendering)
+		return;
+	if (m_backBufferCb != VK_NULL_HANDLE)
+		Vk13Api::CmdEndRendering(m_backBufferCb);
+	m_isInRendering = false;
+	m_backBufferCb = VK_NULL_HANDLE;
 }
 
 
-void BaseDisplayHandler::DisableBackBuffer(void) noexcept {
-    SuspendBackBuffer();
-    // The transition to the presentable layout has to be recorded somewhere as well - a frame in which
-    // nothing was drawn at all has no open list either, and the image would reach the present in the
-    // layout it was acquired in.
-    if (not BackBufferList())
-        return;
+void BaseDisplayHandler::DisableBackBuffer(void)
+noexcept
+{
+	SuspendBackBuffer();
+	// The transition to the presentable layout has to be recorded somewhere as well - a frame in which
+	// nothing was drawn at all has no open list either, and the image would reach the present in the
+	// layout it was acquired in.
+	if (not BackBufferList())
+		return;
 
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
 
-    if (cb == VK_NULL_HANDLE)
-        return;
-    m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
-    TracyVkCollect(commandListHandler.m_gpuProfilerCtx, cb);
+	if (cb == VK_NULL_HANDLE)
+		return;
+	m_swapchain.LayoutTracker(m_backBufferIndex).ToPresent(cb);
+	TracyVkCollect(commandListHandler.m_gpuProfilerCtx, cb);
 }
 
 
-void BaseDisplayHandler::CloseBackBufferList(void) noexcept {
-    DisableBackBuffer();
-    if (m_backBufferList and m_backBufferList->IsRecording() and (commandListHandler.CurrentCmdList() == m_backBufferList))
-        m_backBufferList->Close();
-    m_backBufferList = nullptr;
+void BaseDisplayHandler::CloseBackBufferList(void)
+noexcept
+{
+	DisableBackBuffer();
+	if (m_backBufferList and m_backBufferList->IsRecording() and (commandListHandler.CurrentCmdList() == m_backBufferList))
+		m_backBufferList->Close();
+	m_backBufferList = nullptr;
 }
 
 
-void BaseDisplayHandler::EndFrame(void) {
-    ZoneScoped;
-    if (m_swapchain.Handle() == VK_NULL_HANDLE)
-        return;
-    // The back buffer goes to the present from here, whoever drew on it last - the scope may still be
-    // open from a draw that did not go through DrawScreen (). Idempotent: an already presentable image
-    // is left alone (ImageLayoutTracker::TransitionTo).
-    DisableBackBuffer();
-    // Submit all registered command buffers, then present + advance frame slot.
-    commandListHandler.ExecuteAll();
-    commandListHandler.CmdQueue().EndFrame();
-    m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
-    m_backBufferList = nullptr;
-    FrameMark;
+void BaseDisplayHandler::EndFrame(void)
+{
+	ZoneScoped;
+	if (m_swapchain.Handle() == VK_NULL_HANDLE)
+		return;
+	// The back buffer goes to the present from here, whoever drew on it last - the scope may still be
+	// open from a draw that did not go through DrawScreen (). Idempotent: an already presentable image
+	// is left alone (ImageLayoutTracker::TransitionTo).
+	DisableBackBuffer();
+	// Submit all registered command buffers, then present + advance frame slot.
+	commandListHandler.ExecuteAll();
+	commandListHandler.CmdQueue().EndFrame();
+	m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
+	m_backBufferList = nullptr;
+	FrameMark;
 }
 
 
-void BaseDisplayHandler::BeginFrame(void) {
-    ZoneScoped;
-    if (m_swapchain.Handle() == VK_NULL_HANDLE)
-        return;
-    // CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, resets the slot's
-    // per-frame resources (deferred cleanup, descriptor pools, UBO allocator) and acquires the image.
-    //gfxStates.CheckError();
-    CommandQueue& cmdQueue = commandListHandler.CmdQueue();
-    WaitWhileMinimized();
-    if (cmdQueue.SwapchainIsOutOfDate() and not RestoreSwapchain())
-        return;
-    bool hasImage = cmdQueue.BeginFrame();
-    while (not hasImage and cmdQueue.SwapchainIsOutOfDate() and RestoreSwapchain())
-        hasImage = cmdQueue.ReacquireImage();
-    //gfxStates.CheckError();
-    m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
-    m_backBufferWasWritten = false;
-    //gfxStates.CheckError();
-    commandListHandler.ResetBindings();
-    //gfxStates.CheckError();
-    baseShaderHandler.InvalidateActiveShader();
-    //gfxStates.CheckError();
+void BaseDisplayHandler::BeginFrame(void)
+{
+	ZoneScoped;
+	if (m_swapchain.Handle() == VK_NULL_HANDLE)
+		return;
+	// CmdQueue::BeginFrame waits for the slot's in-flight fence, vkResetFences, resets the slot's
+	// per-frame resources (deferred cleanup, descriptor pools, UBO allocator) and acquires the image.
+	//gfxStates.CheckError();
+	CommandQueue& cmdQueue = commandListHandler.CmdQueue();
+	WaitWhileMinimized();
+	if (cmdQueue.SwapchainIsOutOfDate() and not RestoreSwapchain())
+		return;
+	bool hasImage = cmdQueue.BeginFrame();
+	while (not hasImage and cmdQueue.SwapchainIsOutOfDate() and RestoreSwapchain())
+		hasImage = cmdQueue.ReacquireImage();
+	//gfxStates.CheckError();
+	m_backBufferIndex = commandListHandler.CmdQueue().ImageIndex();
+	m_backBufferWasWritten = false;
+	//gfxStates.CheckError();
+	commandListHandler.ResetBindings();
+	//gfxStates.CheckError();
+	baseShaderHandler.InvalidateActiveShader();
+	//gfxStates.CheckError();
 }
 
 
-void BaseDisplayHandler::Update(void) {
-    EndFrame();
-    BeginFrame();
+void BaseDisplayHandler::Update(void)
+{
+	EndFrame();
+	BeginFrame();
 }
 
 
-BaseDisplayHandler::~BaseDisplayHandler() {
-    m_swapchain.Destroy();
-    if (m_window) {
-        SDL_DestroyWindow(m_window);
-        m_window = nullptr;
-    }
+BaseDisplayHandler::~BaseDisplayHandler()
+{
+	m_swapchain.Destroy();
+	if (m_window) {
+		SDL_DestroyWindow(m_window);
+		m_window = nullptr;
+	}
 }
 
 
-bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) {
-    if (displayMode >= m_displayModes.Length())
-        return false;
-    if (displayMode < 0)
-        displayMode = m_activeDisplayMode;
+bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen)
+{
+	if (displayMode >= m_displayModes.Length())
+		return false;
+	if (displayMode < 0)
+		displayMode = m_activeDisplayMode;
 
-    m_activeDisplayMode = displayMode;
-    m_isFullscreen = useFullscreen;
-    SDL_DisplayMode mode = GetDisplayMode();
+	m_activeDisplayMode = displayMode;
+	m_isFullscreen = useFullscreen;
+	SDL_DisplayMode mode = GetDisplayMode();
 
-    if (m_isFullscreen) {
-        SDL_SetWindowDisplayMode(m_window, &mode);
-        SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
-    }
-    else {
-        SDL_SetWindowFullscreen(m_window, 0);
-        SDL_SetWindowSize(m_window, mode.w, mode.h);
-        SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-    }
-    m_width = mode.w;
-    m_height = mode.h;
-    m_aspectRatio = float(m_width) / float(m_height);
+	if (m_isFullscreen) {
+		SDL_SetWindowDisplayMode(m_window, &mode);
+		SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
+	}
+	else {
+		SDL_SetWindowFullscreen(m_window, 0);
+		SDL_SetWindowSize(m_window, mode.w, mode.h);
+		SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+	}
+	m_width = mode.w;
+	m_height = mode.h;
+	m_aspectRatio = float(m_width) / float(m_height);
 
-    // Resize the swapchain on dimension change. Called between EndFrame and BeginFrame
-    // (see DisplayHandler::Update) — no submit is mid-flight at this point.
-    return RecreateSwapchain();
+	// Resize the swapchain on dimension change. Called between EndFrame and BeginFrame
+	// (see DisplayHandler::Update) — no submit is mid-flight at this point.
+	return RecreateSwapchain();
 }
 
 
-bool BaseDisplayHandler::RecreateSwapchain(void) {
-    if (m_swapchain.Handle() == VK_NULL_HANDLE)
-        return true;
-    VkSurfaceKHR surface = vkContext.Surface();
-    if (not m_swapchain.Recreate(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
-        logHandler.Print("BaseDisplayHandler::RecreateSwapchain: Swapchain::Recreate failed\n");
-        return false;
-    }
-    m_backBufferIndex = 0;
-    // The cached swapchain handle inside CommandQueue is stale — refresh it.
-    commandListHandler.CmdQueue().m_swapchain = m_swapchain.Handle();
-    commandListHandler.CmdQueue().m_swapchainIsOutOfDate = false;
-    // The per-slot binary semaphores were last used as present-wait for images of the
-    // destroyed swapchain. Those images can never be re-acquired, so the semaphores stay
-    // "in use by VkSwapchainKHR" from the validator's point of view — re-signaling them
-    // would trip VUID-vkQueueSubmit2-semaphore-03868. Destroy and re-create them.
-    if (not commandListHandler.CmdQueue().RecreateSyncObjects()) {
-        logHandler.Print("BaseDisplayHandler::RecreateSwapchain: RecreateSyncObjects failed\n");
-        return false;
-    }
-    return true;
+bool BaseDisplayHandler::RecreateSwapchain(void)
+{
+	if (m_swapchain.Handle() == VK_NULL_HANDLE)
+		return true;
+	VkSurfaceKHR surface = vkContext.Surface();
+	if (not m_swapchain.Recreate(surface, uint32_t(m_width), uint32_t(m_height), m_vSync)) {
+		logHandler.Print("BaseDisplayHandler::RecreateSwapchain: Swapchain::Recreate failed\n");
+		return false;
+	}
+	m_backBufferIndex = 0;
+	// The cached swapchain handle inside CommandQueue is stale — refresh it.
+	commandListHandler.CmdQueue().m_swapchain = m_swapchain.Handle();
+	commandListHandler.CmdQueue().m_swapchainIsOutOfDate = false;
+	// The per-slot binary semaphores were last used as present-wait for images of the
+	// destroyed swapchain. Those images can never be re-acquired, so the semaphores stay
+	// "in use by VkSwapchainKHR" from the validator's point of view — re-signaling them
+	// would trip VUID-vkQueueSubmit2-semaphore-03868. Destroy and re-create them.
+	if (not commandListHandler.CmdQueue().RecreateSyncObjects()) {
+		logHandler.Print("BaseDisplayHandler::RecreateSwapchain: RecreateSyncObjects failed\n");
+		return false;
+	}
+	return true;
 }
 
 
-bool BaseDisplayHandler::RestoreSwapchain(void) {
-    SDL_PumpEvents();
-    WaitWhileMinimized();
-    if (not RecreateSwapchain())
-        return false;
-    VkExtent2D extent = m_swapchain.Extent();
-    if ((extent.width != uint32_t(m_width)) or (extent.height != uint32_t(m_height)))
-        logHandler.Print("BaseDisplayHandler::RestoreSwapchain: swapchain is %ux%u, display mode is %dx%d\n", extent.width, extent.height, m_width, m_height);
-    return true;
+bool BaseDisplayHandler::RestoreSwapchain(void)
+{
+	SDL_PumpEvents();
+	WaitWhileMinimized();
+	if (not RecreateSwapchain())
+		return false;
+	VkExtent2D extent = m_swapchain.Extent();
+	if ((extent.width != uint32_t(m_width)) or (extent.height != uint32_t(m_height)))
+		logHandler.Print("BaseDisplayHandler::RestoreSwapchain: swapchain is %ux%u, display mode is %dx%d\n", extent.width,
+						 extent.height, m_width, m_height);
+	return true;
 }
 
 
-void BaseDisplayHandler::WaitWhileMinimized(void) {
-    if ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) == 0)
-        return;
-    OnMinimized();
-    bool restoreRequested = false;
-    while ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0) {
-        SDL_PumpEvents();
-        if (not restoreRequested and (SDL_HasEvent(SDL_QUIT) == SDL_TRUE)) {
-            SDL_RestoreWindow(m_window);
-            restoreRequested = true;
-        }
-        SDL_Delay(10);
-    }
-    OnRestored();
+void BaseDisplayHandler::WaitWhileMinimized(void)
+{
+	if ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) == 0)
+		return;
+	OnMinimized();
+	bool restoreRequested = false;
+	while ((SDL_GetWindowFlags(m_window) & SDL_WINDOW_MINIMIZED) != 0) {
+		SDL_PumpEvents();
+		if (not restoreRequested and (SDL_HasEvent(SDL_QUIT) == SDL_TRUE)) {
+			SDL_RestoreWindow(m_window);
+			restoreRequested = true;
+		}
+		SDL_Delay(10);
+	}
+	OnRestored();
 }
 
 
-bool BaseDisplayHandler::SetVSync(bool vSync) {
-    if (vSync == m_vSync)
-        return true;
-    m_vSync = vSync;
-    // The present mode (FIFO with vertical sync, MAILBOX/IMMEDIATE without) is baked into the
-    // swapchain, so switching means rebuilding it.
-    return RecreateSwapchain();
+bool BaseDisplayHandler::SetVSync(bool vSync)
+{
+	if (vSync == m_vSync)
+		return true;
+	m_vSync = vSync;
+	// The present mode (FIFO with vertical sync, MAILBOX/IMMEDIATE without) is baked into the
+	// swapchain, so switching means rebuilding it.
+	return RecreateSwapchain();
 }
 
 
-void BaseDisplayHandler::SwitchDisplayMode(int direction) {
-    RequestDisplayChange(m_activeDisplayMode + direction, m_isFullscreen);
+void BaseDisplayHandler::SwitchDisplayMode(int direction)
+{
+	RequestDisplayChange(m_activeDisplayMode + direction, m_isFullscreen);
 }
 
 
-void BaseDisplayHandler::ToggleFullscreen(void) {
+void BaseDisplayHandler::ToggleFullscreen(void)
+{
 #ifdef _DEBUG
-    logHandler.Print("Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
+	logHandler.Print("Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
-    RequestDisplayChange(-1, !m_isFullscreen);
+	RequestDisplayChange(-1, !m_isFullscreen);
 }
 
 // =================================================================================================

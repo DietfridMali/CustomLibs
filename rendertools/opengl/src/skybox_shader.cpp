@@ -17,10 +17,11 @@
 // (1.0 = sky1, 0.85 = sky2, 0.7 = sky3) and scales the result, which is what makes an overcast sky a
 // darker one as well.
 
-const ShaderSource& SkyboxShader() {
-    static const ShaderSource source(
-        "skybox",
-        String(R"(
+const ShaderSource& SkyboxShader()
+{
+	static const ShaderSource source(
+		"skybox",
+		String(R"(
             #version 330
             layout(location=0) in vec3 position;
             uniform mat4 mProjection;
@@ -32,7 +33,7 @@ const ShaderSource& SkyboxShader() {
                 gl_Position = gl_Position.xyww;
             }
         )"),
-        String(R"(
+		String(R"(
             #version 330
             in vec3 viewDirection;
             uniform mat4 mView;
@@ -83,9 +84,8 @@ const ShaderSource& SkyboxShader() {
 
                 fragColor = vec4(color * brightness, alpha);
             }
-        )")
-    );
-    return source;
+        )"));
+	return source;
 }
 
 // =================================================================================================

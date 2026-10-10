@@ -5,10 +5,11 @@
 
 // =================================================================================================
 
-const ShaderSource& TestShader() {
-    static const ShaderSource source(
-        "testShader",
-        R"(
+const ShaderSource& TestShader()
+{
+	static const ShaderSource source(
+		"testShader",
+		R"(
             #version 330
             void main() {
                 vec2 positions[3];
@@ -18,22 +19,22 @@ const ShaderSource& TestShader() {
                 gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
             }
         )",
-        R"(
+		R"(
         #version 330
         out vec4 fragColor;
         void main() {
             fragColor = vec4(1.0, 0.0, 1.0, 1.0); 
         }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
 
-const ShaderSource& StencilShader() {
-    static const ShaderSource source(
-        "stencilShader",
-        R"(
+const ShaderSource& StencilShader()
+{
+	static const ShaderSource source(
+		"stencilShader",
+		R"(
             #version 330
             layout(location = 0) in vec3 position;
             uniform mat4 mModelView;
@@ -43,19 +44,19 @@ const ShaderSource& StencilShader() {
                 gl_Position = mViewport * mProjection * vec4(position, 1.0);
             }
         )",
-        R"(
+		R"(
             #version 330
             void main() { }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
 
-const ShaderSource& SurfaceShadowShader() {
-    static const ShaderSource source(
-        "surfaceShadowShader",
-        R"(
+const ShaderSource& SurfaceShadowShader()
+{
+	static const ShaderSource source(
+		"surfaceShadowShader",
+		R"(
         #version 330
         layout(location = 0) in vec3 vertex;
         layout(location = 1) in vec2 texCoord;
@@ -71,7 +72,7 @@ const ShaderSource& SurfaceShadowShader() {
             fragCoord = texCoord;
         }
         )",
-        R"(
+		R"(
         #version 330
         uniform sampler2D surface;
         uniform vec4 surfaceColor;
@@ -82,16 +83,16 @@ const ShaderSource& SurfaceShadowShader() {
                 discard;
 #endif
             }
-        )"
-        );
-    return source;
+        )");
+	return source;
 }
 
 
-const ShaderSource& SphereShadowShader() {
-    static const ShaderSource source(
-        "sphereShadowShader",
-        R"(
+const ShaderSource& SphereShadowShader()
+{
+	static const ShaderSource source(
+		"sphereShadowShader",
+		R"(
         #version 330
         layout(location = 0) in vec3 vertex;
         uniform mat4 mModelView;
@@ -109,7 +110,7 @@ const ShaderSource& SphereShadowShader() {
 #endif
             }
         )",
-        R"(
+		R"(
         #version 330
 
 #define CULL_FACES 0
@@ -123,17 +124,17 @@ const ShaderSource& SphereShadowShader() {
                 discard;
 #endif
             }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
 
-const ShaderSource& DepthRenderer() {
-    static const ShaderSource source(
-        "depthRenderer",
-        Standard2DVS(),
-        R"(
+const ShaderSource& DepthRenderer()
+{
+	static const ShaderSource source(
+		"depthRenderer",
+		Standard2DVS(),
+		R"(
         #version 330
         uniform sampler2D surface;
         in vec2 fragCoord;
@@ -143,17 +144,17 @@ const ShaderSource& DepthRenderer() {
             d = pow(d, 0.5);
             fragColor = vec4(d, d, d, 1.0f);
         }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
 
-const ShaderSource& PlainColorShader() {
-    static const ShaderSource source(
-        "plainColor",
-        Standard2DVS(),
-        R"(
+const ShaderSource& PlainColorShader()
+{
+	static const ShaderSource source(
+		"plainColor",
+		Standard2DVS(),
+		R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -162,16 +163,16 @@ const ShaderSource& PlainColorShader() {
         void main() { 
             fragColor = surfaceColor; 
         }
-        )"
-        );
-    return source;
+        )");
+	return source;
 }
 
 
-const ShaderSource& ColorMeshShader() {
-    static const ShaderSource source(
-        "colorMesh",
-        R"(
+const ShaderSource& ColorMeshShader()
+{
+	static const ShaderSource source(
+		"colorMesh",
+		R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -187,7 +188,7 @@ const ShaderSource& ColorMeshShader() {
                 surfaceColor = color;
                 }
         )",
-        R"(
+		R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -197,17 +198,17 @@ const ShaderSource& ColorMeshShader() {
         void main() { 
             fragColor = surfaceColor; 
         }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
 
-const ShaderSource& GrayScaleShader() {
-    static const ShaderSource source(
-        "grayScale",
-        Standard2DVS(),
-        R"(
+const ShaderSource& GrayScaleShader()
+{
+	static const ShaderSource source(
+		"grayScale",
+		Standard2DVS(),
+		R"(
         #version 330
         // Für OpenGL ES 3.0 statt dessen:
         // #version 300 es
@@ -228,16 +229,17 @@ const ShaderSource& GrayScaleShader() {
             fragColor = vec4(vec3(invert ? 1.0 - gray : gray), texColor.a);
         }
         )");
-    return source;
+	return source;
 }
 
 
 // render a b/w mask with color applied.
-const ShaderSource& PlainTextureShader() {
-    static const ShaderSource source(
-        "plainTexture",
-        Standard2DVS(),
-        R"(
+const ShaderSource& PlainTextureShader()
+{
+	static const ShaderSource source(
+		"plainTexture",
+		Standard2DVS(),
+		R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -276,14 +278,15 @@ const ShaderSource& PlainTextureShader() {
             fragColor = vec4 (texColor.rgb * color /** mix (1.0, a, premultiply)*/, a);
             }
         )");
-    return source;
+	return source;
 }
 
 
-const ShaderSource& ColoredTextureShader() {
-    static const ShaderSource source(
-        "coloredTexture",
-        R"(
+const ShaderSource& ColoredTextureShader()
+{
+	static const ShaderSource source(
+		"coloredTexture",
+		R"(
             #version 330
             layout(location = 0) in vec3 position;
             layout(location = 1) in vec2 texCoord;
@@ -300,7 +303,7 @@ const ShaderSource& ColoredTextureShader() {
                 vertexColor = color;
                 }
         )",
-        R"(
+		R"(
         #version 330
         uniform sampler2D surface;
         uniform vec4 surfaceColor;
@@ -327,15 +330,16 @@ const ShaderSource& ColoredTextureShader() {
             fragColor = vec4 (texColor.rgb * color, a);
             }
         )");
-    return source;
+	return source;
 }
 
 
-const ShaderSource& MovingTextureShader() {
-    static const ShaderSource source(
-        "movingTexture",
-        Standard2DVS(),
-        String(R"(
+const ShaderSource& MovingTextureShader()
+{
+	static const ShaderSource source(
+		"movingTexture",
+		Standard2DVS(),
+		String(R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -356,8 +360,8 @@ const ShaderSource& MovingTextureShader() {
         const float GAMMA_BRIGHT  = 2.2;   // >1 => stärkeres Aufhellen über Threshold
         const float GAMMA_DARK    = 1.5;   // >1 => stärkeres Abdunkeln unter Threshold
         )") +
-        BoostFuncs() +
-        String(R"(
+			BoostFuncs() +
+			String(R"(
         void main() {
 #if 0
             fragColor = vec4(1,0,1,1);
@@ -383,18 +387,18 @@ const ShaderSource& MovingTextureShader() {
 #   endif
 #endif
             }
-        )")
-    );
-    return source;
+        )"));
+	return source;
 }
 
 
 // render a b/w mask with color applied.
-const ShaderSource& BlurTextureShader() {
-    static const ShaderSource source(
-        "blurTexture",
-        Standard2DVS(),
-        String(R"(
+const ShaderSource& BlurTextureShader()
+{
+	static const ShaderSource source(
+		"blurTexture",
+		Standard2DVS(),
+		String(R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -403,9 +407,9 @@ const ShaderSource& BlurTextureShader() {
         //uniform float premultiply;
         in vec3 fragPos;
         in vec2 fragCoord;
-        )")
-        + GaussBlurFuncs() +
-        String(R"(
+        )") +
+			GaussBlurFuncs() +
+			String(R"(
         layout(location = 0) out vec4 fragColor;
         void main() {
             vec4 texColor = GaussBlur(fragCoord, -1, -1);
@@ -413,17 +417,17 @@ const ShaderSource& BlurTextureShader() {
             if (a == 0) discard;
             fragColor = vec4 (texColor.rgb * surfaceColor.rgb /** mix (1.0, a, premultiply)*/, a);
             }
-        )")
-    );
-    return source;
+        )"));
+	return source;
 }
 
 
-const ShaderSource& TintAndBlurShader() {
-    static const ShaderSource source(
-        "tintAndBlur",
-        Standard2DVS(),
-        String(R"(
+const ShaderSource& TintAndBlurShader()
+{
+	static const ShaderSource source(
+		"tintAndBlur",
+		Standard2DVS(),
+		String(R"(
             #version 330
             // Für OpenGL ES 3.0 statt dessen:
             // #version 300 es
@@ -438,9 +442,9 @@ const ShaderSource& TintAndBlurShader() {
             uniform vec4 tint;
             uniform bool invert;
         )") +
-        GaussBlurFuncs() +
-        TintFuncs() +
-        String(R"(
+			GaussBlurFuncs() +
+			TintFuncs() +
+			String(R"(
         void main() {
             vec2 baseUV = fragCoord;
             vec4 texColor = GaussBlur(baseUV, -1, -1);
@@ -453,9 +457,8 @@ const ShaderSource& TintAndBlurShader() {
             vec3 finalRGB = mix(vec3(gray), tint.rgb * gray, tint.a);
             fragColor = vec4(invert ? vec3(1.0) - finalRGB : finalRGB, texColor.a);
         }
-        )")
-    );
-    return source;
+        )"));
+	return source;
 }
 
 // =================================================================================================

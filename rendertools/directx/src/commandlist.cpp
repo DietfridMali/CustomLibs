@@ -17,7 +17,8 @@
 #include "loghandler.h"
 
 // base_displayhandler.cpp - ends the program with a message when the device has been removed.
-extern void HandleDeviceLost(const char* where) noexcept;
+extern void HandleDeviceLost(const char* where)
+noexcept;
 
 // CLs sind die wesentliche Datenstruktur zur Abwicklung von "Render Tasks".
 // Render Tasks liegen immer zwischen open und close einer CL.Es gibt in dem Sinne keine verschachtelten Render-Tasks.
@@ -37,247 +38,275 @@ static_assert(CommandList::kSsboSlots == uint32_t(Shader::kSsboSlots));
 
 List<RenderStates> CommandList::m_renderStateStack;
 
-void CommandList::PushRenderStates(void) noexcept {
-    m_renderStateStack.Push(baseRenderer.RenderStates());
+void CommandList::PushRenderStates(void)
+noexcept
+{
+	m_renderStateStack.Push(baseRenderer.RenderStates());
 }
 
-void CommandList::PopRenderStates(void) noexcept {
-    if (m_renderStateStack.Length() > 0)
-        baseRenderer.RenderStates() = m_renderStateStack.Pop();
+void CommandList::PopRenderStates(void)
+noexcept
+{
+	if (m_renderStateStack.Length() > 0)
+		baseRenderer.RenderStates() = m_renderStateStack.Pop();
 }
 
 // =================================================================================================
 // CommandQueue
 
-bool CommandQueue::Create(ID3D12Device* device, const String& name) noexcept {
-    D3D12_COMMAND_QUEUE_DESC queueDesc{};
-    queueDesc.Type  = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+bool CommandQueue::Create(ID3D12Device* device, const String& name)
+noexcept
+{
+	D3D12_COMMAND_QUEUE_DESC queueDesc{};
+	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 
-    HRESULT hr = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
-    if (FAILED(hr)) {
-        logHandler.Print("CommandQueue: CreateCommandQueue failed (hr=0x%08X)\n", (unsigned)hr);
-        return false;
-    }
+	HRESULT hr = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
+	if (FAILED(hr)) {
+		logHandler.Print("CommandQueue: CreateCommandQueue failed (hr=0x%08X)\n", (unsigned)hr);
+		return false;
+	}
 
-    hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
-    if (FAILED(hr)) {
-        logHandler.Print("CommandQueue: CreateFence failed (hr=0x%08X)\n", (unsigned)hr);
-        return false;
-    }
+	hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
+	if (FAILED(hr)) {
+		logHandler.Print("CommandQueue: CreateFence failed (hr=0x%08X)\n", (unsigned)hr);
+		return false;
+	}
 
-    m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-    if (not m_fenceEvent) {
-        logHandler.Print("CommandQueue: CreateEvent failed\n");
-        return false;
-    }
+	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (not m_fenceEvent) {
+		logHandler.Print("CommandQueue: CreateEvent failed\n");
+		return false;
+	}
 
-    if (not cbvAllocator.Create(device))
-        return false;
+	if (not cbvAllocator.Create(device))
+		return false;
 #if DBG_DIRECTX
-    if (not name.IsEmpty())
-        m_queue->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
+	if (not name.IsEmpty())
+		m_queue->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
 #endif
-    return true;
+	return true;
 }
 
 
-void CommandQueue::Destroy(void) noexcept {
-    WaitIdle();
-    cbvAllocator.Destroy();
-    if (m_fenceEvent) {
-        CloseHandle(m_fenceEvent);
-        m_fenceEvent = nullptr;
-    }
+void CommandQueue::Destroy(void)
+noexcept
+{
+	WaitIdle();
+	cbvAllocator.Destroy();
+	if (m_fenceEvent) {
+		CloseHandle(m_fenceEvent);
+		m_fenceEvent = nullptr;
+	}
 }
 
 
-void CommandQueue::Signal(int frameIndex) noexcept {
-    if (not m_queue or not m_fence)
-        return;
-    if ((frameIndex < 0) or (frameIndex >= int(FRAME_COUNT)))
-        return;
-    const UINT64 fenceValue = ++m_fenceCounter;
-    m_fenceValues[frameIndex] = fenceValue;
-    m_queue->Signal(m_fence.Get(), fenceValue);
+void CommandQueue::Signal(int frameIndex)
+noexcept
+{
+	if (not m_queue or not m_fence)
+		return;
+	if ((frameIndex < 0) or (frameIndex >= int(FRAME_COUNT)))
+		return;
+	const UINT64 fenceValue = ++m_fenceCounter;
+	m_fenceValues[frameIndex] = fenceValue;
+	m_queue->Signal(m_fence.Get(), fenceValue);
 }
 
 
-void CommandQueue::WaitForFrame(int frameIndex) noexcept {
-    if (not m_fence or not m_fenceEvent)
-        return;
-    if ((frameIndex < 0) or (frameIndex >= int(FRAME_COUNT)))
-        return;
-    if (m_fence->GetCompletedValue() < m_fenceValues[frameIndex]) {
-        HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvent);
-        if (FAILED(hr)) {
-            logHandler.Print("CommandQueue::WaitForFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
-            HandleDeviceLost("CommandQueue::WaitForFrame");
-            return;
-        }
-        WaitForSingleObject(m_fenceEvent, INFINITE);
-    }
-    HandleDeviceLost("CommandQueue::WaitForFrame");
+void CommandQueue::WaitForFrame(int frameIndex)
+noexcept
+{
+	if (not m_fence or not m_fenceEvent)
+		return;
+	if ((frameIndex < 0) or (frameIndex >= int(FRAME_COUNT)))
+		return;
+	if (m_fence->GetCompletedValue() < m_fenceValues[frameIndex]) {
+		HRESULT hr = m_fence->SetEventOnCompletion(m_fenceValues[frameIndex], m_fenceEvent);
+		if (FAILED(hr)) {
+			logHandler.Print("CommandQueue::WaitForFrame: SetEventOnCompletion failed (hr=0x%08X)\n", (unsigned)hr);
+			HandleDeviceLost("CommandQueue::WaitForFrame");
+			return;
+		}
+		WaitForSingleObject(m_fenceEvent, INFINITE);
+	}
+	HandleDeviceLost("CommandQueue::WaitForFrame");
 }
 
 
-void CommandQueue::WaitIdle(void) noexcept {
-    if (not m_queue or not m_fence or not m_fenceEvent)
-        return;
-    const UINT64 value = ++m_fenceCounter;
-    m_queue->Signal(m_fence.Get(), value);
-    if (m_fence->GetCompletedValue() < value) {
-        m_fence->SetEventOnCompletion(value, m_fenceEvent);
-        WaitForSingleObject(m_fenceEvent, INFINITE);
-    }
-    HandleDeviceLost("CommandQueue::WaitIdle");
+void CommandQueue::WaitIdle(void)
+noexcept
+{
+	if (not m_queue or not m_fence or not m_fenceEvent)
+		return;
+	const UINT64 value = ++m_fenceCounter;
+	m_queue->Signal(m_fence.Get(), value);
+	if (m_fence->GetCompletedValue() < value) {
+		m_fence->SetEventOnCompletion(value, m_fenceEvent);
+		WaitForSingleObject(m_fenceEvent, INFINITE);
+	}
+	HandleDeviceLost("CommandQueue::WaitIdle");
 #if DBG_DIRECTX
-    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
-    if (FAILED(removed)) {
-        logHandler.Print("CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
-        gfxStates.CheckError();
-        dx12Context.DumpDRED();
-    }
+	HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
+	if (FAILED(removed)) {
+		logHandler.Print("CommandQueue::WaitIdle: device removed after wait (0x%08X)\n", (unsigned)removed);
+		gfxStates.CheckError();
+		dx12Context.DumpDRED();
+	}
 #endif
 }
 
 
-ID3D12GraphicsCommandList* CommandQueue::List(void) const noexcept {
-    return commandListHandler.CurrentGfxList();
+ID3D12GraphicsCommandList* CommandQueue::List(void) const
+noexcept
+{
+	return commandListHandler.CurrentGfxList();
 }
 
 // =================================================================================================
 
-bool CommandList::Create(ID3D12Device* device, const String& name, bool isTemporary) noexcept {
-    for (UINT i = 0; i < FRAME_COUNT; ++i) {
-        HRESULT hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
-        if (FAILED(hr)) {
-            logHandler.Print("CommandList::Create: CreateCommandAllocator[%u] failed (hr=0x%08X)\n", i, (unsigned)hr);
-            return false;
-        }
-    }
-    HRESULT hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_gfxListPtr));
-    if (FAILED(hr)) {
-        logHandler.Print("CommandList::Create: CreateCommandList failed (hr=0x%08X)\n", (unsigned)hr);
-        return false;
-    }
-    m_gfxListPtr->Close();
-    m_id = commandListHandler.m_cmdListId++;
+bool CommandList::Create(ID3D12Device* device, const String& name, bool isTemporary)
+noexcept
+{
+	for (UINT i = 0; i < FRAME_COUNT; ++i) {
+		HRESULT hr = device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
+		if (FAILED(hr)) {
+			logHandler.Print("CommandList::Create: CreateCommandAllocator[%u] failed (hr=0x%08X)\n", i, (unsigned)hr);
+			return false;
+		}
+	}
+	HRESULT hr = device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_gfxListPtr));
+	if (FAILED(hr)) {
+		logHandler.Print("CommandList::Create: CreateCommandList failed (hr=0x%08X)\n", (unsigned)hr);
+		return false;
+	}
+	m_gfxListPtr->Close();
+	m_id = commandListHandler.m_cmdListId++;
 #if DBG_DIRECTX
-    if (not name.IsEmpty())
-        m_gfxListPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
+	if (not name.IsEmpty())
+		m_gfxListPtr->SetPrivateData(WKPDID_D3DDebugObjectName, (UINT)name.Length(), (const char*)name);
 #endif
-    m_name = name;
-    m_isTemporary = isTemporary;
-    return true;
+	m_name = name;
+	m_isTemporary = isTemporary;
+	return true;
 }
 
 
-void CommandList::Destroy(void) noexcept {
-    commandListHandler.NoteStopped(this);
-    m_isRecording = false;
-    m_gfxListPtr.Reset();
-    for (UINT i = 0; i < FRAME_COUNT; ++i)
-        m_allocators[i].Reset();
+void CommandList::Destroy(void)
+noexcept
+{
+	commandListHandler.NoteStopped(this);
+	m_isRecording = false;
+	m_gfxListPtr.Reset();
+	for (UINT i = 0; i < FRAME_COUNT; ++i)
+		m_allocators[i].Reset();
 }
 
 
-void CommandList::Reset(void) noexcept {
-    m_refCounter = 1;
-    m_isFlushed = false;
-    commandListHandler.NoteStopped(this);
-    m_isRecording = false;
-    m_disposableResources.Clear();
+void CommandList::Reset(void)
+noexcept
+{
+	m_refCounter = 1;
+	m_isFlushed = false;
+	commandListHandler.NoteStopped(this);
+	m_isRecording = false;
+	m_disposableResources.Clear();
 }
 
 
-bool CommandList::Open(bool saveRenderStates) noexcept {
-    if (m_isRecording)
-        return true;
-    UINT frameIndex = UINT(commandListHandler.FrameIndex());
-    if (not m_gfxListPtr or not m_allocators[frameIndex])
-        return false;
-    HRESULT hr = m_allocators[frameIndex]->Reset();
-    if (FAILED(hr)) {
-        logHandler.Print("CommandList::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
-        return false;
-    }
-    hr = m_gfxListPtr->Reset(m_allocators[frameIndex].Get(), nullptr);
-    if (FAILED(hr)) {
-        logHandler.Print("CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
-        return false;
-    }
-    m_isRecording = true;
-    m_isFlushed = false;
-    m_openSerial = gfxResourceHandler.NextSerial();
-    commandListHandler.NoteRecording(this);
-    m_activePSO = nullptr;
-    m_activeRootSignature = nullptr;
-    m_descriptorHeapsBound = false;
-    ResetAppliedBindings();
-    ++m_executionCounter;
-    commandListHandler.PushCmdList(this);
-    m_openQueryCount = commandListHandler.ProfilerQueryCount();
+bool CommandList::Open(bool saveRenderStates)
+noexcept
+{
+	if (m_isRecording)
+		return true;
+	UINT frameIndex = UINT(commandListHandler.FrameIndex());
+	if (not m_gfxListPtr or not m_allocators[frameIndex])
+		return false;
+	HRESULT hr = m_allocators[frameIndex]->Reset();
+	if (FAILED(hr)) {
+		logHandler.Print("CommandList::Open: allocator Reset failed (hr=0x%08X)\n", (unsigned)hr);
+		return false;
+	}
+	hr = m_gfxListPtr->Reset(m_allocators[frameIndex].Get(), nullptr);
+	if (FAILED(hr)) {
+		logHandler.Print("CommandList::Open: list Reset failed (hr=0x%08X)\n", (unsigned)hr);
+		return false;
+	}
+	m_isRecording = true;
+	m_isFlushed = false;
+	m_openSerial = gfxResourceHandler.NextSerial();
+	commandListHandler.NoteRecording(this);
+	m_activePSO = nullptr;
+	m_activeRootSignature = nullptr;
+	m_descriptorHeapsBound = false;
+	ResetAppliedBindings();
+	++m_executionCounter;
+	commandListHandler.PushCmdList(this);
+	m_openQueryCount = commandListHandler.ProfilerQueryCount();
 #if USE_TRACY
-    // GPU timestamp zone for this command list, named after m_name. Begin timestamp is written
-    // here onto the freshly reset list; the end timestamp + ResolveQueryData follow in Close().
-    m_gpuZone = new tracy::D3D12ZoneScope(commandListHandler.m_gpuProfilerCtx,
-        uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
-        (const char*)m_name, size_t(m_name.Length()), m_gfxListPtr.Get(), true);
-    ++commandListHandler.m_gpuZonesOpened;
+	// GPU timestamp zone for this command list, named after m_name. Begin timestamp is written
+	// here onto the freshly reset list; the end timestamp + ResolveQueryData follow in Close().
+	m_gpuZone = new tracy::D3D12ZoneScope(commandListHandler.m_gpuProfilerCtx,
+										  uint32_t(__LINE__), __FILE__, strlen(__FILE__), __FUNCTION__, strlen(__FUNCTION__),
+										  (const char*)m_name, size_t(m_name.Length()), m_gfxListPtr.Get(), true);
+	++commandListHandler.m_gpuZonesOpened;
 #endif
-    m_savedRenderStates = saveRenderStates;
-    if (saveRenderStates)
-        PushRenderStates();
-    gfxStates.RestoreViewport();
+	m_savedRenderStates = saveRenderStates;
+	if (saveRenderStates)
+		PushRenderStates();
+	gfxStates.RestoreViewport();
 #if DBG_DIRECTX
-    gfxStates.CheckError();
+	gfxStates.CheckError();
 #endif
-    return true;
+	return true;
 }
 
 
-void CommandList::Close(bool restoreRenderStates) noexcept {
-    if (not m_isRecording)
-        return;
-    m_isRecording = false;
-    commandListHandler.NoteStopped(this);
+void CommandList::Close(bool restoreRenderStates)
+noexcept
+{
+	if (not m_isRecording)
+		return;
+	m_isRecording = false;
+	commandListHandler.NoteStopped(this);
 #if USE_TRACY
-    // End the GPU zone (writes the end timestamp + ResolveQueryData) while the list is still open.
-    if (m_gpuZone)
-        ++commandListHandler.m_gpuZonesClosed;
-    delete m_gpuZone;
-    m_gpuZone = nullptr;
+	// End the GPU zone (writes the end timestamp + ResolveQueryData) while the list is still open.
+	if (m_gpuZone)
+		++commandListHandler.m_gpuZonesClosed;
+	delete m_gpuZone;
+	m_gpuZone = nullptr;
 #endif
-    HRESULT hr = m_gfxListPtr->Close();
-    if (FAILED(hr))
-        logHandler.Print("CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
+	HRESULT hr = m_gfxListPtr->Close();
+	if (FAILED(hr))
+		logHandler.Print("CommandList::Close: list->Close() failed (hr=0x%08X)\n", (unsigned)hr);
 #if DBG_DIRECTX
-    gfxStates.CheckError();
+	gfxStates.CheckError();
 #endif
-    commandListHandler.PopCmdList();
-    commandListHandler.Register(this);
-    if (restoreRenderStates)
-        PopRenderStates();
+	commandListHandler.PopCmdList();
+	commandListHandler.Register(this);
+	if (restoreRenderStates)
+		PopRenderStates();
 }
 
 
-void CommandList::Flush(void) noexcept {
-    ZoneScoped;
-    if (m_isFlushed)
-        return;
-    m_isFlushed = true;
-    Close();
+void CommandList::Flush(void)
+noexcept
+{
+	ZoneScoped;
+	if (m_isFlushed)
+		return;
+	m_isFlushed = true;
+	Close();
 
-    ID3D12CommandList* lists[] = { GfxList(true) };
-    commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
-    HandleDeviceLost("CommandList::Flush");
+	ID3D12CommandList* lists[] = { GfxList(true) };
+	commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
+	HandleDeviceLost("CommandList::Flush");
 
 #if DBG_DIRECTX
-    CheckDeviceRemoved("Flush");
+	CheckDeviceRemoved("Flush");
 #endif
-    commandListHandler.CmdQueue().WaitIdle();
-    DisposeResources();
+	commandListHandler.CmdQueue().WaitIdle();
+	DisposeResources();
 #if 0
     // Reset allocator + list so the debug layer releases resource refs; leave closed.
     UINT fi = UINT(commandListHandler.FrameIndex());
@@ -293,177 +322,198 @@ void CommandList::Flush(void) noexcept {
 }
 
 
-void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) {
-    if (not m_isRecording or not resource or (before == after))
-        return;
-    D3D12_RESOURCE_BARRIER b{};
-    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource = resource;
-    b.Transition.StateBefore = before;
-    b.Transition.StateAfter = after;
-    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    m_gfxListPtr->ResourceBarrier(1, &b);
+void CommandList::SetBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after)
+{
+	if (not m_isRecording or not resource or (before == after))
+		return;
+	D3D12_RESOURCE_BARRIER b{};
+	b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	b.Transition.pResource = resource;
+	b.Transition.StateBefore = before;
+	b.Transition.StateAfter = after;
+	b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	m_gfxListPtr->ResourceBarrier(1, &b);
 #if DBG_DIRECTX
-    gfxStates.CheckError();
+	gfxStates.CheckError();
 #endif
 }
 
 
-void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count) {
-    if (not m_isRecording or not barriers or (count <= 0))
-        return;
-    m_gfxListPtr->ResourceBarrier(UINT(count), barriers);
+void CommandList::SetBarrier(D3D12_RESOURCE_BARRIER* barriers, int count)
+{
+	if (not m_isRecording or not barriers or (count <= 0))
+		return;
+	m_gfxListPtr->ResourceBarrier(UINT(count), barriers);
 #if DBG_DIRECTX
-    gfxStates.CheckError();
+	gfxStates.CheckError();
 #endif
 }
 
 
-void CommandList::BindDescriptorHeaps(void) noexcept {
-    if (m_descriptorHeapsBound)
-        return;
-    ID3D12GraphicsCommandList* list = GfxList();
-    if (not list)
-        return;
-    ID3D12DescriptorHeap* srvHeap     = descriptorHeaps.SrvHeapPtr();
-    ID3D12DescriptorHeap* samplerHeap = descriptorHeaps.SamplerHeapPtr();
-    if (srvHeap and samplerHeap) {
-        ID3D12DescriptorHeap* heaps[] = { srvHeap, samplerHeap };
-        list->SetDescriptorHeaps(2, heaps);
-    }
-    else if (srvHeap)
-        list->SetDescriptorHeaps(1, &srvHeap);
-    else
-        return;
-    m_descriptorHeapsBound = true;
-    ResetAppliedBindings();
+void CommandList::BindDescriptorHeaps(void)
+noexcept
+{
+	if (m_descriptorHeapsBound)
+		return;
+	ID3D12GraphicsCommandList* list = GfxList();
+	if (not list)
+		return;
+	ID3D12DescriptorHeap* srvHeap = descriptorHeaps.SrvHeapPtr();
+	ID3D12DescriptorHeap* samplerHeap = descriptorHeaps.SamplerHeapPtr();
+	if (srvHeap and samplerHeap) {
+		ID3D12DescriptorHeap* heaps[] = { srvHeap, samplerHeap };
+		list->SetDescriptorHeaps(2, heaps);
+	}
+	else if (srvHeap)
+		list->SetDescriptorHeaps(1, &srvHeap);
+	else
+		return;
+	m_descriptorHeapsBound = true;
+	ResetAppliedBindings();
 }
 
 
-void CommandList::ResetAppliedBindings(void) noexcept {
-    for (int i = 0; i < kTableCount; ++i)
-        m_appliedTables[i] = 0;
-    for (uint32_t i = 0; i < kSamplerSlots; ++i)
-        m_appliedSamplers[i] = UINT32_MAX;
-    m_appliedAccelStructure = 0;
+void CommandList::ResetAppliedBindings(void)
+noexcept
+{
+	for (int i = 0; i < kTableCount; ++i)
+		m_appliedTables[i] = 0;
+	for (uint32_t i = 0; i < kSamplerSlots; ++i)
+		m_appliedSamplers[i] = UINT32_MAX;
+	m_appliedAccelStructure = 0;
 }
 
 
-void CommandList::DisposeResources(void) noexcept {
-    for (auto& fn : m_disposableResources)
-        fn();
-    m_disposableResources.Clear();
+void CommandList::DisposeResources(void)
+noexcept
+{
+	for (auto& fn : m_disposableResources)
+		fn();
+	m_disposableResources.Clear();
 }
 
 
-void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader) noexcept {
-    if (pso != m_activePSO) {
-        m_gfxListPtr->SetPipelineState(pso);
-        ID3D12RootSignature* rootSignature = shader->GetRootSignature().Get();
-        if (rootSignature != m_activeRootSignature) {
-            m_gfxListPtr->SetGraphicsRootSignature(rootSignature);
-            m_activeRootSignature = rootSignature;
-            ResetAppliedBindings();
-        }
-        m_activePSO = pso;
+void CommandList::SetActivePSO(ID3D12PipelineState* pso, Shader* shader)
+noexcept
+{
+	if (pso != m_activePSO) {
+		m_gfxListPtr->SetPipelineState(pso);
+		ID3D12RootSignature* rootSignature = shader->GetRootSignature().Get();
+		if (rootSignature != m_activeRootSignature) {
+			m_gfxListPtr->SetGraphicsRootSignature(rootSignature);
+			m_activeRootSignature = rootSignature;
+			ResetAppliedBindings();
+		}
+		m_activePSO = pso;
 #if DBG_DIRECTX
-        gfxStates.CheckError();
+		gfxStates.CheckError();
 #endif
-    }
+	}
 }
 
 
 #if OPTIMIZE_SHADER_LOADING
 struct PipelineTarget {
-    DXGI_FORMAT colorFormats[RenderStates::kColorTargets]{};
-    uint8_t     colorFormatCount{ 0 };
-    DXGI_FORMAT depthFormat{ DXGI_FORMAT_UNKNOWN };
+	DXGI_FORMAT	colorFormats[RenderStates::kColorTargets]{};
+	uint8_t		colorFormatCount{ 0 };
+	DXGI_FORMAT	depthFormat{ DXGI_FORMAT_UNKNOWN };
 
-    bool operator==(const PipelineTarget& other) const noexcept = default;
+	bool operator==(const PipelineTarget& other) const
+	noexcept = default;
 };
 
 #endif
-static RenderStates lastPipelineStates;
-static CommandList* lastPipelineList = nullptr;
-static Shader* lastPipelineShader = nullptr;
+static RenderStates	lastPipelineStates;
+static CommandList*	lastPipelineList = nullptr;
+static Shader*		lastPipelineShader = nullptr;
 #if OPTIMIZE_SHADER_LOADING
 static PipelineTarget lastPipelineTarget;
 
 
-static void FillPipelineTarget(RenderStates& states) noexcept
+static void FillPipelineTarget(RenderStates& states)
+noexcept
 {
-    if (RenderTarget* renderTarget = baseRenderer.GetActiveBuffer())
-        renderTarget->FillPipelineFormats(states);
-    else {
-        states.colorTargetCount = 1;
-        states.colorFormat = BaseDisplayHandler::BACK_BUFFER_FORMAT;
-        for (auto& format : states.mrtFormats)
-            format = DXGI_FORMAT_UNKNOWN;
-        states.depthFormat = DXGI_FORMAT_UNKNOWN;
-    }
+	if (RenderTarget* renderTarget = baseRenderer.GetActiveBuffer())
+		renderTarget->FillPipelineFormats(states);
+	else {
+		states.colorTargetCount = 1;
+		states.colorFormat = BaseDisplayHandler::BACK_BUFFER_FORMAT;
+		for (auto& format : states.mrtFormats)
+			format = DXGI_FORMAT_UNKNOWN;
+		states.depthFormat = DXGI_FORMAT_UNKNOWN;
+	}
 }
 
 
-static PipelineTarget GetPipelineTarget(void) noexcept
+static PipelineTarget GetPipelineTarget(void)
+noexcept
 {
-    RenderStates states;
-    FillPipelineTarget(states);
-    PipelineTarget target;
-    target.colorFormats[0] = states.colorFormat;
-    for (int i = 1; i < RenderStates::kColorTargets; ++i)
-        target.colorFormats[i] = states.mrtFormats[i - 1];
-    target.colorFormatCount = states.colorTargetCount;
-    target.depthFormat = states.depthFormat;
-    return target;
+	RenderStates states;
+	FillPipelineTarget(states);
+	PipelineTarget target;
+	target.colorFormats[0] = states.colorFormat;
+	for (int i = 1; i < RenderStates::kColorTargets; ++i)
+		target.colorFormats[i] = states.mrtFormats[i - 1];
+	target.colorFormatCount = states.colorTargetCount;
+	target.depthFormat = states.depthFormat;
+	return target;
 }
 #endif
 
-bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept {
-    if ((cl->m_activePSO != nullptr) and (cl == lastPipelineList) and (shader == lastPipelineShader)
+bool ResolveDrawPipeline(CommandList* cl, Shader* shader)
+noexcept
+{
+	if ((cl->m_activePSO != nullptr) and (cl == lastPipelineList) and (shader == lastPipelineShader)
 #if OPTIMIZE_SHADER_LOADING
-        and (baseRenderer.RenderStates() == lastPipelineStates) and (GetPipelineTarget() == lastPipelineTarget))
+		and (baseRenderer.RenderStates() == lastPipelineStates) and (GetPipelineTarget() == lastPipelineTarget))
 #else
-        and (baseRenderer.RenderStates() == lastPipelineStates))
+		and (baseRenderer.RenderStates() == lastPipelineStates))
 #endif
-        return true;
-    return cl->GetPSO(shader) != nullptr;
+		return true;
+	return cl->GetPSO(shader) != nullptr;
 }
 
 
-ID3D12PipelineState* CommandList::GetPSO(Shader* shader) noexcept {
-    ID3D12PipelineState* pso = PSO::GetPSO(shader);
-    if (pso) {
-        SetActivePSO(pso, shader);
-        if (m_isRecording)
-            m_gfxListPtr->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
-        m_activeTopology = baseRenderer.RenderStates().topology;
-        lastPipelineStates = baseRenderer.RenderStates();
-        lastPipelineList = this;
-        lastPipelineShader = shader;
+ID3D12PipelineState* CommandList::GetPSO(Shader* shader)
+noexcept
+{
+	ID3D12PipelineState* pso = PSO::GetPSO(shader);
+	if (pso) {
+		SetActivePSO(pso, shader);
+		if (m_isRecording)
+			m_gfxListPtr->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
+		m_activeTopology = baseRenderer.RenderStates().topology;
+		lastPipelineStates = baseRenderer.RenderStates();
+		lastPipelineList = this;
+		lastPipelineShader = shader;
 #if OPTIMIZE_SHADER_LOADING
-        lastPipelineTarget = GetPipelineTarget();
+		lastPipelineTarget = GetPipelineTarget();
 #endif
-    }
-    return pso;
+	}
+	return pso;
 }
 
 
-bool CommandList::SetTopology(Shader* shader, MeshTopology topology) noexcept {
-    if (m_activeTopology == uint8_t(topology))
-        return true;
-    baseRenderer.RenderStates().topology = uint8_t(topology);
-    return GetPSO(shader) != nullptr;
+bool CommandList::SetTopology(Shader* shader, MeshTopology topology)
+noexcept
+{
+	if (m_activeTopology == uint8_t(topology))
+		return true;
+	baseRenderer.RenderStates().topology = uint8_t(topology);
+	return GetPSO(shader) != nullptr;
 }
 
 
 #if DBG_DIRECTX
-void CommandList::CheckDeviceRemoved(const char* context) noexcept {
-    gfxStates.CheckError();
-    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
-    if (FAILED(removed)) {
-        logHandler.Print("CommandList::%s: device removed (0x%08X)\n", context, (unsigned)removed);
-        dx12Context.DumpDRED();
-    }
+void CommandList::CheckDeviceRemoved(const char* context)
+noexcept
+{
+	gfxStates.CheckError();
+	HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
+	if (FAILED(removed)) {
+		logHandler.Print("CommandList::%s: device removed (0x%08X)\n", context, (unsigned)removed);
+		dx12Context.DumpDRED();
+	}
 }
 #endif
 
@@ -474,559 +524,638 @@ void CommandList::CheckDeviceRemoved(const char* context) noexcept {
 bool CommandListHandler::m_logCalls = false;
 #endif
 
-bool CommandListHandler::Create(ID3D12Device* device) noexcept {
-    if (not m_cmdQueue.Create(device, "MainQueue"))
-        return false;
-    gfxResourceHandler.Init(m_frameCount);
-    m_gpuProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
+bool CommandListHandler::Create(ID3D12Device* device)
+noexcept
+{
+	if (not m_cmdQueue.Create(device, "MainQueue"))
+		return false;
+	gfxResourceHandler.Init(m_frameCount);
+	m_gpuProfilerCtx = TracyD3D12Context(device, m_cmdQueue.Queue());
 #if USE_TRACY
-    logHandler.Print("CommandListHandler::Create: Tracy GPU context %s, id %u (255 = constructor bailed out)\n",
-            m_gpuProfilerCtx ? "created" : "NOT created - no GPU zones", m_gpuProfilerCtx ? unsigned(m_gpuProfilerCtx->GetId()) : 255u);
+	logHandler.Print("CommandListHandler::Create: Tracy GPU context %s, id %u (255 = constructor bailed out)\n",
+					 m_gpuProfilerCtx ? "created" : "NOT created - no GPU zones",
+					 m_gpuProfilerCtx ? unsigned(m_gpuProfilerCtx->GetId()) : 255u);
 #endif
-    D3D12_INDIRECT_ARGUMENT_DESC argument{};
-    argument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
-    D3D12_COMMAND_SIGNATURE_DESC signature{};
-    signature.ByteStride = UINT(sizeof(GfxDrawCommand));
-    signature.NumArgumentDescs = 1;
-    signature.pArgumentDescs = &argument;
-    if (FAILED(device->CreateCommandSignature(&signature, nullptr, IID_PPV_ARGS(&m_drawIndexedSignature)))) {
-        logHandler.Print("CommandListHandler::Create: cannot create the command signature for indirect draws\n");
-        return false;
-    }
-    ResetBindings();
-    return true;
+	D3D12_INDIRECT_ARGUMENT_DESC argument{};
+	argument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+	D3D12_COMMAND_SIGNATURE_DESC signature{};
+	signature.ByteStride = UINT(sizeof(GfxDrawCommand));
+	signature.NumArgumentDescs = 1;
+	signature.pArgumentDescs = &argument;
+	if (FAILED(device->CreateCommandSignature(&signature, nullptr, IID_PPV_ARGS(&m_drawIndexedSignature)))) {
+		logHandler.Print("CommandListHandler::Create: cannot create the command signature for indirect draws\n");
+		return false;
+	}
+	ResetBindings();
+	return true;
 }
 
 
-void CommandListHandler::ResetBindings(void) noexcept {
-    for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i)
-        m_boundSrvs[i] = UINT32_MAX;
-    for (uint32_t i = 0; i < CommandList::kSamplerSlots; ++i)
-        m_boundSamplers[i] = UINT32_MAX;
-    for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
-        m_boundStorageBuffers[i] = UINT32_MAX;
-        m_storageBufferStates[i] = {};
-    }
-    for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i) {
-        m_boundReadOnlyBuffers[i] = UINT32_MAX;
-        m_readOnlyBufferStates[i] = {};
-    }
-    for (uint32_t i = 0; i < kVertexSlots; ++i)
-        m_instanceStreams[i] = {};
-    m_boundAccelStructure = 0;
-    for (int i = 0; i < CommandList::kTableCount; ++i)
-        m_bindingVersions[i] = ++m_bindingVersionCounter;
+void CommandListHandler::ResetBindings(void)
+noexcept
+{
+	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i)
+		m_boundSrvs[i] = UINT32_MAX;
+	for (uint32_t i = 0; i < CommandList::kSamplerSlots; ++i)
+		m_boundSamplers[i] = UINT32_MAX;
+	for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
+		m_boundStorageBuffers[i] = UINT32_MAX;
+		m_storageBufferStates[i] = {};
+	}
+	for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i) {
+		m_boundReadOnlyBuffers[i] = UINT32_MAX;
+		m_readOnlyBufferStates[i] = {};
+	}
+	for (uint32_t i = 0; i < kVertexSlots; ++i)
+		m_instanceStreams[i] = {};
+	m_boundAccelStructure = 0;
+	for (int i = 0; i < CommandList::kTableCount; ++i)
+		m_bindingVersions[i] = ++m_bindingVersionCounter;
 }
 
 
-void CommandListHandler::BindAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS accelStructure) noexcept {
-    m_boundAccelStructure = accelStructure;
+void CommandListHandler::BindAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS accelStructure)
+noexcept
+{
+	m_boundAccelStructure = accelStructure;
 }
 
 
-void CommandListHandler::BindSampledImage(uint32_t slot, uint32_t srvIndex) noexcept {
-    if ((slot < CommandList::kSrvSlots) and (m_boundSrvs[slot] != srvIndex)) {
-        m_boundSrvs[slot] = srvIndex;
-        m_bindingVersions[CommandList::kTableSrv] = ++m_bindingVersionCounter;
-    }
+void CommandListHandler::BindSampledImage(uint32_t slot, uint32_t srvIndex)
+noexcept
+{
+	if ((slot < CommandList::kSrvSlots) and (m_boundSrvs[slot] != srvIndex)) {
+		m_boundSrvs[slot] = srvIndex;
+		m_bindingVersions[CommandList::kTableSrv] = ++m_bindingVersionCounter;
+	}
 }
 
 
-void CommandListHandler::BindSampler(uint32_t slot, uint32_t samplerSlot) noexcept {
-    if (slot < CommandList::kSamplerSlots)
-        m_boundSamplers[slot] = samplerSlot;
+void CommandListHandler::BindSampler(uint32_t slot, uint32_t samplerSlot)
+noexcept
+{
+	if (slot < CommandList::kSamplerSlots)
+		m_boundSamplers[slot] = samplerSlot;
 }
 
 
-void CommandListHandler::BindStorageBuffer(uint32_t slot, uint32_t uavIndex, ComPtr<ID3D12Resource>* pResource, D3D12_RESOURCE_STATES* pState) noexcept {
-    if (slot >= CommandList::kUavSlots)
-        return;
-    m_storageBufferStates[slot] = { pResource, pState };
-    if (m_boundStorageBuffers[slot] != uavIndex) {
-        m_boundStorageBuffers[slot] = uavIndex;
-        m_bindingVersions[CommandList::kTableUav] = ++m_bindingVersionCounter;
-    }
+void CommandListHandler::BindStorageBuffer(uint32_t slot, uint32_t uavIndex, ComPtr<ID3D12Resource>* pResource,
+										   D3D12_RESOURCE_STATES* pState)
+noexcept
+{
+	if (slot >= CommandList::kUavSlots)
+		return;
+	m_storageBufferStates[slot] = { pResource, pState };
+	if (m_boundStorageBuffers[slot] != uavIndex) {
+		m_boundStorageBuffers[slot] = uavIndex;
+		m_bindingVersions[CommandList::kTableUav] = ++m_bindingVersionCounter;
+	}
 }
 
 
-void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, uint32_t srvIndex, ComPtr<ID3D12Resource>* pResource, D3D12_RESOURCE_STATES* pState) noexcept {
-    if (slot >= CommandList::kSsboSlots)
-        return;
-    m_readOnlyBufferStates[slot] = { pResource, pState };
-    if (m_boundReadOnlyBuffers[slot] != srvIndex) {
-        m_boundReadOnlyBuffers[slot] = srvIndex;
-        m_bindingVersions[CommandList::kTableSsbo] = ++m_bindingVersionCounter;
-    }
+void CommandListHandler::BindReadOnlyBuffer(uint32_t slot, uint32_t srvIndex, ComPtr<ID3D12Resource>* pResource,
+											D3D12_RESOURCE_STATES* pState)
+noexcept
+{
+	if (slot >= CommandList::kSsboSlots)
+		return;
+	m_readOnlyBufferStates[slot] = { pResource, pState };
+	if (m_boundReadOnlyBuffers[slot] != srvIndex) {
+		m_boundReadOnlyBuffers[slot] = srvIndex;
+		m_bindingVersions[CommandList::kTableSsbo] = ++m_bindingVersionCounter;
+	}
 }
 
 
-void CommandListHandler::UnbindBuffer(const D3D12_RESOURCE_STATES* pState) noexcept {
-    if (not pState)
-        return;
-    for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
-        if (m_storageBufferStates[i].pState == pState)
-            BindStorageBuffer(i, UINT32_MAX);
-    }
-    for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i) {
-        if (m_readOnlyBufferStates[i].pState == pState)
-            BindReadOnlyBuffer(i, UINT32_MAX);
-    }
-    for (uint32_t i = 0; i < kVertexSlots; ++i) {
-        if (m_instanceStreams[i].pState == pState)
-            BindInstanceStream(i);
-    }
+void CommandListHandler::UnbindBuffer(const D3D12_RESOURCE_STATES* pState)
+noexcept
+{
+	if (not pState)
+		return;
+	for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
+		if (m_storageBufferStates[i].pState == pState)
+			BindStorageBuffer(i, UINT32_MAX);
+	}
+	for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i) {
+		if (m_readOnlyBufferStates[i].pState == pState)
+			BindReadOnlyBuffer(i, UINT32_MAX);
+	}
+	for (uint32_t i = 0; i < kVertexSlots; ++i) {
+		if (m_instanceStreams[i].pState == pState)
+			BindInstanceStream(i);
+	}
 }
 
 
-void CommandListHandler::BindInstanceStream(uint32_t slot, ComPtr<ID3D12Resource>* pResource, D3D12_RESOURCE_STATES* pState, UINT size, UINT stride) noexcept {
-    if (slot < kVertexSlots)
-        m_instanceStreams[slot] = { pResource, pState, size, stride };
+void CommandListHandler::BindInstanceStream(uint32_t slot, ComPtr<ID3D12Resource>* pResource, D3D12_RESOURCE_STATES* pState,
+											UINT size, UINT stride)
+noexcept
+{
+	if (slot < kVertexSlots)
+		m_instanceStreams[slot] = { pResource, pState, size, stride };
 }
 
 
-bool CommandListHandler::InstanceStreamView(ID3D12GraphicsCommandList* list, uint32_t slot, D3D12_VERTEX_BUFFER_VIEW& view) noexcept {
-    if (slot >= kVertexSlots)
-        return false;
-    const BoundInstanceStream& stream = m_instanceStreams[slot];
-    if (not (list and stream.pResource and stream.pState and stream.pResource->Get()))
-        return false;
-    if (*stream.pState != D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER) {
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = stream.pResource->Get();
-        barrier.Transition.StateBefore = *stream.pState;
-        barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        list->ResourceBarrier(1, &barrier);
-        *stream.pState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    }
-    view.BufferLocation = stream.pResource->Get()->GetGPUVirtualAddress();
-    view.SizeInBytes = stream.size;
-    view.StrideInBytes = stream.stride;
-    return true;
+bool CommandListHandler::InstanceStreamView(ID3D12GraphicsCommandList* list, uint32_t slot, D3D12_VERTEX_BUFFER_VIEW& view)
+noexcept
+{
+	if (slot >= kVertexSlots)
+		return false;
+	const BoundInstanceStream& stream = m_instanceStreams[slot];
+	if (not (list and stream.pResource and stream.pState and stream.pResource->Get()))
+		return false;
+	if (*stream.pState != D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER) {
+		D3D12_RESOURCE_BARRIER barrier{};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Transition.pResource = stream.pResource->Get();
+		barrier.Transition.StateBefore = *stream.pState;
+		barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+		barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		list->ResourceBarrier(1, &barrier);
+		*stream.pState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+	}
+	view.BufferLocation = stream.pResource->Get()->GetGPUVirtualAddress();
+	view.SizeInBytes = stream.size;
+	view.StrideInBytes = stream.stride;
+	return true;
 }
 
 
-void CommandListHandler::UnbindImage(uint32_t srvIndex) noexcept {
-    if (srvIndex == UINT32_MAX)
-        return;
-    for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i) {
-        if (m_boundSrvs[i] == srvIndex)
-            BindSampledImage(i, UINT32_MAX);
-    }
+void CommandListHandler::UnbindImage(uint32_t srvIndex)
+noexcept
+{
+	if (srvIndex == UINT32_MAX)
+		return;
+	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i) {
+		if (m_boundSrvs[i] == srvIndex)
+			BindSampledImage(i, UINT32_MAX);
+	}
 }
 
 
-static void TransitionBoundBuffer(ID3D12GraphicsCommandList* list, const CommandListHandler::BoundBuffer& buffer, D3D12_RESOURCE_STATES after) noexcept {
-    if (not (buffer.pResource and buffer.pState and *buffer.pResource) or (*buffer.pState == after))
-        return;
-    D3D12_RESOURCE_BARRIER b{};
-    b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    b.Transition.pResource = buffer.pResource->Get();
-    b.Transition.StateBefore = *buffer.pState;
-    b.Transition.StateAfter = after;
-    b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-    list->ResourceBarrier(1, &b);
-    *buffer.pState = after;
+static void TransitionBoundBuffer(ID3D12GraphicsCommandList* list, const CommandListHandler::BoundBuffer& buffer,
+								  D3D12_RESOURCE_STATES after)
+noexcept
+{
+	if (not (buffer.pResource and buffer.pState and *buffer.pResource) or (*buffer.pState == after))
+		return;
+	D3D12_RESOURCE_BARRIER b{};
+	b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	b.Transition.pResource = buffer.pResource->Get();
+	b.Transition.StateBefore = *buffer.pState;
+	b.Transition.StateAfter = after;
+	b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	list->ResourceBarrier(1, &b);
+	*buffer.pState = after;
 }
 
 
-void CommandListHandler::TransitionBoundBuffers(ID3D12GraphicsCommandList* list) noexcept {
-    static constexpr D3D12_RESOURCE_STATES kReadOnlyState = D3D12_RESOURCE_STATES(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+void CommandListHandler::TransitionBoundBuffers(ID3D12GraphicsCommandList* list)
+noexcept
+{
+	static constexpr D3D12_RESOURCE_STATES kReadOnlyState =
+		D3D12_RESOURCE_STATES(D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
 
-    for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
-        const BoundBuffer& buffer = m_storageBufferStates[i];
-        if (buffer.pState and (*buffer.pState == kReadOnlyState))
-            TransitionBoundBuffer(list, buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    }
-    for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i) {
-        const BoundBuffer& buffer = m_readOnlyBufferStates[i];
-        if (buffer.pState and (*buffer.pState != D3D12_RESOURCE_STATE_COMMON))
-            TransitionBoundBuffer(list, buffer, kReadOnlyState);
-    }
+	for (uint32_t i = 0; i < CommandList::kUavSlots; ++i) {
+		const BoundBuffer& buffer = m_storageBufferStates[i];
+		if (buffer.pState and (*buffer.pState == kReadOnlyState))
+			TransitionBoundBuffer(list, buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+	}
+	for (uint32_t i = 0; i < CommandList::kSsboSlots; ++i) {
+		const BoundBuffer& buffer = m_readOnlyBufferStates[i];
+		if (buffer.pState and (*buffer.pState != D3D12_RESOURCE_STATE_COMMON))
+			TransitionBoundBuffer(list, buffer, kReadOnlyState);
+	}
 }
 
 
-void CommandListHandler::OnDescriptorHeapChanged(void) noexcept {
-    for (auto l : m_recordingLists)
-        l->m_descriptorHeapsBound = false;
-    InvalidateTables();
+void CommandListHandler::OnDescriptorHeapChanged(void)
+noexcept
+{
+	for (auto l : m_recordingLists)
+		l->m_descriptorHeapsBound = false;
+	InvalidateTables();
 }
 
 
-bool CommandListHandler::ApplyBindings(const Shader* shader) noexcept {
-    CommandList* cl = CurrentCmdList();
-    ID3D12GraphicsCommandList* list = CurrentGfxList();
-    if (not (cl and list))
-        return false;
-    if (shader and shader->m_usesAccelStructure and (m_boundAccelStructure == 0)) {
-        logHandler.Print("Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)shader->m_name);
-        return false;
-    }
-    cl->BindDescriptorHeaps();
-    TransitionBoundBuffers(list);
+bool CommandListHandler::ApplyBindings(const Shader* shader)
+noexcept
+{
+	CommandList*				cl = CurrentCmdList();
+	ID3D12GraphicsCommandList*	list = CurrentGfxList();
+	if (not (cl and list))
+		return false;
+	if (shader and shader->m_usesAccelStructure and (m_boundAccelStructure == 0)) {
+		logHandler.Print("Shader '%s': declares an acceleration structure, but none is bound\n", (const char*)shader->m_name);
+		return false;
+	}
+	cl->BindDescriptorHeaps();
+	TransitionBoundBuffers(list);
 
-    uint64_t srvDefaultKey = shader ? shader->m_srvDefaultKey : 0;
+	uint64_t srvDefaultKey = shader ? shader->m_srvDefaultKey : 0;
 
-    if (srvDefaultKey != m_srvDefaultKey) {
-        m_srvDefaultKey = srvDefaultKey;
-        m_bindingVersions[CommandList::kTableSrv] = ++m_bindingVersionCounter;
-    }
+	if (srvDefaultKey != m_srvDefaultKey) {
+		m_srvDefaultKey = srvDefaultKey;
+		m_bindingVersions[CommandList::kTableSrv] = ++m_bindingVersionCounter;
+	}
 
-    uint32_t srvs[CommandList::kSrvSlots];
+	uint32_t srvs[CommandList::kSrvSlots];
 
-    for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i)
-        srvs[i] = (m_boundSrvs[i] != UINT32_MAX) ? m_boundSrvs[i] : descriptorHeaps.DefaultSrv(shader ? shader->m_srvDefaults[i] : uint8_t(Shader::dvNone));
+	for (uint32_t i = 0; i < CommandList::kSrvSlots; ++i)
+		srvs[i] = (m_boundSrvs[i] != UINT32_MAX)
+			? m_boundSrvs[i]
+			: descriptorHeaps.DefaultSrv(shader ? shader->m_srvDefaults[i] : uint8_t(Shader::dvNone));
 
-    const UINT tableParams[CommandList::kTableCount] = { UINT(Shader::kSrvBase), UINT(Shader::kUavBase), UINT(Shader::kSsboBase) };
-    const uint32_t* tableSlots[CommandList::kTableCount] = { srvs, m_boundStorageBuffers, m_boundReadOnlyBuffers };
-    const uint32_t tableSizes[CommandList::kTableCount] = { CommandList::kSrvSlots, CommandList::kUavSlots, CommandList::kSsboSlots };
-    const uint32_t nullIndices[CommandList::kTableCount] = { descriptorHeaps.m_nullTextureSrv, descriptorHeaps.m_nullUav, descriptorHeaps.m_nullBufferSrv };
+	const UINT		tableParams[CommandList::kTableCount] = { UINT(Shader::kSrvBase), UINT(Shader::kUavBase), UINT(Shader::kSsboBase) };
+	const uint32_t*	tableSlots[CommandList::kTableCount] = { srvs, m_boundStorageBuffers, m_boundReadOnlyBuffers };
+	const uint32_t	tableSizes[CommandList::kTableCount] = { CommandList::kSrvSlots, CommandList::kUavSlots, CommandList::kSsboSlots };
+	const uint32_t	nullIndices[CommandList::kTableCount] = { descriptorHeaps.m_nullTextureSrv, descriptorHeaps.m_nullUav,
+															  descriptorHeaps.m_nullBufferSrv };
 
-    for (bool heapChanged = true; heapChanged; ) {
-        heapChanged = false;
-        cl->BindDescriptorHeaps();
-        const uint64_t heapVersion = descriptorHeaps.HeapVersion();
-        for (int t = 0; t < CommandList::kTableCount; ++t) {
-            if (cl->m_appliedTables[t] == m_bindingVersions[t])
-                continue;
-            BuiltTable& built = m_builtTables[t];
-            if ((built.version == m_bindingVersions[t]) and (built.generation == descriptorHeaps.TableGeneration()))
-                gfxResourceHandler.NoteFrameAllocation();
-            else {
-                if (not descriptorHeaps.BuildTable(tableSlots[t], tableSizes[t], nullIndices[t], built.gpu))
-                    return false;
-                if (heapVersion != descriptorHeaps.HeapVersion()) {
-                    heapChanged = true;
-                    break;
-                }
-                built.version = m_bindingVersions[t];
-                built.generation = descriptorHeaps.TableGeneration();
-            }
-            list->SetGraphicsRootDescriptorTable(tableParams[t], built.gpu);
-            cl->m_appliedTables[t] = m_bindingVersions[t];
-        }
-    }
+	for (bool heapChanged = true; heapChanged;) {
+		heapChanged = false;
+		cl->BindDescriptorHeaps();
+		const uint64_t heapVersion = descriptorHeaps.HeapVersion();
+		for (int t = 0; t < CommandList::kTableCount; ++t) {
+			if (cl->m_appliedTables[t] == m_bindingVersions[t])
+				continue;
+			BuiltTable& built = m_builtTables[t];
+			if ((built.version == m_bindingVersions[t]) and (built.generation == descriptorHeaps.TableGeneration()))
+				gfxResourceHandler.NoteFrameAllocation();
+			else {
+				if (not descriptorHeaps.BuildTable(tableSlots[t], tableSizes[t], nullIndices[t], built.gpu))
+					return false;
+				if (heapVersion != descriptorHeaps.HeapVersion()) {
+					heapChanged = true;
+					break;
+				}
+				built.version = m_bindingVersions[t];
+				built.generation = descriptorHeaps.TableGeneration();
+			}
+			list->SetGraphicsRootDescriptorTable(tableParams[t], built.gpu);
+			cl->m_appliedTables[t] = m_bindingVersions[t];
+		}
+	}
 
-    for (uint32_t i = 0; i < CommandList::kSamplerSlots; ++i) {
-        uint32_t sampler = (m_boundSamplers[i] == UINT32_MAX) ? descriptorHeaps.m_defaultSampler : m_boundSamplers[i];
-        if (cl->m_appliedSamplers[i] == sampler)
-            continue;
-        list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase) + UINT(i), descriptorHeaps.m_samplerHeap.GpuHandle(sampler));
-        cl->m_appliedSamplers[i] = sampler;
-    }
+	for (uint32_t i = 0; i < CommandList::kSamplerSlots; ++i) {
+		uint32_t sampler = (m_boundSamplers[i] == UINT32_MAX) ? descriptorHeaps.m_defaultSampler : m_boundSamplers[i];
+		if (cl->m_appliedSamplers[i] == sampler)
+			continue;
+		list->SetGraphicsRootDescriptorTable(UINT(Shader::kSamplerBase) + UINT(i), descriptorHeaps.m_samplerHeap.GpuHandle(sampler));
+		cl->m_appliedSamplers[i] = sampler;
+	}
 
-    if (shader and shader->m_usesAccelStructure and (cl->m_appliedAccelStructure != m_boundAccelStructure)) {
-        list->SetGraphicsRootShaderResourceView(UINT(Shader::kAccelBase), m_boundAccelStructure);
-        cl->m_appliedAccelStructure = m_boundAccelStructure;
-    }
-    return true;
+	if (shader and shader->m_usesAccelStructure and (cl->m_appliedAccelStructure != m_boundAccelStructure)) {
+		list->SetGraphicsRootShaderResourceView(UINT(Shader::kAccelBase), m_boundAccelStructure);
+		cl->m_appliedAccelStructure = m_boundAccelStructure;
+	}
+	return true;
 }
 
 
-bool CommandListHandler::BeginFrame(int frameIndex) noexcept {
-    ZoneScoped;
-    ++m_frameNumber;
-    if (frameIndex >= 0)
-        SetFrameIndex(frameIndex);
-    else
-        NextFrame();
-    {
-        ZoneScopedN("WaitForFrame");
-        m_cmdQueue.WaitForFrame(m_frameIndex);
-    }
-    {
-        ZoneScopedN("cbvAllocator::Reset");
-        cbvAllocator.Reset(UINT(m_frameIndex));
-        descriptorHeaps.ResetTables(uint32_t(m_frameIndex));
-    }
-    {
-        ZoneScopedN("gfxResourceHandler::Cleanup");
-        ReleaseFrameResources();
-    }
-    TracyD3D12Collect(m_gpuProfilerCtx);
+bool CommandListHandler::BeginFrame(int frameIndex)
+noexcept
+{
+	ZoneScoped;
+	++m_frameNumber;
+	if (frameIndex >= 0)
+		SetFrameIndex(frameIndex);
+	else
+		NextFrame();
+	{
+		ZoneScopedN("WaitForFrame");
+		m_cmdQueue.WaitForFrame(m_frameIndex);
+	}
+	{
+		ZoneScopedN("cbvAllocator::Reset");
+		cbvAllocator.Reset(UINT(m_frameIndex));
+		descriptorHeaps.ResetTables(uint32_t(m_frameIndex));
+	}
+	{
+		ZoneScopedN("gfxResourceHandler::Cleanup");
+		ReleaseFrameResources();
+	}
+	TracyD3D12Collect(m_gpuProfilerCtx);
 #if DBG_DIRECTX
-    dx12Context.QueryVRAM();
+	dx12Context.QueryVRAM();
 #endif
-    return true;
+	return true;
 }
 
 
-void CommandListHandler::EndFrame(void) noexcept {
-    ZoneScoped;
-    m_cmdQueue.Signal(m_frameIndex);
-    CloseProfilerQueries(false);
+void CommandListHandler::EndFrame(void)
+noexcept
+{
+	ZoneScoped;
+	m_cmdQueue.Signal(m_frameIndex);
+	CloseProfilerQueries(false);
 }
 
 
-uint64_t CommandListHandler::ProfilerQueryCount(void) const noexcept {
+uint64_t CommandListHandler::ProfilerQueryCount(void) const
+noexcept
+{
 #if USE_TRACY
-    if (m_gpuProfilerCtx)
-        return m_closedQueryCount + m_gpuProfilerCtx->QueryCounter();
+	if (m_gpuProfilerCtx)
+		return m_closedQueryCount + m_gpuProfilerCtx->QueryCounter();
 #endif
-    return 0;
+	return 0;
 }
 
 
-void CommandListHandler::CloseProfilerQueries(bool keepRecording) noexcept {
+void CommandListHandler::CloseProfilerQueries(bool keepRecording)
+noexcept
+{
 #if USE_TRACY
-    if (not m_gpuProfilerCtx)
-        return;
+	if (not m_gpuProfilerCtx)
+		return;
 
-    uint32_t queryCounter = m_gpuProfilerCtx->QueryCounter();
-    uint64_t queryCount = m_closedQueryCount + queryCounter;
-    uint64_t oldestOpenQueryCount = queryCount;
+	uint32_t queryCounter = m_gpuProfilerCtx->QueryCounter();
+	uint64_t queryCount = m_closedQueryCount + queryCounter;
+	uint64_t oldestOpenQueryCount = queryCount;
 
-    if (keepRecording) {
-        if (m_currentListData.cmdList and m_currentListData.cmdList->IsRecording() and (m_currentListData.cmdList->m_openQueryCount < oldestOpenQueryCount))
-            oldestOpenQueryCount = m_currentListData.cmdList->m_openQueryCount;
-        for (auto& data : m_cmdListStack) {
-            if (data.cmdList and data.cmdList->IsRecording() and (data.cmdList->m_openQueryCount < oldestOpenQueryCount))
-                oldestOpenQueryCount = data.cmdList->m_openQueryCount;
-        }
-    }
+	if (keepRecording) {
+		if (m_currentListData.cmdList and m_currentListData.cmdList->IsRecording() and
+			(m_currentListData.cmdList->m_openQueryCount < oldestOpenQueryCount))
+			oldestOpenQueryCount = m_currentListData.cmdList->m_openQueryCount;
+		for (auto& data : m_cmdListStack) {
+			if (data.cmdList and data.cmdList->IsRecording() and (data.cmdList->m_openQueryCount < oldestOpenQueryCount))
+				oldestOpenQueryCount = data.cmdList->m_openQueryCount;
+		}
+	}
 
-    uint32_t keepCount = uint32_t(queryCount - oldestOpenQueryCount);
+	uint32_t keepCount = uint32_t(queryCount - oldestOpenQueryCount);
 
-    if (keepCount > queryCounter)
-        keepCount = queryCounter;
-    m_closedQueryCount += queryCounter - keepCount;
-    m_gpuProfilerCtx->NewFrame(keepCount);
-    {
-        static uint64_t reportFrame = 0;
+	if (keepCount > queryCounter)
+		keepCount = queryCounter;
+	m_closedQueryCount += queryCounter - keepCount;
+	m_gpuProfilerCtx->NewFrame(keepCount);
+	{
+		static uint64_t reportFrame = 0;
 
-        if (m_frameNumber >= reportFrame) {
-            reportFrame = m_frameNumber + 300;
-            logHandler.Print("Tracy GPU: frame %llu, zones opened %llu, closed %llu, queries %u -> %u, kept %u, connected %d, ctx id %u, collects %llu, timestamps %llu, payloads pending %llu, active %llu, completed %llu\n",
-                    (unsigned long long)m_frameNumber, (unsigned long long)m_gpuZonesOpened, (unsigned long long)m_gpuZonesClosed,
-                    queryCounter, m_gpuProfilerCtx->QueryCounter(), keepCount, tracy::GetProfiler().IsConnected() ? 1 : 0,
-                    unsigned(m_gpuProfilerCtx->GetId()),
-                    (unsigned long long)m_gpuProfilerCtx->CollectCalls(), (unsigned long long)m_gpuProfilerCtx->CollectedTimestamps(),
-                    (unsigned long long)m_gpuProfilerCtx->PendingPayloads(), (unsigned long long)m_gpuProfilerCtx->ActivePayload(),
-                    (unsigned long long)m_gpuProfilerCtx->CompletedPayload());
-        }
-    }
+		if (m_frameNumber >= reportFrame) {
+			reportFrame = m_frameNumber + 300;
+			logHandler.Print(
+				"Tracy GPU: frame %llu, zones opened %llu, closed %llu, queries %u -> %u, kept %u, connected %d, ctx id %u, collects %llu, timestamps %llu, payloads pending %llu, active %llu, completed %llu\n",
+				(unsigned long long)m_frameNumber, (unsigned long long)m_gpuZonesOpened, (unsigned long long)m_gpuZonesClosed,
+				queryCounter, m_gpuProfilerCtx->QueryCounter(), keepCount, tracy::GetProfiler().IsConnected() ? 1 : 0,
+				unsigned(m_gpuProfilerCtx->GetId()), (unsigned long long)m_gpuProfilerCtx->CollectCalls(),
+				(unsigned long long)m_gpuProfilerCtx->CollectedTimestamps(),
+				(unsigned long long)m_gpuProfilerCtx->PendingPayloads(), (unsigned long long)m_gpuProfilerCtx->ActivePayload(),
+				(unsigned long long)m_gpuProfilerCtx->CompletedPayload());
+		}
+	}
 #endif
 }
 
 
-void CommandListHandler::Flush(void) noexcept {
-    ZoneScoped;
-    ExecuteAll();
-    m_cmdQueue.WaitIdle();
-    ReleaseFrameResources();
-    ResetBindings();
+void CommandListHandler::Flush(void)
+noexcept
+{
+	ZoneScoped;
+	ExecuteAll();
+	m_cmdQueue.WaitIdle();
+	ReleaseFrameResources();
+	ResetBindings();
 }
 
 
-void CommandListHandler::Destroy(void) noexcept {
-    TracyD3D12Destroy(m_gpuProfilerCtx);
-    m_gpuProfilerCtx = nullptr;
-    for (auto cl : m_recycledLists) {
-        cl->Destroy();
-        delete cl;
-    }
-    m_recycledLists.Clear();
-    m_drawIndexedSignature.Reset();
-    m_cmdQueue.Destroy();
+void CommandListHandler::Destroy(void)
+noexcept
+{
+	TracyD3D12Destroy(m_gpuProfilerCtx);
+	m_gpuProfilerCtx = nullptr;
+	for (auto cl : m_recycledLists) {
+		cl->Destroy();
+		delete cl;
+	}
+	m_recycledLists.Clear();
+	m_drawIndexedSignature.Reset();
+	m_cmdQueue.Destroy();
 }
 
 
-void CommandListHandler::PushCmdList(CommandList* cl) noexcept {
-    if (m_currentListData.cmdList)
-        m_cmdListStack.Push(m_currentListData);
-    m_currentListData = CommandListData{ cl, cl->GfxList() };
+void CommandListHandler::PushCmdList(CommandList* cl)
+noexcept
+{
+	if (m_currentListData.cmdList)
+		m_cmdListStack.Push(m_currentListData);
+	m_currentListData = CommandListData{ cl, cl->GfxList() };
 }
 
 
-void CommandListHandler::PopCmdList(void) noexcept {
-    m_currentListData = (m_cmdListStack.Length() > 0) ? m_cmdListStack.Pop() : CommandListData();
+void CommandListHandler::PopCmdList(void)
+noexcept
+{
+	m_currentListData = (m_cmdListStack.Length() > 0) ? m_cmdListStack.Pop() : CommandListData();
 }
 
 
-void CommandListHandler::Register(CommandList* cl) noexcept {
-    if (not cl)
-        return;
+void CommandListHandler::Register(CommandList* cl)
+noexcept
+{
+	if (not cl)
+		return;
 #if DBG_DIRECTX
 	if (cl->m_name.IsEmpty())
-        logHandler.Print("CommandListHandler::Register: Unnamed command list\n");
+		logHandler.Print("CommandListHandler::Register: Unnamed command list\n");
 #endif
-    for (auto l : m_pendingLists)
-        if (cl == l)
-            return;
-    m_pendingLists.Push(cl);
+	for (auto l : m_pendingLists)
+		if (cl == l)
+			return;
+	m_pendingLists.Push(cl);
 }
 
 #define LOG_EXECUTION 0
 
-void CommandListHandler::ExecuteAll(void) noexcept {
-    ZoneScoped;
-    while (m_recordingLists.Length() > 0) {
-        CommandList* l = m_recordingLists[m_recordingLists.Length() - 1];
+void CommandListHandler::ExecuteAll(void)
+noexcept
+{
+	ZoneScoped;
+	while (m_recordingLists.Length() > 0) {
+		CommandList* l = m_recordingLists[m_recordingLists.Length() - 1];
 #if DBG_DIRECTX
-        logHandler.Print("ExecuteAll: closing '%s' (open serial %llu, frame %llu), still recording at the frame end\n",
-                (const char*)l->GetName(), (unsigned long long)l->m_openSerial, (unsigned long long)m_frameNumber);
+		logHandler.Print("ExecuteAll: closing '%s' (open serial %llu, frame %llu), still recording at the frame end\n",
+						 (const char*)l->GetName(), (unsigned long long)l->m_openSerial, (unsigned long long)m_frameNumber);
 #endif
-        if (l->IsRecording())
-            l->Close(l->m_savedRenderStates);
-        else
-            NoteStopped(l);
-    }
-    if (m_pendingLists.IsEmpty())
-        return;
-	AutoArray< ID3D12CommandList*> execList(m_pendingLists.Length());
-    int n = 0;
-#if LOG_EXECUTION//def _DEBUG
-    logHandler.Print("\nCommandListHandler::ExecuteAll: executing %u command lists.\n", (unsigned)m_pendingLists.Length());
+		if (l->IsRecording())
+			l->Close(l->m_savedRenderStates);
+		else
+			NoteStopped(l);
+	}
+	if (m_pendingLists.IsEmpty())
+		return;
+	AutoArray<ID3D12CommandList*>	execList(m_pendingLists.Length());
+	int								n = 0;
+#if LOG_EXECUTION //def _DEBUG
+	logHandler.Print("\nCommandListHandler::ExecuteAll: executing %u command lists.\n", (unsigned)m_pendingLists.Length());
 #endif
-    for (auto l : m_pendingLists) {
-#if LOG_EXECUTION//def _DEBUG
-        if (l->m_isRecording) {
-            logHandler.Print("   '%s' still open; closing it now.\n", (const char*)l->GetName());
-            l->Close();
-        }
-        logHandler.Print("   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
+	for (auto l : m_pendingLists) {
+#if LOG_EXECUTION //def _DEBUG
+		if (l->m_isRecording) {
+			logHandler.Print("   '%s' still open; closing it now.\n", (const char*)l->GetName());
+			l->Close();
+		}
+		logHandler.Print("   executing CommandList '%s' (CL:%p, list:%p).\n", (const char*)l->GetName(), (void*)l, (void*)l->GfxList());
 #endif
-        if (not l->IsFlushed())
-            execList[n++] = l->GfxList(true);
-    }
-#if LOG_EXECUTION//def _DEBUG
-    logHandler.Print("\n");
+		if (not l->IsFlushed())
+			execList[n++] = l->GfxList(true);
+	}
+#if LOG_EXECUTION //def _DEBUG
+	logHandler.Print("\n");
 #endif
-    if (n > 0)
-        m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
-    HandleDeviceLost("CommandListHandler::ExecuteAll");
+	if (n > 0)
+		m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
+	HandleDeviceLost("CommandListHandler::ExecuteAll");
 #if DBG_DIRECTX
-    gfxStates.CheckError();
-    HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
-    if (FAILED(removed)) {
-        logHandler.Print("CommandListHandler::ExecuteAll: device removed (0x%08X)\n", (unsigned)removed);
-        dx12Context.DumpDRED();
-    }
+	gfxStates.CheckError();
+	HRESULT removed = dx12Context.Device() ? dx12Context.Device()->GetDeviceRemovedReason() : E_FAIL;
+	if (FAILED(removed)) {
+		logHandler.Print("CommandListHandler::ExecuteAll: device removed (0x%08X)\n", (unsigned)removed);
+		dx12Context.DumpDRED();
+	}
 #endif
-    for (auto l : m_pendingLists) {
-        if (l->m_isTemporary)
-            m_recycledLists.Push(l);
-    }
-    m_pendingLists.Clear();
-    m_cmdListStack.Clear();
+	for (auto l : m_pendingLists) {
+		if (l->m_isTemporary)
+			m_recycledLists.Push(l);
+	}
+	m_pendingLists.Clear();
+	m_cmdListStack.Clear();
 }
 
 
-void CommandListHandler::ExecutePending(void) noexcept {
-    ZoneScoped;
-    if (m_pendingLists.IsEmpty())
-        return;
-    AutoArray<ID3D12CommandList*> execList(m_pendingLists.Length());
-    int n = 0;
-    for (auto l : m_pendingLists) {
-        if (not l->IsFlushed())
-            execList[n++] = l->GfxList(true);
-    }
-    if (n > 0)
-        m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
+void CommandListHandler::ExecutePending(void)
+noexcept
+{
+	ZoneScoped;
+	if (m_pendingLists.IsEmpty())
+		return;
+	AutoArray<ID3D12CommandList*>	execList(m_pendingLists.Length());
+	int								n = 0;
+	for (auto l : m_pendingLists) {
+		if (not l->IsFlushed())
+			execList[n++] = l->GfxList(true);
+	}
+	if (n > 0)
+		m_cmdQueue.Queue()->ExecuteCommandLists(UINT(n), execList.DataPtr());
 #if DBG_DIRECTX
-    gfxStates.CheckError();
+	gfxStates.CheckError();
 #endif
-    CloseProfilerQueries(true);
-    m_cmdQueue.WaitIdle();
-    TracyD3D12Collect(m_gpuProfilerCtx);
-    for (auto l : m_pendingLists) {
-        if (l->m_isTemporary)
-            m_recycledLists.Push(l);
-    }
-    m_pendingLists.Clear();
-    DrainFrameResources();
+	CloseProfilerQueries(true);
+	m_cmdQueue.WaitIdle();
+	TracyD3D12Collect(m_gpuProfilerCtx);
+	for (auto l : m_pendingLists) {
+		if (l->m_isTemporary)
+			m_recycledLists.Push(l);
+	}
+	m_pendingLists.Clear();
+	DrainFrameResources();
 }
 
 
-void CommandListHandler::DrainFrameResources(void) noexcept {
-    CommandList* oldestList = OldestRecordingList();
-    uint64_t oldestOpenSerial = oldestList ? oldestList->m_openSerial : UINT64_MAX;
+void CommandListHandler::DrainFrameResources(void)
+noexcept
+{
+	CommandList*	oldestList = OldestRecordingList();
+	uint64_t		oldestOpenSerial = oldestList ? oldestList->m_openSerial : UINT64_MAX;
 
-    if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial) {
-        cbvAllocator.Reset(UINT(m_frameIndex));
-        descriptorHeaps.ResetTables(uint32_t(m_frameIndex));
-    }
-    ReleaseFrameResources();
-    ResetBindings();
+	if (gfxResourceHandler.LastAllocSerial() < oldestOpenSerial) {
+		cbvAllocator.Reset(UINT(m_frameIndex));
+		descriptorHeaps.ResetTables(uint32_t(m_frameIndex));
+	}
+	ReleaseFrameResources();
+	ResetBindings();
 }
 
 
-void CommandListHandler::NoteRecording(CommandList* cl) noexcept {
-    for (auto l : m_recordingLists) {
-        if (l == cl)
-            return;
-    }
-    m_recordingLists.Push(cl);
+void CommandListHandler::NoteRecording(CommandList* cl)
+noexcept
+{
+	for (auto l : m_recordingLists) {
+		if (l == cl)
+			return;
+	}
+	m_recordingLists.Push(cl);
 }
 
 
-void CommandListHandler::NoteStopped(CommandList* cl) noexcept {
-    int32_t last = m_recordingLists.Length() - 1;
+void CommandListHandler::NoteStopped(CommandList* cl)
+noexcept
+{
+	int32_t last = m_recordingLists.Length() - 1;
 
-    for (int32_t i = 0; i <= last; ++i) {
-        if (m_recordingLists[i] == cl) {
-            m_recordingLists[i] = m_recordingLists[last];
-            m_recordingLists.Pop();
-            return;
-        }
-    }
+	for (int32_t i = 0; i <= last; ++i) {
+		if (m_recordingLists[i] == cl) {
+			m_recordingLists[i] = m_recordingLists[last];
+			m_recordingLists.Pop();
+			return;
+		}
+	}
 }
 
 
-CommandList* CommandListHandler::OldestRecordingList(void) const noexcept {
-    CommandList* oldest = nullptr;
+CommandList* CommandListHandler::OldestRecordingList(void) const
+noexcept
+{
+	CommandList* oldest = nullptr;
 
-    for (auto l : m_recordingLists) {
-        if (l->IsRecording() and (not oldest or (l->m_openSerial < oldest->m_openSerial)))
-            oldest = l;
-    }
-    return oldest;
+	for (auto l : m_recordingLists) {
+		if (l->IsRecording() and (not oldest or (l->m_openSerial < oldest->m_openSerial)))
+			oldest = l;
+	}
+	return oldest;
 }
 
 
-void CommandListHandler::ReleaseFrameResources(void) noexcept {
-    CommandList* oldestList = OldestRecordingList();
+void CommandListHandler::ReleaseFrameResources(void)
+noexcept
+{
+	CommandList* oldestList = OldestRecordingList();
 
-    gfxResourceHandler.CleanupBefore(m_frameIndex, oldestList ? oldestList->m_openSerial : UINT64_MAX);
+	gfxResourceHandler.CleanupBefore(m_frameIndex, oldestList ? oldestList->m_openSerial : UINT64_MAX);
 }
 
 
-bool CommandListHandler::UsesOrderedCopyList(void) noexcept {
-    return baseRenderer.DrawBuffersSuspended();
+bool CommandListHandler::UsesOrderedCopyList(void)
+noexcept
+{
+	return baseRenderer.DrawBuffersSuspended();
 }
 
 
-CommandList* CommandListHandler::OpenOrderedCopyList(void) noexcept {
-    if (not UsesOrderedCopyList())
-        return nullptr;
-    CommandList* cl = CreateCmdList(String("OrderedCopy"), true);
-    if (not (cl and cl->Open(false)))
-        return nullptr;
-    return cl;
+CommandList* CommandListHandler::OpenOrderedCopyList(void)
+noexcept
+{
+	if (not UsesOrderedCopyList())
+		return nullptr;
+	CommandList* cl = CreateCmdList(String("OrderedCopy"), true);
+	if (not (cl and cl->Open(false)))
+		return nullptr;
+	return cl;
 }
 
 
-CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary) noexcept {
-    if (isTemporary and not m_recycledLists.IsEmpty()) {
-        CommandList* cl = m_recycledLists.Pop();
-        cl->SetName(name);
-        cl->Reset();
-        return cl;
-    }
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return nullptr;
+CommandList* CommandListHandler::CreateCmdList(const String& name, bool isTemporary)
+noexcept
+{
+	if (isTemporary and not m_recycledLists.IsEmpty()) {
+		CommandList* cl = m_recycledLists.Pop();
+		cl->SetName(name);
+		cl->Reset();
+		return cl;
+	}
+	ID3D12Device* device = dx12Context.Device();
+	if (not device)
+		return nullptr;
 
-    CommandList* cl = new CommandList();
-    if (not cl->Create(device, name, isTemporary)) {
-        delete cl;
-        return nullptr;
-    }
-    cl->Reset();
-    ++m_cmdListCount;
-    return cl;
+	CommandList* cl = new CommandList();
+	if (not cl->Create(device, name, isTemporary)) {
+		delete cl;
+		return nullptr;
+	}
+	cl->Reset();
+	++m_cmdListCount;
+	return cl;
 }
 
 // =================================================================================================

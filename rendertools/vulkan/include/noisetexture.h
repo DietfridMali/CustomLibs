@@ -13,88 +13,82 @@
 // 2D templated noise — VK subclass adds a SetParams override that writes m_sampling. The base
 // template's SetParams stays trivial because the OGL Texture base has no m_sampling member.
 
-template<class Tag>
+template <class Tag>
 class NoiseTexture
-    : public BaseNoiseTexture<Tag>
-{
+	: public BaseNoiseTexture<Tag> {
 public:
-    void SetParams(bool enforce) override {
-        if (enforce or not this->m_hasParams) {
-            this->m_hasParams = true;
-            NoiseTraits<Tag>::ConfigureSampling(this->m_sampling);
-        }
-    }
+	void SetParams(bool enforce) override
+	{
+		if (enforce or not this->m_hasParams) {
+			this->m_hasParams = true;
+			NoiseTraits<Tag>::ConfigureSampling(this->m_sampling);
+		}
+	}
 };
 
-using ValueNoiseTexture   = NoiseTexture<ValueNoiseR32F>;
-using PerlinNoiseTexture  = NoiseTexture<PerlinNoiseR32F>;
-using FbmNoiseTexture     = NoiseTexture<FbmNoiseR32F>;
-using FoamNoiseTexture    = NoiseTexture<FoamNoiseR32F>;
-using HashNoiseTexture    = NoiseTexture<HashNoiseRGBA8>;
+using ValueNoiseTexture = NoiseTexture<ValueNoiseR32F>;
+using PerlinNoiseTexture = NoiseTexture<PerlinNoiseR32F>;
+using FbmNoiseTexture = NoiseTexture<FbmNoiseR32F>;
+using FoamNoiseTexture = NoiseTexture<FoamNoiseR32F>;
+using HashNoiseTexture = NoiseTexture<HashNoiseRGBA8>;
 using WeatherNoiseTexture = NoiseTexture<WeatherNoiseRG8>;
 
 // =================================================================================================
 // 3D noise textures.
 
 class NoiseTexture3D
-    : public BaseNoiseTexture3D
-{
+	: public BaseNoiseTexture3D {
 public:
-    bool Deploy(int bufferIndex = 0) override;
-    void SetParams(bool enforce = false) override;
+	bool Deploy(int bufferIndex = 0) override;
+	void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================
 
 class CloudNoiseTexture
-    : public BaseCloudNoiseTexture
-{
+	: public BaseCloudNoiseTexture {
 public:
-    bool Deploy(int bufferIndex = 0) override;
-    void SetParams(bool enforce = false) override;
+	bool Deploy(int bufferIndex = 0) override;
+	void SetParams(bool enforce = false) override;
 
 protected:
-    BaseCloudNoiseTexture* NewMaxMipTex(void) override;
-    BaseCloudNoiseTexture* NewAvgMipTex(void) override;
-    BaseCloudNoiseTexture* NewKuwaharaTex(void) override;
+	BaseCloudNoiseTexture* NewMaxMipTex(void) override;
+	BaseCloudNoiseTexture* NewAvgMipTex(void) override;
+	BaseCloudNoiseTexture* NewKuwaharaTex(void) override;
 };
 
 // =================================================================================================
 
 class NoiseMaxMipTexture
-    : public CloudNoiseTexture
-{
+	: public CloudNoiseTexture {
 public:
-    void SetParams(bool enforce = false) override;
+	void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================
 
 class NoiseAvgMipTexture
-    : public CloudNoiseTexture
-{
+	: public CloudNoiseTexture {
 public:
-    void SetParams(bool enforce = false) override;
+	void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================
 
 class DetailNoiseTexture
-    : public BaseDetailNoiseTexture
-{
+	: public BaseDetailNoiseTexture {
 public:
-    bool Deploy(int bufferIndex = 0) override;
-    void SetParams(bool enforce = false) override;
+	bool Deploy(int bufferIndex = 0) override;
+	void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================
 
 class BlueNoiseTexture
-    : public BaseBlueNoiseTexture
-{
+	: public BaseBlueNoiseTexture {
 public:
-    bool Deploy(int bufferIndex = 0) override;
-    void SetParams(bool enforce = false) override;
+	bool Deploy(int bufferIndex = 0) override;
+	void SetParams(bool enforce = false) override;
 };
 
 // =================================================================================================

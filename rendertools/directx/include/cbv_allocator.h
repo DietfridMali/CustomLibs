@@ -24,58 +24,73 @@
 //   UploadB1()         →  same pattern with root slot 1
 
 struct CbAlloc {
-    uint8_t*                  cpu{ nullptr };
-    D3D12_GPU_VIRTUAL_ADDRESS gpu{ 0 };
+	uint8_t*					cpu{ nullptr };
+	D3D12_GPU_VIRTUAL_ADDRESS	gpu{ 0 };
 
-    bool IsValid(void) const noexcept { return cpu != nullptr; }
+	bool IsValid(void) const
+	noexcept
+	{
+		return cpu != nullptr;
+	}
 };
 
-class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
-{
-    static constexpr UINT kAlign       = 256;
-    static constexpr UINT kInitCap     = 512u * 1024u;   // 64 KB = 256 slots per frame
-    static constexpr UINT kMaxCap      = 1024u * 1024u; // 1 MB ceiling of the slot's own buffer
+class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator> {
+	static constexpr UINT kAlign = 256;
+	static constexpr UINT kInitCap = 512u * 1024u; // 64 KB = 256 slots per frame
+	static constexpr UINT kMaxCap = 1024u * 1024u; // 1 MB ceiling of the slot's own buffer
 
-    struct Chunk {
-        ComPtr<ID3D12Resource>    resource;
-        uint8_t*                  cpuBase    = nullptr;
-        D3D12_GPU_VIRTUAL_ADDRESS gpuBase    = 0;
-        UINT                      capacity   = 0;
-    };
+	struct Chunk {
+		ComPtr<ID3D12Resource>		resource;
+		uint8_t*					cpuBase = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS	gpuBase = 0;
+		UINT						capacity = 0;
+	};
 
-    struct FrameData {
-        ComPtr<ID3D12Resource>    resource;
-        uint8_t*                  cpuBase    = nullptr;
-        D3D12_GPU_VIRTUAL_ADDRESS gpuBase    = 0;
-        UINT                      offset     = 0;
-        UINT                      capacity   = 0;
-        UINT                      peakOffset = 0;
-        std::vector<Chunk>        overflow;
-        UINT                      overflowOffset = 0;
-    };
+	struct FrameData {
+		ComPtr<ID3D12Resource>		resource;
+		uint8_t*					cpuBase = nullptr;
+		D3D12_GPU_VIRTUAL_ADDRESS	gpuBase = 0;
+		UINT						offset = 0;
+		UINT						capacity = 0;
+		UINT						peakOffset = 0;
+		std::vector<Chunk>			overflow;
+		UINT						overflowOffset = 0;
+	};
 
-    FrameData  m_frames[2];   // FRAME_COUNT = 2
-    UINT       m_frameIndex{ 0 };
-    uint64_t   m_generation{ 1 };
-    ComPtr<ID3D12Device> m_device;
+	FrameData				m_frames[2]; // FRAME_COUNT = 2
+	UINT					m_frameIndex{ 0 };
+	uint64_t				m_generation{ 1 };
+	ComPtr<ID3D12Device>	m_device;
 
-    bool CreateBuffer(ID3D12Device* device, UINT capacity, const char* name, ComPtr<ID3D12Resource>& resource, uint8_t*& cpuBase) noexcept;
-    bool AllocFrame(ID3D12Device* device, UINT frameIdx, UINT capacity) noexcept;
-    bool AddChunk(FrameData& f, UINT capacity) noexcept;
-    void DestroyChunks(FrameData& f) noexcept;
+	bool CreateBuffer(ID3D12Device* device, UINT capacity, const char* name, ComPtr<ID3D12Resource>& resource, uint8_t*& cpuBase)
+	noexcept;
+	bool AllocFrame(ID3D12Device* device, UINT frameIdx, UINT capacity)
+	noexcept;
+	bool AddChunk(FrameData& f, UINT capacity)
+	noexcept;
+	void DestroyChunks(FrameData& f)
+	noexcept;
 
 public:
-    bool Create(ID3D12Device* device) noexcept;
-    void Destroy(void) noexcept;
+	bool Create(ID3D12Device* device)
+	noexcept;
+	void Destroy(void)
+	noexcept;
 
-    // Reset at the start of a frame (call after fence wait so GPU is done with this frame's data).
-    void Reset(UINT frameIndex) noexcept;
+	// Reset at the start of a frame (call after fence wait so GPU is done with this frame's data).
+	void Reset(UINT frameIndex)
+	noexcept;
 
-    // Allocate 'bytes' (rounded up to 256) from the current frame's buffer, or from a chained one
-    // once that is full. Returns {nullptr, 0} only when no further buffer could be created.
-    CbAlloc Allocate(UINT bytes) noexcept;
+	// Allocate 'bytes' (rounded up to 256) from the current frame's buffer, or from a chained one
+	// once that is full. Returns {nullptr, 0} only when no further buffer could be created.
+	CbAlloc Allocate(UINT bytes)
+	noexcept;
 
-    inline uint64_t Generation(void) const noexcept { return m_generation; }
+	inline uint64_t Generation(void) const
+	noexcept
+	{
+		return m_generation;
+	}
 };
 
 #define cbvAllocator CbvLinearAllocator::Instance()

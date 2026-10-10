@@ -8,7 +8,8 @@ static bool initializing = false;
 
 static MemoryDescriptor* itemPool = nullptr;
 
-inline void InitAllocator(int capacity = 1000000) {
+inline void InitAllocator(int capacity = 1000000)
+{
 	if (not initializing) {
 		initializing = true;
 		static bool initialized = (MemoryManager::Instance().Create(capacity, true), true);
@@ -22,21 +23,26 @@ inline void InitAllocator(int capacity = 1000000) {
 
 #if DEBUG_MALLOC
 
-void* Allocator::operator new(std::size_t size) {
+void* Allocator::operator new(std::size_t size)
+{
 	::InitAllocator();
 	return MemoryManager::Instance().Alloc(size);
 }
 
-void Allocator::operator delete(void* ptr) noexcept {
+void Allocator::operator delete(void* ptr)
+noexcept
+{
 	MemoryManager::Instance().Free(ptr);
 }
 
-void* Allocator::operator new[](std::size_t size) {
+void* Allocator::operator new[](std::size_t size)
+{
 	::InitAllocator();
 	return MemoryManager::Instance().Alloc(size);
 }
 
-void Allocator::operator delete[](void* ptr) noexcept {
+void Allocator::operator delete[](void* ptr) noexcept
+{
 	MemoryManager::Instance().Free(ptr);
 }
 
@@ -46,21 +52,26 @@ void Allocator::operator delete[](void* ptr) noexcept {
 
 #if DEBUG_MALLOC
 
-void* operator new(std::size_t size) {
+void* operator new(std::size_t size)
+{
 	InitAllocator();
 	return MemoryManager::Instance().Alloc(size);
 }
 
-void operator delete(void* ptr) noexcept {
+void operator delete(void* ptr)
+noexcept
+{
 	MemoryManager::Instance().Free(ptr);
 }
 
-void* operator new[](std::size_t size) {
+void* operator new[](std::size_t size)
+{
 	InitAllocator();
 	return MemoryManager::Instance().Alloc(size);
 }
 
-void operator delete[](void* ptr) noexcept {
+void operator delete[](void* ptr) noexcept
+{
 	MemoryManager::Instance().Free(ptr);
 }
 

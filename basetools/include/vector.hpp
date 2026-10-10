@@ -1,7 +1,7 @@
-﻿# pragma once
+﻿#pragma once
 
 #if USE_GLM
-#	include "glm_vector.hpp"
+#include "glm_vector.hpp"
 #else
-#	include "custom_vector.hpp"
+#include "custom_vector.hpp"
 #endif

@@ -7,13 +7,15 @@
 
 BaseQuadMesh BaseTextureAtlas::renderQuad;
 
-void BaseTextureAtlas::Initialize(void) {
+void BaseTextureAtlas::Initialize(void)
+{
 	renderQuad.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voZero], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular], true);
 	renderQuad.SetTransformations({ .centerOrigin = false, .autoClear = false });
 }
 
 
-bool BaseTextureAtlas::Render(Shader* shader) {
+bool BaseTextureAtlas::Render(Shader* shader)
+{
 	if (not (m_atlas and shader))
 		return false;
 	m_atlas->Render({ .clearBuffer = false, .centerOrigin = true, .shader = shader });
@@ -32,7 +34,8 @@ TextureAtlas::TextureAtlas()
 }
 
 // condition: all glyphs must fit into glyphWidth, glyphHeight - that's the grid they will be rendered into
-bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale, GfxFilterMode filtering, int padding) {
+bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int scale, GfxFilterMode filtering, int padding)
+{
 	if (m_atlas)
 		delete m_atlas;
 	m_atlas = new RenderTarget();
@@ -68,17 +71,20 @@ bool TextureAtlas::Create(String name, GlyphSize glyphSize, int glyphCount, int 
 }
 
 
-bool TextureAtlas::RenderColored(int glyphIndex, RGBAColor color) {
+bool TextureAtlas::RenderColored(int glyphIndex, RGBAColor color)
+{
 	return Render(baseShaderHandler.LoadPlainTextureShader(color, GlyphOffset(glyphIndex), m_scale));
 }
 
 
-bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness) {
+bool TextureAtlas::RenderGrayscale(int glyphIndex, float brightness)
+{
 	return Render(baseShaderHandler.LoadGrayscaleShader(brightness, false, GlyphOffset(glyphIndex), m_scale));
 }
 
 
-bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
+bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale)
+{
 	if (not m_atlas)
 		return false;
 	bool deactivate = not m_atlas->IsEnabled();
@@ -121,7 +127,7 @@ bool TextureAtlas::Add(Texture* glyph, int glyphIndex, Vector2f& scale) {
 		//renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = true, .rotation = 0.0f });
 		renderQuad.Render(shader, { glyph });
 #else
-		renderQuad.Fill(RGBAColor(c, c, c, 1)); 
+		renderQuad.Fill(RGBAColor(c, c, c, 1));
 #endif
 	}
 

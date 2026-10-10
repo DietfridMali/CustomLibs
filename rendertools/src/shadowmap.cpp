@@ -21,7 +21,8 @@
 
 // =================================================================================================
 
-bool ShadowMap::Setup(void) {
+bool ShadowMap::Setup(void)
+{
 	if (CreateMap(Vector2f::ZERO)) {
 		m_status = 1;
 		return true;
@@ -31,7 +32,8 @@ bool ShadowMap::Setup(void) {
 }
 
 
-bool ShadowMap::CreateMap(Vector2f frustumSize) {
+bool ShadowMap::CreateMap(Vector2f frustumSize)
+{
 	m_status = -1;
 #if !DEMO
 	if (not (m_map = new RenderTarget()))
@@ -42,12 +44,22 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	// rendertarget.cpp/resource_view.h. Start bei 8K (industry-typische ShadowMap-Aufloesung),
 	// halbieren bei Fehlschlag bis 1024. Cap zusaetzlich gegen die Hardware-Allocation-Grenze
 	// fuer 4-Byte-Pixel-Formate, falls die GPU weniger als 8K verkraftet.
-	constexpr int ShadowDepthBytesPerPixel = 4;
-	const int maxSize = gfxStates.MaxTextureSize(ShadowDepthBytesPerPixel);
-	int startSize = std::min<int>(maxSize, 8192);
+	constexpr int	ShadowDepthBytesPerPixel = 4;
+	const int		maxSize = gfxStates.MaxTextureSize(ShadowDepthBytesPerPixel);
+	int				startSize = std::min<int>(maxSize, 8192);
 	for (int size = startSize; size >= 1024; size /= 2) {
-		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
-			if (m_dynamicMap->Create(size, size, 1, { .name = "dynamic shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
+		if (m_map->Create(size, size, 1,
+						  { .name = "shadowmap",
+							.colorBufferCount = 0,
+							.depthBufferCount = 1,
+							.vertexBufferCount = 0,
+							.hasMRTs = false })) {
+			if (m_dynamicMap->Create(size, size, 1,
+									 { .name = "dynamic shadowmap",
+									   .colorBufferCount = 0,
+									   .depthBufferCount = 1,
+									   .vertexBufferCount = 0,
+									   .hasMRTs = false })) {
 				m_status = 1;
 				return true;
 			}
@@ -60,7 +72,9 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 }
 
 
-void ShadowMap::Destroy(void) noexcept {
+void ShadowMap::Destroy(void)
+noexcept
+{
 	if (m_map) {
 		delete m_map;
 		m_map = nullptr;
@@ -75,7 +89,9 @@ void ShadowMap::Destroy(void) noexcept {
 }
 
 
-bool ShadowMap::StartRender(bool dynamicCasters) noexcept {
+bool ShadowMap::StartRender(bool dynamicCasters)
+noexcept
+{
 	if (not IsReady())
 		return false;
 	baseRenderer.StartShadowPass();
@@ -94,7 +110,9 @@ bool ShadowMap::StartRender(bool dynamicCasters) noexcept {
 }
 
 
-bool ShadowMap::StopRender(void) noexcept {
+bool ShadowMap::StopRender(void)
+noexcept
+{
 	if (not IsReady())
 		return false;
 	DeactivateCamera();
@@ -124,7 +142,8 @@ void ShadowMap::Stabilize(float shadowMapSize)
 }
 
 
-void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matrix4f& lightProj) {
+void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matrix4f& lightProj)
+{
 	m_lightTransform = lightProj;
 	m_lightTransform *= lightView;
 	Stabilize(float(m_map->GetWidth(true)));
@@ -132,7 +151,8 @@ void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matri
 }
 
 
-void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mModelView for a shader using shadow mapping changes (e.g. for moving geometry)
+void ShadowMap::UpdateTransformation(void)
+{ // needs to be called whenever mModelView for a shader using shadow mapping changes (e.g. for moving geometry)
 	if (IsReady()) {
 		m_modelViewTransform = m_lightTransform;
 #if 1
@@ -152,7 +172,9 @@ void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mMod
 //   #else        viewer-aligned PERSPECTIVE frustum -- the previous default. At lightDistance 1000 and
 //                radius <= 15 its halfFov is ~0.86 deg, i.e. numerically indistinguishable from ortho;
 //                the density is uniform, which is what leaves the near-field stair-stepping in place.
-void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, const Vector3f& worldMin, const Vector3f& worldMax) {
+void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance,
+												  const Vector3f& worldMin, const Vector3f& worldMax)
+{
 	Matrix4f lightView, lightProj;
 
 #if LiSPSM
@@ -174,11 +196,11 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 		lightDistance = 100.0f * worldRadius;
 	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
 	viewDir.Normalize();
-	center += viewDir * worldRadius * 0.8f;   // viewer near rear edge
+	center += viewDir * worldRadius * 0.8f; // viewer near rear edge
 
-	Vector3f lightVec = -lightDirection;                      // direction the light travels
-	Vector3f warpAxis = viewDir - lightVec * lightVec.Dot(viewDir);   // view direction perpendicular to the light
-	float sinGamma = warpAxis.Length();                       // both operands are unit -> this IS sin(gamma)
+	Vector3f	lightVec = -lightDirection; // direction the light travels
+	Vector3f	warpAxis = viewDir - lightVec * lightVec.Dot(viewDir); // view direction perpendicular to the light
+	float		sinGamma = warpAxis.Length(); // both operands are unit -> this IS sin(gamma)
 
 	// Looking (anti)parallel to the light degenerates the warp axis. Rebuild it from any perpendicular
 	// axis so LookAt stays well-defined; the warp itself is then disabled via the sinGamma clamp below.
@@ -219,11 +241,11 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	// n_opt = (zn + sqrt(zn*zf)) / sin(gamma). zn/zf are CAMERA distances along the view direction; the
 	// sinGamma division converts them onto the warp axis. zn is deliberately clamped far above the camera
 	// near plane -- a tiny zn drags n_opt down, which over-warps the near field and starves the far field.
-	static constexpr float lispsmNearClamp = 0.5f;
-	float zn = lispsmNearClamp;
-	float zf = std::max(zn + 0.01f, 1.8f * worldRadius);   // body reaches 0.8*R + R ahead of the viewer
-	float n = (zn + std::sqrt(zn * zf)) / sinGammaClamped;
-	float d = std::max(vMax.y - vMin.y, 0.01f);            // body extent along the warp axis
+	static constexpr float	lispsmNearClamp = 0.5f;
+	float					zn = lispsmNearClamp;
+	float					zf = std::max(zn + 0.01f, 1.8f * worldRadius); // body reaches 0.8*R + R ahead of the viewer
+	float					n = (zn + std::sqrt(zn * zf)) / sinGammaClamped;
+	float					d = std::max(vMax.y - vMin.y, 0.01f); // body extent along the warp axis
 
 	// Shift the body so its near edge sits at y = n. Every y is then >= n > 0, so the divide by w = y
 	// below can never blow up or flip sign.
@@ -237,30 +259,32 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	// bit-identical either way). That makes w = y/n, i.e. w == 1 at the near edge and w == 1 + d/n at the
 	// far edge -- exactly the factor by which the shadow bias has to grow along the warp axis. The shaders
 	// therefore just do "bias *= shadowCoord.w" and need no n_opt uniform. See the bias note above.
-	float a = (2.0f * n + d) / d;
-	float b = -2.0f * n * (n + d) / d;
-	float rn = 1.0f / n;
-	Matrix4f warp({   // Matrix4f(initializer_list) feeds glm::make_mat4 -> COLUMN major: each row here is one column
-		1.0f, 0.0f, 0.0f, 0.0f,
-		0.0f, a * rn, 0.0f, rn,
-		0.0f, 0.0f, 1.0f, 0.0f,
-		0.0f, b * rn, 0.0f, 0.0f
-		});
+	float		a = (2.0f * n + d) / d;
+	float		b = -2.0f * n * (n + d) / d;
+	float		rn = 1.0f / n;
+	Matrix4f	warp({ // Matrix4f(initializer_list) feeds glm::make_mat4 -> COLUMN major: each row here is one column
+					1.0f, 0.0f, 0.0f, 0.0f,
+					0.0f, a * rn, 0.0f, rn,
+					0.0f, 0.0f, 1.0f, 0.0f,
+					0.0f, b * rn, 0.0f, 0.0f });
 	Matrix4f warpTransform = warp * warpShift;
 
 	// Normalize the warped body onto the unit cube. Taking the bounds AFTER the perspective divide is
 	// legitimate because the ortho matrix is affine and leaves w untouched, so ortho*(warp*p) divided by w
 	// equals ortho applied to the already divided point. Going through ComputeOrthoProjection also inherits
 	// whatever depth convention the backend's glm build uses, exactly like CreateOrthoTransformation.
-	Matrix4f warpedView = warpTransform * lightView;
-	float xMin = FLT_MAX, xMax = -FLT_MAX, yMin = FLT_MAX, yMax = -FLT_MAX, zMin = FLT_MAX, zMax = -FLT_MAX;
+	Matrix4f	warpedView = warpTransform * lightView;
+	float		xMin = FLT_MAX, xMax = -FLT_MAX, yMin = FLT_MAX, yMax = -FLT_MAX, zMin = FLT_MAX, zMax = -FLT_MAX;
 	for (int i = 0; i < 8; i++) {
-		Vector4f v = warpedView * corners[i];
-		float rw = 1.0f / v.w;
-		float x = v.x * rw, y = v.y * rw, z = v.z * rw;
-		xMin = std::min(xMin, x); xMax = std::max(xMax, x);
-		yMin = std::min(yMin, y); yMax = std::max(yMax, y);
-		zMin = std::min(zMin, z); zMax = std::max(zMax, z);
+		Vector4f	v = warpedView * corners[i];
+		float		rw = 1.0f / v.w;
+		float		x = v.x * rw, y = v.y * rw, z = v.z * rw;
+		xMin = std::min(xMin, x);
+		xMax = std::max(xMax, x);
+		yMin = std::min(yMin, y);
+		yMax = std::max(yMax, y);
+		zMin = std::min(zMin, z);
+		zMax = std::max(zMax, z);
 	}
 	Projector projector;
 	// z is negative in front of the light camera (LookAt looks down -z), same negation as the ortho path.
@@ -268,13 +292,13 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	lightProj *= warpTransform;
 
 #elif 0 // viewer-focused ORTHO frustum (disabled). Re-enabling also needs the m_lightTransform texel-snap
-        // in Stabilize() (ortho-only). frustumWidth == 2*coverage matches shadowCoverage in the shaders.
+	// in Stabilize() (ortho-only). frustumWidth == 2*coverage matches shadowCoverage in the shaders.
 	float coverage = m_maxLightRadius;
 	if (lightDistance <= 0.0f)
 		lightDistance = 100.0f * coverage;
 	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
 	viewDir.Normalize();
-	center += viewDir * coverage * 0.8f;   // viewer near rear edge
+	center += viewDir * coverage * 0.8f; // viewer near rear edge
 	m_lightPosition = center + lightDirection * lightDistance;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
 	Vector4f corners[8] = {
@@ -296,26 +320,26 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	}
 	Projector projector;
 	lightProj = projector.ComputeOrthoProjection(vMin.x, vMax.x, vMin.y, vMax.y, -vMax.z, -vMin.z);
-#else   // viewer-aligned PERSPECTIVE frustum: worldRadius-sized cone around the area in front of the viewer,
-        // centre shifted forward so the viewer sits near the rear edge. Near field gets more density than ortho.
+#else // viewer-aligned PERSPECTIVE frustum: worldRadius-sized cone around the area in front of the viewer,
+	// centre shifted forward so the viewer sits near the rear edge. Near field gets more density than ortho.
 	float worldRadius = std::min(Vector3f::Abs(worldMax - worldMin).Length() * 0.5f, m_maxLightRadius);
 	if (lightDistance <= 0.0f)
 		lightDistance = 100.0f * worldRadius;
 	Vector3f viewDir = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
 	viewDir.Normalize();
 	center += viewDir * worldRadius * 0.8f;
-	Vector3f f = -lightDirection;
-	float dotFV = f.Dot(viewDir);
-	Vector3f s = viewDir - f * dotFV;      // view-direction component perpendicular to the light
+	Vector3f	f = -lightDirection;
+	float		dotFV = f.Dot(viewDir);
+	Vector3f	s = viewDir - f * dotFV; // view-direction component perpendicular to the light
 	s.Normalize();
 	Vector3f upParam = s.Cross(f);
 	upParam.Normalize();
 	m_lightPosition = center + lightDirection * lightDistance;
 	lightView.LookAt(m_lightPosition, center, upParam);
-	float halfFov = std::atan(worldRadius / lightDistance);
-	float zNear = std::max(0.01f, lightDistance - worldRadius);
-	float zFar = lightDistance + worldRadius;
-	Projector projector(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
+	float		halfFov = std::atan(worldRadius / lightDistance);
+	float		zNear = std::max(0.01f, lightDistance - worldRadius);
+	float		zFar = lightDistance + worldRadius;
+	Projector	projector(1.0f, Conversions::RadToDeg(2.0f * halfFov), zNear, zFar);
 	lightProj = projector.Compute3DProjection();
 	// Normalize w the same way the LiSPSM branch does, so that "bias *= shadowCoord.w" in the shaders is
 	// path-agnostic: here w is the light-space depth (~lightDistance), so dividing the whole matrix by it
@@ -324,9 +348,10 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	{
 		float rd = 1.0f / lightDistance;
 		lightProj = Matrix4f({ rd, 0.0f, 0.0f, 0.0f,
-							 0.0f,   rd, 0.0f, 0.0f,
-							 0.0f, 0.0f,   rd, 0.0f,
-							 0.0f, 0.0f, 0.0f,   rd }) * lightProj;
+							   0.0f, rd, 0.0f, 0.0f,
+							   0.0f, 0.0f, rd, 0.0f,
+							   0.0f, 0.0f, 0.0f, rd }) *
+			lightProj;
 	}
 #endif
 
@@ -334,21 +359,25 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 }
 
 
-void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
+void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance,
+												float worldRadius)
+{
 	Matrix4f lightView, lightProj;
 
 	if (lightDistance == 0.0f)
 		lightDistance = 10.0f * worldRadius;
 	m_lightPosition = center + lightDirection * lightDistance;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
-	float halfFov = std::atan(worldRadius / lightDistance);
-	Projector projector(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+	float		halfFov = std::atan(worldRadius / lightDistance);
+	Projector	projector(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
 	lightProj = projector.Compute3DProjection();
 	CreateLightTransformation(lightView, lightProj);
 }
 
 
-void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightOffset, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax) {
+void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightOffset,
+										  const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax)
+{
 	Matrix4f lightView, lightProj;
 
 	if (lightOffset <= 0.0f) // fall back to a sensible default if the caller didn't supply a distance
@@ -383,12 +412,14 @@ void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f
 }
 
 
-bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
+bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax)
+{
 	if (m_status < 0)
 		return false;
-	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
-	[[maybe_unused]] float worldRadius = worldSize.Length() * 0.5f; // only the _DEBUG perspective path (CreatePerspectiveTransformation) still uses this
-	if (not center.IsValid()) 
+	Vector3f				worldSize = Vector3f::Abs(worldMax - worldMin);
+	[[maybe_unused]] float	worldRadius =
+		worldSize.Length() * 0.5f; // only the _DEBUG perspective path (CreatePerspectiveTransformation) still uses this
+	if (not center.IsValid())
 #if 0
 	{
 		Vector3f f = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);
@@ -425,7 +456,8 @@ bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffs
 
 // =================================================================================================
 
-bool ShadowAtlas::Create(int size, int maxTileSize, int minTileSize) {
+bool ShadowAtlas::Create(int size, int maxTileSize, int minTileSize)
+{
 	Destroy();
 	if ((size <= 0) or (minTileSize <= 0) or (maxTileSize < minTileSize) or (maxTileSize > size))
 		return false;
@@ -451,7 +483,9 @@ bool ShadowAtlas::Create(int size, int maxTileSize, int minTileSize) {
 }
 
 
-void ShadowAtlas::Destroy(void) noexcept {
+void ShadowAtlas::Destroy(void)
+noexcept
+{
 	if (m_map) {
 		delete m_map;
 		m_map = nullptr;
@@ -464,7 +498,9 @@ void ShadowAtlas::Destroy(void) noexcept {
 }
 
 
-int ShadowAtlas::Layout(int tileCount) noexcept {
+int ShadowAtlas::Layout(int tileCount)
+noexcept
+{
 	if (m_size <= 0)
 		return 0;
 	int tileSize = m_maxTileSize;
@@ -478,7 +514,9 @@ int ShadowAtlas::Layout(int tileCount) noexcept {
 }
 
 
-Viewport ShadowAtlas::TileViewport(int tile) const noexcept {
+Viewport ShadowAtlas::TileViewport(int tile) const
+noexcept
+{
 	if ((m_tilesPerRow <= 0) or (tile < 0) or (tile >= m_tilesPerRow * m_tilesPerRow))
 		return Viewport(0, 0, 0, 0);
 	int col = tile % m_tilesPerRow;
@@ -487,10 +525,12 @@ Viewport ShadowAtlas::TileViewport(int tile) const noexcept {
 }
 
 
-bool ShadowAtlas::PointLightTransformation(const Vector3f& lightPosition, const Vector3f& center, float radius, float zFar, float margin, PointLightFrustum& frustum) {
-	Vector3f direction = center - lightPosition;
-	float distance = direction.Length();
-	float extent = radius * (1.0f + margin);
+bool ShadowAtlas::PointLightTransformation(const Vector3f& lightPosition, const Vector3f& center, float radius, float zFar,
+										   float margin, PointLightFrustum& frustum)
+{
+	Vector3f	direction = center - lightPosition;
+	float		distance = direction.Length();
+	float		extent = radius * (1.0f + margin);
 	if ((radius <= 0.0f) or (distance <= extent))
 		return false;
 	direction /= distance;

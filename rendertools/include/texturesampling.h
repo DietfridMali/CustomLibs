@@ -19,48 +19,53 @@
 // direction.
 
 enum class GfxFilterMode : uint8_t {
-    Nearest = 0,
-    Linear  = 1
+	Nearest = 0,
+	Linear = 1
 };
 
 enum class GfxMipMode : uint8_t {
-    None    = 0,    // no mipmaps; sampling stays on base level
-    Nearest = 1,
-    Linear  = 2
+	None = 0, // no mipmaps; sampling stays on base level
+	Nearest = 1,
+	Linear = 2
 };
 
 // =================================================================================================
 
 #pragma pack(push, 1)
-struct TextureSampling
-{
-    GfxFilterMode               minFilter      { GfxFilterMode::Linear };
-    GfxFilterMode               magFilter      { GfxFilterMode::Linear };
-    GfxMipMode                  mipMode        { GfxMipMode::None };
-    GfxWrapMode                 wrapU          { GfxWrapMode::Repeat };
-    GfxWrapMode                 wrapV          { GfxWrapMode::Repeat };
-    GfxWrapMode                 wrapW          { GfxWrapMode::Repeat };
-    GfxOperations::CompareFunc  compareFunc    { GfxOperations::CompareFunc::Always };
-    float                       maxAnisotropy  { 1.0f };
-    float                       mipLodBias     { 0.0f };
-    float                       minLOD         { 0.0f };
-    float                       maxLOD         { 1.0e30f };
-    float                       borderColor[4] { 0.0f, 0.0f, 0.0f, 0.0f };
+struct TextureSampling {
+	GfxFilterMode				minFilter{ GfxFilterMode::Linear };
+	GfxFilterMode				magFilter{ GfxFilterMode::Linear };
+	GfxMipMode					mipMode{ GfxMipMode::None };
+	GfxWrapMode					wrapU{ GfxWrapMode::Repeat };
+	GfxWrapMode					wrapV{ GfxWrapMode::Repeat };
+	GfxWrapMode					wrapW{ GfxWrapMode::Repeat };
+	GfxOperations::CompareFunc	compareFunc{ GfxOperations::CompareFunc::Always };
+	float						maxAnisotropy{ 1.0f };
+	float						mipLodBias{ 0.0f };
+	float						minLOD{ 0.0f };
+	float						maxLOD{ 1.0e30f };
+	float						borderColor[4]{ 0.0f, 0.0f, 0.0f, 0.0f };
 
 
-    bool operator==(const TextureSampling& o) const noexcept {
-        return std::memcmp(this, &o, sizeof(*this)) == 0;
-    }
+	bool operator==(const TextureSampling& o) const
+	noexcept
+	{
+		return std::memcmp(this, &o, sizeof(*this)) == 0;
+	}
 
 
-    bool operator!=(const TextureSampling& o) const noexcept {
-        return not (*this == o);
-    }
+	bool operator!=(const TextureSampling& o) const
+	noexcept
+	{
+		return not (*this == o);
+	}
 
 
-    bool operator<(const TextureSampling& o) const noexcept {
-        return std::memcmp(this, &o, sizeof(*this)) < 0;
-    }
+	bool operator<(const TextureSampling& o) const
+	noexcept
+	{
+		return std::memcmp(this, &o, sizeof(*this)) < 0;
+	}
 };
 #pragma pack(pop)
 

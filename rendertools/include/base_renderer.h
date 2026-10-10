@@ -4,7 +4,7 @@
 #include <utility>
 #include <stdlib.h>
 #ifdef _DEBUG
-#   include <source_location>
+#include <source_location>
 #endif
 
 #include "std_defines.h"
@@ -26,460 +26,586 @@
 // (SetupOpenGL → SetupDX12 internally, but callers still see SetupOpenGL for now).
 
 class BaseRenderer
-    : public RenderMatrices
-    , public DrawBufferHandler
-    , public PolymorphSingleton<BaseRenderer>
-{
+	: public RenderMatrices,
+	  public DrawBufferHandler,
+	  public PolymorphSingleton<BaseRenderer> {
 public:
-    enum class RenderPassType {
-        rpShadows,
-        rpColor,
-        rpFull
-    };
+	enum class RenderPassType {
+		rpShadows,
+		rpColor,
+		rpFull
+	};
 
-    enum eRenderPerspective {
-        rpForward,
-        rpTopDown,
-        rpRespawn
-    };
+	enum eRenderPerspective {
+		rpForward,
+		rpTopDown,
+		rpRespawn
+	};
 
 protected:
-    RenderTarget*           m_screenBuffer;
-    RenderTarget*           m_sceneBuffer;
-    RenderTarget*           m_skyBuffer;
-    Texture                 m_renderTexture;
+	RenderTarget*	m_screenBuffer;
+	RenderTarget*	m_sceneBuffer;
+	RenderTarget*	m_skyBuffer;
+	Texture			m_renderTexture;
 
-    bool                    m_screenIsAvailable;
+	bool m_screenIsAvailable;
 
-    Viewport                m_viewport;
-    Viewport                m_sceneViewport;
-    Vector2f                m_ndcScale;
-    Vector2f                m_ndcBias;
-    BaseQuadMesh                m_renderQuad;
+	Viewport		m_viewport;
+	Viewport		m_sceneViewport;
+	Vector2f		m_ndcScale;
+	Vector2f		m_ndcBias;
+	BaseQuadMesh	m_renderQuad;
 
-    int                     m_renderQuality;
-    int                     m_frameIndex;
-    int                     m_windowWidth;
-    int                     m_windowHeight;
-    int                     m_sceneLeft;
-    int                     m_sceneTop;
-    int                     m_sceneWidth;
-    int                     m_sceneHeight;
-    float                   m_fov;
-    float                   m_aspectRatio;
+	int		m_renderQuality;
+	int		m_frameIndex;
+	int		m_windowWidth;
+	int		m_windowHeight;
+	int		m_sceneLeft;
+	int		m_sceneTop;
+	int		m_sceneWidth;
+	int		m_sceneHeight;
+	float	m_fov;
+	float	m_aspectRatio;
 
-    RGBAColor               m_backgroundColor;
-    RenderPassType          m_renderPass;
-    MovingFrameCounter      m_frameCounter;
+	RGBAColor			m_backgroundColor;
+	RenderPassType		m_renderPass;
+	MovingFrameCounter	m_frameCounter;
 
-    eRenderPerspective      m_perspective{ rpForward };
+	eRenderPerspective m_perspective{ rpForward };
 
-    static List<::Viewport> m_viewportStack;
-    List<RenderTarget*>     m_sceneBufferStack;
+	static List<::Viewport>	m_viewportStack;
+	List<RenderTarget*>		m_sceneBufferStack;
 
-    GfxOperations::CullFace m_frontFace{ GfxOperations::CullFace::None };
-    GfxOperations::CullFace m_backFace{ GfxOperations::CullFace::None };
+	GfxOperations::CullFace m_frontFace{ GfxOperations::CullFace::None };
+	GfxOperations::CullFace m_backFace{ GfxOperations::CullFace::None };
 
-    uint32_t                m_gfxFeatures{ 0 };
-    bool                    m_coverageAlpha{ false };
+	uint32_t	m_gfxFeatures{ 0 };
+	bool		m_coverageAlpha{ false };
 
 public:
 #ifdef _DEBUG
-    bool                    m_xchgSkyAndSceneBuffer{ false };
+	bool m_xchgSkyAndSceneBuffer{ false };
 #endif
 
-    virtual ~BaseRenderer() {
-    }
+	virtual ~BaseRenderer() {
+	}
 
-    BaseRenderer()
-        : m_screenBuffer(nullptr)
-        , m_sceneBuffer(nullptr)
-        , m_skyBuffer(nullptr)
+	BaseRenderer()
+		: m_screenBuffer(nullptr)
+		, m_sceneBuffer(nullptr)
+		, m_skyBuffer(nullptr)
 #ifdef DEMO
-        , m_renderQuality(0)
+		, m_renderQuality(0)
 #else
-        , m_renderQuality(1)
+		, m_renderQuality(1)
 #endif
-        , m_frameIndex(0)
-        , m_windowWidth(0)
-        , m_windowHeight(0)
-        , m_sceneWidth(0)
-        , m_sceneHeight(0)
-        , m_sceneLeft(0)
-        , m_sceneTop(0)
-        , m_fov(0.0f)
-        , m_aspectRatio(1.0f)
-        , m_renderPass(RenderPassType::rpColor)
-        , m_ndcScale(Vector2f::ONE)
-        , m_ndcBias(Vector2f::ONE)
-        , m_backgroundColor(ColorData::Black)
-        , m_screenIsAvailable(false)
-    {
-        _instance = this;
-    }
+		, m_frameIndex(0)
+		, m_windowWidth(0)
+		, m_windowHeight(0)
+		, m_sceneWidth(0)
+		, m_sceneHeight(0)
+		, m_sceneLeft(0)
+		, m_sceneTop(0)
+		, m_fov(0.0f)
+		, m_aspectRatio(1.0f)
+		, m_renderPass(RenderPassType::rpColor)
+		, m_ndcScale(Vector2f::ONE)
+		, m_ndcBias(Vector2f::ONE)
+		, m_backgroundColor(ColorData::Black)
+		, m_screenIsAvailable(false)
+	{
+		_instance = this;
+	}
 
-    static BaseRenderer& Instance(void) {
-        return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance());
-    }
+	static BaseRenderer& Instance(void) {
+		return dynamic_cast<BaseRenderer&>(PolymorphSingleton::Instance());
+	}
 
-    // DX12 one-time init (no equivalent of glewInit).
-    bool CreateScreenBuffer(void);
+	// DX12 one-time init (no equivalent of glewInit).
+	bool CreateScreenBuffer(void);
 
-    virtual void SetSceneBuffer(RenderTarget* sceneBuffer) noexcept {
-        if (sceneBuffer == nullptr) {
-            if (not m_sceneBufferStack.IsEmpty())
-                m_sceneBuffer = m_sceneBufferStack.Pop();
-        }
-        else {
-            m_sceneBufferStack.Push(m_sceneBuffer);
-            m_sceneBuffer = sceneBuffer;
-        }
-    }
+	virtual void SetSceneBuffer(RenderTarget* sceneBuffer)
+	noexcept
+	{
+		if (sceneBuffer == nullptr) {
+			if (not m_sceneBufferStack.IsEmpty())
+				m_sceneBuffer = m_sceneBufferStack.Pop();
+		}
+		else {
+			m_sceneBufferStack.Push(m_sceneBuffer);
+			m_sceneBuffer = sceneBuffer;
+		}
+	}
 
-    virtual RenderTarget* GetSceneBuffer(void) noexcept {
-        return m_sceneBuffer;
-    }
+	virtual RenderTarget* GetSceneBuffer(void)
+	noexcept
+	{
+		return m_sceneBuffer;
+	}
 
-    RenderTarget* GetSkyBuffer(void) noexcept {
-        return m_skyBuffer;
-    }
+	RenderTarget* GetSkyBuffer(void)
+	noexcept
+	{
+		return m_skyBuffer;
+	}
 
-    virtual void ActivateSceneViewport(void) noexcept {
-        SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight));
-    }
+	virtual void ActivateSceneViewport(void)
+	noexcept
+	{
+		SetViewport(::Viewport(0, 0, m_sceneWidth, m_sceneHeight));
+	}
 
-    // Sets default DX12 pipeline state (depth, blend, rasterizer …).
-    // Mirrors SetupOpenGL from the OGL version — same call sites, DX12 internals.
-    void SetupGraphics(void) noexcept;
+	// Sets default DX12 pipeline state (depth, blend, rasterizer …).
+	// Mirrors SetupOpenGL from the OGL version — same call sites, DX12 internals.
+	void SetupGraphics(void)
+	noexcept;
 
-    virtual void Set3DRenderStates(int depthWrite = -1) noexcept;
+	virtual void Set3DRenderStates(int depthWrite = -1)
+	noexcept;
 
-    virtual void Set2DRenderStates(int blending = 0) noexcept;
+	virtual void Set2DRenderStates(int blending = 0)
+	noexcept;
 
-    inline void SetRenderPass(RenderPassType renderPass) noexcept { 
-        m_renderPass = renderPass; 
-    }
+	inline void SetRenderPass(RenderPassType renderPass)
+	noexcept
+	{
+		m_renderPass = renderPass;
+	}
 
-    virtual int GetRenderQuality(void) noexcept {
-        return m_renderQuality;
-    }
+	virtual int GetRenderQuality(void)
+	noexcept
+	{
+		return m_renderQuality;
+	}
 
-    virtual void SetRenderQuality(int quality) noexcept {
-        m_renderQuality = quality;
-    }
+	virtual void SetRenderQuality(int quality)
+	noexcept
+	{
+		m_renderQuality = quality;
+	}
 
-    inline bool HasRenderQuality(int quality) noexcept {
-        return GetRenderQuality() == quality;
-    }
+	inline bool HasRenderQuality(int quality)
+	noexcept
+	{
+		return GetRenderQuality() == quality;
+	}
 
-    virtual void StartShadowPass(void) noexcept;
+	virtual void StartShadowPass(void)
+	noexcept;
 
-    virtual void StartColorPass(void) noexcept;
+	virtual void StartColorPass(void)
+	noexcept;
 
-    virtual void StartFullPass(void) noexcept;
+	virtual void StartFullPass(void)
+	noexcept;
 
-    inline bool IsShadowPass(void) noexcept { 
-        return RenderPass() == RenderPassType::rpShadows; 
-    }
-    
-    inline bool IsColorPass(void) noexcept { 
-        return RenderPass() == RenderPassType::rpColor; 
-    }
-    
-    inline bool IsFullPass(void) noexcept { 
-        return RenderPass() == RenderPassType::rpFull; 
-    }
+	inline bool IsShadowPass(void)
+	noexcept
+	{
+		return RenderPass() == RenderPassType::rpShadows;
+	}
 
-    inline void StartRenderPass(RenderPassType pass) noexcept {
-        if (pass == RenderPassType::rpShadows)  
-            StartShadowPass();
-        else if (pass == RenderPassType::rpColor)
-            StartColorPass();
-        else                                         
-            StartFullPass();
-    }
+	inline bool IsColorPass(void)
+	noexcept
+	{
+		return RenderPass() == RenderPassType::rpColor;
+	}
 
-    RenderPassType RenderPass(void) noexcept { 
-        return m_renderPass; 
-    }
+	inline bool IsFullPass(void)
+	noexcept
+	{
+		return RenderPass() == RenderPassType::rpFull;
+	}
 
-    // HOW A DRAW BLENDS, in the renderer's own vocabulary rather than the backend's. One call sets all
-    // three pieces of state that belong together - blending on, the factor pair, the equation - because
-    // a step that set only some of them inherited the rest from whatever ran before it. The equation in
-    // particular: a step that switches to Max (the lightning and glow renderers do) used to leave it
-    // behind for the next one.
-    //
-    // Implemented once, in terms of gfxStates, which every backend provides with the same neutral types
-    // (GfxOperations). What differs between them is what they DO with it - OpenGL sets it immediately,
-    // Vulkan folds it into the pipeline key - and none of that belongs here or at a call site.
-    void SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::BlendOp op = GfxOperations::BlendOp::Add) noexcept;
+	inline void StartRenderPass(RenderPassType pass)
+	noexcept
+	{
+		if (pass == RenderPassType::rpShadows)
+			StartShadowPass();
+		else if (pass == RenderPassType::rpColor)
+			StartColorPass();
+		else
+			StartFullPass();
+	}
 
-    inline bool SetCoverageAlpha(bool coverageAlpha) noexcept {
-        bool previous = m_coverageAlpha;
-        m_coverageAlpha = coverageAlpha;
-        return previous;
-    }
+	RenderPassType RenderPass(void)
+	noexcept
+	{
+		return m_renderPass;
+	}
 
-    virtual bool Start3DScene(void);
+	// HOW A DRAW BLENDS, in the renderer's own vocabulary rather than the backend's. One call sets all
+	// three pieces of state that belong together - blending on, the factor pair, the equation - because
+	// a step that set only some of them inherited the rest from whatever ran before it. The equation in
+	// particular: a step that switches to Max (the lightning and glow renderers do) used to leave it
+	// behind for the next one.
+	//
+	// Implemented once, in terms of gfxStates, which every backend provides with the same neutral types
+	// (GfxOperations). What differs between them is what they DO with it - OpenGL sets it immediately,
+	// Vulkan folds it into the pipeline key - and none of that belongs here or at a call site.
+	void SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::BlendOp op = GfxOperations::BlendOp::Add)
+	noexcept;
 
-    virtual bool Stop3DScene(void);
+	inline bool SetCoverageAlpha(bool coverageAlpha)
+	noexcept
+	{
+		bool previous = m_coverageAlpha;
+		m_coverageAlpha = coverageAlpha;
+		return previous;
+	}
 
-    virtual bool Start2DScene(void);
+	virtual bool Start3DScene(void);
 
-    virtual bool Stop2DScene(void);
+	virtual bool Stop3DScene(void);
 
-    virtual bool UsePostEffectShader(void) { return false; }
+	virtual bool Start2DScene(void);
 
-    virtual Shader* LoadPostEffectShader(void){ return nullptr; }
+	virtual bool Stop2DScene(void);
 
-    virtual RenderTarget* RenderPostEffect(void) { return GetSceneBuffer(); }
+	virtual bool UsePostEffectShader(void) {
+		return false;
+	}
 
-    inline int FrameIndex(void) noexcept {
-        return m_frameIndex;
-    }
+	virtual Shader* LoadPostEffectShader(void) {
+		return nullptr;
+	}
 
-    inline void BumpFrameIndex(void) noexcept {
-        ++m_frameIndex;
-    }
+	virtual RenderTarget* RenderPostEffect(void) {
+		return GetSceneBuffer();
+	}
 
-    // What the end of a screen pass leaves behind: the screen is no longer available to draw into and
-    // the frame is counted. Here so that a DrawScreen () override of its own does not have to know
-    // which members those are. NOT the frame counter's overlay - that one is a draw, and where it
-    // lands is decided by the pass it is issued in, not by a metrics update.
-    // Call it AFTER Stop2DScene (): that one returns at once once m_screenIsAvailable is false.
-    inline void UpdateFrameMetrics(void) noexcept {
-        m_screenIsAvailable = false;
-        BumpFrameIndex();
-    }
+	inline int FrameIndex(void)
+	noexcept
+	{
+		return m_frameIndex;
+	}
 
-    // The screen buffer is being drawn into by a client that activates it ITSELF, without the clear
-    // and the 2D setup of Start2DScene () - DrawScreen () only puts it on the back buffer when it knows.
-    inline void SetScreenAvailable(bool available) noexcept {
-        m_screenIsAvailable = available;
-    }
+	inline void BumpFrameIndex(void)
+	noexcept
+	{
+		++m_frameIndex;
+	}
 
-    inline void SetSceneViewport(Viewport viewport) noexcept { m_sceneViewport = viewport; }
+	// What the end of a screen pass leaves behind: the screen is no longer available to draw into and
+	// the frame is counted. Here so that a DrawScreen () override of its own does not have to know
+	// which members those are. NOT the frame counter's overlay - that one is a draw, and where it
+	// lands is decided by the pass it is issued in, not by a metrics update.
+	// Call it AFTER Stop2DScene (): that one returns at once once m_screenIsAvailable is false.
+	inline void UpdateFrameMetrics(void)
+	noexcept
+	{
+		m_screenIsAvailable = false;
+		BumpFrameIndex();
+	}
 
-    inline ::Viewport GetSceneViewport(void) noexcept { return m_sceneViewport; }
+	// The screen buffer is being drawn into by a client that activates it ITSELF, without the clear
+	// and the 2D setup of Start2DScene () - DrawScreen () only puts it on the back buffer when it knows.
+	inline void SetScreenAvailable(bool available)
+	noexcept
+	{
+		m_screenIsAvailable = available;
+	}
 
-    void Draw3DScene(bool flipVertically);
+	inline void SetSceneViewport(Viewport viewport)
+	noexcept
+	{
+		m_sceneViewport = viewport;
+	}
 
-    // shader: what to draw the quad with. nullptr takes the plain texture shader, which is what a
-    // straight composite wants; a caller that has to process the frame on its way to the screen -
-    // tone mapping an HDR target, say - passes its own.
-    virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader = nullptr);
+	inline ::Viewport GetSceneViewport(void)
+	noexcept
+	{
+		return m_sceneViewport;
+	}
 
-    virtual void DrawScreen(bool /*bRotate*/, bool /*bFlipVertically*/) {
-        //no op
-    }
+	void Draw3DScene(bool flipVertically);
 
-    virtual bool ActivateCamera(void)  { 
-        return false; 
-    }
+	// shader: what to draw the quad with. nullptr takes the plain texture shader, which is what a
+	// straight composite wants; a caller that has to process the frame on its way to the screen -
+	// tone mapping an HDR target, say - passes its own.
+	virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader = nullptr);
 
-    virtual bool DeactivateCamera(void) {
-        return false;
-    }
+	virtual void DrawScreen(bool /*bRotate*/, bool /*bFlipVertically*/) {
+		//no op
+	}
 
-    inline eRenderPerspective GetPerspective(void) noexcept { 
-        return m_perspective; 
-    }
+	virtual bool ActivateCamera(void) {
+		return false;
+	}
 
-    inline bool HasPerspective(eRenderPerspective value) noexcept { 
-        return m_perspective == value;
-    }
+	virtual bool DeactivateCamera(void) {
+		return false;
+	}
 
-    inline bool HasExternalView(void) noexcept {
-        return (m_perspective == rpTopDown) or (m_perspective == rpRespawn);
-    }
+	inline eRenderPerspective GetPerspective(void)
+	noexcept
+	{
+		return m_perspective;
+	}
 
-    inline bool HasFreeCamera(void) noexcept {
-        return m_perspective == rpTopDown;
-    }
+	inline bool HasPerspective(eRenderPerspective value)
+	noexcept
+	{
+		return m_perspective == value;
+	}
 
-    inline void SetPerspective(eRenderPerspective value) noexcept { 
-        m_perspective = value; 
-    }
+	inline bool HasExternalView(void)
+	noexcept
+	{
+		return (m_perspective == rpTopDown) or (m_perspective == rpRespawn);
+	}
 
-    inline RenderTarget* ScreenBuffer(void) noexcept {
-        return m_screenBuffer; 
-    }
+	inline bool HasFreeCamera(void)
+	noexcept
+	{
+		return m_perspective == rpTopDown;
+	}
 
-    inline int WindowWidth(void) noexcept { 
-        return m_windowWidth; 
-    }
+	inline void SetPerspective(eRenderPerspective value)
+	noexcept
+	{
+		m_perspective = value;
+	}
 
-    inline int WindowHeight(void) noexcept { 
-        return m_windowHeight; 
-    }
+	inline RenderTarget* ScreenBuffer(void)
+	noexcept
+	{
+		return m_screenBuffer;
+	}
 
-    inline int SceneWidth(void) noexcept { 
-        return m_sceneWidth; 
-    }
+	inline int WindowWidth(void)
+	noexcept
+	{
+		return m_windowWidth;
+	}
 
-    inline int SceneHeight(void) noexcept { 
-        return m_sceneHeight; 
-    }
+	inline int WindowHeight(void)
+	noexcept
+	{
+		return m_windowHeight;
+	}
 
-    inline int SceneLeft(void) noexcept { 
-        return m_sceneLeft; 
-    }
+	inline int SceneWidth(void)
+	noexcept
+	{
+		return m_sceneWidth;
+	}
 
-    inline int SceneTop(void) noexcept { 
-        return m_sceneTop; 
-    }
+	inline int SceneHeight(void)
+	noexcept
+	{
+		return m_sceneHeight;
+	}
 
-    inline float FOV(void) noexcept { 
-        return m_fov; 
-    }
+	inline int SceneLeft(void)
+	noexcept
+	{
+		return m_sceneLeft;
+	}
 
-    inline float AspectRatio(void) noexcept { 
-        return m_aspectRatio; 
-    }
+	inline int SceneTop(void)
+	noexcept
+	{
+		return m_sceneTop;
+	}
 
-    inline Matrix4f& ViewportTransformation(void) noexcept { 
-        return m_viewport.Transformation(); 
-    }
+	inline float FOV(void)
+	noexcept
+	{
+		return m_fov;
+	}
 
-    inline Vector2f& NDCScale(void) noexcept { 
-        return m_ndcScale; 
-    }
-    
-    inline Vector2f& NDCBias(void)  noexcept { 
-        return m_ndcBias; 
-    }
-    
-    inline MovingFrameCounter& FrameCounter(void) noexcept { 
-        return m_frameCounter; 
-    }
+	inline float AspectRatio(void)
+	noexcept
+	{
+		return m_aspectRatio;
+	}
 
-    template <typename T>
-    inline void SetBackgroundColor(T&& backgroundColor) {
-        m_backgroundColor = std::forward<T>(backgroundColor);
-    }
+	inline Matrix4f& ViewportTransformation(void)
+	noexcept
+	{
+		return m_viewport.Transformation();
+	}
 
-    template <typename T>
-    inline void SetClearColor(T&& color) noexcept {
-        gfxStates.SetClearColor(std::forward<T>(color));
-    }
+	inline Vector2f& NDCScale(void)
+	noexcept
+	{
+		return m_ndcScale;
+	}
 
-    inline void ResetClearColor(void) noexcept {
-        gfxStates.ResetClearColor();
-    }
+	inline Vector2f& NDCBias(void)
+	noexcept
+	{
+		return m_ndcBias;
+	}
 
-    inline BaseQuadMesh& RenderQuad(void) noexcept { 
-        return m_renderQuad; 
-    }
+	inline MovingFrameCounter& FrameCounter(void)
+	noexcept
+	{
+		return m_frameCounter;
+	}
 
-    inline ::Viewport& GetViewport(void) noexcept { 
-        return m_viewport; 
-    }
+	template <typename T>
+	inline void SetBackgroundColor(T&& backgroundColor) {
+		m_backgroundColor = std::forward<T>(backgroundColor);
+	}
 
-    void SetViewport(bool flipVertically = false) noexcept;
+	template <typename T>
+	inline void SetClearColor(T&& color)
+	noexcept
+	{
+		gfxStates.SetClearColor(std::forward<T>(color));
+	}
 
-    // virtual: a renderer derived from this one decides what setting a viewport means for it. D2X-XL's
-    // does the scissoring the viewport matrix cannot do (it scales into the rectangle, it does not clip).
-    virtual void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false) noexcept;
+	inline void ResetClearColor(void)
+	noexcept
+	{
+		gfxStates.ResetClearColor();
+	}
+
+	inline BaseQuadMesh& RenderQuad(void)
+	noexcept
+	{
+		return m_renderQuad;
+	}
+
+	inline ::Viewport& GetViewport(void)
+	noexcept
+	{
+		return m_viewport;
+	}
+
+	void SetViewport(bool flipVertically = false)
+	noexcept;
+
+	// virtual: a renderer derived from this one decides what setting a viewport means for it. D2X-XL's
+	// does the scissoring the viewport matrix cannot do (it scales into the rectangle, it does not clip).
+	virtual void SetViewport(::Viewport viewport, int windowWidth = 0, int windowHeight = 0, bool flipVertically = false)
+	noexcept;
 
 #ifdef _DEBUG
-    void PushViewport(const std::source_location& caller = std::source_location::current());
+	void PushViewport(const std::source_location& caller = std::source_location::current());
 #else
-    void PushViewport(void);
+	void PushViewport(void);
 #endif
 
-    void PopViewport(void);
+	void PopViewport(void);
 
-    inline TexCoord ViewportSize(void) noexcept {
-        return TexCoord(float(m_viewport.Width()), float(m_viewport.Height()));
-    }
+	inline TexCoord ViewportSize(void)
+	noexcept
+	{
+		return TexCoord(float(m_viewport.Width()), float(m_viewport.Height()));
+	}
 
-    inline TexCoord TexelSize(void) noexcept {
-        return m_viewport.TexelSize();
-    }
+	inline TexCoord TexelSize(void)
+	noexcept
+	{
+		return m_viewport.TexelSize();
+	}
 
-    void Render(Shader* shader, std::span<Texture* const> textures = {}, const RGBAColor& color = ColorData::White);
+	void Render(Shader* shader, std::span<Texture* const> textures = {}, const RGBAColor& color = ColorData::White);
 
-    inline void Render(Shader* shader, std::initializer_list<Texture*> textures, const RGBAColor& color = ColorData::White) {
-        Render(shader, std::span<Texture* const>(textures.begin(), textures.size()), color);
-    }
-    inline void Render(Shader* shader, Texture* texture, const RGBAColor& color) {
-        Render(shader, texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{}, color);
-    }
+	inline void Render(Shader* shader, std::initializer_list<Texture*> textures, const RGBAColor& color = ColorData::White) {
+		Render(shader, std::span<Texture* const>(textures.begin(), textures.size()), color);
+	}
+	inline void Render(Shader* shader, Texture* texture, const RGBAColor& color) {
+		Render(shader, texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{}, color);
+	}
 
-    void Fill(const RGBAColor& color, float scale = 1.0f);
+	void Fill(const RGBAColor& color, float scale = 1.0f);
 
-    void Fill(RGBAColor&& color, float scale = 1.0f) {
-        Fill(static_cast<const RGBAColor&>(color), scale);
-    }
-    
-    template <typename T>
-    inline void Fill(T&& color, float alpha, float scale = 1.0f) {
-        Fill(RGBAColor(std::forward<T>(color), alpha), scale);
-    }
+	void Fill(RGBAColor&& color, float scale = 1.0f) {
+		Fill(static_cast<const RGBAColor&>(color), scale);
+	}
 
-    
-    inline void ShowFps(bool showFps) noexcept { 
-        m_frameCounter.ShowFps(showFps); 
-    }
-    
-    inline void ToggleFps(void) noexcept { 
-        m_frameCounter.Toggle(); 
-    }
-    
-    inline float GetFps(void) noexcept { 
-        return m_frameCounter.GetFps(); 
-    }
+	template <typename T>
+	inline void Fill(T&& color, float alpha, float scale = 1.0f) {
+		Fill(RGBAColor(std::forward<T>(color), alpha), scale);
+	}
 
-    virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
-    virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
+	inline void ShowFps(bool showFps)
+	noexcept
+	{
+		m_frameCounter.ShowFps(showFps);
+	}
 
-    virtual bool InitGraphics(const GfxFeatureRequest& /*request*/ = {}) {
-        return false;
-    }
+	inline void ToggleFps(void)
+	noexcept
+	{
+		m_frameCounter.Toggle();
+	}
 
-    inline bool HasFeature(GfxFeature feature) const noexcept {
-        return (m_gfxFeatures & GfxFeatureBit(feature)) != 0;
-    }
+	inline float GetFps(void)
+	noexcept
+	{
+		return m_frameCounter.GetFps();
+	}
 
-    inline uint32_t GfxFeatures(void) const noexcept {
-        return m_gfxFeatures;
-    }
+	virtual void Init(int width, int height, float fov, float zNear, float zFar);
 
-    bool ApplyFeatures(const GfxFeatureRequest& request, uint32_t available) noexcept;
+	virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
 
-    virtual void* StartOperation(String /*name*/ = "", bool /*piggyback*/ = true) noexcept {
-        return nullptr; 
-    }
+	virtual bool InitGraphics(const GfxFeatureRequest& /*request*/ = {}) {
+		return false;
+	}
 
-    virtual bool StartOperation(void** cl, String /*name*/ = "", bool /*piggyback*/ = true) noexcept {
-        *cl = nullptr;
-        return true;
-    }
+	inline bool HasFeature(GfxFeature feature) const
+	noexcept
+	{
+		return (m_gfxFeatures & GfxFeatureBit(feature)) != 0;
+	}
 
-    virtual bool FinishOperation(void* /*cl*/, bool /*flush*/ = false) noexcept {
-        return false;
-    }
+	inline uint32_t GfxFeatures(void) const
+	noexcept
+	{
+		return m_gfxFeatures;
+	}
 
-    // Forces all deferred GPU resource cleanup queues to drain immediately (single GPU sync
-    // + free all queued descriptors / resources). Used during init phases that lack frame
-    // fences. Default no-op for APIs without an explicit resource queue (OpenGL).
-    virtual void FlushResources(void) noexcept {}
+	bool ApplyFeatures(const GfxFeatureRequest& request, uint32_t available)
+	noexcept;
 
-    // App-shutdown teardown of API-specific GPU resources: WaitIdle + drain of deferred
-    // cleanup queues + destruction of the command-list infrastructure. Called from
-    // Application::Destroy before the general resource handlers (textureHandler etc.) tear
-    // down. Default no-op for APIs without an explicit GPU resource queue (OpenGL).
-    virtual void Cleanup(void) noexcept {}
+	virtual void* StartOperation(String /*name*/ = "", bool /*piggyback*/ = true)
+	noexcept
+	{
+		return nullptr;
+	}
 
-    virtual void LoadPipelineCache(const String& /*shaderFolder*/) {}
+	virtual bool StartOperation(void** cl, String /*name*/ = "", bool /*piggyback*/ = true)
+	noexcept
+	{
+		*cl = nullptr;
+		return true;
+	}
 
-    virtual void SavePipelineCache(void) {}
+	virtual bool FinishOperation(void* /*cl*/, bool /*flush*/ = false)
+	noexcept
+	{
+		return false;
+	}
 
-    virtual void PrecreatePipelines(void) {}
+	// Forces all deferred GPU resource cleanup queues to drain immediately (single GPU sync
+	// + free all queued descriptors / resources). Used during init phases that lack frame
+	// fences. Default no-op for APIs without an explicit resource queue (OpenGL).
+	virtual void FlushResources(void)
+	noexcept
+	{}
+
+	// App-shutdown teardown of API-specific GPU resources: WaitIdle + drain of deferred
+	// cleanup queues + destruction of the command-list infrastructure. Called from
+	// Application::Destroy before the general resource handlers (textureHandler etc.) tear
+	// down. Default no-op for APIs without an explicit GPU resource queue (OpenGL).
+	virtual void Cleanup(void)
+	noexcept
+	{}
+
+	virtual void LoadPipelineCache(const String& /*shaderFolder*/) {}
+
+	virtual void SavePipelineCache(void) {}
+
+	virtual void PrecreatePipelines(void) {}
 
 #include "gfxapitype.h"
-
 };
 
 using RenderPassType = BaseRenderer::RenderPassType;

@@ -10,377 +10,420 @@
 
 // =================================================================================================
 
-static inline float DecodeSRGB(float c) noexcept {
-    c = (c > 0.0f) ? c : 0.0f;
-    return (c <= 0.04045f) ? c / 12.92f : float(std::pow((c + 0.055f) / 1.055f, 2.4f));
+static inline float DecodeSRGB(float c)
+noexcept
+{
+	c = (c > 0.0f) ? c : 0.0f;
+	return (c <= 0.04045f) ? c / 12.92f : float(std::pow((c + 0.055f) / 1.055f, 2.4f));
 }
 
 
-static inline RGBAColor DecodeSRGB(const RGBAColor& color) noexcept {
-    return RGBAColor(DecodeSRGB(color.R()), DecodeSRGB(color.G()), DecodeSRGB(color.B()), color.A());
+static inline RGBAColor DecodeSRGB(const RGBAColor& color)
+noexcept
+{
+	return RGBAColor(DecodeSRGB(color.R()), DecodeSRGB(color.G()), DecodeSRGB(color.B()), color.A());
 }
 
 // =================================================================================================
 
-FloatArray* BaseShaderHandler::ComputeGaussKernel1D(int radius) {
-    FloatArray* kernel = new FloatArray(2 * radius + 1);
+FloatArray* BaseShaderHandler::ComputeGaussKernel1D(int radius)
+{
+	FloatArray* kernel = new FloatArray(2 * radius + 1);
 
-    const float sigma = float(radius) / 1.6f; // 2.0f; // Standardabweichung
-    const float sigma2 = 2.0f * sigma * sigma;
-    const float sqrtSigmaPi2 = float (std::sqrt(float (Conversions::Pi) * sigma2));
-    float sum = 0.0f;
+	const float	sigma = float(radius) / 1.6f; // 2.0f; // Standardabweichung
+	const float	sigma2 = 2.0f * sigma * sigma;
+	const float	sqrtSigmaPi2 = float(std::sqrt(float(Conversions::Pi) * sigma2));
+	float		sum = 0.0f;
 #ifdef _DEBUG
-    float k[33];
+	float k[33];
 #endif
 
-    for (int i = -radius; i <= radius; ++i) {
-        float value = std::exp(-i * i / sigma2) / sqrtSigmaPi2;
-        (*kernel)[i + radius] = value;
+	for (int i = -radius; i <= radius; ++i) {
+		float value = std::exp(-i * i / sigma2) / sqrtSigmaPi2;
+		(*kernel)[i + radius] = value;
 #ifdef _DEBUG
-        k[i + radius] = value;
+		k[i + radius] = value;
 #endif
-        sum += value;
-    }
+		sum += value;
+	}
 
-    // normalisation
-    for (auto& value : *kernel)
-        value /= sum;
+	// normalisation
+	for (auto& value : *kernel)
+		value /= sum;
 #ifdef _DEBUG
-    for (int i = 0; i < 2 * radius + 1; i++)
-        k[i] /= sum;
+	for (int i = 0; i < 2 * radius + 1; i++)
+		k[i] /= sum;
 #endif
-    return kernel;
+	return kernel;
 }
 
 
-void BaseShaderHandler::CreateShaders(const String& shaderFolder) {
-    if (m_shaderCode == nullptr) {
-        baseRenderer.LoadPipelineCache(shaderFolder);
-        CreateShaderCode(shaderFolder);
-    }
-    m_shaderCode->CreateShaders();
+void BaseShaderHandler::CreateShaders(const String& shaderFolder)
+{
+	if (m_shaderCode == nullptr) {
+		baseRenderer.LoadPipelineCache(shaderFolder);
+		CreateShaderCode(shaderFolder);
+	}
+	m_shaderCode->CreateShaders();
 }
 
 
-void BaseShaderHandler::CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds) {
-    if (m_shaderCode == nullptr) {
-        baseRenderer.LoadPipelineCache(shaderFolder);
-        CreateShaderCode(shaderFolder);
-    }
-    m_shaderCode->CreateShaders(shaderIds);
+void BaseShaderHandler::CreateShaders(const String& shaderFolder, const AutoArray<String>& shaderIds)
+{
+	if (m_shaderCode == nullptr) {
+		baseRenderer.LoadPipelineCache(shaderFolder);
+		CreateShaderCode(shaderFolder);
+	}
+	m_shaderCode->CreateShaders(shaderIds);
 }
 
 
-void BaseShaderHandler::ComputeGaussKernels(void) {
-    for (int radius = 1; radius <= 16; radius++)
-        m_kernels[radius - 1] = ComputeGaussKernel1D(radius);
+void BaseShaderHandler::ComputeGaussKernels(void)
+{
+	for (int radius = 1; radius <= 16; radius++)
+		m_kernels[radius - 1] = ComputeGaussKernel1D(radius);
 }
 
 
-Shader* BaseShaderHandler::SelectShader(Texture* texture) {
-    String shaderId = "";
-    if (not texture)
-        shaderId = "color";
-    // select shader depending on texture type
-    else if (texture->GetTextureType() == TextureType::CubeMap)
-        shaderId = "cubemap";
-    else if (texture->GetTextureType() == TextureType::Texture2D)
-        shaderId = "texture";
-    else
-        return nullptr;
-    return SetupRenderShader(shaderId);
+Shader* BaseShaderHandler::SelectShader(Texture* texture)
+{
+	String shaderId = "";
+	if (not texture)
+		shaderId = "color";
+	// select shader depending on texture type
+	else if (texture->GetTextureType() == TextureType::CubeMap)
+		shaderId = "cubemap";
+	else if (texture->GetTextureType() == TextureType::Texture2D)
+		shaderId = "texture";
+	else
+		return nullptr;
+	return SetupRenderShader(shaderId);
 }
 
 
-const String& BaseShaderHandler::DefaultDepthShaderId(void) {
-    static const String shaderId("surfaceShadowShader");
-    return shaderId;
+const String& BaseShaderHandler::DefaultDepthShaderId(void)
+{
+	static const String shaderId("surfaceShadowShader");
+	return shaderId;
 }
 
 
-Shader* BaseShaderHandler::SetupRenderShader(const String& shaderId, const String& depthShaderId) {
-    const String& renderShaderId = baseRenderer.IsShadowPass() ? depthShaderId : shaderId; // override all shaders with simplest possible shader during depth pass
-    const bool isActive = (m_activeShader != nullptr) and (m_activeShaderId == renderShaderId);
-    Shader* shader = m_activeShader;
-    if (not isActive) {
-        shader = GetShader(renderShaderId);
-        if (shader == nullptr)
-            return nullptr;
-        if (not shader->IsValid()) {
+Shader* BaseShaderHandler::SetupRenderShader(const String& shaderId, const String& depthShaderId)
+{
+	const String& renderShaderId = baseRenderer.IsShadowPass()
+		? depthShaderId
+		: shaderId; // override all shaders with simplest possible shader during depth pass
+	const bool		isActive = (m_activeShader != nullptr) and (m_activeShaderId == renderShaderId);
+	Shader*			shader = m_activeShader;
+	if (not isActive) {
+		shader = GetShader(renderShaderId);
+		if (shader == nullptr)
+			return nullptr;
+		if (not shader->IsValid()) {
 #ifdef _DEBUG
-            logHandler.Print("*** shader'%s' is not available\r\n", (const char*)renderShaderId);
+			logHandler.Print("*** shader'%s' is not available\r\n", (const char*)renderShaderId);
 #endif
-            return nullptr;
-        }
-        m_activeShader = shader;
-        m_activeShaderId = renderShaderId;
-    }
-    // In OpenGL the program binding persists across draw calls, so skip re-enabling
-    // if the same shader is already active.
-    // In DX12 / Vulkan the command list is reset each frame, so pipeline state
-    // (root signature, PSO, descriptor heaps) must be re-established on every use.
-    if (not (isActive and baseRenderer.UsesOpenGL())) {
-        if (not shader->Activate()) {
-            //gfxStates.CheckError();
-            return nullptr;
-        }
-    }
-    return shader->UpdateMatrices() ? shader : nullptr;
+			return nullptr;
+		}
+		m_activeShader = shader;
+		m_activeShaderId = renderShaderId;
+	}
+	// In OpenGL the program binding persists across draw calls, so skip re-enabling
+	// if the same shader is already active.
+	// In DX12 / Vulkan the command list is reset each frame, so pipeline state
+	// (root signature, PSO, descriptor heaps) must be re-established on every use.
+	if (not (isActive and baseRenderer.UsesOpenGL())) {
+		if (not shader->Activate()) {
+			//gfxStates.CheckError();
+			return nullptr;
+		}
+	}
+	return shader->UpdateMatrices() ? shader : nullptr;
 }
 
 
-void BaseShaderHandler::StopShader(bool needLegacyMatrices) {
-    if (ShaderIsActive()) {
-        m_activeShader->Deactivate();
-        m_activeShader = nullptr;
-        m_activeShaderId = "";
+void BaseShaderHandler::StopShader(bool needLegacyMatrices)
+{
+	if (ShaderIsActive()) {
+		m_activeShader->Deactivate();
+		m_activeShader = nullptr;
+		m_activeShaderId = "";
 #if 1
-        if (needLegacyMatrices)
-            baseRenderer.UpdateLegacyMatrices();
+		if (needLegacyMatrices)
+			baseRenderer.UpdateLegacyMatrices();
 #endif
-    }
+	}
 }
 
 
-Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f& start, const Vector2f& end, float strength, bool antialias) {
-    Shader* shader = SetupRenderShader("lineShader");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            shader->SetVector2f("start", start);
-            shader->SetVector2f("end", end);
-            shader->SetFloat("strength", strength);
-            shader->SetInt("antialias", antialias ? 1 : 0);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadLineShader(const RGBAColor& color, const Vector2f& start, const Vector2f& end, float strength,
+										  bool antialias)
+{
+	Shader* shader = SetupRenderShader("lineShader");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+			shader->SetVector2f("start", start);
+			shader->SetVector2f("end", end);
+			shader->SetFloat("strength", strength);
+			shader->SetInt("antialias", antialias ? 1 : 0);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle, float endAngle, bool antialias, float dashCount, float dashRatio, float dashOffset, bool roundDashCaps) {
-    Shader* shader = SetupRenderShader("ringShader");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            shader->SetVector2f("center", center);
-            shader->SetVector2f("radius", radius);
-            shader->SetFloat("strength", strength);
-            shader->SetFloat("startAngle", startAngle);
-            shader->SetFloat("endAngle", endAngle);
-            shader->SetInt("antialias", antialias ? 1 : 0);
-            shader->SetFloat("dashCount", dashCount);
-            shader->SetFloat("dashRatio", dashRatio);
-            shader->SetFloat("dashOffset", dashOffset);
-            shader->SetInt("roundDashCaps", roundDashCaps ? 1 : 0);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength,
+										  float startAngle, float endAngle, bool antialias, float dashCount, float dashRatio,
+										  float dashOffset, bool roundDashCaps)
+{
+	Shader* shader = SetupRenderShader("ringShader");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+			shader->SetVector2f("center", center);
+			shader->SetVector2f("radius", radius);
+			shader->SetFloat("strength", strength);
+			shader->SetFloat("startAngle", startAngle);
+			shader->SetFloat("endAngle", endAngle);
+			shader->SetInt("antialias", antialias ? 1 : 0);
+			shader->SetFloat("dashCount", dashCount);
+			shader->SetFloat("dashRatio", dashRatio);
+			shader->SetFloat("dashOffset", dashOffset);
+			shader->SetInt("roundDashCaps", roundDashCaps ? 1 : 0);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float fillLevel, float brightness, bool antialias) {
-    Shader* shader = SetupRenderShader("circleShader");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            shader->SetVector2f("center", center);
-            shader->SetVector2f("radius", radius);
-            shader->SetFloat("fillLevel", fillLevel);
-            shader->SetFloat("brightness", brightness);
-            shader->SetInt("antialias", antialias ? 1 : 0);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadCircleShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius,
+											float fillLevel, float brightness, bool antialias)
+{
+	Shader* shader = SetupRenderShader("circleShader");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+			shader->SetVector2f("center", center);
+			shader->SetVector2f("radius", radius);
+			shader->SetFloat("fillLevel", fillLevel);
+			shader->SetFloat("brightness", brightness);
+			shader->SetInt("antialias", antialias ? 1 : 0);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height, float strength, float radius, bool antialias) {
-    Shader* shader = SetupRenderShader("rectangleShader");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            shader->SetVector2f("center", center);
-            shader->SetVector2f("size", Vector2f(width, height));
-            shader->SetFloat("strength", strength);
-            shader->SetFloat("radius", radius);
-            shader->SetInt("antialias", antialias ? 1 : 0);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height,
+											   float strength, float radius, bool antialias)
+{
+	Shader* shader = SetupRenderShader("rectangleShader");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+			shader->SetVector2f("center", center);
+			shader->SetVector2f("size", Vector2f(width, height));
+			shader->SetFloat("strength", strength);
+			shader->SetFloat("radius", radius);
+			shader->SetInt("antialias", antialias ? 1 : 0);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadShadedRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height, float strength, float radius, float innerAlpha, float outerAlpha, float innerColor, float outerColor, bool antialias) {
-    Shader* shader = SetupRenderShader("shadedRectangleShader");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            shader->SetVector2f("center", center);
-            shader->SetVector2f("size", Vector2f(width, height));
-            shader->SetFloat("strength", strength);
-            shader->SetFloat("radius", radius);
-            shader->SetFloat("innerAlpha", innerAlpha);
-            shader->SetFloat("outerAlpha", outerAlpha);
-            shader->SetFloat("innerColor", innerColor);
-            shader->SetFloat("outerColor", outerColor);
-            shader->SetInt("antialias", antialias ? 1 : 0);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadShadedRectangleShader(const RGBAColor& color, const Vector2f& center, float width, float height,
+													 float strength, float radius, float innerAlpha, float outerAlpha,
+													 float innerColor, float outerColor, bool antialias)
+{
+	Shader* shader = SetupRenderShader("shadedRectangleShader");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+			shader->SetVector2f("center", center);
+			shader->SetVector2f("size", Vector2f(width, height));
+			shader->SetFloat("strength", strength);
+			shader->SetFloat("radius", radius);
+			shader->SetFloat("innerAlpha", innerAlpha);
+			shader->SetFloat("outerAlpha", outerAlpha);
+			shader->SetFloat("innerColor", innerColor);
+			shader->SetFloat("outerColor", outerColor);
+			shader->SetInt("antialias", antialias ? 1 : 0);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius, float strength, float startAngle, float endAngle, float innerAlpha, float outerAlpha, float innerColor, float outerColor, bool antialias) {
-    Shader* shader = SetupRenderShader("shadedRingShader");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            shader->SetVector2f("center", center);
-            shader->SetVector2f("radius", radius);
-            shader->SetFloat("strength", strength);
-            shader->SetFloat("startAngle", startAngle);
-            shader->SetFloat("endAngle", endAngle);
-            shader->SetFloat("innerAlpha", innerAlpha);
-            shader->SetFloat("outerAlpha", outerAlpha);
-            shader->SetFloat("innerColor", innerColor);
-            shader->SetFloat("outerColor", outerColor);
-            shader->SetInt("antialias", antialias ? 1 : 0);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadShadedRingShader(const RGBAColor& color, const Vector2f& center, const Vector2f& radius,
+												float strength, float startAngle, float endAngle, float innerAlpha,
+												float outerAlpha, float innerColor, float outerColor, bool antialias)
+{
+	Shader* shader = SetupRenderShader("shadedRingShader");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+			shader->SetVector2f("center", center);
+			shader->SetVector2f("radius", radius);
+			shader->SetFloat("strength", strength);
+			shader->SetFloat("startAngle", startAngle);
+			shader->SetFloat("endAngle", endAngle);
+			shader->SetFloat("innerAlpha", innerAlpha);
+			shader->SetFloat("outerAlpha", outerAlpha);
+			shader->SetFloat("innerColor", innerColor);
+			shader->SetFloat("outerColor", outerColor);
+			shader->SetInt("antialias", antialias ? 1 : 0);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center, const Vector2f& radius, float maskScale, bool antialias) {
-    Shader* shader = SetupRenderShader("circleMaskShader");
-    if (shader) {
-        if (baseRenderer.UsesOpenGL())
-            shader->SetInt("surface", 0);
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
-            //shader->SetVector4f("maskColor", maskColor);
-            shader->SetVector2f("center", center);
-            shader->SetVector2f("radius", radius);
-            shader->SetFloat("maskScale", maskScale);
-            shader->SetInt("antialias", antialias ? 1 : 0);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadCircleMaskShader(const RGBAColor& color, const RGBAColor& maskColor, const Vector2f& center,
+												const Vector2f& radius, float maskScale, bool antialias)
+{
+	Shader* shader = SetupRenderShader("circleMaskShader");
+	if (shader) {
+		if (baseRenderer.UsesOpenGL())
+			shader->SetInt("surface", 0);
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("viewportSize", baseRenderer.ViewportSize());
+			//shader->SetVector4f("maskColor", maskColor);
+			shader->SetVector2f("center", center);
+			shader->SetVector2f("radius", radius);
+			shader->SetFloat("maskScale", maskScale);
+			shader->SetInt("antialias", antialias ? 1 : 0);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool premultiply) {
-    Shader* shader = SetupRenderShader("plainColor");
-    if (shader) {
-        const RGBAColor surfaceColor = m_decodeColors ? DecodeSRGB(color) : color;
-        shader->SetVector4f("surfaceColor", premultiply ? surfaceColor.Premultiplied() : surfaceColor);
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadPlainColorShader(const RGBAColor& color, bool premultiply)
+{
+	Shader* shader = SetupRenderShader("plainColor");
+	if (shader) {
+		const RGBAColor surfaceColor = m_decodeColors ? DecodeSRGB(color) : color;
+		shader->SetVector4f("surfaceColor", premultiply ? surfaceColor.Premultiplied() : surfaceColor);
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply) {
-    Shader* shader = SetupRenderShader("colorMesh");
+Shader* BaseShaderHandler::LoadColorMeshShader(bool premultiply)
+{
+	Shader* shader = SetupRenderShader("colorMesh");
 #if 0
     if (shader) {
         shader->SetInt("premultiply", premultiply ? 1 : 0);
     }
 #endif
-    return shader;
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool flipVertically, const Vector2f& tcOffset, const Vector2f& tcScale, bool premultiply, eColorEncoding textureEncoding) {
-    Shader* shader = SetupRenderShader("plainTexture");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        shader->SetInt("bEncodeTexture", (m_encodeSRGBTextures and (textureEncoding == ecSRGB) and (baseRenderer.GetActiveBuffer() == nullptr)) ? 1 : 0);
-        shader->SetInt("bDecodeColors", m_decodeColors ? 1 : 0);
-        shader->SetInt("bDecodeTexture", (m_decodeColors and (textureEncoding != ecSRGB)) ? 1 : 0);
-        if (not baseRenderer.IsShadowPass()) {
-            shader->SetVector2f("tcOffset", tcOffset);
-            shader->SetVector2f("tcScale", tcScale);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadPlainTextureShader(const RGBAColor& color, bool flipVertically, const Vector2f& tcOffset,
+												  const Vector2f& tcScale, bool premultiply, eColorEncoding textureEncoding)
+{
+	Shader* shader = SetupRenderShader("plainTexture");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		shader->SetInt("bEncodeTexture",
+					   (m_encodeSRGBTextures and (textureEncoding == ecSRGB) and (baseRenderer.GetActiveBuffer() == nullptr))
+						   ? 1
+						   : 0);
+		shader->SetInt("bDecodeColors", m_decodeColors ? 1 : 0);
+		shader->SetInt("bDecodeTexture", (m_decodeColors and (textureEncoding != ecSRGB)) ? 1 : 0);
+		if (not baseRenderer.IsShadowPass()) {
+			shader->SetVector2f("tcOffset", tcOffset);
+			shader->SetVector2f("tcScale", tcScale);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadColoredTextureShader(const RGBAColor& color, eColorEncoding textureEncoding) {
-    Shader* shader = SetupRenderShader("coloredTexture");
-    if (shader) {
-        shader->SetVector4f("surfaceColor", color);
-        shader->SetInt("bDecodeColors", m_decodeColors ? 1 : 0);
-        shader->SetInt("bDecodeTexture", (m_decodeColors and (textureEncoding != ecSRGB)) ? 1 : 0);
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadColoredTextureShader(const RGBAColor& color, eColorEncoding textureEncoding)
+{
+	Shader* shader = SetupRenderShader("coloredTexture");
+	if (shader) {
+		shader->SetVector4f("surfaceColor", color);
+		shader->SetInt("bDecodeColors", m_decodeColors ? 1 : 0);
+		shader->SetInt("bDecodeTexture", (m_decodeColors and (textureEncoding != ecSRGB)) ? 1 : 0);
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply) {
-    Shader* shader = SetupRenderShader("blurTexture");
-    if (shader) {
-        if (baseRenderer.UsesOpenGL())
-            shader->SetInt("surface", 0);
-        shader->SetVector4f("surfaceColor", color);
-        if (not baseRenderer.IsShadowPass()) {
-            SetGaussBlurParams(shader, blur);
-        //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadBlurTextureShader(const RGBAColor& color, const GaussBlurParams& blur, bool premultiply)
+{
+	Shader* shader = SetupRenderShader("blurTexture");
+	if (shader) {
+		if (baseRenderer.UsesOpenGL())
+			shader->SetInt("surface", 0);
+		shader->SetVector4f("surfaceColor", color);
+		if (not baseRenderer.IsShadowPass()) {
+			SetGaussBlurParams(shader, blur);
+			//shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, bool invert, const Vector2f& tcOffset, const Vector2f& tcScale) {
-    Shader* shader = SetupRenderShader("grayScale");
-    if (shader) {
-        if (baseRenderer.IsShadowPass())
-            shader->SetVector4f("surfaceColor", ColorData::White);
-        else {
-            if (baseRenderer.UsesOpenGL())
-                shader->SetInt("surface", 0);
-            shader->SetInt("invert", invert ? 1 : 0);
-            shader->SetVector2f("tcOffset", tcOffset);
-            shader->SetVector2f("tcScale", tcScale);
-            shader->SetFloat("brightness", brightness);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::LoadGrayscaleShader(float brightness, bool invert, const Vector2f& tcOffset, const Vector2f& tcScale)
+{
+	Shader* shader = SetupRenderShader("grayScale");
+	if (shader) {
+		if (baseRenderer.IsShadowPass())
+			shader->SetVector4f("surfaceColor", ColorData::White);
+		else {
+			if (baseRenderer.UsesOpenGL())
+				shader->SetInt("surface", 0);
+			shader->SetInt("invert", invert ? 1 : 0);
+			shader->SetVector2f("tcOffset", tcOffset);
+			shader->SetVector2f("tcScale", tcScale);
+			shader->SetFloat("brightness", brightness);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, const GaussBlurParams& blur) {
-    if (shader) {
-        if (baseRenderer.IsShadowPass())
-            shader->SetVector4f("surfaceColor", ColorData::White);
-        else {
-            shader->SetVector2f("texelSize", baseRenderer.TexelSize());
-            shader->SetInt("blurStrength", blur.strength);
-            shader->SetFloat("blurSpread", blur.spread);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::SetGaussBlurParams(Shader* shader, const GaussBlurParams& blur)
+{
+	if (shader) {
+		if (baseRenderer.IsShadowPass())
+			shader->SetVector4f("surfaceColor", ColorData::White);
+		else {
+			shader->SetVector2f("texelSize", baseRenderer.TexelSize());
+			shader->SetInt("blurStrength", blur.strength);
+			shader->SetFloat("blurSpread", blur.spread);
+		}
+	}
+	return shader;
 }
 
 
-Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, float aberration, int offsetType) { // offsetType: 0 - linear, 1 - radial
-    if (shader) {
-        if (baseRenderer.IsShadowPass())
-            shader->SetVector4f("surfaceColor", ColorData::White);
-        else {
-            shader->SetInt("offsetType", offsetType);
-            shader->SetFloat("aberration", aberration);
-        }
-    }
-    return shader;
+Shader* BaseShaderHandler::SetChromAbParams(Shader* shader, float aberration, int offsetType)
+{ // offsetType: 0 - linear, 1 - radial
+	if (shader) {
+		if (baseRenderer.IsShadowPass())
+			shader->SetVector4f("surfaceColor", ColorData::White);
+		else {
+			shader->SetInt("offsetType", offsetType);
+			shader->SetFloat("aberration", aberration);
+		}
+	}
+	return shader;
 }
 
 // =================================================================================================

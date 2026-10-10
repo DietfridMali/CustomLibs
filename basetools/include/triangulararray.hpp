@@ -5,14 +5,14 @@
 
 // =================================================================================================
 
-template<typename DATA_T>
+template <typename DATA_T>
 class TriangularArray {
 public:
 	int32_t				m_width;
 	AutoArray<DATA_T>	m_data;
-	TriangularArray() 
+	TriangularArray()
 		: m_width(0)
-	{ }
+	{}
 
 	inline void Create(int32_t width) {
 		m_width = width;
@@ -24,11 +24,15 @@ public:
 		m_width = 0;
 	}
 
-	inline void Fill(const DATA_T& value) noexcept {
+	inline void Fill(const DATA_T& value)
+	noexcept
+	{
 		m_data.Fill(value);
 	}
 
-	inline uint32_t Index(uint32_t x, uint32_t y) const noexcept {
+	inline uint32_t Index(uint32_t x, uint32_t y) const
+	noexcept
+	{
 		return (y > x) ? (y * (y + 1)) / 2 + x : (x * (x + 1)) / 2 + y;
 	}
 

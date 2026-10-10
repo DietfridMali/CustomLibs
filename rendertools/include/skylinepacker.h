@@ -22,12 +22,13 @@
 class SkylinePacker {
 public:
 	struct Place {
-		int	x{ 0 };
-		int	y{ 0 };
+		int x{ 0 };
+		int y{ 0 };
 	};
 
 	// Empties the contour and sets the page size. Everything else is meaningless before this.
-	void Reset(int width, int height) {
+	void Reset(int width, int height)
+	{
 		m_width = width;
 		m_height = height;
 		m_skyline.clear();
@@ -42,7 +43,8 @@ public:
 
 	// Places the rectangle and fills in where it went. false = it does not fit anywhere on this page,
 	// and the contour is unchanged.
-	bool Add(int width, int height, Place& place) {
+	bool Add(int width, int height, Place& place)
+	{
 		if ((width <= 0) or (height <= 0) or (width > m_width) or (height > m_height))
 			return false;
 
@@ -73,20 +75,24 @@ public:
 		return true;
 	}
 
-	inline int Width(void) const noexcept {
+	inline int Width(void) const
+	noexcept
+	{
 		return m_width;
 	}
 
-	inline int Height(void) const noexcept {
+	inline int Height(void) const
+	noexcept
+	{
 		return m_height;
 	}
 
 private:
 	// One horizontal piece of the contour: everything below (x .. x + width, y) is taken.
 	struct Node {
-		int	x{ 0 };
-		int	y{ 0 };
-		int	width{ 0 };
+		int x{ 0 };
+		int y{ 0 };
+		int width{ 0 };
 	};
 
 	std::vector<Node>	m_skyline;
@@ -95,7 +101,8 @@ private:
 
 	// Lowest edge at which a rectangle of this size fits with its left edge at node index, or -1 when
 	// it does not fit there. Const on purpose: asking must not change the contour.
-	int Fit(size_t index, int width, int height) const {
+	int Fit(size_t index, int width, int height) const
+	{
 		if (m_skyline[index].x + width > m_width)
 			return -1;
 
@@ -115,7 +122,8 @@ private:
 		return y;
 	}
 
-	void Insert(size_t index, int x, int y, int width, int height) {
+	void Insert(size_t index, int x, int y, int width, int height)
+	{
 		Node node;
 
 		node.x = x;
@@ -124,7 +132,7 @@ private:
 		m_skyline.insert(m_skyline.begin() + index, node);
 
 		// Whatever the new segment covers is shortened, and what it covers completely goes.
-		for (size_t i = index + 1; i < m_skyline.size(); ) {
+		for (size_t i = index + 1; i < m_skyline.size();) {
 			if (m_skyline[i].x >= x + width)
 				break;
 
@@ -139,7 +147,7 @@ private:
 		}
 		// Neighbours of equal height are one segment. Without this the list grows with every rectangle
 		// and the search over it gets slower and slower.
-		for (size_t i = 0; i + 1 < m_skyline.size(); ) {
+		for (size_t i = 0; i + 1 < m_skyline.size();) {
 			if (m_skyline[i].y == m_skyline[i + 1].y) {
 				m_skyline[i].width += m_skyline[i + 1].width;
 				m_skyline.erase(m_skyline.begin() + i + 1);

@@ -7,7 +7,7 @@
 #include <fstream>
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:4459)
+#pragma warning(disable : 4459)
 #endif
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -18,13 +18,13 @@
 #include "loghandler.h"
 #include "missingfiles.h"
 
-#define ANGLE_WEIGHTED_NORMALS  1
+#define ANGLE_WEIGHTED_NORMALS 1
 
 // This glb loader is specifically designed to load a particular model and fix inconsistencies in the model data.
-// It is not a general-purpose glb loader and does not support all features of the glTF format. 
-// It assumes that the model is a sphere with openings for a mouth and eyes and comes with shape keys for 
-// several animation targets. The sphere vertices all have a special color assigned that isn't used for the 
-// model in-game; this color is used to identify hull vertices. The renderer will replace this color with 
+// It is not a general-purpose glb loader and does not support all features of the glTF format.
+// It assumes that the model is a sphere with openings for a mouth and eyes and comes with shape keys for
+// several animation targets. The sphere vertices all have a special color assigned that isn't used for the
+// model in-game; this color is used to identify hull vertices. The renderer will replace this color with
 // the actual color of the smiley depending on the player color.
 // This loader corrects each animation target's hull shape by removing all dents and protrusions,
 // recalculates normals based on weighted face normals, and adjusts all morph targets accordingly.
@@ -35,1712 +35,1762 @@
 
 // =================================================================================================
 
-static Vector3f TransformPosition(Matrix4f m, Vector3f p) {
-    Vector4f h(p.x, p.y, p.z, 1.0f);
-    Vector4f r = m * h;
-    return Vector3f(r.x, r.y, r.z);
+static Vector3f TransformPosition(Matrix4f m, Vector3f p)
+{
+	Vector4f h(p.x, p.y, p.z, 1.0f);
+	Vector4f r = m * h;
+	return Vector3f(r.x, r.y, r.z);
 }
 
-static Vector3f TransformNormal(Matrix4f m, Vector3f n) {
-    glm::mat3 a = glm::transpose(glm::inverse(glm::mat3(m.m)));
-    glm::vec3 r = a * glm::vec3(n.x, n.y, n.z);
-    Vector3f out(r.x, r.y, r.z);
-    out.Normalize();
-    return out;
+static Vector3f TransformNormal(Matrix4f m, Vector3f n)
+{
+	glm::mat3	a = glm::transpose(glm::inverse(glm::mat3(m.m)));
+	glm::vec3	r = a * glm::vec3(n.x, n.y, n.z);
+	Vector3f	out(r.x, r.y, r.z);
+	out.Normalize();
+	return out;
 }
 
-static Vector3f TransformDelta(Matrix4f m, Vector3f d) {
-    glm::mat3 a = glm::mat3(m.m);
-    glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
-    return Vector3f(r.x, r.y, r.z);
+static Vector3f TransformDelta(Matrix4f m, Vector3f d)
+{
+	glm::mat3 a = glm::mat3(m.m);
+	glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
+	return Vector3f(r.x, r.y, r.z);
 }
 
-static Vector3f TransformNormalDelta(Matrix4f m, Vector3f d) {
-    glm::mat3 a = glm::transpose(glm::inverse(glm::mat3(m.m)));
-    glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
-    return Vector3f(r.x, r.y, r.z);
+static Vector3f TransformNormalDelta(Matrix4f m, Vector3f d)
+{
+	glm::mat3 a = glm::transpose(glm::inverse(glm::mat3(m.m)));
+	glm::vec3 r = a * glm::vec3(d.x, d.y, d.z);
+	return Vector3f(r.x, r.y, r.z);
 }
 
-static RGBAColor Modulate(const RGBAColor& a, const RGBAColor& b) {
-    return RGBAColor(a.R() * b.R(), a.G() * b.G(), a.B() * b.B(), a.A() * b.A());
+static RGBAColor Modulate(const RGBAColor& a, const RGBAColor& b)
+{
+	return RGBAColor(a.R() * b.R(), a.G() * b.G(), a.B() * b.B(), a.A() * b.A());
 }
 
-static GfxWrapMode WrapMode(int wrap) {
-    return (wrap == TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE) ? GfxWrapMode::ClampToEdge : GfxWrapMode::Repeat;
+static GfxWrapMode WrapMode(int wrap)
+{
+	return (wrap == TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE) ? GfxWrapMode::ClampToEdge : GfxWrapMode::Repeat;
 }
 
-static bool KeepImageData(tinygltf::Image* image, const int, std::string*, std::string*, int, int, const unsigned char* bytes, int size, void*) {
-    image->image.assign(bytes, bytes + size);
-    image->as_is = true;
-    return true;
+static bool KeepImageData(tinygltf::Image* image, const int, std::string*, std::string*, int, int, const unsigned char* bytes,
+						  int size, void*)
+{
+	image->image.assign(bytes, bytes + size);
+	image->as_is = true;
+	return true;
 }
 
-static bool IsImageFile(const std::string& filepath) {
-    std::string extension = std::filesystem::path(filepath).extension().string();
-    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-    for (const char* imageExtension : { ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".dds", ".ktx", ".ktx2", ".webp" }) {
-        if (extension == imageExtension)
-            return true;
-    }
-    return false;
+static bool IsImageFile(const std::string& filepath)
+{
+	std::string extension = std::filesystem::path(filepath).extension().string();
+	std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+	for (const char* imageExtension : { ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".dds", ".ktx", ".ktx2", ".webp" }) {
+		if (extension == imageExtension)
+			return true;
+	}
+	return false;
 }
 
-static bool ReadModelFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void* userData) {
-    if (IsImageFile(filepath))
-        return false;
-    return tinygltf::ReadWholeFile(out, err, filepath, userData);
+static bool ReadModelFile(std::vector<unsigned char>* out, std::string* err, const std::string& filepath, void* userData)
+{
+	if (IsImageFile(filepath))
+		return false;
+	return tinygltf::ReadWholeFile(out, err, filepath, userData);
 }
 
-static bool ReadImageFile(const std::filesystem::path& path, AutoArray<uint8_t>& image) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (not file)
-        return false;
-    std::streamsize size = file.tellg();
-    if (size <= 0)
-        return false;
-    image.Resize(int32_t(size));
-    file.seekg(0);
-    file.read(reinterpret_cast<char*>(image.DataPtr()), size);
-    if (file.good())
-        return true;
-    image.Clear();
-    return false;
+static bool ReadImageFile(const std::filesystem::path& path, AutoArray<uint8_t>& image)
+{
+	std::ifstream file(path, std::ios::binary | std::ios::ate);
+	if (not file)
+		return false;
+	std::streamsize size = file.tellg();
+	if (size <= 0)
+		return false;
+	image.Resize(int32_t(size));
+	file.seekg(0);
+	file.read(reinterpret_cast<char*>(image.DataPtr()), size);
+	if (file.good())
+		return true;
+	image.Clear();
+	return false;
 }
 
-static bool IsBinaryFile(const String& filename) {
-    std::ifstream f((const char*) filename, std::ios::binary);
-    char magic[4] = {};
-    f.read(magic, sizeof(magic));
-    return f.good() and (memcmp(magic, "glTF", sizeof(magic)) == 0);
-}
-
-// -------------------------------------------------------------------------------------------------
-
-int GLBLoader::CompareVertices(void* context, const Vector3f& v1, const Vector3f& v2) {
-    if (v1.X() < v2.X())
-        return -1;
-    if (v1.X() > v2.X())
-        return 1;
-    if (v1.Y() < v2.Y())
-        return -1;
-    if (v1.Y() > v2.Y())
-        return 1;
-    if (v1.Z() < v2.Z())
-        return -1;
-    if (v1.Z() > v2.Z())
-        return 1;
-    return 0;
+static bool IsBinaryFile(const String& filename)
+{
+	std::ifstream	f((const char*)filename, std::ios::binary);
+	char			magic[4] = {};
+	f.read(magic, sizeof(magic));
+	return f.good() and (memcmp(magic, "glTF", sizeof(magic)) == 0);
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::Reset(void) {
-    m_data.vertices.Clear();
-    m_data.colors.Clear();
-    m_data.normals.Clear();
-    m_data.texCoords.Clear();
-    m_data.shapeKeys.Clear();
-    m_data.indices.Clear();
-    m_data.parts.Clear();
-    m_data.materials.Clear();
-    m_data.images.Clear();
-    m_data.imageNames.Clear();
-    m_data.jointIndices.Clear();
-    m_data.jointNames.Clear();
-    m_isHullVertex.Clear();
-    m_hullVertexMap.Clear();
+int GLBLoader::CompareVertices(void* context, const Vector3f& v1, const Vector3f& v2)
+{
+	if (v1.X() < v2.X())
+		return -1;
+	if (v1.X() > v2.X())
+		return 1;
+	if (v1.Y() < v2.Y())
+		return -1;
+	if (v1.Y() > v2.Y())
+		return 1;
+	if (v1.Z() < v2.Z())
+		return -1;
+	if (v1.Z() > v2.Z())
+		return 1;
+	return 0;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::Load(const String& filename, bool fixModel) {
+void GLBLoader::Reset(void)
+{
+	m_data.vertices.Clear();
+	m_data.colors.Clear();
+	m_data.normals.Clear();
+	m_data.texCoords.Clear();
+	m_data.shapeKeys.Clear();
+	m_data.indices.Clear();
+	m_data.parts.Clear();
+	m_data.materials.Clear();
+	m_data.images.Clear();
+	m_data.imageNames.Clear();
+	m_data.jointIndices.Clear();
+	m_data.jointNames.Clear();
+	m_isHullVertex.Clear();
+	m_hullVertexMap.Clear();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+bool GLBLoader::Load(const String& filename, bool fixModel)
+{
 	if (LoadFromFile(filename + String(".bin")))
-        return true;
+		return true;
 
-    m_fixModel = fixModel;
-    m_loadSurfaceData = false;
-    if (not ParseFile(filename + String(".glb")))
-        return false;
-    if (m_fixModel)
-        StitchPrimitives();
-    SaveToFile(filename + String(".bin"));
-    ReleaseModel();
-    return true;
+	m_fixModel = fixModel;
+	m_loadSurfaceData = false;
+	if (not ParseFile(filename + String(".glb")))
+		return false;
+	if (m_fixModel)
+		StitchPrimitives();
+	SaveToFile(filename + String(".bin"));
+	ReleaseModel();
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadModel(const String& filename) {
-    m_fixModel = false;
-    m_loadSurfaceData = true;
-    if (not ParseFile(filename))
-        return false;
-    LoadMaterials();
-    LoadImages(std::filesystem::path(static_cast<const char*>(filename)).parent_path());
-    ReleaseModel();
-    return true;
+bool GLBLoader::LoadModel(const String& filename)
+{
+	m_fixModel = false;
+	m_loadSurfaceData = true;
+	if (not ParseFile(filename))
+		return false;
+	LoadMaterials();
+	LoadImages(std::filesystem::path(static_cast<const char*>(filename)).parent_path());
+	ReleaseModel();
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::ReleaseModel(void) {
-    m_model = tinygltf::Model();
-    m_isHullVertex.Clear();
-    m_hullVertexMap.Clear();
+void GLBLoader::ReleaseModel(void)
+{
+	m_model = tinygltf::Model();
+	m_isHullVertex.Clear();
+	m_hullVertexMap.Clear();
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ParseFile(const String& filename) {
-    Reset();
-    m_hullVertexMap.SetComparator(CompareVertices);
+bool GLBLoader::ParseFile(const String& filename)
+{
+	Reset();
+	m_hullVertexMap.SetComparator(CompareVertices);
 
-    tinygltf::TinyGLTF loader;
-    loader.SetImageLoader(KeepImageData, nullptr);
-    if (m_loadSurfaceData) {
-        tinygltf::FsCallbacks callbacks{ &tinygltf::FileExists, &tinygltf::ExpandFilePath, &ReadModelFile, &tinygltf::WriteWholeFile, &tinygltf::GetFileSizeInBytes, nullptr };
-        loader.SetFsCallbacks(callbacks);
-    }
-    std::string errorMsg;
-    std::string warningMsg;
+	tinygltf::TinyGLTF loader;
+	loader.SetImageLoader(KeepImageData, nullptr);
+	if (m_loadSurfaceData) {
+		tinygltf::FsCallbacks callbacks{ &tinygltf::FileExists, &tinygltf::ExpandFilePath, &ReadModelFile,
+										 &tinygltf::WriteWholeFile, &tinygltf::GetFileSizeInBytes, nullptr };
+		loader.SetFsCallbacks(callbacks);
+	}
+	std::string errorMsg;
+	std::string warningMsg;
 
-    std::string fn = filename;
+	std::string fn = filename;
 
-    bool isLoaded = IsBinaryFile(filename) ? loader.LoadBinaryFromFile(&m_model, &errorMsg, &warningMsg, fn) : loader.LoadASCIIFromFile(&m_model, &errorMsg, &warningMsg, fn);
-    if (not isLoaded) {
-        logHandler.Print("GLBLoader: loading '%s' failed: %s\n", (const char*) filename, errorMsg.c_str());
-        missingFiles.Report((const char*) filename);
-        return false;
-    }
+	bool isLoaded = IsBinaryFile(filename) ? loader.LoadBinaryFromFile(&m_model, &errorMsg, &warningMsg, fn)
+										   : loader.LoadASCIIFromFile(&m_model, &errorMsg, &warningMsg, fn);
+	if (not isLoaded) {
+		logHandler.Print("GLBLoader: loading '%s' failed: %s\n", (const char*)filename, errorMsg.c_str());
+		missingFiles.Report((const char*)filename);
+		return false;
+	}
 
-    if (m_model.scenes.empty()) {
-        logHandler.Print("GLBLoader: no scenes found\n");
-        return false;
-    }
+	if (m_model.scenes.empty()) {
+		logHandler.Print("GLBLoader: no scenes found\n");
+		return false;
+	}
 
-    int sceneIndex = m_model.defaultScene;
-    if (sceneIndex < 0 or sceneIndex >= static_cast<int>(m_model.scenes.size()))
+	int sceneIndex = m_model.defaultScene;
+	if (sceneIndex < 0 or sceneIndex >= static_cast<int>(m_model.scenes.size()))
 		sceneIndex = 0;
 
-    auto& scene = m_model.scenes[static_cast<size_t>(sceneIndex)];
+	auto& scene = m_model.scenes[static_cast<size_t>(sceneIndex)];
 
-    Matrix4f identity;
+	Matrix4f identity;
 
-    for (size_t i = 0; i < scene.nodes.size(); ++i) {
-        int nodeIndex = scene.nodes[i];
-        if (not AppendFromNode(nodeIndex, identity)) {
-            return false;
-        }
-    }
-    return true;
+	for (size_t i = 0; i < scene.nodes.size(); ++i) {
+		int nodeIndex = scene.nodes[i];
+		if (not AppendFromNode(nodeIndex, identity)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::LoadMaterials(void) {
-    m_data.materials.Resize(int32_t(m_model.materials.size()));
-    for (size_t i = 0; i < m_model.materials.size(); ++i) {
-        tinygltf::Material& source = m_model.materials[i];
-        MaterialData& material = m_data.materials[int32_t(i)];
-        material.doubleSided = source.doubleSided;
-        material.alphaCutoff = (source.alphaMode == "OPAQUE") ? 0.0f : float(source.alphaCutoff);
-        int textureIndex = source.pbrMetallicRoughness.baseColorTexture.index;
-        if ((textureIndex < 0) or (textureIndex >= int(m_model.textures.size())))
-            continue;
-        tinygltf::Texture& texture = m_model.textures[size_t(textureIndex)];
-        if ((texture.source >= 0) and (texture.source < int(m_model.images.size())))
-            material.imageIndex = texture.source;
-        if ((texture.sampler >= 0) and (texture.sampler < int(m_model.samplers.size()))) {
-            material.wrapU = WrapMode(m_model.samplers[size_t(texture.sampler)].wrapS);
-            material.wrapV = WrapMode(m_model.samplers[size_t(texture.sampler)].wrapT);
-        }
-    }
+void GLBLoader::LoadMaterials(void)
+{
+	m_data.materials.Resize(int32_t(m_model.materials.size()));
+	for (size_t i = 0; i < m_model.materials.size(); ++i) {
+		tinygltf::Material&	source = m_model.materials[i];
+		MaterialData&		material = m_data.materials[int32_t(i)];
+		material.doubleSided = source.doubleSided;
+		material.alphaCutoff = (source.alphaMode == "OPAQUE") ? 0.0f : float(source.alphaCutoff);
+		int textureIndex = source.pbrMetallicRoughness.baseColorTexture.index;
+		if ((textureIndex < 0) or (textureIndex >= int(m_model.textures.size())))
+			continue;
+		tinygltf::Texture& texture = m_model.textures[size_t(textureIndex)];
+		if ((texture.source >= 0) and (texture.source < int(m_model.images.size())))
+			material.imageIndex = texture.source;
+		if ((texture.sampler >= 0) and (texture.sampler < int(m_model.samplers.size()))) {
+			material.wrapU = WrapMode(m_model.samplers[size_t(texture.sampler)].wrapS);
+			material.wrapV = WrapMode(m_model.samplers[size_t(texture.sampler)].wrapT);
+		}
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::LoadImages(const std::filesystem::path& folder) {
-    AutoArray<uint8_t> isUsed;
-    isUsed.Resize(int32_t(m_model.images.size()));
-    isUsed.Fill(0);
-    for (auto& material : m_data.materials) {
-        if (material.imageIndex >= 0)
-            isUsed[material.imageIndex] = 1;
-    }
-    int32_t imageIndex = 0;
-    for (auto& source : m_model.images) {
-        AutoArray<uint8_t>* image = m_data.images.Append();
-        std::filesystem::path path = folder / std::filesystem::path(source.uri);
-        m_data.imageNames.Append(source.uri.empty() ? String("") : String(path.generic_string().c_str()));
-        if (not isUsed[imageIndex++])
-            continue;
-        if (not source.image.empty()) {
-            image->Resize(int32_t(source.image.size()));
-            memcpy(image->DataPtr(), source.image.data(), source.image.size());
-        }
-        else if (not source.uri.empty() and not ReadImageFile(path, *image)) {
-            logHandler.Print("GLBLoader: cannot read image '%s'\n", path.generic_string().c_str());
-            missingFiles.Report(path.generic_string().c_str());
-        }
-    }
+void GLBLoader::LoadImages(const std::filesystem::path& folder)
+{
+	AutoArray<uint8_t> isUsed;
+	isUsed.Resize(int32_t(m_model.images.size()));
+	isUsed.Fill(0);
+	for (auto& material : m_data.materials) {
+		if (material.imageIndex >= 0)
+			isUsed[material.imageIndex] = 1;
+	}
+	int32_t imageIndex = 0;
+	for (auto& source : m_model.images) {
+		AutoArray<uint8_t>*		image = m_data.images.Append();
+		std::filesystem::path	path = folder / std::filesystem::path(source.uri);
+		m_data.imageNames.Append(source.uri.empty() ? String("") : String(path.generic_string().c_str()));
+		if (not isUsed[imageIndex++])
+			continue;
+		if (not source.image.empty()) {
+			image->Resize(int32_t(source.image.size()));
+			memcpy(image->DataPtr(), source.image.data(), source.image.size());
+		}
+		else if (not source.uri.empty() and not ReadImageFile(path, *image)) {
+			logHandler.Print("GLBLoader: cannot read image '%s'\n", path.generic_string().c_str());
+			missingFiles.Report(path.generic_string().c_str());
+		}
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::CheckShapeKeyCount(int32_t targetCount) {
-    int32_t keyCount = m_data.shapeKeys.Length();
-    if (keyCount >= targetCount)
-        return;
+void GLBLoader::CheckShapeKeyCount(int32_t targetCount)
+{
+	int32_t keyCount = m_data.shapeKeys.Length();
+	if (keyCount >= targetCount)
+		return;
 
-    int32_t existingVertexCount = m_data.vertices.Length();
+	int32_t existingVertexCount = m_data.vertices.Length();
 
-    for (int32_t i = keyCount; i < targetCount; ++i) {
-        ShapeKeySet sk;
-        sk.name = String("shapeKey") + String(i);
-        sk.deltas.Resize(existingVertexCount, Vector3f(0.0f, 0.0f, 0.0f));
-        sk.normalDeltas.Resize(existingVertexCount, Vector3f(0.0f, 0.0f, 0.0f));
-        m_data.shapeKeys.Append(std::move(sk));
-    }
+	for (int32_t i = keyCount; i < targetCount; ++i) {
+		ShapeKeySet sk;
+		sk.name = String("shapeKey") + String(i);
+		sk.deltas.Resize(existingVertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+		sk.normalDeltas.Resize(existingVertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+		m_data.shapeKeys.Append(std::move(sk));
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM) {
-    if (nodeIndex < 0 or nodeIndex >= static_cast<int>(m_model.nodes.size())) {
-        logHandler.Print("GLBLoader: node index out of range\n");
-        return false;
-    }
+bool GLBLoader::AppendFromNode(int nodeIndex, Matrix4f parentM)
+{
+	if (nodeIndex < 0 or nodeIndex >= static_cast<int>(m_model.nodes.size())) {
+		logHandler.Print("GLBLoader: node index out of range\n");
+		return false;
+	}
 
-    auto& node = m_model.nodes[static_cast<size_t>(nodeIndex)];
+	auto& node = m_model.nodes[static_cast<size_t>(nodeIndex)];
 
-    Matrix4f localM = NodeLocalMatrix(node);
-    Matrix4f worldM = parentM * localM;
+	Matrix4f localM = NodeLocalMatrix(node);
+	Matrix4f worldM = parentM * localM;
 
-    if (node.mesh >= 0) {
-        if (not AppendMesh(node.mesh, worldM, node.skin)) {
-            return false;
-        }
-    }
+	if (node.mesh >= 0) {
+		if (not AppendMesh(node.mesh, worldM, node.skin)) {
+			return false;
+		}
+	}
 
-    for (size_t i = 0; i < node.children.size(); ++i) {
-        int childIndex = node.children[i];
-        if (not AppendFromNode(childIndex, worldM)) {
-            return false;
-        }
-    }
+	for (size_t i = 0; i < node.children.size(); ++i) {
+		int childIndex = node.children[i];
+		if (not AppendFromNode(childIndex, worldM)) {
+			return false;
+		}
+	}
 
-    return true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM, int skinIndex) {
-    if (meshIndex < 0 or meshIndex >= static_cast<int>(m_model.meshes.size())) {
-        logHandler.Print("GLBLoader: mesh index out of range\n");
-        return false;
-    }
+bool GLBLoader::AppendMesh(int meshIndex, Matrix4f worldM, int skinIndex)
+{
+	if (meshIndex < 0 or meshIndex >= static_cast<int>(m_model.meshes.size())) {
+		logHandler.Print("GLBLoader: mesh index out of range\n");
+		return false;
+	}
 
-    auto& mesh = m_model.meshes[static_cast<size_t>(meshIndex)];
+	auto& mesh = m_model.meshes[static_cast<size_t>(meshIndex)];
 
-    for (size_t p = 0; p < mesh.primitives.size(); ++p) {
-        auto& prim = mesh.primitives[p];
-        if (not AppendPrimitive(prim, worldM, skinIndex)) {
-            return false;
-        }
-    }
+	for (size_t p = 0; p < mesh.primitives.size(); ++p) {
+		auto& prim = mesh.primitives[p];
+		if (not AppendPrimitive(prim, worldM, skinIndex)) {
+			return false;
+		}
+	}
 
-    return true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM, int skinIndex) {
-    if (not ValidateTriangles(prim)) {
-        return false;
-    }
+bool GLBLoader::AppendPrimitive(tinygltf::Primitive& prim, Matrix4f worldM, int skinIndex)
+{
+	if (not ValidateTriangles(prim)) {
+		return false;
+	}
 
-    PrimitiveData in;
+	PrimitiveData in;
 
-    in.baseColor = PrimitiveBaseColor(m_model, prim.material, not m_loadSurfaceData);
+	in.baseColor = PrimitiveBaseColor(m_model, prim.material, not m_loadSurfaceData);
 	in.isHull = in.baseColor.A() < 0.0f;
 
-    if (not LoadVertices(prim, in))
-        return false;
-    if (not LoadIndices(prim, in))
-        return false;
-    if (m_fixModel)
-        WeldVertices(in);
-    if (not LoadTexCoords(prim, in))
-        return false;
-    if (not LoadColors(prim, in))
-        return false;
-    if (not LoadJoints(prim, in, skinIndex))
-        return false;
-    if (not LoadMorphTargets(prim, in))
-        return false;
-    if (m_fixModel) {
-        CorrectMorphTargets(in);
-        if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals))
-            return false;
-        in.haveNormals = true;
-        if (not ComputeMorphNormals(in))
-            return false;
-    }
-    else {
-        if (not LoadNormals(prim, in))
-            return false;
-        }
+	if (not LoadVertices(prim, in))
+		return false;
+	if (not LoadIndices(prim, in))
+		return false;
+	if (m_fixModel)
+		WeldVertices(in);
+	if (not LoadTexCoords(prim, in))
+		return false;
+	if (not LoadColors(prim, in))
+		return false;
+	if (not LoadJoints(prim, in, skinIndex))
+		return false;
+	if (not LoadMorphTargets(prim, in))
+		return false;
+	if (m_fixModel) {
+		CorrectMorphTargets(in);
+		if (not ComputeNormals(in.baseVertices, in.indices, in.baseNormals))
+			return false;
+		in.haveNormals = true;
+		if (not ComputeMorphNormals(in))
+			return false;
+	}
+	else {
+		if (not LoadNormals(prim, in))
+			return false;
+	}
 
-    ReserveOutput(in);
+	ReserveOutput(in);
 
-    AutoArray<ShapeKeySet*> keyPtrs;
-    BuildShapeKeyPointers(keyPtrs);
+	AutoArray<ShapeKeySet*> keyPtrs;
+	BuildShapeKeyPointers(keyPtrs);
 
-    PartData part;
-    part.firstVertex = m_data.vertices.Length();
-    part.firstIndex = m_data.indices.Length();
-    part.materialIndex = ((prim.material >= 0) and (prim.material < int(m_model.materials.size()))) ? prim.material : -1;
+	PartData part;
+	part.firstVertex = m_data.vertices.Length();
+	part.firstIndex = m_data.indices.Length();
+	part.materialIndex = ((prim.material >= 0) and (prim.material < int(m_model.materials.size()))) ? prim.material : -1;
 
-    if (not (m_loadSurfaceData ? AppendIndexedTriangles(in, worldM, keyPtrs) : AppendTriangles(in, worldM, keyPtrs))) {
-        return false;
-    }
+	if (not (m_loadSurfaceData ? AppendIndexedTriangles(in, worldM, keyPtrs) : AppendTriangles(in, worldM, keyPtrs))) {
+		return false;
+	}
 
-    part.vertexCount = m_data.vertices.Length() - part.firstVertex;
-    part.indexCount = m_data.indices.Length() - part.firstIndex;
-    m_data.parts.Append(part);
-    return true;
+	part.vertexCount = m_data.vertices.Length() - part.firstVertex;
+	part.indexCount = m_data.indices.Length() - part.firstIndex;
+	m_data.parts.Append(part);
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ValidateTriangles(tinygltf::Primitive& prim) {
-    int mode = prim.mode;
-    if (mode == -1) {
-        mode = 4;
-    }
+bool GLBLoader::ValidateTriangles(tinygltf::Primitive& prim)
+{
+	int mode = prim.mode;
+	if (mode == -1) {
+		mode = 4;
+	}
 
-    if (mode != 4) {
-        logHandler.Print("GLBLoader: primitive mode is not TRIANGLES\n");
-        return false;
-    }
+	if (mode != 4) {
+		logHandler.Print("GLBLoader: primitive mode is not TRIANGLES\n");
+		return false;
+	}
 
-    return true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveData& in) {
-    auto itPos = prim.attributes.find("POSITION");
-    if (itPos == prim.attributes.end()) {
-        logHandler.Print("GLBLoader: primitive POSITION missing\n");
-        return false;
-    }
+bool GLBLoader::LoadVertices(tinygltf::Primitive& prim, PrimitiveData& in)
+{
+	auto itPos = prim.attributes.find("POSITION");
+	if (itPos == prim.attributes.end()) {
+		logHandler.Print("GLBLoader: primitive POSITION missing\n");
+		return false;
+	}
 
-    if (not ReadAccessorVec3Float(m_model, itPos->second, in.baseVertices))
-        return false;
-    if (in.baseVertices.IsEmpty()) {
-        logHandler.Print("GLBLoader: primitive POSITION empty\n");
-        return false;
-    }
-    return true;
+	if (not ReadAccessorVec3Float(m_model, itPos->second, in.baseVertices))
+		return false;
+	if (in.baseVertices.IsEmpty()) {
+		logHandler.Print("GLBLoader: primitive POSITION empty\n");
+		return false;
+	}
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::WeldVertices(PrimitiveData& in) {
-    AVLTree<Vector3f, int32_t> vertexMap;
-    vertexMap.Clear();
-    vertexMap.SetComparator(CompareVertices);
+void GLBLoader::WeldVertices(PrimitiveData& in)
+{
+	AVLTree<Vector3f, int32_t> vertexMap;
+	vertexMap.Clear();
+	vertexMap.SetComparator(CompareVertices);
 
-    AutoArray<int32_t> indexMap;
-    int32_t vertexCount = in.baseVertices.Length();
-    indexMap.Resize(vertexCount);
+	AutoArray<int32_t>	indexMap;
+	int32_t				vertexCount = in.baseVertices.Length();
+	indexMap.Resize(vertexCount);
 
-    for (int32_t i = 0; i < vertexCount; ++i) {
-        Vector3f v = in.baseVertices[i];
-        int32_t* indexPtr = vertexMap.Find(v);
-        if (indexPtr)
-            indexMap[i] = *indexPtr;
-        else {
-            vertexMap.Insert(v, i);
-            indexMap[i] = i;
-        }
-    }
+	for (int32_t i = 0; i < vertexCount; ++i) {
+		Vector3f v = in.baseVertices[i];
+		int32_t* indexPtr = vertexMap.Find(v);
+		if (indexPtr)
+			indexMap[i] = *indexPtr;
+		else {
+			vertexMap.Insert(v, i);
+			indexMap[i] = i;
+		}
+	}
 
-    int32_t indexCount = in.indices.Length();
-    for (int32_t i = 0; i < indexCount; ++i) {
-        uint32_t idx = in.indices[i];
-        in.indices[i] = static_cast<uint32_t>(indexMap[static_cast<int32_t>(idx)]);
-    }
+	int32_t indexCount = in.indices.Length();
+	for (int32_t i = 0; i < indexCount; ++i) {
+		uint32_t idx = in.indices[i];
+		in.indices[i] = static_cast<uint32_t>(indexMap[static_cast<int32_t>(idx)]);
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveData& in) {
-    in.baseNormals.Clear();
-    in.haveNormals = false;
+bool GLBLoader::LoadNormals(tinygltf::Primitive& prim, PrimitiveData& in)
+{
+	in.baseNormals.Clear();
+	in.haveNormals = false;
 
-    auto itNormal = prim.attributes.find("NORMAL");
-    if (itNormal == prim.attributes.end())
-        return true;
-    if (not ReadAccessorVec3Float(m_model, itNormal->second, in.baseNormals))
-        return false;
-    if (in.baseNormals.Length() != in.baseVertices.Length()) {
-        logHandler.Print("GLBLoader: NORMAL count does not match POSITION count\n");
-        return false;
-    }
-    in.haveNormals = true;
-    return true;
+	auto itNormal = prim.attributes.find("NORMAL");
+	if (itNormal == prim.attributes.end())
+		return true;
+	if (not ReadAccessorVec3Float(m_model, itNormal->second, in.baseNormals))
+		return false;
+	if (in.baseNormals.Length() != in.baseVertices.Length()) {
+		logHandler.Print("GLBLoader: NORMAL count does not match POSITION count\n");
+		return false;
+	}
+	in.haveNormals = true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadTexCoords(tinygltf::Primitive& prim, PrimitiveData& in) {
-    in.baseTexCoords.Clear();
-    in.haveTexCoords = false;
+bool GLBLoader::LoadTexCoords(tinygltf::Primitive& prim, PrimitiveData& in)
+{
+	in.baseTexCoords.Clear();
+	in.haveTexCoords = false;
 
-    if (not m_loadSurfaceData)
-        return true;
-    int texCoordSet = 0;
-    if ((prim.material >= 0) and (prim.material < int(m_model.materials.size())))
-        texCoordSet = m_model.materials[size_t(prim.material)].pbrMetallicRoughness.baseColorTexture.texCoord;
-    auto itTexCoord = prim.attributes.find("TEXCOORD_" + std::to_string(texCoordSet));
-    if (itTexCoord == prim.attributes.end())
-        return true;
-    AutoArray<float> values;
-    int32_t componentCount;
-    if (not ReadAccessorFloats(m_model, itTexCoord->second, values, componentCount))
-        return false;
-    if (componentCount != 2) {
-        logHandler.Print("GLBLoader: TEXCOORD accessor is not VEC2\n");
-        return false;
-    }
-    int32_t count = values.Length() / 2;
-    if (count != in.baseVertices.Length()) {
-        logHandler.Print("GLBLoader: TEXCOORD count does not match POSITION count\n");
-        return false;
-    }
-    in.baseTexCoords.Resize(count);
-    for (int32_t i = 0; i < count; ++i)
-        in.baseTexCoords[i] = TexCoord(values[2 * i], values[2 * i + 1]);
-    in.haveTexCoords = true;
-    return true;
+	if (not m_loadSurfaceData)
+		return true;
+	int texCoordSet = 0;
+	if ((prim.material >= 0) and (prim.material < int(m_model.materials.size())))
+		texCoordSet = m_model.materials[size_t(prim.material)].pbrMetallicRoughness.baseColorTexture.texCoord;
+	auto itTexCoord = prim.attributes.find("TEXCOORD_" + std::to_string(texCoordSet));
+	if (itTexCoord == prim.attributes.end())
+		return true;
+	AutoArray<float>	values;
+	int32_t				componentCount;
+	if (not ReadAccessorFloats(m_model, itTexCoord->second, values, componentCount))
+		return false;
+	if (componentCount != 2) {
+		logHandler.Print("GLBLoader: TEXCOORD accessor is not VEC2\n");
+		return false;
+	}
+	int32_t count = values.Length() / 2;
+	if (count != in.baseVertices.Length()) {
+		logHandler.Print("GLBLoader: TEXCOORD count does not match POSITION count\n");
+		return false;
+	}
+	in.baseTexCoords.Resize(count);
+	for (int32_t i = 0; i < count; ++i)
+		in.baseTexCoords[i] = TexCoord(values[2 * i], values[2 * i + 1]);
+	in.haveTexCoords = true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadColors(tinygltf::Primitive& prim, PrimitiveData& in) {
-    in.baseColors.Clear();
-    in.haveColors = false;
+bool GLBLoader::LoadColors(tinygltf::Primitive& prim, PrimitiveData& in)
+{
+	in.baseColors.Clear();
+	in.haveColors = false;
 
-    if (not m_loadSurfaceData)
-        return true;
-    auto itColor = prim.attributes.find("COLOR_0");
-    if (itColor == prim.attributes.end())
-        return true;
-    AutoArray<float> values;
-    int32_t componentCount;
-    if (not ReadAccessorFloats(m_model, itColor->second, values, componentCount))
-        return false;
-    if ((componentCount != 3) and (componentCount != 4)) {
-        logHandler.Print("GLBLoader: COLOR accessor is neither VEC3 nor VEC4\n");
-        return false;
-    }
-    int32_t count = values.Length() / componentCount;
-    if (count != in.baseVertices.Length()) {
-        logHandler.Print("GLBLoader: COLOR count does not match POSITION count\n");
-        return false;
-    }
-    in.baseColors.Resize(count);
-    for (int32_t i = 0; i < count; ++i) {
-        const float* c = values.DataPtr(i * componentCount);
-        in.baseColors[i] = RGBAColor(c[0], c[1], c[2], (componentCount == 4) ? c[3] : 1.0f);
-    }
-    in.haveColors = true;
-    return true;
+	if (not m_loadSurfaceData)
+		return true;
+	auto itColor = prim.attributes.find("COLOR_0");
+	if (itColor == prim.attributes.end())
+		return true;
+	AutoArray<float>	values;
+	int32_t				componentCount;
+	if (not ReadAccessorFloats(m_model, itColor->second, values, componentCount))
+		return false;
+	if ((componentCount != 3) and (componentCount != 4)) {
+		logHandler.Print("GLBLoader: COLOR accessor is neither VEC3 nor VEC4\n");
+		return false;
+	}
+	int32_t count = values.Length() / componentCount;
+	if (count != in.baseVertices.Length()) {
+		logHandler.Print("GLBLoader: COLOR count does not match POSITION count\n");
+		return false;
+	}
+	in.baseColors.Resize(count);
+	for (int32_t i = 0; i < count; ++i) {
+		const float* c = values.DataPtr(i * componentCount);
+		in.baseColors[i] = RGBAColor(c[0], c[1], c[2], (componentCount == 4) ? c[3] : 1.0f);
+	}
+	in.haveColors = true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadJoints(tinygltf::Primitive& prim, PrimitiveData& in, int skinIndex) {
-    in.baseJoints.Clear();
-    in.haveJoints = false;
+bool GLBLoader::LoadJoints(tinygltf::Primitive& prim, PrimitiveData& in, int skinIndex)
+{
+	in.baseJoints.Clear();
+	in.haveJoints = false;
 
-    if ((skinIndex < 0) or (skinIndex >= static_cast<int>(m_model.skins.size())))
-        return true;
-    auto itJoints = prim.attributes.find("JOINTS_0");
-    if (itJoints == prim.attributes.end())
-        return true;
+	if ((skinIndex < 0) or (skinIndex >= static_cast<int>(m_model.skins.size())))
+		return true;
+	auto itJoints = prim.attributes.find("JOINTS_0");
+	if (itJoints == prim.attributes.end())
+		return true;
 
-    auto& skin = m_model.skins[static_cast<size_t>(skinIndex)];
-    int32_t skinJointCount = static_cast<int32_t>(skin.joints.size());
-    AutoArray<int32_t> jointIds;
-    jointIds.Resize(skinJointCount);
-    for (int32_t j = 0; j < skinJointCount; ++j) {
-        int nodeIndex = skin.joints[static_cast<size_t>(j)];
-        if ((nodeIndex < 0) or (nodeIndex >= static_cast<int>(m_model.nodes.size()))) {
-            logHandler.Print("GLBLoader: skin joint node index out of range\n");
-            return false;
-        }
-        jointIds[j] = JointId(String(m_model.nodes[static_cast<size_t>(nodeIndex)].name.c_str()));
-    }
+	auto&				skin = m_model.skins[static_cast<size_t>(skinIndex)];
+	int32_t				skinJointCount = static_cast<int32_t>(skin.joints.size());
+	AutoArray<int32_t>	jointIds;
+	jointIds.Resize(skinJointCount);
+	for (int32_t j = 0; j < skinJointCount; ++j) {
+		int nodeIndex = skin.joints[static_cast<size_t>(j)];
+		if ((nodeIndex < 0) or (nodeIndex >= static_cast<int>(m_model.nodes.size()))) {
+			logHandler.Print("GLBLoader: skin joint node index out of range\n");
+			return false;
+		}
+		jointIds[j] = JointId(String(m_model.nodes[static_cast<size_t>(nodeIndex)].name.c_str()));
+	}
 
-    AutoArray<float> joints;
-    int32_t jointComponents;
-    if (not ReadAccessorFloats(m_model, itJoints->second, joints, jointComponents))
-        return false;
-    int32_t count = joints.Length() / jointComponents;
-    if (count != in.baseVertices.Length()) {
-        logHandler.Print("GLBLoader: JOINTS count does not match POSITION count\n");
-        return false;
-    }
+	AutoArray<float>	joints;
+	int32_t				jointComponents;
+	if (not ReadAccessorFloats(m_model, itJoints->second, joints, jointComponents))
+		return false;
+	int32_t count = joints.Length() / jointComponents;
+	if (count != in.baseVertices.Length()) {
+		logHandler.Print("GLBLoader: JOINTS count does not match POSITION count\n");
+		return false;
+	}
 
-    AutoArray<float> weights;
-    int32_t weightComponents = 0;
-    auto itWeights = prim.attributes.find("WEIGHTS_0");
-    if (itWeights != prim.attributes.end()) {
-        if (not ReadAccessorFloats(m_model, itWeights->second, weights, weightComponents))
-            return false;
-        if ((weightComponents != jointComponents) or (weights.Length() != joints.Length())) {
-            logHandler.Print("GLBLoader: WEIGHTS layout does not match JOINTS layout\n");
-            return false;
-        }
-    }
+	AutoArray<float>	weights;
+	int32_t				weightComponents = 0;
+	auto				itWeights = prim.attributes.find("WEIGHTS_0");
+	if (itWeights != prim.attributes.end()) {
+		if (not ReadAccessorFloats(m_model, itWeights->second, weights, weightComponents))
+			return false;
+		if ((weightComponents != jointComponents) or (weights.Length() != joints.Length())) {
+			logHandler.Print("GLBLoader: WEIGHTS layout does not match JOINTS layout\n");
+			return false;
+		}
+	}
 
-    in.baseJoints.Resize(count);
-    for (int32_t i = 0; i < count; ++i) {
-        int32_t dominant = 0;
-        for (int32_t c = 1; c < weightComponents; ++c) {
-            if (weights[i * weightComponents + c] > weights[i * weightComponents + dominant])
-                dominant = c;
-        }
-        int32_t joint = static_cast<int32_t>(joints[i * jointComponents + dominant]);
-        if ((joint < 0) or (joint >= skinJointCount)) {
-            logHandler.Print("GLBLoader: joint index out of range\n");
-            return false;
-        }
-        in.baseJoints[i] = jointIds[joint];
-    }
-    in.haveJoints = true;
-    return true;
+	in.baseJoints.Resize(count);
+	for (int32_t i = 0; i < count; ++i) {
+		int32_t dominant = 0;
+		for (int32_t c = 1; c < weightComponents; ++c) {
+			if (weights[i * weightComponents + c] > weights[i * weightComponents + dominant])
+				dominant = c;
+		}
+		int32_t joint = static_cast<int32_t>(joints[i * jointComponents + dominant]);
+		if ((joint < 0) or (joint >= skinJointCount)) {
+			logHandler.Print("GLBLoader: joint index out of range\n");
+			return false;
+		}
+		in.baseJoints[i] = jointIds[joint];
+	}
+	in.haveJoints = true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-int32_t GLBLoader::JointId(const String& name) {
-    int32_t id = FindJoint(name);
-    if (id >= 0)
-        return id;
-    m_data.jointNames.Append(String(name));
-    return m_data.jointNames.Length() - 1;
+int32_t GLBLoader::JointId(const String& name)
+{
+	int32_t id = FindJoint(name);
+	if (id >= 0)
+		return id;
+	m_data.jointNames.Append(String(name));
+	return m_data.jointNames.Length() - 1;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-int32_t GLBLoader::FindJoint(const String& name) noexcept {
-    int32_t id = 0;
-    for (auto& jointName : m_data.jointNames) {
-        if (jointName == name)
-            return id;
-        ++id;
-    }
-    return -1;
+int32_t GLBLoader::FindJoint(const String& name)
+noexcept
+{
+	int32_t id = 0;
+	for (auto& jointName : m_data.jointNames) {
+		if (jointName == name)
+			return id;
+		++id;
+	}
+	return -1;
 }
 
 // -------------------------------------------------------------------------------------------------
 
 #if ANGLE_WEIGHTED_NORMALS
 
-static float CornerAngle(Vector3f a, Vector3f b) {
-    Vector3f c = a.Cross(b);
-    float sinLen2 = c.Dot(c);
-    float sinLen = (sinLen2 > 0.0f) ? std::sqrt(sinLen2) : 0.0f;
-    float cosVal = a.Dot(b);
-    return std::atan2(sinLen, cosVal);
+static float CornerAngle(Vector3f a, Vector3f b)
+{
+	Vector3f	c = a.Cross(b);
+	float		sinLen2 = c.Dot(c);
+	float		sinLen = (sinLen2 > 0.0f) ? std::sqrt(sinLen2) : 0.0f;
+	float		cosVal = a.Dot(b);
+	return std::atan2(sinLen, cosVal);
 }
 
 
-bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals) {
-    int32_t vertexCount = vertices.Length();
-    if (vertexCount <= 0) {
-        logHandler.Print("GLBLoader: no vertices for normal computation\n");
-        return false;
-    }
+bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals)
+{
+	int32_t vertexCount = vertices.Length();
+	if (vertexCount <= 0) {
+		logHandler.Print("GLBLoader: no vertices for normal computation\n");
+		return false;
+	}
 
-    if ((indices.Length() % 3) != 0) {
-        logHandler.Print("GLBLoader: index count not divisible by 3 in ComputeNormals\n");
-        return false;
-    }
+	if ((indices.Length() % 3) != 0) {
+		logHandler.Print("GLBLoader: index count not divisible by 3 in ComputeNormals\n");
+		return false;
+	}
 
-    normals.Resize(vertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+	normals.Resize(vertexCount, Vector3f(0.0f, 0.0f, 0.0f));
 
-    int32_t triCount = indices.Length() / 3;
+	int32_t triCount = indices.Length() / 3;
 
-    for (int32_t t = 0; t < triCount; ++t) {
-        uint32_t i0 = indices[t * 3 + 0];
-        uint32_t i1 = indices[t * 3 + 1];
-        uint32_t i2 = indices[t * 3 + 2];
+	for (int32_t t = 0; t < triCount; ++t) {
+		uint32_t i0 = indices[t * 3 + 0];
+		uint32_t i1 = indices[t * 3 + 1];
+		uint32_t i2 = indices[t * 3 + 2];
 
-        if (i0 >= static_cast<uint32_t>(vertexCount) or
-            i1 >= static_cast<uint32_t>(vertexCount) or
-            i2 >= static_cast<uint32_t>(vertexCount)) {
-            logHandler.Print("GLBLoader: index normals of range in ComputeNormals\n");
-            return false;
-        }
+		if (i0 >= static_cast<uint32_t>(vertexCount) or
+			i1 >= static_cast<uint32_t>(vertexCount) or
+			i2 >= static_cast<uint32_t>(vertexCount)) {
+			logHandler.Print("GLBLoader: index normals of range in ComputeNormals\n");
+			return false;
+		}
 
-        Vector3f p0 = vertices[static_cast<int32_t>(i0)];
-        Vector3f p1 = vertices[static_cast<int32_t>(i1)];
-        Vector3f p2 = vertices[static_cast<int32_t>(i2)];
+		Vector3f p0 = vertices[static_cast<int32_t>(i0)];
+		Vector3f p1 = vertices[static_cast<int32_t>(i1)];
+		Vector3f p2 = vertices[static_cast<int32_t>(i2)];
 
-        Vector3f e01(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
-        Vector3f e02(p2.x - p0.x, p2.y - p0.y, p2.z - p0.z);
-        Vector3f e10(p0.x - p1.x, p0.y - p1.y, p0.z - p1.z);
-        Vector3f e12(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
-        Vector3f e20(p0.x - p2.x, p0.y - p2.y, p0.z - p2.z);
-        Vector3f e21(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
+		Vector3f e01(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
+		Vector3f e02(p2.x - p0.x, p2.y - p0.y, p2.z - p0.z);
+		Vector3f e10(p0.x - p1.x, p0.y - p1.y, p0.z - p1.z);
+		Vector3f e12(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z);
+		Vector3f e20(p0.x - p2.x, p0.y - p2.y, p0.z - p2.z);
+		Vector3f e21(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z);
 
-        Vector3f faceCross = e01.Cross(e02);
-        float faceCrossLen2 = faceCross.Dot(faceCross);
-        if (faceCrossLen2 <= 1e-20f) {
-            continue;
-        }
+		Vector3f	faceCross = e01.Cross(e02);
+		float		faceCrossLen2 = faceCross.Dot(faceCross);
+		if (faceCrossLen2 <= 1e-20f) {
+			continue;
+		}
 
-        float faceCrossLen = std::sqrt(faceCrossLen2);
-        Vector3f faceNormal(
-            faceCross.x / faceCrossLen,
-            faceCross.y / faceCrossLen,
-            faceCross.z / faceCrossLen
-        );
+		float		faceCrossLen = std::sqrt(faceCrossLen2);
+		Vector3f	faceNormal(
+			faceCross.x / faceCrossLen,
+			faceCross.y / faceCrossLen,
+			faceCross.z / faceCrossLen);
 
-        float a0 = CornerAngle(e01, e02);
-        float a1 = CornerAngle(e12, e10);
-        float a2 = CornerAngle(e20, e21);
+		float a0 = CornerAngle(e01, e02);
+		float a1 = CornerAngle(e12, e10);
+		float a2 = CornerAngle(e20, e21);
 
-        normals[static_cast<int32_t>(i0)] = normals[static_cast<int32_t>(i0)] + Vector3f(
-            faceNormal.x * a0,
-            faceNormal.y * a0,
-            faceNormal.z * a0
-        );
-        normals[static_cast<int32_t>(i1)] = normals[static_cast<int32_t>(i1)] + Vector3f(
-            faceNormal.x * a1,
-            faceNormal.y * a1,
-            faceNormal.z * a1
-        );
-        normals[static_cast<int32_t>(i2)] = normals[static_cast<int32_t>(i2)] + Vector3f(
-            faceNormal.x * a2,
-            faceNormal.y * a2,
-            faceNormal.z * a2
-        );
-    }
+		normals[static_cast<int32_t>(i0)] =
+			normals[static_cast<int32_t>(i0)] + Vector3f(faceNormal.x * a0, faceNormal.y * a0, faceNormal.z * a0);
+		normals[static_cast<int32_t>(i1)] =
+			normals[static_cast<int32_t>(i1)] + Vector3f(faceNormal.x * a1, faceNormal.y * a1, faceNormal.z * a1);
+		normals[static_cast<int32_t>(i2)] =
+			normals[static_cast<int32_t>(i2)] + Vector3f(faceNormal.x * a2, faceNormal.y * a2, faceNormal.z * a2);
+	}
 
-    for (int32_t i = 0; i < vertexCount; ++i) {
-        float len2 = normals[i].Dot(normals[i]);
-        if (len2 > 1e-24f) {
-            normals[i].Normalize();
-        }
-        else {
-            normals[i] = Vector3f(0.0f, 0.0f, 1.0f);
-        }
-    }
+	for (int32_t i = 0; i < vertexCount; ++i) {
+		float len2 = normals[i].Dot(normals[i]);
+		if (len2 > 1e-24f) {
+			normals[i].Normalize();
+		}
+		else {
+			normals[i] = Vector3f(0.0f, 0.0f, 1.0f);
+		}
+	}
 
-    return true;
+	return true;
 }
 
 #else
 
-bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals) {
-    int32_t vertexCount = vertices.Length();
-    if (vertexCount <= 0) {
-        logHandler.Print("GLBLoader: no vertices for normal computation\n");
-        return false;
-    }
+bool GLBLoader::ComputeNormals(const AutoArray<Vector3f>& vertices, const AutoArray<uint32_t>& indices, AutoArray<Vector3f>& normals)
+{
+	int32_t vertexCount = vertices.Length();
+	if (vertexCount <= 0) {
+		logHandler.Print("GLBLoader: no vertices for normal computation\n");
+		return false;
+	}
 
-    if ((indices.Length() % 3) != 0) {
-        logHandler.Print("GLBLoader: index count not divisible by 3 in ComputeNormals\n");
-        return false;
-    }
+	if ((indices.Length() % 3) != 0) {
+		logHandler.Print("GLBLoader: index count not divisible by 3 in ComputeNormals\n");
+		return false;
+	}
 
-    normals.Resize(vertexCount, Vector3f(0.0f, 0.0f, 0.0f));
+	normals.Resize(vertexCount, Vector3f(0.0f, 0.0f, 0.0f));
 
-    int32_t triCount = indices.Length() / 3;
+	int32_t triCount = indices.Length() / 3;
 
-    for (int32_t t = 0; t < triCount; ++t) {
-        uint32_t i0 = indices[t * 3 + 0];
-        uint32_t i1 = indices[t * 3 + 1];
-        uint32_t i2 = indices[t * 3 + 2];
+	for (int32_t t = 0; t < triCount; ++t) {
+		uint32_t i0 = indices[t * 3 + 0];
+		uint32_t i1 = indices[t * 3 + 1];
+		uint32_t i2 = indices[t * 3 + 2];
 
-        if (i0 >= static_cast<uint32_t>(vertexCount) or
-            i1 >= static_cast<uint32_t>(vertexCount) or
-            i2 >= static_cast<uint32_t>(vertexCount)) {
-            logHandler.Print("GLBLoader: index normals of range in ComputeNormals\n");
-            return false;
-        }
+		if (i0 >= static_cast<uint32_t>(vertexCount) or
+			i1 >= static_cast<uint32_t>(vertexCount) or
+			i2 >= static_cast<uint32_t>(vertexCount)) {
+			logHandler.Print("GLBLoader: index normals of range in ComputeNormals\n");
+			return false;
+		}
 
-        Vector3f p0 = vertices[static_cast<int32_t>(i0)];
-        Vector3f p1 = vertices[static_cast<int32_t>(i1)];
-        Vector3f p2 = vertices[static_cast<int32_t>(i2)];
+		Vector3f p0 = vertices[static_cast<int32_t>(i0)];
+		Vector3f p1 = vertices[static_cast<int32_t>(i1)];
+		Vector3f p2 = vertices[static_cast<int32_t>(i2)];
 
-        Vector3f e0(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
-        Vector3f e1(p2.x - p0.x, p2.y - p0.y, p2.z - p0.z);
+		Vector3f e0(p1.x - p0.x, p1.y - p0.y, p1.z - p0.z);
+		Vector3f e1(p2.x - p0.x, p2.y - p0.y, p2.z - p0.z);
 
-        Vector3f  c = e0.Cross(e1);
-        float l2 = c.Dot(c);
-        if (l2 <= 1e-20f) {
-            continue;
-        }
+		Vector3f	c = e0.Cross(e1);
+		float		l2 = c.Dot(c);
+		if (l2 <= 1e-20f) {
+			continue;
+		}
 
-        Vector3f n(c.x, c.y, c.z);
+		Vector3f n(c.x, c.y, c.z);
 
-        normals[static_cast<int32_t>(i0)] = normals[static_cast<int32_t>(i0)] + n;
-        normals[static_cast<int32_t>(i1)] = normals[static_cast<int32_t>(i1)] + n;
-        normals[static_cast<int32_t>(i2)] = normals[static_cast<int32_t>(i2)] + n;
-    }
+		normals[static_cast<int32_t>(i0)] = normals[static_cast<int32_t>(i0)] + n;
+		normals[static_cast<int32_t>(i1)] = normals[static_cast<int32_t>(i1)] + n;
+		normals[static_cast<int32_t>(i2)] = normals[static_cast<int32_t>(i2)] + n;
+	}
 
-    for (int32_t i = 0; i < vertexCount; ++i) {
-        if (normals[i].Length() > 1e-12f) {
-            normals[i].Normalize();
-        }
-        else if (vertices[i].Length() > 1e-12f) {
-            normals[i] = vertices[i];
-            normals[i].Normalize();
-        }
-        else {
-            normals[i] = Vector3f(0.0f, 0.0f, 1.0f);
-        }
-    }
+	for (int32_t i = 0; i < vertexCount; ++i) {
+		if (normals[i].Length() > 1e-12f) {
+			normals[i].Normalize();
+		}
+		else if (vertices[i].Length() > 1e-12f) {
+			normals[i] = vertices[i];
+			normals[i].Normalize();
+		}
+		else {
+			normals[i] = Vector3f(0.0f, 0.0f, 1.0f);
+		}
+	}
 
-    return true;
+	return true;
 }
 
 #endif
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::CorrectMorphTargets(PrimitiveData& in) {
-    if (in.isHull) {
-    for (int32_t t = 0; t < in.targetCount; ++t) {
-        AutoArray<Vector3f>& vertexDeltas = in.morphVertices[t];
-        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
-            Vector3f v = in.baseVertices[i] + vertexDeltas[i];
-            v.Normalize();
-            v *= 0.5f;
-            vertexDeltas[i] = v - in.baseVertices[i];
-            }
-        }
-    }
+void GLBLoader::CorrectMorphTargets(PrimitiveData& in)
+{
+	if (in.isHull) {
+		for (int32_t t = 0; t < in.targetCount; ++t) {
+			AutoArray<Vector3f>& vertexDeltas = in.morphVertices[t];
+			for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
+				Vector3f v = in.baseVertices[i] + vertexDeltas[i];
+				v.Normalize();
+				v *= 0.5f;
+				vertexDeltas[i] = v - in.baseVertices[i];
+			}
+		}
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ComputeMorphNormals(PrimitiveData& in) {
-    in.morphNormals.Resize(in.targetCount);
+bool GLBLoader::ComputeMorphNormals(PrimitiveData& in)
+{
+	in.morphNormals.Resize(in.targetCount);
 
-    for (int32_t t = 0; t < in.targetCount; ++t) {
-        AutoArray<Vector3f> morphedVertices;
-        AutoArray<Vector3f> morphedNormals;
-        AutoArray<Vector3f>& vertexDeltas = in.morphVertices[t];
-        AutoArray<Vector3f>& normalDeltas = in.morphNormals[t];
+	for (int32_t t = 0; t < in.targetCount; ++t) {
+		AutoArray<Vector3f>		morphedVertices;
+		AutoArray<Vector3f>		morphedNormals;
+		AutoArray<Vector3f>&	vertexDeltas = in.morphVertices[t];
+		AutoArray<Vector3f>&	normalDeltas = in.morphNormals[t];
 
-        morphedVertices.Resize(in.baseVertices.Length());
+		morphedVertices.Resize(in.baseVertices.Length());
 
-        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) 
-            morphedVertices[i] = in.baseVertices[i] + vertexDeltas[i];
+		for (int32_t i = 0; i < in.baseVertices.Length(); ++i)
+			morphedVertices[i] = in.baseVertices[i] + vertexDeltas[i];
 
-        if (not ComputeNormals(morphedVertices, in.indices, morphedNormals))
-            return false;
+		if (not ComputeNormals(morphedVertices, in.indices, morphedNormals))
+			return false;
 
-        in.morphNormals[t].Resize(in.baseVertices.Length());
-        for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
-            normalDeltas[i] = morphedNormals[i] - in.baseNormals[i];
-        }
-    }
-    return true;
+		in.morphNormals[t].Resize(in.baseVertices.Length());
+		for (int32_t i = 0; i < in.baseVertices.Length(); ++i) {
+			normalDeltas[i] = morphedNormals[i] - in.baseNormals[i];
+		}
+	}
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in) {
-    in.targetCount = static_cast<int32_t>(prim.targets.size());
-    CheckShapeKeyCount(in.targetCount);
+bool GLBLoader::LoadMorphTargets(tinygltf::Primitive& prim, PrimitiveData& in)
+{
+	in.targetCount = static_cast<int32_t>(prim.targets.size());
+	CheckShapeKeyCount(in.targetCount);
 
-    in.morphVertices.Resize(in.targetCount);
-    in.morphNormals.Resize(in.targetCount);
+	in.morphVertices.Resize(in.targetCount);
+	in.morphNormals.Resize(in.targetCount);
 
-    for (int32_t t = 0; t < in.targetCount; ++t) {
-        in.morphVertices[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
-        in.morphNormals[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
+	for (int32_t t = 0; t < in.targetCount; ++t) {
+		in.morphVertices[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
+		in.morphNormals[t].Resize(in.baseVertices.Length(), Vector3f(0.0f, 0.0f, 0.0f));
 
-        auto& target = prim.targets[static_cast<size_t>(t)];
+		auto& target = prim.targets[static_cast<size_t>(t)];
 
-        auto itPos = target.find("POSITION");
-        if (itPos != target.end()) {
-            if (not ReadAccessorVec3Float(m_model, itPos->second, in.morphVertices[t])) {
-                return false;
-            }
-            if (in.morphVertices[t].Length() != in.baseVertices.Length()) {
-                logHandler.Print("GLBLoader: morph POSITION count does not match POSITION count\n");
-                return false;
-            }
-        }
-        if (not m_fixModel) {
-            auto itNormal = target.find("NORMAL");
-            if (itNormal != target.end()) {
-                if (not ReadAccessorVec3Float(m_model, itNormal->second, in.morphNormals[t])) {
-                    return false;
-                }
-                if (in.morphNormals[t].Length() != in.baseVertices.Length()) {
-                    logHandler.Print("GLBLoader: morph NORMAL count does not match POSITION count\n");
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
+		auto itPos = target.find("POSITION");
+		if (itPos != target.end()) {
+			if (not ReadAccessorVec3Float(m_model, itPos->second, in.morphVertices[t])) {
+				return false;
+			}
+			if (in.morphVertices[t].Length() != in.baseVertices.Length()) {
+				logHandler.Print("GLBLoader: morph POSITION count does not match POSITION count\n");
+				return false;
+			}
+		}
+		if (not m_fixModel) {
+			auto itNormal = target.find("NORMAL");
+			if (itNormal != target.end()) {
+				if (not ReadAccessorVec3Float(m_model, itNormal->second, in.morphNormals[t])) {
+					return false;
+				}
+				if (in.morphNormals[t].Length() != in.baseVertices.Length()) {
+					logHandler.Print("GLBLoader: morph NORMAL count does not match POSITION count\n");
+					return false;
+				}
+			}
+		}
+	}
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveData& in) {
-    in.indices.Clear();
+bool GLBLoader::LoadIndices(tinygltf::Primitive& prim, PrimitiveData& in)
+{
+	in.indices.Clear();
 
-    if (prim.indices >= 0) {
-        if (not ReadAccessorIndicesU32(m_model, prim.indices, in.indices)) {
-            return false;
-        }
-    }
-    else {
-        in.indices.Resize(in.baseVertices.Length());
-        for (int32_t i = 0; i < in.indices.Length(); ++i) 
-            in.indices[i] = static_cast<uint32_t>(i);
-    }
+	if (prim.indices >= 0) {
+		if (not ReadAccessorIndicesU32(m_model, prim.indices, in.indices)) {
+			return false;
+		}
+	}
+	else {
+		in.indices.Resize(in.baseVertices.Length());
+		for (int32_t i = 0; i < in.indices.Length(); ++i)
+			in.indices[i] = static_cast<uint32_t>(i);
+	}
 
-    if ((in.indices.Length() % 3) != 0) {
-        logHandler.Print("GLBLoader: index count not divisible by 3\n");
-        return false;
-    }
-    in.triCount = in.indices.Length() / 3;
-    return true;
+	if ((in.indices.Length() % 3) != 0) {
+		logHandler.Print("GLBLoader: index count not divisible by 3\n");
+		return false;
+	}
+	in.triCount = in.indices.Length() / 3;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::ReserveOutput(const PrimitiveData& in) {
-    int32_t addVertexCount = in.triCount * 3;
+void GLBLoader::ReserveOutput(const PrimitiveData& in)
+{
+	int32_t addVertexCount = in.triCount * 3;
 
-    m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
-    m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
-    m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
-    m_data.texCoords.Reserve(m_data.texCoords.Length() + addVertexCount);
-    m_data.jointIndices.Reserve(m_data.jointIndices.Length() + addVertexCount);
+	m_data.vertices.Reserve(m_data.vertices.Length() + addVertexCount);
+	m_data.colors.Reserve(m_data.colors.Length() + addVertexCount);
+	m_data.normals.Reserve(m_data.normals.Length() + addVertexCount);
+	m_data.texCoords.Reserve(m_data.texCoords.Length() + addVertexCount);
+	m_data.jointIndices.Reserve(m_data.jointIndices.Length() + addVertexCount);
 	if (m_fixModel)
-        m_isHullVertex.Reserve(m_isHullVertex.Length() + addVertexCount);
+		m_isHullVertex.Reserve(m_isHullVertex.Length() + addVertexCount);
 
-    for (auto& sk : m_data.shapeKeys) {
-        sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
-        sk.normalDeltas.Reserve(sk.normalDeltas.Length() + addVertexCount);
-    }
+	for (auto& sk : m_data.shapeKeys) {
+		sk.deltas.Reserve(sk.deltas.Length() + addVertexCount);
+		sk.normalDeltas.Reserve(sk.normalDeltas.Length() + addVertexCount);
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs) {
-    int32_t globalKeyCount = m_data.shapeKeys.Length();
-    keyPtrs.Resize(globalKeyCount);
+void GLBLoader::BuildShapeKeyPointers(AutoArray<ShapeKeySet*>& keyPtrs)
+{
+	int32_t globalKeyCount = m_data.shapeKeys.Length();
+	keyPtrs.Resize(globalKeyCount);
 
-    int32_t k = 0;
-    for (auto& sk : m_data.shapeKeys) {
-        keyPtrs[k] = &sk;
-        k += 1;
-    }
+	int32_t k = 0;
+	for (auto& sk : m_data.shapeKeys) {
+		keyPtrs[k] = &sk;
+		k += 1;
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
-    int32_t globalKeyCount = keyPtrs.Length();
+bool GLBLoader::AppendTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs)
+{
+	int32_t globalKeyCount = keyPtrs.Length();
 
-    for (int32_t i = 0, t = 0; t < in.triCount; ++t, i += 3) {
-        int32_t indices[3];
-        Vector3f p[3];
-        for (int32_t j = 0; j < 3; ++j) {
-            indices[j] = int32_t(in.indices[i + j]);
-            p[j] = in.baseVertices[indices[j]];
+	for (int32_t i = 0, t = 0; t < in.triCount; ++t, i += 3) {
+		int32_t		indices[3];
+		Vector3f	p[3];
+		for (int32_t j = 0; j < 3; ++j) {
+			indices[j] = int32_t(in.indices[i + j]);
+			p[j] = in.baseVertices[indices[j]];
 			p[j] = TransformPosition(worldM, p[j]);
-            if (m_fixModel) {
-                if (in.isHull and not m_hullVertexMap.Find(p[j]))
-                    m_hullVertexMap.Insert(p[j], m_data.vertices.Length());
-                m_isHullVertex.Append(in.isHull);
-            }
-            m_data.vertices.Append(p[j]);
-            m_data.colors.Append(in.haveColors ? Modulate(in.baseColor, in.baseColors[indices[j]]) : in.baseColor);
-            m_data.texCoords.Append(in.haveTexCoords ? in.baseTexCoords[indices[j]] : TexCoord(0.0f, 0.0f));
-            m_data.jointIndices.Append(in.haveJoints ? in.baseJoints[indices[j]] : -1);
+			if (m_fixModel) {
+				if (in.isHull and not m_hullVertexMap.Find(p[j]))
+					m_hullVertexMap.Insert(p[j], m_data.vertices.Length());
+				m_isHullVertex.Append(in.isHull);
+			}
+			m_data.vertices.Append(p[j]);
+			m_data.colors.Append(in.haveColors ? Modulate(in.baseColor, in.baseColors[indices[j]]) : in.baseColor);
+			m_data.texCoords.Append(in.haveTexCoords ? in.baseTexCoords[indices[j]] : TexCoord(0.0f, 0.0f));
+			m_data.jointIndices.Append(in.haveJoints ? in.baseJoints[indices[j]] : -1);
 
-            if (in.haveNormals) {
-                Vector3f n = TransformNormal(worldM, in.baseNormals[indices[j]]);
-                m_data.normals.Append(n);
-            }
-        }
+			if (in.haveNormals) {
+				Vector3f n = TransformNormal(worldM, in.baseNormals[indices[j]]);
+				m_data.normals.Append(n);
+			}
+		}
 
-        if (not in.haveNormals) {
-            Vector3f n = Vector3f::Normal(p[0], p[1], p[2]);
-            for (int j = 0; j < 3; ++j) 
-                m_data.normals.Append(n);
-        }
+		if (not in.haveNormals) {
+			Vector3f n = Vector3f::Normal(p[0], p[1], p[2]);
+			for (int j = 0; j < 3; ++j)
+				m_data.normals.Append(n);
+		}
 
-        for (int32_t k = 0; k < globalKeyCount; ++k) {
-            for (int j = 0; j < 3; ++j) {
-                Vector3f d(0.0f, 0.0f, 0.0f);
-                Vector3f dn(0.0f, 0.0f, 0.0f);
-                if (k < in.targetCount) {
-                    d = TransformDelta(worldM, in.morphVertices[k][indices[j]]);
-                    dn = TransformNormalDelta(worldM, in.morphNormals[k][indices[j]]);
-                }
-                keyPtrs[k]->deltas.Append(d);
-                keyPtrs[k]->normalDeltas.Append(dn);
-            }
-        }
-    }
-    return true;
+		for (int32_t k = 0; k < globalKeyCount; ++k) {
+			for (int j = 0; j < 3; ++j) {
+				Vector3f d(0.0f, 0.0f, 0.0f);
+				Vector3f dn(0.0f, 0.0f, 0.0f);
+				if (k < in.targetCount) {
+					d = TransformDelta(worldM, in.morphVertices[k][indices[j]]);
+					dn = TransformNormalDelta(worldM, in.morphNormals[k][indices[j]]);
+				}
+				keyPtrs[k]->deltas.Append(d);
+				keyPtrs[k]->normalDeltas.Append(dn);
+			}
+		}
+	}
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::AppendIndexedTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs) {
-    if (not in.haveNormals) {
-        int32_t firstVertex = m_data.vertices.Length();
-        if (not AppendTriangles(in, worldM, keyPtrs))
-            return false;
-        for (int32_t i = firstVertex, l = m_data.vertices.Length(); i < l; ++i)
-            m_data.indices.Append(uint32_t(i));
-        return true;
-    }
+bool GLBLoader::AppendIndexedTriangles(PrimitiveData& in, Matrix4f worldM, AutoArray<ShapeKeySet*>& keyPtrs)
+{
+	if (not in.haveNormals) {
+		int32_t firstVertex = m_data.vertices.Length();
+		if (not AppendTriangles(in, worldM, keyPtrs))
+			return false;
+		for (int32_t i = firstVertex, l = m_data.vertices.Length(); i < l; ++i)
+			m_data.indices.Append(uint32_t(i));
+		return true;
+	}
 
-    int32_t globalKeyCount = keyPtrs.Length();
+	int32_t globalKeyCount = keyPtrs.Length();
 
-    AutoArray<int32_t> vertexMap;
-    vertexMap.Resize(in.baseVertices.Length());
-    std::fill(vertexMap.begin(), vertexMap.end(), -1);
+	AutoArray<int32_t> vertexMap;
+	vertexMap.Resize(in.baseVertices.Length());
+	std::fill(vertexMap.begin(), vertexMap.end(), -1);
 
-    for (int32_t i = 0, l = in.triCount * 3; i < l; ++i) {
-        int32_t source = int32_t(in.indices[i]);
-        if (vertexMap[source] < 0) {
-            vertexMap[source] = m_data.vertices.Length();
-            m_data.vertices.Append(TransformPosition(worldM, in.baseVertices[source]));
-            m_data.colors.Append(in.haveColors ? Modulate(in.baseColor, in.baseColors[source]) : in.baseColor);
-            m_data.texCoords.Append(in.haveTexCoords ? in.baseTexCoords[source] : TexCoord(0.0f, 0.0f));
-            m_data.jointIndices.Append(in.haveJoints ? in.baseJoints[source] : -1);
-            m_data.normals.Append(TransformNormal(worldM, in.baseNormals[source]));
+	for (int32_t i = 0, l = in.triCount * 3; i < l; ++i) {
+		int32_t source = int32_t(in.indices[i]);
+		if (vertexMap[source] < 0) {
+			vertexMap[source] = m_data.vertices.Length();
+			m_data.vertices.Append(TransformPosition(worldM, in.baseVertices[source]));
+			m_data.colors.Append(in.haveColors ? Modulate(in.baseColor, in.baseColors[source]) : in.baseColor);
+			m_data.texCoords.Append(in.haveTexCoords ? in.baseTexCoords[source] : TexCoord(0.0f, 0.0f));
+			m_data.jointIndices.Append(in.haveJoints ? in.baseJoints[source] : -1);
+			m_data.normals.Append(TransformNormal(worldM, in.baseNormals[source]));
 
-            for (int32_t k = 0; k < globalKeyCount; ++k) {
-                Vector3f d(0.0f, 0.0f, 0.0f);
-                Vector3f dn(0.0f, 0.0f, 0.0f);
-                if (k < in.targetCount) {
-                    d = TransformDelta(worldM, in.morphVertices[k][source]);
-                    dn = TransformNormalDelta(worldM, in.morphNormals[k][source]);
-                }
-                keyPtrs[k]->deltas.Append(d);
-                keyPtrs[k]->normalDeltas.Append(dn);
-            }
-        }
-        m_data.indices.Append(uint32_t(vertexMap[source]));
-    }
-    return true;
+			for (int32_t k = 0; k < globalKeyCount; ++k) {
+				Vector3f d(0.0f, 0.0f, 0.0f);
+				Vector3f dn(0.0f, 0.0f, 0.0f);
+				if (k < in.targetCount) {
+					d = TransformDelta(worldM, in.morphVertices[k][source]);
+					dn = TransformNormalDelta(worldM, in.morphNormals[k][source]);
+				}
+				keyPtrs[k]->deltas.Append(d);
+				keyPtrs[k]->normalDeltas.Append(dn);
+			}
+		}
+		m_data.indices.Append(uint32_t(vertexMap[source]));
+	}
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-Matrix4f GLBLoader::NodeLocalMatrix(const tinygltf::Node& node) {
-    if (node.matrix.size() == 16) {
-        float data[16];
-        for (int i = 0; i < 16; ++i)
-            data[i] = static_cast<float>(node.matrix[static_cast<size_t>(i)]);
-        return Matrix4f(data);
-    }
+Matrix4f GLBLoader::NodeLocalMatrix(const tinygltf::Node& node)
+{
+	if (node.matrix.size() == 16) {
+		float data[16];
+		for (int i = 0; i < 16; ++i)
+			data[i] = static_cast<float>(node.matrix[static_cast<size_t>(i)]);
+		return Matrix4f(data);
+	}
 
-    glm::vec3 t(0.0f, 0.0f, 0.0f);
-    glm::quat r(1.0f, 0.0f, 0.0f, 0.0f);
-    glm::vec3 s(1.0f, 1.0f, 1.0f);
+	glm::vec3 t(0.0f, 0.0f, 0.0f);
+	glm::quat r(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::vec3 s(1.0f, 1.0f, 1.0f);
 
-    if (node.translation.size() == 3) {
-        t.x = static_cast<float>(node.translation[0]);
-        t.y = static_cast<float>(node.translation[1]);
-        t.z = static_cast<float>(node.translation[2]);
-    }
+	if (node.translation.size() == 3) {
+		t.x = static_cast<float>(node.translation[0]);
+		t.y = static_cast<float>(node.translation[1]);
+		t.z = static_cast<float>(node.translation[2]);
+	}
 
-    if (node.rotation.size() == 4) {
-        r.x = static_cast<float>(node.rotation[0]);
-        r.y = static_cast<float>(node.rotation[1]);
-        r.z = static_cast<float>(node.rotation[2]);
-        r.w = static_cast<float>(node.rotation[3]);
-    }
+	if (node.rotation.size() == 4) {
+		r.x = static_cast<float>(node.rotation[0]);
+		r.y = static_cast<float>(node.rotation[1]);
+		r.z = static_cast<float>(node.rotation[2]);
+		r.w = static_cast<float>(node.rotation[3]);
+	}
 
-    if (node.scale.size() == 3) {
-        s.x = static_cast<float>(node.scale[0]);
-        s.y = static_cast<float>(node.scale[1]);
-        s.z = static_cast<float>(node.scale[2]);
-    }
+	if (node.scale.size() == 3) {
+		s.x = static_cast<float>(node.scale[0]);
+		s.y = static_cast<float>(node.scale[1]);
+		s.z = static_cast<float>(node.scale[2]);
+	}
 
-    glm::mat4 tm = glm::translate(glm::mat4(1.0f), t);
-    glm::mat4 rm = glm::mat4_cast(r);
-    glm::mat4 sm = glm::scale(glm::mat4(1.0f), s);
+	glm::mat4 tm = glm::translate(glm::mat4(1.0f), t);
+	glm::mat4 rm = glm::mat4_cast(r);
+	glm::mat4 sm = glm::scale(glm::mat4(1.0f), s);
 
-    return Matrix4f(tm * rm * sm);
+	return Matrix4f(tm * rm * sm);
 }
 
 // =================================================================================================
 
-bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, AutoArray<Vector3f>& out) {
-    if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
-        logHandler.Print("GLBLoader: accessor index out of range\n");
-        return false;
-    }
+bool GLBLoader::ReadAccessorVec3Float(const tinygltf::Model& model, int accessorIndex, AutoArray<Vector3f>& out)
+{
+	if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
+		logHandler.Print("GLBLoader: accessor index out of range\n");
+		return false;
+	}
 
-    auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
+	auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
 
-    if (acc.type != TINYGLTF_TYPE_VEC3) {
-        logHandler.Print("GLBLoader: accessor is not VEC3\n");
-        return false;
-    }
+	if (acc.type != TINYGLTF_TYPE_VEC3) {
+		logHandler.Print("GLBLoader: accessor is not VEC3\n");
+		return false;
+	}
 
-    if (acc.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
-        logHandler.Print("GLBLoader: accessor componentType is not FLOAT\n");
-        return false;
-    }
+	if (acc.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
+		logHandler.Print("GLBLoader: accessor componentType is not FLOAT\n");
+		return false;
+	}
 
-    auto readElement = [](const uint8_t* src) -> Vector3f {
-        float fx;
-        float fy;
-        float fz;
+	auto readElement = [](const uint8_t* src) -> Vector3f {
+		float fx;
+		float fy;
+		float fz;
 
-        std::memcpy(&fx, src + 0, sizeof(float));
-        std::memcpy(&fy, src + 4, sizeof(float));
-        std::memcpy(&fz, src + 8, sizeof(float));
+		std::memcpy(&fx, src + 0, sizeof(float));
+		std::memcpy(&fy, src + 4, sizeof(float));
+		std::memcpy(&fz, src + 8, sizeof(float));
 
-        return Vector3f(fx, fy, fz);
-        };
+		return Vector3f(fx, fy, fz);
+	};
 
-    out.Resize(static_cast<int32_t>(acc.count));
+	out.Resize(static_cast<int32_t>(acc.count));
 
-    if (acc.bufferView < 0) {
-        if (not acc.sparse.isSparse) {
-            logHandler.Print("GLBLoader: bufferView index out of range\n");
-            return false;
-        }
-        out.Fill(Vector3f(0.0f, 0.0f, 0.0f));
-    }
-    else {
-        if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-            logHandler.Print("GLBLoader: bufferView index out of range\n");
-            return false;
-        }
+	if (acc.bufferView < 0) {
+		if (not acc.sparse.isSparse) {
+			logHandler.Print("GLBLoader: bufferView index out of range\n");
+			return false;
+		}
+		out.Fill(Vector3f(0.0f, 0.0f, 0.0f));
+	}
+	else {
+		if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
+			logHandler.Print("GLBLoader: bufferView index out of range\n");
+			return false;
+		}
 
-        auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+		auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
 
-        if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-            logHandler.Print("GLBLoader: buffer index out of range\n");
-            return false;
-        }
+		if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
+			logHandler.Print("GLBLoader: buffer index out of range\n");
+			return false;
+		}
 
-        auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
+		auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
 
-        size_t stride = static_cast<size_t>(view.byteStride);
-        if (stride == 0) {
-            stride = sizeof(float) * 3;
-        }
+		size_t stride = static_cast<size_t>(view.byteStride);
+		if (stride == 0) {
+			stride = sizeof(float) * 3;
+		}
 
-        if (stride < sizeof(float) * 3) {
-            logHandler.Print("GLBLoader: invalid stride for VEC3\n");
-            return false;
-        }
+		if (stride < sizeof(float) * 3) {
+			logHandler.Print("GLBLoader: invalid stride for VEC3\n");
+			return false;
+		}
 
-        size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
-        size_t need = base + stride * static_cast<size_t>(acc.count);
+		size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
+		size_t need = base + stride * static_cast<size_t>(acc.count);
 
-        if (need > buf.data.size()) {
-            logHandler.Print("GLBLoader: buffer overrun in ReadAccessorVec3Float\n");
-            return false;
-        }
+		if (need > buf.data.size()) {
+			logHandler.Print("GLBLoader: buffer overrun in ReadAccessorVec3Float\n");
+			return false;
+		}
 
-        for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
-            out[static_cast<int32_t>(i)] = readElement(buf.data.data() + base + i * stride);
-    }
+		for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
+			out[static_cast<int32_t>(i)] = readElement(buf.data.data() + base + i * stride);
+	}
 
-    if (acc.sparse.isSparse) {
-        AutoArray<uint32_t> sparseIndices;
-        const uint8_t* sparseValues = nullptr;
-        if (not ReadSparseAccessor(model, acc, sizeof(float) * 3, sparseIndices, sparseValues))
-            return false;
-        for (int32_t s = 0; s < sparseIndices.Length(); ++s)
-            out[static_cast<int32_t>(sparseIndices[s])] = readElement(sparseValues + static_cast<size_t>(s) * sizeof(float) * 3);
-    }
+	if (acc.sparse.isSparse) {
+		AutoArray<uint32_t>	sparseIndices;
+		const uint8_t*		sparseValues = nullptr;
+		if (not ReadSparseAccessor(model, acc, sizeof(float) * 3, sparseIndices, sparseValues))
+			return false;
+		for (int32_t s = 0; s < sparseIndices.Length(); ++s)
+			out[static_cast<int32_t>(sparseIndices[s])] = readElement(sparseValues + static_cast<size_t>(s) * sizeof(float) * 3);
+	}
 
-    return true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ReadAccessorFloats(const tinygltf::Model& model, int accessorIndex, AutoArray<float>& out, int32_t& componentCount) {
-    if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
-        logHandler.Print("GLBLoader: accessor index out of range\n");
-        return false;
-    }
+bool GLBLoader::ReadAccessorFloats(const tinygltf::Model& model, int accessorIndex, AutoArray<float>& out, int32_t& componentCount)
+{
+	if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
+		logHandler.Print("GLBLoader: accessor index out of range\n");
+		return false;
+	}
 
-    auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
+	auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
 
-    if (acc.type == TINYGLTF_TYPE_VEC2)
-        componentCount = 2;
-    else if (acc.type == TINYGLTF_TYPE_VEC3)
-        componentCount = 3;
-    else if (acc.type == TINYGLTF_TYPE_VEC4)
-        componentCount = 4;
-    else {
-        logHandler.Print("GLBLoader: accessor is not VEC2, VEC3 or VEC4\n");
-        return false;
-    }
+	if (acc.type == TINYGLTF_TYPE_VEC2)
+		componentCount = 2;
+	else if (acc.type == TINYGLTF_TYPE_VEC3)
+		componentCount = 3;
+	else if (acc.type == TINYGLTF_TYPE_VEC4)
+		componentCount = 4;
+	else {
+		logHandler.Print("GLBLoader: accessor is not VEC2, VEC3 or VEC4\n");
+		return false;
+	}
 
-    size_t elemSize = 0;
-    float normalization = 1.0f;
-    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT)
-        elemSize = 4;
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
-        elemSize = 1;
-        normalization = acc.normalized ? 1.0f / 255.0f : 1.0f;
-    }
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-        elemSize = 2;
-        normalization = acc.normalized ? 1.0f / 65535.0f : 1.0f;
-    }
-    else {
-        logHandler.Print("GLBLoader: unsupported accessor componentType\n");
-        return false;
-    }
+	size_t	elemSize = 0;
+	float	normalization = 1.0f;
+	if (acc.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT)
+		elemSize = 4;
+	else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+		elemSize = 1;
+		normalization = acc.normalized ? 1.0f / 255.0f : 1.0f;
+	}
+	else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+		elemSize = 2;
+		normalization = acc.normalized ? 1.0f / 65535.0f : 1.0f;
+	}
+	else {
+		logHandler.Print("GLBLoader: unsupported accessor componentType\n");
+		return false;
+	}
 
-    size_t elementSize = elemSize * static_cast<size_t>(componentCount);
+	size_t elementSize = elemSize * static_cast<size_t>(componentCount);
 
-    auto readElement = [&](const uint8_t* src, float* dest) {
-        for (int32_t c = 0; c < componentCount; ++c, src += elemSize) {
-            if (elemSize == 4)
-                std::memcpy(dest, src, sizeof(float));
-            else if (elemSize == 2) {
-                uint16_t v;
-                std::memcpy(&v, src, sizeof(v));
-                *dest = float(v) * normalization;
-            }
-            else
-                *dest = float(*src) * normalization;
-            ++dest;
-        }
-        };
+	auto readElement = [&](const uint8_t* src, float* dest) {
+		for (int32_t c = 0; c < componentCount; ++c, src += elemSize) {
+			if (elemSize == 4)
+				std::memcpy(dest, src, sizeof(float));
+			else if (elemSize == 2) {
+				uint16_t v;
+				std::memcpy(&v, src, sizeof(v));
+				*dest = float(v) * normalization;
+			}
+			else
+				*dest = float(*src) * normalization;
+			++dest;
+		}
+	};
 
-    out.Resize(static_cast<int32_t>(acc.count) * componentCount);
+	out.Resize(static_cast<int32_t>(acc.count) * componentCount);
 
-    if (acc.bufferView < 0) {
-        if (not acc.sparse.isSparse) {
-            logHandler.Print("GLBLoader: bufferView index out of range\n");
-            return false;
-        }
-        out.Fill(0.0f);
-    }
-    else {
-        if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-            logHandler.Print("GLBLoader: bufferView index out of range\n");
-            return false;
-        }
+	if (acc.bufferView < 0) {
+		if (not acc.sparse.isSparse) {
+			logHandler.Print("GLBLoader: bufferView index out of range\n");
+			return false;
+		}
+		out.Fill(0.0f);
+	}
+	else {
+		if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
+			logHandler.Print("GLBLoader: bufferView index out of range\n");
+			return false;
+		}
 
-        auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+		auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
 
-        if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-            logHandler.Print("GLBLoader: buffer index out of range\n");
-            return false;
-        }
+		if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
+			logHandler.Print("GLBLoader: buffer index out of range\n");
+			return false;
+		}
 
-        auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
+		auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
 
-        size_t stride = static_cast<size_t>(view.byteStride);
-        if (stride == 0) {
-            stride = elementSize;
-        }
+		size_t stride = static_cast<size_t>(view.byteStride);
+		if (stride == 0) {
+			stride = elementSize;
+		}
 
-        if (stride < elementSize) {
-            logHandler.Print("GLBLoader: invalid accessor stride\n");
-            return false;
-        }
+		if (stride < elementSize) {
+			logHandler.Print("GLBLoader: invalid accessor stride\n");
+			return false;
+		}
 
-        size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
-        size_t need = base + stride * static_cast<size_t>(acc.count);
+		size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
+		size_t need = base + stride * static_cast<size_t>(acc.count);
 
-        if (need > buf.data.size()) {
-            logHandler.Print("GLBLoader: buffer overrun in ReadAccessorFloats\n");
-            return false;
-        }
+		if (need > buf.data.size()) {
+			logHandler.Print("GLBLoader: buffer overrun in ReadAccessorFloats\n");
+			return false;
+		}
 
-        for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
-            readElement(buf.data.data() + base + i * stride, out.DataPtr(static_cast<int32_t>(i) * componentCount));
-    }
+		for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
+			readElement(buf.data.data() + base + i * stride, out.DataPtr(static_cast<int32_t>(i) * componentCount));
+	}
 
-    if (acc.sparse.isSparse) {
-        AutoArray<uint32_t> sparseIndices;
-        const uint8_t* sparseValues = nullptr;
-        if (not ReadSparseAccessor(model, acc, elementSize, sparseIndices, sparseValues))
-            return false;
-        for (int32_t s = 0; s < sparseIndices.Length(); ++s)
-            readElement(sparseValues + static_cast<size_t>(s) * elementSize, out.DataPtr(static_cast<int32_t>(sparseIndices[s]) * componentCount));
-    }
+	if (acc.sparse.isSparse) {
+		AutoArray<uint32_t>	sparseIndices;
+		const uint8_t*		sparseValues = nullptr;
+		if (not ReadSparseAccessor(model, acc, elementSize, sparseIndices, sparseValues))
+			return false;
+		for (int32_t s = 0; s < sparseIndices.Length(); ++s)
+			readElement(sparseValues + static_cast<size_t>(s) * elementSize,
+						out.DataPtr(static_cast<int32_t>(sparseIndices[s]) * componentCount));
+	}
 
-    return true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out) {
-    if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
-        logHandler.Print("GLBLoader: accessor index out of range\n");
-        return false;
-    }
+bool GLBLoader::ReadAccessorIndicesU32(const tinygltf::Model& model, int accessorIndex, AutoArray<uint32_t>& out)
+{
+	if (accessorIndex < 0 or accessorIndex >= static_cast<int>(model.accessors.size())) {
+		logHandler.Print("GLBLoader: accessor index out of range\n");
+		return false;
+	}
 
-    auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
+	auto& acc = model.accessors[static_cast<size_t>(accessorIndex)];
 
-    if (acc.type != TINYGLTF_TYPE_SCALAR) {
-        logHandler.Print("GLBLoader: indices accessor is not SCALAR\n");
-        return false;
-    }
+	if (acc.type != TINYGLTF_TYPE_SCALAR) {
+		logHandler.Print("GLBLoader: indices accessor is not SCALAR\n");
+		return false;
+	}
 
-    size_t elemSize = 0;
-    if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-        elemSize = 1;
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-        elemSize = 2;
-    else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-        elemSize = 4;
-    else {
-        logHandler.Print("GLBLoader: unsupported index componentType\n");
-        return false;
-    }
+	size_t elemSize = 0;
+	if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+		elemSize = 1;
+	else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+		elemSize = 2;
+	else if (acc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+		elemSize = 4;
+	else {
+		logHandler.Print("GLBLoader: unsupported index componentType\n");
+		return false;
+	}
 
-    auto readElement = [elemSize](const uint8_t* src) -> uint32_t {
-        if (elemSize == 1) {
-            uint8_t v;
-            std::memcpy(&v, src, 1);
-            return static_cast<uint32_t>(v);
-        }
-        if (elemSize == 2) {
-            uint16_t v;
-            std::memcpy(&v, src, 2);
-            return static_cast<uint32_t>(v);
-        }
-        uint32_t v;
-        std::memcpy(&v, src, 4);
-        return v;
-        };
+	auto readElement = [elemSize](const uint8_t* src) -> uint32_t {
+		if (elemSize == 1) {
+			uint8_t v;
+			std::memcpy(&v, src, 1);
+			return static_cast<uint32_t>(v);
+		}
+		if (elemSize == 2) {
+			uint16_t v;
+			std::memcpy(&v, src, 2);
+			return static_cast<uint32_t>(v);
+		}
+		uint32_t v;
+		std::memcpy(&v, src, 4);
+		return v;
+	};
 
-    out.Resize(static_cast<int32_t>(acc.count));
+	out.Resize(static_cast<int32_t>(acc.count));
 
-    if (acc.bufferView < 0) {
-        if (not acc.sparse.isSparse) {
-            logHandler.Print("GLBLoader: bufferView index out of range\n");
-            return false;
-        }
-        out.Fill(0u);
-    }
-    else {
-        if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
-            logHandler.Print("GLBLoader: bufferView index out of range\n");
-            return false;
-        }
+	if (acc.bufferView < 0) {
+		if (not acc.sparse.isSparse) {
+			logHandler.Print("GLBLoader: bufferView index out of range\n");
+			return false;
+		}
+		out.Fill(0u);
+	}
+	else {
+		if (acc.bufferView >= static_cast<int>(model.bufferViews.size())) {
+			logHandler.Print("GLBLoader: bufferView index out of range\n");
+			return false;
+		}
 
-        auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
+		auto& view = model.bufferViews[static_cast<size_t>(acc.bufferView)];
 
-        if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
-            logHandler.Print("GLBLoader: buffer index out of range\n");
-            return false;
-        }
+		if (view.buffer < 0 or view.buffer >= static_cast<int>(model.buffers.size())) {
+			logHandler.Print("GLBLoader: buffer index out of range\n");
+			return false;
+		}
 
-        auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
+		auto& buf = model.buffers[static_cast<size_t>(view.buffer)];
 
-        size_t stride = static_cast<size_t>(view.byteStride);
-        if (stride == 0) {
-            stride = elemSize;
-        }
+		size_t stride = static_cast<size_t>(view.byteStride);
+		if (stride == 0) {
+			stride = elemSize;
+		}
 
-        if (stride < elemSize) {
-            logHandler.Print("GLBLoader: invalid stride for indices\n");
-            return false;
-        }
+		if (stride < elemSize) {
+			logHandler.Print("GLBLoader: invalid stride for indices\n");
+			return false;
+		}
 
-        size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
-        size_t need = base + stride * static_cast<size_t>(acc.count);
+		size_t base = static_cast<size_t>(view.byteOffset) + static_cast<size_t>(acc.byteOffset);
+		size_t need = base + stride * static_cast<size_t>(acc.count);
 
-        if (need > buf.data.size()) {
-            logHandler.Print("GLBLoader: buffer overrun in ReadAccessorIndicesU32\n");
-            return false;
-        }
+		if (need > buf.data.size()) {
+			logHandler.Print("GLBLoader: buffer overrun in ReadAccessorIndicesU32\n");
+			return false;
+		}
 
-        for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
-            out[static_cast<int32_t>(i)] = readElement(buf.data.data() + base + i * stride);
-    }
+		for (size_t i = 0; i < static_cast<size_t>(acc.count); ++i)
+			out[static_cast<int32_t>(i)] = readElement(buf.data.data() + base + i * stride);
+	}
 
-    if (acc.sparse.isSparse) {
-        AutoArray<uint32_t> sparseIndices;
-        const uint8_t* sparseValues = nullptr;
-        if (not ReadSparseAccessor(model, acc, elemSize, sparseIndices, sparseValues))
-            return false;
-        for (int32_t s = 0; s < sparseIndices.Length(); ++s)
-            out[static_cast<int32_t>(sparseIndices[s])] = readElement(sparseValues + static_cast<size_t>(s) * elemSize);
-    }
+	if (acc.sparse.isSparse) {
+		AutoArray<uint32_t>	sparseIndices;
+		const uint8_t*		sparseValues = nullptr;
+		if (not ReadSparseAccessor(model, acc, elemSize, sparseIndices, sparseValues))
+			return false;
+		for (int32_t s = 0; s < sparseIndices.Length(); ++s)
+			out[static_cast<int32_t>(sparseIndices[s])] = readElement(sparseValues + static_cast<size_t>(s) * elemSize);
+	}
 
-    return true;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::ReadSparseAccessor(const tinygltf::Model& model, const tinygltf::Accessor& acc, size_t elementSize, AutoArray<uint32_t>& indices, const uint8_t*& values) {
-    auto& sparse = acc.sparse;
+bool GLBLoader::ReadSparseAccessor(const tinygltf::Model& model, const tinygltf::Accessor& acc, size_t elementSize,
+								   AutoArray<uint32_t>& indices, const uint8_t*& values)
+{
+	auto& sparse = acc.sparse;
 
-    if (sparse.count < 0 or static_cast<size_t>(sparse.count) > acc.count) {
-        logHandler.Print("GLBLoader: sparse count out of range\n");
-        return false;
-    }
+	if (sparse.count < 0 or static_cast<size_t>(sparse.count) > acc.count) {
+		logHandler.Print("GLBLoader: sparse count out of range\n");
+		return false;
+	}
 
-    if (sparse.indices.bufferView < 0 or sparse.indices.bufferView >= static_cast<int>(model.bufferViews.size())) {
-        logHandler.Print("GLBLoader: sparse indices bufferView index out of range\n");
-        return false;
-    }
+	if (sparse.indices.bufferView < 0 or sparse.indices.bufferView >= static_cast<int>(model.bufferViews.size())) {
+		logHandler.Print("GLBLoader: sparse indices bufferView index out of range\n");
+		return false;
+	}
 
-    if (sparse.values.bufferView < 0 or sparse.values.bufferView >= static_cast<int>(model.bufferViews.size())) {
-        logHandler.Print("GLBLoader: sparse values bufferView index out of range\n");
-        return false;
-    }
+	if (sparse.values.bufferView < 0 or sparse.values.bufferView >= static_cast<int>(model.bufferViews.size())) {
+		logHandler.Print("GLBLoader: sparse values bufferView index out of range\n");
+		return false;
+	}
 
-    size_t indexSize = 0;
-    if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
-        indexSize = 1;
-    else if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
-        indexSize = 2;
-    else if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
-        indexSize = 4;
-    else {
-        logHandler.Print("GLBLoader: unsupported sparse index componentType\n");
-        return false;
-    }
+	size_t indexSize = 0;
+	if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)
+		indexSize = 1;
+	else if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT)
+		indexSize = 2;
+	else if (sparse.indices.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT)
+		indexSize = 4;
+	else {
+		logHandler.Print("GLBLoader: unsupported sparse index componentType\n");
+		return false;
+	}
 
-    auto& indexView = model.bufferViews[static_cast<size_t>(sparse.indices.bufferView)];
-    auto& valueView = model.bufferViews[static_cast<size_t>(sparse.values.bufferView)];
+	auto& indexView = model.bufferViews[static_cast<size_t>(sparse.indices.bufferView)];
+	auto& valueView = model.bufferViews[static_cast<size_t>(sparse.values.bufferView)];
 
-    if (indexView.buffer < 0 or indexView.buffer >= static_cast<int>(model.buffers.size()) or valueView.buffer < 0 or valueView.buffer >= static_cast<int>(model.buffers.size())) {
-        logHandler.Print("GLBLoader: sparse buffer index out of range\n");
-        return false;
-    }
+	if (indexView.buffer < 0 or indexView.buffer >= static_cast<int>(model.buffers.size()) or valueView.buffer < 0 or
+		valueView.buffer >= static_cast<int>(model.buffers.size())) {
+		logHandler.Print("GLBLoader: sparse buffer index out of range\n");
+		return false;
+	}
 
-    auto& indexBuf = model.buffers[static_cast<size_t>(indexView.buffer)];
-    auto& valueBuf = model.buffers[static_cast<size_t>(valueView.buffer)];
+	auto& indexBuf = model.buffers[static_cast<size_t>(indexView.buffer)];
+	auto& valueBuf = model.buffers[static_cast<size_t>(valueView.buffer)];
 
-    size_t count = static_cast<size_t>(sparse.count);
-    size_t indexBase = static_cast<size_t>(indexView.byteOffset) + sparse.indices.byteOffset;
-    size_t valueBase = static_cast<size_t>(valueView.byteOffset) + sparse.values.byteOffset;
+	size_t count = static_cast<size_t>(sparse.count);
+	size_t indexBase = static_cast<size_t>(indexView.byteOffset) + sparse.indices.byteOffset;
+	size_t valueBase = static_cast<size_t>(valueView.byteOffset) + sparse.values.byteOffset;
 
-    if (indexBase + indexSize * count > indexBuf.data.size()) {
-        logHandler.Print("GLBLoader: buffer overrun in sparse indices\n");
-        return false;
-    }
+	if (indexBase + indexSize * count > indexBuf.data.size()) {
+		logHandler.Print("GLBLoader: buffer overrun in sparse indices\n");
+		return false;
+	}
 
-    if (valueBase + elementSize * count > valueBuf.data.size()) {
-        logHandler.Print("GLBLoader: buffer overrun in sparse values\n");
-        return false;
-    }
+	if (valueBase + elementSize * count > valueBuf.data.size()) {
+		logHandler.Print("GLBLoader: buffer overrun in sparse values\n");
+		return false;
+	}
 
-    indices.Resize(static_cast<int32_t>(count));
+	indices.Resize(static_cast<int32_t>(count));
 
-    for (size_t i = 0; i < count; ++i) {
-        const uint8_t* src = indexBuf.data.data() + indexBase + i * indexSize;
-        uint32_t index;
-        if (indexSize == 1)
-            index = static_cast<uint32_t>(*src);
-        else if (indexSize == 2) {
-            uint16_t v;
-            std::memcpy(&v, src, 2);
-            index = static_cast<uint32_t>(v);
-        }
-        else
-            std::memcpy(&index, src, 4);
-        if (static_cast<size_t>(index) >= acc.count) {
-            logHandler.Print("GLBLoader: sparse index out of range\n");
-            return false;
-        }
-        indices[static_cast<int32_t>(i)] = index;
-    }
+	for (size_t i = 0; i < count; ++i) {
+		const uint8_t*	src = indexBuf.data.data() + indexBase + i * indexSize;
+		uint32_t		index;
+		if (indexSize == 1)
+			index = static_cast<uint32_t>(*src);
+		else if (indexSize == 2) {
+			uint16_t v;
+			std::memcpy(&v, src, 2);
+			index = static_cast<uint32_t>(v);
+		}
+		else
+			std::memcpy(&index, src, 4);
+		if (static_cast<size_t>(index) >= acc.count) {
+			logHandler.Print("GLBLoader: sparse index out of range\n");
+			return false;
+		}
+		indices[static_cast<int32_t>(i)] = index;
+	}
 
-    values = valueBuf.data.data() + valueBase;
-    return true;
+	values = valueBuf.data.data() + valueBase;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex, bool detectHull) {
-    if (materialIndex < 0 or materialIndex >= static_cast<int>(model.materials.size())) {
-        return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
-    }
+Vector4f GLBLoader::PrimitiveBaseColor(const tinygltf::Model& model, int materialIndex, bool detectHull)
+{
+	if (materialIndex < 0 or materialIndex >= static_cast<int>(model.materials.size())) {
+		return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+	}
 
-    auto& mat = model.materials[static_cast<size_t>(materialIndex)];
-    auto& f = mat.pbrMetallicRoughness.baseColorFactor;
+	auto& mat = model.materials[static_cast<size_t>(materialIndex)];
+	auto& f = mat.pbrMetallicRoughness.baseColorFactor;
 
-    if (f.size() == 4) {
-        Vector4f color = Vector4f(
-            static_cast<float>(f[0]),
-            static_cast<float>(f[1]),
-            static_cast<float>(f[2]),
-            static_cast<float>(f[3])
-        );
+	if (f.size() == 4) {
+		Vector4f color = Vector4f(
+			static_cast<float>(f[0]),
+			static_cast<float>(f[1]),
+			static_cast<float>(f[2]),
+			static_cast<float>(f[3]));
 
-        static Conversions::FloatInterval placeholderColor{ 0.99f, 0.992f };
-        if (detectHull and placeholderColor.Contains(color.R()) and placeholderColor.Contains(color.G()) and placeholderColor.Contains(color.B()))
-            return RGBAColor(0.0f, 0.0f, 0.0f, -1.0f);
-        return color;
-        }
-    return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
+		static Conversions::FloatInterval placeholderColor{ 0.99f, 0.992f };
+		if (detectHull and placeholderColor.Contains(color.R()) and placeholderColor.Contains(color.G()) and
+			placeholderColor.Contains(color.B()))
+			return RGBAColor(0.0f, 0.0f, 0.0f, -1.0f);
+		return color;
+	}
+	return Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::RecomputeMorphDeltas(ShapeKeySet& sk, const AutoArray<Vector3f>& morphedVertices) {
-    int32_t l = m_data.vertices.Length();
-    if (morphedVertices.Length() != l) {
-        logHandler.Print("GLBLoader: morphed vertex count does not match base vertex count in RecomputeMorphDeltas\n");
-        return;
-    }
+void GLBLoader::RecomputeMorphDeltas(ShapeKeySet& sk, const AutoArray<Vector3f>& morphedVertices)
+{
+	int32_t l = m_data.vertices.Length();
+	if (morphedVertices.Length() != l) {
+		logHandler.Print("GLBLoader: morphed vertex count does not match base vertex count in RecomputeMorphDeltas\n");
+		return;
+	}
 
-    sk.deltas.Resize(l);
+	sk.deltas.Resize(l);
 
-    for (int32_t i = 0; i < l; ++i) {
-        sk.deltas[i] = morphedVertices[i] - m_data.vertices[i];
-    }
+	for (int32_t i = 0; i < l; ++i) {
+		sk.deltas[i] = morphedVertices[i] - m_data.vertices[i];
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void GLBLoader::StitchPrimitives(void) {
-    for (auto& sk : m_data.shapeKeys) {
-        int32_t l = m_data.vertices.Length();
-        AutoArray<Vector3f> morphedVertices;
-        morphedVertices.Resize(l);
-        for (int32_t i = 0; i < l; ++i)
-            morphedVertices[i] = m_data.vertices[i] + sk.deltas[i];
-        for (int32_t i = 0; i < l; ++i) {
-            if (m_isHullVertex[i])
-                continue;
-            int32_t* indexPtr = m_hullVertexMap.Find(m_data.vertices[i]);
-            if (not indexPtr)
-                continue;
-            morphedVertices[i] = morphedVertices[*indexPtr];
-        }
-        RecomputeMorphDeltas(sk, morphedVertices);
-    }
+void GLBLoader::StitchPrimitives(void)
+{
+	for (auto& sk : m_data.shapeKeys) {
+		int32_t				l = m_data.vertices.Length();
+		AutoArray<Vector3f>	morphedVertices;
+		morphedVertices.Resize(l);
+		for (int32_t i = 0; i < l; ++i)
+			morphedVertices[i] = m_data.vertices[i] + sk.deltas[i];
+		for (int32_t i = 0; i < l; ++i) {
+			if (m_isHullVertex[i])
+				continue;
+			int32_t* indexPtr = m_hullVertexMap.Find(m_data.vertices[i]);
+			if (not indexPtr)
+				continue;
+			morphedVertices[i] = morphedVertices[*indexPtr];
+		}
+		RecomputeMorphDeltas(sk, morphedVertices);
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::SaveToFile(const String& filename) const {
-    std::ofstream f((const char*) filename, std::ios::binary | std::ios::trunc);
-    if (not f)
-        return false;
+bool GLBLoader::SaveToFile(const String& filename) const
+{
+	std::ofstream f((const char*)filename, std::ios::binary | std::ios::trunc);
+	if (not f)
+		return false;
 
-    auto writeU32 = [&](uint32_t v) -> bool {
-        f.write(reinterpret_cast<const char*>(&v), sizeof(v));
-        return f.good();
-        };
+	auto writeU32 = [&](uint32_t v) -> bool {
+		f.write(reinterpret_cast<const char*>(&v), sizeof(v));
+		return f.good();
+	};
 
-    auto writeBuffer = [&](const void* data, size_t size) -> bool {
-        if (size == 0)
-            return true;
-        f.write(reinterpret_cast<const char*>(data), size);
-        return f.good();
-        };
+	auto writeBuffer = [&](const void* data, size_t size) -> bool {
+		if (size == 0)
+			return true;
+		f.write(reinterpret_cast<const char*>(data), size);
+		return f.good();
+	};
 
-    uint32_t vertexCount = uint32_t(m_data.vertices.Length());
-    uint32_t colorCount = uint32_t(m_data.colors.Length());
-    uint32_t normalCount = uint32_t(m_data.normals.Length());
-    uint32_t shapeKeyCount = uint32_t(m_data.shapeKeys.Length());
+	uint32_t vertexCount = uint32_t(m_data.vertices.Length());
+	uint32_t colorCount = uint32_t(m_data.colors.Length());
+	uint32_t normalCount = uint32_t(m_data.normals.Length());
+	uint32_t shapeKeyCount = uint32_t(m_data.shapeKeys.Length());
 
-    if (not writeU32(vertexCount))
-        return false;
-    if (not writeU32(colorCount))
-        return false;
-    if (not writeU32(normalCount))
-        return false;
-    if (not writeU32(shapeKeyCount))
-        return false;
+	if (not writeU32(vertexCount))
+		return false;
+	if (not writeU32(colorCount))
+		return false;
+	if (not writeU32(normalCount))
+		return false;
+	if (not writeU32(shapeKeyCount))
+		return false;
 
-    if (not writeBuffer(m_data.vertices.DataPtr(), size_t(vertexCount) * sizeof(Vector3f)))
-        return false;
-    if (not writeBuffer(m_data.colors.DataPtr(), size_t(colorCount) * sizeof(RGBAColor)))
-        return false;
-    if (not writeBuffer(m_data.normals.DataPtr(), size_t(normalCount) * sizeof(Vector3f)))
-        return false;
+	if (not writeBuffer(m_data.vertices.DataPtr(), size_t(vertexCount) * sizeof(Vector3f)))
+		return false;
+	if (not writeBuffer(m_data.colors.DataPtr(), size_t(colorCount) * sizeof(RGBAColor)))
+		return false;
+	if (not writeBuffer(m_data.normals.DataPtr(), size_t(normalCount) * sizeof(Vector3f)))
+		return false;
 
-    for (auto& sk : m_data.shapeKeys) {
-        std::string name = sk.name;
-        uint32_t nameLen = uint32_t(name.size());
-        uint32_t deltaCount = uint32_t(sk.deltas.Length());
-        uint32_t normalDeltaCount = uint32_t(sk.normalDeltas.Length());
+	for (auto& sk : m_data.shapeKeys) {
+		std::string	name = sk.name;
+		uint32_t	nameLen = uint32_t(name.size());
+		uint32_t	deltaCount = uint32_t(sk.deltas.Length());
+		uint32_t	normalDeltaCount = uint32_t(sk.normalDeltas.Length());
 
-        if (not writeU32(nameLen))
-            return false;
-        if (not writeBuffer(name.data(), size_t(nameLen)))
-            return false;
+		if (not writeU32(nameLen))
+			return false;
+		if (not writeBuffer(name.data(), size_t(nameLen)))
+			return false;
 
-        if (not writeU32(deltaCount))
-            return false;
-        if (not writeBuffer(sk.deltas.DataPtr(), size_t(deltaCount) * sizeof(Vector3f)))
-            return false;
+		if (not writeU32(deltaCount))
+			return false;
+		if (not writeBuffer(sk.deltas.DataPtr(), size_t(deltaCount) * sizeof(Vector3f)))
+			return false;
 
-        if (not writeU32(normalDeltaCount))
-            return false;
-        if (not writeBuffer(sk.normalDeltas.DataPtr(), size_t(normalDeltaCount) * sizeof(Vector3f)))
-            return false;
-    }
+		if (not writeU32(normalDeltaCount))
+			return false;
+		if (not writeBuffer(sk.normalDeltas.DataPtr(), size_t(normalDeltaCount) * sizeof(Vector3f)))
+			return false;
+	}
 
-    uint32_t jointNameCount = uint32_t(m_data.jointNames.Length());
-    if (not writeU32(jointNameCount))
-        return false;
-    for (auto& jointName : m_data.jointNames) {
-        std::string name = jointName;
-        uint32_t nameLen = uint32_t(name.size());
-        if (not writeU32(nameLen))
-            return false;
-        if (not writeBuffer(name.data(), size_t(nameLen)))
-            return false;
-    }
+	uint32_t jointNameCount = uint32_t(m_data.jointNames.Length());
+	if (not writeU32(jointNameCount))
+		return false;
+	for (auto& jointName : m_data.jointNames) {
+		std::string	name = jointName;
+		uint32_t	nameLen = uint32_t(name.size());
+		if (not writeU32(nameLen))
+			return false;
+		if (not writeBuffer(name.data(), size_t(nameLen)))
+			return false;
+	}
 
-    uint32_t jointIndexCount = uint32_t(m_data.jointIndices.Length());
-    if (not writeU32(jointIndexCount))
-        return false;
-    if (not writeBuffer(m_data.jointIndices.DataPtr(), size_t(jointIndexCount) * sizeof(int32_t)))
-        return false;
+	uint32_t jointIndexCount = uint32_t(m_data.jointIndices.Length());
+	if (not writeU32(jointIndexCount))
+		return false;
+	if (not writeBuffer(m_data.jointIndices.DataPtr(), size_t(jointIndexCount) * sizeof(int32_t)))
+		return false;
 
-    return f.good();
+	return f.good();
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool GLBLoader::LoadFromFile(const String& filename) {
-    std::ifstream f((const char*) filename, std::ios::binary);
-    if (not f)
-        return false;
+bool GLBLoader::LoadFromFile(const String& filename)
+{
+	std::ifstream f((const char*)filename, std::ios::binary);
+	if (not f)
+		return false;
 
-    auto readU32 = [&](uint32_t& v) -> bool {
-        f.read(reinterpret_cast<char*>(&v), sizeof(v));
-        return f.good();
-        };
+	auto readU32 = [&](uint32_t& v) -> bool {
+		f.read(reinterpret_cast<char*>(&v), sizeof(v));
+		return f.good();
+	};
 
-    auto readBuffer = [&](void* data, size_t size) -> bool {
-        if (size == 0)
-            return true;
-        f.read(reinterpret_cast<char*>(data), size);
-        return f.good();
-        };
+	auto readBuffer = [&](void* data, size_t size) -> bool {
+		if (size == 0)
+			return true;
+		f.read(reinterpret_cast<char*>(data), size);
+		return f.good();
+	};
 
-    uint32_t vertexCount;
-    uint32_t colorCount;
-    uint32_t normalCount;
-    uint32_t shapeKeyCount;
+	uint32_t vertexCount;
+	uint32_t colorCount;
+	uint32_t normalCount;
+	uint32_t shapeKeyCount;
 
-    if (not readU32(vertexCount))
-        return false;
-    if (not readU32(colorCount))
-        return false;
-    if (not readU32(normalCount))
-        return false;
-    if (not readU32(shapeKeyCount))
-        return false;
+	if (not readU32(vertexCount))
+		return false;
+	if (not readU32(colorCount))
+		return false;
+	if (not readU32(normalCount))
+		return false;
+	if (not readU32(shapeKeyCount))
+		return false;
 
-    m_data.vertices.Clear();
-    m_data.colors.Clear();
-    m_data.normals.Clear();
-    m_data.texCoords.Clear();
-    m_data.shapeKeys.Clear();
-    m_data.indices.Clear();
-    m_data.parts.Clear();
-    m_data.materials.Clear();
-    m_data.images.Clear();
-    m_data.imageNames.Clear();
-    m_data.jointIndices.Clear();
-    m_data.jointNames.Clear();
-    m_model = tinygltf::Model();
+	m_data.vertices.Clear();
+	m_data.colors.Clear();
+	m_data.normals.Clear();
+	m_data.texCoords.Clear();
+	m_data.shapeKeys.Clear();
+	m_data.indices.Clear();
+	m_data.parts.Clear();
+	m_data.materials.Clear();
+	m_data.images.Clear();
+	m_data.imageNames.Clear();
+	m_data.jointIndices.Clear();
+	m_data.jointNames.Clear();
+	m_model = tinygltf::Model();
 
-    m_data.vertices.Resize(int32_t(vertexCount));
-    m_data.colors.Resize(int32_t(colorCount));
-    m_data.normals.Resize(int32_t(normalCount));
+	m_data.vertices.Resize(int32_t(vertexCount));
+	m_data.colors.Resize(int32_t(colorCount));
+	m_data.normals.Resize(int32_t(normalCount));
 
-    if (not readBuffer(m_data.vertices.DataPtr(), size_t(vertexCount) * sizeof(Vector3f)))
-        return false;
-    if (not readBuffer(m_data.colors.DataPtr(), size_t(colorCount) * sizeof(RGBAColor)))
-        return false;
-    if (not readBuffer(m_data.normals.DataPtr(), size_t(normalCount) * sizeof(Vector3f)))
-        return false;
+	if (not readBuffer(m_data.vertices.DataPtr(), size_t(vertexCount) * sizeof(Vector3f)))
+		return false;
+	if (not readBuffer(m_data.colors.DataPtr(), size_t(colorCount) * sizeof(RGBAColor)))
+		return false;
+	if (not readBuffer(m_data.normals.DataPtr(), size_t(normalCount) * sizeof(Vector3f)))
+		return false;
 
-    if (m_data.colors.Length() != m_data.vertices.Length())
-        return false;
-    if (m_data.normals.Length() != m_data.vertices.Length())
-        return false;
+	if (m_data.colors.Length() != m_data.vertices.Length())
+		return false;
+	if (m_data.normals.Length() != m_data.vertices.Length())
+		return false;
 
-    for (uint32_t k = 0; k < shapeKeyCount; ++k) {
-        ShapeKeySet sk;
-        uint32_t nameLen;
-        uint32_t deltaCount;
-        uint32_t normalDeltaCount;
+	for (uint32_t k = 0; k < shapeKeyCount; ++k) {
+		ShapeKeySet	sk;
+		uint32_t	nameLen;
+		uint32_t	deltaCount;
+		uint32_t	normalDeltaCount;
 
-        if (not readU32(nameLen))
-            return false;
+		if (not readU32(nameLen))
+			return false;
 
-        std::string name;
-        name.resize(size_t(nameLen));
-        if (not readBuffer(name.data(), size_t(nameLen)))
-            return false;
-        sk.name = String(name.c_str());
+		std::string name;
+		name.resize(size_t(nameLen));
+		if (not readBuffer(name.data(), size_t(nameLen)))
+			return false;
+		sk.name = String(name.c_str());
 
-        if (not readU32(deltaCount))
-            return false;
-        sk.deltas.Resize(int32_t(deltaCount));
-        if (not readBuffer(sk.deltas.DataPtr(), size_t(deltaCount) * sizeof(Vector3f)))
-            return false;
+		if (not readU32(deltaCount))
+			return false;
+		sk.deltas.Resize(int32_t(deltaCount));
+		if (not readBuffer(sk.deltas.DataPtr(), size_t(deltaCount) * sizeof(Vector3f)))
+			return false;
 
-        if (not readU32(normalDeltaCount))
-            return false;
-        sk.normalDeltas.Resize(int32_t(normalDeltaCount));
-        if (not readBuffer(sk.normalDeltas.DataPtr(), size_t(normalDeltaCount) * sizeof(Vector3f)))
-            return false;
+		if (not readU32(normalDeltaCount))
+			return false;
+		sk.normalDeltas.Resize(int32_t(normalDeltaCount));
+		if (not readBuffer(sk.normalDeltas.DataPtr(), size_t(normalDeltaCount) * sizeof(Vector3f)))
+			return false;
 
-        if (sk.deltas.Length() != m_data.vertices.Length())
-            return false;
-        if (sk.normalDeltas.Length() != m_data.vertices.Length())
-            return false;
+		if (sk.deltas.Length() != m_data.vertices.Length())
+			return false;
+		if (sk.normalDeltas.Length() != m_data.vertices.Length())
+			return false;
 
-        m_data.shapeKeys.Append(std::move(sk));
-    }
+		m_data.shapeKeys.Append(std::move(sk));
+	}
 
-    uint32_t jointNameCount;
-    if (not readU32(jointNameCount))
-        return false;
-    for (uint32_t k = 0; k < jointNameCount; ++k) {
-        uint32_t nameLen;
-        if (not readU32(nameLen))
-            return false;
-        std::string name;
-        name.resize(size_t(nameLen));
-        if (not readBuffer(name.data(), size_t(nameLen)))
-            return false;
-        m_data.jointNames.Append(String(name.c_str()));
-    }
+	uint32_t jointNameCount;
+	if (not readU32(jointNameCount))
+		return false;
+	for (uint32_t k = 0; k < jointNameCount; ++k) {
+		uint32_t nameLen;
+		if (not readU32(nameLen))
+			return false;
+		std::string name;
+		name.resize(size_t(nameLen));
+		if (not readBuffer(name.data(), size_t(nameLen)))
+			return false;
+		m_data.jointNames.Append(String(name.c_str()));
+	}
 
-    uint32_t jointIndexCount;
-    if (not readU32(jointIndexCount))
-        return false;
-    if (jointIndexCount != uint32_t(m_data.vertices.Length()))
-        return false;
-    m_data.jointIndices.Resize(int32_t(jointIndexCount));
-    if (not readBuffer(m_data.jointIndices.DataPtr(), size_t(jointIndexCount) * sizeof(int32_t)))
-        return false;
+	uint32_t jointIndexCount;
+	if (not readU32(jointIndexCount))
+		return false;
+	if (jointIndexCount != uint32_t(m_data.vertices.Length()))
+		return false;
+	m_data.jointIndices.Resize(int32_t(jointIndexCount));
+	if (not readBuffer(m_data.jointIndices.DataPtr(), size_t(jointIndexCount) * sizeof(int32_t)))
+		return false;
 
-    return f.good();
+	return f.good();
 }
 // =================================================================================================

@@ -5,102 +5,121 @@
 
 // =================================================================================================
 
-template<typename DATA_T>
+template <typename DATA_T>
 class DataContainer {
 public:
-    using DataList = List<DATA_T>;
-    using DataTable = AutoArray<DATA_T>;
+	using DataList = List<DATA_T>;
+	using DataTable = AutoArray<DATA_T>;
 
-    DataList    m_dataList;
-    DataTable   m_dataTable;
+	DataList	m_dataList;
+	DataTable	m_dataTable;
 
-    DataContainer()
-        : m_dataList(), m_dataTable()
-    {
-    }
-
-    inline DataList& GetList(void) {
-        return m_dataList;
-    }
-
-    inline DataTable& GetTable(void) {
-        return m_dataTable;
-    }
-
-    inline DATA_T* Append(DATA_T data) {
-        return m_dataList.Append(data);
-    }
-
-    inline DATA_T& operator[](const int i) {
-        return m_dataTable[i];
-    }
-
-    inline const DATA_T& operator[](const int i) const {
-        return m_dataTable[i];
-    }
-
-    inline DATA_T* Data(const int i) noexcept {
-        return m_dataTable.Data(i);
+	DataContainer()
+		: m_dataList()
+		, m_dataTable()
+	{
 	}
 
-    inline int Count(void) {
-        return static_cast<int>(m_dataList.IsEmpty() ? m_dataTable.Length() : m_dataList.Length());
-    }
+	inline DataList& GetList(void) {
+		return m_dataList;
+	}
 
-    inline auto begin() { return m_dataTable.begin(); }
+	inline DataTable& GetTable(void) {
+		return m_dataTable;
+	}
 
-    inline auto end() { return m_dataTable.end(); }
+	inline DATA_T* Append(DATA_T data) {
+		return m_dataList.Append(data);
+	}
 
-    inline auto rbegin() { return m_dataTable.rbegin(); }
+	inline DATA_T& operator[](const int i) {
+		return m_dataTable[i];
+	}
 
-    inline auto rend() { return m_dataTable.rend(); }
+	inline const DATA_T& operator[](const int i) const {
+		return m_dataTable[i];
+	}
 
-    inline auto begin() const { return m_dataTable.begin(); }
+	inline DATA_T* Data(const int i)
+	noexcept
+	{
+		return m_dataTable.Data(i);
+	}
 
-    inline auto end() const { return m_dataTable.end(); }
+	inline int Count(void) {
+		return static_cast<int>(m_dataList.IsEmpty() ? m_dataTable.Length() : m_dataList.Length());
+	}
 
-    inline auto rbegin() const { return m_dataTable.rbegin(); }
+	inline auto begin() {
+		return m_dataTable.begin();
+	}
 
-    inline auto rend() const { return m_dataTable.rend(); }
+	inline auto end() {
+		return m_dataTable.end();
+	}
 
-    void Convert(void) {
-        m_dataTable.Reserve(m_dataList.Length());
-        for (const auto& data : m_dataList)
-            m_dataTable.Append(data);
-        m_dataList.Clear();
-    }
+	inline auto rbegin() {
+		return m_dataTable.rbegin();
+	}
 
-    bool LoadFromFile(const std::string& filename) {
-        return m_dataTable.LoadFromFile(filename);
-    }
+	inline auto rend() {
+		return m_dataTable.rend();
+	}
 
-    bool SaveToFile(const std::string& filename) {
-        return m_dataTable.SaveToFile(filename);
-    }
+	inline auto begin() const {
+		return m_dataTable.begin();
+	}
+
+	inline auto end() const {
+		return m_dataTable.end();
+	}
+
+	inline auto rbegin() const {
+		return m_dataTable.rbegin();
+	}
+
+	inline auto rend() const {
+		return m_dataTable.rend();
+	}
+
+	void Convert(void)
+	{
+		m_dataTable.Reserve(m_dataList.Length());
+		for (const auto& data : m_dataList)
+			m_dataTable.Append(data);
+		m_dataList.Clear();
+	}
+
+	bool LoadFromFile(const std::string& filename) {
+		return m_dataTable.LoadFromFile(filename);
+	}
+
+	bool SaveToFile(const std::string& filename) {
+		return m_dataTable.SaveToFile(filename);
+	}
 
 private:
-    template<typename T>
-    static constexpr bool deleteable = requires(T v) {
-        delete v;
-    };
+	template <typename T>
+	static constexpr bool deleteable = requires(T v) {
+		delete v;
+	};
 
 public:
-    void Destroy(void) {
-        if constexpr (deleteable<DATA_T>) {
-            for (auto data : m_dataList)
-                delete data;
-            for (auto data : m_dataTable)
-                delete data;
-        }
-        m_dataList.Clear();
-        m_dataTable.Reset();
-    }
+	void Destroy(void)
+	{
+		if constexpr (deleteable<DATA_T>) {
+			for (auto data : m_dataList)
+				delete data;
+			for (auto data : m_dataTable)
+				delete data;
+		}
+		m_dataList.Clear();
+		m_dataTable.Reset();
+	}
 
-    ~DataContainer(void) {
-        Destroy();
-    }
+	~DataContainer(void) {
+		Destroy();
+	}
 };
 
 // =================================================================================================
-
-

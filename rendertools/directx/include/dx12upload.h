@@ -15,31 +15,39 @@ void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resourc
 // wires COPY_DEST -> PIXEL_SHADER_RESOURCE, which is right for a resource that was just created in
 // COPY_DEST but wrong for one that has already been read by a shader and is written again.
 void SubresourceBarrier(ID3D12GraphicsCommandList* list, ID3D12Resource* resource, UINT subresource,
-                        D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
+						D3D12_RESOURCE_STATES stateBefore, D3D12_RESOURCE_STATES stateAfter);
 
-bool UploadSubresource(ID3D12Device* device,
-                       ID3D12GraphicsCommandList* list,
-                       ID3D12Resource* dstResource,
-                       UINT subresource,
-                       const uint8_t* pixels,
-                       int width, int height, int channels,
-                       ComPtr<ID3D12Resource>& outUpload,
-                       bool addBarrier = true) noexcept;
+bool UploadSubresource(ID3D12Device*				device,
+					   ID3D12GraphicsCommandList*	list,
+					   ID3D12Resource*				dstResource,
+					   UINT							subresource,
+					   const uint8_t*				pixels,
+					   int width, int height, int	channels,
+					   ComPtr<ID3D12Resource>&	outUpload,
+					   bool						addBarrier = true)
+noexcept;
 
 // =================================================================================================
 // High-level: open upload list, copy all subresources, flush — no list management by the caller.
 
 // Upload faceCount subresources (1 for a plain 2D texture, 6 for a cubemap).
-bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces, int faceCount, int width, int height, int channels) noexcept;
+bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces, int faceCount, int width,
+					   int height, int channels)
+noexcept;
 
 // Single-subresource convenience.
-inline bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels) noexcept {
-    return UploadTextureData(device, dstResource, &pixels, 1, width, height, channels);
+inline bool UploadTextureData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height,
+							  int channels)
+noexcept
+{
+	return UploadTextureData(device, dstResource, &pixels, 1, width, height, channels);
 }
 
 // Build a CPU mip chain from the base image (2×2 box filter, edge-clamped) and upload one
 // subresource per level. dstResource must have been created with the matching MipLevels count.
-bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height, int channels, uint32_t mipLevels, eColorEncoding colorEncoding) noexcept;
+bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* pixels, int width, int height,
+							   int channels, uint32_t mipLevels, eColorEncoding colorEncoding)
+noexcept;
 
 // Upload an uncompressed 2D texture ARRAY: one subresource per (layer, mip). layers[l] points at that
 // layer's tightly packed mip chain, level 0 first - what BaseTextureArray::BuildMipChains () hands out.
@@ -52,19 +60,23 @@ bool UploadTextureDataWithMips(ID3D12Device* device, ID3D12Resource* dstResource
 // the closing barrier declares a StateBefore the resource is not in, both of which the debug layer
 // rejects and the driver is free to ignore.
 bool UploadTextureArrayData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* layers,
-                            int layerCount, int width, int height, int channels, int mipCount,
-                            int firstLayer = 0, bool isRefresh = false) noexcept;
+							int layerCount, int width, int height, int channels, int mipCount,
+							int firstLayer = 0, bool isRefresh = false)
+noexcept;
 
 // Upload a block-compressed (BC1/BC7) texture: one subresource per (face, mip). faces[f] points at
 // face f's tightly-packed mip chain (level 0 first; ceil(w/4)*ceil(h/4)*GfxBlockBytes bytes per
 // level). dstResource must already exist with the matching DXGI BC format, DepthOrArraySize ==
 // faceCount (1 for a plain 2D texture, 6 for a cubemap) and MipLevels == mipCount.
 bool UploadCompressedData(ID3D12Device* device, ID3D12Resource* dstResource, const uint8_t* const* faces,
-                          int faceCount, int width, int height, GfxPixelFormat fmt, int mipCount,
-                          int firstLayer = 0, bool isRefresh = false) noexcept;
+						  int faceCount, int width, int height, GfxPixelFormat fmt, int mipCount,
+						  int firstLayer = 0, bool isRefresh = false)
+noexcept;
 
 // Create + upload a Texture3D resource. Returns nullptr on failure.
-ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride, const void* data) noexcept;
+ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, int d, DXGI_FORMAT fmt, uint32_t pixelStride,
+										   const void* data)
+noexcept;
 
 // =================================================================================================
 // Platform-neutral upload entry points used by base_noisetexture. Each function does the full
@@ -73,8 +85,10 @@ ComPtr<ID3D12Resource> Upload3DTextureData(ID3D12Device* device, int w, int h, i
 // uploads the pixel data, (re)allocates an SRV handle in the global descriptor heap, calls
 // tex.SetParams(false), and sets tex.m_isValid + tex.m_isDeployed on success.
 
-bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, const void* data) noexcept;
+bool Upload2DTexture(Texture& tex, int width, int height, GfxPixelFormat fmt, const void* data)
+noexcept;
 
-bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips) noexcept;
+bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips)
+noexcept;
 
 // =================================================================================================

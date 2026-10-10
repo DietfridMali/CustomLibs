@@ -14,11 +14,11 @@
 #include "avltree.hpp"
 #include "gfxstates.h"
 #include "texturebuffer.h"
-#include "texturesampling.h"	// GfxFilterMode
+#include "texturesampling.h" // GfxFilterMode
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL.h"
 #include "SDL_image.h"
@@ -33,13 +33,13 @@ using TextureList = List<Texture*>;
 using TextureArray = AutoArray<Texture*>;
 
 #ifdef USE_SHARED_HANDLES
-#   undef USE_SHARED_HANDLES
+#undef USE_SHARED_HANDLES
 #endif
 
 #define USE_SHARED_HANDLES 1
 
 #ifdef USE_SHARED_POINTERS
-#   undef USE_SHARED_POINTERS
+#undef USE_SHARED_POINTERS
 #endif
 
 #define USE_SHARED_POINTERS 0
@@ -47,17 +47,17 @@ using TextureArray = AutoArray<Texture*>;
 // =================================================================================================
 
 struct TextureCreationParams {
-    bool        premultiply{ false };
-    bool        flipVertically{ false };
-    bool        cartoonize{ false };
-	bool        isRequired{ true };
-    bool        isDisposable{ false };
-    bool        useMipMaps{ false };
-    eColorEncoding colorEncoding{ ecLinear };
-    uint16_t    blur{ 4 };
-    uint16_t    gradients{ 7 };
-    uint16_t    outline{ 4 };
-	String	    keyDecoration{ "" };
+	bool			premultiply{ false };
+	bool			flipVertically{ false };
+	bool			cartoonize{ false };
+	bool			isRequired{ true };
+	bool			isDisposable{ false };
+	bool			useMipMaps{ false };
+	eColorEncoding	colorEncoding{ ecLinear };
+	uint16_t		blur{ 4 };
+	uint16_t		gradients{ 7 };
+	uint16_t		outline{ 4 };
+	String			keyDecoration{ "" };
 };
 
 // =================================================================================================
@@ -65,355 +65,387 @@ struct TextureCreationParams {
 
 class AbstractTexture {
 public:
-    virtual bool Create(void) = 0;
+	virtual bool Create(void) = 0;
 
-    virtual void Destroy(void) = 0;
+	virtual void Destroy(void) = 0;
 
-    virtual bool IsAvailable(bool isDeploying = false) = 0;
+	virtual bool IsAvailable(bool isDeploying = false) = 0;
 
-    virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
+	virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
 
-    virtual void Release(void) = 0;
+	virtual void Release(void) = 0;
 
-    virtual void SetParams(bool forceUpdate = false) = 0;
+	virtual void SetParams(bool forceUpdate = false) = 0;
 
-    virtual bool Deploy(int bufferIndex = 0) = 0;
+	virtual bool Deploy(int bufferIndex = 0) = 0;
 
-    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
+	virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
 };
 
 // =================================================================================================
-// texture handling: Loading from file, parameterization and sending to OpenGL driver, 
+// texture handling: Loading from file, parameterization and sending to OpenGL driver,
 // enabling for rendering
 // Base class for higher level textures (e.g. cubemaps)
 
 struct RenderOffsets {
-    float x, y;
+	float x, y;
 };
 
 
-class Texture 
-    : public AbstractTexture
-{
+class Texture
+	: public AbstractTexture {
 public:
 #if USE_SHARED_HANDLES
-    SharedTextureHandle         m_handle;
+	SharedTextureHandle m_handle;
 #else
-    GLuint                      m_handle;
+	GLuint m_handle;
 #endif
-    String                      m_name;
-    List<TextureBuffer*>        m_buffers;
-    List<String>                m_filenames;
-    GLenum                      m_type{ GL_TEXTURE_2D };
-    int                         m_tmuIndex{ -1 };
-    int                         m_wrapMode{ GL_REPEAT };   // GL constant, S axis - set through SetWrapping ()
-    int                         m_wrapModeV{ GL_REPEAT };  // T axis; the two differ only where asked for
-    int                         m_useMipMaps{ false };
-    eTextureCompression         m_compression{ tcNone };  // set from the DDS format at load; tcNone = uncompressed / PNG
-    eColorEncoding              m_colorEncoding{ ecLinear };
-    int                         m_mipChainLength{ 0 };
-    bool                        m_hasParams{ false };
-    bool                        m_isDeployed{ false };
-    bool                        m_isValid{ false };
-    bool                        m_isRenderTarget{ false };
-    bool                        m_isDisposable{ false };
-    // The sampling state the texture is parameterized with - the same record DX and Vulkan keep.
-    // SetParams () fills it (DefaultSampling ()) and writes it to GL (ApplySampling ()); a derived
-    // texture with a filter policy of its own fills it differently and applies it the same way.
-    TextureSampling             m_sampling;
+	String					m_name;
+	List<TextureBuffer*>	m_buffers;
+	List<String>			m_filenames;
+	GLenum					m_type{ GL_TEXTURE_2D };
+	int						m_tmuIndex{ -1 };
+	int						m_wrapMode{ GL_REPEAT }; // GL constant, S axis - set through SetWrapping ()
+	int						m_wrapModeV{ GL_REPEAT }; // T axis; the two differ only where asked for
+	int						m_useMipMaps{ false };
+	eTextureCompression		m_compression{ tcNone }; // set from the DDS format at load; tcNone = uncompressed / PNG
+	eColorEncoding			m_colorEncoding{ ecLinear };
+	int						m_mipChainLength{ 0 };
+	bool					m_hasParams{ false };
+	bool					m_isDeployed{ false };
+	bool					m_isValid{ false };
+	bool					m_isRenderTarget{ false };
+	bool					m_isDisposable{ false };
+	// The sampling state the texture is parameterized with - the same record DX and Vulkan keep.
+	// SetParams () fills it (DefaultSampling ()) and writes it to GL (ApplySampling ()); a derived
+	// texture with a filter policy of its own fills it differently and applies it the same way.
+	TextureSampling m_sampling;
+
+	static SharedTextureHandle nullHandle;
+
+	static inline AVLTree<String, Texture*> textureLUT;
+
+	static inline size_t CreateID(void)
+	noexcept
+	{
+		static size_t textureID = 0;
+		return ++textureID;
+	}
+
+	static int CompareTextures(void* context, const String& key1, const String& key2);
+
+	static void SetupLUT(void)
+	noexcept
+	{
+		static bool needSetup = true;
+		if (needSetup) {
+			textureLUT.SetComparator(&Texture::CompareTextures);
+			needSetup = false;
+		}
+	}
+
+	static inline bool UpdateLUT(int update = -1)
+	{ // -1: just query; 0: false; 1: true
+		static bool updateLUT = true;
+		if (update != -1)
+			updateLUT = update == 1;
+		return updateLUT;
+	}
+
+	// GL_REPEAT, not GL_CLAMP_TO_EDGE: SetParams () forced repeat on every texture regardless of this
+	// value, so repeat is what the default HAS been all along. Now that SetParams () reads the member,
+	// the default has to say the same thing.
+	Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_REPEAT);
+
+	static int GLWrapMode(GfxWrapMode wrapMode)
+	noexcept;
+
+	~Texture()
+	noexcept;
+
+	inline void Register(String& name) {
+		m_name = name;
+		textureLUT.Insert(m_name, this);
+	}
+
+
+	Texture(const Texture& other) {
+		Copy(other);
+	}
+
+
+	Texture(Texture&& other)
+	noexcept
+	{
+		Move(other);
+	}
+
+
+	Texture& operator=(const Texture& other) {
+		return Copy(other);
+	}
 
-    static SharedTextureHandle  nullHandle;
 
-    static inline AVLTree<String, Texture*>  textureLUT;
+	Texture& operator=(Texture&& other)
+	noexcept
+	{
+		return Move(other);
+	}
 
-    static inline size_t CreateID(void) noexcept {
-        static size_t textureID = 0;
-        return ++textureID;
-    }
 
-    static int CompareTextures(void* context, const String& key1, const String& key2);
+	Texture& Copy(const Texture& other);
 
-    static void SetupLUT(void) noexcept {
-        static bool needSetup = true;
-        if (needSetup) {
-            textureLUT.SetComparator(&Texture::CompareTextures);
-            needSetup = false;
-        }
-    }
+	Texture& Move(Texture& other)
+	noexcept;
 
-    static inline bool UpdateLUT(int update = -1) { // -1: just query; 0: false; 1: true
-        static bool updateLUT = true;
-        if (update != -1)
-            updateLUT = update == 1;
-        return updateLUT;
-    }
+	inline bool operator==(Texture const& other) const
+	noexcept
+	{
+		return m_handle == other.m_handle;
+	}
 
-    // GL_REPEAT, not GL_CLAMP_TO_EDGE: SetParams () forced repeat on every texture regardless of this
-    // value, so repeat is what the default HAS been all along. Now that SetParams () reads the member,
-    // the default has to say the same thing.
-    Texture(GLuint handle = 0, int type = GL_TEXTURE_2D, int wrapMode = GL_REPEAT);
+	inline bool operator!=(Texture const& other) const
+	noexcept
+	{
+		return m_handle != other.m_handle;
+	}
 
-    static int GLWrapMode(GfxWrapMode wrapMode) noexcept;
+	virtual bool Create(void) override;
 
-    ~Texture() noexcept;
+	bool CreateHandle(void);
 
-    inline void Register(String& name) {
-       m_name = name;
-        textureLUT.Insert(m_name, this);
-    }
+	bool HasHandle(void) const
+	noexcept;
 
+	virtual void Destroy(void) override;
 
-    Texture(const Texture& other) {
-        Copy(other);
-    }
+	virtual bool IsAvailable(bool isDeploying = false) override;
 
+	virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
 
-    Texture(Texture&& other) noexcept {
-        Move(other);
-    }
+	virtual void Release(void) override;
 
+	inline bool IsRenderTarget(void)
+	noexcept
+	{
+		return m_isRenderTarget;
+	}
 
-    Texture& operator=(const Texture& other) {
-        return Copy(other);
-    }
+	inline bool IsDeployed(void)
+	noexcept
+	{
+		return m_isDeployed;
+	}
 
+	inline bool Activate(int tmuIndex = 0) {
+		return Bind(tmuIndex);
+	}
 
-    Texture& operator=(Texture&& other) noexcept {
-        return Move(other);
-    }
+	inline void Deactivate(void) {
+		Release();
+	}
 
-
-    Texture& Copy(const Texture& other);
-
-    Texture& Move(Texture& other)
-        noexcept;
-
-    inline bool operator== (Texture const& other) const
-        noexcept
-    {
-        return m_handle == other.m_handle;
-    }
-
-    inline bool operator!= (Texture const& other) const
-        noexcept
-    {
-        return m_handle != other.m_handle;
-    }
-
-    virtual bool Create(void) override;
-
-    bool CreateHandle(void);
-
-    bool HasHandle(void) const noexcept;
-
-    virtual void Destroy(void) override;
-
-    virtual bool IsAvailable(bool isDeploying = false) override;
-
-    virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
-
-    virtual void Release(void) override;
-
-    inline bool IsRenderTarget(void) noexcept {
-        return m_isRenderTarget;
-    }
-
-    inline bool IsDeployed(void) noexcept {
-        return m_isDeployed;
-    }
-
-    inline bool Activate(int tmuIndex = 0) {
-        return Bind(tmuIndex);
-    }
-
-    inline void Deactivate(void) {
-        Release();
-    }
-
-    inline void Validate(void) noexcept {
-        m_isValid = true;
-        m_isDeployed = true;
-    }
-
-    inline void Invalidate(void) noexcept {
-        m_isValid = false;
-        m_isDeployed = false;
-    }
-
-    virtual void SetParams(bool forceUpdate = false) override;
-
-    // The two halves of SetParams (): the default policy (linear, mip mapped if asked for, the wrap
-    // modes SetWrapping () recorded) into m_sampling, and m_sampling into the bound GL texture.
-    void DefaultSampling(void) noexcept;
-
-    void ApplySampling(void);
-
-    static GfxWrapMode WrapModeFromGL(int glWrapMode) noexcept;
-
-    void SetWrapping(GfxWrapMode wrapMode)
-        noexcept;
-
-    void SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
-        noexcept;
-
-    virtual bool Deploy(int bufferIndex = 0) override;
-
-    void UploadSRGBMipChain(GLenum internalFormat, GLenum format, const uint8_t* data, int width, int height, int channels);
-
-    bool GenerateSRGBMipChain(void);
-
-    bool Redeploy(void);
-
-    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
-
-    bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
-
-    bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
-
-    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
-
-    inline size_t TextureCount(void)
-        noexcept
-    {
-        return m_buffers.Length();
-    }
-
-    inline int GetWidth(int i = 0)
-        noexcept
-    {
-        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width : 0;
-    }
-
-    inline int GetHeight(int i = 0)
-        noexcept
-    {
-        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0;
-    }
-
-    inline uint8_t* GetData(int i = 0) {
-        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr;
-    }
-
-    inline int Type(void)
-        noexcept
-    {
-        return m_type;
-    }
-
-    inline TextureType GetTextureType(void) const noexcept {
-        if (m_type == GL_TEXTURE_3D)    return TextureType::Texture3D;
-        if (m_type == GL_TEXTURE_CUBE_MAP) return TextureType::CubeMap;
-        if (m_type == GL_TEXTURE_2D_ARRAY) return TextureType::Texture2DArray;
-        return TextureType::Texture2D;
-    }
-
-    inline eTextureCompression GetCompression(void) noexcept {
-        return m_compression;
-    }
-
-    inline void SetColorEncoding(eColorEncoding colorEncoding) noexcept {
-        m_colorEncoding = colorEncoding;
-    }
-
-    inline eColorEncoding ColorEncoding(int bufferIndex = 0) noexcept {
-        if ((bufferIndex < m_buffers.Length()) and m_buffers[bufferIndex]->m_info.m_hasColorEncoding)
-            return m_buffers[bufferIndex]->m_info.m_colorEncoding;
-        return m_colorEncoding;
-    }
-
-    // API-neutral type setter. Lets common code (e.g. base_noisetexture) assign m_type via
-    // TextureType without knowing that OGL stores it as GLenum. Mirrors VK/DX where m_type
-    // is already TextureType so the assignment is trivial there.
-    inline void SetType(TextureType t) noexcept {
-        m_type = TextureTypeToGLenum(t);
-    }
-
-    inline int WrapMode(void)
-        noexcept
-    {
-        return m_wrapMode;
-    }
-
-    inline String GetName(void) {
-        return m_name;
-    }
-
-    template <GLenum typeID>
-    inline static void Release(int tmuIndex)
-        noexcept
-    {
-        if (tmuIndex >= 0)
-            gfxStates.BindTexture<typeID>(0, tmuIndex);
-        gfxStates.ActiveTexture(GL_TEXTURE0); // always reset!
-    }
-
-    template <TextureType typeID>
-    inline static void Release(int tmuIndex)
-        noexcept
-    {
-        if (tmuIndex >= 0)
-            gfxStates.BindTexture(TextureTypeToGLenum(typeID), 0, tmuIndex);
-        gfxStates.ActiveTexture(GL_TEXTURE0);
-    }
-
-    static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
-        noexcept;
+	inline void Validate(void)
+	noexcept
+	{
+		m_isValid = true;
+		m_isDeployed = true;
+	}
+
+	inline void Invalidate(void)
+	noexcept
+	{
+		m_isValid = false;
+		m_isDeployed = false;
+	}
+
+	virtual void SetParams(bool forceUpdate = false) override;
+
+	// The two halves of SetParams (): the default policy (linear, mip mapped if asked for, the wrap
+	// modes SetWrapping () recorded) into m_sampling, and m_sampling into the bound GL texture.
+	void DefaultSampling(void)
+	noexcept;
+
+	void ApplySampling(void);
+
+	static GfxWrapMode WrapModeFromGL(int glWrapMode)
+	noexcept;
+
+	void SetWrapping(GfxWrapMode wrapMode)
+	noexcept;
+
+	void SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
+	noexcept;
+
+	virtual bool Deploy(int bufferIndex = 0) override;
+
+	void UploadSRGBMipChain(GLenum internalFormat, GLenum format, const uint8_t* data, int width, int height, int channels);
+
+	bool GenerateSRGBMipChain(void);
+
+	bool Redeploy(void);
+
+	virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
+
+	bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
+
+	bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
+
+	void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
+
+	inline size_t TextureCount(void)
+	noexcept
+	{
+		return m_buffers.Length();
+	}
+
+	inline int GetWidth(int i = 0)
+	noexcept
+	{
+		return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width : 0;
+	}
+
+	inline int GetHeight(int i = 0)
+	noexcept
+	{
+		return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0;
+	}
+
+	inline uint8_t* GetData(int i = 0) {
+		return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr;
+	}
+
+	inline int Type(void)
+	noexcept
+	{
+		return m_type;
+	}
+
+	inline TextureType GetTextureType(void) const
+	noexcept
+	{
+		if (m_type == GL_TEXTURE_3D)
+			return TextureType::Texture3D;
+		if (m_type == GL_TEXTURE_CUBE_MAP)
+			return TextureType::CubeMap;
+		if (m_type == GL_TEXTURE_2D_ARRAY)
+			return TextureType::Texture2DArray;
+		return TextureType::Texture2D;
+	}
+
+	inline eTextureCompression GetCompression(void)
+	noexcept
+	{
+		return m_compression;
+	}
+
+	inline void SetColorEncoding(eColorEncoding colorEncoding)
+	noexcept
+	{
+		m_colorEncoding = colorEncoding;
+	}
+
+	inline eColorEncoding ColorEncoding(int bufferIndex = 0)
+	noexcept
+	{
+		if ((bufferIndex < m_buffers.Length()) and m_buffers[bufferIndex]->m_info.m_hasColorEncoding)
+			return m_buffers[bufferIndex]->m_info.m_colorEncoding;
+		return m_colorEncoding;
+	}
+
+	// API-neutral type setter. Lets common code (e.g. base_noisetexture) assign m_type via
+	// TextureType without knowing that OGL stores it as GLenum. Mirrors VK/DX where m_type
+	// is already TextureType so the assignment is trivial there.
+	inline void SetType(TextureType t)
+	noexcept
+	{
+		m_type = TextureTypeToGLenum(t);
+	}
+
+	inline int WrapMode(void)
+	noexcept
+	{
+		return m_wrapMode;
+	}
+
+	inline String GetName(void) {
+		return m_name;
+	}
+
+	template <GLenum typeID>
+	inline static void Release(int tmuIndex)
+	noexcept
+	{
+		if (tmuIndex >= 0)
+			gfxStates.BindTexture<typeID>(0, tmuIndex);
+		gfxStates.ActiveTexture(GL_TEXTURE0); // always reset!
+	}
+
+	template <TextureType typeID>
+	inline static void Release(int tmuIndex)
+	noexcept
+	{
+		if (tmuIndex >= 0)
+			gfxStates.BindTexture(TextureTypeToGLenum(typeID), 0, tmuIndex);
+		gfxStates.ActiveTexture(GL_TEXTURE0);
+	}
+
+	static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,
+										int renderAreaHeight)
+	noexcept;
 };
 
 // =================================================================================================
 
 class TiledTexture
-    : public Texture
-{
+	: public Texture {
 public:
-    TiledTexture()
-        : Texture(0, GL_TEXTURE_2D, GL_REPEAT) 
-    { }
+	TiledTexture()
+		: Texture(0, GL_TEXTURE_2D, GL_REPEAT)
+	{}
 
-    ~TiledTexture() = default;
+	~TiledTexture() = default;
 
-    virtual void SetParams(bool forceUpdate = false) override;
+	virtual void SetParams(bool forceUpdate = false) override;
 };
 
 // =================================================================================================
 
 class RenderTargetTexture
-    : public Texture
-{
+	: public Texture {
 public:
-    // Set by the owning RenderTarget (RenderTarget::SetFiltering ()); SetParams () applies it.
-    GfxFilterMode   m_filtering{ GfxFilterMode::Linear };
+	// Set by the owning RenderTarget (RenderTarget::SetFiltering ()); SetParams () applies it.
+	GfxFilterMode m_filtering{ GfxFilterMode::Linear };
 
-    RenderTargetTexture() {
-        m_isRenderTarget = true;
-    }
+	RenderTargetTexture() {
+		m_isRenderTarget = true;
+	}
 
-    ~RenderTargetTexture();
+	~RenderTargetTexture();
 
-    virtual void SetParams(bool forceUpdate = false) override;
+	virtual void SetParams(bool forceUpdate = false) override;
 
-    // The GL texture name is owned by the wrapped RenderTarget's BufferInfo. Drop our
-    // borrowed handle here so the implicit ~Texture path's Texture::Destroy() sees a
-    // zero handle and glDeleteTextures(0) is silently ignored per spec. Functionally
-    // redundant in OpenGL (glDeleteTextures tolerates already-deleted names), but the
-    // pattern is kept symmetric to the Vulkan / DX12 paths.
-    virtual void Destroy(void) override;
+	// The GL texture name is owned by the wrapped RenderTarget's BufferInfo. Drop our
+	// borrowed handle here so the implicit ~Texture path's Texture::Destroy() sees a
+	// zero handle and glDeleteTextures(0) is silently ignored per spec. Functionally
+	// redundant in OpenGL (glDeleteTextures tolerates already-deleted names), but the
+	// pattern is kept symmetric to the Vulkan / DX12 paths.
+	virtual void Destroy(void) override;
 };
 
 // =================================================================================================
 
 class ShadowTexture
-    : public Texture
-{
+	: public Texture {
 public:
-    ShadowTexture() = default;
+	ShadowTexture() = default;
 
-    ~ShadowTexture();
+	~ShadowTexture();
 
-    virtual void SetParams(bool forceUpdate = false) override;
+	virtual void SetParams(bool forceUpdate = false) override;
 
-    // Same lifetime semantics as RenderTargetTexture.
-    virtual void Destroy(void) override;
+	// Same lifetime semantics as RenderTargetTexture.
+	virtual void Destroy(void) override;
 };
 
 // =================================================================================================

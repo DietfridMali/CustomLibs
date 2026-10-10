@@ -7,7 +7,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL_image.h"
 #ifdef _MSC_VER
@@ -28,22 +28,24 @@
 
 SharedTextureHandle Texture::nullHandle = SharedTextureHandle(0);
 
-int Texture::CompareTextures(void* context, const String& key1, const String& key2) {
-    int i = String::Compare(nullptr, key1, key2);
-    return (i < 0) ? -1 : (i > 0) ? 1 : 0;
+int Texture::CompareTextures(void* context, const String& key1, const String& key2)
+{
+	int i = String::Compare(nullptr, key1, key2);
+	return (i < 0) ? -1 : (i > 0) ? 1
+								  : 0;
 }
 
 
 Texture::Texture(GLuint handle, int type, int wrapMode)
-    : m_handle(handle)
-    , m_type(type)
-    , m_tmuIndex(-1)
-    , m_wrapMode(wrapMode)
-    , m_wrapModeV(wrapMode)
-    , m_name("")
+	: m_handle(handle)
+	, m_type(type)
+	, m_tmuIndex(-1)
+	, m_wrapMode(wrapMode)
+	, m_wrapModeV(wrapMode)
+	, m_name("")
 {
 #if USE_TEXTURE_LUT
-    SetupLUT();
+	SetupLUT();
 #endif
 }
 
@@ -56,182 +58,189 @@ Texture::~Texture()
 noexcept
 {
 #if USE_TEXTURE_LUT
-    if (UpdateLUT() and (m_name.Length() > 0)) {
-        textureLUT.Remove(m_name);
-        m_name = "";
-    }
+	if (UpdateLUT() and (m_name.Length() > 0)) {
+		textureLUT.Remove(m_name);
+		m_name = "";
+	}
 #endif
-    if (m_isValid)
-        Destroy();
+	if (m_isValid)
+		Destroy();
 }
 
 
-bool Texture::Create(void) {
-    Destroy();
-    return CreateHandle();
+bool Texture::Create(void)
+{
+	Destroy();
+	return CreateHandle();
 }
 
 
-bool Texture::CreateHandle(void) {
+bool Texture::CreateHandle(void)
+{
 #if USE_SHARED_HANDLES
-    m_handle = SharedTextureHandle();
-    m_isValid = m_handle.Claim() != 0;
+	m_handle = SharedTextureHandle();
+	m_isValid = m_handle.Claim() != 0;
 #else
-    glGenTextures(1, &m_handle);
-    m_isValid = m_handle != 0;
+	glGenTextures(1, &m_handle);
+	m_isValid = m_handle != 0;
 #endif
-    return m_isValid;
+	return m_isValid;
 }
 
 
-bool Texture::HasHandle(void) const noexcept {
+bool Texture::HasHandle(void) const
+noexcept
+{
 #if USE_SHARED_HANDLES
-    return m_handle.Data() != 0;
+	return m_handle.Data() != 0;
 #else
-    return m_handle != 0;
+	return m_handle != 0;
 #endif
 }
 
 
 void Texture::Destroy(void)
 {
-    if (m_isValid) {
-        m_isValid = false;
-        // OUT of the texture unit bookkeeping BEFORE the name goes back to GL. A deleted texture is
-        // unbound by GL itself, but GfxStates does not learn of it and keeps the name in m_bindings -
-        // and GL hands deleted names out again. TextureSlotInfo::Bind () then sees "this handle already
-        // sits on that unit", issues no glBindTexture, and the new texture of the same name never
-        // receives a type: glTexImage goes to whatever really is on the unit, glIsTexture says false,
-        // and attaching it to a framebuffer fails with GL_INVALID_OPERATION on a handle that looks
-        // perfectly sound. A local Texture in a loop - CFont::Create ()'s glyph texture - hits this
-        // once per iteration.
-        gfxStates.ReleaseTexture(m_type, m_handle);
+	if (m_isValid) {
+		m_isValid = false;
+		// OUT of the texture unit bookkeeping BEFORE the name goes back to GL. A deleted texture is
+		// unbound by GL itself, but GfxStates does not learn of it and keeps the name in m_bindings -
+		// and GL hands deleted names out again. TextureSlotInfo::Bind () then sees "this handle already
+		// sits on that unit", issues no glBindTexture, and the new texture of the same name never
+		// receives a type: glTexImage goes to whatever really is on the unit, glIsTexture says false,
+		// and attaching it to a framebuffer fails with GL_INVALID_OPERATION on a handle that looks
+		// perfectly sound. A local Texture in a loop - CFont::Create ()'s glyph texture - hits this
+		// once per iteration.
+		gfxStates.ReleaseTexture(m_type, m_handle);
 #if USE_SHARED_HANDLES
-        m_handle.Release();
+		m_handle.Release();
 #else
-        glDeleteTextures(1, &m_handle);
-        m_handle = 0;
+		glDeleteTextures(1, &m_handle);
+		m_handle = 0;
 #endif
-        for (const auto& p : m_buffers) {
-            if (p->m_refCount)
-                --(p->m_refCount);
-            else
-                delete p;
-        }
-        m_buffers.Clear();
-        m_isDeployed = false; // BUGFIX: Status zur�cksetzen
-        // ... and the filter/wrap state with it. It belongs to the GL name that was just deleted, not
-        // to this object: leaving it set made SetParams () return at once on the NEXT texture created
-        // here, so that one kept GL's default GL_NEAREST_MIPMAP_LINEAR without ever getting a mip
-        // chain. A mip filter without mip levels is an INCOMPLETE texture, and sampling one yields
-        // (0, 0, 0, 1) - black - whatever it actually holds.
-        m_hasParams = false;
-        m_mipChainLength = 0;
-    }
+		for (const auto& p : m_buffers) {
+			if (p->m_refCount)
+				--(p->m_refCount);
+			else
+				delete p;
+		}
+		m_buffers.Clear();
+		m_isDeployed = false; // BUGFIX: Status zur�cksetzen
+		// ... and the filter/wrap state with it. It belongs to the GL name that was just deleted, not
+		// to this object: leaving it set made SetParams () return at once on the NEXT texture created
+		// here, so that one kept GL's default GL_NEAREST_MIPMAP_LINEAR without ever getting a mip
+		// chain. A mip filter without mip levels is an INCOMPLETE texture, and sampling one yields
+		// (0, 0, 0, 1) - black - whatever it actually holds.
+		m_hasParams = false;
+		m_mipChainLength = 0;
+	}
 }
 
 
-Texture& Texture::Copy(const Texture& other) {
-    if (this != &other) {
-        Destroy();
-        m_handle = other.m_handle;
-        m_name = other.m_name;
-        m_buffers = other.m_buffers;
-        m_filenames = other.m_filenames;
-        m_type = other.m_type;
-        m_wrapMode = other.m_wrapMode;
-        m_wrapModeV = other.m_wrapModeV;
-        m_useMipMaps = other.m_useMipMaps;
-        m_colorEncoding = other.m_colorEncoding;
-        m_mipChainLength = other.m_mipChainLength;
-        m_isDeployed = other.m_isDeployed;
-        m_hasParams = other.m_hasParams;
-        m_isValid = other.m_isValid;
-    }
-    return *this;
+Texture& Texture::Copy(const Texture& other)
+{
+	if (this != &other) {
+		Destroy();
+		m_handle = other.m_handle;
+		m_name = other.m_name;
+		m_buffers = other.m_buffers;
+		m_filenames = other.m_filenames;
+		m_type = other.m_type;
+		m_wrapMode = other.m_wrapMode;
+		m_wrapModeV = other.m_wrapModeV;
+		m_useMipMaps = other.m_useMipMaps;
+		m_colorEncoding = other.m_colorEncoding;
+		m_mipChainLength = other.m_mipChainLength;
+		m_isDeployed = other.m_isDeployed;
+		m_hasParams = other.m_hasParams;
+		m_isValid = other.m_isValid;
+	}
+	return *this;
 }
 
 
 Texture& Texture::Move(Texture& other)
 noexcept
 {
-    if (this != &other) {
-        Destroy();
-        m_handle = std::move(other.m_handle);
+	if (this != &other) {
+		Destroy();
+		m_handle = std::move(other.m_handle);
 #if !USE_SHARED_HANDLES
-        other.m_handle = 0;
+		other.m_handle = 0;
 #endif
-        m_name = std::move(other.m_name);
-        m_buffers = std::move(other.m_buffers);
-        m_filenames = std::move(other.m_filenames);
-        m_type = other.m_type;
-        m_wrapMode = other.m_wrapMode;
-        m_wrapModeV = other.m_wrapModeV;
-        m_useMipMaps = other.m_useMipMaps;
-        m_colorEncoding = other.m_colorEncoding;
-        m_mipChainLength = other.m_mipChainLength;
-        m_isDeployed = other.m_isDeployed;
-        m_hasParams = other.m_hasParams;
-        m_isValid = other.m_isValid;
-        textureLUT.Remove(m_name);
-        textureLUT.Insert(m_name, this, true); // overwrite the data entry for key m_id with this texture
-    }
-    return *this;
+		m_name = std::move(other.m_name);
+		m_buffers = std::move(other.m_buffers);
+		m_filenames = std::move(other.m_filenames);
+		m_type = other.m_type;
+		m_wrapMode = other.m_wrapMode;
+		m_wrapModeV = other.m_wrapModeV;
+		m_useMipMaps = other.m_useMipMaps;
+		m_colorEncoding = other.m_colorEncoding;
+		m_mipChainLength = other.m_mipChainLength;
+		m_isDeployed = other.m_isDeployed;
+		m_hasParams = other.m_hasParams;
+		m_isValid = other.m_isValid;
+		textureLUT.Remove(m_name);
+		textureLUT.Insert(m_name, this, true); // overwrite the data entry for key m_id with this texture
+	}
+	return *this;
 }
 
 
 bool Texture::IsAvailable(bool isDeploying)
 {
-    if (not m_isValid)
-        return false;
-    if (m_isDeployed)
-        return true;
-    if (isDeploying)
-        return true;
-    return false;
+	if (not m_isValid)
+		return false;
+	if (m_isDeployed)
+		return true;
+	if (isDeploying)
+		return true;
+	return false;
 }
 
 
 bool Texture::Bind(int tmuIndex, bool isDeploying)
 {
-    if (not IsAvailable(isDeploying))
-        return false;
-    m_tmuIndex = 
+	if (not IsAvailable(isDeploying))
+		return false;
+	m_tmuIndex =
 #if USE_SHARED_HANDLES
-        gfxStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
+		gfxStates.BindTexture(m_type, m_handle.Data(), tmuIndex);
 #else
-        gfxStates.BindTexture(m_type, m_handle, tmuIndex);
+		gfxStates.BindTexture(m_type, m_handle, tmuIndex);
 #endif
-    if ((m_tmuIndex < 0) or isDeploying)
-        return m_tmuIndex >= 0;
-    // A wrap or filter wish made since the last time is applied HERE, on the texture that was just
-    // bound - SetWrapping () only records it, and glTexParameteri needs a binding. m_hasParams makes
-    // this a single comparison whenever nothing changed. Not while deploying: the texture is not
-    // finished then, and the upload calls SetParams () itself once it is. Same as DX and Vulkan.
-    if (not m_hasParams)
-        SetParams(false);
-    return true;
+	if ((m_tmuIndex < 0) or isDeploying)
+		return m_tmuIndex >= 0;
+	// A wrap or filter wish made since the last time is applied HERE, on the texture that was just
+	// bound - SetWrapping () only records it, and glTexParameteri needs a binding. m_hasParams makes
+	// this a single comparison whenever nothing changed. Not while deploying: the texture is not
+	// finished then, and the upload calls SetParams () itself once it is. Same as DX and Vulkan.
+	if (not m_hasParams)
+		SetParams(false);
+	return true;
 }
 
 
-void Texture::Release(void) {
-    if (m_tmuIndex >= 0) {
+void Texture::Release(void)
+{
+	if (m_tmuIndex >= 0) {
 #if USE_SHARED_HANDLES
-        gfxStates.ReleaseTexture(m_type, m_handle.Data(), m_tmuIndex);
+		gfxStates.ReleaseTexture(m_type, m_handle.Data(), m_tmuIndex);
 #else
-        gfxStates.ReleaseTexture(m_type, m_handle, m_tmuIndex);
+		gfxStates.ReleaseTexture(m_type, m_handle, m_tmuIndex);
 #endif
-        m_tmuIndex = -1;
-    }
+		m_tmuIndex = -1;
+	}
 }
 
 
-void Texture::SetParams(bool forceUpdate) {
-    if (forceUpdate or not m_hasParams) {
-        m_hasParams = true;
-        DefaultSampling();
-        ApplySampling();
-    }
+void Texture::SetParams(bool forceUpdate)
+{
+	if (forceUpdate or not m_hasParams) {
+		m_hasParams = true;
+		DefaultSampling();
+		ApplySampling();
+	}
 }
 
 
@@ -239,32 +248,38 @@ void Texture::SetParams(bool forceUpdate) {
 // linear mip filter where there are mip levels, anisotropy coupled to that, and the wrap modes
 // SetWrapping () recorded. Block-compressed textures carry their mip chain in the DDS, so for them
 // "there are mip levels" means the file brought more than one.
-void Texture::DefaultSampling(void) noexcept {
-    const bool compressed = (m_compression != tcNone);
-    const int  mipCount   = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
-    const bool useMips    = compressed ? (mipCount > 1) : (m_useMipMaps != 0);
-    m_sampling.minFilter = GfxFilterMode::Linear;
-    m_sampling.magFilter = GfxFilterMode::Linear;
-    m_sampling.mipMode = useMips ? GfxMipMode::Linear : GfxMipMode::None;
-    m_sampling.wrapU = WrapModeFromGL(m_wrapMode);
-    m_sampling.wrapV = WrapModeFromGL(m_wrapModeV);
-    m_sampling.wrapW = m_sampling.wrapV;
-    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
-    m_sampling.maxAnisotropy = useMips ? 16.0f : 1.0f;
+void Texture::DefaultSampling(void)
+noexcept
+{
+	const bool	compressed = (m_compression != tcNone);
+	const int	mipCount = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
+	const bool	useMips = compressed ? (mipCount > 1) : (m_useMipMaps != 0);
+	m_sampling.minFilter = GfxFilterMode::Linear;
+	m_sampling.magFilter = GfxFilterMode::Linear;
+	m_sampling.mipMode = useMips ? GfxMipMode::Linear : GfxMipMode::None;
+	m_sampling.wrapU = WrapModeFromGL(m_wrapMode);
+	m_sampling.wrapV = WrapModeFromGL(m_wrapModeV);
+	m_sampling.wrapW = m_sampling.wrapV;
+	m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+	m_sampling.maxAnisotropy = useMips ? 16.0f : 1.0f;
 }
 
 
-static inline GLint GLMagFilter(GfxFilterMode filter) noexcept {
-    return (filter == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
+static inline GLint GLMagFilter(GfxFilterMode filter)
+noexcept
+{
+	return (filter == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
 }
 
 
-static inline GLint GLMinFilter(GfxFilterMode filter, GfxMipMode mipMode) noexcept {
-    if (mipMode == GfxMipMode::None)
-        return GLMagFilter(filter);
-    if (mipMode == GfxMipMode::Nearest)
-        return (filter == GfxFilterMode::Nearest) ? GL_NEAREST_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_NEAREST;
-    return (filter == GfxFilterMode::Nearest) ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_LINEAR;
+static inline GLint GLMinFilter(GfxFilterMode filter, GfxMipMode mipMode)
+noexcept
+{
+	if (mipMode == GfxMipMode::None)
+		return GLMagFilter(filter);
+	if (mipMode == GfxMipMode::Nearest)
+		return (filter == GfxFilterMode::Nearest) ? GL_NEAREST_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_NEAREST;
+	return (filter == GfxFilterMode::Nearest) ? GL_NEAREST_MIPMAP_LINEAR : GL_LINEAR_MIPMAP_LINEAR;
 }
 
 
@@ -273,56 +288,67 @@ static inline GLint GLMinFilter(GfxFilterMode filter, GfxMipMode mipMode) noexce
 // glGenerateMipmap cannot build levels for a block-compressed texture, there GL_TEXTURE_MAX_LEVEL is
 // capped to what the DDS brought; an uncompressed one gets its chain generated. Without a mip
 // filter the texture is pinned to its base level.
-void Texture::ApplySampling(void) {
-    const bool compressed = (m_compression != tcNone);
-    const int  mipCount   = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
-    const bool useMips    = (m_sampling.mipMode != GfxMipMode::None);
-    glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GLMinFilter(m_sampling.minFilter, m_sampling.mipMode));
-    glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GLMagFilter(m_sampling.magFilter));
-    if (useMips) {
-        if (compressed)
-            glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
-        else if (m_mipChainLength > 0)
-            glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipChainLength - 1);
-        else if (not GenerateSRGBMipChain())
-            glGenerateMipmap(m_type);
-    }
-    else {
-        glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
-    }
-    GLfloat maxAniso = 1.0f;
-    if (m_sampling.maxAnisotropy > 1.0f)
-        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
-    glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, (maxAniso < m_sampling.maxAnisotropy) ? maxAniso : m_sampling.maxAnisotropy);
-    glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GLWrapMode(m_sampling.wrapU));
-    glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GLWrapMode(m_sampling.wrapV));
-    if ((m_sampling.wrapU == GfxWrapMode::ClampToBorder) or (m_sampling.wrapV == GfxWrapMode::ClampToBorder))
-        glTexParameterfv(m_type, GL_TEXTURE_BORDER_COLOR, m_sampling.borderColor);
-    if (m_sampling.compareFunc != GfxOperations::CompareFunc::Always) {
-        glTexParameteri(m_type, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glTexParameteri(m_type, GL_TEXTURE_COMPARE_FUNC, GfxToGL::ToGLenum(m_sampling.compareFunc));
-    }
+void Texture::ApplySampling(void)
+{
+	const bool	compressed = (m_compression != tcNone);
+	const int	mipCount = m_buffers.IsEmpty() ? 1 : m_buffers[0]->m_info.m_mipCount;
+	const bool	useMips = (m_sampling.mipMode != GfxMipMode::None);
+	glTexParameteri(m_type, GL_TEXTURE_MIN_FILTER, GLMinFilter(m_sampling.minFilter, m_sampling.mipMode));
+	glTexParameteri(m_type, GL_TEXTURE_MAG_FILTER, GLMagFilter(m_sampling.magFilter));
+	if (useMips) {
+		if (compressed)
+			glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, mipCount - 1);
+		else if (m_mipChainLength > 0)
+			glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipChainLength - 1);
+		else if (not GenerateSRGBMipChain())
+			glGenerateMipmap(m_type);
+	}
+	else {
+		glTexParameteri(m_type, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, 0);
+	}
+	GLfloat maxAniso = 1.0f;
+	if (m_sampling.maxAnisotropy > 1.0f)
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
+	glTexParameterf(m_type, GL_TEXTURE_MAX_ANISOTROPY_EXT, (maxAniso < m_sampling.maxAnisotropy) ? maxAniso : m_sampling.maxAnisotropy);
+	glTexParameteri(m_type, GL_TEXTURE_WRAP_S, GLWrapMode(m_sampling.wrapU));
+	glTexParameteri(m_type, GL_TEXTURE_WRAP_T, GLWrapMode(m_sampling.wrapV));
+	if ((m_sampling.wrapU == GfxWrapMode::ClampToBorder) or (m_sampling.wrapV == GfxWrapMode::ClampToBorder))
+		glTexParameterfv(m_type, GL_TEXTURE_BORDER_COLOR, m_sampling.borderColor);
+	if (m_sampling.compareFunc != GfxOperations::CompareFunc::Always) {
+		glTexParameteri(m_type, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(m_type, GL_TEXTURE_COMPARE_FUNC, GfxToGL::ToGLenum(m_sampling.compareFunc));
+	}
 }
 
 
-GfxWrapMode Texture::WrapModeFromGL(int glWrapMode) noexcept {
-    switch (glWrapMode) {
-        case GL_REPEAT:          return GfxWrapMode::Repeat;
-        case GL_CLAMP_TO_BORDER: return GfxWrapMode::ClampToBorder;
-        default:                 return GfxWrapMode::ClampToEdge;
-    }
+GfxWrapMode Texture::WrapModeFromGL(int glWrapMode)
+noexcept
+{
+	switch (glWrapMode) {
+		case GL_REPEAT:
+			return GfxWrapMode::Repeat;
+		case GL_CLAMP_TO_BORDER:
+			return GfxWrapMode::ClampToBorder;
+		default:
+			return GfxWrapMode::ClampToEdge;
+	}
 }
 
 
 // The GL constant for a wrap mode. ClampToBorder is a mode of its own - it used to fall back to
 // ClampToEdge, which smears the edge texel instead of reading the border colour.
-int Texture::GLWrapMode(GfxWrapMode wrapMode) noexcept {
-    switch (wrapMode) {
-        case GfxWrapMode::Repeat:        return int(GL_REPEAT);
-        case GfxWrapMode::ClampToBorder: return int(GL_CLAMP_TO_BORDER);
-        default:                         return int(GL_CLAMP_TO_EDGE);
-    }
+int Texture::GLWrapMode(GfxWrapMode wrapMode)
+noexcept
+{
+	switch (wrapMode) {
+		case GfxWrapMode::Repeat:
+			return int(GL_REPEAT);
+		case GfxWrapMode::ClampToBorder:
+			return int(GL_CLAMP_TO_BORDER);
+		default:
+			return int(GL_CLAMP_TO_EDGE);
+	}
 }
 
 
@@ -332,146 +358,147 @@ int Texture::GLWrapMode(GfxWrapMode wrapMode) noexcept {
 void Texture::SetWrapping(GfxWrapMode wrapMode)
 noexcept
 {
-    SetWrapping(wrapMode, wrapMode);
+	SetWrapping(wrapMode, wrapMode);
 }
 
 
 void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
 noexcept
 {
-    const int glWrapU = GLWrapMode(wrapU);
-    const int glWrapV = GLWrapMode(wrapV);
-    if ((m_wrapMode == glWrapU) and (m_wrapModeV == glWrapV))
-        return;   // nothing changes, so nothing has to be written again
-    m_wrapMode = glWrapU;
-    m_wrapModeV = glWrapV;
-    m_hasParams = false;   // SetParams () writes them on the next use
+	const int glWrapU = GLWrapMode(wrapU);
+	const int glWrapV = GLWrapMode(wrapV);
+	if ((m_wrapMode == glWrapU) and (m_wrapModeV == glWrapV))
+		return; // nothing changes, so nothing has to be written again
+	m_wrapMode = glWrapU;
+	m_wrapModeV = glWrapV;
+	m_hasParams = false; // SetParams () writes them on the next use
 }
 
 
-void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses) {
-    for (auto& b : m_buffers)
-        b->Cartoonize(blurStrength, gradients, outlinePasses);
+void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses)
+{
+	for (auto& b : m_buffers)
+		b->Cartoonize(blurStrength, gradients, outlinePasses);
 }
 
 
 void Texture::UploadSRGBMipChain(GLenum internalFormat, GLenum format, const uint8_t* data, int width, int height, int channels)
 {
-    const int mipCount = CalcMipLevels(width, height, 1);
-    AutoArray<uint8_t> levels[2];
-    const uint8_t* src = data;
-    int srcW = width;
-    int srcH = height;
-    for (int mip = 1; mip < mipCount; ++mip) {
-        const int dstW = (srcW > 1) ? (srcW >> 1) : 1;
-        const int dstH = (srcH > 1) ? (srcH >> 1) : 1;
-        AutoArray<uint8_t>& dst = levels[mip & 1];
-        dst.Resize(int32_t(dstW * dstH * channels));
-        Downsample2D_SRGB8(src, srcW, srcH, channels, dst.Data(), dstW, dstH);
-        glTexImage2D(m_type, mip, internalFormat, dstW, dstH, 0, format, GL_UNSIGNED_BYTE,
-                     reinterpret_cast<const void*>(dst.Data()));
-        src = dst.Data();
-        srcW = dstW;
-        srcH = dstH;
-    }
-    m_mipChainLength = mipCount;
+	const int			mipCount = CalcMipLevels(width, height, 1);
+	AutoArray<uint8_t>	levels[2];
+	const uint8_t*		src = data;
+	int					srcW = width;
+	int					srcH = height;
+	for (int mip = 1; mip < mipCount; ++mip) {
+		const int			dstW = (srcW > 1) ? (srcW >> 1) : 1;
+		const int			dstH = (srcH > 1) ? (srcH >> 1) : 1;
+		AutoArray<uint8_t>&	dst = levels[mip & 1];
+		dst.Resize(int32_t(dstW * dstH * channels));
+		Downsample2D_SRGB8(src, srcW, srcH, channels, dst.Data(), dstW, dstH);
+		glTexImage2D(m_type, mip, internalFormat, dstW, dstH, 0, format, GL_UNSIGNED_BYTE,
+					 reinterpret_cast<const void*>(dst.Data()));
+		src = dst.Data();
+		srcW = dstW;
+		srcH = dstH;
+	}
+	m_mipChainLength = mipCount;
 }
 
 
 bool Texture::GenerateSRGBMipChain(void)
 {
-    if (m_type != GL_TEXTURE_2D)
-        return false;
-    GLint internalFormat = 0;
-    glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
-    if ((internalFormat != GL_SRGB8_ALPHA8) and (internalFormat != GL_SRGB8))
-        return false;
-    GLint width = 0;
-    GLint height = 0;
-    glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_WIDTH, &width);
-    glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_HEIGHT, &height);
-    if ((width <= 0) or (height <= 0))
-        return false;
-    const int channels = (internalFormat == GL_SRGB8_ALPHA8) ? 4 : 3;
-    const GLenum format = (channels == 4) ? GL_RGBA : GL_RGB;
-    AutoArray<uint8_t> level;
-    level.Resize(int32_t(width * height * channels));
-    GLint packAlignment = 4;
-    glGetIntegerv(GL_PACK_ALIGNMENT, &packAlignment);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glGetTexImage(m_type, 0, format, GL_UNSIGNED_BYTE, reinterpret_cast<void*>(level.Data()));
-    glPixelStorei(GL_PACK_ALIGNMENT, packAlignment);
-    GLint unpackAlignment = 4;
-    glGetIntegerv(GL_UNPACK_ALIGNMENT, &unpackAlignment);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    UploadSRGBMipChain(GLenum(internalFormat), format, level.Data(), width, height, channels);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, unpackAlignment);
-    glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipChainLength - 1);
-    return true;
+	if (m_type != GL_TEXTURE_2D)
+		return false;
+	GLint internalFormat = 0;
+	glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat);
+	if ((internalFormat != GL_SRGB8_ALPHA8) and (internalFormat != GL_SRGB8))
+		return false;
+	GLint width = 0;
+	GLint height = 0;
+	glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_WIDTH, &width);
+	glGetTexLevelParameteriv(m_type, 0, GL_TEXTURE_HEIGHT, &height);
+	if ((width <= 0) or (height <= 0))
+		return false;
+	const int			channels = (internalFormat == GL_SRGB8_ALPHA8) ? 4 : 3;
+	const GLenum		format = (channels == 4) ? GL_RGBA : GL_RGB;
+	AutoArray<uint8_t>	level;
+	level.Resize(int32_t(width * height * channels));
+	GLint packAlignment = 4;
+	glGetIntegerv(GL_PACK_ALIGNMENT, &packAlignment);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glGetTexImage(m_type, 0, format, GL_UNSIGNED_BYTE, reinterpret_cast<void*>(level.Data()));
+	glPixelStorei(GL_PACK_ALIGNMENT, packAlignment);
+	GLint unpackAlignment = 4;
+	glGetIntegerv(GL_UNPACK_ALIGNMENT, &unpackAlignment);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	UploadSRGBMipChain(GLenum(internalFormat), format, level.Data(), width, height, channels);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, unpackAlignment);
+	glTexParameteri(m_type, GL_TEXTURE_MAX_LEVEL, m_mipChainLength - 1);
+	return true;
 }
 
 
 bool Texture::Deploy(int bufferIndex)
 {
-    if (IsDeployed())
-        return true;
-    if (not Bind(0, true))
-        return false;
-    TextureBuffer* texBuf = m_buffers[bufferIndex];
-    const GfxPixelFormat gfxFmt = texBuf->m_info.m_gfxFormat;
-    const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
-    if (GfxIsBlockCompressed(gfxFmt)) {
-        // Block-compressed: upload each mip level straight from the DDS payload (no glGenerateMipmap).
-        const GLenum   internalFormat = ToGLFormat(GfxEncodedFormat(gfxFmt, colorEncoding)).internalFormat;
-        const uint32_t blockBytes     = GfxBlockBytes(gfxFmt);
-        const uint8_t* level          = reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr());
-        int w = texBuf->m_info.m_width, h = texBuf->m_info.m_height;
-        for (int mip = 0; mip < texBuf->m_info.m_mipCount; ++mip) {
-            const GLsizei imgSize = GLsizei(uint32_t((w + 3) / 4) * uint32_t((h + 3) / 4) * blockBytes);
-            glCompressedTexImage2D(m_type, mip, internalFormat, w, h, 0, imgSize, level);
-            level += imgSize;
-            w = (w > 1) ? (w >> 1) : 1;
-            h = (h > 1) ? (h >> 1) : 1;
-        }
-    }
-    else {
-        const GLenum internalFormat = ToGLEncodedFormat(texBuf->m_info.m_internalFormat, colorEncoding);
-        glTexImage2D(m_type, 0, internalFormat, texBuf->m_info.m_width,
-                     texBuf->m_info.m_height, 0,
-                     texBuf->m_info.m_format, GL_UNSIGNED_BYTE,
-                     reinterpret_cast<const void*>(texBuf->m_data.DataPtr()));
-        m_mipChainLength = 0;
-        if (m_useMipMaps and (internalFormat != texBuf->m_info.m_internalFormat))
-            UploadSRGBMipChain(internalFormat, texBuf->m_info.m_format, reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr()),
-                               texBuf->m_info.m_width, texBuf->m_info.m_height, texBuf->m_info.m_componentCount);
-    }
-    SetParams();
+	if (IsDeployed())
+		return true;
+	if (not Bind(0, true))
+		return false;
+	TextureBuffer*			texBuf = m_buffers[bufferIndex];
+	const GfxPixelFormat	gfxFmt = texBuf->m_info.m_gfxFormat;
+	const eColorEncoding	colorEncoding = ColorEncoding(bufferIndex);
+	if (GfxIsBlockCompressed(gfxFmt)) {
+		// Block-compressed: upload each mip level straight from the DDS payload (no glGenerateMipmap).
+		const GLenum	internalFormat = ToGLFormat(GfxEncodedFormat(gfxFmt, colorEncoding)).internalFormat;
+		const uint32_t	blockBytes = GfxBlockBytes(gfxFmt);
+		const uint8_t*	level = reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr());
+		int				w = texBuf->m_info.m_width, h = texBuf->m_info.m_height;
+		for (int mip = 0; mip < texBuf->m_info.m_mipCount; ++mip) {
+			const GLsizei imgSize = GLsizei(uint32_t((w + 3) / 4) * uint32_t((h + 3) / 4) * blockBytes);
+			glCompressedTexImage2D(m_type, mip, internalFormat, w, h, 0, imgSize, level);
+			level += imgSize;
+			w = (w > 1) ? (w >> 1) : 1;
+			h = (h > 1) ? (h >> 1) : 1;
+		}
+	}
+	else {
+		const GLenum internalFormat = ToGLEncodedFormat(texBuf->m_info.m_internalFormat, colorEncoding);
+		glTexImage2D(m_type, 0, internalFormat, texBuf->m_info.m_width,
+					 texBuf->m_info.m_height, 0,
+					 texBuf->m_info.m_format, GL_UNSIGNED_BYTE,
+					 reinterpret_cast<const void*>(texBuf->m_data.DataPtr()));
+		m_mipChainLength = 0;
+		if (m_useMipMaps and (internalFormat != texBuf->m_info.m_internalFormat))
+			UploadSRGBMipChain(internalFormat, texBuf->m_info.m_format, reinterpret_cast<const uint8_t*>(texBuf->m_data.DataPtr()),
+							   texBuf->m_info.m_width, texBuf->m_info.m_height, texBuf->m_info.m_componentCount);
+	}
+	SetParams();
 #ifdef _DEBUG
-    gfxStates.CheckError();
+	gfxStates.CheckError();
 #endif
-    Release();
-    m_isDeployed = true;
-    return true;
-    
+	Release();
+	m_isDeployed = true;
+	return true;
 }
 
 
-bool Texture::Redeploy(void) {
+bool Texture::Redeploy(void)
+{
 #if USE_SHARED_HANDLES
-    m_handle.Release();
-    m_handle = SharedTextureHandle();
-    m_isValid = m_handle.Claim() != 0;
+	m_handle.Release();
+	m_handle = SharedTextureHandle();
+	m_isValid = m_handle.Claim() != 0;
 #else
-    glDeleteTextures(1, &m_handle);
-    glGenTextures(1, &m_handle);
-    m_isValid = m_handle != 0;
+	glDeleteTextures(1, &m_handle);
+	glGenTextures(1, &m_handle);
+	m_isValid = m_handle != 0;
 #endif
 
-    if (not m_isValid)
-        return false;
-    m_tmuIndex = -1;
-    m_hasParams = false;
-    return Deploy(0);
+	if (not m_isValid)
+		return false;
+	m_tmuIndex = -1;
+	m_hasParams = false;
+	return Deploy(0);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -492,23 +519,24 @@ bool Texture::Redeploy(void) {
 
 #ifdef _DEBUG
 
-static void CheckFileOpen(const std::string& path) {
-    errno = 0;
-    FILE* f = std::fopen(path.c_str(), "rb");
-    if (!f) {
-        const int error = errno;
-        logHandler.Print("fopen failed for \"%s\"\n", path.c_str());
-        logHandler.Print("errno=%d (%s)\n", error, std::strerror(error));
-        logHandler.Print("bytes:");
-        for (auto c : path) {
-            logHandler.Print(" %x", int(c));
-        }
-        logHandler.Print("\n");
-    }
-    else {
-        logHandler.Print("fopen OK for \"%s\"\n", path.c_str());
-        std::fclose(f);
-    }
+static void CheckFileOpen(const std::string& path)
+{
+	errno = 0;
+	FILE* f = std::fopen(path.c_str(), "rb");
+	if (!f) {
+		const int error = errno;
+		logHandler.Print("fopen failed for \"%s\"\n", path.c_str());
+		logHandler.Print("errno=%d (%s)\n", error, std::strerror(error));
+		logHandler.Print("bytes:");
+		for (auto c : path) {
+			logHandler.Print(" %x", int(c));
+		}
+		logHandler.Print("\n");
+	}
+	else {
+		logHandler.Print("fopen OK for \"%s\"\n", path.c_str());
+		std::fclose(f);
+	}
 }
 
 #endif
@@ -518,142 +546,150 @@ static void CheckFileOpen(const std::string& path) {
 // Load will load the texture, and for each subsequent side with texture name "", that texture's data buffer
 // will be used. This is saving memory for smileys, where 5 sides bear the same texture, while only the front
 // face bears the face.
-bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) {
-    // load texture from file
-    m_filenames = fileNames;
-    // The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
-    // replaced by the file name here: the destructor removes the entry under m_name, and with the
-    // key overwritten the LUT kept a dangling pointer under the registration key while removing a
-    // key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
-    if (m_name.Length() == 0)
-        m_name = fileNames.First();
-    TextureBuffer* texBuf = nullptr;
-    for (auto& fileName : fileNames) {
-        if (fileName.IsEmpty()) { // This means that the last previously loaded texture should be used here as well; must never be true for first filename
-            if (not texBuf) // must always be true here -> fileNames[0] must always contain a valid filename of an existing texture file
-                throw std::runtime_error("Texture::Load: missing texture names");
-            else {
-                ++(texBuf->m_refCount);
-                m_buffers.Append(texBuf);
-            }
-        }
-        else {
-            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
-            if (not texBuf)
-                return false;
-            m_buffers.Append(texBuf);
-        }
-    }
-    return true;
+bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params)
+{
+	// load texture from file
+	m_filenames = fileNames;
+	// The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
+	// replaced by the file name here: the destructor removes the entry under m_name, and with the
+	// key overwritten the LUT kept a dangling pointer under the registration key while removing a
+	// key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
+	if (m_name.Length() == 0)
+		m_name = fileNames.First();
+	TextureBuffer* texBuf = nullptr;
+	for (auto& fileName : fileNames) {
+		if (fileName
+				.IsEmpty()) { // This means that the last previously loaded texture should be used here as well; must never be true for first filename
+			if (not texBuf) // must always be true here -> fileNames[0] must always contain a valid filename of an existing texture file
+				throw std::runtime_error("Texture::Load: missing texture names");
+			else {
+				++(texBuf->m_refCount);
+				m_buffers.Append(texBuf);
+			}
+		}
+		else {
+			texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
+			if (not texBuf)
+				return false;
+			m_buffers.Append(texBuf);
+		}
+	}
+	return true;
 }
 
 
-bool Texture::CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params) {
-    if (not Create())
-        return false;
-    if (fileNames.IsEmpty())
-        return true;
-    if (not Load(folder, fileNames, params))
-        return false;
-    if (not m_buffers.IsEmpty())
-        m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
-    if (params.cartoonize)
-        Cartoonize(params.blur, params.gradients, params.outline);
-    m_useMipMaps = params.useMipMaps;
-    m_isDisposable = params.isDisposable;
-    m_colorEncoding = params.colorEncoding;
-    return Deploy();
+bool Texture::CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params)
+{
+	if (not Create())
+		return false;
+	if (fileNames.IsEmpty())
+		return true;
+	if (not Load(folder, fileNames, params))
+		return false;
+	if (not m_buffers.IsEmpty())
+		m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
+	if (params.cartoonize)
+		Cartoonize(params.blur, params.gradients, params.outline);
+	m_useMipMaps = params.useMipMaps;
+	m_isDisposable = params.isDisposable;
+	m_colorEncoding = params.colorEncoding;
+	return Deploy();
 }
 
 
-bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params) {
-    if (not Create()) {
-        SDL_FreeSurface(surface);
-        return false;
-    }
-    m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
-    m_useMipMaps = params.useMipMaps;
-    m_isDisposable = params.isDisposable;
-    m_colorEncoding = params.colorEncoding;
-    return Deploy();
+bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
+{
+	if (not Create()) {
+		SDL_FreeSurface(surface);
+		return false;
+	}
+	m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
+	m_useMipMaps = params.useMipMaps;
+	m_isDisposable = params.isDisposable;
+	m_colorEncoding = params.colorEncoding;
+	return Deploy();
 }
 
 
-RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
+RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,
+									  int renderAreaHeight)
 noexcept
 {
-    if (renderAreaWidth == 0)
-        renderAreaWidth = viewportWidth;
-    if (renderAreaHeight == 0)
-        renderAreaHeight = viewportHeight;
-    float xScale = float(renderAreaWidth) / float(viewportWidth);
-    float yScale = float(renderAreaHeight) / float(viewportHeight);
-    float wRatio = float(renderAreaWidth) / float(w);
-    float hRatio = float(renderAreaHeight) / float(h);
-    RenderOffsets offsets = { 0.5f * xScale, 0.5f * yScale };
-    if (wRatio > hRatio)
-        offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
-    else if (wRatio < hRatio)
-        offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
-    return offsets;
+	if (renderAreaWidth == 0)
+		renderAreaWidth = viewportWidth;
+	if (renderAreaHeight == 0)
+		renderAreaHeight = viewportHeight;
+	float			xScale = float(renderAreaWidth) / float(viewportWidth);
+	float			yScale = float(renderAreaHeight) / float(viewportHeight);
+	float			wRatio = float(renderAreaWidth) / float(w);
+	float			hRatio = float(renderAreaHeight) / float(h);
+	RenderOffsets	offsets = { 0.5f * xScale, 0.5f * yScale };
+	if (wRatio > hRatio)
+		offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
+	else if (wRatio < hRatio)
+		offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
+	return offsets;
 }
 
 // =================================================================================================
 
-void TiledTexture::SetParams(bool forceUpdate) {
-    if (forceUpdate or not m_hasParams) {
-        Texture::SetParams(forceUpdate);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glGenerateMipmap(GL_TEXTURE_2D);
+void TiledTexture::SetParams(bool forceUpdate)
+{
+	if (forceUpdate or not m_hasParams) {
+		Texture::SetParams(forceUpdate);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glGenerateMipmap(GL_TEXTURE_2D);
 
-        // (optional) Anisotropie
-        GLfloat aniso = 0.f;
-        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-    }
+		// (optional) Anisotropie
+		GLfloat aniso = 0.f;
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+	}
 }
 
 // =================================================================================================
 
-void RenderTargetTexture::SetParams(bool forceUpdate) {
-    if (forceUpdate or not m_hasParams) {
-        m_hasParams = true;
-        // m_type, not a hard coded GL_TEXTURE_2D: a wrapper around a colour buffer that is a texture
-        // ARRAY is bound to GL_TEXTURE_2D_ARRAY, and the parameters would otherwise land on whichever
-        // plain 2D texture happens to sit on the same unit.
-        const GLenum target = m_type;
-        const GLint filter = (m_filtering == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
-        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
-        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
-        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE); 
+void RenderTargetTexture::SetParams(bool forceUpdate)
+{
+	if (forceUpdate or not m_hasParams) {
+		m_hasParams = true;
+		// m_type, not a hard coded GL_TEXTURE_2D: a wrapper around a colour buffer that is a texture
+		// ARRAY is bound to GL_TEXTURE_2D_ARRAY, and the parameters would otherwise land on whichever
+		// plain 2D texture happens to sit on the same unit.
+		const GLenum	target = m_type;
+		const GLint		filter = (m_filtering == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
+		glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);
+		glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
+		glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
 #if 1
-        glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
 #endif
-    }
+	}
 }
 
 // =================================================================================================
 
-void ShadowTexture::SetParams(bool forceUpdate) {
-    if (forceUpdate or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS); // or GL_LEQUAL
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        float borderColor[4] = { 1.0, 1.0, 1.0, 1.0 };
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+void ShadowTexture::SetParams(bool forceUpdate)
+{
+	if (forceUpdate or not m_hasParams) {
+		m_hasParams = true;
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LESS); // or GL_LEQUAL
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		float borderColor[4] = { 1.0, 1.0, 1.0, 1.0 };
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 #if 1
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 #endif
-    }
+	}
 }
 
 
@@ -665,20 +701,20 @@ void ShadowTexture::SetParams(bool forceUpdate) {
 void RenderTargetTexture::Destroy(void)
 {
 #if USE_SHARED_HANDLES
-    m_handle = SharedTextureHandle(0);
+	m_handle = SharedTextureHandle(0);
 #else
-    m_handle = 0;
+	m_handle = 0;
 #endif
-    Texture::Destroy();
+	Texture::Destroy();
 }
 
 
 RenderTargetTexture::~RenderTargetTexture()
 {
 #if USE_SHARED_HANDLES
-    m_handle = SharedTextureHandle(0);
+	m_handle = SharedTextureHandle(0);
 #else
-    m_handle = 0;
+	m_handle = 0;
 #endif
 }
 
@@ -686,20 +722,20 @@ RenderTargetTexture::~RenderTargetTexture()
 void ShadowTexture::Destroy(void)
 {
 #if USE_SHARED_HANDLES
-    m_handle = SharedTextureHandle(0);
+	m_handle = SharedTextureHandle(0);
 #else
-    m_handle = 0;
+	m_handle = 0;
 #endif
-    Texture::Destroy();
+	Texture::Destroy();
 }
 
 
 ShadowTexture::~ShadowTexture()
 {
 #if USE_SHARED_HANDLES
-    m_handle = SharedTextureHandle(0);
+	m_handle = SharedTextureHandle(0);
 #else
-    m_handle = 0;
+	m_handle = 0;
 #endif
 }
 

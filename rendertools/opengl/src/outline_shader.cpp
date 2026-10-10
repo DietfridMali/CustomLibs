@@ -5,11 +5,12 @@
 
 // =================================================================================================
 
-const ShaderSource& OutlineShader() {
-    static const ShaderSource outlineShader(
-        "outline",
-        Offset2DVS(),
-        R"(
+const ShaderSource& OutlineShader()
+{
+	static const ShaderSource outlineShader(
+		"outline",
+		Offset2DVS(),
+		R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -37,9 +38,8 @@ const ShaderSource& OutlineShader() {
                     }
                 fragColor = (alpha > 0.0) ? vec4(outlineColor.rgb /** mix(1.0, alpha, premultiply)*/, alpha) : vec4(0.0);
                 }
-            )"
-    );
-    return outlineShader;
+            )");
+	return outlineShader;
 }
 
 // =================================================================================================

@@ -5,14 +5,15 @@
 // =================================================================================================
 
 static const ShaderDataAttributes VtxTcAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 // -------------------------------------------------------------------------------------------------
 
-static const String& KuwaharaConstants() {
-    static const String source(R"(
+static const String& KuwaharaConstants()
+{
+	static const String source(R"(
         cbuffer ShaderConstants : register(b1) {
             int    width;
             int    height;
@@ -20,12 +21,13 @@ static const String& KuwaharaConstants() {
             int    wrapV;
             float  alphaThreshold;
     )");
-    return source;
+	return source;
 }
 
 
-static const String& KuwaharaFuncs() {
-    static const String source(R"(
+static const String& KuwaharaFuncs()
+{
+	static const String source(R"(
         struct PSInput {
             float4 pos       : SV_Position;
             float3 fragPos   : TEXCOORD0;
@@ -52,12 +54,13 @@ static const String& KuwaharaFuncs() {
             return c.a >= alphaThreshold;
         }
     )");
-    return source;
+	return source;
 }
 
 
-static const String& KuwaharaPlaneSource() {
-    static const String source(R"(
+static const String& KuwaharaPlaneSource()
+{
+	static const String source(R"(
         float4 SourceTexel(int2 p) {
             return srcTex.Load(int3(FilterTexel(p), 0));
         }
@@ -70,22 +73,24 @@ static const String& KuwaharaPlaneSource() {
             return int2(pos.xy);
         }
     )");
-    return source;
+	return source;
 }
 
 
-static const String& KuwaharaCubeConstants() {
-    static const String source(R"(
+static const String& KuwaharaCubeConstants()
+{
+	static const String source(R"(
             int    face;
             int    faceSize;
             int    margin;
     )");
-    return source;
+	return source;
 }
 
 
-static const String& KuwaharaCubeSource() {
-    static const String source(R"(
+static const String& KuwaharaCubeSource()
+{
+	static const String source(R"(
         float3 CubeDirection(int cubeFace, float2 uv) {
             if (cubeFace == 0)
                 return float3(1.0, -uv.y, -uv.x);
@@ -136,12 +141,13 @@ static const String& KuwaharaCubeSource() {
             return int2(pos.xy) - int2(margin, margin);
         }
     )");
-    return source;
+	return source;
 }
 
 
-static const String& KuwaharaTensorBody() {
-    static const String source(R"(
+static const String& KuwaharaTensorBody()
+{
+	static const String source(R"(
         float3 SobelColor(int2 p, float3 center) {
             float4 c = SourceTexel(p);
             return Opaque(c) ? c.rgb : center;
@@ -163,12 +169,13 @@ static const String& KuwaharaTensorBody() {
             return float4(dot(gx, gx), dot(gy, gy), dot(gx, gy), 1.0);
         }
     )");
-    return source;
+	return source;
 }
 
 
-static const String& KuwaharaFilterBody() {
-    static const String source(R"(
+static const String& KuwaharaFilterBody()
+{
+	static const String source(R"(
         static const float sectorHalfAngle = 3.14159265 / 8.0;
 
         float4 PSMain(PSInput i) : SV_Target {
@@ -274,65 +281,66 @@ static const String& KuwaharaFilterBody() {
             return (weightSum > 0.0) ? float4(result / weightSum, src.a) : src;
         }
     )");
-    return source;
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-const ShaderSource& KuwaharaTensorShader() {
-    static const ShaderSource source(
-        "kuwaharaTensor",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        String(R"(
+const ShaderSource& KuwaharaTensorShader()
+{
+	static const ShaderSource source(
+		"kuwaharaTensor",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			String(R"(
         };
         Texture2D srcTex : register(t0);
         )") +
-        KuwaharaFuncs() +
-        KuwaharaPlaneSource() +
-        KuwaharaTensorBody(),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+			KuwaharaFuncs() +
+			KuwaharaPlaneSource() +
+			KuwaharaTensorBody(),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-const ShaderSource& KuwaharaCubeTensorShader() {
-    static const ShaderSource source(
-        "kuwaharaCubeTensor",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        KuwaharaCubeConstants() +
-        String(R"(
+const ShaderSource& KuwaharaCubeTensorShader()
+{
+	static const ShaderSource source(
+		"kuwaharaCubeTensor",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			KuwaharaCubeConstants() +
+			String(R"(
         };
         TextureCube  srcTex : register(t0);
         SamplerState s0     : register(s0);
         )") +
-        KuwaharaFuncs() +
-        KuwaharaCubeSource() +
-        KuwaharaTensorBody(),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+			KuwaharaFuncs() +
+			KuwaharaCubeSource() +
+			KuwaharaTensorBody(),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-const ShaderSource& KuwaharaTensorBlurShader() {
-    static const ShaderSource source(
-        "kuwaharaTensorBlur",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        String(R"(
+const ShaderSource& KuwaharaTensorBlurShader()
+{
+	static const ShaderSource source(
+		"kuwaharaTensorBlur",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			String(R"(
             int    directionX;
             int    directionY;
             float  sigma;
         };
         Texture2D tensorTex : register(t0);
         )") +
-        KuwaharaFuncs() +
-        String(R"(
+			KuwaharaFuncs() +
+			String(R"(
         float4 PSMain(PSInput i) : SV_Target {
             int2 p = int2(i.pos.xy);
             int2 direction = int2(directionX, directionY);
@@ -348,19 +356,19 @@ const ShaderSource& KuwaharaTensorBlurShader() {
             return float4(sum / weightSum, 1.0);
         }
         )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-const ShaderSource& KuwaharaFilterShader() {
-    static const ShaderSource source(
-        "kuwaharaFilter",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        String(R"(
+const ShaderSource& KuwaharaFilterShader()
+{
+	static const ShaderSource source(
+		"kuwaharaFilter",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			String(R"(
             float  radius;
             float  anisotropy;
             float  sharpness;
@@ -369,28 +377,28 @@ const ShaderSource& KuwaharaFilterShader() {
         Texture2D srcTex    : register(t0);
         Texture2D tensorTex : register(t1);
         )") +
-        KuwaharaFuncs() +
-        KuwaharaPlaneSource() +
-        String(R"(
+			KuwaharaFuncs() +
+			KuwaharaPlaneSource() +
+			String(R"(
         float3 TensorTexel(int2 p) {
             return tensorTex.Load(int3(p, 0)).rgb;
         }
         )") +
-        KuwaharaFilterBody(),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+			KuwaharaFilterBody(),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-const ShaderSource& KuwaharaCubeFilterShader() {
-    static const ShaderSource source(
-        "kuwaharaCubeFilter",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        KuwaharaCubeConstants() +
-        String(R"(
+const ShaderSource& KuwaharaCubeFilterShader()
+{
+	static const ShaderSource source(
+		"kuwaharaCubeFilter",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			KuwaharaCubeConstants() +
+			String(R"(
             float  radius;
             float  anisotropy;
             float  sharpness;
@@ -400,75 +408,76 @@ const ShaderSource& KuwaharaCubeFilterShader() {
         Texture2D    tensorTex : register(t1);
         SamplerState s0        : register(s0);
         )") +
-        KuwaharaFuncs() +
-        KuwaharaCubeSource() +
-        String(R"(
+			KuwaharaFuncs() +
+			KuwaharaCubeSource() +
+			String(R"(
         float3 TensorTexel(int2 p) {
             return tensorTex.Load(int3(p + int2(margin, margin), 0)).rgb;
         }
         )") +
-        KuwaharaFilterBody(),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+			KuwaharaFilterBody(),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-static const String& KuwaharaSourceBody() {
-    static const String source(R"(
+static const String& KuwaharaSourceBody()
+{
+	static const String source(R"(
         float4 PSMain(PSInput i) : SV_Target {
             return SourceTexel(TensorOrigin(i.pos));
         }
     )");
-    return source;
+	return source;
 }
 
 
-const ShaderSource& KuwaharaSourceShader() {
-    static const ShaderSource source(
-        "kuwaharaSource",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        String(R"(
+const ShaderSource& KuwaharaSourceShader()
+{
+	static const ShaderSource source(
+		"kuwaharaSource",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			String(R"(
         };
         Texture2D srcTex : register(t0);
         )") +
-        KuwaharaFuncs() +
-        KuwaharaPlaneSource() +
-        KuwaharaSourceBody(),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+			KuwaharaFuncs() +
+			KuwaharaPlaneSource() +
+			KuwaharaSourceBody(),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
-const ShaderSource& KuwaharaCubeSourceShader() {
-    static const ShaderSource source(
-        "kuwaharaCubeSource",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        KuwaharaCubeConstants() +
-        String(R"(
+const ShaderSource& KuwaharaCubeSourceShader()
+{
+	static const ShaderSource source(
+		"kuwaharaCubeSource",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			KuwaharaCubeConstants() +
+			String(R"(
         };
         TextureCube  srcTex : register(t0);
         SamplerState s0     : register(s0);
         )") +
-        KuwaharaFuncs() +
-        KuwaharaCubeSource() +
-        KuwaharaSourceBody(),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+			KuwaharaFuncs() +
+			KuwaharaCubeSource() +
+			KuwaharaSourceBody(),
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
-const ShaderSource& KuwaharaGaussShader() {
-    static const ShaderSource source(
-        "kuwaharaGauss",
-        Standard2DVS(),
-        KuwaharaConstants() +
-        String(R"(
+const ShaderSource& KuwaharaGaussShader()
+{
+	static const ShaderSource source(
+		"kuwaharaGauss",
+		Standard2DVS(),
+		KuwaharaConstants() +
+			String(R"(
             int    directionX;
             int    directionY;
             int    blurRadius;
@@ -477,8 +486,8 @@ const ShaderSource& KuwaharaGaussShader() {
         };
         Texture2D tensorTex : register(t0);
         )") +
-        KuwaharaFuncs() +
-        String(R"(
+			KuwaharaFuncs() +
+			String(R"(
         float4 PSMain(PSInput i) : SV_Target {
             int2 p = int2(i.pos.xy) + int2(offset, offset);
             int2 direction = int2(directionX, directionY);
@@ -493,9 +502,8 @@ const ShaderSource& KuwaharaGaussShader() {
             return sum / weightSum;
         }
         )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

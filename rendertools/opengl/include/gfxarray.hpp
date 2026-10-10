@@ -14,7 +14,8 @@ public:
 	// query would answer "no extensions", the snapshot would say "no SSBOs", and the array would stay
 	// unavailable for the rest of the run - silently, because Create () just returns false.
 	// (It was a shared static on top, so the LAST array constructed decided for all of them.)
-	static bool IsAvailable(void) {
+	static bool IsAvailable(void)
+	{
 		// Two ways to have shader storage buffers, and a core profile context may only offer the second:
 		// a 3.3 driver advertises them through the ARB extension, but from GL 4.3 on they are CORE and the
 		// driver is free to stop listing that extension altogether. Asking for the string alone therefore
@@ -28,14 +29,12 @@ public:
 
 template <typename DATA_T, typename STORAGE_T = GfxTypes::UavTexture>
 class GfxArray
-	: public BaseGfxArray
-{
+	: public BaseGfxArray {
 public:
 	SharedGfxHandle		m_handle;
 	AutoArray<DATA_T>	m_data;
 
-	GfxArray()
-	{
+	GfxArray() {
 		m_handle = SharedGfxHandle(0, glGenBuffers, glDeleteBuffers);
 	}
 
@@ -50,8 +49,9 @@ public:
 	}
 
 
-	bool Create(int width, int height = 1) {
-		if (not IsAvailable ())
+	bool Create(int width, int height = 1)
+	{
+		if (not IsAvailable())
 			return false;
 		if (not gfxStates.HaveFeatureLevel(GfxStates::SSBOFeatureLevel))
 			return false;
@@ -73,7 +73,8 @@ public:
 	}
 
 
-	void Destroy(void) {
+	void Destroy(void)
+	{
 		if (m_handle) {
 			m_handle.Release();
 			m_data.Reset();
@@ -81,7 +82,8 @@ public:
 		}
 	}
 
-	bool Bind(GLuint bindingPoint) {
+	bool Bind(GLuint bindingPoint)
+	{
 		if (not m_handle)
 			return false;
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingPoint, m_handle);
@@ -105,7 +107,8 @@ public:
 	}
 
 
-	bool Upload(void) {
+	bool Upload(void)
+	{
 		if (not m_handle)
 			return false;
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
@@ -121,12 +124,13 @@ public:
 
 	// Upload only [first, first+count) elements; leaves the rest of the GPU buffer untouched.
 	// Used to spawn one particle system without resetting the others.
-	bool UploadRange(int first, int count, bool /*ordered*/ = true) {
+	bool UploadRange(int first, int count, bool /*ordered*/ = true)
+	{
 		if (not m_handle or (count <= 0))
 			return false;
-		int elemSize = int(sizeof(DATA_T));
-		GLintptr offset = GLintptr(first) * elemSize;
-		GLsizeiptr bytes = GLsizeiptr(count) * elemSize;
+		int			elemSize = int(sizeof(DATA_T));
+		GLintptr	offset = GLintptr(first) * elemSize;
+		GLsizeiptr	bytes = GLsizeiptr(count) * elemSize;
 		if (offset + bytes > GLsizeiptr(this->DataSize()))
 			return false;
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);
@@ -135,16 +139,21 @@ public:
 	}
 
 
-	inline int AppendBase(void) noexcept {
+	inline int AppendBase(void)
+	noexcept
+	{
 		return 0;
 	}
 
 
-	inline void SetAppendBase(int /*base*/) noexcept {
+	inline void SetAppendBase(int /*base*/)
+	noexcept
+	{
 	}
 
 
-	bool Download(void) {
+	bool Download(void)
+	{
 		if (not m_handle)
 			return false;
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_handle);

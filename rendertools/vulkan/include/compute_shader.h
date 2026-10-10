@@ -20,129 +20,152 @@
 #include "string.hpp"
 #include "array.hpp"
 #include "vector.hpp"
-#include "base_shadercode.h"   // ComputeBindingDesc
+#include "base_shadercode.h" // ComputeBindingDesc
 
 class Texture;
 class RenderTarget;
 
 // =================================================================================================
 
-class ComputeShader
-{
+class ComputeShader {
 public:
-    String                              m_name;
-    String                              m_cs;       // CS HLSL source (reference / reload)
-    std::vector<uint8_t>                m_csSpirv;  // SPIR-V bytecode
-    VkShaderModule                      m_csModule{ VK_NULL_HANDLE };
-    VkPipelineLayout                    m_pipelineLayout{ VK_NULL_HANDLE };
-    VkDescriptorSetLayout               m_setLayout{ VK_NULL_HANDLE };
-    VkPipeline                          m_pipeline{ VK_NULL_HANDLE };
-    AutoArray<ComputeBindingDesc>       m_bindings;
+	String							m_name;
+	String							m_cs; // CS HLSL source (reference / reload)
+	std::vector<uint8_t>			m_csSpirv; // SPIR-V bytecode
+	VkShaderModule					m_csModule{ VK_NULL_HANDLE };
+	VkPipelineLayout				m_pipelineLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout			m_setLayout{ VK_NULL_HANDLE };
+	VkPipeline						m_pipeline{ VK_NULL_HANDLE };
+	AutoArray<ComputeBindingDesc>	m_bindings;
 
-    // Reflected b1 cbuffer layout — { fieldName -> {offset, size} } populated from spirv-reflect
-    // on Create. Backed by m_b1Staging (sized to the reflected block size). SetB1Field looks up
-    // the name and writes into the staging buffer. UploadB1 flushes to a UBO sub-allocation.
-    struct FieldInfo { uint32_t offset{ 0 }; uint32_t size{ 0 }; };
-    uint32_t                            m_b1Size{ 0 };
-    AutoArray<std::pair<String, FieldInfo>> m_b1Fields;
-    std::vector<uint8_t>                m_b1Staging;
-    bool                                m_b1Dirty{ true };
+	// Reflected b1 cbuffer layout — { fieldName -> {offset, size} } populated from spirv-reflect
+	// on Create. Backed by m_b1Staging (sized to the reflected block size). SetB1Field looks up
+	// the name and writes into the staging buffer. UploadB1 flushes to a UBO sub-allocation.
+	struct FieldInfo {
+		uint32_t offset{ 0 };
+		uint32_t size{ 0 };
+	};
+	uint32_t								m_b1Size{ 0 };
+	AutoArray<std::pair<String, FieldInfo>>	m_b1Fields;
+	std::vector<uint8_t>					m_b1Staging;
+	bool									m_b1Dirty{ true };
 
-    // After UploadB1 the per-frame UBO dynamic offset of the b1 binding lives here. Caller wires
-    // it into pDynamicOffsets for vkCmdBindDescriptorSets, and m_b1Buffer into the descriptor - the
-    // allocator chains buffers within a frame, so the offset alone does not say where the data is.
-    uint32_t                            m_b1DynamicOffset{ 0 };
-    VkBuffer                            m_b1Buffer{ VK_NULL_HANDLE };
+	// After UploadB1 the per-frame UBO dynamic offset of the b1 binding lives here. Caller wires
+	// it into pDynamicOffsets for vkCmdBindDescriptorSets, and m_b1Buffer into the descriptor - the
+	// allocator chains buffers within a frame, so the offset alone does not say where the data is.
+	uint32_t m_b1DynamicOffset{ 0 };
+	VkBuffer m_b1Buffer{ VK_NULL_HANDLE };
 
-    static constexpr uint32_t           kBindingAccel = 66;
-    static constexpr uint32_t           kAccelSpace = 2;
-    bool                                m_usesAccelStructure{ false };
+	static constexpr uint32_t	kBindingAccel = 66;
+	static constexpr uint32_t	kAccelSpace = 2;
+	bool						m_usesAccelStructure{ false };
 
-    struct ImageBinding {
-        RenderTarget*   target{ nullptr };
-        int             bufferIndex{ -1 };
-    };
+	struct ImageBinding {
+		RenderTarget*	target{ nullptr };
+		int				bufferIndex{ -1 };
+	};
 
-    static constexpr uint32_t           kSampledBase = 4;
-    static constexpr uint32_t           kSampledSlots = 16;
-    static constexpr uint32_t           kStorageBase = 36;
-    static constexpr uint32_t           kStorageSlots = 4;
-    ImageBinding                        m_sampledImages[kSampledSlots];
-    ImageBinding                        m_storageImages[kStorageSlots];
+	static constexpr uint32_t	kSampledBase = 4;
+	static constexpr uint32_t	kSampledSlots = 16;
+	static constexpr uint32_t	kStorageBase = 36;
+	static constexpr uint32_t	kStorageSlots = 4;
+	ImageBinding				m_sampledImages[kSampledSlots];
+	ImageBinding				m_storageImages[kStorageSlots];
 
-    ComputeShader(String name = "")
-        : m_name(std::move(name))
-    {
-    }
+	ComputeShader(String name = "")
+		: m_name(std::move(name))
+	{
+	}
 
-    ~ComputeShader() {
-        Destroy();
-    }
+	~ComputeShader() {
+		Destroy();
+	}
 
-    bool Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut, const String& shaderFolder);
+	bool Compile(const char* hlslCode, const char* entryPoint, std::vector<uint8_t>& spirvOut, const String& shaderFolder);
 
-    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
+	bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    inline bool IsValid(void) const noexcept {
-        return (m_csModule != VK_NULL_HANDLE) and (m_pipeline != VK_NULL_HANDLE);
-    }
+	inline bool IsValid(void) const
+	noexcept
+	{
+		return (m_csModule != VK_NULL_HANDLE) and (m_pipeline != VK_NULL_HANDLE);
+	}
 
-    bool Activate(void);
-    bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
-    bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
+	bool Activate(void);
+	bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+	bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
 
-    // One complete compute run outside the per-frame command list: allocates a descriptor set,
-    // writes the storage buffers the caller bound through GfxArray::Bind () (u0..u3) plus the b1
-    // cbuffer, submits and waits. For work that happens while no frame is being drawn - level load
-    // precomputations, bakes - where the caller wants the result in memory when the call returns.
-    // The buffers are read back with GfxArray::Download (), which does its own submit.
-    bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
+	// One complete compute run outside the per-frame command list: allocates a descriptor set,
+	// writes the storage buffers the caller bound through GfxArray::Bind () (u0..u3) plus the b1
+	// cbuffer, submits and waits. For work that happens while no frame is being drawn - level load
+	// precomputations, bakes - where the caller wants the result in memory when the call returns.
+	// The buffers are read back with GfxArray::Download (), which does its own submit.
+	bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
 
-    bool BindSampledImage(uint32_t binding, Texture* texture, uint32_t arrayIndex = 0);
-    bool BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex);
-    bool BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex = 0);
-    bool BindSampler(uint32_t binding, VkSampler sampler);
+	bool BindSampledImage(uint32_t binding, Texture* texture, uint32_t arrayIndex = 0);
+	bool BindSampledImage(uint32_t binding, RenderTarget* target, int bufferIndex);
+	bool BindStorageImage(uint32_t binding, RenderTarget* target, int bufferIndex, uint32_t arrayIndex = 0);
+	bool BindSampler(uint32_t binding, VkSampler sampler);
 
-    // -----------------------------------------------------------------------------------------
-    // b1 uniform setters (name-based, reflection-resolved).
+	// -----------------------------------------------------------------------------------------
+	// b1 uniform setters (name-based, reflection-resolved).
 
-    // Low-level: write 'size' bytes at the reflected offset of 'name' in the b1 cbuffer.
-    // Returns the offset on success or -1 if the name is not in the reflected layout.
-    int SetB1Field(const char* name, const void* data, size_t size) noexcept;
+	// Low-level: write 'size' bytes at the reflected offset of 'name' in the b1 cbuffer.
+	// Returns the offset on success or -1 if the name is not in the reflected layout.
+	int SetB1Field(const char* name, const void* data, size_t size)
+	noexcept;
 
-    // Direct byte writes (escape hatch). offset/size are caller-supplied.
-    int SetB1(uint32_t offset, const void* data, size_t size) noexcept;
+	// Direct byte writes (escape hatch). offset/size are caller-supplied.
+	int SetB1(uint32_t offset, const void* data, size_t size)
+	noexcept;
 
-    // Typed wrappers — mirror Graphics Shader::SetXxx so cloudrenderer.cpp can use one pattern.
-    int SetFloat(const char* name, float data) noexcept;
-    int SetInt(const char* name, int data) noexcept;
-    int SetVector2f(const char* name, const Vector2f& data) noexcept;
-    int SetVector3f(const char* name, const Vector3f& data) noexcept;
-    int SetVector4f(const char* name, const Vector4f& data) noexcept;
-    int SetVector2i(const char* name, const Vector2i& data) noexcept;
-    int SetVector3i(const char* name, const Vector3i& data) noexcept;
-    int SetVector4i(const char* name, const Vector4i& data) noexcept;
-    int SetMatrix4f(const char* name, const float* data, bool transpose = false) noexcept;
-    int SetMatrix3f(const char* name, const float* data, bool transpose = false) noexcept;
+	// Typed wrappers — mirror Graphics Shader::SetXxx so cloudrenderer.cpp can use one pattern.
+	int SetFloat(const char* name, float data)
+	noexcept;
+	int SetInt(const char* name, int data)
+	noexcept;
+	int SetVector2f(const char* name, const Vector2f& data)
+	noexcept;
+	int SetVector3f(const char* name, const Vector3f& data)
+	noexcept;
+	int SetVector4f(const char* name, const Vector4f& data)
+	noexcept;
+	int SetVector2i(const char* name, const Vector2i& data)
+	noexcept;
+	int SetVector3i(const char* name, const Vector3i& data)
+	noexcept;
+	int SetVector4i(const char* name, const Vector4i& data)
+	noexcept;
+	int SetMatrix4f(const char* name, const float* data, bool transpose = false)
+	noexcept;
+	int SetMatrix3f(const char* name, const float* data, bool transpose = false)
+	noexcept;
 
-    // Sub-allocate m_b1Size bytes from cbvAllocator, memcpy m_b1Staging into it, stash the
-    // dynamic offset in m_b1DynamicOffset for the next descriptor-set bind.
-    bool UploadB1(void) noexcept;
+	// Sub-allocate m_b1Size bytes from cbvAllocator, memcpy m_b1Staging into it, stash the
+	// dynamic offset in m_b1DynamicOffset for the next descriptor-set bind.
+	bool UploadB1(void)
+	noexcept;
 
 private:
-    bool Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+	bool Record(VkCommandBuffer cb, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
-    bool HasBinding(uint32_t binding, ComputeBindingDesc::Kind kind) const noexcept;
+	bool HasBinding(uint32_t binding, ComputeBindingDesc::Kind kind) const
+	noexcept;
 
-    void ResetImageBindings(void) noexcept;
+	void ResetImageBindings(void)
+	noexcept;
 
-    bool CreatePipelineLayout(const AutoArray<ComputeBindingDesc>& bindings) noexcept;
-    bool CreatePipeline(void) noexcept;
+	bool CreatePipelineLayout(const AutoArray<ComputeBindingDesc>& bindings)
+	noexcept;
+	bool CreatePipeline(void)
+	noexcept;
 
-    // SPIR-V reflection: walk descriptor binding 1 (b1) and collect member { name, offset, size }.
-    void ReflectB1Fields(void) noexcept;
+	// SPIR-V reflection: walk descriptor binding 1 (b1) and collect member { name, offset, size }.
+	void ReflectB1Fields(void)
+	noexcept;
 };
 
 // =================================================================================================

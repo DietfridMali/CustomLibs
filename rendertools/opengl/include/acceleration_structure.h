@@ -12,60 +12,89 @@
 //
 // The real implementation lives in rendertools/vulkan. Signatures must stay identical.
 
-struct AccelGeometryDesc
-{
-    const float*    vertices     { nullptr };
-    uint32_t        vertexCount  { 0 };
-    const uint32_t* indices      { nullptr };
-    uint32_t        indexCount   { 0 };
-    bool            opaque       { true };
+struct AccelGeometryDesc {
+	const float*	vertices{ nullptr };
+	uint32_t		vertexCount{ 0 };
+	const uint32_t*	indices{ nullptr };
+	uint32_t		indexCount{ 0 };
+	bool			opaque{ true };
 };
 
 
-struct AccelInstance
-{
-    float           transform [12] { 1.0f, 0.0f, 0.0f, 0.0f,
-                                     0.0f, 1.0f, 0.0f, 0.0f,
-                                     0.0f, 0.0f, 1.0f, 0.0f };
-    uint32_t        customIndex  { 0 };
-    uint32_t        mask         { 0xFFu };
-    bool            singleSided  { false };
-    const class AccelerationStructure* blas { nullptr };
+struct AccelInstance {
+	float								transform[12]{ 1.0f, 0.0f, 0.0f, 0.0f,
+													  0.0f, 1.0f, 0.0f, 0.0f,
+													  0.0f, 0.0f, 1.0f, 0.0f };
+	uint32_t							customIndex{ 0 };
+	uint32_t							mask{ 0xFFu };
+	bool								singleSided{ false };
+	const class AccelerationStructure*	blas{ nullptr };
 };
 
 
-namespace RayTracingApi
+namespace RayTracingApi {
+inline bool IsLoaded(void)
+noexcept
 {
-    inline bool IsLoaded(void) noexcept { return false; }
+	return false;
+}
 
-    inline uint32_t ScratchAlignment(void) noexcept { return 0; }
+inline uint32_t ScratchAlignment(void)
+noexcept
+{
+	return 0;
+}
 }
 
 
-struct AccelBuildItem
-{
-    class AccelerationStructure* structure     { nullptr };
-    const AccelGeometryDesc*     geometries    { nullptr };
-    uint32_t                     geometryCount { 0 };
+struct AccelBuildItem {
+	class AccelerationStructure*	structure{ nullptr };
+	const AccelGeometryDesc*		geometries{ nullptr };
+	uint32_t						geometryCount{ 0 };
 };
 
 
-class AccelerationStructure
-{
+class AccelerationStructure {
 public:
-    static bool BuildBottomLevelBatch(const AccelBuildItem*, uint32_t) noexcept { return false; }
+	static bool BuildBottomLevelBatch(const AccelBuildItem*, uint32_t)
+	noexcept
+	{
+		return false;
+	}
 
-    bool BuildBottomLevel(const AccelGeometryDesc*, uint32_t) noexcept { return false; }
+	bool BuildBottomLevel(const AccelGeometryDesc*, uint32_t)
+	noexcept
+	{
+		return false;
+	}
 
-    bool BuildTopLevel(const AccelInstance*, uint32_t, bool = false) noexcept { return false; }
+	bool BuildTopLevel(const AccelInstance*, uint32_t, bool = false)
+	noexcept
+	{
+		return false;
+	}
 
-    bool Bind(void) const noexcept { return false; }
+	bool Bind(void) const
+	noexcept
+	{
+		return false;
+	}
 
-    void Destroy(void) noexcept { }
+	void Destroy(void)
+	noexcept
+	{}
 
-    inline uint32_t Primitives(void) const noexcept { return 0; }
+	inline uint32_t Primitives(void) const
+	noexcept
+	{
+		return 0;
+	}
 
-    inline bool IsValid(void) const noexcept { return false; }
+	inline bool IsValid(void) const
+	noexcept
+	{
+		return false;
+	}
 };
 
 // =================================================================================================

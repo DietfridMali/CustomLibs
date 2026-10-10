@@ -18,13 +18,14 @@
 // darker one as well.
 
 static const ShaderDataAttributes VtxAttrs[] = {
-    { "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
 };
 
-const ShaderSource& SkyboxShader() {
-    static const ShaderSource source(
-        "skybox",
-        R"(
+const ShaderSource& SkyboxShader()
+{
+	static const ShaderSource source(
+		"skybox",
+		R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -45,7 +46,7 @@ const ShaderSource& SkyboxShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 column_major float4x4 mView;
                 float3 lightDirection;
@@ -89,9 +90,8 @@ const ShaderSource& SkyboxShader() {
                 return float4(color * brightness, alpha);
             }
         )",
-        ShaderDataLayout(VtxAttrs, 1)
-    );
-    return source;
+		ShaderDataLayout(VtxAttrs, 1));
+	return source;
 }
 
 // =================================================================================================

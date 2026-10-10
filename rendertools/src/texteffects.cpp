@@ -18,50 +18,52 @@
 
 #define AUTORENDER 0
 
-void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply) {
-    if (aaMethod.ApplyAA()) {
-        RenderTarget::RTRenderParams params = { .clearBuffer = true, .scale = 1.0f };
-        gfxStates.ClearError();
-        baseRenderer.Set2DRenderStates(0);
-        params.shader = baseShaderHandler.SetupRenderShader(aaMethod.method);
-        if (params.shader == nullptr)
-            return;
-        if (baseRenderer.UsesOpenGL())
-            params.shader->SetInt("surface", 0);
-        params.shader->SetFloat("offset", 0.0f);
-        //params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
-        params.shader->SetVector2f("texelSize", renderTarget->TexelSize());
-        if (aaMethod.method != "gaussblur") {
-            params.destination = renderTarget->NextBuffer(params.source);
-            renderTarget->AutoRender(params);
-        }
-        else {
-            FloatArray* kernel = baseShaderHandler.GetKernel(aaMethod.strength);
-            if (kernel != nullptr) {
-                params.shader->SetFloatArray("coeffs", *kernel);
-                params.shader->SetInt("radius", aaMethod.strength);
-                params.destination = renderTarget->GetLastDestination();
-                
-                for (int i = 0; i < 2; ++i) {
-                    // the following code only works if not called multiple times in a loop!
-                    params.shader->SetFloat("direction", float (i));
-                    params.source = params.destination;
-                    params.destination = renderTarget->NextBuffer(params.source);
-                    renderTarget->Render(params);
-                }
-            }
-        }
-    }
+void TextEffects::AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply)
+{
+	if (aaMethod.ApplyAA()) {
+		RenderTarget::RTRenderParams params = { .clearBuffer = true, .scale = 1.0f };
+		gfxStates.ClearError();
+		baseRenderer.Set2DRenderStates(0);
+		params.shader = baseShaderHandler.SetupRenderShader(aaMethod.method);
+		if (params.shader == nullptr)
+			return;
+		if (baseRenderer.UsesOpenGL())
+			params.shader->SetInt("surface", 0);
+		params.shader->SetFloat("offset", 0.0f);
+		//params.shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
+		params.shader->SetVector2f("texelSize", renderTarget->TexelSize());
+		if (aaMethod.method != "gaussblur") {
+			params.destination = renderTarget->NextBuffer(params.source);
+			renderTarget->AutoRender(params);
+		}
+		else {
+			FloatArray* kernel = baseShaderHandler.GetKernel(aaMethod.strength);
+			if (kernel != nullptr) {
+				params.shader->SetFloatArray("coeffs", *kernel);
+				params.shader->SetInt("radius", aaMethod.strength);
+				params.destination = renderTarget->GetLastDestination();
+
+				for (int i = 0; i < 2; ++i) {
+					// the following code only works if not called multiple times in a loop!
+					params.shader->SetFloat("direction", float(i));
+					params.source = params.destination;
+					params.destination = renderTarget->NextBuffer(params.source);
+					renderTarget->Render(params);
+				}
+			}
+		}
+	}
 }
 
 
-void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& decoration, bool premultiply) {
-    if (decoration.HaveOutline()) {
-        baseRenderer.Set2DRenderStates();
-        Shader* shader = baseShaderHandler.SetupRenderShader("outline");
-        if (shader and not baseRenderer.IsShadowPass()) {
-            if (baseRenderer.UsesOpenGL())
-                shader->SetInt("surface", 0);
+void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& decoration, bool premultiply)
+{
+	if (decoration.HaveOutline()) {
+		baseRenderer.Set2DRenderStates();
+		Shader* shader = baseShaderHandler.SetupRenderShader("outline");
+		if (shader and not baseRenderer.IsShadowPass()) {
+			if (baseRenderer.UsesOpenGL())
+				shader->SetInt("surface", 0);
 #if 0
             else {
                 int nextBuf = renderTarget->NextBuffer(renderTarget->GetLastDestination());
@@ -69,15 +71,17 @@ void TextEffects::RenderOutline(RenderTarget* renderTarget, const Decoration& de
                 renderTarget->SetLastDestination(nextBuf);
             }
 #endif
-            shader->SetVector2f("texelSize", TexCoord(1.0f / float(renderTarget->GetWidth(true)), 1.0f / float(renderTarget->GetHeight(true))));
-            shader->SetFloat("outlineWidth", decoration.outlineWidth * float(renderTarget->GetScale()));
-            shader->SetVector4f("outlineColor", decoration.outlineColor);
-            shader->SetFloat("offset", 0.0f); // 0.5f);
-            //shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
-            renderTarget->AutoRender({ .clearBuffer = true, .shader = shader });
-        }
-        AntiAlias(renderTarget, decoration.aaMethod);
-    }
+			shader->SetVector2f("texelSize",
+								TexCoord(1.0f / float(renderTarget->GetWidth(true)),
+										 1.0f / float(renderTarget->GetHeight(true))));
+			shader->SetFloat("outlineWidth", decoration.outlineWidth * float(renderTarget->GetScale()));
+			shader->SetVector4f("outlineColor", decoration.outlineColor);
+			shader->SetFloat("offset", 0.0f); // 0.5f);
+			//shader->SetFloat("premultiply", premultiply ? 1.0f : 0.0f);
+			renderTarget->AutoRender({ .clearBuffer = true, .shader = shader });
+		}
+		AntiAlias(renderTarget, decoration.aaMethod);
+	}
 }
 
 // =================================================================================================

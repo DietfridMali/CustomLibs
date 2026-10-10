@@ -1,4 +1,4 @@
 #pragma once
 
 #define OPTIMIZE_SHADER_LOADING 1
-#define OPTIMIZE_BUFFER_REUSE	1
+#define OPTIMIZE_BUFFER_REUSE 1

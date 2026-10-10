@@ -50,10 +50,10 @@ class Texture;
 
 #pragma pack(push, 4)
 struct FrameConstants {
-    float mModelView[16]{};
-    float mProjection[16]{};
-    float mViewport[16]{};
-    float mLightTransform[16]{};
+	float mModelView[16]{};
+	float mProjection[16]{};
+	float mViewport[16]{};
+	float mLightTransform[16]{};
 };
 static_assert(sizeof(FrameConstants) == 256, "FrameConstants must be 256 bytes");
 #pragma pack(pop)
@@ -62,13 +62,13 @@ static_assert(sizeof(FrameConstants) == 256, "FrameConstants must be 256 bytes")
 
 template <typename T, typename = void>
 struct ScalarTraits {
-    using scalarType = std::remove_cv_t<T>;
-    static constexpr int componentCount = 1;
+	using scalarType = std::remove_cv_t<T>;
+	static constexpr int componentCount = 1;
 };
 template <typename T>
 struct ScalarTraits<T, std::void_t<typename T::value_type>> {
-    using scalarType = std::remove_cv_t<typename T::value_type>;
-    static constexpr int componentCount = int(sizeof(T) / sizeof(typename T::value_type));
+	using scalarType = std::remove_cv_t<typename T::value_type>;
+	static constexpr int componentCount = int(sizeof(T) / sizeof(typename T::value_type));
 };
 template <typename T>
 using ScalarBaseType = typename ScalarTraits<std::remove_cv_t<T>>::scalarType;
@@ -77,355 +77,492 @@ inline constexpr int ComponentCount = ScalarTraits<std::remove_cv_t<T>>::compone
 
 // =================================================================================================
 
-class Shader
-{
+class Shader {
 public:
-    String  m_name;
-    String  m_vs;     // VS HLSL source (for reference / reload)
-    String  m_fs;     // PS HLSL source
-    String  m_gs;     // GS HLSL source (optional)
+	String m_name;
+	String m_vs; // VS HLSL source (for reference / reload)
+	String m_fs; // PS HLSL source
+	String m_gs; // GS HLSL source (optional)
 
-    // SPIR-V bytecode per stage (raw bytes; stays alive for VkShaderModule lifetime is not
-    // required, but we keep it for reload / debug).
-    std::vector<uint8_t> m_vsSpirv;
-    std::vector<uint8_t> m_fsSpirv;
-    std::vector<uint8_t> m_gsSpirv;
-    std::vector<uint8_t> m_hsSpirv;
-    std::vector<uint8_t> m_dsSpirv;
+	// SPIR-V bytecode per stage (raw bytes; stays alive for VkShaderModule lifetime is not
+	// required, but we keep it for reload / debug).
+	std::vector<uint8_t> m_vsSpirv;
+	std::vector<uint8_t> m_fsSpirv;
+	std::vector<uint8_t> m_gsSpirv;
+	std::vector<uint8_t> m_hsSpirv;
+	std::vector<uint8_t> m_dsSpirv;
 
-    // Vulkan shader modules (one per stage).
-    VkShaderModule  m_vsModule { VK_NULL_HANDLE };
-    VkShaderModule  m_fsModule { VK_NULL_HANDLE };
-    VkShaderModule  m_gsModule { VK_NULL_HANDLE };
-    VkShaderModule  m_hsModule { VK_NULL_HANDLE };
-    VkShaderModule  m_dsModule { VK_NULL_HANDLE };
-    uint32_t        m_patchControlPoints { 0 };
+	// Vulkan shader modules (one per stage).
+	VkShaderModule	m_vsModule{ VK_NULL_HANDLE };
+	VkShaderModule	m_fsModule{ VK_NULL_HANDLE };
+	VkShaderModule	m_gsModule{ VK_NULL_HANDLE };
+	VkShaderModule	m_hsModule{ VK_NULL_HANDLE };
+	VkShaderModule	m_dsModule{ VK_NULL_HANDLE };
+	uint32_t		m_patchControlPoints{ 0 };
 
-    // Pipeline layout + descriptor set layout (fixed layout per shader).
-    VkPipelineLayout       m_pipelineLayout { VK_NULL_HANDLE };
-    VkDescriptorSetLayout  m_setLayout      { VK_NULL_HANDLE };
+	// Pipeline layout + descriptor set layout (fixed layout per shader).
+	VkPipelineLayout		m_pipelineLayout{ VK_NULL_HANDLE };
+	VkDescriptorSetLayout	m_setLayout{ VK_NULL_HANDLE };
 
-    // b0 — FrameConstants (matrices); written when changed to a UBO ring-buffer sub-allocation
-    FrameConstants  m_b0Staging { };
+	// b0 — FrameConstants (matrices); written when changed to a UBO ring-buffer sub-allocation
+	FrameConstants m_b0Staging{};
 
-    // Per-stage shader constants (VS/PS/GS), each uploaded to its own UBO binding (1/2/3)
-    struct FieldInfo { uint32_t offset { 0 }; uint32_t size { 0 }; };
+	// Per-stage shader constants (VS/PS/GS), each uploaded to its own UBO binding (1/2/3)
+	struct FieldInfo {
+		uint32_t offset{ 0 };
+		uint32_t size{ 0 };
+	};
 
-    static constexpr int kStageVS = 0;
-    static constexpr int kStagePS = 1;
-    static constexpr int kStageGS = 2;
-    static constexpr int kStageHS = 3;
-    static constexpr int kStageDS = 4;
-    static constexpr int kStageCount = 5;
+	static constexpr int kStageVS = 0;
+	static constexpr int kStagePS = 1;
+	static constexpr int kStageGS = 2;
+	static constexpr int kStageHS = 3;
+	static constexpr int kStageDS = 4;
+	static constexpr int kStageCount = 5;
 
-    // Descriptor-set bindings (Vulkan numeric layout — see header comment above).
-    static constexpr uint32_t kBindingB0 = 0;
-    static constexpr uint32_t kBindingB1VS = 1;
-    static constexpr uint32_t kBindingB1PS = 2;
-    static constexpr uint32_t kBindingB1GS = 3;
-    static constexpr uint32_t kSrvBase = 4;     // t0..t15 -> bindings 4..19
-    static constexpr uint32_t kSrvLowSlots = 16;
-    static constexpr uint32_t kSrvSlots = 24;
-    static constexpr uint32_t kSamplerBase = kSrvBase + kSrvLowSlots;   // s0..s15 -> bindings 20..35
-    static constexpr uint32_t kSamplerLowSlots = 16;
-    static constexpr uint32_t kSamplerSlots = 24;
-    static constexpr uint32_t kUavBase = kSamplerBase + kSamplerLowSlots;  // u0..u3 -> bindings 36..39
-    static constexpr uint32_t kUavSlots = 4;
-    static constexpr uint32_t kBindingB1HS = kUavBase + kUavSlots;
-    static constexpr uint32_t kBindingB1DS = kBindingB1HS + 1;
-    static constexpr uint32_t kSsboBase = kBindingB1DS + 1;
-    static constexpr uint32_t kSsboSlots = 24;
-    static constexpr uint32_t kSsboSpace = 1;
-    static constexpr uint32_t kBindingAccel = kSsboBase + kSsboSlots;
-    static constexpr uint32_t kAccelSpace = 2;
-    static constexpr uint32_t kSrvHighBase = kBindingAccel + 1;     // t16..t23 -> bindings 67..74
-    static constexpr uint32_t kSamplerHighBase = kSrvHighBase + (kSrvSlots - kSrvLowSlots);   // s16..s23 -> bindings 75..82
-    static constexpr uint32_t kBindingCount = kSamplerHighBase + (kSamplerSlots - kSamplerLowSlots);
+	// Descriptor-set bindings (Vulkan numeric layout — see header comment above).
+	static constexpr uint32_t kBindingB0 = 0;
+	static constexpr uint32_t kBindingB1VS = 1;
+	static constexpr uint32_t kBindingB1PS = 2;
+	static constexpr uint32_t kBindingB1GS = 3;
+	static constexpr uint32_t kSrvBase = 4; // t0..t15 -> bindings 4..19
+	static constexpr uint32_t kSrvLowSlots = 16;
+	static constexpr uint32_t kSrvSlots = 24;
+	static constexpr uint32_t kSamplerBase = kSrvBase + kSrvLowSlots; // s0..s15 -> bindings 20..35
+	static constexpr uint32_t kSamplerLowSlots = 16;
+	static constexpr uint32_t kSamplerSlots = 24;
+	static constexpr uint32_t kUavBase = kSamplerBase + kSamplerLowSlots; // u0..u3 -> bindings 36..39
+	static constexpr uint32_t kUavSlots = 4;
+	static constexpr uint32_t kBindingB1HS = kUavBase + kUavSlots;
+	static constexpr uint32_t kBindingB1DS = kBindingB1HS + 1;
+	static constexpr uint32_t kSsboBase = kBindingB1DS + 1;
+	static constexpr uint32_t kSsboSlots = 24;
+	static constexpr uint32_t kSsboSpace = 1;
+	static constexpr uint32_t kBindingAccel = kSsboBase + kSsboSlots;
+	static constexpr uint32_t kAccelSpace = 2;
+	static constexpr uint32_t kSrvHighBase = kBindingAccel + 1; // t16..t23 -> bindings 67..74
+	static constexpr uint32_t kSamplerHighBase = kSrvHighBase + (kSrvSlots - kSrvLowSlots); // s16..s23 -> bindings 75..82
+	static constexpr uint32_t kBindingCount = kSamplerHighBase + (kSamplerSlots - kSamplerLowSlots);
 
-    static constexpr uint32_t SrvBinding(uint32_t slot) noexcept {
-        return (slot < kSrvLowSlots) ? kSrvBase + slot : kSrvHighBase + (slot - kSrvLowSlots);
-    }
+	static constexpr uint32_t SrvBinding(uint32_t slot)
+	noexcept
+	{
+		return (slot < kSrvLowSlots) ? kSrvBase + slot : kSrvHighBase + (slot - kSrvLowSlots);
+	}
 
-    static constexpr uint32_t SamplerBinding(uint32_t slot) noexcept {
-        return (slot < kSamplerLowSlots) ? kSamplerBase + slot : kSamplerHighBase + (slot - kSamplerLowSlots);
-    }
+	static constexpr uint32_t SamplerBinding(uint32_t slot)
+	noexcept
+	{
+		return (slot < kSamplerLowSlots) ? kSamplerBase + slot : kSamplerHighBase + (slot - kSamplerLowSlots);
+	}
 
-    static constexpr bool SrvSlotOfBinding(uint32_t binding, uint32_t& slot) noexcept {
-        if ((binding >= kSrvBase) and (binding < kSrvBase + kSrvLowSlots)) {
-            slot = binding - kSrvBase;
-            return true;
-        }
-        if ((binding >= kSrvHighBase) and (binding < kSrvHighBase + (kSrvSlots - kSrvLowSlots))) {
-            slot = kSrvLowSlots + (binding - kSrvHighBase);
-            return true;
-        }
-        return false;
-    }
+	static constexpr bool SrvSlotOfBinding(uint32_t binding, uint32_t& slot)
+	noexcept
+	{
+		if ((binding >= kSrvBase) and (binding < kSrvBase + kSrvLowSlots)) {
+			slot = binding - kSrvBase;
+			return true;
+		}
+		if ((binding >= kSrvHighBase) and (binding < kSrvHighBase + (kSrvSlots - kSrvLowSlots))) {
+			slot = kSrvLowSlots + (binding - kSrvHighBase);
+			return true;
+		}
+		return false;
+	}
 
-    static constexpr bool SamplerSlotOfBinding(uint32_t binding, uint32_t& slot) noexcept {
-        if ((binding >= kSamplerBase) and (binding < kSamplerBase + kSamplerLowSlots)) {
-            slot = binding - kSamplerBase;
-            return true;
-        }
-        if ((binding >= kSamplerHighBase) and (binding < kSamplerHighBase + (kSamplerSlots - kSamplerLowSlots))) {
-            slot = kSamplerLowSlots + (binding - kSamplerHighBase);
-            return true;
-        }
-        return false;
-    }
+	static constexpr bool SamplerSlotOfBinding(uint32_t binding, uint32_t& slot)
+	noexcept
+	{
+		if ((binding >= kSamplerBase) and (binding < kSamplerBase + kSamplerLowSlots)) {
+			slot = binding - kSamplerBase;
+			return true;
+		}
+		if ((binding >= kSamplerHighBase) and (binding < kSamplerHighBase + (kSamplerSlots - kSamplerLowSlots))) {
+			slot = kSamplerLowSlots + (binding - kSamplerHighBase);
+			return true;
+		}
+		return false;
+	}
 
-    struct StageConstants {
-        uint32_t size { 0 };
-        std::vector<uint8_t> staging;
-        bool dirty { true };
-        uint64_t generation { 0 };
-        AutoArray<std::pair<String, FieldInfo>> fields;
-    };
+	struct StageConstants {
+		uint32_t								size{ 0 };
+		std::vector<uint8_t>					staging;
+		bool									dirty{ true };
+		uint64_t								generation{ 0 };
+		AutoArray<std::pair<String, FieldInfo>>	fields;
+	};
 
-    StageConstants m_stages[kStageCount];
+	StageConstants m_stages[kStageCount];
 
-    // Dynamic UBO offsets, filled by UploadB0 / UploadB1 from cbvAllocator allocations.
-    // Order matches descriptor-set bindings 0..3 (b0, b1-VS, b1-PS, b1-GS). Forwarded to
-    // vkCmdBindDescriptorSets via pDynamicOffsets in Shader::UpdateVariables.
-    static constexpr uint32_t kDynamicOffsetCount = 1 + kStageCount;
-    uint32_t  m_dynamicOffsets[kDynamicOffsetCount] { };
-    VkBuffer  m_dynamicBuffers[kDynamicOffsetCount] { };
+	// Dynamic UBO offsets, filled by UploadB0 / UploadB1 from cbvAllocator allocations.
+	// Order matches descriptor-set bindings 0..3 (b0, b1-VS, b1-PS, b1-GS). Forwarded to
+	// vkCmdBindDescriptorSets via pDynamicOffsets in Shader::UpdateVariables.
+	static constexpr uint32_t	kDynamicOffsetCount = 1 + kStageCount;
+	uint32_t					m_dynamicOffsets[kDynamicOffsetCount]{};
+	VkBuffer					m_dynamicBuffers[kDynamicOffsetCount]{};
 
-    FrameConstants  m_b0Uploaded { };
-    uint64_t        m_b0Generation { 0 };
+	FrameConstants	m_b0Uploaded{};
+	uint64_t		m_b0Generation{ 0 };
 
-    struct DescriptorContents {
-        VkBuffer                    uniformBuffers[kDynamicOffsetCount] { };
-        VkImageView                 views[kSrvSlots] { };
-        VkImageLayout               layouts[kSrvSlots] { };
-        VkSampler                   samplers[kSamplerSlots] { };
-        VkBuffer                    storageBuffers[kUavSlots] { };
-        VkDeviceSize                storageBufferSizes[kUavSlots] { };
-        VkBuffer                    readOnlyBuffers[kSsboSlots] { };
-        VkDeviceSize                readOnlyBufferSizes[kSsboSlots] { };
-        VkAccelerationStructureKHR  accelStructure { VK_NULL_HANDLE };
+	struct DescriptorContents {
+		VkBuffer					uniformBuffers[kDynamicOffsetCount]{};
+		VkImageView					views[kSrvSlots]{};
+		VkImageLayout				layouts[kSrvSlots]{};
+		VkSampler					samplers[kSamplerSlots]{};
+		VkBuffer					storageBuffers[kUavSlots]{};
+		VkDeviceSize				storageBufferSizes[kUavSlots]{};
+		VkBuffer					readOnlyBuffers[kSsboSlots]{};
+		VkDeviceSize				readOnlyBufferSizes[kSsboSlots]{};
+		VkAccelerationStructureKHR	accelStructure{ VK_NULL_HANDLE };
 
-        bool operator==(const DescriptorContents& other) const noexcept = default;
-    };
+		bool operator==(const DescriptorContents& other) const
+		noexcept = default;
+	};
 
-    VkDescriptorSet     m_descriptorSet { VK_NULL_HANDLE };
-    DescriptorContents  m_descriptorContents;
-    uint64_t            m_descriptorPoolGeneration { 0 };
-    uint64_t            m_descriptorCleanupGeneration { 0 };
+	VkDescriptorSet		m_descriptorSet{ VK_NULL_HANDLE };
+	DescriptorContents	m_descriptorContents;
+	uint64_t			m_descriptorPoolGeneration{ 0 };
+	uint64_t			m_descriptorCleanupGeneration{ 0 };
 
-    enum DefaultViewType : uint8_t {
-        dvNone = 0,
-        dv2D,
-        dv2DArray,
-        dvCube,
-        dv3D
-    };
+	enum DefaultViewType : uint8_t {
+		dvNone = 0,
+		dv2D,
+		dv2DArray,
+		dvCube,
+		dv3D
+	};
 
-    uint8_t   m_srvDefaults[kSrvSlots] { };
-    bool      m_samplerDeclared[kSamplerSlots] { };
-    bool      m_bindingDeclared[kBindingCount] { };
-    bool      m_usesAccelStructure { false };
+	uint8_t	m_srvDefaults[kSrvSlots]{};
+	bool	m_samplerDeclared[kSamplerSlots]{};
+	bool	m_bindingDeclared[kBindingCount]{};
+	bool	m_usesAccelStructure{ false };
 
-    // Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
-    std::vector<VkVertexInputAttributeDescription> m_vsInputAttributes;
-    std::vector<VkVertexInputBindingDescription>   m_vsInputBindings;
+	// Per-shader vertex input — built from m_dataLayout on Create(), or via reflection fallback.
+	std::vector<VkVertexInputAttributeDescription>	m_vsInputAttributes;
+	std::vector<VkVertexInputBindingDescription>	m_vsInputBindings;
 
-    // Vertex data layout: describes which C++ buffers feed which shader inputs.
-    ShaderDataLayout m_dataLayout;
+	// Vertex data layout: describes which C++ buffers feed which shader inputs.
+	ShaderDataLayout m_dataLayout;
 
-    AutoArray<UniformHandle*>  m_uniforms;
-    // Per-shader cache of resolved uniform b1 offsets — see SetB1Field / ResolveB1Location.
-    ShaderLocationTable        m_locations;
+	AutoArray<UniformHandle*> m_uniforms;
+	// Per-shader cache of resolved uniform b1 offsets — see SetB1Field / ResolveB1Location.
+	ShaderLocationTable m_locations;
 
-    using KeyType = String;
+	using KeyType = String;
 
-    Shader(String name = "", String vs = "", String fs = "", String gs = "")
-        : m_name(std::move(name)), m_vs(std::move(vs)), m_fs(std::move(fs)), m_gs(std::move(gs))
-    {
-        m_uniforms.SetAutoFit(true);
-        m_uniforms.SetShrinkable(false);
-        m_uniforms.SetDefaultValue(nullptr);
-    }
+	Shader(String name = "", String vs = "", String fs = "", String gs = "")
+		: m_name(std::move(name))
+		, m_vs(std::move(vs))
+		, m_fs(std::move(fs))
+		, m_gs(std::move(gs))
+	{
+		m_uniforms.SetAutoFit(true);
+		m_uniforms.SetShrinkable(false);
+		m_uniforms.SetDefaultValue(nullptr);
+	}
 
-    Shader(const Shader& other) {
-        Copy(other);
-    }
+	Shader(const Shader& other) {
+		Copy(other);
+	}
 
-    Shader(Shader&& other) noexcept {
-        Move(other);
-    }
+	Shader(Shader&& other)
+	noexcept
+	{
+		Move(other);
+	}
 
-    ~Shader() { Destroy(); }
+	~Shader() {
+		Destroy();
+	}
 
-    Shader& operator=(Shader&& other) noexcept {
-        return Move(other);
-    }
+	Shader& operator=(Shader&& other)
+	noexcept
+	{
+		return Move(other);
+	}
 
-    String& GetKey(void) noexcept {
-        return m_name;
-    }
+	String& GetKey(void)
+	noexcept
+	{
+		return m_name;
+	}
 
-    inline VkPipelineLayout GetPipelineLayout(void) const noexcept {
-        return m_pipelineLayout;
-    }
+	inline VkPipelineLayout GetPipelineLayout(void) const
+	noexcept
+	{
+		return m_pipelineLayout;
+	}
 
-    inline VkDescriptorSetLayout GetDescriptorSetLayout(void) const noexcept {
-        return m_setLayout;
-    }
+	inline VkDescriptorSetLayout GetDescriptorSetLayout(void) const
+	noexcept
+	{
+		return m_setLayout;
+	}
 
-    // -----------------------------------------------------------------------------------------
-    // Creation / destruction
+	// -----------------------------------------------------------------------------------------
+	// Creation / destruction
 
-    // Compile a single HLSL stage to SPIR-V via DXC. entryPoint: "VSMain" / "PSMain" / "GSMain";
-    // target: "vs_6_0" / "ps_6_0" / "gs_6_0".
-    bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
-                 std::vector<uint8_t>& spirvOut, const String& shaderFolder);
+	// Compile a single HLSL stage to SPIR-V via DXC. entryPoint: "VSMain" / "PSMain" / "GSMain";
+	// target: "vs_6_0" / "ps_6_0" / "gs_6_0".
+	bool Compile(const char* hlslCode, const char* entryPoint, const char* target,
+				 std::vector<uint8_t>& spirvOut, const String& shaderFolder);
 
-    // Link: build pipeline layout + descriptor-set layout, build vertex input description from
-    // m_dataLayout, reflect b1 fields. gsCode is optional.
-    bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder);
+	// Link: build pipeline layout + descriptor-set layout, build vertex input description from
+	// m_dataLayout, reflect b1 fields. gsCode is optional.
+	bool Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode,
+				const String& shaderFolder);
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    inline bool IsValid(void) const noexcept {
-        return (m_vsModule != VK_NULL_HANDLE) and (m_fsModule != VK_NULL_HANDLE);  // GS optional
-    }
+	inline bool IsValid(void) const
+	noexcept
+	{
+		return (m_vsModule != VK_NULL_HANDLE) and (m_fsModule != VK_NULL_HANDLE); // GS optional
+	}
 
-    inline bool IsTessellated(void) const noexcept {
-        return (m_hsModule != VK_NULL_HANDLE) and (m_dsModule != VK_NULL_HANDLE);
-    }
+	inline bool IsTessellated(void) const
+	noexcept
+	{
+		return (m_hsModule != VK_NULL_HANDLE) and (m_dsModule != VK_NULL_HANDLE);
+	}
 
-    uint32_t ReflectPatchControlPoints(const std::vector<uint8_t>& spirv) noexcept;
+	uint32_t ReflectPatchControlPoints(const std::vector<uint8_t>& spirv)
+	noexcept;
 
-    // -----------------------------------------------------------------------------------------
-    // Runtime
+	// -----------------------------------------------------------------------------------------
+	// Runtime
 
-    // Activate this shader: vkCmdBindPipeline via the active CommandList. Pipeline lookup
-    // through PipelineCache keyed on {Shader, RenderStates, active RT formats}.
-    bool Activate(void);
+	// Activate this shader: vkCmdBindPipeline via the active CommandList. Pipeline lookup
+	// through PipelineCache keyed on {Shader, RenderStates, active RT formats}.
+	bool Activate(void);
 
-    // No-op (pipeline changes are driven by RenderStates changes in the next bind).
-    inline void Deactivate(void) noexcept {}
+	// No-op (pipeline changes are driven by RenderStates changes in the next bind).
+	inline void Deactivate(void)
+	noexcept
+	{}
 
-    // Upload the b0 / b1 buffers to UBO ring-buffer sub-allocations and stash dynamic offsets
-    // for the next vkCmdBindDescriptorSets in UpdateVariables.
-    bool UploadB0(void) noexcept;
-    bool UploadB1(void) noexcept;
+	// Upload the b0 / b1 buffers to UBO ring-buffer sub-allocations and stash dynamic offsets
+	// for the next vkCmdBindDescriptorSets in UpdateVariables.
+	bool UploadB0(void)
+	noexcept;
+	bool UploadB1(void)
+	noexcept;
 
-    // Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).
-    // Reads from baseRenderer / shadowMap, same as OGL.
-    bool UpdateMatrices(void);
+	// Set the 4 standard matrices (mModelView, mProjection, mViewport, mLightTransform).
+	// Reads from baseRenderer / shadowMap, same as OGL.
+	bool UpdateMatrices(void);
 
-    bool UpdateVariables(void) noexcept;
+	bool UpdateVariables(void)
+	noexcept;
 
-    // -----------------------------------------------------------------------------------------
-    // Pipeline-layout helpers (internal)
+	// -----------------------------------------------------------------------------------------
+	// Pipeline-layout helpers (internal)
 
-    // Build VkDescriptorSetLayout (24 bindings as documented above) and VkPipelineLayout from it.
-    bool CreatePipelineLayout(void) noexcept;
+	// Build VkDescriptorSetLayout (24 bindings as documented above) and VkPipelineLayout from it.
+	bool CreatePipelineLayout(void)
+	noexcept;
 
-    void BuildVertexInput(void) noexcept;
+	void BuildVertexInput(void)
+	noexcept;
 
-    void UpdateStageFields(const std::vector<uint8_t>& spirv, int stage) noexcept;
+	void UpdateStageFields(const std::vector<uint8_t>& spirv, int stage)
+	noexcept;
 
-    void UpdateStageResources(const std::vector<uint8_t>& spirv) noexcept;
+	void UpdateStageResources(const std::vector<uint8_t>& spirv)
+	noexcept;
 
-    static void DestroyDefaultResources(void) noexcept;
+	static void DestroyDefaultResources(void)
+	noexcept;
 
-    // -----------------------------------------------------------------------------------------
-    // Uniform setters — same signatures as DX12 / OGL, return int (was GLint)
+	// -----------------------------------------------------------------------------------------
+	// Uniform setters — same signatures as DX12 / OGL, return int (was GLint)
 
 private:
-    // Write 'size' bytes to all stage buffers that contain the field 'name'.
-    // Returns the offset in the first matching stage, or -1 if not found in any stage.
-    int SetB1Field(const char* name, const void* data, size_t size) noexcept;
+	// Write 'size' bytes to all stage buffers that contain the field 'name'.
+	// Returns the offset in the first matching stage, or -1 if not found in any stage.
+	int SetB1Field(const char* name, const void* data, size_t size)
+	noexcept;
 
-    // Cache-miss path for SetB1Field: scan the reflected per-stage field tables once and
-    // record the field's b1 offset for every stage into the cache entry.
-    void ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept;
+	// Cache-miss path for SetB1Field: scan the reflected per-stage field tables once and
+	// record the field's b1 offset for every stage into the cache entry.
+	void ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name)
+	noexcept;
 
-    bool TrySetB0Field(eBaseMatrices id, const float* data) noexcept;
+	bool TrySetB0Field(eBaseMatrices id, const float* data)
+	noexcept;
 
-    void WriteDescriptorSet(VkDescriptorSet set, const DescriptorContents& contents) noexcept;
+	void WriteDescriptorSet(VkDescriptorSet set, const DescriptorContents& contents)
+	noexcept;
 
 public:
-    int SetFloat(const char* name, float data) noexcept;
-    int SetInt(const char* name, int data) noexcept;
+	int SetFloat(const char* name, float data)
+	noexcept;
+	int SetInt(const char* name, int data)
+	noexcept;
 
-    int SetVector2f(const char* name, const Vector2f& data) noexcept;
-    int SetVector2f(const char* name, Vector2f&& data) noexcept { return SetVector2f(name, static_cast<const Vector2f&>(data)); }
-    int SetVector2f(const char* name, float x, float y) noexcept { return SetVector2f(name, Vector2f(x, y)); }
+	int SetVector2f(const char* name, const Vector2f& data)
+	noexcept;
+	int SetVector2f(const char* name, Vector2f&& data)
+	noexcept
+	{
+		return SetVector2f(name, static_cast<const Vector2f&>(data));
+	}
+	int SetVector2f(const char* name, float x, float y)
+	noexcept
+	{
+		return SetVector2f(name, Vector2f(x, y));
+	}
 
-    int SetVector3f(const char* name, const Vector3f& data) noexcept;
-    int SetVector3f(const char* name, Vector3f&& data) noexcept { return SetVector3f(name, static_cast<const Vector3f&>(data)); }
+	int SetVector3f(const char* name, const Vector3f& data)
+	noexcept;
+	int SetVector3f(const char* name, Vector3f&& data)
+	noexcept
+	{
+		return SetVector3f(name, static_cast<const Vector3f&>(data));
+	}
 
-    int SetVector4f(const char* name, const Vector4f& data) noexcept;
-    int SetVector4f(const char* name, Vector4f&& data) noexcept { return SetVector4f(name, static_cast<const Vector4f&>(data)); }
+	int SetVector4f(const char* name, const Vector4f& data)
+	noexcept;
+	int SetVector4f(const char* name, Vector4f&& data)
+	noexcept
+	{
+		return SetVector4f(name, static_cast<const Vector4f&>(data));
+	}
 
-    int SetVector2i(const char* name, const Vector2i& data) noexcept;
-    int SetVector2i(const char* name, Vector2i&& data) noexcept { return SetVector2i(name, static_cast<const Vector2i&>(data)); }
+	int SetVector2i(const char* name, const Vector2i& data)
+	noexcept;
+	int SetVector2i(const char* name, Vector2i&& data)
+	noexcept
+	{
+		return SetVector2i(name, static_cast<const Vector2i&>(data));
+	}
 
-    int SetVector3i(const char* name, const Vector3i& data) noexcept;
-    int SetVector3i(const char* name, Vector3i&& data) noexcept { return SetVector3i(name, static_cast<const Vector3i&>(data)); }
+	int SetVector3i(const char* name, const Vector3i& data)
+	noexcept;
+	int SetVector3i(const char* name, Vector3i&& data)
+	noexcept
+	{
+		return SetVector3i(name, static_cast<const Vector3i&>(data));
+	}
 
-    int SetVector4i(const char* name, const Vector4i& data) noexcept;
-    int SetVector4i(const char* name, Vector4i&& data) noexcept { return SetVector4i(name, static_cast<const Vector4i&>(data)); }
+	int SetVector4i(const char* name, const Vector4i& data)
+	noexcept;
+	int SetVector4i(const char* name, Vector4i&& data)
+	noexcept
+	{
+		return SetVector4i(name, static_cast<const Vector4i&>(data));
+	}
 
-    int SetMatrix4f(const char* name, const float* data, bool transpose = false) noexcept;
-    int SetMatrix4f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {
-        return SetMatrix4f(name, data.Data(), transpose);
-    }
-    int SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false) noexcept;
+	int SetMatrix4f(const char* name, const float* data, bool transpose = false)
+	noexcept;
+	int SetMatrix4f(const char* name, AutoArray<float>& data, bool transpose = false)
+	noexcept
+	{
+		return SetMatrix4f(name, data.Data(), transpose);
+	}
+	int SetMatrix4f(eBaseMatrices id, const float* data, bool transpose = false)
+	noexcept;
 
-    int SetMatrix3f(const char* name, float* data, bool transpose = false) noexcept;
-    int SetMatrix3f(const char* name, AutoArray<float>& data, bool transpose = false) noexcept {
-        return SetMatrix3f(name, data.Data(), transpose);
-    }
+	int SetMatrix3f(const char* name, float* data, bool transpose = false)
+	noexcept;
+	int SetMatrix3f(const char* name, AutoArray<float>& data, bool transpose = false)
+	noexcept
+	{
+		return SetMatrix3f(name, data.Data(), transpose);
+	}
 
-    int SetFloatArray(const char* name, const float* data, size_t length) noexcept;
-    int SetIntArray(const char* name, const int* data, size_t length) noexcept;
-    int SetFloatArray(const char* name, const AutoArray<float>& data) noexcept {
-        return SetFloatArray(name, data.Data(), data.Length());
-    }
+	int SetFloatArray(const char* name, const float* data, size_t length)
+	noexcept;
+	int SetIntArray(const char* name, const int* data, size_t length)
+	noexcept;
+	int SetFloatArray(const char* name, const AutoArray<float>& data)
+	noexcept
+	{
+		return SetFloatArray(name, data.Data(), data.Length());
+	}
 
-    int SetVector2fArray(const char* name, const Vector2f* data, int length) noexcept;
-    int SetVector3fArray(const char* name, const Vector3f* data, int length) noexcept;
-    int SetVector4fArray(const char* name, const Vector4f* data, int length) noexcept;
+	int SetVector2fArray(const char* name, const Vector2f* data, int length)
+	noexcept;
+	int SetVector3fArray(const char* name, const Vector3f* data, int length)
+	noexcept;
+	int SetVector4fArray(const char* name, const Vector4f* data, int length)
+	noexcept;
 
-    // -----------------------------------------------------------------------------------------
-    // Debug helpers
+	// -----------------------------------------------------------------------------------------
+	// Debug helpers
 #ifdef _DEBUG
-    static void PrintShaderSource(const char* hlslCode, const char* title) noexcept;
+	static void PrintShaderSource(const char* hlslCode, const char* title)
+	noexcept;
 #endif
 
-    // Source-compat stubs (no-ops in Vulkan)
-    static void ClearGfxError() noexcept {}
+	// Source-compat stubs (no-ops in Vulkan)
+	static void ClearGfxError()
+	noexcept
+	{}
 
-    static bool CheckGfxError(const char* = "") noexcept { return true; }
+	static bool CheckGfxError(const char* = "")
+	noexcept
+	{
+		return true;
+	}
 
-    // GetFloatData — OGL-specific, kept as no-op stubs
-    static inline float* GetFloatData(GLenum /*id*/, int32_t /*size*/, float* data) noexcept { return data; }
+	// GetFloatData — OGL-specific, kept as no-op stubs
+	static inline float* GetFloatData(GLenum /*id*/, int32_t /*size*/, float* data)
+	noexcept
+	{
+		return data;
+	}
 
-    static inline AutoArray<float>& GetFloatData(GLenum /*id*/, int32_t /*size*/, AutoArray<float>& d) noexcept { return d; }
+	static inline AutoArray<float>& GetFloatData(GLenum /*id*/, int32_t /*size*/, AutoArray<float>& d)
+	noexcept
+	{
+		return d;
+	}
 
-    // -----------------------------------------------------------------------------------------
-    // Comparison operators (same as OGL)
-    bool operator<(const String& name)  const { return m_name < name; }
-    bool operator>(const String& name)  const { return m_name > name; }
-    bool operator<=(const String& name) const { return m_name <= name; }
-    bool operator>=(const String& name) const { return m_name >= name; }
-    bool operator!=(const String& name) const { return m_name != name; }
-    bool operator==(const String& name) const { return m_name == name; }
-    bool operator<(const Shader& o)  const { return m_name < o.m_name; }
-    bool operator>(const Shader& o)  const { return m_name > o.m_name; }
-    bool operator<=(const Shader& o) const { return m_name <= o.m_name; }
-    bool operator>=(const Shader& o) const { return m_name >= o.m_name; }
-    bool operator!=(const Shader& o) const { return m_name != o.m_name; }
-    bool operator==(const Shader& o) const { return m_name == o.m_name; }
+	// -----------------------------------------------------------------------------------------
+	// Comparison operators (same as OGL)
+	bool operator<(const String& name) const {
+		return m_name < name;
+	}
+	bool operator>(const String& name) const {
+		return m_name > name;
+	}
+	bool operator<=(const String& name) const {
+		return m_name <= name;
+	}
+	bool operator>=(const String& name) const {
+		return m_name >= name;
+	}
+	bool operator!=(const String& name) const {
+		return m_name != name;
+	}
+	bool operator==(const String& name) const {
+		return m_name == name;
+	}
+	bool operator<(const Shader& o) const {
+		return m_name < o.m_name;
+	}
+	bool operator>(const Shader& o) const {
+		return m_name > o.m_name;
+	}
+	bool operator<=(const Shader& o) const {
+		return m_name <= o.m_name;
+	}
+	bool operator>=(const Shader& o) const {
+		return m_name >= o.m_name;
+	}
+	bool operator!=(const Shader& o) const {
+		return m_name != o.m_name;
+	}
+	bool operator==(const Shader& o) const {
+		return m_name == o.m_name;
+	}
 
 private:
-    Shader& Copy(const Shader& other);
-    Shader& Move(Shader& other) noexcept;
+	Shader& Copy(const Shader& other);
+	Shader& Move(Shader& other)
+	noexcept;
 };
 
 // =================================================================================================

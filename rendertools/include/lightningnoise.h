@@ -20,20 +20,20 @@
 
 class LightningNoise {
 public:
-    static float    Perlin1D(float x, uint32_t seed);
-    static Vector3f Perlin3D(float x, uint32_t seed);
-    static float    Fbm1D(float x, uint32_t seed, int32_t octaves, float gain, float lacunarity);
-    static Vector3f Fbm3D(float x, uint32_t seed, int32_t octaves, float gain, float lacunarity);
+	static float Perlin1D(float x, uint32_t seed);
+	static Vector3f Perlin3D(float x, uint32_t seed);
+	static float Fbm1D(float x, uint32_t seed, int32_t octaves, float gain, float lacunarity);
+	static Vector3f Fbm3D(float x, uint32_t seed, int32_t octaves, float gain, float lacunarity);
 
-    static float    Perlin2D(float x, float y, uint32_t seed);
-    static float    Fbm2D(float x, float y, uint32_t seed, int32_t octaves, float gain, float lacunarity);
-    static Vector3f Fbm2Dv3(float x, float y, uint32_t seed, int32_t octaves, float gain, float lacunarity);
+	static float Perlin2D(float x, float y, uint32_t seed);
+	static float Fbm2D(float x, float y, uint32_t seed, int32_t octaves, float gain, float lacunarity);
+	static Vector3f Fbm2Dv3(float x, float y, uint32_t seed, int32_t octaves, float gain, float lacunarity);
 
 private:
-    static uint32_t Hash(uint32_t x);
-    static float    Gradient(int32_t i, uint32_t seed);
-    static float    GradDot2(int32_t ix, int32_t iy, float dx, float dy, uint32_t seed);
-    static float    Fade(float t);
+	static uint32_t Hash(uint32_t x);
+	static float Gradient(int32_t i, uint32_t seed);
+	static float GradDot2(int32_t ix, int32_t iy, float dx, float dy, uint32_t seed);
+	static float Fade(float t);
 };
 
 // =================================================================================================

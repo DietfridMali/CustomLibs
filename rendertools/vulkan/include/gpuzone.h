@@ -17,75 +17,78 @@
 
 #if USE_TRACY
 
-class GfxGpuZoneScope
-{
+class GfxGpuZoneScope {
 public:
-    inline GfxGpuZoneScope(const tracy::SourceLocationData* srcloc) noexcept
-    {
-        uint16_t queryId = 0;
+	inline GfxGpuZoneScope(const tracy::SourceLocationData* srcloc)
+	noexcept
+	{
+		uint16_t queryId = 0;
 
 #ifdef TRACY_ON_DEMAND
-        if (not tracy::GetProfiler().IsConnected())
-            return;
+		if (not tracy::GetProfiler().IsConnected())
+			return;
 #endif
-        m_active = WriteTimestamp(queryId);
-        if (not m_active)
-            return;
+		m_active = WriteTimestamp(queryId);
+		if (not m_active)
+			return;
 
-        auto item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneBeginSerial);
-        tracy::MemWrite(&item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime());
-        tracy::MemWrite(&item->gpuZoneBegin.srcloc, uint64_t(srcloc));
-        tracy::MemWrite(&item->gpuZoneBegin.thread, tracy::GetThreadHandle());
-        tracy::MemWrite(&item->gpuZoneBegin.queryId, queryId);
-        tracy::MemWrite(&item->gpuZoneBegin.context, commandListHandler.m_gpuProfilerCtx->GetId());
-        tracy::Profiler::QueueSerialFinish();
-    }
+		auto item = tracy::Profiler::QueueSerial();
+		tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneBeginSerial);
+		tracy::MemWrite(&item->gpuZoneBegin.cpuTime, tracy::Profiler::GetTime());
+		tracy::MemWrite(&item->gpuZoneBegin.srcloc, uint64_t(srcloc));
+		tracy::MemWrite(&item->gpuZoneBegin.thread, tracy::GetThreadHandle());
+		tracy::MemWrite(&item->gpuZoneBegin.queryId, queryId);
+		tracy::MemWrite(&item->gpuZoneBegin.context, commandListHandler.m_gpuProfilerCtx->GetId());
+		tracy::Profiler::QueueSerialFinish();
+	}
 
-    inline ~GfxGpuZoneScope() noexcept
-    {
-        if (not m_active)
-            return;
+	inline ~GfxGpuZoneScope()
+	noexcept
+	{
+		if (not m_active)
+			return;
 
-        uint16_t queryId = 0;
+		uint16_t queryId = 0;
 
-        if (not WriteTimestamp(queryId))
-            return;
+		if (not WriteTimestamp(queryId))
+			return;
 
-        auto item = tracy::Profiler::QueueSerial();
-        tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneEndSerial);
-        tracy::MemWrite(&item->gpuZoneEnd.cpuTime, tracy::Profiler::GetTime());
-        tracy::MemWrite(&item->gpuZoneEnd.thread, tracy::GetThreadHandle());
-        tracy::MemWrite(&item->gpuZoneEnd.queryId, queryId);
-        tracy::MemWrite(&item->gpuZoneEnd.context, commandListHandler.m_gpuProfilerCtx->GetId());
-        tracy::Profiler::QueueSerialFinish();
-    }
+		auto item = tracy::Profiler::QueueSerial();
+		tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneEndSerial);
+		tracy::MemWrite(&item->gpuZoneEnd.cpuTime, tracy::Profiler::GetTime());
+		tracy::MemWrite(&item->gpuZoneEnd.thread, tracy::GetThreadHandle());
+		tracy::MemWrite(&item->gpuZoneEnd.queryId, queryId);
+		tracy::MemWrite(&item->gpuZoneEnd.context, commandListHandler.m_gpuProfilerCtx->GetId());
+		tracy::Profiler::QueueSerialFinish();
+	}
 
-    GfxGpuZoneScope(const GfxGpuZoneScope&) = delete;
-    GfxGpuZoneScope& operator=(const GfxGpuZoneScope&) = delete;
+	GfxGpuZoneScope(const GfxGpuZoneScope&) = delete;
+	GfxGpuZoneScope& operator=(const GfxGpuZoneScope&) = delete;
 
 private:
-    bool    m_active { false };
+	bool m_active{ false };
 
-    static inline bool WriteTimestamp(uint16_t& queryId) noexcept
-    {
-        TracyVkCtx ctx = commandListHandler.m_gpuProfilerCtx;
-        if (not ctx)
-            return false;
-        VkCommandBuffer cb = commandListHandler.CurrentGfxList();
-        if (cb == VK_NULL_HANDLE)
-            cb = commandListHandler.UploadCmdBuffer();
-        if (cb == VK_NULL_HANDLE)
-            return false;
-        queryId = uint16_t(ctx->NextQueryId());
-        vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->GetQueryPool(), queryId);
-        return true;
-    }
+	static inline bool WriteTimestamp(uint16_t& queryId)
+	noexcept
+	{
+		TracyVkCtx ctx = commandListHandler.m_gpuProfilerCtx;
+		if (not ctx)
+			return false;
+		VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+		if (cb == VK_NULL_HANDLE)
+			cb = commandListHandler.UploadCmdBuffer();
+		if (cb == VK_NULL_HANDLE)
+			return false;
+		queryId = uint16_t(ctx->NextQueryId());
+		vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, ctx->GetQueryPool(), queryId);
+		return true;
+	}
 };
 
 #define GfxGpuZone(name) \
-    static constexpr tracy::SourceLocationData TracyConcat(__gfx_gpu_source_location, TracyLine) { name, TracyFunction, TracyFile, uint32_t(TracyLine), 0 }; \
-    GfxGpuZoneScope TracyConcat(__gfx_gpu_zone, TracyLine)(&TracyConcat(__gfx_gpu_source_location, TracyLine))
+	static constexpr tracy::SourceLocationData TracyConcat(__gfx_gpu_source_location, \
+														   TracyLine){ name, TracyFunction, TracyFile, uint32_t(TracyLine), 0 }; \
+	GfxGpuZoneScope TracyConcat(__gfx_gpu_zone, TracyLine)(&TracyConcat(__gfx_gpu_source_location, TracyLine))
 
 #else
 

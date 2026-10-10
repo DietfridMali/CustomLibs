@@ -1,7 +1,7 @@
 #pragma once
 
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #include "SDL.h"
 #pragma warning(pop)
 
@@ -12,18 +12,18 @@
 // Calls SDL_QuitSubSystem with these flags, as calling SDL_Quit() when not all subsystems have been
 // initialized with SDL_Init(SDL_INIT_EVERYTHING) can cause crashes in SDL2.
 
-class SDLHandler 
-	: public BaseSingleton<SDLHandler>
-{
+class SDLHandler
+	: public BaseSingleton<SDLHandler> {
 private:
-	uint32_t	m_subSystems{ 0 };
+	uint32_t m_subSystems{ 0 };
 
 public:
-	inline uint32_t Init(uint32_t subSystems) {
+	inline uint32_t Init(uint32_t subSystems)
+	{
 		uint32_t failed = 0;
 		for (uint32_t i = 1; i; i <<= 1) {
 			if ((subSystems & i) and not (m_subSystems & i)) {
-				if (SDL_Init(i)) 
+				if (SDL_Init(i))
 					failed |= i;
 				else
 					m_subSystems |= i;

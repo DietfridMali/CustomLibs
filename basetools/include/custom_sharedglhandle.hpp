@@ -2,7 +2,7 @@
 
 #if USE_STD
 
-#   error custom shared GL handle included
+#error custom shared GL handle included
 
 #else
 
@@ -15,11 +15,10 @@ using glBufferAllocator = void (*)(GLsizei, GLuint*);
 using glBufferReleaser = void (*)(GLsizei, const GLuint*);
 
 class SharedGLBufferHandle
-    : public SharedHandle<GLuint>
-{
+	: public SharedHandle<GLuint> {
 public:
-    glBufferAllocator   m_allocate;
-    glBufferReleaser    m_release;
+	glBufferAllocator	m_allocate;
+	glBufferReleaser	m_release;
 
 #if 0
     SharedGLBufferHandle(glBufferAllocator allocate, glBufferReleaser release)
@@ -29,115 +28,115 @@ public:
     }
 #endif
 
-    SharedGLBufferHandle(GLuint handle, glBufferAllocator allocate, glBufferReleaser release)
-        : SharedHandle<GLuint>(handle, (GLuint) 0), m_allocate(allocate), m_release(release)
-    {
-    }
+	SharedGLBufferHandle(GLuint handle, glBufferAllocator allocate, glBufferReleaser release)
+		: SharedHandle<GLuint>(handle, (GLuint)0)
+		, m_allocate(allocate)
+		, m_release(release)
+	{
+	}
 
 
-    virtual GLuint Claim(size_t capacity = 1) {
-        this->m_allocate(1, &this->m_handle);
-        this->m_refCount = 1;
-        return this->m_handle;
-    }
+	virtual GLuint Claim(size_t capacity = 1) {
+		this->m_allocate(1, &this->m_handle);
+		this->m_refCount = 1;
+		return this->m_handle;
+	}
 
 
-    virtual void Release(void) {
-        if (this->m_refCount > 1)
-            --(this->m_refCount);
-        else if (this->m_handle) {
-            this->m_release(1, &this->m_handle);
-            this->m_handle = 0;
-            this->m_refCount = 0;
-        }
-    }
+	virtual void Release(void)
+	{
+		if (this->m_refCount > 1)
+			--(this->m_refCount);
+		else if (this->m_handle) {
+			this->m_release(1, &this->m_handle);
+			this->m_handle = 0;
+			this->m_refCount = 0;
+		}
+	}
 
 
-    virtual operator bool() {
-        return this->m_handle != 0;
-    }
+	virtual operator bool() {
+		return this->m_handle != 0;
+	}
 };
 
 // =================================================================================================
 
 class SharedGfxHandle
-    : public SharedResourceHandler<GLuint>
-{
+	: public SharedResourceHandler<GLuint> {
 public:
-    using Base = SharedResourceHandler<GLuint>;
+	using Base = SharedResourceHandler<GLuint>;
 
 
-    SharedGfxHandle()
-        : Base(nullptr)
-    {
-    }
+	SharedGfxHandle()
+		: Base(nullptr)
+	{
+	}
 
 
-    SharedGfxHandle(GLuint handle, glBufferAllocator allocate, glBufferReleaser release)
-        : Base(new SharedGLBufferHandle(handle, allocate, release))
-    {
-    }
+	SharedGfxHandle(GLuint handle, glBufferAllocator allocate, glBufferReleaser release)
+		: Base(new SharedGLBufferHandle(handle, allocate, release))
+	{
+	}
 
 
-    GLuint Claim(size_t capacity = 1) {
-        if (not m_resource)
-            return 0;
-        glBufferAllocator allocate = static_cast<SharedGLBufferHandle*>(m_resource)->m_allocate;
-        glBufferReleaser release = static_cast<SharedGLBufferHandle*>(m_resource)->m_release;
-        m_resource->Release();
-        m_resource = new SharedGLBufferHandle(0, allocate, release);
-        return m_resource ? m_resource->Claim(capacity) : (GLuint)0;
-    }
+	GLuint Claim(size_t capacity = 1)
+	{
+		if (not m_resource)
+			return 0;
+		glBufferAllocator	allocate = static_cast<SharedGLBufferHandle*>(m_resource)->m_allocate;
+		glBufferReleaser	release = static_cast<SharedGLBufferHandle*>(m_resource)->m_release;
+		m_resource->Release();
+		m_resource = new SharedGLBufferHandle(0, allocate, release);
+		return m_resource ? m_resource->Claim(capacity) : (GLuint)0;
+	}
 
 
-    GLuint operator*() {
-        // throw exception if m_data->m_address == nullptr
-        return m_resource ? m_resource->m_handle : 0;
-    }
+	GLuint operator*() {
+		// throw exception if m_data->m_address == nullptr
+		return m_resource ? m_resource->m_handle : 0;
+	}
 
 
-    operator GLuint() const {
-        return m_resource ? m_resource->m_handle : 0;
-    }
+	operator GLuint() const {
+		return m_resource ? m_resource->m_handle : 0;
+	}
 
 
-    inline bool IsAvailable(void) {
-        return m_resource and m_resource->m_handle;
-    }
+	inline bool IsAvailable(void) {
+		return m_resource and m_resource->m_handle;
+	}
 };
 
 // =================================================================================================
 
 class SharedTextureHandle
-    : public SharedGfxHandle
-{
+	: public SharedGfxHandle {
 public:
-    SharedTextureHandle(GLuint handle = 0)
-        : SharedGfxHandle(handle, glGenTextures, glDeleteTextures)
-    { }
+	SharedTextureHandle(GLuint handle = 0)
+		: SharedGfxHandle(handle, glGenTextures, glDeleteTextures)
+	{}
 };
 
 // =================================================================================================
 
 class SharedBufferHandle
-    : public SharedGfxHandle
-{
+	: public SharedGfxHandle {
 public:
-    SharedBufferHandle(GLuint handle = 0)
-        : SharedGfxHandle(handle, glGenBuffers, glDeleteBuffers)
-    { }
+	SharedBufferHandle(GLuint handle = 0)
+		: SharedGfxHandle(handle, glGenBuffers, glDeleteBuffers)
+	{}
 };
 
 // =================================================================================================
 
 class SharedFramebufferHandle
-    : public SharedGfxHandle
-{
+	: public SharedGfxHandle {
 public:
-    SharedFramebufferHandle(GLuint handle = 0)
-        : SharedGfxHandle(handle, glGenFramebuffers, glDeleteFramebuffers)
-    {
-    }
+	SharedFramebufferHandle(GLuint handle = 0)
+		: SharedGfxHandle(handle, glGenFramebuffers, glDeleteFramebuffers)
+	{
+	}
 };
 
 // =================================================================================================

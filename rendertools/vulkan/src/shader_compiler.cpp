@@ -55,11 +55,18 @@
 // Reset), so the compiler code below stays identical on both platforms.
 #ifdef LINUX
 template <typename T>
-struct ComPtr : public CComPtr<T>
-{
-    using CComPtr<T>::CComPtr;
-    T** GetAddressOf(void) noexcept { return &this->p; }
-    void Reset(void) noexcept { this->Release(); }
+struct ComPtr : public CComPtr<T> {
+	using CComPtr<T>::CComPtr;
+	T** GetAddressOf(void)
+	noexcept
+	{
+		return &this->p;
+	}
+	void Reset(void)
+	noexcept
+	{
+		this->Release();
+	}
 };
 #else
 using Microsoft::WRL::ComPtr;
@@ -68,250 +75,257 @@ using Microsoft::WRL::ComPtr;
 // =================================================================================================
 // shader_compiler implementation
 
-namespace
-{
-    ComPtr<IDxcUtils>     g_dxcUtils;
-    ComPtr<IDxcCompiler3> g_dxcCompiler;
-    bool                  g_initialized = false;
+namespace {
+ComPtr<IDxcUtils>		g_dxcUtils;
+ComPtr<IDxcCompiler3>	g_dxcCompiler;
+bool					g_initialized = false;
 }
 
 #if VK_STALL_DIAG
-extern double VkStallClock(void) noexcept;
-extern void VkStallEvent(const char* what, double startMs, const char* detail) noexcept;
+extern double VkStallClock(void)
+noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail)
+noexcept;
 
 static const char* CacheMissReason(const String& shaderFolder, const String& fileName, uint64_t key)
 {
-    std::vector<uint8_t> data;
-    if (not ShaderCache::ReadFile(shaderFolder, fileName, data))
-        return "no file";
-    if (data.size() <= sizeof(ShaderCache::Header))
-        return "file too small";
-    ShaderCache::Header header;
-    std::memcpy(&header, data.data(), sizeof(header));
-    if (header.magic != ShaderCache::kMagic)
-        return "magic differs";
-    if (header.key != key)
-        return "key differs";
-    if (header.size != uint64_t(data.size() - sizeof(ShaderCache::Header)))
-        return "size differs";
-    return "odd size";
+	std::vector<uint8_t> data;
+	if (not ShaderCache::ReadFile(shaderFolder, fileName, data))
+		return "no file";
+	if (data.size() <= sizeof(ShaderCache::Header))
+		return "file too small";
+	ShaderCache::Header header;
+	std::memcpy(&header, data.data(), sizeof(header));
+	if (header.magic != ShaderCache::kMagic)
+		return "magic differs";
+	if (header.key != key)
+		return "key differs";
+	if (header.size != uint64_t(data.size() - sizeof(ShaderCache::Header)))
+		return "size differs";
+	return "odd size";
 }
 #endif
 
-namespace ShaderCompiler
-{
+namespace ShaderCompiler {
 
-bool Initialize(void) noexcept
+bool Initialize(void)
+noexcept
 {
-    if (g_initialized)
-        return true;
+	if (g_initialized)
+		return true;
 
-    HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(g_dxcUtils.GetAddressOf()));
-    if (FAILED(hr)) {
-        logHandler.Print("ShaderCompiler::Initialize: DxcCreateInstance(IDxcUtils) failed (0x%08X)\n", (unsigned)hr);
-        return false;
-    }
-    hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(g_dxcCompiler.GetAddressOf()));
-    if (FAILED(hr)) {
-        logHandler.Print("ShaderCompiler::Initialize: DxcCreateInstance(IDxcCompiler3) failed (0x%08X)\n", (unsigned)hr);
-        g_dxcUtils.Reset();
-        return false;
-    }
-    g_initialized = true;
-    return true;
+	HRESULT hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(g_dxcUtils.GetAddressOf()));
+	if (FAILED(hr)) {
+		logHandler.Print("ShaderCompiler::Initialize: DxcCreateInstance(IDxcUtils) failed (0x%08X)\n", (unsigned)hr);
+		return false;
+	}
+	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(g_dxcCompiler.GetAddressOf()));
+	if (FAILED(hr)) {
+		logHandler.Print("ShaderCompiler::Initialize: DxcCreateInstance(IDxcCompiler3) failed (0x%08X)\n", (unsigned)hr);
+		g_dxcUtils.Reset();
+		return false;
+	}
+	g_initialized = true;
+	return true;
 }
 
 
-void Shutdown(void) noexcept
+void Shutdown(void)
+noexcept
 {
-    g_dxcCompiler.Reset();
-    g_dxcUtils.Reset();
-    g_initialized = false;
+	g_dxcCompiler.Reset();
+	g_dxcUtils.Reset();
+	g_initialized = false;
 }
 
 
 // Helper: convert a UTF-8 narrow string to a UTF-16 wide string (DXC takes wchar_t* args).
-static std::wstring ToWide(const char* utf8) noexcept
+static std::wstring ToWide(const char* utf8)
+noexcept
 {
-    if (not utf8)
-        return std::wstring();
-    std::wstring result;
-    while (*utf8) {
-        // Source files are ASCII-only in this project; widen char-by-char.
-        result.push_back(wchar_t(uint8_t(*utf8++)));
-    }
-    return result;
+	if (not utf8)
+		return std::wstring();
+	std::wstring result;
+	while (*utf8) {
+		// Source files are ASCII-only in this project; widen char-by-char.
+		result.push_back(wchar_t(uint8_t(*utf8++)));
+	}
+	return result;
 }
 
 
-static constexpr uint32_t kSpirvPatchVersion = 1;
-static constexpr size_t kSpirvHeaderWords = 5;
-static constexpr size_t kSpirvBoundWord = 3;
+static constexpr uint32_t	kSpirvPatchVersion = 1;
+static constexpr size_t		kSpirvHeaderWords = 5;
+static constexpr size_t		kSpirvBoundWord = 3;
 
 static void DeclareRayCullingCapability(std::vector<uint8_t>& spirv)
 {
-    const uint32_t* words = reinterpret_cast<const uint32_t*>(spirv.data());
-    const size_t wordCount = spirv.size() / sizeof(uint32_t);
-    const uint32_t cullFlags = uint32_t(SpvRayFlagsSkipTrianglesKHRMask) | uint32_t(SpvRayFlagsSkipAABBsKHRMask);
-    std::vector<uint32_t> knownBits(words[kSpirvBoundWord], 0);
-    bool isDeclared = false;
-    bool isNeeded = false;
-    size_t i = kSpirvHeaderWords;
-    while (i < wordCount) {
-        const SpvOp opcode = SpvOp(words[i] & SpvOpCodeMask);
-        if (opcode == SpvOpCapability)
-            isDeclared = isDeclared or (words[i + 1] == uint32_t(SpvCapabilityRayTraversalPrimitiveCullingKHR));
-        else if (opcode == SpvOpConstant)
-            knownBits[words[i + 2]] = words[i + 3];
-        else if (opcode == SpvOpBitwiseOr)
-            knownBits[words[i + 2]] = knownBits[words[i + 3]] | knownBits[words[i + 4]];
-        else if (opcode == SpvOpRayQueryInitializeKHR)
-            isNeeded = isNeeded or ((knownBits[words[i + 3]] & cullFlags) != 0);
-        i += words[i] >> SpvWordCountShift;
-    }
-    if (isDeclared or not isNeeded)
-        return;
+	const uint32_t*			words = reinterpret_cast<const uint32_t*>(spirv.data());
+	const size_t			wordCount = spirv.size() / sizeof(uint32_t);
+	const uint32_t			cullFlags = uint32_t(SpvRayFlagsSkipTrianglesKHRMask) | uint32_t(SpvRayFlagsSkipAABBsKHRMask);
+	std::vector<uint32_t>	knownBits(words[kSpirvBoundWord], 0);
+	bool					isDeclared = false;
+	bool					isNeeded = false;
+	size_t					i = kSpirvHeaderWords;
+	while (i < wordCount) {
+		const SpvOp opcode = SpvOp(words[i] & SpvOpCodeMask);
+		if (opcode == SpvOpCapability)
+			isDeclared = isDeclared or (words[i + 1] == uint32_t(SpvCapabilityRayTraversalPrimitiveCullingKHR));
+		else if (opcode == SpvOpConstant)
+			knownBits[words[i + 2]] = words[i + 3];
+		else if (opcode == SpvOpBitwiseOr)
+			knownBits[words[i + 2]] = knownBits[words[i + 3]] | knownBits[words[i + 4]];
+		else if (opcode == SpvOpRayQueryInitializeKHR)
+			isNeeded = isNeeded or ((knownBits[words[i + 3]] & cullFlags) != 0);
+		i += words[i] >> SpvWordCountShift;
+	}
+	if (isDeclared or not isNeeded)
+		return;
 
-    const uint32_t capability[] = { (2u << SpvWordCountShift) | uint32_t(SpvOpCapability), uint32_t(SpvCapabilityRayTraversalPrimitiveCullingKHR) };
-    const uint8_t* capabilityBytes = reinterpret_cast<const uint8_t*>(capability);
-    spirv.insert(spirv.begin() + kSpirvHeaderWords * sizeof(uint32_t), capabilityBytes, capabilityBytes + sizeof(capability));
+	const uint32_t capability[] = { (2u << SpvWordCountShift) | uint32_t(SpvOpCapability),
+									uint32_t(SpvCapabilityRayTraversalPrimitiveCullingKHR) };
+	const uint8_t* capabilityBytes = reinterpret_cast<const uint8_t*>(capability);
+	spirv.insert(spirv.begin() + kSpirvHeaderWords * sizeof(uint32_t), capabilityBytes, capabilityBytes + sizeof(capability));
 }
 
 
-bool CompileHlslToSpirv(const char* hlslSource,
-                        const char* entryPoint,
-                        const char* targetProfile,
-                        const wchar_t* const* extraArgs,
-                        uint32_t extraArgsCount,
-                        std::vector<uint8_t>& outSpirv,
-                        String& outError,
-                        const String& shaderFolder,
-                        const String& fileName)
+bool CompileHlslToSpirv(const char*				hlslSource,
+						const char*				entryPoint,
+						const char*				targetProfile,
+						const wchar_t* const*	extraArgs,
+						uint32_t				extraArgsCount,
+						std::vector<uint8_t>&	outSpirv,
+						String&					outError,
+						const String&			shaderFolder,
+						const String&			fileName)
 {
-    outSpirv.clear();
-    outError = "";
+	outSpirv.clear();
+	outError = "";
 
-    if (not g_initialized) {
-        if (not Initialize()) {
-            outError = "ShaderCompiler not initialized";
-            return false;
-        }
-    }
-    if ((not hlslSource) or (not entryPoint) or (not targetProfile)) {
-        outError = "null argument";
-        return false;
-    }
+	if (not g_initialized) {
+		if (not Initialize()) {
+			outError = "ShaderCompiler not initialized";
+			return false;
+		}
+	}
+	if ((not hlslSource) or (not entryPoint) or (not targetProfile)) {
+		outError = "null argument";
+		return false;
+	}
 
-    DxcBuffer source { };
-    source.Ptr = hlslSource;
-    source.Size = std::strlen(hlslSource);
-    source.Encoding = DXC_CP_UTF8;
+	DxcBuffer source{};
+	source.Ptr = hlslSource;
+	source.Size = std::strlen(hlslSource);
+	source.Encoding = DXC_CP_UTF8;
 
-    // Stable storage for the per-call args (entry/target are converted from narrow strings).
-    std::wstring entryWide = ToWide(entryPoint);
-    std::wstring targetWide = ToWide(targetProfile);
+	// Stable storage for the per-call args (entry/target are converted from narrow strings).
+	std::wstring entryWide = ToWide(entryPoint);
+	std::wstring targetWide = ToWide(targetProfile);
 
-    // Standard args: emit SPIR-V, target the device's Vulkan version (1.2 or 1.3), set entry + profile.
-    std::vector<const wchar_t*> args;
-    args.push_back(L"-spirv");
-    args.push_back(vkContext.UsesCore13() ? L"-fspv-target-env=vulkan1.3" : L"-fspv-target-env=vulkan1.2");
-    // DX-compatible memory layout for cbuffers and StructuredBuffers: tight packing that matches the
-    // C++ upload structs (Particle = 36 B, ParticleSystemParams = 108 B; float3 + scalar packed with
-    // no std430 16-byte rounding). Without this, DXC's default layout rounds the StructuredBuffer
-    // ArrayStride up, so particles[>0] / systems[>0] read from the wrong offset and render nothing.
-    args.push_back(L"-fvk-use-dx-layout");
-    args.push_back(L"-E");
-    args.push_back(entryWide.c_str());
-    args.push_back(L"-T");
-    args.push_back(targetWide.c_str());
-    args.push_back(kOptimizationArg);
-    for (uint32_t i = 0; i < extraArgsCount; ++i)
-        args.push_back(extraArgs[i]);
+	// Standard args: emit SPIR-V, target the device's Vulkan version (1.2 or 1.3), set entry + profile.
+	std::vector<const wchar_t*> args;
+	args.push_back(L"-spirv");
+	args.push_back(vkContext.UsesCore13() ? L"-fspv-target-env=vulkan1.3" : L"-fspv-target-env=vulkan1.2");
+	// DX-compatible memory layout for cbuffers and StructuredBuffers: tight packing that matches the
+	// C++ upload structs (Particle = 36 B, ParticleSystemParams = 108 B; float3 + scalar packed with
+	// no std430 16-byte rounding). Without this, DXC's default layout rounds the StructuredBuffer
+	// ArrayStride up, so particles[>0] / systems[>0] read from the wrong offset and render nothing.
+	args.push_back(L"-fvk-use-dx-layout");
+	args.push_back(L"-E");
+	args.push_back(entryWide.c_str());
+	args.push_back(L"-T");
+	args.push_back(targetWide.c_str());
+	args.push_back(kOptimizationArg);
+	for (uint32_t i = 0; i < extraArgsCount; ++i)
+		args.push_back(extraArgs[i]);
 
-    const bool useCache = not shaderFolder.IsEmpty();
-    uint64_t key = 0;
+	const bool	useCache = not shaderFolder.IsEmpty();
+	uint64_t	key = 0;
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
-    const char* missReason = "";
-    char detail[512];
+	double		stallStart = VkStallClock();
+	const char*	missReason = "";
+	char		detail[512];
 #endif
-    if (useCache) {
-        key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslSource);
-        key = ShaderCache::Hash(key, args.data(), args.size());
-        key = ShaderCache::Hash(key, &kSpirvPatchVersion, sizeof(kSpirvPatchVersion));
-        ComPtr<IDxcVersionInfo> versionInfo;
-        if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
-            UINT32 major = 0;
-            UINT32 minor = 0;
-            versionInfo->GetVersion(&major, &minor);
-            key = ShaderCache::Hash(key, &major, sizeof(major));
-            key = ShaderCache::Hash(key, &minor, sizeof(minor));
-        }
-        uint32_t tag = 0;
-        const bool isCached = ShaderCache::Read(shaderFolder, fileName, key, outSpirv, tag) and ((outSpirv.size() % 4) == 0);
+	if (useCache) {
+		key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslSource);
+		key = ShaderCache::Hash(key, args.data(), args.size());
+		key = ShaderCache::Hash(key, &kSpirvPatchVersion, sizeof(kSpirvPatchVersion));
+		ComPtr<IDxcVersionInfo> versionInfo;
+		if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
+			UINT32 major = 0;
+			UINT32 minor = 0;
+			versionInfo->GetVersion(&major, &minor);
+			key = ShaderCache::Hash(key, &major, sizeof(major));
+			key = ShaderCache::Hash(key, &minor, sizeof(minor));
+		}
+		uint32_t	tag = 0;
+		const bool	isCached = ShaderCache::Read(shaderFolder, fileName, key, outSpirv, tag) and ((outSpirv.size() % 4) == 0);
 #if VK_STALL_DIAG
-        if (isCached) {
-            snprintf(detail, sizeof(detail), "%s: from cache, %zu bytes", static_cast<const char*>(fileName), outSpirv.size());
-            VkStallEvent("spirv", VkStallClock(), detail);
-        }
-        else
-            missReason = CacheMissReason(shaderFolder, fileName, key);
+		if (isCached) {
+			snprintf(detail, sizeof(detail), "%s: from cache, %zu bytes", static_cast<const char*>(fileName), outSpirv.size());
+			VkStallEvent("spirv", VkStallClock(), detail);
+		}
+		else
+			missReason = CacheMissReason(shaderFolder, fileName, key);
 #endif
-        if (isCached)
-            return true;
-        outSpirv.clear();
-    }
+		if (isCached)
+			return true;
+		outSpirv.clear();
+	}
 
-    ComPtr<IDxcResult> result;
-    HRESULT hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()),
-                                        nullptr, IID_PPV_ARGS(result.GetAddressOf()));
-    if (FAILED(hr)) {
-        char buf[64];
-        std::snprintf(buf, sizeof(buf), "Compile call failed (0x%08X)", (unsigned)hr);
-        outError = buf;
-        return false;
-    }
+	ComPtr<IDxcResult>	result;
+	HRESULT				hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()),
+												   nullptr, IID_PPV_ARGS(result.GetAddressOf()));
+	if (FAILED(hr)) {
+		char buf[64];
+		std::snprintf(buf, sizeof(buf), "Compile call failed (0x%08X)", (unsigned)hr);
+		outError = buf;
+		return false;
+	}
 
-    HRESULT compileStatus = E_FAIL;
-    result->GetStatus(&compileStatus);
+	HRESULT compileStatus = E_FAIL;
+	result->GetStatus(&compileStatus);
 
-    // Always pull errors/warnings out (even on success, for warnings).
-    ComPtr<IDxcBlobUtf8> errors;
-    if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
-        if (errors and (errors->GetStringLength() > 0)) {
-            outError = String(errors->GetStringPointer());
-        }
-    }
+	// Always pull errors/warnings out (even on success, for warnings).
+	ComPtr<IDxcBlobUtf8> errors;
+	if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
+		if (errors and (errors->GetStringLength() > 0)) {
+			outError = String(errors->GetStringPointer());
+		}
+	}
 
-    if (FAILED(compileStatus))
-        return false;
+	if (FAILED(compileStatus))
+		return false;
 
-    ComPtr<IDxcBlob> objectBlob;
-    if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(objectBlob.GetAddressOf()), nullptr))
-        or (not objectBlob) or (objectBlob->GetBufferSize() == 0)) {
-        if (outError.IsEmpty())
-            outError = "no SPIR-V output";
-        return false;
-    }
+	ComPtr<IDxcBlob> objectBlob;
+	if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(objectBlob.GetAddressOf()), nullptr)) or (not objectBlob) or
+		(objectBlob->GetBufferSize() == 0)) {
+		if (outError.IsEmpty())
+			outError = "no SPIR-V output";
+		return false;
+	}
 
-    const uint8_t* src = static_cast<const uint8_t*>(objectBlob->GetBufferPointer());
-    size_t bytes = size_t(objectBlob->GetBufferSize());
-    outSpirv.assign(src, src + bytes);
-    DeclareRayCullingCapability(outSpirv);
-    [[maybe_unused]] const bool isStored = useCache and ShaderCache::Write(shaderFolder, fileName, key, 0, outSpirv.data(), outSpirv.size());
+	const uint8_t*	src = static_cast<const uint8_t*>(objectBlob->GetBufferPointer());
+	size_t			bytes = size_t(objectBlob->GetBufferSize());
+	outSpirv.assign(src, src + bytes);
+	DeclareRayCullingCapability(outSpirv);
+	[[maybe_unused]] const bool isStored =
+		useCache and ShaderCache::Write(shaderFolder, fileName, key, 0, outSpirv.data(), outSpirv.size());
 #if VK_STALL_DIAG
-    if (useCache) {
-        snprintf(detail, sizeof(detail), "%s: compiled (cache: %s), %zu bytes, %s", static_cast<const char*>(fileName), missReason, outSpirv.size(), isStored ? "stored" : "NOT stored");
-        VkStallEvent("spirv", stallStart, detail);
-    }
+	if (useCache) {
+		snprintf(detail, sizeof(detail), "%s: compiled (cache: %s), %zu bytes, %s", static_cast<const char*>(fileName),
+				 missReason, outSpirv.size(), isStored ? "stored" : "NOT stored");
+		VkStallEvent("spirv", stallStart, detail);
+	}
 #endif
-    return true;
+	return true;
 }
 
 
-static bool CompileRayQueryProbe(void) noexcept
+static bool CompileRayQueryProbe(void)
+noexcept
 {
-    static const char* probe = R"(
+	static const char*		probe = R"(
 RaytracingAccelerationStructure scene : register(t0);
 RWStructuredBuffer<uint> result : register(u0);
 
@@ -329,50 +343,53 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	result [id.x] = (q.CommittedStatus () == COMMITTED_TRIANGLE_HIT) ? 1u : 0u;
 }
 )";
-    std::vector<uint8_t> spirv;
-    String error;
-    if (CompileHlslToSpirv(probe, "CSMain", "cs_6_5", nullptr, 0, spirv, error, String(""), String("")))
-        return true;
-    logHandler.Print("ShaderCompiler::SupportsRayQuery: probe failed: %s\n", static_cast<const char*>(error));
-    return false;
+	std::vector<uint8_t>	spirv;
+	String					error;
+	if (CompileHlslToSpirv(probe, "CSMain", "cs_6_5", nullptr, 0, spirv, error, String(""), String("")))
+		return true;
+	logHandler.Print("ShaderCompiler::SupportsRayQuery: probe failed: %s\n", static_cast<const char*>(error));
+	return false;
 }
 
 
-bool SupportsRayQuery(void) noexcept
+bool SupportsRayQuery(void)
+noexcept
 {
-    static const bool supported = CompileRayQueryProbe();
-    return supported;
+	static const bool supported = CompileRayQueryProbe();
+	return supported;
 }
 
 
-VkShaderModule CreateShaderModule(const std::vector<uint8_t>& spirv) noexcept
+VkShaderModule CreateShaderModule(const std::vector<uint8_t>& spirv)
+noexcept
 {
-    VkDevice device = vkContext.Device();
-    if ((device == VK_NULL_HANDLE) or spirv.empty() or ((spirv.size() % 4) != 0))
-        return VK_NULL_HANDLE;
+	VkDevice device = vkContext.Device();
+	if ((device == VK_NULL_HANDLE) or spirv.empty() or ((spirv.size() % 4) != 0))
+		return VK_NULL_HANDLE;
 
-    VkShaderModuleCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    info.codeSize = spirv.size();
-    info.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
+	VkShaderModuleCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	info.codeSize = spirv.size();
+	info.pCode = reinterpret_cast<const uint32_t*>(spirv.data());
 
-    VkShaderModule module = VK_NULL_HANDLE;
-    VkResult res = vkCreateShaderModule(device, &info, nullptr, &module);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("ShaderCompiler::CreateShaderModule: vkCreateShaderModule failed (%d)\n", (int)res);
-        return VK_NULL_HANDLE;
-    }
-    return module;
+	VkShaderModule	module = VK_NULL_HANDLE;
+	VkResult		res = vkCreateShaderModule(device, &info, nullptr, &module);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("ShaderCompiler::CreateShaderModule: vkCreateShaderModule failed (%d)\n", (int)res);
+		return VK_NULL_HANDLE;
+	}
+	return module;
 }
 
 
-void DestroyShaderModule(VkShaderModule module) noexcept
+void DestroyShaderModule(VkShaderModule module)
+noexcept
 {
-    VkDevice device = vkContext.Device();
-    if ((module != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
-        vkDestroyShaderModule(device, module, nullptr);
+	VkDevice device = vkContext.Device();
+	if ((module != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE))
+		vkDestroyShaderModule(device, module, nullptr);
 }
 
-}  // namespace ShaderCompiler
+} // namespace ShaderCompiler
 
 // =================================================================================================

@@ -6,7 +6,7 @@
 #include <cstring>
 
 #ifdef USE_SHARED_HANDLES
-#   undef USE_SHARED_HANDLES
+#undef USE_SHARED_HANDLES
 #endif
 
 #define USE_SHARED_HANDLES 1
@@ -14,145 +14,148 @@
 // =================================================================================================
 // OpenGL vertex buffer handling: Creation, sending attributes to OpenGL, binding for rendering
 
-class GfxDataBuffer
-{
+class GfxDataBuffer {
 public:
-
-    int                 m_index;
-    const char*         m_type;
-    int                 m_id;
-    GLenum              m_bufferType;
-    char* m_data;
+	int			m_index;
+	const char*	m_type;
+	int			m_id;
+	GLenum		m_bufferType;
+	char*		m_data;
 #if USE_SHARED_HANDLES
-    SharedGfxHandle     m_handle;
+	SharedGfxHandle m_handle;
 #else
-    GLuint              m_handle;
+	GLuint m_handle;
 #endif
-    GLsizei             m_size;
-    size_t              m_itemSize;
-    GLsizei             m_itemCount;
-    GLint               m_componentCount;
-    GLenum              m_componentType;
-    bool                m_isDynamic;
+	GLsizei	m_size;
+	size_t	m_itemSize;
+	GLsizei	m_itemCount;
+	GLint	m_componentCount;
+	GLenum	m_componentType;
+	bool	m_isDynamic;
 
-    GfxDataBuffer(const char* type = "", int id = 0, GLint bufferType = GL_ARRAY_BUFFER, bool isDynamic = true)
-        noexcept;
+	GfxDataBuffer(const char* type = "", int id = 0, GLint bufferType = GL_ARRAY_BUFFER, bool isDynamic = true)
+	noexcept;
 
-    void Reset(void) {
+	void Reset(void)
+	{
 #if USE_SHARED_HANDLES
-        m_handle = SharedGfxHandle();
+		m_handle = SharedGfxHandle();
 #else
-        m_handle = 0;
+		m_handle = 0;
 #endif
-        m_id = 0;
-        m_isDynamic = true;
-    }
+		m_id = 0;
+		m_isDynamic = true;
+	}
 
-    GfxDataBuffer(GfxDataBuffer const& other) {
-        Copy(other);
-    }
+	GfxDataBuffer(GfxDataBuffer const& other) {
+		Copy(other);
+	}
 
-    GfxDataBuffer& operator=(GfxDataBuffer const& other) {
-        Copy(other);
-        return *this;
-    }
+	GfxDataBuffer& operator=(GfxDataBuffer const& other) {
+		Copy(other);
+		return *this;
+	}
 
-    GfxDataBuffer& operator=(GfxDataBuffer&& other) noexcept {
-        Move(other);
-        return *this;
-    }
+	GfxDataBuffer& operator=(GfxDataBuffer&& other)
+	noexcept
+	{
+		Move(other);
+		return *this;
+	}
 
-    GfxDataBuffer& Copy(GfxDataBuffer const& other);
+	GfxDataBuffer& Copy(GfxDataBuffer const& other);
 
-    GfxDataBuffer& Move(GfxDataBuffer& other)
-        noexcept;
+	GfxDataBuffer& Move(GfxDataBuffer& other)
+	noexcept;
 
-    inline void Bind(void)
-        noexcept
-    {
-        glBindBuffer(m_bufferType, m_handle);
-    }
+	inline void Bind(void)
+	noexcept
+	{
+		glBindBuffer(m_bufferType, m_handle);
+	}
 
-    inline void Release(void)
-        noexcept
-    {
-        glBindBuffer(m_bufferType, 0);
-    }
+	inline void Release(void)
+	noexcept
+	{
+		glBindBuffer(m_bufferType, 0);
+	}
 
-    inline void EnableAttribs(void)
-        noexcept
-    {
-        if (m_index > -1)
-            glEnableVertexAttribArray(m_index);
-    }
+	inline void EnableAttribs(void)
+	noexcept
+	{
+		if (m_index > -1)
+			glEnableVertexAttribArray(m_index);
+	}
 
-    inline void DisableAttribs(void)
-        noexcept
-    {
-        if (m_index > -1)
-            glDisableVertexAttribArray(m_index);
-    }
+	inline void DisableAttribs(void)
+	noexcept
+	{
+		if (m_index > -1)
+			glDisableVertexAttribArray(m_index);
+	}
 
-    // An integer attribute has to be bound with glVertexAttribIPointer (): glVertexAttribPointer ()
-    // hands the shader a float, so a "uint" input would read a converted value or garbage. The index
-    // buffer never comes through here (its m_index is -1).
-    inline bool IsIntegerAttrib(void)
-        noexcept
-    {
-        return (m_componentType == GL_UNSIGNED_INT) or (m_componentType == GL_INT) or
-               (m_componentType == GL_UNSIGNED_SHORT) or (m_componentType == GL_SHORT);
-    }
+	// An integer attribute has to be bound with glVertexAttribIPointer (): glVertexAttribPointer ()
+	// hands the shader a float, so a "uint" input would read a converted value or garbage. The index
+	// buffer never comes through here (its m_index is -1).
+	inline bool IsIntegerAttrib(void)
+	noexcept
+	{
+		return (m_componentType == GL_UNSIGNED_INT) or (m_componentType == GL_INT) or
+			(m_componentType == GL_UNSIGNED_SHORT) or (m_componentType == GL_SHORT);
+	}
 
 #ifdef _DEBUG
-    void Describe(void);
+	void Describe(void);
 #else
-    inline void Describe(void)
-        noexcept
-    {
-        if (m_index > -1) {
-            if (IsIntegerAttrib())
-                glVertexAttribIPointer(m_index, m_componentCount, m_componentType, 0, nullptr);
-            else
-                glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
-            EnableAttribs();
-        }
-    }
+	inline void Describe(void)
+	noexcept
+	{
+		if (m_index > -1) {
+			if (IsIntegerAttrib())
+				glVertexAttribIPointer(m_index, m_componentCount, m_componentType, 0, nullptr);
+			else
+				glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
+			EnableAttribs();
+		}
+	}
 
 #endif
-    // data: buffer with OpenGL data (float or unsigned int)
-    // dataSize: buffer size in bytes
-    // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
-    // componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
-    bool Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate = false)
+	// data: buffer with OpenGL data (float or unsigned int)
+	// dataSize: buffer size in bytes
+	// componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
+	// componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
+	bool Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType,
+				size_t componentCount, bool forceUpdate = false)
 #if USE_SHARED_HANDLES
-        noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
+		noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
 #else
-        noexcept(noexcept(Bind()) && noexcept(Describe()))
+		noexcept(noexcept(Bind()) && noexcept(Describe()))
 #endif
-        ;
+			;
 
-    void Destroy(void)
-        noexcept;
+	void Destroy(void)
+	noexcept;
 
-    size_t ComponentSize(size_t componentType)
-        noexcept;
+	size_t ComponentSize(size_t componentType)
+	noexcept;
 
-    inline bool IsType(const char* type)
-        noexcept
-    {
-        return !strcmp(m_type, type);
-    }
+	inline bool IsType(const char* type)
+	noexcept
+	{
+		return !strcmp(m_type, type);
+	}
 
-    inline bool HasID(int id)
-        noexcept {
-        return m_id == id;
-    }
+	inline bool HasID(int id)
+	noexcept
+	{
+		return m_id == id;
+	}
 
-    inline void SetDynamic(bool isDynamic)
-        noexcept
-    {
-        m_isDynamic = isDynamic;
-    }
+	inline void SetDynamic(bool isDynamic)
+	noexcept
+	{
+		m_isDynamic = isDynamic;
+	}
 };
 
 // =================================================================================================

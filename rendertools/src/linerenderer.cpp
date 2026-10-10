@@ -8,30 +8,32 @@
 
 // =================================================================================================
 
-bool LineRenderer::Create(int capacity) {
-    Destroy();
-    if (capacity < 1)
-        capacity = 1;
-    if (not m_buffer.Create(capacity))
-        return false;
-    m_lines.Resize(capacity);
-    m_lineCapacity = capacity;
-    m_capacity = capacity;
-    m_count = 0;
-    m_isResident = false;
-    m_isAvailable = true;
-    return true;
+bool LineRenderer::Create(int capacity)
+{
+	Destroy();
+	if (capacity < 1)
+		capacity = 1;
+	if (not m_buffer.Create(capacity))
+		return false;
+	m_lines.Resize(capacity);
+	m_lineCapacity = capacity;
+	m_capacity = capacity;
+	m_count = 0;
+	m_isResident = false;
+	m_isAvailable = true;
+	return true;
 }
 
 
-void LineRenderer::Destroy(void) {
-    m_buffer.Destroy();
-    m_lines.Reset();
-    m_lineCapacity = 0;
-    m_capacity = 0;
-    m_count = 0;
-    m_isResident = false;
-    m_isAvailable = false;
+void LineRenderer::Destroy(void)
+{
+	m_buffer.Destroy();
+	m_lines.Reset();
+	m_lineCapacity = 0;
+	m_capacity = 0;
+	m_count = 0;
+	m_isResident = false;
+	m_isAvailable = false;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -39,224 +41,234 @@ void LineRenderer::Destroy(void) {
 // GPU buffer all batches of a frame are appended to. GfxArray::Create () starts a new buffer (the old
 // one is released once the frames using it are through), so the append position starts over with it.
 
-bool LineRenderer::Reserve(int count) {
-    if (count <= m_lineCapacity)
-        return true;
+bool LineRenderer::Reserve(int count)
+{
+	if (count <= m_lineCapacity)
+		return true;
 
-    int newCapacity = m_lineCapacity ? m_lineCapacity : 1;
+	int newCapacity = m_lineCapacity ? m_lineCapacity : 1;
 
-    while (newCapacity < count)
-        newCapacity *= 2;
-    m_lines.Resize(newCapacity);
-    m_lineCapacity = newCapacity;
-    return true;
+	while (newCapacity < count)
+		newCapacity *= 2;
+	m_lines.Resize(newCapacity);
+	m_lineCapacity = newCapacity;
+	return true;
 }
 
 
-bool LineRenderer::ReserveBuffer(int count) {
-    if (count <= m_capacity)
-        return true;
+bool LineRenderer::ReserveBuffer(int count)
+{
+	if (count <= m_capacity)
+		return true;
 
-    int newCapacity = m_capacity ? m_capacity : 1;
+	int newCapacity = m_capacity ? m_capacity : 1;
 
-    while (newCapacity < count)
-        newCapacity *= 2;
-    if (not m_buffer.Create(newCapacity)) {
-        m_isAvailable = false;
-        return false;
-    }
-    m_capacity = newCapacity;
-    return true;
-}
-
-// -------------------------------------------------------------------------------------------------
-
-static int CapFlags(LineRenderer::Cap cap, int flatFlag, int miterFlag) {
-    return (cap == LineRenderer::Cap::Flat) ? flatFlag : (cap == LineRenderer::Cap::Miter) ? miterFlag : 0;
-}
-
-
-bool LineRenderer::Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style, float phase, Cap startCap, float startValue, Cap endCap, float endValue) {
-    if (not m_isAvailable)
-        return false;
-    if (not Reserve(m_count + 1))
-        return false;
-
-    Line& line = m_lines[m_count++];
-
-    line.p0 = p0;
-    line.width = width;
-    line.p1 = p1;
-    line.style = float(int(style));
-    line.color = color;
-    line.phase = phase;
-    line.pad[0] = float(CapFlags(startCap, 1, 4) + CapFlags(endCap, 2, 8));
-    line.pad[1] = startValue;
-    line.pad[2] = endValue;
-    return true;
-}
-
-
-float LineRenderer::MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other) {
-    const float* m = baseRenderer.ModelView().AsArray();
-
-    auto ToView = [m](const Vector3f& p) {
-        return Vector3f(m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12],
-                        m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13],
-                        m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14]);
-    };
-
-    Vector3f v0 = ToView(p0);
-    Vector3f v1 = ToView(p1);
-    Vector3f joint = atEnd ? v1 : v0;
-    Vector3f seg = v1 - v0;
-    float segLen = seg.Length();
-
-    if (segLen < 1e-6f)
-        return 0.0f;
-
-    Vector3f axis = seg * (1.0f / segLen);
-    bool perspective = (baseRenderer.Projection().AsArray()[11] != 0.0f);
-    Vector3f toEye = perspective ? (v0 + v1) * -0.5f : Vector3f(0.0f, 0.0f, 1.0f);
-
-    toEye.Normalize();
-
-    Vector3f perp = axis.Cross(toEye);
-    float perpLen = perp.Length();
-
-    if (perpLen < 1e-4f)
-        return 0.0f;
-    perp = perp * (1.0f / perpLen);
-
-    Vector3f toOther = ToView(other) - joint;
-    float otherLen = toOther.Length();
-
-    if (otherLen < 1e-6f)
-        return 0.0f;
-    toOther = toOther * (1.0f / otherLen);
-
-    float ox = toOther.Dot(axis) + (atEnd ? -1.0f : 1.0f);
-    float oy = toOther.Dot(perp);
-
-    if (std::fabs(oy) < 1e-4f)
-        return 0.0f;
-    return atEnd ? ox / oy : -ox / oy;
-}
-
-
-bool LineRenderer::AddStrip(const Vector3f* points, int count, float width, const RGBAColor& color, Style style, bool closed) {
-    if (not (points and (count > 1)))
-        return false;
-
-    int   segments = closed ? count : count - 1;
-    float phase = 0.0f;
-
-    if (not Reserve(m_count + segments))
-        return false;
-    for (int i = 0; i < segments; i++) {
-        const Vector3f& p0 = points[i];
-        const Vector3f& p1 = points[(i + 1) % count];
-
-        if (not Add(p0, p1, width, color, style, phase))
-            return false;
-        phase += (p1 - p0).Length();
-    }
-    return true;
+	while (newCapacity < count)
+		newCapacity *= 2;
+	if (not m_buffer.Create(newCapacity)) {
+		m_isAvailable = false;
+		return false;
+	}
+	m_capacity = newCapacity;
+	return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 
-void LineRenderer::SetupQuad(void) {
-    if (m_quadReady)
-        return;
-    m_quadReady = true;
-    m_quad.Setup(
-        { Vector3f(-0.5f, -0.5f, 0.0f), Vector3f(0.5f, -0.5f, 0.0f), Vector3f(0.5f, 0.5f, 0.0f), Vector3f(-0.5f, 0.5f, 0.0f) },
-        { TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } }
-    );
+static int CapFlags(LineRenderer::Cap cap, int flatFlag, int miterFlag)
+{
+	return (cap == LineRenderer::Cap::Flat) ? flatFlag : (cap == LineRenderer::Cap::Miter) ? miterFlag
+																						   : 0;
 }
 
 
-bool LineRenderer::Upload(void) {
-    m_isResident = false;
-    if (not m_isAvailable or (m_count <= 0))
-        return false;
-    if (not ReserveBuffer(m_count))
-        return false;
-    std::memcpy(m_buffer.m_data.Data(), m_lines.Data(), size_t(m_count) * sizeof(Line));
-    if (not m_buffer.UploadRange(0, m_count, false))
-        return false;
-    m_isResident = true;
-    return true;
+bool LineRenderer::Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style, float phase,
+					   Cap startCap, float startValue, Cap endCap, float endValue)
+{
+	if (not m_isAvailable)
+		return false;
+	if (not Reserve(m_count + 1))
+		return false;
+
+	Line& line = m_lines[m_count++];
+
+	line.p0 = p0;
+	line.width = width;
+	line.p1 = p1;
+	line.style = float(int(style));
+	line.color = color;
+	line.phase = phase;
+	line.pad[0] = float(CapFlags(startCap, 1, 4) + CapFlags(endCap, 2, 8));
+	line.pad[1] = startValue;
+	line.pad[2] = endValue;
+	return true;
 }
 
 
-bool LineRenderer::Render(void) {
-    if (not m_isAvailable or (m_count <= 0))
-        return false;
+float LineRenderer::MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other)
+{
+	const float* m = baseRenderer.ModelView().AsArray();
 
-    int firstLine = 0;
+	auto ToView = [m](const Vector3f& p) {
+		return Vector3f(m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12],
+						m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13],
+						m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14]);
+	};
 
-    if (not m_isResident) {
-        if (not ReserveBuffer(m_buffer.AppendBase() + m_count))
-            return false;
-        firstLine = m_buffer.AppendBase();
-        std::memcpy(m_buffer.m_data.Data() + firstLine, m_lines.Data(), size_t(m_count) * sizeof(Line));
-        if (not m_buffer.UploadRange(firstLine, m_count, false))
-            return false;
-        m_buffer.SetAppendBase(firstLine + m_count);
-    }
+	Vector3f	v0 = ToView(p0);
+	Vector3f	v1 = ToView(p1);
+	Vector3f	joint = atEnd ? v1 : v0;
+	Vector3f	seg = v1 - v0;
+	float		segLen = seg.Length();
 
-    // states feed the PSO, so they are set before the shader is activated. Alpha blending for the
-    // antialiased edge; a ribbon is never culled. Depth test and write stay what the caller set.
-    int prevBlend = gfxStates.SetBlending(1);
-    GfxOperations::BlendFactor prevSrc;
-    GfxOperations::BlendFactor prevDst;
+	if (segLen < 1e-6f)
+		return 0.0f;
 
-    gfxStates.GetBlendFunc(prevSrc, prevDst);
-    baseRenderer.SetBlendMode(GfxOperations::BlendMode::Alpha);
+	Vector3f	axis = seg * (1.0f / segLen);
+	bool		perspective = (baseRenderer.Projection().AsArray()[11] != 0.0f);
+	Vector3f	toEye = perspective ? (v0 + v1) * -0.5f : Vector3f(0.0f, 0.0f, 1.0f);
 
-    int prevCull = gfxStates.SetFaceCulling(0);
+	toEye.Normalize();
 
-    Shader* shader = baseShaderHandler.SetupRenderShader("lineDraw");
-    bool ok = false;
+	Vector3f	perp = axis.Cross(toEye);
+	float		perpLen = perp.Length();
 
-    if (shader != nullptr) {
-        SetupQuad();
-        // Perspective or orthographic: a perspective matrix has the w row's z coefficient (-1 or 1) where
-        // an orthographic one has 0. Column major, so that is element 11. The shader divides the pixel
-        // scale by the depth only for a perspective projection.
-        const float* projection = baseRenderer.Projection().AsArray();
+	if (perpLen < 1e-4f)
+		return 0.0f;
+	perp = perp * (1.0f / perpLen);
 
-        shader->SetFloat("perspective", (projection[11] != 0.0f) ? 1.0f : 0.0f);
-        // What the VS converts pixels into view units with: the texel size of the ACTIVE RENDER TARGET.
-        // The VS measures the projection through mViewport, i.e. in the NDC of the whole target buffer
-        // (the gfx viewport always spans the buffer; mViewport scales into the sub rectangle), so the
-        // pixel scale is the buffer's - baseRenderer.TexelSize () describes the viewport and inflated a
-        // line drawn into a 370 px wide menu canvas on a 1920 px screen five times. Without an active
-        // buffer the window is the target.
-        RenderTarget* renderTarget = baseRenderer.GetActiveBuffer();
-        TexCoord texelSize = renderTarget
-            ? renderTarget->TexelSize()
-            : TexCoord(1.0f / float(baseRenderer.WindowWidth()), 1.0f / float(baseRenderer.WindowHeight()));
+	Vector3f	toOther = ToView(other) - joint;
+	float		otherLen = toOther.Length();
 
-        shader->SetVector2f("texelSize", texelSize);
-        shader->SetFloat("dashScale", m_dashScale);
-        shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
-        shader->SetInt("firstLine", firstLine);
-        shader->SetFloat("viewerPull", m_viewerPull);
-        shader->SetFloat("worldWidth", m_worldWidth);
-        m_buffer.BindReadOnly(0);
-        m_quad.GetGfxDataLayout().SetInstanceCount(uint32_t(m_count));
-        ok = m_quad.Render(shader);
-        m_quad.GetGfxDataLayout().SetInstanceCount(1);
-        m_buffer.ReleaseReadOnly(0);
-    }
+	if (otherLen < 1e-6f)
+		return 0.0f;
+	toOther = toOther * (1.0f / otherLen);
 
-    gfxStates.SetFaceCulling(prevCull);
-    gfxStates.BlendFunc(prevSrc, prevDst);
-    gfxStates.SetBlending(prevBlend);
-    return ok;
+	float ox = toOther.Dot(axis) + (atEnd ? -1.0f : 1.0f);
+	float oy = toOther.Dot(perp);
+
+	if (std::fabs(oy) < 1e-4f)
+		return 0.0f;
+	return atEnd ? ox / oy : -ox / oy;
+}
+
+
+bool LineRenderer::AddStrip(const Vector3f* points, int count, float width, const RGBAColor& color, Style style, bool closed)
+{
+	if (not (points and (count > 1)))
+		return false;
+
+	int		segments = closed ? count : count - 1;
+	float	phase = 0.0f;
+
+	if (not Reserve(m_count + segments))
+		return false;
+	for (int i = 0; i < segments; i++) {
+		const Vector3f& p0 = points[i];
+		const Vector3f& p1 = points[(i + 1) % count];
+
+		if (not Add(p0, p1, width, color, style, phase))
+			return false;
+		phase += (p1 - p0).Length();
+	}
+	return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+
+void LineRenderer::SetupQuad(void)
+{
+	if (m_quadReady)
+		return;
+	m_quadReady = true;
+	m_quad.Setup(
+		{ Vector3f(-0.5f, -0.5f, 0.0f), Vector3f(0.5f, -0.5f, 0.0f), Vector3f(0.5f, 0.5f, 0.0f), Vector3f(-0.5f, 0.5f, 0.0f) },
+		{ TexCoord{ 0, 0 }, TexCoord{ 1, 0 }, TexCoord{ 1, 1 }, TexCoord{ 0, 1 } });
+}
+
+
+bool LineRenderer::Upload(void)
+{
+	m_isResident = false;
+	if (not m_isAvailable or (m_count <= 0))
+		return false;
+	if (not ReserveBuffer(m_count))
+		return false;
+	std::memcpy(m_buffer.m_data.Data(), m_lines.Data(), size_t(m_count) * sizeof(Line));
+	if (not m_buffer.UploadRange(0, m_count, false))
+		return false;
+	m_isResident = true;
+	return true;
+}
+
+
+bool LineRenderer::Render(void)
+{
+	if (not m_isAvailable or (m_count <= 0))
+		return false;
+
+	int firstLine = 0;
+
+	if (not m_isResident) {
+		if (not ReserveBuffer(m_buffer.AppendBase() + m_count))
+			return false;
+		firstLine = m_buffer.AppendBase();
+		std::memcpy(m_buffer.m_data.Data() + firstLine, m_lines.Data(), size_t(m_count) * sizeof(Line));
+		if (not m_buffer.UploadRange(firstLine, m_count, false))
+			return false;
+		m_buffer.SetAppendBase(firstLine + m_count);
+	}
+
+	// states feed the PSO, so they are set before the shader is activated. Alpha blending for the
+	// antialiased edge; a ribbon is never culled. Depth test and write stay what the caller set.
+	int							prevBlend = gfxStates.SetBlending(1);
+	GfxOperations::BlendFactor	prevSrc;
+	GfxOperations::BlendFactor	prevDst;
+
+	gfxStates.GetBlendFunc(prevSrc, prevDst);
+	baseRenderer.SetBlendMode(GfxOperations::BlendMode::Alpha);
+
+	int prevCull = gfxStates.SetFaceCulling(0);
+
+	Shader*	shader = baseShaderHandler.SetupRenderShader("lineDraw");
+	bool	ok = false;
+
+	if (shader != nullptr) {
+		SetupQuad();
+		// Perspective or orthographic: a perspective matrix has the w row's z coefficient (-1 or 1) where
+		// an orthographic one has 0. Column major, so that is element 11. The shader divides the pixel
+		// scale by the depth only for a perspective projection.
+		const float* projection = baseRenderer.Projection().AsArray();
+
+		shader->SetFloat("perspective", (projection[11] != 0.0f) ? 1.0f : 0.0f);
+		// What the VS converts pixels into view units with: the texel size of the ACTIVE RENDER TARGET.
+		// The VS measures the projection through mViewport, i.e. in the NDC of the whole target buffer
+		// (the gfx viewport always spans the buffer; mViewport scales into the sub rectangle), so the
+		// pixel scale is the buffer's - baseRenderer.TexelSize () describes the viewport and inflated a
+		// line drawn into a 370 px wide menu canvas on a 1920 px screen five times. Without an active
+		// buffer the window is the target.
+		RenderTarget*	renderTarget = baseRenderer.GetActiveBuffer();
+		TexCoord		texelSize = renderTarget
+				 ? renderTarget->TexelSize()
+				 : TexCoord(1.0f / float(baseRenderer.WindowWidth()), 1.0f / float(baseRenderer.WindowHeight()));
+
+		shader->SetVector2f("texelSize", texelSize);
+		shader->SetFloat("dashScale", m_dashScale);
+		shader->SetFloat("antialias", m_antialias ? 1.0f : 0.0f);
+		shader->SetInt("firstLine", firstLine);
+		shader->SetFloat("viewerPull", m_viewerPull);
+		shader->SetFloat("worldWidth", m_worldWidth);
+		m_buffer.BindReadOnly(0);
+		m_quad.GetGfxDataLayout().SetInstanceCount(uint32_t(m_count));
+		ok = m_quad.Render(shader);
+		m_quad.GetGfxDataLayout().SetInstanceCount(1);
+		m_buffer.ReleaseReadOnly(0);
+	}
+
+	gfxStates.SetFaceCulling(prevCull);
+	gfxStates.BlendFunc(prevSrc, prevDst);
+	gfxStates.SetBlending(prevBlend);
+	return ok;
 }
 
 // =================================================================================================

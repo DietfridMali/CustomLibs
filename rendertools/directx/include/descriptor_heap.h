@@ -13,8 +13,9 @@
 
 class BaseDescriptorHeap {
 public:
-    virtual ~BaseDescriptorHeap() = default;
-    virtual void Free(uint32_t index) noexcept = 0;
+	virtual ~BaseDescriptorHeap() = default;
+	virtual void Free(uint32_t index)
+	noexcept = 0;
 };
 
 // =================================================================================================
@@ -22,22 +23,28 @@ public:
 // owning heap so the handle can free itself.
 
 struct DescriptorHandle {
-    D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle{ 0 };
-    D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle{ 0 };
-    uint32_t                    index{ UINT32_MAX };
-    BaseDescriptorHeap*         m_heap{ nullptr };
+	D3D12_CPU_DESCRIPTOR_HANDLE	cpuHandle{ 0 };
+	D3D12_GPU_DESCRIPTOR_HANDLE	gpuHandle{ 0 };
+	uint32_t					index{ UINT32_MAX };
+	BaseDescriptorHeap*			m_heap{ nullptr };
 
-    inline bool IsValid(void) const noexcept { 
-        return index != UINT32_MAX;
-    }
+	inline bool IsValid(void) const
+	noexcept
+	{
+		return index != UINT32_MAX;
+	}
 
-    inline void SetIndex(uint32_t value) noexcept {
-        index = value;
-    }
+	inline void SetIndex(uint32_t value)
+	noexcept
+	{
+		index = value;
+	}
 
-    inline uint32_t GetIndex(void) noexcept {
-        return index;
-    }
+	inline uint32_t GetIndex(void)
+	noexcept
+	{
+		return index;
+	}
 };
 
 // =================================================================================================
@@ -46,53 +53,74 @@ struct DescriptorHandle {
 
 class DescriptorHeap : public BaseDescriptorHeap {
 public:
-    ComPtr<ID3D12DescriptorHeap>    m_heap;
-    ComPtr<ID3D12DescriptorHeap>    m_mirror;
-    D3D12_DESCRIPTOR_HEAP_TYPE      m_type{};
-    uint32_t                        m_capacity{ 0 };
-    uint32_t                        m_count{ 0 };
-    uint32_t                        m_descriptorSize{ 0 };
-    bool                            m_gpuVisible{ false };
-    AutoArray<uint32_t>             m_freeList;
-    AutoArray<std::source_location> m_owners;   // debug: per-slot allocation site, temporary RTV-leak diagnostic
+	ComPtr<ID3D12DescriptorHeap>	m_heap;
+	ComPtr<ID3D12DescriptorHeap>	m_mirror;
+	D3D12_DESCRIPTOR_HEAP_TYPE		m_type{};
+	uint32_t						m_capacity{ 0 };
+	uint32_t						m_count{ 0 };
+	uint32_t						m_descriptorSize{ 0 };
+	bool							m_gpuVisible{ false };
+	AutoArray<uint32_t>				m_freeList;
+	AutoArray<std::source_location>	m_owners; // debug: per-slot allocation site, temporary RTV-leak diagnostic
 
-    bool Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity, bool gpuVisible = false, bool mirrored = false, uint32_t extraDescriptors = 0) noexcept;
+	bool Create(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity, bool gpuVisible = false,
+				bool mirrored = false, uint32_t extraDescriptors = 0)
+	noexcept;
 
-    void Publish(uint32_t index) noexcept;
+	void Publish(uint32_t index)
+	noexcept;
 
-    bool Grow(ID3D12Device* device, uint32_t extraDescriptors) noexcept;
+	bool Grow(ID3D12Device* device, uint32_t extraDescriptors)
+	noexcept;
 
-    D3D12_CPU_DESCRIPTOR_HANDLE HeapCpuHandle(uint32_t index) const noexcept;
+	D3D12_CPU_DESCRIPTOR_HANDLE HeapCpuHandle(uint32_t index) const
+	noexcept;
 
-    // Allocates the next free slot (reuses freed slots). Returns an invalid handle if the heap is full.
-    DescriptorHandle Allocate(void) noexcept;
-    // Returns a slot to the free list so it can be reused by a future Allocate().
-    void Free(uint32_t index) noexcept override;
-    
-    inline void Free(const DescriptorHandle& h) noexcept { 
-        if (h.IsValid()) 
-            Free(h.index); 
-    }
+	// Allocates the next free slot (reuses freed slots). Returns an invalid handle if the heap is full.
+	DescriptorHandle Allocate(void)
+	noexcept;
+	// Returns a slot to the free list so it can be reused by a future Allocate().
+	void Free(uint32_t index)
+	noexcept override;
 
-    inline bool IsFull(void) const noexcept { 
-        return m_freeList.Length() == 0 && m_count >= m_capacity; 
-    }
-    
-    inline uint32_t Remaining(void) const noexcept { 
-        return (m_capacity - m_count) + uint32_t(m_freeList.Length()); 
-    }
+	inline void Free(const DescriptorHandle& h)
+	noexcept
+	{
+		if (h.IsValid())
+			Free(h.index);
+	}
 
-    D3D12_CPU_DESCRIPTOR_HANDLE CpuHandle(uint32_t index) const noexcept;
-    D3D12_GPU_DESCRIPTOR_HANDLE GpuHandle(uint32_t index) const noexcept;
+	inline bool IsFull(void) const
+	noexcept
+	{
+		return m_freeList.Length() == 0 && m_count >= m_capacity;
+	}
 
-    // debug: temporary RTV-leak diagnostic — records/dumps the allocation site per slot.
+	inline uint32_t Remaining(void) const
+	noexcept
+	{
+		return (m_capacity - m_count) + uint32_t(m_freeList.Length());
+	}
+
+	D3D12_CPU_DESCRIPTOR_HANDLE CpuHandle(uint32_t index) const
+	noexcept;
+	D3D12_GPU_DESCRIPTOR_HANDLE GpuHandle(uint32_t index) const
+	noexcept;
+
+	// debug: temporary RTV-leak diagnostic — records/dumps the allocation site per slot.
 #if DBG_DIRECTX
-    void SetOwner(uint32_t index, const std::source_location& loc) noexcept;
+	void SetOwner(uint32_t index, const std::source_location& loc)
+	noexcept;
 
-    void DumpOwners(void) noexcept;
+	void DumpOwners(void)
+	noexcept;
 #endif
 
-    inline ID3D12DescriptorHeap* Ptr(void) const noexcept { return m_heap.Get(); }
+	inline ID3D12DescriptorHeap* Ptr(void) const
+	noexcept
+	{
+		return m_heap.Get();
+	}
 };
 
 // =================================================================================================
@@ -100,105 +128,137 @@ public:
 // Capacity constants are intentionally generous; adjust if a project requires more.
 
 class DescriptorHeapHandler
-    : public BaseSingleton<DescriptorHeapHandler>
-{
+	: public BaseSingleton<DescriptorHeapHandler> {
 public:
-    static constexpr uint32_t RTV_CAPACITY     = 1024;
-    static constexpr uint32_t DSV_CAPACITY     = 128;
-    static constexpr uint32_t SRV_CAPACITY     = 16384; // CBV/SRV/UAV, GPU-visible
-    static constexpr uint32_t SAMPLER_CAPACITY = 2048;
-    static constexpr uint32_t TABLE_FRAME_SLOTS = 2;
-    static constexpr uint32_t TABLE_CAPACITY   = 65536;
-    static constexpr uint32_t MAX_SHADER_VISIBLE_DESCRIPTORS = 1000000;
+	static constexpr uint32_t RTV_CAPACITY = 1024;
+	static constexpr uint32_t DSV_CAPACITY = 128;
+	static constexpr uint32_t SRV_CAPACITY = 16384; // CBV/SRV/UAV, GPU-visible
+	static constexpr uint32_t SAMPLER_CAPACITY = 2048;
+	static constexpr uint32_t TABLE_FRAME_SLOTS = 2;
+	static constexpr uint32_t TABLE_CAPACITY = 65536;
+	static constexpr uint32_t MAX_SHADER_VISIBLE_DESCRIPTORS = 1000000;
 
-    DescriptorHeap m_rtvHeap;
-    DescriptorHeap m_dsvHeap;
-    DescriptorHeap m_srvHeap;
-    DescriptorHeap m_samplerHeap;
+	DescriptorHeap m_rtvHeap;
+	DescriptorHeap m_dsvHeap;
+	DescriptorHeap m_srvHeap;
+	DescriptorHeap m_samplerHeap;
 
-    uint32_t       m_nullTextureSrv{ UINT32_MAX };
-    uint32_t       m_nullBufferSrv{ UINT32_MAX };
-    uint32_t       m_nullUav{ UINT32_MAX };
-    uint32_t       m_defaultSampler{ UINT32_MAX };
+	uint32_t m_nullTextureSrv{ UINT32_MAX };
+	uint32_t m_nullBufferSrv{ UINT32_MAX };
+	uint32_t m_nullUav{ UINT32_MAX };
+	uint32_t m_defaultSampler{ UINT32_MAX };
 
-    static constexpr int kDefaultViewTypes = 5;
+	static constexpr int kDefaultViewTypes = 5;
 
-    uint32_t                m_defaultSrvs[kDefaultViewTypes]{ UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
-    ComPtr<ID3D12Resource>  m_defaultFlat;
-    ComPtr<ID3D12Resource>  m_defaultCube;
-    ComPtr<ID3D12Resource>  m_defaultVolume;
+	uint32_t				m_defaultSrvs[kDefaultViewTypes]{ UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX };
+	ComPtr<ID3D12Resource>	m_defaultFlat;
+	ComPtr<ID3D12Resource>	m_defaultCube;
+	ComPtr<ID3D12Resource>	m_defaultVolume;
 
-    uint32_t       m_tableFrame{ 0 };
-    uint32_t       m_tableOffset{ 0 };
-    uint32_t       m_tableCapacity{ TABLE_CAPACITY };
-    uint64_t       m_heapVersion{ 0 };
-    uint64_t       m_tableGeneration{ 1 };
-    bool           m_tableOverflowReported{ false };
+	uint32_t	m_tableFrame{ 0 };
+	uint32_t	m_tableOffset{ 0 };
+	uint32_t	m_tableCapacity{ TABLE_CAPACITY };
+	uint64_t	m_heapVersion{ 0 };
+	uint64_t	m_tableGeneration{ 1 };
+	bool		m_tableOverflowReported{ false };
 
-    bool Create(ID3D12Device* device) noexcept;
+	bool Create(ID3D12Device* device)
+	noexcept;
 
-    bool CreateDefaultTextures(ID3D12Device* device) noexcept;
+	bool CreateDefaultTextures(ID3D12Device* device)
+	noexcept;
 
-    inline uint32_t DefaultSrv(uint8_t viewType) const noexcept {
-        return ((viewType > 0) and (viewType < kDefaultViewTypes) and (m_defaultSrvs[viewType] != UINT32_MAX)) ? m_defaultSrvs[viewType] : m_nullTextureSrv;
-    }
+	inline uint32_t DefaultSrv(uint8_t viewType) const
+	noexcept
+	{
+		return ((viewType > 0) and (viewType < kDefaultViewTypes) and (m_defaultSrvs[viewType] != UINT32_MAX))
+			? m_defaultSrvs[viewType]
+			: m_nullTextureSrv;
+	}
 
-    void ResetTables(uint32_t frameIndex) noexcept;
+	void ResetTables(uint32_t frameIndex)
+	noexcept;
 
-    bool BuildTable(const uint32_t* srvIndices, uint32_t count, uint32_t nullIndex, D3D12_GPU_DESCRIPTOR_HANDLE& table) noexcept;
+	bool BuildTable(const uint32_t* srvIndices, uint32_t count, uint32_t nullIndex, D3D12_GPU_DESCRIPTOR_HANDLE& table)
+	noexcept;
 
-    inline uint64_t TableGeneration(void) const noexcept {
-        return m_tableGeneration;
-    }
+	inline uint64_t TableGeneration(void) const
+	noexcept
+	{
+		return m_tableGeneration;
+	}
 
-    inline uint64_t HeapVersion(void) const noexcept {
-        return m_heapVersion;
-    }
+	inline uint64_t HeapVersion(void) const
+	noexcept
+	{
+		return m_heapVersion;
+	}
 
-    bool GrowTables(ID3D12Device* device) noexcept;
+	bool GrowTables(ID3D12Device* device)
+	noexcept;
 
-    inline DescriptorHandle AllocRTV(void) noexcept { 
-        return m_rtvHeap.Allocate(); 
-    }
-    
-    inline DescriptorHandle AllocDSV(void) noexcept { 
-        return m_dsvHeap.Allocate(); 
-    }
-    
-    inline DescriptorHandle AllocSRV(void) noexcept {
-        return m_srvHeap.Allocate();
-    }
+	inline DescriptorHandle AllocRTV(void)
+	noexcept
+	{
+		return m_rtvHeap.Allocate();
+	}
 
-    inline DescriptorHandle AllocSampler(void) noexcept {
-        return m_samplerHeap.Allocate();
-    }
+	inline DescriptorHandle AllocDSV(void)
+	noexcept
+	{
+		return m_dsvHeap.Allocate();
+	}
 
-    inline void FreeRTV(const DescriptorHandle& h) noexcept {
-        m_rtvHeap.Free(h);
-    }
+	inline DescriptorHandle AllocSRV(void)
+	noexcept
+	{
+		return m_srvHeap.Allocate();
+	}
 
-    inline void FreeDSV(const DescriptorHandle& h) noexcept {
-        m_dsvHeap.Free(h);
-    }
+	inline DescriptorHandle AllocSampler(void)
+	noexcept
+	{
+		return m_samplerHeap.Allocate();
+	}
 
-    inline void FreeSRV(const DescriptorHandle& h) noexcept {
-        m_srvHeap.Free(h);
-    }
+	inline void FreeRTV(const DescriptorHandle& h)
+	noexcept
+	{
+		m_rtvHeap.Free(h);
+	}
 
-    inline void FreeSampler(const DescriptorHandle& h) noexcept {
-        m_samplerHeap.Free(h);
-    }
+	inline void FreeDSV(const DescriptorHandle& h)
+	noexcept
+	{
+		m_dsvHeap.Free(h);
+	}
 
-    // The GPU-visible SRV heap must be bound before any draw call.
-    inline ID3D12DescriptorHeap* SrvHeapPtr(void) const noexcept {
-        return m_srvHeap.Ptr();
-    }
+	inline void FreeSRV(const DescriptorHandle& h)
+	noexcept
+	{
+		m_srvHeap.Free(h);
+	}
 
-    // Sampler heap must also be bound (alongside the SRV heap) before any draw call
-    // that issues a SetGraphicsRootDescriptorTable for a sampler slot.
-    inline ID3D12DescriptorHeap* SamplerHeapPtr(void) const noexcept {
-        return m_samplerHeap.Ptr();
-    }
+	inline void FreeSampler(const DescriptorHandle& h)
+	noexcept
+	{
+		m_samplerHeap.Free(h);
+	}
+
+	// The GPU-visible SRV heap must be bound before any draw call.
+	inline ID3D12DescriptorHeap* SrvHeapPtr(void) const
+	noexcept
+	{
+		return m_srvHeap.Ptr();
+	}
+
+	// Sampler heap must also be bound (alongside the SRV heap) before any draw call
+	// that issues a SetGraphicsRootDescriptorTable for a sampler slot.
+	inline ID3D12DescriptorHeap* SamplerHeapPtr(void) const
+	noexcept
+	{
+		return m_samplerHeap.Ptr();
+	}
 };
 
 #define descriptorHeaps DescriptorHeapHandler::Instance()

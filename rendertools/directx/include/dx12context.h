@@ -8,44 +8,59 @@
 // DX12Context: Singleton managing the D3D12 device, DXGI factory and selected adapter.
 // Must be created before any other DX12 resource.
 
-class DX12Context : public BaseSingleton<DX12Context>
-{
+class DX12Context : public BaseSingleton<DX12Context> {
 public:
-    ComPtr<ID3D12Device>        m_device;
-    ComPtr<IDXGIFactory4>       m_factory;
-    ComPtr<IDXGIAdapter1>       m_adapter;
-    D3D_FEATURE_LEVEL           m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
-    bool                        m_hasRayTracing{ false };
+	ComPtr<ID3D12Device>	m_device;
+	ComPtr<IDXGIFactory4>	m_factory;
+	ComPtr<IDXGIAdapter1>	m_adapter;
+	D3D_FEATURE_LEVEL		m_featureLevel{ D3D_FEATURE_LEVEL_12_0 };
+	bool					m_hasRayTracing{ false };
 
 #if DBG_DIRECTX
-    ComPtr<ID3D12Debug>         m_debugController;
-    ComPtr<ID3D12InfoQueue>     m_infoQueue;
+	ComPtr<ID3D12Debug>		m_debugController;
+	ComPtr<ID3D12InfoQueue>	m_infoQueue;
 #endif
 
-    // Creates the DXGI factory, selects the best adapter (highest VRAM, non-software),
-    // and creates the D3D12 device. Returns false on any failure.
-    bool Create(bool enableDebugLayer = false, const GfxFeatureRequest& request = {}) noexcept;
+	// Creates the DXGI factory, selects the best adapter (highest VRAM, non-software),
+	// and creates the D3D12 device. Returns false on any failure.
+	bool Create(bool enableDebugLayer = false, const GfxFeatureRequest& request = {})
+	noexcept;
 
-    inline ID3D12Device* Device(void) const noexcept { return m_device.Get(); }
+	inline ID3D12Device* Device(void) const
+	noexcept
+	{
+		return m_device.Get();
+	}
 
-    inline bool HasRayTracing(void) const noexcept { return m_hasRayTracing; }
+	inline bool HasRayTracing(void) const
+	noexcept
+	{
+		return m_hasRayTracing;
+	}
 
 #if DBG_DIRECTX
-    // Drains all pending D3D12 InfoQueue messages to stderr.
-    int DrainMessages(bool onlyErrors = false) noexcept;
-    // Dumps DRED auto-breadcrumbs to stderr after device removal.
-    void DumpDRED(void) noexcept;
-    // Logs adapter VRAM usage vs. budget to stderr, throttled to ~1/s.
-    void QueryVRAM(void) noexcept;
+	// Drains all pending D3D12 InfoQueue messages to stderr.
+	int DrainMessages(bool onlyErrors = false)
+	noexcept;
+	// Dumps DRED auto-breadcrumbs to stderr after device removal.
+	void DumpDRED(void)
+	noexcept;
+	// Logs adapter VRAM usage vs. budget to stderr, throttled to ~1/s.
+	void QueryVRAM(void)
+	noexcept;
 #endif
 
-    inline D3D_FEATURE_LEVEL FeatureLevel(void) noexcept {
-        return m_featureLevel;
-    }
+	inline D3D_FEATURE_LEVEL FeatureLevel(void)
+	noexcept
+	{
+		return m_featureLevel;
+	}
 
 private:
-    bool SelectAdapter(void) noexcept;
-    bool SupportsRayTracing(void) noexcept;
+	bool SelectAdapter(void)
+	noexcept;
+	bool SupportsRayTracing(void)
+	noexcept;
 };
 
 #define dx12Context DX12Context::Instance()

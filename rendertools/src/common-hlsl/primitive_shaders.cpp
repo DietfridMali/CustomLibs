@@ -12,19 +12,20 @@
 // =================================================================================================
 
 static const ShaderDataAttributes VtxTcAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 
 // -------------------------------------------------------------------------------------------------
 // SDF line segment with optional AA, round caps.
 // ShaderConstants: viewportSize, start (UV), end (UV), surfaceColor, strength, antialias.
-const ShaderSource& LineShader() {
-    static const ShaderSource source(
-        "lineShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& LineShader()
+{
+	static const ShaderSource source(
+		"lineShader",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 viewportSize;
                 float2 start;
@@ -65,9 +66,8 @@ const ShaderSource& LineShader() {
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
@@ -75,11 +75,12 @@ const ShaderSource& LineShader() {
 // SDF ring / arc with optional AA and angular segment clipping.
 // ShaderConstants: center (UV), radius, strength, surfaceColor, antialias, viewportSize,
 //                  startAngle, endAngle (degrees, 0 = 12 o'clock, CW increasing).
-const ShaderSource& RingShader() {
-    static const ShaderSource source(
-        "ringShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& RingShader()
+{
+	static const ShaderSource source(
+		"ringShader",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 center;
                 float2 viewportSize;
@@ -186,9 +187,8 @@ const ShaderSource& RingShader() {
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
@@ -196,10 +196,11 @@ const ShaderSource& RingShader() {
 // SDF filled circle with fill-level (lower half in greyscale when unfilled).
 // Uses its own VS to pass vertexY.
 // ShaderConstants: viewportSize, surfaceColor, center (UV), radius (UV), fillLevel, brightness, antialias.
-const ShaderSource& CircleShader() {
-    static const ShaderSource source(
-        "circleShader",
-        R"(
+const ShaderSource& CircleShader()
+{
+	static const ShaderSource source(
+		"circleShader",
+		R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -222,7 +223,7 @@ const ShaderSource& CircleShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 viewportSize;
                 float2 center;
@@ -268,9 +269,8 @@ const ShaderSource& CircleShader() {
                 return float4(color, surfaceColor.a * alpha);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
@@ -278,11 +278,12 @@ const ShaderSource& CircleShader() {
 // Circle mask: blends a texture inside a circular region.
 // ShaderConstants: viewportSize, surfaceColor, maskColor, center, radius (UV),
 //                  maskScale, antialias.
-const ShaderSource& CircleMaskShader() {
-    static const ShaderSource source(
-        "circleMaskShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& CircleMaskShader()
+{
+	static const ShaderSource source(
+		"circleMaskShader",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 viewportSize;
                 float2 center;
@@ -330,9 +331,8 @@ const ShaderSource& CircleMaskShader() {
                 return float4(surfaceColor.rgb, surfaceColor.a * alpha);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
@@ -340,11 +340,12 @@ const ShaderSource& CircleMaskShader() {
 // SDF rounded rectangle, solid fill or stroke, optional AA.
 // ShaderConstants: viewportSize, surfaceColor, center (UV), size (half-size UV),
 //                  strength (stroke width, 0 = filled), radius, antialias.
-const ShaderSource& RectangleShader() {
-    static const ShaderSource source(
-        "rectangleShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& RectangleShader()
+{
+	static const ShaderSource source(
+		"rectangleShader",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 viewportSize;
                 float2 center;
@@ -387,9 +388,8 @@ const ShaderSource& RectangleShader() {
                 }
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
@@ -400,11 +400,12 @@ const ShaderSource& RectangleShader() {
 //   innerColor / outerColor - base-colour brightness multiplier at the inner / outer edge (1,1 = none).
 // To grade the whole rectangle instead of just the border, set strength = half the rect size.
 // Only affects the stroke (strength > 0); the filled branch is unchanged.
-const ShaderSource& ShadedRectangleShader() {
-    static const ShaderSource source(
-        "shadedRectangleShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& ShadedRectangleShader()
+{
+	static const ShaderSource source(
+		"shadedRectangleShader",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 viewportSize;
                 float2 center;
@@ -454,9 +455,8 @@ const ShaderSource& ShadedRectangleShader() {
                 }
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
@@ -465,11 +465,12 @@ const ShaderSource& ShadedRectangleShader() {
 // Like RingShader, plus a linear ramp from the OUTER edge to the INNER edge of the band:
 //   innerAlpha / outerAlpha - alpha multiplier at the inner / outer edge (1,1 = no fade).
 //   innerColor / outerColor - base-colour brightness multiplier at the inner / outer edge (1,1 = none).
-const ShaderSource& ShadedRingShader() {
-    static const ShaderSource source(
-        "shadedRingShader",
-        Standard2DVS(),
-        R"(
+const ShaderSource& ShadedRingShader()
+{
+	static const ShaderSource source(
+		"shadedRingShader",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 center;
                 float2 viewportSize;
@@ -536,9 +537,8 @@ const ShaderSource& ShadedRingShader() {
                 return float4(surfaceColor.rgb * cMul, surfaceColor.a * alpha * aMul);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return source;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

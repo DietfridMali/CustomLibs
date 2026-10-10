@@ -13,7 +13,7 @@
 // clouds does not have. Without them Skybox::Render () falls back to the ordinary night sky.
 
 static const ShaderDataAttributes VtxAttrs[] = {
-    { "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -22,10 +22,11 @@ static const ShaderDataAttributes VtxAttrs[] = {
 // event horizon; disk structure is sampled from the shared 3D cloud shape-noise volume.
 // ShaderConstants: mView, direction, distance, diskNormal, gravity, time, horizon, innerDiskRad, outerDiskRad,
 //                  angSpeed, brightness, noiseScale.
-const ShaderSource& BlackholeShader() {
-    static const ShaderSource source(
-        "blackhole",
-        R"(
+const ShaderSource& BlackholeShader()
+{
+	static const ShaderSource source(
+		"blackhole",
+		R"(
             cbuffer FrameConstants : register(b0) {
                 column_major float4x4 mModelView;
                 column_major float4x4 mProjection;
@@ -46,7 +47,7 @@ const ShaderSource& BlackholeShader() {
                 return o;
             }
         )",
-        R"(
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 column_major float4x4 mView;
                 float3 direction;
@@ -341,9 +342,8 @@ const ShaderSource& BlackholeShader() {
                 return float4(col, 1.0);
             }
         )",
-        ShaderDataLayout(VtxAttrs, 1)
-    );
-    return source;
+		ShaderDataLayout(VtxAttrs, 1));
+	return source;
 }
 
 // =================================================================================================

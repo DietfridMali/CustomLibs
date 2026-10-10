@@ -18,64 +18,72 @@
 
 class LightningSystem {
 public:
-    AutoArray<BaseLightning*> m_lightnings;   // owned; deleted in the dtor
-    LightningEmitter*         m_emitter{ nullptr };   // owned; nullptr = no time control
-    // The noise properties of this bundle - kink sharpness, fbm octaves and gain. They describe the
-    // KIND of discharge, which every bolt in the bundle shares, so they live here once and the
-    // lightnings only point at them. Taken from the creation parameters of the first one added.
-    LightningFbmParams        m_fbm;
-    int64_t m_spawnTime{ 0 };
-    int64_t m_ttl{ 0 };                       // ms; <= 0 = permanent
+	AutoArray<BaseLightning*>	m_lightnings; // owned; deleted in the dtor
+	LightningEmitter*			m_emitter{ nullptr }; // owned; nullptr = no time control
+	// The noise properties of this bundle - kink sharpness, fbm octaves and gain. They describe the
+	// KIND of discharge, which every bolt in the bundle shares, so they live here once and the
+	// lightnings only point at them. Taken from the creation parameters of the first one added.
+	LightningFbmParams	m_fbm;
+	int64_t				m_spawnTime{ 0 };
+	int64_t				m_ttl{ 0 }; // ms; <= 0 = permanent
 
-    LightningSystem() = default;
+	LightningSystem() = default;
 
-    LightningSystem(int64_t ttlMs, int64_t now) : m_spawnTime(now), m_ttl(ttlMs) { }
+	LightningSystem(int64_t ttlMs, int64_t now)
+		: m_spawnTime(now)
+		, m_ttl(ttlMs)
+	{}
 
-    LightningSystem(const LightningSystem&) = delete;
-    LightningSystem& operator=(const LightningSystem&) = delete;
+	LightningSystem(const LightningSystem&) = delete;
+	LightningSystem& operator=(const LightningSystem&) = delete;
 
-    ~LightningSystem();
+	~LightningSystem();
 
-    LightningStrike* AddStrike(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t now);
+	LightningStrike* AddStrike(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t now);
 
-    LightningArc* AddArc(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params);
+	LightningArc* AddArc(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params);
 
-    // Attach a time control. The system takes ownership; its ttl becomes the emitter's safety net.
-    LightningEmitter* SetEmitter(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, const LightningEmitterParams& emitterParams, int64_t now);
+	// Attach a time control. The system takes ownership; its ttl becomes the emitter's safety net.
+	LightningEmitter* SetEmitter(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params,
+								 const LightningEmitterParams& emitterParams, int64_t now);
 
-    void SetEndpoints(const Vector3f& start, const Vector3f& end);
+	void SetEndpoints(const Vector3f& start, const Vector3f& end);
 
-    void UpdateEndpoints(const Vector3f& start, const Vector3f& end);   // re-anchor already-built geometry to a moved endpoint
+	void UpdateEndpoints(const Vector3f& start, const Vector3f& end); // re-anchor already-built geometry to a moved endpoint
 
-    // Carry the whole bundle - emitter and every lightning in it - along, for a system that hangs on
-    // something that moves. Rigid, unlike SetEndpoints - see BaseLightning::Translate. Inline so the
-    // whole operation lives in the header and no consumer has to relink for it.
-    inline void Translate(const Vector3f& offset) {
-        if (m_emitter != nullptr)
-            m_emitter->Translate(offset);
-        for (int32_t i = 0; i < m_lightnings.Length(); i++)
-            m_lightnings[i]->Translate(offset);
-    }
+	// Carry the whole bundle - emitter and every lightning in it - along, for a system that hangs on
+	// something that moves. Rigid, unlike SetEndpoints - see BaseLightning::Translate. Inline so the
+	// whole operation lives in the header and no consumer has to relink for it.
+	inline void Translate(const Vector3f& offset)
+	{
+		if (m_emitter != nullptr)
+			m_emitter->Translate(offset);
+		for (int32_t i = 0; i < m_lightnings.Length(); i++)
+			m_lightnings[i]->Translate(offset);
+	}
 
-    inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) {
-        if (m_emitter != nullptr)
-            m_emitter->Transform(pivot, rotation, newPivot);
-        for (int32_t i = 0; i < m_lightnings.Length(); i++)
-            m_lightnings[i]->Transform(pivot, rotation, newPivot);
-    }
+	inline void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot)
+	{
+		if (m_emitter != nullptr)
+			m_emitter->Transform(pivot, rotation, newPivot);
+		for (int32_t i = 0; i < m_lightnings.Length(); i++)
+			m_lightnings[i]->Transform(pivot, rotation, newPivot);
+	}
 
-    // Emitter first (it may ignite or extinguish), then rebuild the animated lightnings whose regeneration
-    // interval has elapsed. Returns true if any geometry changed this frame -> the renderer's segment
-    // buffer is stale. Returns false when nothing moved, and then the buffer can simply be reused.
-    bool Update(int64_t now);
+	// Emitter first (it may ignite or extinguish), then rebuild the animated lightnings whose regeneration
+	// interval has elapsed. Returns true if any geometry changed this frame -> the renderer's segment
+	// buffer is stale. Returns false when nothing moved, and then the buffer can simply be reused.
+	bool Update(int64_t now);
 
-    void RemoveDead(int64_t now);             // drop the lightnings whose lifetime has run out
+	void RemoveDead(int64_t now); // drop the lightnings whose lifetime has run out
 
-    void Clear(void);                         // delete every lightning (the emitter stays)
+	void Clear(void); // delete every lightning (the emitter stays)
 
-    inline bool IsEmpty(void) const { return m_lightnings.Length() < 1; }
+	inline bool IsEmpty(void) const {
+		return m_lightnings.Length() < 1;
+	}
 
-    bool IsExpired(int64_t now) const;
+	bool IsExpired(int64_t now) const;
 };
 
 // =================================================================================================

@@ -14,20 +14,20 @@
 
 class InternetServices {
 public:
-    std::optional<NetworkEndpoint> StunQueryIPv4(const char* serverHost = "stun.l.google.com", uint16_t serverPort = 19302, uint32_t timeoutMs = 1500);
+	std::optional<NetworkEndpoint> StunQueryIPv4(const char* serverHost = "stun.l.google.com", uint16_t serverPort = 19302,
+												 uint32_t timeoutMs = 1500);
 
-    String GetLanAddress(void);
+	String GetLanAddress(void);
 
-    uint32_t QueryDate(int timeout);
+	uint32_t QueryDate(int timeout);
 
-    static constexpr uint16_t NtpServerPort = 123;
-    static constexpr int NtpRequestSize = 48;
+	static constexpr uint16_t	NtpServerPort = 123;
+	static constexpr int		NtpRequestSize = 48;
 
-    static void BuildNtpRequest(uint8_t* buf, int len);
+	static void BuildNtpRequest(uint8_t* buf, int len);
 
-    static uint32_t ParseNtpDate(const uint8_t* buf, int len);
+	static uint32_t ParseNtpDate(const uint8_t* buf, int len);
 };
 
 
 // =================================================================================================
-

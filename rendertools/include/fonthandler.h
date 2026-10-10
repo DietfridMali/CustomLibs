@@ -12,7 +12,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL_ttf.h"
 #ifdef _MSC_VER
@@ -23,135 +23,155 @@
 
 // =================================================================================================
 
-class FontHandler 
-{
+class FontHandler {
 public:
-    using GlyphSize = TextureAtlas::GlyphSize;
-    using TextDimensions = TextureAtlas::GlyphSize;
+	using GlyphSize = TextureAtlas::GlyphSize;
+	using TextDimensions = TextureAtlas::GlyphSize;
 
-    struct GlyphInfo {
-        Texture*                texture;
-        String                  name;
-        int32_t                 index;
-        GlyphSize               glyphSize;
-        Vector2f                atlasPosition;
-        Vector2f                atlasSize;
+	struct GlyphInfo {
+		Texture*	texture;
+		String		name;
+		int32_t		index;
+		GlyphSize	glyphSize;
+		Vector2f	atlasPosition;
+		Vector2f	atlasSize;
 
-        GlyphInfo(Texture* _texture = nullptr, String _name = "", int32_t _index = -1, Vector2f _position = Vector2f::ZERO, Vector2f _size = Vector2f::ZERO)
-            : texture(_texture)
-            , name(_name)
-            , index(_index)
-            , atlasPosition(_position)
-            , atlasSize(_size)
-        { }
-    };
+		GlyphInfo(Texture* _texture = nullptr, String _name = "", int32_t _index = -1, Vector2f _position = Vector2f::ZERO,
+				  Vector2f _size = Vector2f::ZERO)
+			: texture(_texture)
+			, name(_name)
+			, index(_index)
+			, atlasPosition(_position)
+			, atlasSize(_size)
+		{}
+	};
 
 private:
-    TTF_Font*                   m_font;
-    String                      m_fontName;
-    int                         m_fontSize;
-    String                      m_euroChar;
-    String                      m_glyphs;
-    RGBAColor                   m_color;
-    GlyphSize                   m_maxGlyphSize;
-    float                       m_inkTop{ 0.0f };       // start of the glyphs' actual ink band as a fraction of the (metric-padded) glyph surface height
-    float                       m_inkHeight{ 1.0f };    // height of the ink band as a fraction of the glyph surface height; 1.0 = use full surface (no metric correction)
-    GfxDataLayout               m_gfxDataLayout;
-    bool                        m_isAvailable;
+	TTF_Font*	m_font;
+	String		m_fontName;
+	int			m_fontSize;
+	String		m_euroChar;
+	String		m_glyphs;
+	RGBAColor	m_color;
+	GlyphSize	m_maxGlyphSize;
+	float		m_inkTop{ 0.0f }; // start of the glyphs' actual ink band as a fraction of the (metric-padded) glyph surface height
+	float		m_inkHeight{
+		1.0f
+	}; // height of the ink band as a fraction of the glyph surface height; 1.0 = use full surface (no metric correction)
+	GfxDataLayout	m_gfxDataLayout;
+	bool			m_isAvailable;
 
-    AVLTree<String, GlyphInfo>  m_glyphDict;
-    TextureAtlas                m_atlas;
+	AVLTree<String, GlyphInfo>	m_glyphDict;
+	TextureAtlas				m_atlas;
 
 public:
-    static int CompareTextures(void* context, const char& key1, const char& key2);
+	static int CompareTextures(void* context, const char& key1, const char& key2);
 
-    FontHandler();
+	FontHandler();
 
-    ~FontHandler() {
-        Destroy();
-    }
+	~FontHandler() {
+		Destroy();
+	}
 
-    void Destroy(void);
+	void Destroy(void);
 
-    bool InitTTF(void);
+	bool InitTTF(void);
 
-    bool Create(String fontFolder, String fontName, int fontSize = 127, String glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-=.,*/: _?!%");
+	bool Create(String fontFolder, String fontName, int fontSize = 127,
+				String glyphs = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-=.,*/: _?!%");
 
-    bool Open(String fontFolder, String fontName, int fontSize);
+	bool Open(String fontFolder, String fontName, int fontSize);
 
-    bool SetShaping(bool rightToLeft, String script = "");
+	bool SetShaping(bool rightToLeft, String script = "");
 
-    Texture* CreateTextTexture(const String& text);
+	Texture* CreateTextTexture(const String& text);
 
-    inline GlyphInfo* FindGlyph(String key) {
-        return m_glyphDict.Find(key);
-    }
+	inline GlyphInfo* FindGlyph(String key) {
+		return m_glyphDict.Find(key);
+	}
 
-    static inline String NextGlyph(const String& text, int32_t& offset) {
-        int32_t length = int32_t(text.Length());
-        uint8_t c = uint8_t(text.Data()[offset]);
-        int32_t glyphLength = (c < 0xC0) ? 1 : (c < 0xE0) ? 2 : (c < 0xF0) ? 3 : 4;
-        if (glyphLength > length - offset)
-            glyphLength = length - offset;
-        String glyph = text.SubStr(offset, glyphLength);
-        offset += glyphLength;
-        return glyph;
-    }
+	static inline String NextGlyph(const String& text, int32_t& offset)
+	{
+		int32_t length = int32_t(text.Length());
+		uint8_t c = uint8_t(text.Data()[offset]);
+		int32_t glyphLength = (c < 0xC0) ? 1 : (c < 0xE0) ? 2
+			: (c < 0xF0)									? 3
+														  : 4;
+		if (glyphLength > length - offset)
+			glyphLength = length - offset;
+		String glyph = text.SubStr(offset, glyphLength);
+		offset += glyphLength;
+		return glyph;
+	}
 
-    inline TextureAtlas& GetAtlas(void) noexcept {
-        return m_atlas;
-    }
+	inline TextureAtlas& GetAtlas(void)
+	noexcept
+	{
+		return m_atlas;
+	}
 
-    inline RenderTarget* GetRenderTarget(void) noexcept {
-        return m_atlas.GetRenderTarget();
-    }
+	inline RenderTarget* GetRenderTarget(void)
+	noexcept
+	{
+		return m_atlas.GetRenderTarget();
+	}
 
-    inline Texture* GetAsTexture(void) noexcept {
-        return m_atlas.GetAsTexture();
-    }
+	inline Texture* GetAsTexture(void)
+	noexcept
+	{
+		return m_atlas.GetAsTexture();
+	}
 
-    inline const String& GetGlyphs(void) const noexcept {
-        return m_glyphs;
-    }
+	inline const String& GetGlyphs(void) const
+	noexcept
+	{
+		return m_glyphs;
+	}
 
-    inline bool IsAvailable(void) noexcept {
-        return m_isAvailable;
-    }
+	inline bool IsAvailable(void)
+	noexcept
+	{
+		return m_isAvailable;
+	}
 
-    inline float InkTop(void) const noexcept {
-        return m_inkTop;
-    }
+	inline float InkTop(void) const
+	noexcept
+	{
+		return m_inkTop;
+	}
 
-    inline float InkHeight(void) const noexcept {
-        return m_inkHeight;
-    }
+	inline float InkHeight(void) const
+	noexcept
+	{
+		return m_inkHeight;
+	}
 
-    inline int FontSize(void) const noexcept {
-        return m_fontSize;
-    }
+	inline int FontSize(void) const
+	noexcept
+	{
+		return m_fontSize;
+	}
 
-    TextDimensions TextSize(String text);
+	TextDimensions TextSize(String text);
 
 private:
-    Shader* LoadShader(void);
+	Shader* LoadShader(void);
 
-    bool InitFont(String fontFolder, String fontName, int fontSize, String glyphs);
+	bool InitFont(String fontFolder, String fontName, int fontSize, String glyphs);
 
-    bool CreateTexture(const char* szChar, String key, int index);
+	bool CreateTexture(const char* szChar, String key, int index);
 
-    int CreateTextures(void);
+	int CreateTextures(void);
 
-    int BuildAtlas(void);
-        
-    bool CreateAtlas(void);
+	int BuildAtlas(void);
 
-    void ComputeInkBand(void);
+	bool CreateAtlas(void);
 
-    bool RenderGlyphToAtlas(const String& key, GlyphInfo* info);
+	void ComputeInkBand(void);
 
-    bool FreeGlyph(const String& key, GlyphInfo* info);
+	bool RenderGlyphToAtlas(const String& key, GlyphInfo* info);
+
+	bool FreeGlyph(const String& key, GlyphInfo* info);
 };
 
 // =================================================================================================
-
-

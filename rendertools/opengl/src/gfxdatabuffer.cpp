@@ -8,165 +8,168 @@
 // dataSize: buffer size in bytes
 // componentType: OpenGL type of OpenGL data components (GL_FLOAT or GL_UNSIGNED_INT)
 // componentCount: Number of components of the primitives represented by the render data (3 for 3D vectors, 2 for texture coords, 4 for color values, ...)
-GfxDataBuffer::GfxDataBuffer(const char* type, int id, GLint bufferType, bool isDynamic) noexcept
-    : m_index(-1)
-    , m_id(id)
-    , m_type(type)
-    , m_bufferType(bufferType)
-    , m_data(nullptr)
+GfxDataBuffer::GfxDataBuffer(const char* type, int id, GLint bufferType, bool isDynamic)
+noexcept
+	: m_index(-1)
+	, m_id(id)
+	, m_type(type)
+	, m_bufferType(bufferType)
+	, m_data(nullptr)
 #if USE_SHARED_HANDLES
-    , m_handle(SharedBufferHandle())
+	, m_handle(SharedBufferHandle())
 #else
-    , m_handle(0)
+	, m_handle(0)
 #endif
-    , m_size(0)
-    , m_itemSize(0)
-    , m_itemCount(0)
-    , m_componentCount(0)
-    , m_componentType(0)
-    , m_isDynamic(isDynamic)
-{ }
+	, m_size(0)
+	, m_itemSize(0)
+	, m_itemCount(0)
+	, m_componentCount(0)
+	, m_componentType(0)
+	, m_isDynamic(isDynamic)
+{}
 
 
 size_t GfxDataBuffer::ComponentSize(size_t componentType)
 noexcept
 {
-    switch (componentType) {
-    case GL_FLOAT:
-        return 4;
-    case GL_UNSIGNED_INT:
-        return 4;
-    case GL_UNSIGNED_SHORT:
-        return 2;
-    default:
-        return 4;
-    }
+	switch (componentType) {
+		case GL_FLOAT:
+			return 4;
+		case GL_UNSIGNED_INT:
+			return 4;
+		case GL_UNSIGNED_SHORT:
+			return 2;
+		default:
+			return 4;
+	}
 }
 
 
-GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other) {
-    if (this != &other) {
-        m_index = other.m_index;
-        m_type = other.m_type;
-        m_id = other.m_id;
-        m_bufferType = other.m_bufferType;
-        m_data = other.m_data;
-        m_handle = other.m_handle;
-        m_size = other.m_size;
-        m_itemSize = other.m_itemSize;
-        m_itemCount = other.m_itemCount;
-        m_componentCount = other.m_componentCount;
-        m_componentType = other.m_componentType;
-        m_isDynamic = other.m_isDynamic;
-    }
-    return *this;
+GfxDataBuffer& GfxDataBuffer::Copy(GfxDataBuffer const& other)
+{
+	if (this != &other) {
+		m_index = other.m_index;
+		m_type = other.m_type;
+		m_id = other.m_id;
+		m_bufferType = other.m_bufferType;
+		m_data = other.m_data;
+		m_handle = other.m_handle;
+		m_size = other.m_size;
+		m_itemSize = other.m_itemSize;
+		m_itemCount = other.m_itemCount;
+		m_componentCount = other.m_componentCount;
+		m_componentType = other.m_componentType;
+		m_isDynamic = other.m_isDynamic;
+	}
+	return *this;
 }
 
 
 GfxDataBuffer& GfxDataBuffer::Move(GfxDataBuffer& other)
 noexcept
 {
-    if (this != &other) {
-        m_index = other.m_index;
-        m_type = other.m_type;
-        m_id = other.m_id;
-        m_bufferType = other.m_bufferType;
-        m_data = other.m_data;
-        m_handle = std::move(other.m_handle);
+	if (this != &other) {
+		m_index = other.m_index;
+		m_type = other.m_type;
+		m_id = other.m_id;
+		m_bufferType = other.m_bufferType;
+		m_data = other.m_data;
+		m_handle = std::move(other.m_handle);
 #if !USE_SHARED_HANDLES
-        other.m_handle = 0;
+		other.m_handle = 0;
 #endif
-        m_size = other.m_size;
-        m_itemSize = other.m_itemSize;
-        m_itemCount = other.m_itemCount;
-        m_componentCount = other.m_componentCount;
-        m_componentType = other.m_componentType;
-        m_isDynamic = other.m_isDynamic;
-        other.Reset();
-    }
-    return *this;
+		m_size = other.m_size;
+		m_itemSize = other.m_itemSize;
+		m_itemCount = other.m_itemCount;
+		m_componentCount = other.m_componentCount;
+		m_componentType = other.m_componentType;
+		m_isDynamic = other.m_isDynamic;
+		other.Reset();
+	}
+	return *this;
 }
 
 
-bool GfxDataBuffer::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate)
+bool GfxDataBuffer::Update(const char* type, GLint bufferType, int index, void* data, size_t dataSize, size_t componentType,
+						   size_t componentCount, bool forceUpdate)
 #if USE_SHARED_HANDLES
-noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
+	noexcept(noexcept(Bind()) && noexcept(Describe()) && noexcept(m_handle.Claim()))
 #else
-noexcept(noexcept(Bind()) && noexcept(Describe()))
+	noexcept(noexcept(Bind()) && noexcept(Describe()))
 #endif
 {
 #ifdef _DEBUG
-    gfxStates.ClearError();
+	gfxStates.ClearError();
 #endif
-    bool updateSubData;
+	bool updateSubData;
 #if USE_SHARED_HANDLES
-    if (m_handle.IsAvailable()) {
+	if (m_handle.IsAvailable()) {
 #else
-    if (m_handle != 0) {                     // BUGFIX: fehlende Klammer im #else-Zweig erg�nzt
+	if (m_handle != 0) { // BUGFIX: fehlende Klammer im #else-Zweig erg�nzt
 #endif
-        // Update() is only called for a dirty buffer, so the data is always new — upload it
-        // unconditionally. m_isDynamic only selects the GL usage hint and glBufferSubData vs
-        // glBufferData below, never whether the upload happens.
-        updateSubData = m_size == dataSize;
-    }
-    else {
+		// Update() is only called for a dirty buffer, so the data is always new — upload it
+		// unconditionally. m_isDynamic only selects the GL usage hint and glBufferSubData vs
+		// glBufferData below, never whether the upload happens.
+		updateSubData = m_size == dataSize;
+	}
+	else {
 #if USE_SHARED_HANDLES
-        if (not m_handle.Claim())
+		if (not m_handle.Claim())
 #else
-        glGenBuffers(1, &m_handle);
-        if (m_handle == 0)
+		glGenBuffers(1, &m_handle);
+		if (m_handle == 0)
 #endif
-            return false;
+			return false;
 
-        updateSubData = false;
-    }
-    if (not updateSubData) {
-        m_type = type;
-        m_bufferType = bufferType;
-        m_itemSize = ComponentSize(componentType) * componentCount;
-        m_itemCount = GLsizei(dataSize / m_itemSize);
-        m_componentType = GLenum(componentType);
-        m_componentCount = GLint(componentCount);
-    }
-    m_index = index;
-    m_data = reinterpret_cast<char*>(data);
-    m_size = GLsizei(dataSize);
-    Bind();
-    if (m_isDynamic and updateSubData)
-        glBufferSubData(m_bufferType, 0, dataSize, data);
-    else
-        glBufferData(m_bufferType, dataSize, data, m_isDynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
-    Describe();
-    return true;
-    }
+		updateSubData = false;
+	}
+	if (not updateSubData) {
+		m_type = type;
+		m_bufferType = bufferType;
+		m_itemSize = ComponentSize(componentType) * componentCount;
+		m_itemCount = GLsizei(dataSize / m_itemSize);
+		m_componentType = GLenum(componentType);
+		m_componentCount = GLint(componentCount);
+	}
+	m_index = index;
+	m_data = reinterpret_cast<char*>(data);
+	m_size = GLsizei(dataSize);
+	Bind();
+	if (m_isDynamic and updateSubData)
+		glBufferSubData(m_bufferType, 0, dataSize, data);
+	else
+		glBufferData(m_bufferType, dataSize, data, m_isDynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
+	Describe();
+	return true;
+}
 
 #ifdef _DEBUG
 void GfxDataBuffer::Describe(void)
 {
-    if (m_index > -1) {
-        if (IsIntegerAttrib())
-            glVertexAttribIPointer(m_index, m_componentCount, m_componentType, 0, nullptr);
-        else
-            glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
-        EnableAttribs();
-    }
+	if (m_index > -1) {
+		if (IsIntegerAttrib())
+			glVertexAttribIPointer(m_index, m_componentCount, m_componentType, 0, nullptr);
+		else
+			glVertexAttribPointer(m_index, m_componentCount, m_componentType, GL_FALSE, 0, nullptr);
+		EnableAttribs();
+	}
 }
 #endif
 
 void GfxDataBuffer::Destroy(void)
 noexcept
 {
-    if (m_handle) {
-        Release();
+	if (m_handle) {
+		Release();
 #if USE_SHARED_HANDLES
-        m_handle.Release();
+		m_handle.Release();
 #else
-        if (m_handle) {
-            glDeleteBuffers(1, &m_handle);
-            m_handle = 0;
-        }
+		if (m_handle) {
+			glDeleteBuffers(1, &m_handle);
+			m_handle = 0;
+		}
 #endif
-    }
+	}
 }
 
 // =================================================================================================

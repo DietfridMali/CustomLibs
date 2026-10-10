@@ -8,8 +8,8 @@
 // =================================================================================================
 
 static const ShaderDataAttributes VtxTcAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 
@@ -17,11 +17,12 @@ static const ShaderDataAttributes VtxTcAttrs[] = {
 // Outline: blends an outline colour around non-transparent pixels.
 // Uses Offset2DVS().  textureSize() replaced by texelSize from cbuffer.
 // ShaderConstants: vsOffset, texelSize, outlineColor, outlineWidth.
-const ShaderSource& OutlineShader() {
-    static const ShaderSource outlineShader(
-        "outline",
-        Offset2DVS(),
-        R"(
+const ShaderSource& OutlineShader()
+{
+	static const ShaderSource outlineShader(
+		"outline",
+		Offset2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float  vsOffset;      // VS 'offset'; PS ignores
                 float  outlineWidth;  // in texels
@@ -54,9 +55,8 @@ const ShaderSource& OutlineShader() {
                 return (alpha > 0.0) ? float4(outlineColor.rgb, alpha) : float4(0.0, 0.0, 0.0, 0.0);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return outlineShader;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return outlineShader;
 }
 
 
@@ -66,11 +66,12 @@ const ShaderSource& OutlineShader() {
 // shadow on the opposite side, flat interior (zero gradient) left unchanged. bevelWidth = edge sampling
 // distance in texels (= width of the lit band ~ perceived thickness). ShaderConstants: texelSize, lightDir,
 // bevelWidth, strength.
-const ShaderSource& BevelShader() {
-    static const ShaderSource bevelShader(
-        "bevel",
-        Standard2DVS(),
-        R"(
+const ShaderSource& BevelShader()
+{
+	static const ShaderSource bevelShader(
+		"bevel",
+		Standard2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 texelSize;    // 1 / buffer size
                 float2 lightDir;     // screen-space direction to the light (y down); normalized in-shader
@@ -97,9 +98,8 @@ const ShaderSource& BevelShader() {
                 return float4(rgb, color.a);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return bevelShader;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return bevelShader;
 }
 
 // =================================================================================================

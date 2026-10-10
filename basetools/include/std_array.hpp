@@ -14,530 +14,644 @@
 
 // =================================================================================================
 
-template<typename DATA_T>
+template <typename DATA_T>
 class AutoArray {
 private:
-    using DataArray = std::vector<DATA_T>;
+	using DataArray = std::vector<DATA_T>;
 
-    DataArray               m_array;
-    DataArray*              m_arrayPtr{ &m_array };
-    int32_t                 m_width{ 0 };
-    int32_t                 m_height{ 0 };
-    bool                    m_autoFit{ false };
-    bool                    m_isShrinkable{ true };
-    DATA_T                  m_defaultValue{};
-    int32_t                 m_pos{ 0 };
-    std::string             m_name;
+	DataArray	m_array;
+	DataArray*	m_arrayPtr{ &m_array };
+	int32_t		m_width{ 0 };
+	int32_t		m_height{ 0 };
+	bool		m_autoFit{ false };
+	bool		m_isShrinkable{ true };
+	DATA_T		m_defaultValue{};
+	int32_t		m_pos{ 0 };
+	std::string	m_name;
 
 public:
 	static const int32_t MaxIndex = (std::numeric_limits<int32_t>::max)();
 
-    // Konstruktor fuer 1D-AutoArray
-    inline AutoArray(int32_t size = 0)
-        : m_array(static_cast<size_t>(std::max<int32_t>(size, 0))) {
-    }
+	// Konstruktor fuer 1D-AutoArray
+	inline AutoArray(int32_t size = 0)
+		: m_array(static_cast<size_t>(std::max<int32_t>(size, 0)))
+	{
+	}
 
-    inline AutoArray(std::initializer_list<DATA_T> data)
-        : m_array(data)
-    {
-    }
+	inline AutoArray(std::initializer_list<DATA_T> data)
+		: m_array(data)
+	{
+	}
 
-    // Konstruktor f�r 2D-AutoArray
-    inline AutoArray(int32_t width, int32_t height)
-        : m_array(ValidatedSize2D(width, height, 0))
-        {
-        assert(width * height > 0 and "Width and height must be > 0");
+	// Konstruktor f�r 2D-AutoArray
+	inline AutoArray(int32_t width, int32_t height)
+		: m_array(ValidatedSize2D(width, height, 0))
+	{
+		assert(width * height > 0 and "Width and height must be > 0");
 #if defined(_DEBUG)
-        if (width * height <= 0)
-            throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
-#endif    
-        m_width = (Length() > 0) and (ValidatedSize(width, 0) > -1) ? width : 0;
-        m_height = (Length() > 0) and (ValidatedSize(height, 0) > -1) ? height : 0;
-    }
+		if (width * height <= 0)
+			throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
+#endif
+		m_width = (Length() > 0) and (ValidatedSize(width, 0) > -1) ? width : 0;
+		m_height = (Length() > 0) and (ValidatedSize(height, 0) > -1) ? height : 0;
+	}
 
-    AutoArray(const AutoArray& other)
-        : m_array(*other.m_arrayPtr),
-        m_width(other.m_width),
-        m_height(other.m_height),
-        m_autoFit(other.m_autoFit),
-        m_isShrinkable(other.m_isShrinkable),
-        m_defaultValue(other.m_defaultValue)
-    {
-    }
+	AutoArray(const AutoArray& other)
+		: m_array(*other.m_arrayPtr)
+		, m_width(other.m_width)
+		, m_height(other.m_height)
+		, m_autoFit(other.m_autoFit)
+		, m_isShrinkable(other.m_isShrinkable)
+		, m_defaultValue(other.m_defaultValue)
+	{
+	}
 
-    // Move-Konstruktor
-    AutoArray(AutoArray&& other) noexcept
-        : m_width(std::exchange(other.m_width, 0)),
-        m_height(std::exchange(other.m_height, 0)),
-        m_autoFit(std::exchange(other.m_autoFit, false)),
-        m_isShrinkable(std::exchange(other.m_isShrinkable, true)),
-        m_defaultValue(std::move(other.m_defaultValue))
-    {
-        if (other.IsArrayOwner()) {
-            m_array = std::move(other.m_array);
-        }
-        else {
-            m_arrayPtr = other.m_arrayPtr;
-            other.m_arrayPtr = &other.m_array;
-        }
-    }
+	// Move-Konstruktor
+	AutoArray(AutoArray&& other)
+	noexcept
+		: m_width(std::exchange(other.m_width, 0))
+		, m_height(std::exchange(other.m_height, 0))
+		, m_autoFit(std::exchange(other.m_autoFit, false))
+		, m_isShrinkable(std::exchange(other.m_isShrinkable, true))
+		, m_defaultValue(std::move(other.m_defaultValue))
+	{
+		if (other.IsArrayOwner()) {
+			m_array = std::move(other.m_array);
+		}
+		else {
+			m_arrayPtr = other.m_arrayPtr;
+			other.m_arrayPtr = &other.m_array;
+		}
+	}
 
-    // Copy-Zuweisungsoperator
-    AutoArray& operator=(const AutoArray& other) {
-        if (this != &other) {
-            (*m_arrayPtr) = (*other.m_arrayPtr);
-            m_width = other.m_width;
-            m_height = other.m_height;
-            m_autoFit = other.m_autoFit;
-            m_isShrinkable = other.m_isShrinkable;
-            m_defaultValue = other.m_defaultValue;
-        }
-        return *this;
-    }
+	// Copy-Zuweisungsoperator
+	AutoArray& operator=(const AutoArray& other)
+	{
+		if (this != &other) {
+			(*m_arrayPtr) = (*other.m_arrayPtr);
+			m_width = other.m_width;
+			m_height = other.m_height;
+			m_autoFit = other.m_autoFit;
+			m_isShrinkable = other.m_isShrinkable;
+			m_defaultValue = other.m_defaultValue;
+		}
+		return *this;
+	}
 
-    // Move-Zuweisungsoperator
-    AutoArray& operator=(AutoArray&& other) noexcept {
-        if (this != &other) {
-            if (other.IsArrayOwner()) {
-                m_arrayPtr = &m_array;
-                m_array = std::move(other.m_array);
-            }
-            else {
-                m_array.clear();
-                m_array.shrink_to_fit();
-                m_arrayPtr = other.m_arrayPtr;
-                other.m_arrayPtr = &other.m_array;
-            }
-            m_width = std::exchange(other.m_width, 0);
-            m_height = std::exchange(other.m_height, 0);
-            m_autoFit = std::exchange(other.m_autoFit, false);
-            m_isShrinkable = std::exchange(other.m_isShrinkable, true);
-            m_defaultValue = std::move(other.m_defaultValue);
-        }
-        return *this;
-    }
+	// Move-Zuweisungsoperator
+	AutoArray& operator=(AutoArray&& other)
+	noexcept
+	{
+		if (this != &other) {
+			if (other.IsArrayOwner()) {
+				m_arrayPtr = &m_array;
+				m_array = std::move(other.m_array);
+			}
+			else {
+				m_array.clear();
+				m_array.shrink_to_fit();
+				m_arrayPtr = other.m_arrayPtr;
+				other.m_arrayPtr = &other.m_array;
+			}
+			m_width = std::exchange(other.m_width, 0);
+			m_height = std::exchange(other.m_height, 0);
+			m_autoFit = std::exchange(other.m_autoFit, false);
+			m_isShrinkable = std::exchange(other.m_isShrinkable, true);
+			m_defaultValue = std::move(other.m_defaultValue);
+		}
+		return *this;
+	}
 
-    inline DataArray* ArrayPtr(void) noexcept {
-        return m_arrayPtr;
-    }
+	inline DataArray* ArrayPtr(void)
+	noexcept
+	{
+		return m_arrayPtr;
+	}
 
-    inline void ShareBuffer(DataArray* other = nullptr) {
-        m_arrayPtr = other ? other : &m_array;
-    }
+	inline void ShareBuffer(DataArray* other = nullptr) {
+		m_arrayPtr = other ? other : &m_array;
+	}
 
-    bool IsArrayOwner(void) noexcept {
-        return m_arrayPtr == &m_array;
-    }
+	bool IsArrayOwner(void)
+	noexcept
+	{
+		return m_arrayPtr == &m_array;
+	}
 
-    AutoArray& operator=(std::initializer_list<DATA_T> data) {
-        (*m_arrayPtr) = data;
-        return *this;
-    }
+	AutoArray& operator=(std::initializer_list<DATA_T> data) {
+		(*m_arrayPtr) = data;
+		return *this;
+	}
 
-    inline int32_t Capacity(void) const noexcept { 
-        return static_cast<int32_t>(m_arrayPtr->capacity()); 
-    }
+	inline int32_t Capacity(void) const
+	noexcept
+	{
+		return static_cast<int32_t>(m_arrayPtr->capacity());
+	}
 
-    // Zugriff auf Laenge
-    inline int32_t Length(void) const noexcept { 
-        return static_cast<int32_t>(m_arrayPtr->size()); 
-    }
+	// Zugriff auf Laenge
+	inline int32_t Length(void) const
+	noexcept
+	{
+		return static_cast<int32_t>(m_arrayPtr->size());
+	}
 
-    inline bool IsEmpty(void) const noexcept { 
-        return Length() == 0; 
-    }
+	inline bool IsEmpty(void) const
+	noexcept
+	{
+		return Length() == 0;
+	}
 
-    // Gesamte Datenmenge in Bytes
-    inline int32_t DataSize() const noexcept { 
-        return Length() * static_cast<int32_t>(sizeof(DATA_T)); 
-    }
+	// Gesamte Datenmenge in Bytes
+	inline int32_t DataSize() const
+	noexcept
+	{
+		return Length() * static_cast<int32_t>(sizeof(DATA_T));
+	}
 
-    inline int32_t AutoFit(int32_t i) {
-        if (not m_autoFit)
+	inline int32_t AutoFit(int32_t i)
+	{
+		if (not m_autoFit)
 			return (i < Length()) ? i : -1;
-        if (ValidatedSize(static_cast<size_t>(i)) < 0)
-            return -1;
-        if (i >= Length())
-            m_arrayPtr->resize(static_cast<size_t>(i) + 1, m_defaultValue);
-        return i;
-    }
+		if (ValidatedSize(static_cast<size_t>(i)) < 0)
+			return -1;
+		if (i >= Length())
+			m_arrayPtr->resize(static_cast<size_t>(i) + 1, m_defaultValue);
+		return i;
+	}
 
-    // 1D-Indexzugriff
-    inline decltype(auto) operator[](int32_t i) {
+	// 1D-Indexzugriff
+	inline decltype(auto) operator[](int32_t i)
+	{
 		if (AutoFit(i) < 0)
-            throw std::out_of_range("AutoArray::operator[]: index out of range");
+			throw std::out_of_range("AutoArray::operator[]: index out of range");
 #if defined(_DEBUG)
-        return m_arrayPtr->at(static_cast<size_t>(i));
+		return m_arrayPtr->at(static_cast<size_t>(i));
 #else
-        return (*m_arrayPtr)[static_cast<size_t>(i)];
+		return (*m_arrayPtr)[static_cast<size_t>(i)];
 #endif
-    }
+	}
 
-    inline decltype(auto) operator[](int32_t i) const {
+	inline decltype(auto) operator[](int32_t i) const
+	{
 #if defined(_DEBUG)
-        return m_arrayPtr->at(static_cast<size_t>(i));
+		return m_arrayPtr->at(static_cast<size_t>(i));
 #else
-        return (*m_arrayPtr)[static_cast<size_t>(i)];
+		return (*m_arrayPtr)[static_cast<size_t>(i)];
 #endif
-    }
+	}
 
-    // 2D-Zugriff (x, y)
-    inline DATA_T& operator()(int32_t x, int32_t y) {
-        assert(m_width > 0 and m_height > 0);
+	// 2D-Zugriff (x, y)
+	inline DATA_T& operator()(int32_t x, int32_t y)
+	{
+		assert(m_width > 0 and m_height > 0);
 #if defined(_DEBUG)
-        int32_t i = AutoFit(ValidatedSize(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)));
-        if (i < 0)
-            throw std::out_of_range("AutoArray::operator(): indices out of range");
-        return m_arrayPtr->at(static_cast<size_t>(i));
+		int32_t i = AutoFit(ValidatedSize(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)));
+		if (i < 0)
+			throw std::out_of_range("AutoArray::operator(): indices out of range");
+		return m_arrayPtr->at(static_cast<size_t>(i));
 #else
-        return (*m_arrayPtr)[static_cast<size_t>(y * m_width + x)];
+		return (*m_arrayPtr)[static_cast<size_t>(y * m_width + x)];
 #endif
-    }
+	}
 
-    inline int32_t ValidatedSize(size_t size, int32_t defaultSize = -1) const noexcept {
-        return (size > static_cast<size_t>(MaxIndex)) ? defaultSize : int32_t(size);
-    }
+	inline int32_t ValidatedSize(size_t size, int32_t defaultSize = -1) const
+	noexcept
+	{
+		return (size > static_cast<size_t>(MaxIndex)) ? defaultSize : int32_t(size);
+	}
 
-    inline int32_t ValidatedSize2D(int32_t x, int32_t y, int32_t defaultSize = -1) const noexcept {
+	inline int32_t ValidatedSize2D(int32_t x, int32_t y, int32_t defaultSize = -1) const
+	noexcept
+	{
 		return ((x < 0) or (y < 0)) ? defaultSize : ValidatedSize(static_cast<size_t>(x) * static_cast<size_t>(y), defaultSize);
-    }
+	}
 
-    inline bool IsValidIndex(int32_t i) const noexcept { 
-        return (i >= 0) and (m_autoFit or (i < Length())); 
-    }
+	inline bool IsValidIndex(int32_t i) const
+	noexcept
+	{
+		return (i >= 0) and (m_autoFit or (i < Length()));
+	}
 
-    inline bool IsValidIndex(int32_t x, int32_t y) const noexcept { 
-        return m_autoFit ? ValidatedSize2D(x, y) > -1 : (x >= 0) and (y >= 0) and (x < m_width) and (y < m_height);
-    }
+	inline bool IsValidIndex(int32_t x, int32_t y) const
+	noexcept
+	{
+		return m_autoFit ? ValidatedSize2D(x, y) > -1 : (x >= 0) and (y >= 0) and (x < m_width) and (y < m_height);
+	}
 
-    inline int32_t GetCheckedIndex(int32_t x, int32_t y) const noexcept { 
-        return IsValidIndex(x, y) ? int32_t(y * m_width + x) : -1; 
-    }
+	inline int32_t GetCheckedIndex(int32_t x, int32_t y) const
+	noexcept
+	{
+		return IsValidIndex(x, y) ? int32_t(y * m_width + x) : -1;
+	}
 
-    inline int32_t GetIndex(int32_t x, int32_t y) const noexcept { 
-        return int32_t(y * m_width + x); 
-    }
+	inline int32_t GetIndex(int32_t x, int32_t y) const
+	noexcept
+	{
+		return int32_t(y * m_width + x);
+	}
 
-    inline DATA_T* operator()(int32_t x, int32_t y, bool rangeCheck) {
-        int32_t i = AutoFit(rangeCheck ? GetCheckedIndex(x, y) : GetIndex(x, y));
-        return (i < 0) ? nullptr : DataPtr(i);
-    }
+	inline DATA_T* operator()(int32_t x, int32_t y, bool rangeCheck) {
+		int32_t i = AutoFit(rangeCheck ? GetCheckedIndex(x, y) : GetIndex(x, y));
+		return (i < 0) ? nullptr : DataPtr(i);
+	}
 
-    inline const DATA_T& operator()(int32_t x, int32_t y) const {
-        assert(m_width > 0 and m_height > 0);
+	inline const DATA_T& operator()(int32_t x, int32_t y) const
+	{
+		assert(m_width > 0 and m_height > 0);
 #if defined(_DEBUG)
-        return m_arrayPtr->at(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x));
+		return m_arrayPtr->at(static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x));
 #else
-        return (*m_arrayPtr)[static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)];
+		return (*m_arrayPtr)[static_cast<size_t>(y) * static_cast<size_t>(m_width) + static_cast<size_t>(x)];
 #endif
-    }
+	}
 
-    void Append(const DATA_T& data) { 
-        if (Length() < MaxIndex)
-            m_arrayPtr->push_back(data);
-    }
+	void Append(const DATA_T& data) {
+		if (Length() < MaxIndex)
+			m_arrayPtr->push_back(data);
+	}
 
-    AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData) {
-        int32_t size = ValidatedSize(Length() + other.Length());
+	AutoArray<DATA_T>& Append(AutoArray<DATA_T>& other, bool copyData)
+	{
+		int32_t size = ValidatedSize(Length() + other.Length());
 		if (size >= 0) {
-            Reserve(size);
-            if (copyData)
-                m_arrayPtr->insert(m_arrayPtr->end(), other.begin(), other.end());
-            else {
-                m_arrayPtr->insert(m_arrayPtr->end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
-                other.Clear();
-            }
-        }
-        return *this;
-    }
+			Reserve(size);
+			if (copyData)
+				m_arrayPtr->insert(m_arrayPtr->end(), other.begin(), other.end());
+			else {
+				m_arrayPtr->insert(m_arrayPtr->end(), std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
+				other.Clear();
+			}
+		}
+		return *this;
+	}
 
-    AutoArray& operator+=(const AutoArray& other) {
-        if (std::addressof(other) == this) 
-            return *this;
-        return Append(const_cast<AutoArray&>(other), true);
-    }
+	AutoArray& operator+=(const AutoArray& other) {
+		if (std::addressof(other) == this)
+			return *this;
+		return Append(const_cast<AutoArray&>(other), true);
+	}
 
-    AutoArray& operator+=(AutoArray&& other) {
-        if (std::addressof(other) == this) 
-            return *this;
-        return Append(other, false);
-        return *this;
-    }
-
-
-    AutoArray operator+(const AutoArray& other) const {
-        AutoArray result;
-        int32_t size = ValidatedSize(Length() + other.Length());
-        if (size >= 0) {
-            result.m_arrayPtr->reserve(static_cast<size_t>(size));
-            result.m_arrayPtr->insert(result.m_arrayPtr->end(), m_arrayPtr->begin(), m_arrayPtr->end());
-            result.m_arrayPtr->insert(result.m_arrayPtr->end(), other.m_arrayPtr->begin(), other.m_arrayPtr->end());
-        }
-        return result;
-    }
+	AutoArray& operator+=(AutoArray&& other)
+	{
+		if (std::addressof(other) == this)
+			return *this;
+		return Append(other, false);
+		return *this;
+	}
 
 
-    void Fill(DATA_T value) noexcept {
-        std::fill(m_arrayPtr->begin(), m_arrayPtr->end(), value);
-    }
+	AutoArray operator+(const AutoArray& other) const
+	{
+		AutoArray	result;
+		int32_t		size = ValidatedSize(Length() + other.Length());
+		if (size >= 0) {
+			result.m_arrayPtr->reserve(static_cast<size_t>(size));
+			result.m_arrayPtr->insert(result.m_arrayPtr->end(), m_arrayPtr->begin(), m_arrayPtr->end());
+			result.m_arrayPtr->insert(result.m_arrayPtr->end(), other.m_arrayPtr->begin(), other.m_arrayPtr->end());
+		}
+		return result;
+	}
 
 
-    DATA_T* Append(void) {
+	void Fill(DATA_T value)
+	noexcept
+	{
+		std::fill(m_arrayPtr->begin(), m_arrayPtr->end(), value);
+	}
+
+
+	DATA_T* Append(void)
+	{
 		if (Length() == MaxIndex)
-            return nullptr;
-        m_arrayPtr->emplace_back();
-        return &m_arrayPtr->back();
-    }
+			return nullptr;
+		m_arrayPtr->emplace_back();
+		return &m_arrayPtr->back();
+	}
 
 
-    bool Push(DATA_T data) { 
-        if (Length() < MaxIndex) {
-            m_arrayPtr->push_back(data);
-            return true;
-        }
-        return false;
-    }
+	bool Push(DATA_T data)
+	{
+		if (Length() < MaxIndex) {
+			m_arrayPtr->push_back(data);
+			return true;
+		}
+		return false;
+	}
 
 
-    DATA_T Pop(void) {
-        if (m_arrayPtr->empty())
-            return DATA_T();
-        DATA_T data = m_arrayPtr->back();
-        m_arrayPtr->pop_back();
-        return data;
-    }
+	DATA_T Pop(void)
+	{
+		if (m_arrayPtr->empty())
+			return DATA_T();
+		DATA_T data = m_arrayPtr->back();
+		m_arrayPtr->pop_back();
+		return data;
+	}
 
 
-    bool Discard(int32_t i) {
-        if ((i < 0) or (i >= Length()))
-            return false;
-        m_arrayPtr->erase(m_arrayPtr->begin() + i);
-        return true;
-    }
+	bool Discard(int32_t i)
+	{
+		if ((i < 0) or (i >= Length()))
+			return false;
+		m_arrayPtr->erase(m_arrayPtr->begin() + i);
+		return true;
+	}
 
-    
-    template<typename... Args>
-    DATA_T* Append(Args&&... args) {
-        auto argCount = sizeof...(Args);
+
+	template <typename... Args>
+	DATA_T* Append(Args&&... args)
+	{
+		auto argCount = sizeof...(Args);
 		if (size_t(Length()) + argCount > static_cast<size_t>(MaxIndex))
-            return nullptr;
-        m_arrayPtr->emplace_back(std::forward<Args>(args)...);
-        return &m_arrayPtr->back();
-    }
+			return nullptr;
+		m_arrayPtr->emplace_back(std::forward<Args>(args)...);
+		return &m_arrayPtr->back();
+	}
 
-    inline DATA_T* Data(void) noexcept {
-        return m_arrayPtr->data();
-    }
+	inline DATA_T* Data(void)
+	noexcept
+	{
+		return m_arrayPtr->data();
+	}
 
-    inline const DATA_T* Data(void) const noexcept {
-        return m_arrayPtr->data();
-    }
+	inline const DATA_T* Data(void) const
+	noexcept
+	{
+		return m_arrayPtr->data();
+	}
 
 #if 0
     // Zeiger auf Rohdaten (z.B. fuer OpenGL)
-    inline DATA_T* DataPtr(int32_t i = 0) noexcept { 
+    inline DATA_T* DataPtr(int32_t i = 0)
+    noexcept { 
         return m_arrayPtr->data() + i; 
     }
 
-    inline const DATA_T* DataPtr(int32_t i = 0) const noexcept { 
+    inline const DATA_T* DataPtr(int32_t i = 0) const
+    noexcept { 
         return m_arrayPtr->data() + i; 
     }
 #else
-    inline auto DataPtr(int32_t i = 0) noexcept { 
-        return m_arrayPtr->data() + i; 
-    }
+	inline auto DataPtr(int32_t i = 0)
+	noexcept
+	{
+		return m_arrayPtr->data() + i;
+	}
 
-    inline auto DataPtr(int32_t i = 0) const noexcept { 
-        return m_arrayPtr->data() + i; 
-    }
+	inline auto DataPtr(int32_t i = 0) const
+	noexcept
+	{
+		return m_arrayPtr->data() + i;
+	}
 #endif
-    // Non owning view of [offset, offset + count), count < 0 = up to the last element.
-    // Sorting or writing through the span acts on this array's elements; the span becomes
-    // invalid when the array is resized or destroyed.
-    inline std::span<DATA_T> Span(int32_t offset = 0, int32_t count = -1) noexcept {
-        int32_t length = Length();
-        if ((offset < 0) or (offset > length))
-            return {};
-        if ((count < 0) or (count > length - offset))
-            count = length - offset;
-        return std::span<DATA_T>(DataPtr(offset), static_cast<size_t>(count));
-    }
+	// Non owning view of [offset, offset + count), count < 0 = up to the last element.
+	// Sorting or writing through the span acts on this array's elements; the span becomes
+	// invalid when the array is resized or destroyed.
+	inline std::span<DATA_T> Span(int32_t offset = 0, int32_t count = -1)
+	noexcept
+	{
+		int32_t length = Length();
+		if ((offset < 0) or (offset > length))
+			return {};
+		if ((count < 0) or (count > length - offset))
+			count = length - offset;
+		return std::span<DATA_T>(DataPtr(offset), static_cast<size_t>(count));
+	}
 
-    inline std::span<const DATA_T> Span(int32_t offset = 0, int32_t count = -1) const noexcept {
-        int32_t length = Length();
-        if ((offset < 0) or (offset > length))
-            return {};
-        if ((count < 0) or (count > length - offset))
-            count = length - offset;
-        return std::span<const DATA_T>(DataPtr(offset), static_cast<size_t>(count));
-    }
+	inline std::span<const DATA_T> Span(int32_t offset = 0, int32_t count = -1) const
+	noexcept
+	{
+		int32_t length = Length();
+		if ((offset < 0) or (offset > length))
+			return {};
+		if ((count < 0) or (count > length - offset))
+			count = length - offset;
+		return std::span<const DATA_T>(DataPtr(offset), static_cast<size_t>(count));
+	}
 
-    DATA_T* DataRow(int32_t y) {
+	DATA_T* DataRow(int32_t y)
+	{
 #if defined(_DEBUG)
-        if (m_width * m_height <= 0)
-            throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
-#endif    
-        return DataPtr(y * m_width);
-    }
+		if (m_width * m_height <= 0)
+			throw std::invalid_argument("AutoArray: invalid width or height arguments (must both be > 0)");
+#endif
+		return DataPtr(y * m_width);
+	}
 
-    inline void Reserve(int32_t capacity) {
-        if (ValidatedSize(capacity) > -1)
-            m_arrayPtr->reserve(static_cast<size_t>(capacity));
-    }
+	inline void Reserve(int32_t capacity) {
+		if (ValidatedSize(capacity) > -1)
+			m_arrayPtr->reserve(static_cast<size_t>(capacity));
+	}
 
-    inline bool AllowResize(size_t newSize) const noexcept { 
-        return (ValidatedSize(newSize) > -1) and (m_isShrinkable or (newSize > static_cast<size_t>(Length())));
-    }
+	inline bool AllowResize(size_t newSize) const
+	noexcept
+	{
+		return (ValidatedSize(newSize) > -1) and (m_isShrinkable or (newSize > static_cast<size_t>(Length())));
+	}
 
-    // Resize-Methoden
-    inline DATA_T* Resize(int32_t newSize) {
-        if (AllowResize(static_cast<size_t>(newSize)))
-            m_arrayPtr->resize(static_cast<size_t>(newSize));
-        return DataPtr();
-    }
+	// Resize-Methoden
+	inline DATA_T* Resize(int32_t newSize) {
+		if (AllowResize(static_cast<size_t>(newSize)))
+			m_arrayPtr->resize(static_cast<size_t>(newSize));
+		return DataPtr();
+	}
 
-    inline DATA_T* Resize(int32_t newSize, const DATA_T& value) {
-        if (AllowResize(static_cast<size_t>(newSize)))
-            m_arrayPtr->resize(static_cast<size_t>(newSize), value);
-        return DataPtr();
-    }
+	inline DATA_T* Resize(int32_t newSize, const DATA_T& value) {
+		if (AllowResize(static_cast<size_t>(newSize)))
+			m_arrayPtr->resize(static_cast<size_t>(newSize), value);
+		return DataPtr();
+	}
 
-    inline DATA_T* Resize(int32_t width, int32_t height) {
+	inline DATA_T* Resize(int32_t width, int32_t height)
+	{
 		if (ValidatedSize2D(width, height) > -1) {
-            m_arrayPtr->resize(static_cast<size_t>(width) * static_cast<size_t>(height));
-            m_width = width;
-            m_height = height;
-        }
-        return DataPtr();
-    }
+			m_arrayPtr->resize(static_cast<size_t>(width) * static_cast<size_t>(height));
+			m_width = width;
+			m_height = height;
+		}
+		return DataPtr();
+	}
 
-    inline void Clear(void) {
-        if (IsArrayOwner())
-            m_arrayPtr->clear();
-    }
+	inline void Clear(void) {
+		if (IsArrayOwner())
+			m_arrayPtr->clear();
+	}
 
-    inline void Reset(void) {
-        if (IsArrayOwner()) {
-            m_arrayPtr->clear();
-            m_arrayPtr->shrink_to_fit();
-        }
-    }
+	inline void Reset(void)
+	{
+		if (IsArrayOwner()) {
+			m_arrayPtr->clear();
+			m_arrayPtr->shrink_to_fit();
+		}
+	}
 
-    inline void Destroy(void) {
-        Reset();
-    }
+	inline void Destroy(void) {
+		Reset();
+	}
 
-    inline auto begin() noexcept { return m_arrayPtr->begin(); }
+	inline auto begin()
+	noexcept
+	{
+		return m_arrayPtr->begin();
+	}
 
-    inline auto end() noexcept { return m_arrayPtr->end(); }
+	inline auto end()
+	noexcept
+	{
+		return m_arrayPtr->end();
+	}
 
-    inline auto begin() const noexcept { return m_arrayPtr->begin(); }
+	inline auto begin() const
+	noexcept
+	{
+		return m_arrayPtr->begin();
+	}
 
-    inline auto end() const noexcept { return m_arrayPtr->end(); }
+	inline auto end() const
+	noexcept
+	{
+		return m_arrayPtr->end();
+	}
 
-    inline auto rbegin() noexcept { return m_arrayPtr->rbegin(); }
+	inline auto rbegin()
+	noexcept
+	{
+		return m_arrayPtr->rbegin();
+	}
 
-    inline auto rend() noexcept { return m_arrayPtr->rend(); }
+	inline auto rend()
+	noexcept
+	{
+		return m_arrayPtr->rend();
+	}
 
-    inline auto rbegin() const noexcept { return m_arrayPtr->rbegin(); }
+	inline auto rbegin() const
+	noexcept
+	{
+		return m_arrayPtr->rbegin();
+	}
 
-    inline auto rend() const noexcept { return m_arrayPtr->rend(); }
+	inline auto rend() const
+	noexcept
+	{
+		return m_arrayPtr->rend();
+	}
 
-    // Typecast-Operator zu std::vector<DATA_T>
-    inline operator std::vector<DATA_T>& () noexcept { return (*m_arrayPtr); }
+	// Typecast-Operator zu std::vector<DATA_T>
+	inline operator std::vector<DATA_T>&()
+	noexcept
+	{
+		return (*m_arrayPtr);
+	}
 
-    inline operator const std::vector<DATA_T>& () const noexcept { return (*m_arrayPtr); }
+	inline operator const std::vector<DATA_T>&() const
+	noexcept
+	{
+		return (*m_arrayPtr);
+	}
 
-    template <typename Predicate>
-    auto Find(Predicate compare) {
-        return std::find_if(m_arrayPtr->begin(), m_arrayPtr->end(), compare);
-    }
-
-
-    template<typename KEY_T, typename COMPARE_T>
-    int32_t FindLinear(const KEY_T& key, COMPARE_T compare) const {
-        int32_t i = 0;
-        for (const auto& data : (*m_arrayPtr)) {
-            if (not compare(data, key))
-                return i;
-            ++i;
-        }
-        return -1;
-    }
-
-
-    template<typename KEY_T, typename COMPARE_T>
-    int32_t FindBinary(const KEY_T& key, COMPARE_T compare) const {
-        auto it = std::lower_bound(
-            m_arrayPtr->begin(), m_arrayPtr->end(), key,
-            [&](const DATA_T& data, const KEY_T& key) {
-                return compare(data, key) < 0; // a < b
-            }
-        );
-        if (it != m_arrayPtr->end() and compare(*it, key) == 0)
-            return static_cast<int32_t>(std::distance(m_arrayPtr->begin(), it));
-        else
-            return -1;
-    }
-
-    inline bool GetAutoFit(void) const noexcept {
-        return m_autoFit;
-    }
-
-    inline bool SetAutoFit(bool newSetting) noexcept {
-        bool currentSetting = m_autoFit;
-        m_autoFit = newSetting;
-        return currentSetting;
-    }
-
-    inline bool GetShrinkable(void) const noexcept {
-        return m_isShrinkable;
-    }
-
-    inline bool SetShrinkable(bool newSetting) noexcept {
-        bool currentSetting = m_isShrinkable;
-        m_isShrinkable = newSetting;
-        return currentSetting;
-    }
-
-    inline void SetDefaultValue(const DATA_T& defaultValue) {
-        m_defaultValue = defaultValue;
-    }
+	template <typename Predicate>
+	auto Find(Predicate compare) {
+		return std::find_if(m_arrayPtr->begin(), m_arrayPtr->end(), compare);
+	}
 
 
-    bool LoadFromFile(const std::string & filename, uint32_t elemCount = 0) {
-        if (filename.empty())
-            return false;
-        std::ifstream f(filename.c_str(), std::ios::binary);
-        if (not f)
-            return false;
+	template <typename KEY_T, typename COMPARE_T>
+	int32_t FindLinear(const KEY_T& key, COMPARE_T compare) const
+	{
+		int32_t i = 0;
+		for (const auto& data : (*m_arrayPtr)) {
+			if (not compare(data, key))
+				return i;
+			++i;
+		}
+		return -1;
+	}
 
-        f.seekg(0, std::ios::end);
-        std::streamoff fileSize = f.tellg();
-        f.seekg(0, std::ios::beg);
-        if (elemCount == 0)
+
+	template <typename KEY_T, typename COMPARE_T>
+	int32_t FindBinary(const KEY_T& key, COMPARE_T compare) const
+	{
+		auto it = std::lower_bound(
+			m_arrayPtr->begin(), m_arrayPtr->end(), key,
+			[&](const DATA_T& data, const KEY_T& key) {
+				return compare(data, key) < 0; // a < b
+			});
+		if (it != m_arrayPtr->end() and compare(*it, key) == 0)
+			return static_cast<int32_t>(std::distance(m_arrayPtr->begin(), it));
+		else
+			return -1;
+	}
+
+	inline bool GetAutoFit(void) const
+	noexcept
+	{
+		return m_autoFit;
+	}
+
+	inline bool SetAutoFit(bool newSetting)
+	noexcept
+	{
+		bool currentSetting = m_autoFit;
+		m_autoFit = newSetting;
+		return currentSetting;
+	}
+
+	inline bool GetShrinkable(void) const
+	noexcept
+	{
+		return m_isShrinkable;
+	}
+
+	inline bool SetShrinkable(bool newSetting)
+	noexcept
+	{
+		bool currentSetting = m_isShrinkable;
+		m_isShrinkable = newSetting;
+		return currentSetting;
+	}
+
+	inline void SetDefaultValue(const DATA_T& defaultValue) {
+		m_defaultValue = defaultValue;
+	}
+
+
+	bool LoadFromFile(const std::string& filename, uint32_t elemCount = 0)
+	{
+		if (filename.empty())
+			return false;
+		std::ifstream f(filename.c_str(), std::ios::binary);
+		if (not f)
+			return false;
+
+		f.seekg(0, std::ios::end);
+		std::streamoff fileSize = f.tellg();
+		f.seekg(0, std::ios::beg);
+		if (elemCount == 0)
 			elemCount = uint32_t(fileSize) / sizeof(DATA_T);
-        size_t dataSize = size_t(elemCount) * sizeof(DATA_T);
-        if (fileSize != std::streamoff(dataSize))
-            return false;
+		size_t dataSize = size_t(elemCount) * sizeof(DATA_T);
+		if (fileSize != std::streamoff(dataSize))
+			return false;
 
-        if (Length() != int32_t(elemCount))
-            Resize(int32_t(elemCount));
+		if (Length() != int32_t(elemCount))
+			Resize(int32_t(elemCount));
 
-        f.read(reinterpret_cast<char*>(DataPtr()), dataSize);
-        return f.good();
-    }
+		f.read(reinterpret_cast<char*>(DataPtr()), dataSize);
+		return f.good();
+	}
 
 
-    bool SaveToFile(const std::string& filename) const {
-        if (filename.empty())
-            return false;
-        std::ofstream f(filename.c_str(), std::ios::binary | std::ios::trunc);
-        if (not f)
-            return false;
-        f.write(reinterpret_cast<const char*>(DataPtr()), size_t(Length()) * sizeof(DATA_T));
-        return f.good();
-    }
+	bool SaveToFile(const std::string& filename) const
+	{
+		if (filename.empty())
+			return false;
+		std::ofstream f(filename.c_str(), std::ios::binary | std::ios::trunc);
+		if (not f)
+			return false;
+		f.write(reinterpret_cast<const char*>(DataPtr()), size_t(Length()) * sizeof(DATA_T));
+		return f.good();
+	}
 #if 0
     // --- d2x-xl CArray compatibility shims (type migration; same semantics, legacy names) ---
     inline DATA_T* Buffer(int32_t i = 0) noexcept { return DataPtr(i); }
@@ -546,107 +660,147 @@ public:
 
     inline DATA_T* Pointer(int32_t i) noexcept { return DataPtr(i); }
 #endif
-    inline DATA_T* operator+(int32_t i) noexcept { return DataPtr(i); }
+	inline DATA_T* operator+(int32_t i)
+	noexcept
+	{
+		return DataPtr(i);
+	}
 
-    inline const DATA_T* operator+(int32_t i) const noexcept { return DataPtr(i); }
+	inline const DATA_T* operator+(int32_t i) const
+	noexcept
+	{
+		return DataPtr(i);
+	}
 
-    // reallocate = false keeps the array in place and only adjusts its length, so the elements that
-    // are already there survive. reallocate = true releases the buffer and builds a new one, which
-    // runs the destructor of every old element and the constructor of every new one - what
-    // CArray::Create () did (Destroy () followed by new DATA_T [length]) and what a caller of a class
-    // type array needs when it wants freshly constructed elements rather than whatever the previous
-    // use left behind.
-    inline DATA_T* Create(int32_t length, const char* = nullptr, bool reallocate = false) {
-        if (not reallocate)
-            Resize(length);
-        else if ((ValidatedSize(static_cast<size_t>(length)) > -1) and IsArrayOwner()) {
-            m_arrayPtr->clear();
-            m_arrayPtr->shrink_to_fit();
-            m_arrayPtr->resize(static_cast<size_t>(length));
-        }
-        return DataPtr();
-    }
+	// reallocate = false keeps the array in place and only adjusts its length, so the elements that
+	// are already there survive. reallocate = true releases the buffer and builds a new one, which
+	// runs the destructor of every old element and the constructor of every new one - what
+	// CArray::Create () did (Destroy () followed by new DATA_T [length]) and what a caller of a class
+	// type array needs when it wants freshly constructed elements rather than whatever the previous
+	// use left behind.
+	inline DATA_T* Create(int32_t length, const char* = nullptr, bool reallocate = false)
+	{
+		if (not reallocate)
+			Resize(length);
+		else if ((ValidatedSize(static_cast<size_t>(length)) > -1) and IsArrayOwner()) {
+			m_arrayPtr->clear();
+			m_arrayPtr->shrink_to_fit();
+			m_arrayPtr->resize(static_cast<size_t>(length));
+		}
+		return DataPtr();
+	}
 
-    inline int32_t Size(void) const noexcept { return DataSize(); }
+	inline int32_t Size(void) const
+	noexcept
+	{
+		return DataSize();
+	}
 
-    inline void Init(void) { Clear(); }
+	inline void Init(void) {
+		Clear();
+	}
 
-    inline bool IsElement(const DATA_T* elem, bool = false) const noexcept {
-        return (elem >= DataPtr()) and (elem < DataPtr() + Length());
-    }
+	inline bool IsElement(const DATA_T* elem, bool = false) const
+	noexcept
+	{
+		return (elem >= DataPtr()) and (elem < DataPtr() + Length());
+	}
 
-    // CFile-style block I/O (FILE_T resolved at the call site, so basetools needs no CFile knowledge)
-    template <typename FILE_T>
-    size_t Read(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
-        uint32_t len = static_cast<uint32_t>(Length());
-        if ((len == 0) or (nOffset >= len))
-            return static_cast<size_t>(-1);
-        if ((nCount == 0) or (nCount > len - nOffset))
-            nCount = len - nOffset;
-        return cf.Read(DataPtr() + nOffset, sizeof(DATA_T), nCount, bCompressed);
-    }
+	// CFile-style block I/O (FILE_T resolved at the call site, so basetools needs no CFile knowledge)
+	template <typename FILE_T>
+	size_t Read(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0)
+	{
+		uint32_t len = static_cast<uint32_t>(Length());
+		if ((len == 0) or (nOffset >= len))
+			return static_cast<size_t>(-1);
+		if ((nCount == 0) or (nCount > len - nOffset))
+			nCount = len - nOffset;
+		return cf.Read(DataPtr() + nOffset, sizeof(DATA_T), nCount, bCompressed);
+	}
 
-    template <typename FILE_T>
-    size_t Write(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
-        uint32_t len = static_cast<uint32_t>(Length());
-        if ((len == 0) or (nOffset >= len))
-            return static_cast<size_t>(-1);
-        if ((nCount == 0) or (nCount > len - nOffset))
-            nCount = len - nOffset;
-        return cf.Write(DataPtr() + nOffset, sizeof(DATA_T), nCount, bCompressed);
-    }
+	template <typename FILE_T>
+	size_t Write(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0)
+	{
+		uint32_t len = static_cast<uint32_t>(Length());
+		if ((len == 0) or (nOffset >= len))
+			return static_cast<size_t>(-1);
+		if ((nCount == 0) or (nCount > len - nOffset))
+			nCount = len - nOffset;
+		return cf.Write(DataPtr() + nOffset, sizeof(DATA_T), nCount, bCompressed);
+	}
 
-    inline void SetName(const char* name) { m_name = name ? name : ""; }
+	inline void SetName(const char* name) {
+		m_name = name ? name : "";
+	}
 
-    inline const std::string& GetName(void) const noexcept { return m_name; }
+	inline const std::string& GetName(void) const
+	noexcept
+	{
+		return m_name;
+	}
 
-    inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - DataPtr()); }
+	inline uint32_t Index(const DATA_T* elem) const
+	noexcept
+	{
+		return static_cast<uint32_t>(elem - DataPtr());
+	}
 
-    // Sorting. left/right are inclusive bounds (right < 0 = up to the last element), as the
-    // hand written quick sort these replace used them.
-    inline void SortAscending(int32_t left = 0, int32_t right = -1) {
-        if (right < 0)
-            right = Length() - 1;
-        if (right > left)
-            std::sort(Data() + left, Data() + right + 1);
-    }
+	// Sorting. left/right are inclusive bounds (right < 0 = up to the last element), as the
+	// hand written quick sort these replace used them.
+	inline void SortAscending(int32_t left = 0, int32_t right = -1)
+	{
+		if (right < 0)
+			right = Length() - 1;
+		if (right > left)
+			std::sort(Data() + left, Data() + right + 1);
+	}
 
-    inline void SortDescending(int32_t left = 0, int32_t right = -1) {
-        if (right < 0)
-            right = Length() - 1;
-        if (right > left)
-            std::sort(Data() + left, Data() + right + 1, std::greater<DATA_T>());
-    }
+	inline void SortDescending(int32_t left = 0, int32_t right = -1)
+	{
+		if (right < 0)
+			right = Length() - 1;
+		if (right > left)
+			std::sort(Data() + left, Data() + right + 1, std::greater<DATA_T>());
+	}
 
-    // compare returns < 0, 0 or > 0 like the classic C comparators
-    template <typename COMPARE_T>
-    inline void Sort(COMPARE_T compare, int32_t left = 0, int32_t right = -1) {
-        if (right < 0)
-            right = Length() - 1;
-        if (right > left)
-            std::sort(Data() + left, Data() + right + 1,
-                      [compare](const DATA_T& a, const DATA_T& b) {
-                          return compare(const_cast<DATA_T*>(&a), const_cast<DATA_T*>(&b)) < 0;
-                      });
-    }
+	// compare returns < 0, 0 or > 0 like the classic C comparators
+	template <typename COMPARE_T>
+	inline void Sort(COMPARE_T compare, int32_t left = 0, int32_t right = -1)
+	{
+		if (right < 0)
+			right = Length() - 1;
+		if (right > left)
+			std::sort(Data() + left, Data() + right + 1,
+					  [compare](const DATA_T& a, const DATA_T& b) {
+						  return compare(const_cast<DATA_T*>(&a), const_cast<DATA_T*>(&b)) < 0;
+					  });
+	}
 
-    inline DATA_T* Current(void) noexcept { return IsEmpty() ? nullptr : DataPtr() + m_pos; }
+	inline DATA_T* Current(void)
+	noexcept
+	{
+		return IsEmpty() ? nullptr : DataPtr() + m_pos;
+	}
 
-    inline void Pos(uint32_t pos) noexcept { m_pos = (Length() > 0) ? static_cast<int32_t>(pos % static_cast<uint32_t>(Length())) : 0; }
+	inline void Pos(uint32_t pos)
+	noexcept
+	{
+		m_pos = (Length() > 0) ? static_cast<int32_t>(pos % static_cast<uint32_t>(Length())) : 0;
+	}
 
-    // Reset elements in place, size kept. Trivial types: byte-fill (memset, honours filler).
-    // Class types: reset each element via its default ctor (filler ignored) - see d2x-xl CArray::Clear migration.
-    inline void Clear(uint8_t filler, uint32_t count = 0xffffffff) {
-        uint32_t len = static_cast<uint32_t>(Length());
-        if (len == 0)
-            return;
-        uint32_t n = (count < len) ? count : len;
-        if constexpr (std::is_trivial_v<DATA_T>)
-            memset(DataPtr(), filler, static_cast<size_t>(n) * sizeof(DATA_T));
-        else
-            std::fill(begin(), begin() + static_cast<ptrdiff_t>(n), DATA_T {});
-    }
-
+	// Reset elements in place, size kept. Trivial types: byte-fill (memset, honours filler).
+	// Class types: reset each element via its default ctor (filler ignored) - see d2x-xl CArray::Clear migration.
+	inline void Clear(uint8_t filler, uint32_t count = 0xffffffff)
+	{
+		uint32_t len = static_cast<uint32_t>(Length());
+		if (len == 0)
+			return;
+		uint32_t n = (count < len) ? count : len;
+		if constexpr (std::is_trivial_v<DATA_T>)
+			memset(DataPtr(), filler, static_cast<size_t>(n) * sizeof(DATA_T));
+		else
+			std::fill(begin(), begin() + static_cast<ptrdiff_t>(n), DATA_T{});
+	}
 };
 
 // =================================================================================================

@@ -19,398 +19,513 @@
 
 class String {
 private:
-    std::string m_str;
+	std::string m_str;
 
-    inline static bool m_logErrors{ false };
+	inline static bool m_logErrors{ false };
 
 public:
-    // Konstruktoren
-    String() = default;
+	// Konstruktoren
+	String() = default;
 
-    String(const char* s) : m_str(s ? s : "") {}
+	String(const char* s)
+		: m_str(s ? s : "")
+	{}
 
-    String(const std::string& s) : m_str(s) {}
+	String(const std::string& s)
+		: m_str(s)
+	{}
 
-    String(const char* s, size_t l) : m_str(s, l) {}
+	String(const char* s, size_t l)
+		: m_str(s, l)
+	{}
 
-    explicit String(char c) : m_str(1, c) {}
+	explicit String(char c)
+		: m_str(1, c)
+	{}
 
-    explicit String(int n) : m_str(std::to_string(n)) {}
+	explicit String(int n)
+		: m_str(std::to_string(n))
+	{}
 
-    explicit String(uint8_t n) : m_str(std::to_string(n)) {}
+	explicit String(uint8_t n)
+		: m_str(std::to_string(n))
+	{}
 
-    explicit String(uint16_t n) : m_str(std::to_string(n)) {}
+	explicit String(uint16_t n)
+		: m_str(std::to_string(n))
+	{}
 
-    explicit String(uint32_t n) : m_str(std::to_string(n)) {}
+	explicit String(uint32_t n)
+		: m_str(std::to_string(n))
+	{}
 
-    explicit String(int64_t n) : m_str(std::to_string(n)) {}
+	explicit String(int64_t n)
+		: m_str(std::to_string(n))
+	{}
 
-    explicit String(uint64_t n) : m_str(std::to_string(n)) {}
-    template <typename T = size_t>
-    explicit String(T n) requires (std::is_same_v<T, size_t> && !std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) : m_str(std::to_string(n)) {}
-    explicit String(float f) : m_str(std::to_string(f)) {}
+	explicit String(uint64_t n)
+		: m_str(std::to_string(n))
+	{}
+	template <typename T = size_t>
+	explicit String(T n)
+		requires(std::is_same_v<T, size_t> && !std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>)
+		: m_str(std::to_string(n))
+	{}
+	explicit String(float f)
+		: m_str(std::to_string(f))
+	{}
 
-    void LogError(std::string caller) const;
+	void LogError(std::string caller) const;
 
-    String(const String&) = default;
+	String(const String&) = default;
 
-    String(String&&) noexcept = default;
+	String(String&&)
+	noexcept = default;
 
-    String& operator=(const String&) = default;
+	String& operator=(const String&) = default;
 
-    String& operator=(String&&) noexcept = default;
+	String& operator=(String&&)
+	noexcept = default;
 
-    String& operator=(const char* s);
+	String& operator=(const char* s);
 
-    String& operator=(size_t n);
+	String& operator=(size_t n);
 
-    String& operator=(float f);
+	String& operator=(float f);
 
-    // Operatoren
-    operator std::string() const noexcept {
-        return m_str;
-    }
+	// Operatoren
+	operator std::string() const
+	noexcept
+	{
+		return m_str;
+	}
 
-    std::string GetStr(void) {
-        return m_str;
-    }
+	std::string GetStr(void) {
+		return m_str;
+	}
 
-    String& operator+=(const String& other);
-    String& operator+=(const char* s);
-    String& operator+=(const char c);
-    String operator+(const String& other) const;
-    String operator+(const char* s) const;
-    String operator+(const char c) const;
+	String& operator+=(const String& other);
+	String& operator+=(const char* s);
+	String& operator+=(const char c);
+	String operator+(const String& other) const;
+	String operator+(const char* s) const;
+	String operator+(const char c) const;
 
-    bool operator==(const String& other) const noexcept;
-    bool operator!=(const String& other) const noexcept;
-    bool operator<(const String& other) const noexcept;
-    bool operator>(const String& other) const noexcept;
-    bool operator<=(const String& other) const noexcept;
-    bool operator>=(const String& other) const noexcept;
-    bool operator==(const char* s) const noexcept;
-    bool operator!=(const char* s) const noexcept;
-    // --- In class String (public) erg�nzen ---
+	bool operator==(const String& other) const
+	noexcept;
+	bool operator!=(const String& other) const
+	noexcept;
+	bool operator<(const String& other) const
+	noexcept;
+	bool operator>(const String& other) const
+	noexcept;
+	bool operator<=(const String& other) const
+	noexcept;
+	bool operator>=(const String& other) const
+	noexcept;
+	bool operator==(const char* s) const
+	noexcept;
+	bool operator!=(const char* s) const
+	noexcept;
+	// --- In class String (public) erg�nzen ---
 
-    // Typecasts
-    operator const char* () const noexcept;
-    operator char* () noexcept;
-    explicit operator int() const;
-    explicit operator uint8_t() const;
-    explicit operator uint16_t() const;
-    explicit operator uint32_t() const;
-    explicit operator int64_t() const;
-    explicit operator uint64_t() const;
-    template <typename T = size_t>
-    explicit operator T() const requires (std::is_same_v<T, size_t> && !std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>) {
-        return ToNumber<size_t>("size_t");
-    }
-    explicit operator float() const;
-    explicit operator bool() const noexcept;
+	// Typecasts
+	operator const char*() const
+	noexcept;
+	operator char*()
+	noexcept;
+	explicit operator int() const;
+	explicit operator uint8_t() const;
+	explicit operator uint16_t() const;
+	explicit operator uint32_t() const;
+	explicit operator int64_t() const;
+	explicit operator uint64_t() const;
+	template <typename T = size_t>
+	explicit operator T() const
+		requires(std::is_same_v<T, size_t> && !std::is_same_v<size_t, uint32_t> && !std::is_same_v<size_t, uint64_t>)
+	{
+		return ToNumber<size_t>("size_t");
+	}
+	explicit operator float() const;
+	explicit operator bool() const
+	noexcept;
 
-    char& operator[](int idx) noexcept;
-    const char& operator[](int idx) const noexcept;
+	char& operator[](int idx) noexcept;
+	const char& operator[](int idx) const noexcept;
 
-    // Eigenschaften
-    inline int Length(void) const noexcept { return static_cast<int>(m_str.length()); }
+	// Eigenschaften
+	inline int Length(void) const
+	noexcept
+	{
+		return static_cast<int>(m_str.length());
+	}
 
-    inline bool IsEmpty(void) const noexcept { return m_str.empty(); }
+	inline bool IsEmpty(void) const
+	noexcept
+	{
+		return m_str.empty();
+	}
 
-    inline void Reserve(size_t capacity) { m_str.reserve(capacity); }
+	inline void Reserve(size_t capacity) {
+		m_str.reserve(capacity);
+	}
 
-    inline void Resize(size_t capacity) { m_str.resize(capacity); }
+	inline void Resize(size_t capacity) {
+		m_str.resize(capacity);
+	}
 
-    inline void _Reset(void) noexcept {
-        m_str.clear();
-    }
+	inline void _Reset(void)
+	noexcept
+	{
+		m_str.clear();
+	}
 
-    inline void Destroy(void) {
-        m_str.clear();
-        m_str.shrink_to_fit();
-    }
+	inline void Destroy(void) {
+		m_str.clear();
+		m_str.shrink_to_fit();
+	}
 
-    inline char* Data(void) noexcept { return m_str.data(); }
+	inline char* Data(void)
+	noexcept
+	{
+		return m_str.data();
+	}
 
-    inline const char* Data(void) const noexcept { return m_str.data(); }
+	inline const char* Data(void) const
+	noexcept
+	{
+		return m_str.data();
+	}
 
-    // Methoden
-    inline String SubStr(int offset, int length) const {
-        if (offset < 0 or offset > Length()) return String("");
-        return String(m_str.substr(offset, length));
-    }
+	// Methoden
+	inline String SubStr(int offset, int length) const {
+		if (offset < 0 or offset > Length())
+			return String("");
+		return String(m_str.substr(offset, length));
+	}
 
-    inline String& Delete(int offset, int length) noexcept {
-        if (offset < 0 or offset >= Length()) return *this;
-        m_str.erase(static_cast<size_t>(offset), static_cast<size_t>(length));
-        return *this;
-    }
+	inline String& Delete(int offset, int length)
+	noexcept
+	{
+		if (offset < 0 or offset >= Length())
+			return *this;
+		m_str.erase(static_cast<size_t>(offset), static_cast<size_t>(length));
+		return *this;
+	}
 
-    inline int Find(const char* pattern) const noexcept {
-        auto pos = m_str.find(pattern);
-        return pos != std::string::npos ? static_cast<int>(pos) : -1;
-    }
+	inline int Find(const char* pattern) const
+	noexcept
+	{
+		auto pos = m_str.find(pattern);
+		return pos != std::string::npos ? static_cast<int>(pos) : -1;
+	}
 
-    inline int Find(const char c) const noexcept {
-        auto pos = m_str.find(c);
-        return pos != std::string::npos ? static_cast<int>(pos) : -1;
-    }
+	inline int Find(const char c) const
+	noexcept
+	{
+		auto pos = m_str.find(c);
+		return pos != std::string::npos ? static_cast<int>(pos) : -1;
+	}
 
-    String Replace(const char* oldPattern, const char* newPattern = "", int repetitions = 0) const;
+	String Replace(const char* oldPattern, const char* newPattern = "", int repetitions = 0) const;
 
-    static AutoArray<String> Split(const String& str, char delim);
+	static AutoArray<String> Split(const String& str, char delim);
 
-    inline AutoArray<String> Split(char delim) const {
-        return Split(m_str, delim);
-    }
+	inline AutoArray<String> Split(char delim) const {
+		return Split(m_str, delim);
+	}
 
-    inline auto begin() noexcept {
-        return m_str.begin();
-    }
+	inline auto begin()
+	noexcept
+	{
+		return m_str.begin();
+	}
 
-    inline auto end() noexcept {
-        return m_str.end();
-    }
+	inline auto end()
+	noexcept
+	{
+		return m_str.end();
+	}
 
-    inline bool IsLowercase() const noexcept {
-        return std::all_of(m_str.begin(), m_str.end(), [](unsigned char c) {
-            return not std::isalpha(c) or std::islower(c);
-            });
-    }
+	inline bool IsLowercase() const
+	noexcept
+	{
+		return std::all_of(m_str.begin(), m_str.end(), [](unsigned char c) {
+			return not std::isalpha(c) or std::islower(c);
+		});
+	}
 
-    inline bool IsUppercase() const noexcept {
-        return std::all_of(m_str.begin(), m_str.end(), [](unsigned char c) {
-            return not std::isalpha(c) or std::isupper(c);
-            });
-    }
+	inline bool IsUppercase() const
+	noexcept
+	{
+		return std::all_of(m_str.begin(), m_str.end(), [](unsigned char c) {
+			return not std::isalpha(c) or std::isupper(c);
+		});
+	}
 
-    inline String ToLowercase() const {
-        std::string tmp = m_str;
-        std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return String(tmp);
-    }
+	inline String ToLowercase() const {
+		std::string tmp = m_str;
+		std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+		return String(tmp);
+	}
 
-    inline String ToUppercase() const {
-        std::string tmp = m_str;
-        std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
-        return String(tmp);
-    }
+	inline String ToUppercase() const {
+		std::string tmp = m_str;
+		std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+		return String(tmp);
+	}
 
-    // Statische Helfer
-    template <typename... Args>
-    static String Concat(const Args&... args);
+	// Statische Helfer
+	template <typename... Args>
+	static String Concat(const Args&... args);
 
-    static String Concat(std::initializer_list<String> values);
+	static String Concat(std::initializer_list<String> values);
 
-    static int Compare(void*, const String& s1, const String& s2) noexcept {
-        return (s1.Length() or s2.Length()) ? std::strcmp(static_cast<const char*>(s1), static_cast<const char*>(s2)) : 0;
-    }
+	static int Compare(void*, const String& s1, const String& s2)
+	noexcept
+	{
+		return (s1.Length() or s2.Length()) ? std::strcmp(static_cast<const char*>(s1), static_cast<const char*>(s2)) : 0;
+	}
 
-    template <typename... Args>
-    void Format(std::string_view fmt, Args&&... args) {
-        auto hold = std::tuple<std::decay_t<Args>...>(std::forward<Args>(args)...);
-        m_str = std::apply([&](auto&... largs) { return fmt::vformat(fmt, fmt::make_format_args(largs...)); }, hold);
-    }
+	template <typename... Args>
+	void Format(std::string_view fmt, Args&&... args) {
+		auto hold = std::tuple<std::decay_t<Args>...>(std::forward<Args>(args)...);
+		m_str = std::apply([&](auto&... largs) { return fmt::vformat(fmt, fmt::make_format_args(largs...)); }, hold);
+	}
 
 
-    String& LTrim(String filter) {
-        size_t start = m_str.find_first_not_of(filter.m_str);
-        if (start == std::string::npos)
-            m_str.clear();
-        else
-            m_str.erase(0, start);
-        return *this;
-    }
+	String& LTrim(String filter)
+	{
+		size_t start = m_str.find_first_not_of(filter.m_str);
+		if (start == std::string::npos)
+			m_str.clear();
+		else
+			m_str.erase(0, start);
+		return *this;
+	}
 
-    template <typename T>
-    T ToNumber(std::string caller) const noexcept;
+	template <typename T>
+	T ToNumber(std::string caller) const
+	noexcept;
 
-    inline static void SetErrorLogging(bool logErrors) {
-        m_logErrors = logErrors;
-    }
-
+	inline static void SetErrorLogging(bool logErrors) {
+		m_logErrors = logErrors;
+	}
 };
 
 // ---------- Inline-Funktionen (kurze Operatoren & Zuweisungen) ----------
 
 inline String& String::operator=(const char* s) {
-    m_str = s ? s : "";
-    return *this;
+	m_str = s ? s : "";
+	return *this;
 }
 
 inline String& String::operator=(size_t n) {
-    m_str = std::to_string(n);
-    return *this;
+	m_str = std::to_string(n);
+	return *this;
 }
 
 inline String& String::operator=(float f) {
-    m_str = std::to_string(f);
-    return *this;
+	m_str = std::to_string(f);
+	return *this;
 }
 
 inline String& String::operator+=(const String& other) {
-    m_str += other.m_str;
-    return *this;
+	m_str += other.m_str;
+	return *this;
 }
 
 inline String& String::operator+=(const char* s) {
-    m_str += s;
-    return *this;
+	m_str += s;
+	return *this;
 }
 
 inline String& String::operator+=(const char c) {
-    m_str += c;
-    return *this;
+	m_str += c;
+	return *this;
 }
 
 inline String String::operator+(const String& other) const {
-    return String(m_str + other.m_str);
+	return String(m_str + other.m_str);
 }
 
 inline String String::operator+(const char* s) const {
-    return String(m_str + s);
+	return String(m_str + s);
 }
 
 inline String String::operator+(const char c) const {
-    return String(m_str + c);
+	return String(m_str + c);
 }
 
-inline bool String::operator==(const String& other) const noexcept {
-    return m_str == other.m_str;
+inline bool String::operator==(const String& other) const
+noexcept
+{
+	return m_str == other.m_str;
 }
 
-inline bool String::operator!=(const String& other) const noexcept {
-    return m_str != other.m_str;
+inline bool String::operator!=(const String& other) const
+noexcept
+{
+	return m_str != other.m_str;
 }
 
-inline bool String::operator<(const String& other) const noexcept {
-    return m_str < other.m_str;
+inline bool String::operator<(const String& other) const
+noexcept
+{
+	return m_str < other.m_str;
 }
 
-inline bool String::operator>(const String& other) const noexcept {
-    return m_str > other.m_str;
+inline bool String::operator>(const String& other) const
+noexcept
+{
+	return m_str > other.m_str;
 }
 
-inline bool String::operator<=(const String& other) const noexcept {
-    return m_str <= other.m_str;
+inline bool String::operator<=(const String& other) const
+noexcept
+{
+	return m_str <= other.m_str;
 }
 
-inline bool String::operator>=(const String& other) const noexcept {
-    return m_str >= other.m_str;
+inline bool String::operator>=(const String& other) const
+noexcept
+{
+	return m_str >= other.m_str;
 }
 
-inline bool String::operator==(const char* s) const noexcept {
-    return m_str == (s ? s : "");
+inline bool String::operator==(const char* s) const
+noexcept
+{
+	return m_str == (s ? s : "");
 }
 
-inline bool String::operator!=(const char* s) const noexcept {
-    return m_str != (s ? s : "");
+inline bool String::operator!=(const char* s) const
+noexcept
+{
+	return m_str != (s ? s : "");
 }
 
-inline String::operator const char* () const noexcept {
-    return m_str.c_str();
+inline String::operator const char*() const
+noexcept
+{
+	return m_str.c_str();
 }
 
-inline String::operator char*() noexcept {
-    return m_str.data();
+inline String::operator char*()
+noexcept
+{
+	return m_str.data();
 }
 
-inline void String::LogError(std::string caller) const {
-    std::string msg = "String::" + caller + "(): Invalid argument '" + m_str + "'\n";
-    if (m_logErrors)
-        logHandler.Print("%s", msg.c_str());
-    else
-        throw std::invalid_argument(msg);
+inline void String::LogError(std::string caller) const
+{
+	std::string msg = "String::" + caller + "(): Invalid argument '" + m_str + "'\n";
+	if (m_logErrors)
+		logHandler.Print("%s", msg.c_str());
+	else
+		throw std::invalid_argument(msg);
 }
 
 template <typename T>
-inline T String::ToNumber(std::string caller) const noexcept {
-    if (IsEmpty())
-        return 0;
-    try {
-        if constexpr (std::is_signed_v<T>) {
-            long long n = std::stoll(m_str, nullptr, 10);
-            if ((n < static_cast<long long>((std::numeric_limits<T>::min)())) or (n > static_cast<long long>((std::numeric_limits<T>::max)()))) {
-                LogError(caller);
-                return 0;
-            }
-            return static_cast<T>(n);
-        }
-        else {
-            unsigned long long n = std::stoull(m_str, nullptr, 10);
-            if (n > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
-                LogError(caller);
-                return 0;
-            }
-            return static_cast<T>(n);
-        }
-    }
-    catch (...) {
-        try { LogError(caller); } catch (...) {}
-        return 0;
-    }
+inline T String::ToNumber(std::string caller) const
+noexcept
+{
+	if (IsEmpty())
+		return 0;
+	try {
+		if constexpr (std::is_signed_v<T>) {
+			long long n = std::stoll(m_str, nullptr, 10);
+			if ((n < static_cast<long long>((std::numeric_limits<T>::min)())) or
+				(n > static_cast<long long>((std::numeric_limits<T>::max)()))) {
+				LogError(caller);
+				return 0;
+			}
+			return static_cast<T>(n);
+		}
+		else {
+			unsigned long long n = std::stoull(m_str, nullptr, 10);
+			if (n > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
+				LogError(caller);
+				return 0;
+			}
+			return static_cast<T>(n);
+		}
+	}
+	catch (...) {
+		try {
+			LogError(caller);
+		}
+		catch (...) {
+		}
+		return 0;
+	}
 }
 
 inline String::operator int() const {
-    return ToNumber<int>("int");
+	return ToNumber<int>("int");
 }
 inline String::operator uint8_t() const {
-    return ToNumber<uint8_t>("uint8_t");
+	return ToNumber<uint8_t>("uint8_t");
 }
 
 inline String::operator uint16_t() const {
-    return ToNumber<uint16_t>("uint16_t");
+	return ToNumber<uint16_t>("uint16_t");
 }
 
 inline String::operator uint32_t() const {
-    return ToNumber<uint32_t>("uint32_t");
+	return ToNumber<uint32_t>("uint32_t");
 }
 
 inline String::operator int64_t() const {
-    return ToNumber<int64_t>("int64_t");
+	return ToNumber<int64_t>("int64_t");
 }
 
 inline String::operator uint64_t() const {
-    return ToNumber<uint64_t>("uint64_t");
+	return ToNumber<uint64_t>("uint64_t");
 }
 
-inline String::operator float() const {
-    if (IsEmpty())
-        return 0.0f;
-    try {
-        return std::stof(m_str);
-    }
-    catch (...) {
-        LogError("float");
-        return 0.0;
-    }
+inline String::operator float() const
+{
+	if (IsEmpty())
+		return 0.0f;
+	try {
+		return std::stof(m_str);
+	}
+	catch (...) {
+		LogError("float");
+		return 0.0;
+	}
 }
 
-inline String::operator bool() const noexcept {
-    return not IsEmpty() and (m_str != "0");
+inline String::operator bool() const
+noexcept
+{
+	return not IsEmpty() and (m_str != "0");
 }
 
 // ---------- Template-Funktionen ----------
 
 template <typename... Args>
 String String::Concat(const Args&... args) {
-    std::ostringstream oss;
-    (oss << ... << args);
-    return String(oss.str());
+	std::ostringstream oss;
+	(oss << ... << args);
+	return String(oss.str());
 }
 
-inline String String::Concat(std::initializer_list<String> values) {
-    std::ostringstream oss;
-    for (const auto& v : values)
-        oss << static_cast<const char*>(v);
-    return String(oss.str());   // BUGFIX: eine �berfl�ssige Klammer entfernt
+inline String String::Concat(std::initializer_list<String> values)
+{
+	std::ostringstream oss;
+	for (const auto& v : values)
+		oss << static_cast<const char*>(v);
+	return String(oss.str()); // BUGFIX: eine �berfl�ssige Klammer entfernt
 }
 
 // --- Inline-Implementierungen ---
 inline char& String::operator[](int idx) noexcept {
-    return m_str[static_cast<size_t>(idx)];
+	return m_str[static_cast<size_t>(idx)];
 }
 
 inline const char& String::operator[](int idx) const noexcept {
-    return m_str[static_cast<size_t>(idx)];
+	return m_str[static_cast<size_t>(idx)];
 }
 // =================================================================================================

@@ -21,78 +21,87 @@
 // extension of this table must stay below that limit.
 // Returns -1 for unknown (datatype, id) tags; callers skip such buffers.
 
-inline int GfxAttributeSlot(const char* datatype, int id) noexcept
+inline int GfxAttributeSlot(const char* datatype, int id)
+noexcept
 {
-    if (strcmp(datatype, "Vertex") == 0)
-        return 0;
-    if (strcmp(datatype, "TexCoord") == 0)
-        return ((id >= 0) and (id <= 2)) ? 1 + id : -1;
-    if (strcmp(datatype, "Color") == 0)
-        return 4;
-    if (strcmp(datatype, "Normal") == 0)
-        return 5;
-    if (strcmp(datatype, "Tangent") == 0)
-        return 6;
-    if (strcmp(datatype, "Offset") == 0) {
-        if ((id >= 0) and (id <= 3))
-            return 7 + id;
-        return ((id >= 4) and (id <= 5)) ? 13 + (id - 4) : -1;
-    }
-    if (strcmp(datatype, "Float") == 0)
-        return ((id >= 0) and (id <= 1)) ? 11 + id : -1;
-    if (strcmp(datatype, "Uint") == 0)
-        return ((id >= 0) and (id <= 1)) ? 13 + id : -1;
-    return -1;
+	if (strcmp(datatype, "Vertex") == 0)
+		return 0;
+	if (strcmp(datatype, "TexCoord") == 0)
+		return ((id >= 0) and (id <= 2)) ? 1 + id : -1;
+	if (strcmp(datatype, "Color") == 0)
+		return 4;
+	if (strcmp(datatype, "Normal") == 0)
+		return 5;
+	if (strcmp(datatype, "Tangent") == 0)
+		return 6;
+	if (strcmp(datatype, "Offset") == 0) {
+		if ((id >= 0) and (id <= 3))
+			return 7 + id;
+		return ((id >= 4) and (id <= 5)) ? 13 + (id - 4) : -1;
+	}
+	if (strcmp(datatype, "Float") == 0)
+		return ((id >= 0) and (id <= 1)) ? 11 + id : -1;
+	if (strcmp(datatype, "Uint") == 0)
+		return ((id >= 0) and (id <= 1)) ? 13 + id : -1;
+	return -1;
 }
 
 // Maps (datatype, id) to an HLSL semantic name and index.
-inline const char* GfxAttributeSemantic(const char* datatype, int id, uint32_t& semanticIndex) noexcept
+inline const char* GfxAttributeSemantic(const char* datatype, int id, uint32_t& semanticIndex)
+noexcept
 {
-    if (strcmp(datatype, "Vertex") == 0) {
-        semanticIndex = 0;
-        return "POSITION";
-    }
-    if (strcmp(datatype, "TexCoord") == 0) {
-        semanticIndex = uint32_t(id);
-        return "TEXCOORD";
-    }
-    if (strcmp(datatype, "Color") == 0) {
-        semanticIndex = uint32_t(id);
-        return "COLOR";
-    }
-    if (strcmp(datatype, "Normal") == 0) {
-        semanticIndex = uint32_t(id);
-        return "NORMAL";
-    }
-    if (strcmp(datatype, "Tangent") == 0) {
-        semanticIndex = uint32_t(id);
-        return "TANGENT";
-    }
-    if (strcmp(datatype, "Offset") == 0) {
-        semanticIndex = uint32_t(id);
-        return "OFFSET";
-    }
-    if (strcmp(datatype, "Float") == 0) {
-        semanticIndex = uint32_t(id);
-        return "FLOAT";
-    }
-    if (strcmp(datatype, "Uint") == 0) {
-        semanticIndex = uint32_t(id);
-        return "UINT";
-    }
-    semanticIndex = 0;
-    return "TEXCOORD";
+	if (strcmp(datatype, "Vertex") == 0) {
+		semanticIndex = 0;
+		return "POSITION";
+	}
+	if (strcmp(datatype, "TexCoord") == 0) {
+		semanticIndex = uint32_t(id);
+		return "TEXCOORD";
+	}
+	if (strcmp(datatype, "Color") == 0) {
+		semanticIndex = uint32_t(id);
+		return "COLOR";
+	}
+	if (strcmp(datatype, "Normal") == 0) {
+		semanticIndex = uint32_t(id);
+		return "NORMAL";
+	}
+	if (strcmp(datatype, "Tangent") == 0) {
+		semanticIndex = uint32_t(id);
+		return "TANGENT";
+	}
+	if (strcmp(datatype, "Offset") == 0) {
+		semanticIndex = uint32_t(id);
+		return "OFFSET";
+	}
+	if (strcmp(datatype, "Float") == 0) {
+		semanticIndex = uint32_t(id);
+		return "FLOAT";
+	}
+	if (strcmp(datatype, "Uint") == 0) {
+		semanticIndex = uint32_t(id);
+		return "UINT";
+	}
+	semanticIndex = 0;
+	return "TEXCOORD";
 }
 
 // =================================================================================================
 
 enum class TextureFormat {
-    None,
-    R8, RG8, RGBA8,
-    R16F, RG16F, RGBA16F,
-    R32F, RG32F, RGBA32F,
-    D24S8,
-    R16UI, R32UI
+	None,
+	R8,
+	RG8,
+	RGBA8,
+	R16F,
+	RG16F,
+	RGBA16F,
+	R32F,
+	RG32F,
+	RGBA32F,
+	D24S8,
+	R16UI,
+	R32UI
 };
 
 // =================================================================================================
@@ -101,38 +110,46 @@ enum class TextureFormat {
 // to build per-shader D3D12_INPUT_ELEMENT_DESC arrays. Ignored by the OpenGL backend.
 
 struct ShaderDataAttributes {
-    const char* datatype;   // C++ buffer type: "Vertex", "Normal", "Color",
-                            //   "TexCoord", "Tangent", "Offset", "Float", "Uint"
-    int         id;         // index for multi-instance types (TexCoord/0, Offset/2, ...)
-    // Uint* reaches the shader as an integer, not as a float - see UintDataBuffer.
-    enum Format { Float1, Float2, Float3, Float4, Uint1, Uint2, Uint3, Uint4 } format;
-    bool        perInstance { false };
+	const char* datatype; // C++ buffer type: "Vertex", "Normal", "Color",
+	//   "TexCoord", "Tangent", "Offset", "Float", "Uint"
+	int id; // index for multi-instance types (TexCoord/0, Offset/2, ...)
+	// Uint* reaches the shader as an integer, not as a float - see UintDataBuffer.
+	enum Format { Float1,
+				  Float2,
+				  Float3,
+				  Float4,
+				  Uint1,
+				  Uint2,
+				  Uint3,
+				  Uint4 } format;
+	bool perInstance{ false };
 };
 
 static constexpr int MaxRenderTargets = 8;
 
 class ShaderDataLayout {
 public:
-    const ShaderDataAttributes* m_attrs{ nullptr };
-    int                         m_count{ 0 };
-    int                         m_numRenderTargets{ 1 };
-    StaticArray<TextureFormat, MaxRenderTargets> m_rtvFormats{ TextureFormat::RGBA8 };
+	const ShaderDataAttributes*						m_attrs{ nullptr };
+	int												m_count{ 0 };
+	int												m_numRenderTargets{ 1 };
+	StaticArray<TextureFormat, MaxRenderTargets>	m_rtvFormats{ TextureFormat::RGBA8 };
 
-    ShaderDataLayout() = default;
+	ShaderDataLayout() = default;
 
-    ShaderDataLayout(const ShaderDataAttributes* attrs, int count, int numRenderTargets = 1)
-        : m_attrs(attrs)
-        , m_count(count)
-        , m_numRenderTargets(numRenderTargets)
-    { }
+	ShaderDataLayout(const ShaderDataAttributes* attrs, int count, int numRenderTargets = 1)
+		: m_attrs(attrs)
+		, m_count(count)
+		, m_numRenderTargets(numRenderTargets)
+	{}
 
-    ShaderDataLayout& SetFormats(std::initializer_list<TextureFormat> formats) {
-        int i = 0;
-        for (auto fmt : formats)
-            if (i < MaxRenderTargets)
-                m_rtvFormats[i++] = fmt;
-        return *this;
-    }
+	ShaderDataLayout& SetFormats(std::initializer_list<TextureFormat> formats)
+	{
+		int i = 0;
+		for (auto fmt : formats)
+			if (i < MaxRenderTargets)
+				m_rtvFormats[i++] = fmt;
+		return *this;
+	}
 };
 
 // =================================================================================================

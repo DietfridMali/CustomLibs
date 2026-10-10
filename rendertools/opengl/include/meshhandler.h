@@ -13,19 +13,22 @@
 // without that flag every text after the first keeps the first one's data.
 
 class MeshHandler
-    : public BaseSingleton<MeshHandler>
-{
+	: public BaseSingleton<MeshHandler> {
 private:
-    Mesh m_mesh;
+	Mesh m_mesh;
 
 public:
-    inline Mesh* AllocMesh(uint32_t meshBufferMask = 0) noexcept {
-        m_mesh.SetDynamic(meshBufferMask);
-        m_mesh.ResetGfxData();
-        return &m_mesh;
-    }
+	inline Mesh* AllocMesh(uint32_t meshBufferMask = 0)
+	noexcept
+	{
+		m_mesh.SetDynamic(meshBufferMask);
+		m_mesh.ResetGfxData();
+		return &m_mesh;
+	}
 
-    inline void Destroy(void) noexcept { }
+	inline void Destroy(void)
+	noexcept
+	{}
 };
 
 #define meshHandler MeshHandler::Instance()

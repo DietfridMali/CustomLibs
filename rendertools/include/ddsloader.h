@@ -9,16 +9,18 @@ class TextureBuffer;
 
 // True if the path ends in the ".dds" extension (case-insensitive). The per-backend Texture::Load
 // loop uses this to route a file to LoadDDS instead of the SDL image loader.
-inline bool IsDDSFile(const String& path) noexcept {
-    const char* s = (const char*) path;
-    if (s == nullptr)
-        return false;
-    const size_t n = strlen(s);
-    if (n < 4)
-        return false;
-    const char* t = s + (n - 4);
-    auto lower = [](char c) noexcept { return ((c >= 'A') and (c <= 'Z')) ? char(c - 'A' + 'a') : c; };
-    return (t[0] == '.') and (lower(t[1]) == 'd') and (lower(t[2]) == 'd') and (lower(t[3]) == 's');
+inline bool IsDDSFile(const String& path)
+noexcept
+{
+	const char* s = (const char*)path;
+	if (s == nullptr)
+		return false;
+	const size_t n = strlen(s);
+	if (n < 4)
+		return false;
+	const char*	t = s + (n - 4);
+	auto		lower = [](char c) noexcept { return ((c >= 'A') and (c <= 'Z')) ? char(c - 'A' + 'a') : c; };
+	return (t[0] == '.') and (lower(t[1]) == 'd') and (lower(t[2]) == 'd') and (lower(t[3]) == 's');
 }
 
 // =================================================================================================
@@ -33,11 +35,14 @@ inline bool IsDDSFile(const String& path) noexcept {
 //
 // Returns false (and logs to stderr) on I/O error, a malformed header, or any unsupported format.
 
-bool LoadDDS(const String& path, TextureBuffer& buf) noexcept;
+bool LoadDDS(const String& path, TextureBuffer& buf)
+noexcept;
 
-void SetUseFileColorEncoding(bool use) noexcept;
+void SetUseFileColorEncoding(bool use)
+noexcept;
 
-bool ReadPNGText(const String& path, const char* keyword, std::string& text) noexcept;
+bool ReadPNGText(const String& path, const char* keyword, std::string& text)
+noexcept;
 
 // =================================================================================================
 // Unified texture-file loader shared by every backend's Texture::Load, so the DDS-vs-PNG decision
@@ -49,7 +54,8 @@ bool ReadPNGText(const String& path, const char* keyword, std::string& text) noe
 // allowDDS is passed false by backends whose Deploy can't upload block-compressed data yet.
 
 TextureBuffer* LoadTextureFile(const String& folder, const String& fileName,
-                               bool premultiply, bool flipVertically, bool isRequired,
-                               bool allowDDS) noexcept;
+							   bool premultiply, bool flipVertically, bool isRequired,
+							   bool allowDDS)
+noexcept;
 
 // =================================================================================================

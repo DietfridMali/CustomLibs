@@ -7,7 +7,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL_image.h"
 #ifdef _MSC_VER
@@ -27,8 +27,10 @@
 #include "loghandler.h"
 
 #if VK_STALL_DIAG
-extern double VkStallClock(void) noexcept;
-extern void VkStallNote(const char* what, double startMs, const char* detail) noexcept;
+extern double VkStallClock(void)
+noexcept;
+extern void VkStallNote(const char* what, double startMs, const char* detail)
+noexcept;
 #endif
 
 // =================================================================================================
@@ -42,22 +44,24 @@ extern void VkStallNote(const char* what, double startMs, const char* detail) no
 // Common-logic methods (Load, CreateFromFile, CreateFromSurface, Cartoonize, ComputeOffsets,
 // SetParams, SetWrapping) are API-neutral and unchanged from the DX12 version.
 
-int Texture::CompareTextures(void* context, const String& k1, const String& k2) {
-    int i = String::Compare(nullptr, k1, k2);
-    return (i < 0) ? -1 : (i > 0) ? 1 : 0;
+int Texture::CompareTextures(void* context, const String& k1, const String& k2)
+{
+	int i = String::Compare(nullptr, k1, k2);
+	return (i < 0) ? -1 : (i > 0) ? 1
+								  : 0;
 }
 
 // =================================================================================================
 
 Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
-    : m_handle(handle)
-    , m_type(type)
-    , m_tmuIndex(-1)
-    , m_wrapMode(wrap)
-    , m_wrapModeV(wrap)
-    , m_name("")
+	: m_handle(handle)
+	, m_type(type)
+	, m_tmuIndex(-1)
+	, m_wrapMode(wrap)
+	, m_wrapModeV(wrap)
+	, m_name("")
 {
-    SetupLUT();
+	SetupLUT();
 }
 
 
@@ -65,494 +69,502 @@ Texture::Texture(uint32_t handle, TextureType type, GfxWrapMode wrap)
 // the registration happens in TextureHandler::GetTexture () BEFORE the texture is loaded, so a load
 // that fails is deleted while the LUT still points at it (Skybox::LoadTextures () does exactly that).
 // Tying the removal to m_isValid left that dangling pointer behind.
-Texture::~Texture() noexcept
+Texture::~Texture()
+noexcept
 {
-    if (UpdateLUT() and (m_name.Length() > 0)) {
-        textureLUT.Remove(m_name);
-        m_name = "";
-    }
-    if (m_isValid)
-        Destroy();
+	if (UpdateLUT() and (m_name.Length() > 0)) {
+		textureLUT.Remove(m_name);
+		m_name = "";
+	}
+	if (m_isValid)
+		Destroy();
 }
 
 
 Texture& Texture::Copy(const Texture& other)
 {
-    if (this != &other) {
-        Destroy();
-        m_handle = other.m_handle;
-        // Vulkan has no refcounted ComPtr — we do not share VkImage / VkImageView / VmaAllocation.
-        // After Copy the new Texture has no GPU image; caller is expected to Deploy again.
-        m_image = VK_NULL_HANDLE;
-        m_imageView = VK_NULL_HANDLE;
-        m_allocation = VK_NULL_HANDLE;
-        m_layoutTracker = ImageLayoutTracker { };
-        m_name = other.m_name;
-        m_buffers = other.m_buffers;
-        m_filenames = other.m_filenames;
-        m_type = other.m_type;
-        m_wrapMode = other.m_wrapMode;
-        m_wrapModeV = other.m_wrapModeV;
-        m_useMipMaps = other.m_useMipMaps;
-        m_colorEncoding = other.m_colorEncoding;
-        m_isDeployed = false;
-        m_hasParams = other.m_hasParams;
-        m_isValid = other.m_isValid;
-    }
-    return *this;
+	if (this != &other) {
+		Destroy();
+		m_handle = other.m_handle;
+		// Vulkan has no refcounted ComPtr — we do not share VkImage / VkImageView / VmaAllocation.
+		// After Copy the new Texture has no GPU image; caller is expected to Deploy again.
+		m_image = VK_NULL_HANDLE;
+		m_imageView = VK_NULL_HANDLE;
+		m_allocation = VK_NULL_HANDLE;
+		m_layoutTracker = ImageLayoutTracker{};
+		m_name = other.m_name;
+		m_buffers = other.m_buffers;
+		m_filenames = other.m_filenames;
+		m_type = other.m_type;
+		m_wrapMode = other.m_wrapMode;
+		m_wrapModeV = other.m_wrapModeV;
+		m_useMipMaps = other.m_useMipMaps;
+		m_colorEncoding = other.m_colorEncoding;
+		m_isDeployed = false;
+		m_hasParams = other.m_hasParams;
+		m_isValid = other.m_isValid;
+	}
+	return *this;
 }
 
 
-Texture& Texture::Move(Texture& other) noexcept
+Texture& Texture::Move(Texture& other)
+noexcept
 {
-    if (this != &other) {
-        Destroy();
-        m_handle = std::exchange(other.m_handle, UINT32_MAX);
-        m_image = std::exchange(other.m_image, VkImage(VK_NULL_HANDLE));
-        m_imageView = std::exchange(other.m_imageView, VkImageView(VK_NULL_HANDLE));
-        m_allocation = std::exchange(other.m_allocation, VmaAllocation(VK_NULL_HANDLE));
-        m_layoutTracker = other.m_layoutTracker;
-        other.m_layoutTracker = ImageLayoutTracker { };
-        m_name = std::move(other.m_name);
-        m_buffers = std::move(other.m_buffers);
-        m_filenames = std::move(other.m_filenames);
-        m_type = other.m_type;
-        m_wrapMode = other.m_wrapMode;
-        m_wrapModeV = other.m_wrapModeV;
-        m_useMipMaps = other.m_useMipMaps;
-        m_colorEncoding = other.m_colorEncoding;
-        m_isDeployed = std::exchange(other.m_isDeployed, false);
-        m_hasParams = other.m_hasParams;
-        m_isValid = std::exchange(other.m_isValid, false);
-    }
-    return *this;
+	if (this != &other) {
+		Destroy();
+		m_handle = std::exchange(other.m_handle, UINT32_MAX);
+		m_image = std::exchange(other.m_image, VkImage(VK_NULL_HANDLE));
+		m_imageView = std::exchange(other.m_imageView, VkImageView(VK_NULL_HANDLE));
+		m_allocation = std::exchange(other.m_allocation, VmaAllocation(VK_NULL_HANDLE));
+		m_layoutTracker = other.m_layoutTracker;
+		other.m_layoutTracker = ImageLayoutTracker{};
+		m_name = std::move(other.m_name);
+		m_buffers = std::move(other.m_buffers);
+		m_filenames = std::move(other.m_filenames);
+		m_type = other.m_type;
+		m_wrapMode = other.m_wrapMode;
+		m_wrapModeV = other.m_wrapModeV;
+		m_useMipMaps = other.m_useMipMaps;
+		m_colorEncoding = other.m_colorEncoding;
+		m_isDeployed = std::exchange(other.m_isDeployed, false);
+		m_hasParams = other.m_hasParams;
+		m_isValid = std::exchange(other.m_isValid, false);
+	}
+	return *this;
 }
 
 
 bool Texture::Create(void)
 {
-    Destroy();
-    // Vulkan: no GPU descriptor-heap slot to allocate. The image itself is created in
-    // CreateTextureResource (called from Deploy with the actual pixel dimensions).
-    return CreateHandle();
+	Destroy();
+	// Vulkan: no GPU descriptor-heap slot to allocate. The image itself is created in
+	// CreateTextureResource (called from Deploy with the actual pixel dimensions).
+	return CreateHandle();
 }
 
 
 void Texture::Destroy(void)
 {
-    if (not m_isValid)
-        return;
-    m_isValid = false;
-    m_isDeployed = false;
-    // The sampler/filter state belongs to the image that is going away, not to this object. Left
-    // standing, SetParams () returns at once for the NEXT texture created here and that one never
-    // gets its sampler set up. 1:1 to the OpenGL path.
-    m_hasParams = false;
+	if (not m_isValid)
+		return;
+	m_isValid = false;
+	m_isDeployed = false;
+	// The sampler/filter state belongs to the image that is going away, not to this object. Left
+	// standing, SetParams () returns at once for the NEXT texture created here and that one never
+	// gets its sampler set up. 1:1 to the OpenGL path.
+	m_hasParams = false;
 
-    VkDevice device = vkContext.Device();
-    VmaAllocator allocator = vkContext.Allocator();
+	VkDevice		device = vkContext.Device();
+	VmaAllocator	allocator = vkContext.Allocator();
 
-    // The GPU-resource teardown goes through the deletion queue, ALWAYS (RT BufferInfo::Release does
-    // the same). The CPU-side Texture object is invalidated right here; the VkImageView / VkImage live
-    // on for one full frame-slot cycle, until the in-flight command buffers that bound them have
-    // signalled their fence.
-    //
-    // This used to depend on TextureCreationParams::isDisposable, on the assumption that a long-lived
-    // texture is only ever destroyed at shutdown behind a WaitIdle. It is not: a caller that drops
-    // textures during a frame - a texture cache being flushed, a font being rebuilt - invalidated every
-    // command buffer that still had one of those views bound, and from that point on the frame was
-    // never submitted (vkEndCommandBuffer rejects an invalidated buffer) and the swapchain image went
-    // to the present in UNDEFINED layout.
-    //
-    // Nothing leaks at shutdown: GfxRenderer::Cleanup drains both queues behind a WaitIdle, and what a
-    // later destructor still drops lands in the queue that ~GfxResourceHandler flushes. Once the device
-    // is gone the guards below drop the handles without queueing anything - they went with the device.
-    if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
-        VkImageView view = m_imageView;
-        gfxResourceHandler.TrackCleanup([device, view]() {
-            vkDestroyImageView(device, view, nullptr);
-        });
-        m_imageView = VK_NULL_HANDLE;
-    }
-    if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
-        VkImage image = m_image;
-        VmaAllocation alloc = m_allocation;
-        gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
-            vmaDestroyImage(allocator, image, alloc);
-        });
-        m_image = VK_NULL_HANDLE;
-        m_allocation = VK_NULL_HANDLE;
-    }
-    m_layoutTracker = ImageLayoutTracker { };
-    m_handle = UINT32_MAX;
+	// The GPU-resource teardown goes through the deletion queue, ALWAYS (RT BufferInfo::Release does
+	// the same). The CPU-side Texture object is invalidated right here; the VkImageView / VkImage live
+	// on for one full frame-slot cycle, until the in-flight command buffers that bound them have
+	// signalled their fence.
+	//
+	// This used to depend on TextureCreationParams::isDisposable, on the assumption that a long-lived
+	// texture is only ever destroyed at shutdown behind a WaitIdle. It is not: a caller that drops
+	// textures during a frame - a texture cache being flushed, a font being rebuilt - invalidated every
+	// command buffer that still had one of those views bound, and from that point on the frame was
+	// never submitted (vkEndCommandBuffer rejects an invalidated buffer) and the swapchain image went
+	// to the present in UNDEFINED layout.
+	//
+	// Nothing leaks at shutdown: GfxRenderer::Cleanup drains both queues behind a WaitIdle, and what a
+	// later destructor still drops lands in the queue that ~GfxResourceHandler flushes. Once the device
+	// is gone the guards below drop the handles without queueing anything - they went with the device.
+	if ((m_imageView != VK_NULL_HANDLE) and (device != VK_NULL_HANDLE)) {
+		VkImageView view = m_imageView;
+		gfxResourceHandler.TrackCleanup([device, view]() {
+			vkDestroyImageView(device, view, nullptr);
+		});
+		m_imageView = VK_NULL_HANDLE;
+	}
+	if ((m_image != VK_NULL_HANDLE) and (allocator != VK_NULL_HANDLE)) {
+		VkImage			image = m_image;
+		VmaAllocation	alloc = m_allocation;
+		gfxResourceHandler.TrackCleanup([allocator, image, alloc]() {
+			vmaDestroyImage(allocator, image, alloc);
+		});
+		m_image = VK_NULL_HANDLE;
+		m_allocation = VK_NULL_HANDLE;
+	}
+	m_layoutTracker = ImageLayoutTracker{};
+	m_handle = UINT32_MAX;
 
-    for (auto* p : m_buffers) {
-        if (p->m_refCount) --p->m_refCount;
-        else delete p;
-    }
-    m_buffers.Clear();
+	for (auto* p : m_buffers) {
+		if (p->m_refCount)
+			--p->m_refCount;
+		else
+			delete p;
+	}
+	m_buffers.Clear();
 }
 
 
 bool Texture::IsAvailable(void)
 {
-    if (not m_isValid)
-        return false;
-    if (m_isDeployed)
-        return true;
-    return false;
+	if (not m_isValid)
+		return false;
+	if (m_isDeployed)
+		return true;
+	return false;
 }
 
 
 bool Texture::Bind(int tmuIndex, bool)
 {
-    if (not IsAvailable())
-        return false;
-    m_tmuIndex = tmuIndex;
+	if (not IsAvailable())
+		return false;
+	m_tmuIndex = tmuIndex;
 
-    // Lazily populate the per-texture sampler configuration on first bind.
-    if (not m_hasParams)
-        SetParams(false);
+	// Lazily populate the per-texture sampler configuration on first bind.
+	if (not m_hasParams)
+		SetParams(false);
 
-    // Stage the (image-view, sampler) pair in the CommandListHandler bind table at slot
-    // tmuIndex. Materialized into a VkDescriptorSet by Shader::UpdateVariables right before the
-    // next draw (descriptorPoolHandler.Allocate + vkUpdateDescriptorSets + vkCmdBindDescriptorSets).
-    // The DX12 SetGraphicsRootDescriptorTable equivalent.
-    if (tmuIndex >= 0 and uint32_t(tmuIndex) < CommandListHandler::kSrvSlots) {
-        commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_imageView, m_sampleLayout);
-        VkSampler sampler = samplerCache.GetSampler(m_sampling);
-        commandListHandler.BindSampler(uint32_t(tmuIndex), sampler);
-    }
-    return true;
+	// Stage the (image-view, sampler) pair in the CommandListHandler bind table at slot
+	// tmuIndex. Materialized into a VkDescriptorSet by Shader::UpdateVariables right before the
+	// next draw (descriptorPoolHandler.Allocate + vkUpdateDescriptorSets + vkCmdBindDescriptorSets).
+	// The DX12 SetGraphicsRootDescriptorTable equivalent.
+	if (tmuIndex >= 0 and uint32_t(tmuIndex) < CommandListHandler::kSrvSlots) {
+		commandListHandler.BindSampledImage(uint32_t(tmuIndex), m_imageView, m_sampleLayout);
+		VkSampler sampler = samplerCache.GetSampler(m_sampling);
+		commandListHandler.BindSampler(uint32_t(tmuIndex), sampler);
+	}
+	return true;
 }
 
 
 void Texture::Release(void)
 {
-    if (m_tmuIndex >= 0) {
-        gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
-        m_tmuIndex = -1;
-    }
+	if (m_tmuIndex >= 0) {
+		gfxStates.BindTexture(TextureTypeToGLenum(m_type), UINT32_MAX, m_tmuIndex);
+		m_tmuIndex = -1;
+	}
 }
 
 
 void Texture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
-        return;
-    m_hasParams = true;
-    DefaultSampling();
-    ApplySampling();
+	if (not (forceUpdate or not m_hasParams))
+		return;
+	m_hasParams = true;
+	DefaultSampling();
+	ApplySampling();
 }
 
 
-void Texture::DefaultSampling(void) noexcept
+void Texture::DefaultSampling(void)
+noexcept
 {
-    // Default: linear filter, repeat wrap (most textures in this app are tile/wrap-style).
-    // Subclasses that need clamp (RenderTargetTexture, ShadowTexture, Cubemap) override this.
-    m_sampling.minFilter = GfxFilterMode::Linear;
-    m_sampling.magFilter = GfxFilterMode::Linear;
-    m_sampling.mipMode = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
-    // What SetWrapping () asked for, not a fixed Repeat - a texture created to clamp used to have that
-    // overwritten here on its first use. TiledTexture::SetParams () sets Repeat on purpose.
-    m_sampling.wrapU = m_wrapMode;
-    m_sampling.wrapV = m_wrapModeV;
-    m_sampling.wrapW = m_wrapModeV;
-    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
-    // Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
-    m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;
+	// Default: linear filter, repeat wrap (most textures in this app are tile/wrap-style).
+	// Subclasses that need clamp (RenderTargetTexture, ShadowTexture, Cubemap) override this.
+	m_sampling.minFilter = GfxFilterMode::Linear;
+	m_sampling.magFilter = GfxFilterMode::Linear;
+	m_sampling.mipMode = m_useMipMaps ? GfxMipMode::Linear : GfxMipMode::None;
+	// What SetWrapping () asked for, not a fixed Repeat - a texture created to clamp used to have that
+	// overwritten here on its first use. TiledTexture::SetParams () sets Repeat on purpose.
+	m_sampling.wrapU = m_wrapMode;
+	m_sampling.wrapV = m_wrapModeV;
+	m_sampling.wrapW = m_wrapModeV;
+	m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+	// Anisotropic filtering only pays off with a mip chain to choose from; tie the two together.
+	m_sampling.maxAnisotropy = m_useMipMaps ? 16.0f : 1.0f;
 }
 
 
 bool Texture::CreateTextureResource(int w, int h, int arraySize, int mipLevels, VkFormat format)
 {
-    VmaAllocator allocator = vkContext.Allocator();
-    if (allocator == VK_NULL_HANDLE)
-        return false;
+	VmaAllocator allocator = vkContext.Allocator();
+	if (allocator == VK_NULL_HANDLE)
+		return false;
 
-    m_vkFormat = format;
+	m_vkFormat = format;
 
-    VkImageCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    info.imageType = VK_IMAGE_TYPE_2D;
-    info.format = m_vkFormat;
-    info.extent.width = uint32_t(w);
-    info.extent.height = uint32_t(h);
-    info.extent.depth = 1;
-    info.mipLevels = uint32_t(mipLevels);
-    info.arrayLayers = uint32_t(arraySize);
-    info.samples = VK_SAMPLE_COUNT_1_BIT;
-    info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    if ((m_type == TextureType::CubeMap) and (arraySize == 6))
-        info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+	VkImageCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	info.imageType = VK_IMAGE_TYPE_2D;
+	info.format = m_vkFormat;
+	info.extent.width = uint32_t(w);
+	info.extent.height = uint32_t(h);
+	info.extent.depth = 1;
+	info.mipLevels = uint32_t(mipLevels);
+	info.arrayLayers = uint32_t(arraySize);
+	info.samples = VK_SAMPLE_COUNT_1_BIT;
+	info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	if ((m_type == TextureType::CubeMap) and (arraySize == 6))
+		info.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
-    VmaAllocationCreateInfo allocInfo { };
-    allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+	VmaAllocationCreateInfo allocInfo{};
+	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-    VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &m_image, &m_allocation, nullptr);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("Texture::CreateTextureResource: vmaCreateImage failed (%d)\n", (int)res);
-        return false;
-    }
+	VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &m_image, &m_allocation, nullptr);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("Texture::CreateTextureResource: vmaCreateImage failed (%d)\n", (int)res);
+		return false;
+	}
 
-    m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
-    return true;
+	m_layoutTracker.Init(m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
+	return true;
 }
 
 
 bool Texture::CreateSRV(void)
 {
-    VkDevice device = vkContext.Device();
-    if ((device == VK_NULL_HANDLE) or (m_image == VK_NULL_HANDLE))
-        return false;
+	VkDevice device = vkContext.Device();
+	if ((device == VK_NULL_HANDLE) or (m_image == VK_NULL_HANDLE))
+		return false;
 
-    VkImageViewCreateInfo info { };
-    info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    info.image = m_image;
-    info.format = m_vkFormat;
-    info.viewType = (m_type == TextureType::CubeMap) ? VK_IMAGE_VIEW_TYPE_CUBE
-                  : (m_type == TextureType::Texture2DArray) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
-                  : VK_IMAGE_VIEW_TYPE_2D;
-    info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    info.subresourceRange.baseMipLevel = 0;
-    info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-    info.subresourceRange.baseArrayLayer = 0;
-    info.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	VkImageViewCreateInfo info{};
+	info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	info.image = m_image;
+	info.format = m_vkFormat;
+	info.viewType = (m_type == TextureType::CubeMap) ? VK_IMAGE_VIEW_TYPE_CUBE
+		: (m_type == TextureType::Texture2DArray)		? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+													 : VK_IMAGE_VIEW_TYPE_2D;
+	info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+	info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+	info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	info.subresourceRange.baseMipLevel = 0;
+	info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+	info.subresourceRange.baseArrayLayer = 0;
+	info.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
-    VkResult res = vkCreateImageView(device, &info, nullptr, &m_imageView);
-    if (res != VK_SUCCESS) {
-        logHandler.Print("Texture::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
-        return false;
-    }
-    return true;
+	VkResult res = vkCreateImageView(device, &info, nullptr, &m_imageView);
+	if (res != VK_SUCCESS) {
+		logHandler.Print("Texture::CreateSRV: vkCreateImageView failed (%d)\n", (int)res);
+		return false;
+	}
+	return true;
 }
 
 
 bool Texture::Deploy(int bufferIndex)
 {
-    if (m_isDeployed)
-        return true;
-    if (bufferIndex >= m_buffers.Length())
-        return false;
-    TextureBuffer* tb = m_buffers[bufferIndex];
-    if (not tb)
-        return false;
+	if (m_isDeployed)
+		return true;
+	if (bufferIndex >= m_buffers.Length())
+		return false;
+	TextureBuffer* tb = m_buffers[bufferIndex];
+	if (not tb)
+		return false;
 
-    int w = tb->m_info.m_width;
-    int h = tb->m_info.m_height;
-    if ((w <= 0) or (h <= 0))
-        return false;
+	int w = tb->m_info.m_width;
+	int h = tb->m_info.m_height;
+	if ((w <= 0) or (h <= 0))
+		return false;
 
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
-    const GfxPixelFormat gfxFmt = GfxEncodedFormat(tb->m_info.m_gfxFormat, colorEncoding);
-    if (GfxIsBlockCompressed(gfxFmt)) {
-        const int mipCount = tb->m_info.m_mipCount;
-        if (not CreateTextureResource(w, h, 1, mipCount, ToVkFormat(gfxFmt)))
-            return false;
-        const uint8_t* face = static_cast<const uint8_t*>(tb->DataBuffer());
-        if (not UploadCompressedData(m_image, m_layoutTracker, &face, 1, w, h, gfxFmt, mipCount))
-            return false;
-    }
-    else {
-        const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
-        if (not CreateTextureResource(w, h, 1, int(mipLevels), ToVkFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
-            return false;
-        const uint8_t* pixels = static_cast<const uint8_t*>(tb->DataBuffer());
-        const int channels = tb->m_info.m_componentCount;
-        if (mipLevels > 1) {
-            if (not UploadTextureDataWithMips(m_image, m_layoutTracker, pixels, w, h, channels, mipLevels, colorEncoding))
-                return false;
-        }
-        else if (not UploadTextureData(m_image, m_layoutTracker, pixels, w, h, channels))
-            return false;
-    }
-    if (not CreateSRV())
-        return false;
+	const eColorEncoding colorEncoding = ColorEncoding(bufferIndex);
+	const GfxPixelFormat gfxFmt = GfxEncodedFormat(tb->m_info.m_gfxFormat, colorEncoding);
+	if (GfxIsBlockCompressed(gfxFmt)) {
+		const int mipCount = tb->m_info.m_mipCount;
+		if (not CreateTextureResource(w, h, 1, mipCount, ToVkFormat(gfxFmt)))
+			return false;
+		const uint8_t* face = static_cast<const uint8_t*>(tb->DataBuffer());
+		if (not UploadCompressedData(m_image, m_layoutTracker, &face, 1, w, h, gfxFmt, mipCount))
+			return false;
+	}
+	else {
+		const uint32_t mipLevels = m_useMipMaps ? uint32_t(CalcMipLevels(w, h, 1)) : 1u;
+		if (not CreateTextureResource(w, h, 1, int(mipLevels), ToVkFormat(GfxEncodedFormat(GfxPixelFormat::RGBA8_UNorm, colorEncoding))))
+			return false;
+		const uint8_t*	pixels = static_cast<const uint8_t*>(tb->DataBuffer());
+		const int		channels = tb->m_info.m_componentCount;
+		if (mipLevels > 1) {
+			if (not UploadTextureDataWithMips(m_image, m_layoutTracker, pixels, w, h, channels, mipLevels, colorEncoding))
+				return false;
+		}
+		else if (not UploadTextureData(m_image, m_layoutTracker, pixels, w, h, channels))
+			return false;
+	}
+	if (not CreateSRV())
+		return false;
 
-    m_isDeployed = true;
+	m_isDeployed = true;
 #if VK_STALL_DIAG
-    char detail[64];
-    snprintf(detail, sizeof(detail), "%dx%d", w, h);
-    VkStallNote("texture deploy", stallStart, detail);
+	char detail[64];
+	snprintf(detail, sizeof(detail), "%dx%d", w, h);
+	VkStallNote("texture deploy", stallStart, detail);
 #endif
-    return true;
+	return true;
 }
 
 
 bool Texture::Redeploy(void)
 {
-    m_isDeployed = false;
-    return Deploy(0);
+	m_isDeployed = false;
+	return Deploy(0);
 }
 
 
 bool Texture::Load(String& folder, List<String>& fileNames, const TextureCreationParams& params)
 {
-    m_filenames = fileNames;
-    // The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
-    // replaced by the file name here: the destructor removes the entry under m_name, and with the
-    // key overwritten the LUT kept a dangling pointer under the registration key while removing a
-    // key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
-    if (m_name.Length() == 0)
-        m_name = fileNames.First();
-    TextureBuffer* texBuf = nullptr;
-    for (auto& fileName : fileNames) {
-        if (fileName.IsEmpty()) {
-            if (not texBuf)
-                return false;
-            ++(texBuf->m_refCount);
-            m_buffers.Append(texBuf);
-        }
-        else {
-            texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
-            if (not texBuf)
-                return false;
-            m_buffers.Append(texBuf);
-        }
-    }
-    return true;
+	m_filenames = fileNames;
+	// The name a texture was Register ()ed under is its key in textureLUT, so it must NOT be
+	// replaced by the file name here: the destructor removes the entry under m_name, and with the
+	// key overwritten the LUT kept a dangling pointer under the registration key while removing a
+	// key that was never in it. Only an unregistered texture gets the file name as its (debug) name.
+	if (m_name.Length() == 0)
+		m_name = fileNames.First();
+	TextureBuffer* texBuf = nullptr;
+	for (auto& fileName : fileNames) {
+		if (fileName.IsEmpty()) {
+			if (not texBuf)
+				return false;
+			++(texBuf->m_refCount);
+			m_buffers.Append(texBuf);
+		}
+		else {
+			texBuf = LoadTextureFile(folder, fileName, params.premultiply, params.flipVertically, params.isRequired, /*allowDDS=*/true);
+			if (not texBuf)
+				return false;
+			m_buffers.Append(texBuf);
+		}
+	}
+	return true;
 }
 
 
 bool Texture::CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params)
 {
-    if (not Create())
-        return false;
-    if (fileNames.IsEmpty())
-        return true;
-    if (not Load(folder, fileNames, params))
-        return false;
-    if (not m_buffers.IsEmpty())
-        m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
-    if (params.cartoonize)
-        Cartoonize(params.blur, params.gradients, params.outline);
-    m_useMipMaps = params.useMipMaps;
-    m_isDisposable = params.isDisposable;
-    m_colorEncoding = params.colorEncoding;
-    return Deploy();
+	if (not Create())
+		return false;
+	if (fileNames.IsEmpty())
+		return true;
+	if (not Load(folder, fileNames, params))
+		return false;
+	if (not m_buffers.IsEmpty())
+		m_compression = GfxFormatToCompression(m_buffers[0]->m_info.m_gfxFormat);
+	if (params.cartoonize)
+		Cartoonize(params.blur, params.gradients, params.outline);
+	m_useMipMaps = params.useMipMaps;
+	m_isDisposable = params.isDisposable;
+	m_colorEncoding = params.colorEncoding;
+	return Deploy();
 }
 
 
 bool Texture::CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params)
 {
-    if (not Create()) {
-        SDL_FreeSurface(surface);
-        return false;
-    }
-    m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
-    m_useMipMaps = params.useMipMaps;
-    m_isDisposable = params.isDisposable;
-    m_colorEncoding = params.colorEncoding;
-    return Deploy();
+	if (not Create()) {
+		SDL_FreeSurface(surface);
+		return false;
+	}
+	m_buffers.Append(new TextureBuffer(surface, params.premultiply, params.flipVertically));
+	m_useMipMaps = params.useMipMaps;
+	m_isDisposable = params.isDisposable;
+	m_colorEncoding = params.colorEncoding;
+	return Deploy();
 }
 
 
 void Texture::Cartoonize(uint16_t blurStrength, uint16_t gradients, uint16_t outlinePasses)
 {
-    for (auto& b : m_buffers)
-        b->Cartoonize(blurStrength, gradients, outlinePasses);
+	for (auto& b : m_buffers)
+		b->Cartoonize(blurStrength, gradients, outlinePasses);
 }
 
 
-void Texture::SetWrapping(GfxWrapMode wrapMode) noexcept
-{
-    SetWrapping(wrapMode, wrapMode);
-}
-
-
-void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept
-{
-    if ((m_wrapMode == wrapU) and (m_wrapModeV == wrapV))
-        return;   // nothing changes, so nothing has to be written again
-    m_wrapMode = wrapU;
-    m_wrapModeV = wrapV;
-    m_sampling.wrapU = wrapU;
-    m_sampling.wrapV = wrapV;
-    m_sampling.wrapW = wrapV;
-    m_hasParams = false;   // SetParams () writes them on the next use
-}
-
-
-RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight)
+void Texture::SetWrapping(GfxWrapMode wrapMode)
 noexcept
 {
-    if (renderAreaWidth == 0)
-        renderAreaWidth = viewportWidth;
-    if (renderAreaHeight == 0)
-        renderAreaHeight = viewportHeight;
-    float xScale = float(renderAreaWidth) / float(viewportWidth);
-    float yScale = float(renderAreaHeight) / float(viewportHeight);
-    float wRatio = float(renderAreaWidth) / float(w);
-    float hRatio = float(renderAreaHeight) / float(h);
-    RenderOffsets offsets = { 0.5f * xScale, 0.5f * yScale };
-    if (wRatio > hRatio)
-        offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
-    else if (wRatio < hRatio)
-        offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
-    return offsets;
+	SetWrapping(wrapMode, wrapMode);
+}
+
+
+void Texture::SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
+noexcept
+{
+	if ((m_wrapMode == wrapU) and (m_wrapModeV == wrapV))
+		return; // nothing changes, so nothing has to be written again
+	m_wrapMode = wrapU;
+	m_wrapModeV = wrapV;
+	m_sampling.wrapU = wrapU;
+	m_sampling.wrapV = wrapV;
+	m_sampling.wrapW = wrapV;
+	m_hasParams = false; // SetParams () writes them on the next use
+}
+
+
+RenderOffsets Texture::ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,
+									  int renderAreaHeight)
+noexcept
+{
+	if (renderAreaWidth == 0)
+		renderAreaWidth = viewportWidth;
+	if (renderAreaHeight == 0)
+		renderAreaHeight = viewportHeight;
+	float			xScale = float(renderAreaWidth) / float(viewportWidth);
+	float			yScale = float(renderAreaHeight) / float(viewportHeight);
+	float			wRatio = float(renderAreaWidth) / float(w);
+	float			hRatio = float(renderAreaHeight) / float(h);
+	RenderOffsets	offsets = { 0.5f * xScale, 0.5f * yScale };
+	if (wRatio > hRatio)
+		offsets.x -= (float(renderAreaWidth) - float(w) * hRatio) / float(2 * viewportWidth);
+	else if (wRatio < hRatio)
+		offsets.y -= (float(renderAreaHeight) - float(h) * wRatio) / float(2 * viewportHeight);
+	return offsets;
 }
 
 // =================================================================================================
 
 void TiledTexture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
-        return;
-    Texture::SetParams(forceUpdate);
-    m_sampling.wrapU = GfxWrapMode::Repeat;
-    m_sampling.wrapV = GfxWrapMode::Repeat;
-    m_sampling.wrapW = GfxWrapMode::Repeat;
-    m_sampling.mipMode = GfxMipMode::Linear;
-    m_sampling.maxAnisotropy = 16.0f;
+	if (not (forceUpdate or not m_hasParams))
+		return;
+	Texture::SetParams(forceUpdate);
+	m_sampling.wrapU = GfxWrapMode::Repeat;
+	m_sampling.wrapV = GfxWrapMode::Repeat;
+	m_sampling.wrapW = GfxWrapMode::Repeat;
+	m_sampling.mipMode = GfxMipMode::Linear;
+	m_sampling.maxAnisotropy = 16.0f;
 }
 
 
 void RenderTargetTexture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
-        return;
-    m_hasParams = true;
-    m_sampling.minFilter = m_filtering;
-    m_sampling.magFilter = m_filtering;
-    m_sampling.mipMode = GfxMipMode::None;
-    m_sampling.wrapU = GfxWrapMode::ClampToEdge;
-    m_sampling.wrapV = GfxWrapMode::ClampToEdge;
-    m_sampling.wrapW = GfxWrapMode::ClampToEdge;
-    m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
-    m_sampling.maxAnisotropy = 1.0f;
+	if (not (forceUpdate or not m_hasParams))
+		return;
+	m_hasParams = true;
+	m_sampling.minFilter = m_filtering;
+	m_sampling.magFilter = m_filtering;
+	m_sampling.mipMode = GfxMipMode::None;
+	m_sampling.wrapU = GfxWrapMode::ClampToEdge;
+	m_sampling.wrapV = GfxWrapMode::ClampToEdge;
+	m_sampling.wrapW = GfxWrapMode::ClampToEdge;
+	m_sampling.compareFunc = GfxOperations::CompareFunc::Always;
+	m_sampling.maxAnisotropy = 1.0f;
 }
 
 
 void ShadowTexture::SetParams(bool forceUpdate)
 {
-    if (not (forceUpdate or not m_hasParams))
-        return;
-    m_hasParams = true;
-    m_sampling.minFilter = GfxFilterMode::Linear;
-    m_sampling.magFilter = GfxFilterMode::Linear;
-    m_sampling.mipMode = GfxMipMode::None;
-    // Outside the shadow map there is no shadow: clamp to a WHITE border (depth 1 = farthest) instead of
-    // repeating the edge texel, which smeared the border shadow across everything beyond the map. This is
-    // what the OpenGL backend has always done (GL_CLAMP_TO_BORDER + white border colour).
-    m_sampling.wrapU = GfxWrapMode::ClampToBorder;
-    m_sampling.wrapV = GfxWrapMode::ClampToBorder;
-    m_sampling.wrapW = GfxWrapMode::ClampToBorder;
-    m_sampling.borderColor[0] = 1.0f;
-    m_sampling.borderColor[1] = 1.0f;
-    m_sampling.borderColor[2] = 1.0f;
-    m_sampling.borderColor[3] = 1.0f;
-    m_sampling.compareFunc = GfxOperations::CompareFunc::Less;
-    m_sampling.maxAnisotropy = 1.0f;
+	if (not (forceUpdate or not m_hasParams))
+		return;
+	m_hasParams = true;
+	m_sampling.minFilter = GfxFilterMode::Linear;
+	m_sampling.magFilter = GfxFilterMode::Linear;
+	m_sampling.mipMode = GfxMipMode::None;
+	// Outside the shadow map there is no shadow: clamp to a WHITE border (depth 1 = farthest) instead of
+	// repeating the edge texel, which smeared the border shadow across everything beyond the map. This is
+	// what the OpenGL backend has always done (GL_CLAMP_TO_BORDER + white border colour).
+	m_sampling.wrapU = GfxWrapMode::ClampToBorder;
+	m_sampling.wrapV = GfxWrapMode::ClampToBorder;
+	m_sampling.wrapW = GfxWrapMode::ClampToBorder;
+	m_sampling.borderColor[0] = 1.0f;
+	m_sampling.borderColor[1] = 1.0f;
+	m_sampling.borderColor[2] = 1.0f;
+	m_sampling.borderColor[3] = 1.0f;
+	m_sampling.compareFunc = GfxOperations::CompareFunc::Less;
+	m_sampling.maxAnisotropy = 1.0f;
 }
 
 
@@ -564,10 +576,10 @@ void ShadowTexture::SetParams(bool forceUpdate)
 
 void RenderTargetTexture::Destroy(void)
 {
-    m_imageView = VK_NULL_HANDLE;
-    m_image = VK_NULL_HANDLE;
-    m_allocation = VK_NULL_HANDLE;
-    Texture::Destroy();
+	m_imageView = VK_NULL_HANDLE;
+	m_image = VK_NULL_HANDLE;
+	m_allocation = VK_NULL_HANDLE;
+	Texture::Destroy();
 }
 
 
@@ -577,26 +589,26 @@ void RenderTargetTexture::Destroy(void)
 // own destructor preserves the same invariant for the implicit member-destruction path.
 RenderTargetTexture::~RenderTargetTexture()
 {
-    m_imageView = VK_NULL_HANDLE;
-    m_image = VK_NULL_HANDLE;
-    m_allocation = VK_NULL_HANDLE;
+	m_imageView = VK_NULL_HANDLE;
+	m_image = VK_NULL_HANDLE;
+	m_allocation = VK_NULL_HANDLE;
 }
 
 
 void ShadowTexture::Destroy(void)
 {
-    m_imageView = VK_NULL_HANDLE;
-    m_image = VK_NULL_HANDLE;
-    m_allocation = VK_NULL_HANDLE;
-    Texture::Destroy();
+	m_imageView = VK_NULL_HANDLE;
+	m_image = VK_NULL_HANDLE;
+	m_allocation = VK_NULL_HANDLE;
+	Texture::Destroy();
 }
 
 
 ShadowTexture::~ShadowTexture()
 {
-    m_imageView = VK_NULL_HANDLE;
-    m_image = VK_NULL_HANDLE;
-    m_allocation = VK_NULL_HANDLE;
+	m_imageView = VK_NULL_HANDLE;
+	m_image = VK_NULL_HANDLE;
+	m_allocation = VK_NULL_HANDLE;
 }
 
 // =================================================================================================

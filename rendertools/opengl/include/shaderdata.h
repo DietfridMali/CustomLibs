@@ -7,194 +7,254 @@
 
 // =================================================================================================
 // The following code is meant to make caching of uniform variable locations and data as easy as possible.
-// Each shader will hold a list (AutoArray / std::vector) of uniform variable class instances as 
+// Each shader will hold a list (AutoArray / std::vector) of uniform variable class instances as
 // defined below.
 
-struct UniformHandle
-{
-    GLint   m_location{ std::numeric_limits<GLint>::min() };
-    String  m_name{ "" };
+struct UniformHandle {
+	GLint	m_location{ std::numeric_limits<GLint>::min() };
+	String	m_name{ "" };
 
-    UniformHandle() = default;
+	UniformHandle() = default;
 
-    UniformHandle(String name, GLint location = std::numeric_limits<GLint>::min())
-        : m_location{ location }, m_name{ std::move(name) }
-    {
-    }
+	UniformHandle(String name, GLint location = std::numeric_limits<GLint>::min())
+		: m_location{ location }
+		, m_name{ std::move(name) }
+	{
+	}
 
-    virtual ~UniformHandle() = default; // falls du polymorph speichern willst
+	virtual ~UniformHandle() = default; // falls du polymorph speichern willst
 
-    inline GLint& Location(void) { return m_location; }
+	inline GLint& Location(void) {
+		return m_location;
+	}
 
-    inline String& Name(void) { return m_name; }
+	inline String& Name(void) {
+		return m_name;
+	}
 
-    bool operator<(const UniformHandle& other) const noexcept { return m_name < other.m_name; }
+	bool operator<(const UniformHandle& other) const
+	noexcept
+	{
+		return m_name < other.m_name;
+	}
 
-    bool operator>(const UniformHandle& other) const noexcept { return m_name > other.m_name; }
+	bool operator>(const UniformHandle& other) const
+	noexcept
+	{
+		return m_name > other.m_name;
+	}
 
-    bool operator==(const UniformHandle& other) const noexcept { return m_name == other.m_name; }
+	bool operator==(const UniformHandle& other) const
+	noexcept
+	{
+		return m_name == other.m_name;
+	}
 
-    bool operator!=(const UniformHandle& other) const noexcept { return m_name != other.m_name; }
+	bool operator!=(const UniformHandle& other) const
+	noexcept
+	{
+		return m_name != other.m_name;
+	}
 };
 
 // -------------------------------------------------------------------------------------------------
 
-template<typename T>
+template <typename T>
 struct UniformData
-    : public UniformHandle
-{
-    T m_data{};
+	: public UniformHandle {
+	T m_data{};
 
-    UniformData() = default;
-    UniformData(String name, GLint location, T data = {})
-        : UniformHandle(std::move(name), location), m_data(std::move(data)) {
-    }
+	UniformData() = default;
+	UniformData(String name, GLint location, T data = {})
+		: UniformHandle(std::move(name), location)
+		, m_data(std::move(data))
+	{
+	}
 
-    // Zuweisung AUS einem T
-    UniformData& operator=(const T& other) {
-        m_data = other;
-        return *this;
-    }
-    UniformData& operator=(T&& other) noexcept(std::is_nothrow_move_assignable_v<T>) {
-        m_data = std::move(other);
-        return *this;
-    }
+	// Zuweisung AUS einem T
+	UniformData& operator=(const T& other) {
+		m_data = other;
+		return *this;
+	}
+	UniformData& operator=(T&& other)
+	noexcept(std::is_nothrow_move_assignable_v<T>)
+	{
+		m_data = std::move(other);
+		return *this;
+	}
 
-    // optional: Vergleich mit T
-    inline bool operator==(const T& other) const noexcept { return m_data == other; }
-    inline bool operator!=(const T& other) const noexcept { return !(*this == other); }
+	// optional: Vergleich mit T
+	inline bool operator==(const T& other) const
+	noexcept
+	{
+		return m_data == other;
+	}
+	inline bool operator!=(const T& other) const
+	noexcept
+	{
+		return !(*this == other);
+	}
 
-    inline T& data(void) { return m_data; }
+	inline T& data(void) {
+		return m_data;
+	}
 };
 
 // -------------------------------------------------------------------------------------------------
 
-template<typename DATA_T>
+template <typename DATA_T>
 struct UniformArrayData {
-    DATA_T* m_data;
-    size_t  m_length;
+	DATA_T*	m_data;
+	size_t	m_length;
 
-    void operator()(DATA_T* data, size_t length) {
-        return Copy(data, length);
-    }
+	void operator()(DATA_T* data, size_t length) {
+		return Copy(data, length);
+	}
 };
 
-template<typename DATA_T>
+template <typename DATA_T>
 struct UniformArray : public UniformHandle {
-    std::unique_ptr<DATA_T[]>   m_data; // eigener Speicher
-    size_t                      m_size{ 0 }; // Größe in BYTES
-    size_t                      m_length{ 0 };
+	std::unique_ptr<DATA_T[]>	m_data; // eigener Speicher
+	size_t						m_size{ 0 }; // Größe in BYTES
+	size_t						m_length{ 0 };
 
-    UniformArray() = default;
+	UniformArray() = default;
 
-    bool Copy(const DATA_T* data, size_t length) {
-        if (not data or (length == 0)) {
-            m_data.reset();
-            m_size =
-                m_length = 0;
-            return true;
-        }
-        if (not m_data or (m_length != length)) {
-            m_length = length;
-            m_size = m_length * sizeof(DATA_T);
-            m_data = std::make_unique<DATA_T[]>(m_length);
-        }
-        std::memcpy(m_data.get(), data, m_size);
-        return true;
-    }
+	bool Copy(const DATA_T* data, size_t length)
+	{
+		if (not data or (length == 0)) {
+			m_data.reset();
+			m_size =
+				m_length = 0;
+			return true;
+		}
+		if (not m_data or (m_length != length)) {
+			m_length = length;
+			m_size = m_length * sizeof(DATA_T);
+			m_data = std::make_unique<DATA_T[]>(m_length);
+		}
+		std::memcpy(m_data.get(), data, m_size);
+		return true;
+	}
 
-    UniformArray(String name, GLint location, DATA_T* data = nullptr, size_t length = 0)
-        : UniformHandle(std::move(name), location)
-    {
-        Copy(data, length);
-    }
+	UniformArray(String name, GLint location, DATA_T* data = nullptr, size_t length = 0)
+		: UniformHandle(std::move(name), location)
+	{
+		Copy(data, length);
+	}
 
-    // Setzen/Updaten via Funktionsaufruf-Operator:
-    // - Wenn Größe unterschiedlich: reallozieren + kopieren -> true zurück
-    // - Wenn Größe gleich: memcmp, falls anders -> kopieren -> true, sonst false
-    bool operator()(const DATA_T* data, size_t length) {
-        return Copy(data, length);
-    }
-
-
-    UniformArray& operator=(const DATA_T* data) {
-        Copy(data, m_length);
-        return *this;
-    }
+	// Setzen/Updaten via Funktionsaufruf-Operator:
+	// - Wenn Größe unterschiedlich: reallozieren + kopieren -> true zurück
+	// - Wenn Größe gleich: memcmp, falls anders -> kopieren -> true, sonst false
+	bool operator()(const DATA_T* data, size_t length) {
+		return Copy(data, length);
+	}
 
 
-    bool operator==(const DATA_T* other) const noexcept {
-        return m_data and other and std::memcmp(m_data.get(), other, m_size) == 0;
-    }
+	UniformArray& operator=(const DATA_T* data) {
+		Copy(data, m_length);
+		return *this;
+	}
 
 
-    bool operator!=(const DATA_T* other) const noexcept {
-        return not (*this == other); // Komma-Operator als Guard gegen versehentliche Klammerfehler
-    }
+	bool operator==(const DATA_T* other) const
+	noexcept
+	{
+		return m_data and other and std::memcmp(m_data.get(), other, m_size) == 0;
+	}
 
 
-    // Vergleich mit externem Buffer + Bytegröße
-    bool operator==(UniformArrayData<DATA_T*>&& other) const noexcept {
-        if (not m_data or not other.m_data)
-            return false;
-        if (m_length != other.m_length) // also catches size == 0
-            return false;
-        return std::memcmp(m_data.get(), other.m_data, m_size) == 0;
-    }
+	bool operator!=(const DATA_T* other) const
+	noexcept
+	{
+		return not (*this == other); // Komma-Operator als Guard gegen versehentliche Klammerfehler
+	}
 
 
-    bool operator!=(UniformArrayData<DATA_T*>&& other) const noexcept {
-        return !(*this == other); // Komma-Operator als Guard gegen versehentliche Klammerfehler
-    }
+	// Vergleich mit externem Buffer + Bytegröße
+	bool operator==(UniformArrayData<DATA_T*>&& other) const
+	noexcept
+	{
+		if (not m_data or not other.m_data)
+			return false;
+		if (m_length != other.m_length) // also catches size == 0
+			return false;
+		return std::memcmp(m_data.get(), other.m_data, m_size) == 0;
+	}
 
-    // Zugriff
-    inline DATA_T* Data() noexcept { return m_data.get(); }
 
-    inline const DATA_T* Data() const noexcept { return m_data.get(); }
+	bool operator!=(UniformArrayData<DATA_T*>&& other) const
+	noexcept
+	{
+		return !(*this == other); // Komma-Operator als Guard gegen versehentliche Klammerfehler
+	}
 
-    // Größen-API
-    constexpr size_t Length() noexcept { return m_length; }
+	// Zugriff
+	inline DATA_T* Data()
+	noexcept
+	{
+		return m_data.get();
+	}
 
-    constexpr size_t Size()    noexcept { return m_size; }
+	inline const DATA_T* Data() const
+	noexcept
+	{
+		return m_data.get();
+	}
+
+	// Größen-API
+	constexpr size_t Length()
+	noexcept
+	{
+		return m_length;
+	}
+
+	constexpr size_t Size()
+	noexcept
+	{
+		return m_size;
+	}
 };
 
 // -------------------------------------------------------------------------------------------------
 
-template<typename DATA_T, size_t ElemCount>
-struct FixedUniformArray 
-    : public UniformArray<DATA_T> 
-{
-    using Base = UniformArray<DATA_T>;
+template <typename DATA_T, size_t ElemCount>
+struct FixedUniformArray
+	: public UniformArray<DATA_T> {
+	using Base = UniformArray<DATA_T>;
 
-    FixedUniformArray() = default;
+	FixedUniformArray() = default;
 
-    FixedUniformArray(String name, GLint location)
-        : Base(std::move(name), location) {
-    }
+	FixedUniformArray(String name, GLint location)
+		: Base(std::move(name), location)
+	{
+	}
 
-    using Base::operator=;
+	using Base::operator=;
 
-    // fester Copy/Update ohne size-Parameter
-    inline bool Copy(const DATA_T* data) {
-        return Base::Copy(data, ElemCount);
-    }
+	// fester Copy/Update ohne size-Parameter
+	inline bool Copy(const DATA_T* data) {
+		return Base::Copy(data, ElemCount);
+	}
 
-    inline bool operator()(const DATA_T* data) {
-        return Base::Copy(data, ElemCount);
-    }
+	inline bool operator()(const DATA_T* data) {
+		return Base::Copy(data, ElemCount);
+	}
 
-    FixedUniformArray& operator=(const DATA_T*&& data) {
-        Base::Copy(data, ElemCount);
-        return *this;
-    }
+	FixedUniformArray& operator=(const DATA_T*&& data) {
+		Base::Copy(data, ElemCount);
+		return *this;
+	}
 
 #if 0
     // Vergleich gegen externen Buffer gleicher fester Größe
-    inline bool operator==(const DATA_T* other) const noexcept {
+    inline bool operator==(const DATA_T* other) const
+    noexcept {
         return Base::operator==(other, ElemCount);
     }
 
-    inline bool operator!=(const DATA_T* other) const noexcept {
+    inline bool operator!=(const DATA_T* other) const
+    noexcept {
         return !(*this == other);
     }
 #endif
@@ -205,9 +265,9 @@ struct FixedUniformArray
 // is provided internally. The shader resets its location table index on every load call (even if it is
 // already loaded), and then uses the location table to store the locations of all uniform variables
 // set through it by its uniform setter functions.
-// 
-// The way this works is that the first time a locations entry is referenced it is initialized with 
-// a value OpenGL will not use or return. To the shader's uniform management this means that the 
+//
+// The way this works is that the first time a locations entry is referenced it is initialized with
+// a value OpenGL will not use or return. To the shader's uniform management this means that the
 // location hasn't been retrieved yet. In that case, the uniform location will be retrieved using
 // glGetUniformLocation and be stored in the location entry passed to the shader's uniform setter.
 // If the uniform location is valid (>= 0), a new uniform variable cache instance will be created
@@ -220,7 +280,7 @@ class ShaderLocationTable {
 public:
 private:
     AutoArray<UniformHandle> m_locations;
-    int                         m_index{ -1 };
+    int							m_index{ -1 };
 
 public:
     ShaderLocationTable()
@@ -247,53 +307,62 @@ public:
 
 class ShaderLocationTable {
 public:
-    struct ShaderLocation {
-        String  m_name{ "" };
-        int     m_nameLength;
-        GLint   m_location{ std::numeric_limits<GLint>::min() };
+	struct ShaderLocation {
+		String	m_name{ "" };
+		int		m_nameLength;
+		GLint	m_location{ std::numeric_limits<GLint>::min() };
 
-        ShaderLocation(String name = "") 
-            : m_name(name), m_nameLength(name.Length()), m_location(std::numeric_limits<GLint>::min())
-        { }
+		ShaderLocation(String name = "")
+			: m_name(name)
+			, m_nameLength(name.Length())
+			, m_location(std::numeric_limits<GLint>::min())
+		{}
 
-        inline String& Name(void) noexcept {
-            return m_name;
-        }
+		inline String& Name(void)
+		noexcept
+		{
+			return m_name;
+		}
 
-        inline GLint* Location(void) noexcept {
-            return &m_location;
-        }
+		inline GLint* Location(void)
+		noexcept
+		{
+			return &m_location;
+		}
 
-        inline bool operator==(const String& name) const {
-            return (m_nameLength == name.Length()) and (m_name == name);
-        }
-    };
+		inline bool operator==(const String& name) const {
+			return (m_nameLength == name.Length()) and (m_name == name);
+		}
+	};
 
 private:
-    AutoArray<ShaderLocation> m_locations;
+	AutoArray<ShaderLocation> m_locations;
 
 public:
-    ShaderLocationTable() = default;
-    ~ShaderLocationTable() = default;
+	ShaderLocationTable() = default;
+	~ShaderLocationTable() = default;
 
-    void Start(void) { /*nothing*/ }
+	void Start(void)
+	{ /*nothing*/
+	}
 
-    GLint* operator[](const String name) noexcept {
-        for (auto& location : m_locations)
-            if (location == name)
-                return location.Location();
-        ShaderLocation* location;
-        try {
-            location = m_locations.Append();
-        }
-        catch (...) {
-            return nullptr;
-        }
-        if (not location)
-            return nullptr;
-        *location = ShaderLocation(name);
-        return location->Location();
-    }
+	GLint* operator[](const String name) noexcept
+	{
+		for (auto& location : m_locations)
+			if (location == name)
+				return location.Location();
+		ShaderLocation* location;
+		try {
+			location = m_locations.Append();
+		}
+		catch (...) {
+			return nullptr;
+		}
+		if (not location)
+			return nullptr;
+		*location = ShaderLocation(name);
+		return location->Location();
+	}
 };
 
 #endif

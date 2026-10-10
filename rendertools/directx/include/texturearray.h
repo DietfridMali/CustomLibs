@@ -16,35 +16,34 @@
 // The result is the same pyramid either way.
 
 class GfxTextureArray
-    : public Texture
-    , public BaseTextureArray
-{
+	: public Texture,
+	  public BaseTextureArray {
 public:
-    GfxTextureArray()
-        : Texture(UINT32_MAX, TextureType::Texture2DArray, GfxWrapMode::ClampToEdge)
-    {}
+	GfxTextureArray()
+		: Texture(UINT32_MAX, TextureType::Texture2DArray, GfxWrapMode::ClampToEdge)
+	{}
 
-    // The overload below would otherwise hide Texture's parameterless Create ().
-    using Texture::Create;
+	// The overload below would otherwise hide Texture's parameterless Create ().
+	using Texture::Create;
 
-    // Sprite sheets must not wrap: a bilinear tap at u = 1 would read column 0 back in. Filtering and
-    // mip mapping come from Texture::SetParams (), which reads m_wrapMode and m_useMipMaps - unlike an
-    // atlas an array can have a mip chain, because a mip level never mixes two slots.
-    bool Create(String name, int slotWidth, int slotHeight, int slotCount, bool useMipMaps = true);
+	// Sprite sheets must not wrap: a bilinear tap at u = 1 would read column 0 back in. Filtering and
+	// mip mapping come from Texture::SetParams (), which reads m_wrapMode and m_useMipMaps - unlike an
+	// atlas an array can have a mip chain, because a mip level never mixes two slots.
+	bool Create(String name, int slotWidth, int slotHeight, int slotCount, bool useMipMaps = true);
 
-    bool CreateCompressed(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount);
+	bool CreateCompressed(String name, int slotWidth, int slotHeight, int slotCount, GfxPixelFormat format, int mipCount);
 
-    using BaseTextureArray::SetSlot;
+	using BaseTextureArray::SetSlot;
 
-    bool SetSlot(int slotIndex, TextureBuffer& buffer);
+	bool SetSlot(int slotIndex, TextureBuffer& buffer);
 
-    // bufferIndex is ignored: the array has no m_buffers, its pixels come from SetSlot ().
-    virtual bool Deploy(int bufferIndex = 0) override;
+	// bufferIndex is ignored: the array has no m_buffers, its pixels come from SetSlot ().
+	virtual bool Deploy(int bufferIndex = 0) override;
 
-    // Sends one slot up again after it changed. Only valid once Deploy () has run.
-    bool UpdateSlot(int slotIndex);
+	// Sends one slot up again after it changed. Only valid once Deploy () has run.
+	bool UpdateSlot(int slotIndex);
 
-    virtual void Destroy(void) override;
+	virtual void Destroy(void) override;
 };
 
 // =================================================================================================

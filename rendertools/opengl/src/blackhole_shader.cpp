@@ -18,10 +18,11 @@
 // event horizon; disk structure is sampled from the shared 3D cloud shape-noise volume.
 // Uniforms: mView, direction, distance, diskNormal, gravity, time, horizon, innerDiskRad, outerDiskRad,
 //           angSpeed, brightness, noiseScale.
-const ShaderSource& BlackholeShader() {
-    static const ShaderSource source(
-        "blackhole",
-        String(R"(
+const ShaderSource& BlackholeShader()
+{
+	static const ShaderSource source(
+		"blackhole",
+		String(R"(
             #version 330
             layout(location=0) in vec3 position;
             uniform mat4 mProjection;
@@ -33,7 +34,7 @@ const ShaderSource& BlackholeShader() {
                 gl_Position = gl_Position.xyww;
             }
         )"),
-        String(R"(
+		String(R"(
             #version 330
             in vec3 viewDirection;
             uniform mat4 mView;
@@ -317,9 +318,8 @@ const ShaderSource& BlackholeShader() {
                 col = mix(col, vec3(1.0, 1.0, 0.97) * STAR_BRIGHTNESS, star);
                 fragColor = vec4(col, 1.0);
             }
-        )")
-    );
-    return source;
+        )"));
+	return source;
 }
 
 // =================================================================================================

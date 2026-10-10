@@ -11,9 +11,8 @@
 // textures, the opposite of what this is.
 
 class GfxTextureArray
-	: public Texture
-	, public BaseTextureArray
-{
+	: public Texture,
+	  public BaseTextureArray {
 public:
 	GfxTextureArray()
 		: Texture(0, GL_TEXTURE_2D_ARRAY, GL_CLAMP_TO_EDGE)

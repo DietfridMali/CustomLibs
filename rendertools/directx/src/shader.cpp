@@ -35,7 +35,8 @@
 #pragma comment(lib, "dxcompiler.lib")
 
 #if OPTIMIZE_SHADER_LOADING
-extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
+extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader)
+noexcept;
 
 #endif
 
@@ -44,74 +45,84 @@ extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
 // Replaces FXC (D3DCompile) for noticeably better generated code on NVIDIA hardware.
 
 namespace {
-    Microsoft::WRL::ComPtr<IDxcUtils>     g_dxcUtils;
-    Microsoft::WRL::ComPtr<IDxcCompiler3> g_dxcCompiler;
-    bool                                  g_dxcInitialized = false;
+Microsoft::WRL::ComPtr<IDxcUtils>		g_dxcUtils;
+Microsoft::WRL::ComPtr<IDxcCompiler3>	g_dxcCompiler;
+bool									g_dxcInitialized = false;
 
-    bool InitDxc(void) noexcept {
-        if (g_dxcInitialized)
-            return true;
-        if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(g_dxcUtils.GetAddressOf()))))
-            return false;
-        if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(g_dxcCompiler.GetAddressOf())))) {
-            g_dxcUtils.Reset();
-            return false;
-        }
-        g_dxcInitialized = true;
-        return true;
-    }
+bool InitDxc(void)
+noexcept
+{
+	if (g_dxcInitialized)
+		return true;
+	if (FAILED(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(g_dxcUtils.GetAddressOf()))))
+		return false;
+	if (FAILED(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(g_dxcCompiler.GetAddressOf())))) {
+		g_dxcUtils.Reset();
+		return false;
+	}
+	g_dxcInitialized = true;
+	return true;
+}
 
-    std::wstring ToWide(const char* utf8) noexcept {
-        std::wstring s;
-        if (utf8)
-            while (*utf8)
-                s.push_back(wchar_t(uint8_t(*utf8++)));
-        return s;
-    }
+std::wstring ToWide(const char* utf8)
+noexcept
+{
+	std::wstring s;
+	if (utf8)
+		while (*utf8)
+			s.push_back(wchar_t(uint8_t(*utf8++)));
+	return s;
+}
 
-    uint64_t CompileKey(const char* hlslCode, const std::vector<const wchar_t*>& args) noexcept {
-        uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslCode);
-        key = ShaderCache::Hash(key, args.data(), args.size());
-        Microsoft::WRL::ComPtr<IDxcVersionInfo> versionInfo;
-        if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
-            UINT32 major = 0;
-            UINT32 minor = 0;
-            versionInfo->GetVersion(&major, &minor);
-            key = ShaderCache::Hash(key, &major, sizeof(major));
-            key = ShaderCache::Hash(key, &minor, sizeof(minor));
-        }
-        return key;
-    }
+uint64_t CompileKey(const char* hlslCode, const std::vector<const wchar_t*>& args)
+noexcept
+{
+	uint64_t key = ShaderCache::Hash(ShaderCache::kHashSeed, hlslCode);
+	key = ShaderCache::Hash(key, args.data(), args.size());
+	Microsoft::WRL::ComPtr<IDxcVersionInfo> versionInfo;
+	if (SUCCEEDED(g_dxcCompiler->QueryInterface(IID_PPV_ARGS(versionInfo.GetAddressOf())))) {
+		UINT32 major = 0;
+		UINT32 minor = 0;
+		versionInfo->GetVersion(&major, &minor);
+		key = ShaderCache::Hash(key, &major, sizeof(major));
+		key = ShaderCache::Hash(key, &minor, sizeof(minor));
+	}
+	return key;
+}
 
-    // DXC-based reflection that returns the same ID3D12ShaderReflection* as D3DReflect.
-    // Required for DXIL — D3DReflect from d3dcompiler.lib does not always handle DXIL blobs.
-    bool ReflectShader(ID3DBlob* blob, Microsoft::WRL::ComPtr<ID3D12ShaderReflection>& refl) noexcept {
-        if (not blob or not InitDxc())
-            return false;
-        DxcBuffer reflBuf{};
-        reflBuf.Ptr = blob->GetBufferPointer();
-        reflBuf.Size = blob->GetBufferSize();
-        reflBuf.Encoding = DXC_CP_ACP;
-        return SUCCEEDED(g_dxcUtils->CreateReflection(&reflBuf, IID_PPV_ARGS(refl.GetAddressOf())));
-    }
+// DXC-based reflection that returns the same ID3D12ShaderReflection* as D3DReflect.
+// Required for DXIL — D3DReflect from d3dcompiler.lib does not always handle DXIL blobs.
+bool ReflectShader(ID3DBlob* blob, Microsoft::WRL::ComPtr<ID3D12ShaderReflection>& refl)
+noexcept
+{
+	if (not blob or not InitDxc())
+		return false;
+	DxcBuffer reflBuf{};
+	reflBuf.Ptr = blob->GetBufferPointer();
+	reflBuf.Size = blob->GetBufferSize();
+	reflBuf.Encoding = DXC_CP_ACP;
+	return SUCCEEDED(g_dxcUtils->CreateReflection(&reflBuf, IID_PPV_ARGS(refl.GetAddressOf())));
+}
 
-    constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
+constexpr const char* kAccelTypeName = "RaytracingAccelerationStructure";
 
-    bool ReflectUsesAccelStructure(ID3DBlob* blob) noexcept {
-        Microsoft::WRL::ComPtr<ID3D12ShaderReflection> refl;
-        if (not ReflectShader(blob, refl))
-            return false;
-        D3D12_SHADER_DESC sd{};
-        refl->GetDesc(&sd);
-        for (UINT i = 0; i < sd.BoundResources; ++i) {
-            D3D12_SHADER_INPUT_BIND_DESC bd{};
-            if (FAILED(refl->GetResourceBindingDesc(i, &bd)))
-                continue;
-            if ((bd.Type == D3D_SIT_RTACCELERATIONSTRUCTURE) and (bd.Space == UINT(Shader::kAccelSpace)) and (bd.BindPoint == 0))
-                return true;
-        }
-        return false;
-    }
+bool ReflectUsesAccelStructure(ID3DBlob* blob)
+noexcept
+{
+	Microsoft::WRL::ComPtr<ID3D12ShaderReflection> refl;
+	if (not ReflectShader(blob, refl))
+		return false;
+	D3D12_SHADER_DESC sd{};
+	refl->GetDesc(&sd);
+	for (UINT i = 0; i < sd.BoundResources; ++i) {
+		D3D12_SHADER_INPUT_BIND_DESC bd{};
+		if (FAILED(refl->GetResourceBindingDesc(i, &bd)))
+			continue;
+		if ((bd.Type == D3D_SIT_RTACCELERATIONSTRUCTURE) and (bd.Space == UINT(Shader::kAccelSpace)) and (bd.BindPoint == 0))
+			return true;
+	}
+	return false;
+}
 }
 
 // =================================================================================================
@@ -135,138 +146,143 @@ namespace {
 // (GfxAttributeSlot / GfxAttributeSemantic in shaderdatalayout.h), shared with the
 // OpenGL and Vulkan backends and with GfxDataLayout.
 
-static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt) noexcept
+static DXGI_FORMAT DxgiFormatForAttr(ShaderDataAttributes::Format fmt)
+noexcept
 {
-    switch (fmt) {
-    case ShaderDataAttributes::Float1: 
-        return DXGI_FORMAT_R32_FLOAT;
-    case ShaderDataAttributes::Float2: 
-        return DXGI_FORMAT_R32G32_FLOAT;
-    case ShaderDataAttributes::Float3: 
-        return DXGI_FORMAT_R32G32B32_FLOAT;
-    case ShaderDataAttributes::Float4:
-        return DXGI_FORMAT_R32G32B32A32_FLOAT;
-    case ShaderDataAttributes::Uint1:
-        return DXGI_FORMAT_R32_UINT;
-    case ShaderDataAttributes::Uint2:
-        return DXGI_FORMAT_R32G32_UINT;
-    case ShaderDataAttributes::Uint3:
-        return DXGI_FORMAT_R32G32B32_UINT;
-    case ShaderDataAttributes::Uint4:
-        return DXGI_FORMAT_R32G32B32A32_UINT;
-    }
-    return DXGI_FORMAT_R32G32B32_FLOAT;
+	switch (fmt) {
+		case ShaderDataAttributes::Float1:
+			return DXGI_FORMAT_R32_FLOAT;
+		case ShaderDataAttributes::Float2:
+			return DXGI_FORMAT_R32G32_FLOAT;
+		case ShaderDataAttributes::Float3:
+			return DXGI_FORMAT_R32G32B32_FLOAT;
+		case ShaderDataAttributes::Float4:
+			return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		case ShaderDataAttributes::Uint1:
+			return DXGI_FORMAT_R32_UINT;
+		case ShaderDataAttributes::Uint2:
+			return DXGI_FORMAT_R32G32_UINT;
+		case ShaderDataAttributes::Uint3:
+			return DXGI_FORMAT_R32G32B32_UINT;
+		case ShaderDataAttributes::Uint4:
+			return DXGI_FORMAT_R32G32B32A32_UINT;
+	}
+	return DXGI_FORMAT_R32G32B32_FLOAT;
 }
 
 
 // =================================================================================================
 
 #ifdef _DEBUG
-static constexpr const char* kOptimizationLevel = "-Od";
-static constexpr const wchar_t* kOptimizationArg = L"-Od";
+static constexpr const char*	kOptimizationLevel = "-Od";
+static constexpr const wchar_t*	kOptimizationArg = L"-Od";
 #else
-static constexpr const char* kOptimizationLevel = "-O3";
-static constexpr const wchar_t* kOptimizationArg = L"-O3";
+static constexpr const char*	kOptimizationLevel = "-O3";
+static constexpr const wchar_t*	kOptimizationArg = L"-O3";
 #endif
 
-bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut, const String& shaderFolder)
+bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* target, ComPtr<ID3DBlob>& blobOut,
+					 const String& shaderFolder)
 {
-    if (not hlslCode or not *hlslCode)
-        return false;
-    if (not InitDxc()) {
-        logHandler.Print("Shader '%s' (%s): DXC initialization failed\n", (const char*)m_name, target);
-        return false;
-    }
+	if (not hlslCode or not *hlslCode)
+		return false;
+	if (not InitDxc()) {
+		logHandler.Print("Shader '%s' (%s): DXC initialization failed\n", (const char*)m_name, target);
+		return false;
+	}
 
-    DxcBuffer source{};
-    source.Ptr = hlslCode;
-    source.Size = std::strlen(hlslCode);
-    source.Encoding = DXC_CP_UTF8;
+	DxcBuffer source{};
+	source.Ptr = hlslCode;
+	source.Size = std::strlen(hlslCode);
+	source.Encoding = DXC_CP_UTF8;
 
-    char rayQueryTarget[8] { target[0], target[1], '_', '6', '_', '5', '\0', '\0' };
-    if (std::strstr(hlslCode, kAccelTypeName) != nullptr)
-        target = rayQueryTarget;
+	char rayQueryTarget[8]{ target[0], target[1], '_', '6', '_', '5', '\0', '\0' };
+	if (std::strstr(hlslCode, kAccelTypeName) != nullptr)
+		target = rayQueryTarget;
 
-    std::wstring entryWide = ToWide(entryPoint);
-    std::wstring targetWide = ToWide(target);
+	std::wstring entryWide = ToWide(entryPoint);
+	std::wstring targetWide = ToWide(target);
 
-    std::vector<const wchar_t*> args;
-    args.push_back(L"-E");
-    args.push_back(entryWide.c_str());
-    args.push_back(L"-T");
-    args.push_back(targetWide.c_str());
-    args.push_back(L"-Wno-ignored-attributes");
+	std::vector<const wchar_t*> args;
+	args.push_back(L"-E");
+	args.push_back(entryWide.c_str());
+	args.push_back(L"-T");
+	args.push_back(targetWide.c_str());
+	args.push_back(L"-Wno-ignored-attributes");
 #ifdef _DEBUG
-    args.push_back(L"-Zi");
+	args.push_back(L"-Zi");
 #endif
-    args.push_back(kOptimizationArg);
+	args.push_back(kOptimizationArg);
 
-    const bool useCache = not shaderFolder.IsEmpty();
-    const String fileName = m_name + String(".") + String(target) + String(kOptimizationLevel) + String(".dxil");
-    uint64_t key = 0;
-    if (useCache) {
-        key = CompileKey(hlslCode, args);
-        std::vector<uint8_t> dxil;
-        uint32_t tag = 0;
-        if (ShaderCache::Read(shaderFolder, fileName, key, dxil, tag) and SUCCEEDED(D3DCreateBlob(dxil.size(), &blobOut))) {
-            std::memcpy(blobOut->GetBufferPointer(), dxil.data(), dxil.size());
-            return true;
-        }
-    }
+	const bool		useCache = not shaderFolder.IsEmpty();
+	const String	fileName = m_name + String(".") + String(target) + String(kOptimizationLevel) + String(".dxil");
+	uint64_t		key = 0;
+	if (useCache) {
+		key = CompileKey(hlslCode, args);
+		std::vector<uint8_t>	dxil;
+		uint32_t				tag = 0;
+		if (ShaderCache::Read(shaderFolder, fileName, key, dxil, tag) and SUCCEEDED(D3DCreateBlob(dxil.size(), &blobOut))) {
+			std::memcpy(blobOut->GetBufferPointer(), dxil.data(), dxil.size());
+			return true;
+		}
+	}
 
-    ComPtr<IDxcResult> result;
-    HRESULT hr = g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
-    if (FAILED(hr)) {
-        logHandler.Print("Shader '%s' (%s): DXC Compile call failed (0x%08X)\n", (const char*)m_name, target, (unsigned)hr);
-        return false;
-    }
+	ComPtr<IDxcResult>	result;
+	HRESULT				hr =
+		g_dxcCompiler->Compile(&source, args.data(), uint32_t(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
+	if (FAILED(hr)) {
+		logHandler.Print("Shader '%s' (%s): DXC Compile call failed (0x%08X)\n", (const char*)m_name, target, (unsigned)hr);
+		return false;
+	}
 
-    HRESULT compileStatus = E_FAIL;
-    result->GetStatus(&compileStatus);
+	HRESULT compileStatus = E_FAIL;
+	result->GetStatus(&compileStatus);
 
-    ComPtr<IDxcBlobUtf8> errors;
-    if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
+	ComPtr<IDxcBlobUtf8> errors;
+	if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
 #ifdef _DEBUG
-        if (errors and (errors->GetStringLength() > 0)) {
+		if (errors and (errors->GetStringLength() > 0)) {
 #else
-        if (FAILED(compileStatus) and errors and (errors->GetStringLength() > 0)) {
+		if (FAILED(compileStatus) and errors and (errors->GetStringLength() > 0)) {
 #endif
-            logHandler.Print("Shader '%s' (%s) compile output:\n%s\n",
-                    (const char*)m_name, target,
-                    errors->GetStringPointer());
-        }
-    }
+			logHandler.Print("Shader '%s' (%s) compile output:\n%s\n",
+							 (const char*)m_name, target,
+							 errors->GetStringPointer());
+		}
+	}
 
-    if (FAILED(compileStatus)) {
+	if (FAILED(compileStatus)) {
 #ifdef _DEBUG
-        PrintShaderSource(hlslCode, target);
+		PrintShaderSource(hlslCode, target);
 #endif
-        return false;
-    }
+		return false;
+	}
 
-    ComPtr<IDxcBlob> dxilBlob;
-    if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(dxilBlob.GetAddressOf()), nullptr))
-        or (not dxilBlob) or (dxilBlob->GetBufferSize() == 0)) {
+	ComPtr<IDxcBlob> dxilBlob;
+	if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(dxilBlob.GetAddressOf()), nullptr)) or (not dxilBlob) or
+		(dxilBlob->GetBufferSize() == 0)) {
 #ifdef _DEBUG
-        logHandler.Print("Shader '%s' (%s): no DXIL output\n", (const char*)m_name, target);
+		logHandler.Print("Shader '%s' (%s): no DXIL output\n", (const char*)m_name, target);
 #endif
-        return false;
-    }
+		return false;
+	}
 
-    // Wrap DXIL bytes in an ID3DBlob so the rest of the engine (PSO setup, reflection
-    // via blob->GetBufferPointer/GetBufferSize) sees an unchanged interface.
-    if (FAILED(D3DCreateBlob(dxilBlob->GetBufferSize(), &blobOut)))
-        return false;
-    std::memcpy(blobOut->GetBufferPointer(), dxilBlob->GetBufferPointer(), dxilBlob->GetBufferSize());
-    if (useCache)
-        ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(blobOut->GetBufferPointer()), blobOut->GetBufferSize());
-    return true;
+	// Wrap DXIL bytes in an ID3DBlob so the rest of the engine (PSO setup, reflection
+	// via blob->GetBufferPointer/GetBufferSize) sees an unchanged interface.
+	if (FAILED(D3DCreateBlob(dxilBlob->GetBufferSize(), &blobOut)))
+		return false;
+	std::memcpy(blobOut->GetBufferPointer(), dxilBlob->GetBufferPointer(), dxilBlob->GetBufferSize());
+	if (useCache)
+		ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(blobOut->GetBufferPointer()),
+						   blobOut->GetBufferSize());
+	return true;
 }
 
 
-static bool CompileRayQueryProbe(void) noexcept
+static bool CompileRayQueryProbe(void)
+noexcept
 {
-    static const char* probe = R"(
+	static const char* probe = R"(
 RaytracingAccelerationStructure scene : register(t0);
 RWStructuredBuffer<uint> result : register(u0);
 
@@ -284,829 +300,866 @@ void CSMain(uint3 id : SV_DispatchThreadID)
 	result [id.x] = (q.CommittedStatus () == COMMITTED_TRIANGLE_HIT) ? 1u : 0u;
 }
 )";
-    if (not InitDxc()) {
-        logHandler.Print("Shader::SupportsRayQuery: DXC initialization failed\n");
-        return false;
-    }
+	if (not InitDxc()) {
+		logHandler.Print("Shader::SupportsRayQuery: DXC initialization failed\n");
+		return false;
+	}
 
-    DxcBuffer source{};
-    source.Ptr = probe;
-    source.Size = std::strlen(probe);
-    source.Encoding = DXC_CP_UTF8;
+	DxcBuffer source{};
+	source.Ptr = probe;
+	source.Size = std::strlen(probe);
+	source.Encoding = DXC_CP_UTF8;
 
-    const wchar_t* args[] = { L"-E", L"CSMain", L"-T", L"cs_6_5", kOptimizationArg };
+	const wchar_t* args[] = { L"-E", L"CSMain", L"-T", L"cs_6_5", kOptimizationArg };
 
-    ComPtr<IDxcResult> result;
-    HRESULT hr = g_dxcCompiler->Compile(&source, args, UINT32(std::size(args)), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
-    if (FAILED(hr)) {
-        logHandler.Print("Shader::SupportsRayQuery: DXC Compile call failed (0x%08X)\n", unsigned(hr));
-        return false;
-    }
+	ComPtr<IDxcResult>	result;
+	HRESULT				hr = g_dxcCompiler->Compile(&source, args, UINT32(std::size(args)), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
+	if (FAILED(hr)) {
+		logHandler.Print("Shader::SupportsRayQuery: DXC Compile call failed (0x%08X)\n", unsigned(hr));
+		return false;
+	}
 
-    HRESULT compileStatus = E_FAIL;
-    result->GetStatus(&compileStatus);
-    if (SUCCEEDED(compileStatus))
-        return true;
+	HRESULT compileStatus = E_FAIL;
+	result->GetStatus(&compileStatus);
+	if (SUCCEEDED(compileStatus))
+		return true;
 
-    ComPtr<IDxcBlobUtf8> errors;
-    result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr);
-    logHandler.Print("Shader::SupportsRayQuery: probe failed: %s\n", (errors and (errors->GetStringLength() > 0)) ? errors->GetStringPointer() : "");
-    return false;
+	ComPtr<IDxcBlobUtf8> errors;
+	result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr);
+	logHandler.Print("Shader::SupportsRayQuery: probe failed: %s\n",
+					 (errors and (errors->GetStringLength() > 0)) ? errors->GetStringPointer() : "");
+	return false;
 }
 
 
-bool Shader::SupportsRayQuery(void) noexcept
+bool Shader::SupportsRayQuery(void)
+noexcept
 {
-    static const bool supported = CompileRayQueryProbe();
-    return supported;
+	static const bool supported = CompileRayQueryProbe();
+	return supported;
 }
 
 
 #ifdef _DEBUG
-void Shader::PrintShaderSource(const char* hlslCode, const char* title) noexcept
+void Shader::PrintShaderSource(const char* hlslCode, const char* title)
+noexcept
 {
-    if (not hlslCode or not *hlslCode) 
-        return;
-    const std::string_view src(hlslCode);
-    const size_t lineCount = std::ranges::count(src, '\n') + 1;
-    const int width = static_cast<int>(std::to_string(lineCount).size());
-    logHandler.Print("\n%s\n", title);
-    int lineNo = 0;
-    for (auto&& chunk : src | std::views::split('\n')) {
-        std::string_view line(chunk.begin(), chunk.end());
-        if (not line.empty() and line.back() == '\r')
-            line.remove_suffix(1);
-        logHandler.Print("%*d: %.*s\n", width, ++lineNo,
-                static_cast<int>(line.size()), line.data());
-    }
-    logHandler.Print("\n");
+	if (not hlslCode or not *hlslCode)
+		return;
+	const std::string_view	src(hlslCode);
+	const size_t			lineCount = std::ranges::count(src, '\n') + 1;
+	const int				width = static_cast<int>(std::to_string(lineCount).size());
+	logHandler.Print("\n%s\n", title);
+	int lineNo = 0;
+	for (auto&& chunk : src | std::views::split('\n')) {
+		std::string_view line(chunk.begin(), chunk.end());
+		if (not line.empty() and line.back() == '\r')
+			line.remove_suffix(1);
+		logHandler.Print("%*d: %.*s\n", width, ++lineNo,
+						 static_cast<int>(line.size()), line.data());
+	}
+	logHandler.Print("\n");
 }
 #endif
 
 
-bool Shader::CreateRootSignature(void) noexcept
+bool Shader::CreateRootSignature(void)
+noexcept
 {
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return false;
+	ID3D12Device* device = dx12Context.Device();
+	if (not device)
+		return false;
 
-    if (s_rootSignature) {
-        m_rootSignature = s_rootSignature;
-        m_rootSignatureBlob = s_rootSignatureBlob;
-        return true;
-    }
+	if (s_rootSignature) {
+		m_rootSignature = s_rootSignature;
+		m_rootSignatureBlob = s_rootSignatureBlob;
+		return true;
+	}
 
-    D3D12_DESCRIPTOR_RANGE srvRange{};
-    srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    srvRange.NumDescriptors = UINT(kSrvSlots);
-    srvRange.BaseShaderRegister = 0;
-    srvRange.RegisterSpace = 0;
-    srvRange.OffsetInDescriptorsFromTableStart = 0;
+	D3D12_DESCRIPTOR_RANGE srvRange{};
+	srvRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	srvRange.NumDescriptors = UINT(kSrvSlots);
+	srvRange.BaseShaderRegister = 0;
+	srvRange.RegisterSpace = 0;
+	srvRange.OffsetInDescriptorsFromTableStart = 0;
 
-    // Params kSamplerBase..kSamplerBase+23: one 1-entry descriptor table per sampler
-    // slot (s0..s23), parallel to the SRV slots. The bound sampler is fed by
-    // SamplerCache from the texture's TextureSampling at Texture::Bind() time.
-    D3D12_DESCRIPTOR_RANGE samplerRanges[kSamplerSlots]{};
-    for (int i = 0; i < kSamplerSlots; ++i) {
-        samplerRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
-        samplerRanges[i].NumDescriptors = 1;
-        samplerRanges[i].BaseShaderRegister = UINT(i); // s0, s1, ...
-        samplerRanges[i].RegisterSpace = 0;
-        samplerRanges[i].OffsetInDescriptorsFromTableStart = 0;
-    }
+	// Params kSamplerBase..kSamplerBase+23: one 1-entry descriptor table per sampler
+	// slot (s0..s23), parallel to the SRV slots. The bound sampler is fed by
+	// SamplerCache from the texture's TextureSampling at Texture::Bind() time.
+	D3D12_DESCRIPTOR_RANGE samplerRanges[kSamplerSlots]{};
+	for (int i = 0; i < kSamplerSlots; ++i) {
+		samplerRanges[i].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+		samplerRanges[i].NumDescriptors = 1;
+		samplerRanges[i].BaseShaderRegister = UINT(i); // s0, s1, ...
+		samplerRanges[i].RegisterSpace = 0;
+		samplerRanges[i].OffsetInDescriptorsFromTableStart = 0;
+	}
 
-    D3D12_DESCRIPTOR_RANGE uavRange{};
-    uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-    uavRange.NumDescriptors = UINT(kUavSlots);
-    uavRange.BaseShaderRegister = 0;
-    uavRange.RegisterSpace = 0;
-    uavRange.OffsetInDescriptorsFromTableStart = 0;
+	D3D12_DESCRIPTOR_RANGE uavRange{};
+	uavRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	uavRange.NumDescriptors = UINT(kUavSlots);
+	uavRange.BaseShaderRegister = 0;
+	uavRange.RegisterSpace = 0;
+	uavRange.OffsetInDescriptorsFromTableStart = 0;
 
-    D3D12_DESCRIPTOR_RANGE ssboRange{};
-    ssboRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    ssboRange.NumDescriptors = UINT(kSsboSlots);
-    ssboRange.BaseShaderRegister = 0;
-    ssboRange.RegisterSpace = UINT(kSsboSpace);
-    ssboRange.OffsetInDescriptorsFromTableStart = 0;
+	D3D12_DESCRIPTOR_RANGE ssboRange{};
+	ssboRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	ssboRange.NumDescriptors = UINT(kSsboSlots);
+	ssboRange.BaseShaderRegister = 0;
+	ssboRange.RegisterSpace = UINT(kSsboSpace);
+	ssboRange.OffsetInDescriptorsFromTableStart = 0;
 
-    D3D12_ROOT_PARAMETER params[kRootParamCount]{};
+	D3D12_ROOT_PARAMETER params[kRootParamCount]{};
 
-    // Root CBV b0 — FrameConstants (visible to all stages)
-    params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[0].Descriptor.ShaderRegister = 0;
-    params[0].Descriptor.RegisterSpace = 0;
-    params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	// Root CBV b0 — FrameConstants (visible to all stages)
+	params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	params[0].Descriptor.ShaderRegister = 0;
+	params[0].Descriptor.RegisterSpace = 0;
+	params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // Root CBV b1 — VS ShaderConstants (VERTEX only)
-    params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[1].Descriptor.ShaderRegister = 1;
-    params[1].Descriptor.RegisterSpace = 0;
-    params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	// Root CBV b1 — VS ShaderConstants (VERTEX only)
+	params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	params[1].Descriptor.ShaderRegister = 1;
+	params[1].Descriptor.RegisterSpace = 0;
+	params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
-    // Root CBV b1 — PS ShaderConstants (PIXEL only)
-    params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[2].Descriptor.ShaderRegister = 1;
-    params[2].Descriptor.RegisterSpace = 0;
-    params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	// Root CBV b1 — PS ShaderConstants (PIXEL only)
+	params[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	params[2].Descriptor.ShaderRegister = 1;
+	params[2].Descriptor.RegisterSpace = 0;
+	params[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-    // Root CBV b1 — GS ShaderConstants (GEOMETRY only)
-    params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[3].Descriptor.ShaderRegister = 1;
-    params[3].Descriptor.RegisterSpace = 0;
-    params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
+	// Root CBV b1 — GS ShaderConstants (GEOMETRY only)
+	params[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	params[3].Descriptor.ShaderRegister = 1;
+	params[3].Descriptor.RegisterSpace = 0;
+	params[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
 
-    params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[4].Descriptor.ShaderRegister = 1;
-    params[4].Descriptor.RegisterSpace = 0;
-    params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_HULL;
+	params[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	params[4].Descriptor.ShaderRegister = 1;
+	params[4].Descriptor.RegisterSpace = 0;
+	params[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_HULL;
 
-    params[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    params[5].Descriptor.ShaderRegister = 1;
-    params[5].Descriptor.RegisterSpace = 0;
-    params[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_DOMAIN;
+	params[5].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	params[5].Descriptor.ShaderRegister = 1;
+	params[5].Descriptor.RegisterSpace = 0;
+	params[5].ShaderVisibility = D3D12_SHADER_VISIBILITY_DOMAIN;
 
-    params[kSrvBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[kSrvBase].DescriptorTable.NumDescriptorRanges = 1;
-    params[kSrvBase].DescriptorTable.pDescriptorRanges = &srvRange;
-    params[kSrvBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	params[kSrvBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	params[kSrvBase].DescriptorTable.NumDescriptorRanges = 1;
+	params[kSrvBase].DescriptorTable.pDescriptorRanges = &srvRange;
+	params[kSrvBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // One 1-entry descriptor table per sampler slot (s0..s15)
-    for (int i = 0; i < kSamplerSlots; ++i) {
-        params[kSamplerBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[kSamplerBase + i].DescriptorTable.NumDescriptorRanges = 1;
-        params[kSamplerBase + i].DescriptorTable.pDescriptorRanges = &samplerRanges[i];
-        params[kSamplerBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-    }
+	// One 1-entry descriptor table per sampler slot (s0..s15)
+	for (int i = 0; i < kSamplerSlots; ++i) {
+		params[kSamplerBase + i].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+		params[kSamplerBase + i].DescriptorTable.NumDescriptorRanges = 1;
+		params[kSamplerBase + i].DescriptorTable.pDescriptorRanges = &samplerRanges[i];
+		params[kSamplerBase + i].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	}
 
-    params[kUavBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[kUavBase].DescriptorTable.NumDescriptorRanges = 1;
-    params[kUavBase].DescriptorTable.pDescriptorRanges = &uavRange;
-    params[kUavBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	params[kUavBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	params[kUavBase].DescriptorTable.NumDescriptorRanges = 1;
+	params[kUavBase].DescriptorTable.pDescriptorRanges = &uavRange;
+	params[kUavBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    params[kSsboBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-    params[kSsboBase].DescriptorTable.NumDescriptorRanges = 1;
-    params[kSsboBase].DescriptorTable.pDescriptorRanges = &ssboRange;
-    params[kSsboBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	params[kSsboBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	params[kSsboBase].DescriptorTable.NumDescriptorRanges = 1;
+	params[kSsboBase].DescriptorTable.pDescriptorRanges = &ssboRange;
+	params[kSsboBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    params[kAccelBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
-    params[kAccelBase].Descriptor.ShaderRegister = 0;
-    params[kAccelBase].Descriptor.RegisterSpace = UINT(kAccelSpace);
-    params[kAccelBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	params[kAccelBase].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+	params[kAccelBase].Descriptor.ShaderRegister = 0;
+	params[kAccelBase].Descriptor.RegisterSpace = UINT(kAccelSpace);
+	params[kAccelBase].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-    // Samplers are no longer baked into the root signature — each Texture carries
-    // its own TextureSampling, resolved through SamplerCache and bound at draw
-    // time via the per-slot sampler tables defined above.
-    D3D12_ROOT_SIGNATURE_DESC rsd{};
-    rsd.NumParameters     = kRootParamCount;
-    rsd.pParameters       = params;
-    rsd.NumStaticSamplers = 0;
-    rsd.pStaticSamplers   = nullptr;
-    rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	// Samplers are no longer baked into the root signature — each Texture carries
+	// its own TextureSampling, resolved through SamplerCache and bound at draw
+	// time via the per-slot sampler tables defined above.
+	D3D12_ROOT_SIGNATURE_DESC rsd{};
+	rsd.NumParameters = kRootParamCount;
+	rsd.pParameters = params;
+	rsd.NumStaticSamplers = 0;
+	rsd.pStaticSamplers = nullptr;
+	rsd.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
-    ComPtr<ID3DBlob> sig, err;
-    if (FAILED(D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
+	ComPtr<ID3DBlob> sig, err;
+	if (FAILED(D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
 #ifdef _DEBUG
-        if (err)
-            logHandler.Print("Shader '%s': root signature serialization error:\n%s\n",
-                    (const char*)m_name,
-                    static_cast<const char*>(err->GetBufferPointer()));
+		if (err)
+			logHandler.Print("Shader '%s': root signature serialization error:\n%s\n",
+							 (const char*)m_name,
+							 static_cast<const char*>(err->GetBufferPointer()));
 #endif
-        return false;
-    }
-    if (FAILED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&s_rootSignature))))
-        return false;
-    s_rootSignatureBlob = sig;
-    m_rootSignature = s_rootSignature;
-    m_rootSignatureBlob = s_rootSignatureBlob;
-    return true;
+		return false;
+	}
+	if (FAILED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&s_rootSignature))))
+		return false;
+	s_rootSignatureBlob = sig;
+	m_rootSignature = s_rootSignature;
+	m_rootSignatureBlob = s_rootSignatureBlob;
+	return true;
 }
 
 
-void Shader::DestroyRootSignature(void) noexcept
+void Shader::DestroyRootSignature(void)
+noexcept
 {
-    s_rootSignature.Reset();
-    s_rootSignatureBlob.Reset();
+	s_rootSignature.Reset();
+	s_rootSignatureBlob.Reset();
 }
 
 
 
-
-void Shader::BuildInputLayout(void) noexcept
+void Shader::BuildInputLayout(void)
+noexcept
 {
-    if (m_dataLayout.m_count > 0) {
-        for (int i = 0; i < m_dataLayout.m_count; ++i) {
-            const ShaderDataAttributes& attr = m_dataLayout.m_attrs[i];
-            UINT semanticIndex = 0;
-            const char* semantic = GfxAttributeSemantic(attr.datatype, attr.id, semanticIndex);
-            int slot = GfxAttributeSlot(attr.datatype, attr.id);
-            if (slot < 0)
-                continue;
-            D3D12_INPUT_ELEMENT_DESC desc{};
-            desc.SemanticName = semantic;
-            desc.SemanticIndex = semanticIndex;
-            desc.Format = DxgiFormatForAttr(attr.format);
-            desc.InputSlot = UINT(slot);
-            desc.AlignedByteOffset = 0;
-            desc.InputSlotClass = attr.perInstance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-            desc.InstanceDataStepRate = attr.perInstance ? 1 : 0;
-            m_vsInputLayout.push_back(desc);
-        }
-    }
-    else {
-        static const D3D12_INPUT_ELEMENT_DESC kFallbackLayout[] = {
-            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,     0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,        1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT,        2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT,  3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT,  4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "NORMAL",   0, DXGI_FORMAT_R32G32B32A32_FLOAT,  5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-            { "TANGENT",  0, DXGI_FORMAT_R32G32B32A32_FLOAT,  6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-        };
-        static constexpr UINT kFallbackCount = UINT(std::size(kFallbackLayout));
-        ComPtr<ID3D12ShaderReflection> vsRefl;
-        if (ReflectShader(m_vsBlob.Get(), vsRefl)) {
-            D3D12_SHADER_DESC sd{};
-            vsRefl->GetDesc(&sd);
-            for (UINT i = 0; i < sd.InputParameters; ++i) {
-                D3D12_SIGNATURE_PARAMETER_DESC pd{};
-                vsRefl->GetInputParameterDesc(i, &pd);
-                if (pd.SystemValueType != D3D_NAME_UNDEFINED)
-                    continue;
-                for (UINT j = 0; j < kFallbackCount; ++j) {
-                    if ((_stricmp(kFallbackLayout[j].SemanticName, pd.SemanticName) == 0) and (kFallbackLayout[j].SemanticIndex == pd.SemanticIndex)) {
-                        m_vsInputLayout.push_back(kFallbackLayout[j]);
-                        break;
-                    }
-                }
-            }
-        }
-        if (m_vsInputLayout.empty())
-            m_vsInputLayout.assign(kFallbackLayout, kFallbackLayout + kFallbackCount);
-    }
+	if (m_dataLayout.m_count > 0) {
+		for (int i = 0; i < m_dataLayout.m_count; ++i) {
+			const ShaderDataAttributes&	attr = m_dataLayout.m_attrs[i];
+			UINT						semanticIndex = 0;
+			const char*					semantic = GfxAttributeSemantic(attr.datatype, attr.id, semanticIndex);
+			int							slot = GfxAttributeSlot(attr.datatype, attr.id);
+			if (slot < 0)
+				continue;
+			D3D12_INPUT_ELEMENT_DESC desc{};
+			desc.SemanticName = semantic;
+			desc.SemanticIndex = semanticIndex;
+			desc.Format = DxgiFormatForAttr(attr.format);
+			desc.InputSlot = UINT(slot);
+			desc.AlignedByteOffset = 0;
+			desc.InputSlotClass =
+				attr.perInstance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+			desc.InstanceDataStepRate = attr.perInstance ? 1 : 0;
+			m_vsInputLayout.push_back(desc);
+		}
+	}
+	else {
+		static const D3D12_INPUT_ELEMENT_DESC kFallbackLayout[] = {
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 1, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 2, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 3, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 4, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 5, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 6, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		};
+		static constexpr UINT			kFallbackCount = UINT(std::size(kFallbackLayout));
+		ComPtr<ID3D12ShaderReflection>	vsRefl;
+		if (ReflectShader(m_vsBlob.Get(), vsRefl)) {
+			D3D12_SHADER_DESC sd{};
+			vsRefl->GetDesc(&sd);
+			for (UINT i = 0; i < sd.InputParameters; ++i) {
+				D3D12_SIGNATURE_PARAMETER_DESC pd{};
+				vsRefl->GetInputParameterDesc(i, &pd);
+				if (pd.SystemValueType != D3D_NAME_UNDEFINED)
+					continue;
+				for (UINT j = 0; j < kFallbackCount; ++j) {
+					if ((_stricmp(kFallbackLayout[j].SemanticName, pd.SemanticName) == 0) and
+						(kFallbackLayout[j].SemanticIndex == pd.SemanticIndex)) {
+						m_vsInputLayout.push_back(kFallbackLayout[j]);
+						break;
+					}
+				}
+			}
+		}
+		if (m_vsInputLayout.empty())
+			m_vsInputLayout.assign(kFallbackLayout, kFallbackLayout + kFallbackCount);
+	}
 }
 
 
-bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode, const String& tesCode, const String& shaderFolder)
+bool Shader::Create(const String& vsCode, const String& fsCode, const String& gsCode, const String& tcsCode,
+					const String& tesCode, const String& shaderFolder)
 {
-    if (IsValid())
-        return true;
+	if (IsValid())
+		return true;
 
-    if (not dx12Context.HasRayTracing()) {
-        const String* stageCode[] = { &vsCode, &fsCode, &gsCode, &tcsCode, &tesCode };
-        for (const String* code : stageCode) {
-            if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
+	if (not dx12Context.HasRayTracing()) {
+		const String* stageCode[] = { &vsCode, &fsCode, &gsCode, &tcsCode, &tesCode };
+		for (const String* code : stageCode) {
+			if (not code->IsEmpty() and (std::strstr(static_cast<const char*>(*code), kAccelTypeName) != nullptr)) {
 #ifdef _DEBUG
-                logHandler.Print("Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
+				logHandler.Print("Shader '%s': needs ray tracing, which this device does not have - not created\n", (const char*)m_name);
 #endif
-                return false;
-            }
-        }
-    }
-    if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
+				return false;
+			}
+		}
+	}
+	if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
 #ifdef _DEBUG
-        logHandler.Print("Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
+		logHandler.Print("Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
 #endif
-        return false;
-    }
-    if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsBlob, shaderFolder))
-        return false;
-    if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_psBlob, shaderFolder))
-        return false;
-    if (gsCode.Length() > 0) {
-        if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob, shaderFolder))
-            return false;
-    }
-    if (not tcsCode.IsEmpty()) {
-        if (not Compile(static_cast<const char*>(tcsCode), "HSMain", "hs_6_0", m_hsBlob, shaderFolder))
-            return false;
-        if (not Compile(static_cast<const char*>(tesCode), "DSMain", "ds_6_0", m_dsBlob, shaderFolder))
-            return false;
-    }
+		return false;
+	}
+	if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsBlob, shaderFolder))
+		return false;
+	if (not Compile((const char*)fsCode, "PSMain", "ps_6_0", m_psBlob, shaderFolder))
+		return false;
+	if (gsCode.Length() > 0) {
+		if (not Compile((const char*)gsCode, "GSMain", "gs_6_0", m_gsBlob, shaderFolder))
+			return false;
+	}
+	if (not tcsCode.IsEmpty()) {
+		if (not Compile(static_cast<const char*>(tcsCode), "HSMain", "hs_6_0", m_hsBlob, shaderFolder))
+			return false;
+		if (not Compile(static_cast<const char*>(tesCode), "DSMain", "ds_6_0", m_dsBlob, shaderFolder))
+			return false;
+	}
 
-    BuildInputLayout();
+	BuildInputLayout();
 
-    UpdateStageFields(m_vsBlob.Get(), kStageVS);
-    UpdateStageFields(m_psBlob.Get(), kStagePS);
-    if (m_gsBlob)
-        UpdateStageFields(m_gsBlob.Get(), kStageGS);
-    if (m_hsBlob)
-        UpdateStageFields(m_hsBlob.Get(), kStageHS);
-    if (m_dsBlob)
-        UpdateStageFields(m_dsBlob.Get(), kStageDS);
+	UpdateStageFields(m_vsBlob.Get(), kStageVS);
+	UpdateStageFields(m_psBlob.Get(), kStagePS);
+	if (m_gsBlob)
+		UpdateStageFields(m_gsBlob.Get(), kStageGS);
+	if (m_hsBlob)
+		UpdateStageFields(m_hsBlob.Get(), kStageHS);
+	if (m_dsBlob)
+		UpdateStageFields(m_dsBlob.Get(), kStageDS);
 
-    UpdateStageResources(m_vsBlob.Get());
-    UpdateStageResources(m_psBlob.Get());
-    UpdateStageResources(m_gsBlob.Get());
-    UpdateStageResources(m_hsBlob.Get());
-    UpdateStageResources(m_dsBlob.Get());
-    m_srvDefaultKey = 0;
-    for (int i = 0; i < kSrvSlots; ++i)
-        m_srvDefaultKey = m_srvDefaultKey * uint64_t(dvCount) + uint64_t(m_srvDefaults[i]);
+	UpdateStageResources(m_vsBlob.Get());
+	UpdateStageResources(m_psBlob.Get());
+	UpdateStageResources(m_gsBlob.Get());
+	UpdateStageResources(m_hsBlob.Get());
+	UpdateStageResources(m_dsBlob.Get());
+	m_srvDefaultKey = 0;
+	for (int i = 0; i < kSrvSlots; ++i)
+		m_srvDefaultKey = m_srvDefaultKey * uint64_t(dvCount) + uint64_t(m_srvDefaults[i]);
 
-    m_usesAccelStructure = ReflectUsesAccelStructure(m_vsBlob.Get()) or ReflectUsesAccelStructure(m_psBlob.Get())
-                        or ReflectUsesAccelStructure(m_gsBlob.Get()) or ReflectUsesAccelStructure(m_hsBlob.Get())
-                        or ReflectUsesAccelStructure(m_dsBlob.Get());
+	m_usesAccelStructure = ReflectUsesAccelStructure(m_vsBlob.Get()) or ReflectUsesAccelStructure(m_psBlob.Get()) or
+		ReflectUsesAccelStructure(m_gsBlob.Get()) or ReflectUsesAccelStructure(m_hsBlob.Get()) or
+		ReflectUsesAccelStructure(m_dsBlob.Get());
 
-    if (not CreateRootSignature())
-        return false;
+	if (not CreateRootSignature())
+		return false;
 
-    for (int s = 0; s < kStageCount; ++s) {
-        if (m_stages[s].size > 0)
-            m_stages[s].staging.assign(m_stages[s].size, 0);
-        m_stages[s].dirty = true;
-    }
-    return true;
+	for (int s = 0; s < kStageCount; ++s) {
+		if (m_stages[s].size > 0)
+			m_stages[s].staging.assign(m_stages[s].size, 0);
+		m_stages[s].dirty = true;
+	}
+	return true;
 }
 
 
-void Shader::UpdateStageResources(ID3DBlob* blob) noexcept
+void Shader::UpdateStageResources(ID3DBlob* blob)
+noexcept
 {
-    if (not blob)
-        return;
-    ComPtr<ID3D12ShaderReflection> refl;
-    if (not ReflectShader(blob, refl))
-        return;
-    D3D12_SHADER_DESC sd{};
-    refl->GetDesc(&sd);
-    for (UINT i = 0; i < sd.BoundResources; ++i) {
-        D3D12_SHADER_INPUT_BIND_DESC bd{};
-        if (FAILED(refl->GetResourceBindingDesc(i, &bd)))
-            continue;
-        if ((bd.Type != D3D_SIT_TEXTURE) or (bd.Space != 0) or (bd.BindPoint >= UINT(kSrvSlots)))
-            continue;
-        if (bd.ReturnType != D3D_RETURN_TYPE_FLOAT)
-            continue;
-        uint8_t viewType = dvNone;
-        if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE2D)
-            viewType = dv2D;
-        else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE2DARRAY)
-            viewType = dv2DArray;
-        else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURECUBE)
-            viewType = dvCube;
-        else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
-            viewType = dv3D;
-        m_srvDefaults[bd.BindPoint] = viewType;
-    }
+	if (not blob)
+		return;
+	ComPtr<ID3D12ShaderReflection> refl;
+	if (not ReflectShader(blob, refl))
+		return;
+	D3D12_SHADER_DESC sd{};
+	refl->GetDesc(&sd);
+	for (UINT i = 0; i < sd.BoundResources; ++i) {
+		D3D12_SHADER_INPUT_BIND_DESC bd{};
+		if (FAILED(refl->GetResourceBindingDesc(i, &bd)))
+			continue;
+		if ((bd.Type != D3D_SIT_TEXTURE) or (bd.Space != 0) or (bd.BindPoint >= UINT(kSrvSlots)))
+			continue;
+		if (bd.ReturnType != D3D_RETURN_TYPE_FLOAT)
+			continue;
+		uint8_t viewType = dvNone;
+		if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE2D)
+			viewType = dv2D;
+		else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE2DARRAY)
+			viewType = dv2DArray;
+		else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURECUBE)
+			viewType = dvCube;
+		else if (bd.Dimension == D3D_SRV_DIMENSION_TEXTURE3D)
+			viewType = dv3D;
+		m_srvDefaults[bd.BindPoint] = viewType;
+	}
 }
 
 
-void Shader::UpdateStageFields(ID3DBlob* blob, int stage) noexcept
+void Shader::UpdateStageFields(ID3DBlob* blob, int stage)
+noexcept
 {
-    if (not blob)
-        return;
-    ComPtr<ID3D12ShaderReflection> refl;
-    if (not ReflectShader(blob, refl))
-        return;
-    StageConstants& sc = m_stages[stage];
-    D3D12_SHADER_DESC sd{};
-    refl->GetDesc(&sd);
-    for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
-        ID3D12ShaderReflectionConstantBuffer* cb = refl->GetConstantBufferByIndex(i);
-        D3D12_SHADER_BUFFER_DESC cbd{};
-        cb->GetDesc(&cbd);
-        if (strcmp(cbd.Name, "ShaderConstants") == 0) {
-            if (cbd.Size > sc.size)
-                sc.size = cbd.Size;
-            for (UINT j = 0; j < cbd.Variables; ++j) {
-                ID3D12ShaderReflectionVariable* var = cb->GetVariableByIndex(j);
-                D3D12_SHADER_VARIABLE_DESC vd{};
-                var->GetDesc(&vd);
-                bool found = false;
-                for (auto& kv : sc.fields)
-                    if (kv.first == String(vd.Name)) {
-                        found = true;
-                        break;
-                    }
-                if (not found) {
-                    auto* entry = sc.fields.Append();
-                    if (entry)
-                        *entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
-                }
-            }
-            break;
-        }
-    }
+	if (not blob)
+		return;
+	ComPtr<ID3D12ShaderReflection> refl;
+	if (not ReflectShader(blob, refl))
+		return;
+	StageConstants&		sc = m_stages[stage];
+	D3D12_SHADER_DESC	sd{};
+	refl->GetDesc(&sd);
+	for (UINT i = 0; i < sd.ConstantBuffers; ++i) {
+		ID3D12ShaderReflectionConstantBuffer*	cb = refl->GetConstantBufferByIndex(i);
+		D3D12_SHADER_BUFFER_DESC				cbd{};
+		cb->GetDesc(&cbd);
+		if (strcmp(cbd.Name, "ShaderConstants") == 0) {
+			if (cbd.Size > sc.size)
+				sc.size = cbd.Size;
+			for (UINT j = 0; j < cbd.Variables; ++j) {
+				ID3D12ShaderReflectionVariable*	var = cb->GetVariableByIndex(j);
+				D3D12_SHADER_VARIABLE_DESC		vd{};
+				var->GetDesc(&vd);
+				bool found = false;
+				for (auto& kv : sc.fields)
+					if (kv.first == String(vd.Name)) {
+						found = true;
+						break;
+					}
+				if (not found) {
+					auto* entry = sc.fields.Append();
+					if (entry)
+						*entry = { String(vd.Name), { vd.StartOffset, vd.Size } };
+				}
+			}
+			break;
+		}
+	}
 }
 
 
-void Shader::Destroy(void) noexcept
+void Shader::Destroy(void)
+noexcept
 {
-    PSO::RemovePSOs(this);
-    for (int s = 0; s < kStageCount; ++s) {
-        m_stages[s].fields.Clear();
-        m_stages[s].staging.clear();
-        m_stages[s].size = 0;
-        m_stages[s].dirty = true;
+	PSO::RemovePSOs(this);
+	for (int s = 0; s < kStageCount; ++s) {
+		m_stages[s].fields.Clear();
+		m_stages[s].staging.clear();
+		m_stages[s].size = 0;
+		m_stages[s].dirty = true;
 #if OPTIMIZE_SHADER_LOADING
-        m_stages[s].generation = 0;
+		m_stages[s].generation = 0;
 #endif
-    }
+	}
 #if OPTIMIZE_SHADER_LOADING
-    m_b0Generation = 0;
+	m_b0Generation = 0;
 #endif
-    m_locations.Clear();
-    m_vsInputLayout.clear();
-    std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
-    m_srvDefaultKey = 0;
-    m_usesAccelStructure = false;
-    m_rootSignature.Reset();
-    m_rootSignatureBlob.Reset();
-    m_vsBlob.Reset();
-    m_psBlob.Reset();
-    m_gsBlob.Reset();
-    m_hsBlob.Reset();
-    m_dsBlob.Reset();
+	m_locations.Clear();
+	m_vsInputLayout.clear();
+	std::memset(m_srvDefaults, 0, sizeof(m_srvDefaults));
+	m_srvDefaultKey = 0;
+	m_usesAccelStructure = false;
+	m_rootSignature.Reset();
+	m_rootSignatureBlob.Reset();
+	m_vsBlob.Reset();
+	m_psBlob.Reset();
+	m_gsBlob.Reset();
+	m_hsBlob.Reset();
+	m_dsBlob.Reset();
 }
 
 
 Shader& Shader::Copy(const Shader& other)
 {
-    // Shaders are not copyable in DX12 (GPU resources), just copy metadata
-    m_name = other.m_name;
-    m_vs   = other.m_vs;
-    m_fs   = other.m_fs;
-    m_gs   = other.m_gs;
-    return *this;
+	// Shaders are not copyable in DX12 (GPU resources), just copy metadata
+	m_name = other.m_name;
+	m_vs = other.m_vs;
+	m_fs = other.m_fs;
+	m_gs = other.m_gs;
+	return *this;
 }
 
 
-Shader& Shader::Move(Shader& other) noexcept
+Shader& Shader::Move(Shader& other)
+noexcept
 {
-    if (this != &other) {
-        Destroy();
-        m_name         = std::move(other.m_name);
-        m_vs           = std::move(other.m_vs);
-        m_fs           = std::move(other.m_fs);
-        m_gs           = std::move(other.m_gs);
-        m_vsBlob       = std::move(other.m_vsBlob);
-        m_psBlob       = std::move(other.m_psBlob);
-        m_gsBlob       = std::move(other.m_gsBlob);
-        m_hsBlob       = std::move(other.m_hsBlob);
-        m_dsBlob       = std::move(other.m_dsBlob);
-        m_rootSignature = std::move(other.m_rootSignature);
-        m_rootSignatureBlob = std::move(other.m_rootSignatureBlob);
-        m_b0Staging    = other.m_b0Staging;
-        for (int s = 0; s < kStageCount; ++s) {
-            m_stages[s].size    = other.m_stages[s].size;
-            m_stages[s].staging = std::move(other.m_stages[s].staging);
-            m_stages[s].dirty   = other.m_stages[s].dirty;
-            m_stages[s].fields  = std::move(other.m_stages[s].fields);
-        }
-        m_vsInputLayout = std::move(other.m_vsInputLayout);
-        for (int i = 0; i < kSrvSlots; ++i)
-            m_srvDefaults[i] = other.m_srvDefaults[i];
-        m_srvDefaultKey = other.m_srvDefaultKey;
-        m_usesAccelStructure = other.m_usesAccelStructure;
-    }
-    return *this;
+	if (this != &other) {
+		Destroy();
+		m_name = std::move(other.m_name);
+		m_vs = std::move(other.m_vs);
+		m_fs = std::move(other.m_fs);
+		m_gs = std::move(other.m_gs);
+		m_vsBlob = std::move(other.m_vsBlob);
+		m_psBlob = std::move(other.m_psBlob);
+		m_gsBlob = std::move(other.m_gsBlob);
+		m_hsBlob = std::move(other.m_hsBlob);
+		m_dsBlob = std::move(other.m_dsBlob);
+		m_rootSignature = std::move(other.m_rootSignature);
+		m_rootSignatureBlob = std::move(other.m_rootSignatureBlob);
+		m_b0Staging = other.m_b0Staging;
+		for (int s = 0; s < kStageCount; ++s) {
+			m_stages[s].size = other.m_stages[s].size;
+			m_stages[s].staging = std::move(other.m_stages[s].staging);
+			m_stages[s].dirty = other.m_stages[s].dirty;
+			m_stages[s].fields = std::move(other.m_stages[s].fields);
+		}
+		m_vsInputLayout = std::move(other.m_vsInputLayout);
+		for (int i = 0; i < kSrvSlots; ++i)
+			m_srvDefaults[i] = other.m_srvDefaults[i];
+		m_srvDefaultKey = other.m_srvDefaultKey;
+		m_usesAccelStructure = other.m_usesAccelStructure;
+	}
+	return *this;
 }
 
 // =================================================================================================
 
-bool Shader::UploadB0(void) noexcept {
-    ZoneScopedN("Shader::UploadB0");
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
-
-#if OPTIMIZE_SHADER_LOADING
-    const uint64_t generation = cbvAllocator.Generation();
-    if ((m_b0Generation != generation) or (std::memcmp(&m_b0Uploaded, &m_b0Staging, sizeof(FrameConstants)) != 0)) {
-        CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
-        if (not a.IsValid())
-            return false;
-        std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
-        m_rootCbvAddresses[0] = a.gpu;
-        m_b0Uploaded = m_b0Staging;
-        m_b0Generation = generation;
-    }
-    list->SetGraphicsRootConstantBufferView(0, m_rootCbvAddresses[0]);
-#else
-    CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
-    if (not a.IsValid())
-        return false;
-
-    std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
-    list->SetGraphicsRootConstantBufferView(0, a.gpu);
-#endif
-    return true;
-}
-
-
-bool Shader::UploadB1(void) noexcept
+bool Shader::UploadB0(void)
+noexcept
 {
-    ZoneScopedN("Shader::UploadB1");
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
+	ZoneScopedN("Shader::UploadB0");
+	auto* list = commandListHandler.CurrentGfxList();
+	if (not list)
+		return false;
 
 #if OPTIMIZE_SHADER_LOADING
-    const uint64_t generation = cbvAllocator.Generation();
-#endif
-    for (int s = 0; s < kStageCount; ++s) {
-        StageConstants& sc = m_stages[s];
-        if (sc.size == 0)
-            continue;
-#if OPTIMIZE_SHADER_LOADING
-        if (sc.dirty or (sc.generation != generation)) {
-            CbAlloc a = cbvAllocator.Allocate(sc.size);
-            if (not a.IsValid())
-                return false;
-            std::memcpy(a.cpu, sc.staging.data(), sc.size);
-            m_rootCbvAddresses[1 + s] = a.gpu;
-            sc.dirty = false;
-            sc.generation = generation;
-        }
-        list->SetGraphicsRootConstantBufferView(UINT(1 + s), m_rootCbvAddresses[1 + s]);
+	const uint64_t generation = cbvAllocator.Generation();
+	if ((m_b0Generation != generation) or (std::memcmp(&m_b0Uploaded, &m_b0Staging, sizeof(FrameConstants)) != 0)) {
+		CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
+		if (not a.IsValid())
+			return false;
+		std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
+		m_rootCbvAddresses[0] = a.gpu;
+		m_b0Uploaded = m_b0Staging;
+		m_b0Generation = generation;
+	}
+	list->SetGraphicsRootConstantBufferView(0, m_rootCbvAddresses[0]);
 #else
-        CbAlloc a = cbvAllocator.Allocate(sc.size);
-        if (not a.IsValid())
-            return false;
-        std::memcpy(a.cpu, sc.staging.data(), sc.size);
-        list->SetGraphicsRootConstantBufferView(UINT(1 + s), a.gpu);
-        sc.dirty = false;
+	CbAlloc a = cbvAllocator.Allocate(sizeof(FrameConstants));
+	if (not a.IsValid())
+		return false;
+
+	std::memcpy(a.cpu, &m_b0Staging, sizeof(FrameConstants));
+	list->SetGraphicsRootConstantBufferView(0, a.gpu);
 #endif
-    }
-    return true;
+	return true;
 }
 
 
-bool Shader::Activate(void) {
-    ZoneScoped;
-    if (not IsValid())
-        return false;
-
-    // Nothing on the draw buffer stack means the back buffer is the target, and here is where that has
-    // to become true: the resource state, its render target binding, and a command list of its own when
-    // nobody else has one open. The draw buffer handler only sees the MOMENT a target comes or goes -
-    // an app that draws on the back buffer without ever having activated one would otherwise record
-    // nothing at all. Idempotent, and skipped while a target is active.
-    if (baseRenderer.GetActiveBuffer() == nullptr)
-        baseDisplayHandler.EnableBackBuffer();
-
-    auto* list = commandListHandler.CurrentGfxList();
-    if (not list)
-        return false;
-
-    CommandList* cl = commandListHandler.CurrentCmdList();
-    if (not cl)
-        return false;
+bool Shader::UploadB1(void)
+noexcept
+{
+	ZoneScopedN("Shader::UploadB1");
+	auto* list = commandListHandler.CurrentGfxList();
+	if (not list)
+		return false;
 
 #if OPTIMIZE_SHADER_LOADING
-    bool hasPipeline;
-    {
-        ZoneScopedN("Shader::GetPSO");
-        hasPipeline = ResolveDrawPipeline(cl, this);
-    }
-    if (not hasPipeline) {
-#ifdef _DEBUG
-        hasPipeline = ResolveDrawPipeline(cl, this);
+	const uint64_t generation = cbvAllocator.Generation();
 #endif
-        return false;
-    }
+	for (int s = 0; s < kStageCount; ++s) {
+		StageConstants& sc = m_stages[s];
+		if (sc.size == 0)
+			continue;
+#if OPTIMIZE_SHADER_LOADING
+		if (sc.dirty or (sc.generation != generation)) {
+			CbAlloc a = cbvAllocator.Allocate(sc.size);
+			if (not a.IsValid())
+				return false;
+			std::memcpy(a.cpu, sc.staging.data(), sc.size);
+			m_rootCbvAddresses[1 + s] = a.gpu;
+			sc.dirty = false;
+			sc.generation = generation;
+		}
+		list->SetGraphicsRootConstantBufferView(UINT(1 + s), m_rootCbvAddresses[1 + s]);
 #else
-    ID3D12PipelineState* pso;
-    {
-        ZoneScopedN("Shader::GetPSO");
-        pso = cl->GetPSO(this);
-    }
-    if (not pso) {
+		CbAlloc a = cbvAllocator.Allocate(sc.size);
+		if (not a.IsValid())
+			return false;
+		std::memcpy(a.cpu, sc.staging.data(), sc.size);
+		list->SetGraphicsRootConstantBufferView(UINT(1 + s), a.gpu);
+		sc.dirty = false;
+#endif
+	}
+	return true;
+}
+
+
+bool Shader::Activate(void)
+{
+	ZoneScoped;
+	if (not IsValid())
+		return false;
+
+	// Nothing on the draw buffer stack means the back buffer is the target, and here is where that has
+	// to become true: the resource state, its render target binding, and a command list of its own when
+	// nobody else has one open. The draw buffer handler only sees the MOMENT a target comes or goes -
+	// an app that draws on the back buffer without ever having activated one would otherwise record
+	// nothing at all. Idempotent, and skipped while a target is active.
+	if (baseRenderer.GetActiveBuffer() == nullptr)
+		baseDisplayHandler.EnableBackBuffer();
+
+	auto* list = commandListHandler.CurrentGfxList();
+	if (not list)
+		return false;
+
+	CommandList* cl = commandListHandler.CurrentCmdList();
+	if (not cl)
+		return false;
+
+#if OPTIMIZE_SHADER_LOADING
+	bool hasPipeline;
+	{
+		ZoneScopedN("Shader::GetPSO");
+		hasPipeline = ResolveDrawPipeline(cl, this);
+	}
+	if (not hasPipeline) {
 #ifdef _DEBUG
-        pso = cl->GetPSO(this);
+		hasPipeline = ResolveDrawPipeline(cl, this);
 #endif
-        return false;
-    }
+		return false;
+	}
+#else
+	ID3D12PipelineState* pso;
+	{
+		ZoneScopedN("Shader::GetPSO");
+		pso = cl->GetPSO(this);
+	}
+	if (not pso) {
+#ifdef _DEBUG
+		pso = cl->GetPSO(this);
+#endif
+		return false;
+	}
 #endif
 
-    list->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
+	list->OMSetStencilRef(baseRenderer.RenderStates().stencilRef);
 
-    cl->BindDescriptorHeaps();
-    return true;
+	cl->BindDescriptorHeaps();
+	return true;
 }
 
 
 bool Shader::UpdateMatrices(void)
 {
-    std::memcpy(m_b0Staging.mModelView, baseRenderer.ModelView().AsArray(), 16 * sizeof(float));
-    std::memcpy(m_b0Staging.mProjection, baseRenderer.Projection().AsArray(), 16 * sizeof(float));
-    std::memcpy(m_b0Staging.mViewport, baseRenderer.ViewportTransformation().AsArray(), 16 * sizeof(float));
-    if (shadowMap.IsReady())
-        std::memcpy(m_b0Staging.mLightTransform, shadowMap.GetTransformation().AsArray(), 16 * sizeof(float));
-    return true;
+	std::memcpy(m_b0Staging.mModelView, baseRenderer.ModelView().AsArray(), 16 * sizeof(float));
+	std::memcpy(m_b0Staging.mProjection, baseRenderer.Projection().AsArray(), 16 * sizeof(float));
+	std::memcpy(m_b0Staging.mViewport, baseRenderer.ViewportTransformation().AsArray(), 16 * sizeof(float));
+	if (shadowMap.IsReady())
+		std::memcpy(m_b0Staging.mLightTransform, shadowMap.GetTransformation().AsArray(), 16 * sizeof(float));
+	return true;
 }
 
 
 // place all shader variables in CL; to be called right before the actual shader call
-bool Shader::UpdateVariables(void) noexcept {
+bool Shader::UpdateVariables(void)
+noexcept
+{
 #if OPTIMIZE_SHADER_LOADING
-    if (not (UploadB0() and UploadB1()))
-        return false;
-    gfxResourceHandler.NoteFrameAllocation();
-    return commandListHandler.ApplyBindings(this);
+	if (not (UploadB0() and UploadB1()))
+		return false;
+	gfxResourceHandler.NoteFrameAllocation();
+	return commandListHandler.ApplyBindings(this);
 #else
-    return UploadB0() and UploadB1() and commandListHandler.ApplyBindings(this);
+	return UploadB0() and UploadB1() and commandListHandler.ApplyBindings(this);
 #endif
 }
 
 // =================================================================================================
 // Uniform setters
 
-bool Shader::TrySetB0Field(eBaseMatrices id, const float* data) noexcept
+bool Shader::TrySetB0Field(eBaseMatrices id, const float* data)
+noexcept
 {
-    switch (id) {
-        case bmModelView:
-            std::memcpy(m_b0Staging.mModelView, data, 64);
-            return true;
-        case bmProjection:
-            std::memcpy(m_b0Staging.mProjection, data, 64);
-            return true;
-        case bmViewport:
-            std::memcpy(m_b0Staging.mViewport, data, 64);
-            return true;
-        case bmLightTransform:
-            std::memcpy(m_b0Staging.mLightTransform, data, 64);
-            return true;
-        default:
-            return false;
-    }
+	switch (id) {
+		case bmModelView:
+			std::memcpy(m_b0Staging.mModelView, data, 64);
+			return true;
+		case bmProjection:
+			std::memcpy(m_b0Staging.mProjection, data, 64);
+			return true;
+		case bmViewport:
+			std::memcpy(m_b0Staging.mViewport, data, 64);
+			return true;
+		case bmLightTransform:
+			std::memcpy(m_b0Staging.mLightTransform, data, 64);
+			return true;
+		default:
+			return false;
+	}
 }
 
 
-void Shader::ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name) noexcept
+void Shader::ResolveB1Location(ShaderLocationTable::ShaderLocation& loc, const char* name)
+noexcept
 {
-    static_assert(kStageCount == 5, "ShaderLocation::m_stageOffset assumes 5 stages (VS/PS/GS/HS/DS)");
-    for (int s = 0; s < kStageCount; ++s) {
-        loc.m_stageOffset[s] = -1;
-        StageConstants& sc = m_stages[s];
-        if (sc.size == 0)
-            continue;
-        for (auto& kv : sc.fields)
-            if (kv.first == name) {
-                loc.m_stageOffset[s] = int(kv.second.offset);
-                break;
-            }
-    }
-    loc.m_resolved = true;
+	static_assert(kStageCount == 5, "ShaderLocation::m_stageOffset assumes 5 stages (VS/PS/GS/HS/DS)");
+	for (int s = 0; s < kStageCount; ++s) {
+		loc.m_stageOffset[s] = -1;
+		StageConstants& sc = m_stages[s];
+		if (sc.size == 0)
+			continue;
+		for (auto& kv : sc.fields)
+			if (kv.first == name) {
+				loc.m_stageOffset[s] = int(kv.second.offset);
+				break;
+			}
+	}
+	loc.m_resolved = true;
 }
 
 
-int Shader::SetB1Field(const char* name, const void* data, size_t size) noexcept
+int Shader::SetB1Field(const char* name, const void* data, size_t size)
+noexcept
 {
-    ShaderLocationTable::ShaderLocation* loc = m_locations[name];
-    if (not loc)
-        return -1;
-    if (not loc->m_resolved)
-        ResolveB1Location(*loc, name);
+	ShaderLocationTable::ShaderLocation* loc = m_locations[name];
+	if (not loc)
+		return -1;
+	if (not loc->m_resolved)
+		ResolveB1Location(*loc, name);
 
-    int result = -1;
-    for (int s = 0; s < kStageCount; ++s) {
-        int offset = loc->m_stageOffset[s];
-        if (offset < 0)
-            continue;
-        StageConstants& sc = m_stages[s];
-        if (size_t(offset) + size <= sc.staging.size()) {
+	int result = -1;
+	for (int s = 0; s < kStageCount; ++s) {
+		int offset = loc->m_stageOffset[s];
+		if (offset < 0)
+			continue;
+		StageConstants& sc = m_stages[s];
+		if (size_t(offset) + size <= sc.staging.size()) {
 #if OPTIMIZE_SHADER_LOADING
-            if (std::memcmp(sc.staging.data() + offset, data, size) != 0) {
-                std::memcpy(sc.staging.data() + offset, data, size);
-                sc.dirty = true;
-            }
+			if (std::memcmp(sc.staging.data() + offset, data, size) != 0) {
+				std::memcpy(sc.staging.data() + offset, data, size);
+				sc.dirty = true;
+			}
 #else
-            std::memcpy(sc.staging.data() + offset, data, size);
-            sc.dirty = true;
+			std::memcpy(sc.staging.data() + offset, data, size);
+			sc.dirty = true;
 #endif
-            if (result < 0)
-                result = offset;
-        }
-    }
+			if (result < 0)
+				result = offset;
+		}
+	}
 #ifdef _DEBUG
-    if ((result < 0) and not loc->m_warned) {
-        loc->m_warned = true;
-        logHandler.Print("Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
-    }
+	if ((result < 0) and not loc->m_warned) {
+		loc->m_warned = true;
+		logHandler.Print("Shader '%s': unknown uniform '%s'\n", (const char*)m_name, name);
+	}
 #endif
-    return result;
+	return result;
 }
 
 
-int Shader::SetFloat(const char* name, float data) noexcept
+int Shader::SetFloat(const char* name, float data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(float));
+	return SetB1Field(name, &data, sizeof(float));
 }
 
 
-int Shader::SetInt(const char* name, int data) noexcept
+int Shader::SetInt(const char* name, int data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(int));
+	return SetB1Field(name, &data, sizeof(int));
 }
 
 
-int Shader::SetVector2f(const char* name, const Vector2f& data) noexcept
+int Shader::SetVector2f(const char* name, const Vector2f& data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(Vector2f));
+	return SetB1Field(name, &data, sizeof(Vector2f));
 }
 
-int Shader::SetVector3f(const char* name, const Vector3f& data) noexcept
+int Shader::SetVector3f(const char* name, const Vector3f& data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(Vector3f));
+	return SetB1Field(name, &data, sizeof(Vector3f));
 }
 
-int Shader::SetVector4f(const char* name, const Vector4f& data) noexcept
+int Shader::SetVector4f(const char* name, const Vector4f& data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(Vector4f));
+	return SetB1Field(name, &data, sizeof(Vector4f));
 }
 
-int Shader::SetVector2i(const char* name, const Vector2i& data) noexcept
+int Shader::SetVector2i(const char* name, const Vector2i& data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(Vector2i));
+	return SetB1Field(name, &data, sizeof(Vector2i));
 }
 
-int Shader::SetVector3i(const char* name, const Vector3i& data) noexcept
+int Shader::SetVector3i(const char* name, const Vector3i& data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(Vector3i));
+	return SetB1Field(name, &data, sizeof(Vector3i));
 }
 
-int Shader::SetVector4i(const char* name, const Vector4i& data) noexcept
+int Shader::SetVector4i(const char* name, const Vector4i& data)
+noexcept
 {
-    return SetB1Field(name, &data, sizeof(Vector4i));
-}
-
-
-int Shader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/) noexcept
-{
-    return SetB1Field(name, data, 16 * sizeof(float));
+	return SetB1Field(name, &data, sizeof(Vector4i));
 }
 
 
-int Shader::SetMatrix4f(eBaseMatrices id, const float* data, bool /*transpose*/) noexcept
+int Shader::SetMatrix4f(const char* name, const float* data, bool /*transpose*/)
+noexcept
 {
-    return TrySetB0Field(id, data) ? 0 : -1;
+	return SetB1Field(name, data, 16 * sizeof(float));
+}
+
+
+int Shader::SetMatrix4f(eBaseMatrices id, const float* data, bool /*transpose*/)
+noexcept
+{
+	return TrySetB0Field(id, data) ? 0 : -1;
 }
 
 
 // A column_major float3x3 in a cbuffer keeps each column in a 16-byte slot (the last one takes 12), so
 // the nine floats are spread over 44 bytes - handed over packed, the second column would start in the
 // first one's padding.
-int Shader::SetMatrix3f(const char* name, float* data, bool /*transpose*/) noexcept
+int Shader::SetMatrix3f(const char* name, float* data, bool /*transpose*/)
+noexcept
 {
-    float padded[11] { };
-    for (int column = 0; column < 3; ++column)
-        std::memcpy(padded + column * 4, data + column * 3, 3 * sizeof(float));
-    return SetB1Field(name, padded, sizeof(padded));
+	float padded[11]{};
+	for (int column = 0; column < 3; ++column)
+		std::memcpy(padded + column * 4, data + column * 3, 3 * sizeof(float));
+	return SetB1Field(name, padded, sizeof(padded));
 }
 
 
 // HLSL cbuffer rules pad every element of a scalar or short-vector array to a 16-byte slot.
 // The Set*Array helpers therefore build a padded staging buffer (4 floats per element) before
 // dispatching to SetB1Field. SetVector4fArray needs no padding (16 bytes per element already).
-int Shader::SetFloatArray(const char* name, const float* data, size_t length) noexcept
+int Shader::SetFloatArray(const char* name, const float* data, size_t length)
+noexcept
 {
-    if (length == 0)
-        return -1;
-    std::vector<float> padded(length * 4, 0.0f);
-    for (size_t i = 0; i < length; ++i)
-        padded[i * 4] = data[i];
-    return SetB1Field(name, padded.data(), length * 4 * sizeof(float));
+	if (length == 0)
+		return -1;
+	std::vector<float> padded(length * 4, 0.0f);
+	for (size_t i = 0; i < length; ++i)
+		padded[i * 4] = data[i];
+	return SetB1Field(name, padded.data(), length * 4 * sizeof(float));
 }
 
 // Same padding as SetFloatArray: a scalar array occupies one 16 byte slot per element.
-int Shader::SetIntArray(const char* name, const int* data, size_t length) noexcept
+int Shader::SetIntArray(const char* name, const int* data, size_t length)
+noexcept
 {
-    if (length == 0)
-        return -1;
-    std::vector<int> padded(length * 4, 0);
-    for (size_t i = 0; i < length; ++i)
-        padded[i * 4] = data[i];
-    return SetB1Field(name, padded.data(), length * 4 * sizeof(int));
+	if (length == 0)
+		return -1;
+	std::vector<int> padded(length * 4, 0);
+	for (size_t i = 0; i < length; ++i)
+		padded[i * 4] = data[i];
+	return SetB1Field(name, padded.data(), length * 4 * sizeof(int));
 }
 
-int Shader::SetVector2fArray(const char* name, const Vector2f* data, int length) noexcept
+int Shader::SetVector2fArray(const char* name, const Vector2f* data, int length)
+noexcept
 {
-    if (length <= 0)
-        return -1;
-    std::vector<float> padded(size_t(length) * 4, 0.0f);
-    for (int i = 0; i < length; ++i) {
-        padded[size_t(i) * 4 + 0] = data[i].X();
-        padded[size_t(i) * 4 + 1] = data[i].Y();
-    }
-    return SetB1Field(name, padded.data(), size_t(length) * 4 * sizeof(float));
+	if (length <= 0)
+		return -1;
+	std::vector<float> padded(size_t(length) * 4, 0.0f);
+	for (int i = 0; i < length; ++i) {
+		padded[size_t(i) * 4 + 0] = data[i].X();
+		padded[size_t(i) * 4 + 1] = data[i].Y();
+	}
+	return SetB1Field(name, padded.data(), size_t(length) * 4 * sizeof(float));
 }
 
-int Shader::SetVector3fArray(const char* name, const Vector3f* data, int length) noexcept
+int Shader::SetVector3fArray(const char* name, const Vector3f* data, int length)
+noexcept
 {
-    if (length <= 0)
-        return -1;
-    std::vector<float> padded(size_t(length) * 4, 0.0f);
-    for (int i = 0; i < length; ++i) {
-        padded[size_t(i) * 4 + 0] = data[i].X();
-        padded[size_t(i) * 4 + 1] = data[i].Y();
-        padded[size_t(i) * 4 + 2] = data[i].Z();
-    }
-    return SetB1Field(name, padded.data(), size_t(length) * 4 * sizeof(float));
+	if (length <= 0)
+		return -1;
+	std::vector<float> padded(size_t(length) * 4, 0.0f);
+	for (int i = 0; i < length; ++i) {
+		padded[size_t(i) * 4 + 0] = data[i].X();
+		padded[size_t(i) * 4 + 1] = data[i].Y();
+		padded[size_t(i) * 4 + 2] = data[i].Z();
+	}
+	return SetB1Field(name, padded.data(), size_t(length) * 4 * sizeof(float));
 }
 
-int Shader::SetVector4fArray(const char* name, const Vector4f* data, int length) noexcept
+int Shader::SetVector4fArray(const char* name, const Vector4f* data, int length)
+noexcept
 {
-    return SetB1Field(name, data, size_t(length) * sizeof(Vector4f));
+	return SetB1Field(name, data, size_t(length) * sizeof(Vector4f));
 }
 
 // =================================================================================================

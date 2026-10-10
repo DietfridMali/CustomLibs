@@ -19,30 +19,33 @@
 // the underlying sampler-heap is destroyed when DescriptorHeapHandler shuts down.
 
 class SamplerCache
-    : public BaseSingleton<SamplerCache>
-{
+	: public BaseSingleton<SamplerCache> {
 public:
-    using SamplerMap = AVLTree<TextureSampling, uint32_t>;
+	using SamplerMap = AVLTree<TextureSampling, uint32_t>;
 
 
-    SamplerCache(void) noexcept;
+	SamplerCache(void)
+	noexcept;
 
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
 
-    // Lazy lookup. Returns UINT32_MAX on failure (heap full or device missing).
-    uint32_t GetSlot(const TextureSampling& s) noexcept;
+	// Lazy lookup. Returns UINT32_MAX on failure (heap full or device missing).
+	uint32_t GetSlot(const TextureSampling& s)
+	noexcept;
 
 
 private:
-    SamplerMap m_cache;
+	SamplerMap m_cache;
 
 
-    static int Compare(void* context, const TextureSampling& a, const TextureSampling& b);
+	static int Compare(void* context, const TextureSampling& a, const TextureSampling& b);
 
 
-    static D3D12_SAMPLER_DESC ToD3D12Desc(const TextureSampling& s) noexcept;
+	static D3D12_SAMPLER_DESC ToD3D12Desc(const TextureSampling& s)
+	noexcept;
 };
 
 #define samplerCache SamplerCache::Instance()

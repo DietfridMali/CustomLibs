@@ -6,190 +6,208 @@
 // common base_noisetexture.cpp; this unit only configures the GL sampler state and routes the
 // Deploy call through the platform-neutral Upload<2D,3D>Texture helpers.
 
-void ApplyTextureSamplingToGL(GLenum target, const TextureSampling& s) noexcept
+void ApplyTextureSamplingToGL(GLenum target, const TextureSampling& s)
+noexcept
 {
-    GLint minFilter = GL_LINEAR;
-    GLint magFilter = GL_LINEAR;
+	GLint minFilter = GL_LINEAR;
+	GLint magFilter = GL_LINEAR;
 
-    if (s.minFilter == GfxFilterMode::Nearest) {
-        minFilter = 
-            (s.mipMode == GfxMipMode::None)
-            ? GL_NEAREST
-            : (s.mipMode == GfxMipMode::Nearest ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_LINEAR);
-    }
-    else {
-        minFilter = 
-            (s.mipMode == GfxMipMode::None)
-            ? GL_LINEAR
-            : (s.mipMode == GfxMipMode::Nearest ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_LINEAR);
-    }
+	if (s.minFilter == GfxFilterMode::Nearest) {
+		minFilter =
+			(s.mipMode == GfxMipMode::None)
+			? GL_NEAREST
+			: (s.mipMode == GfxMipMode::Nearest ? GL_NEAREST_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_LINEAR);
+	}
+	else {
+		minFilter =
+			(s.mipMode == GfxMipMode::None)
+			? GL_LINEAR
+			: (s.mipMode == GfxMipMode::Nearest ? GL_LINEAR_MIPMAP_NEAREST : GL_LINEAR_MIPMAP_LINEAR);
+	}
 
-    magFilter = (s.magFilter == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
+	magFilter = (s.magFilter == GfxFilterMode::Nearest) ? GL_NEAREST : GL_LINEAR;
 
-    auto wrap = [](GfxWrapMode m) -> GLint {
-        switch (m) {
-            case GfxWrapMode::Repeat:
-                return GL_REPEAT;
-            case GfxWrapMode::ClampToBorder:
-                return GL_CLAMP_TO_BORDER;
-            case GfxWrapMode::ClampToEdge:
-            default:
-                return GL_CLAMP_TO_EDGE;
-        }
-    };
+	auto wrap = [](GfxWrapMode m) -> GLint {
+		switch (m) {
+			case GfxWrapMode::Repeat:
+				return GL_REPEAT;
+			case GfxWrapMode::ClampToBorder:
+				return GL_CLAMP_TO_BORDER;
+			case GfxWrapMode::ClampToEdge:
+			default:
+				return GL_CLAMP_TO_EDGE;
+		}
+	};
 
-    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
-    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, magFilter);
-    glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap(s.wrapU));
-    glTexParameteri(target, GL_TEXTURE_WRAP_T, wrap(s.wrapV));
-    glTexParameteri(target, GL_TEXTURE_WRAP_R, wrap(s.wrapW));
-    glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, s.borderColor);
+	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
+	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, magFilter);
+	glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap(s.wrapU));
+	glTexParameteri(target, GL_TEXTURE_WRAP_T, wrap(s.wrapV));
+	glTexParameteri(target, GL_TEXTURE_WRAP_R, wrap(s.wrapW));
+	glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, s.borderColor);
 
-    // Depth compare (sampler2DShadow / HW PCF). Same rule as the DX and Vulkan sampler caches: a
-    // compareFunc of Always means "no comparison".
-    if (s.compareFunc != GfxOperations::CompareFunc::Always) {
-        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GfxToGL::ToGLenum(s.compareFunc));
-    }
-    else
-        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+	// Depth compare (sampler2DShadow / HW PCF). Same rule as the DX and Vulkan sampler caches: a
+	// compareFunc of Always means "no comparison".
+	if (s.compareFunc != GfxOperations::CompareFunc::Always) {
+		glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+		glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GfxToGL::ToGLenum(s.compareFunc));
+	}
+	else
+		glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
 
-    // Anisotropy, LOD bias and LOD range were dropped here while DX/VK honoured them.
-    glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, (s.maxAnisotropy > 1.0f) ? s.maxAnisotropy : 1.0f);
-    glTexParameterf(target, GL_TEXTURE_LOD_BIAS, s.mipLodBias);
+	// Anisotropy, LOD bias and LOD range were dropped here while DX/VK honoured them.
+	glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, (s.maxAnisotropy > 1.0f) ? s.maxAnisotropy : 1.0f);
+	glTexParameterf(target, GL_TEXTURE_LOD_BIAS, s.mipLodBias);
 
-    if (s.mipMode != GfxMipMode::None) {
-        glGenerateMipmap(target);
-        glTexParameterf(target, GL_TEXTURE_MIN_LOD, s.minLOD);
-        glTexParameterf(target, GL_TEXTURE_MAX_LOD, s.maxLOD);
-    }
-    else {
-        glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
-        // Match DX/VK, which clamp LOD to the base level when mip-mapping is off.
-        glTexParameterf(target, GL_TEXTURE_MIN_LOD, 0.0f);
-        glTexParameterf(target, GL_TEXTURE_MAX_LOD, 0.0f);
-    }
+	if (s.mipMode != GfxMipMode::None) {
+		glGenerateMipmap(target);
+		glTexParameterf(target, GL_TEXTURE_MIN_LOD, s.minLOD);
+		glTexParameterf(target, GL_TEXTURE_MAX_LOD, s.maxLOD);
+	}
+	else {
+		glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
+		// Match DX/VK, which clamp LOD to the base level when mip-mapping is off.
+		glTexParameterf(target, GL_TEXTURE_MIN_LOD, 0.0f);
+		glTexParameterf(target, GL_TEXTURE_MAX_LOD, 0.0f);
+	}
 }
 
 // =================================================================================================
 // NoiseTexture3D
 
-bool NoiseTexture3D::Deploy(int) {
-    return Upload3DTexture(*this, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, GfxPixelFormat::RGBA16_SFloat, reinterpret_cast<const void*>(m_data.DataPtr()));
+bool NoiseTexture3D::Deploy(int)
+{
+	return Upload3DTexture(*this, m_gridDimensions.x, m_gridDimensions.y, m_gridDimensions.z, GfxPixelFormat::RGBA16_SFloat,
+						   reinterpret_cast<const void*>(m_data.DataPtr()));
 }
 
 
-void NoiseTexture3D::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
+void NoiseTexture3D::SetParams(bool enforce)
+{
+	if (enforce or not m_hasParams) {
+		m_hasParams = true;
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
 }
 
 // =================================================================================================
 // CloudNoiseTexture + mip variants
 
-bool CloudNoiseTexture::Deploy(int) {
-    // Hardware-Mip-Chain auf der 256³ Shape-Noise erzeugen: ersetzt die separate CPU-vorberechnete
-    // AvgMip-Pyramide (shapeNoiseAvgMip1..4Tex) durch eine lückenlose, statistisch kohärente
-    // Mip-Folge ab dem Original. Distance-LOD im Shader läuft jetzt über ein einziges textureLod
-    // mit lodFloat-Mip-Bias statt zweier separater Samples + manuellem mix.
-    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R16_SFloat, reinterpret_cast<const void*>(m_data.DataPtr()), true);
+bool CloudNoiseTexture::Deploy(int)
+{
+	// Hardware-Mip-Chain auf der 256³ Shape-Noise erzeugen: ersetzt die separate CPU-vorberechnete
+	// AvgMip-Pyramide (shapeNoiseAvgMip1..4Tex) durch eine lückenlose, statistisch kohärente
+	// Mip-Folge ab dem Original. Distance-LOD im Shader läuft jetzt über ein einziges textureLod
+	// mit lodFloat-Mip-Bias statt zweier separater Samples + manuellem mix.
+	return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R16_SFloat,
+						   reinterpret_cast<const void*>(m_data.DataPtr()), true);
 }
 
 
-void CloudNoiseTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        // GL_LINEAR_MIPMAP_LINEAR → trilineares Sampling über die Hardware-Mip-Chain.
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
+void CloudNoiseTexture::SetParams(bool enforce)
+{
+	if (enforce or not m_hasParams) {
+		m_hasParams = true;
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+		// GL_LINEAR_MIPMAP_LINEAR → trilineares Sampling über die Hardware-Mip-Chain.
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
 }
 
 
-BaseCloudNoiseTexture* CloudNoiseTexture::NewMaxMipTex(void) {
-    return new NoiseMaxMipTexture();
+BaseCloudNoiseTexture* CloudNoiseTexture::NewMaxMipTex(void)
+{
+	return new NoiseMaxMipTexture();
 }
 
 
-BaseCloudNoiseTexture* CloudNoiseTexture::NewAvgMipTex(void) {
-    return new NoiseAvgMipTexture();
+BaseCloudNoiseTexture* CloudNoiseTexture::NewAvgMipTex(void)
+{
+	return new NoiseAvgMipTexture();
 }
 
 
-BaseCloudNoiseTexture* CloudNoiseTexture::NewKuwaharaTex(void) {
-    return new CloudNoiseTexture();
+BaseCloudNoiseTexture* CloudNoiseTexture::NewKuwaharaTex(void)
+{
+	return new CloudNoiseTexture();
 }
 
 
-void NoiseMaxMipTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    }
+void NoiseMaxMipTexture::SetParams(bool enforce)
+{
+	if (enforce or not m_hasParams) {
+		m_hasParams = true;
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
 }
 
 
-void NoiseAvgMipTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
+void NoiseAvgMipTexture::SetParams(bool enforce)
+{
+	if (enforce or not m_hasParams) {
+		m_hasParams = true;
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
 }
 
 // =================================================================================================
 // DetailNoiseTexture
 
-bool DetailNoiseTexture::Deploy(int) {
-    return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.DataPtr()));
+bool DetailNoiseTexture::Deploy(int)
+{
+	return Upload3DTexture(*this, m_gridSize, m_gridSize, m_gridSize, GfxPixelFormat::R8_UNorm,
+						   reinterpret_cast<const void*>(m_data.DataPtr()));
 }
 
 
-void DetailNoiseTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    }
+void DetailNoiseTexture::SetParams(bool enforce)
+{
+	if (enforce or not m_hasParams) {
+		m_hasParams = true;
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
 }
 
 // =================================================================================================
 // BlueNoiseTexture
 
-bool BlueNoiseTexture::Deploy(int) {
-    return Upload3DTexture(*this, m_gridSize.x, m_gridSize.y, m_gridSize.z, GfxPixelFormat::R8_UNorm, reinterpret_cast<const void*>(m_data.DataPtr()));
+bool BlueNoiseTexture::Deploy(int)
+{
+	return Upload3DTexture(*this, m_gridSize.x, m_gridSize.y, m_gridSize.z, GfxPixelFormat::R8_UNorm,
+						   reinterpret_cast<const void*>(m_data.DataPtr()));
 }
 
 
-void BlueNoiseTexture::SetParams(bool enforce) {
-    if (enforce or not m_hasParams) {
-        m_hasParams = true;
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    }
+void BlueNoiseTexture::SetParams(bool enforce)
+{
+	if (enforce or not m_hasParams) {
+		m_hasParams = true;
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
 }
 
 // =================================================================================================

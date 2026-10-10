@@ -25,60 +25,69 @@
 // (SetupOpenGL → SetupDX12 internally, but callers still see SetupOpenGL for now).
 
 class GfxRenderer
-    : public BaseRenderer
-{
+	: public BaseRenderer {
 public:
-    struct GLVersion {
-        GLint major{ 0 };
-        GLint minor{ 0 };
-    };
+	struct GLVersion {
+		GLint major{ 0 };
+		GLint minor{ 0 };
+	};
 
-    GLVersion   m_glVersion;
+	GLVersion m_glVersion;
 
-    virtual ~GfxRenderer() {
-    }
+	virtual ~GfxRenderer() {
+	}
 
-    GfxRenderer() 
-        : BaseRenderer()
-    {
-        _instance = this;
-        gfxApiType = BaseRenderer::GfxApiType::OpenGL;
-    }
+	GfxRenderer()
+		: BaseRenderer()
+	{
+		_instance = this;
+		gfxApiType = BaseRenderer::GfxApiType::OpenGL;
+	}
 
-    static GfxRenderer& Instance(void) {
-        return dynamic_cast<GfxRenderer&>(PolymorphSingleton::Instance());
-    }
+	static GfxRenderer& Instance(void) {
+		return dynamic_cast<GfxRenderer&>(PolymorphSingleton::Instance());
+	}
 
-    virtual bool InitGraphics(const GfxFeatureRequest& request = {}) override;
+	virtual bool InitGraphics(const GfxFeatureRequest& request = {}) override;
 
-    virtual void* StartOperation(String name, bool piggyback = true) noexcept override;
+	virtual void* StartOperation(String name, bool piggyback = true)
+	noexcept override;
 
-    virtual bool StartOperation(void** cl, String name, bool piggyback = true) noexcept override {
-        return BaseRenderer::StartOperation(cl, name, piggyback);
-    }
+	virtual bool StartOperation(void** cl, String name, bool piggyback = true)
+	noexcept override
+	{
+		return BaseRenderer::StartOperation(cl, name, piggyback);
+	}
 
-    virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
+	virtual bool FinishOperation(void* cl, bool flush = false)
+	noexcept override;
 
-    inline void Draw3DScene(void) noexcept {
-        return BaseRenderer::Draw3DScene(true);
-    }
+	inline void Draw3DScene(void)
+	noexcept
+	{
+		return BaseRenderer::Draw3DScene(true);
+	}
 
-    virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
+	virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 
-    // The presented picture as packed RGBA8, bottom row first: the window's back buffer, what
-    // DrawScreen () just put there. width/height of 0 mean the whole back buffer; a rectangle is
-    // (x, y) from the bottom left, and the destination needs width * height * 4 bytes. The same
-    // call exists in every backend - here it is a glReadPixels of the default framebuffer, DX and
-    // VK copy the swap chain image through a readback buffer.
-    bool ReadBuffer(void* buffer, size_t bufferSize, int x = 0, int y = 0, int width = 0, int height = 0);
+	// The presented picture as packed RGBA8, bottom row first: the window's back buffer, what
+	// DrawScreen () just put there. width/height of 0 mean the whole back buffer; a rectangle is
+	// (x, y) from the bottom left, and the destination needs width * height * 4 bytes. The same
+	// call exists in every backend - here it is a glReadPixels of the default framebuffer, DX and
+	// VK copy the swap chain image through a readback buffer.
+	bool ReadBuffer(void* buffer, size_t bufferSize, int x = 0, int y = 0, int width = 0, int height = 0);
 
-    inline void SetGeometryFrontFace(void) noexcept {
-        gfxStates.FrontFace(GfxOperations::Winding::Reverse);
-    }
+	inline void SetGeometryFrontFace(void)
+	noexcept
+	{
+		gfxStates.FrontFace(GfxOperations::Winding::Reverse);
+	}
 
-    inline void SetShadowFrontFace(void) noexcept {
-        gfxStates.FrontFace(GfxOperations::Winding::Regular);
-    }
+	inline void SetShadowFrontFace(void)
+	noexcept
+	{
+		gfxStates.FrontFace(GfxOperations::Winding::Regular);
+	}
 };
 
 #define baseRenderer GfxRenderer::Instance()

@@ -4,8 +4,9 @@
 
 // =================================================================================================
 
-static const String& OceanConstants() {
-    static const String source(R"(
+static const String& OceanConstants()
+{
+	static const String source(R"(
         cbuffer ShaderConstants : register(b1) {
             float4 tileSizes;
             float  time;
@@ -24,22 +25,23 @@ static const String& OceanConstants() {
             return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
         }
     )");
-    return source;
+	return source;
 }
 
 
-static AutoArray<ComputeBindingDesc> MakeOceanBindings(int sampledCount, int storageImageCount, int storageBufferCount) {
-    AutoArray<ComputeBindingDesc> b;
-    b.SetAutoFit(true);
-    using Kind = ComputeBindingDesc::Kind;
-    *b.Append() = { .binding = 1, .kind = Kind::UniformBuffer, .count = 1 };
-    for (int i = 0; i < sampledCount; ++i)
-        *b.Append() = { .binding = uint32_t(4 + i), .kind = Kind::SampledImage, .count = 1 };
-    for (int i = 0; i < storageImageCount; ++i)
-        *b.Append() = { .binding = uint32_t(36 + i), .kind = Kind::StorageImage, .count = 1 };
-    for (int i = 0; i < storageBufferCount; ++i)
-        *b.Append() = { .binding = uint32_t(36 + storageImageCount + i), .kind = Kind::StorageBuffer, .count = 1 };
-    return b;
+static AutoArray<ComputeBindingDesc> MakeOceanBindings(int sampledCount, int storageImageCount, int storageBufferCount)
+{
+	AutoArray<ComputeBindingDesc> b;
+	b.SetAutoFit(true);
+	using Kind = ComputeBindingDesc::Kind;
+	*b.Append() = { .binding = 1, .kind = Kind::UniformBuffer, .count = 1 };
+	for (int i = 0; i < sampledCount; ++i)
+		*b.Append() = { .binding = uint32_t(4 + i), .kind = Kind::SampledImage, .count = 1 };
+	for (int i = 0; i < storageImageCount; ++i)
+		*b.Append() = { .binding = uint32_t(36 + i), .kind = Kind::StorageImage, .count = 1 };
+	for (int i = 0; i < storageBufferCount; ++i)
+		*b.Append() = { .binding = uint32_t(36 + storageImageCount + i), .kind = Kind::StorageBuffer, .count = 1 };
+	return b;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -58,16 +60,14 @@ static const String OceanInitMain = String(R"(
 )");
 
 
-const ShaderSource& OceanInitShader() {
-    static AutoArray<ComputeBindingDesc> bindings = MakeOceanBindings(0, 1, 1);
-    static const ShaderSource source(
-        "oceanInit",
-        {
-            .cs = OceanConstants() + OceanInitMain,
-            .computeBindings = bindings
-        }
-    );
-    return source;
+const ShaderSource& OceanInitShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(0, 1, 1);
+	static const ShaderSource				source(
+		   "oceanInit",
+		   { .cs = OceanConstants() + OceanInitMain,
+					 .computeBindings = bindings });
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -109,16 +109,14 @@ static const String OceanSpectrumMain = String(R"(
 )");
 
 
-const ShaderSource& OceanSpectrumShader() {
-    static AutoArray<ComputeBindingDesc> bindings = MakeOceanBindings(1, 2, 0);
-    static const ShaderSource source(
-        "oceanSpectrum",
-        {
-            .cs = OceanConstants() + OceanSpectrumMain,
-            .computeBindings = bindings
-        }
-    );
-    return source;
+const ShaderSource& OceanSpectrumShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(1, 2, 0);
+	static const ShaderSource				source(
+		   "oceanSpectrum",
+		   { .cs = OceanConstants() + OceanSpectrumMain,
+					 .computeBindings = bindings });
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -163,16 +161,14 @@ static const String OceanTransformMain = String(R"(
 )");
 
 
-const ShaderSource& OceanTransformShader() {
-    static AutoArray<ComputeBindingDesc> bindings = MakeOceanBindings(2, 2, 0);
-    static const ShaderSource source(
-        "oceanTransform",
-        {
-            .cs = OceanConstants() + OceanTransformMain,
-            .computeBindings = bindings
-        }
-    );
-    return source;
+const ShaderSource& OceanTransformShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(2, 2, 0);
+	static const ShaderSource				source(
+		   "oceanTransform",
+		   { .cs = OceanConstants() + OceanTransformMain,
+					 .computeBindings = bindings });
+	return source;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -204,16 +200,14 @@ static const String OceanAssembleMain = String(R"(
 )");
 
 
-const ShaderSource& OceanAssembleShader() {
-    static AutoArray<ComputeBindingDesc> bindings = MakeOceanBindings(3, 2, 0);
-    static const ShaderSource source(
-        "oceanAssemble",
-        {
-            .cs = OceanConstants() + OceanAssembleMain,
-            .computeBindings = bindings
-        }
-    );
-    return source;
+const ShaderSource& OceanAssembleShader()
+{
+	static AutoArray<ComputeBindingDesc>	bindings = MakeOceanBindings(3, 2, 0);
+	static const ShaderSource				source(
+		   "oceanAssemble",
+		   { .cs = OceanConstants() + OceanAssembleMain,
+					 .computeBindings = bindings });
+	return source;
 }
 
 // =================================================================================================

@@ -32,79 +32,93 @@
 
 class LineRenderer {
 public:
-    enum class Style : uint8_t {
-        Solid = 0,
-        Dashed = 1,
-        Dotted = 2,
-        DashDot = 3
-    };
+	enum class Style : uint8_t {
+		Solid = 0,
+		Dashed = 1,
+		Dotted = 2,
+		DashDot = 3
+	};
 
-    enum class Cap : uint8_t {
-        Round = 0,
-        Flat = 1,
-        Miter = 2
-    };
+	enum class Cap : uint8_t {
+		Round = 0,
+		Flat = 1,
+		Miter = 2
+	};
 
-    // One line as the shader reads it (GPU structured buffer, 64 bytes). Position vectors are in
-    // whatever space the current model view maps to view space.
-    struct Line {
-        Vector3f    p0;
-        float       width;      // target pixels
-        Vector3f    p1;
-        float       style;      // Style as float - the shader reads it as such
-        RGBAColor   color;
-        float       phase;      // pattern offset at p0, view units
-        float       pad[3];
-    };
+	// One line as the shader reads it (GPU structured buffer, 64 bytes). Position vectors are in
+	// whatever space the current model view maps to view space.
+	struct Line {
+		Vector3f	p0;
+		float		width; // target pixels
+		Vector3f	p1;
+		float		style; // Style as float - the shader reads it as such
+		RGBAColor	color;
+		float		phase; // pattern offset at p0, view units
+		float		pad[3];
+	};
 
-    float           m_dashScale{ 1.0f };
-    bool            m_antialias{ true };
-    float           m_viewerPull{ 0.0f };
-    float           m_worldWidth{ 0.0f };
+	float	m_dashScale{ 1.0f };
+	bool	m_antialias{ true };
+	float	m_viewerPull{ 0.0f };
+	float	m_worldWidth{ 0.0f };
 
-    LineRenderer() = default;
-    ~LineRenderer() { Destroy(); }
+	LineRenderer() = default;
+	~LineRenderer() {
+		Destroy();
+	}
 
-    bool Create(int capacity = 256);
-    void Destroy(void);
+	bool Create(int capacity = 256);
+	void Destroy(void);
 
-    inline bool IsAvailable(void) const noexcept { return m_isAvailable; }
-    inline int Count(void) const noexcept { return m_count; }
+	inline bool IsAvailable(void) const
+	noexcept
+	{
+		return m_isAvailable;
+	}
+	inline int Count(void) const
+	noexcept
+	{
+		return m_count;
+	}
 
-    // start a new batch
-    inline void Clear(void) noexcept {
-        m_count = 0;
-        m_isResident = false;
-    }
+	// start a new batch
+	inline void Clear(void)
+	noexcept
+	{
+		m_count = 0;
+		m_isResident = false;
+	}
 
-    bool Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style = Style::Solid, float phase = 0.0f, Cap startCap = Cap::Round, float startValue = 0.0f, Cap endCap = Cap::Round, float endValue = 0.0f);
+	bool Add(const Vector3f& p0, const Vector3f& p1, float width, const RGBAColor& color, Style style = Style::Solid,
+			 float phase = 0.0f, Cap startCap = Cap::Round, float startValue = 0.0f, Cap endCap = Cap::Round,
+			 float endValue = 0.0f);
 
-    static float MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other);
+	static float MiterSlope(const Vector3f& p0, const Vector3f& p1, bool atEnd, const Vector3f& other);
 
-    // A polyline through count points (closed: last back to first), the pattern continuous over the
-    // joints. The phase is accumulated from the point distances, i.e. in the caller's units - equal to
-    // view units as long as the model view carries no scale.
-    bool AddStrip(const Vector3f* points, int count, float width, const RGBAColor& color, Style style = Style::Solid, bool closed = false);
+	// A polyline through count points (closed: last back to first), the pattern continuous over the
+	// joints. The phase is accumulated from the point distances, i.e. in the caller's units - equal to
+	// view units as long as the model view carries no scale.
+	bool AddStrip(const Vector3f* points, int count, float width, const RGBAColor& color, Style style = Style::Solid, bool closed = false);
 
-    // Draws what was added since Clear () with the current matrices and viewport.
-    bool Render(void);
+	// Draws what was added since Clear () with the current matrices and viewport.
+	bool Render(void);
 
-    bool Upload(void);
+	bool Upload(void);
 
 private:
-    GfxArray<Line, GfxTypes::StructuredBuffer>  m_buffer;
-    AutoArray<Line>                             m_lines;
-    int                                         m_lineCapacity{ 0 };
-    int                                         m_capacity{ 0 };
-    int                                         m_count{ 0 };
-    BaseQuadMesh                                m_quad;
-    bool                                        m_quadReady{ false };
-    bool                                        m_isAvailable{ false };
-    bool                                        m_isResident{ false };
+	GfxArray<Line, GfxTypes::StructuredBuffer>	m_buffer;
+	AutoArray<Line>								m_lines;
+	int											m_lineCapacity{ 0 };
+	int											m_capacity{ 0 };
+	int											m_count{ 0 };
+	BaseQuadMesh								m_quad;
+	bool										m_quadReady{ false };
+	bool										m_isAvailable{ false };
+	bool										m_isResident{ false };
 
-    bool Reserve(int count);
-    bool ReserveBuffer(int count);
-    void SetupQuad(void);
+	bool Reserve(int count);
+	bool ReserveBuffer(int count);
+	void SetupQuad(void);
 };
 
 static_assert(sizeof(LineRenderer::Line) == 64, "LineRenderer::Line must stay 64 bytes (GPU StructuredBuffer layout)");

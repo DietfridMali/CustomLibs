@@ -15,8 +15,8 @@
 // 16-byte alignment, so the segment struct is declared as flat floats to match the 96-byte C++ layout.
 
 static const ShaderDataAttributes LightningQuadAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 static const String LightningDrawVS = String(R"(#version 430 core
@@ -162,14 +162,14 @@ void main() {
 }
 )");
 
-const ShaderSource& LightningDrawShader() {
-    static const ShaderSource source(
-        "lightningDraw",
-        LightningDrawVS,
-        LightningDrawFS,
-        ShaderDataLayout(LightningQuadAttrs, 2)
-    );
-    return source;
+const ShaderSource& LightningDrawShader()
+{
+	static const ShaderSource source(
+		"lightningDraw",
+		LightningDrawVS,
+		LightningDrawFS,
+		ShaderDataLayout(LightningQuadAttrs, 2));
+	return source;
 }
 
 // =================================================================================================
@@ -254,14 +254,14 @@ void main() {
 }
 )");
 
-const ShaderSource& LightningFlareShader() {
-    static const ShaderSource source(
-        "lightningFlare",
-        LightningFlareVS,
-        LightningFlareFS,
-        ShaderDataLayout(LightningQuadAttrs, 2)
-    );
-    return source;
+const ShaderSource& LightningFlareShader()
+{
+	static const ShaderSource source(
+		"lightningFlare",
+		LightningFlareVS,
+		LightningFlareFS,
+		ShaderDataLayout(LightningQuadAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

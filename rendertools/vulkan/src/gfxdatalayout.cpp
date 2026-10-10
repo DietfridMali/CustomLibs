@@ -15,7 +15,8 @@
 #include <new>
 #include <vector>
 
-extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
+extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader)
+noexcept;
 
 // =================================================================================================
 // Vulkan GfxDataLayout implementation
@@ -34,193 +35,211 @@ extern bool ResolveDrawPipeline(CommandList* cl, Shader* shader) noexcept;
 
 // =================================================================================================
 
-GfxDataLayout* GfxDataLayout::activeLayout = nullptr;
-List<GfxDataLayout*> GfxDataLayout::layoutStack;
+GfxDataLayout*			GfxDataLayout::activeLayout = nullptr;
+List<GfxDataLayout*>	GfxDataLayout::layoutStack;
 
 // =================================================================================================
 
-bool GfxDataLayout::Create(MeshTopology shape, uint32_t dynamicBuffers) noexcept
+bool GfxDataLayout::Create(MeshTopology shape, uint32_t dynamicBuffers)
+noexcept
 {
-    m_shape = shape;
-    SetDynamic(dynamicBuffers);
-    return true;
+	m_shape = shape;
+	SetDynamic(dynamicBuffers);
+	return true;
 }
 
 
-void GfxDataLayout::SetDynamic(uint32_t dynamicBuffers) noexcept
+void GfxDataLayout::SetDynamic(uint32_t dynamicBuffers)
+noexcept
 {
-    m_dynamicBuffers = dynamicBuffers;
-    for (auto gfxDataBuffer : m_dataBuffers)
-        gfxDataBuffer->SetDynamic((dynamicBuffers & Mesh::MeshBufferBit(gfxDataBuffer->m_type, gfxDataBuffer->m_id)) != 0);
-    m_indexBuffer.SetDynamic((dynamicBuffers & Mesh::mbIndex) != 0);
+	m_dynamicBuffers = dynamicBuffers;
+	for (auto gfxDataBuffer : m_dataBuffers)
+		gfxDataBuffer->SetDynamic((dynamicBuffers & Mesh::MeshBufferBit(gfxDataBuffer->m_type, gfxDataBuffer->m_id)) != 0);
+	m_indexBuffer.SetDynamic((dynamicBuffers & Mesh::mbIndex) != 0);
 }
 
 
-void GfxDataLayout::Destroy(void) noexcept
+void GfxDataLayout::Destroy(void)
+noexcept
 {
-    Disable();
-    for (auto& gfxDataBuffer : m_dataBuffers) {
-        gfxDataBuffer->Destroy();
-        delete gfxDataBuffer;
-    }
-    m_indexBuffer.Destroy();
-    m_dataBuffers.Clear();
+	Disable();
+	for (auto& gfxDataBuffer : m_dataBuffers) {
+		gfxDataBuffer->Destroy();
+		delete gfxDataBuffer;
+	}
+	m_indexBuffer.Destroy();
+	m_dataBuffers.Clear();
 }
 
 
 GfxDataLayout& GfxDataLayout::Copy(GfxDataLayout const& other)
 {
-    if (this != &other) {
-        Destroy();
-        m_dataBuffers = other.m_dataBuffers;
-        m_indexBuffer = other.m_indexBuffer;
-        m_shape = other.m_shape;
-        m_instanceCount = other.m_instanceCount;
-    }
-    return *this;
+	if (this != &other) {
+		Destroy();
+		m_dataBuffers = other.m_dataBuffers;
+		m_indexBuffer = other.m_indexBuffer;
+		m_shape = other.m_shape;
+		m_instanceCount = other.m_instanceCount;
+	}
+	return *this;
 }
 
 
-GfxDataLayout& GfxDataLayout::Move(GfxDataLayout& other) noexcept
+GfxDataLayout& GfxDataLayout::Move(GfxDataLayout& other)
+noexcept
 {
-    if (this != &other) {
-        Destroy();
-        m_dataBuffers = std::move(other.m_dataBuffers);
-        m_indexBuffer = std::move(other.m_indexBuffer);
-        m_shape = other.m_shape;
-        m_instanceCount = other.m_instanceCount;
-    }
-    return *this;
+	if (this != &other) {
+		Destroy();
+		m_dataBuffers = std::move(other.m_dataBuffers);
+		m_indexBuffer = std::move(other.m_indexBuffer);
+		m_shape = other.m_shape;
+		m_instanceCount = other.m_instanceCount;
+	}
+	return *this;
 }
 
 
-GfxDataBuffer* GfxDataLayout::FindBuffer(const char* type, int id, int& index) noexcept
+GfxDataBuffer* GfxDataLayout::FindBuffer(const char* type, int id, int& index)
+noexcept
 {
-    int i = 0;
-    for (auto gfxDataBuffer : m_dataBuffers) {
-        if (gfxDataBuffer->IsType(type) and gfxDataBuffer->HasID(id)) {
-            index = i;
-            return gfxDataBuffer;
-        }
-        ++i;
-    }
-    return nullptr;
+	int i = 0;
+	for (auto gfxDataBuffer : m_dataBuffers) {
+		if (gfxDataBuffer->IsType(type) and gfxDataBuffer->HasID(id)) {
+			index = i;
+			return gfxDataBuffer;
+		}
+		++i;
+	}
+	return nullptr;
 }
 
 
-bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType,
+									 bool forceUpdate)
+noexcept
 {
-    if (forceUpdate or buffer.IsDirty()) {
-        if (not UpdateDataBuffer(type, id,
-                                 buffer.GfxDataBuffer(), buffer.GfxDataSize(),
-                                 size_t(componentType),
-                                 size_t(buffer.ComponentCount()), forceUpdate))
-            return false;
-        buffer.SetDirty(false);
-    }
-    return true;
+	if (forceUpdate or buffer.IsDirty()) {
+		if (not UpdateDataBuffer(type, id,
+								 buffer.GfxDataBuffer(), buffer.GfxDataSize(),
+								 size_t(componentType),
+								 size_t(buffer.ComponentCount()), forceUpdate))
+			return false;
+		buffer.SetDirty(false);
+	}
+	return true;
 }
 
 
-void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate) noexcept
+void GfxDataLayout::UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate)
+noexcept
 {
-    if (forceUpdate or buffer.IsDirty()) {
-        if (UpdateIndexBuffer(buffer.GfxDataBuffer(), buffer.GfxDataSize(), size_t(componentType), forceUpdate))
-            buffer.SetDirty(false);
-    }
+	if (forceUpdate or buffer.IsDirty()) {
+		if (UpdateIndexBuffer(buffer.GfxDataBuffer(), buffer.GfxDataSize(), size_t(componentType), forceUpdate))
+			buffer.SetDirty(false);
+	}
 }
 
 
-bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType,
+								 size_t componentCount, bool forceUpdate)
+noexcept
 {
-    if (strcmp(type, "Index"))
-        return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
-    return UpdateIndexBuffer(data, dataSize, componentType, forceUpdate);
+	if (strcmp(type, "Index"))
+		return UpdateDataBuffer(type, id, data, dataSize, componentType, componentCount, forceUpdate);
+	return UpdateIndexBuffer(data, dataSize, componentType, forceUpdate);
 }
 
 
-bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType,
+									 size_t componentCount, bool forceUpdate)
+noexcept
 {
-    if (dataSize == 0)
-        return false;
-    int foundIndex = -1;
-    GfxDataBuffer* buffer = FindBuffer(type, id, foundIndex);
-    if (not buffer) {
-        buffer = new (std::nothrow) GfxDataBuffer(type, id);
-        if (not buffer)
-            return false;
-        m_dataBuffers.Append(buffer);
-        buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
-        foundIndex = int(m_dataBuffers.Length()) - 1;
-    }
-    int slot = GfxAttributeSlot(type, id);
-    assert(slot >= 0);  // unknown buffer tags are not part of the attribute registry
-    if (slot < 0)
-        return false;
+	if (dataSize == 0)
+		return false;
+	int				foundIndex = -1;
+	GfxDataBuffer*	buffer = FindBuffer(type, id, foundIndex);
+	if (not buffer) {
+		buffer = new (std::nothrow) GfxDataBuffer(type, id);
+		if (not buffer)
+			return false;
+		m_dataBuffers.Append(buffer);
+		buffer->SetDynamic((m_dynamicBuffers & Mesh::MeshBufferBit(type, id)) != 0);
+		foundIndex = int(m_dataBuffers.Length()) - 1;
+	}
+	int slot = GfxAttributeSlot(type, id);
+	assert(slot >= 0); // unknown buffer tags are not part of the attribute registry
+	if (slot < 0)
+		return false;
 
-    return buffer->Update(type, GfxBufferTarget::Vertex, slot, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
+	return buffer->Update(type, GfxBufferTarget::Vertex, slot, data, dataSize, ComponentType(componentType), componentCount, forceUpdate);
 }
 
 
-bool GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate) noexcept
+bool GfxDataLayout::UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate)
+noexcept
 {
-    return m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
+	return m_indexBuffer.Update("Index", GfxBufferTarget::Index, -1, data, dataSize, ComponentType(componentType), 1, forceUpdate);
 }
 
 // =================================================================================================
 
 struct DefaultVertexStreams {
-    GfxDataBuffer   zeros { "DefaultVertexZeros", 0, GfxBufferTarget::Vertex, true };
-    GfxDataBuffer   unitW { "DefaultVertexUnitW", 0, GfxBufferTarget::Vertex, true };
-    uint32_t        capacity { 0 };
+	GfxDataBuffer	zeros{ "DefaultVertexZeros", 0, GfxBufferTarget::Vertex, true };
+	GfxDataBuffer	unitW{ "DefaultVertexUnitW", 0, GfxBufferTarget::Vertex, true };
+	uint32_t		capacity{ 0 };
 };
 
 static DefaultVertexStreams* defaultStreams = nullptr;
 
 
 #if OPTIMIZE_BUFFER_REUSE
-static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::Format format, uint64_t frameNumber) noexcept
+static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::Format format, uint64_t frameNumber)
+noexcept
 #else
-static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::Format format) noexcept
+static VkBuffer DefaultVertexBuffer(uint32_t vertexCount, ShaderDataAttributes::Format format)
+noexcept
 #endif
 {
-    if (not defaultStreams) {
-        defaultStreams = new (std::nothrow) DefaultVertexStreams;
-        if (not defaultStreams)
-            return VK_NULL_HANDLE;
-    }
-    DefaultVertexStreams& streams = *defaultStreams;
-    if (vertexCount > streams.capacity) {
-        uint32_t capacity = std::max(std::max(vertexCount, streams.capacity * 2), uint32_t(4096));
-        std::vector<float> data(size_t(capacity) * 4, 0.0f);
-        if (not streams.zeros.Update("DefaultVertexZeros", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float), ComponentType::Float, 4))
-            return VK_NULL_HANDLE;
-        for (size_t i = 3; i < data.size(); i += 4)
-            data[i] = 1.0f;
-        if (not streams.unitW.Update("DefaultVertexUnitW", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float), ComponentType::Float, 4))
-            return VK_NULL_HANDLE;
-        streams.capacity = capacity;
-    }
+	if (not defaultStreams) {
+		defaultStreams = new (std::nothrow) DefaultVertexStreams;
+		if (not defaultStreams)
+			return VK_NULL_HANDLE;
+	}
+	DefaultVertexStreams& streams = *defaultStreams;
+	if (vertexCount > streams.capacity) {
+		uint32_t capacity = std::max(std::max(vertexCount, streams.capacity * 2), uint32_t(4096));
+		std::vector<float> data(size_t(capacity) * 4, 0.0f);
+		if (not streams.zeros.Update("DefaultVertexZeros", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float),
+									 ComponentType::Float, 4))
+			return VK_NULL_HANDLE;
+		for (size_t i = 3; i < data.size(); i += 4)
+			data[i] = 1.0f;
+		if (not streams.unitW.Update("DefaultVertexUnitW", GfxBufferTarget::Vertex, 0, data.data(), data.size() * sizeof(float),
+									 ComponentType::Float, 4))
+			return VK_NULL_HANDLE;
+		streams.capacity = capacity;
+	}
 #if OPTIMIZE_BUFFER_REUSE
 
-    GfxDataBuffer& stream = (format == ShaderDataAttributes::Float4) ? streams.unitW : streams.zeros;
+	GfxDataBuffer& stream = (format == ShaderDataAttributes::Float4) ? streams.unitW : streams.zeros;
 
-    stream.MarkBound(frameNumber);
-    return stream.Buffer();
+	stream.MarkBound(frameNumber);
+	return stream.Buffer();
 #else
-    return (format == ShaderDataAttributes::Float4) ? streams.unitW.Buffer() : streams.zeros.Buffer();
+	return (format == ShaderDataAttributes::Float4) ? streams.unitW.Buffer() : streams.zeros.Buffer();
 #endif
 }
 
 
-void GfxDataLayout::DestroyDefaultStreams(void) noexcept
+void GfxDataLayout::DestroyDefaultStreams(void)
+noexcept
 {
-    if (not defaultStreams)
-        return;
-    defaultStreams->zeros.Destroy();
-    defaultStreams->unitW.Destroy();
-    delete defaultStreams;
-    defaultStreams = nullptr;
+	if (not defaultStreams)
+		return;
+	defaultStreams->zeros.Destroy();
+	defaultStreams->unitW.Destroy();
+	delete defaultStreams;
+	defaultStreams = nullptr;
 }
 
 // =================================================================================================
@@ -230,226 +249,237 @@ void GfxDataLayout::DestroyDefaultStreams(void) noexcept
 // IASetIndexBuffer -> vkCmdBindIndexBuffer, IASetPrimitiveTopology -> baked into the pipeline.
 // DrawInstanced / DrawIndexedInstanced go through the matching commandListHandler wrappers.
 
-bool GfxDataLayout::Enable(void) noexcept
+bool GfxDataLayout::Enable(void)
+noexcept
 {
-    Activate();
-    m_isBound = true;
+	Activate();
+	m_isBound = true;
 
-    VkCommandBuffer cb = commandListHandler.CurrentGfxList();
-    if (cb == VK_NULL_HANDLE)
-        return true;
+	VkCommandBuffer cb = commandListHandler.CurrentGfxList();
+	if (cb == VK_NULL_HANDLE)
+		return true;
 
-    constexpr int kMaxStreams = 16;
+	constexpr int kMaxStreams = 16;
 #if OPTIMIZE_BUFFER_REUSE
-    const uint64_t frameNumber = commandListHandler.CmdQueue().FrameNumber();
+	const uint64_t frameNumber = commandListHandler.CmdQueue().FrameNumber();
 #endif
-    VkBuffer     buffers[kMaxStreams] { };
-    VkDeviceSize offsets[kMaxStreams] { };
-    bool         filled[kMaxStreams]  { };
-    int maxSlot = 0;
-    for (auto* gdb : m_dataBuffers) {
-        if (not gdb or not gdb->IsValid() or (gdb->m_bufferType != GfxBufferTarget::Vertex))
-            continue;
-        int slot = (gdb->m_index >= 0) ? gdb->m_index : maxSlot;
-        if (slot >= kMaxStreams)
-            continue;
-        buffers[slot] = gdb->Buffer();
+	VkBuffer		buffers[kMaxStreams]{};
+	VkDeviceSize	offsets[kMaxStreams]{};
+	bool			filled[kMaxStreams]{};
+	int				maxSlot = 0;
+	for (auto* gdb : m_dataBuffers) {
+		if (not gdb or not gdb->IsValid() or (gdb->m_bufferType != GfxBufferTarget::Vertex))
+			continue;
+		int slot = (gdb->m_index >= 0) ? gdb->m_index : maxSlot;
+		if (slot >= kMaxStreams)
+			continue;
+		buffers[slot] = gdb->Buffer();
 #if OPTIMIZE_BUFFER_REUSE
-        gdb->MarkBound(frameNumber);
+		gdb->MarkBound(frameNumber);
 #endif
-        offsets[slot] = 0;
-        filled[slot] = true;
-        if (slot >= maxSlot)
-            maxSlot = slot + 1;
-    }
-    Shader* shader = baseShaderHandler.ActiveShader();
-    if (shader) {
-        uint32_t vertexCount = 0;
-        for (auto* gdb : m_dataBuffers) {
-            if (gdb and gdb->IsValid() and (gdb->m_bufferType == GfxBufferTarget::Vertex))
-                vertexCount = std::max(vertexCount, gdb->m_itemCount);
-        }
-        const ShaderDataLayout& layout = shader->m_dataLayout;
-        for (int i = 0; i < layout.m_count; ++i) {
-            int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
-            if ((slot < 0) or (slot >= kMaxStreams) or filled[slot])
-                continue;
-            if (layout.m_attrs[i].perInstance) {
-                VkBuffer stream = commandListHandler.InstanceStream(uint32_t(slot));
-                if (stream == VK_NULL_HANDLE)
-                    continue;
-                buffers[slot] = stream;
-                offsets[slot] = 0;
-                filled[slot] = true;
-                if (slot >= maxSlot)
-                    maxSlot = slot + 1;
-                continue;
-            }
+		offsets[slot] = 0;
+		filled[slot] = true;
+		if (slot >= maxSlot)
+			maxSlot = slot + 1;
+	}
+	Shader* shader = baseShaderHandler.ActiveShader();
+	if (shader) {
+		uint32_t vertexCount = 0;
+		for (auto* gdb : m_dataBuffers) {
+			if (gdb and gdb->IsValid() and (gdb->m_bufferType == GfxBufferTarget::Vertex))
+				vertexCount = std::max(vertexCount, gdb->m_itemCount);
+		}
+		const ShaderDataLayout& layout = shader->m_dataLayout;
+		for (int i = 0; i < layout.m_count; ++i) {
+			int slot = GfxAttributeSlot(layout.m_attrs[i].datatype, layout.m_attrs[i].id);
+			if ((slot < 0) or (slot >= kMaxStreams) or filled[slot])
+				continue;
+			if (layout.m_attrs[i].perInstance) {
+				VkBuffer stream = commandListHandler.InstanceStream(uint32_t(slot));
+				if (stream == VK_NULL_HANDLE)
+					continue;
+				buffers[slot] = stream;
+				offsets[slot] = 0;
+				filled[slot] = true;
+				if (slot >= maxSlot)
+					maxSlot = slot + 1;
+				continue;
+			}
 #if OPTIMIZE_BUFFER_REUSE
-            VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format, frameNumber);
+			VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format, frameNumber);
 #else
-            VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format);
+			VkBuffer buffer = DefaultVertexBuffer(vertexCount, layout.m_attrs[i].format);
 #endif
-            if (buffer == VK_NULL_HANDLE)
-                continue;
-            buffers[slot] = buffer;
-            offsets[slot] = 0;
-            filled[slot] = true;
-            if (slot >= maxSlot)
-                maxSlot = slot + 1;
-        }
-    }
-    // Bind contiguous ranges only — vkCmdBindVertexBuffers does not accept VK_NULL_HANDLE
-    // elements without the nullDescriptor feature. The fixed slot layout has semantic gaps
-    // (e.g. ColorMeshShader uses slots 0 + 4; SmileyModelShader uses 0 + 4..10, skipping 1..3).
-    int i = 0;
-    while (i < maxSlot) {
-        if (not filled[i]) {
-            ++i;
-            continue;
-        }
-        int j = i;
-        while ((j < maxSlot) and filled[j])
-            ++j;
-        vkCmdBindVertexBuffers(cb, uint32_t(i), uint32_t(j - i), buffers + i, offsets + i);
-        i = j;
-    }
+			if (buffer == VK_NULL_HANDLE)
+				continue;
+			buffers[slot] = buffer;
+			offsets[slot] = 0;
+			filled[slot] = true;
+			if (slot >= maxSlot)
+				maxSlot = slot + 1;
+		}
+	}
+	// Bind contiguous ranges only — vkCmdBindVertexBuffers does not accept VK_NULL_HANDLE
+	// elements without the nullDescriptor feature. The fixed slot layout has semantic gaps
+	// (e.g. ColorMeshShader uses slots 0 + 4; SmileyModelShader uses 0 + 4..10, skipping 1..3).
+	int i = 0;
+	while (i < maxSlot) {
+		if (not filled[i]) {
+			++i;
+			continue;
+		}
+		int j = i;
+		while ((j < maxSlot) and filled[j])
+			++j;
+		vkCmdBindVertexBuffers(cb, uint32_t(i), uint32_t(j - i), buffers + i, offsets + i);
+		i = j;
+	}
 
 #if OPTIMIZE_BUFFER_REUSE
-    if (m_indexBuffer.IsValid()) {
-        vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
-        m_indexBuffer.MarkBound(frameNumber);
-    }
+	if (m_indexBuffer.IsValid()) {
+		vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
+		m_indexBuffer.MarkBound(frameNumber);
+	}
 #else
-    if (m_indexBuffer.IsValid())
-        vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
+	if (m_indexBuffer.IsValid())
+		vkCmdBindIndexBuffer(cb, m_indexBuffer.Buffer(), 0, m_indexBuffer.IndexType());
 #endif
 
-    // Primitive topology is baked into the VkPipeline (no IASetPrimitiveTopology equivalent
-    // in dynamic rendering). Render () feeds m_shape into the PipelineKey via CommandList::SetTopology ().
-    return true;
+	// Primitive topology is baked into the VkPipeline (no IASetPrimitiveTopology equivalent
+	// in dynamic rendering). Render () feeds m_shape into the PipelineKey via CommandList::SetTopology ().
+	return true;
 }
 
 
-void GfxDataLayout::Disable(void) noexcept
+void GfxDataLayout::Disable(void)
+noexcept
 {
-    Deactivate();
-    m_isBound = false;
+	Deactivate();
+	m_isBound = false;
 }
 
 
-CommandList* GfxDataLayout::StartUpdate(void) noexcept
+CommandList* GfxDataLayout::StartUpdate(void)
+noexcept
 {
-    m_updateList = static_cast<CommandList*>(baseRenderer.StartOperation("GfxDataLayout::Update", false));
-    return m_updateList;
+	m_updateList = static_cast<CommandList*>(baseRenderer.StartOperation("GfxDataLayout::Update", false));
+	return m_updateList;
 }
 
 
-bool GfxDataLayout::FinishUpdate(void) noexcept
+bool GfxDataLayout::FinishUpdate(void)
+noexcept
 {
-    bool result = baseRenderer.FinishOperation(m_updateList);
-    m_updateList = nullptr;
-    return result;
+	bool result = baseRenderer.FinishOperation(m_updateList);
+	m_updateList = nullptr;
+	return result;
 }
 
 
-bool GfxDataLayout::ActivateTextures(std::span<Texture* const> textures) noexcept {
-    int tmu = 0;
-    for (Texture* t : textures) {
-        if (t) {
-            if (not t->Activate(tmu))
-                return false;
-        }
-        else {
-            // Texture-array slot is null (e.g. shadowMap when no shadows are cast).
-            // Clear the bind-table entry so a previous pass' image (e.g. CloudRenderer's
-            // 3D blueNoise) doesn't leak into this draw's DescriptorSet.
-            commandListHandler.BindSampledImage(uint32_t(tmu), VK_NULL_HANDLE);
-            commandListHandler.BindSampler(uint32_t(tmu), VK_NULL_HANDLE);
-        }
-        ++tmu;
-    }
-    return true;
-}
-
-
-void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstIndex, uint32_t indexCount) noexcept
+bool GfxDataLayout::ActivateTextures(std::span<Texture* const> textures)
+noexcept
 {
-    if (not StartRender())
-        return;
-    ActivateTextures(textures);
-    //gfxStates.CheckError();
-
-    // Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU and
-    // materialize the bind table into a VkDescriptorSet for this draw.
-    Shader* shader = baseShaderHandler.ActiveShader();
-    // A draw whose descriptor set or constants could not be set up is not recorded: it would run with
-    // whatever set the command buffer had bound before, or with none, and that costs the device.
-    bool hasVariables = true;
-    if (shader) {
-        if (CommandList* cl = commandListHandler.CurrentCmdList()) {
-            cl->SetTopology(shader, m_shape);
-            ResolveDrawPipeline(cl, shader);
-        }
-        vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
-        hasVariables = shader->UpdateVariables();
-    }
-    //gfxStates.CheckError();
-    if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
-        if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
-            uint32_t count = (indexCount > 0) ? uint32_t(indexCount) : uint32_t(m_indexBuffer.m_itemCount) - uint32_t(firstIndex);
-            if (count > 0) {
-                commandListHandler.DrawIndexedInstanced(count, m_instanceCount, uint32_t(firstIndex), 0, 0);
-                gfxStates.CountDraw();
-            }
-        }
-        else {
-            uint32_t vertCount = 0;
-            if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
-                vertCount = uint32_t(m_dataBuffers[0]->m_itemCount);
-            if (vertCount > 0) {
-                commandListHandler.DrawInstanced(vertCount, m_instanceCount, 0, 0);
-                gfxStates.CountDraw();
-            }
-        }
-    }
-    gfxStates.CheckError("GfxDataLayout::Render draw");
-    vkContext.SetValidationShader(nullptr);
-    // The textures stay bound. GfxStates::BindTexture () returns at once when the same texture is
-    // already on the same unit, so a batch that keeps using them costs nothing after the first draw -
-    // releasing them here threw that away and made every draw bind again, plus two calls for the
-    // release itself. Nor did it protect anything: a slot a later draw does not assign is a fault in
-    // that draw's shader setup, and one that is better seen than papered over.
-    //gfxStates.CheckError();
-    FinishRender();
-    //gfxStates.CheckError();
+	int tmu = 0;
+	for (Texture* t : textures) {
+		if (t) {
+			if (not t->Activate(tmu))
+				return false;
+		}
+		else {
+			// Texture-array slot is null (e.g. shadowMap when no shadows are cast).
+			// Clear the bind-table entry so a previous pass' image (e.g. CloudRenderer's
+			// 3D blueNoise) doesn't leak into this draw's DescriptorSet.
+			commandListHandler.BindSampledImage(uint32_t(tmu), VK_NULL_HANDLE);
+			commandListHandler.BindSampler(uint32_t(tmu), VK_NULL_HANDLE);
+		}
+		++tmu;
+	}
+	return true;
 }
 
 
-void GfxDataLayout::RenderIndirect(std::span<Texture* const> textures, GfxDrawCommandBuffer& commands, uint32_t firstCommand, uint32_t commandCount) noexcept
+void GfxDataLayout::Render(std::span<Texture* const> textures, uint32_t firstIndex, uint32_t indexCount)
+noexcept
 {
-    if ((commandCount == 0) or (commands.m_buffer == VK_NULL_HANDLE) or not m_indexBuffer.IsValid())
-        return;
-    if (not StartRender())
-        return;
-    ActivateTextures(textures);
-    Shader* shader = baseShaderHandler.ActiveShader();
-    bool hasVariables = true;
-    if (shader) {
-        if (CommandList* cl = commandListHandler.CurrentCmdList()) {
-            cl->SetTopology(shader, m_shape);
-            ResolveDrawPipeline(cl, shader);
-        }
-        vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
-        hasVariables = shader->UpdateVariables();
-    }
-    if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
-        commandListHandler.DrawIndexedIndirect(commands.m_buffer, VkDeviceSize(firstCommand) * VkDeviceSize(sizeof(GfxDrawCommand)), commandCount, uint32_t(sizeof(GfxDrawCommand)));
-        gfxStates.CountDraw();
-    }
-    gfxStates.CheckError("GfxDataLayout::RenderIndirect draw");
-    vkContext.SetValidationShader(nullptr);
-    FinishRender();
+	if (not StartRender())
+		return;
+	ActivateTextures(textures);
+	//gfxStates.CheckError();
+
+	// Flush b1 shader constants (SetFloat/SetVector calls made after Enable()) to GPU and
+	// materialize the bind table into a VkDescriptorSet for this draw.
+	Shader* shader = baseShaderHandler.ActiveShader();
+	// A draw whose descriptor set or constants could not be set up is not recorded: it would run with
+	// whatever set the command buffer had bound before, or with none, and that costs the device.
+	bool hasVariables = true;
+	if (shader) {
+		if (CommandList* cl = commandListHandler.CurrentCmdList()) {
+			cl->SetTopology(shader, m_shape);
+			ResolveDrawPipeline(cl, shader);
+		}
+		vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
+		hasVariables = shader->UpdateVariables();
+	}
+	//gfxStates.CheckError();
+	if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
+		if (m_indexBuffer.IsValid() and (m_indexBuffer.m_itemCount > 0)) {
+			uint32_t count = (indexCount > 0) ? uint32_t(indexCount) : uint32_t(m_indexBuffer.m_itemCount) - uint32_t(firstIndex);
+			if (count > 0) {
+				commandListHandler.DrawIndexedInstanced(count, m_instanceCount, uint32_t(firstIndex), 0, 0);
+				gfxStates.CountDraw();
+			}
+		}
+		else {
+			uint32_t vertCount = 0;
+			if (m_dataBuffers.Length() > 0 and m_dataBuffers[0])
+				vertCount = uint32_t(m_dataBuffers[0]->m_itemCount);
+			if (vertCount > 0) {
+				commandListHandler.DrawInstanced(vertCount, m_instanceCount, 0, 0);
+				gfxStates.CountDraw();
+			}
+		}
+	}
+	gfxStates.CheckError("GfxDataLayout::Render draw");
+	vkContext.SetValidationShader(nullptr);
+	// The textures stay bound. GfxStates::BindTexture () returns at once when the same texture is
+	// already on the same unit, so a batch that keeps using them costs nothing after the first draw -
+	// releasing them here threw that away and made every draw bind again, plus two calls for the
+	// release itself. Nor did it protect anything: a slot a later draw does not assign is a fault in
+	// that draw's shader setup, and one that is better seen than papered over.
+	//gfxStates.CheckError();
+	FinishRender();
+	//gfxStates.CheckError();
+}
+
+
+void GfxDataLayout::RenderIndirect(std::span<Texture* const> textures, GfxDrawCommandBuffer& commands, uint32_t firstCommand,
+								   uint32_t commandCount)
+noexcept
+{
+	if ((commandCount == 0) or (commands.m_buffer == VK_NULL_HANDLE) or not m_indexBuffer.IsValid())
+		return;
+	if (not StartRender())
+		return;
+	ActivateTextures(textures);
+	Shader*	shader = baseShaderHandler.ActiveShader();
+	bool	hasVariables = true;
+	if (shader) {
+		if (CommandList* cl = commandListHandler.CurrentCmdList()) {
+			cl->SetTopology(shader, m_shape);
+			ResolveDrawPipeline(cl, shader);
+		}
+		vkContext.SetValidationShader(static_cast<const char*>(shader->m_name));
+		hasVariables = shader->UpdateVariables();
+	}
+	if (hasVariables and (commandListHandler.CurrentGfxList() != VK_NULL_HANDLE)) {
+		commandListHandler.DrawIndexedIndirect(commands.m_buffer,
+											   VkDeviceSize(firstCommand) * VkDeviceSize(sizeof(GfxDrawCommand)), commandCount,
+											   uint32_t(sizeof(GfxDrawCommand)));
+		gfxStates.CountDraw();
+	}
+	gfxStates.CheckError("GfxDataLayout::RenderIndirect draw");
+	vkContext.SetValidationShader(nullptr);
+	FinishRender();
 }
 
 // =================================================================================================

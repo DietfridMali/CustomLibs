@@ -14,8 +14,7 @@ using FileList = AutoArray<String>;
 
 class FileLister {
 public:
-    static FileList Get(const String& pattern);
+	static FileList Get(const String& pattern);
 };
 
 // =================================================================================================
-

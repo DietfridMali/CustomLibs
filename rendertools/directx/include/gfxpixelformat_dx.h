@@ -7,31 +7,52 @@
 // DirectX 12 mapping for the platform-neutral GfxPixelFormat enum (defined in rendertypes.h).
 // Returns the DXGI_FORMAT used both for resource creation and SRV typing.
 
-inline constexpr DXGI_FORMAT ToDXGIFormat(GfxPixelFormat f) noexcept {
-    switch (f) {
-        case GfxPixelFormat::R8_UNorm:       return DXGI_FORMAT_R8_UNORM;
-        case GfxPixelFormat::RG8_UNorm:      return DXGI_FORMAT_R8G8_UNORM;
-        case GfxPixelFormat::RGBA8_UNorm:    return DXGI_FORMAT_R8G8B8A8_UNORM;
-        case GfxPixelFormat::R16_SFloat:     return DXGI_FORMAT_R16_FLOAT;
-        case GfxPixelFormat::R32_SFloat:     return DXGI_FORMAT_R32_FLOAT;
-        case GfxPixelFormat::RGBA16_SFloat:  return DXGI_FORMAT_R16G16B16A16_FLOAT;
-        case GfxPixelFormat::RGBA32_SFloat:  return DXGI_FORMAT_R32G32B32A32_FLOAT;
-        case GfxPixelFormat::RG11B10_SFloat: return DXGI_FORMAT_R11G11B10_FLOAT;
-        case GfxPixelFormat::BC1_UNorm:      return DXGI_FORMAT_BC1_UNORM;
-        case GfxPixelFormat::BC7_UNorm:      return DXGI_FORMAT_BC7_UNORM;
-        case GfxPixelFormat::BC7_UNorm_SRGB: return DXGI_FORMAT_BC7_UNORM_SRGB;
-        case GfxPixelFormat::BC4_UNorm:      return DXGI_FORMAT_BC4_UNORM;
-        case GfxPixelFormat::BC5_UNorm:      return DXGI_FORMAT_BC5_UNORM;
-        case GfxPixelFormat::RGBA8_UNorm_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        case GfxPixelFormat::BC1_UNorm_SRGB: return DXGI_FORMAT_BC1_UNORM_SRGB;
-        case GfxPixelFormat::R16_UInt:       return DXGI_FORMAT_R16_UINT;
-        case GfxPixelFormat::R32_UInt:       return DXGI_FORMAT_R32_UINT;
-    }
-    return DXGI_FORMAT_UNKNOWN;
+inline constexpr DXGI_FORMAT ToDXGIFormat(GfxPixelFormat f)
+noexcept
+{
+	switch (f) {
+		case GfxPixelFormat::R8_UNorm:
+			return DXGI_FORMAT_R8_UNORM;
+		case GfxPixelFormat::RG8_UNorm:
+			return DXGI_FORMAT_R8G8_UNORM;
+		case GfxPixelFormat::RGBA8_UNorm:
+			return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case GfxPixelFormat::R16_SFloat:
+			return DXGI_FORMAT_R16_FLOAT;
+		case GfxPixelFormat::R32_SFloat:
+			return DXGI_FORMAT_R32_FLOAT;
+		case GfxPixelFormat::RGBA16_SFloat:
+			return DXGI_FORMAT_R16G16B16A16_FLOAT;
+		case GfxPixelFormat::RGBA32_SFloat:
+			return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		case GfxPixelFormat::RG11B10_SFloat:
+			return DXGI_FORMAT_R11G11B10_FLOAT;
+		case GfxPixelFormat::BC1_UNorm:
+			return DXGI_FORMAT_BC1_UNORM;
+		case GfxPixelFormat::BC7_UNorm:
+			return DXGI_FORMAT_BC7_UNORM;
+		case GfxPixelFormat::BC7_UNorm_SRGB:
+			return DXGI_FORMAT_BC7_UNORM_SRGB;
+		case GfxPixelFormat::BC4_UNorm:
+			return DXGI_FORMAT_BC4_UNORM;
+		case GfxPixelFormat::BC5_UNorm:
+			return DXGI_FORMAT_BC5_UNORM;
+		case GfxPixelFormat::RGBA8_UNorm_SRGB:
+			return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		case GfxPixelFormat::BC1_UNorm_SRGB:
+			return DXGI_FORMAT_BC1_UNORM_SRGB;
+		case GfxPixelFormat::R16_UInt:
+			return DXGI_FORMAT_R16_UINT;
+		case GfxPixelFormat::R32_UInt:
+			return DXGI_FORMAT_R32_UINT;
+	}
+	return DXGI_FORMAT_UNKNOWN;
 }
 
-inline constexpr bool IsIntegerColorFormat(DXGI_FORMAT format) noexcept {
-    return (format == DXGI_FORMAT_R16_UINT) or (format == DXGI_FORMAT_R32_UINT);
+inline constexpr bool IsIntegerColorFormat(DXGI_FORMAT format)
+noexcept
+{
+	return (format == DXGI_FORMAT_R16_UINT) or (format == DXGI_FORMAT_R32_UINT);
 }
 
 
@@ -39,8 +60,10 @@ inline constexpr bool IsIntegerColorFormat(DXGI_FORMAT format) noexcept {
 // The same mapping under a name that is spelled identically in all three backends, so that code
 // outside the backend directories (TextureAtlas and friends) can fill RTCreationParams::colorFormat
 // without knowing whether that field is a GLenum, a DXGI_FORMAT or a VkFormat.
-inline constexpr DXGI_FORMAT ToNativeColorFormat(GfxPixelFormat f) noexcept {
-    return ToDXGIFormat(f);
+inline constexpr DXGI_FORMAT ToNativeColorFormat(GfxPixelFormat f)
+noexcept
+{
+	return ToDXGIFormat(f);
 }
 
 // =================================================================================================

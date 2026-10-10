@@ -20,30 +20,30 @@
 
 //-----------------------------------------------------------------------------
 
-#define AVL_OVERFLOW   1
-#define AVL_BALANCED   0
-#define AVL_UNDERFLOW  3
+#define AVL_OVERFLOW 1
+#define AVL_BALANCED 0
+#define AVL_UNDERFLOW 3
 
 //-----------------------------------------------------------------------------
-// Internal function to search a value in an avl tree. The value (key) pointer is 
+// Internal function to search a value in an avl tree. The value (key) pointer is
 // passed in avlTree->value.
 
 static void* find_value(avlTreeDescriptor_t* avlTree)
 {
-    for (avlTreeNode_t* node = avlTree->root; node; ) {
-        switch (avlTree->comparator(avlTree->value, node->value)) {
-        case -1:
-            node = node->left;
-            break;
-        case 1:
-            node = node->right;
-            break;
-        default:
-            avlTree->current = node;
-            return node->value;
-        }
-    }
-    return NULL;
+	for (avlTreeNode_t* node = avlTree->root; node;) {
+		switch (avlTree->comparator(avlTree->value, node->value)) {
+			case -1:
+				node = node->left;
+				break;
+			case 1:
+				node = node->right;
+				break;
+			default:
+				avlTree->current = node;
+				return node->value;
+		}
+	}
+	return NULL;
 }
 
 //-----------------------------------------------------------------------------
@@ -51,112 +51,112 @@ static void* find_value(avlTreeDescriptor_t* avlTree)
 
 static avlTreeNode_t* avltree_alloc_node(avlTreeDescriptor_t* avlTree, void* value)
 {
-    if (!(avlTree->current = (avlTreeNode_t*)malloc(sizeof (avlTreeNode_t)))) {
-        return NULL;
-    }
-    avlTree->current->value = value;
-    avlTree->branchHasChanged = true;
-    return avlTree->current;
+	if (!(avlTree->current = (avlTreeNode_t*)malloc(sizeof(avlTreeNode_t)))) {
+		return NULL;
+	}
+	avlTree->current->value = value;
+	avlTree->branchHasChanged = true;
+	return avlTree->current;
 }
 
 //-----------------------------------------------------------------------------
-// Internal function to insert a value in the avl tree. The value pointer is 
+// Internal function to insert a value in the avl tree. The value pointer is
 // passed in avlTree->value.
 
 static bool insert_value(avlTreeDescriptor_t* avlTree, avlTreeNode_t* root)
 {
-    avlTreeNode_t* p1, * p2, * r = avlTree->root;
-    if (!r)
-        return ((root = avltree_alloc_node(avlTree, avlTree->value)) != NULL);
+	avlTreeNode_t *p1, *p2, *r = avlTree->root;
+	if (!r)
+		return ((root = avltree_alloc_node(avlTree, avlTree->value)) != NULL);
 
-    switch (avlTree->comparator(avlTree->value, r->value)) {
-        case -1:
-            if (!insert_value(avlTree, r->left))
-                return false;
-            if (avlTree->branchHasChanged) {
-                switch (r->balance) {
-                case AVL_UNDERFLOW:
-                    p1 = r->left;
-                    if (p1->balance == AVL_UNDERFLOW) {  // single LL rotation
-                        r->left = p1->right;
-                        p1->right = r;
-                        r->balance = AVL_BALANCED;
-                        r = p1;
-                    }
-                    else { // double LR rotation
-                        p2 = p1->right;
-                        p1->right = p2->left;
-                        p2->left = p1;
-                        r->left = p2->right;
-                        p2->right = r;
-                        char b = p2->balance;
-                        r->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
-                        p1->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
-                        r = p2;
-                    }
-                    r->balance = AVL_BALANCED;
-                    avlTree->branchHasChanged = false;
-                    break;
+	switch (avlTree->comparator(avlTree->value, r->value)) {
+		case -1:
+			if (!insert_value(avlTree, r->left))
+				return false;
+			if (avlTree->branchHasChanged) {
+				switch (r->balance) {
+					case AVL_UNDERFLOW:
+						p1 = r->left;
+						if (p1->balance == AVL_UNDERFLOW) { // single LL rotation
+							r->left = p1->right;
+							p1->right = r;
+							r->balance = AVL_BALANCED;
+							r = p1;
+						}
+						else { // double LR rotation
+							p2 = p1->right;
+							p1->right = p2->left;
+							p2->left = p1;
+							r->left = p2->right;
+							p2->right = r;
+							char b = p2->balance;
+							r->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
+							p1->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
+							r = p2;
+						}
+						r->balance = AVL_BALANCED;
+						avlTree->branchHasChanged = false;
+						break;
 
-                case AVL_BALANCED:
-                    r->balance = AVL_UNDERFLOW;
-                    break;
+					case AVL_BALANCED:
+						r->balance = AVL_UNDERFLOW;
+						break;
 
-                case AVL_OVERFLOW:
-                    r->balance = AVL_BALANCED;
-                    avlTree->branchHasChanged = false;
-                    break;
-                }
-            }
-            break;
+					case AVL_OVERFLOW:
+						r->balance = AVL_BALANCED;
+						avlTree->branchHasChanged = false;
+						break;
+				}
+			}
+			break;
 
-        case 0:
-            avlTree->isDuplicate = true;
-            avlTree->current = r;
-            break;
+		case 0:
+			avlTree->isDuplicate = true;
+			avlTree->current = r;
+			break;
 
-        case 1:
-            if (!insert_value(avlTree, r->right))
-                return false;
-            if (avlTree->branchHasChanged) {
-                switch (r->balance) {
-                case AVL_UNDERFLOW:
-                    r->balance = AVL_BALANCED;
-                    avlTree->branchHasChanged = false;
-                    break;
+		case 1:
+			if (!insert_value(avlTree, r->right))
+				return false;
+			if (avlTree->branchHasChanged) {
+				switch (r->balance) {
+					case AVL_UNDERFLOW:
+						r->balance = AVL_BALANCED;
+						avlTree->branchHasChanged = false;
+						break;
 
-                case AVL_BALANCED:
-                    r->balance = AVL_OVERFLOW;
-                    break;
+					case AVL_BALANCED:
+						r->balance = AVL_OVERFLOW;
+						break;
 
-                case AVL_OVERFLOW: {
-                    avlTreeNode_t* p1 = r->right;
-                    if (p1->balance == AVL_OVERFLOW) { // single RR rotation
-                        r->right = p1->left;
-                        p1->left = r;
-                        r->balance = AVL_BALANCED;
-                        r = p1;
-                    }
-                    else { // double RL rotation
-                        avlTreeNode_t* p2 = p1->left;
-                        p1->left = p2->right;
-                        p2->right = p1;
-                        r->right = p2->left;
-                        p2->left = r;
-                        char b = p2->balance;
-                        r->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
-                        p1->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
-                        r = p2;
-                    }
-                    r->balance = AVL_BALANCED;
-                    avlTree->branchHasChanged = false;
-                }
-            }
-        }
-        break;
-    }
-    root = r;
-    return true;
+					case AVL_OVERFLOW: {
+						avlTreeNode_t* p1 = r->right;
+						if (p1->balance == AVL_OVERFLOW) { // single RR rotation
+							r->right = p1->left;
+							p1->left = r;
+							r->balance = AVL_BALANCED;
+							r = p1;
+						}
+						else { // double RL rotation
+							avlTreeNode_t* p2 = p1->left;
+							p1->left = p2->right;
+							p2->right = p1;
+							r->right = p2->left;
+							p2->left = r;
+							char b = p2->balance;
+							r->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
+							p1->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
+							r = p2;
+						}
+						r->balance = AVL_BALANCED;
+						avlTree->branchHasChanged = false;
+					}
+				}
+			}
+			break;
+	}
+	root = r;
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -164,47 +164,47 @@ static bool insert_value(avlTreeDescriptor_t* avlTree, avlTreeNode_t* root)
 
 static void balance_left_shrink(avlTreeNode_t** root, bool* branchHasShrunk)
 {
-    avlTreeNode_t* r = *root;
-    switch (r->balance) {
-        case AVL_UNDERFLOW:
-            r->balance = AVL_BALANCED;
-            break;
+	avlTreeNode_t* r = *root;
+	switch (r->balance) {
+		case AVL_UNDERFLOW:
+			r->balance = AVL_BALANCED;
+			break;
 
-        case AVL_BALANCED:
-            r->balance = AVL_OVERFLOW;
-            *branchHasShrunk = false;
-            break;
+		case AVL_BALANCED:
+			r->balance = AVL_OVERFLOW;
+			*branchHasShrunk = false;
+			break;
 
-        case AVL_OVERFLOW: {
-            avlTreeNode_t* p1 = r->right;
-            char b = p1->balance;
-            if (b != AVL_UNDERFLOW) { // single RR rotation
-                r->right = p1->left;
-                p1->left = r;
-                if (b)
-                    r->balance = p1->balance = AVL_BALANCED;
-                else {
-                    r->balance = AVL_OVERFLOW;
-                    p1->balance = AVL_UNDERFLOW;
-                    *branchHasShrunk = false;
-                }
-                r = p1;
-            }
-            else { // double RL rotation
-                avlTreeNode_t* p2 = p1->left;
-                b = p2->balance;
-                p1->left = p2->right;
-                p2->right = p1;
-                r->right = p2->left;
-                p2->left = r;
-                r->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
-                p1->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
-                r = p2;
-                r->balance = AVL_BALANCED;
-            }
-        }
-    }
-    *root = r;
+		case AVL_OVERFLOW: {
+			avlTreeNode_t*	p1 = r->right;
+			char			b = p1->balance;
+			if (b != AVL_UNDERFLOW) { // single RR rotation
+				r->right = p1->left;
+				p1->left = r;
+				if (b)
+					r->balance = p1->balance = AVL_BALANCED;
+				else {
+					r->balance = AVL_OVERFLOW;
+					p1->balance = AVL_UNDERFLOW;
+					*branchHasShrunk = false;
+				}
+				r = p1;
+			}
+			else { // double RL rotation
+				avlTreeNode_t* p2 = p1->left;
+				b = p2->balance;
+				p1->left = p2->right;
+				p2->right = p1;
+				r->right = p2->left;
+				p2->left = r;
+				r->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
+				p1->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
+				r = p2;
+				r->balance = AVL_BALANCED;
+			}
+		}
+	}
+	*root = r;
 }
 
 //-----------------------------------------------------------------------------
@@ -212,47 +212,47 @@ static void balance_left_shrink(avlTreeNode_t** root, bool* branchHasShrunk)
 
 static void balance_right_shrink(avlTreeNode_t** root, bool* branchHasShrunk)
 {
-    avlTreeNode_t* r = *root;
-    switch (r->balance) {
-        case AVL_OVERFLOW:
-            r->balance = AVL_BALANCED;
-            break;
+	avlTreeNode_t* r = *root;
+	switch (r->balance) {
+		case AVL_OVERFLOW:
+			r->balance = AVL_BALANCED;
+			break;
 
-        case AVL_BALANCED:
-            r->balance = AVL_UNDERFLOW;
-            *branchHasShrunk = false;
-            break;
+		case AVL_BALANCED:
+			r->balance = AVL_UNDERFLOW;
+			*branchHasShrunk = false;
+			break;
 
-        case AVL_UNDERFLOW: {
-            avlTreeNode_t* p1 = r->left;
-            char b = p1->balance;
-            if (b != AVL_OVERFLOW) { // single LL rotation
-                r->left = p1->right;
-                p1->right = r;
-                if (b)
-                    r->balance = p1->balance = AVL_BALANCED;
-                else {
-                    r->balance = AVL_UNDERFLOW;
-                    p1->balance = AVL_OVERFLOW;
-                    *branchHasShrunk = false;
-                }
-                r = p1;
-            }
-            else { // double LR rotation
-                avlTreeNode_t* p2 = p1->right;
-                b = p2->balance;
-                p1->right = p2->left;
-                p2->left = p1;
-                r->left = p2->right;
-                p2->right = r;
-                r->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
-                p1->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
-                r = p2;
-                r->balance = AVL_BALANCED;
-            }
-        }
-    }
-    *root = r;
+		case AVL_UNDERFLOW: {
+			avlTreeNode_t*	p1 = r->left;
+			char			b = p1->balance;
+			if (b != AVL_OVERFLOW) { // single LL rotation
+				r->left = p1->right;
+				p1->right = r;
+				if (b)
+					r->balance = p1->balance = AVL_BALANCED;
+				else {
+					r->balance = AVL_UNDERFLOW;
+					p1->balance = AVL_OVERFLOW;
+					*branchHasShrunk = false;
+				}
+				r = p1;
+			}
+			else { // double LR rotation
+				avlTreeNode_t* p2 = p1->right;
+				b = p2->balance;
+				p1->right = p2->left;
+				p2->left = p1;
+				r->left = p2->right;
+				p2->right = r;
+				r->balance = (b == AVL_UNDERFLOW) ? AVL_OVERFLOW : AVL_BALANCED;
+				p1->balance = (b == AVL_OVERFLOW) ? AVL_UNDERFLOW : AVL_BALANCED;
+				r = p2;
+				r->balance = AVL_BALANCED;
+			}
+		}
+	}
+	*root = r;
 }
 
 //-----------------------------------------------------------------------------
@@ -262,22 +262,22 @@ static void balance_right_shrink(avlTreeNode_t** root, bool* branchHasShrunk)
 
 static void reorder_value(avlTreeNode_t** root, avlTreeNode_t** nodeToDelete, bool* branchHasShrunk)
 {
-    avlTreeNode_t* r = *root;
-    if (r->right) {
-        reorder_value(&r->right, nodeToDelete, branchHasShrunk);
-        if (*branchHasShrunk)
-            balance_right_shrink(&r, branchHasShrunk);
-    }
-    else {
-        avlTreeNode_t* d = *nodeToDelete;
-        void* h = r->value;
-        r->value = d->value;
-        d->value = h;
-        *nodeToDelete = r;
-        r = r->left;
-        *branchHasShrunk = true;
-    }
-    *root = r;
+	avlTreeNode_t* r = *root;
+	if (r->right) {
+		reorder_value(&r->right, nodeToDelete, branchHasShrunk);
+		if (*branchHasShrunk)
+			balance_right_shrink(&r, branchHasShrunk);
+	}
+	else {
+		avlTreeNode_t*	d = *nodeToDelete;
+		void*			h = r->value;
+		r->value = d->value;
+		d->value = h;
+		*nodeToDelete = r;
+		r = r->left;
+		*branchHasShrunk = true;
+	}
+	*root = r;
 }
 
 //-----------------------------------------------------------------------------
@@ -285,50 +285,50 @@ static void reorder_value(avlTreeNode_t** root, avlTreeNode_t** nodeToDelete, bo
 
 static bool remove_node(avlTreeDescriptor_t* avlTree, avlTreeNode_t** root, bool* branchHasChanged)
 {
-    if (!root)
-        branchHasChanged = false;
-    else {
-        avlTreeNode_t* r = *root;
-        switch (avlTree->comparator(avlTree->value, r->value)) {
-            case -1:
-                if (!remove_node(avlTree, &r->left, branchHasChanged))
-                    return false;
-                if (*branchHasChanged)
-                    balance_left_shrink(&r, branchHasChanged);
-                break;
+	if (!root)
+		branchHasChanged = false;
+	else {
+		avlTreeNode_t* r = *root;
+		switch (avlTree->comparator(avlTree->value, r->value)) {
+			case -1:
+				if (!remove_node(avlTree, &r->left, branchHasChanged))
+					return false;
+				if (*branchHasChanged)
+					balance_left_shrink(&r, branchHasChanged);
+				break;
 
-            case 1:
-                if (!remove_node(avlTree, &r->right, branchHasChanged))
-                    return false;
-                if (*branchHasChanged)
-                    balance_right_shrink(&r, branchHasChanged);
-                break;
+			case 1:
+				if (!remove_node(avlTree, &r->right, branchHasChanged))
+					return false;
+				if (*branchHasChanged)
+					balance_right_shrink(&r, branchHasChanged);
+				break;
 
-            default: {
-                avlTreeNode_t* d = r;
-                if (!r->right) {
-                    r = r->left;
-                    *branchHasChanged = true;
-                }
-                else if (!r->left) {
-                    r = r->right;
-                    *branchHasChanged = true;
-                }
-                else {
-                    reorder_value(&d->left, &d, branchHasChanged);
-                    if (*branchHasChanged)
-                        balance_left_shrink(&r, branchHasChanged);
-                }
-                avlTree->value = d->value;
-                if (avlTree->deleteValues && d->value) {
-                    free(d->value);
-                }
-                free(d);
-            }
-        }
-        *root = r;
-    }
-    return true;
+			default: {
+				avlTreeNode_t* d = r;
+				if (!r->right) {
+					r = r->left;
+					*branchHasChanged = true;
+				}
+				else if (!r->left) {
+					r = r->right;
+					*branchHasChanged = true;
+				}
+				else {
+					reorder_value(&d->left, &d, branchHasChanged);
+					if (*branchHasChanged)
+						balance_left_shrink(&r, branchHasChanged);
+				}
+				avlTree->value = d->value;
+				if (avlTree->deleteValues && d->value) {
+					free(d->value);
+				}
+				free(d);
+			}
+		}
+		*root = r;
+	}
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -336,11 +336,11 @@ static bool remove_node(avlTreeDescriptor_t* avlTree, avlTreeNode_t** root, bool
 
 static void free_nodes(avlTreeNode_t* root)
 {
-    if (root) {
-        free_nodes(root->left);
-        free_nodes(root->right);
-        free(root);
-    }
+	if (root) {
+		free_nodes(root->left);
+		free_nodes(root->right);
+		free(root);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -348,7 +348,7 @@ static void free_nodes(avlTreeNode_t* root)
 
 static void avltree_free(avlTreeDescriptor_t* avlTree)
 {
-    free_nodes(avlTree->root);
+	free_nodes(avlTree->root);
 }
 
 //-----------------------------------------------------------------------------
@@ -357,15 +357,15 @@ static void avltree_free(avlTreeDescriptor_t* avlTree)
 
 static bool walk_nodes_forward(avlTreeNode_t* root, nodeProcessor_t processNode)
 {
-    if (root) {
-        if (!walk_nodes_forward(root->left, processNode))
-            return false;
-        if (!processNode(root->value))
-            return false;
-        if (!walk_nodes_forward(root->right, processNode))
-            return false;
-    }
-    return true;
+	if (root) {
+		if (!walk_nodes_forward(root->left, processNode))
+			return false;
+		if (!processNode(root->value))
+			return false;
+		if (!walk_nodes_forward(root->right, processNode))
+			return false;
+	}
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -374,24 +374,24 @@ static bool walk_nodes_forward(avlTreeNode_t* root, nodeProcessor_t processNode)
 
 static bool walk_nodes_reverse(avlTreeNode_t* root, nodeProcessor_t processNode)
 {
-    if (root) {
-        if (!walk_nodes_reverse(root->right, processNode))
-            return false;
-        if (!processNode(root->value))
-            return false;
-        if (!walk_nodes_reverse(root->left, processNode))
-            return false;
-    }
-    return true;
+	if (root) {
+		if (!walk_nodes_reverse(root->right, processNode))
+			return false;
+		if (!processNode(root->value))
+			return false;
+		if (!walk_nodes_reverse(root->left, processNode))
+			return false;
+	}
+	return true;
 }
 
 //-----------------------------------------------------------------------------
-// Walk through an entire avl tree, calling processNode for each value stored in the 
+// Walk through an entire avl tree, calling processNode for each value stored in the
 // avl tree either in ascending or descending key order.
 
 bool avltree_walk(avlTreeDescriptor_t* avlTree, nodeProcessor_t processNode, bool reverse)
 {
-    return reverse ? walk_nodes_reverse(avlTree->root, processNode) : walk_nodes_forward(avlTree->root, processNode);
+	return reverse ? walk_nodes_reverse(avlTree->root, processNode) : walk_nodes_forward(avlTree->root, processNode);
 } /*AvlWalk*/
 
 // ------------------------------------------------------------------
@@ -399,14 +399,14 @@ bool avltree_walk(avlTreeDescriptor_t* avlTree, nodeProcessor_t processNode, boo
 
 avlTreeDescriptor_t* avltree_create(char* typeName, int typeSize, valueComparator_t comparator)
 {
-    avlTreeDescriptor_t* avlTree = malloc(sizeof(avlTreeDescriptor_t));
-    if (avlTree != NULL) {
-        memset(avlTree, 0, sizeof(avlTreeDescriptor_t));
-        avlTree->typeName = typeName;
-        avlTree->typeSize = typeSize;
-        avlTree->comparator = comparator;
-    }
-    return avlTree;
+	avlTreeDescriptor_t* avlTree = malloc(sizeof(avlTreeDescriptor_t));
+	if (avlTree != NULL) {
+		memset(avlTree, 0, sizeof(avlTreeDescriptor_t));
+		avlTree->typeName = typeName;
+		avlTree->typeSize = typeSize;
+		avlTree->comparator = comparator;
+	}
+	return avlTree;
 }
 
 //-----------------------------------------------------------------------------
@@ -414,14 +414,14 @@ avlTreeDescriptor_t* avltree_create(char* typeName, int typeSize, valueComparato
 
 bool avltree_insert(avlTreeDescriptor_t* avlTree, void* value)
 {
-    avlTree->branchHasChanged = avlTree->isDuplicate = false;
-    avlTree->value = value;
-    if (!insert_value(avlTree, avlTree->root))
-        return false;
-    if (!avlTree->isDuplicate) {
-        avlTree->current->value = value;
-    }
-    return true;
+	avlTree->branchHasChanged = avlTree->isDuplicate = false;
+	avlTree->value = value;
+	if (!insert_value(avlTree, avlTree->root))
+		return false;
+	if (!avlTree->isDuplicate) {
+		avlTree->current->value = value;
+	}
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -429,13 +429,13 @@ bool avltree_insert(avlTreeDescriptor_t* avlTree, void* value)
 
 bool avltree_delete(avlTreeDescriptor_t* avlTree, void* key, bool deleteValues)
 {
-    if (!(avlTree && avlTree->root))
-        return false;
-    avlTree->value = key;
-    avlTree->branchHasChanged = false;
-    avlTree->deleteValues = deleteValues;
-    return remove_node(avlTree, &avlTree->root, &avlTree->branchHasChanged);
-    free(avlTree);
+	if (!(avlTree && avlTree->root))
+		return false;
+	avlTree->value = key;
+	avlTree->branchHasChanged = false;
+	avlTree->deleteValues = deleteValues;
+	return remove_node(avlTree, &avlTree->root, &avlTree->branchHasChanged);
+	free(avlTree);
 }
 
 //-----------------------------------------------------------------------------
@@ -443,14 +443,14 @@ bool avltree_delete(avlTreeDescriptor_t* avlTree, void* key, bool deleteValues)
 
 static void destroy_nodes(avlTreeNode_t* root, bool deleteValues)
 {
-    if (root) {
-        destroy_nodes(root->left, deleteValues);
-        destroy_nodes(root->right, deleteValues);
-        if (deleteValues && (root->value)) {
-            free(root->value);
-        }
-        free(root);
-    }
+	if (root) {
+		destroy_nodes(root->left, deleteValues);
+		destroy_nodes(root->right, deleteValues);
+		if (deleteValues && (root->value)) {
+			free(root->value);
+		}
+		free(root);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -459,10 +459,10 @@ static void destroy_nodes(avlTreeNode_t* root, bool deleteValues)
 
 void avltree_destroy(avlTreeDescriptor_t* avlTree, bool deleteValues)
 {
-    if (!avltree_is_empty(avlTree)) {
-        destroy_nodes(avlTree->root, deleteValues);
-        free(avlTree);
-    }
+	if (!avltree_is_empty(avlTree)) {
+		destroy_nodes(avlTree->root, deleteValues);
+		free(avlTree);
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -470,11 +470,11 @@ void avltree_destroy(avlTreeDescriptor_t* avlTree, bool deleteValues)
 
 bool avltree_replace(avlTreeDescriptor_t* avlTree, void* oldValue, void* newValue, bool deleteValue)
 {
-    if (!avltree_delete(avlTree, oldValue, deleteValue))
-        return false;
-    if (!avltree_insert(avlTree, newValue))
-        return false;
-    return true;
+	if (!avltree_delete(avlTree, oldValue, deleteValue))
+		return false;
+	if (!avltree_insert(avlTree, newValue))
+		return false;
+	return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -482,21 +482,21 @@ bool avltree_replace(avlTreeDescriptor_t* avlTree, void* oldValue, void* newValu
 
 static void* avltree_find(avlTreeDescriptor_t* avlTree, void* key)
 {
-    avlTree->value = key;
-    return find_value(avlTree);
+	avlTree->value = key;
+	return find_value(avlTree);
 }
- 
+
 //-----------------------------------------------------------------------------
 // Return the value with the smallest key stored in avl tree avlTree.
 
 static void* avltree_get_min(avlTreeDescriptor_t* avlTree)
 {
-    if (!avlTree->root)
-        return NULL;
-    avlTreeNode_t* p = avlTree->root;
-    for (; p->left; p = p->left)
-        ;
-    return p->value;
+	if (!avlTree->root)
+		return NULL;
+	avlTreeNode_t* p = avlTree->root;
+	for (; p->left; p = p->left)
+		;
+	return p->value;
 }
 
 //-----------------------------------------------------------------------------
@@ -504,12 +504,12 @@ static void* avltree_get_min(avlTreeDescriptor_t* avlTree)
 
 static void* avltree_get_max(avlTreeDescriptor_t* avlTree)
 {
-    if (!avlTree->root)
-        return NULL;
-    avlTreeNode_t* p = avlTree->root;
-    for (; p->right; p = p->right)
-        ;
-    return p->value;
+	if (!avlTree->root)
+		return NULL;
+	avlTreeNode_t* p = avlTree->root;
+	for (; p->right; p = p->right)
+		;
+	return p->value;
 }
 
 //-----------------------------------------------------------------------------
@@ -517,22 +517,22 @@ static void* avltree_get_max(avlTreeDescriptor_t* avlTree)
 
 static void extract_min_value(avlTreeDescriptor_t* avlTree, avlTreeNode_t** root, bool* branchHasChanged)
 {
-    avlTreeNode_t* r = *root;
+	avlTreeNode_t* r = *root;
 
-    if (!r)
-        avlTree->branchHasChanged = false;
-    else if (r->left) {
-        extract_min_value(avlTree, &r->left, branchHasChanged);
-        if (*branchHasChanged)
-            balance_left_shrink(&r, branchHasChanged);
-    }
-    else {
-        avlTreeNode_t* d = r;
-        avlTree->value = r->value;
-        free (d);
-        *branchHasChanged = true;
-    }
-    *root = r;
+	if (!r)
+		avlTree->branchHasChanged = false;
+	else if (r->left) {
+		extract_min_value(avlTree, &r->left, branchHasChanged);
+		if (*branchHasChanged)
+			balance_left_shrink(&r, branchHasChanged);
+	}
+	else {
+		avlTreeNode_t* d = r;
+		avlTree->value = r->value;
+		free(d);
+		*branchHasChanged = true;
+	}
+	*root = r;
 }
 
 //-----------------------------------------------------------------------------
@@ -540,11 +540,11 @@ static void extract_min_value(avlTreeDescriptor_t* avlTree, avlTreeNode_t** root
 
 void* avltree_extract_min(avlTreeDescriptor_t* avlTree)
 {
-    if (!avlTree->root)
-        return NULL;
-    avlTree->branchHasChanged = false;
-    extract_min_value(avlTree, &avlTree->root, &avlTree->branchHasChanged);
-    return avlTree->value;
+	if (!avlTree->root)
+		return NULL;
+	avlTree->branchHasChanged = false;
+	extract_min_value(avlTree, &avlTree->root, &avlTree->branchHasChanged);
+	return avlTree->value;
 }
 
 //-----------------------------------------------------------------------------
@@ -552,22 +552,22 @@ void* avltree_extract_min(avlTreeDescriptor_t* avlTree)
 
 static void extract_max_value(avlTreeDescriptor_t* avlTree, avlTreeNode_t** root, bool* branchHasChanged)
 {
-    avlTreeNode_t* r = *root;
+	avlTreeNode_t* r = *root;
 
-    if (!r)
-        avlTree->branchHasChanged = false;
-    else if (r->right) {
-        extract_max_value(avlTree, &r->right, branchHasChanged);
-        if (*branchHasChanged)
-            balance_right_shrink(&r, branchHasChanged);
-    }
-    else {
-        avlTreeNode_t* d = r;
-        avlTree->value = r->value;
-        free (d);
-        *branchHasChanged = true;
-    }
-    *root = r;
+	if (!r)
+		avlTree->branchHasChanged = false;
+	else if (r->right) {
+		extract_max_value(avlTree, &r->right, branchHasChanged);
+		if (*branchHasChanged)
+			balance_right_shrink(&r, branchHasChanged);
+	}
+	else {
+		avlTreeNode_t* d = r;
+		avlTree->value = r->value;
+		free(d);
+		*branchHasChanged = true;
+	}
+	*root = r;
 }
 
 //-----------------------------------------------------------------------------
@@ -575,11 +575,11 @@ static void extract_max_value(avlTreeDescriptor_t* avlTree, avlTreeNode_t** root
 
 void* avltree_extract_max(avlTreeDescriptor_t* avlTree)
 {
-    if (!avlTree->root)
-        return NULL;
-    avlTree->branchHasChanged = false;
-    extract_max_value(avlTree, &avlTree->root, &avlTree->branchHasChanged);
-    return avlTree->value;
+	if (!avlTree->root)
+		return NULL;
+	avlTree->branchHasChanged = false;
+	extract_max_value(avlTree, &avlTree->root, &avlTree->branchHasChanged);
+	return avlTree->value;
 }
 
 // ------------------------------------------------------------------
@@ -587,7 +587,7 @@ void* avltree_extract_max(avlTreeDescriptor_t* avlTree)
 
 bool avltree_is_empty(avlTreeDescriptor_t* avlTree)
 {
-    return ((avlTree != NULL) && (avlTree->root != NULL));
+	return ((avlTree != NULL) && (avlTree->root != NULL));
 }
 
 // ------------------------------------------------------------------

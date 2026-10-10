@@ -12,146 +12,173 @@
 // =================================================================================================
 // basic renderer class. Initializes display and OpenGL and sets up projections and view matrix
 
-class BaseDisplayHandler 
-    : public PolymorphSingleton<BaseDisplayHandler>
-{
+class BaseDisplayHandler
+	: public PolymorphSingleton<BaseDisplayHandler> {
 public:
-    int             m_width;
-    int             m_height;
-    int             m_maxWidth;
-    int             m_maxHeight;
-    bool            m_isFullscreen;
-    bool            m_vSync;
-    bool            m_isLandscape;
-    float           m_aspectRatio;
-    SDL_Window*     m_window;
-    SDL_GLContext   m_context;
+	int				m_width;
+	int				m_height;
+	int				m_maxWidth;
+	int				m_maxHeight;
+	bool			m_isFullscreen;
+	bool			m_vSync;
+	bool			m_isLandscape;
+	float			m_aspectRatio;
+	SDL_Window*		m_window;
+	SDL_GLContext	m_context;
 
-    AutoArray<SDL_DisplayMode>   m_displayModes;
-    int                             m_activeDisplayMode{ 0 };
+	AutoArray<SDL_DisplayMode>	m_displayModes;
+	int							m_activeDisplayMode{ 0 };
 
-    BaseDisplayHandler()
-        : m_width(0)
-        , m_height(0)
-        , m_maxWidth(0)
-        , m_maxHeight(0)
-        , m_isFullscreen(false)
-        , m_vSync(true)
-        , m_isLandscape(false)
-        , m_aspectRatio(1.0f)
-        , m_window(nullptr)
-        , m_context(SDL_GLContext(0))
-        , m_activeDisplayMode(0)
-    { 
-        _instance = this;
-    }
+	BaseDisplayHandler()
+		: m_width(0)
+		, m_height(0)
+		, m_maxWidth(0)
+		, m_maxHeight(0)
+		, m_isFullscreen(false)
+		, m_vSync(true)
+		, m_isLandscape(false)
+		, m_aspectRatio(1.0f)
+		, m_window(nullptr)
+		, m_context(SDL_GLContext(0))
+		, m_activeDisplayMode(0)
+	{
+		_instance = this;
+	}
 
-    virtual ~BaseDisplayHandler();
+	virtual ~BaseDisplayHandler();
 
-    bool Init(void);
+	bool Init(void);
 
-    int GetDisplayModes(void);
+	int GetDisplayModes(void);
 
-    void Create (String windowTitle = "", int width = 1920, int height = 1080, bool useFullscreen = true, bool vSync = false, bool matchDisplayMode = true);
+	void Create(String windowTitle = "", int width = 1920, int height = 1080, bool useFullscreen = true, bool vSync = false,
+				bool matchDisplayMode = true);
 
-    static BaseDisplayHandler& Instance(void) { return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance()); }
+	static BaseDisplayHandler& Instance(void) {
+		return dynamic_cast<BaseDisplayHandler&>(PolymorphSingleton::Instance());
+	}
 
-    int FindDisplayMode(int width, int height);
+	int FindDisplayMode(int width, int height);
 
-    virtual void ComputeDimensions(int width, int height, bool useFullscreen)
-        noexcept;
+	virtual void ComputeDimensions(int width, int height, bool useFullscreen)
+	noexcept;
 
-    // The attributes the graphics context is created with. SetupDisplay () calls this before it creates
-    // the window, so an application that needs more than the defaults below (a stencil buffer, a deeper
-    // depth buffer, FSAA, quad buffer stereo) overrides this, calls the base version and adds its own
-    // attributes.
-    virtual void SetContextAttributes(void);
+	// The attributes the graphics context is created with. SetupDisplay () calls this before it creates
+	// the window, so an application that needs more than the defaults below (a stencil buffer, a deeper
+	// depth buffer, FSAA, quad buffer stereo) overrides this, calls the base version and adds its own
+	// attributes.
+	virtual void SetContextAttributes(void);
 
-    virtual void SetupDisplay(String windowTitle);
+	virtual void SetupDisplay(String windowTitle);
 
-    virtual void Update(void);
+	virtual void Update(void);
 
-    void EndFrame(void);
-    void BeginFrame(void);
+	void EndFrame(void);
+	void BeginFrame(void);
 
-    virtual void OnMinimized(void) {}
+	virtual void OnMinimized(void) {}
 
-    virtual void OnRestored(void) {}
+	virtual void OnRestored(void) {}
 
-    // Applies the swap interval to the current context. Returns false if the driver refused
-    // (SDL_GL_SetSwapInterval () fails without a context, and for adaptive vsync it may not
-    // be supported at all).
-    bool SetVSync(bool vSync);
+	// Applies the swap interval to the current context. Returns false if the driver refused
+	// (SDL_GL_SetSwapInterval () fails without a context, and for adaptive vsync it may not
+	// be supported at all).
+	bool SetVSync(bool vSync);
 
-    inline bool VSync(void) noexcept {
-        return m_vSync;
-    }
+	inline bool VSync(void)
+	noexcept
+	{
+		return m_vSync;
+	}
 
-    inline int GetWidth(void) noexcept {
-        return m_width;
-    }
+	inline int GetWidth(void)
+	noexcept
+	{
+		return m_width;
+	}
 
-    inline int GetHeight(void) noexcept {
-        return m_height;
-    }
+	inline int GetHeight(void)
+	noexcept
+	{
+		return m_height;
+	}
 
-    inline float GetAspectRatio(void) noexcept {
-        return m_aspectRatio;
-    }
+	inline float GetAspectRatio(void)
+	noexcept
+	{
+		return m_aspectRatio;
+	}
 
-    inline SDL_Window* GetWindow(void) noexcept {
-        return m_window;
-    }
+	inline SDL_Window* GetWindow(void)
+	noexcept
+	{
+		return m_window;
+	}
 
-    inline SDL_GLContext GetContext(void) noexcept {
-        return m_context;
-    }
+	inline SDL_GLContext GetContext(void)
+	noexcept
+	{
+		return m_context;
+	}
 
-    inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const noexcept {
-        return m_displayModes;
-    }
+	inline const AutoArray<SDL_DisplayMode>& DisplayModes(void) const
+	noexcept
+	{
+		return m_displayModes;
+	}
 
-    inline const SDL_DisplayMode& GetDisplayMode(int i = -1) const noexcept {
-        return m_displayModes[((i < 0) or (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
-    }
+	inline const SDL_DisplayMode& GetDisplayMode(int i = -1) const
+	noexcept
+	{
+		return m_displayModes[((i < 0) or (i >= m_displayModes.Length())) ? m_activeDisplayMode : i];
+	}
 
-    inline int SelectedDisplayMode(void) noexcept {
-        return m_activeDisplayMode;
-    }
+	inline int SelectedDisplayMode(void)
+	noexcept
+	{
+		return m_activeDisplayMode;
+	}
 
-    inline void SelectDisplayMode(int displayMode) noexcept {
-        m_activeDisplayMode = displayMode;
-    }
+	inline void SelectDisplayMode(int displayMode)
+	noexcept
+	{
+		m_activeDisplayMode = displayMode;
+	}
 
-    bool UpdateDisplayMode(int displayMode, bool useFullscreen);
+	bool UpdateDisplayMode(int displayMode, bool useFullscreen);
 
-    inline bool IsFullScreen(void) noexcept {
-        return m_isFullscreen;
-    }
+	inline bool IsFullScreen(void)
+	noexcept
+	{
+		return m_isFullscreen;
+	}
 
-    inline void SetFullScreen(bool useFullscreen) noexcept {
-        m_isFullscreen = useFullscreen;
-    }
+	inline void SetFullScreen(bool useFullscreen)
+	noexcept
+	{
+		m_isFullscreen = useFullscreen;
+	}
 
-    void SwitchDisplayMode(int direction);
+	void SwitchDisplayMode(int direction);
 
-    void ToggleFullscreen(void);
+	void ToggleFullscreen(void);
 
-    inline bool DisplayModeHasChanged(int& lastDisplayMode) noexcept {
-        if (lastDisplayMode == m_activeDisplayMode)
-            return false;
-        lastDisplayMode = m_activeDisplayMode;
-        return true;
-    }
+	inline bool DisplayModeHasChanged(int& lastDisplayMode)
+	noexcept
+	{
+		if (lastDisplayMode == m_activeDisplayMode)
+			return false;
+		lastDisplayMode = m_activeDisplayMode;
+		return true;
+	}
 
-    void EnableBackBuffer(void);
+	void EnableBackBuffer(void);
 
-    void DisableBackBuffer(void);
+	void DisableBackBuffer(void);
 
-    virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
+	virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()
 
 // =================================================================================================
-

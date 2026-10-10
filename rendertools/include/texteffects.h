@@ -7,31 +7,31 @@
 
 class TextEffects {
 public:
-    struct AAMethod {
-        String  method = "";
-        int     strength = 0;
-        inline bool ApplyAA() const { return method.Length() > 0; };
-    };
+	struct AAMethod {
+		String	method = "";
+		int		strength = 0;
+		inline	bool ApplyAA() const {
+			return method.Length() > 0;
+		};
+	};
 
-    struct Decoration {
-        float           outlineWidth = 0.0f;
-        RGBAColor       outlineColor = ColorData::Invisible;
-        struct AAMethod aaMethod = {};
+	struct Decoration {
+		float			outlineWidth = 0.0f;
+		RGBAColor		outlineColor = ColorData::Invisible;
+		struct AAMethod	aaMethod = {};
 
-        inline bool HaveOutline() const { 
-            return (outlineWidth > 0.0f) and (outlineColor.A() > 0.0f); 
-        };
+		inline bool HaveOutline() const {
+			return (outlineWidth > 0.0f) and (outlineColor.A() > 0.0f);
+		};
 
-        inline bool ApplyAA() const { 
-            return aaMethod.ApplyAA(); 
-        };
-    };
+		inline bool ApplyAA() const {
+			return aaMethod.ApplyAA();
+		};
+	};
 
-    void AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply = false);
+	void AntiAlias(RenderTarget* renderTarget, const AAMethod& aaMethod, bool premultiply = false);
 
-    void RenderOutline(RenderTarget* renderTarget, const Decoration& decoration, bool premultiply = false);
+	void RenderOutline(RenderTarget* renderTarget, const Decoration& decoration, bool premultiply = false);
 };
 
 // =================================================================================================
-
-

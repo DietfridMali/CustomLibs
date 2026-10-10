@@ -13,226 +13,248 @@
 // =================================================================================================
 
 #ifdef USE_SHARED_HANDLES
-#   undef USE_SHARED_HANDLES
+#undef USE_SHARED_HANDLES
 #endif
 
 #define USE_SHARED_HANDLES 1
 
-class GfxDataLayout
-{
+class GfxDataLayout {
 public:
-    List<GfxDataBuffer*>    m_dataBuffers;
-    GfxDataBuffer           m_indexBuffer;
+	List<GfxDataBuffer*>	m_dataBuffers;
+	GfxDataBuffer			m_indexBuffer;
 #if USE_SHARED_HANDLES
-    SharedGfxHandle          m_handle;
+	SharedGfxHandle m_handle;
 #else
-    GLuint                  m_handle;
+	GLuint m_handle;
 #endif
-    MeshTopology            m_shape{ MeshTopology::Quads };
-    uint32_t                m_dynamicBuffers{ 0 };
-    uint32_t                m_instanceCount{ 1 };
-    bool                    m_isBound{ false };
+	MeshTopology	m_shape{ MeshTopology::Quads };
+	uint32_t		m_dynamicBuffers{ 0 };
+	uint32_t		m_instanceCount{ 1 };
+	bool			m_isBound{ false };
 
-    static GfxDataLayout*         activeLayout;
-    static List<GfxDataLayout*>   layoutStack;
+	static GfxDataLayout*		activeLayout;
+	static List<GfxDataLayout*>	layoutStack;
 
-    GfxDataLayout() = default;
+	GfxDataLayout() = default;
 
-    static inline void PushGfxDataLayout(GfxDataLayout* gfxDataLayout)
-        noexcept
-    {
-        layoutStack.Append(gfxDataLayout);
-    }
+	static inline void PushGfxDataLayout(GfxDataLayout* gfxDataLayout)
+	noexcept
+	{
+		layoutStack.Append(gfxDataLayout);
+	}
 
-    static inline GfxDataLayout* PopGfxDataLayout(void)
-        noexcept
-    {
-        if (not layoutStack.Length())
-            return nullptr;
-        GfxDataLayout* gfxDataLayout = nullptr;
-        layoutStack.Pop(gfxDataLayout);
-        return gfxDataLayout;
-    }
+	static inline GfxDataLayout* PopGfxDataLayout(void)
+	noexcept
+	{
+		if (not layoutStack.Length())
+			return nullptr;
+		GfxDataLayout* gfxDataLayout = nullptr;
+		layoutStack.Pop(gfxDataLayout);
+		return gfxDataLayout;
+	}
 
-    void SetDynamic(uint32_t dynamicBuffers)
-        noexcept;
+	void SetDynamic(uint32_t dynamicBuffers)
+	noexcept;
 
-    inline void SetShape(MeshTopology shape) noexcept {
-        m_shape = shape;
-    }
+	inline void SetShape(MeshTopology shape)
+	noexcept
+	{
+		m_shape = shape;
+	}
 
-    inline void SetInstanceCount(uint32_t instanceCount) noexcept {
-        m_instanceCount = instanceCount;
-    }
+	inline void SetInstanceCount(uint32_t instanceCount)
+	noexcept
+	{
+		m_instanceCount = instanceCount;
+	}
 
-    inline uint32_t GetInstanceCount(void) noexcept {
-        return m_instanceCount;
-    }
+	inline uint32_t GetInstanceCount(void)
+	noexcept
+	{
+		return m_instanceCount;
+	}
 
-    bool Create(MeshTopology shape = MeshTopology::Quads, uint32_t dynamicBuffers = 0)
-        noexcept;
+	bool Create(MeshTopology shape = MeshTopology::Quads, uint32_t dynamicBuffers = 0)
+	noexcept;
 
-    ~GfxDataLayout() {
-        Destroy();
-    }
+	~GfxDataLayout() {
+		Destroy();
+	}
 
-    GfxDataLayout(GfxDataLayout const& other) {
-        Copy(other);
-    }
+	GfxDataLayout(GfxDataLayout const& other) {
+		Copy(other);
+	}
 
-    GfxDataLayout(GfxDataLayout&& other) noexcept {
-        Move(other);
-    }
+	GfxDataLayout(GfxDataLayout&& other)
+	noexcept
+	{
+		Move(other);
+	}
 
-    GfxDataLayout& operator=(const GfxDataLayout& other) {
-        return Copy(other);
-    }
+	GfxDataLayout& operator=(const GfxDataLayout& other) {
+		return Copy(other);
+	}
 
-    GfxDataLayout& operator=(GfxDataLayout&& other) noexcept {
-        return Move(other);
-    }
+	GfxDataLayout& operator=(GfxDataLayout&& other)
+	noexcept
+	{
+		return Move(other);
+	}
 
-    GfxDataLayout& Copy(GfxDataLayout const& other);
+	GfxDataLayout& Copy(GfxDataLayout const& other);
 
-    GfxDataLayout& Move(GfxDataLayout& other)
-        noexcept;
+	GfxDataLayout& Move(GfxDataLayout& other)
+	noexcept;
 
-    void Destroy(void)
-        noexcept;
+	void Destroy(void)
+	noexcept;
 
-    inline bool IsValid(void)
-        noexcept
-    {
+	inline bool IsValid(void)
+	noexcept
+	{
 #if USE_SHARED_HANDLES
-        return m_handle.IsAvailable();
+		return m_handle.IsAvailable();
 #else
-        return m_handle != 0;
+		return m_handle != 0;
 #endif
-    }
+	}
 
-    inline bool IsBound(void)
-        noexcept
-    {
-        return IsValid() and m_isBound;
-    }
+	inline bool IsBound(void)
+	noexcept
+	{
+		return IsValid() and m_isBound;
+	}
 
-    inline bool IsActive(void)
-        noexcept
-    {
-        return this == activeLayout;
-    }
+	inline bool IsActive(void)
+	noexcept
+	{
+		return this == activeLayout;
+	}
 
-    inline void Activate(void)
-        noexcept
-    {
-        if (not IsActive()) {
-            PushGfxDataLayout(activeLayout);
-            activeLayout = this;
-        }
-    }
+	inline void Activate(void)
+	noexcept
+	{
+		if (not IsActive()) {
+			PushGfxDataLayout(activeLayout);
+			activeLayout = this;
+		}
+	}
 
-    inline void Deactivate(void)
-        noexcept
-    {
-        if (IsActive()) {
-            activeLayout = PopGfxDataLayout();
-            if (activeLayout and activeLayout->IsBound())
-                activeLayout->Activate();
-        }
-    }
+	inline void Deactivate(void)
+	noexcept
+	{
+		if (IsActive()) {
+			activeLayout = PopGfxDataLayout();
+			if (activeLayout and activeLayout->IsBound())
+				activeLayout->Activate();
+		}
+	}
 
-    bool Enable(void)
-        noexcept;
+	bool Enable(void)
+	noexcept;
 
-    void Disable(void)
-        noexcept;
+	void Disable(void)
+	noexcept;
 
-    inline bool StartUpdate(void) noexcept {
-        return Enable();  
-    }
+	inline bool StartUpdate(void)
+	noexcept
+	{
+		return Enable();
+	}
 
-    inline void FinishUpdate(void) noexcept {
-        Disable();
-    }
+	inline void FinishUpdate(void)
+	noexcept
+	{
+		Disable();
+	}
 
-    inline bool StartRender(void) noexcept {
-        return Enable(); 
-    }
+	inline bool StartRender(void)
+	noexcept
+	{
+		return Enable();
+	}
 
-    inline void FinishRender(void) noexcept {
-        Disable();
-    }
+	inline void FinishRender(void)
+	noexcept
+	{
+		Disable();
+	}
 
 
 
-    inline bool EnableTextures(std::span<Texture* const> textures = {})
-        noexcept
-    {
-        int tmu = 0;
+	inline bool EnableTextures(std::span<Texture* const> textures = {})
+	noexcept
+	{
+		int tmu = 0;
 		for (Texture* texture : textures) {
-            if ((texture != nullptr) and not texture->Activate(tmu)) {
+			if ((texture != nullptr) and not texture->Activate(tmu)) {
 #ifdef _DEBUG
-                texture->Activate(tmu);
+				texture->Activate(tmu);
 #endif
-                return false;
-            }
-             ++tmu;
-        }
-        return true;
-    }
+				return false;
+			}
+			++tmu;
+		}
+		return true;
+	}
 
-    inline void DisableTextures(std::span<Texture* const> textures = {})
-        noexcept
-    {
-        for (Texture* texture : textures) {
-            if (texture != nullptr)
-                texture->Deactivate();
-        }
-    }
+	inline void DisableTextures(std::span<Texture* const> textures = {})
+	noexcept
+	{
+		for (Texture* texture : textures) {
+			if (texture != nullptr)
+				texture->Deactivate();
+		}
+	}
 
-    // Names used by the DX and Vulkan backends for the same two calls.
-    inline bool ActivateTextures(std::span<Texture* const> textures = {})
-        noexcept
-    {
-        return EnableTextures(textures);
-    }
+	// Names used by the DX and Vulkan backends for the same two calls.
+	inline bool ActivateTextures(std::span<Texture* const> textures = {})
+	noexcept
+	{
+		return EnableTextures(textures);
+	}
 
-    inline void DeactivateTextures(std::span<Texture* const> textures = {})
-        noexcept
-    {
-        DisableTextures(textures);
-    }
-
-
-    GfxDataBuffer* FindBuffer(const char* type, int id, int& index)
-        noexcept;
-
-    bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;
-
-    void UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;
-
-    // Draws a RANGE of the index buffer instead of all of it: firstIndex is where to start, indexCount
-    // how many indices to draw, and 0 means "to the end". A consumer that keeps several batches in one
-    // mesh - a model whose faces are grouped by texture, say - would otherwise need a mesh per batch,
-    // which is a state change and a buffer each.
-    void Render(std::span<Texture* const> textures = {}, uint32_t firstIndex = 0, uint32_t indexCount = 0)
-        noexcept;
-
-    inline void Render(Texture* texture) {
-        Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{});
-    }
+	inline void DeactivateTextures(std::span<Texture* const> textures = {})
+	noexcept
+	{
+		DisableTextures(textures);
+	}
 
 
-    protected:
-        // add a vertex or index data buffer
-        bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0, bool forceUpdate = false)
-            noexcept;
+	GfxDataBuffer* FindBuffer(const char* type, int id, int& index)
+	noexcept;
 
-        bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate = false)
-            noexcept;
+	bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType,
+						  bool forceUpdate = false)
+	noexcept;
 
-        void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate = false)
-            noexcept;
+	void UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate = false)
+	noexcept;
+
+	// Draws a RANGE of the index buffer instead of all of it: firstIndex is where to start, indexCount
+	// how many indices to draw, and 0 means "to the end". A consumer that keeps several batches in one
+	// mesh - a model whose faces are grouped by texture, say - would otherwise need a mesh per batch,
+	// which is a state change and a buffer each.
+	void Render(std::span<Texture* const> textures = {}, uint32_t firstIndex = 0, uint32_t indexCount = 0)
+	noexcept;
+
+	inline void Render(Texture* texture) {
+		Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{});
+	}
+
+
+protected:
+	// add a vertex or index data buffer
+	bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0,
+					  bool forceUpdate = false)
+	noexcept;
+
+	bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount,
+						  bool forceUpdate = false)
+	noexcept;
+
+	void UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate = false)
+	noexcept;
 };
 
 // =================================================================================================

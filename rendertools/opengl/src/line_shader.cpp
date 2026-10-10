@@ -20,8 +20,8 @@
 // C++ layout (LineRenderer::Line).
 
 static const ShaderDataAttributes LineQuadAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 static const String LineDrawVS = String(R"(#version 430 core
@@ -195,14 +195,14 @@ void main() {
 }
 )");
 
-const ShaderSource& LineDrawShader() {
-    static const ShaderSource source(
-        "lineDraw",
-        LineDrawVS,
-        LineDrawFS,
-        ShaderDataLayout(LineQuadAttrs, 2)
-    );
-    return source;
+const ShaderSource& LineDrawShader()
+{
+	static const ShaderSource source(
+		"lineDraw",
+		LineDrawVS,
+		LineDrawFS,
+		ShaderDataLayout(LineQuadAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

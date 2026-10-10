@@ -19,31 +19,34 @@
 // frees them all at app shutdown (called before VKContext::Destroy releases the device).
 
 class SamplerCache
-    : public BaseSingleton<SamplerCache>
-{
+	: public BaseSingleton<SamplerCache> {
 public:
-    using SamplerMap = AVLTree<TextureSampling, VkSampler>;
+	using SamplerMap = AVLTree<TextureSampling, VkSampler>;
 
 
-    SamplerCache(void) noexcept;
+	SamplerCache(void)
+	noexcept;
 
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
 
-    // Lazy lookup. Returns VK_NULL_HANDLE on failure (vkCreateSampler error or device missing).
-    VkSampler GetSampler(const TextureSampling& s) noexcept;
+	// Lazy lookup. Returns VK_NULL_HANDLE on failure (vkCreateSampler error or device missing).
+	VkSampler GetSampler(const TextureSampling& s)
+	noexcept;
 
 
 private:
-    SamplerMap m_cache;
-    AutoArray<VkSampler> m_samplers;  // companion list for Destroy iteration
+	SamplerMap				m_cache;
+	AutoArray<VkSampler>	m_samplers; // companion list for Destroy iteration
 
 
-    static int Compare(void* context, const TextureSampling& a, const TextureSampling& b);
+	static int Compare(void* context, const TextureSampling& a, const TextureSampling& b);
 
 
-    static VkSamplerCreateInfo ToVulkanInfo(const TextureSampling& s) noexcept;
+	static VkSamplerCreateInfo ToVulkanInfo(const TextureSampling& s)
+	noexcept;
 };
 
 #define samplerCache SamplerCache::Instance()

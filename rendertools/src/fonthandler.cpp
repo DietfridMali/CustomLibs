@@ -10,7 +10,7 @@
 #include "missingfiles.h"
 
 #ifndef _WIN32
-#   include <locale>
+#include <locale>
 #endif
 
 #define USE_TEXT_RTS 1
@@ -19,15 +19,21 @@
 
 // =================================================================================================
 
-int FontHandler::CompareTextures(void* context, const char& key1, const char& key2) {
-    return (key1 < key2) ? -1 : (key1 > key2) ? 1 : 0;
+int FontHandler::CompareTextures(void* context, const char& key1, const char& key2)
+{
+	return (key1 < key2) ? -1 : (key1 > key2) ? 1
+											  : 0;
 }
 
 
 FontHandler::FontHandler()
-    : m_font(nullptr), m_fontName(""), m_fontSize(0), m_glyphs(""), m_isAvailable(false)
+	: m_font(nullptr)
+	, m_fontName("")
+	, m_fontSize(0)
+	, m_glyphs("")
+	, m_isAvailable(false)
 {
-    m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
+	m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
 #if 0
 #ifdef _WIN32
     m_euroChar = "\xE2\x82\xAC"; // "\u20AC";
@@ -36,149 +42,160 @@ FontHandler::FontHandler()
     m_euroChar = "\u20AC";
 #endif
 #endif
-    m_glyphDict.SetComparator(String::Compare); //FontHandler::CompareTextures);
+	m_glyphDict.SetComparator(String::Compare); //FontHandler::CompareTextures);
 }
 
 
-Shader* FontHandler::LoadShader(void) {
-    return baseShaderHandler.LoadPlainTextureShader(ColorData::White);
+Shader* FontHandler::LoadShader(void)
+{
+	return baseShaderHandler.LoadPlainTextureShader(ColorData::White);
 }
 
-bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info) {
-    Shader* shader = LoadShader();
-    if (not shader)
-        return false;
-    if (info) {
-        info->glyphSize.width = info->texture->GetWidth();
-        info->glyphSize.height = info->texture->GetHeight();
-        info->atlasPosition = m_atlas.GlyphOffset(info->index);
-        Vector2f scale = Vector2f(float(info->glyphSize.width) / float(m_maxGlyphSize.width), float(info->glyphSize.height) / float(m_maxGlyphSize.height));
-        // compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
-        info->atlasSize = scale * m_atlas.GlyphScale();
-        m_atlas.Add(info->texture, info->index, scale);
+bool FontHandler::RenderGlyphToAtlas(const String& key, GlyphInfo* info)
+{
+	Shader* shader = LoadShader();
+	if (not shader)
+		return false;
+	if (info) {
+		info->glyphSize.width = info->texture->GetWidth();
+		info->glyphSize.height = info->texture->GetHeight();
+		info->atlasPosition = m_atlas.GlyphOffset(info->index);
+		Vector2f scale = Vector2f(float(info->glyphSize.width) / float(m_maxGlyphSize.width),
+								  float(info->glyphSize.height) / float(m_maxGlyphSize.height));
+		// compute position and size relative to atlas dimensions; the grid size is determined by m_maxGlyphSize / (atlasWidth, atlasHeight)
+		info->atlasSize = scale * m_atlas.GlyphScale();
+		m_atlas.Add(info->texture, info->index, scale);
 #if 1
-        delete info->texture;
-        info->texture = nullptr;
+		delete info->texture;
+		info->texture = nullptr;
 #endif
-    }
+	}
 #ifdef _DEBUG
-    else
-        logHandler.Print("unknown glyph\n");
+	else
+		logHandler.Print("unknown glyph\n");
 #endif
-    return true;
+	return true;
 }
 
 
-// FontHandler is gfx api agnostic, but for directx, textures must be kept until the command list used to render the glyphs 
+// FontHandler is gfx api agnostic, but for directx, textures must be kept until the command list used to render the glyphs
 // to the atlas has been executed.  So we keep the textures in memory until the atlas is built, then free them.
-bool FontHandler::FreeGlyph(const String& key, GlyphInfo* info) { 
-    if (info) {
-        delete info->texture;
-        info->texture = nullptr;
-    }
-    return true;
+bool FontHandler::FreeGlyph(const String& key, GlyphInfo* info)
+{
+	if (info) {
+		delete info->texture;
+		info->texture = nullptr;
+	}
+	return true;
 }
 
 
-int FontHandler::BuildAtlas(void) {
+int FontHandler::BuildAtlas(void)
+{
 #if 0
     m_atlas.GetRenderTarget()->SetClearColor(RGBAColor(0.5, 0, 0.5, 0));
 #endif
-    if (not m_atlas.Activate())
-        return -1;
-    gfxStates.SetBlending(0);
-    gfxStates.SetFaceCulling(0);
-    gfxStates.SetDepthTest(0);
-    gfxStates.SetDepthWrite(0);
-    baseRenderer.ResetTransformation();
-    m_atlas.Initialize();
-    baseRenderer.PushViewport();
-    m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
-    baseRenderer.PopViewport();
-    m_atlas.Deactivate();
+	if (not m_atlas.Activate())
+		return -1;
+	gfxStates.SetBlending(0);
+	gfxStates.SetFaceCulling(0);
+	gfxStates.SetDepthTest(0);
+	gfxStates.SetDepthWrite(0);
+	baseRenderer.ResetTransformation();
+	m_atlas.Initialize();
+	baseRenderer.PushViewport();
+	m_glyphDict.Walk(&FontHandler::RenderGlyphToAtlas, this);
+	baseRenderer.PopViewport();
+	m_atlas.Deactivate();
 #if 0
     m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
 #endif
-    return m_glyphDict.Size();
+	return m_glyphDict.Size();
 }
 
 
-bool FontHandler::InitTTF(void) {
-    static int haveTTF = 0;
-    if (not haveTTF) {
-        haveTTF = (0 > TTF_Init()) ? -1 : 1;
-        if (haveTTF < 0) 
-            logHandler.Print("Paintjob-Rampage: Cannot initialize font system.\n");
-    }
-    return haveTTF > 0;
+bool FontHandler::InitTTF(void)
+{
+	static int haveTTF = 0;
+	if (not haveTTF) {
+		haveTTF = (0 > TTF_Init()) ? -1 : 1;
+		if (haveTTF < 0)
+			logHandler.Print("Paintjob-Rampage: Cannot initialize font system.\n");
+	}
+	return haveTTF > 0;
 }
 
 
-bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, String glyphs) {
-    if (not InitTTF())
-        return false;
+bool FontHandler::InitFont(String fontFolder, String fontName, int fontSize, String glyphs)
+{
+	if (not InitTTF())
+		return false;
 
-    if (m_font) {
-        if ((fontName == m_fontName) and (fontSize == m_fontSize))
-            return true;
-        TTF_CloseFont(m_font);
-        m_font = nullptr;
-    }
+	if (m_font) {
+		if ((fontName == m_fontName) and (fontSize == m_fontSize))
+			return true;
+		TTF_CloseFont(m_font);
+		m_font = nullptr;
+	}
 
-    String fontFile = fontFolder + fontName;
-    if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
-        logHandler.Print("Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*) fontName, TTF_GetError());
-        missingFiles.Report(fontFile.Data());
-        return false;
-    }
-    //SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
-    m_glyphs = glyphs;
-    m_fontName = fontName;
-    m_fontSize = fontSize;
-    return true;
+	String fontFile = fontFolder + fontName;
+	if (not (m_font = TTF_OpenFont(fontFile.Data(), fontSize))) {
+		logHandler.Print("Paintjob-Rampage: Cannot load font '%s'(%s).\n", (char*)fontName, TTF_GetError());
+		missingFiles.Report(fontFile.Data());
+		return false;
+	}
+	//SDL_Log("family=%s style=%s", TTF_FontFaceFamilyName(m_font), TTF_FontFaceStyleName(m_font));
+	m_glyphs = glyphs;
+	m_fontName = fontName;
+	m_fontSize = fontSize;
+	return true;
 }
 
 
-bool FontHandler::Create(String fontFolder, String fontName, int fontSize, String glyphs) {
-    Destroy();
-    m_isAvailable = InitFont(fontFolder, fontName, fontSize, glyphs) and CreateAtlas();
-    if (m_isAvailable)
-        ComputeInkBand();
-    return m_isAvailable;
+bool FontHandler::Create(String fontFolder, String fontName, int fontSize, String glyphs)
+{
+	Destroy();
+	m_isAvailable = InitFont(fontFolder, fontName, fontSize, glyphs) and CreateAtlas();
+	if (m_isAvailable)
+		ComputeInkBand();
+	return m_isAvailable;
 }
 
 
-bool FontHandler::Open(String fontFolder, String fontName, int fontSize) {
-    Destroy();
-    m_isAvailable = InitFont(fontFolder, fontName, fontSize, "");
-    return m_isAvailable;
+bool FontHandler::Open(String fontFolder, String fontName, int fontSize)
+{
+	Destroy();
+	m_isAvailable = InitFont(fontFolder, fontName, fontSize, "");
+	return m_isAvailable;
 }
 
 
-bool FontHandler::SetShaping(bool rightToLeft, String script) {
-    if (not m_font)
-        return false;
-    if (TTF_SetFontDirection(m_font, rightToLeft ? TTF_DIRECTION_RTL : TTF_DIRECTION_LTR) != 0)
-        return false;
-    return script.IsEmpty() or (TTF_SetFontScriptName(m_font, script.Data()) == 0);
+bool FontHandler::SetShaping(bool rightToLeft, String script)
+{
+	if (not m_font)
+		return false;
+	if (TTF_SetFontDirection(m_font, rightToLeft ? TTF_DIRECTION_RTL : TTF_DIRECTION_LTR) != 0)
+		return false;
+	return script.IsEmpty() or (TTF_SetFontScriptName(m_font, script.Data()) == 0);
 }
 
 
-Texture* FontHandler::CreateTextTexture(const String& text) {
-    if (not m_font or text.IsEmpty())
-        return nullptr;
-    SDL_Surface* surface = TTF_RenderUTF8_Blended(m_font, text.Data(), SDL_Color(255, 255, 255, 255));
-    if (surface == nullptr)
-        return nullptr;
-    Texture* texture = new Texture();
-    void* cl = baseRenderer.StartOperation("FontHandler::CreateTextTexture");
-    bool isValid = texture->CreateFromSurface(surface, {});
-    baseRenderer.FinishOperation(cl, true);
-    if (not isValid) {
-        delete texture;
-        return nullptr;
-    }
-    return texture;
+Texture* FontHandler::CreateTextTexture(const String& text)
+{
+	if (not m_font or text.IsEmpty())
+		return nullptr;
+	SDL_Surface* surface = TTF_RenderUTF8_Blended(m_font, text.Data(), SDL_Color(255, 255, 255, 255));
+	if (surface == nullptr)
+		return nullptr;
+	Texture*	texture = new Texture();
+	void*		cl = baseRenderer.StartOperation("FontHandler::CreateTextTexture");
+	bool		isValid = texture->CreateFromSurface(surface, {});
+	baseRenderer.FinishOperation(cl, true);
+	if (not isValid) {
+		delete texture;
+		return nullptr;
+	}
+	return texture;
 }
 
 
@@ -189,152 +206,157 @@ Texture* FontHandler::CreateTextTexture(const String& text) {
 // all glyph surfaces share the same height and baseline, the band is identical for every glyph, so two
 // numbers suffice. TextSize() uses m_inkHeight for fitting, TextRenderer samples only [m_inkTop, m_inkTop +
 // m_inkHeight] of each glyph. Falls back to the full surface (0 / 1) if metrics are unavailable.
-void FontHandler::ComputeInkBand(void) {
-    m_inkTop = 0.0f;
-    m_inkHeight = 1.0f;
-    if (not m_font)
-        return;
-    int fontHeight = TTF_FontHeight(m_font);
-    int ascent = TTF_FontAscent(m_font);
-    if (fontHeight <= 0)
-        return;
+void FontHandler::ComputeInkBand(void)
+{
+	m_inkTop = 0.0f;
+	m_inkHeight = 1.0f;
+	if (not m_font)
+		return;
+	int fontHeight = TTF_FontHeight(m_font);
+	int ascent = TTF_FontAscent(m_font);
+	if (fontHeight <= 0)
+		return;
 
-    int inkTop = fontHeight, inkBottom = 0;
-    bool haveInk = false;
-    auto Accumulate = [&](Uint16 ch) {
-        int minx, maxx, miny, maxy, advance;
-        if (TTF_GlyphMetrics(m_font, ch, &minx, &maxx, &miny, &maxy, &advance) != 0)
-            return;
-        if (maxy <= miny) // empty glyph (e.g. space)
-            return;
-        int top = ascent - maxy;    // surface row of the glyph's top ink (baseline sits at 'ascent' from the top)
-        int bottom = ascent - miny; // surface row of the glyph's bottom ink
-        if (not haveInk) {
-            inkTop = top;
-            inkBottom = bottom;
-            haveInk = true;
-        }
-        else {
-            if (top < inkTop)
-                inkTop = top;
-            if (bottom > inkBottom)
-                inkBottom = bottom;
-        }
-    };
-    for (char* glyph = m_glyphs.Data(); *glyph; glyph++)
-        Accumulate(Uint16(uint8_t(*glyph)));
-    Accumulate(Uint16(0x20AC)); // euro sign, rasterized alongside the glyph set in CreateTextures
+	int		inkTop = fontHeight, inkBottom = 0;
+	bool	haveInk = false;
+	auto	Accumulate = [&](Uint16 ch) {
+		int minx, maxx, miny, maxy, advance;
+		if (TTF_GlyphMetrics(m_font, ch, &minx, &maxx, &miny, &maxy, &advance) != 0)
+			return;
+		if (maxy <= miny) // empty glyph (e.g. space)
+			return;
+		int top = ascent - maxy; // surface row of the glyph's top ink (baseline sits at 'ascent' from the top)
+		int bottom = ascent - miny; // surface row of the glyph's bottom ink
+		if (not haveInk) {
+			inkTop = top;
+			inkBottom = bottom;
+			haveInk = true;
+		}
+		else {
+			if (top < inkTop)
+				inkTop = top;
+			if (bottom > inkBottom)
+				inkBottom = bottom;
+		}
+	};
+	for (char* glyph = m_glyphs.Data(); *glyph; glyph++)
+		Accumulate(Uint16(uint8_t(*glyph)));
+	Accumulate(Uint16(0x20AC)); // euro sign, rasterized alongside the glyph set in CreateTextures
 
-    if (not haveInk)
-        return;
-    if (inkTop < 0)
-        inkTop = 0;
-    if (inkBottom > fontHeight)
-        inkBottom = fontHeight;
-    if (inkBottom <= inkTop)
-        return;
-    m_inkTop = float(inkTop) / float(fontHeight);
-    m_inkHeight = float(inkBottom - inkTop) / float(fontHeight);
+	if (not haveInk)
+		return;
+	if (inkTop < 0)
+		inkTop = 0;
+	if (inkBottom > fontHeight)
+		inkBottom = fontHeight;
+	if (inkBottom <= inkTop)
+		return;
+	m_inkTop = float(inkTop) / float(fontHeight);
+	m_inkHeight = float(inkBottom - inkTop) / float(fontHeight);
 }
 
 
 bool FontHandler::CreateTexture(const char* szChar, String key, int index)
 {
-    GlyphInfo info{ new Texture(), String (key), index };
-    if (info.texture == nullptr)
-        return false;
-    SDL_Surface* surface = (strlen(szChar) == 1)
-        ? TTF_RenderText_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255))
-        : TTF_RenderUTF8_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255));
-    if ((surface == nullptr) or not info.texture->CreateFromSurface(surface, { .isDisposable = true })) {
-        delete info.texture;
-        info = GlyphInfo();
-        return false;
-        }
+	GlyphInfo info{ new Texture(), String(key), index };
+	if (info.texture == nullptr)
+		return false;
+	SDL_Surface* surface = (strlen(szChar) == 1)
+		? TTF_RenderText_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255))
+		: TTF_RenderUTF8_Blended(m_font, szChar, SDL_Color(255, 255, 255, 255));
+	if ((surface == nullptr) or not info.texture->CreateFromSurface(surface, { .isDisposable = true })) {
+		delete info.texture;
+		info = GlyphInfo();
+		return false;
+	}
 #if 0 // macht jetzt Texture::CreateFromSurface
     info.texture->Deploy();
 #endif
-    if (not m_glyphDict.Insert(info.name, info))
-        return false;
-    info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());
-    m_maxGlyphSize.width = std::max(m_maxGlyphSize.width, info.texture->GetWidth());
-    m_maxGlyphSize.height = std::max(m_maxGlyphSize.height, info.texture->GetHeight());
-    return true;
+	if (not m_glyphDict.Insert(info.name, info))
+		return false;
+	info.glyphSize = GlyphSize(info.texture->GetWidth(), info.texture->GetHeight());
+	m_maxGlyphSize.width = std::max(m_maxGlyphSize.width, info.texture->GetWidth());
+	m_maxGlyphSize.height = std::max(m_maxGlyphSize.height, info.texture->GetHeight());
+	return true;
 }
 
 
-int FontHandler::CreateTextures(void) {
-    char szChar[4] = " ";
-    int32_t i = 0;
-    void* cl = baseRenderer.StartOperation("FontHandler::CreateTextures");
-    for (char* info = m_glyphs.Data(); *info; info++) {
-        szChar[0] = *info;
-        if (CreateTexture(szChar, String(*info), i))
-            ++i;
-    }
-    if (CreateTexture((const char*)m_euroChar, String(m_euroChar), i))
-        ++i;
-    baseRenderer.FinishOperation(cl, true);
-    return i;
+int FontHandler::CreateTextures(void)
+{
+	char	szChar[4] = " ";
+	int32_t	i = 0;
+	void*	cl = baseRenderer.StartOperation("FontHandler::CreateTextures");
+	for (char* info = m_glyphs.Data(); *info; info++) {
+		szChar[0] = *info;
+		if (CreateTexture(szChar, String(*info), i))
+			++i;
+	}
+	if (CreateTexture((const char*)m_euroChar, String(m_euroChar), i))
+		++i;
+	baseRenderer.FinishOperation(cl, true);
+	return i;
 }
 
 
-bool FontHandler::CreateAtlas(void) {
-    int i = CreateTextures();
-    m_maxGlyphSize.Update();
-    int glyphCount = m_glyphs.Length() + 1;
-    if (not m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2, GfxFilterMode::Linear, 1)) {
+bool FontHandler::CreateAtlas(void)
+{
+	int i = CreateTextures();
+	m_maxGlyphSize.Update();
+	int glyphCount = m_glyphs.Length() + 1;
+	if (not m_atlas.Create("LetterAtlas", m_maxGlyphSize, m_glyphs.Length() + 1, 2, GfxFilterMode::Linear, 1)) {
 #ifdef _DEBUG
-        logHandler.Print("FontHandler: Failed to create atlas.\n");
+		logHandler.Print("FontHandler: Failed to create atlas.\n");
 #endif
-        return false;
-    }
+		return false;
+	}
 #ifdef _DEBUG
-    if (BuildAtlas() == int(glyphCount))
-        return true;
-    logHandler.Print("FontHandler: Failed to create all glyphs.\n");
-    return false;
+	if (BuildAtlas() == int(glyphCount))
+		return true;
+	logHandler.Print("FontHandler: Failed to create all glyphs.\n");
+	return false;
 #else
-    return BuildAtlas() == int(glyphCount);
+	return BuildAtlas() == int(glyphCount);
 #endif
 }
 
 
-FontHandler::TextDimensions FontHandler::TextSize(String text) {
-    TextDimensions d;
-    for (int32_t offset = 0; offset < int32_t(text.Length()); ) {
-        String glyph = NextGlyph(text, offset);
-        GlyphInfo* info = FindGlyph(glyph);
-        if ((info == nullptr) or (info->index < 0)) {
+FontHandler::TextDimensions FontHandler::TextSize(String text)
+{
+	TextDimensions d;
+	for (int32_t offset = 0; offset < int32_t(text.Length());) {
+		String		glyph = NextGlyph(text, offset);
+		GlyphInfo*	info = FindGlyph(glyph);
+		if ((info == nullptr) or (info->index < 0)) {
 #ifdef _DEBUG
-            logHandler.Print("Couldn't load texture for glyph '%s'\r\n", (const char*)glyph);
+			logHandler.Print("Couldn't load texture for glyph '%s'\r\n", (const char*)glyph);
 #endif
-            return TextDimensions();
-        }
-        int tw = info->glyphSize.width;
-        d.width += tw;
-        //auto Max = [=](auto& a, auto b) { return (a > b) ? a : b; };
-        int th = info->glyphSize.height;
-        if (d.height < th)
-            d.height = th;
-        }
-    d.height = int(float(d.height) * m_inkHeight + 0.5f); // fit against the real ink height, not the metric-padded surface height
-    return d.Update();
+			return TextDimensions();
+		}
+		int tw = info->glyphSize.width;
+		d.width += tw;
+		//auto Max = [=](auto& a, auto b) { return (a > b) ? a : b; };
+		int th = info->glyphSize.height;
+		if (d.height < th)
+			d.height = th;
+	}
+	d.height = int(float(d.height) * m_inkHeight + 0.5f); // fit against the real ink height, not the metric-padded surface height
+	return d.Update();
 }
 
 
-void FontHandler::Destroy(void) {
-    m_atlas.Destroy();
-    m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
-    m_glyphDict.Clear();
-    m_maxGlyphSize = GlyphSize();
-    m_isAvailable = false;
-    if (m_font) {
-        TTF_CloseFont(m_font);
-        m_font = nullptr;
-        m_fontName = "";
-        m_fontSize = 0;
-    }
+void FontHandler::Destroy(void)
+{
+	m_atlas.Destroy();
+	m_glyphDict.Walk(&FontHandler::FreeGlyph, this);
+	m_glyphDict.Clear();
+	m_maxGlyphSize = GlyphSize();
+	m_isAvailable = false;
+	if (m_font) {
+		TTF_CloseFont(m_font);
+		m_font = nullptr;
+		m_fontName = "";
+		m_fontSize = 0;
+	}
 }
 
 

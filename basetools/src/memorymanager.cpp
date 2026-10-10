@@ -7,7 +7,10 @@
 #include <cstdlib>
 #include <new>
 
-typedef struct { int data; int key; } avlTestData;
+typedef struct {
+	int data;
+	int key;
+} avlTestData;
 
 avlTestData avlTestSet[] = {
 #if 0
@@ -81,104 +84,113 @@ avlTestData avlTestSet[] = {
 	{ 36, 164168064 },
 	{ 35, 55105920 },
 	{ 37, 164165376 },
-	{ -35 , 55105920 } 
+	{ -35 , 55105920 }
 #endif
 #if 1
-{ 0, 69820528 },
-{ 1, 264514104 },
-{ 2, 69820584 },
-{ 3, 264514048 },
-{ 4, 69820616 },
-{ 5, 264513992 },
-{ 6, 69820672 },
-{ 7, 264513936 },
-{ 8, 69820728 },
-{ 9, 264513880 },
-{ 10, 69820784 },
-{ 11, 264513824 },
-{ 12, 69820840 },
-{ 13, 264513768 },
-{ 14, 69820896 },
-{ 15, 264513712 },
-{ 16, 69820952 },
-{ 17, 264513656 },
-{ 18, 69821008 },
-{ 19, 264513056 },
-{ 20, 69821064 },
-{ 21, 264513000 },
-{ 22, 69821120 },
-{ 23, 264512944 },
-{ 24, 69821176 },
-{ 25, 264512808 },
-{ 26, 69821232 },
-{ 27, 264512752 },
-{ -27, 264512752 },
-{ 27, 69821288 },
-{ 28, 264512696 },
-{ 29, 69821424 },
-{ -29, 69821424 },
-{ 29, 264512584 },
-{ 30, 69821480 },
-{ 31, 264512552 },
-{ 32, 69821536 },
-{ 33, 264512488 },
-{ -32, 69821536 },
-{ 32, 69821584 },
-{ -33, 264512488 }
+	{ 0, 69820528 },
+	{ 1, 264514104 },
+	{ 2, 69820584 },
+	{ 3, 264514048 },
+	{ 4, 69820616 },
+	{ 5, 264513992 },
+	{ 6, 69820672 },
+	{ 7, 264513936 },
+	{ 8, 69820728 },
+	{ 9, 264513880 },
+	{ 10, 69820784 },
+	{ 11, 264513824 },
+	{ 12, 69820840 },
+	{ 13, 264513768 },
+	{ 14, 69820896 },
+	{ 15, 264513712 },
+	{ 16, 69820952 },
+	{ 17, 264513656 },
+	{ 18, 69821008 },
+	{ 19, 264513056 },
+	{ 20, 69821064 },
+	{ 21, 264513000 },
+	{ 22, 69821120 },
+	{ 23, 264512944 },
+	{ 24, 69821176 },
+	{ 25, 264512808 },
+	{ 26, 69821232 },
+	{ 27, 264512752 },
+	{ -27, 264512752 },
+	{ 27, 69821288 },
+	{ 28, 264512696 },
+	{ 29, 69821424 },
+	{ -29, 69821424 },
+	{ 29, 264512584 },
+	{ 30, 69821480 },
+	{ 31, 264512552 },
+	{ 32, 69821536 },
+	{ 33, 264512488 },
+	{ -32, 69821536 },
+	{ 32, 69821584 },
+	{ -33, 264512488 }
 #endif
 };
 
 
 // =================================================================================================
 
-bool MemoryManager::Create(int capacity, bool createOnce) {
+bool MemoryManager::Create(int capacity, bool createOnce)
+{
 	memoryPool = memoryStart = reinterpret_cast<Address>(malloc(1000 * 1000 * 1000));
 	memoryEnd = memoryStart + 1000 * 1000 * 1000;
 	return m_memoryDescriptors.Create(capacity, KeyComparer, this, createOnce);
 }
 
 
-void MemoryManager::Destroy(void) {
+void MemoryManager::Destroy(void)
+{
 	m_memoryDescriptors.Destroy();
 }
 
 
-bool MemoryManager::IsIntact(MemoryDescriptor& md) {
+bool MemoryManager::IsIntact(MemoryDescriptor& md)
+{
 	return md.address and not strncmp(md.address - 11, "@#@#", 4) and not strncmp(md.address + md.size, "@#@#", 4);
 }
 
 
-bool MemoryManager::IsIntact(int itemIndex) {
+bool MemoryManager::IsIntact(int itemIndex)
+{
 	return (itemIndex < 0) ? true : IsIntact(m_memoryDescriptors[itemIndex]);
 }
 
 
 
-bool MemoryManager::IsAddress(int itemIndex) {
+bool MemoryManager::IsAddress(int itemIndex)
+{
 	if (ToKey(m_memoryDescriptors[itemIndex].address) == m_key)
 		return true;
 	return false;
 }
 
 
-bool MemoryManager::ItemProcessor(void* context, const Key& key, const int& itemIndex) {
+bool MemoryManager::ItemProcessor(void* context, const Key& key, const int& itemIndex)
+{
 	return context ? static_cast<MemoryManager*>(context)->IsIntact(itemIndex) : false;
 }
 
 
-bool MemoryManager::ItemFinder(void* context, const Key& key, const int& itemIndex) {
+bool MemoryManager::ItemFinder(void* context, const Key& key, const int& itemIndex)
+{
 	return context ? static_cast<MemoryManager*>(context)->IsAddress(itemIndex) : false;
 }
 
 
-bool MemoryManager::CheckIntegrity(void) {
-//	for (int i = 0; (md = m_memoryDescriptors.UsedItem(i)); i++) {
+bool MemoryManager::CheckIntegrity(void)
+{
+	//	for (int i = 0; (md = m_memoryDescriptors.UsedItem(i)); i++) {
 	return m_memoryDescriptors.UsedItems().Walk(ItemProcessor, this);
 	///return m_memoryDescriptors.ProcessItems(this->IsIntact);
 }
 
 
-MemoryManager::Address MemoryManager::Reserve(uint32_t size) {
+MemoryManager::Address MemoryManager::Reserve(uint32_t size)
+{
 	if (memoryStart + size > memoryEnd)
 		return nullptr;
 	allocFromStart = true; // !allocFromStart;
@@ -194,7 +206,8 @@ MemoryManager::Address MemoryManager::Reserve(uint32_t size) {
 }
 
 
-MemoryDescriptor* MemoryManager::Claim(uint32_t size) {
+MemoryDescriptor* MemoryManager::Claim(uint32_t size)
+{
 	CheckIntegrity();
 	Address address = Reserve(size + 16); // static_cast<Address>(malloc(size + 16));
 	if (not address) {
@@ -204,8 +217,8 @@ MemoryDescriptor* MemoryManager::Claim(uint32_t size) {
 #define AVL_TEST 0
 #if AVL_TEST
 	for (int i = 0; i < sizeof(avlTestSet) / sizeof(*avlTestSet); i++) {
-		avlTestData& h = avlTestSet[i];
-		int data, key = abs(h.key);
+		avlTestData&	h = avlTestSet[i];
+		int				data, key = abs(h.key);
 		if (h.key < 0) {
 			m_memoryDescriptors.UsedItems().Extract(h.key, data);
 			if (m_memoryDescriptors.UsedItems().FindData(h.data))
@@ -215,8 +228,8 @@ MemoryDescriptor* MemoryManager::Claim(uint32_t size) {
 			m_memoryDescriptors.UsedItems().Insert(h.key, h.data);
 	}
 #endif
-	Key key = ToKey(address);
-	MemoryDescriptor* md = m_memoryDescriptors.Claim(key); // address);
+	Key					key = ToKey(address);
+	MemoryDescriptor*	md = m_memoryDescriptors.Claim(key); // address);
 	if (not md) {
 		//free(address);
 		//fprintf(stderr, "MM::Alloc: out of memory blocks\n");
@@ -237,13 +250,15 @@ MemoryDescriptor* MemoryManager::Claim(uint32_t size) {
 }
 
 
-void* MemoryManager::Alloc(uint32_t size) {
+void* MemoryManager::Alloc(uint32_t size)
+{
 	MemoryDescriptor* md = Claim(size);
 	return md ? reinterpret_cast<void*>(md->address) : nullptr;
 }
 
 
-void* MemoryManager::Realloc(void* address, uint32_t size, bool bCopy) {
+void* MemoryManager::Realloc(void* address, uint32_t size, bool bCopy)
+{
 	if (not address) {
 		//fprintf(stderr, "%s (%d): realloc on nullptr\n", __FILE__, __LINE__);
 		return nullptr;
@@ -258,9 +273,9 @@ void* MemoryManager::Realloc(void* address, uint32_t size, bool bCopy) {
 	if (not mbNew)
 		return address;
 
-	address = Address (address) - 11;
-	Key key = ToKey(address);
-	MemoryDescriptor* mbOld = m_memoryDescriptors.FindItem(key);
+	address = Address(address) - 11;
+	Key					key = ToKey(address);
+	MemoryDescriptor*	mbOld = m_memoryDescriptors.FindItem(key);
 	if (not mbOld) {
 		fprintf(stderr, "%s (%d): memory block list is corrupted\n", __FILE__, __LINE__);
 		mbOld = m_memoryDescriptors.FindItem(key);
@@ -287,7 +302,8 @@ void* MemoryManager::Realloc(void* address, uint32_t size, bool bCopy) {
 }
 
 
-void MemoryManager::Free(void* address) {
+void MemoryManager::Free(void* address)
+{
 	address = reinterpret_cast<Address>(address) - 11;
 	Key key = ToKey(address);
 	//Address key = reinterpret_cast<Address>(address) - 11;
@@ -321,9 +337,10 @@ void MemoryManager::Free(void* address) {
 }
 
 
-void* MemoryManager::SetPtr(void* address, uint32_t size) {
-	Key key = ToKey(address);
-	MemoryDescriptor* md = m_memoryDescriptors.Claim(key);
+void* MemoryManager::SetPtr(void* address, uint32_t size)
+{
+	Key					key = ToKey(address);
+	MemoryDescriptor*	md = m_memoryDescriptors.Claim(key);
 	if (not md) {
 		//fprintf(stderr, "MM::SetPtr: out of memory blocks\n");
 		return nullptr;

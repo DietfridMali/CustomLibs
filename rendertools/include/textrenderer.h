@@ -2,7 +2,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL_ttf.h"
 #ifdef _MSC_VER
@@ -24,161 +24,194 @@
 
 // =================================================================================================
 
-class TextRenderer 
-    : public TextEffects 
-    , public BaseSingleton<TextRenderer>
-{
+class TextRenderer
+	: public TextEffects,
+	  public BaseSingleton<TextRenderer> {
 public:
-    using TextDecoration = TextEffects::Decoration;
-    using TextDimensions = FontHandler::TextDimensions;
+	using TextDecoration = TextEffects::Decoration;
+	using TextDimensions = FontHandler::TextDimensions;
 
-    typedef enum {
-        taLeft,
-        taCenter,
-        taRight
-    } eTextAlignments;
+	typedef enum {
+		taLeft,
+		taCenter,
+		taRight
+	} eTextAlignments;
 
 private:
-    RGBAColor           m_color;
-    float               m_scale{ 1.0f };
-    eTextAlignments     m_textAlignment;
-    TextDecoration      m_decoration;
-    GfxDataLayout       m_gfxDataLayout;
-    RenderTarget*       m_renderTarget{ nullptr };
-    FontHandler*        m_font;
-    List<RGBAColor>     m_colorStack;
-    AutoArray<RGBAColor> m_glyphColors;
+	RGBAColor				m_color;
+	float					m_scale{ 1.0f };
+	eTextAlignments			m_textAlignment;
+	TextDecoration			m_decoration;
+	GfxDataLayout			m_gfxDataLayout;
+	RenderTarget*			m_renderTarget{ nullptr };
+	FontHandler*			m_font;
+	List<RGBAColor>			m_colorStack;
+	AutoArray<RGBAColor>	m_glyphColors;
 
 public:
-    static int CompareRenderTargets(void* context, const int& key1, const int& key2);
+	static int CompareRenderTargets(void* context, const int& key1, const int& key2);
 
-    TextRenderer(RGBAColor color = ColorData::White, const TextDecoration& decoration = {}, float scale = 1.0f);
+	TextRenderer(RGBAColor color = ColorData::White, const TextDecoration& decoration = {}, float scale = 1.0f);
 
-    void Fill(Vector4f color);
+	void Fill(Vector4f color);
 
-    float FitScale(String text, int viewportWidth, int viewportHeight, const TextDecoration& decoration = {});
+	float FitScale(String text, int viewportWidth, int viewportHeight, const TextDecoration& decoration = {});
 
-    void RenderToBuffer(String text, eTextAlignments alignment, RenderTarget* renderTarget, Viewport& viewport, int renderAreaWidth = 0, int renderAreaHeight = 0, int flipVertically = 0);
+	void RenderToBuffer(String text, eTextAlignments alignment, RenderTarget* renderTarget, Viewport& viewport,
+						int renderAreaWidth = 0, int renderAreaHeight = 0, int flipVertically = 0);
 
-    void RenderToScreen(RenderTarget* renderTarget, int flipVertically = 0);
+	void RenderToScreen(RenderTarget* renderTarget, int flipVertically = 0);
 
-    void Render(String text, eTextAlignments alignment = taLeft, int flipVertically = 0, int renderAreaWidth = 0, int renderAreaHeight = 0, bool useRenderTarget = true);
+	void Render(String text, eTextAlignments alignment = taLeft, int flipVertically = 0, int renderAreaWidth = 0,
+				int renderAreaHeight = 0, bool useRenderTarget = true);
 
-    inline FontHandler* SetFont(FontHandler * font) noexcept {
-        FontHandler* currentFont = m_font;
-        m_font = font;
-        return currentFont;
-    }
+	inline FontHandler* SetFont(FontHandler* font)
+	noexcept
+	{
+		FontHandler* currentFont = m_font;
+		m_font = font;
+		return currentFont;
+	}
 
-    inline FontHandler* GetFont(void) noexcept {
-        return m_font;
-    }
+	inline FontHandler* GetFont(void)
+	noexcept
+	{
+		return m_font;
+	}
 
-    inline TextDimensions TextSize(String text) {
-        return m_font ? m_font->TextSize(text) : TextDimensions(0, 0);
-    }
+	inline TextDimensions TextSize(String text) {
+		return m_font ? m_font->TextSize(text) : TextDimensions(0, 0);
+	}
 
-    inline bool SetColor(RGBAColor color = ColorData::White) noexcept {
-        if (color.A() < 0.0f)
-            return false;
-        m_color = color;
-        return true;
-    }
+	inline bool SetColor(RGBAColor color = ColorData::White)
+	noexcept
+	{
+		if (color.A() < 0.0f)
+			return false;
+		m_color = color;
+		return true;
+	}
 
-    inline RGBAColor GetColor(void) noexcept {
-        return m_color;
-    }
+	inline RGBAColor GetColor(void)
+	noexcept
+	{
+		return m_color;
+	}
 
-    inline void SetGlyphColors(const AutoArray<RGBAColor>& colors) {
-        m_glyphColors = colors;
-    }
+	inline void SetGlyphColors(const AutoArray<RGBAColor>& colors) {
+		m_glyphColors = colors;
+	}
 
-    inline bool SetAlpha(float alpha = 1.0) noexcept {
-        if (alpha < 0.0f)
-            return false;
-        m_color.A() = alpha;
-        return true;
-    }
+	inline bool SetAlpha(float alpha = 1.0)
+	noexcept
+	{
+		if (alpha < 0.0f)
+			return false;
+		m_color.A() = alpha;
+		return true;
+	}
 
-    inline bool SetScale(float scale = 1.0) noexcept {
-        if (scale < 0.0f)
-            return false;
-        m_scale = scale;
-        return true;
-    }
+	inline bool SetScale(float scale = 1.0)
+	noexcept
+	{
+		if (scale < 0.0f)
+			return false;
+		m_scale = scale;
+		return true;
+	}
 
-    void SetAAMethod(const TextEffects::AAMethod& aaMethod) noexcept {
-        m_decoration.aaMethod = aaMethod;
-    }
+	void SetAAMethod(const TextEffects::AAMethod& aaMethod)
+	noexcept
+	{
+		m_decoration.aaMethod = aaMethod;
+	}
 
-    inline void SetTextAlignment(eTextAlignments alignment) noexcept {
-        m_textAlignment = alignment;
-    }
+	inline void SetTextAlignment(eTextAlignments alignment)
+	noexcept
+	{
+		m_textAlignment = alignment;
+	}
 
-    inline void SetOutline(float outlineWidth = 0.0f, RGBAColor outlineColor = ColorData::Invisible) noexcept {
-        m_decoration.outlineWidth = outlineWidth;
-        m_decoration.outlineColor = outlineColor;
-    }
+	inline void SetOutline(float outlineWidth = 0.0f, RGBAColor outlineColor = ColorData::Invisible)
+	noexcept
+	{
+		m_decoration.outlineWidth = outlineWidth;
+		m_decoration.outlineColor = outlineColor;
+	}
 
 
-    inline void SetDecoration(const TextDecoration& decoration = {}) noexcept {
-        m_decoration = decoration;
-    }
+	inline void SetDecoration(const TextDecoration& decoration = {})
+	noexcept
+	{
+		m_decoration = decoration;
+	}
 
-    inline bool HaveOutline(void) noexcept {
-        return m_decoration.HaveOutline();
-    }
+	inline bool HaveOutline(void)
+	noexcept
+	{
+		return m_decoration.HaveOutline();
+	}
 
-    inline bool ApplyAA(void) noexcept {
-        return m_decoration.ApplyAA();
-    }
+	inline bool ApplyAA(void)
+	noexcept
+	{
+		return m_decoration.ApplyAA();
+	}
 
-    inline void PushColor(void) noexcept {
-        m_colorStack.Push(m_color);
-    }
+	inline void PushColor(void)
+	noexcept
+	{
+		m_colorStack.Push(m_color);
+	}
 
-    inline void PopColor(void) noexcept {
-        if (not m_colorStack.IsEmpty())
-            m_color = m_colorStack.Pop();
-    }
+	inline void PopColor(void)
+	noexcept
+	{
+		if (not m_colorStack.IsEmpty())
+			m_color = m_colorStack.Pop();
+	}
 
 private:
-    inline bool HaveGlyphColors(void) noexcept {
-        return m_glyphColors.Length() > 1;
-    }
+	inline bool HaveGlyphColors(void)
+	noexcept
+	{
+		return m_glyphColors.Length() > 1;
+	}
 
-    inline RGBAColor& GlyphColor(int32_t glyphIndex) {
-        return m_glyphColors[glyphIndex % m_glyphColors.Length()];
-    }
+	inline RGBAColor& GlyphColor(int32_t glyphIndex) {
+		return m_glyphColors[glyphIndex % m_glyphColors.Length()];
+	}
 
-    BaseQuadMesh& CreateQuad(BaseQuadMesh& q, float x, float y, float w, Texture* t, bool flipVertically);
+	BaseQuadMesh& CreateQuad(BaseQuadMesh& q, float x, float y, float w, Texture* t, bool flipVertically);
 
-    RenderTarget* GetRenderTarget(int scale);
+	RenderTarget* GetRenderTarget(int scale);
 
-    Shader* LoadShader(void);
+	Shader* LoadShader(void);
 
-    void RenderTextMesh(String& text, float x, float y, float scale, bool flipVertically);
+	void RenderTextMesh(String& text, float x, float y, float scale, bool flipVertically);
 
-    void RenderGlyphs(String& text, float x, float y, float scale, bool flipVertically);
+	void RenderGlyphs(String& text, float x, float y, float scale, bool flipVertically);
 
-    float XOffset(float xOffset, int textWidth, eTextAlignments alignment);
+	float XOffset(float xOffset, int textWidth, eTextAlignments alignment);
 
-    void RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment = taLeft, int flipVertically = 0, float xMargin = 0.0f);
+	void RenderText(String& text, int textWidth, float xOffset, float yOffset, eTextAlignments alignment = taLeft,
+					int flipVertically = 0, float xMargin = 0.0f);
 
-    int SourceBuffer(bool hasOutline, bool antiAliased);
+	int SourceBuffer(bool hasOutline, bool antiAliased);
 
-    static inline int RenderTargetID(const int width, const int height) noexcept {
-        return width << 16 | height;
-    }
+	static inline int RenderTargetID(const int width, const int height)
+	noexcept
+	{
+		return width << 16 | height;
+	}
 
-    static inline int RenderTargetID(const RenderTarget* renderTarget) noexcept {
-        return RenderTargetID (renderTarget->m_width, renderTarget->m_height);
-    }
-
+	static inline int RenderTargetID(const RenderTarget* renderTarget)
+	noexcept
+	{
+		return RenderTargetID(renderTarget->m_width, renderTarget->m_height);
+	}
 };
 
 #define textRenderer TextRenderer::Instance()
 
 // =================================================================================================
-
-

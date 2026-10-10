@@ -11,7 +11,8 @@
 #include "commandlist.h"
 #include "gfxtypes.h"
 
-template <typename DATA_T, typename STORAGE_T> class GfxArray;
+template <typename DATA_T, typename STORAGE_T>
+class GfxArray;
 
 using GfxDrawCommandBuffer = GfxArray<GfxDrawCommand, GfxTypes::IndirectBuffer>;
 
@@ -24,157 +25,220 @@ using GfxDrawCommandBuffer = GfxArray<GfxDrawCommand, GfxTypes::IndirectBuffer>;
 // and delegates to the command list via IASetVertexBuffers / IASetIndexBuffer / DrawIndexedInstanced
 // inside Enable() and Render().
 
-class GfxDataLayout
-{
+class GfxDataLayout {
 public:
-    List<GfxDataBuffer*>    m_dataBuffers;
-    GfxDataBuffer           m_indexBuffer;
-    MeshTopology            m_shape{ MeshTopology::Quads };
-	CommandList*            m_updateList{ nullptr };  
-    uint32_t                m_dynamicBuffers{ 0 };
-    uint32_t                m_instanceCount{ 1 };
-    bool                    m_isBound{ false };
+	List<GfxDataBuffer*>	m_dataBuffers;
+	GfxDataBuffer			m_indexBuffer;
+	MeshTopology			m_shape{ MeshTopology::Quads };
+	CommandList*			m_updateList{ nullptr };
+	uint32_t				m_dynamicBuffers{ 0 };
+	uint32_t				m_instanceCount{ 1 };
+	bool					m_isBound{ false };
 
-    static GfxDataLayout*         activeLayout;
-    static List<GfxDataLayout*>   layoutStack;
+	static GfxDataLayout*		activeLayout;
+	static List<GfxDataLayout*>	layoutStack;
 
-    GfxDataLayout() = default;
+	GfxDataLayout() = default;
 
-    static inline void PushGfxDataLayout(GfxDataLayout* gfxDataLayout) noexcept { 
-        layoutStack.Append(gfxDataLayout); 
-    }
+	static inline void PushGfxDataLayout(GfxDataLayout* gfxDataLayout)
+	noexcept
+	{
+		layoutStack.Append(gfxDataLayout);
+	}
 
-    static inline GfxDataLayout* PopGfxDataLayout(void) noexcept {
-        if (not layoutStack.Length()) 
-            return nullptr;
-        GfxDataLayout* gfxDataLayout = nullptr;
-        layoutStack.Pop(gfxDataLayout);
-        return gfxDataLayout;
-    }
+	static inline GfxDataLayout* PopGfxDataLayout(void)
+	noexcept
+	{
+		if (not layoutStack.Length())
+			return nullptr;
+		GfxDataLayout* gfxDataLayout = nullptr;
+		layoutStack.Pop(gfxDataLayout);
+		return gfxDataLayout;
+	}
 
-    void SetDynamic(uint32_t dynamicBuffers) noexcept;
+	void SetDynamic(uint32_t dynamicBuffers)
+	noexcept;
 
-    inline void SetShape(MeshTopology shape) noexcept { m_shape = shape; }
+	inline void SetShape(MeshTopology shape)
+	noexcept
+	{
+		m_shape = shape;
+	}
 
-    inline void SetInstanceCount(uint32_t instanceCount) noexcept { m_instanceCount = instanceCount; }
+	inline void SetInstanceCount(uint32_t instanceCount)
+	noexcept
+	{
+		m_instanceCount = instanceCount;
+	}
 
-    inline uint32_t GetInstanceCount(void) noexcept { return m_instanceCount; }
+	inline uint32_t GetInstanceCount(void)
+	noexcept
+	{
+		return m_instanceCount;
+	}
 
-    // In DX12 there is nothing to initialise at "GfxDataLayout creation" time.
-    // Returns true always.
-    bool Create(MeshTopology shape = MeshTopology::Quads, uint32_t dynamicBuffers = 0) noexcept;
+	// In DX12 there is nothing to initialise at "GfxDataLayout creation" time.
+	// Returns true always.
+	bool Create(MeshTopology shape = MeshTopology::Quads, uint32_t dynamicBuffers = 0)
+	noexcept;
 
-    ~GfxDataLayout() { Destroy(); }
+	~GfxDataLayout() {
+		Destroy();
+	}
 
-    GfxDataLayout(GfxDataLayout const& other)  { 
-        Copy(other); 
-    }
+	GfxDataLayout(GfxDataLayout const& other) {
+		Copy(other);
+	}
 
-    GfxDataLayout(GfxDataLayout&& other) noexcept { 
-        Move(other); 
-    }
-    
-    GfxDataLayout& operator=(const GfxDataLayout& other) { 
-        return Copy(other); 
-    }
-    
-    GfxDataLayout& operator=(GfxDataLayout&& other) noexcept { 
-        return Move(other); 
-    }
+	GfxDataLayout(GfxDataLayout&& other)
+	noexcept
+	{
+		Move(other);
+	}
 
-    GfxDataLayout& Copy(GfxDataLayout const& other);
-    
-    GfxDataLayout& Move(GfxDataLayout& other) noexcept;
+	GfxDataLayout& operator=(const GfxDataLayout& other) {
+		return Copy(other);
+	}
 
-    void Destroy(void) noexcept;
+	GfxDataLayout& operator=(GfxDataLayout&& other)
+	noexcept
+	{
+		return Move(other);
+	}
 
-    static void DestroyDefaultStreams(void) noexcept;
+	GfxDataLayout& Copy(GfxDataLayout const& other);
 
-    inline bool IsValid(void) noexcept { 
-        return true; 
-    }  // always "valid" in DX12
-    
-    inline bool IsBound(void) noexcept { 
-        return m_isBound; 
-    }
-    
-    inline bool IsActive(void) noexcept { 
-        return this == activeLayout; 
-    }
+	GfxDataLayout& Move(GfxDataLayout& other)
+	noexcept;
 
-    inline void Activate(void) noexcept {
-        if (not IsActive()) { 
-            PushGfxDataLayout(activeLayout); 
-            activeLayout = this; 
-        }
-    }
+	void Destroy(void)
+	noexcept;
 
-    inline void Deactivate(void) noexcept {
-        if (IsActive()) {
-            activeLayout = PopGfxDataLayout();
-            if (activeLayout && activeLayout->IsBound())
-                activeLayout->Activate();
-        }
-    }
+	static void DestroyDefaultStreams(void)
+	noexcept;
 
-    // Bind vertex + index buffers on the command list.
-    bool Enable(void) noexcept;
+	inline bool IsValid(void)
+	noexcept
+	{
+		return true;
+	} // always "valid" in DX12
 
-    void Disable(void) noexcept;
+	inline bool IsBound(void)
+	noexcept
+	{
+		return m_isBound;
+	}
 
-    CommandList* StartUpdate(void) noexcept;
+	inline bool IsActive(void)
+	noexcept
+	{
+		return this == activeLayout;
+	}
 
-    bool FinishUpdate(void) noexcept;
+	inline void Activate(void)
+	noexcept
+	{
+		if (not IsActive()) {
+			PushGfxDataLayout(activeLayout);
+			activeLayout = this;
+		}
+	}
 
-    inline bool StartRender(void) noexcept {
-        return Enable(); 
-    }
+	inline void Deactivate(void)
+	noexcept
+	{
+		if (IsActive()) {
+			activeLayout = PopGfxDataLayout();
+			if (activeLayout && activeLayout->IsBound())
+				activeLayout->Activate();
+		}
+	}
 
-    inline void FinishRender(void) noexcept {
-        Disable();
-    } 
+	// Bind vertex + index buffers on the command list.
+	bool Enable(void)
+	noexcept;
 
-    bool ActivateTextures(std::span<Texture* const> textures = {}) noexcept;
+	void Disable(void)
+	noexcept;
 
-    inline void DeactivateTextures(std::span<Texture* const> textures = {}) noexcept {
-        for (Texture* t : textures)
-            if (t) 
-                t->Deactivate();
-    }
+	CommandList* StartUpdate(void)
+	noexcept;
 
-    // Names used by the OpenGL backend for the same two calls.
-    inline bool EnableTextures(std::span<Texture* const> textures = {}) noexcept {
-        return ActivateTextures(textures);
-    }
+	bool FinishUpdate(void)
+	noexcept;
 
-    inline void DisableTextures(std::span<Texture* const> textures = {}) noexcept {
-        DeactivateTextures(textures);
-    }
+	inline bool StartRender(void)
+	noexcept
+	{
+		return Enable();
+	}
 
-    GfxDataBuffer* FindBuffer(const char* type, int id, int& index) noexcept;
+	inline void FinishRender(void)
+	noexcept
+	{
+		Disable();
+	}
 
-    bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;
+	bool ActivateTextures(std::span<Texture* const> textures = {})
+	noexcept;
 
-    void UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate = false) noexcept;
+	inline void DeactivateTextures(std::span<Texture* const> textures = {})
+	noexcept
+	{
+		for (Texture* t : textures)
+			if (t)
+				t->Deactivate();
+	}
 
-    // Draws a RANGE of the index buffer instead of all of it: firstIndex is where to start, indexCount
-    // how many indices to draw, and 0 means "to the end". A consumer that keeps several batches in one
-    // mesh - a model whose faces are grouped by texture, say - would otherwise need a mesh per batch,
-    // which is a state change and a buffer each.
-    void Render(std::span<Texture* const> textures = {}, uint32_t firstIndex = 0, uint32_t indexCount = 0) noexcept;
+	// Names used by the OpenGL backend for the same two calls.
+	inline bool EnableTextures(std::span<Texture* const> textures = {})
+	noexcept
+	{
+		return ActivateTextures(textures);
+	}
 
-    inline void Render(Texture* texture) {
-        Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{});
-    }
+	inline void DisableTextures(std::span<Texture* const> textures = {})
+	noexcept
+	{
+		DeactivateTextures(textures);
+	}
 
-    void RenderIndirect(std::span<Texture* const> textures, GfxDrawCommandBuffer& commands, uint32_t firstCommand, uint32_t commandCount) noexcept;
+	GfxDataBuffer* FindBuffer(const char* type, int id, int& index)
+	noexcept;
+
+	bool UpdateDataBuffer(const char* type, int id, BaseVertexDataBuffer& buffer, ComponentType componentType,
+						  bool forceUpdate = false)
+	noexcept;
+
+	void UpdateIndexBuffer(IndexBuffer& buffer, ComponentType componentType, bool forceUpdate = false)
+	noexcept;
+
+	// Draws a RANGE of the index buffer instead of all of it: firstIndex is where to start, indexCount
+	// how many indices to draw, and 0 means "to the end". A consumer that keeps several batches in one
+	// mesh - a model whose faces are grouped by texture, say - would otherwise need a mesh per batch,
+	// which is a state change and a buffer each.
+	void Render(std::span<Texture* const> textures = {}, uint32_t firstIndex = 0, uint32_t indexCount = 0)
+	noexcept;
+
+	inline void Render(Texture* texture) {
+		Render(texture ? std::span<Texture* const>(&texture, 1) : std::span<Texture* const>{});
+	}
+
+	void RenderIndirect(std::span<Texture* const> textures, GfxDrawCommandBuffer& commands, uint32_t firstCommand,
+						uint32_t commandCount)
+	noexcept;
 
 protected:
-    bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0, bool forceUpdate = false) noexcept;  // componentType cast to ComponentType internally
+	bool UpdateBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount = 0,
+					  bool forceUpdate = false)
+	noexcept; // componentType cast to ComponentType internally
 
-    bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount, bool forceUpdate = false) noexcept;
+	bool UpdateDataBuffer(const char* type, int id, void* data, size_t dataSize, size_t componentType, size_t componentCount,
+						  bool forceUpdate = false)
+	noexcept;
 
-    bool UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate = false) noexcept;
+	bool UpdateIndexBuffer(void* data, size_t dataSize, size_t componentType, bool forceUpdate = false)
+	noexcept;
 };
 
 // =================================================================================================

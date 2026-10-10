@@ -19,7 +19,7 @@ class DataPool : public BasicDataPool<ITEM_T> {
 
 	using DataProcessor = typename AVLTreeTraits<KEY_T, int>::DataProcessor;
 
-	using ItemProcessor = bool(*) (void* t, ITEM_T&);
+	using ItemProcessor = bool (*)(void* t, ITEM_T&);
 
 	using ItemMap = AVLTree<KEY_T, int>;
 
@@ -30,7 +30,9 @@ private:
 
 public:
 	DataPool()
-		: BasicDataPool<ITEM_T>(), m_usedItems(nullptr), m_itemKey(0) //nullptr)
+		: BasicDataPool<ITEM_T>()
+		, m_usedItems(nullptr)
+		, m_itemKey(0) //nullptr)
 	{
 	}
 
@@ -41,7 +43,8 @@ public:
 
 
 private:
-	bool Setup(int32_t capacity, Comparator comparator, void* context, bool createOnce) {
+	bool Setup(int32_t capacity, Comparator comparator, void* context, bool createOnce)
+	{
 		if (createOnce and this->m_isCreated)
 			return true;
 		if (not this->BasicDataPool<ITEM_T>::Setup(capacity, createOnce))
@@ -51,7 +54,7 @@ private:
 			Destroy();
 			return false;
 		}
-		m_usedItems = new(buffer) ItemMap(capacity);
+		m_usedItems = new (buffer) ItemMap(capacity);
 		m_usedItems->SetComparator(comparator, context);
 		return true;
 	}
@@ -63,7 +66,8 @@ public:
 	}
 
 
-	void Destroy(void) {
+	void Destroy(void)
+	{
 		if (m_usedItems) {
 			//delete m_usedItems;
 			m_usedItems->~ItemMap();
@@ -74,7 +78,8 @@ public:
 	}
 
 
-	ITEM_T* FindItem(const KEY_T& key) {
+	ITEM_T* FindItem(const KEY_T& key)
+	{
 		if (not m_usedItems)
 			return nullptr;
 		int* itemIndex = m_usedItems->Find(key);
@@ -84,13 +89,14 @@ public:
 	}
 
 
-	ITEM_T* Claim(const KEY_T& key) {
-//		if (not key)
-//			return nullptr;
+	ITEM_T* Claim(const KEY_T& key)
+	{
+		//		if (not key)
+		//			return nullptr;
 		if (not m_usedItems)
 			return nullptr;
-		int itemIndex;
-		ITEM_T* item = this->BasicDataPool<ITEM_T>::Claim(itemIndex);
+		int		itemIndex;
+		ITEM_T*	item = this->BasicDataPool<ITEM_T>::Claim(itemIndex);
 		if (not item)
 			return nullptr;
 		KEY_T nullKey = (KEY_T)0;
@@ -105,7 +111,8 @@ public:
 	}
 
 
-	ITEM_T* Release(const KEY_T& key) {
+	ITEM_T* Release(const KEY_T& key)
+	{
 		if (not m_usedItems)
 			return nullptr;
 		int itemIndex = -1;
@@ -115,9 +122,9 @@ public:
 				fprintf(stderr, "                                                item index #%d not found\n", itemIndex);
 		}
 		if (not m_usedItems->Extract(key, itemIndex)) {
-			char* address = reinterpret_cast<char*>(key) + 11;
-			ITEM_T* itemPool = this->BasicDataPool<ITEM_T>::GetDataPool();
-			int* freeItems = this->BasicDataPool<ITEM_T>::GetFreeItems();
+			char*	address = reinterpret_cast<char*>(key) + 11;
+			ITEM_T*	itemPool = this->BasicDataPool<ITEM_T>::GetDataPool();
+			int*	freeItems = this->BasicDataPool<ITEM_T>::GetFreeItems();
 			for (int i = this->BasicDataPool<ITEM_T>::FreeItemCount(), j = this->BasicDataPool<ITEM_T>::Capacity(); i < j; i++) {
 				int h = freeItems[i];
 				if (itemPool[h].address == address) {

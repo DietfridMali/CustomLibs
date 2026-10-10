@@ -13,51 +13,74 @@
 // the matching float / unsigned-byte variant for the source buffer.
 
 struct GLFormat {
-    GLenum internalFormat;
-    GLenum externalFormat;
-    GLenum type;
+	GLenum internalFormat;
+	GLenum externalFormat;
+	GLenum type;
 };
 
-inline constexpr GLFormat ToGLFormat(GfxPixelFormat f) noexcept {
-    switch (f) {
-        case GfxPixelFormat::R8_UNorm:       return { GL_R8,      GL_RED,  GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::RG8_UNorm:      return { GL_RG8,     GL_RG,   GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::RGBA8_UNorm:    return { GL_RGBA8,   GL_RGBA, GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::R16_SFloat:     return { GL_R16F,    GL_RED,  GL_FLOAT };
-        case GfxPixelFormat::R32_SFloat:     return { GL_R32F,    GL_RED,  GL_FLOAT };
-        case GfxPixelFormat::RGBA16_SFloat:  return { GL_RGBA16F, GL_RGBA, GL_FLOAT };
-        case GfxPixelFormat::RGBA32_SFloat:  return { GL_RGBA32F, GL_RGBA, GL_FLOAT };
-        // The upload type is the packed one, not GL_FLOAT: the texel IS one 32 bit word, so a CPU
-        // side buffer holds uint32 per texel and not three floats.
-        case GfxPixelFormat::RG11B10_SFloat: return { GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV };
-        // Block-compressed: externalFormat/type are ignored by glCompressedTexImage2D, but the
-        // struct needs values — keep the nominal channel layout for documentation.
-        case GfxPixelFormat::BC1_UNorm:      return { GL_COMPRESSED_RGB_S3TC_DXT1_EXT, GL_RGB,  GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::BC7_UNorm:      return { GL_COMPRESSED_RGBA_BPTC_UNORM,   GL_RGBA, GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::BC7_UNorm_SRGB: return { GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM, GL_RGBA, GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::BC4_UNorm:      return { GL_COMPRESSED_RED_RGTC1,         GL_RED,  GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::BC5_UNorm:      return { GL_COMPRESSED_RG_RGTC2,          GL_RG,   GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::RGBA8_UNorm_SRGB: return { GL_SRGB8_ALPHA8,                GL_RGBA, GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::BC1_UNorm_SRGB: return { GL_COMPRESSED_SRGB_S3TC_DXT1_EXT, GL_RGB,  GL_UNSIGNED_BYTE };
-        case GfxPixelFormat::R16_UInt:       return { GL_R16UI,   GL_RED_INTEGER, GL_UNSIGNED_SHORT };
-        case GfxPixelFormat::R32_UInt:       return { GL_R32UI,   GL_RED_INTEGER, GL_UNSIGNED_INT };
-    }
-    return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+inline constexpr GLFormat ToGLFormat(GfxPixelFormat f)
+noexcept
+{
+	switch (f) {
+		case GfxPixelFormat::R8_UNorm:
+			return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::RG8_UNorm:
+			return { GL_RG8, GL_RG, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::RGBA8_UNorm:
+			return { GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::R16_SFloat:
+			return { GL_R16F, GL_RED, GL_FLOAT };
+		case GfxPixelFormat::R32_SFloat:
+			return { GL_R32F, GL_RED, GL_FLOAT };
+		case GfxPixelFormat::RGBA16_SFloat:
+			return { GL_RGBA16F, GL_RGBA, GL_FLOAT };
+		case GfxPixelFormat::RGBA32_SFloat:
+			return { GL_RGBA32F, GL_RGBA, GL_FLOAT };
+		// The upload type is the packed one, not GL_FLOAT: the texel IS one 32 bit word, so a CPU
+		// side buffer holds uint32 per texel and not three floats.
+		case GfxPixelFormat::RG11B10_SFloat:
+			return { GL_R11F_G11F_B10F, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV };
+		// Block-compressed: externalFormat/type are ignored by glCompressedTexImage2D, but the
+		// struct needs values — keep the nominal channel layout for documentation.
+		case GfxPixelFormat::BC1_UNorm:
+			return { GL_COMPRESSED_RGB_S3TC_DXT1_EXT, GL_RGB, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::BC7_UNorm:
+			return { GL_COMPRESSED_RGBA_BPTC_UNORM, GL_RGBA, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::BC7_UNorm_SRGB:
+			return { GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM, GL_RGBA, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::BC4_UNorm:
+			return { GL_COMPRESSED_RED_RGTC1, GL_RED, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::BC5_UNorm:
+			return { GL_COMPRESSED_RG_RGTC2, GL_RG, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::RGBA8_UNorm_SRGB:
+			return { GL_SRGB8_ALPHA8, GL_RGBA, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::BC1_UNorm_SRGB:
+			return { GL_COMPRESSED_SRGB_S3TC_DXT1_EXT, GL_RGB, GL_UNSIGNED_BYTE };
+		case GfxPixelFormat::R16_UInt:
+			return { GL_R16UI, GL_RED_INTEGER, GL_UNSIGNED_SHORT };
+		case GfxPixelFormat::R32_UInt:
+			return { GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT };
+	}
+	return { GL_R8, GL_RED, GL_UNSIGNED_BYTE };
 }
 
-inline constexpr bool IsIntegerColorFormat(GLenum internalFormat) noexcept {
-    return (internalFormat == GL_R16UI) or (internalFormat == GL_R32UI);
+inline constexpr bool IsIntegerColorFormat(GLenum internalFormat)
+noexcept
+{
+	return (internalFormat == GL_R16UI) or (internalFormat == GL_R32UI);
 }
 
 
-inline constexpr GLenum ToGLEncodedFormat(GLenum internalFormat, eColorEncoding colorEncoding) noexcept {
-    if (colorEncoding != ecSRGB)
-        return internalFormat;
-    if (internalFormat == GL_RGBA8)
-        return GL_SRGB8_ALPHA8;
-    if (internalFormat == GL_RGB8)
-        return GL_SRGB8;
-    return internalFormat;
+inline constexpr GLenum ToGLEncodedFormat(GLenum internalFormat, eColorEncoding colorEncoding)
+noexcept
+{
+	if (colorEncoding != ecSRGB)
+		return internalFormat;
+	if (internalFormat == GL_RGBA8)
+		return GL_SRGB8_ALPHA8;
+	if (internalFormat == GL_RGB8)
+		return GL_SRGB8;
+	return internalFormat;
 }
 
 
@@ -65,8 +88,10 @@ inline constexpr GLenum ToGLEncodedFormat(GLenum internalFormat, eColorEncoding 
 // The same mapping under a name that is spelled identically in all three backends, so that code
 // outside the backend directories (TextureAtlas and friends) can fill RTCreationParams::colorFormat
 // without knowing whether that field is a GLenum, a DXGI_FORMAT or a VkFormat.
-inline constexpr GLenum ToNativeColorFormat(GfxPixelFormat f) noexcept {
-    return ToGLFormat(f).internalFormat;
+inline constexpr GLenum ToNativeColorFormat(GfxPixelFormat f)
+noexcept
+{
+	return ToGLFormat(f).internalFormat;
 }
 
 // =================================================================================================

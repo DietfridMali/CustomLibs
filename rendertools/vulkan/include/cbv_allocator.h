@@ -25,64 +25,88 @@
 //                      // a.offset later goes into vkCmdBindDescriptorSets pDynamicOffsets
 
 struct CbAlloc {
-    uint8_t*  cpu     { nullptr };
-    uint32_t  offset  { 0 };          // dynamic offset into 'buffer'
-    VkBuffer  buffer  { VK_NULL_HANDLE };   // the buffer the allocation lies in - not always the slot's own
+	uint8_t* cpu{ nullptr };
+	uint32_t offset{ 0 }; // dynamic offset into 'buffer'
+	VkBuffer buffer{ VK_NULL_HANDLE }; // the buffer the allocation lies in - not always the slot's own
 
-    bool IsValid(void) const noexcept { return cpu != nullptr; }
+	bool IsValid(void) const
+	noexcept
+	{
+		return cpu != nullptr;
+	}
 };
 
 
-class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator>
-{
-    static constexpr uint32_t kInitCap = 512u * 1024u;     // 512 KB per frame slot
-    static constexpr uint32_t kMaxCap  = 4u * 1024u * 1024u;  // 4 MB ceiling of the slot's own buffer
+class CbvLinearAllocator : public BaseSingleton<CbvLinearAllocator> {
+	static constexpr uint32_t kInitCap = 512u * 1024u; // 512 KB per frame slot
+	static constexpr uint32_t kMaxCap = 4u * 1024u * 1024u; // 4 MB ceiling of the slot's own buffer
 
-    struct Chunk {
-        GfxBuffer  buffer;
-        uint32_t   capacity    { 0 };
-    };
+	struct Chunk {
+		GfxBuffer	buffer;
+		uint32_t	capacity{ 0 };
+	};
 
-    struct FrameData {
-        GfxBuffer  buffer;
-        uint32_t   offset      { 0 };
-        uint32_t   capacity    { 0 };
-        uint32_t   peakOffset  { 0 };
-        std::vector<Chunk>  overflow;
-        uint32_t   overflowOffset { 0 };
-    };
+	struct FrameData {
+		GfxBuffer			buffer;
+		uint32_t			offset{ 0 };
+		uint32_t			capacity{ 0 };
+		uint32_t			peakOffset{ 0 };
+		std::vector<Chunk>	overflow;
+		uint32_t			overflowOffset{ 0 };
+	};
 
-    FrameData  m_frames[2];   // FRAME_COUNT = 2
-    uint32_t   m_frameIndex   { 0 };
-    uint32_t   m_align        { 256 };  // queried from device limits at Create
-    uint64_t   m_generation   { 1 };
+	FrameData	m_frames[2]; // FRAME_COUNT = 2
+	uint32_t	m_frameIndex{ 0 };
+	uint32_t	m_align{ 256 }; // queried from device limits at Create
+	uint64_t	m_generation{ 1 };
 
-    bool AllocFrame(uint32_t frameIdx, uint32_t capacity) noexcept;
-    bool AddChunk(FrameData& f, uint32_t capacity) noexcept;
-    void DestroyChunks(FrameData& f) noexcept;
+	bool AllocFrame(uint32_t frameIdx, uint32_t capacity)
+	noexcept;
+	bool AddChunk(FrameData& f, uint32_t capacity)
+	noexcept;
+	void DestroyChunks(FrameData& f)
+	noexcept;
 
 public:
-    // Allocates the per-frame UBO buffers. Reads minUniformBufferOffsetAlignment from
-    // VKContext::DeviceProps to set the alignment.
-    bool Create(void) noexcept;
-    void Destroy(void) noexcept;
+	// Allocates the per-frame UBO buffers. Reads minUniformBufferOffsetAlignment from
+	// VKContext::DeviceProps to set the alignment.
+	bool Create(void)
+	noexcept;
+	void Destroy(void)
+	noexcept;
 
-    // Reset at frame start (after fence wait so the GPU is done with this frame's data).
-    // Grows the buffer if the previous frame overshot capacity, and drops the chained buffers.
-    void Reset(uint32_t frameIndex) noexcept;
+	// Reset at frame start (after fence wait so the GPU is done with this frame's data).
+	// Grows the buffer if the previous frame overshot capacity, and drops the chained buffers.
+	void Reset(uint32_t frameIndex)
+	noexcept;
 
-    // Allocate 'bytes' (rounded up to m_align) from the current frame's buffer, or from a chained
-    // one once that is full. Returns an invalid CbAlloc only when no further buffer could be created.
-    CbAlloc Allocate(uint32_t bytes) noexcept;
+	// Allocate 'bytes' (rounded up to m_align) from the current frame's buffer, or from a chained
+	// one once that is full. Returns an invalid CbAlloc only when no further buffer could be created.
+	CbAlloc Allocate(uint32_t bytes)
+	noexcept;
 
-    inline VkBuffer CurrentBuffer(void) const noexcept {
-        return m_frames[m_frameIndex].buffer.Buffer();
-    }
+	inline VkBuffer CurrentBuffer(void) const
+	noexcept
+	{
+		return m_frames[m_frameIndex].buffer.Buffer();
+	}
 
-    inline uint64_t Generation(void) const noexcept { return m_generation; }
+	inline uint64_t Generation(void) const
+	noexcept
+	{
+		return m_generation;
+	}
 
-    inline uint32_t CurrentFrame(void) const noexcept { return m_frameIndex; }
-    inline uint32_t Alignment(void) const noexcept { return m_align; }
+	inline uint32_t CurrentFrame(void) const
+	noexcept
+	{
+		return m_frameIndex;
+	}
+	inline uint32_t Alignment(void) const
+	noexcept
+	{
+		return m_align;
+	}
 };
 
 #define cbvAllocator CbvLinearAllocator::Instance()

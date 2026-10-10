@@ -19,8 +19,8 @@
 // The record matches the 64 byte C++ layout (LineRenderer::Line).
 
 static const ShaderDataAttributes LineQuadAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 static const String LineDrawVS = String(R"(
@@ -218,14 +218,14 @@ float4 PSMain(PSInput i) : SV_Target {
 }
 )");
 
-const ShaderSource& LineDrawShader() {
-    static const ShaderSource source(
-        "lineDraw",
-        LineDrawVS,
-        LineDrawFS,
-        ShaderDataLayout(LineQuadAttrs, 2)
-    );
-    return source;
+const ShaderSource& LineDrawShader()
+{
+	static const ShaderSource source(
+		"lineDraw",
+		LineDrawVS,
+		LineDrawFS,
+		ShaderDataLayout(LineQuadAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

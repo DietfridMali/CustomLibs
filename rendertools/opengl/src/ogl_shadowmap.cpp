@@ -4,7 +4,8 @@
 
 // =================================================================================================
 
-bool ShadowMap::Setup(void) {
+bool ShadowMap::Setup(void)
+{
 	if (CreateMap(Vector2f::ZERO)) {
 		m_status = 1;
 		return true;
@@ -14,7 +15,8 @@ bool ShadowMap::Setup(void) {
 }
 
 
-bool ShadowMap::CreateMap(Vector2f frustumSize) {
+bool ShadowMap::CreateMap(Vector2f frustumSize)
+{
 	m_status = -1;
 #if !DEMO
 	if (not (m_map = new RenderTarget()))
@@ -22,11 +24,16 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 	// ShadowMap-Format ist GL_DEPTH_COMPONENT32F (4 Byte/Pixel). Start bei 8K, halbieren bei
 	// Fehlschlag bis 1024. Cap zusaetzlich gegen die Hardware-Allocation-Grenze fuer 4-Byte-
 	// Pixel-Formate.
-	constexpr int kShadowDepthBytesPerPixel = 4;
-	const int hwCap = gfxStates.MaxTextureSize(kShadowDepthBytesPerPixel);
-	int startSize = (hwCap < 8192) ? hwCap : 8192;
+	constexpr int	kShadowDepthBytesPerPixel = 4;
+	const int		hwCap = gfxStates.MaxTextureSize(kShadowDepthBytesPerPixel);
+	int				startSize = (hwCap < 8192) ? hwCap : 8192;
 	for (int size = startSize; size >= 1024; size /= 2) {
-		if (m_map->Create(size, size, 1, { .name = "shadowmap", .colorBufferCount = 0, .depthBufferCount = 1, .vertexBufferCount = 0, .hasMRTs = false })) {
+		if (m_map->Create(size, size, 1,
+						  { .name = "shadowmap",
+							.colorBufferCount = 0,
+							.depthBufferCount = 1,
+							.vertexBufferCount = 0,
+							.hasMRTs = false })) {
 			m_status = 1;
 			return true;
 		}
@@ -37,7 +44,9 @@ bool ShadowMap::CreateMap(Vector2f frustumSize) {
 }
 
 
-void ShadowMap::Destroy(void) noexcept {
+void ShadowMap::Destroy(void)
+noexcept
+{
 	if (m_map) {
 		delete m_map;
 		m_map = nullptr;
@@ -46,7 +55,9 @@ void ShadowMap::Destroy(void) noexcept {
 }
 
 
-bool ShadowMap::StartRender(void) noexcept {
+bool ShadowMap::StartRender(void)
+noexcept
+{
 	if (not IsReady())
 		return false;
 	baseRenderer.StartShadowPass();
@@ -63,7 +74,9 @@ bool ShadowMap::StartRender(void) noexcept {
 }
 
 
-bool ShadowMap::StopRender(void) noexcept {
+bool ShadowMap::StopRender(void)
+noexcept
+{
 	if (not IsReady())
 		return false;
 	DeactivateCamera();
@@ -87,7 +100,8 @@ void ShadowMap::Stabilize(float shadowMapSize)
 }
 
 
-void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matrix4f& lightProj) {
+void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matrix4f& lightProj)
+{
 	m_lightTransform = lightProj;
 	m_lightTransform *= lightView;
 	Stabilize(float(m_map->GetWidth(true)));
@@ -95,7 +109,8 @@ void ShadowMap::CreateLightTransformation(const Matrix4f& lightView, const Matri
 }
 
 
-void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mModelView for a shader using shadow mapping changes (e.g. for moving geometry)
+void ShadowMap::UpdateTransformation(void)
+{ // needs to be called whenever mModelView for a shader using shadow mapping changes (e.g. for moving geometry)
 	if (IsReady()) {
 		m_modelViewTransform = m_lightTransform;
 #if 1
@@ -105,7 +120,8 @@ void ShadowMap::UpdateTransformation(void) { // needs to be called whenever mMod
 }
 
 
-void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
+void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3f& lightDirection, float lightDistance, float worldRadius)
+{
 	Matrix4f lightView, lightProj;
 
 	worldRadius = std::min(worldRadius, m_maxLightRadius);
@@ -119,11 +135,11 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 	// Frustumzentrum vor den Viewer schieben (Viewer knapp am hinteren Rand)
 	center += viewDir * worldRadius * 0.8f;
 
-	Vector3f f = -lightDirection; // angenommen normalisiert
-	float dotFV = f.Dot(viewDir);
+	Vector3f	f = -lightDirection; // angenommen normalisiert
+	float		dotFV = f.Dot(viewDir);
 
 	// X-Achse im Lichtraum: Projektionsanteil der Viewrichtung senkrecht zu f
-	Vector3f s = viewDir - f * dotFV;      // liegt senkrecht zu f
+	Vector3f s = viewDir - f * dotFV; // liegt senkrecht zu f
 	s.Normalize();
 
 	// Up-Vektor so w�hlen, dass LookAt(s) als Right bekommt
@@ -145,21 +161,25 @@ void ShadowMap::CreateViewerAlignedTransformation(Vector3f center, const Vector3
 }
 
 
-void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance, float worldRadius) {
+void ShadowMap::CreatePerspectiveTransformation(const Vector3f& center, const Vector3f& lightDirection, float lightDistance,
+												float worldRadius)
+{
 	Matrix4f lightView, lightProj;
 
 	if (lightDistance == 0.0f)
 		lightDistance = 10.0f * worldRadius;
 	m_lightPosition = center + lightDirection * lightDistance;
 	lightView.LookAt(m_lightPosition, center, Vector3f(0.0f, 1.0f, 0.0f));
-	float halfFov = std::atan(worldRadius / lightDistance);
-	Projector projector(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
+	float		halfFov = std::atan(worldRadius / lightDistance);
+	Projector	projector(1.0f, Conversions::RadToDeg(2 * halfFov), lightDistance - worldRadius, lightDistance + worldRadius);
 	lightProj = projector.Compute3DProjection();
 	CreateLightTransformation(lightView, lightProj);
 }
 
 
-void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, const Vector3f& worldSize, const Vector3f& worldMin, const Vector3f& worldMax) {
+void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f& lightDirection, const Vector3f& worldSize,
+										  const Vector3f& worldMin, const Vector3f& worldMax)
+{
 	Matrix4f lightView, lightProj;
 
 	float lightOffset = worldSize.Length();
@@ -193,12 +213,13 @@ void ShadowMap::CreateOrthoTransformation(const Vector3f& center, const Vector3f
 }
 
 
-bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax) {
+bool ShadowMap::Update(Vector3f center, Vector3f lightDirection, float lightOffset, Vector3f worldMin, Vector3f worldMax)
+{
 	if (m_status < 0)
 		return false;
-	Vector3f worldSize = Vector3f::Abs(worldMax - worldMin);
-	float worldRadius = worldSize.Length() * 0.5f;
-	if (not center.IsValid()) 
+	Vector3f	worldSize = Vector3f::Abs(worldMax - worldMin);
+	float		worldRadius = worldSize.Length() * 0.5f;
+	if (not center.IsValid())
 #if 0
 	{
 		Vector3f f = baseRenderer.Matrices(0)->ModelView().Inverse() * Vector3f(0.0f, 0.0f, -1.0f);

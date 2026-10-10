@@ -20,8 +20,9 @@
 
 // -------------------------------------------------------------------------------------------------
 // Standard 2-D vertex shader (uses mViewport * mProjection * mModelView)
-const String& Standard2DVS() {
-    static const String source(R"(
+const String& Standard2DVS()
+{
+	static const String source(R"(
         cbuffer FrameConstants : register(b0) {
             column_major float4x4 mModelView;
             column_major float4x4 mProjection;
@@ -42,14 +43,15 @@ const String& Standard2DVS() {
             return o;
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // Standard 3-D vertex shader (uses mProjection * mModelView, no viewport)
-const String& Standard3DVS() {
-    static const String source(R"(
+const String& Standard3DVS()
+{
+	static const String source(R"(
         cbuffer FrameConstants : register(b0) {
             column_major float4x4 mModelView;
             column_major float4x4 mProjection;
@@ -69,15 +71,16 @@ const String& Standard3DVS() {
             return o;
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // 2-D vertex shader with scalar XY offset (mViewport * mProjection * mModelView + offset)
 // Requires ShaderConstants cbuffer with: float offset;
-const String& Offset2DVS() {
-    static const String source(R"(
+const String& Offset2DVS()
+{
+	static const String source(R"(
         cbuffer FrameConstants : register(b0) {
             column_major float4x4 mModelView;
             column_major float4x4 mProjection;
@@ -100,7 +103,7 @@ const String& Offset2DVS() {
             return o;
         }
     )");
-    return source;
+	return source;
 }
 
 
@@ -110,8 +113,9 @@ const String& Offset2DVS() {
 //   Texture2D        surface : register(t0);
 //   SamplerState     s0;            // linear clamp
 //   ShaderConstants: float2 texelSize; int blurStrength; float blurSpread;
-const String& GaussBlurFuncs() {
-    static const String source(R"(
+const String& GaussBlurFuncs()
+{
+	static const String source(R"(
         float4 GaussBlur7x7(float2 baseUV, float spread) {
             const int HALF = 3;
             static const int weight[7] = { 1, 6, 15, 20, 15, 6, 1 };
@@ -175,13 +179,14 @@ const String& GaussBlurFuncs() {
             return surface.Sample(s0, baseUV);
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
-const String& CelShadingFuncs() {
-    static const String source(R"(
+const String& CelShadingFuncs()
+{
+	static const String source(R"(
         float CelPeak(float3 light) {
             return max(light.r, max(light.g, light.b));
         }
@@ -225,13 +230,14 @@ const String& CelShadingFuncs() {
             return color * (CelQuantizeRound(min(peak, 1.0), levels) / peak);
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
-const String& BoostFuncs() {
-    static const String source(R"(
+const String& BoostFuncs()
+{
+	static const String source(R"(
         float Boost(float v, float strength) {
             return (v < 0.5) ? pow(v, 1.0/strength) : pow(v, strength);
         }
@@ -258,23 +264,25 @@ const String& BoostFuncs() {
             return float3(SinBoost(v.r,strength), SinBoost(v.g,strength), SinBoost(v.b,strength));
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
-const String& SRGBFuncs() {
-    static const String source(R"(
+const String& SRGBFuncs()
+{
+	static const String source(R"(
         float3 ToLinear(float3 c) { return pow(c, 2.2); }
         float3 ToSRGB(float3 c)   { return pow(max(c, 0.0), 1.0/2.2); }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
-const String& TintFuncs() {
-    static const String source(R"(
+const String& TintFuncs()
+{
+	static const String source(R"(
         float3 ApplyExponentialTint(float3 color, float3 tintScale, float e) {
             float3 s = pow(max(tintScale, 1e-6), max(e, 0.0));
             float3 denom = max(color * s, 1e-6);
@@ -285,13 +293,14 @@ const String& TintFuncs() {
             return ApplyExponentialTint(color, tintScale, 1.0);
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
-const String& NoiseFuncs() {
-    static const String source(R"(
+const String& NoiseFuncs()
+{
+	static const String source(R"(
         float hash12(float2 p) {
             return frac(sin(dot(p, float2(127.1,311.7))) * 43758.5453);
         }
@@ -354,14 +363,15 @@ const String& NoiseFuncs() {
             return dot(w, d) * simplexScale;
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 
-const String& RandFuncs() {
-    static const String source(R"(
+const String& RandFuncs()
+{
+	static const String source(R"(
         static uint _rngState;
         void seedRand(float s) {
             uint u = (uint)(s * 4096.0);
@@ -372,14 +382,15 @@ const String& RandFuncs() {
         float rand() { return (float)_lcg() * (1.0/4294967296.0); }
         int   randn(int n) { return (int)(_lcg() % (uint)max(n,1)); }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // EdgeFadeFunc: references uniform 'edgeFade' (must be in ShaderConstants).
-const String& EdgeFadeFunc() {
-    static const String source(R"(
+const String& EdgeFadeFunc()
+{
+	static const String source(R"(
         float2 EdgeFade(float2 baseUV, float2 dispUV) {
             float ef = clamp(edgeFade, 0.0, 0.5);
             if (ef > 1e-6) {
@@ -393,15 +404,16 @@ const String& EdgeFadeFunc() {
             return dispUV;
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // ChromAbFuncs: references Texture2D surface (t0), SamplerState s0,
 //   uniforms: float aberration, int offsetType, float2 viewportSize
-const String& ChromAbFuncs() {
-    static const String source(R"(
+const String& ChromAbFuncs()
+{
+	static const String source(R"(
         float2 LinearOffset(float2 uv) {
             return uv * (0.6*aberration + 1e-4);
         }
@@ -429,15 +441,16 @@ const String& ChromAbFuncs() {
                                       surface.Sample(s0,baseUV-off).b - c0.b);
         }
     )");
-    return source;
+	return source;
 }
 
 
 // -------------------------------------------------------------------------------------------------
 // VignetteFunc: uses static float2 fragCoord (set in PSMain),
 //   uniform float vignetteRadius (in ShaderConstants).
-const String& VignetteFunc() {
-    static const String source(R"(
+const String& VignetteFunc()
+{
+	static const String source(R"(
         float Vignette() {
             const float vignetteBlur = 0.25;
             float dist  = distance(fragCoord, float2(0.5,0.5)) / 0.7071;
@@ -446,7 +459,7 @@ const String& VignetteFunc() {
             return smoothstep(edge1, edge0, dist);
         }
     )");
-    return source;
+	return source;
 }
 
 // =================================================================================================

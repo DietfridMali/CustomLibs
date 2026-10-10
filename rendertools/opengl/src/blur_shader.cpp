@@ -5,11 +5,9 @@
 
 // =================================================================================================
 
-const ShaderSource& BoxBlurShader() {
-    static const ShaderSource boxBlurShader(
-        "boxblur",
-        Offset2DVS(),
-        String(R"(
+const ShaderSource& BoxBlurShader()
+{
+	static const ShaderSource boxBlurShader("boxblur", Offset2DVS(), String(R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -20,9 +18,7 @@ const ShaderSource& BoxBlurShader() {
             //uniform float premultiply;
             in vec2 fragCoord;
             out vec4 fragColor;
-            )") +
-            GaussBlurFuncs() +
-            String(R"(
+            )") + GaussBlurFuncs() + String(R"(
 #if 0
             vec3 FxaaPixelShader(vec2 pos, sampler2D tex, vec2 texelSize) {
                 vec3 rgbNW = textureOffset(tex, pos, ivec2(-1, -1)).xyz;
@@ -58,16 +54,14 @@ const ShaderSource& BoxBlurShader() {
                 fragColor = vec4(color /** mix(1.0, a, premultiply)*/, a);
 #endif
                 }
-            )")
-    );
-    return boxBlurShader;
+            )"));
+	return boxBlurShader;
 }
 
-const ShaderSource& FxaaShader() {
-    static const ShaderSource fxaaShader(
-        "fxaa",
-        Offset2DVS(),
-        R"(
+const ShaderSource& FxaaShader()
+{
+	static const ShaderSource fxaaShader("fxaa", Offset2DVS(),
+										 R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -107,16 +101,16 @@ const ShaderSource& FxaaShader() {
             float a = texture(surface, fragCoord).a;
             fragColor = vec4(color /** mix(1.0, a, premultiply)*/, a);
         }
-        )"
-    );
-    return fxaaShader;
+        )");
+	return fxaaShader;
 }
 
-const ShaderSource& GaussBlurShader() {
-    static const ShaderSource gaussBlurShader(
-        "gaussblur",
-        Offset2DVS(),
-        R"(
+const ShaderSource& GaussBlurShader()
+{
+	static const ShaderSource gaussBlurShader(
+		"gaussblur",
+		Offset2DVS(),
+		R"(
         //#version 140
         //#extension GL_ARB_explicit_attrib_location : enable
         #version 330
@@ -142,9 +136,8 @@ const ShaderSource& GaussBlurShader() {
     	    fragColor = vec4(sum.rgb /** mix(1.0, sum.a, premultiply)*/, sum.a);
 #endif
         }
-        )"
-    );
-    return gaussBlurShader;
+        )");
+	return gaussBlurShader;
 }
 
 // =================================================================================================
@@ -165,10 +158,11 @@ const ShaderSource& GaussBlurShader() {
 // projDepth carries (A, B) of the projection matrix, so the depth path needs neither the near nor the
 // far plane: the eye space distance of a normalized device z is B / (z + A).
 
-const ShaderSource& BilateralBlurShader() {
-    static const ShaderSource source(
-        "bilateralBlur",
-        String(R"(
+const ShaderSource& BilateralBlurShader()
+{
+	static const ShaderSource source(
+		"bilateralBlur",
+		String(R"(
             #version 330
             layout(location = 0) in vec3 position;
             layout(location = 1) in vec2 texCoord;
@@ -185,7 +179,7 @@ const ShaderSource& BilateralBlurShader() {
                 gl_Position = mProjection * viewPos;
             }
         )"),
-        String(R"(
+		String(R"(
             #version 330
             in vec2 fragCoord;
             out vec4 fragColor;
@@ -254,18 +248,18 @@ const ShaderSource& BilateralBlurShader() {
                 }
                 fragColor = (sumW > 0.0) ? sum / sumW : textureLod(surface, muv, 0.0);
             }
-        )")
-        );
-    return source;
+        )"));
+	return source;
 };
 
 
 // The name the scene depth user deploys (see the note in src/common-hlsl/blur_shader.cpp - HLSL needs
 // one shader per distance source). OpenGL does not validate a sampler the branch never reads, so here
 // it is the same program under the second name.
-const ShaderSource& BilateralBlurDepthShader() {
-    static const ShaderSource source("bilateralBlurDepth", BilateralBlurShader().m_vs, BilateralBlurShader().m_fs);
-    return source;
+const ShaderSource& BilateralBlurDepthShader()
+{
+	static const ShaderSource source("bilateralBlurDepth", BilateralBlurShader().m_vs, BilateralBlurShader().m_fs);
+	return source;
 }
 
 // =================================================================================================

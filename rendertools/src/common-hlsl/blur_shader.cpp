@@ -7,8 +7,8 @@
 // HLSL shader strings for the DirectX 12 backend — blur / AA post-process shaders.
 
 static const ShaderDataAttributes VtxTcAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 //
 // All three shaders use Offset2DVS() for the VS (which declares b1 with 'float offset').
@@ -20,11 +20,12 @@ static const ShaderDataAttributes VtxTcAttrs[] = {
 // -------------------------------------------------------------------------------------------------
 // Box/Gauss blur wrapper: runs GaussBlur(uv, 3, 1) — fixed 7×7 kernel with spread 1.
 // ShaderConstants: vsOffset (= VS offset), texelSize, blurStrength, blurSpread.
-const ShaderSource& BoxBlurShader() {
-    static const ShaderSource boxBlurShader(
-        "boxblur",
-        Offset2DVS(),
-        String(R"(
+const ShaderSource& BoxBlurShader()
+{
+	static const ShaderSource boxBlurShader(
+		"boxblur",
+		Offset2DVS(),
+		String(R"(
             cbuffer ShaderConstants : register(b1) {
                 float  vsOffset;      // VS 'offset' lives at byte 0; PS ignores it
                 float2 texelSize;     // used by GaussBlurFuncs
@@ -39,15 +40,14 @@ const ShaderSource& BoxBlurShader() {
                 float2 fragCoord : TEXCOORD1;
             };
         )") +
-        GaussBlurFuncs() +
-        String(R"(
+			GaussBlurFuncs() +
+			String(R"(
             float4 PSMain(PSInput i) : SV_Target {
                 return GaussBlur(i.fragCoord, 3, 1);
             }
         )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return boxBlurShader;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return boxBlurShader;
 }
 
 
@@ -56,11 +56,12 @@ const ShaderSource& BoxBlurShader() {
 // textureSize() replaced by texelSize uniform.
 // textureOffset → SampleLevel with int2 offset; textureLod → SampleLevel.
 // ShaderConstants: vsOffset, texelSize.
-const ShaderSource& FxaaShader() {
-    static const ShaderSource fxaaShader(
-        "fxaa",
-        Offset2DVS(),
-        R"(
+const ShaderSource& FxaaShader()
+{
+	static const ShaderSource fxaaShader(
+		"fxaa",
+		Offset2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float  vsOffset;   // VS 'offset'; PS ignores
                 float  _pad0;
@@ -110,9 +111,8 @@ const ShaderSource& FxaaShader() {
                 return float4(color, a);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return fxaaShader;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return fxaaShader;
 }
 
 
@@ -121,11 +121,12 @@ const ShaderSource& FxaaShader() {
 // HLSL pads scalar arrays to 16-byte slots; the C++ SetFloatArray setter emits padded uploads.
 // ShaderConstants: vsOffset, direction (0=horiz,1=vert), radius (half-kernel size),
 //                  texelSize, coeffs[33].
-const ShaderSource& GaussBlurShader() {
-    static const ShaderSource gaussBlurShader(
-        "gaussblur",
-        Offset2DVS(),
-        R"(
+const ShaderSource& GaussBlurShader()
+{
+	static const ShaderSource gaussBlurShader(
+		"gaussblur",
+		Offset2DVS(),
+		R"(
             cbuffer ShaderConstants : register(b1) {
                 float  vsOffset;          // VS 'offset'; PS ignores
                 float  direction;         // 0=horizontal, 1=vertical
@@ -153,9 +154,8 @@ const ShaderSource& GaussBlurShader() {
                 return float4(sum.rgb, sum.a);
             }
         )",
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return gaussBlurShader;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return gaussBlurShader;
 }
 
 // =================================================================================================
@@ -172,8 +172,9 @@ const ShaderSource& GaussBlurShader() {
 // attachment by then, is an error even if the branch never samples it. distanceSource stays in the
 // constant buffer so that SetupBilateralBlur () serves both; the shaders do not read it.
 
-static const String& BilateralBlurFS(bool useSceneDepth) {
-    static const String head(R"(
+static const String& BilateralBlurFS(bool useSceneDepth)
+{
+	static const String head(R"(
             cbuffer ShaderConstants : register(b1) {
                 float2 texelSize;
                 float  direction;
@@ -194,11 +195,11 @@ static const String& BilateralBlurFS(bool useSceneDepth) {
             };
     )");
 
-    // Plane distance, NOT Euclidean: how far the neighbour lies off the centre pixel's tangent plane.
-    // A grazing same-surface (floor running to the horizon) stays ~0 and is kept; only real depth
-    // steps are rejected. The old length(PC-PS) blew up on grazing surfaces (screen-adjacent pixels
-    // sit far apart in world space) -> every tap rejected -> no blur -> raw noise survived.
-    static const String positionSource(R"(
+	// Plane distance, NOT Euclidean: how far the neighbour lies off the centre pixel's tangent plane.
+	// A grazing same-surface (floor running to the horizon) stays ~0 and is kept; only real depth
+	// steps are rejected. The old length(PC-PS) blew up on grazing surfaces (screen-adjacent pixels
+	// sit far apart in world space) -> every tap rejected -> no blur -> raw noise survived.
+	static const String positionSource(R"(
             Texture2D    uWorldPositions : register(t2);
             SamplerState s2 : register(s2);
             float3 SurfaceKey(float2 uv) {
@@ -209,7 +210,7 @@ static const String& BilateralBlurFS(bool useSceneDepth) {
             }
     )");
 
-    static const String depthSource(R"(
+	static const String depthSource(R"(
             Texture2D    uSceneDepth     : register(t3);
             SamplerState s3 : register(s3);
             float EyeDepth(float d) {
@@ -223,7 +224,7 @@ static const String& BilateralBlurFS(bool useSceneDepth) {
             }
     )");
 
-    static const String body(R"(
+	static const String body(R"(
             float4 PSMain(PSInput i) : SV_Target {
                 float2 uv = i.fragCoord;
                 float4 nrmC = uWorldNormals.SampleLevel(s1, uv, 0);
@@ -253,22 +254,24 @@ static const String& BilateralBlurFS(bool useSceneDepth) {
             }
     )");
 
-    static const String positionShader(head + positionSource + body);
-    static const String depthShader(head + depthSource + body);
+	static const String positionShader(head + positionSource + body);
+	static const String depthShader(head + depthSource + body);
 
-    return useSceneDepth ? depthShader : positionShader;
+	return useSceneDepth ? depthShader : positionShader;
 }
 
 
-const ShaderSource& BilateralBlurShader() {
-    static const ShaderSource source("bilateralBlur", Standard2DVS(), BilateralBlurFS(false), ShaderDataLayout(VtxTcAttrs, 2));
-    return source;
+const ShaderSource& BilateralBlurShader()
+{
+	static const ShaderSource source("bilateralBlur", Standard2DVS(), BilateralBlurFS(false), ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 
-const ShaderSource& BilateralBlurDepthShader() {
-    static const ShaderSource source("bilateralBlurDepth", Standard2DVS(), BilateralBlurFS(true), ShaderDataLayout(VtxTcAttrs, 2));
-    return source;
+const ShaderSource& BilateralBlurDepthShader()
+{
+	static const ShaderSource source("bilateralBlurDepth", Standard2DVS(), BilateralBlurFS(true), ShaderDataLayout(VtxTcAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

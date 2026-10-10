@@ -4,7 +4,8 @@
 // =================================================================================================
 
 bool VariableTextureAtlas::Create(String name, int width, int height, int layers,
-											 GfxPixelFormat format, int scale) {
+								  GfxPixelFormat format, int scale)
+{
 	if ((width <= 0) or (height <= 0) or (layers <= 0))
 		return false;
 	Destroy();
@@ -34,7 +35,8 @@ bool VariableTextureAtlas::Create(String name, int width, int height, int layers
 
 
 RenderTarget* VariableTextureAtlas::CreateShared(String name, int width, int height, int pages, int layers,
-																 GfxPixelFormat format, int scale) {
+												 GfxPixelFormat format, int scale)
+{
 	if ((width <= 0) or (height <= 0) or (layers <= 0) or (pages <= 0))
 		return nullptr;
 
@@ -65,7 +67,8 @@ RenderTarget* VariableTextureAtlas::CreateShared(String name, int width, int hei
 }
 
 
-bool VariableTextureAtlas::Attach(RenderTarget* target, int layer) {
+bool VariableTextureAtlas::Attach(RenderTarget* target, int layer)
+{
 	if ((target == nullptr) or (layer < 0) or (layer >= target->ArrayLayerCount()))
 		return false;
 	Destroy();
@@ -80,7 +83,9 @@ bool VariableTextureAtlas::Attach(RenderTarget* target, int layer) {
 }
 
 
-void VariableTextureAtlas::Reset(void) noexcept {
+void VariableTextureAtlas::Reset(void)
+noexcept
+{
 	m_tiles.Clear();
 	m_tileCount = 0;
 	if (m_atlas)
@@ -88,7 +93,8 @@ void VariableTextureAtlas::Reset(void) noexcept {
 }
 
 
-int VariableTextureAtlas::Add(int width, int height, int padding) {
+int VariableTextureAtlas::Add(int width, int height, int padding)
+{
 	if (not m_atlas)
 		return -1;
 
@@ -102,7 +108,8 @@ int VariableTextureAtlas::Add(int width, int height, int padding) {
 }
 
 
-int VariableTextureAtlas::Place(int x, int y, int width, int height) {
+int VariableTextureAtlas::Place(int x, int y, int width, int height)
+{
 	if (not m_atlas)
 		return -1;
 
@@ -118,7 +125,9 @@ int VariableTextureAtlas::Place(int x, int y, int width, int height) {
 }
 
 
-Vector2f VariableTextureAtlas::TileOffset(int index) noexcept {
+Vector2f VariableTextureAtlas::TileOffset(int index)
+noexcept
+{
 	const Tile* tile = GetTile(index);
 
 	if (not (tile and m_atlas))
@@ -133,7 +142,9 @@ Vector2f VariableTextureAtlas::TileOffset(int index) noexcept {
 }
 
 
-Vector2f VariableTextureAtlas::TileScale(int index) noexcept {
+Vector2f VariableTextureAtlas::TileScale(int index)
+noexcept
+{
 	const Tile* tile = GetTile(index);
 
 	if (not (tile and m_atlas))
@@ -148,22 +159,29 @@ Vector2f VariableTextureAtlas::TileScale(int index) noexcept {
 }
 
 
-uint32_t VariableTextureAtlas::LayerHandle(int layer) noexcept {
+uint32_t VariableTextureAtlas::LayerHandle(int layer)
+noexcept
+{
 	return (m_atlas and (layer >= 0) and (layer < m_layers)) ? uint32_t(m_atlas->BufferHandle(layer)) : 0;
 }
 
 
-Texture* VariableTextureAtlas::LayerTexture(int layer) noexcept {
+Texture* VariableTextureAtlas::LayerTexture(int layer)
+noexcept
+{
 	return (m_atlas and (layer >= 0) and (layer < m_layers)) ? m_atlas->GetAsTexture({ .source = layer }) : nullptr;
 }
 
 
-size_t VariableTextureAtlas::LayerSize(void) noexcept {
+size_t VariableTextureAtlas::LayerSize(void)
+noexcept
+{
 	return m_atlas ? m_atlas->BufferSize(0) : 0;
 }
 
 
-bool VariableTextureAtlas::Clear(void) {
+bool VariableTextureAtlas::Clear(void)
+{
 	if (not m_atlas)
 		return false;
 	// This page's layer of the array first - the clear below has to land on it and not on whichever one
@@ -181,7 +199,8 @@ bool VariableTextureAtlas::Clear(void) {
 }
 
 
-bool VariableTextureAtlas::WriteLayer(int layer, const void* data, size_t dataSize) {
+bool VariableTextureAtlas::WriteLayer(int layer, const void* data, size_t dataSize)
+{
 	return (m_atlas and (layer >= 0) and (layer < m_layers))
 		// m_layer is this PAGE's slice of a shared array target, and 0 on one of its own.
 		? m_atlas->WriteBuffer(layer, data, dataSize, m_layer)
@@ -189,7 +208,8 @@ bool VariableTextureAtlas::WriteLayer(int layer, const void* data, size_t dataSi
 }
 
 
-bool VariableTextureAtlas::ReadLayer(int layer, void* buffer, size_t bufferSize) {
+bool VariableTextureAtlas::ReadLayer(int layer, void* buffer, size_t bufferSize)
+{
 	return (m_atlas and (layer >= 0) and (layer < m_layers))
 		? m_atlas->ReadBuffer(layer, buffer, bufferSize, m_layer)
 		: false;

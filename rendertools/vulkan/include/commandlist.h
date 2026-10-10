@@ -28,79 +28,136 @@ class RenderTarget;
 //   CommandQueue::EndFrame()          - vkQueuePresentKHR + advance frame slot
 //   CommandQueue::BeginFrame()        - vkWaitForFences on inFlight[slot] + vkAcquireNextImageKHR
 
-class CommandQueue
-{
+class CommandQueue {
 public:
-    static constexpr uint32_t FRAME_COUNT = 2;
+	static constexpr uint32_t FRAME_COUNT = 2;
 
-    VkQueue        m_graphicsQueue    { VK_NULL_HANDLE };
-    VkQueue        m_presentQueue     { VK_NULL_HANDLE };
-    uint32_t       m_graphicsFamily   { 0 };
-    uint32_t       m_presentFamily    { 0 };
+	VkQueue		m_graphicsQueue{ VK_NULL_HANDLE };
+	VkQueue		m_presentQueue{ VK_NULL_HANDLE };
+	uint32_t	m_graphicsFamily{ 0 };
+	uint32_t	m_presentFamily{ 0 };
 
-    // imageAvailable is the acquire-wait semaphore: signaled by vkAcquireNextImageKHR before the
-    // image index is known, so it must be indexed by frame slot. inFlight is the CPU-throttle
-    // fence, also per frame slot.
-    // renderFinished follows the swapchain image: it is signaled by the submit and waited on by
-    // vkQueuePresentKHR for a given image. Because the driver is free to return acquired image
-    // indices in any order, indexing renderFinished by frame slot can re-signal a semaphore
-    // whose previously-presented image has not yet been re-acquired (VUID-vkQueueSubmit2-
-    // semaphore-03868). Index by m_imageIndex instead — one renderFinished per swapchain image.
-    VkSemaphore    m_imageAvailable[FRAME_COUNT] { };
-    VkSemaphore    m_renderFinished[Swapchain::MAX_BACK_BUFFERS] { };
-    VkFence        m_inFlight       [FRAME_COUNT] { };
+	// imageAvailable is the acquire-wait semaphore: signaled by vkAcquireNextImageKHR before the
+	// image index is known, so it must be indexed by frame slot. inFlight is the CPU-throttle
+	// fence, also per frame slot.
+	// renderFinished follows the swapchain image: it is signaled by the submit and waited on by
+	// vkQueuePresentKHR for a given image. Because the driver is free to return acquired image
+	// indices in any order, indexing renderFinished by frame slot can re-signal a semaphore
+	// whose previously-presented image has not yet been re-acquired (VUID-vkQueueSubmit2-
+	// semaphore-03868). Index by m_imageIndex instead — one renderFinished per swapchain image.
+	VkSemaphore	m_imageAvailable[FRAME_COUNT]{};
+	VkSemaphore	m_renderFinished[Swapchain::MAX_BACK_BUFFERS]{};
+	VkFence		m_inFlight[FRAME_COUNT]{};
 
-    VkDevice       m_device      { VK_NULL_HANDLE };
-    VkSwapchainKHR m_swapchain   { VK_NULL_HANDLE };
+	VkDevice		m_device{ VK_NULL_HANDLE };
+	VkSwapchainKHR	m_swapchain{ VK_NULL_HANDLE };
 
-    uint32_t       m_frameIndex  { 0 };
-    uint32_t       m_imageIndex  { 0 };
-    uint64_t       m_frameNumber { 0 };   // monotonic; ++ per BeginFrame — reliable frame-boundary signal
-    bool           m_acquireWaitPending { false };
-    bool           m_swapchainIsOutOfDate { false };
+	uint32_t	m_frameIndex{ 0 };
+	uint32_t	m_imageIndex{ 0 };
+	uint64_t	m_frameNumber{ 0 }; // monotonic; ++ per BeginFrame — reliable frame-boundary signal
+	bool		m_acquireWaitPending{ false };
+	bool		m_swapchainIsOutOfDate{ false };
 
-    bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
-                uint32_t graphicsFamily, uint32_t presentFamily,
-                const String& name = "") noexcept;
+	bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
+				uint32_t graphicsFamily, uint32_t presentFamily,
+				const String& name = "")
+	noexcept;
 
-    bool InitSyncObjects(VkSwapchainKHR swapchain) noexcept;
+	bool InitSyncObjects(VkSwapchainKHR swapchain)
+	noexcept;
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    bool BeginFrame(void) noexcept;
-    bool ReacquireImage(void) noexcept;
-    void EndFrame(void) noexcept;
+	bool BeginFrame(void)
+	noexcept;
+	bool ReacquireImage(void)
+	noexcept;
+	void EndFrame(void)
+	noexcept;
 
-    // Destroy + re-create the per-slot binary semaphores and the in-flight fences.
-    // Called from BaseDisplayHandler::UpdateDisplayMode after Swapchain::Recreate, so the
-    // present-pending semaphores of the destroyed swapchain images do not leak into the
-    // next frame's submit (VUID-vkQueueSubmit2-semaphore-03868).
-    bool RecreateSyncObjects(void) noexcept;
+	// Destroy + re-create the per-slot binary semaphores and the in-flight fences.
+	// Called from BaseDisplayHandler::UpdateDisplayMode after Swapchain::Recreate, so the
+	// present-pending semaphores of the destroyed swapchain images do not leak into the
+	// next frame's submit (VUID-vkQueueSubmit2-semaphore-03868).
+	bool RecreateSyncObjects(void)
+	noexcept;
 
-    void WaitIdle(void) noexcept;
+	void WaitIdle(void)
+	noexcept;
 
-    inline VkSemaphore SubmitWaitSemaphore(void) const noexcept { return m_imageAvailable[m_frameIndex]; }
-    inline VkSemaphore SubmitSignalSemaphore(void) const noexcept { return m_renderFinished[m_imageIndex]; }
-    inline VkFence SubmitSignalFence(void) const noexcept { return m_inFlight[m_frameIndex]; }
+	inline VkSemaphore SubmitWaitSemaphore(void) const
+	noexcept
+	{
+		return m_imageAvailable[m_frameIndex];
+	}
+	inline VkSemaphore SubmitSignalSemaphore(void) const
+	noexcept
+	{
+		return m_renderFinished[m_imageIndex];
+	}
+	inline VkFence SubmitSignalFence(void) const
+	noexcept
+	{
+		return m_inFlight[m_frameIndex];
+	}
 
-    bool TakeAcquireWait(VkSemaphoreSubmitInfo& waitInfo) noexcept;
+	bool TakeAcquireWait(VkSemaphoreSubmitInfo& waitInfo)
+	noexcept;
 
-    inline VkQueue GraphicsQueue(void) const noexcept { return m_graphicsQueue; }
-    inline VkQueue PresentQueue(void) const noexcept { return m_presentQueue; }
-    inline uint32_t GraphicsFamily(void) const noexcept { return m_graphicsFamily; }
-    inline uint32_t PresentFamily(void) const noexcept { return m_presentFamily; }
-    inline uint32_t FrameIndex(void) const noexcept { return m_frameIndex; }
-    inline uint64_t FrameNumber(void) const noexcept { return m_frameNumber; }
-    inline uint32_t ImageIndex(void) const noexcept { return m_imageIndex; }
-    inline bool SwapchainIsOutOfDate(void) const noexcept { return m_swapchainIsOutOfDate; }
+	inline VkQueue GraphicsQueue(void) const
+	noexcept
+	{
+		return m_graphicsQueue;
+	}
+	inline VkQueue PresentQueue(void) const
+	noexcept
+	{
+		return m_presentQueue;
+	}
+	inline uint32_t GraphicsFamily(void) const
+	noexcept
+	{
+		return m_graphicsFamily;
+	}
+	inline uint32_t PresentFamily(void) const
+	noexcept
+	{
+		return m_presentFamily;
+	}
+	inline uint32_t FrameIndex(void) const
+	noexcept
+	{
+		return m_frameIndex;
+	}
+	inline uint64_t FrameNumber(void) const
+	noexcept
+	{
+		return m_frameNumber;
+	}
+	inline uint32_t ImageIndex(void) const
+	noexcept
+	{
+		return m_imageIndex;
+	}
+	inline bool SwapchainIsOutOfDate(void) const
+	noexcept
+	{
+		return m_swapchainIsOutOfDate;
+	}
 
-    VkCommandBuffer CmdBuffer(void) const noexcept;
+	VkCommandBuffer CmdBuffer(void) const
+	noexcept;
 
 private:
-    bool CreateSyncObjects(void) noexcept;
-    void DestroySyncObjects(void) noexcept;
-    bool AcquireNextImage(void) noexcept;
-    void Present(void) noexcept;
+	bool CreateSyncObjects(void)
+	noexcept;
+	void DestroySyncObjects(void)
+	noexcept;
+	bool AcquireNextImage(void)
+	noexcept;
+	void Present(void)
+	noexcept;
 };
 
 // =================================================================================================
@@ -115,79 +172,126 @@ private:
 // one or more command lists/buffers and can be reset to recycle them. We allocate exactly
 // one CB per pool to match the DX12 layout exactly.
 
-class CommandList
-{
+class CommandList {
 public:
-    static constexpr uint32_t FRAME_COUNT = 2;
+	static constexpr uint32_t FRAME_COUNT = 2;
 
-    VkCommandPool                       m_pools[FRAME_COUNT]   { };
-    VkCommandBuffer                     m_cmdBuffers[FRAME_COUNT] { };
-    bool                                m_isRecording  { false };
-    bool                                m_isFlushed    { false };
-    bool                                m_isTemporary  { false };
-    bool                                m_isDetached   { false };
-    bool                                m_usesBackBuffer { false };
-    uint64_t                            m_openSerial   { 0 };
-    AutoArray<std::function<void()>>    m_disposableResources;
-    uint64_t                            m_id           { 0 };
-    uint64_t                            m_executionCounter { 0 };
-    uint32_t                            m_refCounter   { 1 };
-    String                              m_name         { "" };
-    VkPipeline                          m_activePipeline { VK_NULL_HANDLE };
-    uint8_t                             m_activeTopology { uint8_t(MeshTopology::Triangles) };
-    tracy::VkCtxScope*                  m_gpuZone { nullptr };
+	VkCommandPool						m_pools[FRAME_COUNT]{};
+	VkCommandBuffer						m_cmdBuffers[FRAME_COUNT]{};
+	bool								m_isRecording{ false };
+	bool								m_isFlushed{ false };
+	bool								m_isTemporary{ false };
+	bool								m_isDetached{ false };
+	bool								m_usesBackBuffer{ false };
+	uint64_t							m_openSerial{ 0 };
+	AutoArray<std::function<void()>> m_disposableResources;
+	uint64_t							m_id{ 0 };
+	uint64_t							m_executionCounter{ 0 };
+	uint32_t							m_refCounter{ 1 };
+	String								m_name{ "" };
+	VkPipeline							m_activePipeline{ VK_NULL_HANDLE };
+	uint8_t								m_activeTopology{ uint8_t(MeshTopology::Triangles) };
+	tracy::VkCtxScope*					m_gpuZone{ nullptr };
 
-    static List<RenderStates>           m_renderStateStack;
+	static List<RenderStates> m_renderStateStack;
 
-    static void PushRenderStates(void) noexcept;
-    static void PopRenderStates(void) noexcept;
+	static void PushRenderStates(void)
+	noexcept;
+	static void PopRenderStates(void)
+	noexcept;
 
-    bool Create(const String& name = "", bool isTemporary = false) noexcept;
-    void Destroy(void) noexcept;
-    void Reset(void) noexcept;
+	bool Create(const String& name = "", bool isTemporary = false)
+	noexcept;
+	void Destroy(void)
+	noexcept;
+	void Reset(void)
+	noexcept;
 
-    bool Open(bool saveRenderStates = true, bool detached = false) noexcept;
-    void Close(bool restoreRenderStates = true) noexcept;
-    void Flush(void) noexcept;
+	bool Open(bool saveRenderStates = true, bool detached = false)
+	noexcept;
+	void Close(bool restoreRenderStates = true)
+	noexcept;
+	void Flush(void)
+	noexcept;
 
-    inline void AddResource(std::function<void()> fn) {
-        m_disposableResources.Append(std::move(fn));
-    }
+	inline void AddResource(std::function<void()> fn) {
+		m_disposableResources.Append(std::move(fn));
+	}
 
-    void DisposeResources(void) noexcept;
+	void DisposeResources(void)
+	noexcept;
 
-    void SetBarrier(VkImage image, ImageLayoutTracker& tracker, VkImageLayout newLayout,
-                    VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
+	void SetBarrier(VkImage image, ImageLayoutTracker& tracker, VkImageLayout newLayout,
+					VkPipelineStageFlags2 dstStage, VkAccessFlags2 dstAccess);
 
-    void SetBarrier(const VkImageMemoryBarrier2* barriers, int count);
+	void SetBarrier(const VkImageMemoryBarrier2* barriers, int count);
 
-    inline VkCommandBuffer GfxList(bool ignoreState = false) const noexcept {
-        if (not (ignoreState or m_isRecording))
-            return VK_NULL_HANDLE;
-        return m_cmdBuffers[ActiveFrameIndex()];
-    }
+	inline VkCommandBuffer GfxList(bool ignoreState = false) const
+	noexcept
+	{
+		if (not (ignoreState or m_isRecording))
+			return VK_NULL_HANDLE;
+		return m_cmdBuffers[ActiveFrameIndex()];
+	}
 
-    inline uint64_t GetId(void) const noexcept { return m_id; }
-    inline String GetName(void) const noexcept { return m_name; }
-    inline void SetName(String name) noexcept { m_name = name; }
-    inline uint64_t GetExecutionCounter(void) const noexcept { return m_executionCounter; }
-    inline bool IsRecording(void) const noexcept { return m_isRecording; }
-    inline bool IsFlushed(void) const noexcept { return m_isFlushed; }
-    inline bool IsTemporary(void) const noexcept { return m_isTemporary; }
-    inline void SetTemporary(bool value) noexcept { m_isTemporary = value; }
+	inline uint64_t GetId(void) const
+	noexcept
+	{
+		return m_id;
+	}
+	inline String GetName(void) const
+	noexcept
+	{
+		return m_name;
+	}
+	inline void SetName(String name)
+	noexcept
+	{
+		m_name = name;
+	}
+	inline uint64_t GetExecutionCounter(void) const
+	noexcept
+	{
+		return m_executionCounter;
+	}
+	inline bool IsRecording(void) const
+	noexcept
+	{
+		return m_isRecording;
+	}
+	inline bool IsFlushed(void) const
+	noexcept
+	{
+		return m_isFlushed;
+	}
+	inline bool IsTemporary(void) const
+	noexcept
+	{
+		return m_isTemporary;
+	}
+	inline void SetTemporary(bool value)
+	noexcept
+	{
+		m_isTemporary = value;
+	}
 
-    void SetActivePipeline(VkPipeline pipeline, Shader* shader) noexcept;
+	void SetActivePipeline(VkPipeline pipeline, Shader* shader)
+	noexcept;
 
-    VkPipeline GetPipeline(Shader* shader) noexcept;
+	VkPipeline GetPipeline(Shader* shader)
+	noexcept;
 
-    bool SetTopology(Shader* shader, MeshTopology topology) noexcept;
+	bool SetTopology(Shader* shader, MeshTopology topology)
+	noexcept;
 
 #ifdef _DEBUG
-    void CheckDeviceRemoved(const char* context) noexcept;
+	void CheckDeviceRemoved(const char* context)
+	noexcept;
 #endif
 
 private:
-    static uint32_t ActiveFrameIndex(void) noexcept;
+	static uint32_t ActiveFrameIndex(void)
+	noexcept;
 };
 
 // =================================================================================================
@@ -196,206 +300,259 @@ private:
 // wrappers are reproduced here using the matching vkCmd entry points.
 
 struct CommandListData {
-    CommandList*    cmdList { nullptr };
-    VkCommandBuffer cmdBuf  { VK_NULL_HANDLE };
+	CommandList*	cmdList{ nullptr };
+	VkCommandBuffer	cmdBuf{ VK_NULL_HANDLE };
 };
 
 
 class CommandListHandler
-    : public BaseSingleton<CommandListHandler>
-{
+	: public BaseSingleton<CommandListHandler> {
 public:
-    CommandQueue                        m_cmdQueue;
-    // m_openLists: CLs that have been Open()ed but not yet Close()d. Tracked for
-    // the frame-end submit pass which forces a Close on anything still recording.
-    // m_pendingLists: CLs that have been Close()d, in close order. ExecuteAll submits
-    // them in this order, so a CL whose Close() ran first (innermost render-pass scope)
-    // is submitted first — matching the "CL == one render pass, close-order = submit-order"
-    // architecture.
-    AutoArray<CommandList*>             m_openLists;
-    AutoArray<CommandList*>             m_pendingLists;
-    AutoArray<CommandList*>             m_recycledLists;
-    AutoArray<CommandListData>          m_cmdListStack;
-    CommandListData                     m_currentListData;
-    CommandList*                        m_uploadList   { nullptr };
-    uint64_t                            m_cmdListId    { 1 };
-    uint64_t                            m_cmdListCount { 0 };
-    TracyVkCtx                          m_gpuProfilerCtx { nullptr };
+	CommandQueue m_cmdQueue;
+	// m_openLists: CLs that have been Open()ed but not yet Close()d. Tracked for
+	// the frame-end submit pass which forces a Close on anything still recording.
+	// m_pendingLists: CLs that have been Close()d, in close order. ExecuteAll submits
+	// them in this order, so a CL whose Close() ran first (innermost render-pass scope)
+	// is submitted first — matching the "CL == one render pass, close-order = submit-order"
+	// architecture.
+	AutoArray<CommandList*>		m_openLists;
+	AutoArray<CommandList*>		m_pendingLists;
+	AutoArray<CommandList*>		m_recycledLists;
+	AutoArray<CommandListData>	m_cmdListStack;
+	CommandListData				m_currentListData;
+	CommandList*				m_uploadList{ nullptr };
+	uint64_t					m_cmdListId{ 1 };
+	uint64_t					m_cmdListCount{ 0 };
+	TracyVkCtx					m_gpuProfilerCtx{ nullptr };
 
 #ifdef _DEBUG
-    static bool s_logCalls;
+	static bool s_logCalls;
 #endif
 
-    // -------------------------------------------------------------------------
-    // Bind table — CPU-side staging of per-draw shader resource bindings.
-    //
-    // Texture::Bind / RenderTarget::BindBuffer / GfxArray::Bind populate this table at the
-    // logical t/s/u slot. Shader::UpdateVariables (right before each draw) materializes the
-    // table into a VkDescriptorSet via descriptorPoolHandler.Allocate + vkUpdateDescriptorSets,
-    // then vkCmdBindDescriptorSets binds the set with the b0/b1 dynamic offsets.
-    //
-    // Reset() at frame start invalidates all slots (cleared to VK_NULL_HANDLE). Slots that
-    // remain null at materialize time are simply not written, which mirrors the DX12 path
-    // (unbound slots stay at whatever the previous draw left in the descriptor heap).
+	// -------------------------------------------------------------------------
+	// Bind table — CPU-side staging of per-draw shader resource bindings.
+	//
+	// Texture::Bind / RenderTarget::BindBuffer / GfxArray::Bind populate this table at the
+	// logical t/s/u slot. Shader::UpdateVariables (right before each draw) materializes the
+	// table into a VkDescriptorSet via descriptorPoolHandler.Allocate + vkUpdateDescriptorSets,
+	// then vkCmdBindDescriptorSets binds the set with the b0/b1 dynamic offsets.
+	//
+	// Reset() at frame start invalidates all slots (cleared to VK_NULL_HANDLE). Slots that
+	// remain null at materialize time are simply not written, which mirrors the DX12 path
+	// (unbound slots stay at whatever the previous draw left in the descriptor heap).
 
-    static constexpr uint32_t kSrvSlots     = 24;  // matches Shader::kSrvSlots
-    static constexpr uint32_t kSamplerSlots = 24;  // matches Shader::kSamplerSlots
-    static constexpr uint32_t kUavSlots     = 4;   // matches Shader::kUavSlots
-    static constexpr uint32_t kSsboSlots    = 24;  // matches Shader::kSsboSlots
-    static constexpr uint32_t kVertexSlots  = 16;
+	static constexpr uint32_t kSrvSlots = 24; // matches Shader::kSrvSlots
+	static constexpr uint32_t kSamplerSlots = 24; // matches Shader::kSamplerSlots
+	static constexpr uint32_t kUavSlots = 4; // matches Shader::kUavSlots
+	static constexpr uint32_t kSsboSlots = 24; // matches Shader::kSsboSlots
+	static constexpr uint32_t kVertexSlots = 16;
 
-    VkBuffer     m_boundInstanceStreams  [kVertexSlots]  { };
-    VkImageView  m_boundSrvViews         [kSrvSlots]     { };
-    VkImageLayout m_boundSrvLayouts      [kSrvSlots]     { };
-    VkSampler    m_boundSamplers         [kSamplerSlots] { };
-    VkBuffer     m_boundStorageBuffers   [kUavSlots]     { };
-    VkDeviceSize m_boundStorageBufferSize[kUavSlots]     { };
-    VkBuffer     m_boundReadOnlyBuffers   [kSsboSlots]   { };
-    VkDeviceSize m_boundReadOnlyBufferSize[kSsboSlots]   { };
-    VkAccelerationStructureKHR m_boundAccelStructure     { VK_NULL_HANDLE };
+	VkBuffer					m_boundInstanceStreams[kVertexSlots]{};
+	VkImageView					m_boundSrvViews[kSrvSlots]{};
+	VkImageLayout				m_boundSrvLayouts[kSrvSlots]{};
+	VkSampler					m_boundSamplers[kSamplerSlots]{};
+	VkBuffer					m_boundStorageBuffers[kUavSlots]{};
+	VkDeviceSize				m_boundStorageBufferSize[kUavSlots]{};
+	VkBuffer					m_boundReadOnlyBuffers[kSsboSlots]{};
+	VkDeviceSize				m_boundReadOnlyBufferSize[kSsboSlots]{};
+	VkAccelerationStructureKHR	m_boundAccelStructure{ VK_NULL_HANDLE };
 
-    void ResetBindings(void) noexcept;
-    void BindAccelerationStructure(VkAccelerationStructureKHR accelStructure) noexcept;
-    void BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) noexcept;
-    void BindSampler(uint32_t slot, VkSampler sampler) noexcept;
-    void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
-    void BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range) noexcept;
-    void BindInstanceStream(uint32_t slot, VkBuffer buffer) noexcept;
+	void ResetBindings(void)
+	noexcept;
+	void BindAccelerationStructure(VkAccelerationStructureKHR accelStructure)
+	noexcept;
+	void BindSampledImage(uint32_t slot, VkImageView view, VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+	noexcept;
+	void BindSampler(uint32_t slot, VkSampler sampler)
+	noexcept;
+	void BindStorageBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range)
+	noexcept;
+	void BindReadOnlyBuffer(uint32_t slot, VkBuffer buffer, VkDeviceSize range)
+	noexcept;
+	void BindInstanceStream(uint32_t slot, VkBuffer buffer)
+	noexcept;
 
-    inline VkBuffer InstanceStream(uint32_t slot) const noexcept {
-        return (slot < kVertexSlots) ? m_boundInstanceStreams[slot] : VK_NULL_HANDLE;
-    }
+	inline VkBuffer InstanceStream(uint32_t slot) const
+	noexcept
+	{
+		return (slot < kVertexSlots) ? m_boundInstanceStreams[slot] : VK_NULL_HANDLE;
+	}
 
-    // Every slot this buffer is bound to, cleared. A GfxArray that is destroyed while still bound
-    // would otherwise leave its slots pointing at memory that is being freed, and the next thing
-    // that materializes a descriptor set writes it - the DX12 path does the same in UnbindBuffer ().
-    void UnbindBuffer(VkBuffer buffer) noexcept;
+	// Every slot this buffer is bound to, cleared. A GfxArray that is destroyed while still bound
+	// would otherwise leave its slots pointing at memory that is being freed, and the next thing
+	// that materializes a descriptor set writes it - the DX12 path does the same in UnbindBuffer ().
+	void UnbindBuffer(VkBuffer buffer)
+	noexcept;
 
-    void UnbindImage(VkImageView view) noexcept;
+	void UnbindImage(VkImageView view)
+	noexcept;
 
-    bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
-                uint32_t graphicsFamily, uint32_t presentFamily,
-                const String& name = "MainQueue") noexcept;
+	bool Create(VkDevice device, VkQueue graphicsQueue, VkQueue presentQueue,
+				uint32_t graphicsFamily, uint32_t presentFamily,
+				const String& name = "MainQueue")
+	noexcept;
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    inline VkQueue GetQueue(void) noexcept {
-        return m_cmdQueue.GraphicsQueue();
-    }
+	inline VkQueue GetQueue(void)
+	noexcept
+	{
+		return m_cmdQueue.GraphicsQueue();
+	}
 
-    inline CommandQueue& CmdQueue(void) noexcept {
-        return m_cmdQueue;
-    }
+	inline CommandQueue& CmdQueue(void)
+	noexcept
+	{
+		return m_cmdQueue;
+	}
 
-    inline VkQueue GraphicsQueue(void) const noexcept {
-        return m_cmdQueue.GraphicsQueue();
-    }
+	inline VkQueue GraphicsQueue(void) const
+	noexcept
+	{
+		return m_cmdQueue.GraphicsQueue();
+	}
 
-    inline VkCommandBuffer CurrentGfxList(void) const noexcept {
-        return m_currentListData.cmdBuf;
-    }
+	inline VkCommandBuffer CurrentGfxList(void) const
+	noexcept
+	{
+		return m_currentListData.cmdBuf;
+	}
 
-    inline CommandList* CurrentCmdList(void) const noexcept {
-        return m_currentListData.cmdList;
-    }
+	inline CommandList* CurrentCmdList(void) const
+	noexcept
+	{
+		return m_currentListData.cmdList;
+	}
 
-    void PushCmdList(CommandList* cl) noexcept;
-    void PopCmdList(void) noexcept;
+	void PushCmdList(CommandList* cl)
+	noexcept;
+	void PopCmdList(void)
+	noexcept;
 
-    void Register(CommandList* cl) noexcept;
+	void Register(CommandList* cl)
+	noexcept;
 
-    void ExecuteAll(bool intermediate = false) noexcept;
+	void ExecuteAll(bool intermediate = false)
+	noexcept;
 
-    // Submits what has been CLOSED so far, in close order, and waits for it. The lists still recording
-    // are left alone and go out with the frame as usual. For a CPU readback in mid frame: the draws it
-    // wants to read sit in closed lists that have not been submitted yet.
-    void ExecutePending(void) noexcept;
+	// Submits what has been CLOSED so far, in close order, and waits for it. The lists still recording
+	// are left alone and go out with the frame as usual. For a CPU readback in mid frame: the draws it
+	// wants to read sit in closed lists that have not been submitted yet.
+	void ExecutePending(void)
+	noexcept;
 
-    void DrainFrameResources(void) noexcept;
+	void DrainFrameResources(void)
+	noexcept;
 
-    CommandList* CreateCmdList(const String& name = "", bool isTemporary = true) noexcept;
+	CommandList* CreateCmdList(const String& name = "", bool isTemporary = true)
+	noexcept;
 
-    bool IsInRendering(void) noexcept;
+	bool IsInRendering(void)
+	noexcept;
 
-    VkCommandBuffer UploadCmdBuffer(void) noexcept;
+	VkCommandBuffer UploadCmdBuffer(void)
+	noexcept;
 
-    bool UsesOrderedCopyList(void) noexcept;
+	bool UsesOrderedCopyList(void)
+	noexcept;
 
-    CommandList* OpenOrderedCopyList(void) noexcept;
+	CommandList* OpenOrderedCopyList(void)
+	noexcept;
 
-    // The rendering scope open on the current command buffer, closed for commands that are illegal
-    // inside one (copies, fills) and reopened with its contents kept. For work that has to stay in
-    // recording order; what may run ahead of the frame goes through UploadCmdBuffer () instead.
-    struct RenderingScope {
-        RenderTarget*   target { nullptr };
-        bool            backBuffer { false };
-    };
+	// The rendering scope open on the current command buffer, closed for commands that are illegal
+	// inside one (copies, fills) and reopened with its contents kept. For work that has to stay in
+	// recording order; what may run ahead of the frame goes through UploadCmdBuffer () instead.
+	struct RenderingScope {
+		RenderTarget*	target{ nullptr };
+		bool			backBuffer{ false };
+	};
 
-    RenderingScope SuspendRendering(void) noexcept;
+	RenderingScope SuspendRendering(void)
+	noexcept;
 
-    void ResumeRendering(const RenderingScope& scope) noexcept;
+	void ResumeRendering(const RenderingScope& scope)
+	noexcept;
 
 #ifdef _DEBUG
-    inline void DrawInstanced(uint32_t vtxCount, uint32_t instCount, uint32_t startVtx, uint32_t startInst,
-                              std::source_location loc = std::source_location::current()) noexcept {
-        if (s_logCalls)
-            logHandler.Print("[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), (unsigned)loc.line());
+	inline void DrawInstanced(uint32_t vtxCount, uint32_t instCount, uint32_t startVtx, uint32_t startInst,
+							  std::source_location loc = std::source_location::current())
+	noexcept
+	{
+		if (s_logCalls)
+			logHandler.Print("[DI]  %u x%u  %s:%u\n", vtxCount, instCount, loc.file_name(), (unsigned)loc.line());
 #else
-    inline void DrawInstanced(uint32_t vtxCount, uint32_t instCount, uint32_t startVtx, uint32_t startInst) noexcept {
+	inline void DrawInstanced(uint32_t vtxCount, uint32_t instCount, uint32_t startVtx, uint32_t startInst)
+	noexcept
+	{
 #endif
-        VkCommandBuffer cb = CurrentGfxList();
-        if (cb != VK_NULL_HANDLE)
-            vkCmdDraw(cb, vtxCount, instCount, startVtx, startInst);
-    }
+		VkCommandBuffer cb = CurrentGfxList();
+		if (cb != VK_NULL_HANDLE)
+			vkCmdDraw(cb, vtxCount, instCount, startVtx, startInst);
+	}
 
 #ifdef _DEBUG
-    inline void DrawIndexedInstanced(uint32_t idxCount, uint32_t instCount, uint32_t startIdx, int32_t baseVtx, uint32_t startInst,
-                                     std::source_location loc = std::source_location::current()) noexcept {
+	inline void DrawIndexedInstanced(uint32_t idxCount, uint32_t instCount, uint32_t startIdx, int32_t baseVtx, uint32_t startInst,
+									 std::source_location loc = std::source_location::current())
+	noexcept
+	{
 #if 0
         if (s_logCalls)
             logHandler.Print("[DII] %u x%u  %s:%u\n", idxCount, instCount, loc.file_name(), (unsigned)loc.line());
 #endif
 #else
-    inline void DrawIndexedInstanced(uint32_t idxCount, uint32_t instCount, uint32_t startIdx, int32_t baseVtx, uint32_t startInst) noexcept {
+	inline void DrawIndexedInstanced(uint32_t idxCount, uint32_t instCount, uint32_t startIdx, int32_t baseVtx, uint32_t startInst)
+	noexcept
+	{
 #endif
-        VkCommandBuffer cb = CurrentGfxList();
-        if (cb != VK_NULL_HANDLE)
-            vkCmdDrawIndexed(cb, idxCount, instCount, startIdx, baseVtx, startInst);
-    }
+		VkCommandBuffer cb = CurrentGfxList();
+		if (cb != VK_NULL_HANDLE)
+			vkCmdDrawIndexed(cb, idxCount, instCount, startIdx, baseVtx, startInst);
+	}
 
-    inline void DrawIndexedIndirect(VkBuffer commands, VkDeviceSize offset, uint32_t commandCount, uint32_t stride) noexcept {
-        VkCommandBuffer cb = CurrentGfxList();
-        if (cb != VK_NULL_HANDLE)
-            vkCmdDrawIndexedIndirect(cb, commands, offset, commandCount, stride);
-    }
-
-#ifdef _DEBUG
-    inline void CopyImage(VkImage src, VkImageLayout srcLayout, VkImage dst, VkImageLayout dstLayout,
-                          uint32_t regionCount, const VkImageCopy* regions,
-                          std::source_location loc = std::source_location::current()) noexcept {
-        if (s_logCalls)
-            logHandler.Print("[CI]  %s:%u\n", loc.file_name(), (unsigned)loc.line());
-#else
-    inline void CopyImage(VkImage src, VkImageLayout srcLayout, VkImage dst, VkImageLayout dstLayout,
-                          uint32_t regionCount, const VkImageCopy* regions) noexcept {
-#endif
-        VkCommandBuffer cb = CurrentGfxList();
-        if (cb != VK_NULL_HANDLE)
-            vkCmdCopyImage(cb, src, srcLayout, dst, dstLayout, regionCount, regions);
-    }
+	inline void DrawIndexedIndirect(VkBuffer commands, VkDeviceSize offset, uint32_t commandCount, uint32_t stride)
+	noexcept
+	{
+		VkCommandBuffer cb = CurrentGfxList();
+		if (cb != VK_NULL_HANDLE)
+			vkCmdDrawIndexedIndirect(cb, commands, offset, commandCount, stride);
+	}
 
 #ifdef _DEBUG
-    inline void PipelineBarrier2(const VkDependencyInfo* dep,
-                                 std::source_location loc = std::source_location::current()) noexcept {
-        if (s_logCalls)
-            logHandler.Print("[PB2] %s:%u\n", loc.file_name(), (unsigned)loc.line());
+	inline void CopyImage(VkImage src, VkImageLayout srcLayout, VkImage dst, VkImageLayout dstLayout,
+						  uint32_t regionCount, const VkImageCopy* regions,
+						  std::source_location loc = std::source_location::current())
+	noexcept
+	{
+		if (s_logCalls)
+			logHandler.Print("[CI]  %s:%u\n", loc.file_name(), (unsigned)loc.line());
 #else
-    inline void PipelineBarrier2(const VkDependencyInfo* dep) noexcept {
+	inline void CopyImage(VkImage src, VkImageLayout srcLayout, VkImage dst, VkImageLayout dstLayout,
+						  uint32_t regionCount, const VkImageCopy* regions)
+	noexcept
+	{
 #endif
-        VkCommandBuffer cb = CurrentGfxList();
-        if (cb != VK_NULL_HANDLE)
-            Vk13Api::CmdPipelineBarrier2(cb, dep);
-    }
+		VkCommandBuffer cb = CurrentGfxList();
+		if (cb != VK_NULL_HANDLE)
+			vkCmdCopyImage(cb, src, srcLayout, dst, dstLayout, regionCount, regions);
+	}
+
+#ifdef _DEBUG
+	inline void PipelineBarrier2(const VkDependencyInfo* dep,
+								 std::source_location		loc = std::source_location::current())
+	noexcept
+	{
+		if (s_logCalls)
+			logHandler.Print("[PB2] %s:%u\n", loc.file_name(), (unsigned)loc.line());
+#else
+	inline void PipelineBarrier2(const VkDependencyInfo* dep)
+	noexcept
+	{
+#endif
+		VkCommandBuffer cb = CurrentGfxList();
+		if (cb != VK_NULL_HANDLE)
+			Vk13Api::CmdPipelineBarrier2(cb, dep);
+	}
 };
 
 #define commandListHandler CommandListHandler::Instance()

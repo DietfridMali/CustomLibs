@@ -5,7 +5,7 @@
 #include "texture.h"
 #include "rendertarget.h"
 #include "colordata.h"
-#include "base_quadmesh.h"	// static BaseQuadMesh renderQuad below - the header has to stand alone
+#include "base_quadmesh.h" // static BaseQuadMesh renderQuad below - the header has to stand alone
 
 // =================================================================================================
 
@@ -16,19 +16,21 @@
 
 class BaseTextureAtlas {
 protected:
-	RenderTarget*	m_atlas;
+	RenderTarget* m_atlas;
 	// An atlas normally owns its target. It may instead be ONE ARRAY LAYER of a target somebody else
 	// owns - which is what puts many pages of the same atlas into a single texture, so a shader reaches
 	// them through a layer index instead of through a texture binding. m_layer is that page's layer;
 	// Activate () selects it, and the owner is responsible for the target's life.
-	bool			m_ownsAtlas;
-	int				m_layer;
+	bool	m_ownsAtlas;
+	int		m_layer;
 
-	static BaseQuadMesh	renderQuad;
+	static BaseQuadMesh renderQuad;
 
 public:
 	BaseTextureAtlas()
-		: m_atlas(nullptr), m_ownsAtlas(true), m_layer(0)
+		: m_atlas(nullptr)
+		, m_ownsAtlas(true)
+		, m_layer(0)
 	{
 	}
 
@@ -36,7 +38,8 @@ public:
 	// only thing this class costs. Add one here the moment that changes.
 	~BaseTextureAtlas() = default;
 
-	void Destroy(void) {
+	void Destroy(void)
+	{
 		if (m_ownsAtlas)
 			delete m_atlas;
 		m_atlas = nullptr;
@@ -49,13 +52,16 @@ public:
 
 	bool Render(Shader* shader);
 
-	Texture* GetAsTexture(void) noexcept {
-		return m_atlas ? m_atlas->GetAsTexture({}) :  nullptr;
+	Texture* GetAsTexture(void)
+	noexcept
+	{
+		return m_atlas ? m_atlas->GetAsTexture({}) : nullptr;
 	}
 
 	// Selecting the layer BEFORE activating: Activate () attaches and clears, and a clear has to land on
 	// this page's layer rather than on whichever one was selected last.
-	inline bool Activate(void) {
+	inline bool Activate(void)
+	{
 		if (m_atlas == nullptr)
 			return false;
 		if (m_atlas->HasArrayBuffers())
@@ -73,27 +79,39 @@ public:
 			m_atlas->SetViewport();
 	}
 
-	inline int GetWidth(bool scaled = false) noexcept {
+	inline int GetWidth(bool scaled = false)
+	noexcept
+	{
 		return m_atlas ? m_atlas->GetWidth(scaled) : 0;
 	}
 
-	inline int GetHeight(bool scaled = false) noexcept {
+	inline int GetHeight(bool scaled = false)
+	noexcept
+	{
 		return m_atlas ? m_atlas->GetHeight(scaled) : 0;
 	}
 
-	inline RenderTarget* GetRenderTarget(void) noexcept {
+	inline RenderTarget* GetRenderTarget(void)
+	noexcept
+	{
 		return m_atlas;
 	}
 
-	inline bool IsAvailable(void) noexcept {
+	inline bool IsAvailable(void)
+	noexcept
+	{
 		return m_atlas != nullptr;
 	}
 
-	inline int Layer(void) noexcept {
+	inline int Layer(void)
+	noexcept
+	{
 		return m_layer;
 	}
 
-	inline bool OwnsRenderTarget(void) noexcept {
+	inline bool OwnsRenderTarget(void)
+	noexcept
+	{
 		return m_ownsAtlas;
 	}
 };
@@ -101,16 +119,16 @@ public:
 // -------------------------------------------------------------------------------------------------
 
 class TextureAtlas
-	: public BaseTextureAtlas
-{
+	: public BaseTextureAtlas {
 public:
 	struct GlyphSize {
-		int width{ 0 };
-		int height{ 0 };
-		float aspectRatio{ 1.0f };
+		int		width{ 0 };
+		int		height{ 0 };
+		float	aspectRatio{ 1.0f };
 
 		GlyphSize(int w = 0, int h = 0)
-			: width(w), height(h)
+			: width(w)
+			, height(h)
 		{
 			Update();
 		}
@@ -130,12 +148,12 @@ public:
 	};
 
 protected:
-	TableSize		m_size;
-	GlyphSize		m_glyphSize;
-	Vector2f		m_scale;
-	Vector2f		m_cellScale;
-	Vector2f		m_paddingOffset;
-	int				m_padding;
+	TableSize	m_size;
+	GlyphSize	m_glyphSize;
+	Vector2f	m_scale;
+	Vector2f	m_cellScale;
+	Vector2f	m_paddingOffset;
+	int			m_padding;
 
 public:
 	TextureAtlas();
@@ -143,17 +161,19 @@ public:
 	~TextureAtlas() = default;
 
 	inline Vector2f GlyphOffset(int glyphIndex) {
-		return
-			(m_cellScale.X() * m_cellScale.Y()) // both != 0?
+		return (m_cellScale.X() * m_cellScale.Y()) // both != 0?
 			? Vector2f(m_size.Colf(glyphIndex) * m_cellScale.X(), m_size.Rowf(glyphIndex) * m_cellScale.Y()) + m_paddingOffset
 			: Vector2f::ZERO;
 	}
 
-	inline Vector2f GlyphScale(void) noexcept {
+	inline Vector2f GlyphScale(void)
+	noexcept
+	{
 		return m_scale;
 	}
 
-	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1, GfxFilterMode filtering = GfxFilterMode::Nearest, int padding = 0);
+	bool Create(String name, GlyphSize glyphSize, int glyphCount, int scale = 1, GfxFilterMode filtering = GfxFilterMode::Nearest,
+				int padding = 0);
 
 	bool RenderColored(int glyphIndex, RGBAColor color = ColorData::White);
 

@@ -12,75 +12,92 @@
 #include <cstdio>
 
 #if VK_STALL_DIAG
-extern double VkStallClock(void) noexcept;
-extern void VkStallNote(const char* what, double startMs, const char* detail) noexcept;
+extern double VkStallClock(void)
+noexcept;
+extern void VkStallNote(const char* what, double startMs, const char* detail)
+noexcept;
 #endif
 
 // =================================================================================================
 // TextureSlotInfo — API-neutral (slot bookkeeping only, no GPU calls).
 
 TextureSlotInfo::TextureSlotInfo(GLenum typeTag)
-    : m_typeTag(typeTag)
+	: m_typeTag(typeTag)
 {
-    m_srvIndices.fill(0u);
+	m_srvIndices.fill(0u);
 }
 
 
-int TextureSlotInfo::Find(uint32_t srvIndex) const noexcept {
-    if (not srvIndex)
-        return -1;
-    for (int i = 0; i < m_maxUsed; ++i)
-        if (m_srvIndices[i] == srvIndex)
-            return i;
-    return -1;
+int TextureSlotInfo::Find(uint32_t srvIndex) const
+noexcept
+{
+	if (not srvIndex)
+		return -1;
+	for (int i = 0; i < m_maxUsed; ++i)
+		if (m_srvIndices[i] == srvIndex)
+			return i;
+	return -1;
 }
 
 
-int TextureSlotInfo::Bind(uint32_t srvIndex, int slotIndex) noexcept {
-    if (slotIndex < 0) {
-        for (int i = 0; i < MAX_SLOTS; ++i) {
-            if (not m_srvIndices[i]) { slotIndex = i; break; }
-        }
-        if (slotIndex < 0)
-            return -1;
-    }
-    if (slotIndex >= MAX_SLOTS)
-        return -1;
-    m_srvIndices[slotIndex] = srvIndex;
-    if (slotIndex >= m_maxUsed)
-        m_maxUsed = slotIndex + 1;
-    return slotIndex;
+int TextureSlotInfo::Bind(uint32_t srvIndex, int slotIndex)
+noexcept
+{
+	if (slotIndex < 0) {
+		for (int i = 0; i < MAX_SLOTS; ++i) {
+			if (not m_srvIndices[i]) {
+				slotIndex = i;
+				break;
+			}
+		}
+		if (slotIndex < 0)
+			return -1;
+	}
+	if (slotIndex >= MAX_SLOTS)
+		return -1;
+	m_srvIndices[slotIndex] = srvIndex;
+	if (slotIndex >= m_maxUsed)
+		m_maxUsed = slotIndex + 1;
+	return slotIndex;
 }
 
 
-bool TextureSlotInfo::Release(uint32_t srvIndex, int slotIndex) noexcept {
-    if (slotIndex >= 0) {
-        if (slotIndex < MAX_SLOTS && m_srvIndices[slotIndex] != srvIndex)
-            return false;
-        m_srvIndices[slotIndex] = 0u;
-        return true;
-    }
-    bool released = false;
-    for (int i = 0; i < m_maxUsed; ++i) {
-        if (m_srvIndices[i] == srvIndex) {
-            m_srvIndices[i] = 0u;
-            released = true;
-        }
-    }
-    return released;
+bool TextureSlotInfo::Release(uint32_t srvIndex, int slotIndex)
+noexcept
+{
+	if (slotIndex >= 0) {
+		if (slotIndex < MAX_SLOTS && m_srvIndices[slotIndex] != srvIndex)
+			return false;
+		m_srvIndices[slotIndex] = 0u;
+		return true;
+	}
+	bool released = false;
+	for (int i = 0; i < m_maxUsed; ++i) {
+		if (m_srvIndices[i] == srvIndex) {
+			m_srvIndices[i] = 0u;
+			released = true;
+		}
+	}
+	return released;
 }
 
 
-uint32_t TextureSlotInfo::Query(int slotIndex) const noexcept {
-    return (slotIndex >= 0 && slotIndex < MAX_SLOTS) ? m_srvIndices[slotIndex] : 0u;
+uint32_t TextureSlotInfo::Query(int slotIndex) const
+noexcept
+{
+	return (slotIndex >= 0 && slotIndex < MAX_SLOTS) ? m_srvIndices[slotIndex] : 0u;
 }
 
 
-bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
-    if (slotIndex < 0 || slotIndex >= MAX_SLOTS) return false;
-    m_srvIndices[slotIndex] = srvIndex;
-    if (slotIndex >= m_maxUsed) m_maxUsed = slotIndex + 1;
-    return true;
+bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex)
+noexcept
+{
+	if (slotIndex < 0 || slotIndex >= MAX_SLOTS)
+		return false;
+	m_srvIndices[slotIndex] = srvIndex;
+	if (slotIndex >= m_maxUsed)
+		m_maxUsed = slotIndex + 1;
+	return true;
 }
 
 // =================================================================================================
@@ -93,14 +110,16 @@ bool TextureSlotInfo::Update(uint32_t srvIndex, int slotIndex) noexcept {
 //
 // CommandList::Flush keeps using CommandQueue::WaitIdle (queue-local).
 
-void GfxStates::Finish(void) noexcept {
+void GfxStates::Finish(void)
+noexcept
+{
 #if VK_STALL_DIAG
-    double stallStart = VkStallClock();
+	double stallStart = VkStallClock();
 #endif
-    if (vkContext.Device() != VK_NULL_HANDLE)
-        vkDeviceWaitIdle(vkContext.Device());
+	if (vkContext.Device() != VK_NULL_HANDLE)
+		vkDeviceWaitIdle(vkContext.Device());
 #if VK_STALL_DIAG
-    VkStallNote("device wait idle", stallStart, nullptr);
+	VkStallNote("device wait idle", stallStart, nullptr);
 #endif
 }
 
@@ -108,83 +127,96 @@ void GfxStates::Finish(void) noexcept {
 // API-neutral GfxStates methods (slot bookkeeping, ActiveState pass-through, ReleaseBuffers,
 // ClearError, SetDrawBuffers). Bodies identical to the DX12 / OGL counterpart — no GPU calls.
 
-RenderStates& GfxStates::ActiveState(void) noexcept {
-    return baseRenderer.RenderStates();
+RenderStates& GfxStates::ActiveState(void)
+noexcept
+{
+	return baseRenderer.RenderStates();
 }
 
 
-TextureSlotInfo* GfxStates::FindInfo(GLenum typeTag) {
-    // Nothing to find once this singleton has been torn down - the list is gone, and iterating it
-    // reads freed memory, while appending to it would be worse still. Textures and render targets
-    // owned by other statics are destroyed after it and drop their bindings here on the way out;
-    // for those there is nothing left to drop.
-    if (IsDestroyed())
-        return nullptr;
-    for (auto& info : m_slotInfos)
-        if (info.GetTypeTag() == typeTag)
-            return &info;
-    m_slotInfos.Append(TextureSlotInfo(typeTag));
-    return &m_slotInfos[m_slotInfos.Length() - 1];
+TextureSlotInfo* GfxStates::FindInfo(GLenum typeTag)
+{
+	// Nothing to find once this singleton has been torn down - the list is gone, and iterating it
+	// reads freed memory, while appending to it would be worse still. Textures and render targets
+	// owned by other statics are destroyed after it and drop their bindings here on the way out;
+	// for those there is nothing left to drop.
+	if (IsDestroyed())
+		return nullptr;
+	for (auto& info : m_slotInfos)
+		if (info.GetTypeTag() == typeTag)
+			return &info;
+	m_slotInfos.Append(TextureSlotInfo(typeTag));
+	return &m_slotInfos[m_slotInfos.Length() - 1];
 }
 
 
-int GfxStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
-    TextureSlotInfo* info = FindInfo(typeTag);
-    if (not info)
-        return -1;
-    return (slotIndex >= 0) ? (info->Query(slotIndex) == srvIndex ? slotIndex : -1) : info->Find(srvIndex);
+int GfxStates::BoundTMU(GLenum typeTag, uint32_t srvIndex, int slotIndex)
+{
+	TextureSlotInfo* info = FindInfo(typeTag);
+	if (not info)
+		return -1;
+	return (slotIndex >= 0) ? (info->Query(slotIndex) == srvIndex ? slotIndex : -1) : info->Find(srvIndex);
 }
 
 
-int GfxStates::BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
-    TextureSlotInfo* info = FindInfo(typeTag);
-    if (not info)
-        return -1;
-    if ((srvIndex == UINT32_MAX) and (slotIndex >= 0))
-        commandListHandler.BindSampledImage(uint32_t(slotIndex), VK_NULL_HANDLE);
-    return info->Bind(srvIndex, slotIndex);
+int GfxStates::BindTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
+{
+	TextureSlotInfo* info = FindInfo(typeTag);
+	if (not info)
+		return -1;
+	if ((srvIndex == UINT32_MAX) and (slotIndex >= 0))
+		commandListHandler.BindSampledImage(uint32_t(slotIndex), VK_NULL_HANDLE);
+	return info->Bind(srvIndex, slotIndex);
 }
 
 
-bool GfxStates::ReleaseTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
-    TextureSlotInfo* info = FindInfo(typeTag);
-    if (not info)
-        return false;
-    return info->Release(srvIndex, slotIndex);
+bool GfxStates::ReleaseTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
+{
+	TextureSlotInfo* info = FindInfo(typeTag);
+	if (not info)
+		return false;
+	return info->Release(srvIndex, slotIndex);
 }
 
 
-int GfxStates::GetBoundTexture(GLenum typeTag, int slotIndex) {
-    TextureSlotInfo* info = FindInfo(typeTag);
-    if (not info)
-        return 0;
-    return int(info->Query(slotIndex));
+int GfxStates::GetBoundTexture(GLenum typeTag, int slotIndex)
+{
+	TextureSlotInfo* info = FindInfo(typeTag);
+	if (not info)
+		return 0;
+	return int(info->Query(slotIndex));
 }
 
 
-int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex) {
-    TextureSlotInfo* info = FindInfo(typeTag);
-    if (not info)
-        return -1;
-    info->Update(srvIndex, slotIndex);
-    return slotIndex;
+int GfxStates::SetBoundTexture(GLenum typeTag, uint32_t srvIndex, int slotIndex)
+{
+	TextureSlotInfo* info = FindInfo(typeTag);
+	if (not info)
+		return -1;
+	info->Update(srvIndex, slotIndex);
+	return slotIndex;
 }
 
 
-void GfxStates::ReleaseBuffers(void) noexcept {
-    for (auto& info : m_slotInfos)
-        info = TextureSlotInfo(info.GetTypeTag());
+void GfxStates::ReleaseBuffers(void)
+noexcept
+{
+	for (auto& info : m_slotInfos)
+		info = TextureSlotInfo(info.GetTypeTag());
 }
 
 
-void GfxStates::SetDrawBuffers(const DrawBufferList& /*drawBuffers*/) {
-    // no op — Vulkan binds attachments via vkCmdBeginRendering, not via per-draw mask.
+void GfxStates::SetDrawBuffers(const DrawBufferList& /*drawBuffers*/)
+{
+	// no op — Vulkan binds attachments via vkCmdBeginRendering, not via per-draw mask.
 }
 
 
-void GfxStates::ClearError(void) noexcept {
-    // no op — Vulkan has no equivalent of glGetError to drain. Validation messages are buffered
-    // by the debug callback and cleared inside CheckError -> VKContext::DrainMessages.
+void GfxStates::ClearError(void)
+noexcept
+{
+	// no op — Vulkan has no equivalent of glGetError to drain. Validation messages are buffered
+	// by the debug callback and cleared inside CheckError -> VKContext::DrainMessages.
 }
 
 // =================================================================================================
@@ -195,199 +227,221 @@ void GfxStates::ClearError(void) noexcept {
 // is responsible for transitioning back to COLOR_ATTACHMENT / DEPTH_ATTACHMENT before the
 // next draw (RenderTarget::Activate / Swapchain owners do this).
 
-static VkImageSubresourceRange MakeColorRange(void) noexcept {
-    VkImageSubresourceRange range{};
-    range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    range.baseMipLevel = 0;
-    range.levelCount = VK_REMAINING_MIP_LEVELS;
-    range.baseArrayLayer = 0;
-    range.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    return range;
+static VkImageSubresourceRange MakeColorRange(void)
+noexcept
+{
+	VkImageSubresourceRange range{};
+	range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	range.baseMipLevel = 0;
+	range.levelCount = VK_REMAINING_MIP_LEVELS;
+	range.baseArrayLayer = 0;
+	range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	return range;
 }
 
 
-static VkImageSubresourceRange MakeDepthRange(void) noexcept {
-    VkImageSubresourceRange range{};
-    range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    range.baseMipLevel = 0;
-    range.levelCount = VK_REMAINING_MIP_LEVELS;
-    range.baseArrayLayer = 0;
-    range.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    return range;
+static VkImageSubresourceRange MakeDepthRange(void)
+noexcept
+{
+	VkImageSubresourceRange range{};
+	range.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	range.baseMipLevel = 0;
+	range.levelCount = VK_REMAINING_MIP_LEVELS;
+	range.baseArrayLayer = 0;
+	range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	return range;
 }
 
 
-static VkImageSubresourceRange MakeStencilRange(void) noexcept {
-    VkImageSubresourceRange range{};
-    range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-    range.baseMipLevel = 0;
-    range.levelCount = VK_REMAINING_MIP_LEVELS;
-    range.baseArrayLayer = 0;
-    range.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    return range;
+static VkImageSubresourceRange MakeStencilRange(void)
+noexcept
+{
+	VkImageSubresourceRange range{};
+	range.aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+	range.baseMipLevel = 0;
+	range.levelCount = VK_REMAINING_MIP_LEVELS;
+	range.baseArrayLayer = 0;
+	range.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	return range;
 }
 
 
-void GfxStates::ClearColorBuffers(VkImage image, ImageLayoutTracker& tracker) noexcept {
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
-        return;
+void GfxStates::ClearColorBuffers(VkImage image, ImageLayoutTracker& tracker)
+noexcept
+{
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
+		return;
 
-    tracker.ToTransferDst(cb);
+	tracker.ToTransferDst(cb);
 
-    const float* src = m_clearColor.Data();
-    VkClearColorValue value{};
-    value.float32[0] = src[0];
-    value.float32[1] = src[1];
-    value.float32[2] = src[2];
-    value.float32[3] = src[3];
+	const float*		src = m_clearColor.Data();
+	VkClearColorValue	value{};
+	value.float32[0] = src[0];
+	value.float32[1] = src[1];
+	value.float32[2] = src[2];
+	value.float32[3] = src[3];
 
-    VkImageSubresourceRange range = MakeColorRange();
-    vkCmdClearColorImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+	VkImageSubresourceRange range = MakeColorRange();
+	vkCmdClearColorImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
 }
 
 
-void GfxStates::ClearComputeBuffers(RenderTarget* rt) noexcept {
-    if (rt == nullptr or (rt->m_computeBufferCount <= 0))
-        return;
+void GfxStates::ClearComputeBuffers(RenderTarget* rt)
+noexcept
+{
+	if (rt == nullptr or (rt->m_computeBufferCount <= 0))
+		return;
 
-    // Open a temporary CL if none is active. vkCmdClearColorImage + layout transitions need a
-    // recording command buffer outside any render-pass scope.
-    void* opHandle = nullptr;
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE) {
-        opHandle = baseRenderer.StartOperation("GfxStates::ClearComputeBuffers", false);
-        if (opHandle == nullptr)
-            return;
-        cb = commandListHandler.CmdQueue().CmdBuffer();
-        if (cb == VK_NULL_HANDLE) {
-            baseRenderer.FinishOperation(opHandle);
-            return;
-        }
-    }
+	// Open a temporary CL if none is active. vkCmdClearColorImage + layout transitions need a
+	// recording command buffer outside any render-pass scope.
+	void*			opHandle = nullptr;
+	VkCommandBuffer	cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE) {
+		opHandle = baseRenderer.StartOperation("GfxStates::ClearComputeBuffers", false);
+		if (opHandle == nullptr)
+			return;
+		cb = commandListHandler.CmdQueue().CmdBuffer();
+		if (cb == VK_NULL_HANDLE) {
+			baseRenderer.FinishOperation(opHandle);
+			return;
+		}
+	}
 
-    CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
-    VkClearColorValue zero{ .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } };
-    VkImageSubresourceRange range = MakeColorRange();
-    for (int i = 0; i < rt->m_computeBufferCount; ++i) {
-        BufferInfo& bi = rt->m_bufferInfo[rt->m_computeBufferIndex + i];
-        bi.m_layoutTracker.ToTransferDst(cb);
-        vkCmdClearColorImage(cb, bi.m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
-        bi.m_layoutTracker.ToShaderInput(cb);
-    }
-    commandListHandler.ResumeRendering(scope);
+	CommandListHandler::RenderingScope	scope = commandListHandler.SuspendRendering();
+	VkClearColorValue					zero{ .float32 = { 0.0f, 0.0f, 0.0f, 0.0f } };
+	VkImageSubresourceRange				range = MakeColorRange();
+	for (int i = 0; i < rt->m_computeBufferCount; ++i) {
+		BufferInfo& bi = rt->m_bufferInfo[rt->m_computeBufferIndex + i];
+		bi.m_layoutTracker.ToTransferDst(cb);
+		vkCmdClearColorImage(cb, bi.m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &zero, 1, &range);
+		bi.m_layoutTracker.ToShaderInput(cb);
+	}
+	commandListHandler.ResumeRendering(scope);
 
-    if (opHandle != nullptr)
-        baseRenderer.FinishOperation(opHandle);
+	if (opHandle != nullptr)
+		baseRenderer.FinishOperation(opHandle);
 }
 
 
-void GfxStates::ClearColorBuffers(void) noexcept {
-    RenderTarget* rt = baseRenderer.GetActiveBuffer();
-    if (not rt) {
-        ClearBackBuffer(m_clearColor);
-        return;
-    }
-    RGBAColor clearColor = rt->m_clearColor;
-    rt->SetClearColor(m_clearColor);
-    rt->ClearColorBuffers();
-    rt->SetClearColor(clearColor);
+void GfxStates::ClearColorBuffers(void)
+noexcept
+{
+	RenderTarget* rt = baseRenderer.GetActiveBuffer();
+	if (not rt) {
+		ClearBackBuffer(m_clearColor);
+		return;
+	}
+	RGBAColor clearColor = rt->m_clearColor;
+	rt->SetClearColor(m_clearColor);
+	rt->ClearColorBuffers();
+	rt->SetClearColor(clearColor);
 }
 
 
-void GfxStates::ClearDepthBuffer(float clearValue) noexcept {
-    RenderTarget* rt = baseRenderer.GetActiveBuffer();
-    if (rt)
-        rt->ClearDepthBuffer(clearValue);
+void GfxStates::ClearDepthBuffer(float clearValue)
+noexcept
+{
+	RenderTarget* rt = baseRenderer.GetActiveBuffer();
+	if (rt)
+		rt->ClearDepthBuffer(clearValue);
 }
 
 
-void GfxStates::ClearStencilBuffer(int clearValue) noexcept {
-    RenderTarget* rt = baseRenderer.GetActiveBuffer();
-    if (rt)
-        rt->ClearStencilBuffer(clearValue);
+void GfxStates::ClearStencilBuffer(int clearValue)
+noexcept
+{
+	RenderTarget* rt = baseRenderer.GetActiveBuffer();
+	if (rt)
+		rt->ClearStencilBuffer(clearValue);
 }
 
 
-void GfxStates::ClearBackBuffer(const RGBAColor& color) noexcept {
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE)
-        return;
+void GfxStates::ClearBackBuffer(const RGBAColor& color)
+noexcept
+{
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE)
+		return;
 
-    const float* src = color.Data();
+	const float* src = color.Data();
 
-    if (baseDisplayHandler.IsInRendering()) {
-        // Common path: EnableBackBuffer opened a dynamic-rendering scope. Clear via
-        // vkCmdClearAttachments, which is the in-pass clear and keeps the image in
-        // COLOR_ATTACHMENT_OPTIMAL for the subsequent draws.
-        VkClearAttachment clear{};
-        clear.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        clear.colorAttachment = 0;
-        clear.clearValue.color.float32[0] = src[0];
-        clear.clearValue.color.float32[1] = src[1];
-        clear.clearValue.color.float32[2] = src[2];
-        clear.clearValue.color.float32[3] = src[3];
+	if (baseDisplayHandler.IsInRendering()) {
+		// Common path: EnableBackBuffer opened a dynamic-rendering scope. Clear via
+		// vkCmdClearAttachments, which is the in-pass clear and keeps the image in
+		// COLOR_ATTACHMENT_OPTIMAL for the subsequent draws.
+		VkClearAttachment clear{};
+		clear.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		clear.colorAttachment = 0;
+		clear.clearValue.color.float32[0] = src[0];
+		clear.clearValue.color.float32[1] = src[1];
+		clear.clearValue.color.float32[2] = src[2];
+		clear.clearValue.color.float32[3] = src[3];
 
-        VkClearRect rect{};
-        rect.rect.offset = { 0, 0 };
-        rect.rect.extent = baseDisplayHandler.m_swapchain.Extent();
-        rect.baseArrayLayer = 0;
-        rect.layerCount = 1;
+		VkClearRect rect{};
+		rect.rect.offset = { 0, 0 };
+		rect.rect.extent = baseDisplayHandler.m_swapchain.Extent();
+		rect.baseArrayLayer = 0;
+		rect.layerCount = 1;
 
-        vkCmdClearAttachments(cb, 1, &clear, 1, &rect);
-        return;
-    }
+		vkCmdClearAttachments(cb, 1, &clear, 1, &rect);
+		return;
+	}
 
-    // Fallback: no render-pass scope active — clear the image directly. Used only when a
-    // caller bypasses EnableBackBuffer.
-    VkImage image = baseDisplayHandler.CurrentBackBuffer();
-    if (image == VK_NULL_HANDLE)
-        return;
+	// Fallback: no render-pass scope active — clear the image directly. Used only when a
+	// caller bypasses EnableBackBuffer.
+	VkImage image = baseDisplayHandler.CurrentBackBuffer();
+	if (image == VK_NULL_HANDLE)
+		return;
 
-    commandListHandler.CurrentCmdList()->m_usesBackBuffer = true;
-    ImageLayoutTracker& tracker = baseDisplayHandler.CurrentBackBufferTracker();
-    tracker.ToTransferDst(cb);
+	commandListHandler.CurrentCmdList()->m_usesBackBuffer = true;
+	ImageLayoutTracker& tracker = baseDisplayHandler.CurrentBackBufferTracker();
+	tracker.ToTransferDst(cb);
 
-    VkClearColorValue value{};
-    value.float32[0] = src[0];
-    value.float32[1] = src[1];
-    value.float32[2] = src[2];
-    value.float32[3] = src[3];
+	VkClearColorValue value{};
+	value.float32[0] = src[0];
+	value.float32[1] = src[1];
+	value.float32[2] = src[2];
+	value.float32[3] = src[3];
 
-    VkImageSubresourceRange range = MakeColorRange();
-    vkCmdClearColorImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+	VkImageSubresourceRange range = MakeColorRange();
+	vkCmdClearColorImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
 }
 
 
-void GfxStates::ClearDepthBuffer(VkImage image, ImageLayoutTracker& tracker, float clearValue) noexcept {
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
-        return;
+void GfxStates::ClearDepthBuffer(VkImage image, ImageLayoutTracker& tracker, float clearValue)
+noexcept
+{
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
+		return;
 
-    tracker.ToTransferDst(cb);
+	tracker.ToTransferDst(cb);
 
-    VkClearDepthStencilValue value{};
-    value.depth = clearValue;
-    value.stencil = 0;
+	VkClearDepthStencilValue value{};
+	value.depth = clearValue;
+	value.stencil = 0;
 
-    VkImageSubresourceRange range = MakeDepthRange();
-    vkCmdClearDepthStencilImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+	VkImageSubresourceRange range = MakeDepthRange();
+	vkCmdClearDepthStencilImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
 }
 
 
-void GfxStates::ClearStencilBuffer(VkImage image, ImageLayoutTracker& tracker, int clearValue) noexcept {
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
-        return;
+void GfxStates::ClearStencilBuffer(VkImage image, ImageLayoutTracker& tracker, int clearValue)
+noexcept
+{
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE or image == VK_NULL_HANDLE)
+		return;
 
-    tracker.ToTransferDst(cb);
+	tracker.ToTransferDst(cb);
 
-    VkClearDepthStencilValue value{};
-    value.depth = 0.0f;
-    value.stencil = uint32_t(clearValue);
+	VkClearDepthStencilValue value{};
+	value.depth = 0.0f;
+	value.stencil = uint32_t(clearValue);
 
-    VkImageSubresourceRange range = MakeStencilRange();
-    vkCmdClearDepthStencilImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
+	VkImageSubresourceRange range = MakeStencilRange();
+	vkCmdClearDepthStencilImage(cb, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &value, 1, &range);
 }
 
 // =================================================================================================
@@ -395,38 +449,40 @@ void GfxStates::ClearStencilBuffer(VkImage image, ImageLayoutTracker& tracker, i
 // D3D12_RESOURCE_BARRIER_TYPE_UAV with pResource=nullptr ("flush all UAV writes").
 // The Bitfield parameter is currently ignored (DX12 also ignores it — the call sites pass 0).
 
-void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE)
-        return;
+void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/)
+noexcept
+{
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE)
+		return;
 
-    // Framebuffer-space stages only — legal inside an active dynamic-rendering instance
-    // (Vulkan spec VUID-vkCmdPipelineBarrier2-srcStageMask-09556). Scoped to fragment-shader
-    // storage access; matches DecalHandler::Render's UAV pass-0-write -> pass-1-read sync
-    // on RWTexture2D<uint> depths.
-    VkMemoryBarrier2 barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
-    barrier.srcStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
-    barrier.dstStageMask  = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
-    barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+	// Framebuffer-space stages only — legal inside an active dynamic-rendering instance
+	// (Vulkan spec VUID-vkCmdPipelineBarrier2-srcStageMask-09556). Scoped to fragment-shader
+	// storage access; matches DecalHandler::Render's UAV pass-0-write -> pass-1-read sync
+	// on RWTexture2D<uint> depths.
+	VkMemoryBarrier2 barrier{};
+	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+	barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+	barrier.srcAccessMask = VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
+	barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
+	barrier.dstAccessMask = VK_ACCESS_2_SHADER_STORAGE_READ_BIT | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT;
 
-    VkDependencyInfo dep{};
-    dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    // BY_REGION_BIT required for intra-renderpass barriers with framebuffer-space stages
-    // (VUID-vkCmdPipelineBarrier2-dependencyFlags-07891). Per-fragment scope is sufficient
-    // for the UAV write/read pattern.
-    dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    dep.memoryBarrierCount = 1;
-    dep.pMemoryBarriers = &barrier;
+	VkDependencyInfo dep{};
+	dep.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	// BY_REGION_BIT required for intra-renderpass barriers with framebuffer-space stages
+	// (VUID-vkCmdPipelineBarrier2-dependencyFlags-07891). Per-fragment scope is sufficient
+	// for the UAV write/read pattern.
+	dep.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+	dep.memoryBarrierCount = 1;
+	dep.pMemoryBarriers = &barrier;
 
-    if (vkContext.HasFeature(GfxFeature::RenderingLocalRead)) {
-        Vk13Api::CmdPipelineBarrier2(cb, &dep);
-        return;
-    }
-    CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
-    Vk13Api::CmdPipelineBarrier2(cb, &dep);
-    commandListHandler.ResumeRendering(scope);
+	if (vkContext.HasFeature(GfxFeature::RenderingLocalRead)) {
+		Vk13Api::CmdPipelineBarrier2(cb, &dep);
+		return;
+	}
+	CommandListHandler::RenderingScope scope = commandListHandler.SuspendRendering();
+	Vk13Api::CmdPipelineBarrier2(cb, &dep);
+	commandListHandler.ResumeRendering(scope);
 }
 
 // =================================================================================================
@@ -437,79 +493,91 @@ void GfxStates::SetMemoryBarrier(GfxTypes::Bitfield /*barriers*/) noexcept {
 // produce the same on-screen result as the DX12 path. Scissor stays in window-pixel coordinates
 // (top-left origin, no flip).
 
-void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
-    m_viewport[0] = left;
-    m_viewport[1] = top;
-    m_viewport[2] = width;
-    m_viewport[3] = height;
+void GfxStates::SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width,
+							const GfxTypes::Int height)
+noexcept
+{
+	m_viewport[0] = left;
+	m_viewport[1] = top;
+	m_viewport[2] = width;
+	m_viewport[3] = height;
 
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE)
-        return;
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE)
+		return;
 
-    VkViewport vp{};
-    vp.x = float(left);
-    vp.y = float(top + height);
-    vp.width = float(width);
-    vp.height = -float(height);
-    vp.minDepth = 0.0f;
-    vp.maxDepth = 1.0f;
-    vkCmdSetViewport(cb, 0, 1, &vp);
+	VkViewport vp{};
+	vp.x = float(left);
+	vp.y = float(top + height);
+	vp.width = float(width);
+	vp.height = -float(height);
+	vp.minDepth = 0.0f;
+	vp.maxDepth = 1.0f;
+	vkCmdSetViewport(cb, 0, 1, &vp);
 
-    VkRect2D scissor{};
-    scissor.offset.x = (left < 0) ? 0 : left;
-    scissor.offset.y = (top < 0) ? 0 : top;
-    scissor.extent.width = (width < 0) ? 0u : uint32_t(width);
-    scissor.extent.height = (height < 0) ? 0u : uint32_t(height);
-    vkCmdSetScissor(cb, 0, 1, &scissor);
-    m_scissor[0] = left;
-    m_scissor[1] = top;
-    m_scissor[2] = width;
-    m_scissor[3] = height;
+	VkRect2D scissor{};
+	scissor.offset.x = (left < 0) ? 0 : left;
+	scissor.offset.y = (top < 0) ? 0 : top;
+	scissor.extent.width = (width < 0) ? 0u : uint32_t(width);
+	scissor.extent.height = (height < 0) ? 0u : uint32_t(height);
+	vkCmdSetScissor(cb, 0, 1, &scissor);
+	m_scissor[0] = left;
+	m_scissor[1] = top;
+	m_scissor[2] = width;
+	m_scissor[3] = height;
 }
 
 
-void GfxStates::SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
-    m_scissor[0] = left;
-    m_scissor[1] = top;
-    m_scissor[2] = width;
-    m_scissor[3] = height;
+void GfxStates::SetScissor(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width,
+						   const GfxTypes::Int height)
+noexcept
+{
+	m_scissor[0] = left;
+	m_scissor[1] = top;
+	m_scissor[2] = width;
+	m_scissor[3] = height;
 
-    VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
-    if (cb == VK_NULL_HANDLE)
-        return;
-    VkRect2D scissor{};
-    scissor.offset.x = (left < 0) ? 0 : left;
-    scissor.offset.y = (top < 0) ? 0 : top;
-    scissor.extent.width = (width < 0) ? 0u : uint32_t(width);
-    scissor.extent.height = (height < 0) ? 0u : uint32_t(height);
-    vkCmdSetScissor(cb, 0, 1, &scissor);
+	VkCommandBuffer cb = commandListHandler.CmdQueue().CmdBuffer();
+	if (cb == VK_NULL_HANDLE)
+		return;
+	VkRect2D scissor{};
+	scissor.offset.x = (left < 0) ? 0 : left;
+	scissor.offset.y = (top < 0) ? 0 : top;
+	scissor.extent.width = (width < 0) ? 0u : uint32_t(width);
+	scissor.extent.height = (height < 0) ? 0u : uint32_t(height);
+	vkCmdSetScissor(cb, 0, 1, &scissor);
 }
 
 
-void GfxStates::RestoreViewport(void) noexcept {
-    if ((m_viewport[2] <= 0) or (m_viewport[3] <= 0))
-        return;
-    GfxTypes::Int scissor[4] = { m_scissor[0], m_scissor[1], m_scissor[2], m_scissor[3] };
-    SetViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
-    SetScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+void GfxStates::RestoreViewport(void)
+noexcept
+{
+	if ((m_viewport[2] <= 0) or (m_viewport[3] <= 0))
+		return;
+	GfxTypes::Int scissor[4] = { m_scissor[0], m_scissor[1], m_scissor[2], m_scissor[3] };
+	SetViewport(m_viewport[0], m_viewport[1], m_viewport[2], m_viewport[3]);
+	SetScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
 }
 
 
-int GfxStates::MaxTextureUnits(void) noexcept {
-    return int(CommandListHandler::kSrvSlots);
+int GfxStates::MaxTextureUnits(void)
+noexcept
+{
+	return int(CommandListHandler::kSrvSlots);
 }
 
 
-String GfxStates::DeviceName(void) {
-    return String(vkContext.DeviceProps().deviceName);
+String GfxStates::DeviceName(void)
+{
+	return String(vkContext.DeviceProps().deviceName);
 }
 
 
-bool GfxStates::CanBlend(GfxPixelFormat format) {
-    VkFormatProperties props{};
-    vkGetPhysicalDeviceFormatProperties(vkContext.PhysicalDevice(), ToVkFormat(format), &props);
-    return (props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT) != 0;
+bool GfxStates::CanBlend(GfxPixelFormat format)
+{
+	VkFormatProperties props{};
+	vkGetPhysicalDeviceFormatProperties(vkContext.PhysicalDevice(), ToVkFormat(format), &props);
+	return (props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT) != 0;
 }
 
 // =================================================================================================
@@ -517,20 +585,22 @@ bool GfxStates::CanBlend(GfxPixelFormat format) {
 // VkContextDebugCallback in vkcontext.cpp) and returns false if any error-severity entries
 // were collected since the last call. 1:1 to DX12Context::DrainMessages-based CheckError.
 
-bool GfxStates::CheckError(const char* operation) noexcept {
-#if 1//def _DEBUG
-    int errors = vkContext.DrainMessages(true);
-    if (errors > 0) {
-        if (operation and *operation)
-            logHandler.Print("GfxStates::CheckError: %d Vulkan validation error(s) at '%s'\n", errors, operation);
-        else
-            logHandler.Print("GfxStates::CheckError: %d Vulkan validation error(s)\n", errors);
-        return false;
-    }
+bool GfxStates::CheckError(const char* operation)
+noexcept
+{
+#if 1 //def _DEBUG
+	int errors = vkContext.DrainMessages(true);
+	if (errors > 0) {
+		if (operation and *operation)
+			logHandler.Print("GfxStates::CheckError: %d Vulkan validation error(s) at '%s'\n", errors, operation);
+		else
+			logHandler.Print("GfxStates::CheckError: %d Vulkan validation error(s)\n", errors);
+		return false;
+	}
 #else
-    (void)operation;
+	(void)operation;
 #endif
-    return true;
+	return true;
 }
 
 // =================================================================================================

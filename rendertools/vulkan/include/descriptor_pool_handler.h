@@ -28,46 +28,60 @@
 //
 // Singleton, created from Application::InitGraphics() after VKContext is up, before BeginFrame.
 
-class DescriptorPoolHandler : public BaseSingleton<DescriptorPoolHandler>
-{
+class DescriptorPoolHandler : public BaseSingleton<DescriptorPoolHandler> {
 public:
-    static constexpr uint32_t FRAME_COUNT = 2;
-    static constexpr uint32_t kMaxSetsPerPool = 1024;
-    static constexpr uint32_t kMaxUbosPerPool = kMaxSetsPerPool * 6;
-    static constexpr uint32_t kMaxSampledImagesPerPool = 12288;  // t0..t23 per draw
-    static constexpr uint32_t kMaxSamplersPerPool = 12288;       // s0..s23 per draw
-    static constexpr uint32_t kMaxStoragePerPool = kMaxSetsPerPool * 28;  // u0..u3 + t0..t23 space1 per set (StorageBuffer)
-    static constexpr uint32_t kMaxStorageImagesPerPool = 256;   // u0..u3 per draw (StorageImage, e.g. TSP sky-map target)
+	static constexpr uint32_t FRAME_COUNT = 2;
+	static constexpr uint32_t kMaxSetsPerPool = 1024;
+	static constexpr uint32_t kMaxUbosPerPool = kMaxSetsPerPool * 6;
+	static constexpr uint32_t kMaxSampledImagesPerPool = 12288; // t0..t23 per draw
+	static constexpr uint32_t kMaxSamplersPerPool = 12288; // s0..s23 per draw
+	static constexpr uint32_t kMaxStoragePerPool = kMaxSetsPerPool * 28; // u0..u3 + t0..t23 space1 per set (StorageBuffer)
+	static constexpr uint32_t kMaxStorageImagesPerPool = 256; // u0..u3 per draw (StorageImage, e.g. TSP sky-map target)
 
-    VkDevice         m_device       { VK_NULL_HANDLE };
-    VkDescriptorPool m_pools[FRAME_COUNT] { };
-    std::vector<VkDescriptorPool> m_overflowPools[FRAME_COUNT];
-    uint32_t         m_overflowUsed[FRAME_COUNT] { };
-    uint32_t         m_currentFrame { 0 };
-    uint64_t         m_generation   { 1 };
+	VkDevice						m_device{ VK_NULL_HANDLE };
+	VkDescriptorPool				m_pools[FRAME_COUNT]{};
+	std::vector<VkDescriptorPool>	m_overflowPools[FRAME_COUNT];
+	uint32_t						m_overflowUsed[FRAME_COUNT]{};
+	uint32_t						m_currentFrame{ 0 };
+	uint64_t						m_generation{ 1 };
 
-    inline uint64_t Generation(void) const noexcept { return m_generation; }
+	inline uint64_t Generation(void) const
+	noexcept
+	{
+		return m_generation;
+	}
 
-    // Allocates one VkDescriptorPool per frame slot. Returns false on any vkCreateDescriptorPool failure.
-    bool Create(VkDevice device) noexcept;
+	// Allocates one VkDescriptorPool per frame slot. Returns false on any vkCreateDescriptorPool failure.
+	bool Create(VkDevice device)
+	noexcept;
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    // Called from CommandQueue::BeginFrame after fence-wait. Resets the current slot's pool so
-    // all sets allocated last cycle on this slot become invalid.
-    void BeginFrame(uint32_t frameIndex) noexcept;
+	// Called from CommandQueue::BeginFrame after fence-wait. Resets the current slot's pool so
+	// all sets allocated last cycle on this slot become invalid.
+	void BeginFrame(uint32_t frameIndex)
+	noexcept;
 
-    // Allocates one VkDescriptorSet with the given layout from the current slot's pool, or from a
-    // further one once that is exhausted. Returns VK_NULL_HANDLE only when no pool could be created
-    // (caller skips the draw).
-    VkDescriptorSet Allocate(VkDescriptorSetLayout layout) noexcept;
+	// Allocates one VkDescriptorSet with the given layout from the current slot's pool, or from a
+	// further one once that is exhausted. Returns VK_NULL_HANDLE only when no pool could be created
+	// (caller skips the draw).
+	VkDescriptorSet Allocate(VkDescriptorSetLayout layout)
+	noexcept;
 
-    inline VkDescriptorPool CurrentPool(void) const noexcept { return m_pools[m_currentFrame]; }
+	inline VkDescriptorPool CurrentPool(void) const
+	noexcept
+	{
+		return m_pools[m_currentFrame];
+	}
 
 private:
-    bool CreatePool(VkDescriptorPool& pool) noexcept;
-    VkDescriptorPool ActivePool(void) const noexcept;
-    VkDescriptorPool NextPool(void) noexcept;
+	bool CreatePool(VkDescriptorPool& pool)
+	noexcept;
+	VkDescriptorPool ActivePool(void) const
+	noexcept;
+	VkDescriptorPool NextPool(void)
+	noexcept;
 };
 
 #define descriptorPoolHandler DescriptorPoolHandler::Instance()

@@ -14,8 +14,8 @@
 // draws a white core with a cool-blue halo, additively into the dedicated glow buffer (HDR -> bloom).
 
 static const ShaderDataAttributes LightningQuadAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 static const String LightningDrawVS = String(R"(
@@ -199,14 +199,14 @@ float4 PSMain(PSInput i) : SV_Target {
 }
 )");
 
-const ShaderSource& LightningDrawShader() {
-    static const ShaderSource source(
-        "lightningDraw",
-        LightningDrawVS,
-        LightningDrawFS,
-        ShaderDataLayout(LightningQuadAttrs, 2)
-    );
-    return source;
+const ShaderSource& LightningDrawShader()
+{
+	static const ShaderSource source(
+		"lightningDraw",
+		LightningDrawVS,
+		LightningDrawFS,
+		ShaderDataLayout(LightningQuadAttrs, 2));
+	return source;
 }
 
 // =================================================================================================
@@ -322,14 +322,14 @@ float4 PSMain(PSInput i) : SV_Target {
 }
 )");
 
-const ShaderSource& LightningFlareShader() {
-    static const ShaderSource source(
-        "lightningFlare",
-        LightningFlareVS,
-        LightningFlareFS,
-        ShaderDataLayout(LightningQuadAttrs, 2)
-    );
-    return source;
+const ShaderSource& LightningFlareShader()
+{
+	static const ShaderSource source(
+		"lightningFlare",
+		LightningFlareVS,
+		LightningFlareFS,
+		ShaderDataLayout(LightningQuadAttrs, 2));
+	return source;
 }
 
 // =================================================================================================

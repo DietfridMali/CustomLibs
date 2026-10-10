@@ -4,9 +4,10 @@
 
 // =================================================================================================
 
-bool Billboard::Setup(String textureFolder, String iconName) {
-	List<String> filename = { iconName };
-	TextureList	texture = textureHandler.CreateStandardTextures(textureFolder, filename, {});
+bool Billboard::Setup(String textureFolder, String iconName)
+{
+	List<String>	filename = { iconName };
+	TextureList		texture = textureHandler.CreateStandardTextures(textureFolder, filename, {});
 	if (texture.IsEmpty())
 		return false;
 	m_icon = texture[0];
@@ -14,7 +15,8 @@ bool Billboard::Setup(String textureFolder, String iconName) {
 }
 
 
-void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float height, float offset) {
+void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float height, float offset)
+{
 	Vector3f u = p1 - p2;
 	u.Normalize();
 	Vector3f f = p1 - p0;
@@ -31,7 +33,8 @@ void Billboard::Update(Vector3f p0, Vector3f p1, Vector3f p2, float width, float
 }
 
 
-void  Billboard::Render(void) {
+void Billboard::Render(void)
+{
 	gfxStates.SetFaceCulling(0);
 	gfxStates.SetBlending(1);
 	//SetTransformations({ .centerOrigin = true });
@@ -39,4 +42,3 @@ void  Billboard::Render(void) {
 }
 
 // =================================================================================================
-

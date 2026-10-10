@@ -14,8 +14,8 @@ private:
 public:
 	union {
 		struct {
-			Vector3f	p0;
-			Vector3f	p1;
+			Vector3f p0;
+			Vector3f p1;
 		} pts;
 		std::array<Vector3f, 2> vec;
 	};
@@ -29,13 +29,13 @@ public:
 	}
 
 	inline void Refresh(void)
-		noexcept
+	noexcept
 	{
 		properties = pts.p1 - pts.p0;
 	}
 
 	void Init(Vector3f _p0 = Vector3f::ZERO, Vector3f _p1 = Vector3f::ZERO)
-		noexcept
+	noexcept
 	{
 		pts.p0 = _p0;
 		pts.p1 = _p1;
@@ -44,67 +44,69 @@ public:
 	}
 
 	inline Vector3f& Velocity(void)
-		noexcept
+	noexcept
 	{
 		return properties.velocity;
 	}
 
 	inline float Length(void)
-		noexcept
+	noexcept
 	{
 		return properties.length;
 	}
 
 	inline float LengthSquared(void)
-		noexcept
+	noexcept
 	{
 		return properties.length * properties.length;
 	}
 
 	inline Vector3f& Normal(void)
-		noexcept
+	noexcept
 	{
 		return properties.normal;
 	}
 
 	inline Movement& Properties(void)
-		noexcept
+	noexcept
 	{
 		return properties;
 	}
 
 	float Distance(const Vector3f& p)
-		noexcept;
+	noexcept;
 
 	float Project(const Vector3f& p, Vector3f& f)
-		noexcept;
+	noexcept;
 
 	int ComputeNearestPointsAt(const Vector3f& p, float radius, const Conversions::FloatInterval& limits)
-		noexcept;
+	noexcept;
 
 	inline Vector3f NearestPointAt(int i)
-		noexcept
+	noexcept
 	{
 		return (i < solutions) ? pts.p0 + Velocity() * offsets[i] : Vector3f::NONE;
 	}
 
 	float ComputeNearestPoints(LineSegment& other, LineSegment& nearestPoints)
-		noexcept;
+	noexcept;
 
-	int ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius, const Conversions::FloatInterval& limits)
-		noexcept;
+	int ComputeCapsuleIntersection(LineSegment& other, LineSegment& collisionPoints, float radius,
+								   const Conversions::FloatInterval& limits)
+	noexcept;
 
 	// compute t so that q = p0 + dir * t is the foot point of a perpendicular on p0,dir through p1
 	static inline float ScalarProjection(const Vector3f& p0, const Vector3f& p1, const Vector3f& dir)
-		noexcept
+	noexcept
 	{
 		float d = dir.Dot(dir);
 		return (d < Conversions::NumericTolerance) ? 0.0f : (p1 - p0).Dot(dir) / d;
 	}
 
 private:
-	bool CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits, float& tSel) const
-		noexcept;
+	bool CapCheckOnP(const Vector3f& c, const Vector3f& d, float dd, float radius, const Conversions::FloatInterval& limits,
+					 float& tSel) const
+	noexcept;
 };
 
 // =================================================================================================

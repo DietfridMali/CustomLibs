@@ -15,7 +15,7 @@
 #include "texturebuffer.h"
 
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #include "SDL.h"
 #include "SDL_image.h"
 #pragma warning(pop)
@@ -34,319 +34,379 @@
 
 class Texture;
 
-using TextureList  = List<Texture*>;
+using TextureList = List<Texture*>;
 using TextureArray = AutoArray<Texture*>;
 
 // =================================================================================================
 
 struct TextureCreationParams {
-    bool        premultiply{ false };
-    bool        flipVertically{ false };
-    bool        cartoonize{ false };
-    bool        isRequired{ true };
-    bool        isDisposable{ false };
-    bool        useMipMaps{ false };
-    eColorEncoding colorEncoding{ ecLinear };
-    uint16_t    blur{ 4 };
-    uint16_t    gradients{ 7 };
-    uint16_t    outline{ 4 };
-    String      keyDecoration{ "{}" };
+	bool			premultiply{ false };
+	bool			flipVertically{ false };
+	bool			cartoonize{ false };
+	bool			isRequired{ true };
+	bool			isDisposable{ false };
+	bool			useMipMaps{ false };
+	eColorEncoding	colorEncoding{ ecLinear };
+	uint16_t		blur{ 4 };
+	uint16_t		gradients{ 7 };
+	uint16_t		outline{ 4 };
+	String			keyDecoration{ "{}" };
 };
 
 // =================================================================================================
 
 class AbstractTexture {
 public:
-    virtual bool Create(void) = 0;
-    virtual void Destroy(void) = 0;
-    virtual bool IsAvailable(void) = 0;
-    virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
-    virtual void Release(void) = 0;
-    virtual void SetParams(bool forceUpdate = false) = 0;
-    virtual bool Deploy(int bufferIndex = 0) = 0;
-    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
+	virtual bool Create(void) = 0;
+	virtual void Destroy(void) = 0;
+	virtual bool IsAvailable(void) = 0;
+	virtual bool Bind(int tmuIndex, bool isDeploying = false) = 0;
+	virtual void Release(void) = 0;
+	virtual void SetParams(bool forceUpdate = false) = 0;
+	virtual bool Deploy(int bufferIndex = 0) = 0;
+	virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) = 0;
 };
 
 // =================================================================================================
 
-struct RenderOffsets { float x, y; };
-
-// =================================================================================================
-
-class Texture 
-    : public AbstractTexture
-{
-public:
-    // m_handle stores the SRV descriptor-heap index (UINT32_MAX = invalid).
-    // Named m_handle for source-level compatibility with existing assignment sites
-    // (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)).
-    uint32_t                    m_handle{ UINT32_MAX };
-    uint32_t                    m_ownedHandle{ UINT32_MAX };
-
-    ComPtr<ID3D12Resource>      m_resource;   // default-heap resource (D3D12_RESOURCE_DIMENSION_TEXTURE2D)
-    DXGI_FORMAT                 m_dxgiFormat{ DXGI_FORMAT_R8G8B8A8_UNORM };  // GPU format of m_resource + its SRV
-    String                      m_name;
-    List<TextureBuffer*>        m_buffers;
-    List<String>                m_filenames;
-    TextureType                 m_type{ TextureType::Texture2D };
-    int                         m_tmuIndex{ -1 };
-    GfxWrapMode                 m_wrapMode{ GfxWrapMode::Repeat };    // U axis - set through SetWrapping ()
-    GfxWrapMode                 m_wrapModeV{ GfxWrapMode::Repeat };   // V/W axis; differs only where asked for
-    int                         m_useMipMaps{ false };
-    eTextureCompression         m_compression{ tcNone };  // set from the DDS format at load; tcNone = uncompressed / PNG
-    eColorEncoding              m_colorEncoding{ ecLinear };
-    bool                        m_hasParams{ false };
-    bool                        m_isValid{ false };
-    bool                        m_isDeployed{ false };
-    bool                        m_isRenderTarget{ false };
-    bool                        m_isDisposable{ false };
-    TextureSampling             m_sampling;
-
-    static uint32_t             nullHandle;   // UINT32_MAX — matches OGL Texture::nullHandle usage
-
-    static inline AVLTree<String, Texture*> textureLUT;
-
-    static inline size_t CreateID(void) noexcept {
-        static size_t textureID = 0;
-        return ++textureID;
-    }
-
-    static int  CompareTextures(void* context, const String& k1, const String& k2);
-    static void SetupLUT(void) noexcept {
-        static bool needSetup = true;
-        if (needSetup) { textureLUT.SetComparator(&Texture::CompareTextures); needSetup = false; }
-    }
-    static inline bool UpdateLUT(int update = -1) {
-        static bool updateLUT = true;
-        if (update != -1) updateLUT = (update == 1);
-        return updateLUT;
-    }
-
-    explicit Texture(uint32_t handle = UINT32_MAX, TextureType type = TextureType::Texture2D, GfxWrapMode wrap = GfxWrapMode::Repeat);
-
-    ~Texture() noexcept;
-
-    inline void Register(String& name) {
-        m_name = name;
-        textureLUT.Insert(m_name, this);
-    }
-
-    Texture(const Texture& other) { 
-        Copy(other); 
-    }
-
-    Texture(Texture&& other) noexcept { 
-        Move(other); 
-    }
-
-    Texture& operator=(const Texture& other) { 
-        return Copy(other); 
-    }
-    Texture& operator=(Texture&& other) noexcept { 
-        return Move(other); 
-    }
-
-    Texture& Copy(const Texture& other);
-
-    Texture& Move(Texture& other) noexcept;
-
-    inline bool operator==(const Texture& o) const noexcept { 
-        return m_handle == o.m_handle; 
-    }
-
-    inline bool operator!=(const Texture& o) const noexcept { 
-        return m_handle != o.m_handle;
-    }
-
-    virtual bool Create(void) override;
-
-    bool CreateHandle(void);
-
-    bool AllocateHandle(void) noexcept;
-
-    void ReleaseResource(void) noexcept;
-
-    inline bool HasHandle(void) const noexcept {
-        return m_handle != UINT32_MAX;
-    }
-
-    virtual void Destroy(void) override;
-    
-    virtual bool IsAvailable(void) override;
-    
-    virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
-    
-    virtual void Release(void) override;
-    
-    virtual void SetParams(bool forceUpdate = false) override;
-
-    // The two halves of SetParams (), spelled the same in every backend: the default policy into
-    // m_sampling, and m_sampling to the API. Here the sampler is derived from m_sampling on every
-    // bind (samplerCache), so applying is nothing; OpenGL writes texture parameters there.
-    void DefaultSampling(void) noexcept;
-
-    inline void ApplySampling(void) noexcept {
-    }
-
-    virtual bool Deploy(int bufferIndex = 0) override;
-    
-    virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
-
-    inline bool Activate(int tmuIndex = 0) { 
-        return Bind(tmuIndex); 
-    }
-
-    inline void Deactivate(void) {
-        Release();
-    }
-
-    inline void Validate(bool isValid) noexcept {
-        m_isValid = isValid;
-    }
-
-    void SetWrapping(GfxWrapMode wrapMode) noexcept;
-
-    void SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV) noexcept;
-
-    bool Redeploy(void);
-
-    bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
-
-    bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
-    
-    void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
-
-    inline size_t TextureCount(void) noexcept { 
-        return m_buffers.Length(); 
-    }
-    
-    inline int GetWidth(int i = 0) noexcept { 
-        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width  : 0; 
-    }
-    
-    inline int GetHeight(int i = 0) noexcept { 
-        return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0; 
-    }
-    
-    inline uint8_t* GetData(int i = 0) { 
-        return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr; 
-    }
-    
-    inline TextureType Type(void) noexcept { 
-        return m_type; 
-    }
-    
-    inline GfxWrapMode  WrapMode(void) noexcept { 
-        return m_wrapMode; 
-    }
-    
-    inline String GetName(void) { 
-        return m_name; 
-    }
-
-    inline TextureType GetTextureType(void) const noexcept {
-        return m_type;
-    }
-
-    inline eTextureCompression GetCompression(void) noexcept {
-        return m_compression;
-    }
-
-    inline void SetColorEncoding(eColorEncoding colorEncoding) noexcept {
-        m_colorEncoding = colorEncoding;
-    }
-
-    inline eColorEncoding ColorEncoding(int bufferIndex = 0) noexcept {
-        if ((bufferIndex < m_buffers.Length()) and m_buffers[bufferIndex]->m_info.m_hasColorEncoding)
-            return m_buffers[bufferIndex]->m_info.m_colorEncoding;
-        return m_colorEncoding;
-    }
-
-    // API-neutral type setter. Common code (e.g. base_noisetexture) calls this; the OGL
-    // backend overrides it internally via TextureTypeToGLenum because OGL stores m_type as
-    // GLenum. Here it is a trivial assignment.
-    inline void SetType(TextureType t) noexcept {
-        m_type = t;
-    }
-
-    // Static release helpers — clear the slot in gfxStates.
-    template<TextureType typeID>
-    static inline void Release(int tmuIndex) noexcept {
-        if (tmuIndex >= 0)
-            gfxStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
-    }
-
-    inline bool IsRenderTarget(void) noexcept {
-        return m_isRenderTarget;
-    }
-
-    inline bool IsDeployed(void) const noexcept {
-        return m_isDeployed;
-    }
-
-    inline void Validate(void) noexcept {
-        m_isValid = true;
-        m_isDeployed = true;
-    }
-
-    inline void Invalidate(void) noexcept {
-        m_isValid = false;
-        m_isDeployed = false;
-    }
-
-    bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
-
-    bool CreateSRV(void);
-
-    static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth, int renderAreaHeight) noexcept;
+struct RenderOffsets {
+	float x, y;
 };
 
 // =================================================================================================
 
-class TiledTexture 
-    : public Texture
-{
+class Texture
+	: public AbstractTexture {
 public:
-    TiledTexture() 
-        : Texture(UINT32_MAX, TextureType::Texture2D, GfxWrapMode::Repeat) 
-    {}
-    ~TiledTexture() = default;
-    
-    virtual void SetParams(bool forceUpdate = false) override;
+	// m_handle stores the SRV descriptor-heap index (UINT32_MAX = invalid).
+	// Named m_handle for source-level compatibility with existing assignment sites
+	// (e.g. m_renderTexture.m_handle = renderTarget->BufferHandle(0)).
+	uint32_t m_handle{ UINT32_MAX };
+	uint32_t m_ownedHandle{ UINT32_MAX };
+
+	ComPtr<ID3D12Resource>	m_resource; // default-heap resource (D3D12_RESOURCE_DIMENSION_TEXTURE2D)
+	DXGI_FORMAT				m_dxgiFormat{ DXGI_FORMAT_R8G8B8A8_UNORM }; // GPU format of m_resource + its SRV
+	String					m_name;
+	List<TextureBuffer*>	m_buffers;
+	List<String>			m_filenames;
+	TextureType				m_type{ TextureType::Texture2D };
+	int						m_tmuIndex{ -1 };
+	GfxWrapMode				m_wrapMode{ GfxWrapMode::Repeat }; // U axis - set through SetWrapping ()
+	GfxWrapMode				m_wrapModeV{ GfxWrapMode::Repeat }; // V/W axis; differs only where asked for
+	int						m_useMipMaps{ false };
+	eTextureCompression		m_compression{ tcNone }; // set from the DDS format at load; tcNone = uncompressed / PNG
+	eColorEncoding			m_colorEncoding{ ecLinear };
+	bool					m_hasParams{ false };
+	bool					m_isValid{ false };
+	bool					m_isDeployed{ false };
+	bool					m_isRenderTarget{ false };
+	bool					m_isDisposable{ false };
+	TextureSampling			m_sampling;
+
+	static uint32_t nullHandle; // UINT32_MAX — matches OGL Texture::nullHandle usage
+
+	static inline AVLTree<String, Texture*> textureLUT;
+
+	static inline size_t CreateID(void)
+	noexcept
+	{
+		static size_t textureID = 0;
+		return ++textureID;
+	}
+
+	static int CompareTextures(void* context, const String& k1, const String& k2);
+	static void SetupLUT(void)
+	noexcept
+	{
+		static bool needSetup = true;
+		if (needSetup) {
+			textureLUT.SetComparator(&Texture::CompareTextures);
+			needSetup = false;
+		}
+	}
+	static inline bool UpdateLUT(int update = -1)
+	{
+		static bool updateLUT = true;
+		if (update != -1)
+			updateLUT = (update == 1);
+		return updateLUT;
+	}
+
+	explicit Texture(uint32_t handle = UINT32_MAX, TextureType type = TextureType::Texture2D, GfxWrapMode wrap = GfxWrapMode::Repeat);
+
+	~Texture()
+	noexcept;
+
+	inline void Register(String& name) {
+		m_name = name;
+		textureLUT.Insert(m_name, this);
+	}
+
+	Texture(const Texture& other) {
+		Copy(other);
+	}
+
+	Texture(Texture&& other)
+	noexcept
+	{
+		Move(other);
+	}
+
+	Texture& operator=(const Texture& other) {
+		return Copy(other);
+	}
+	Texture& operator=(Texture&& other)
+	noexcept
+	{
+		return Move(other);
+	}
+
+	Texture& Copy(const Texture& other);
+
+	Texture& Move(Texture& other)
+	noexcept;
+
+	inline bool operator==(const Texture& o) const
+	noexcept
+	{
+		return m_handle == o.m_handle;
+	}
+
+	inline bool operator!=(const Texture& o) const
+	noexcept
+	{
+		return m_handle != o.m_handle;
+	}
+
+	virtual bool Create(void) override;
+
+	bool CreateHandle(void);
+
+	bool AllocateHandle(void)
+	noexcept;
+
+	void ReleaseResource(void)
+	noexcept;
+
+	inline bool HasHandle(void) const
+	noexcept
+	{
+		return m_handle != UINT32_MAX;
+	}
+
+	virtual void Destroy(void) override;
+
+	virtual bool IsAvailable(void) override;
+
+	virtual bool Bind(int tmuIndex = 0, bool isDeploying = false) override;
+
+	virtual void Release(void) override;
+
+	virtual void SetParams(bool forceUpdate = false) override;
+
+	// The two halves of SetParams (), spelled the same in every backend: the default policy into
+	// m_sampling, and m_sampling to the API. Here the sampler is derived from m_sampling on every
+	// bind (samplerCache), so applying is nothing; OpenGL writes texture parameters there.
+	void DefaultSampling(void)
+	noexcept;
+
+	inline void ApplySampling(void)
+	noexcept
+	{
+	}
+
+	virtual bool Deploy(int bufferIndex = 0) override;
+
+	virtual bool Load(String& folder, List<String>& fileNames, const TextureCreationParams& params) override;
+
+	inline bool Activate(int tmuIndex = 0) {
+		return Bind(tmuIndex);
+	}
+
+	inline void Deactivate(void) {
+		Release();
+	}
+
+	inline void Validate(bool isValid)
+	noexcept
+	{
+		m_isValid = isValid;
+	}
+
+	void SetWrapping(GfxWrapMode wrapMode)
+	noexcept;
+
+	void SetWrapping(GfxWrapMode wrapU, GfxWrapMode wrapV)
+	noexcept;
+
+	bool Redeploy(void);
+
+	bool CreateFromFile(String folder, List<String>& fileNames, const TextureCreationParams& params);
+
+	bool CreateFromSurface(SDL_Surface* surface, const TextureCreationParams& params);
+
+	void Cartoonize(uint16_t blurStrength = 4, uint16_t gradients = 7, uint16_t outlinePasses = 4);
+
+	inline size_t TextureCount(void)
+	noexcept
+	{
+		return m_buffers.Length();
+	}
+
+	inline int GetWidth(int i = 0)
+	noexcept
+	{
+		return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_width : 0;
+	}
+
+	inline int GetHeight(int i = 0)
+	noexcept
+	{
+		return (i < m_buffers.Length()) ? m_buffers[i]->m_info.m_height : 0;
+	}
+
+	inline uint8_t* GetData(int i = 0) {
+		return (i < m_buffers.Length()) ? static_cast<uint8_t*>(m_buffers[i]->DataBuffer()) : nullptr;
+	}
+
+	inline TextureType Type(void)
+	noexcept
+	{
+		return m_type;
+	}
+
+	inline GfxWrapMode WrapMode(void)
+	noexcept
+	{
+		return m_wrapMode;
+	}
+
+	inline String GetName(void) {
+		return m_name;
+	}
+
+	inline TextureType GetTextureType(void) const
+	noexcept
+	{
+		return m_type;
+	}
+
+	inline eTextureCompression GetCompression(void)
+	noexcept
+	{
+		return m_compression;
+	}
+
+	inline void SetColorEncoding(eColorEncoding colorEncoding)
+	noexcept
+	{
+		m_colorEncoding = colorEncoding;
+	}
+
+	inline eColorEncoding ColorEncoding(int bufferIndex = 0)
+	noexcept
+	{
+		if ((bufferIndex < m_buffers.Length()) and m_buffers[bufferIndex]->m_info.m_hasColorEncoding)
+			return m_buffers[bufferIndex]->m_info.m_colorEncoding;
+		return m_colorEncoding;
+	}
+
+	// API-neutral type setter. Common code (e.g. base_noisetexture) calls this; the OGL
+	// backend overrides it internally via TextureTypeToGLenum because OGL stores m_type as
+	// GLenum. Here it is a trivial assignment.
+	inline void SetType(TextureType t)
+	noexcept
+	{
+		m_type = t;
+	}
+
+	// Static release helpers — clear the slot in gfxStates.
+	template <TextureType typeID>
+	static inline void Release(int tmuIndex)
+	noexcept
+	{
+		if (tmuIndex >= 0)
+			gfxStates.BindTexture(TextureTypeToGLenum(typeID), UINT32_MAX, tmuIndex);
+	}
+
+	inline bool IsRenderTarget(void)
+	noexcept
+	{
+		return m_isRenderTarget;
+	}
+
+	inline bool IsDeployed(void) const
+	noexcept
+	{
+		return m_isDeployed;
+	}
+
+	inline void Validate(void)
+	noexcept
+	{
+		m_isValid = true;
+		m_isDeployed = true;
+	}
+
+	inline void Invalidate(void)
+	noexcept
+	{
+		m_isValid = false;
+		m_isDeployed = false;
+	}
+
+	bool CreateTextureResource(int w, int h, int arraySize, int mipLevels = 1, DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM);
+
+	bool CreateSRV(void);
+
+	static RenderOffsets ComputeOffsets(int w, int h, int viewportWidth, int viewportHeight, int renderAreaWidth,
+										int renderAreaHeight)
+	noexcept;
+};
+
+// =================================================================================================
+
+class TiledTexture
+	: public Texture {
+public:
+	TiledTexture()
+		: Texture(UINT32_MAX, TextureType::Texture2D, GfxWrapMode::Repeat)
+	{}
+	~TiledTexture() = default;
+
+	virtual void SetParams(bool forceUpdate = false) override;
 };
 
 // =================================================================================================
 
 class RenderTargetTexture
-    : public Texture
-{
+	: public Texture {
 public:
-    // Set by the owning RenderTarget (RenderTarget::SetFiltering ()); SetParams () applies it.
-    GfxFilterMode   m_filtering{ GfxFilterMode::Linear };
+	// Set by the owning RenderTarget (RenderTarget::SetFiltering ()); SetParams () applies it.
+	GfxFilterMode m_filtering{ GfxFilterMode::Linear };
 
-    RenderTargetTexture() = default;
-    ~RenderTargetTexture();
-    virtual void SetParams(bool forceUpdate = false) override;
+	RenderTargetTexture() = default;
+	~RenderTargetTexture();
+	virtual void SetParams(bool forceUpdate = false) override;
 
-    // The resource and SRV index are owned by the wrapped RenderTarget's BufferInfo.
-    // Drop our shared reference / borrowed index here so the implicit ~Texture path's
-    // Texture::Destroy() sees null handles and is a no-op. ComPtr-RAII makes this
-    // functionally redundant in DX12 (refcount-shared resource is released safely
-    // either way), but the pattern is kept symmetric to the Vulkan / OpenGL paths.
-    virtual void Destroy(void) override;
+	// The resource and SRV index are owned by the wrapped RenderTarget's BufferInfo.
+	// Drop our shared reference / borrowed index here so the implicit ~Texture path's
+	// Texture::Destroy() sees null handles and is a no-op. ComPtr-RAII makes this
+	// functionally redundant in DX12 (refcount-shared resource is released safely
+	// either way), but the pattern is kept symmetric to the Vulkan / OpenGL paths.
+	virtual void Destroy(void) override;
 };
 
 // =================================================================================================
 
-class ShadowTexture : public Texture
-{
+class ShadowTexture : public Texture {
 public:
-    ShadowTexture() = default;
-    ~ShadowTexture();
-    virtual void SetParams(bool forceUpdate = false) override;
+	ShadowTexture() = default;
+	~ShadowTexture();
+	virtual void SetParams(bool forceUpdate = false) override;
 
-    // Same lifetime semantics as RenderTargetTexture.
-    virtual void Destroy(void) override;
+	// Same lifetime semantics as RenderTargetTexture.
+	virtual void Destroy(void) override;
 };
 
 // =================================================================================================

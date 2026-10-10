@@ -11,129 +11,136 @@
 
 // =================================================================================================
 
-class ArgValue 
-{
-    public:
-        using ArgumentList = List<ArgValue*>;
+class ArgValue {
+public:
+	using ArgumentList = List<ArgValue*>;
 
-        String          m_value;
-        ArgumentList*   m_subValues;
+	String			m_value;
+	ArgumentList*	m_subValues;
 
-        ArgValue() 
-            : m_value(""), m_subValues(nullptr)
-        { }
-       
-        ArgValue(const String& value, const char* delims = ";,:");
+	ArgValue()
+		: m_value("")
+		, m_subValues(nullptr)
+	{}
 
-        ArgValue(String&& value, const char* delims = ";,:");
+	ArgValue(const String& value, const char* delims = ";,:");
 
-        ArgValue(ArgValue const& other);
+	ArgValue(String&& value, const char* delims = ";,:");
 
-        ArgValue(ArgValue&& other) noexcept;
+	ArgValue(ArgValue const& other);
 
-        ~ArgValue () {
-            if (m_subValues) {
-				for (auto& v : *m_subValues)
-                    delete v;
-                delete m_subValues;
-                m_subValues = nullptr;
-            }
-        }
+	ArgValue(ArgValue&& other)
+	noexcept;
 
-        ArgValue& Move (ArgValue& other);
-            
-        ArgValue& operator= (ArgValue&& other) noexcept;
-                
-        ArgValue& operator= (ArgValue const& other);
+	~ArgValue()
+	{
+		if (m_subValues) {
+			for (auto& v : *m_subValues)
+				delete v;
+			delete m_subValues;
+			m_subValues = nullptr;
+		}
+	}
 
-        ArgValue& Copy (ArgValue const& other);
+	ArgValue& Move(ArgValue& other);
 
-        ArgumentList* Parse (const char* delims);
+	ArgValue& operator=(ArgValue&& other)
+	noexcept;
 
-        String& GetVal (int i);
+	ArgValue& operator=(ArgValue const& other);
+
+	ArgValue& Copy(ArgValue const& other);
+
+	ArgumentList* Parse(const char* delims);
+
+	String& GetVal(int i);
 };
 
 // =================================================================================================
 
-class Argument 
-{
-    public:
-        String      m_key;
-        ArgValue    m_values;
+class Argument {
+public:
+	String		m_key;
+	ArgValue	m_values;
 
-        Argument() = default;
+	Argument() = default;
 
-        Argument(const Argument&) = default; // Copy-Konstruktor
+	Argument(const Argument&) = default; // Copy-Konstruktor
 
-        Argument& operator=(const Argument&) = default; // Copy-Assignment
+	Argument& operator=(const Argument&) = default; // Copy-Assignment
 
-        Argument(Argument&& other) noexcept {
-            Move(other);
-        }
+	Argument(Argument&& other)
+	noexcept
+	{
+		Move(other);
+	}
 
-        String Create (String arg);
+	String Create(String arg);
 
-        String& GetVal (int i = 0);
+	String& GetVal(int i = 0);
 
-        Argument& operator=(Argument&& other) noexcept {
-            return Move(other);
-        }
+	Argument& operator=(Argument&& other)
+	noexcept
+	{
+		return Move(other);
+	}
 
-        Argument& Move (Argument& other) {
-            if (this != &other) {
-                m_key = std::move(other.m_key);
-                m_values = std::move(other.m_values);
-            }
-            return *this;
-        }
+	Argument& Move(Argument& other)
+	{
+		if (this != &other) {
+			m_key = std::move(other.m_key);
+			m_values = std::move(other.m_values);
+		}
+		return *this;
+	}
 };
 
 // =================================================================================================
 
 class ArgHandler
-    : public BaseSingleton<ArgHandler>
-{
+	: public BaseSingleton<ArgHandler> {
 public:
-    Dictionary<String, Argument>    m_argList;
+	Dictionary<String, Argument> m_argList;
 
-    ArgHandler() {
+	ArgHandler() {
 #if !(USE_STD || USE_STD_MAP)
-        m_argList.SetComparator(String::Compare);
+		m_argList.SetComparator(String::Compare);
 #endif
-    }
+	}
 
-    bool LineFilter(String& line);
+	bool LineFilter(String& line);
 
-    void Add(const String& arg);
+	void Add(const String& arg);
 
-    void Add(String&& arg) {
-        Add(static_cast<const String&>(arg));
-    }
+	void Add(String&& arg) {
+		Add(static_cast<const String&>(arg));
+	}
 
-    int LoadArgs(int argC, char** argV);
+	int LoadArgs(int argC, char** argV);
 
-    int LoadArgs(const char* fileName = "smileybattle.ini");
+	int LoadArgs(const char* fileName = "smileybattle.ini");
 
-    Argument* GetArg(const char* key);
+	Argument* GetArg(const char* key);
 
-    const String StrVal(const char* key, int i = 0, String defVal = String(""), bool onlyDebug = true);
+	const String StrVal(const char* key, int i = 0, String defVal = String(""), bool onlyDebug = true);
 
-    int IntVal(const char* key, int i = 0, int defVal = 0, bool onlyDebug = true);
+	int IntVal(const char* key, int i = 0, int defVal = 0, bool onlyDebug = true);
 
-    inline int IntValChecked(const char* key, int i = 0, int defVal = 0, int minVal = 0, int maxVal = 0, bool onlyDebug = true) {
-        int v = IntVal(key, i, defVal, onlyDebug);
-        return ((v >= minVal) and (v <= maxVal)) ? v : defVal;
-    }
+	inline int IntValChecked(const char* key, int i = 0, int defVal = 0, int minVal = 0, int maxVal = 0, bool onlyDebug = true) {
+		int v = IntVal(key, i, defVal, onlyDebug);
+		return ((v >= minVal) and (v <= maxVal)) ? v : defVal;
+	}
 
-    float FloatVal(const char* key, int i = 0, float defVal = 0.0f, bool onlyDebug = true);
+	float FloatVal(const char* key, int i = 0, float defVal = 0.0f, bool onlyDebug = true);
 
-    float FloatValChecked(const char* key, int i = 0, float defVal = 0.0f, float minVal = 0.0f, float maxVal = 0.0f, bool onlyDebug = true) {
-        float v = FloatVal(key, i, defVal, onlyDebug);
-        return ((v >= minVal) and (v <= maxVal)) ? v : defVal;
-    }
+	float FloatValChecked(const char* key, int i = 0, float defVal = 0.0f, float minVal = 0.0f, float maxVal = 0.0f, bool onlyDebug = true)
+	{
+		float v = FloatVal(key, i, defVal, onlyDebug);
+		return ((v >= minVal) and (v <= maxVal)) ? v : defVal;
+	}
 
-    bool BoolVal(const char* key, int i = 0, bool defVal = false, bool onlyDebug = true);
- };
+	bool BoolVal(const char* key, int i = 0, bool defVal = false, bool onlyDebug = true);
+};
 
 #define argHandler ArgHandler::Instance()
 

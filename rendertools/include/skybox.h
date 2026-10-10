@@ -12,15 +12,16 @@
 // =================================================================================================
 
 class Skybox
-	: public BaseSingleton<Skybox>
-{
+	: public BaseSingleton<Skybox> {
 private:
-	Cubemap* m_skyTextures[3][3] = { { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr }, { nullptr, nullptr, nullptr } };
-	CloudNoiseTexture* m_noiseTexture{ nullptr };
-	Texture* m_blueNoise{ nullptr };
-	Mesh* m_skybox{ nullptr };
-	int32_t	m_activationTime{ -1 };
-	String m_textureFolder;
+	Cubemap*			m_skyTextures[3][3] = { { nullptr, nullptr, nullptr },
+											   { nullptr, nullptr, nullptr },
+											   { nullptr, nullptr, nullptr } };
+	CloudNoiseTexture*	m_noiseTexture{ nullptr };
+	Texture*			m_blueNoise{ nullptr };
+	Mesh*				m_skybox{ nullptr };
+	int32_t				m_activationTime{ -1 };
+	String				m_textureFolder;
 
 public:
 	Skybox() = default;
@@ -31,7 +32,8 @@ public:
 	// 0 asks for the largest set the GPU can hold, which is what Paintjob Rampage wants; an application
 	// that ships only one size says so and gets that one (d2x-xl: 2048). It is a CAP, not a demand -
 	// a GPU that cannot hold that much still gets the next size down.
-	bool Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture = nullptr, Texture* blueNoise = nullptr, int maxTextureSize = 0);
+	bool Setup(const String& textureFolder, CloudNoiseTexture* noiseTexture = nullptr, Texture* blueNoise = nullptr,
+			   int maxTextureSize = 0);
 
 	// Releases the cube maps and the cube, so that Setup () can run again. Needed by any application
 	// that can lose its textures while running (d2x-xl throws all of them away on a video mode change);
@@ -41,25 +43,35 @@ public:
 
 	bool ApplyKuwaharaFilter(int32_t skyType, const KuwaharaFilter::Params& params, const String& suffix, const String& sourceFolder);
 
-	inline int FaceSize(void) noexcept {
+	inline int FaceSize(void)
+	noexcept
+	{
 		return (m_skyTextures[0][0] != nullptr) ? m_skyTextures[0][0]->GetWidth() : 0;
 	}
 
 	bool Render(int32_t skyType, Matrix4f& view, Vector3f lightDirection, float brightness, int32_t currentTime);
 
-	inline bool IsAvailable(void) const noexcept {
+	inline bool IsAvailable(void) const
+	noexcept
+	{
 		return (m_skybox != nullptr);
 	}
 
-	inline void FadeIn(uint32_t t) noexcept {
+	inline void FadeIn(uint32_t t)
+	noexcept
+	{
 		m_activationTime = t;
 	}
 
-	inline bool HasNightSky(int32_t i) noexcept {
+	inline bool HasNightSky(int32_t i)
+	noexcept
+	{
 		return (i == 0) ? false : m_skyTextures[(i == 3) ? 1 : i][0] != nullptr;
 	}
 
-	inline Cubemap* SkyTexture(int32_t skyType, int32_t variant) noexcept {
+	inline Cubemap* SkyTexture(int32_t skyType, int32_t variant)
+	noexcept
+	{
 		if (not HasNightSky(skyType))
 			skyType = 0;
 		else if (skyType == 3)

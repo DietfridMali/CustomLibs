@@ -5,19 +5,19 @@
 #pragma once
 
 #ifndef NOMINMAX
-#	define NOMINMAX
+#define NOMINMAX
 #endif
 
 #if (USE_STD || USE_STD_VECTOR)
 
-#	include <vector>
-#	include <algorithm>
-#	include <utility>
-#	include "std_array.hpp"
+#include <vector>
+#include <algorithm>
+#include <utility>
+#include "std_array.hpp"
 
 #else
 
-#	include "custom_array.hpp"
+#include "custom_array.hpp"
 
 #endif //USE_STD_VECTOR
 
@@ -37,110 +37,226 @@
 template <typename DATA_T, size_t CAPACITY>
 class StaticArray {
 private:
-    std::array<DATA_T, CAPACITY> m_array{};
-    int32_t                      m_length{ static_cast<int32_t>(CAPACITY) };
-    std::string                  m_name;
+	std::array<DATA_T, CAPACITY>	m_array{};
+	int32_t							m_length{ static_cast<int32_t>(CAPACITY) };
+	std::string						m_name;
 
 public:
-    using value_type = DATA_T;
+	using value_type = DATA_T;
 
-    StaticArray() = default;
+	StaticArray() = default;
 
-    StaticArray(std::initializer_list<DATA_T> data) {
-        m_length = static_cast<int32_t>((data.size() < CAPACITY) ? data.size() : CAPACITY);
-        std::copy_n(data.begin(), static_cast<size_t>(m_length), m_array.begin());
-    }
+	StaticArray(std::initializer_list<DATA_T> data) {
+		m_length = static_cast<int32_t>((data.size() < CAPACITY) ? data.size() : CAPACITY);
+		std::copy_n(data.begin(), static_cast<size_t>(m_length), m_array.begin());
+	}
 
-    // ---- AutoArray-style interface (capitalized) ----
-    inline int32_t Length(void) const noexcept { return m_length; }
-    inline int32_t Capacity(void) const noexcept { return static_cast<int32_t>(CAPACITY); }
-    inline int32_t Size(void) const noexcept { return m_length * static_cast<int32_t>(sizeof(DATA_T)); }
-    inline bool IsEmpty(void) const noexcept { return m_length == 0; }
+	// ---- AutoArray-style interface (capitalized) ----
+	inline int32_t Length(void) const
+	noexcept
+	{
+		return m_length;
+	}
+	inline int32_t Capacity(void) const
+	noexcept
+	{
+		return static_cast<int32_t>(CAPACITY);
+	}
+	inline int32_t Size(void) const
+	noexcept
+	{
+		return m_length * static_cast<int32_t>(sizeof(DATA_T));
+	}
+	inline bool IsEmpty(void) const
+	noexcept
+	{
+		return m_length == 0;
+	}
 
-    inline DATA_T* Data(int32_t i = 0) noexcept { return m_array.data() + i; }
-    inline const DATA_T* Data(int32_t i = 0) const noexcept { return m_array.data() + i; }
-    inline DATA_T* DataPtr(int32_t i = 0) noexcept { return m_array.data() + i; }
-    inline const DATA_T* DataPtr(int32_t i = 0) const noexcept { return m_array.data() + i; }
-    inline DATA_T* Buffer(int32_t i = 0) noexcept { return m_array.data() + i; }
-    inline const DATA_T* Buffer(int32_t i = 0) const noexcept { return m_array.data() + i; }
+	inline DATA_T* Data(int32_t i = 0)
+	noexcept
+	{
+		return m_array.data() + i;
+	}
+	inline const DATA_T* Data(int32_t i = 0) const
+	noexcept
+	{
+		return m_array.data() + i;
+	}
+	inline DATA_T* DataPtr(int32_t i = 0)
+	noexcept
+	{
+		return m_array.data() + i;
+	}
+	inline const DATA_T* DataPtr(int32_t i = 0) const
+	noexcept
+	{
+		return m_array.data() + i;
+	}
+	inline DATA_T* Buffer(int32_t i = 0)
+	noexcept
+	{
+		return m_array.data() + i;
+	}
+	inline const DATA_T* Buffer(int32_t i = 0) const
+	noexcept
+	{
+		return m_array.data() + i;
+	}
 
-    inline DATA_T* operator+(int32_t i) noexcept { return m_array.data() + i; }
-    inline const DATA_T* operator+(int32_t i) const noexcept { return m_array.data() + i; }
+	inline DATA_T* operator+(int32_t i)
+	noexcept
+	{
+		return m_array.data() + i;
+	}
+	inline const DATA_T* operator+(int32_t i) const
+	noexcept
+	{
+		return m_array.data() + i;
+	}
 
-    // The reallocate flag exists so a call can be written the same way for both array types. A
-    // StaticArray owns its elements for its entire lifetime and never allocates, so there is nothing
-    // to release and rebuild here - see AutoArray::Create ().
-    inline DATA_T* Create(int32_t length = static_cast<int32_t>(CAPACITY), const char* = nullptr, bool = false) noexcept {
-        m_length = (length < static_cast<int32_t>(CAPACITY)) ? length : static_cast<int32_t>(CAPACITY);
-        return m_array.data();
-    }
-    inline void Destroy(void) noexcept { m_length = 0; }
+	// The reallocate flag exists so a call can be written the same way for both array types. A
+	// StaticArray owns its elements for its entire lifetime and never allocates, so there is nothing
+	// to release and rebuild here - see AutoArray::Create ().
+	inline DATA_T* Create(int32_t length = static_cast<int32_t>(CAPACITY), const char* = nullptr, bool = false)
+	noexcept
+	{
+		m_length = (length < static_cast<int32_t>(CAPACITY)) ? length : static_cast<int32_t>(CAPACITY);
+		return m_array.data();
+	}
+	inline void Destroy(void)
+	noexcept
+	{
+		m_length = 0;
+	}
 
-    inline void Clear(uint8_t filler = 0) noexcept {
-        if constexpr (std::is_trivial_v<DATA_T>)
-            memset(m_array.data(), filler, CAPACITY * sizeof(DATA_T));
-        else
-            m_array.fill(DATA_T{});
-    }
-    inline void Fill(const DATA_T& value) noexcept { m_array.fill(value); }
+	inline void Clear(uint8_t filler = 0)
+	noexcept
+	{
+		if constexpr (std::is_trivial_v<DATA_T>)
+			memset(m_array.data(), filler, CAPACITY * sizeof(DATA_T));
+		else
+			m_array.fill(DATA_T{});
+	}
+	inline void Fill(const DATA_T& value)
+	noexcept
+	{
+		m_array.fill(value);
+	}
 
-    inline void SetName(const char* name) { m_name = name ? name : ""; }
-    inline const std::string& GetName(void) const noexcept { return m_name; }
+	inline void SetName(const char* name) {
+		m_name = name ? name : "";
+	}
+	inline const std::string& GetName(void) const
+	noexcept
+	{
+		return m_name;
+	}
 
-    inline uint32_t Index(const DATA_T* elem) const noexcept { return static_cast<uint32_t>(elem - m_array.data()); }
+	inline uint32_t Index(const DATA_T* elem) const
+	noexcept
+	{
+		return static_cast<uint32_t>(elem - m_array.data());
+	}
 
-    // Non owning view of [offset, offset + count), count < 0 = up to the last element.
-    // Sorting or writing through the span acts on this array's elements; the span becomes
-    // invalid when the array is destroyed.
-    inline std::span<DATA_T> Span(int32_t offset = 0, int32_t count = -1) noexcept {
-        int32_t length = Length();
-        if ((offset < 0) or (offset > length))
-            return {};
-        if ((count < 0) or (count > length - offset))
-            count = length - offset;
-        return std::span<DATA_T>(m_array.data() + offset, static_cast<size_t>(count));
-    }
+	// Non owning view of [offset, offset + count), count < 0 = up to the last element.
+	// Sorting or writing through the span acts on this array's elements; the span becomes
+	// invalid when the array is destroyed.
+	inline std::span<DATA_T> Span(int32_t offset = 0, int32_t count = -1)
+	noexcept
+	{
+		int32_t length = Length();
+		if ((offset < 0) or (offset > length))
+			return {};
+		if ((count < 0) or (count > length - offset))
+			count = length - offset;
+		return std::span<DATA_T>(m_array.data() + offset, static_cast<size_t>(count));
+	}
 
-    inline std::span<const DATA_T> Span(int32_t offset = 0, int32_t count = -1) const noexcept {
-        int32_t length = Length();
-        if ((offset < 0) or (offset > length))
-            return {};
-        if ((count < 0) or (count > length - offset))
-            count = length - offset;
-        return std::span<const DATA_T>(m_array.data() + offset, static_cast<size_t>(count));
-    }
+	inline std::span<const DATA_T> Span(int32_t offset = 0, int32_t count = -1) const
+	noexcept
+	{
+		int32_t length = Length();
+		if ((offset < 0) or (offset > length))
+			return {};
+		if ((count < 0) or (count > length - offset))
+			count = length - offset;
+		return std::span<const DATA_T>(m_array.data() + offset, static_cast<size_t>(count));
+	}
 
-    // CFile-style block I/O (FILE_T resolved at the call site; same contract as AutoArray::Read/Write)
-    template <typename FILE_T>
-    size_t Read(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
-        uint32_t len = static_cast<uint32_t>(Length());
-        if ((len == 0) or (nOffset >= len))
-            return static_cast<size_t>(-1);
-        if ((nCount == 0) or (nCount > len - nOffset))
-            nCount = len - nOffset;
-        return cf.Read(Data(static_cast<int32_t>(nOffset)), sizeof(DATA_T), nCount, bCompressed);
-    }
+	// CFile-style block I/O (FILE_T resolved at the call site; same contract as AutoArray::Read/Write)
+	template <typename FILE_T>
+	size_t Read(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0)
+	{
+		uint32_t len = static_cast<uint32_t>(Length());
+		if ((len == 0) or (nOffset >= len))
+			return static_cast<size_t>(-1);
+		if ((nCount == 0) or (nCount > len - nOffset))
+			nCount = len - nOffset;
+		return cf.Read(Data(static_cast<int32_t>(nOffset)), sizeof(DATA_T), nCount, bCompressed);
+	}
 
-    template <typename FILE_T>
-    size_t Write(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0) {
-        uint32_t len = static_cast<uint32_t>(Length());
-        if ((len == 0) or (nOffset >= len))
-            return static_cast<size_t>(-1);
-        if ((nCount == 0) or (nCount > len - nOffset))
-            nCount = len - nOffset;
-        return cf.Write(Data(static_cast<int32_t>(nOffset)), sizeof(DATA_T), nCount, bCompressed);
-    }
+	template <typename FILE_T>
+	size_t Write(FILE_T& cf, uint32_t nCount = 0, uint32_t nOffset = 0, int32_t bCompressed = 0)
+	{
+		uint32_t len = static_cast<uint32_t>(Length());
+		if ((len == 0) or (nOffset >= len))
+			return static_cast<size_t>(-1);
+		if ((nCount == 0) or (nCount > len - nOffset))
+			nCount = len - nOffset;
+		return cf.Write(Data(static_cast<int32_t>(nOffset)), sizeof(DATA_T), nCount, bCompressed);
+	}
 
-    // ---- std::array-style interface (rendertools / Smiley-Battle) ----
-    inline DATA_T& operator[](size_t i) noexcept { return m_array[i]; }
-    inline const DATA_T& operator[](size_t i) const noexcept { return m_array[i]; }
-    inline size_t size(void) const noexcept { return CAPACITY; }
-    inline DATA_T* data(void) noexcept { return m_array.data(); }
-    inline const DATA_T* data(void) const noexcept { return m_array.data(); }
-    inline DATA_T& front(void) noexcept { return m_array.front(); }
-    inline DATA_T& back(void) noexcept { return m_array.back(); }
-    inline auto begin(void) noexcept { return m_array.begin(); }
-    inline auto end(void) noexcept { return m_array.end(); }
-    inline auto begin(void) const noexcept { return m_array.begin(); }
-    inline auto end(void) const noexcept { return m_array.end(); }
+	// ---- std::array-style interface (rendertools / Smiley-Battle) ----
+	inline DATA_T& operator[](size_t i) noexcept {
+		return m_array[i];
+	}
+	inline const DATA_T& operator[](size_t i) const noexcept {
+		return m_array[i];
+	}
+	inline size_t size(void) const
+	noexcept
+	{
+		return CAPACITY;
+	}
+	inline DATA_T* data(void)
+	noexcept
+	{
+		return m_array.data();
+	}
+	inline const DATA_T* data(void) const
+	noexcept
+	{
+		return m_array.data();
+	}
+	inline DATA_T& front(void)
+	noexcept
+	{
+		return m_array.front();
+	}
+	inline DATA_T& back(void)
+	noexcept
+	{
+		return m_array.back();
+	}
+	inline auto begin(void)
+	noexcept
+	{
+		return m_array.begin();
+	}
+	inline auto end(void)
+	noexcept
+	{
+		return m_array.end();
+	}
+	inline auto begin(void) const
+	noexcept
+	{
+		return m_array.begin();
+	}
+	inline auto end(void) const
+	noexcept
+	{
+		return m_array.end();
+	}
 };

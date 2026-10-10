@@ -16,7 +16,7 @@
 
 // ------------------------------------------------------------------
 // Return sizeof of data type with name typeName
-static comparatorDescriptor_t* get_type_descriptor(char* typeName) 
+static comparatorDescriptor_t* get_type_descriptor(char* typeName)
 {
 	for (comparatorDescriptor_t* p = comparatorDescriptors; p->typeName != NULL; p++)
 		if (!strcmp(p->typeName, typeName))
@@ -26,7 +26,7 @@ static comparatorDescriptor_t* get_type_descriptor(char* typeName)
 
 // ------------------------------------------------------------------
 // Return sizeof of data type with name typeName
-static size_t get_type_index(char* typeName) 
+static size_t get_type_index(char* typeName)
 {
 	comparatorDescriptor_t* p = get_type_descriptor(typeName);
 	return (p ? p - comparatorDescriptors : 0);
@@ -34,7 +34,7 @@ static size_t get_type_index(char* typeName)
 
 // ------------------------------------------------------------------
 // Return sizeof of data type with name typeName
-static size_t get_type_size(char* typeName) 
+static size_t get_type_size(char* typeName)
 {
 	comparatorDescriptor_t* p = get_type_descriptor(typeName);
 	return (p ? p->typeSize : 0);
@@ -74,7 +74,7 @@ listDescriptor_t* create_list(size_t capacity, char* typeName, int typeSize, val
 // ------------------------------------------------------------------
 // Copy values into the list's value buffer
 // Alternatively, just set pList->value = values if no copy is needed
-bool populate_list(listDescriptor_t* pList, void* values) 
+bool populate_list(listDescriptor_t* pList, void* values)
 {
 	if (!list_is_valid(pList)) {
 		return false;
@@ -85,7 +85,7 @@ bool populate_list(listDescriptor_t* pList, void* values)
 
 // ------------------------------------------------------------------
 // Free list descriptor and value buffer
-void release_list(listDescriptor_t* pList) 
+void release_list(listDescriptor_t* pList)
 {
 	if (pList) {
 		if (pList->value) {
@@ -97,7 +97,7 @@ void release_list(listDescriptor_t* pList)
 
 // ------------------------------------------------------------------
 // Determine whether the list descriptor has been properly initialized
-bool list_is_valid(listDescriptor_t* pList) 
+bool list_is_valid(listDescriptor_t* pList)
 {
 	return (pList && pList->value && pList->typeSize && pList->comparator);
 }
@@ -107,12 +107,12 @@ bool list_is_valid(listDescriptor_t* pList)
 // return -1 if not present in the list
 // *pTerminator points at a value that is used to indicate the end of the list
 // So the last element of a list must contain that value
-int get_list_index (listDescriptor_t* pList, const void* pValue, const void* pTerminator) 
+int get_list_index(listDescriptor_t* pList, const void* pValue, const void* pTerminator)
 {
-	if (list_is_valid (pList)) {
+	if (list_is_valid(pList)) {
 		for (char* p = (char*)pList->value; pList->comparator(p, pTerminator); p += pList->typeSize) {
 			if (!pList->comparator(p, pValue)) {
-				return (int) ((p - (char*)pList->value) / pList->typeSize);
+				return (int)((p - (char*)pList->value) / pList->typeSize);
 			}
 		}
 	}

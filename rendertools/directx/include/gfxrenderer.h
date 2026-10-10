@@ -26,78 +26,90 @@
 // (SetupOpenGL → SetupDX12 internally, but callers still see SetupOpenGL for now).
 
 class GfxRenderer
-    : public BaseRenderer
-{
+	: public BaseRenderer {
 private:
-    CommandList*    m_cmdList{ nullptr };
-    CommandList*    m_temporaryList{ nullptr };
-    uint64_t        m_temporaryExecution{ 0 };
+	CommandList*	m_cmdList{ nullptr };
+	CommandList*	m_temporaryList{ nullptr };
+	uint64_t		m_temporaryExecution{ 0 };
 
 protected:
-    ::RenderStates  m_renderStates;
+	::RenderStates m_renderStates;
 
 public:
-    virtual ~GfxRenderer() {
-    }
+	virtual ~GfxRenderer() {
+	}
 
-    GfxRenderer() 
-        : BaseRenderer()
-    {
-        _instance = this;
-        m_frontFace = GfxOperations::CullFace::Front;
-        m_backFace = GfxOperations::CullFace::Back;
-        gfxApiType = BaseRenderer::GfxApiType::DirectX;
+	GfxRenderer()
+		: BaseRenderer()
+	{
+		_instance = this;
+		m_frontFace = GfxOperations::CullFace::Front;
+		m_backFace = GfxOperations::CullFace::Back;
+		gfxApiType = BaseRenderer::GfxApiType::DirectX;
+	}
 
-    }
+	static GfxRenderer& Instance(void) {
+		return dynamic_cast<GfxRenderer&>(PolymorphSingleton::Instance());
+	}
 
-    static GfxRenderer& Instance(void) {
-        return dynamic_cast<GfxRenderer&>(PolymorphSingleton::Instance());
-    }
+	virtual bool InitGraphics(const GfxFeatureRequest& request = {}) override;
 
-    virtual bool InitGraphics(const GfxFeatureRequest& request = {}) override;
+	virtual void* StartOperation(String name = "", bool piggyback = true)
+	noexcept override;
 
-    virtual void* StartOperation(String name = "", bool piggyback = true) noexcept override;
+	virtual bool StartOperation(void** cl, String name = "", bool piggyback = true)
+	noexcept override
+	{
+		*cl = StartOperation(name, piggyback);
+		return *cl != nullptr;
+	}
 
-    virtual bool StartOperation(void** cl, String name = "", bool piggyback = true) noexcept override {
-        *cl = StartOperation(name, piggyback);
-        return *cl != nullptr;
-    }
+	virtual bool FinishOperation(void* cl, bool flush = false)
+	noexcept override;
 
-    virtual bool FinishOperation(void* cl, bool flush = false) noexcept override;
+	virtual void FlushResources(void)
+	noexcept override;
 
-    virtual void FlushResources(void) noexcept override;
+	virtual void Cleanup(void)
+	noexcept override;
 
-    virtual void Cleanup(void) noexcept override;
+	virtual void LoadPipelineCache(const String& shaderFolder) override;
 
-    virtual void LoadPipelineCache(const String& shaderFolder) override;
+	virtual void SavePipelineCache(void) override;
 
-    virtual void SavePipelineCache(void) override;
+	virtual void PrecreatePipelines(void) override;
 
-    virtual void PrecreatePipelines(void) override;
+	virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
 
-    virtual void DrawScreen(bool bRotate, bool bFlipVertically) override;
+	// The presented picture as packed RGBA8, bottom row first (the OpenGL convention, so every
+	// backend hands out the same thing): the current swap chain back buffer, copied through a
+	// readback heap. width/height of 0 mean the whole back buffer; a rectangle is (x, y) from the
+	// bottom left, and the destination needs width * height * 4 bytes.
+	bool ReadBuffer(void* buffer, size_t bufferSize, int x = 0, int y = 0, int width = 0, int height = 0);
 
-    // The presented picture as packed RGBA8, bottom row first (the OpenGL convention, so every
-    // backend hands out the same thing): the current swap chain back buffer, copied through a
-    // readback heap. width/height of 0 mean the whole back buffer; a rectangle is (x, y) from the
-    // bottom left, and the destination needs width * height * 4 bytes.
-    bool ReadBuffer(void* buffer, size_t bufferSize, int x = 0, int y = 0, int width = 0, int height = 0);
+	inline void Draw3DScene(void)
+	noexcept
+	{
+		return BaseRenderer::Draw3DScene(false);
+	}
 
-    inline void Draw3DScene(void) noexcept {
-        return BaseRenderer::Draw3DScene(false);
-    }
+	inline ::RenderStates& RenderStates(void)
+	noexcept
+	{
+		return m_renderStates;
+	}
 
-    inline ::RenderStates& RenderStates(void) noexcept {
-        return m_renderStates;
-    }
+	inline void SetGeometryFrontFace(void)
+	noexcept
+	{
+		gfxStates.FrontFace(GfxOperations::Winding::Regular);
+	}
 
-    inline void SetGeometryFrontFace(void) noexcept {
-        gfxStates.FrontFace(GfxOperations::Winding::Regular);
-    }
-
-    inline void SetShadowFrontFace(void) noexcept {
-        gfxStates.FrontFace(GfxOperations::Winding::Reverse);
-    }
+	inline void SetShadowFrontFace(void)
+	noexcept
+	{
+		gfxStates.FrontFace(GfxOperations::Winding::Reverse);
+	}
 };
 
 #define baseRenderer GfxRenderer::Instance()

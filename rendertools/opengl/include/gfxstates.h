@@ -26,31 +26,34 @@
 // DirectX / Vulkan gfxstates.h so common code can resolve a single TextureType value into the
 // per-backend native binding tag.
 
-inline GLenum TextureTypeToGLenum(TextureType t) noexcept {
-    switch (t) {
-        case TextureType::Texture3D:
-            return GL_TEXTURE_3D;
-        case TextureType::CubeMap:
-            return GL_TEXTURE_CUBE_MAP;
-        case TextureType::Texture2DArray:
-            return GL_TEXTURE_2D_ARRAY;
-        case TextureType::Texture2D:
-        default:
-            return GL_TEXTURE_2D;
-    }
+inline GLenum TextureTypeToGLenum(TextureType t)
+noexcept
+{
+	switch (t) {
+		case TextureType::Texture3D:
+			return GL_TEXTURE_3D;
+		case TextureType::CubeMap:
+			return GL_TEXTURE_CUBE_MAP;
+		case TextureType::Texture2DArray:
+			return GL_TEXTURE_2D_ARRAY;
+		case TextureType::Texture2D:
+		default:
+			return GL_TEXTURE_2D;
+	}
 }
 
 // =================================================================================================
 
 class TextureSlotInfo {
 private:
-	GLenum m_type{ GL_TEXTURE_2D };
-	GLint m_tmuCount{ 0 };
-	GLint m_maxUsedTMU{ 0 };
-	AutoArray<GLuint> m_bindings;
+	GLenum				m_type{ GL_TEXTURE_2D };
+	GLint				m_tmuCount{ 0 };
+	GLint				m_maxUsedTMU{ 0 };
+	AutoArray<GLuint>	m_bindings;
 
 public:
-	TextureSlotInfo(GLenum type = 0) {
+	TextureSlotInfo(GLenum type = 0)
+	{
 		glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_tmuCount);
 		m_bindings.Resize(m_tmuCount);
 		m_bindings.Fill(0);
@@ -58,17 +61,23 @@ public:
 		m_maxUsedTMU = 0;
 	}
 
-	int Find(GLuint handle, int tmuIndex = -1) noexcept;
+	int Find(GLuint handle, int tmuIndex = -1)
+	noexcept;
 	int Bind(GLuint handle, int tmuIndex);
 	bool Release(GLuint handle, int tmuIndex);
 
-	inline GLenum GetType(void) const noexcept {
+	inline GLenum GetType(void) const
+	noexcept
+	{
 		return m_type;
 	}
 
-	bool Update(GLuint handle, int tmuIndex) noexcept;
+	bool Update(GLuint handle, int tmuIndex)
+	noexcept;
 
-	inline GLuint Query(int tmuIndex) const noexcept {
+	inline GLuint Query(int tmuIndex) const
+	noexcept
+	{
 		return ((tmuIndex >= 0) and (tmuIndex < m_maxUsedTMU)) ? m_bindings[tmuIndex] : 0;
 	}
 };
@@ -77,46 +86,64 @@ public:
 // GfxOperations → GLenum conversion (OpenGL backend)
 
 namespace GfxToGL {
-	using namespace GfxOperations;
+using namespace GfxOperations;
 
-	inline GLenum ToGLenum(CompareFunc f) noexcept {
-		GLenum lut[] = { GL_NEVER, GL_LESS, GL_EQUAL, GL_LEQUAL, GL_GREATER, GL_NOTEQUAL, GL_GEQUAL, GL_ALWAYS, GL_LEQUAL };
-		return lut[int(f)];
-	}
+inline GLenum ToGLenum(CompareFunc f)
+noexcept
+{
+	GLenum lut[] = { GL_NEVER, GL_LESS, GL_EQUAL, GL_LEQUAL, GL_GREATER, GL_NOTEQUAL, GL_GEQUAL, GL_ALWAYS, GL_LEQUAL };
+	return lut[int(f)];
+}
 
-	inline GLenum ToGLenum(BlendFactor f) noexcept {
-		GLenum lut[] = { GL_ZERO, GL_ONE, GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA, GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR };
-		return lut[int(f)];
-	}
+inline GLenum ToGLenum(BlendFactor f)
+noexcept
+{
+	GLenum lut[] = { GL_ZERO, GL_ONE,
+					 GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR,
+					 GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
+					 GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA,
+					 GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR };
+	return lut[int(f)];
+}
 
-	inline GLenum ToGLenum(BlendOp op) noexcept {
-		GLenum lut[] = { GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT, GL_MIN, GL_MAX };
-		return lut[int(op)];
-	}
+inline GLenum ToGLenum(BlendOp op)
+noexcept
+{
+	GLenum lut[] = { GL_FUNC_ADD, GL_FUNC_SUBTRACT, GL_FUNC_REVERSE_SUBTRACT, GL_MIN, GL_MAX };
+	return lut[int(op)];
+}
 
-	inline GLenum ToGLenum(CullFace c) noexcept {
-		GLenum lut[] = { GL_FRONT, GL_BACK, GL_FRONT_AND_BACK };
-		return lut[int(c)];
-	}
+inline GLenum ToGLenum(CullFace c)
+noexcept
+{
+	GLenum lut[] = { GL_FRONT, GL_BACK, GL_FRONT_AND_BACK };
+	return lut[int(c)];
+}
 
-	inline GLenum ToGLenum(Winding w) noexcept {
-		return (w == Winding::Regular) ? GL_CW : GL_CCW;
-	}
+inline GLenum ToGLenum(Winding w)
+noexcept
+{
+	return (w == Winding::Regular) ? GL_CW : GL_CCW;
+}
 
-	inline GLenum ToGLenum(StencilOp op) noexcept {
-		GLenum lut[] = { GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_DECR, GL_INCR_WRAP, GL_DECR_WRAP };
-		return lut[int(op)];
-	}
+inline GLenum ToGLenum(StencilOp op)
+noexcept
+{
+	GLenum lut[] = { GL_KEEP, GL_ZERO, GL_REPLACE, GL_INCR, GL_DECR, GL_INCR_WRAP, GL_DECR_WRAP };
+	return lut[int(op)];
+}
 
-	inline GLbitfield ToBufferMask(GLbitfield mask) noexcept {
-		GLbitfield lut[] = { GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_STENCIL_BUFFER_BIT };
-		GLbitfield m = 0;
-		GLbitfield f = GLbitfield(mask);
-		for (int i = 0; f != 0; f <<= 1, ++i)
-			if (f & 1)
-				m |= lut[i];
-		return m;
-	}
+inline GLbitfield ToBufferMask(GLbitfield mask)
+noexcept
+{
+	GLbitfield lut[] = { GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_STENCIL_BUFFER_BIT };
+	GLbitfield m = 0;
+	GLbitfield f = GLbitfield(mask);
+	for (int i = 0; f != 0; f <<= 1, ++i)
+		if (f & 1)
+			m |= lut[i];
+	return m;
+}
 }
 
 // =================================================================================================
@@ -126,82 +153,117 @@ namespace GfxToGL {
 // Round trip stable with ToGLenum, including its CullFace::None -> GL_FRONT_AND_BACK mapping.
 
 namespace GLToGfx {
-	using namespace GfxOperations;
+using namespace GfxOperations;
 
-	inline CompareFunc ToCompareFunc(GLenum e) noexcept {
-		switch (e) {
-			case GL_NEVER:    return CompareFunc::Never;
-			case GL_LESS:     return CompareFunc::Less;
-			case GL_EQUAL:    return CompareFunc::Equal;
-			case GL_GREATER:  return CompareFunc::Greater;
-			case GL_NOTEQUAL: return CompareFunc::NotEqual;
-			case GL_GEQUAL:   return CompareFunc::GreaterEqual;
-			case GL_ALWAYS:   return CompareFunc::Always;
-			case GL_LEQUAL:
-			default:          return CompareFunc::LessEqual;   // also the answer for the "nothing set yet" GL_NONE
-		}
+inline CompareFunc ToCompareFunc(GLenum e)
+noexcept
+{
+	switch (e) {
+		case GL_NEVER:
+			return CompareFunc::Never;
+		case GL_LESS:
+			return CompareFunc::Less;
+		case GL_EQUAL:
+			return CompareFunc::Equal;
+		case GL_GREATER:
+			return CompareFunc::Greater;
+		case GL_NOTEQUAL:
+			return CompareFunc::NotEqual;
+		case GL_GEQUAL:
+			return CompareFunc::GreaterEqual;
+		case GL_ALWAYS:
+			return CompareFunc::Always;
+		case GL_LEQUAL:
+		default:
+			return CompareFunc::LessEqual; // also the answer for the "nothing set yet" GL_NONE
 	}
+}
 
-	inline BlendOp ToBlendOp(GLenum e) noexcept {
-		switch (e) {
-			case GL_FUNC_SUBTRACT:         return BlendOp::Subtract;
-			case GL_FUNC_REVERSE_SUBTRACT: return BlendOp::RevSubtract;
-			case GL_MIN:                   return BlendOp::Min;
-			case GL_MAX:                   return BlendOp::Max;
-			case GL_FUNC_ADD:
-			default:                       return BlendOp::Add;
-		}
+inline BlendOp ToBlendOp(GLenum e)
+noexcept
+{
+	switch (e) {
+		case GL_FUNC_SUBTRACT:
+			return BlendOp::Subtract;
+		case GL_FUNC_REVERSE_SUBTRACT:
+			return BlendOp::RevSubtract;
+		case GL_MIN:
+			return BlendOp::Min;
+		case GL_MAX:
+			return BlendOp::Max;
+		case GL_FUNC_ADD:
+		default:
+			return BlendOp::Add;
 	}
+}
 
-	inline CullFace ToCullFace(GLenum e) noexcept {
-		switch (e) {
-			case GL_FRONT:          return CullFace::Front;
-			case GL_FRONT_AND_BACK: return CullFace::None;
-			case GL_BACK:
-			default:                return CullFace::Back;
-		}
+inline CullFace ToCullFace(GLenum e)
+noexcept
+{
+	switch (e) {
+		case GL_FRONT:
+			return CullFace::Front;
+		case GL_FRONT_AND_BACK:
+			return CullFace::None;
+		case GL_BACK:
+		default:
+			return CullFace::Back;
 	}
+}
 
-	inline Winding ToWinding(GLenum e) noexcept {
-		return (e == GL_CW) ? Winding::Regular : Winding::Reverse;
-	}
+inline Winding ToWinding(GLenum e)
+noexcept
+{
+	return (e == GL_CW) ? Winding::Regular : Winding::Reverse;
+}
 
-	inline BlendFactor ToBlendFactor(GLenum e) noexcept {
-		switch (e) {
-			case GL_ZERO:                return BlendFactor::Zero;
-			case GL_SRC_COLOR:           return BlendFactor::SrcColor;
-			case GL_ONE_MINUS_SRC_COLOR: return BlendFactor::InvSrcColor;
-			case GL_SRC_ALPHA:           return BlendFactor::SrcAlpha;
-			case GL_ONE_MINUS_SRC_ALPHA: return BlendFactor::InvSrcAlpha;
-			case GL_DST_ALPHA:           return BlendFactor::DstAlpha;
-			case GL_ONE_MINUS_DST_ALPHA: return BlendFactor::InvDstAlpha;
-			case GL_DST_COLOR:           return BlendFactor::DstColor;
-			case GL_ONE_MINUS_DST_COLOR: return BlendFactor::InvDstColor;
-			case GL_ONE:
-			default:                     return BlendFactor::One;
-		}
+inline BlendFactor ToBlendFactor(GLenum e)
+noexcept
+{
+	switch (e) {
+		case GL_ZERO:
+			return BlendFactor::Zero;
+		case GL_SRC_COLOR:
+			return BlendFactor::SrcColor;
+		case GL_ONE_MINUS_SRC_COLOR:
+			return BlendFactor::InvSrcColor;
+		case GL_SRC_ALPHA:
+			return BlendFactor::SrcAlpha;
+		case GL_ONE_MINUS_SRC_ALPHA:
+			return BlendFactor::InvSrcAlpha;
+		case GL_DST_ALPHA:
+			return BlendFactor::DstAlpha;
+		case GL_ONE_MINUS_DST_ALPHA:
+			return BlendFactor::InvDstAlpha;
+		case GL_DST_COLOR:
+			return BlendFactor::DstColor;
+		case GL_ONE_MINUS_DST_COLOR:
+			return BlendFactor::InvDstColor;
+		case GL_ONE:
+		default:
+			return BlendFactor::One;
 	}
+}
 }
 
 // =================================================================================================
 
 class GfxStates
-	: public BaseSingleton<GfxStates>
-{
+	: public BaseSingleton<GfxStates> {
 private:
-	int m_maxTextureSize{ 0 };
-	GLint m_maxTextureUnits{ 0 };
-	uint64_t m_maxAllocSize{ 0 };
-	std::unordered_set<std::string> m_extensions;
-	bool m_haveExtensions{ false };
-	RGBAColor m_clearColor{ ColorData::Invisible };
-	float m_depthClearValue{ 1.0f };
-	int m_stencilClearValue{ 0 };
-	int m_featureLevel{ 0 };
-	uint32_t m_drawCount{ 0 };
+	int								m_maxTextureSize{ 0 };
+	GLint							m_maxTextureUnits{ 0 };
+	uint64_t						m_maxAllocSize{ 0 };
+	std::unordered_set<std::string>	m_extensions;
+	bool							m_haveExtensions{ false };
+	RGBAColor						m_clearColor{ ColorData::Invisible };
+	float							m_depthClearValue{ 1.0f };
+	int								m_stencilClearValue{ 0 };
+	int								m_featureLevel{ 0 };
+	uint32_t						m_drawCount{ 0 };
 
-	List<TextureSlotInfo> m_tmuBindings;
-	List<RGBAColor> m_clearColorStack;
+	List<TextureSlotInfo>	m_tmuBindings;
+	List<RGBAColor>			m_clearColorStack;
 
 	// Static, not a member: it has to survive this object's own destruction, because that is exactly
 	// when it is asked.
@@ -209,11 +271,13 @@ private:
 
 public:
 	static constexpr int MinFeatureLevel = 330;
-	static constexpr int SSBOFeatureLevel = 330; // actually 430; but NVidia 3.30 drivers support SSBOs, so we rely on querying GL_ARB_shader_storage_buffer_object
+	static constexpr int SSBOFeatureLevel =
+		330; // actually 430; but NVidia 3.30 drivers support SSBOs, so we rely on querying GL_ARB_shader_storage_buffer_object
 
-	GfxStates() {
+	GfxStates()
+	{
 		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
-#if 0//def _DEBUG
+#if 0 //def _DEBUG
 		logHandler.Print("Max. texture size: %d\n", m_maxTextureSize);
 #endif
 		// OGL hat keine dynamische "max single resource allocation"-Abfrage. Konservative
@@ -230,7 +294,9 @@ public:
 		m_isDestroyed = true;
 	}
 
-	static inline bool IsDestroyed(void) noexcept {
+	static inline bool IsDestroyed(void)
+	noexcept
+	{
 		return m_isDestroyed;
 	}
 
@@ -246,7 +312,9 @@ public:
 		return m_extensions.find(extension) != m_extensions.end();
 	}
 
-	inline int FeatureLevel(void) noexcept {
+	inline int FeatureLevel(void)
+	noexcept
+	{
 		if (m_featureLevel == 0) {
 			const char* s = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
 			m_featureLevel = int(float(String(s)) * 100);
@@ -254,32 +322,44 @@ public:
 		return m_featureLevel;
 	}
 
-	inline bool HaveFeatureLevel(int level) noexcept {
+	inline bool HaveFeatureLevel(int level)
+	noexcept
+	{
 		return FeatureLevel() >= (level ? level : MinFeatureLevel);
 	}
 
-	inline int MaxTextureSize(void) noexcept {
+	inline int MaxTextureSize(void)
+	noexcept
+	{
 		return m_maxTextureSize;
 	}
 
 	// THE DRAW COUNTER. Every draw the library issues (GfxDataLayout::Render ()) counts here; an
 	// application resets it where its frame begins and reads it at its pass boundaries to see what a
 	// pass costs in draws. The count is what the batching work is measured by.
-	inline void CountDraw(void) noexcept {
+	inline void CountDraw(void)
+	noexcept
+	{
 		m_drawCount++;
 	}
 
-	inline uint32_t DrawCount(void) const noexcept {
+	inline uint32_t DrawCount(void) const
+	noexcept
+	{
 		return m_drawCount;
 	}
 
-	inline void ResetDrawCount(void) noexcept {
+	inline void ResetDrawCount(void)
+	noexcept
+	{
 		m_drawCount = 0;
 	}
 
 	// How many textures a draw can have bound at once. Asked lazily for the same reason
 	// HasExtension () asks again: this singleton may exist before the GL context does.
-	inline int MaxTextureUnits(void) noexcept {
+	inline int MaxTextureUnits(void)
+	noexcept
+	{
 		if (m_maxTextureUnits == 0)
 			glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_maxTextureUnits);
 		return m_maxTextureUnits;
@@ -292,7 +372,9 @@ public:
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).
-	inline int MaxTextureSize(int bytesPerPixel) noexcept {
+	inline int MaxTextureSize(int bytesPerPixel)
+	noexcept
+	{
 		if (bytesPerPixel <= 1)
 			return m_maxTextureSize;
 		const uint64_t bytes = m_maxAllocSize / uint64_t(bytesPerPixel);
@@ -301,8 +383,9 @@ public:
 		return int((uint64_t(m_maxTextureSize) < allocCap) ? uint64_t(m_maxTextureSize) : allocCap);
 	}
 
-	template<GLenum stateID>
-	inline int SetState(int state, bool invalidate = false) {
+	template <GLenum stateID>
+	inline int SetState(int state, bool invalidate = false)
+	{
 		static int current = -1;
 		if (state < 0) {
 			if (invalidate)
@@ -320,11 +403,14 @@ public:
 		return previous;
 	}
 
-	inline int SetDepthTest(int state) { return SetState<GL_DEPTH_TEST>(state); }
+	inline int SetDepthTest(int state) {
+		return SetState<GL_DEPTH_TEST>(state);
+	}
 
-	inline int SetBlending(int state, int bufferIndex = -1) { 
+	inline int SetBlending(int state, int bufferIndex = -1)
+	{
 		if (bufferIndex < 0)
-			return SetState<GL_BLEND>(state); 
+			return SetState<GL_BLEND>(state);
 		SetState<GL_BLEND>(-1, true);
 		if (state)
 			glEnablei(GL_BLEND, bufferIndex);
@@ -333,9 +419,13 @@ public:
 		return -1;
 	}
 
-	inline int SetFaceCulling(int state) { return SetState<GL_CULL_FACE>(state); }
+	inline int SetFaceCulling(int state) {
+		return SetState<GL_CULL_FACE>(state);
+	}
 
-	inline int SetScissorTest(int state) { return SetState<GL_SCISSOR_TEST>(state); }
+	inline int SetScissorTest(int state) {
+		return SetState<GL_SCISSOR_TEST>(state);
+	}
 
 	// The scissor rectangle. Same coordinate convention as SetViewport () - the backend's own, so
 	// here the origin is the bottom left corner of the target, as with glScissor (). Whether the
@@ -345,12 +435,14 @@ public:
 		FuncState(stateID, std::make_tuple(left, top, width, height), glScissor);
 	}
 
-	inline int SetStencilTest(int state) { return SetState<GL_STENCIL_TEST>(state); }
+	inline int SetStencilTest(int state) {
+		return SetState<GL_STENCIL_TEST>(state);
+	}
 
 	inline void StencilFunc(GLenum func, uint8_t ref, uint8_t mask) {
 		static int32_t stateID = -1;
 		FuncState(stateID, std::make_tuple(func, GLint(ref), GLuint(mask)),
-			[](GLenum f, GLint r, GLuint m) { glStencilFunc(f, r, m); });
+				  [](GLenum f, GLint r, GLuint m) { glStencilFunc(f, r, m); });
 	}
 
 	inline void StencilOp(GLenum sfail, GLenum dpfail, GLenum dppass) {
@@ -360,13 +452,15 @@ public:
 
 	inline void StencilOpBack(GLenum sfail, GLenum dpfail, GLenum dppass) {
 		static int32_t stateID = -1;
-		FuncState(stateID, std::make_tuple(sfail, dpfail, dppass), [](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
+		FuncState(stateID, std::make_tuple(sfail, dpfail, dppass),
+				  [](GLenum sf, GLenum dp, GLenum dpp) { glStencilOpSeparate(GL_BACK, sf, dp, dpp); });
 	}
 
 	// The offset is on as soon as EITHER term is non-zero -- a pure slope scale (factor, 0) and a pure
 	// constant offset (0, units) are both valid and used. And the values are pushed on every call: gating
 	// them on the enable state swallowed a change of factor/units while the offset was already on.
-	inline int SetPolygonOffset(GfxTypes::Float factor = 0.0f, GfxTypes::Float units = 0.0f) { 
+	inline int SetPolygonOffset(GfxTypes::Float factor = 0.0f, GfxTypes::Float units = 0.0f)
+	{
 		int enable = ((factor == 0.0f) and (units == 0.0f)) ? 0 : 1;
 		SetState<GL_POLYGON_OFFSET_FILL>(enable);
 		if (enable)
@@ -387,8 +481,8 @@ public:
 		return (prevState < 0) ? prevState : (prevState ? 0 : 1);
 	}
 
-	inline int SetDither(int state) { 
-		return SetState<GL_DITHER>(state); 
+	inline int SetDither(int state) {
+		return SetState<GL_DITHER>(state);
 	}
 
 	inline int SetMultiSample(int state) {
@@ -397,7 +491,8 @@ public:
 
 	// Line antialiasing. Core profile still has GL_LINE_SMOOTH; DX and VK carry no equivalent toggle and
 	// stub this out, the same way SetPolygonOffsetFill / SetDither / SetMultiSample are handled there.
-	inline int SetLineSmooth(int state) {
+	inline int SetLineSmooth(int state)
+	{
 		int prevState = SetState<GL_LINE_SMOOTH>(state);
 		if (state > 0)
 			glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
@@ -428,17 +523,39 @@ public:
 	// Every setter above doubles as a query through its "unknown" sentinel (-1 for the toggles, GL_NONE
 	// for the enum states). These are the readable spelling of that, and they exist in all three backends,
 	// so that the rule reads the same everywhere: SetX () returns the PREVIOUS state, GetX () asks.
-	inline int GetDepthTest(void) { return SetDepthTest(-1); }
-	inline int GetDepthWrite(void) { return SetDepthWrite(-1); }
-	inline int GetBlending(void) { return SetBlending(-1); }
-	inline int GetFaceCulling(void) { return SetFaceCulling(-1); }
-	inline int GetScissorTest(void) { return SetScissorTest(-1); }
-	inline int GetStencilTest(void) { return SetStencilTest(-1); }
-	inline int GetPolygonOffsetFill(void) { return SetPolygonOffsetFill(-1); }
-	inline int GetDepthClip(void) { return SetDepthClip(-1); }
-	inline int GetDither(void) { return SetDither(-1); }
-	inline int GetMultiSample(void) { return SetMultiSample(-1); }
-	inline int GetLineSmooth(void) { return SetState<GL_LINE_SMOOTH>(-1); }
+	inline int GetDepthTest(void) {
+		return SetDepthTest(-1);
+	}
+	inline int GetDepthWrite(void) {
+		return SetDepthWrite(-1);
+	}
+	inline int GetBlending(void) {
+		return SetBlending(-1);
+	}
+	inline int GetFaceCulling(void) {
+		return SetFaceCulling(-1);
+	}
+	inline int GetScissorTest(void) {
+		return SetScissorTest(-1);
+	}
+	inline int GetStencilTest(void) {
+		return SetStencilTest(-1);
+	}
+	inline int GetPolygonOffsetFill(void) {
+		return SetPolygonOffsetFill(-1);
+	}
+	inline int GetDepthClip(void) {
+		return SetDepthClip(-1);
+	}
+	inline int GetDither(void) {
+		return SetDither(-1);
+	}
+	inline int GetMultiSample(void) {
+		return SetMultiSample(-1);
+	}
+	inline int GetLineSmooth(void) {
+		return SetState<GL_LINE_SMOOTH>(-1);
+	}
 
 	template <class T>
 	struct StateRegistry {
@@ -446,7 +563,8 @@ public:
 	};
 
 	template <typename STATE_T, STATE_T unknown, class FUNC_T>
-	STATE_T FuncState(STATE_T state, int32_t& stateID, FUNC_T&& glFunc) {
+	STATE_T FuncState(STATE_T state, int32_t& stateID, FUNC_T&& glFunc)
+	{
 		auto& currentList = StateRegistry<STATE_T>::list;
 
 		bool initialized = stateID >= 0;
@@ -460,25 +578,25 @@ public:
 		STATE_T previous = current;
 		if (ENFORCE_STATE or not initialized or (current != state)) {
 			current = state;
-			std::forward<FUNC_T>(glFunc) (state);
+			std::forward<FUNC_T>(glFunc)(state);
 		}
 		return previous;
 	}
 
-	template<class F, class... Args>
+	template <class F, class... Args>
 	auto FuncState(int32_t& stateID, const std::tuple<Args...>& state, F&& glFunc)
 		-> std::tuple<Args...>
 	{
-		bool initialized = stateID >= 0;
-		auto& currentList = MultiStateRegistry<Args...>::list;
+		bool	initialized = stateID >= 0;
+		auto&	currentList = MultiStateRegistry<Args...>::list;
 		if (stateID < -1)
 			stateID = -stateID - 2;
 		else if (not initialized) {
 			stateID = currentList.Length();
 			currentList.Append(state);
 		}
-		auto& current = currentList[stateID];
-		auto previous = current;
+		auto&	current = currentList[stateID];
+		auto	previous = current;
 		if (ENFORCE_STATE or not initialized or (current != state)) {
 			current = state;
 			std::apply(std::forward<F>(glFunc), state);
@@ -491,7 +609,9 @@ public:
 		static inline AutoArray<std::tuple<Args...>> list{};
 	};
 
-	inline void InvalidateFuncState(int32_t& stateID) noexcept {
+	inline void InvalidateFuncState(int32_t& stateID)
+	noexcept
+	{
 		if (stateID >= 0)
 			stateID = -stateID - 2;
 	}
@@ -503,7 +623,8 @@ public:
 
 	int32_t m_blendEquationStateID{ -1 };
 
-	inline std::tuple<GLenum, GLenum> BlendEquationSeparate(GLenum opRGB, GLenum opAlpha, int bufferIndex = -1) {
+	inline std::tuple<GLenum, GLenum> BlendEquationSeparate(GLenum opRGB, GLenum opAlpha, int bufferIndex = -1)
+	{
 		if (bufferIndex < 0)
 			return FuncState(m_blendEquationStateID, std::make_tuple(opRGB, opAlpha), glBlendEquationSeparate);
 		InvalidateFuncState(m_blendEquationStateID);
@@ -548,12 +669,14 @@ public:
 	// Masked to 8 bits so the returned previous value matches DX/VK (uint8 mask, GL's default is all ones);
 	// every backend's depth buffer carries an 8 bit stencil plane, so the upper bits carry no information.
 	inline int SetStencilWrite(int mask) {
-		static int32_t stateID = -1;
-		GLuint state = (mask < 0) ? GLuint(-1) : GLuint(mask & 0xFF);
+		static int32_t	stateID = -1;
+		GLuint			state = (mask < 0) ? GLuint(-1) : GLuint(mask & 0xFF);
 		return int(FuncState<GLuint, GLuint(-1)>(state, stateID, glStencilMask) & 0xFF);
 	}
 
-	inline std::tuple<GLboolean, GLboolean, GLboolean, GLboolean> ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a, int bufferIndex = -1) {
+	inline std::tuple<GLboolean, GLboolean, GLboolean, GLboolean> ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a,
+																			int bufferIndex = -1)
+	{
 		static int32_t stateID = -1;
 		if (bufferIndex < 0)
 			return FuncState(stateID, std::make_tuple(r, g, b, a), glColorMask);
@@ -582,7 +705,9 @@ public:
 	// the static was.
 	int32_t m_blendFuncStateID{ -1 };
 
-	inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA, int bufferIndex = -1) {
+	inline std::tuple<GLenum, GLenum, GLenum, GLenum> BlendFuncSeparate(GLenum srcRGB, GLenum dstRGB, GLenum srcA, GLenum dstA,
+																		int bufferIndex = -1)
+	{
 		if (bufferIndex < 0)
 			return FuncState(m_blendFuncStateID, std::make_tuple(srcRGB, dstRGB, srcA, dstA), glBlendFuncSeparate);
 		InvalidateFuncState(m_blendFuncStateID);
@@ -638,15 +763,31 @@ public:
 	// The enum state queries. The portable spelling returns the GfxOperations vocabulary and exists in
 	// every backend; the *GL variants sit next to the GLenum setters that only OpenGL has and spare an
 	// application that talks GL anyway (d2x-xl) the conversion back and forth.
-	inline GfxOperations::CompareFunc GetDepthFunc(void) { return GLToGfx::ToCompareFunc(DepthFunc(GLenum(GL_NONE))); }
-	inline GfxOperations::CullFace GetCullFace(void) { return GLToGfx::ToCullFace(CullFace(GLenum(GL_NONE))); }
-	inline GfxOperations::Winding GetFrontFace(void) { return GLToGfx::ToWinding(FrontFace(GLenum(GL_NONE))); }
-	inline GfxOperations::BlendOp GetBlendEquation(void) { return GLToGfx::ToBlendOp(BlendEquation(GLenum(GL_NONE))); }
+	inline GfxOperations::CompareFunc GetDepthFunc(void) {
+		return GLToGfx::ToCompareFunc(DepthFunc(GLenum(GL_NONE)));
+	}
+	inline GfxOperations::CullFace GetCullFace(void) {
+		return GLToGfx::ToCullFace(CullFace(GLenum(GL_NONE)));
+	}
+	inline GfxOperations::Winding GetFrontFace(void) {
+		return GLToGfx::ToWinding(FrontFace(GLenum(GL_NONE)));
+	}
+	inline GfxOperations::BlendOp GetBlendEquation(void) {
+		return GLToGfx::ToBlendOp(BlendEquation(GLenum(GL_NONE)));
+	}
 
-	inline GLenum GetDepthFuncGL(void) { return DepthFunc(GLenum(GL_NONE)); }
-	inline GLenum GetCullFaceGL(void) { return CullFace(GLenum(GL_NONE)); }
-	inline GLenum GetFrontFaceGL(void) { return FrontFace(GLenum(GL_NONE)); }
-	inline GLenum GetBlendEquationGL(void) { return BlendEquation(GLenum(GL_NONE)); }
+	inline GLenum GetDepthFuncGL(void) {
+		return DepthFunc(GLenum(GL_NONE));
+	}
+	inline GLenum GetCullFaceGL(void) {
+		return CullFace(GLenum(GL_NONE));
+	}
+	inline GLenum GetFrontFaceGL(void) {
+		return FrontFace(GLenum(GL_NONE));
+	}
+	inline GLenum GetBlendEquationGL(void) {
+		return BlendEquation(GLenum(GL_NONE));
+	}
 
 	inline void BlendFunc(GfxOperations::BlendFactor src, GfxOperations::BlendFactor dst, int bufferIndex = -1) {
 		BlendFunc(GfxToGL::ToGLenum(src), GfxToGL::ToGLenum(dst), bufferIndex);
@@ -657,12 +798,16 @@ public:
 	// SetIndependentBlend is a no-op. The global BlendFunc still sets RT0 (and every buffer); RT1 is then
 	// overridden here. NOTE: these bypass the global FuncState cache -> after the pass, reset RT1 explicitly
 	// (BlendFuncRT1) and re-issue the global BlendFunc so RT1 does not stay desynced for a later MRT pass.
-	inline int SetIndependentBlend(int) { return 0; }
+	inline int SetIndependentBlend(int) {
+		return 0;
+	}
 
 	inline void BlendFuncSeparate(GfxOperations::BlendFactor srcRGB, GfxOperations::BlendFactor dstRGB,
 								  GfxOperations::BlendFactor srcAlpha, GfxOperations::BlendFactor dstAlpha,
-								  int bufferIndex = -1) {
-		BlendFuncSeparate(GfxToGL::ToGLenum(srcRGB), GfxToGL::ToGLenum(dstRGB), GfxToGL::ToGLenum(srcAlpha), GfxToGL::ToGLenum(dstAlpha), bufferIndex);
+								  int bufferIndex = -1)
+	{
+		BlendFuncSeparate(GfxToGL::ToGLenum(srcRGB), GfxToGL::ToGLenum(dstRGB), GfxToGL::ToGLenum(srcAlpha),
+						  GfxToGL::ToGLenum(dstAlpha), bufferIndex);
 	}
 
 	inline void StencilFunc(GfxOperations::CompareFunc func, uint8_t ref, uint8_t mask) {
@@ -680,13 +825,13 @@ public:
 	TextureSlotInfo* FindInfo(GLenum type);
 
 	int BoundTMU(GLenum type, GLuint handle, int tmuIndex = -1);
-	
+
 	int BindTexture(GLenum type, GLuint handle, int tmuIndex);
-	
+
 	bool ReleaseTexture(GLenum type, GLuint handle, int tmuIndex = -1);
-	
+
 	int GetBoundTexture(GLenum type, int tmuIndex);
-	
+
 	int SetBoundTexture(GLenum type, GLuint handle, int tmuIndex);
 
 	template <GLenum typeID>
@@ -702,22 +847,32 @@ public:
 		return BindTexture<GL_TEXTURE_CUBE_MAP>(texture, tmuIndex);
 	}
 
-	void ReleaseBuffers(void) noexcept;
+	void ReleaseBuffers(void)
+	noexcept;
 
-	inline void GetViewport(GfxTypes::Int* vp) noexcept {
+	inline void GetViewport(GfxTypes::Int* vp)
+	noexcept
+	{
 		glGetIntegerv(GL_VIEWPORT, vp);
 	}
 
-	inline void SetViewport(const GfxTypes::Int* vp) noexcept {
+	inline void SetViewport(const GfxTypes::Int* vp)
+	noexcept
+	{
 		glViewport(vp[0], vp[1], vp[2], vp[3]);
 	}
 
-	inline void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width, const GfxTypes::Int height) noexcept {
+	inline void SetViewport(const GfxTypes::Int left, const GfxTypes::Int top, const GfxTypes::Int width,
+							const GfxTypes::Int height)
+	noexcept
+	{
 		glViewport(left, top, width, height);
 	}
 
 	template <typename T>
-	inline void SetClearColor(T&& color)  noexcept {
+	inline void SetClearColor(T&& color)
+	noexcept
+	{
 		m_clearColor = std::forward<T>(color);
 		glClearColor(m_clearColor.R(), m_clearColor.G(), m_clearColor.B(), m_clearColor.A());
 	}
@@ -726,31 +881,39 @@ public:
 		SetClearColor(RGBAColor(r, g, b, a));
 	}
 
-	inline RGBAColor GetClearColor(void) noexcept {
+	inline RGBAColor GetClearColor(void)
+	noexcept
+	{
 		return m_clearColor;
 	}
 
-	inline void ResetClearColor(void) noexcept {
+	inline void ResetClearColor(void)
+	noexcept
+	{
 		SetClearColor(ColorData::Invisible);
 	}
 
 	// Masked by the colour write mask, same as the depth and stencil clears below: a pass that had
 	// channels masked off (e.g. a depth prepass) would clear nothing, while DX (ClearRenderTargetView)
 	// and Vulkan (loadOp CLEAR) clear all channels regardless.
-	inline void ClearColorBuffers(void) noexcept {
+	inline void ClearColorBuffers(void)
+	noexcept
+	{
 		ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
 	// Clear every btSkyMap of the given RT to (0,0,0,0). OGL: glClearTexImage works on
 	// any texture regardless of FBO attachment — no temporary CL needed (GL is immediate-mode).
-	void ClearSkyMaps(class RenderTarget* rt) noexcept;
+	void ClearSkyMaps(class RenderTarget* rt)
+	noexcept;
 
 	// glClear is masked by the depth write mask, so with depth writes off the clear silently does nothing
 	// -- DX (ClearDepthStencilView) and Vulkan (loadOp CLEAR) clear regardless. The write is enabled here
 	// and deliberately left enabled afterwards, per the render state contract (every stage sets what it
 	// needs); stashing and restoring the previous value is exactly what that rule forbids.
-	inline void ClearDepthBuffer(GfxTypes::Float clearValue = 1.0f) {
+	inline void ClearDepthBuffer(GfxTypes::Float clearValue = 1.0f)
+	{
 		if (m_depthClearValue != clearValue) {
 			m_depthClearValue = clearValue;
 			glClearDepth(clearValue);
@@ -760,7 +923,8 @@ public:
 	}
 
 	// Masked by the stencil write mask for the same reason.
-	inline void ClearStencilBuffer(GfxTypes::Int clearValue = 0) {
+	inline void ClearStencilBuffer(GfxTypes::Int clearValue = 0)
+	{
 		if (m_stencilClearValue != clearValue) {
 			m_stencilClearValue = clearValue;
 			glClearStencil(clearValue);
@@ -769,17 +933,23 @@ public:
 		glClear(GL_STENCIL_BUFFER_BIT);
 	}
 
-	inline void PushClearColor(void) noexcept {
+	inline void PushClearColor(void)
+	noexcept
+	{
 		m_clearColorStack.Push(m_clearColor);
 	}
 
 
-	inline void PopClearColor(void) noexcept {
+	inline void PopClearColor(void)
+	noexcept
+	{
 		if (not m_clearColorStack.IsEmpty())
 			m_clearColor = m_clearColorStack.Pop();
 	}
 
-	inline void SetMemoryBarrier(GLbitfield /*barriers*/) noexcept {
+	inline void SetMemoryBarrier(GLbitfield /*barriers*/)
+	noexcept
+	{
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 	}
 
@@ -789,13 +959,17 @@ public:
 
 	void ClearBackBuffer(void);
 
-	inline void Finish(void) noexcept {
+	inline void Finish(void)
+	noexcept
+	{
 		glFinish();
 	}
 
-	void ClearError(void) noexcept;
+	void ClearError(void)
+	noexcept;
 
-	bool CheckError(const char* operation = "") noexcept;
+	bool CheckError(const char* operation = "")
+	noexcept;
 };
 
 #define gfxStates GfxStates::Instance()

@@ -25,7 +25,7 @@
 #include <initializer_list>
 
 #include "shader.h"
-#include "base_shadercode.h"   // ComputeBindingDesc
+#include "base_shadercode.h" // ComputeBindingDesc
 
 class Texture;
 class RenderTarget;
@@ -33,60 +33,60 @@ class RenderTarget;
 // =================================================================================================
 
 class ComputeShader
-    : public Shader
-{
+	: public Shader {
 public:
-    String                          m_cs;       // GLSL compute source (retained for reload/debug)
-    AutoArray<ComputeBindingDesc>   m_bindings;
+	String							m_cs; // GLSL compute source (retained for reload/debug)
+	AutoArray<ComputeBindingDesc>	m_bindings;
 
-    ComputeShader(String name = "")
-        : Shader(std::move(name))
-    {
-    }
+	ComputeShader(String name = "")
+		: Shader(std::move(name))
+	{
+	}
 
-    ~ComputeShader() = default;
+	~ComputeShader() = default;
 
-    // Compile + link a compute-only program from GLSL source. bindings is retained for
-    // descriptor-introspection (e.g. when the caller wants to validate slot usage); GL itself
-    // resolves bindings from the explicit `layout(binding=N)` qualifiers inside the shader source.
-    bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
+	// Compile + link a compute-only program from GLSL source. bindings is retained for
+	// descriptor-introspection (e.g. when the caller wants to validate slot usage); GL itself
+	// resolves bindings from the explicit `layout(binding=N)` qualifiers inside the shader source.
+	bool Create(const String& csCode, const AutoArray<ComputeBindingDesc>& bindings, const String& shaderFolder);
 
-    // glUseProgram on m_handle. Returns false if the program is invalid.
-    bool Activate(void);
+	// glUseProgram on m_handle. Returns false if the program is invalid.
+	bool Activate(void);
 
-    // glDispatchCompute(x, y, z). Caller-supplied workgroup counts (already divided by local_size).
-    bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+	// glDispatchCompute(x, y, z). Caller-supplied workgroup counts (already divided by local_size).
+	bool Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
-    // One complete compute run for work outside the drawing of a frame - level load precomputations,
-    // bakes - where the caller wants the result in memory when the call returns: dispatch, barrier and
-    // wait for the GPU. The storage buffers are the ones the caller bound through GfxArray::Bind ().
-    // Mirrors vulkan/directx, which have more to do for the same thing.
-    bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
+	// One complete compute run for work outside the drawing of a frame - level load precomputations,
+	// bakes - where the caller wants the result in memory when the call returns: dispatch, barrier and
+	// wait for the GPU. The storage buffers are the ones the caller bound through GfxArray::Bind ().
+	// Mirrors vulkan/directx, which have more to do for the same thing.
+	bool DispatchOnce(uint32_t groupCountX, uint32_t groupCountY = 1, uint32_t groupCountZ = 1);
 
-    // Bind a list of textures to sampler units 0..N-1 (analog Mesh::Render(textures)), then
-    // dispatch. nullptr entries skip the corresponding unit.
-    bool Dispatch(std::span<Texture* const> textures,
-                  uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+	// Bind a list of textures to sampler units 0..N-1 (analog Mesh::Render(textures)), then
+	// dispatch. nullptr entries skip the corresponding unit.
+	bool Dispatch(std::span<Texture* const> textures,
+				  uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 
-    inline bool Dispatch(std::initializer_list<Texture*> textures,
-                         uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) {
-        return Dispatch(std::span<Texture* const>(textures.begin(), textures.size()),
-                        groupCountX, groupCountY, groupCountZ);
-    }
+	inline bool Dispatch(std::initializer_list<Texture*> textures,
+						 uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+	{
+		return Dispatch(std::span<Texture* const>(textures.begin(), textures.size()),
+						groupCountX, groupCountY, groupCountZ);
+	}
 
-    // Convenience: dispatch over a 2D region with a chosen workgroup tile size. Rounds up.
-    bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
+	// Convenience: dispatch over a 2D region with a chosen workgroup tile size. Rounds up.
+	bool Dispatch2D(uint32_t width, uint32_t height, uint32_t tileX, uint32_t tileY);
 
-    // Bind a regular sampler-texture for read (layout(binding=unit) uniform sampler*).
-    // GL uses combined sampler+texture; unit is the GL_TEXTURE0+unit slot.
-    bool BindSampledImage(uint32_t unit, Texture* texture);
+	// Bind a regular sampler-texture for read (layout(binding=unit) uniform sampler*).
+	// GL uses combined sampler+texture; unit is the GL_TEXTURE0+unit slot.
+	bool BindSampledImage(uint32_t unit, Texture* texture);
 
-    // Bind a RenderTarget color-buffer as image2D for read/write
-    // (layout(binding=unit, format) uniform image2D X). access is GL_READ_ONLY / GL_WRITE_ONLY /
-    // GL_READ_WRITE. Internal format must match the shader's format qualifier (e.g. GL_RGBA16F).
-    bool BindStorageImage(uint32_t unit, RenderTarget* target, int bufferIndex,
-                          GLenum access = GL_READ_WRITE, GLenum internalFormat = GL_RGBA16F,
-                          int level = 0);
+	// Bind a RenderTarget color-buffer as image2D for read/write
+	// (layout(binding=unit, format) uniform image2D X). access is GL_READ_ONLY / GL_WRITE_ONLY /
+	// GL_READ_WRITE. Internal format must match the shader's format qualifier (e.g. GL_RGBA16F).
+	bool BindStorageImage(uint32_t unit, RenderTarget* target, int bufferIndex,
+						  GLenum access = GL_READ_WRITE, GLenum internalFormat = GL_RGBA16F,
+						  int level = 0);
 };
 
 // =================================================================================================

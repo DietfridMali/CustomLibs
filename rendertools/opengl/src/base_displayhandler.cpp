@@ -6,7 +6,7 @@
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:26819)
+#pragma warning(disable : 26819)
 #endif
 #include "SDL.h"
 #ifdef _MSC_VER
@@ -19,122 +19,131 @@
 
 // =================================================================================================
 
-bool BaseDisplayHandler::Init(void) {
-    if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
-        return false;
-    return GetDisplayModes() > 0;
+bool BaseDisplayHandler::Init(void)
+{
+	if (sdlHandler.Init(SDL_INIT_VIDEO) != 0)
+		return false;
+	return GetDisplayModes() > 0;
 }
 
 
-int BaseDisplayHandler::GetDisplayModes(void) {
-    int n = SDL_GetNumDisplayModes(0);
-    AutoArray<SDL_DisplayMode> m(n);
-    for (int i = 0; i < n; ++i)
-        SDL_GetDisplayMode(0, i, &m[i]);
+int BaseDisplayHandler::GetDisplayModes(void)
+{
+	int							n = SDL_GetNumDisplayModes(0);
+	AutoArray<SDL_DisplayMode>	m(n);
+	for (int i = 0; i < n; ++i)
+		SDL_GetDisplayMode(0, i, &m[i]);
 
-    std::sort(m.begin(), m.end(),
-        [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
-            int64_t areaA = int64_t(a.w) * int64_t(a.h);
-            int64_t areaB = int64_t(b.w) * int64_t(b.h);
-            if (areaA != areaB)
-                return areaA > areaB;
-            if (a.w != b.w)
-                return a.w > b.w;
-            if (a.refresh_rate != b.refresh_rate)
-                return a.refresh_rate > b.refresh_rate;
-            return a.format > b.format;
-        });
+	std::sort(m.begin(), m.end(),
+			  [](const SDL_DisplayMode& a, const SDL_DisplayMode& b) {
+				  int64_t areaA = int64_t(a.w) * int64_t(a.h);
+				  int64_t areaB = int64_t(b.w) * int64_t(b.h);
+				  if (areaA != areaB)
+					  return areaA > areaB;
+				  if (a.w != b.w)
+					  return a.w > b.w;
+				  if (a.refresh_rate != b.refresh_rate)
+					  return a.refresh_rate > b.refresh_rate;
+				  return a.format > b.format;
+			  });
 
-    m_displayModes.Reset();
-    for (int i = 0; i < n; ++i) {
-        if ((i == 0) or (m[i].w != m[i - 1].w) or (m[i].h != m[i - 1].h))
-            m_displayModes.Append(m[i]);
-    }
-    return m_displayModes.Length();
+	m_displayModes.Reset();
+	for (int i = 0; i < n; ++i) {
+		if ((i == 0) or (m[i].w != m[i - 1].w) or (m[i].h != m[i - 1].h))
+			m_displayModes.Append(m[i]);
+	}
+	return m_displayModes.Length();
 }
 
 // find display mode closest to width*height with aspect ratio width/height
 // aspect ratio comes first
-int BaseDisplayHandler::FindDisplayMode(int width, int height) {
-    float aspectRatio = float(width) / float(height);
-    int64_t size = int64_t(width) * int64_t(height);
-    int bestMode = -1;
-    float daMin = 1e6;
-    int64_t dsMin = std::numeric_limits<int64_t>::max();
-    for (int i = 0; i < m_displayModes.Length(); ++i) {
-        SDL_DisplayMode& m = m_displayModes[i];
-        float da = fabs(float(m.w) / float(m.h) - aspectRatio);
-        int64_t ds = static_cast<int64_t>(std::llabs((int64_t(m.w) * int64_t(m.h)) - size));
-        if (da < daMin) {
-            daMin = da;
-            dsMin = ds;
-            bestMode = i;
-        }
-        else if ((da == daMin) and (ds < dsMin)) {
-            dsMin = ds;
-            bestMode = i;
-        }
-    }
-    return bestMode;
+int BaseDisplayHandler::FindDisplayMode(int width, int height)
+{
+	float	aspectRatio = float(width) / float(height);
+	int64_t	size = int64_t(width) * int64_t(height);
+	int		bestMode = -1;
+	float	daMin = 1e6;
+	int64_t	dsMin = std::numeric_limits<int64_t>::max();
+	for (int i = 0; i < m_displayModes.Length(); ++i) {
+		SDL_DisplayMode&	m = m_displayModes[i];
+		float				da = fabs(float(m.w) / float(m.h) - aspectRatio);
+		int64_t				ds = static_cast<int64_t>(std::llabs((int64_t(m.w) * int64_t(m.h)) - size));
+		if (da < daMin) {
+			daMin = da;
+			dsMin = ds;
+			bestMode = i;
+		}
+		else if ((da == daMin) and (ds < dsMin)) {
+			dsMin = ds;
+			bestMode = i;
+		}
+	}
+	return bestMode;
 }
 
 
-void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync, bool matchDisplayMode) {
-    m_activeDisplayMode = FindDisplayMode(width, height);
-    if (matchDisplayMode) {
-        width = m_displayModes[m_activeDisplayMode].w;
-        height = m_displayModes[m_activeDisplayMode].h;
-    }
-    SDL_Rect rect;
-    SDL_GetDisplayBounds(0, &rect);
-    m_maxWidth = rect.w;
-    m_maxHeight = rect.h;
-    ComputeDimensions(width, height, useFullscreen);
-    m_aspectRatio = float(m_width) / float(m_height);
-    m_isLandscape = m_width > m_height;
-    m_vSync = vSync;
-    SetupDisplay(windowTitle);
+void BaseDisplayHandler::Create(String windowTitle, int width, int height, bool useFullscreen, bool vSync, bool matchDisplayMode)
+{
+	m_activeDisplayMode = FindDisplayMode(width, height);
+	if (matchDisplayMode) {
+		width = m_displayModes[m_activeDisplayMode].w;
+		height = m_displayModes[m_activeDisplayMode].h;
+	}
+	SDL_Rect rect;
+	SDL_GetDisplayBounds(0, &rect);
+	m_maxWidth = rect.w;
+	m_maxHeight = rect.h;
+	ComputeDimensions(width, height, useFullscreen);
+	m_aspectRatio = float(m_width) / float(m_height);
+	m_isLandscape = m_width > m_height;
+	m_vSync = vSync;
+	SetupDisplay(windowTitle);
 }
 
 
-void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullscreen) noexcept {
-    if (width * height == 0) {
-        m_width = m_maxWidth;
-        m_height = m_maxHeight;
-        m_isFullscreen = true;
-    }
-    else {
-        m_width = std::min(width, m_maxWidth);
-        m_height = std::min(height, m_maxHeight);
-        m_isFullscreen = useFullscreen;
-    }
+void BaseDisplayHandler::ComputeDimensions(int width, int height, bool useFullscreen)
+noexcept
+{
+	if (width * height == 0) {
+		m_width = m_maxWidth;
+		m_height = m_maxHeight;
+		m_isFullscreen = true;
+	}
+	else {
+		m_width = std::min(width, m_maxWidth);
+		m_height = std::min(height, m_maxHeight);
+		m_isFullscreen = useFullscreen;
+	}
 }
 
 
-BaseDisplayHandler::~BaseDisplayHandler() {
-    if (m_context != SDL_GLContext(0))
-        SDL_GL_DeleteContext(m_context);
+BaseDisplayHandler::~BaseDisplayHandler()
+{
+	if (m_context != SDL_GLContext(0))
+		SDL_GL_DeleteContext(m_context);
 }
 
 
-void BaseDisplayHandler::SetContextAttributes(void) {
-    SDL_GL_ResetAttributes();
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    // GL 4.3 minimum — required for compute shaders (glDispatchCompute, image2D bindings,
-    // shader storage buffers). The TSP cloud-rendering path relies on this.
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-    //SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "0"); 
+void BaseDisplayHandler::SetContextAttributes(void)
+{
+	SDL_GL_ResetAttributes();
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	// GL 4.3 minimum — required for compute shaders (glDispatchCompute, image2D bindings,
+	// shader storage buffers). The TSP cloud-rendering path relies on this.
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+	//SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "0");
 }
 
 
-void BaseDisplayHandler::SetupDisplay(String windowTitle) {
-    int screenType = SDL_WINDOW_OPENGL;
+void BaseDisplayHandler::SetupDisplay(String windowTitle)
+{
+	int screenType = SDL_WINDOW_OPENGL;
 #if 0
     if (m_isFullscreen) {
         if ((m_width != m_maxWidth) or (m_height != m_maxHeight))
@@ -144,87 +153,92 @@ void BaseDisplayHandler::SetupDisplay(String windowTitle) {
         m_isFullscreen = true;
     }
 #else
-    if (m_isFullscreen)
-        screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
+	if (m_isFullscreen)
+		screenType |= SDL_WINDOW_FULLSCREEN; // don't use SDL_WINDOW_FULLSCREEN_DESKTOP, as it can cause problems on scaled Linux desktops
 #endif
-    SetContextAttributes();
-    try {
-        m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, screenType);
-    }
-    catch (...) {
-        m_window = nullptr;
-    }
-    if (not m_window) {
-        logHandler.Print("Smiley-Battle: Couldn't set screen mode (%d x %d) (error '%s')\n", m_width, m_height, SDL_GetError());
-        exit(1);
-    }
-    try {
-        m_context = SDL_GL_CreateContext(m_window);
-    }
-    catch (...) {
-        m_context = nullptr;
-    }
-    if (not m_context) {
-        logHandler.Print("Smiley-Battle: Couldn't get OpenGL context (error '%s')\n", SDL_GetError());
-        exit(1);
-    }
-    SetVSync(m_vSync);
+	SetContextAttributes();
+	try {
+		m_window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, m_width, m_height, screenType);
+	}
+	catch (...) {
+		m_window = nullptr;
+	}
+	if (not m_window) {
+		logHandler.Print("Smiley-Battle: Couldn't set screen mode (%d x %d) (error '%s')\n", m_width, m_height, SDL_GetError());
+		exit(1);
+	}
+	try {
+		m_context = SDL_GL_CreateContext(m_window);
+	}
+	catch (...) {
+		m_context = nullptr;
+	}
+	if (not m_context) {
+		logHandler.Print("Smiley-Battle: Couldn't get OpenGL context (error '%s')\n", SDL_GetError());
+		exit(1);
+	}
+	SetVSync(m_vSync);
 }
 
 
-bool BaseDisplayHandler::SetVSync(bool vSync) {
-    m_vSync = vSync;
-    return SDL_GL_SetSwapInterval(m_vSync ? 1 : 0) == 0;
+bool BaseDisplayHandler::SetVSync(bool vSync)
+{
+	m_vSync = vSync;
+	return SDL_GL_SetSwapInterval(m_vSync ? 1 : 0) == 0;
 }
 
 
-void BaseDisplayHandler::EndFrame(void) {
-    ZoneScoped;
-    SDL_GL_SwapWindow(m_window);
+void BaseDisplayHandler::EndFrame(void)
+{
+	ZoneScoped;
+	SDL_GL_SwapWindow(m_window);
 #if USE_TRACY
-    TracyGpuCollect;
+	TracyGpuCollect;
 #endif
-    FrameMark;
+	FrameMark;
 }
 
 
-void BaseDisplayHandler::BeginFrame(void) {
-    ZoneScoped;
+void BaseDisplayHandler::BeginFrame(void)
+{
+	ZoneScoped;
 }
 
 
-void BaseDisplayHandler::Update(void) {
-    EndFrame();
-    BeginFrame();
+void BaseDisplayHandler::Update(void)
+{
+	EndFrame();
+	BeginFrame();
 }
 
 
-bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) {
-    if (displayMode >= m_displayModes.Length())
-        return false;
+bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen)
+{
+	if (displayMode >= m_displayModes.Length())
+		return false;
 
-    if (displayMode < 0)
-       displayMode = m_activeDisplayMode;
+	if (displayMode < 0)
+		displayMode = m_activeDisplayMode;
 #if 0 // always set window size and fullscreen or the output might not get centered when toggling fullscreen
-    if (m_activeDisplayMode != displayMode) 
+    if (m_activeDisplayMode != displayMode)
 #endif
-    {
-        m_activeDisplayMode = displayMode;
-        m_isFullscreen = useFullscreen;
-        SDL_DisplayMode mode = GetDisplayMode();
-        if (m_isFullscreen) {
-            SDL_SetWindowDisplayMode(m_window, &mode);
-            SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
-        }
-        else {
-            SDL_SetWindowFullscreen(m_window, 0);
-            SDL_SetWindowSize(m_window, mode.w, mode.h);
-            SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-        }
-        m_width = mode.w;
-        m_height = mode.h;
-        m_aspectRatio = float(m_width) / float(m_height);
-    }
+	{
+		m_activeDisplayMode = displayMode;
+		m_isFullscreen = useFullscreen;
+		SDL_DisplayMode mode = GetDisplayMode();
+		if (m_isFullscreen) {
+			SDL_SetWindowDisplayMode(m_window, &mode);
+			SDL_SetWindowFullscreen(m_window, SDL_WINDOW_FULLSCREEN);
+		}
+		else {
+			SDL_SetWindowFullscreen(m_window, 0);
+			SDL_SetWindowSize(m_window, mode.w, mode.h);
+			SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+		}
+		m_width = mode.w;
+		m_height = mode.h;
+		m_aspectRatio = float(m_width) / float(m_height);
+	}
 #if 0
     else if (m_isFullscreen != useFullscreen) {
         m_isFullscreen = useFullscreen;
@@ -232,30 +246,34 @@ bool BaseDisplayHandler::UpdateDisplayMode(int displayMode, bool useFullscreen) 
         SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     }
 #endif
-    return true;
+	return true;
 }
 
 
-void BaseDisplayHandler::SwitchDisplayMode(int direction) {
-    RequestDisplayChange(m_activeDisplayMode + direction, m_isFullscreen);
+void BaseDisplayHandler::SwitchDisplayMode(int direction)
+{
+	RequestDisplayChange(m_activeDisplayMode + direction, m_isFullscreen);
 }
 
 
-void BaseDisplayHandler::ToggleFullscreen(void) {
+void BaseDisplayHandler::ToggleFullscreen(void)
+{
 #ifdef _DEBUG
-    logHandler.Print("Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
+	logHandler.Print("Toggle fullscreen -> %d\n", m_isFullscreen ? 0 : 1);
 #endif
-    RequestDisplayChange(-1, not m_isFullscreen);
+	RequestDisplayChange(-1, not m_isFullscreen);
 }
 
 
-void BaseDisplayHandler::EnableBackBuffer(void) {
-    gfxStates.SetDrawBuffers({});
+void BaseDisplayHandler::EnableBackBuffer(void)
+{
+	gfxStates.SetDrawBuffers({});
 }
 
 
-void BaseDisplayHandler::DisableBackBuffer(void) {
-    // no op
+void BaseDisplayHandler::DisableBackBuffer(void)
+{
+	// no op
 }
 
 

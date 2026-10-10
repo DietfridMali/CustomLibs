@@ -16,11 +16,12 @@
 // white blob. Both constants are the reference values of that curve and are not meant to be tuned -
 // what a caller sets is the exposure, i.e. how much of its range it wants to bring into view.
 
-const ShaderSource& ToneMapShader() {
-    static const ShaderSource toneMapShader(
-        "tonemap",
-        Offset2DVS(),
-        String(R"(
+const ShaderSource& ToneMapShader()
+{
+	static const ShaderSource toneMapShader(
+		"tonemap",
+		Offset2DVS(),
+		String(R"(
             #version 330
             uniform sampler2D surface;
             uniform float exposure;
@@ -57,9 +58,8 @@ const ShaderSource& ToneMapShader() {
                     color = LinearToSRGB(color);
                 fragColor = vec4(color, sceneColor.a);
             }
-        )")
-    );
-    return toneMapShader;
+        )"));
+	return toneMapShader;
 }
 
 // =================================================================================================

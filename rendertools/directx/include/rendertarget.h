@@ -11,9 +11,9 @@
 #include "drawbufferhandler.h"
 #include "resource_view.h"
 #include "renderstates.h"
-#include "gfxpixelformat_dx.h"	// ToNativeColorFormat () for RTCreationParams::colorFormat - backend neutral
+#include "gfxpixelformat_dx.h" // ToNativeColorFormat () for RTCreationParams::colorFormat - backend neutral
 #ifdef _DEBUG
-#   include <source_location>
+#include <source_location>
 #endif
 
 // =================================================================================================
@@ -41,613 +41,712 @@ static constexpr int RT_MAX_COLOR_BUFFERS = 4;
 
 class BufferInfo {
 public:
-    typedef enum {
-        btColor,
-        btDepth,
-        btStencil, // never created as a buffer of its own -- stencil is a plane of btDepth (see RenderTarget::m_stencilBufferIndex)
-        btVertex,
-        btSkyMap, // Compute-only storage texture (R16G16B16A16_FLOAT, UAV+SRV+RTV-for-clear, no DSV)
-        // A cube map rendered INTO, one face at a time - see SelectCubeFace (). One resource with six
-        // array slices and D3D12_SRV_DIMENSION_TEXTURECUBE on the SRV, so a shader samples it by
-        // direction; one RTV per slice, because a render target view addresses a single slice.
-        btCubemap,
-        btId
-    } eBufferType;
+	typedef enum {
+		btColor,
+		btDepth,
+		btStencil, // never created as a buffer of its own -- stencil is a plane of btDepth (see RenderTarget::m_stencilBufferIndex)
+		btVertex,
+		btSkyMap, // Compute-only storage texture (R16G16B16A16_FLOAT, UAV+SRV+RTV-for-clear, no DSV)
+		// A cube map rendered INTO, one face at a time - see SelectCubeFace (). One resource with six
+		// array slices and D3D12_SRV_DIMENSION_TEXTURECUBE on the SRV, so a shader samples it by
+		// direction; one RTV per slice, because a render target view addresses a single slice.
+		btCubemap,
+		btId
+	} eBufferType;
 
-    ComPtr<ID3D12Resource>  m_resource;
-    RTV                     m_rtv;
-    // A cube map is one resource with six slices, and a render target view addresses exactly one of
-    // them - so a btCubemap buffer needs six views where every other type needs one. m_rtv above stays
-    // the view of the face currently selected (RenderTarget::SelectCubeFace), so everything that binds
-    // render targets goes on working unchanged.
-    RTV                     m_cubeRtv[6];
-    // A colour buffer that is a texture ARRAY is one resource with m_arrayRtv.Length () slices, and a
-    // render target view addresses exactly one of them - the same situation as the cube map above, only
-    // with a layer count that is not fixed at six. m_rtv stays the view of the layer currently selected
-    // (RenderTarget::SelectArrayLayer), so everything that binds render targets goes on working.
-    AutoArray<RTV>          m_arrayRtv;
-    SRV                     m_srv;
-    DSV                     m_dsv;
-    DSV                     m_dsvReadOnly;   // read-only depth view (compare, no write) for simultaneous SRV sampling
-    UAV                     m_uav;
-    D3D12_RESOURCE_STATES   m_state{ kShaderReadState };
-    eBufferType             m_type{ btColor };
-    DXGI_FORMAT             m_colorFormat{ dxColorFormat };  // per-RT color format; HDR scene/sky use R16G16B16A16_FLOAT
-    // Set by RenderTarget::CreateDepthBuffer before the views are allocated: this depth buffer carries a
-    // stencil plane, so resource, DSV and SRV all have to use the combined formats.
-    bool                    m_hasStencil{ false };
-    // Rendered into one layer at a time, sampled as a whole through a Texture2DArray. A flag rather
-    // than a buffer type of its own, because such a buffer IS a colour buffer - it takes part in MRT,
-    // in the RTV list and in every count, and only its views differ.
-    bool                    m_isArray{ false };
+	ComPtr<ID3D12Resource>	m_resource;
+	RTV						m_rtv;
+	// A cube map is one resource with six slices, and a render target view addresses exactly one of
+	// them - so a btCubemap buffer needs six views where every other type needs one. m_rtv above stays
+	// the view of the face currently selected (RenderTarget::SelectCubeFace), so everything that binds
+	// render targets goes on working unchanged.
+	RTV m_cubeRtv[6];
+	// A colour buffer that is a texture ARRAY is one resource with m_arrayRtv.Length () slices, and a
+	// render target view addresses exactly one of them - the same situation as the cube map above, only
+	// with a layer count that is not fixed at six. m_rtv stays the view of the layer currently selected
+	// (RenderTarget::SelectArrayLayer), so everything that binds render targets goes on working.
+	AutoArray<RTV>			m_arrayRtv;
+	SRV						m_srv;
+	DSV						m_dsv;
+	DSV						m_dsvReadOnly; // read-only depth view (compare, no write) for simultaneous SRV sampling
+	UAV						m_uav;
+	D3D12_RESOURCE_STATES	m_state{ kShaderReadState };
+	eBufferType				m_type{ btColor };
+	DXGI_FORMAT				m_colorFormat{ dxColorFormat }; // per-RT color format; HDR scene/sky use R16G16B16A16_FLOAT
+	// Set by RenderTarget::CreateDepthBuffer before the views are allocated: this depth buffer carries a
+	// stencil plane, so resource, DSV and SRV all have to use the combined formats.
+	bool m_hasStencil{ false };
+	// Rendered into one layer at a time, sampled as a whole through a Texture2DArray. A flag rather
+	// than a buffer type of its own, because such a buffer IS a colour buffer - it takes part in MRT,
+	// in the RTV list and in every count, and only its views differ.
+	bool m_isArray{ false };
 
-    void Init(void);
+	void Init(void);
 
-    void SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState);
+	void SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState);
 
-    bool AllocRTV(const std::source_location& loc = std::source_location::current());
+	bool AllocRTV(const std::source_location& loc = std::source_location::current());
 
-    // Six render target views, one per cube map face, plus a cube SRV to sample the finished map by
-    // direction. Only meaningful on a btCubemap buffer.
-    bool AllocCubeViews(void);
+	// Six render target views, one per cube map face, plus a cube SRV to sample the finished map by
+	// direction. Only meaningful on a btCubemap buffer.
+	bool AllocCubeViews(void);
 
-    // One render target view per LAYER, plus an array SRV to sample the whole stack by layer index.
-    // Only meaningful on a colour buffer with m_isArray set.
-    bool AllocArrayViews(int layerCount);
+	// One render target view per LAYER, plus an array SRV to sample the whole stack by layer index.
+	// Only meaningful on a colour buffer with m_isArray set.
+	bool AllocArrayViews(int layerCount);
 
-    void FreeRTV(void);
+	void FreeRTV(void);
 
-    bool AllocSRV(void);
+	bool AllocSRV(void);
 
-    void FreeSRV(void);
+	void FreeSRV(void);
 
-    bool AllocDSV(void);
+	bool AllocDSV(void);
 
-    bool AllocReadOnlyDSV(void);
+	bool AllocReadOnlyDSV(void);
 
-    void FreeDSV(void);
+	void FreeDSV(void);
 
-    bool AllocUAV(void);
+	bool AllocUAV(void);
 
-    void FreeUAV(void);
+	void FreeUAV(void);
 
-    void Release(bool immediate = false);
+	void Release(bool immediate = false);
 
-    inline bool IsValid(void) noexcept {
-        return m_rtv.IsValid();
-    }
+	inline bool IsValid(void)
+	noexcept
+	{
+		return m_rtv.IsValid();
+	}
 
-    inline ::RTV& RTV(void) noexcept {
-        return m_rtv;
-    }
+	inline ::RTV& RTV(void)
+	noexcept
+	{
+		return m_rtv;
+	}
 
-    inline ::SRV& SRV(void) noexcept {
-        return m_srv;
-    }
+	inline ::SRV& SRV(void)
+	noexcept
+	{
+		return m_srv;
+	}
 
-    inline ::DSV& DSV(void) noexcept {
-        return m_dsv;
-    }
+	inline ::DSV& DSV(void)
+	noexcept
+	{
+		return m_dsv;
+	}
 
-    inline uint32_t SRVIndex(void) noexcept {
-        return m_srv.GetIndex();
-    }
+	inline uint32_t SRVIndex(void)
+	noexcept
+	{
+		return m_srv.GetIndex();
+	}
 
-    DXGI_FORMAT ViewFormat(void);
+	DXGI_FORMAT ViewFormat(void);
 };
 
 // =================================================================================================
 
 class GfxReadTarget;
 
-class RenderTarget
-{
+class RenderTarget {
 public:
-    using DrawBufferList = DrawBufferHandler::DrawBufferList;
-    using CustomDrawBufferList = DrawBufferHandler::CustomDrawBufferList; // required for high level compatibility
+	using DrawBufferList = DrawBufferHandler::DrawBufferList;
+	using CustomDrawBufferList = DrawBufferHandler::CustomDrawBufferList; // required for high level compatibility
 
-    typedef enum {
-        dbAll,
-        dbColor,
-        dbExtra,
-        dbSingle,
-        dbCustom,
-        dbDepth,
-        dbCount,
-        dbNone = -1
-    } eDrawBufferGroups;
+	typedef enum {
+		dbAll,
+		dbColor,
+		dbExtra,
+		dbSingle,
+		dbCustom,
+		dbDepth,
+		dbCount,
+		dbNone = -1
+	} eDrawBufferGroups;
 
-    // How an own depth buffer is bound on activation. Orthogonal to the draw-buffer group (which selects
-    // *which* buffers attach). dbmReadOnly binds the read-only DSV (compare, no write) AND transitions the
-    // depth into a shader-readable state, so the same depth may be sampled as an SRV in the same pass
-    // (soft particles, etc.). dbmWrite (default) is the normal writable/compare depth.
-    typedef enum {
-        dbmWrite,
-        dbmReadOnly
-    } eDepthBufferMode;
+	// How an own depth buffer is bound on activation. Orthogonal to the draw-buffer group (which selects
+	// *which* buffers attach). dbmReadOnly binds the read-only DSV (compare, no write) AND transitions the
+	// depth into a shader-readable state, so the same depth may be sampled as an SRV in the same pass
+	// (soft particles, etc.). dbmWrite (default) is the normal writable/compare depth.
+	typedef enum {
+		dbmWrite,
+		dbmReadOnly
+	} eDepthBufferMode;
 
-    struct RTCreationParams {
-        String name{ "" };
-        int colorBufferCount{ 1 };
-        DXGI_FORMAT colorFormat{ dxColorFormat };  // R16G16B16A16_FLOAT for HDR color targets
-        int depthBufferCount{ 0 };
-        int stencilBufferCount{ 0 };
-        int vertexBufferCount{ 0 };
-        int idBufferCount{ 0 };
-        int skyMapCount{ 0 };  // Compute-only storage textures (R16G16B16A16_FLOAT), UAV+SRV+RTV.
-        DXGI_FORMAT skyMapFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
-        // Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
-        // square by definition. The format is separate from colorFormat: a shadow cube map holds one
-        // distance per texel, a colour target holds RGBA.
-        // Makes the colour buffers texture ARRAYS of this many layers, each layer of the target's own
-        // width and height, in colorFormat like any colour buffer. Rendering picks one layer at a time
-        // (SelectArrayLayer); sampling reads the whole stack through a Texture2DArray. Everything else
-        // - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
-        int arrayLayerCount{ 0 };
-        int cubeMapCount{ 0 };
-        DXGI_FORMAT cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
-        bool hasMRTs{ false };
-        bool isScreenBuffer{ false };
-        bool storageImage{ false };   // Cross-API; honored only by Vulkan today.
-    };
-
-    struct RTRenderParams {
-        int    source{ 0 };
-        int    destination{ -1 };
-        bool   clearBuffer{ true };
-        bool   premultiply{ false };
-        int    flipVertically{ 0 };
-        bool   centerOrigin{ true };
-        float  rotation{ 0.0f };
-        float  scale{ 1.0f };
-        Shader* shader{ nullptr };
-        eDepthBufferMode depthMode{ dbmWrite };
-    };
-
-	struct RTActivationParams {
-		int bufferIndex{ -1 };
-		eDrawBufferGroups drawBufferGroup{ dbAll };
-        bool clear{ true };
-		bool reactivate{ false };
-		eDepthBufferMode depthMode{ dbmWrite };
+	struct RTCreationParams {
+		String		name{ "" };
+		int			colorBufferCount{ 1 };
+		DXGI_FORMAT	colorFormat{ dxColorFormat }; // R16G16B16A16_FLOAT for HDR color targets
+		int			depthBufferCount{ 0 };
+		int			stencilBufferCount{ 0 };
+		int			vertexBufferCount{ 0 };
+		int			idBufferCount{ 0 };
+		int			skyMapCount{ 0 }; // Compute-only storage textures (R16G16B16A16_FLOAT), UAV+SRV+RTV.
+		DXGI_FORMAT	skyMapFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
+		// Cube maps to render into (btCubemap). Edge length is the target's width - a cube map is
+		// square by definition. The format is separate from colorFormat: a shadow cube map holds one
+		// distance per texel, a colour target holds RGBA.
+		// Makes the colour buffers texture ARRAYS of this many layers, each layer of the target's own
+		// width and height, in colorFormat like any colour buffer. Rendering picks one layer at a time
+		// (SelectArrayLayer); sampling reads the whole stack through a Texture2DArray. Everything else
+		// - MRT, the draw buffer groups, GetAsTexture () - works exactly as it does without it.
+		int			arrayLayerCount{ 0 };
+		int			cubeMapCount{ 0 };
+		DXGI_FORMAT	cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
+		bool		hasMRTs{ false };
+		bool		isScreenBuffer{ false };
+		bool		storageImage{ false }; // Cross-API; honored only by Vulkan today.
 	};
 
-    // -------------------------------------------------------------------------
+	struct RTRenderParams {
+		int					source{ 0 };
+		int					destination{ -1 };
+		bool				clearBuffer{ true };
+		bool				premultiply{ false };
+		int					flipVertically{ 0 };
+		bool				centerOrigin{ true };
+		float				rotation{ 0.0f };
+		float				scale{ 1.0f };
+		Shader*				shader{ nullptr };
+		eDepthBufferMode	depthMode{ dbmWrite };
+	};
 
-    String              m_name;
-    int                 m_width{ 0 };
-    int                 m_height{ 0 };
-    int                 m_scale{ 1 };
-    int                 m_bufferCount{ 0 };
-    int                 m_colorBufferCount{ 0 };
-    DXGI_FORMAT         m_colorFormat{ dxColorFormat };
-    DXGI_FORMAT         m_cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
-    DXGI_FORMAT         m_skyMapFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
-    int                 m_vertexBufferCount{ 0 };
-    int                 m_extraBufferIndex{ -1 };
-    int                 m_idBufferCount{ 0 };
-    int                 m_idBufferIndex{ -1 };
-    int                 m_depthBufferIndex{ -1 };
-    // Stencil is never a buffer of its own: DXGI has no pure stencil format, both planes always share one
-    // resource. stencilBufferCount > 0 therefore gives the DEPTH buffer a stencil plane (R32G8X24_TYPELESS
-    // instead of R32_TYPELESS), and m_stencilBufferIndex is just an alias of m_depthBufferIndex. Without it
-    // the depth buffer stays 32 bit.
-    int                 m_stencilBufferIndex{ -1 };
-    bool                m_hasStencil{ false };
-    int                 m_computeBufferIndex{ -1 };   // start of compute-buffer slot range in m_bufferInfo
-    int                 m_computeBufferCount{ 0 };
-    int                 m_cubeMapIndex{ -1 };         // start of cube-map slot range in m_bufferInfo
-    int                 m_cubeMapCount{ 0 };
-    int                 m_cubeFace{ 0 };              // face currently attached, see SelectCubeFace
-    // Layers per colour buffer. 0 means plain 2D buffers; anything else makes EVERY colour buffer of
-    // this target a texture array of that many layers, of which m_arrayLayer is the one selected.
-    int                 m_arrayLayerCount{ 0 };
-    int                 m_arrayLayer{ 0 };            // layer currently selected, see SelectArrayLayer
-    int                 m_activeBufferIndex{ 0 };
-    int                 m_lastDestination{ -1 };
-    bool                m_pingPong{ false };
-    bool                m_isAvailable{ false };
-    bool                m_wasActivated{ false };
-    bool                m_isScreenBuffer{ false };
-    RGBAColor           m_clearColor{ ColorData::Invisible };
-    eDrawBufferGroups   m_drawBufferGroup{ dbAll };
-    // Depth mode of the current activation, so a Reactivate does not silently drop back to a writable
-    // depth buffer while a pass is still sampling it.
-    eDepthBufferMode    m_depthMode{ dbmWrite };
-    DrawBufferList      m_drawBuffers{};
-    CustomDrawBufferList m_customDrawBuffers{};   // see SelectCustomDrawBuffers
+	struct RTActivationParams {
+		int					bufferIndex{ -1 };
+		eDrawBufferGroups	drawBufferGroup{ dbAll };
+		bool				clear{ true };
+		bool				reactivate{ false };
+		eDepthBufferMode	depthMode{ dbmWrite };
+	};
 
-    RenderStates        m_renderStates{};
-    Viewport            m_viewport;
-    RenderTarget*       m_depthSource{ nullptr };   // foreign depth buffer to bind instead of an own one (SetDepthSource)
-    Viewport*           m_viewportSave{ nullptr };
-    // How this target's colour buffer is sampled when it is read back as a texture. One that gets
-    // rescaled on the way out (post processing) wants LINEAR; one that is read texel for texel - a
-    // TextureAtlas, whose cells sit flush against each other - must not be filtered at all. Only the
-    // owner knows which of the two it is, so RenderTargetTexture::SetParams () takes it from here.
-    GfxFilterMode               m_filtering{ GfxFilterMode::Linear };
-    // One wrapper PER COLOUR BUFFER, not one for the target - a single one had its handle rehung on
-    // every GetAsTexture () call, so two buffers of the same target came back as the same pointer
-    // carrying the second one's handle. Sized once in Create () from colorBufferCount and never grown:
-    // the array is a std::vector and would move its elements, while their addresses are handed out.
-    AutoArray<RenderTargetTexture> m_renderTextures;
-    // For everything that is not a colour buffer - depth, sky map, cube map. Those shared the single
-    // wrapper with the colour buffers before; they keep sharing one, just not with them.
-    RenderTargetTexture m_externalTexture;
-    RenderTargetTexture m_depthTexture;
-    ShadowTexture       m_shadowTexture; // ShadowTexture mit Compare-Sampler fuer HW-PCF (sampler2DShadow-Aequivalent)
-    BaseQuadMesh        m_viewportArea;
+	// -------------------------------------------------------------------------
 
-    AutoArray<BufferInfo>   m_bufferInfo;
+	String		m_name;
+	int			m_width{ 0 };
+	int			m_height{ 0 };
+	int			m_scale{ 1 };
+	int			m_bufferCount{ 0 };
+	int			m_colorBufferCount{ 0 };
+	DXGI_FORMAT	m_colorFormat{ dxColorFormat };
+	DXGI_FORMAT	m_cubeMapFormat{ DXGI_FORMAT_R32_FLOAT };
+	DXGI_FORMAT	m_skyMapFormat{ DXGI_FORMAT_R16G16B16A16_FLOAT };
+	int			m_vertexBufferCount{ 0 };
+	int			m_extraBufferIndex{ -1 };
+	int			m_idBufferCount{ 0 };
+	int			m_idBufferIndex{ -1 };
+	int			m_depthBufferIndex{ -1 };
+	// Stencil is never a buffer of its own: DXGI has no pure stencil format, both planes always share one
+	// resource. stencilBufferCount > 0 therefore gives the DEPTH buffer a stencil plane (R32G8X24_TYPELESS
+	// instead of R32_TYPELESS), and m_stencilBufferIndex is just an alias of m_depthBufferIndex. Without it
+	// the depth buffer stays 32 bit.
+	int		m_stencilBufferIndex{ -1 };
+	bool	m_hasStencil{ false };
+	int		m_computeBufferIndex{ -1 }; // start of compute-buffer slot range in m_bufferInfo
+	int		m_computeBufferCount{ 0 };
+	int		m_cubeMapIndex{ -1 }; // start of cube-map slot range in m_bufferInfo
+	int		m_cubeMapCount{ 0 };
+	int		m_cubeFace{ 0 }; // face currently attached, see SelectCubeFace
+	// Layers per colour buffer. 0 means plain 2D buffers; anything else makes EVERY colour buffer of
+	// this target a texture array of that many layers, of which m_arrayLayer is the one selected.
+	int					m_arrayLayerCount{ 0 };
+	int					m_arrayLayer{ 0 }; // layer currently selected, see SelectArrayLayer
+	int					m_activeBufferIndex{ 0 };
+	int					m_lastDestination{ -1 };
+	bool				m_pingPong{ false };
+	bool				m_isAvailable{ false };
+	bool				m_wasActivated{ false };
+	bool				m_isScreenBuffer{ false };
+	RGBAColor			m_clearColor{ ColorData::Invisible };
+	eDrawBufferGroups	m_drawBufferGroup{ dbAll };
+	// Depth mode of the current activation, so a Reactivate does not silently drop back to a writable
+	// depth buffer while a pass is still sampling it.
+	eDepthBufferMode		m_depthMode{ dbmWrite };
+	DrawBufferList			m_drawBuffers{};
+	CustomDrawBufferList	m_customDrawBuffers{}; // see SelectCustomDrawBuffers
 
-    // Own command list - all rendering into this RenderTarget is recorded here.
-    CommandList*        m_cmdList{ nullptr };
-    uint64_t            m_cmdListExecution{ 0 };
+	RenderStates	m_renderStates{};
+	Viewport		m_viewport;
+	RenderTarget*	m_depthSource{ nullptr }; // foreign depth buffer to bind instead of an own one (SetDepthSource)
+	Viewport*		m_viewportSave{ nullptr };
+	// How this target's colour buffer is sampled when it is read back as a texture. One that gets
+	// rescaled on the way out (post processing) wants LINEAR; one that is read texel for texel - a
+	// TextureAtlas, whose cells sit flush against each other - must not be filtered at all. Only the
+	// owner knows which of the two it is, so RenderTargetTexture::SetParams () takes it from here.
+	GfxFilterMode m_filtering{ GfxFilterMode::Linear };
+	// One wrapper PER COLOUR BUFFER, not one for the target - a single one had its handle rehung on
+	// every GetAsTexture () call, so two buffers of the same target came back as the same pointer
+	// carrying the second one's handle. Sized once in Create () from colorBufferCount and never grown:
+	// the array is a std::vector and would move its elements, while their addresses are handed out.
+	AutoArray<RenderTargetTexture> m_renderTextures;
+	// For everything that is not a colour buffer - depth, sky map, cube map. Those shared the single
+	// wrapper with the colour buffers before; they keep sharing one, just not with them.
+	RenderTargetTexture	m_externalTexture;
+	RenderTargetTexture	m_depthTexture;
+	ShadowTexture		m_shadowTexture; // ShadowTexture mit Compare-Sampler fuer HW-PCF (sampler2DShadow-Aequivalent)
+	BaseQuadMesh		m_viewportArea;
 
-    // -------------------------------------------------------------------------
+	AutoArray<BufferInfo> m_bufferInfo;
 
-    RenderTarget();
+	// Own command list - all rendering into this RenderTarget is recorded here.
+	CommandList*	m_cmdList{ nullptr };
+	uint64_t		m_cmdListExecution{ 0 };
 
-    ~RenderTarget() {
-        Destroy();
-    }
+	// -------------------------------------------------------------------------
 
-    void Init(void);
+	RenderTarget();
 
-    bool Create(int width, int height, int scale, const RTCreationParams& params);
+	~RenderTarget() {
+		Destroy();
+	}
 
-    void Destroy(bool immediate = false);
+	void Init(void);
 
-    void SetName(const String& name) noexcept {
-        m_name = name;
-        if (IsEnabled())
-            m_cmdList->SetName(name);
-    }
+	bool Create(int width, int height, int scale, const RTCreationParams& params);
 
-    bool IsActive(void) noexcept;
+	void Destroy(bool immediate = false);
+
+	void SetName(const String& name)
+	noexcept
+	{
+		m_name = name;
+		if (IsEnabled())
+			m_cmdList->SetName(name);
+	}
+
+	bool IsActive(void)
+	noexcept;
 
 #ifdef _DEBUG
-    bool Activate(const RTActivationParams& params, const std::source_location& loc = std::source_location::current());
+	bool Activate(const RTActivationParams& params, const std::source_location& loc = std::source_location::current());
 #else
-    bool Activate(const RTActivationParams& params);
+	bool Activate(const RTActivationParams& params);
 #endif
 
-    bool EnableBuffers(const RTActivationParams& params);
-
-    bool SelectDrawBuffers(const RTActivationParams& params);
-
-    // Custom draw-buffer setup: bypasses the standard groups (dbAll / dbColor / dbExtra / dbSingle) so a
-    // pass can bind an arbitrary set of this target's buffers, in an arbitrary slot order, without the
-    // general draw-buffer handling interfering. Entry i of the list is the buffer index bound to fragment
-    // output slot i, or CUSTOM_DRAW_BUFFER_NONE to leave that slot unwritten. Buffers not named in the
-    // list are released to shader-readable state. Stays in effect until another draw-buffer group is
-    // selected; a Reactivate (or any Activate with dbCustom) re-applies it. The depth buffer is
-    // unaffected and follows the usual rules.
-    void SelectCustomDrawBuffers(const CustomDrawBufferList& bufferIndices);
-
-    inline bool Reactivate(bool clear = false) noexcept {
-        RTActivationParams params{ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = clear, .reactivate = true, .depthMode = m_depthMode };
-        return Activate(params);
-    }
-
-    void Deactivate(void) noexcept;
-
-    // No-op on DX12: render-pass scope pause/resume is a Vulkan-only concept (vkCmdBeginRendering /
-    // vkCmdEndRendering). In DX12 the render-target binding via OMSetRenderTargets is persistent
-    // and does not need to be suspended around UAV clears or copy ops. Present for source-level
-    // compatibility with the Vulkan path; common-code callers (e.g. DecalHandler::Render) use it
-    // unconditionally.
-    inline void BeginRendering(bool /*clearColor*/ = false, bool /*clearDepth*/ = false) noexcept {}
-    inline void EndRendering(void) noexcept {}
-
-    bool Enable(const RTActivationParams& params);
-
-    void Disable(bool deactivate = true) noexcept;
-
-    bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
-
-    inline void Flush(void) noexcept {
-        if (IsEnabled())
-            m_cmdList->Flush();
-    }
-
-    inline CommandList* GetCmdList(void) noexcept { return IsEnabled() ? m_cmdList : nullptr; }
-
-    void SetViewport(bool flipVertically = false) noexcept;
-
-    inline void SetClearColor(RGBAColor color) noexcept {
-        m_clearColor = color;
-    }
-
-    void Fill(RGBAColor color);
-
-    void Clear(const RTActivationParams& params);
-
-    void ClearColorBuffers(void);
-
-    // Clear a single attached color buffer to its own value (e.g. WBOIT: accum -> 0, revealage -> 1).
-    // The buffer must be currently attached (RENDER_TARGET state) -- call right after Activate.
-    void ClearColorBuffer(int bufferIndex, RGBAColor color);
-
-    void ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area);
-
-    void ClearDepthBuffer(float clearValue = 1.0f);
-
-    void ClearStencilBuffer(int clearValue = 0);
-
-    // Share another render target's depth buffer: while set, activating this target binds the
-    // source's DSV instead of an own depth buffer (this target needs none of its own). The foreign
-    // depth is never cleared - all Clear*/GetDepth* paths stay own-buffer-based - and is meant to
-    // be tested against, not written (leave depth write off). Lets an overlay pass (e.g. the
-    // wet-splat decal buffer) hardware-depth-test against the scene. Pass nullptr to unshare.
-    inline void SetDepthSource(RenderTarget* source) noexcept {
-        m_depthSource = source;
-    }
-
-    // Render helpers (same as OGL)
-    Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
-
-    // One colour buffer's texels into a CPU buffer, in the target's own colour format. bufferSize is
-    // the size of the destination in BYTES and is checked against BufferSize (), so a buffer that is
-    // too small is refused rather than overrun.
-    //
-    // This DRAINS THE PIPELINE: everything queued has to finish before the texels can be handed over.
-    // It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
-    // per frame. It may be called in mid frame, but the target must NOT be enabled: what is read is what
-    // the CLOSED command lists produce (CommandListHandler::ExecutePending ()), and a list still
-    // recording - the target's own, while it is enabled - is not among them.
-    // arraySlice picks the LAYER on a colour buffer that is a texture array (arrayLayerCount > 0) and
-    // is ignored on a plain one.
-    bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);
-
-    bool ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice = 0);
-
-    // The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
-    // dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
-    // Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
-    bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
-
-    // Bytes one colour buffer occupies, at the target's scaled size and its colour format.
-    size_t BufferSize(int bufferIndex);
-
-    Texture* GetDepthAsTexture(void);
-
-    Texture* GetDepthAsShadowTexture(void);
-
-    bool UpdateTransformation(const RTRenderParams& params);
-
-    bool RenderAsTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
-
-    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p, RGBAColor&& c) {
-        return RenderAsTexture(tex, p, static_cast<const RGBAColor&>(c));
-    }
-
-    inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p) {
-        return RenderAsTexture(tex, p, ColorData::White);
-    }
-
-    bool Render(const RTRenderParams& params, const RGBAColor& color);
-
-    inline bool Render(const RTRenderParams& p, RGBAColor&& c) {
-        return Render(p, static_cast<const RGBAColor&>(c));
-    }
-
-    inline bool  Render(const RTRenderParams& p) {
-        return Render(p, ColorData::White);
-    }
-
-    bool AutoRender(const RTRenderParams& params, const RGBAColor& color);
-
-    inline bool  AutoRender(const RTRenderParams& p, RGBAColor&& c) {
-        return AutoRender(p, static_cast<const RGBAColor&>(c));
-    }
-
-    inline bool  AutoRender(const RTRenderParams& p) {
-        return AutoRender(p, ColorData::White);
-    }
-
-    inline int  GetWidth(bool scaled = false) noexcept {
-        return scaled ? m_width * m_scale : m_width;
-    }
-
-    inline int GetHeight(bool scaled = false) noexcept {
-        return scaled ? m_height * m_scale : m_height;
-    }
-
-    inline int GetScale(void) noexcept {
-        return m_scale;
-    }
-
-    // Texel size of THIS render target's own texture (1 / actual buffer dimensions). Use this instead of
-    // baseRenderer.TexelSize() for any in-buffer step (blur / denoise / bloom): half-res scratch buffers
-    // have a different texel size than the full-res scene / viewport.
-    inline TexCoord TexelSize(void) noexcept {
-        return TexCoord(1.0f / float(GetWidth()), 1.0f / float(GetHeight()));
-    }
-
-    inline bool IsAvailable(void) noexcept {
-        return m_isAvailable;
-    }
-
-    inline Viewport& GetViewport(void) noexcept {
-        return m_viewport;
-    }
-
-    inline int  GetLastDestination(void) noexcept {
-        return m_lastDestination;
-    }
-
-    inline void SetLastDestination(int i) noexcept {
-        m_lastDestination = i;
-    }
-
-    inline int  NextBuffer(int i) noexcept {
-        return (i + 1) % m_bufferCount;
-    }
-
-    inline GfxFilterMode Filtering(void) noexcept {
-        return m_filtering;
-    }
-
-    // Hands the filter down to the render texture and makes it re-apply its parameters.
-    void SetFiltering(GfxFilterMode filtering);
-
-    // The wrapper for one colour buffer. nullptr if there is no such buffer.
-    inline RenderTargetTexture* GetRenderTexture(int bufferIndex = 0) noexcept {
-        return ((bufferIndex >= 0) and (bufferIndex < m_renderTextures.Length())) ? &m_renderTextures[bufferIndex] : nullptr;
-    }
-
-    // In DX12 there is no explicit framebuffer binding state - always report enabled.
-    inline bool IsEnabled(void)  noexcept {
-        return m_cmdList and m_cmdList->IsRecording() and (m_cmdList->GetExecutionCounter() == m_cmdListExecution);
-    }
-
-    uint32_t& BufferHandle(int bufferIndex);
-
-    inline bool operator==(const RenderTarget& o) const noexcept {
-        return this == &o;
-    }
-
-    inline bool operator!=(const RenderTarget& o) const noexcept {
-        return this != &o;
-    }
-
-    static D3D12_CPU_DESCRIPTOR_HANDLE NullRTV(void);
-
-    bool AttachBuffer(int bufferIndex);
-
-    bool DetachBuffer(int bufferIndex);
-
-    bool BindBuffer(int bufferIndex, int tmuIndex = -1);
-
-    bool BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filtering);
-
-    inline void ReleaseBuffers() {}
-
-    inline int DepthBufferIndex(void) noexcept {
-        return m_depthBufferIndex;
-    }
-
-    // Points the render target at one face of a cube map buffer. The target must be active; everything
-    // drawn afterwards lands on that face until another one is selected. Six calls with a draw in
-    // between capture the whole surroundings of a point.
-    //
-    // A call of its own rather than a field in RTActivationParams: nothing else about the target
-    // changes between faces, and re-activating six times would re-select draw buffers and depth state
-    // that have not moved.
-    bool SelectCubeFace(int face, int bufferIndex = -1);
-
-    // Points the render target views at one layer of the colour buffer arrays - ALL of them, so an MRT
-    // pass writes the same layer of every buffer. Everything drawn afterwards lands on that layer until
-    // another one is selected.
-    bool SelectArrayLayer(int layer);
-
-    inline int ArrayLayerCount(void) noexcept {
-        return m_arrayLayerCount;
-    }
-
-    inline int ArrayLayer(void) noexcept {
-        return m_arrayLayer;
-    }
-
-    inline bool HasArrayBuffers(void) noexcept {
-        return m_arrayLayerCount > 0;
-    }
-
-    inline int CubeMapIndex(int i = 0) noexcept {
-        return m_cubeMapCount ? m_cubeMapIndex + i : -1;
-    }
-
-    inline int CubeMapCount(void) noexcept {
-        return m_cubeMapCount;
-    }
-
-    inline int ExtraBufferIndex(int i = 0) noexcept {
-        return m_vertexBufferCount ? m_extraBufferIndex + i : -1;
-    }
-
-    inline int VertexBufferIndex(int i = 0) noexcept {
-        return ExtraBufferIndex(i);
-    }
-
-    inline int IdBufferIndex(int i = 0) noexcept {
-        return m_idBufferCount ? m_idBufferIndex + i : -1;
-    }
-
-    inline DrawBufferList& DrawBuffers(void) noexcept {
-        return m_drawBuffers;
-    }
+	bool EnableBuffers(const RTActivationParams& params);
+
+	bool SelectDrawBuffers(const RTActivationParams& params);
+
+	// Custom draw-buffer setup: bypasses the standard groups (dbAll / dbColor / dbExtra / dbSingle) so a
+	// pass can bind an arbitrary set of this target's buffers, in an arbitrary slot order, without the
+	// general draw-buffer handling interfering. Entry i of the list is the buffer index bound to fragment
+	// output slot i, or CUSTOM_DRAW_BUFFER_NONE to leave that slot unwritten. Buffers not named in the
+	// list are released to shader-readable state. Stays in effect until another draw-buffer group is
+	// selected; a Reactivate (or any Activate with dbCustom) re-applies it. The depth buffer is
+	// unaffected and follows the usual rules.
+	void SelectCustomDrawBuffers(const CustomDrawBufferList& bufferIndices);
+
+	inline bool Reactivate(bool clear = false)
+	noexcept
+	{
+		RTActivationParams params{ .bufferIndex = m_activeBufferIndex,
+								   .drawBufferGroup = m_drawBufferGroup,
+								   .clear = clear,
+								   .reactivate = true,
+								   .depthMode = m_depthMode };
+		return Activate(params);
+	}
+
+	void Deactivate(void)
+	noexcept;
+
+	// No-op on DX12: render-pass scope pause/resume is a Vulkan-only concept (vkCmdBeginRendering /
+	// vkCmdEndRendering). In DX12 the render-target binding via OMSetRenderTargets is persistent
+	// and does not need to be suspended around UAV clears or copy ops. Present for source-level
+	// compatibility with the Vulkan path; common-code callers (e.g. DecalHandler::Render) use it
+	// unconditionally.
+	inline void BeginRendering(bool /*clearColor*/ = false, bool /*clearDepth*/ = false)
+	noexcept
+	{}
+	inline void EndRendering(void)
+	noexcept
+	{}
+
+	bool Enable(const RTActivationParams& params);
+
+	void Disable(bool deactivate = true)
+	noexcept;
+
+	bool DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup);
+
+	inline void Flush(void)
+	noexcept
+	{
+		if (IsEnabled())
+			m_cmdList->Flush();
+	}
+
+	inline CommandList* GetCmdList(void)
+	noexcept
+	{
+		return IsEnabled() ? m_cmdList : nullptr;
+	}
+
+	void SetViewport(bool flipVertically = false)
+	noexcept;
+
+	inline void SetClearColor(RGBAColor color)
+	noexcept
+	{
+		m_clearColor = color;
+	}
+
+	void Fill(RGBAColor color);
+
+	void Clear(const RTActivationParams& params);
+
+	void ClearColorBuffers(void);
+
+	// Clear a single attached color buffer to its own value (e.g. WBOIT: accum -> 0, revealage -> 1).
+	// The buffer must be currently attached (RENDER_TARGET state) -- call right after Activate.
+	void ClearColorBuffer(int bufferIndex, RGBAColor color);
+
+	void ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area);
+
+	void ClearDepthBuffer(float clearValue = 1.0f);
+
+	void ClearStencilBuffer(int clearValue = 0);
+
+	// Share another render target's depth buffer: while set, activating this target binds the
+	// source's DSV instead of an own depth buffer (this target needs none of its own). The foreign
+	// depth is never cleared - all Clear*/GetDepth* paths stay own-buffer-based - and is meant to
+	// be tested against, not written (leave depth write off). Lets an overlay pass (e.g. the
+	// wet-splat decal buffer) hardware-depth-test against the scene. Pass nullptr to unshare.
+	inline void SetDepthSource(RenderTarget* source)
+	noexcept
+	{
+		m_depthSource = source;
+	}
+
+	// Render helpers (same as OGL)
+	Texture* GetAsTexture(const RTRenderParams& params, int tmuIndex = 0);
+
+	// One colour buffer's texels into a CPU buffer, in the target's own colour format. bufferSize is
+	// the size of the destination in BYTES and is checked against BufferSize (), so a buffer that is
+	// too small is refused rather than overrun.
+	//
+	// This DRAINS THE PIPELINE: everything queued has to finish before the texels can be handed over.
+	// It is meant for saving a baked result to disk or for a diagnosis, never for something that runs
+	// per frame. It may be called in mid frame, but the target must NOT be enabled: what is read is what
+	// the CLOSED command lists produce (CommandListHandler::ExecutePending ()), and a list still
+	// recording - the target's own, while it is enabled - is not among them.
+	// arraySlice picks the LAYER on a colour buffer that is a texture array (arrayLayerCount > 0) and
+	// is ignored on a plain one.
+	bool ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice = 0);
+
+	bool ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice = 0);
+
+	// The other direction: CPU texels INTO one colour buffer, in the target's own colour format.
+	// dataSize is checked against BufferSize () the same way ReadBuffer () checks its destination.
+	// Used to restore a buffer that was saved earlier - a baked lightmap read back from a file.
+	bool WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice = 0);
+
+	// Bytes one colour buffer occupies, at the target's scaled size and its colour format.
+	size_t BufferSize(int bufferIndex);
+
+	Texture* GetDepthAsTexture(void);
+
+	Texture* GetDepthAsShadowTexture(void);
+
+	bool UpdateTransformation(const RTRenderParams& params);
+
+	bool RenderAsTexture(Texture* texture, const RTRenderParams& params, const RGBAColor& color);
+
+	inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p, RGBAColor&& c) {
+		return RenderAsTexture(tex, p, static_cast<const RGBAColor&>(c));
+	}
+
+	inline bool RenderAsTexture(Texture* tex, const RTRenderParams& p) {
+		return RenderAsTexture(tex, p, ColorData::White);
+	}
+
+	bool Render(const RTRenderParams& params, const RGBAColor& color);
+
+	inline bool Render(const RTRenderParams& p, RGBAColor&& c) {
+		return Render(p, static_cast<const RGBAColor&>(c));
+	}
+
+	inline bool Render(const RTRenderParams& p) {
+		return Render(p, ColorData::White);
+	}
+
+	bool AutoRender(const RTRenderParams& params, const RGBAColor& color);
+
+	inline bool AutoRender(const RTRenderParams& p, RGBAColor&& c) {
+		return AutoRender(p, static_cast<const RGBAColor&>(c));
+	}
+
+	inline bool AutoRender(const RTRenderParams& p) {
+		return AutoRender(p, ColorData::White);
+	}
+
+	inline int GetWidth(bool scaled = false)
+	noexcept
+	{
+		return scaled ? m_width * m_scale : m_width;
+	}
+
+	inline int GetHeight(bool scaled = false)
+	noexcept
+	{
+		return scaled ? m_height * m_scale : m_height;
+	}
+
+	inline int GetScale(void)
+	noexcept
+	{
+		return m_scale;
+	}
+
+	// Texel size of THIS render target's own texture (1 / actual buffer dimensions). Use this instead of
+	// baseRenderer.TexelSize() for any in-buffer step (blur / denoise / bloom): half-res scratch buffers
+	// have a different texel size than the full-res scene / viewport.
+	inline TexCoord TexelSize(void)
+	noexcept
+	{
+		return TexCoord(1.0f / float(GetWidth()), 1.0f / float(GetHeight()));
+	}
+
+	inline bool IsAvailable(void)
+	noexcept
+	{
+		return m_isAvailable;
+	}
+
+	inline Viewport& GetViewport(void)
+	noexcept
+	{
+		return m_viewport;
+	}
+
+	inline int GetLastDestination(void)
+	noexcept
+	{
+		return m_lastDestination;
+	}
+
+	inline void SetLastDestination(int i)
+	noexcept
+	{
+		m_lastDestination = i;
+	}
+
+	inline int NextBuffer(int i)
+	noexcept
+	{
+		return (i + 1) % m_bufferCount;
+	}
+
+	inline GfxFilterMode Filtering(void)
+	noexcept
+	{
+		return m_filtering;
+	}
+
+	// Hands the filter down to the render texture and makes it re-apply its parameters.
+	void SetFiltering(GfxFilterMode filtering);
+
+	// The wrapper for one colour buffer. nullptr if there is no such buffer.
+	inline RenderTargetTexture* GetRenderTexture(int bufferIndex = 0)
+	noexcept
+	{
+		return ((bufferIndex >= 0) and (bufferIndex < m_renderTextures.Length())) ? &m_renderTextures[bufferIndex] : nullptr;
+	}
+
+	// In DX12 there is no explicit framebuffer binding state - always report enabled.
+	inline bool IsEnabled(void)
+	noexcept
+	{
+		return m_cmdList and m_cmdList->IsRecording() and (m_cmdList->GetExecutionCounter() == m_cmdListExecution);
+	}
+
+	uint32_t& BufferHandle(int bufferIndex);
+
+	inline bool operator==(const RenderTarget& o) const
+	noexcept
+	{
+		return this == &o;
+	}
+
+	inline bool operator!=(const RenderTarget& o) const
+	noexcept
+	{
+		return this != &o;
+	}
+
+	static D3D12_CPU_DESCRIPTOR_HANDLE NullRTV(void);
+
+	bool AttachBuffer(int bufferIndex);
+
+	bool DetachBuffer(int bufferIndex);
+
+	bool BindBuffer(int bufferIndex, int tmuIndex = -1);
+
+	bool BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filtering);
+
+	inline void ReleaseBuffers() {}
+
+	inline int DepthBufferIndex(void)
+	noexcept
+	{
+		return m_depthBufferIndex;
+	}
+
+	// Points the render target at one face of a cube map buffer. The target must be active; everything
+	// drawn afterwards lands on that face until another one is selected. Six calls with a draw in
+	// between capture the whole surroundings of a point.
+	//
+	// A call of its own rather than a field in RTActivationParams: nothing else about the target
+	// changes between faces, and re-activating six times would re-select draw buffers and depth state
+	// that have not moved.
+	bool SelectCubeFace(int face, int bufferIndex = -1);
+
+	// Points the render target views at one layer of the colour buffer arrays - ALL of them, so an MRT
+	// pass writes the same layer of every buffer. Everything drawn afterwards lands on that layer until
+	// another one is selected.
+	bool SelectArrayLayer(int layer);
+
+	inline int ArrayLayerCount(void)
+	noexcept
+	{
+		return m_arrayLayerCount;
+	}
+
+	inline int ArrayLayer(void)
+	noexcept
+	{
+		return m_arrayLayer;
+	}
+
+	inline bool HasArrayBuffers(void)
+	noexcept
+	{
+		return m_arrayLayerCount > 0;
+	}
+
+	inline int CubeMapIndex(int i = 0)
+	noexcept
+	{
+		return m_cubeMapCount ? m_cubeMapIndex + i : -1;
+	}
+
+	inline int CubeMapCount(void)
+	noexcept
+	{
+		return m_cubeMapCount;
+	}
+
+	inline int ExtraBufferIndex(int i = 0)
+	noexcept
+	{
+		return m_vertexBufferCount ? m_extraBufferIndex + i : -1;
+	}
+
+	inline int VertexBufferIndex(int i = 0)
+	noexcept
+	{
+		return ExtraBufferIndex(i);
+	}
+
+	inline int IdBufferIndex(int i = 0)
+	noexcept
+	{
+		return m_idBufferCount ? m_idBufferIndex + i : -1;
+	}
+
+	inline DrawBufferList& DrawBuffers(void)
+	noexcept
+	{
+		return m_drawBuffers;
+	}
 
 private:
-    bool CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
+	bool CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType);
 
-    bool CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+	bool CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
-    bool CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+	bool CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
-    // One resource with six slices plus the views for it - see BufferInfo::AllocCubeViews (). Square by
-    // definition, hence one edge length instead of width and height.
-    bool CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, int edge);
+	// One resource with six slices plus the views for it - see BufferInfo::AllocCubeViews (). Square by
+	// definition, hence one edge length instead of width and height.
+	bool CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, int edge);
 
-    bool CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
+	bool CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h);
 
-    int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
+	int CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount);
 
-    void CreateRenderArea(void);
+	void CreateRenderArea(void);
 
 public:
-    inline bool HaveDepthBuffer(bool checkHandle = true) noexcept {
-        return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsv.IsValid());
-    }
+	inline bool HaveDepthBuffer(bool checkHandle = true)
+	noexcept
+	{
+		return (m_depthBufferIndex >= 0) and (not checkHandle or m_bufferInfo[m_depthBufferIndex].m_dsv.IsValid());
+	}
 
-    // The depth buffer carries a stencil plane (see m_stencilBufferIndex).
-    inline bool HaveStencilBuffer(bool checkHandle = true) noexcept {
-        return m_hasStencil and HaveDepthBuffer(checkHandle);
-    }
+	// The depth buffer carries a stencil plane (see m_stencilBufferIndex).
+	inline bool HaveStencilBuffer(bool checkHandle = true)
+	noexcept
+	{
+		return m_hasStencil and HaveDepthBuffer(checkHandle);
+	}
 
-    // Depth/stencil write state for the requested depth mode, identical in all three backends: dbmReadOnly
-    // means "test against the depth buffer, never write it", which is what allows the same buffer to be
-    // sampled while it stays bound. DX and Vulkan additionally reject a writing pipeline over a read-only
-    // depth view, so turning the writes off here is not optional there either. Only the stencil plane of
-    // the ACTIVE depth buffer (own, or a shared source's) is considered. dbmWrite deliberately restores
-    // nothing: every stage sets the states it needs (render state contract).
-    inline void SetDepthMode(eDepthBufferMode depthMode) {
-        bool changed = (m_depthMode != depthMode);
-        m_depthMode = depthMode;
-        if (changed and IsEnabled())
-            SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = false, .reactivate = true, .depthMode = depthMode });
-        if (depthMode != dbmReadOnly)
-            return;
-        gfxStates.SetDepthWrite(0);
-        RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
-        if (depthOwner->HaveStencilBuffer(true))
-            gfxStates.SetStencilWrite(0);
-    }
+	// Depth/stencil write state for the requested depth mode, identical in all three backends: dbmReadOnly
+	// means "test against the depth buffer, never write it", which is what allows the same buffer to be
+	// sampled while it stays bound. DX and Vulkan additionally reject a writing pipeline over a read-only
+	// depth view, so turning the writes off here is not optional there either. Only the stencil plane of
+	// the ACTIVE depth buffer (own, or a shared source's) is considered. dbmWrite deliberately restores
+	// nothing: every stage sets the states it needs (render state contract).
+	inline void SetDepthMode(eDepthBufferMode depthMode)
+	{
+		bool changed = (m_depthMode != depthMode);
+		m_depthMode = depthMode;
+		if (changed and IsEnabled())
+			SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex,
+								.drawBufferGroup = m_drawBufferGroup,
+								.clear = false,
+								.reactivate = true,
+								.depthMode = depthMode });
+		if (depthMode != dbmReadOnly)
+			return;
+		gfxStates.SetDepthWrite(0);
+		RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
+		if (depthOwner->HaveStencilBuffer(true))
+			gfxStates.SetStencilWrite(0);
+	}
 
-    void FillPipelineFormats(RenderStates& states) const noexcept;
+	void FillPipelineFormats(RenderStates& states) const
+	noexcept;
 
 private:
-    DXGI_FORMAT m_boundColorFormats[RT_MAX_COLOR_BUFFERS]{};
-    int         m_boundColorCount{ 0 };
-    DXGI_FORMAT m_boundDepthFormat{ DXGI_FORMAT_UNKNOWN };
+	DXGI_FORMAT	m_boundColorFormats[RT_MAX_COLOR_BUFFERS]{};
+	int			m_boundColorCount{ 0 };
+	DXGI_FORMAT	m_boundDepthFormat{ DXGI_FORMAT_UNKNOWN };
 
-    // DSV format of the depth buffer that actually gets bound; a shared depth source (SetDepthSource)
-    // takes precedence, exactly like ActiveDepthBufferHandle.
-    inline DXGI_FORMAT DepthFormat(void) noexcept {
-        RenderTarget* owner = (m_depthSource != nullptr) ? m_depthSource : this;
-        return owner->m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
-    }
+	// DSV format of the depth buffer that actually gets bound; a shared depth source (SetDepthSource)
+	// takes precedence, exactly like ActiveDepthBufferHandle.
+	inline DXGI_FORMAT DepthFormat(void)
+	noexcept
+	{
+		RenderTarget* owner = (m_depthSource != nullptr) ? m_depthSource : this;
+		return owner->m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
+	}
 
-    inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle() noexcept {
-        return HaveDepthBuffer(true) ? m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandleAddress() : nullptr;
-    }
+	inline const D3D12_CPU_DESCRIPTOR_HANDLE* DepthBufferHandle()
+	noexcept
+	{
+		return HaveDepthBuffer(true) ? m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandleAddress() : nullptr;
+	}
 
-    // The DSV to bind when this target is activated: the shared source's depth (SetDepthSource)
-    // takes precedence over an own depth buffer. Used by SelectDrawBuffers only - the Clear* and
-    // GetDepth* paths intentionally keep using the own buffer.
-    inline const D3D12_CPU_DESCRIPTOR_HANDLE* ActiveDepthBufferHandle() noexcept {
-        return (m_depthSource != nullptr) ? m_depthSource->DepthBufferHandle() : DepthBufferHandle();
-    }
+	// The DSV to bind when this target is activated: the shared source's depth (SetDepthSource)
+	// takes precedence over an own depth buffer. Used by SelectDrawBuffers only - the Clear* and
+	// GetDepth* paths intentionally keep using the own buffer.
+	inline const D3D12_CPU_DESCRIPTOR_HANDLE* ActiveDepthBufferHandle()
+	noexcept
+	{
+		return (m_depthSource != nullptr) ? m_depthSource->DepthBufferHandle() : DepthBufferHandle();
+	}
 };
 
 // =================================================================================================

@@ -19,33 +19,36 @@
 
 static D3D12_RESOURCE_FLAGS ResourceFlagsForType(BufferInfo::eBufferType type)
 {
-    if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
-        return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-    if (type == BufferInfo::btSkyMap)
-        return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	if ((type == BufferInfo::btDepth) or (type == BufferInfo::btStencil))
+		return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	if (type == BufferInfo::btSkyMap)
+		return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 }
 
 
-static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt, D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal, D3D12_RESOURCE_FLAGS flags, int arraySize = 1) noexcept
+static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int h, DXGI_FORMAT fmt,
+											   D3D12_RESOURCE_STATES initState, const D3D12_CLEAR_VALUE* clearVal,
+											   D3D12_RESOURCE_FLAGS flags, int arraySize = 1)
+noexcept
 {
-    D3D12_HEAP_PROPERTIES hp{ D3D12_HEAP_TYPE_DEFAULT };
-    D3D12_RESOURCE_DESC rd{};
-    rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    rd.Width = UINT(w);
-    rd.Height = UINT(h);
-    // Six for a cube map, one for everything else. A cube map is a plain texture array as far as the
-    // resource is concerned; what makes it a cube is the SRV that reads it (SRV::CreateCube).
-    rd.DepthOrArraySize = UINT16(arraySize);
-    rd.MipLevels = 1;
-    rd.Format = fmt;
-    rd.SampleDesc.Count = 1;
-    rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    rd.Flags = flags;
+	D3D12_HEAP_PROPERTIES	hp{ D3D12_HEAP_TYPE_DEFAULT };
+	D3D12_RESOURCE_DESC		rd{};
+	rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	rd.Width = UINT(w);
+	rd.Height = UINT(h);
+	// Six for a cube map, one for everything else. A cube map is a plain texture array as far as the
+	// resource is concerned; what makes it a cube is the SRV that reads it (SRV::CreateCube).
+	rd.DepthOrArraySize = UINT16(arraySize);
+	rd.MipLevels = 1;
+	rd.Format = fmt;
+	rd.SampleDesc.Count = 1;
+	rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	rd.Flags = flags;
 
-    ComPtr<ID3D12Resource> resource;
-    device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, initState, clearVal, IID_PPV_ARGS(&resource));
-    return resource;
+	ComPtr<ID3D12Resource> resource;
+	device->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd, initState, clearVal, IID_PPV_ARGS(&resource));
+	return resource;
 }
 
 
@@ -54,280 +57,291 @@ static ComPtr<ID3D12Resource> CreateRTResource(ID3D12Device* device, int w, int 
 
 void BufferInfo::Init(void)
 {
-    m_resource.Reset();
-    RTV().Handle() = {};
-    for (int face = 0; face < 6; ++face)
-        m_cubeRtv[face].Handle() = {};
-    SRV().Handle() = {};
-    DSV().Handle() = {};
-    m_dsvReadOnly.Handle() = {};
-    m_uav.Handle() = {};
-    for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
-        m_arrayRtv[layer].Handle() = {};
-    m_arrayRtv.Destroy();
-    m_state = kShaderReadState;
-    m_type = btColor;
-    m_hasStencil = false;
-    m_isArray = false;
+	m_resource.Reset();
+	RTV().Handle() = {};
+	for (int face = 0; face < 6; ++face)
+		m_cubeRtv[face].Handle() = {};
+	SRV().Handle() = {};
+	DSV().Handle() = {};
+	m_dsvReadOnly.Handle() = {};
+	m_uav.Handle() = {};
+	for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
+		m_arrayRtv[layer].Handle() = {};
+	m_arrayRtv.Destroy();
+	m_state = kShaderReadState;
+	m_type = btColor;
+	m_hasStencil = false;
+	m_isArray = false;
 }
 
 
 DXGI_FORMAT BufferInfo::ViewFormat(void)
 {
-    switch (m_type) {
-        case BufferInfo::btDepth:
-        case BufferInfo::btStencil:
-            return m_hasStencil ? dxDepthStencilSRVFormat : dxDepthSRVFormat;
-        case BufferInfo::btVertex:
-            return dxVertexFormat;
-        case BufferInfo::btId:
-            return dxIdFormat;
-        case BufferInfo::btSkyMap:
-            return m_colorFormat;
-        default:
-            return m_colorFormat;
-    }
+	switch (m_type) {
+		case BufferInfo::btDepth:
+		case BufferInfo::btStencil:
+			return m_hasStencil ? dxDepthStencilSRVFormat : dxDepthSRVFormat;
+		case BufferInfo::btVertex:
+			return dxVertexFormat;
+		case BufferInfo::btId:
+			return dxIdFormat;
+		case BufferInfo::btSkyMap:
+			return m_colorFormat;
+		default:
+			return m_colorFormat;
+	}
 }
 
 
 void BufferInfo::SetState(CommandList* cmdList, D3D12_RESOURCE_STATES targetState)
 {
-    if ((m_state == targetState) or not cmdList or not m_resource)
-        return;
-    cmdList->SetBarrier(m_resource.Get(), m_state, targetState);
-    m_state = targetState;
+	if ((m_state == targetState) or not cmdList or not m_resource)
+		return;
+	cmdList->SetBarrier(m_resource.Get(), m_state, targetState);
+	m_state = targetState;
 }
 
 
-bool BufferInfo::AllocRTV(const std::source_location& loc) {
+bool BufferInfo::AllocRTV(const std::source_location& loc)
+{
 #if DBG_DIRECTX
-    if (not m_rtv.Create(m_resource, ViewFormat()))
-        return false;
-    descriptorHeaps.m_rtvHeap.SetOwner(m_rtv.GetIndex(), loc);
-    return true;
+	if (not m_rtv.Create(m_resource, ViewFormat()))
+		return false;
+	descriptorHeaps.m_rtvHeap.SetOwner(m_rtv.GetIndex(), loc);
+	return true;
 #else
-    return m_rtv.Create(m_resource, ViewFormat());
+	return m_rtv.Create(m_resource, ViewFormat());
 #endif
 }
 
 
-void BufferInfo::FreeRTV(void) {
-    m_rtv.Free();
+void BufferInfo::FreeRTV(void)
+{
+	m_rtv.Free();
 }
 
 
-bool BufferInfo::AllocSRV(void) {
-    return m_srv.Create(m_resource, ViewFormat());
+bool BufferInfo::AllocSRV(void)
+{
+	return m_srv.Create(m_resource, ViewFormat());
 }
 
 
-void BufferInfo::FreeSRV(void) {
-    m_srv.Free();
+void BufferInfo::FreeSRV(void)
+{
+	m_srv.Free();
 }
 
 
-bool BufferInfo::AllocDSV(void) {
-    return m_dsv.Create(m_resource, m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat);
+bool BufferInfo::AllocDSV(void)
+{
+	return m_dsv.Create(m_resource, m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat);
 }
 
 
-bool BufferInfo::AllocReadOnlyDSV(void) {
-    // With a stencil plane the read-only view has to lock BOTH planes: D3D12 rejects a DSV that leaves the
-    // stencil writable while the same resource is bound as an SRV.
-    D3D12_DSV_FLAGS flags = m_hasStencil ? (D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL)
-                                         : D3D12_DSV_FLAG_READ_ONLY_DEPTH;
-    return m_dsvReadOnly.Create(m_resource, m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat, flags);
+bool BufferInfo::AllocReadOnlyDSV(void)
+{
+	// With a stencil plane the read-only view has to lock BOTH planes: D3D12 rejects a DSV that leaves the
+	// stencil writable while the same resource is bound as an SRV.
+	D3D12_DSV_FLAGS flags = m_hasStencil ? (D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL)
+										 : D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+	return m_dsvReadOnly.Create(m_resource, m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat, flags);
 }
 
 
-void BufferInfo::FreeDSV(void) {
-    m_dsv.Free();
+void BufferInfo::FreeDSV(void)
+{
+	m_dsv.Free();
 }
 
 
-bool BufferInfo::AllocUAV(void) {
-    return m_uav.Create(m_resource, ViewFormat());
+bool BufferInfo::AllocUAV(void)
+{
+	return m_uav.Create(m_resource, ViewFormat());
 }
 
 
-void BufferInfo::FreeUAV(void) {
-    m_uav.Free();
+void BufferInfo::FreeUAV(void)
+{
+	m_uav.Free();
 }
 
 
-void BufferInfo::Release(bool immediate) {
-    // During graphics teardown the descriptor heaps are destroyed wholesale and the
-    // gfxResourceHandler singleton may already be gone (RenderTargets die at static
-    // destruction). Skip deferred tracking entirely - Init() drops the resource ref
-    // immediately (GPU is idle) and clears the handles; the heap slots are reclaimed
-    // when the descriptor heaps themselves are destroyed.
-    if (GfxResourceHandler::IsShuttingDown()) {
-        Init();
-        return;
-    }
+void BufferInfo::Release(bool immediate)
+{
+	// During graphics teardown the descriptor heaps are destroyed wholesale and the
+	// gfxResourceHandler singleton may already be gone (RenderTargets die at static
+	// destruction). Skip deferred tracking entirely - Init() drops the resource ref
+	// immediately (GPU is idle) and clears the handles; the heap slots are reclaimed
+	// when the descriptor heaps themselves are destroyed.
+	if (GfxResourceHandler::IsShuttingDown()) {
+		Init();
+		return;
+	}
 
-    auto release = [immediate](const DescriptorHandle& handle) {
-        if (not immediate)
-            gfxResourceHandler.Track(handle);
-        else if (handle.IsValid())
-            handle.m_heap->Free(handle.index);
-    };
+	auto release = [immediate](const DescriptorHandle& handle) {
+		if (not immediate)
+			gfxResourceHandler.Track(handle);
+		else if (handle.IsValid())
+			handle.m_heap->Free(handle.index);
+	};
 
-    // All descriptors and the resource go through deferred release - in-flight command lists
-    // may still reference them; gfxResourceHandler frees them once the frame fence has signalled.
-    // On a cube map buffer m_rtv is an ALIAS of m_cubeRtv[m_cubeFace] (see SelectCubeFace), so tracking
-    // both would hand the same descriptor slot back twice. The six face views are tracked instead.
-    if (m_type == btCubemap) {
-        for (int face = 0; face < 6; ++face)
-            release(m_cubeRtv[face].Handle());
-    }
-    // Same on an array buffer: m_rtv is an ALIAS of m_arrayRtv[m_arrayLayer], so tracking both would
-    // hand the same descriptor slot back twice. The per layer views are tracked instead.
-    else if (m_isArray) {
-        for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
-            release(m_arrayRtv[layer].Handle());
-    }
-    else
-        release(m_rtv.Handle());
-    release(m_srv.Handle());
-    release(m_dsv.Handle());
-    release(m_dsvReadOnly.Handle());
-    release(m_uav.Handle());
-    if (not immediate)
-        gfxResourceHandler.Track(m_resource);
-    Init();
+	// All descriptors and the resource go through deferred release - in-flight command lists
+	// may still reference them; gfxResourceHandler frees them once the frame fence has signalled.
+	// On a cube map buffer m_rtv is an ALIAS of m_cubeRtv[m_cubeFace] (see SelectCubeFace), so tracking
+	// both would hand the same descriptor slot back twice. The six face views are tracked instead.
+	if (m_type == btCubemap) {
+		for (int face = 0; face < 6; ++face)
+			release(m_cubeRtv[face].Handle());
+	}
+	// Same on an array buffer: m_rtv is an ALIAS of m_arrayRtv[m_arrayLayer], so tracking both would
+	// hand the same descriptor slot back twice. The per layer views are tracked instead.
+	else if (m_isArray) {
+		for (int layer = 0; layer < m_arrayRtv.Length(); ++layer)
+			release(m_arrayRtv[layer].Handle());
+	}
+	else
+		release(m_rtv.Handle());
+	release(m_srv.Handle());
+	release(m_dsv.Handle());
+	release(m_dsvReadOnly.Handle());
+	release(m_uav.Handle());
+	if (not immediate)
+		gfxResourceHandler.Track(m_resource);
+	Init();
 }
 
 // =================================================================================================
 
 RenderTarget::RenderTarget()
 {
-    Init();
+	Init();
 }
 
 
 void RenderTarget::Init(void)
 {
-    m_width = m_height = 0;
-    m_scale = 1;
-    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
-    m_extraBufferIndex = -1;
-    m_idBufferCount = 0;
-    m_idBufferIndex = -1;
-    m_depthBufferIndex = -1;
-    m_stencilBufferIndex = -1;
-    m_hasStencil = false;
-    m_computeBufferIndex = -1;
-    m_computeBufferCount = 0;
-    m_arrayLayerCount = 0;
-    m_arrayLayer = 0;
-    m_activeBufferIndex = 0;
-    m_lastDestination = -1;
-    m_pingPong = false;
-    m_isAvailable = false;
-    m_drawBufferGroup = dbAll;
-    m_clearColor = ColorData::Invisible;
-    m_bufferInfo.Reset();
+	m_width = m_height = 0;
+	m_scale = 1;
+	m_bufferCount = m_colorBufferCount = m_vertexBufferCount = 0;
+	m_extraBufferIndex = -1;
+	m_idBufferCount = 0;
+	m_idBufferIndex = -1;
+	m_depthBufferIndex = -1;
+	m_stencilBufferIndex = -1;
+	m_hasStencil = false;
+	m_computeBufferIndex = -1;
+	m_computeBufferCount = 0;
+	m_arrayLayerCount = 0;
+	m_arrayLayer = 0;
+	m_activeBufferIndex = 0;
+	m_lastDestination = -1;
+	m_pingPong = false;
+	m_isAvailable = false;
+	m_drawBufferGroup = dbAll;
+	m_clearColor = ColorData::Invisible;
+	m_bufferInfo.Reset();
 }
 
 
 bool RenderTarget::CreateDepthBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
-    info.m_hasStencil = m_hasStencil;   // must be set before the views below are allocated
-    D3D12_CLEAR_VALUE cv{};
-    cv.Format = m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
-    cv.DepthStencil.Depth = 1.0f;
-    cv.DepthStencil.Stencil = 0;
-    info.m_resource = CreateRTResource(device, w, h, m_hasStencil ? dxTypelessDepthStencilFormat : dxTypelessDepthFormat,
-                                       D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
-    if (not info.m_resource)
-        return false;
-    info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+	info.m_hasStencil = m_hasStencil; // must be set before the views below are allocated
+	D3D12_CLEAR_VALUE cv{};
+	cv.Format = m_hasStencil ? dxDepthStencilDSVFormat : dxDepthDSVFormat;
+	cv.DepthStencil.Depth = 1.0f;
+	cv.DepthStencil.Stencil = 0;
+	info.m_resource = CreateRTResource(device, w, h, m_hasStencil ? dxTypelessDepthStencilFormat : dxTypelessDepthFormat,
+									   D3D12_RESOURCE_STATE_DEPTH_WRITE, &cv, ResourceFlagsForType(info.m_type));
+	if (not info.m_resource)
+		return false;
+	info.m_state = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 
-    if (not info.AllocDSV())
-        return false;
-    // Read-only DSV over the same depth resource: lets a pass bind the depth for compare-only testing
-    // while simultaneously sampling it as an SRV (soft particles). One extra descriptor, no extra memory.
-    if (not info.AllocReadOnlyDSV())
-        return false;
-    if (not info.AllocSRV())
-        return false;
-    return true;
+	if (not info.AllocDSV())
+		return false;
+	// Read-only DSV over the same depth resource: lets a pass bind the depth for compare-only testing
+	// while simultaneously sampling it as an SRV (soft particles). One extra descriptor, no extra memory.
+	if (not info.AllocReadOnlyDSV())
+		return false;
+	if (not info.AllocSRV())
+		return false;
+	return true;
 }
 
 
 bool BufferInfo::AllocCubeViews(void)
 {
-    for (int face = 0; face < 6; ++face)
-        if (not m_cubeRtv[face].Create(m_resource, ViewFormat(), face))
-            return false;
-    // The face selected first is face 0 - RenderTarget::SelectCubeFace () moves m_rtv along afterwards.
-    m_rtv = m_cubeRtv[0];
-    return m_srv.CreateCube(m_resource, ViewFormat());
+	for (int face = 0; face < 6; ++face)
+		if (not m_cubeRtv[face].Create(m_resource, ViewFormat(), face))
+			return false;
+	// The face selected first is face 0 - RenderTarget::SelectCubeFace () moves m_rtv along afterwards.
+	m_rtv = m_cubeRtv[0];
+	return m_srv.CreateCube(m_resource, ViewFormat());
 }
 
 
 bool BufferInfo::AllocArrayViews(int layerCount)
 {
-    m_arrayRtv.Resize(layerCount);
-    for (int layer = 0; layer < layerCount; ++layer)
-        if (not m_arrayRtv[layer].Create(m_resource, ViewFormat(), layer))
-            return false;
-    // The layer selected first is layer 0 - RenderTarget::SelectArrayLayer () moves m_rtv along.
-    m_rtv = m_arrayRtv[0];
-    return m_srv.CreateArray(m_resource, ViewFormat(), layerCount);
+	m_arrayRtv.Resize(layerCount);
+	for (int layer = 0; layer < layerCount; ++layer)
+		if (not m_arrayRtv[layer].Create(m_resource, ViewFormat(), layer))
+			return false;
+	// The layer selected first is layer 0 - RenderTarget::SelectArrayLayer () moves m_rtv along.
+	m_rtv = m_arrayRtv[0];
+	return m_srv.CreateArray(m_resource, ViewFormat(), layerCount);
 }
 
 
 bool RenderTarget::CreateCubemapBuffer(ID3D12Device* device, BufferInfo& info, int edge)
 {
-    info.m_colorFormat = m_cubeMapFormat;
+	info.m_colorFormat = m_cubeMapFormat;
 
-    D3D12_CLEAR_VALUE cv{};
+	D3D12_CLEAR_VALUE cv{};
 
-    cv.Format = info.ViewFormat();
-    // Square by definition, so the edge length is used for both dimensions, and six slices.
-    info.m_resource = CreateRTResource(device, edge, edge, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv,
-                                       ResourceFlagsForType(info.m_type), 6);
-    if (not info.m_resource)
-        return false;
-    info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    if (not info.AllocCubeViews())
-        return false;
+	cv.Format = info.ViewFormat();
+	// Square by definition, so the edge length is used for both dimensions, and six slices.
+	info.m_resource = CreateRTResource(device, edge, edge, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv,
+									   ResourceFlagsForType(info.m_type), 6);
+	if (not info.m_resource)
+		return false;
+	info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	if (not info.AllocCubeViews())
+		return false;
 
-    auto* list = m_cmdList->GfxList();
+	auto* list = m_cmdList->GfxList();
 
-    if (list)
-        info.SetState(m_cmdList, kShaderReadState);
-    return true;
+	if (list)
+		info.SetState(m_cmdList, kShaderReadState);
+	return true;
 }
 
 
 bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
-    info.m_colorFormat = m_colorFormat;
-    info.m_isArray = (info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0);
-    D3D12_CLEAR_VALUE cv{};
-    cv.Format = info.ViewFormat();
-    int arraySize = info.m_isArray ? m_arrayLayerCount : 1;
-    info.m_resource = CreateRTResource(device, w, h, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv, ResourceFlagsForType(info.m_type), arraySize);
-    if (not info.m_resource)
-        return false;
-    info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	info.m_colorFormat = m_colorFormat;
+	info.m_isArray = (info.m_type == BufferInfo::btColor) and (m_arrayLayerCount > 0);
+	D3D12_CLEAR_VALUE cv{};
+	cv.Format = info.ViewFormat();
+	int arraySize = info.m_isArray ? m_arrayLayerCount : 1;
+	info.m_resource = CreateRTResource(device, w, h, cv.Format, D3D12_RESOURCE_STATE_RENDER_TARGET, &cv,
+									   ResourceFlagsForType(info.m_type), arraySize);
+	if (not info.m_resource)
+		return false;
+	info.m_state = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-    // An array buffer takes its views here - one RTV per layer plus an array SRV - instead of the
-    // plain SRV (and the RTV that AllocRTV () makes for a single 2D resource) below.
-    if (info.m_isArray) {
-        if (not info.AllocArrayViews(m_arrayLayerCount))
-            return false;
-    }
-    else if (not (info.AllocSRV() and info.AllocRTV()))
-        return false;
+	// An array buffer takes its views here - one RTV per layer plus an array SRV - instead of the
+	// plain SRV (and the RTV that AllocRTV () makes for a single 2D resource) below.
+	if (info.m_isArray) {
+		if (not info.AllocArrayViews(m_arrayLayerCount))
+			return false;
+	}
+	else if (not (info.AllocSRV() and info.AllocRTV()))
+		return false;
 
-    auto* list = m_cmdList->GfxList();
-    if (list)
-        info.SetState(m_cmdList, kShaderReadState);
-    return true;
+	auto* list = m_cmdList->GfxList();
+	if (list)
+		info.SetState(m_cmdList, kShaderReadState);
+	return true;
 }
 
 
@@ -336,20 +350,21 @@ bool RenderTarget::CreateColorBuffer(ID3D12Device* device, BufferInfo& info, int
 // is a regular state transition.
 bool RenderTarget::CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, int w, int h)
 {
-    info.m_colorFormat = m_skyMapFormat;
-    info.m_resource = CreateRTResource(device, w, h, m_skyMapFormat, D3D12_RESOURCE_STATE_COMMON, nullptr, ResourceFlagsForType(info.m_type));
-    if (not info.m_resource)
-        return false;
-    info.m_state = D3D12_RESOURCE_STATE_COMMON;
-    if (not info.AllocSRV())
-        return false;
-    if (not info.AllocUAV())
-        return false;
-    // RTV for GfxStates::ClearSkyMaps via ClearRenderTargetView (cleaner than ClearUAV -
-    // the RTV-heap is non-shader-visible by design, no auxiliary heap quirks).
-    if (not info.AllocRTV())
-        return false;
-    return true;
+	info.m_colorFormat = m_skyMapFormat;
+	info.m_resource =
+		CreateRTResource(device, w, h, m_skyMapFormat, D3D12_RESOURCE_STATE_COMMON, nullptr, ResourceFlagsForType(info.m_type));
+	if (not info.m_resource)
+		return false;
+	info.m_state = D3D12_RESOURCE_STATE_COMMON;
+	if (not info.AllocSRV())
+		return false;
+	if (not info.AllocUAV())
+		return false;
+	// RTV for GfxStates::ClearSkyMaps via ClearRenderTargetView (cleaner than ClearUAV -
+	// the RTV-heap is non-shader-visible by design, no auxiliary heap quirks).
+	if (not info.AllocRTV())
+		return false;
+	return true;
 }
 
 
@@ -359,234 +374,240 @@ bool RenderTarget::CreateComputeBuffer(ID3D12Device* device, BufferInfo& info, i
 
 bool RenderTarget::SelectCubeFace(int face, int bufferIndex)
 {
-    if ((m_cubeMapCount <= 0) or (face < 0) or (face > 5))
-        return false;
+	if ((m_cubeMapCount <= 0) or (face < 0) or (face > 5))
+		return false;
 
-    int index = (bufferIndex < 0) ? m_cubeMapIndex : bufferIndex;
+	int index = (bufferIndex < 0) ? m_cubeMapIndex : bufferIndex;
 
-    if ((index < 0) or (index >= m_bufferCount) or (m_bufferInfo[index].m_type != BufferInfo::btCubemap))
-        return false;
-    m_cubeFace = face;
-    m_bufferInfo[index].m_rtv = m_bufferInfo[index].m_cubeRtv[face];
-    // An enabled target has the face it was activated with bound (OMSetRenderTargets in
-    // SelectDrawBuffers ()); moving m_rtv alone leaves every later draw on that face. Bind again.
-    if (IsEnabled() and (m_drawBufferGroup == dbSingle) and (m_activeBufferIndex == index))
-        return SelectDrawBuffers({ .bufferIndex = index, .drawBufferGroup = dbSingle, .clear = false, .reactivate = true, .depthMode = m_depthMode });
-    return true;
+	if ((index < 0) or (index >= m_bufferCount) or (m_bufferInfo[index].m_type != BufferInfo::btCubemap))
+		return false;
+	m_cubeFace = face;
+	m_bufferInfo[index].m_rtv = m_bufferInfo[index].m_cubeRtv[face];
+	// An enabled target has the face it was activated with bound (OMSetRenderTargets in
+	// SelectDrawBuffers ()); moving m_rtv alone leaves every later draw on that face. Bind again.
+	if (IsEnabled() and (m_drawBufferGroup == dbSingle) and (m_activeBufferIndex == index))
+		return SelectDrawBuffers(
+			{ .bufferIndex = index, .drawBufferGroup = dbSingle, .clear = false, .reactivate = true, .depthMode = m_depthMode });
+	return true;
 }
 
 
 bool RenderTarget::SelectArrayLayer(int layer)
 {
-    if ((m_arrayLayerCount <= 0) or (layer < 0) or (layer >= m_arrayLayerCount))
-        return false;
-    if (m_arrayLayer == layer)
-        return true;
-    m_arrayLayer = layer;
-    // EVERY colour buffer moves, so an MRT pass writes the same layer of all of them. m_rtv is the view
-    // everything that binds render targets reads, so moving it is the whole operation - there is no
-    // attach/detach here as there is in OpenGL.
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        if (m_bufferInfo[i].m_isArray and (layer < m_bufferInfo[i].m_arrayRtv.Length()))
-            m_bufferInfo[i].m_rtv = m_bufferInfo[i].m_arrayRtv[layer];
-    if (IsEnabled())
-        return SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex, .drawBufferGroup = m_drawBufferGroup, .clear = false, .reactivate = true, .depthMode = m_depthMode });
-    return true;
+	if ((m_arrayLayerCount <= 0) or (layer < 0) or (layer >= m_arrayLayerCount))
+		return false;
+	if (m_arrayLayer == layer)
+		return true;
+	m_arrayLayer = layer;
+	// EVERY colour buffer moves, so an MRT pass writes the same layer of all of them. m_rtv is the view
+	// everything that binds render targets reads, so moving it is the whole operation - there is no
+	// attach/detach here as there is in OpenGL.
+	for (int i = 0; i < m_colorBufferCount; ++i)
+		if (m_bufferInfo[i].m_isArray and (layer < m_bufferInfo[i].m_arrayRtv.Length()))
+			m_bufferInfo[i].m_rtv = m_bufferInfo[i].m_arrayRtv[layer];
+	if (IsEnabled())
+		return SelectDrawBuffers({ .bufferIndex = m_activeBufferIndex,
+								   .drawBufferGroup = m_drawBufferGroup,
+								   .clear = false,
+								   .reactivate = true,
+								   .depthMode = m_depthMode });
+	return true;
 }
 
 
 bool RenderTarget::CreateBuffer(int bufferIndex, int& attachmentIndex, BufferInfo::eBufferType bufferType)
 {
-    ID3D12Device* device = dx12Context.Device();
-    if (device) {
-        BufferInfo& info = m_bufferInfo[bufferIndex];
-        info.Init();
-        info.m_type = bufferType;
+	ID3D12Device* device = dx12Context.Device();
+	if (device) {
+		BufferInfo& info = m_bufferInfo[bufferIndex];
+		info.Init();
+		info.m_type = bufferType;
 
-        int w = m_width * m_scale;
-        int h = m_height * m_scale;
+		int w = m_width * m_scale;
+		int h = m_height * m_scale;
 
-        if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil)) {
-            if (not CreateDepthBuffer(device, info, w, h))
-                return false;
-        }
-        else if (bufferType == BufferInfo::btSkyMap) {
-            if (not CreateComputeBuffer(device, info, w, h))
-                return false;
-        }
-        else if (bufferType == BufferInfo::btCubemap) {
-            // Edge length is the WIDTH - a cube map is square, and taking the height as well would
-            // quietly produce something that is not a cube.
-            if (not CreateCubemapBuffer(device, info, w))
-                return false;
-        }
-        else {
-            if (not CreateColorBuffer(device, info, w, h))
-                return false;
-        }
+		if ((bufferType == BufferInfo::btDepth) or (bufferType == BufferInfo::btStencil)) {
+			if (not CreateDepthBuffer(device, info, w, h))
+				return false;
+		}
+		else if (bufferType == BufferInfo::btSkyMap) {
+			if (not CreateComputeBuffer(device, info, w, h))
+				return false;
+		}
+		else if (bufferType == BufferInfo::btCubemap) {
+			// Edge length is the WIDTH - a cube map is square, and taking the height as well would
+			// quietly produce something that is not a cube.
+			if (not CreateCubemapBuffer(device, info, w))
+				return false;
+		}
+		else {
+			if (not CreateColorBuffer(device, info, w, h))
+				return false;
+		}
 #if DBG_DIRECTX
-        if (info.m_resource) {
-            char name[160];
-            snprintf(name, sizeof(name), "RenderTarget[%s] buffer %d type %d", (const char*)m_name, bufferIndex, int(bufferType));
-            info.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
-        }
+		if (info.m_resource) {
+			char name[160];
+			snprintf(name, sizeof(name), "RenderTarget[%s] buffer %d type %d", (const char*)m_name, bufferIndex, int(bufferType));
+			info.m_resource->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+		}
 #endif
-        ++m_bufferCount;
-    }
-    return true;
+		++m_bufferCount;
+	}
+	return true;
 }
 
 
 int RenderTarget::CreateSpecialBuffers(BufferInfo::eBufferType bufferType, int& attachmentIndex, int bufferCount)
 {
-    if (not bufferCount)
-        return -1;
-    for (int i = 0; i < bufferCount; ++i)
-        CreateBuffer(m_bufferCount, attachmentIndex, bufferType);
-    return m_bufferCount - bufferCount;
+	if (not bufferCount)
+		return -1;
+	for (int i = 0; i < bufferCount; ++i)
+		CreateBuffer(m_bufferCount, attachmentIndex, bufferType);
+	return m_bufferCount - bufferCount;
 }
 
 
 bool RenderTarget::Create(int width, int height, int scale, const RTCreationParams& params)
 {
-    Destroy();
+	Destroy();
 
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return false;
+	ID3D12Device* device = dx12Context.Device();
+	if (not device)
+		return false;
 
-    m_name = params.name;
-    m_width = width;
-    m_height = height;
-    m_scale = scale;
-    m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
-    m_colorFormat = params.colorFormat;
-    if (IsIntegerColorFormat(m_colorFormat))
-        m_filtering = GfxFilterMode::Nearest;
-    m_cubeMapFormat = params.cubeMapFormat;
-    m_skyMapFormat = params.skyMapFormat;
-    // Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of resource to
-    // allocate, and SelectArrayLayer () bounds against it.
-    m_arrayLayerCount = params.arrayLayerCount;
-    m_arrayLayer = 0;
-    // Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
-    // for stencil without depth still yields one combined buffer.
-    m_hasStencil = params.stencilBufferCount > 0;
-    int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
-    m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.idBufferCount + depthBufferCount + params.cubeMapCount);
-    // One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
-    m_renderTextures.Resize(m_colorBufferCount);
-    for (int i = 0; i < m_renderTextures.Length(); i++)
-        m_renderTextures[i].m_filtering = m_filtering;
-    m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
-    m_isScreenBuffer = params.isScreenBuffer;
+	m_name = params.name;
+	m_width = width;
+	m_height = height;
+	m_scale = scale;
+	m_colorBufferCount = std::min(params.colorBufferCount, RT_MAX_COLOR_BUFFERS);
+	m_colorFormat = params.colorFormat;
+	if (IsIntegerColorFormat(m_colorFormat))
+		m_filtering = GfxFilterMode::Nearest;
+	m_cubeMapFormat = params.cubeMapFormat;
+	m_skyMapFormat = params.skyMapFormat;
+	// Before the first buffer is made: CreateColorBuffer () reads it to decide what kind of resource to
+	// allocate, and SelectArrayLayer () bounds against it.
+	m_arrayLayerCount = params.arrayLayerCount;
+	m_arrayLayer = 0;
+	// Stencil is a plane of the depth buffer, not a buffer of its own (see m_stencilBufferIndex). Asking
+	// for stencil without depth still yields one combined buffer.
+	m_hasStencil = params.stencilBufferCount > 0;
+	int depthBufferCount = m_hasStencil ? std::max(params.depthBufferCount, 1) : params.depthBufferCount;
+	m_bufferInfo.Resize(params.skyMapCount + params.colorBufferCount + params.vertexBufferCount + params.idBufferCount +
+						depthBufferCount + params.cubeMapCount);
+	// One sampling wrapper per colour buffer, dimensioned here and never again - see m_renderTextures.
+	m_renderTextures.Resize(m_colorBufferCount);
+	for (int i = 0; i < m_renderTextures.Length(); i++)
+		m_renderTextures[i].m_filtering = m_filtering;
+	m_pingPong = (m_colorBufferCount > 1) or (params.skyMapCount > 1);
+	m_isScreenBuffer = params.isScreenBuffer;
 
-    bool deferSubmit = (commandListHandler.CurrentCmdList() != nullptr);
-    m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
-    if (not m_cmdList or not m_cmdList->Open())
-        return false;
-    m_cmdListExecution = m_cmdList->GetExecutionCounter();
+	bool deferSubmit = (commandListHandler.CurrentCmdList() != nullptr);
+	m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name, true);
+	if (not m_cmdList or not m_cmdList->Open())
+		return false;
+	m_cmdListExecution = m_cmdList->GetExecutionCounter();
 
-    int attachmentIndex = 0;
-    for (int i = 0; i < m_colorBufferCount; ++i)
-        CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
+	int attachmentIndex = 0;
+	for (int i = 0; i < m_colorBufferCount; ++i)
+		CreateBuffer(m_bufferCount, attachmentIndex, BufferInfo::btColor);
 
-    m_vertexBufferCount = params.vertexBufferCount;
-    // extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
-    m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
-    m_idBufferCount = params.idBufferCount;
-    m_idBufferIndex = CreateSpecialBuffers(BufferInfo::btId, attachmentIndex, params.idBufferCount);
-    m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, depthBufferCount);
-    m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
-    // Compute buffers come last so the existing color/vertex/depth-buffer iterations
-    // (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
-    // buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
-    m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
-    m_computeBufferCount = params.skyMapCount;
-    // Cube maps last, for the same reason as the compute buffers: everything that walks the colour
-    // buffers assumes they sit contiguously from index 0.
-    m_cubeMapIndex = (params.cubeMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btCubemap, attachmentIndex, params.cubeMapCount) : -1;
-    m_cubeMapCount = params.cubeMapCount;
-    m_cubeFace = 0;
+	m_vertexBufferCount = params.vertexBufferCount;
+	// extra buffers *must* be created right after any color buffers, or SelectDrawBuffers will not work correctly for dbExtra
+	m_extraBufferIndex = CreateSpecialBuffers(BufferInfo::btVertex, attachmentIndex, params.vertexBufferCount);
+	m_idBufferCount = params.idBufferCount;
+	m_idBufferIndex = CreateSpecialBuffers(BufferInfo::btId, attachmentIndex, params.idBufferCount);
+	m_depthBufferIndex = CreateSpecialBuffers(BufferInfo::btDepth, attachmentIndex, depthBufferCount);
+	m_stencilBufferIndex = m_hasStencil ? m_depthBufferIndex : -1;
+	// Compute buffers come last so the existing color/vertex/depth-buffer iterations
+	// (e.g. SelectDrawBuffers, which assumes m_bufferInfo[0..m_colorBufferCount-1] are color
+	// buffers) remain valid. Caller addresses them via m_computeBufferIndex + slot.
+	m_computeBufferIndex = (params.skyMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btSkyMap, attachmentIndex, params.skyMapCount) : -1;
+	m_computeBufferCount = params.skyMapCount;
+	// Cube maps last, for the same reason as the compute buffers: everything that walks the colour
+	// buffers assumes they sit contiguously from index 0.
+	m_cubeMapIndex = (params.cubeMapCount > 0) ? CreateSpecialBuffers(BufferInfo::btCubemap, attachmentIndex, params.cubeMapCount) : -1;
+	m_cubeMapCount = params.cubeMapCount;
+	m_cubeFace = 0;
 
-    if (deferSubmit)
-        m_cmdList->Close();
-    else
-        m_cmdList->Flush();
-    m_cmdList = nullptr;
+	if (deferSubmit)
+		m_cmdList->Close();
+	else
+		m_cmdList->Flush();
+	m_cmdList = nullptr;
 
-    int w = width * scale;
-    int h = height * scale;
-    m_viewport = Viewport(0, 0, w, h);
-    CreateRenderArea();
-    m_isAvailable = true;
-    return true;
+	int w = width * scale;
+	int h = height * scale;
+	m_viewport = Viewport(0, 0, w, h);
+	CreateRenderArea();
+	m_isAvailable = true;
+	return true;
 }
 
 
 bool RenderTarget::AttachBuffer(int bufferIndex)
 {
-    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not IsEnabled())
-        return false;
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return false;
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    if (not info.RTV().IsValid())
-        if (not info.AllocRTV())
-            return false;
-    info.SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    commandListHandler.UnbindImage(info.SRVIndex());
-    return true;
+	if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not IsEnabled())
+		return false;
+	auto* list = m_cmdList->GfxList();
+	if (not list)
+		return false;
+	BufferInfo& info = m_bufferInfo[bufferIndex];
+	if (not info.RTV().IsValid())
+		if (not info.AllocRTV())
+			return false;
+	info.SetState(m_cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	commandListHandler.UnbindImage(info.SRVIndex());
+	return true;
 }
 
 
 bool RenderTarget::DetachBuffer(int bufferIndex)
 {
-    if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not IsEnabled())
-        return false;
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return false;
-    m_bufferInfo[bufferIndex].SetState(m_cmdList, kShaderReadState);
-    return true;
+	if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not IsEnabled())
+		return false;
+	auto* list = m_cmdList->GfxList();
+	if (not list)
+		return false;
+	m_bufferInfo[bufferIndex].SetState(m_cmdList, kShaderReadState);
+	return true;
 }
 
 
 void RenderTarget::Destroy(bool immediate)
 {
-    if (IsEnabled())
-        m_cmdList->Close();
-    m_cmdList = nullptr;
-    if (immediate and (m_bufferCount > 0)) {
-        commandListHandler.ExecutePending();
-        commandListHandler.CmdQueue().WaitIdle();
-    }
-    for (int i = 0; i < m_bufferCount; ++i) {
-        // Out of the texture slot bookkeeping before the SRV index is handed back - see the note in
-        // Texture::Destroy (). The sampling wrappers (m_renderTextures, m_externalTexture) borrow the
-        // buffer's index and register it there on Bind (), but their own Destroy () nulls m_handle
-        // first, so it has to happen here. The tag is GL_TEXTURE_2D whatever the buffer is: a wrapper
-        // is a plain RenderTargetTexture and never carries a cube or array type, so that is what it
-        // was registered under. A buffer without an SRV has UINT32_MAX, which is also what
-        // Texture::Release () parks in an empty slot - releasing it would sweep every empty slot.
-        const uint32_t srvIndex = m_bufferInfo[i].SRVIndex();
-        if (srvIndex != UINT32_MAX)
-            gfxStates.ReleaseTexture(GL_TEXTURE_2D, srvIndex);
-        if (immediate)
-            commandListHandler.UnbindImage(srvIndex);
-        m_bufferInfo[i].Release(immediate);
-        gfxStates.CheckError();
-    }
-    m_isAvailable = false;
-    m_bufferCount = m_colorBufferCount = m_vertexBufferCount = m_idBufferCount = 0;
-    m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = m_idBufferIndex = -1;
-    m_hasStencil = false;
-    m_computeBufferIndex = -1;
-    m_computeBufferCount = 0;
-    m_depthMode = dbmWrite;
-    m_bufferInfo.Reset();
-    m_customDrawBuffers.Reset();
+	if (IsEnabled())
+		m_cmdList->Close();
+	m_cmdList = nullptr;
+	if (immediate and (m_bufferCount > 0)) {
+		commandListHandler.ExecutePending();
+		commandListHandler.CmdQueue().WaitIdle();
+	}
+	for (int i = 0; i < m_bufferCount; ++i) {
+		// Out of the texture slot bookkeeping before the SRV index is handed back - see the note in
+		// Texture::Destroy (). The sampling wrappers (m_renderTextures, m_externalTexture) borrow the
+		// buffer's index and register it there on Bind (), but their own Destroy () nulls m_handle
+		// first, so it has to happen here. The tag is GL_TEXTURE_2D whatever the buffer is: a wrapper
+		// is a plain RenderTargetTexture and never carries a cube or array type, so that is what it
+		// was registered under. A buffer without an SRV has UINT32_MAX, which is also what
+		// Texture::Release () parks in an empty slot - releasing it would sweep every empty slot.
+		const uint32_t srvIndex = m_bufferInfo[i].SRVIndex();
+		if (srvIndex != UINT32_MAX)
+			gfxStates.ReleaseTexture(GL_TEXTURE_2D, srvIndex);
+		if (immediate)
+			commandListHandler.UnbindImage(srvIndex);
+		m_bufferInfo[i].Release(immediate);
+		gfxStates.CheckError();
+	}
+	m_isAvailable = false;
+	m_bufferCount = m_colorBufferCount = m_vertexBufferCount = m_idBufferCount = 0;
+	m_depthBufferIndex = m_stencilBufferIndex = m_extraBufferIndex = m_idBufferIndex = -1;
+	m_hasStencil = false;
+	m_computeBufferIndex = -1;
+	m_computeBufferCount = 0;
+	m_depthMode = dbmWrite;
+	m_bufferInfo.Reset();
+	m_customDrawBuffers.Reset();
 }
 
 
@@ -595,217 +616,220 @@ void RenderTarget::Destroy(bool immediate)
 // a zeroed handle there, so one null RTV descriptor is created on first use and shared from then on.
 D3D12_CPU_DESCRIPTOR_HANDLE RenderTarget::NullRTV(void)
 {
-    static DescriptorHandle nullHandle;
-    if (not nullHandle.IsValid()) {
-        ID3D12Device* device = dx12Context.Device();
-        if (not device)
-            return D3D12_CPU_DESCRIPTOR_HANDLE{ 0 };
-        nullHandle = descriptorHeaps.AllocRTV();
-        if (not nullHandle.IsValid())
-            return D3D12_CPU_DESCRIPTOR_HANDLE{ 0 };
-        D3D12_RENDER_TARGET_VIEW_DESC desc{};
-        desc.Format = dxColorFormat;
-        desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-        device->CreateRenderTargetView(nullptr, &desc, descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index));
-    }
-    return descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index);
+	static DescriptorHandle nullHandle;
+	if (not nullHandle.IsValid()) {
+		ID3D12Device* device = dx12Context.Device();
+		if (not device)
+			return D3D12_CPU_DESCRIPTOR_HANDLE{ 0 };
+		nullHandle = descriptorHeaps.AllocRTV();
+		if (not nullHandle.IsValid())
+			return D3D12_CPU_DESCRIPTOR_HANDLE{ 0 };
+		D3D12_RENDER_TARGET_VIEW_DESC desc{};
+		desc.Format = dxColorFormat;
+		desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		device->CreateRenderTargetView(nullptr, &desc, descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index));
+	}
+	return descriptorHeaps.m_rtvHeap.CpuHandle(nullHandle.index);
 }
 
 
 bool RenderTarget::SelectDrawBuffers(const RTActivationParams& params)
 {
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return false;
+	auto* list = m_cmdList->GfxList();
+	if (not list)
+		return false;
 
-    const D3D12_CPU_DESCRIPTOR_HANDLE* pDSV = nullptr;
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[RT_MAX_COLOR_BUFFERS]{};
-    DXGI_FORMAT formats[RT_MAX_COLOR_BUFFERS]{};
-    int count = 0;
-    auto push = [&](D3D12_CPU_DESCRIPTOR_HANDLE rtv, DXGI_FORMAT format) {
-        if (count < RT_MAX_COLOR_BUFFERS) {
-            rtvs[count] = rtv;
-            formats[count] = format;
-            ++count;
-        }
-    };
+	const D3D12_CPU_DESCRIPTOR_HANDLE*	pDSV = nullptr;
+	D3D12_CPU_DESCRIPTOR_HANDLE			rtvs[RT_MAX_COLOR_BUFFERS]{};
+	DXGI_FORMAT							formats[RT_MAX_COLOR_BUFFERS]{};
+	int									count = 0;
+	auto								push = [&](D3D12_CPU_DESCRIPTOR_HANDLE rtv, DXGI_FORMAT format) {
+		  if (count < RT_MAX_COLOR_BUFFERS) {
+			  rtvs[count] = rtv;
+			  formats[count] = format;
+			  ++count;
+		  }
+	};
 
-    if (params.drawBufferGroup == dbDepth) {
-        for (int i = 0; i < m_colorBufferCount; ++i)
-            m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
-        pDSV = ActiveDepthBufferHandle();
-    }
-    else if (params.drawBufferGroup == dbSingle) {
-        if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
-            return false;
-        m_drawBufferGroup = dbSingle;
-        m_activeBufferIndex = params.bufferIndex;
-        if (AttachBuffer(params.bufferIndex))
-            push(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_bufferInfo[params.bufferIndex].ViewFormat());
-        for (int i = 0; i < m_colorBufferCount; ++i)
-            if (i != params.bufferIndex)
-                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
-        for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
-            if (j != params.bufferIndex)
-                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
-        for (int i = 0, j = IdBufferIndex(); i < m_idBufferCount; ++i, ++j)
-            if (j != params.bufferIndex)
-                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
-        pDSV = ActiveDepthBufferHandle();
-    }
-    else {
-        m_activeBufferIndex = -1;
-        m_drawBufferGroup = (params.drawBufferGroup == dbNone) ? dbAll : params.drawBufferGroup;
-        if (m_drawBufferGroup == dbAll) {
-            for (int i = 0; (i < m_bufferCount) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
-                if ((m_bufferInfo[i].m_type != BufferInfo::btColor) and (m_bufferInfo[i].m_type != BufferInfo::btVertex))
-                    continue;
-                if (AttachBuffer(i))
-                    push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
-            }
-            pDSV = ActiveDepthBufferHandle();
-        }
-        else if (m_drawBufferGroup == dbColor) {
-            for (int i = 0; i < m_colorBufferCount; ++i) {
-                if (AttachBuffer(i))
-                    push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
-            }
-            pDSV = ActiveDepthBufferHandle();
-            for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
-        }
-        else if (m_drawBufferGroup == dbExtra) {
-            int i = 0;
-            for (; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
-            for (int j = 0; j < m_vertexBufferCount; ++j, ++i) {
-                if (AttachBuffer(i))
-                    push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
-            }
-            pDSV = ActiveDepthBufferHandle();
-        }
-        else if (m_drawBufferGroup == dbCustom) {
-            // Caller-defined setup: slot i draws into m_customDrawBuffers[i]. Everything not named goes to
-            // PIXEL_SHADER_RESOURCE, so a buffer left out of the list can be sampled by the same pass.
-            int listed = m_customDrawBuffers.Length();
-            for (int i = 0; i < m_bufferCount; ++i) {
-                BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
-                if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex) and (type != BufferInfo::btId))
-                    continue;
-                bool isTarget = false;
-                for (int j = 0; (j < listed) and not isTarget; ++j)
-                    isTarget = (m_customDrawBuffers[j] == i);
-                if (not isTarget)
-                    m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
-            }
-            for (int i = 0; (i < listed) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
-                int bufferIndex = m_customDrawBuffers[i];
-                // An unused slot still occupies its position, or every later output would shift down one
-                // slot. D3D12 needs a real null RTV descriptor for that, hence NullRTV().
-                if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not AttachBuffer(bufferIndex))
-                    push(NullRTV(), dxColorFormat);
-                else
-                    push(m_bufferInfo[bufferIndex].RTV().CPUHandle(), m_bufferInfo[bufferIndex].ViewFormat());
-            }
-            pDSV = ActiveDepthBufferHandle();
-        }
-    }
+	if (params.drawBufferGroup == dbDepth) {
+		for (int i = 0; i < m_colorBufferCount; ++i)
+			m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
+		pDSV = ActiveDepthBufferHandle();
+	}
+	else if (params.drawBufferGroup == dbSingle) {
+		if ((params.bufferIndex < 0) or (params.bufferIndex >= m_bufferInfo.Length()))
+			return false;
+		m_drawBufferGroup = dbSingle;
+		m_activeBufferIndex = params.bufferIndex;
+		if (AttachBuffer(params.bufferIndex))
+			push(m_bufferInfo[params.bufferIndex].RTV().CPUHandle(), m_bufferInfo[params.bufferIndex].ViewFormat());
+		for (int i = 0; i < m_colorBufferCount; ++i)
+			if (i != params.bufferIndex)
+				m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
+		for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
+			if (j != params.bufferIndex)
+				m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
+		for (int i = 0, j = IdBufferIndex(); i < m_idBufferCount; ++i, ++j)
+			if (j != params.bufferIndex)
+				m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
+		pDSV = ActiveDepthBufferHandle();
+	}
+	else {
+		m_activeBufferIndex = -1;
+		m_drawBufferGroup = (params.drawBufferGroup == dbNone) ? dbAll : params.drawBufferGroup;
+		if (m_drawBufferGroup == dbAll) {
+			for (int i = 0; (i < m_bufferCount) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
+				if ((m_bufferInfo[i].m_type != BufferInfo::btColor) and (m_bufferInfo[i].m_type != BufferInfo::btVertex))
+					continue;
+				if (AttachBuffer(i))
+					push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
+			}
+			pDSV = ActiveDepthBufferHandle();
+		}
+		else if (m_drawBufferGroup == dbColor) {
+			for (int i = 0; i < m_colorBufferCount; ++i) {
+				if (AttachBuffer(i))
+					push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
+			}
+			pDSV = ActiveDepthBufferHandle();
+			for (int i = m_colorBufferCount; i < m_bufferCount; ++i)
+				m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
+		}
+		else if (m_drawBufferGroup == dbExtra) {
+			int i = 0;
+			for (; i < m_colorBufferCount; ++i)
+				m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
+			for (int j = 0; j < m_vertexBufferCount; ++j, ++i) {
+				if (AttachBuffer(i))
+					push(m_bufferInfo[i].RTV().CPUHandle(), m_bufferInfo[i].ViewFormat());
+			}
+			pDSV = ActiveDepthBufferHandle();
+		}
+		else if (m_drawBufferGroup == dbCustom) {
+			// Caller-defined setup: slot i draws into m_customDrawBuffers[i]. Everything not named goes to
+			// PIXEL_SHADER_RESOURCE, so a buffer left out of the list can be sampled by the same pass.
+			int listed = m_customDrawBuffers.Length();
+			for (int i = 0; i < m_bufferCount; ++i) {
+				BufferInfo::eBufferType type = m_bufferInfo[i].m_type;
+				if ((type != BufferInfo::btColor) and (type != BufferInfo::btVertex) and (type != BufferInfo::btId))
+					continue;
+				bool isTarget = false;
+				for (int j = 0; (j < listed) and not isTarget; ++j)
+					isTarget = (m_customDrawBuffers[j] == i);
+				if (not isTarget)
+					m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
+			}
+			for (int i = 0; (i < listed) and (count < RT_MAX_COLOR_BUFFERS); ++i) {
+				int bufferIndex = m_customDrawBuffers[i];
+				// An unused slot still occupies its position, or every later output would shift down one
+				// slot. D3D12 needs a real null RTV descriptor for that, hence NullRTV().
+				if ((bufferIndex < 0) or (bufferIndex >= m_bufferCount) or not AttachBuffer(bufferIndex))
+					push(NullRTV(), dxColorFormat);
+				else
+					push(m_bufferInfo[bufferIndex].RTV().CPUHandle(), m_bufferInfo[bufferIndex].ViewFormat());
+			}
+			pDSV = ActiveDepthBufferHandle();
+		}
+	}
 
-    // Bind the depth either writable (normal) or read-only + shader-readable (dbmReadOnly: a pass that
-    // samples the same depth it tests against, e.g. soft particles / WBOIT accumulation). Routed through
-    // the depth owner, so this works both for an own depth buffer AND a shared one (SetDepthSource) -- an
-    // overlay buffer can then hardware-depth-test against the scene depth AND sample it. dbmWrite restores
-    // DEPTH_WRITE, so a later normal pass transitions back on its own and never has to know about it.
-    m_depthMode = params.depthMode;
-    SetDepthMode(params.depthMode);
-    RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
-    if ((depthOwner->m_depthBufferIndex >= 0) and pDSV) {
-        BufferInfo& di = depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex];
-        if ((m_depthSource != nullptr) or (params.depthMode == dbmReadOnly)) {
-            di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
-            pDSV = di.m_dsvReadOnly.CPUHandleAddress();
-        }
-        else {
-            di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-            commandListHandler.UnbindImage(di.SRVIndex());
-            commandListHandler.UnbindImage(m_shadowTexture.m_handle);
-        }
-    }
+	// Bind the depth either writable (normal) or read-only + shader-readable (dbmReadOnly: a pass that
+	// samples the same depth it tests against, e.g. soft particles / WBOIT accumulation). Routed through
+	// the depth owner, so this works both for an own depth buffer AND a shared one (SetDepthSource) -- an
+	// overlay buffer can then hardware-depth-test against the scene depth AND sample it. dbmWrite restores
+	// DEPTH_WRITE, so a later normal pass transitions back on its own and never has to know about it.
+	m_depthMode = params.depthMode;
+	SetDepthMode(params.depthMode);
+	RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
+	if ((depthOwner->m_depthBufferIndex >= 0) and pDSV) {
+		BufferInfo& di = depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex];
+		if ((m_depthSource != nullptr) or (params.depthMode == dbmReadOnly)) {
+			di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
+			pDSV = di.m_dsvReadOnly.CPUHandleAddress();
+		}
+		else {
+			di.SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+			commandListHandler.UnbindImage(di.SRVIndex());
+			commandListHandler.UnbindImage(m_shadowTexture.m_handle);
+		}
+	}
 
-    if (count > 0)
-        list->OMSetRenderTargets(count, rtvs, FALSE, pDSV);
-    else
-        list->OMSetRenderTargets(0, nullptr, FALSE, pDSV);
+	if (count > 0)
+		list->OMSetRenderTargets(count, rtvs, FALSE, pDSV);
+	else
+		list->OMSetRenderTargets(0, nullptr, FALSE, pDSV);
 
-    for (int i = 0; i < RT_MAX_COLOR_BUFFERS; ++i)
-        m_boundColorFormats[i] = (i < count) ? formats[i] : DXGI_FORMAT_UNKNOWN;
-    m_boundColorCount = count;
-    m_boundDepthFormat = pDSV ? DepthFormat() : DXGI_FORMAT_UNKNOWN;
-    m_cmdList->m_activePSO = nullptr;
-    return true;
+	for (int i = 0; i < RT_MAX_COLOR_BUFFERS; ++i)
+		m_boundColorFormats[i] = (i < count) ? formats[i] : DXGI_FORMAT_UNKNOWN;
+	m_boundColorCount = count;
+	m_boundDepthFormat = pDSV ? DepthFormat() : DXGI_FORMAT_UNKNOWN;
+	m_cmdList->m_activePSO = nullptr;
+	return true;
 }
 
 
-void RenderTarget::FillPipelineFormats(RenderStates& states) const noexcept
+void RenderTarget::FillPipelineFormats(RenderStates& states) const
+noexcept
 {
-    states.colorTargetCount = uint8_t(m_boundColorCount);
-    states.colorFormat = (m_boundColorCount > 0) ? m_boundColorFormats[0] : DXGI_FORMAT_UNKNOWN;
-    for (int i = 1; i < RenderStates::kColorTargets; ++i)
-        states.mrtFormats[i - 1] = ((i < m_boundColorCount) and (i < RT_MAX_COLOR_BUFFERS)) ? m_boundColorFormats[i] : DXGI_FORMAT_UNKNOWN;
-    states.depthFormat = m_boundDepthFormat;
+	states.colorTargetCount = uint8_t(m_boundColorCount);
+	states.colorFormat = (m_boundColorCount > 0) ? m_boundColorFormats[0] : DXGI_FORMAT_UNKNOWN;
+	for (int i = 1; i < RenderStates::kColorTargets; ++i)
+		states.mrtFormats[i - 1] = ((i < m_boundColorCount) and (i < RT_MAX_COLOR_BUFFERS)) ? m_boundColorFormats[i] : DXGI_FORMAT_UNKNOWN;
+	states.depthFormat = m_boundDepthFormat;
 }
 
 
 void RenderTarget::SelectCustomDrawBuffers(const CustomDrawBufferList& bufferIndices)
 {
-    m_customDrawBuffers = bufferIndices;
-    m_activeBufferIndex = -1;
-    m_drawBufferGroup = dbCustom;
-    // An enabled target has the render targets of the group that was current bound on its list. The new
-    // setup has to reach the list NOW, the way the OpenGL backend applies it at once
-    // (ApplyCustomDrawBuffers ()) - otherwise the pass keeps drawing into the old set while the PSO
-    // already speaks of the new one.
-    if (IsEnabled())
-        SelectDrawBuffers({ .bufferIndex = -1, .drawBufferGroup = dbCustom, .clear = false, .reactivate = true, .depthMode = m_depthMode });
+	m_customDrawBuffers = bufferIndices;
+	m_activeBufferIndex = -1;
+	m_drawBufferGroup = dbCustom;
+	// An enabled target has the render targets of the group that was current bound on its list. The new
+	// setup has to reach the list NOW, the way the OpenGL backend applies it at once
+	// (ApplyCustomDrawBuffers ()) - otherwise the pass keeps drawing into the old set while the PSO
+	// already speaks of the new one.
+	if (IsEnabled())
+		SelectDrawBuffers({ .bufferIndex = -1, .drawBufferGroup = dbCustom, .clear = false, .reactivate = true, .depthMode = m_depthMode });
 }
 
 
 bool RenderTarget::DepthBufferIsActive(int bufferIndex, eDrawBufferGroups drawBufferGroup)
 {
-    // a shared depth source (SetDepthSource) is bound like an own depth buffer
-    if ((m_depthBufferIndex < 0) and (m_depthSource == nullptr))
-        return false;
-    if (bufferIndex >= 0)
-        return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
-    return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth) or (m_drawBufferGroup == dbCustom);
+	// a shared depth source (SetDepthSource) is bound like an own depth buffer
+	if ((m_depthBufferIndex < 0) and (m_depthSource == nullptr))
+		return false;
+	if (bufferIndex >= 0)
+		return (m_bufferInfo[bufferIndex].m_type == BufferInfo::btColor) or (m_bufferInfo[bufferIndex].m_type == BufferInfo::btDepth);
+	return (m_drawBufferGroup == dbAll) or (m_drawBufferGroup == dbColor) or (m_drawBufferGroup == dbDepth) or
+		(m_drawBufferGroup == dbCustom);
 }
 
 
 bool RenderTarget::EnableBuffers(const RTActivationParams& params)
 {
-    if (not SelectDrawBuffers(params))
-        return false;
-    gfxStates.SetDepthTest(DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup));
-    return true;
+	if (not SelectDrawBuffers(params))
+		return false;
+	gfxStates.SetDepthTest(DepthBufferIsActive(params.bufferIndex, params.drawBufferGroup));
+	return true;
 }
 
 
-bool RenderTarget::Enable(const RTActivationParams& params) {
-    ZoneScoped;
-    if (not m_isAvailable)
-        return false;
-    m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
-    m_drawBufferGroup = params.drawBufferGroup;
+bool RenderTarget::Enable(const RTActivationParams& params)
+{
+	ZoneScoped;
+	if (not m_isAvailable)
+		return false;
+	m_activeBufferIndex = (params.bufferIndex < 0) ? 0 : (params.bufferIndex % m_bufferCount);
+	m_drawBufferGroup = params.drawBufferGroup;
 
-    if (not IsEnabled()) {
-        m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
-        if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
-            return false;
-        m_cmdListExecution = m_cmdList->GetExecutionCounter();
-    }
-    if (not EnableBuffers(params))
-        return false;
-    return true;
+	if (not IsEnabled()) {
+		m_cmdList = commandListHandler.CreateCmdList(String("RenderTarget:") + m_name);
+		if (not m_cmdList or not m_cmdList->Open(not params.reactivate))
+			return false;
+		m_cmdListExecution = m_cmdList->GetExecutionCounter();
+	}
+	if (not EnableBuffers(params))
+		return false;
+	return true;
 }
 
 
@@ -816,23 +840,26 @@ bool RenderTarget::Enable(const RTActivationParams& params) {
 // point sampled, mirroring the OGL buffer creation), so this setting only decides what buffer types
 // that rule leaves alone. For a colour buffer - what a TextureAtlas is - DX already point samples.
 
-void RenderTarget::SetFiltering(GfxFilterMode filtering) {
-    if (IsIntegerColorFormat(m_colorFormat))
-        filtering = GfxFilterMode::Nearest;
-    if (filtering == m_filtering)
-        return;
-    m_filtering = filtering;
-    // The filtering belongs to the target, so every buffer's wrapper takes it.
-    for (int i = 0; i < m_renderTextures.Length(); i++) {
-        m_renderTextures[i].m_filtering = filtering;
-        m_renderTextures[i].SetParams(true);
-    }
+void RenderTarget::SetFiltering(GfxFilterMode filtering)
+{
+	if (IsIntegerColorFormat(m_colorFormat))
+		filtering = GfxFilterMode::Nearest;
+	if (filtering == m_filtering)
+		return;
+	m_filtering = filtering;
+	// The filtering belongs to the target, so every buffer's wrapper takes it.
+	for (int i = 0; i < m_renderTextures.Length(); i++) {
+		m_renderTextures[i].m_filtering = filtering;
+		m_renderTextures[i].SetParams(true);
+	}
 }
 
 // -------------------------------------------------------------------------------------------------
 
-bool RenderTarget::IsActive(void) noexcept {
-    return baseRenderer.IsActiveDrawBuffer(this);
+bool RenderTarget::IsActive(void)
+noexcept
+{
+	return baseRenderer.IsActiveDrawBuffer(this);
 }
 
 
@@ -840,128 +867,135 @@ bool RenderTarget::IsActive(void) noexcept {
 bool RenderTarget::Activate(const RTActivationParams& params, const std::source_location& loc)
 #else
 bool RenderTarget::Activate(const RTActivationParams& params)
-#   define loc
+#define loc
 #endif
 {
-    ZoneScoped;
-    if (/*m_wasActivated or*/ params.reactivate) { // -> reactivating
-        if (not IsEnabled())
-            baseRenderer.RenderStates() = m_renderStates;
-    }
-    else if (not m_wasActivated)
-        baseRenderer.PushViewport(loc);
-    baseRenderer.ActivateDrawBuffer(this);
-    if (not Enable(params)) {
-        baseRenderer.DeactivateDrawBuffer(this);
-        return false;
-    }
-    Clear(params);
-    // Activate/Deactivate are a balanced viewport push/pop pair: Activate pushes the caller's
-    // viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
-    // has no Deactivate of its own, so it must not push or set a viewport - the caller's
-    // viewport is restored by the PopViewport immediately following in Deactivate().
-    SetViewport();
-    m_wasActivated = true;
-    return true;
+	ZoneScoped;
+	if (/*m_wasActivated or*/ params.reactivate) { // -> reactivating
+		if (not IsEnabled())
+			baseRenderer.RenderStates() = m_renderStates;
+	}
+	else if (not m_wasActivated)
+		baseRenderer.PushViewport(loc);
+	baseRenderer.ActivateDrawBuffer(this);
+	if (not Enable(params)) {
+		baseRenderer.DeactivateDrawBuffer(this);
+		return false;
+	}
+	Clear(params);
+	// Activate/Deactivate are a balanced viewport push/pop pair: Activate pushes the caller's
+	// viewport, Deactivate's PopViewport restores it. A reactivation (via DeactivateDrawBuffer)
+	// has no Deactivate of its own, so it must not push or set a viewport - the caller's
+	// viewport is restored by the PopViewport immediately following in Deactivate().
+	SetViewport();
+	m_wasActivated = true;
+	return true;
 }
 #ifndef _DEBUG
-#   undef loc
+#undef loc
 #endif
 
 
-void RenderTarget::Disable(bool deactivate) noexcept {
-    ZoneScoped;
-    if (IsEnabled()) {
-        m_renderStates = baseRenderer.RenderStates();
-        auto* list = m_cmdList->GfxList();
-        if (list) {
-            list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
-            for (int i = 0; i < m_colorBufferCount; ++i)
-                m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
-            for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
-                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
-            for (int i = 0, j = IdBufferIndex(); i < m_idBufferCount; ++i, ++j)
-                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
-            for (int i = 0, j = m_cubeMapIndex; i < m_cubeMapCount; ++i, ++j)
-                m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
-            // The depth buffer is an RT output too: the deferred shadow (and the soft-particle / WBOIT pass)
-            // sample it as an SRV to reconstruct world position. Colour + MRT above were made shader-readable
-            // but the depth was missed -> a sampled depth left in DEPTH_WRITE reads as garbage on D3D12, so the
-            // deferred shadow mask came out all-lit (cast shadows on walls/floor/decals vanished). Transition
-            // it to a read+sample state too; a later depth-write pass restores DEPTH_WRITE via the depthOwner
-            // block in SelectDrawBuffers. (An RT with a shared depth source has m_depthBufferIndex < 0 -> skip.)
-            if (m_depthBufferIndex >= 0)
-                m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
-        }
-        m_cmdList->Close(deactivate);
-    }
-    m_cmdList = nullptr;
+void RenderTarget::Disable(bool deactivate)
+noexcept
+{
+	ZoneScoped;
+	if (IsEnabled()) {
+		m_renderStates = baseRenderer.RenderStates();
+		auto* list = m_cmdList->GfxList();
+		if (list) {
+			list->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
+			for (int i = 0; i < m_colorBufferCount; ++i)
+				m_bufferInfo[i].SetState(m_cmdList, kShaderReadState);
+			for (int i = 0, j = VertexBufferIndex(); i < m_vertexBufferCount; ++i, ++j)
+				m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
+			for (int i = 0, j = IdBufferIndex(); i < m_idBufferCount; ++i, ++j)
+				m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
+			for (int i = 0, j = m_cubeMapIndex; i < m_cubeMapCount; ++i, ++j)
+				m_bufferInfo[j].SetState(m_cmdList, kShaderReadState);
+			// The depth buffer is an RT output too: the deferred shadow (and the soft-particle / WBOIT pass)
+			// sample it as an SRV to reconstruct world position. Colour + MRT above were made shader-readable
+			// but the depth was missed -> a sampled depth left in DEPTH_WRITE reads as garbage on D3D12, so the
+			// deferred shadow mask came out all-lit (cast shadows on walls/floor/decals vanished). Transition
+			// it to a read+sample state too; a later depth-write pass restores DEPTH_WRITE via the depthOwner
+			// block in SelectDrawBuffers. (An RT with a shared depth source has m_depthBufferIndex < 0 -> skip.)
+			if (m_depthBufferIndex >= 0)
+				m_bufferInfo[m_depthBufferIndex].SetState(m_cmdList, D3D12_RESOURCE_STATE_DEPTH_READ | kShaderReadState);
+		}
+		m_cmdList->Close(deactivate);
+	}
+	m_cmdList = nullptr;
 }
 
 
-void RenderTarget::Deactivate(void) noexcept {
-    baseRenderer.DeactivateDrawBuffer(this);
-    baseRenderer.PopViewport();
-    m_wasActivated = false;
+void RenderTarget::Deactivate(void)
+noexcept
+{
+	baseRenderer.DeactivateDrawBuffer(this);
+	baseRenderer.PopViewport();
+	m_wasActivated = false;
 }
 
 
 uint32_t& RenderTarget::BufferHandle(int bufferIndex)
 {
-    if ((bufferIndex >= 0) and (bufferIndex < m_colorBufferCount))
-        return m_bufferInfo[bufferIndex].SRV().Index();
-    static uint32_t invalid = UINT32_MAX;
-    return invalid;
+	if ((bufferIndex >= 0) and (bufferIndex < m_colorBufferCount))
+		return m_bufferInfo[bufferIndex].SRV().Index();
+	static uint32_t invalid = UINT32_MAX;
+	return invalid;
 }
 
 
 bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex)
 {
-    if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
-        return false;
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    // Color and worldPos/normal MRT (btVertex) buffers must be POINT-sampled, mirroring the OGL
-    // RT buffer creation (GL_NEAREST for RGBA8 color + RGBA32F MRT buffers; LINEAR only for
-    // skymap/depth). Linear filtering interpolates world positions across geometry silhouettes,
-    // which smears decals along moving geometry. Set per bind: the wrapper behind a non colour buffer
-    // is still shared across buffer types, so this must not rely on the one-shot SetParams above.
-    bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or (info.m_type == BufferInfo::btId) or (info.m_type == BufferInfo::btCubemap);
-    return BindBuffer(bufferIndex, tmuIndex, pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear);
+	if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
+		return false;
+	BufferInfo& info = m_bufferInfo[bufferIndex];
+	// Color and worldPos/normal MRT (btVertex) buffers must be POINT-sampled, mirroring the OGL
+	// RT buffer creation (GL_NEAREST for RGBA8 color + RGBA32F MRT buffers; LINEAR only for
+	// skymap/depth). Linear filtering interpolates world positions across geometry silhouettes,
+	// which smears decals along moving geometry. Set per bind: the wrapper behind a non colour buffer
+	// is still shared across buffer types, so this must not rely on the one-shot SetParams above.
+	bool pointSampled = (info.m_type == BufferInfo::btColor) or (info.m_type == BufferInfo::btVertex) or
+		(info.m_type == BufferInfo::btId) or (info.m_type == BufferInfo::btCubemap);
+	return BindBuffer(bufferIndex, tmuIndex, pointSampled ? GfxFilterMode::Nearest : GfxFilterMode::Linear);
 }
 
 
 bool RenderTarget::BindBuffer(int bufferIndex, int tmuIndex, GfxFilterMode filtering)
 {
-    if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
-        return false;
-    if (tmuIndex < 0)
-        tmuIndex = bufferIndex;
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    if (info.SRVIndex() == UINT32_MAX)
-        return false;
-    if (((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat)) or (info.m_type == BufferInfo::btId))
-        filtering = GfxFilterMode::Nearest;
-    if (tmuIndex >= Shader::kSrvSlots)
-        return false;
-    commandListHandler.BindSampledImage(uint32_t(tmuIndex), info.SRVIndex());
+	if (bufferIndex < 0 or bufferIndex >= m_bufferInfo.Length())
+		return false;
+	if (tmuIndex < 0)
+		tmuIndex = bufferIndex;
+	BufferInfo& info = m_bufferInfo[bufferIndex];
+	if (info.SRVIndex() == UINT32_MAX)
+		return false;
+	if (((info.m_type == BufferInfo::btColor) and IsIntegerColorFormat(m_colorFormat)) or (info.m_type == BufferInfo::btId))
+		filtering = GfxFilterMode::Nearest;
+	if (tmuIndex >= Shader::kSrvSlots)
+		return false;
+	commandListHandler.BindSampledImage(uint32_t(tmuIndex), info.SRVIndex());
 
-    // Bind the matching sampler from the buffer's own sampling configuration.
-    // Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets the
-    // wrap/mip/compare defaults).
-    RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
-    if (texture == nullptr)
-        texture = &m_externalTexture;
-    if (not texture->m_hasParams)
-        texture->SetParams(false);
-    texture->m_sampling.minFilter = filtering;
-    texture->m_sampling.magFilter = filtering;
-    commandListHandler.BindSampler(uint32_t(tmuIndex), samplerCache.GetSlot(texture->m_sampling));
-    return true;
+	// Bind the matching sampler from the buffer's own sampling configuration.
+	// Lazy: populate m_sampling on first use (RenderTargetTexture::SetParams sets the
+	// wrap/mip/compare defaults).
+	RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
+	if (texture == nullptr)
+		texture = &m_externalTexture;
+	if (not texture->m_hasParams)
+		texture->SetParams(false);
+	texture->m_sampling.minFilter = filtering;
+	texture->m_sampling.magFilter = filtering;
+	commandListHandler.BindSampler(uint32_t(tmuIndex), samplerCache.GetSlot(texture->m_sampling));
+	return true;
 }
 
 
-void RenderTarget::SetViewport(bool flipVertically) noexcept {
-    baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
+void RenderTarget::SetViewport(bool flipVertically)
+noexcept
+{
+	baseRenderer.SetViewport(m_viewport, GetWidth(true), GetHeight(true), flipVertically);
 }
 
 
@@ -972,168 +1006,168 @@ void RenderTarget::SetViewport(bool flipVertically) noexcept {
 
 static bool IsDrawBuffer(RenderTarget& rt, int i)
 {
-    BufferInfo& bi = rt.m_bufferInfo[i];
-    if (not bi.RTV().Handle().IsValid())
-        return false;
+	BufferInfo& bi = rt.m_bufferInfo[i];
+	if (not bi.RTV().Handle().IsValid())
+		return false;
 
-    bool isColor = (bi.m_type == BufferInfo::btColor);
-    bool isVertex = (bi.m_type == BufferInfo::btVertex);
-    bool isId = (bi.m_type == BufferInfo::btId);
+	bool isColor = (bi.m_type == BufferInfo::btColor);
+	bool isVertex = (bi.m_type == BufferInfo::btVertex);
+	bool isId = (bi.m_type == BufferInfo::btId);
 
-    switch (rt.m_drawBufferGroup) {
-        case RenderTarget::dbDepth:
-            return false;
-        case RenderTarget::dbSingle:
-            return i == rt.m_activeBufferIndex;
-        case RenderTarget::dbExtra:
-            return isVertex;
-        case RenderTarget::dbAll:
-            return isColor or isVertex;
-        case RenderTarget::dbCustom:
-            for (int j = 0; j < rt.m_customDrawBuffers.Length(); ++j)
-                if (rt.m_customDrawBuffers[j] == i)
-                    return isColor or isVertex or isId;
-            return false;
-        default:
-            return isColor;
-    }
+	switch (rt.m_drawBufferGroup) {
+		case RenderTarget::dbDepth:
+			return false;
+		case RenderTarget::dbSingle:
+			return i == rt.m_activeBufferIndex;
+		case RenderTarget::dbExtra:
+			return isVertex;
+		case RenderTarget::dbAll:
+			return isColor or isVertex;
+		case RenderTarget::dbCustom:
+			for (int j = 0; j < rt.m_customDrawBuffers.Length(); ++j)
+				if (rt.m_customDrawBuffers[j] == i)
+					return isColor or isVertex or isId;
+			return false;
+		default:
+			return isColor;
+	}
 }
 
 
 void RenderTarget::Fill(RGBAColor color)
 {
-    if (not IsEnabled())
-        return;
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return;
-    float c[4] = { color.R(), color.G(), color.B(), color.A() };
-    for (int i = 0; i < m_bufferCount; ++i)
-        if (IsDrawBuffer(*this, i))
-            list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), c, 0, nullptr);
+	if (not IsEnabled())
+		return;
+	auto* list = m_cmdList->GfxList();
+	if (not list)
+		return;
+	float c[4] = { color.R(), color.G(), color.B(), color.A() };
+	for (int i = 0; i < m_bufferCount; ++i)
+		if (IsDrawBuffer(*this, i))
+			list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), c, 0, nullptr);
 }
 
 
 void RenderTarget::Clear(const RTActivationParams& params)
 {
-    if (not params.clear or not IsEnabled())
-        return;
-    auto* list = m_cmdList->GfxList();
-    if (not list)
-        return;
-    // Clear color AND worldPos/normal MRT (btVertex) buffers, matching Vulkan (loadOp=CLEAR
-    // for color+vertex in dbAll) and OGL (glClear over all active draw buffers). Iterating
-    // only m_colorBufferCount left the btVertex buffers uncleared, so stale world positions
-    // persisted where moving geometry (e.g. an opening door) vacated pixels - the decal pass
-    // then mapped those stale positions into its volume and smeared the decal along the motion.
-    // Only the draw buffers of the current group (IsDrawBuffer ()).
-    for (int i = 0; i < m_bufferCount; ++i) {
-        if (IsDrawBuffer(*this, i))
-            list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
-    }
-    // A read-only depth activation must not clear depth: ClearDepthStencilView needs the writable DSV and
-    // DEPTH_WRITE state, neither of which holds in dbmReadOnly.
-    if (HaveDepthBuffer(true) and (params.depthMode != dbmReadOnly))
-        list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	if (not params.clear or not IsEnabled())
+		return;
+	auto* list = m_cmdList->GfxList();
+	if (not list)
+		return;
+	// Clear color AND worldPos/normal MRT (btVertex) buffers, matching Vulkan (loadOp=CLEAR
+	// for color+vertex in dbAll) and OGL (glClear over all active draw buffers). Iterating
+	// only m_colorBufferCount left the btVertex buffers uncleared, so stale world positions
+	// persisted where moving geometry (e.g. an opening door) vacated pixels - the decal pass
+	// then mapped those stale positions into its volume and smeared the decal along the motion.
+	// Only the draw buffers of the current group (IsDrawBuffer ()).
+	for (int i = 0; i < m_bufferCount; ++i) {
+		if (IsDrawBuffer(*this, i))
+			list->ClearRenderTargetView(m_bufferInfo[i].RTV().CPUHandle(), m_clearColor.Data(), 0, nullptr);
+	}
+	// A read-only depth activation must not clear depth: ClearDepthStencilView needs the writable DSV and
+	// DEPTH_WRITE state, neither of which holds in dbmReadOnly.
+	if (HaveDepthBuffer(true) and (params.depthMode != dbmReadOnly))
+		list->ClearDepthStencilView(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 }
 
 
 Texture* RenderTarget::GetAsTexture(const RTRenderParams& params, int /*tmuIndex*/)
 {
-    int bufferIndex = params.source % m_bufferCount;
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    if (not info.m_resource)
-        return nullptr;
-    // A colour buffer has a wrapper of its own; anything else (depth, sky map, cube map) shares the
-    // one behind the colour buffers, which is what the single wrapper used to be for all of them.
-    RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
-    if (texture == nullptr)
-        texture = &m_externalTexture;
-    texture->m_handle = info.SRVIndex();
-    texture->m_resource = info.m_resource;
-    texture->Validate();
-    return texture;
+	int			bufferIndex = params.source % m_bufferCount;
+	BufferInfo&	info = m_bufferInfo[bufferIndex];
+	if (not info.m_resource)
+		return nullptr;
+	// A colour buffer has a wrapper of its own; anything else (depth, sky map, cube map) shares the
+	// one behind the colour buffers, which is what the single wrapper used to be for all of them.
+	RenderTargetTexture* texture = GetRenderTexture(bufferIndex);
+	if (texture == nullptr)
+		texture = &m_externalTexture;
+	texture->m_handle = info.SRVIndex();
+	texture->m_resource = info.m_resource;
+	texture->Validate();
+	return texture;
 }
 
 
 void RenderTarget::ClearColorBuffers(void)
 {
-    if (not IsEnabled())
-        return;
-    for (int i = 0; i < m_bufferCount; ++i)
-        if (IsDrawBuffer(*this, i))
-            gfxStates.ClearColorBuffers(m_bufferInfo[i].RTV().CPUHandle());
+	if (not IsEnabled())
+		return;
+	for (int i = 0; i < m_bufferCount; ++i)
+		if (IsDrawBuffer(*this, i))
+			gfxStates.ClearColorBuffers(m_bufferInfo[i].RTV().CPUHandle());
 }
 
 
 void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color)
 {
-    auto* list = IsEnabled() ? m_cmdList->GfxList() : nullptr;
-    if (not list)
-        return;
-    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
-        return;
-    // Only a draw buffer of the current group (IsDrawBuffer ()) - ClearRenderTargetView () requires the
-    // RENDER_TARGET state, and only those are in it.
-    if (IsDrawBuffer(*this, bufferIndex))
-        list->ClearRenderTargetView(m_bufferInfo[bufferIndex].RTV().CPUHandle(), color.Data(), 0, nullptr);
+	auto* list = IsEnabled() ? m_cmdList->GfxList() : nullptr;
+	if (not list)
+		return;
+	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return;
+	// Only a draw buffer of the current group (IsDrawBuffer ()) - ClearRenderTargetView () requires the
+	// RENDER_TARGET state, and only those are in it.
+	if (IsDrawBuffer(*this, bufferIndex))
+		list->ClearRenderTargetView(m_bufferInfo[bufferIndex].RTV().CPUHandle(), color.Data(), 0, nullptr);
 }
 
 
 void RenderTarget::ClearColorBuffer(int bufferIndex, RGBAColor color, const Viewport& area)
 {
-    auto* list = IsEnabled() ? m_cmdList->GfxList() : nullptr;
-    if (not list)
-        return;
-    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
-        return;
+	auto* list = IsEnabled() ? m_cmdList->GfxList() : nullptr;
+	if (not list)
+		return;
+	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return;
 
-    int left = (area.Left() < 0) ? 0 : area.Left();
-    int top = (area.Top() < 0) ? 0 : area.Top();
-    int right = area.Left() + area.Width();
-    int bottom = area.Top() + area.Height();
-    if (right > GetWidth(true))
-        right = GetWidth(true);
-    if (bottom > GetHeight(true))
-        bottom = GetHeight(true);
-    if ((right <= left) or (bottom <= top))
-        return;
+	int left = (area.Left() < 0) ? 0 : area.Left();
+	int top = (area.Top() < 0) ? 0 : area.Top();
+	int right = area.Left() + area.Width();
+	int bottom = area.Top() + area.Height();
+	if (right > GetWidth(true))
+		right = GetWidth(true);
+	if (bottom > GetHeight(true))
+		bottom = GetHeight(true);
+	if ((right <= left) or (bottom <= top))
+		return;
 
-    D3D12_RECT rect{ left, top, right, bottom };
-    if (IsDrawBuffer(*this, bufferIndex))
-        list->ClearRenderTargetView(m_bufferInfo[bufferIndex].RTV().CPUHandle(), color.Data(), 1, &rect);
+	D3D12_RECT rect{ left, top, right, bottom };
+	if (IsDrawBuffer(*this, bufferIndex))
+		list->ClearRenderTargetView(m_bufferInfo[bufferIndex].RTV().CPUHandle(), color.Data(), 1, &rect);
 }
 
 
 void RenderTarget::ClearDepthBuffer(float clearValue)
 {
-    if (IsEnabled() and HaveDepthBuffer(true) and (m_depthMode != dbmReadOnly))
-        gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
+	if (IsEnabled() and HaveDepthBuffer(true) and (m_depthMode != dbmReadOnly))
+		gfxStates.ClearDepthBuffer(m_bufferInfo[m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
 }
 
 
 void RenderTarget::ClearStencilBuffer(int clearValue)
 {
-    // Gated on the stencil PLANE OF THE ACTIVE depth attachment - own, or a shared source's
-    // (SetDepthSource), which is the DSV that is bound. Without a stencil plane the clear would
-    // address a plane the DSV does not have.
-    RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
-    if (IsEnabled() and depthOwner->HaveStencilBuffer(true) and (m_depthMode != dbmReadOnly))
-        gfxStates.ClearStencilBuffer(depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
+	// Gated on the stencil PLANE OF THE ACTIVE depth attachment - own, or a shared source's
+	// (SetDepthSource), which is the DSV that is bound. Without a stencil plane the clear would
+	// address a plane the DSV does not have.
+	RenderTarget* depthOwner = (m_depthSource != nullptr) ? m_depthSource : this;
+	if (IsEnabled() and depthOwner->HaveStencilBuffer(true) and (m_depthMode != dbmReadOnly))
+		gfxStates.ClearStencilBuffer(depthOwner->m_bufferInfo[depthOwner->m_depthBufferIndex].m_dsv.CPUHandle(), clearValue);
 }
 
 
 Texture* RenderTarget::GetDepthAsTexture(void)
 {
-    if (m_depthBufferIndex < 0)
-        return nullptr;
-    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
-    if (not info.m_resource)
-        return nullptr;
-    m_depthTexture.m_handle = info.SRVIndex();
-    m_depthTexture.m_resource = info.m_resource;
-    m_depthTexture.Validate();
-    return &m_depthTexture;
+	if (m_depthBufferIndex < 0)
+		return nullptr;
+	BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
+	if (not info.m_resource)
+		return nullptr;
+	m_depthTexture.m_handle = info.SRVIndex();
+	m_depthTexture.m_resource = info.m_resource;
+	m_depthTexture.Validate();
+	return &m_depthTexture;
 }
 
 
@@ -1143,50 +1177,50 @@ Texture* RenderTarget::GetDepthAsTexture(void)
 // Der Shader sampelt dann mit SampleCmpLevelZero(depth, uv, ndc.z - bias).
 Texture* RenderTarget::GetDepthAsShadowTexture(void)
 {
-    if (m_depthBufferIndex < 0)
-        return nullptr;
-    BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
-    if (not info.m_resource)
-        return nullptr;
-    ID3D12Device* device = dx12Context.Device();
-    if (not device)
-        return nullptr;
-    // info.SRVIndex() is the depth buffer's own (DSV-side) view and is not a sample-able, shader-visible
-    // texture SRV -- binding it directly leaves the slot effectively unbound (shows up missing in a capture).
-    // Create a dedicated shader-visible R32_FLOAT SRV over the R32-typeless depth resource so the shadow
-    // shaders can SampleCmp it. Descriptor allocated once (cached in m_handle); the view is (re)written each
-    // call so it follows a recreated depth resource (e.g. after a resolution change).
-    if (m_shadowTexture.m_handle == UINT32_MAX) {
-        DescriptorHandle hdl = descriptorHeaps.AllocSRV();
-        if (not hdl.IsValid())
-            return nullptr;
-        m_shadowTexture.m_handle = hdl.index;
-        m_shadowTexture.m_ownedHandle = hdl.index;
-    }
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-    srvDesc.Format = info.ViewFormat();
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = 1;
-    device->CreateShaderResourceView(info.m_resource.Get(), &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_shadowTexture.m_handle));
-    descriptorHeaps.m_srvHeap.Publish(m_shadowTexture.m_handle);
-    m_shadowTexture.m_resource = info.m_resource;
-    m_shadowTexture.Validate();
-    return &m_shadowTexture;
+	if (m_depthBufferIndex < 0)
+		return nullptr;
+	BufferInfo& info = m_bufferInfo[m_depthBufferIndex];
+	if (not info.m_resource)
+		return nullptr;
+	ID3D12Device* device = dx12Context.Device();
+	if (not device)
+		return nullptr;
+	// info.SRVIndex() is the depth buffer's own (DSV-side) view and is not a sample-able, shader-visible
+	// texture SRV -- binding it directly leaves the slot effectively unbound (shows up missing in a capture).
+	// Create a dedicated shader-visible R32_FLOAT SRV over the R32-typeless depth resource so the shadow
+	// shaders can SampleCmp it. Descriptor allocated once (cached in m_handle); the view is (re)written each
+	// call so it follows a recreated depth resource (e.g. after a resolution change).
+	if (m_shadowTexture.m_handle == UINT32_MAX) {
+		DescriptorHandle hdl = descriptorHeaps.AllocSRV();
+		if (not hdl.IsValid())
+			return nullptr;
+		m_shadowTexture.m_handle = hdl.index;
+		m_shadowTexture.m_ownedHandle = hdl.index;
+	}
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = info.ViewFormat();
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+	device->CreateShaderResourceView(info.m_resource.Get(), &srvDesc, descriptorHeaps.m_srvHeap.CpuHandle(m_shadowTexture.m_handle));
+	descriptorHeaps.m_srvHeap.Publish(m_shadowTexture.m_handle);
+	m_shadowTexture.m_resource = info.m_resource;
+	m_shadowTexture.Validate();
+	return &m_shadowTexture;
 }
 
 
 bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
 {
-    bool haveTransformation = false;
-    if (params.centerOrigin) {
-        haveTransformation = true;
-        baseRenderer.Translate(0.5, 0.5, 0);
-    }
-    if (params.rotation) {
-        haveTransformation = true;
-        baseRenderer.Rotate(params.rotation, 0, 0, 1);
-    }
+	bool haveTransformation = false;
+	if (params.centerOrigin) {
+		haveTransformation = true;
+		baseRenderer.Translate(0.5, 0.5, 0);
+	}
+	if (params.rotation) {
+		haveTransformation = true;
+		baseRenderer.Rotate(params.rotation, 0, 0, 1);
+	}
 #if 0
     if (params.flipVertically) {
         haveTransformation = true;
@@ -1197,69 +1231,78 @@ bool RenderTarget::UpdateTransformation(const RTRenderParams& params)
         baseRenderer.Scale(params.scale, -params.scale, 1);
     }
 #endif
-    else if (params.scale != 1.0f) {
-        haveTransformation = true;
-        baseRenderer.Scale(params.scale, params.scale, 1);
-    }
-    return haveTransformation;
+	else if (params.scale != 1.0f) {
+		haveTransformation = true;
+		baseRenderer.Scale(params.scale, params.scale, 1);
+	}
+	return haveTransformation;
 }
 
 
 bool RenderTarget::RenderAsTexture(Texture* source, const RTRenderParams& params, const RGBAColor& color)
 {
-    ZoneScoped;
-    bool deactivate = false;
-    if (params.destination >= 0) {
-        deactivate = not IsActive();
-        if (not Activate({ .bufferIndex = params.destination, .drawBufferGroup = RenderTarget::dbSingle, .clear = params.clearBuffer, .reactivate = not deactivate, .depthMode = params.depthMode }))
-            return false;
-        m_lastDestination = params.destination;
-        //gfxStates.SetBlending(0);
-    }
-    baseRenderer.PushMatrix();
-    bool applyTransformation = UpdateTransformation(params);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxStates.SetFaceCulling(0);
+	ZoneScoped;
+	bool deactivate = false;
+	if (params.destination >= 0) {
+		deactivate = not IsActive();
+		if (not Activate({ .bufferIndex = params.destination,
+						   .drawBufferGroup = RenderTarget::dbSingle,
+						   .clear = params.clearBuffer,
+						   .reactivate = not deactivate,
+						   .depthMode = params.depthMode }))
+			return false;
+		m_lastDestination = params.destination;
+		//gfxStates.SetBlending(0);
+	}
+	baseRenderer.PushMatrix();
+	bool applyTransformation = UpdateTransformation(params);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+	gfxStates.SetFaceCulling(0);
 #if 0 // must be called before shader load in DirectX!
     baseRenderer.Set2DRenderStates(params.destination < 0);
 #endif
-    if (params.shader) {
-        if (applyTransformation)
-            params.shader->UpdateMatrices();
-        m_viewportArea.Render(params.shader, source);
-    }
-    else {
-        if (params.premultiply)
-            m_viewportArea.Premultiply();
+	if (params.shader) {
+		if (applyTransformation)
+			params.shader->UpdateMatrices();
+		m_viewportArea.Render(params.shader, source);
+	}
+	else {
+		if (params.premultiply)
+			m_viewportArea.Premultiply();
 #if 1
-        baseRenderer.Set2DRenderStates(params.destination < 0);
+		baseRenderer.Set2DRenderStates(params.destination < 0);
 #endif
-        m_viewportArea.Render(nullptr, source, color);
-    }
-    baseRenderer.PopMatrix();
-    if (deactivate)
-        Deactivate();
-    return true;
+		m_viewportArea.Render(nullptr, source, color);
+	}
+	baseRenderer.PopMatrix();
+	if (deactivate)
+		Deactivate();
+	return true;
 }
 
 
 bool RenderTarget::Render(const RTRenderParams& params, const RGBAColor& color)
 {
-    if (params.destination >= 0)
-        m_lastDestination = params.destination;
-    return RenderAsTexture((params.source == params.destination) ? nullptr : GetAsTexture(params), params, color);
+	if (params.destination >= 0)
+		m_lastDestination = params.destination;
+	return RenderAsTexture((params.source == params.destination) ? nullptr : GetAsTexture(params), params, color);
 }
 
 
 void RenderTarget::CreateRenderArea(void)
 {
-    m_viewportArea.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular]);
+	m_viewportArea.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter], BaseQuadMesh::defaultTexCoords[BaseQuadMesh::tcRegular]);
 }
 
 
 bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& color)
 {
-    return Render({ .source = m_lastDestination, .destination = NextBuffer(m_lastDestination), .clearBuffer = params.clearBuffer, .scale = params.scale, .shader = params.shader }, color);
+	return Render({ .source = m_lastDestination,
+					.destination = NextBuffer(m_lastDestination),
+					.clearBuffer = params.clearBuffer,
+					.scale = params.scale,
+					.shader = params.shader },
+				  color);
 }
 
 // =================================================================================================
@@ -1273,275 +1316,279 @@ bool RenderTarget::AutoRender(const RTRenderParams& params, const RGBAColor& col
 // caller's tightly packed buffer is not - hence the row by row copy at the end. GetCopyableFootprints
 // works out both pitches, so nothing here has to know the format's byte size.
 
-size_t RenderTarget::BufferSize(int bufferIndex) {
-    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
-        return 0;
+size_t RenderTarget::BufferSize(int bufferIndex)
+{
+	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return 0;
 
-    ID3D12Resource* resource = m_bufferInfo[bufferIndex].m_resource.Get();
-    ID3D12Device* device = dx12Context.Device();
+	ID3D12Resource*	resource = m_bufferInfo[bufferIndex].m_resource.Get();
+	ID3D12Device*	device = dx12Context.Device();
 
-    if (not (resource and device))
-        return 0;
+	if (not (resource and device))
+		return 0;
 
-    D3D12_RESOURCE_DESC desc = resource->GetDesc();
-    UINT rowCount = 0;
-    UINT64 rowSize = 0, totalSize = 0;
+	D3D12_RESOURCE_DESC	desc = resource->GetDesc();
+	UINT				rowCount = 0;
+	UINT64				rowSize = 0, totalSize = 0;
 
-    device->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, &rowCount, &rowSize, &totalSize);
-    // What the CALLER's packed buffer needs - rowSize is the unpadded row, unlike totalSize.
-    return size_t(rowSize) * size_t(rowCount);
+	device->GetCopyableFootprints(&desc, 0, 1, 0, nullptr, &rowCount, &rowSize, &totalSize);
+	// What the CALLER's packed buffer needs - rowSize is the unpadded row, unlike totalSize.
+	return size_t(rowSize) * size_t(rowCount);
 }
 
 
-bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice) {
-    if (not (buffer and m_isAvailable))
-        return false;
-    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
-        return false;
+bool RenderTarget::ReadBuffer(int bufferIndex, void* buffer, size_t bufferSize, int arraySlice)
+{
+	if (not (buffer and m_isAvailable))
+		return false;
+	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return false;
 
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    ID3D12Resource* resource = info.m_resource.Get();
-    ID3D12Device* device = dx12Context.Device();
+	BufferInfo&		info = m_bufferInfo[bufferIndex];
+	ID3D12Resource*	resource = info.m_resource.Get();
+	ID3D12Device*	device = dx12Context.Device();
 
-    if (not (resource and device))
-        return false;
+	if (not (resource and device))
+		return false;
 
-    D3D12_RESOURCE_DESC desc = resource->GetDesc();
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-    UINT rowCount = 0;
-    UINT64 rowSize = 0, totalSize = 0;
+	D3D12_RESOURCE_DESC					desc = resource->GetDesc();
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT	layout{};
+	UINT								rowCount = 0;
+	UINT64								rowSize = 0, totalSize = 0;
 
-    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
-    if (bufferSize < size_t(rowSize) * size_t(rowCount))
-        return false;
+	device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+	if (bufferSize < size_t(rowSize) * size_t(rowCount))
+		return false;
 
-    D3D12_HEAP_PROPERTIES heapProps{};
-    D3D12_RESOURCE_DESC readbackDesc{};
+	D3D12_HEAP_PROPERTIES	heapProps{};
+	D3D12_RESOURCE_DESC		readbackDesc{};
 
-    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-    readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    readbackDesc.Width = totalSize;
-    readbackDesc.Height = 1;
-    readbackDesc.DepthOrArraySize = 1;
-    readbackDesc.MipLevels = 1;
-    readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
-    readbackDesc.SampleDesc.Count = 1;
-    readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    readbackDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProps.CreationNodeMask = 1;
+	heapProps.VisibleNodeMask = 1;
+	readbackDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	readbackDesc.Width = totalSize;
+	readbackDesc.Height = 1;
+	readbackDesc.DepthOrArraySize = 1;
+	readbackDesc.MipLevels = 1;
+	readbackDesc.Format = DXGI_FORMAT_UNKNOWN;
+	readbackDesc.SampleDesc.Count = 1;
+	readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	readbackDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    ComPtr<ID3D12Resource> readback;
+	ComPtr<ID3D12Resource> readback;
 
-    if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
-                                               D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
-        return false;
+	if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &readbackDesc,
+											   D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback))))
+		return false;
 #if DBG_DIRECTX
-    {
-        char name[160];
-        snprintf(name, sizeof(name), "RenderTarget[%s] ReadBuffer readback", (const char*)m_name);
-        readback->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
-    }
+	{
+		char name[160];
+		snprintf(name, sizeof(name), "RenderTarget[%s] ReadBuffer readback", (const char*)m_name);
+		readback->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+	}
 #endif
 
-    // A list of its OWN, not whatever list is current (StartOperation () would hand that out, and it keeps
-    // recording until the frame ends): the copy has to be CLOSED to go out. It closes last, so it runs
-    // after the closed lists that hold the draws it is supposed to read.
-    CommandList* cl = commandListHandler.CreateCmdList(String("ReadBuffer"), true);
+	// A list of its OWN, not whatever list is current (StartOperation () would hand that out, and it keeps
+	// recording until the frame ends): the copy has to be CLOSED to go out. It closes last, so it runs
+	// after the closed lists that hold the draws it is supposed to read.
+	CommandList* cl = commandListHandler.CreateCmdList(String("ReadBuffer"), true);
 
-    if (not (cl and cl->Open(false)))
-        return false;
+	if (not (cl and cl->Open(false)))
+		return false;
 
-    D3D12_RESOURCE_STATES stateBefore = info.m_state;
+	D3D12_RESOURCE_STATES stateBefore = info.m_state;
 
-    info.SetState(cl, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	info.SetState(cl, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+	D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
 
-    srcLoc.pResource = resource;
-    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    srcLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0);   // one mip level, so the index IS the layer
-    dstLoc.pResource = readback.Get();
-    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    dstLoc.PlacedFootprint = layout;
-    if (ID3D12GraphicsCommandList* list = cl->GfxList())
-        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-    // Back to what it was: the caller's next pass expects the buffer in the state it left it in.
-    info.SetState(cl, stateBefore);
-    cl->Close(false);
-    // Submitted AND waited for - the map below reads what the GPU wrote, so the copy has to be done.
-    commandListHandler.ExecutePending();
+	srcLoc.pResource = resource;
+	srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	srcLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0); // one mip level, so the index IS the layer
+	dstLoc.pResource = readback.Get();
+	dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+	dstLoc.PlacedFootprint = layout;
+	if (ID3D12GraphicsCommandList* list = cl->GfxList())
+		list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+	// Back to what it was: the caller's next pass expects the buffer in the state it left it in.
+	info.SetState(cl, stateBefore);
+	cl->Close(false);
+	// Submitted AND waited for - the map below reads what the GPU wrote, so the copy has to be done.
+	commandListHandler.ExecutePending();
 
-    uint8_t* source = nullptr;
-    D3D12_RANGE readRange{ 0, size_t(totalSize) };
+	uint8_t*	source = nullptr;
+	D3D12_RANGE	readRange{ 0, size_t(totalSize) };
 
-    if (FAILED(readback->Map(0, &readRange, reinterpret_cast<void**>(&source))))
-        return false;
+	if (FAILED(readback->Map(0, &readRange, reinterpret_cast<void**>(&source))))
+		return false;
 
-    uint8_t* dest = static_cast<uint8_t*>(buffer);
+	uint8_t* dest = static_cast<uint8_t*>(buffer);
 
-    for (UINT row = 0; row < rowCount; ++row)
-        memcpy(dest + size_t(row) * size_t(rowSize),
-               source + size_t(layout.Offset) + size_t(row) * size_t(layout.Footprint.RowPitch),
-               size_t(rowSize));
+	for (UINT row = 0; row < rowCount; ++row)
+		memcpy(dest + size_t(row) * size_t(rowSize),
+			   source + size_t(layout.Offset) + size_t(row) * size_t(layout.Footprint.RowPitch),
+			   size_t(rowSize));
 
-    D3D12_RANGE writeRange{ 0, 0 };   // nothing was written from the CPU side
+	D3D12_RANGE writeRange{ 0, 0 }; // nothing was written from the CPU side
 
-    readback->Unmap(0, &writeRange);
-    return true;
+	readback->Unmap(0, &writeRange);
+	return true;
 }
 
 
-bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice) {
-    if (not (m_isAvailable and readTarget.IsIdle()))
-        return false;
-    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
-        return false;
-    if (not commandListHandler.CurrentCmdList())
-        return false;
+bool RenderTarget::ReadBufferAsync(int bufferIndex, GfxReadTarget& readTarget, int arraySlice)
+{
+	if (not (m_isAvailable and readTarget.IsIdle()))
+		return false;
+	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return false;
+	if (not commandListHandler.CurrentCmdList())
+		return false;
 
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    ID3D12Resource* resource = info.m_resource.Get();
-    ID3D12Device* device = dx12Context.Device();
+	BufferInfo&		info = m_bufferInfo[bufferIndex];
+	ID3D12Resource*	resource = info.m_resource.Get();
+	ID3D12Device*	device = dx12Context.Device();
 
-    if (not (resource and device))
-        return false;
+	if (not (resource and device))
+		return false;
 
-    D3D12_RESOURCE_DESC desc = resource->GetDesc();
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-    UINT rowCount = 0;
-    UINT64 rowSize = 0;
-    UINT64 totalSize = 0;
+	D3D12_RESOURCE_DESC					desc = resource->GetDesc();
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT	layout{};
+	UINT								rowCount = 0;
+	UINT64								rowSize = 0;
+	UINT64								totalSize = 0;
 
-    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
-    if (not readTarget.Allocate(totalSize))
-        return false;
+	device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+	if (not readTarget.Allocate(totalSize))
+		return false;
 
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("ReadBufferAsync"));
+	CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("ReadBufferAsync"));
 
-    if (not cl)
-        return false;
+	if (not cl)
+		return false;
 
-    D3D12_RESOURCE_STATES stateBefore = info.m_state;
+	D3D12_RESOURCE_STATES stateBefore = info.m_state;
 
-    info.SetState(cl, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	info.SetState(cl, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    D3D12_TEXTURE_COPY_LOCATION srcLoc{};
-    D3D12_TEXTURE_COPY_LOCATION dstLoc{};
+	D3D12_TEXTURE_COPY_LOCATION srcLoc{};
+	D3D12_TEXTURE_COPY_LOCATION dstLoc{};
 
-    srcLoc.pResource = resource;
-    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    srcLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0);
-    dstLoc.pResource = readTarget.Resource();
-    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    dstLoc.PlacedFootprint = layout;
-    if (ID3D12GraphicsCommandList* list = cl->GfxList())
-        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-    info.SetState(cl, stateBefore);
-    baseRenderer.FinishOperation(cl, false);
-    return readTarget.Submit(layout, rowCount, rowSize, GetWidth(true), GetHeight(true),
-                             commandListHandler.FrameNumber(), commandListHandler.FrameIndex());
+	srcLoc.pResource = resource;
+	srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	srcLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0);
+	dstLoc.pResource = readTarget.Resource();
+	dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+	dstLoc.PlacedFootprint = layout;
+	if (ID3D12GraphicsCommandList* list = cl->GfxList())
+		list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+	info.SetState(cl, stateBefore);
+	baseRenderer.FinishOperation(cl, false);
+	return readTarget.Submit(layout, rowCount, rowSize, GetWidth(true), GetHeight(true),
+							 commandListHandler.FrameNumber(), commandListHandler.FrameIndex());
 }
 
 // =================================================================================================
 
-bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice) {
-    if (not (data and m_isAvailable))
-        return false;
-    if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
-        return false;
+bool RenderTarget::WriteBuffer(int bufferIndex, const void* data, size_t dataSize, int arraySlice)
+{
+	if (not (data and m_isAvailable))
+		return false;
+	if ((bufferIndex < 0) or (bufferIndex >= m_colorBufferCount))
+		return false;
 
-    BufferInfo& info = m_bufferInfo[bufferIndex];
-    ID3D12Resource* resource = info.m_resource.Get();
-    ID3D12Device* device = dx12Context.Device();
+	BufferInfo&		info = m_bufferInfo[bufferIndex];
+	ID3D12Resource*	resource = info.m_resource.Get();
+	ID3D12Device*	device = dx12Context.Device();
 
-    if (not (resource and device))
-        return false;
+	if (not (resource and device))
+		return false;
 
-    D3D12_RESOURCE_DESC desc = resource->GetDesc();
-    D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-    UINT rowCount = 0;
-    UINT64 rowSize = 0, totalSize = 0;
+	D3D12_RESOURCE_DESC					desc = resource->GetDesc();
+	D3D12_PLACED_SUBRESOURCE_FOOTPRINT	layout{};
+	UINT								rowCount = 0;
+	UINT64								rowSize = 0, totalSize = 0;
 
-    device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
-    if (dataSize < size_t(rowSize) * size_t(rowCount))
-        return false;
+	device->GetCopyableFootprints(&desc, 0, 1, 0, &layout, &rowCount, &rowSize, &totalSize);
+	if (dataSize < size_t(rowSize) * size_t(rowCount))
+		return false;
 
-    D3D12_HEAP_PROPERTIES heapProps{};
-    D3D12_RESOURCE_DESC uploadDesc{};
+	D3D12_HEAP_PROPERTIES	heapProps{};
+	D3D12_RESOURCE_DESC		uploadDesc{};
 
-    heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-    uploadDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    uploadDesc.Width = totalSize;
-    uploadDesc.Height = 1;
-    uploadDesc.DepthOrArraySize = 1;
-    uploadDesc.MipLevels = 1;
-    uploadDesc.Format = DXGI_FORMAT_UNKNOWN;
-    uploadDesc.SampleDesc.Count = 1;
-    uploadDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    uploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+	heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	heapProps.CreationNodeMask = 1;
+	heapProps.VisibleNodeMask = 1;
+	uploadDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	uploadDesc.Width = totalSize;
+	uploadDesc.Height = 1;
+	uploadDesc.DepthOrArraySize = 1;
+	uploadDesc.MipLevels = 1;
+	uploadDesc.Format = DXGI_FORMAT_UNKNOWN;
+	uploadDesc.SampleDesc.Count = 1;
+	uploadDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	uploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-    ComPtr<ID3D12Resource> upload;
+	ComPtr<ID3D12Resource> upload;
 
-    if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadDesc,
-                                               D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
-        return false;
+	if (FAILED(device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &uploadDesc,
+											   D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&upload))))
+		return false;
 #if DBG_DIRECTX
-    {
-        char name[160];
-        snprintf(name, sizeof(name), "RenderTarget[%s] WriteBuffer upload", (const char*)m_name);
-        upload->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
-    }
+	{
+		char name[160];
+		snprintf(name, sizeof(name), "RenderTarget[%s] WriteBuffer upload", (const char*)m_name);
+		upload->SetPrivateData(WKPDID_D3DDebugObjectName, UINT(strlen(name)), name);
+	}
 #endif
 
-    uint8_t* dest = nullptr;
-    D3D12_RANGE readRange{ 0, 0 };   // nothing is read back from this one
+	uint8_t*	dest = nullptr;
+	D3D12_RANGE	readRange{ 0, 0 }; // nothing is read back from this one
 
-    if (FAILED(upload->Map(0, &readRange, reinterpret_cast<void**>(&dest))))
-        return false;
+	if (FAILED(upload->Map(0, &readRange, reinterpret_cast<void**>(&dest))))
+		return false;
 
-    const uint8_t* source = static_cast<const uint8_t*>(data);
+	const uint8_t* source = static_cast<const uint8_t*>(data);
 
-    // Row by row: the caller's data is packed, the upload buffer's rows are padded to
-    // D3D12_TEXTURE_DATA_PITCH_ALIGNMENT.
-    for (UINT row = 0; row < rowCount; ++row)
-        memcpy(dest + size_t(layout.Offset) + size_t(row) * size_t(layout.Footprint.RowPitch),
-               source + size_t(row) * size_t(rowSize),
-               size_t(rowSize));
-    upload->Unmap(0, nullptr);
+	// Row by row: the caller's data is packed, the upload buffer's rows are padded to
+	// D3D12_TEXTURE_DATA_PITCH_ALIGNMENT.
+	for (UINT row = 0; row < rowCount; ++row)
+		memcpy(dest + size_t(layout.Offset) + size_t(row) * size_t(layout.Footprint.RowPitch),
+			   source + size_t(row) * size_t(rowSize),
+			   size_t(rowSize));
+	upload->Unmap(0, nullptr);
 
-    CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("WriteBuffer"));
+	CommandList* cl = static_cast<CommandList*>(baseRenderer.StartOperation("WriteBuffer"));
 
-    if (not cl)
-        return false;
+	if (not cl)
+		return false;
 
-    D3D12_RESOURCE_STATES stateBefore = info.m_state;
+	D3D12_RESOURCE_STATES stateBefore = info.m_state;
 
-    info.SetState(cl, D3D12_RESOURCE_STATE_COPY_DEST);
+	info.SetState(cl, D3D12_RESOURCE_STATE_COPY_DEST);
 
-    D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
+	D3D12_TEXTURE_COPY_LOCATION srcLoc{}, dstLoc{};
 
-    srcLoc.pResource = upload.Get();
-    srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    srcLoc.PlacedFootprint = layout;
-    dstLoc.pResource = resource;
-    dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    dstLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0);   // one mip level, so the index IS the layer
-    if (ID3D12GraphicsCommandList* list = cl->GfxList())
-        list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
-    info.SetState(cl, stateBefore);
-    // The upload buffer is a local, and the copy only runs when its list is submitted - with the frame, if
-    // it was recorded into the current list. The resource handler keeps it alive until that frame slot
-    // comes round again.
-    gfxResourceHandler.Track(upload);
-    baseRenderer.FinishOperation(cl);
-    return true;
+	srcLoc.pResource = upload.Get();
+	srcLoc.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+	srcLoc.PlacedFootprint = layout;
+	dstLoc.pResource = resource;
+	dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+	dstLoc.SubresourceIndex = UINT(info.m_isArray ? arraySlice : 0); // one mip level, so the index IS the layer
+	if (ID3D12GraphicsCommandList* list = cl->GfxList())
+		list->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+	info.SetState(cl, stateBefore);
+	// The upload buffer is a local, and the copy only runs when its list is submitted - with the frame, if
+	// it was recorded into the current list. The resource handler keeps it alive until that frame slot
+	// comes round again.
+	gfxResourceHandler.Track(upload);
+	baseRenderer.FinishOperation(cl);
+	return true;
 }
 
 // =================================================================================================

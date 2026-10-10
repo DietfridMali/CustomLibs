@@ -17,16 +17,16 @@ class Texture;
 // works without the Phase-C CommandList infrastructure. When CommandList lands, callers
 // can switch to passing an existing CommandBuffer via the low-level UploadSubresource entry.
 
-struct VkStagingBuffer
-{
-    VkBuffer      buffer     { VK_NULL_HANDLE };
-    VmaAllocation allocation { VK_NULL_HANDLE };
-    void*         mapped     { nullptr };
-    VkDeviceSize  size       { 0 };
+struct VkStagingBuffer {
+	VkBuffer		buffer{ VK_NULL_HANDLE };
+	VmaAllocation	allocation{ VK_NULL_HANDLE };
+	void*			mapped{ nullptr };
+	VkDeviceSize	size{ 0 };
 
-    // Destroys the staging buffer via vkContext.Allocator(). Safe to call on a default-constructed
-    // (empty) buffer.
-    void Destroy(void) noexcept;
+	// Destroys the staging buffer via vkContext.Allocator(). Safe to call on a default-constructed
+	// (empty) buffer.
+	void Destroy(void)
+	noexcept;
 };
 
 // =================================================================================================
@@ -35,21 +35,24 @@ struct VkStagingBuffer
 // Pattern: BeginSingleTimeCommands creates a transient VkCommandPool + VkCommandBuffer in
 // recording state; the caller fills it; EndSingleTimeCommands submits + waits + frees.
 
-struct OneShotCommandBuffer
-{
-    VkCommandPool   pool { VK_NULL_HANDLE };
-    VkCommandBuffer cb   { VK_NULL_HANDLE };
+struct OneShotCommandBuffer {
+	VkCommandPool	pool{ VK_NULL_HANDLE };
+	VkCommandBuffer	cb{ VK_NULL_HANDLE };
 };
 
-bool CreateStagingBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) noexcept;
+bool CreateStagingBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging)
+noexcept;
 
 // A staging buffer for the other direction: TRANSFER_DST and host READ access, so the GPU copies
 // into it and the CPU reads it out. CreateStagingBuffer () above is write-only from the host side
 // (SEQUENTIAL_WRITE) and reading from it would be a mistake on some memory types.
-bool CreateReadbackBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging) noexcept;
+bool CreateReadbackBuffer(VkDeviceSize byteSize, VkStagingBuffer& outStaging)
+noexcept;
 
-bool BeginSingleTimeCommands(OneShotCommandBuffer& out) noexcept;
-bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept;
+bool BeginSingleTimeCommands(OneShotCommandBuffer& out)
+noexcept;
+bool EndSingleTimeCommands(OneShotCommandBuffer& cmd)
+noexcept;
 
 // =================================================================================================
 // Low-level: into an already-open command buffer, transition the image to TRANSFER_DST, record a
@@ -58,29 +61,33 @@ bool EndSingleTimeCommands(OneShotCommandBuffer& cmd) noexcept;
 // keep it alive until the command buffer has been submitted and waited, then call outStaging.Destroy().
 
 bool UploadSubresource(VkCommandBuffer cb, VkImage dstImage, ImageLayoutTracker& tracker,
-                       uint32_t layer, const uint8_t* pixels, int width, int height, int channels,
-                       VkStagingBuffer& outStaging, bool addBarrier = true) noexcept;
+					   uint32_t layer, const uint8_t* pixels, int width, int height, int channels,
+					   VkStagingBuffer& outStaging, bool addBarrier = true)
+noexcept;
 
 // =================================================================================================
 // High-level: opens a one-shot CommandBuffer, uploads faceCount array layers (1 for plain 2D,
 // 6 for cubemaps), transitions to SHADER_READ_ONLY, submits + waits, frees temp resources.
 
 bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
-                       const uint8_t* const* faces, int faceCount,
-                       int width, int height, int channels) noexcept;
+					   const uint8_t* const* faces, int faceCount,
+					   int width, int height, int channels)
+noexcept;
 
 // Single-subresource convenience overload.
 inline bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
-                              const uint8_t* pixels, int width, int height, int channels) noexcept
+							  const uint8_t* pixels, int width, int height, int channels)
+noexcept
 {
-    return UploadTextureData(dstImage, tracker, &pixels, 1, width, height, channels);
+	return UploadTextureData(dstImage, tracker, &pixels, 1, width, height, channels);
 }
 
 // Build a CPU mip chain from the base image (2×2 box filter, edge-clamped) and upload one
 // subresource per level. dstImage must have been created with the matching mipLevels count.
 bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
-                               const uint8_t* pixels, int width, int height, int channels,
-                               uint32_t mipLevels, eColorEncoding colorEncoding) noexcept;
+							   const uint8_t* pixels, int width, int height, int channels,
+							   uint32_t mipLevels, eColorEncoding colorEncoding)
+noexcept;
 
 // Upload a block-compressed (BC1/BC4/BC5/BC7) texture: one staging buffer + copy per (face, mip).
 // faces[f] points at face f's tightly-packed mip chain (level 0 first; ceil(w/4)*ceil(h/4)*GfxBlockBytes
@@ -91,14 +98,16 @@ bool UploadTextureDataWithMips(VkImage dstImage, ImageLayoutTracker& tracker,
 // image must exist with arrayLayers == layerCount and mipLevels == mipCount. firstLayer lets a caller
 // refresh a single layer in place: pass one pointer, layerCount 1 and that layer's index.
 bool UploadTextureArrayData(VkImage dstImage, ImageLayoutTracker& tracker,
-                            const uint8_t* const* layers, int layerCount,
-                            int width, int height, int channels, int mipCount,
-                            int firstLayer = 0) noexcept;
+							const uint8_t* const* layers, int layerCount,
+							int width, int height, int channels, int mipCount,
+							int firstLayer = 0)
+noexcept;
 
 bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
-                          const uint8_t* const* faces, int faceCount,
-                          int width, int height, GfxPixelFormat fmt, int mipCount,
-                          int firstLayer = 0) noexcept;
+						  const uint8_t* const* faces, int faceCount,
+						  int width, int height, GfxPixelFormat fmt, int mipCount,
+						  int firstLayer = 0)
+noexcept;
 
 // =================================================================================================
 // Create + upload a Texture3D (VkImage with imageType=VK_IMAGE_TYPE_3D). On success outImage,
@@ -106,8 +115,9 @@ bool UploadCompressedData(VkImage dstImage, ImageLayoutTracker& tracker,
 // Caller owns outImage/outAllocation and must vmaDestroyImage them on cleanup.
 
 bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStride,
-                         const void* data, VkImage& outImage, VmaAllocation& outAllocation,
-                         ImageLayoutTracker& outTracker) noexcept;
+						 const void* data, VkImage& outImage, VmaAllocation& outAllocation,
+						 ImageLayoutTracker& outTracker)
+noexcept;
 
 // =================================================================================================
 // Platform-neutral upload entry points used by base_noisetexture. Each function does the full
@@ -117,8 +127,10 @@ bool Upload3DTextureData(int w, int h, int d, VkFormat format, uint32_t pixelStr
 // tex.m_isValid + tex.m_isDeployed on success.
 
 bool Upload2DTexture(Texture& tex, int width, int height,
-                     GfxPixelFormat fmt, const void* data) noexcept;
+					 GfxPixelFormat fmt, const void* data)
+noexcept;
 
-bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips) noexcept;
+bool Upload3DTexture(Texture& tex, int width, int height, int depth, GfxPixelFormat fmt, const void* data, bool generateMips)
+noexcept;
 
 // =================================================================================================

@@ -5,9 +5,10 @@
 
 // =================================================================================================
 
-const String& Standard2DVS() {
-    static const String source(
-        R"(
+const String& Standard2DVS()
+{
+	static const String source(
+		R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -24,14 +25,14 @@ const String& Standard2DVS() {
                 fragCoord = texCoord;
                 fragPos = viewPos.xyz;
                 }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
-const String& Standard3DVS() {
-    static const String source(
-        R"(
+const String& Standard3DVS()
+{
+	static const String source(
+		R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -47,14 +48,14 @@ const String& Standard3DVS() {
                 fragCoord = texCoord;
                 fragPos = viewPos.xyz;
                 }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
-const String& Offset2DVS() {
-    static const String source(
-        R"(
+const String& Offset2DVS()
+{
+	static const String source(
+		R"(
             //#version 140
             //#extension GL_ARB_explicit_attrib_location : enable
             #version 330
@@ -72,15 +73,15 @@ const String& Offset2DVS() {
                 fragCoord = texCoord;
                 fragPos = viewPos.xyz;
                 }
-        )"
-    );
-    return source;
+        )");
+	return source;
 }
 
 
-const String& GaussBlurFuncs() {
-    static const String source(
-        R"(
+const String& GaussBlurFuncs()
+{
+	static const String source(
+		R"(
         uniform vec2 texelSize;
         uniform int blurStrength;
         uniform float blurSpread;
@@ -173,14 +174,14 @@ const String& GaussBlurFuncs() {
                     return texture(surface, baseUV);
             }
         }
-      )"
-    );
-    return source;
+      )");
+	return source;
 };
 
 
-const String& CelShadingFuncs() {
-    static const String source(R"(
+const String& CelShadingFuncs()
+{
+	static const String source(R"(
         float CelPeak(vec3 light) {
             return max(light.r, max(light.g, light.b));
         }
@@ -224,12 +225,13 @@ const String& CelShadingFuncs() {
             return color * (CelQuantizeRound(min(peak, 1.0), levels) / peak);
         }
     )");
-    return source;
+	return source;
 }
 
 
-const String& BoostFuncs() {
-    static const String source(R"(
+const String& BoostFuncs()
+{
+	static const String source(R"(
         float Boost(float v, float strength) { 
             return (v < 0.5) ? pow(v, 1.0 / strength) : pow(v, strength); 
         }
@@ -258,22 +260,24 @@ const String& BoostFuncs() {
             return vec3(SinBoost(v.r,strength), SinBoost(v.g,strength), SinBoost(v.b,strength)); 
         }
     )");
-    return source;
+	return source;
 }
 
 
-const String& SRGBFuncs() {
-    static const String source(R"(
+const String& SRGBFuncs()
+{
+	static const String source(R"(
         vec3 ToLinear(vec3 c) { return pow(c, vec3(2.2)); }
 
         vec3 ToSRGB(vec3 c) { return pow(max(c, 0.0), vec3(1.0 / 2.2)); }
     )");
-    return source;
+	return source;
 }
 
 
-const String& TintFuncs() {
-    static const String source(R"(
+const String& TintFuncs()
+{
+	static const String source(R"(
         // downscale color just so much inf need be that tint can be fully applied
         vec3 ApplyExponentialTint(vec3 color, vec3 tintScale, float e) {
             // exponentiell verstärkter Tint
@@ -290,11 +294,12 @@ const String& TintFuncs() {
             return ApplyExponentialTint(color, tintScale, 1.0);
         }
     )");
-    return source;
+	return source;
 }
 
-const String& NoiseFuncs() {
-    static const String source(R"(
+const String& NoiseFuncs()
+{
+	static const String source(R"(
         float hash12(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
         }
@@ -371,12 +376,13 @@ const String& NoiseFuncs() {
             return dot(w, d) * simplexScale;
         }
     )");
-    return source;
+	return source;
 }
 
 
-const String& RandFuncs() {
-    static const String source(R"(
+const String& RandFuncs()
+{
+	static const String source(R"(
         uint _rngState;
 
         void seedRand(float s) {
@@ -399,12 +405,13 @@ const String& RandFuncs() {
             return int(_lcg() % uint(max(n, 1)));        // 0..n-1
         }
     )");
-    return source;
+	return source;
 }
 
 
-const String& EdgeFadeFunc() {
-    static const String source(R"(
+const String& EdgeFadeFunc()
+{
+	static const String source(R"(
         uniform float edgeFade;
         vec2 EdgeFade(vec2 baseUV, vec2 dispUV) {
             float ef = clamp(edgeFade, 0.0, 0.5);
@@ -420,12 +427,13 @@ const String& EdgeFadeFunc() {
             return dispUV;
         }
     )");
-    return source;
+	return source;
 }
 
 
-const String& ChromAbFuncs() {
-    static const String source(R"(
+const String& ChromAbFuncs()
+{
+	static const String source(R"(
         // === Chromatic Aberration (UV-space) ===
         // Uses existing uniforms: sampler2D source, vec2 viewportSize
         uniform float aberration;
@@ -470,12 +478,13 @@ const String& ChromAbFuncs() {
             return baseColor + fringe;
         }
     )");
-    return source;
+	return source;
 }
 
 
-const String& VignetteFunc() {
-    static const String source(R"(
+const String& VignetteFunc()
+{
+	static const String source(R"(
         uniform float vignetteRadius = 0.25f;
         const float vignetteBlur = 0.25; // konstant, kann auch Uniform werden
 
@@ -489,7 +498,7 @@ const String& VignetteFunc() {
             return smoothstep(edge1, edge0, dist);
         }
     )");
-    return source;
+	return source;
 }
 
 // =================================================================================================

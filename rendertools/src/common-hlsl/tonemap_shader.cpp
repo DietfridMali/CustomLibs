@@ -7,17 +7,18 @@
 // curve does and why a renderer that lights into a floating point target needs one.
 
 static const ShaderDataAttributes VtxTcAttrs[] = {
-    { "Vertex",   0, ShaderDataAttributes::Float3 },
-    { "TexCoord", 0, ShaderDataAttributes::Float2 },
+	{ "Vertex", 0, ShaderDataAttributes::Float3 },
+	{ "TexCoord", 0, ShaderDataAttributes::Float2 },
 };
 
 // The VS is Offset2DVS(), which declares b1 with 'float offset'. The PS b1 starts with the same
 // 'float vsOffset' so the combined cbuffer layout stays consistent across VS and PS.
-const ShaderSource& ToneMapShader() {
-    static const ShaderSource toneMapShader(
-        "tonemap",
-        Offset2DVS(),
-        String(R"(
+const ShaderSource& ToneMapShader()
+{
+	static const ShaderSource toneMapShader(
+		"tonemap",
+		Offset2DVS(),
+		String(R"(
             cbuffer ShaderConstants : register(b1) {
                 float vsOffset;   // VS 'offset' lives at byte 0; PS ignores it
                 float exposure;
@@ -61,9 +62,8 @@ const ShaderSource& ToneMapShader() {
                 return float4(color, sceneColor.a);
             }
         )"),
-        ShaderDataLayout(VtxTcAttrs, 2)
-    );
-    return toneMapShader;
+		ShaderDataLayout(VtxTcAttrs, 2));
+	return toneMapShader;
 }
 
 // =================================================================================================

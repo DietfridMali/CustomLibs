@@ -1,7 +1,7 @@
 ﻿#pragma once
 
-#include "gfxtypes.h"   // GfxTypes::Int — resolved to GL or DX12 definition via include path
-#include "gfxstates.h"  // GfxStates singleton — GetViewport/SetViewport
+#include "gfxtypes.h" // GfxTypes::Int — resolved to GL or DX12 definition via include path
+#include "gfxstates.h" // GfxStates singleton — GetViewport/SetViewport
 #include "rectangle.h"
 #include "vector.hpp"
 #include "matrix.hpp"
@@ -11,178 +11,227 @@
 // =================================================================================================
 
 struct ScreenCoord {
-    int x;
-    int y;
+	int x;
+	int y;
 };
 
-class Viewport 
-    : public Rectangle
-{
+class Viewport
+	: public Rectangle {
 public:
-    Matrix4f        m_transformation;
-    int             m_windowWidth;
-    int             m_windowHeight;
-    Vector2f        m_center;
-    bool            m_flipVertically;
-    GfxTypes::Int   m_gfxViewport[4];
+	Matrix4f		m_transformation;
+	int				m_windowWidth;
+	int				m_windowHeight;
+	Vector2f		m_center;
+	bool			m_flipVertically;
+	GfxTypes::Int	m_gfxViewport[4];
 
-    Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
-        : Rectangle(left, top, width, height) 
-        , m_windowWidth(0)
-        , m_windowHeight(0)
-        , m_center({ float(left) + float (width) * 0.5f, float(top) + float(height) * 0.5f })
-        , m_flipVertically(false)
-    { 
-        m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
-    }
+	Viewport(int left = 0, int top = 0, int width = 0, int height = 0)
+		: Rectangle(left, top, width, height)
+		, m_windowWidth(0)
+		, m_windowHeight(0)
+		, m_center({ float(left) + float(width) * 0.5f, float(top) + float(height) * 0.5f })
+		, m_flipVertically(false)
+	{
+		m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
+	}
 
-    Viewport(Vector2i center, int width = 0, int height = 0)
-        : Rectangle(center.x - width / 2, center.y - height / 2, width, height)
-        , m_windowWidth(0)
-        , m_windowHeight(0)
-        , m_center({ float(center.x), float(center.y) })
-        , m_flipVertically(false)
-    { 
-        m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
-    }
+	Viewport(Vector2i center, int width = 0, int height = 0)
+		: Rectangle(center.x - width / 2, center.y - height / 2, width, height)
+		, m_windowWidth(0)
+		, m_windowHeight(0)
+		, m_center({ float(center.x), float(center.y) })
+		, m_flipVertically(false)
+	{
+		m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
+	}
 
-    Viewport(Rectangle& r)
-        : Rectangle (r.m_left, r.m_top, r.m_width, r.m_height) 
-        , m_windowWidth(0)
-        , m_windowHeight(0)
-        , m_center({ float(r.m_left) + float(r.m_width) * 0.5f, float(r.m_top) + float(r.m_height) * 0.5f })
-        , m_flipVertically(false)
-    { 
-        m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
-    }
+	Viewport(Rectangle& r)
+		: Rectangle(r.m_left, r.m_top, r.m_width, r.m_height)
+		, m_windowWidth(0)
+		, m_windowHeight(0)
+		, m_center({ float(r.m_left) + float(r.m_width) * 0.5f, float(r.m_top) + float(r.m_height) * 0.5f })
+		, m_flipVertically(false)
+	{
+		m_gfxViewport[0] = m_gfxViewport[1] = m_gfxViewport[2] = m_gfxViewport[3] = 0;
+	}
 
-    void Fill(const RGBColor& color, float alpha = 1.0f, float scale = 1.0f);
+	void Fill(const RGBColor& color, float alpha = 1.0f, float scale = 1.0f);
 
-    inline void Fill(RGBColor&& color, float alpha = 1.0f, float scale = 1.0f) {
-        Fill(static_cast<const RGBColor&>(color), alpha, scale);
-    }
+	inline void Fill(RGBColor&& color, float alpha = 1.0f, float scale = 1.0f) {
+		Fill(static_cast<const RGBColor&>(color), alpha, scale);
+	}
 
-    inline void Fill(void) {
-        Fill(static_cast<RGBColor>(ColorData::White));
-    }
+	inline void Fill(void) {
+		Fill(static_cast<RGBColor>(ColorData::White));
+	}
 
-    inline float Leftf(void) noexcept { return float(m_left); }
+	inline float Leftf(void)
+	noexcept
+	{
+		return float(m_left);
+	}
 
-    inline float Topf(void) noexcept { return float(m_top); }
+	inline float Topf(void)
+	noexcept
+	{
+		return float(m_top);
+	}
 
-    inline float Widthf(void) noexcept { return float(m_width); }
+	inline float Widthf(void)
+	noexcept
+	{
+		return float(m_width);
+	}
 
-    inline float Heightf(void) noexcept { return float(m_height); }
+	inline float Heightf(void)
+	noexcept
+	{
+		return float(m_height);
+	}
 
-    inline int WindowWidth(void) noexcept { return m_windowWidth; }
+	inline int WindowWidth(void)
+	noexcept
+	{
+		return m_windowWidth;
+	}
 
-    inline int WindowHeight(void) noexcept { return m_windowHeight; }
+	inline int WindowHeight(void)
+	noexcept
+	{
+		return m_windowHeight;
+	}
 
-    // One over the viewport's size: what a shader needs to convert between pixels and the normalized
-    // coordinates the projection produces. It belongs here because it is a property of the viewport -
-    // BaseRenderer::TexelSize() hands this one out, and RenderTarget has its own for steps that work
-    // inside a buffer rather than inside the viewport.
-    inline TexCoord TexelSize(void) noexcept {
-        return TexCoord(1.0f / float(m_width), 1.0f / float(m_height));
-    }
+	// One over the viewport's size: what a shader needs to convert between pixels and the normalized
+	// coordinates the projection produces. It belongs here because it is a property of the viewport -
+	// BaseRenderer::TexelSize() hands this one out, and RenderTarget has its own for steps that work
+	// inside a buffer rather than inside the viewport.
+	inline TexCoord TexelSize(void)
+	noexcept
+	{
+		return TexCoord(1.0f / float(m_width), 1.0f / float(m_height));
+	}
 
-    inline int FlipVertically(void) noexcept { return m_flipVertically; }
+	inline int FlipVertically(void)
+	noexcept
+	{
+		return m_flipVertically;
+	}
 
-    inline Vector2f Center(void) const noexcept {
-        return m_center;
-    }
+	inline Vector2f Center(void) const
+	noexcept
+	{
+		return m_center;
+	}
 
-    inline Vector2i Centeri(void) const noexcept {
-        return Vector2i(int(round(m_center.X())), int(round(m_center.Y())));
-    }
+	inline Vector2i Centeri(void) const
+	noexcept
+	{
+		return Vector2i(int(round(m_center.X())), int(round(m_center.Y())));
+	}
 
-    inline Matrix4f& Transformation(void) noexcept { return m_transformation; }
+	inline Matrix4f& Transformation(void)
+	noexcept
+	{
+		return m_transformation;
+	}
 
-    void SetViewport(void);
+	void SetViewport(void);
 
-    Viewport& Resize(float scale);
+	Viewport& Resize(float scale);
 
-    Viewport Resized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
+	Viewport Resized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
 
-    Viewport Resized(float scale) const;
+	Viewport Resized(float scale) const;
 
-    void SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
+	void SetResized(int deltaLeft, int deltaTop, int deltaWidth, int deltaHeight) const;
 
-    void BuildTransformation(int windowWidth, int windowHeight, bool flipVertically) noexcept;
+	void BuildTransformation(int windowWidth, int windowHeight, bool flipVertically)
+	noexcept;
 
-    Viewport& Move(int dx, int dy);
+	Viewport& Move(int dx, int dy);
 
-    Viewport Moved(int dx, int dy) {
-        return Viewport(m_left + dx, m_top + dy, m_width, m_height);
-    }
-
-
-    Viewport Movedf(float dx, float dy) {
-        return Viewport(m_left + int(m_width * dx), int (m_top + m_height * dy), m_width, m_height);
-    }
-
-
-    Viewport& operator+=(Vector2i offset) {
-        m_left += offset.x;
-        m_right += offset.x;
-        m_top += offset.y;
-        m_bottom += offset.y;
-        m_center.X() += offset.x;
-        m_center.Y() += offset.y;
-        return *this;
-    }
-
-
-    Viewport& operator+=(Vector2f offset) {
-        *this += Vector2i(int(m_width * offset.x), int(m_height * offset.y));
-        return *this;
-    }
+	Viewport Moved(int dx, int dy) {
+		return Viewport(m_left + dx, m_top + dy, m_width, m_height);
+	}
 
 
-    Viewport& operator*=(float scale) {
-        if (fabs(scale) > Conversions::NumericTolerance) {
-            float w = float(m_width) * scale;
-            float h = float(m_height) * scale;
-            if (w * h <= Conversions::NumericTolerance)
-                return *this;
-            m_left = int(round(m_center.X() - w * 0.5f));
-            m_top = int(round(m_center.Y() - h * 0.5f));
-            m_right = int(round(m_center.X() + w * 0.5f));
-            m_bottom = int(round(m_center.Y() + h * 0.5f));
-            m_width = int(round(w));
-            m_height = int(round(h));
-        }
-        return *this;
-    }
+	Viewport Movedf(float dx, float dy) {
+		return Viewport(m_left + int(m_width * dx), int(m_top + m_height * dy), m_width, m_height);
+	}
 
-    Viewport operator*(float scale) {
-        if (fabs(scale) < Conversions::NumericTolerance)
-            return *this;
-        float w = float(m_width) * scale;
-        float h = float(m_height) * scale;
-        if (w * h <= Conversions::NumericTolerance)
-            return *this;
-        return Viewport (int(round(m_center.X() - w * 0.5f)), int(round(m_center.Y() - h * 0.5f)), int(round(w)), int(round(h)));
-    }
 
-    inline void GetGfxViewport(void) noexcept {
-        gfxStates.GetViewport(m_gfxViewport);
-    }
+	Viewport& operator+=(Vector2i offset)
+	{
+		m_left += offset.x;
+		m_right += offset.x;
+		m_top += offset.y;
+		m_bottom += offset.y;
+		m_center.X() += offset.x;
+		m_center.Y() += offset.y;
+		return *this;
+	}
 
-    inline void SetGfxViewport(void) noexcept {
-        gfxStates.SetViewport(m_gfxViewport);
-    }
+
+	Viewport& operator+=(Vector2f offset) {
+		*this += Vector2i(int(m_width * offset.x), int(m_height * offset.y));
+		return *this;
+	}
+
+
+	Viewport& operator*=(float scale)
+	{
+		if (fabs(scale) > Conversions::NumericTolerance) {
+			float w = float(m_width) * scale;
+			float h = float(m_height) * scale;
+			if (w * h <= Conversions::NumericTolerance)
+				return *this;
+			m_left = int(round(m_center.X() - w * 0.5f));
+			m_top = int(round(m_center.Y() - h * 0.5f));
+			m_right = int(round(m_center.X() + w * 0.5f));
+			m_bottom = int(round(m_center.Y() + h * 0.5f));
+			m_width = int(round(w));
+			m_height = int(round(h));
+		}
+		return *this;
+	}
+
+	Viewport operator*(float scale)
+	{
+		if (fabs(scale) < Conversions::NumericTolerance)
+			return *this;
+		float w = float(m_width) * scale;
+		float h = float(m_height) * scale;
+		if (w * h <= Conversions::NumericTolerance)
+			return *this;
+		return Viewport(int(round(m_center.X() - w * 0.5f)), int(round(m_center.Y() - h * 0.5f)), int(round(w)), int(round(h)));
+	}
+
+	inline void GetGfxViewport(void)
+	noexcept
+	{
+		gfxStates.GetViewport(m_gfxViewport);
+	}
+
+	inline void SetGfxViewport(void)
+	noexcept
+	{
+		gfxStates.SetViewport(m_gfxViewport);
+	}
 #ifdef _DEBUG
-    String          m_owner;
+	String m_owner;
 
-    template<typename T>
-    void SetOwner(T&& owner) noexcept {
-        m_owner = std::forward<T>(owner);
-    }
+	template <typename T>
+	void SetOwner(T&& owner)
+	noexcept
+	{
+		m_owner = std::forward<T>(owner);
+	}
 
-    void SetOwner(const char* owner) noexcept {
-        m_owner = String(owner);
-    }
+	void SetOwner(const char* owner)
+	noexcept
+	{
+		m_owner = String(owner);
+	}
 #endif
 };
 

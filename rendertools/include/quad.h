@@ -1,4 +1,4 @@
-# pragma once
+#pragma once
 
 #include <math.h>
 #include <initializer_list>
@@ -12,108 +12,120 @@
 // =================================================================================================
 // Geometric computations in planes and rectangles in a plane
 
-class Quad
-{
+class Quad {
 public:
-    AutoArray<Vector3f>  m_coordinates;
-    Vector3f             m_normal;
-    Vector3f             m_center;
-    Vector3f             m_refEdges[2];
-    float                m_refDots[2];
-    float                m_tolerance;
-    float                m_toleranceSquared;
+	AutoArray<Vector3f>	m_coordinates;
+	Vector3f			m_normal;
+	Vector3f			m_center;
+	Vector3f			m_refEdges[2];
+	float				m_refDots[2];
+	float				m_tolerance;
+	float				m_toleranceSquared;
 
-    Quad()
-        noexcept;
+	Quad()
+	noexcept;
 
-    Quad(std::initializer_list<Vector3f> vertices);
+	Quad(std::initializer_list<Vector3f> vertices);
 
-    Quad& operator= (std::initializer_list<Vector3f> vertices);
+	Quad& operator=(std::initializer_list<Vector3f> vertices);
 
-    void Init(std::initializer_list<Vector3f> vertices);
+	void Init(std::initializer_list<Vector3f> vertices);
 
-    int Winding(void)
-        noexcept;
+	int Winding(void)
+	noexcept;
 
-    // distance to plane (v0, v1, v2)
-    inline float Distance(const Vector3f& v) {
-        return (v - m_coordinates[0]).Dot(m_normal);
-    }
-    /* noexcept is intentionally omitted here to keep your original single-line style for inlines;
+	// distance to plane (v0, v1, v2)
+	inline float Distance(const Vector3f& v) {
+		return (v - m_coordinates[0]).Dot(m_normal);
+	}
+	/* noexcept is intentionally omitted here to keep your original single-line style for inlines;
        all other non-inline declarations below are marked with noexcept in the next line. */
 
-       // flips the normal for collision handling with walls with thickness zero (i.e. where a wall is accessible from both of its sides)
-    inline void AdjustNormal(const Vector3f& v) {
-        if (Distance(v) < 0.0f)
-            m_normal = -m_normal;
-    }
+	// flips the normal for collision handling with walls with thickness zero (i.e. where a wall is accessible from both of its sides)
+	inline void AdjustNormal(const Vector3f& v) {
+		if (Distance(v) < 0.0f)
+			m_normal = -m_normal;
+	}
 
-    // project point p on this plane (i.e. compute a point in the plane 
-    // so that a vector from that point to p is parallel to the plane's normal)
-    float Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
-        noexcept;
+	// project point p on this plane (i.e. compute a point in the plane
+	// so that a vector from that point to p is parallel to the plane's normal)
+	float Project(const Vector3f& p, Vector3f& vCoplanarRectanglePoint)
+	noexcept;
 
-    float PointToLineDistanceEx(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1, bool clampToSegment, bool squared)
-        noexcept;
+	float PointToLineDistanceEx(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1, bool clampToSegment, bool squared)
+	noexcept;
 
-    inline float PointToLineDistance(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1) noexcept {
-        return PointToLineDistanceEx(p, lp0, lp1, false, false);
-    }
+	inline float PointToLineDistance(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1)
+	noexcept
+	{
+		return PointToLineDistanceEx(p, lp0, lp1, false, false);
+	}
 
-    inline float PointToLineDistanceSquared(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1) noexcept {
-        return PointToLineDistanceEx(p, lp0, lp1, false, true);
-    }
+	inline float PointToLineDistanceSquared(const Vector3f& p, const Vector3f& lp0, const Vector3f& lp1)
+	noexcept
+	{
+		return PointToLineDistanceEx(p, lp0, lp1, false, true);
+	}
 
-    inline float PointToSegmentDistance(const Vector3f& p, const Vector3f& sp0, const Vector3f& sp1) noexcept {
-        return PointToLineDistanceEx(p, sp0, sp1, true, false);
-    }
+	inline float PointToSegmentDistance(const Vector3f& p, const Vector3f& sp0, const Vector3f& sp1)
+	noexcept
+	{
+		return PointToLineDistanceEx(p, sp0, sp1, true, false);
+	}
 
-    inline float PointToSegmentDistanceSquared(const Vector3f& p, const Vector3f& sp0, const Vector3f& sp1) noexcept {
-        return PointToLineDistanceEx(p, sp0, sp1, true, true);
-    }
+	inline float PointToSegmentDistanceSquared(const Vector3f& p, const Vector3f& sp0, const Vector3f& sp1)
+	noexcept
+	{
+		return PointToLineDistanceEx(p, sp0, sp1, true, true);
+	}
 
-    float NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
-        noexcept;
+	float NearestPointOnLine(const Vector3f& p0, const Vector3f& p1, Vector3f& vLinePoint)
+	noexcept;
 
-    // compute the intersection of a vector v between two points with a plane
-    // Will return None if v parallel to the plane or doesn't intersect with plane 
-    // (i.e. both points are on the same side of the plane)
-    int LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vCoplanarRectanglePoint)
-        noexcept;
+	// compute the intersection of a vector v between two points with a plane
+	// Will return None if v parallel to the plane or doesn't intersect with plane
+	// (i.e. both points are on the same side of the plane)
+	int LineIntersection(const Vector3f& p0, const Vector3f& p1, Vector3f& vCoplanarRectanglePoint)
+	noexcept;
 
-    int SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint, Conversions::FloatInterval limits)
-        noexcept;
+	int SphereIntersection(LineSegment line, float radius, Vector3f& collisionPoint, Vector3f& endPoint,
+						   Conversions::FloatInterval limits)
+	noexcept;
 
-    int PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
-        noexcept;
+	int PointOnLineAt(LineSegment& line, float d, Vector3f& vLinePoint)
+	noexcept;
 
-    // barycentric method for testing whether a point lies in an arbitrarily shaped triangle
-    // not needed for rectangular shapes in a plane
-    bool TriangleContains(const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c)
-        noexcept;
+	// barycentric method for testing whether a point lies in an arbitrarily shaped triangle
+	// not needed for rectangular shapes in a plane
+	bool TriangleContains(const Vector3f& p, const Vector3f& a, const Vector3f& b, const Vector3f& c)
+	noexcept;
 
-    bool Contains(Vector3f& p, bool barycentric = false)
-        noexcept;
+	bool Contains(Vector3f& p, bool barycentric = false)
+	noexcept;
 
-    float SegmentDistance(Vector3f s1, Vector3f s2)
-        noexcept;
+	float SegmentDistance(Vector3f s1, Vector3f s2)
+	noexcept;
 
-    float PointDistance(Vector3f p, bool intersectRectangle = false)
-        noexcept;
+	float PointDistance(Vector3f p, bool intersectRectangle = false)
+	noexcept;
 
-    void Translate(Vector3f t)
-        noexcept;
+	void Translate(Vector3f t)
+	noexcept;
 
-    inline Vector3f& GetNormal(void) noexcept {
-        return m_normal;
-    }
+	inline Vector3f& GetNormal(void)
+	noexcept
+	{
+		return m_normal;
+	}
 
-    inline Vector3f& GetCenter(void) noexcept {
-        return m_center;
-    };
+	inline Vector3f& GetCenter(void)
+	noexcept
+	{
+		return m_center;
+	};
 
-    bool SpherePenetratesQuad(LineSegment& line, float radius)
-        noexcept;
+	bool SpherePenetratesQuad(LineSegment& line, float radius)
+	noexcept;
 };
 
 // =================================================================================================

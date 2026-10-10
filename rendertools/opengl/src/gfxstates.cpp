@@ -16,7 +16,9 @@
 // A texture may be bound to several units at once - a texture array that serves as the base texture on
 // one unit and as the overlay on another, say - so tmuIndex is answered first: is the handle on THAT
 // unit? Only when it is not is the first unit that holds it returned.
-int TextureSlotInfo::Find(GLuint handle, int tmuIndex) noexcept {
+int TextureSlotInfo::Find(GLuint handle, int tmuIndex)
+noexcept
+{
 	if ((tmuIndex >= 0) and (tmuIndex < m_maxUsedTMU) and (m_bindings[tmuIndex] == handle))
 		return tmuIndex;
 	for (int i = 0; i < m_maxUsedTMU; ++i)
@@ -27,7 +29,9 @@ int TextureSlotInfo::Find(GLuint handle, int tmuIndex) noexcept {
 }
 
 
-bool TextureSlotInfo::Update(GLuint handle, int tmuIndex) noexcept {
+bool TextureSlotInfo::Update(GLuint handle, int tmuIndex)
+noexcept
+{
 	if ((tmuIndex < 0) or (tmuIndex >= m_bindings.Length()))
 		return false;
 	if (m_maxUsedTMU < tmuIndex + 1)
@@ -42,7 +46,8 @@ bool TextureSlotInfo::Update(GLuint handle, int tmuIndex) noexcept {
 // to this one - assumed one unit per texture, and that is not what a draw with a texture array on the
 // base unit and the same array on the overlay unit needs: it put the array on the second unit and took
 // it off the first.
-int TextureSlotInfo::Bind(GLuint handle, int tmuIndex) {
+int TextureSlotInfo::Bind(GLuint handle, int tmuIndex)
+{
 	if (handle != 0) {
 		if (Find(handle, tmuIndex) == tmuIndex)
 			return tmuIndex;
@@ -59,7 +64,8 @@ int TextureSlotInfo::Bind(GLuint handle, int tmuIndex) {
 }
 
 
-bool TextureSlotInfo::Release(GLuint handle, int tmuIndex) {
+bool TextureSlotInfo::Release(GLuint handle, int tmuIndex)
+{
 	int boundTMU = Find(handle, tmuIndex);
 	if (boundTMU < 0)
 		return false;
@@ -71,7 +77,8 @@ bool TextureSlotInfo::Release(GLuint handle, int tmuIndex) {
 
 // =================================================================================================
 
-TextureSlotInfo* GfxStates::FindInfo(GLenum type) {
+TextureSlotInfo* GfxStates::FindInfo(GLenum type)
+{
 	// Nothing to find once this singleton has been torn down - the list is gone, and iterating it reads
 	// freed memory. Textures and render targets owned by other statics are destroyed after it and drop
 	// their bindings here on the way out; for those there is nothing left to drop.
@@ -84,7 +91,8 @@ TextureSlotInfo* GfxStates::FindInfo(GLenum type) {
 }
 
 
-int GfxStates::GetBoundTexture(GLenum type, int tmuIndex) {
+int GfxStates::GetBoundTexture(GLenum type, int tmuIndex)
+{
 #if TRACK_TMU_USAGE
 	TextureSlotInfo* info = FindInfo(type);
 	if (info)
@@ -94,7 +102,8 @@ int GfxStates::GetBoundTexture(GLenum type, int tmuIndex) {
 }
 
 
-int GfxStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
+int GfxStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex)
+{
 #if TRACK_TMU_USAGE
 	TextureSlotInfo* info = FindInfo(type);
 	if (info)
@@ -104,7 +113,8 @@ int GfxStates::SetBoundTexture(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-int GfxStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
+int GfxStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex)
+{
 #if TRACK_TMU_USAGE
 	TextureSlotInfo* info = FindInfo(type);
 	if (info)
@@ -114,7 +124,8 @@ int GfxStates::BoundTMU(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
+int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex)
+{
 #if 0
 	gfxStates.ClearError();
 	GLint tex = 0;
@@ -150,16 +161,18 @@ int GfxStates::BindTexture(GLenum type, GLuint handle, int tmuIndex) {
 }
 
 
-bool GfxStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex) {
+bool GfxStates::ReleaseTexture(GLenum type, GLuint handle, int tmuIndex)
+{
 	TextureSlotInfo* info = FindInfo(type);
 	return info ? info->Release(handle, tmuIndex) : false;
 }
 
 
-void GfxStates::DetermineExtensions(void) {
+void GfxStates::DetermineExtensions(void)
+{
 	GLint extCount = 0;
 	glGetIntegerv(GL_NUM_EXTENSIONS, &extCount);
-	if (extCount < 1)   // no GL context (yet): leave m_haveExtensions clear so HasExtension () retries
+	if (extCount < 1) // no GL context (yet): leave m_haveExtensions clear so HasExtension () retries
 		return;
 	m_extensions.reserve(extCount);
 	for (GLint i = 0; i < extCount; ++i) {
@@ -171,23 +184,27 @@ void GfxStates::DetermineExtensions(void) {
 }
 
 
-String GfxStates::DeviceName(void) {
-	const char* vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
-	const char* renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-	char buffer[256];
+String GfxStates::DeviceName(void)
+{
+	const char*	vendor = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+	const char*	renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+	char		buffer[256];
 	snprintf(buffer, sizeof(buffer), "%s %s", vendor ? vendor : "", renderer ? renderer : "");
 	return String(buffer);
 }
 
 
-bool GfxStates::CanBlend(GfxPixelFormat format) {
+bool GfxStates::CanBlend(GfxPixelFormat format)
+{
 	GLint value = GL_FALSE;
 	glGetInternalformativ(GL_TEXTURE_2D, ToGLFormat(format).internalFormat, GL_FRAMEBUFFER_BLEND, 1, &value);
 	return value != GL_FALSE;
 }
 
 
-void GfxStates::ReleaseBuffers(void) noexcept {
+void GfxStates::ReleaseBuffers(void)
+noexcept
+{
 	glUseProgram(0);
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -198,7 +215,8 @@ void GfxStates::ReleaseBuffers(void) noexcept {
 }
 
 
-void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) {
+void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers)
+{
 	if (drawBuffers.IsEmpty())
 		glDrawBuffer(GL_BACK);
 	else
@@ -206,13 +224,16 @@ void GfxStates::SetDrawBuffers(const DrawBufferList& drawBuffers) {
 }
 
 
-void GfxStates::ClearBackBuffer(void) {
+void GfxStates::ClearBackBuffer(void)
+{
 	SetDrawBuffers({});
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 
-void GfxStates::ClearError(void) noexcept {
+void GfxStates::ClearError(void)
+noexcept
+{
 #ifdef _DEBUG
 	while (glGetError() != GL_NO_ERROR)
 		;
@@ -220,7 +241,9 @@ void GfxStates::ClearError(void) noexcept {
 }
 
 
-bool GfxStates::CheckError(const char* operation) noexcept {
+bool GfxStates::CheckError(const char* operation)
+noexcept
+{
 #ifdef NDEBUG
 	return true;
 #else
@@ -234,15 +257,17 @@ bool GfxStates::CheckError(const char* operation) noexcept {
 }
 
 
-void GfxStates::ClearSkyMaps(RenderTarget* rt) noexcept {
-    if (rt == nullptr or (rt->m_computeBufferCount <= 0))
-        return;
-    const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    for (int i = 0; i < rt->m_computeBufferCount; ++i) {
-        GLuint h = rt->GetHandle(rt->m_computeBufferIndex + i);
-        if (h)
-            glClearTexImage(h, 0, GL_RGBA, GL_FLOAT, zero);
-    }
+void GfxStates::ClearSkyMaps(RenderTarget* rt)
+noexcept
+{
+	if (rt == nullptr or (rt->m_computeBufferCount <= 0))
+		return;
+	const float zero[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	for (int i = 0; i < rt->m_computeBufferCount; ++i) {
+		GLuint h = rt->GetHandle(rt->m_computeBufferIndex + i);
+		if (h)
+			glClearTexImage(h, 0, GL_RGBA, GL_FLOAT, zero);
+	}
 }
 
 

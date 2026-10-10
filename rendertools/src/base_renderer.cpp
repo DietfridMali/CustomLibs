@@ -30,270 +30,299 @@ static Texture* testTexture = nullptr;
 // Viewport management: RSSetViewports is called where glViewport was.
 // Clear operations: the command list's ClearRenderTargetView / ClearDepthStencilView are used.
 
-void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar) {
-    gfxStates.ReleaseBuffers();
-    m_sceneWidth =
-    m_windowWidth = width;
-    m_sceneHeight =
-    m_windowHeight = height;
-    m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
-    m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
-    m_fov = fov;
-    m_aspectRatio = float(m_windowWidth) / float(m_windowHeight);
-    CreateMatrices(float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
-    ResetTransformation();
-    DrawBufferHandler::Setup(WindowWidth(), WindowHeight());
-    m_drawBufferStack.Clear();
-    int w = m_windowWidth / 15;
-    int h = int(w * 0.5f / m_aspectRatio);
-    m_frameCounter.Setup(::Viewport(m_windowWidth - w, m_windowHeight - h, w, h), ColorData::White);
+void BaseRenderer::Init(int width, int height, float fov, float zNear, float zFar)
+{
+	gfxStates.ReleaseBuffers();
+	m_sceneWidth =
+		m_windowWidth = width;
+	m_sceneHeight =
+		m_windowHeight = height;
+	m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
+	m_sceneViewport = ::Viewport(m_sceneLeft, m_sceneTop, m_sceneWidth, m_sceneHeight);
+	m_fov = fov;
+	m_aspectRatio = float(m_windowWidth) / float(m_windowHeight);
+	CreateMatrices(float(m_sceneWidth) / float(m_sceneHeight), fov, zNear, zFar);
+	ResetTransformation();
+	DrawBufferHandler::Setup(WindowWidth(), WindowHeight());
+	m_drawBufferStack.Clear();
+	int w = m_windowWidth / 15;
+	int h = int(w * 0.5f / m_aspectRatio);
+	m_frameCounter.Setup(::Viewport(m_windowWidth - w, m_windowHeight - h, w, h), ColorData::White);
 }
 
 
-bool BaseRenderer::CreateScreenBuffer(void) {
-    if (m_screenBuffer)
-        delete m_screenBuffer;
-    if (not (m_screenBuffer = new RenderTarget()))
-        return false;
-    m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 });
-    return true;
+bool BaseRenderer::CreateScreenBuffer(void)
+{
+	if (m_screenBuffer)
+		delete m_screenBuffer;
+	if (not (m_screenBuffer = new RenderTarget()))
+		return false;
+	m_screenBuffer->Create(m_windowWidth, m_windowHeight, 1, { .name = "screen", .colorBufferCount = 1 });
+	return true;
 }
 
 
-bool BaseRenderer::ApplyFeatures(const GfxFeatureRequest& request, uint32_t available) noexcept {
-    uint32_t missing = request.required & ~available;
-    for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
-        if (missing & GfxFeatureBit(GfxFeature(i)))
-            logHandler.Print("Graphics device lacks required feature: %s\n", GfxFeatureName(GfxFeature(i)));
-    }
-    m_gfxFeatures = request.Requested() & available;
-    return missing == 0;
+bool BaseRenderer::ApplyFeatures(const GfxFeatureRequest& request, uint32_t available)
+noexcept
+{
+	uint32_t missing = request.required & ~available;
+	for (uint32_t i = 0; i < uint32_t(GfxFeature::Count); ++i) {
+		if (missing & GfxFeatureBit(GfxFeature(i)))
+			logHandler.Print("Graphics device lacks required feature: %s\n", GfxFeatureName(GfxFeature(i)));
+	}
+	m_gfxFeatures = request.Requested() & available;
+	return missing == 0;
 }
 
 
-bool BaseRenderer::Create(int width, int height, float fov, float zNear, float zFar) {
-    Init(width, height, fov, zNear, zFar);
-    m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
-    SetupGraphics();
-    m_renderTexture.Validate();
-    m_renderQuad.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter]);
-    //gfxStates.CheckError();
-    return true;
+bool BaseRenderer::Create(int width, int height, float fov, float zNear, float zFar)
+{
+	Init(width, height, fov, zNear, zFar);
+	m_viewport = ::Viewport(0, 0, m_windowWidth, m_windowHeight);
+	SetupGraphics();
+	m_renderTexture.Validate();
+	m_renderQuad.Setup(BaseQuadMesh::defaultVertices[BaseQuadMesh::voCenter]);
+	//gfxStates.CheckError();
+	return true;
 }
 
 
-void BaseRenderer::SetupGraphics(void) noexcept {
-    // Default DX12 render state — same values as the OGL version but stored in GfxStates
-    // (no immediate API calls here; state is applied to the PSO on demand).
-    gfxStates.ClearColor(ColorData::Invisible);
-    gfxStates.ColorMask(true, true, true, true);
-    Set3DRenderStates(1);
-    // Set the initial viewport via the DX12 command list.
-    gfxStates.SetViewport(0, 0, m_windowWidth, m_windowHeight);
+void BaseRenderer::SetupGraphics(void)
+noexcept
+{
+	// Default DX12 render state — same values as the OGL version but stored in GfxStates
+	// (no immediate API calls here; state is applied to the PSO on demand).
+	gfxStates.ClearColor(ColorData::Invisible);
+	gfxStates.ColorMask(true, true, true, true);
+	Set3DRenderStates(1);
+	// Set the initial viewport via the DX12 command list.
+	gfxStates.SetViewport(0, 0, m_windowWidth, m_windowHeight);
 }
 
 
-void BaseRenderer::Set3DRenderStates(int depthWrite) noexcept {
-    gfxStates.SetDepthWrite((depthWrite < 0) ? IsColorPass() ? 0 : 1 : depthWrite);
-    gfxStates.SetDepthTest(1);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxStates.SetBlending(0);
-    gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
-    gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
-    gfxStates.FrontFace(GfxOperations::Winding::Reverse);
-    gfxStates.SetFaceCulling(1);
-    gfxStates.CullFace(IsShadowPass() ? GfxOperations::CullFace::Front : GfxOperations::CullFace::Back);
+void BaseRenderer::Set3DRenderStates(int depthWrite)
+noexcept
+{
+	gfxStates.SetDepthWrite((depthWrite < 0) ? IsColorPass() ? 0 : 1 : depthWrite);
+	gfxStates.SetDepthTest(1);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+	gfxStates.SetBlending(0);
+	gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
+	gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
+	gfxStates.FrontFace(GfxOperations::Winding::Reverse);
+	gfxStates.SetFaceCulling(1);
+	gfxStates.CullFace(IsShadowPass() ? GfxOperations::CullFace::Front : GfxOperations::CullFace::Back);
 }
 
 
-void BaseRenderer::Set2DRenderStates(int blending) noexcept {
-    gfxStates.SetDepthTest(0);
-    gfxStates.SetDepthWrite(0);
+void BaseRenderer::Set2DRenderStates(int blending)
+noexcept
+{
+	gfxStates.SetDepthTest(0);
+	gfxStates.SetDepthWrite(0);
 #if 0
     gfxStates.BlendFunc(GfxOperations::BlendFactor::SrcAlpha, GfxOperations::BlendFactor::InvSrcAlpha);
     gfxStates.BlendEquation(GfxOperations::BlendOp::Add);
 #endif
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
-    gfxStates.SetFaceCulling(0);
-    gfxStates.SetBlending(blending);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::Always);
+	gfxStates.SetFaceCulling(0);
+	gfxStates.SetBlending(blending);
 }
 
 
-void BaseRenderer::StartShadowPass(void) noexcept {
-    m_renderPass = RenderPassType::rpShadows;
-    gfxStates.SetDepthTest(1);
-    gfxStates.SetDepthWrite(1);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::Less);
-    gfxStates.ColorMask(false, false, false, false);
-    gfxStates.SetBlending(0);
-    // Caster-side slope-scaled depth bias: push the occluder depth away from the light so receivers sit
-    // clearly in front -> self-shadow / grazing acne is killed at the SOURCE, without a receiver-side bias
-    // that would displace the cast shadow. The slope term scales with the occluder's depth gradient
-    // (handles grazing). Reset to 0 in StartColorPass/StartFullPass. Tune factor (slope) / units (const).
-    //gfxStates.SetPolygonOffset(1.0f, 1.0f);
+void BaseRenderer::StartShadowPass(void)
+noexcept
+{
+	m_renderPass = RenderPassType::rpShadows;
+	gfxStates.SetDepthTest(1);
+	gfxStates.SetDepthWrite(1);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::Less);
+	gfxStates.ColorMask(false, false, false, false);
+	gfxStates.SetBlending(0);
+	// Caster-side slope-scaled depth bias: push the occluder depth away from the light so receivers sit
+	// clearly in front -> self-shadow / grazing acne is killed at the SOURCE, without a receiver-side bias
+	// that would displace the cast shadow. The slope term scales with the occluder's depth gradient
+	// (handles grazing). Reset to 0 in StartColorPass/StartFullPass. Tune factor (slope) / units (const).
+	//gfxStates.SetPolygonOffset(1.0f, 1.0f);
 }
 
 
-void BaseRenderer::StartColorPass(void) noexcept {
-    m_renderPass = RenderPassType::rpColor;
-    gfxStates.SetDepthTest(1);
-    gfxStates.SetDepthWrite(0);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxStates.ColorMask(true, true, true, true);
-    gfxStates.SetBlending(0);
-    gfxStates.SetPolygonOffset(0.0f, 0.0f);   // clear the shadow-pass depth bias
+void BaseRenderer::StartColorPass(void)
+noexcept
+{
+	m_renderPass = RenderPassType::rpColor;
+	gfxStates.SetDepthTest(1);
+	gfxStates.SetDepthWrite(0);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+	gfxStates.ColorMask(true, true, true, true);
+	gfxStates.SetBlending(0);
+	gfxStates.SetPolygonOffset(0.0f, 0.0f); // clear the shadow-pass depth bias
 }
 
 
-void BaseRenderer::StartFullPass(void) noexcept {
-    m_renderPass = RenderPassType::rpFull;
-    gfxStates.SetDepthTest(1);
-    gfxStates.SetDepthWrite(1);
-    gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
-    gfxStates.ColorMask(true, true, true, true);
-    gfxStates.SetBlending(0);
-    gfxStates.SetPolygonOffset(0.0f, 0.0f);   // clear the shadow-pass depth bias
+void BaseRenderer::StartFullPass(void)
+noexcept
+{
+	m_renderPass = RenderPassType::rpFull;
+	gfxStates.SetDepthTest(1);
+	gfxStates.SetDepthWrite(1);
+	gfxStates.DepthFunc(GfxOperations::CompareFunc::LessEqual);
+	gfxStates.ColorMask(true, true, true, true);
+	gfxStates.SetBlending(0);
+	gfxStates.SetPolygonOffset(0.0f, 0.0f); // clear the shadow-pass depth bias
 }
 
 
 // See the note at the declaration. One call, all three pieces of state - the backends differ in what
 // they do with them, not in what they are.
 
-void BaseRenderer::SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::BlendOp op) noexcept {
-    GfxOperations::BlendFactor src, dst;
+void BaseRenderer::SetBlendMode(GfxOperations::BlendMode mode, GfxOperations::BlendOp op)
+noexcept
+{
+	GfxOperations::BlendFactor src, dst;
 
-    GfxOperations::BlendFactors(mode, src, dst);
-    gfxStates.SetBlending(mode != GfxOperations::BlendMode::Replace);
-    if (m_coverageAlpha and (mode == GfxOperations::BlendMode::Alpha))
-        gfxStates.BlendFuncSeparate(src, dst, GfxOperations::BlendFactor::One, dst);
-    else
-        gfxStates.BlendFunc(src, dst);
-    gfxStates.BlendEquation(op);
+	GfxOperations::BlendFactors(mode, src, dst);
+	gfxStates.SetBlending(mode != GfxOperations::BlendMode::Replace);
+	if (m_coverageAlpha and (mode == GfxOperations::BlendMode::Alpha))
+		gfxStates.BlendFuncSeparate(src, dst, GfxOperations::BlendFactor::One, dst);
+	else
+		gfxStates.BlendFunc(src, dst);
+	gfxStates.BlendEquation(op);
 }
 
 // =================================================================================================
 
-bool BaseRenderer::Start3DScene(void) {
-    ZoneScoped;
-    m_frameCounter.Start();
-    SetupGraphics();
-    ResetDrawBuffers();
-    RenderTarget* sceneBuffer = GetSceneBuffer();
-    if (not (sceneBuffer and sceneBuffer->Activate({})))
-        return false;
-    SetupTransformation();
-    SetViewport(m_sceneViewport);
-    ActivateCamera();
-    return true;
+bool BaseRenderer::Start3DScene(void)
+{
+	ZoneScoped;
+	m_frameCounter.Start();
+	SetupGraphics();
+	ResetDrawBuffers();
+	RenderTarget* sceneBuffer = GetSceneBuffer();
+	if (not (sceneBuffer and sceneBuffer->Activate({})))
+		return false;
+	SetupTransformation();
+	SetViewport(m_sceneViewport);
+	ActivateCamera();
+	return true;
 }
 
 
-bool BaseRenderer::Stop3DScene(void) {
-    ZoneScoped;
-    if (not GetSceneBuffer()->IsAvailable())
-        return false;
-    GetSceneBuffer()->Deactivate();
-    DeactivateCamera();
-    ResetTransformation();
-    return true;
+bool BaseRenderer::Stop3DScene(void)
+{
+	ZoneScoped;
+	if (not GetSceneBuffer()->IsAvailable())
+		return false;
+	GetSceneBuffer()->Deactivate();
+	DeactivateCamera();
+	ResetTransformation();
+	return true;
 }
 
 
-bool BaseRenderer::Start2DScene(void) {
-    ZoneScoped;
-    m_frameCounter.Start();
-    ResetDrawBuffers();
-    gfxStates.SetClearColor(m_backgroundColor);
-    m_screenIsAvailable = true;
-    ResetTransformation();
-    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+bool BaseRenderer::Start2DScene(void)
+{
+	ZoneScoped;
+	m_frameCounter.Start();
+	ResetDrawBuffers();
+	gfxStates.SetClearColor(m_backgroundColor);
+	m_screenIsAvailable = true;
+	ResetTransformation();
+	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
 
-    Set2DRenderStates();
+	Set2DRenderStates();
 
-    if (not (m_screenBuffer and m_screenBuffer->Activate({ .clear = true }))) {
-        baseDisplayHandler.EnableBackBuffer();
-        gfxStates.ClearBackBuffer();
-    }
-    gfxStates.ResetClearColor();
-    return true;
+	if (not (m_screenBuffer and m_screenBuffer->Activate({ .clear = true }))) {
+		baseDisplayHandler.EnableBackBuffer();
+		gfxStates.ClearBackBuffer();
+	}
+	gfxStates.ResetClearColor();
+	return true;
 }
 
 
-bool BaseRenderer::Stop2DScene(void) {
-    ZoneScoped;
-    if (not m_screenIsAvailable)
-        return false;
-    ResetDrawBuffers();
-    SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
-    return true;
+bool BaseRenderer::Stop2DScene(void)
+{
+	ZoneScoped;
+	if (not m_screenIsAvailable)
+		return false;
+	ResetDrawBuffers();
+	SetViewport(::Viewport(0, 0, m_windowWidth, m_windowHeight));
+	return true;
 }
 
 
-void BaseRenderer::Draw3DScene(bool flipVertically) {
-    ZoneScoped;
-    RenderTarget* source = RenderPostEffect();
-    if (Stop3DScene() and Start2DScene()) {
-        Set2DRenderStates();
-        SetViewport(m_sceneViewport, 0, 0, false);
+void BaseRenderer::Draw3DScene(bool flipVertically)
+{
+	ZoneScoped;
+	RenderTarget* source = RenderPostEffect();
+	if (Stop3DScene() and Start2DScene()) {
+		Set2DRenderStates();
+		SetViewport(m_sceneViewport, 0, 0, false);
 
-        Shader* shader;
-        if (not UsePostEffectShader())
-            shader = nullptr;
-        else {
-            PushMatrix();
-            Translate(0.5, 0.5, 0);
-            if (UsesOpenGL())
-                Scale(1, -1, 1); // flip vertically
-            if (not (shader = LoadPostEffectShader()))
-                PopMatrix();
-        }
-        if (shader == nullptr)
-            m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = flipVertically, .rotation = 0.0f });
+		Shader* shader;
+		if (not UsePostEffectShader())
+			shader = nullptr;
+		else {
+			PushMatrix();
+			Translate(0.5, 0.5, 0);
+			if (UsesOpenGL())
+				Scale(1, -1, 1); // flip vertically
+			if (not (shader = LoadPostEffectShader()))
+				PopMatrix();
+		}
+		if (shader == nullptr)
+			m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = flipVertically, .rotation = 0.0f });
 
-        static bool renderScene = true;
-        if (renderScene) {
-            m_renderQuad.Render(shader, { source->GetAsTexture({})});
-        }
-        if (shader != nullptr)
-            PopMatrix();
-    }
+		static bool renderScene = true;
+		if (renderScene) {
+			m_renderQuad.Render(shader, { source->GetAsTexture({}) });
+		}
+		if (shader != nullptr)
+			PopMatrix();
+	}
 }
 
 
-void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader) {
+void BaseRenderer::RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader)
+{
 #if 1
-    m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = bRotate ? 90.0f : 0.0f });
-    m_renderQuad.Render(shader, texture, color);
+	m_renderQuad.SetTransformations({ .centerOrigin = true, .flipVertically = bFlipVertically, .rotation = bRotate ? 90.0f : 0.0f });
+	m_renderQuad.Render(shader, texture, color);
 #else
-    baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-    m_renderQuad.Render(baseShaderHandler.LoadPlainTextureShader(color, false), texture, color);
+	baseRenderer.Translate(0.5f, 0.5f, 0.0f);
+	m_renderQuad.Render(baseShaderHandler.LoadPlainTextureShader(color, false), texture, color);
 #endif
 }
 
 
-void BaseRenderer::SetViewport(bool flipVertically) noexcept {
-    SetViewport(m_viewport, 0, 0, flipVertically);
+void BaseRenderer::SetViewport(bool flipVertically)
+noexcept
+{
+	SetViewport(m_viewport, 0, 0, flipVertically);
 }
 
 
-void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically) noexcept {
-    if (windowWidth * windowHeight == 0) {
-        RenderTarget* activeBuffer = GetActiveBuffer();
-        if (activeBuffer) {
-            windowWidth = activeBuffer->GetWidth(true);
-            windowHeight = activeBuffer->GetHeight(true);
-        }
-        else {
-            windowWidth = m_windowWidth;
-            windowHeight = m_windowHeight;
-        }
-    }
-    gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
+void BaseRenderer::SetViewport(::Viewport viewport, int windowWidth, int windowHeight, bool flipVertically)
+noexcept
+{
+	if (windowWidth * windowHeight == 0) {
+		RenderTarget* activeBuffer = GetActiveBuffer();
+		if (activeBuffer) {
+			windowWidth = activeBuffer->GetWidth(true);
+			windowHeight = activeBuffer->GetHeight(true);
+		}
+		else {
+			windowWidth = m_windowWidth;
+			windowHeight = m_windowHeight;
+		}
+	}
+	gfxStates.SetViewport(0, 0, windowWidth, windowHeight);
 
-    m_viewport = viewport;
-    if (flipVertically)
-        m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
-    m_viewport.BuildTransformation(windowWidth, windowHeight, UsesOpenGL() and flipVertically);
+	m_viewport = viewport;
+	if (flipVertically)
+		m_viewport.m_top = windowHeight - m_viewport.m_top - m_viewport.m_height;
+	m_viewport.BuildTransformation(windowWidth, windowHeight, UsesOpenGL() and flipVertically);
 }
 
 
@@ -304,40 +333,43 @@ void BaseRenderer::PushViewport(void)
 #endif
 {
 #ifdef _DEBUG
-    m_viewport.SetOwner(caller.function_name());
+	m_viewport.SetOwner(caller.function_name());
 #endif
-    m_viewport.GetGfxViewport();
-    m_viewportStack.Append(m_viewport);
+	m_viewport.GetGfxViewport();
+	m_viewportStack.Append(m_viewport);
 }
 
 
-void BaseRenderer::PopViewport(void) {
-    if (m_viewportStack.IsEmpty())
-        return;
-    ::Viewport viewport;
-    m_viewportStack.Pop(viewport);
-    if ((viewport.Width() > WindowWidth()) || (viewport.Height() > WindowHeight()))
-        return;
-    SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
+void BaseRenderer::PopViewport(void)
+{
+	if (m_viewportStack.IsEmpty())
+		return;
+	::Viewport viewport;
+	m_viewportStack.Pop(viewport);
+	if ((viewport.Width() > WindowWidth()) || (viewport.Height() > WindowHeight()))
+		return;
+	SetViewport(viewport, viewport.WindowWidth(), viewport.WindowHeight(), viewport.FlipVertically());
 }
 
 
-void BaseRenderer::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color) {
-    baseRenderer.PushMatrix();
-    baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-    if (shader)
-        shader->UpdateMatrices();
-    m_renderQuad.Render(shader, textures, color);
-    baseRenderer.PopMatrix();
+void BaseRenderer::Render(Shader* shader, std::span<Texture* const> textures, const RGBAColor& color)
+{
+	baseRenderer.PushMatrix();
+	baseRenderer.Translate(0.5f, 0.5f, 0.0f);
+	if (shader)
+		shader->UpdateMatrices();
+	m_renderQuad.Render(shader, textures, color);
+	baseRenderer.PopMatrix();
 }
 
 
-void BaseRenderer::Fill(const RGBAColor& color, float scale) {
-    baseRenderer.PushMatrix();
-    baseRenderer.Translate(0.5f, 0.5f, 0.0f);
-    baseRenderer.Scale(scale, scale, 1);
-    m_renderQuad.Fill(color);
-    baseRenderer.PopMatrix();
+void BaseRenderer::Fill(const RGBAColor& color, float scale)
+{
+	baseRenderer.PushMatrix();
+	baseRenderer.Translate(0.5f, 0.5f, 0.0f);
+	baseRenderer.Scale(scale, scale, 1);
+	m_renderQuad.Fill(color);
+	baseRenderer.PopMatrix();
 }
 
 // =================================================================================================

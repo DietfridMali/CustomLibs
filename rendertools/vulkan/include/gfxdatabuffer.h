@@ -20,114 +20,147 @@
 // vkCmdBindIndexBuffer calls are emitted by GfxDataLayout::Enable().
 
 class GfxDataBuffer
-    : public ResourceDescriptor
-{
+	: public ResourceDescriptor {
 public:
-    int                 m_index;          // vertex attribute slot (layout location)
-    const char*         m_type;           // debug tag ("vertices", "normals", …)
-    int                 m_id;
-    GfxBufferTarget     m_bufferType;     // Vertex or Index
-    char*               m_data;           // unused in Vulkan (kept for source compatibility)
+	int				m_index; // vertex attribute slot (layout location)
+	const char*		m_type; // debug tag ("vertices", "normals", …)
+	int				m_id;
+	GfxBufferTarget	m_bufferType; // Vertex or Index
+	char*			m_data; // unused in Vulkan (kept for source compatibility)
 
-    static constexpr int FRAME_COUNT = 2;  // upload-buffer slots, rotated per frame-in-flight
+	static constexpr int FRAME_COUNT = 2; // upload-buffer slots, rotated per frame-in-flight
 
-    GfxBuffer           m_buffer[FRAME_COUNT];  // VkBuffer + VmaAllocation; dynamic buffers rotate slots per frame
-    int                 m_activeSlot{ 0 };      // slot the last Update wrote — what Buffer() / IsValid() report
-    // Which slot is drawn from, and when a slot stopped being that one. A buffer is drawn from its
-    // live slot in EVERY frame until the next Update, not only in the frame it was written in - so
-    // slot rotation alone says nothing about whether a slot is free (see Update ()).
-    int                 m_liveSlot{ -1 };
-    uint64_t            m_slotRetiredFrame[FRAME_COUNT]{};
-    uint64_t            m_slotBoundFrame[FRAME_COUNT]{};
-    bool                m_slotWasBound[FRAME_COUNT]{};
+	GfxBuffer	m_buffer[FRAME_COUNT]; // VkBuffer + VmaAllocation; dynamic buffers rotate slots per frame
+	int			m_activeSlot{ 0 }; // slot the last Update wrote — what Buffer() / IsValid() report
+	// Which slot is drawn from, and when a slot stopped being that one. A buffer is drawn from its
+	// live slot in EVERY frame until the next Update, not only in the frame it was written in - so
+	// slot rotation alone says nothing about whether a slot is free (see Update ()).
+	int			m_liveSlot{ -1 };
+	uint64_t	m_slotRetiredFrame[FRAME_COUNT]{};
+	uint64_t	m_slotBoundFrame[FRAME_COUNT]{};
+	bool		m_slotWasBound[FRAME_COUNT]{};
 
-    uint32_t            m_size;           // total buffer size in bytes
-    size_t              m_itemSize;       // bytes per vertex element (stride)
-    uint32_t            m_itemCount;
-    int                 m_componentCount;
-    ComponentType       m_componentType;  // Float / UInt32 / UInt16
-    bool                m_isDynamic;
+	uint32_t		m_size; // total buffer size in bytes
+	size_t			m_itemSize; // bytes per vertex element (stride)
+	uint32_t		m_itemCount;
+	int				m_componentCount;
+	ComponentType	m_componentType; // Float / UInt32 / UInt16
+	bool			m_isDynamic;
 
-    GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true) noexcept;
+	GfxDataBuffer(const char* type = "", int id = 0, GfxBufferTarget bufferType = GfxBufferTarget::Vertex, bool isDynamic = true)
+	noexcept;
 
-    void Clear(void) {
-        for (auto& b : m_buffer)
-            b.Destroy();
-        m_id = 0;
-        m_isDynamic = true;
-    }
+	void Clear(void)
+	{
+		for (auto& b : m_buffer)
+			b.Destroy();
+		m_id = 0;
+		m_isDynamic = true;
+	}
 
-    GfxDataBuffer(GfxDataBuffer const& other) {
-        Copy(other);
-    }
+	GfxDataBuffer(GfxDataBuffer const& other) {
+		Copy(other);
+	}
 
-    GfxDataBuffer& operator=(GfxDataBuffer const& other) {
-        Copy(other);
-        return *this;
-    }
+	GfxDataBuffer& operator=(GfxDataBuffer const& other) {
+		Copy(other);
+		return *this;
+	}
 
-    GfxDataBuffer& operator=(GfxDataBuffer&& other) noexcept {
-        Move(other);
-        return *this;
-    }
+	GfxDataBuffer& operator=(GfxDataBuffer&& other)
+	noexcept
+	{
+		Move(other);
+		return *this;
+	}
 
-    GfxDataBuffer& Copy(GfxDataBuffer const& other);
+	GfxDataBuffer& Copy(GfxDataBuffer const& other);
 
-    GfxDataBuffer& Move(GfxDataBuffer& other) noexcept;
+	GfxDataBuffer& Move(GfxDataBuffer& other)
+	noexcept;
 
-    // No-ops — binding handled by GfxDataLayout::Enable() in Vulkan.
-    inline void Bind(void) noexcept {}
-    inline void Release(void) noexcept {}
-    inline void EnableAttribs(void) noexcept {}
-    inline void DisableAttribs(void) noexcept {}
-    inline void Describe(void) noexcept {}
+	// No-ops — binding handled by GfxDataLayout::Enable() in Vulkan.
+	inline void Bind(void)
+	noexcept
+	{}
+	inline void Release(void)
+	noexcept
+	{}
+	inline void EnableAttribs(void)
+	noexcept
+	{}
+	inline void DisableAttribs(void)
+	noexcept
+	{}
+	inline void Describe(void)
+	noexcept
+	{}
 
-    bool Create(int slot, size_t dataSize);
+	bool Create(int slot, size_t dataSize);
 
-    // Upload new data and (re-)create the GPU resource if needed.
-    // componentCount: components per vertex element (e.g. 3 for float3)
-    bool Update(const char* type, GfxBufferTarget bufferType, int index,
-                void* data, size_t dataSize,
-                ComponentType componentType, size_t componentCount,
-                bool forceUpdate = false) noexcept;
+	// Upload new data and (re-)create the GPU resource if needed.
+	// componentCount: components per vertex element (e.g. 3 for float3)
+	bool Update(const char* type, GfxBufferTarget bufferType, int index,
+				void* data, size_t dataSize,
+				ComponentType componentType, size_t componentCount,
+				bool forceUpdate = false)
+	noexcept;
 
-    void Destroy(void) noexcept;
+	void Destroy(void)
+	noexcept;
 
-    size_t ComponentSize(size_t componentType) noexcept;
+	size_t ComponentSize(size_t componentType)
+	noexcept;
 
-    inline bool IsType(const char* type) noexcept {
-        return !strcmp(m_type, type);
-    }
+	inline bool IsType(const char* type)
+	noexcept
+	{
+		return !strcmp(m_type, type);
+	}
 
-    inline bool HasID(int id) noexcept {
-        return m_id == id;
-    }
+	inline bool HasID(int id)
+	noexcept
+	{
+		return m_id == id;
+	}
 
-    inline void SetDynamic(bool d) noexcept {
-        m_isDynamic = d;
-    }
+	inline void SetDynamic(bool d)
+	noexcept
+	{
+		m_isDynamic = d;
+	}
 
-    inline uint32_t Stride() const noexcept {
-        return uint32_t(m_itemSize);
-    }
+	inline uint32_t Stride() const
+	noexcept
+	{
+		return uint32_t(m_itemSize);
+	}
 
-    inline VkBuffer Buffer() const noexcept {
-        return m_buffer[m_activeSlot].Buffer();
-    }
+	inline VkBuffer Buffer() const
+	noexcept
+	{
+		return m_buffer[m_activeSlot].Buffer();
+	}
 
-    inline void MarkBound(uint64_t frameNumber) noexcept {
-        m_slotBoundFrame[m_activeSlot] = frameNumber;
-        m_slotWasBound[m_activeSlot] = true;
-    }
+	inline void MarkBound(uint64_t frameNumber)
+	noexcept
+	{
+		m_slotBoundFrame[m_activeSlot] = frameNumber;
+		m_slotWasBound[m_activeSlot] = true;
+	}
 
-    // For index buffers: the matching VkIndexType (UINT16 or UINT32).
-    inline VkIndexType IndexType() const noexcept {
-        return (m_componentType == ComponentType::UInt16) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
-    }
+	// For index buffers: the matching VkIndexType (UINT16 or UINT32).
+	inline VkIndexType IndexType() const
+	noexcept
+	{
+		return (m_componentType == ComponentType::UInt16) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+	}
 
-    inline bool IsValid() const noexcept {
-        return m_buffer[m_activeSlot].IsValid();
-    }
+	inline bool IsValid() const
+	noexcept
+	{
+		return m_buffer[m_activeSlot].IsValid();
+	}
 };
 
 // =================================================================================================
