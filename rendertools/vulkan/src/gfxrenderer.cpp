@@ -198,6 +198,7 @@ noexcept
 	// / VmaAllocation handles are destroyed before gfxResourceHandler / vkContext are torn down.
 	commandListHandler.CmdQueue().WaitIdle();
 	SavePipelineCache();
+	pipelineCache.Destroy();
 	GfxDataLayout::DestroyDefaultStreams();
 	Shader::DestroyDefaultResources();
 	meshHandler.Destroy();
