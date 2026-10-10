@@ -17,11 +17,15 @@
 #include "array.hpp"
 #include "rendertypes.h"
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:26819)
+#endif
 #include "SDL.h"
 #include "SDL_vulkan.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 #if ENABLE_VK_LOGGING
 #include <mutex>

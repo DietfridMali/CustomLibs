@@ -56,10 +56,7 @@ class VertexDataBuffer
         SegmentedList<APP_DATA_T>   m_appData;
         AutoArray<GL_DATA_T>     m_gfxData;
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-        VertexDataBuffer(uint32_t componentCount = 1, size_t listSegmentSize = 1)
-#pragma warning(pop)
+        VertexDataBuffer(uint32_t componentCount = 1, [[maybe_unused]] size_t listSegmentSize = 1)
             : BaseVertexDataBuffer(componentCount)
         {
 #if USE_SEGMENTED_LISTS

@@ -46,18 +46,14 @@ bool GfxRenderer::InitGraphics(const GfxFeatureRequest& request) {
     return ApplyFeatures(request, available);
 }
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-void* GfxRenderer::StartOperation(String name, bool piggyback) noexcept {
+void* GfxRenderer::StartOperation(String /*name*/, bool /*piggyback*/) noexcept {
     return nullptr;
 }
 
 
-bool GfxRenderer::FinishOperation(void* cl, bool flush) noexcept {
+bool GfxRenderer::FinishOperation(void* /*cl*/, bool /*flush*/) noexcept {
     return true;
 }
-
-#pragma warning(pop)
 
 
 void GfxRenderer::DrawScreen(bool bRotate, bool bFlipVertically) {

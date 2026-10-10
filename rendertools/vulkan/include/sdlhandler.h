@@ -1,9 +1,13 @@
 #pragma once
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:26819)
+#endif
 #include "SDL.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 #include "basesingleton.hpp"
 

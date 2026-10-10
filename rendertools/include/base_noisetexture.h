@@ -236,11 +236,8 @@ template<> struct NoiseTraits<HashNoiseRGBA8> {
         s.maxAnisotropy = 1.0f;
     }
 
-#pragma warning(push)
-#pragma warning(disable:4100)
     static void Compute(AutoArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/,
-                        int octave, uint32_t seed)
-#pragma warning(pop)
+                        int /*octave*/, uint32_t /*seed*/)
     {
         data.Resize(size_t(gridSize) * size_t(gridSize) * 4);
     }
@@ -263,10 +260,7 @@ template<> struct NoiseTraits<WeatherNoiseRG8> {
         s.maxAnisotropy = 1.0f;
     }
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-    static void Compute(AutoArray<uint8_t>& data, int gridSize, int yPeriod, int xPeriod, int octaves)
-#pragma warning(pop)
+    static void Compute(AutoArray<uint8_t>& data, int gridSize, int /*yPeriod*/, int /*xPeriod*/, int /*octaves*/)
     {
         data.Resize(size_t(gridSize) * size_t(gridSize) * 2);
     }

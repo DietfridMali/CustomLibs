@@ -78,10 +78,7 @@ public:
         Mesh::Init(MeshTopology::Quads, 100);
     }
 
-#pragma warning(push)
-#pragma warning(disable:4100)
     BaseQuadMesh(std::initializer_list<Vector3f> vertices, std::initializer_list<TexCoord> texCoords = defaultTexCoords[tcRegular], bool privateGfxData = false)
-#pragma warning(pop)
         : Quad(vertices)
         , m_isAvailable(true)
         , m_privateGfxData(privateGfxData)

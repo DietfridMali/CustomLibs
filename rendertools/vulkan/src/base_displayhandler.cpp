@@ -9,11 +9,15 @@
 #include "resource_handler.h"
 #include "tracy_wrapper.h"
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:26819)
+#endif
 #include "SDL.h"
 #include "SDL_vulkan.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 #include "loghandler.h"
 
 #include <algorithm>

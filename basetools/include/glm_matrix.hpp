@@ -1,11 +1,15 @@
 #pragma once
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4459)
+#endif
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 #include <initializer_list>
 #include <algorithm>
 #include "conversions.hpp"

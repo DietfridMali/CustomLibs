@@ -5,11 +5,15 @@
 #include <cctype>
 #include <cstring>
 #include <fstream>
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4459)
+#endif
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 #include "conversions.hpp"
 #include "loghandler.h"
 #include "missingfiles.h"

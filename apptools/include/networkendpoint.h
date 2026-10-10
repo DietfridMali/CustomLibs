@@ -3,17 +3,23 @@
 #include "string.hpp"
 #include "array.hpp"
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:26819)
+#endif
 #include "SDL_net.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 // =================================================================================================
 
 enum class ByteOrder { Host, Network };
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4201)
+#endif
 union NetworkID {
         uint64_t    id{ 0 };
     struct {
@@ -21,7 +27,9 @@ union NetworkID {
         uint16_t    port;
     };
 };
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 typedef enum {
 	ntIPv4,

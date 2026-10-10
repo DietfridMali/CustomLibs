@@ -98,12 +98,9 @@ private:
     //-----------------------------------------------------------------------------
 
 public:
-#pragma warning(push)
-#pragma warning(disable:4100)
-    AVLTree(int capacity = 0) noexcept
+    AVLTree(int /*capacity*/ = 0) noexcept
     {
     }
-#pragma warning(pop)
 
     ~AVLTree() {
         Clear();
@@ -296,10 +293,7 @@ private:
     //-----------------------------------------------------------------------------
 
 private:
-#pragma warning(push)
-#pragma warning(disable:4100)
-    AVLNode* InsertNode(AVLNode* node, AVLNode* parent = nullptr)
-#pragma warning(pop)
+    AVLNode* InsertNode(AVLNode* node, AVLNode* /*parent*/ = nullptr)
     {
         if (not node) {
             if (not (m_info.workingNode = AllocNode()))

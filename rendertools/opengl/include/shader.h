@@ -83,10 +83,7 @@ class Shader
 
         using KeyType = String;
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-        Shader(String name = "", String vs = "", String fs = "", String gs = "")
-#pragma warning(pop)
+        Shader(String name = "", String /*vs*/ = "", String /*fs*/ = "", String /*gs*/ = "")
             : m_handle(0)
             , m_name(name) 
         { 
@@ -397,10 +394,7 @@ class Shader
 
         // -----------------------------------------------------------------------------------------
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-        static inline float* GetFloatData(GLenum id, int32_t size, float* data) noexcept 
-#pragma warning(pop)
+        static inline float* GetFloatData(GLenum id, int32_t /*size*/, float* data) noexcept
         {
             glGetFloatv(id, (GLfloat*)data);
             return data;

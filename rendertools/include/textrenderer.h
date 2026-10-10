@@ -1,9 +1,13 @@
 #pragma once
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:26819)
+#endif
 #include "SDL_ttf.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 #include "vector.hpp"
 #include "base_quadmesh.h"

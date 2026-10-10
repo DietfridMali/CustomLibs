@@ -5,11 +5,15 @@
 #include <cstring>
 #include <ctime>
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:26819)
+#endif
 #include "SDL.h"
 #include "SDL_net.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 // =================================================================================================
 

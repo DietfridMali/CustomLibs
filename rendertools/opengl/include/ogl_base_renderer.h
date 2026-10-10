@@ -311,16 +311,13 @@ public:
         return reverse ? GfxOperations::CullFace::Front : GfxOperations::CullFace::Back;
     }
 
-#pragma warning(push)
-#pragma warning(disable:4100)
     inline void* StartOperation(String /*name*/) noexcept {
         return nullptr;
     }
 
-    inline bool FinishOperation(void* cl = nullptr, bool flush = false) noexcept {
+    inline bool FinishOperation(void* /*cl*/ = nullptr, bool /*flush*/ = false) noexcept {
         return true;
     }
-#pragma warning(pop)
 
 #include "gfxapitype.h"
 

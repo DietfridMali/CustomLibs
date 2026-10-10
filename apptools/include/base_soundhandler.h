@@ -4,11 +4,15 @@
 #include "std_defines.h"
 #include "conversions.hpp"
 
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:26819)
+#endif
 #include "SDL.h"
 #include "SDL_mixer.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 #include "string.hpp"
 #include "vector.hpp"
@@ -98,10 +102,7 @@ class BaseSoundHandler
 
         virtual bool Setup(String soundFolder);
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-        virtual int32_t GetSoundNames(List<String>& soundNames) { return 0; }
-#pragma warning(pop)
+        virtual int32_t GetSoundNames(List<String>& /*soundNames*/) { return 0; }
 
         static BaseSoundHandler& Instance(void) { return dynamic_cast<BaseSoundHandler&>(PolymorphSingleton::Instance()); }
 
@@ -117,10 +118,7 @@ class BaseSoundHandler
         SoundObject* FindSound(int id);
 
         // update all sound volumes depending on application specific cirumstances (e.g. listener or sound source have been moving)
-#pragma warning(push)
-#pragma warning(disable:4100)
-        virtual void UpdateSound(SoundObject& soundObject) { }
-#pragma warning(pop)
+        virtual void UpdateSound(SoundObject& /*soundObject*/) { }
 
 
         // play back the sound with the name 'name'. Position, viewer and DistFunc serve for computing the sound volume
@@ -212,10 +210,7 @@ protected:
 
 private:
         // compute stereo panning from the angle between the viewer direction and the vector from the viewer to the sound source
-#pragma warning(push)
-#pragma warning(disable:4100)
-    virtual float Pan(Vector3f& position) { return 0.0f; }
-#pragma warning(pop)
+    virtual float Pan(Vector3f& /*position*/) { return 0.0f; }
 
         // get a channel for playing back a new sound
         // if all channels are busy, pick the oldest busy one

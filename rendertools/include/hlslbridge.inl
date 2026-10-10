@@ -64,9 +64,7 @@ static String HLSLBridge(const char* glslVersion = nullptr) {
 
 #else
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-static String HLSLBridge(const char* glslVersion = nullptr) {
+static String HLSLBridge(const char* /*glslVersion*/ = nullptr) {
     String source =
         String(R"(
             #ifndef _HLSL_BRIDGE_
@@ -77,7 +75,6 @@ static String HLSLBridge(const char* glslVersion = nullptr) {
         )");
     return source;
 }
-#pragma warning(pop)
 
 #endif
 

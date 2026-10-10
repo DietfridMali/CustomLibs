@@ -269,12 +269,9 @@ public:
     // tone mapping an HDR target, say - passes its own.
     virtual void RenderToViewport(Texture* texture, RGBAColor color, bool bRotate, bool bFlipVertically, Shader* shader = nullptr);
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-    virtual void DrawScreen(bool bRotate, bool bFlipVertically) {
+    virtual void DrawScreen(bool /*bRotate*/, bool /*bFlipVertically*/) {
         //no op
     }
-#pragma warning(pop)
 
     virtual bool ActivateCamera(void)  { 
         return false; 
@@ -437,12 +434,9 @@ public:
 
     virtual bool Create(int width = 1920, int height = 1080, float fov = 45.0f, float zNear = 0.1f, float zFar = 100.0f);
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-    virtual bool InitGraphics(const GfxFeatureRequest& request = {}) {
+    virtual bool InitGraphics(const GfxFeatureRequest& /*request*/ = {}) {
         return false;
     }
-#pragma warning(pop)
 
     inline bool HasFeature(GfxFeature feature) const noexcept {
         return (m_gfxFeatures & GfxFeatureBit(feature)) != 0;
@@ -454,18 +448,16 @@ public:
 
     bool ApplyFeatures(const GfxFeatureRequest& request, uint32_t available) noexcept;
 
-#pragma warning(push)
-#pragma warning(disable:4100)
-    virtual void* StartOperation(String name = "", bool piggyback = true) noexcept {
+    virtual void* StartOperation(String /*name*/ = "", bool /*piggyback*/ = true) noexcept {
         return nullptr; 
     }
 
-    virtual bool StartOperation(void** cl, String name = "", bool piggyback = true) noexcept {
+    virtual bool StartOperation(void** cl, String /*name*/ = "", bool /*piggyback*/ = true) noexcept {
         *cl = nullptr;
         return true;
     }
 
-    virtual bool FinishOperation(void* cl, bool flush = false) noexcept {
+    virtual bool FinishOperation(void* /*cl*/, bool /*flush*/ = false) noexcept {
         return false;
     }
 
@@ -485,7 +477,6 @@ public:
     virtual void SavePipelineCache(void) {}
 
     virtual void PrecreatePipelines(void) {}
-#pragma warning(push)
 
 #include "gfxapitype.h"
 
