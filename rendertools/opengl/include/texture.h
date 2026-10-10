@@ -160,7 +160,7 @@ public:
 	static int GLWrapMode(GfxWrapMode wrapMode)
 	noexcept;
 
-	~Texture()
+	virtual ~Texture()
 	noexcept;
 
 	inline void Register(String& name) {

@@ -450,6 +450,10 @@ public:
 	bool Create(Vector3i gridDimensions, const NoiseParams& params,
 				String noiseFilename = "", bool deploy = true);
 
+	bool Create(void) override {
+		return Texture::Create();
+	}
+
 	inline AutoArray<float>& GetData(void)
 	noexcept
 	{
@@ -487,6 +491,10 @@ class BaseCloudNoiseTexture
 	: public Texture {
 public:
 	bool Create(int gridSize, const NoiseParams& params, String noiseFilename = "", bool compute = true);
+
+	bool Create(void) override {
+		return Texture::Create();
+	}
 
 	void ToMaxMip(BaseCloudNoiseTexture* mipTex);
 
@@ -548,6 +556,10 @@ class BaseDetailNoiseTexture
 public:
 	bool Create(int gridSize, const NoiseParams& params,
 				String noiseFilename = "", bool compute = true);
+
+	bool Create(void) override {
+		return Texture::Create();
+	}
 
 	bool Deploy(int bufferIndex = 0) override = 0;
 	void SetParams(bool enforce = false) override = 0;

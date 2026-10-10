@@ -143,7 +143,7 @@ public:
 
 	explicit Texture(uint32_t handle = UINT32_MAX, TextureType type = TextureType::Texture2D, GfxWrapMode wrap = GfxWrapMode::Repeat);
 
-	~Texture()
+	virtual ~Texture()
 	noexcept;
 
 	inline void Register(String& name) {
