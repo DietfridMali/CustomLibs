@@ -345,6 +345,8 @@ public:
 	// Vendor and device as one printable string: the DXGI adapter description.
 	String DeviceName(void);
 
+	bool GetDeviceInfo(int index, GfxDeviceInfo& info);
+
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxAxis, bit_floor(sqrt(maxAlloc / bpp))).

@@ -10,6 +10,7 @@
 #include "loghandler.h"
 
 #include <cstdio>
+#include <vector>
 
 #if VK_STALL_DIAG
 extern double VkStallClock(void)
@@ -570,6 +571,34 @@ noexcept
 String GfxStates::DeviceName(void)
 {
 	return String(vkContext.DeviceProps().deviceName);
+}
+
+
+bool GfxStates::GetDeviceInfo(int index, GfxDeviceInfo& info)
+{
+	uint32_t count = 0;
+	vkEnumeratePhysicalDevices(vkContext.m_instance, &count, nullptr);
+	if ((index < 0) or (uint32_t(index) >= count))
+		return false;
+	std::vector<VkPhysicalDevice> devices(count);
+	vkEnumeratePhysicalDevices(vkContext.m_instance, &count, devices.data());
+	if (uint32_t(index) >= count)
+		return false;
+
+	VkPhysicalDevice			device = devices[size_t(index)];
+	VkPhysicalDeviceProperties	props{};
+	vkGetPhysicalDeviceProperties(device, &props);
+	VkPhysicalDeviceMemoryProperties memory{};
+	vkGetPhysicalDeviceMemoryProperties(device, &memory);
+
+	info = GfxDeviceInfo{};
+	std::snprintf(info.name, sizeof(info.name), "%s", props.deviceName);
+	for (uint32_t i = 0; i < memory.memoryHeapCount; ++i) {
+		if ((memory.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) and (memory.memoryHeaps[i].size > info.memory))
+			info.memory = uint64_t(memory.memoryHeaps[i].size);
+	}
+	info.isActive = (device == vkContext.PhysicalDevice());
+	return true;
 }
 
 

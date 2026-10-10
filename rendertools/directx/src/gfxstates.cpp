@@ -378,6 +378,37 @@ String GfxStates::DeviceName(void)
 }
 
 
+bool GfxStates::GetDeviceInfo(int index, GfxDeviceInfo& info)
+{
+	if ((index < 0) or not dx12Context.m_factory)
+		return false;
+
+	DXGI_ADAPTER_DESC1 activeDesc{};
+	if (dx12Context.m_adapter)
+		dx12Context.m_adapter->GetDesc1(&activeDesc);
+
+	ComPtr<IDXGIAdapter1>	adapter;
+	int						hardwareIndex = 0;
+	for (UINT i = 0; dx12Context.m_factory->EnumAdapters1(i, adapter.ReleaseAndGetAddressOf()) != DXGI_ERROR_NOT_FOUND; ++i) {
+		DXGI_ADAPTER_DESC1 desc{};
+		if (FAILED(adapter->GetDesc1(&desc)) or (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE))
+			continue;
+		if (hardwareIndex++ < index)
+			continue;
+		info = GfxDeviceInfo{};
+		size_t length = 0;
+		for (; (length < sizeof(info.name) - 1) and desc.Description[length]; ++length)
+			info.name[length] = (desc.Description[length] < 128) ? char(desc.Description[length]) : '?';
+		info.name[length] = '\0';
+		info.memory = uint64_t(desc.DedicatedVideoMemory);
+		info.isActive = dx12Context.m_adapter and (desc.AdapterLuid.LowPart == activeDesc.AdapterLuid.LowPart) and
+			(desc.AdapterLuid.HighPart == activeDesc.AdapterLuid.HighPart);
+		return true;
+	}
+	return false;
+}
+
+
 bool GfxStates::CanBlend(GfxPixelFormat format)
 {
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT support{ .Format = ToDXGIFormat(format) };

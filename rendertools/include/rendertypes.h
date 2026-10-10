@@ -180,6 +180,12 @@ struct GfxFeatureRequest {
 	}
 };
 
+struct GfxDeviceInfo {
+	char		name[256]{};
+	uint64_t	memory{ 0 };
+	bool		isActive{ false };
+};
+
 struct GfxDrawCommand {
 	uint32_t	indexCount{ 0 };
 	uint32_t	instanceCount{ 0 };

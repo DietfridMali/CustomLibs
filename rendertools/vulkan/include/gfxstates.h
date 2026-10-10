@@ -354,6 +354,8 @@ public:
 	// Vendor and device as one printable string: the physical device name.
 	String DeviceName(void);
 
+	bool GetDeviceInfo(int index, GfxDeviceInfo& info);
+
 	bool CanBlend(GfxPixelFormat format);
 
 	// Format-spezifischer Cap. Cap = min(maxImageDimension2D, bit_floor(sqrt(maxAlloc / bpp))).
