@@ -134,7 +134,7 @@ public:
 		}
 
 		GlyphSize& Update(void) {
-			aspectRatio = (width * height) ? float(width) / float(height) : 1.0f;
+			aspectRatio = (width and height) ? float(width) / float(height) : 1.0f;
 			return *this;
 		}
 #if 0
@@ -161,7 +161,7 @@ public:
 	~TextureAtlas() = default;
 
 	inline Vector2f GlyphOffset(int glyphIndex) {
-		return (m_cellScale.X() * m_cellScale.Y()) // both != 0?
+		return ((m_cellScale.X() != 0) and (m_cellScale.Y() != 0)) // both != 0?
 			? Vector2f(m_size.Colf(glyphIndex) * m_cellScale.X(), m_size.Rowf(glyphIndex) * m_cellScale.Y()) + m_paddingOffset
 			: Vector2f::ZERO;
 	}

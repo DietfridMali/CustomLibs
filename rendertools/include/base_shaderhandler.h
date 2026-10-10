@@ -27,9 +27,9 @@ public:
 
 	BaseShaderHandler()
 		: m_kernels(16)
-		, m_shaderCode(nullptr)
 		, m_activeShader(nullptr)
 		, m_activeShaderId("")
+		, m_shaderCode(nullptr)
 	{
 		_instance = this;
 #if 0

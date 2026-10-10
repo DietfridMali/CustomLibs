@@ -94,6 +94,9 @@ public:
 		: m_screenBuffer(nullptr)
 		, m_sceneBuffer(nullptr)
 		, m_skyBuffer(nullptr)
+		, m_screenIsAvailable(false)
+		, m_ndcScale(Vector2f::ONE)
+		, m_ndcBias(Vector2f::ONE)
 #ifdef DEMO
 		, m_renderQuality(0)
 #else
@@ -102,17 +105,14 @@ public:
 		, m_frameIndex(0)
 		, m_windowWidth(0)
 		, m_windowHeight(0)
-		, m_sceneWidth(0)
-		, m_sceneHeight(0)
 		, m_sceneLeft(0)
 		, m_sceneTop(0)
+		, m_sceneWidth(0)
+		, m_sceneHeight(0)
 		, m_fov(0.0f)
 		, m_aspectRatio(1.0f)
-		, m_renderPass(RenderPassType::rpColor)
-		, m_ndcScale(Vector2f::ONE)
-		, m_ndcBias(Vector2f::ONE)
 		, m_backgroundColor(ColorData::Black)
-		, m_screenIsAvailable(false)
+		, m_renderPass(RenderPassType::rpColor)
 	{
 		_instance = this;
 	}

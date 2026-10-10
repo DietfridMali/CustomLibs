@@ -20,8 +20,8 @@ public:
 	BaseFrameCounter()
 		: m_color(ColorData::White)
 		, m_viewport({ 0, 0, 0, 0 })
-		, m_fps(0.0f)
 		, m_renderStartTime(0)
+		, m_fps(0.0f)
 		, m_showFps(false)
 	{
 		Reset();

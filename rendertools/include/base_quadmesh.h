@@ -142,6 +142,10 @@ public:
 	inline bool Render(std::span<Texture* const> textures = {}) {
 		return Render(nullptr, textures);
 	}
+
+	bool Render(std::span<Texture* const> textures, float alpha) override {
+		return Mesh::Render(textures, alpha);
+	}
 #if 0
     inline bool Render(Shader* shader, Texture* texture, const RGBAColor& color) {
         return Render(shader, texture ? { texture } : {}, color);
