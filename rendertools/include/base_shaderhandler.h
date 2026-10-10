@@ -96,6 +96,14 @@ public:
 		return m_shaderCode->GetShader(shaderId);
 	}
 
+	inline int PendingShaderCount(void) const {
+		return m_shaderCode ? m_shaderCode->PendingShaderCount() : 0;
+	}
+
+	inline bool CreateNextShader(void) {
+		return m_shaderCode and m_shaderCode->CreateNextShader();
+	}
+
 	inline ComputeShader* SetupComputeShader(String shaderId) {
 		return m_shaderCode->SetupComputeShader(shaderId);
 	}

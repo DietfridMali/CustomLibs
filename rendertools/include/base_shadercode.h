@@ -235,6 +235,27 @@ public:
 		return m_shaderSources.Length() > 0;
 	}
 
+	inline int PendingShaderCount(void) const {
+		int count = 0;
+		for (const ShaderSource* source : m_shaderSources) {
+			if (source)
+				++count;
+		}
+		return count;
+	}
+
+	inline bool CreateNextShader(void) {
+		for (const ShaderSource*& source : m_shaderSources) {
+			if (source) {
+				CreateShader(source);
+				source = nullptr;
+				return true;
+			}
+		}
+		m_shaderSources.Clear();
+		return false;
+	}
+
 	inline Shader* GetShader(const String& shaderId) {
 		Shader** shader = m_shaders.Find(shaderId);
 		return shader ? *shader : nullptr;
