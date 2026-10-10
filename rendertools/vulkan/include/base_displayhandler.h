@@ -269,7 +269,8 @@ public:
 
 	bool UpdateDisplayMode(int displayMode, bool useFullscreen);
 
-	virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
+	virtual void RequestDisplayChange(int /*displayMode*/, bool /*useFullscreen*/)
+	{}
 };
 
 #define baseDisplayHandler BaseDisplayHandler::Instance()
