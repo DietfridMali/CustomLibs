@@ -11,6 +11,13 @@
 #include <algorithm>
 #include <cstdio>
 
+#if VK_STALL_DIAG
+extern double VkStallClock(void)
+noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail)
+noexcept;
+#endif
+
 // =================================================================================================
 // Vulkan RenderTarget implementation - Phase B (resource setup)
 //
@@ -115,11 +122,19 @@ noexcept
 	VmaAllocationCreateInfo allocInfo{};
 	allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
+#if VK_STALL_DIAG
+	double stallStart = VkStallClock();
+#endif
 	VkResult res = vmaCreateImage(allocator, &info, &allocInfo, &outImage, &outAllocation, nullptr);
 	if (res != VK_SUCCESS) {
 		logHandler.Print("RenderTarget::CreateRTImage: vmaCreateImage failed (%d)\n", (int)res);
 		return false;
 	}
+#if VK_STALL_DIAG
+	char detail[96];
+	snprintf(detail, sizeof(detail), "%d x %d, format %d, %d layers, usage 0x%X", w, h, int(format), arrayLayers, unsigned(usage));
+	VkStallEvent("render target image", stallStart, detail);
+#endif
 	return true;
 }
 

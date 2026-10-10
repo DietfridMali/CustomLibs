@@ -687,6 +687,19 @@ noexcept
 		const VkGpuPassRecord&	pass = slot.passes[(first + i) % kGpuPassSlotSize];
 		const uint64_t*			data = vkGpuPassData[i];
 		logHandler.Print("      %-28s %8.2f ms\n", pass.name, vkGpuPassTimes[i]);
+		uint64_t firstMark = data[2];
+		for (uint32_t j = 0; j < pass.markCount; ++j) {
+			const uint64_t* mark = data + (2 + j) * 2;
+			if (mark[1] != 0) {
+				firstMark = mark[0];
+				break;
+			}
+		}
+		if (firstMark >= data[0]) {
+			double leadMs = double(firstMark - data[0]) * vkGpuPassPeriodMs;
+			if (leadMs >= kStallDetailMinMs)
+				logHandler.Print("         %-35s %8.2f ms\n", (pass.markCount > 0) ? "before the first shader" : "no shader bound", leadMs);
+		}
 		for (uint32_t j = 0; j < pass.markCount; ++j) {
 			const uint64_t*	mark = data + (2 + j) * 2;
 			if (mark[1] == 0)
