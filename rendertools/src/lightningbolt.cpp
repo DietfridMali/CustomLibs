@@ -208,6 +208,23 @@ Vector3f BuildPlaneDir(const Vector3f& planeNormal, const Vector3f& axis)
 	return (l > 1e-4f) ? dir * (1.0f / l) : Vector3f(1.0f, 0.0f, 0.0f);
 }
 
+constexpr float SnapMinGap = 0.25f;
+
+float PathLength(const AutoArray<LightningPathNode>& path)
+{
+	float length = 0.0f;
+	for (int32_t i = 1; i < path.Length(); i++)
+		length += (path[i].position - path[i - 1].position).Length();
+	return length;
+}
+
+Vector3f BlendDirections(const Vector3f& a, const Vector3f& b)
+{
+	Vector3f	sum = a + b;
+	float		l = sum.Length();
+	return (l > 1e-4f) ? sum * (1.0f / l) : b;
+}
+
 #if TORTUOSITY
 // Distribution of the segment-to-segment deflection angles over all bolts of one strike -> stderr.
 // 1-deg histogram internally (percentiles from the cumulative sum, no sorting needed), printed as
@@ -406,6 +423,127 @@ void LightningBolt::Build(const LightningBoltParams& params)
 	m_visibleNodes = segments + 1;
 }
 
+
+void LightningBolt::BuildOnPath(const LightningBoltParams& params, const AutoArray<LightningPathNode>& path, const Vector3f& offset,
+								AutoArray<LightningGuideNode>* guide)
+{
+	Clear();
+	if (guide != nullptr)
+		guide->Clear();
+	const LightningLook&	look = lightningLook;
+	int32_t					pathCount = path.Length();
+	if (pathCount < 2)
+		return;
+
+	AutoArray<float>	pathArcs;
+	AutoArray<Vector3f>	pathDirs;
+	pathArcs.Resize(pathCount, 0.0f);
+	pathDirs.Resize(pathCount, Vector3f::ZERO);
+	float		length = 0.0f;
+	Vector3f	lastDir = Vector3f::ZERO;
+	for (int32_t k = 0; k < pathCount - 1; k++) {
+		Vector3f	delta = path[k + 1].position - path[k].position;
+		float		l = delta.Length();
+		if (l > 1e-6f)
+			lastDir = delta * (1.0f / l);
+		pathDirs[k] = lastDir;
+		pathArcs[k] = length;
+		length += l;
+	}
+	pathArcs[pathCount - 1] = length;
+	pathDirs[pathCount - 1] = lastDir;
+	if (not (length >= 1e-4f))
+		return;
+	for (int32_t k = pathCount - 2; k >= 0; k--) {
+		if (pathDirs[k].IsZero())
+			pathDirs[k] = pathDirs[k + 1];
+	}
+
+	int32_t segments = params.segments;
+	if (segments < 1)
+		segments = 1;
+	if (segments > MaxSegments)
+		segments = MaxSegments;
+	const float step = length / float(segments);
+
+	AutoArray<float> arcs;
+	arcs.Resize(segments + 1, 0.0f);
+	for (int32_t i = 0; i < segments; i++)
+		arcs[i] = step * float(i);
+	arcs[segments] = length;
+	int32_t lastSnapped = 0;
+	for (int32_t k = 1; k < pathCount - 1; k++) {
+		int32_t i = int32_t(pathArcs[k] / step + 0.5f);
+		if ((i <= lastSnapped) or (i >= segments))
+			continue;
+		if (pathArcs[k] - arcs[i - 1] < step * SnapMinGap)
+			continue;
+		arcs[i] = pathArcs[k];
+		lastSnapped = i;
+	}
+
+#if VARIABLE_SEGLENGTH
+	const float stepLength = step;
+	const float lookKink = (params.fbm.kinkAmplitude >= 0.0f) ? params.fbm.kinkAmplitude : look.kinkAmplitude;
+	const float kinkAmplitude = lookKink * (stepLength / ((look.boltSegmentLength > 1e-4f) ? look.boltSegmentLength : 1e-4f));
+#else
+	const float stepLength = look.boltSegmentLength;
+	const float kinkAmplitude = (params.fbm.kinkAmplitude >= 0.0f) ? params.fbm.kinkAmplitude : look.kinkAmplitude;
+#endif
+	const int32_t	octaves = (params.fbm.octaves > 0) ? params.fbm.octaves : look.octaves;
+	const int32_t	kinkOctaves = (params.fbm.kinkOctaves > 0) ? params.fbm.kinkOctaves : look.kinkOctaves;
+	const float		gain = (params.fbm.gain >= 0.0f) ? params.fbm.gain : look.gain;
+	const float		lacunarity = (params.fbm.lacunarity > 0.0f) ? params.fbm.lacunarity : look.lacunarity;
+	const float		kinkScale = stepLength * std::pow(lacunarity, float(kinkOctaves - 1));
+	const float		planeDistTolerance = (params.fbm.planeDistTolerance >= 0.0f) ? params.fbm.planeDistTolerance : look.planeDistTolerance;
+	const float		swingScale = 1.0f / std::sqrt(1.0f + planeDistTolerance * planeDistTolerance);
+
+	m_nodes.Reserve(segments + 1);
+	if (guide != nullptr)
+		guide->Reserve(segments + 1);
+	int32_t k = 0;
+	for (int32_t i = 0; i <= segments; i++) {
+		float arc = arcs[i];
+		while ((k < pathCount - 2) and (pathArcs[k + 1] <= arc))
+			k++;
+		float		t = arc / length;
+		Vector3f	tangent = pathDirs[k];
+		Vector3f	normal = path[k].normal;
+		Vector3f	base = path[k].position + tangent * (arc - pathArcs[k]);
+		if ((k > 0) and (arc == pathArcs[k])) {
+			tangent = BlendDirections(pathDirs[k - 1], tangent);
+			normal = BlendDirections(path[k - 1].normal, normal);
+		}
+		Vector3f	swingU = normal.Cross(tangent);
+		float		ul = swingU.Length();
+		swingU = (ul > 1e-4f) ? swingU * (1.0f / ul) : Vector3f::ZERO;
+		Vector3f	swingV = normal - tangent * normal.Dot(tangent);
+		float		vl = swingV.Length();
+		swingV = (vl > 1e-4f) ? swingV * (1.0f / vl) : Vector3f::ZERO;
+		float		window = std::sin(Pi * t);
+		float		x = t * float(params.waveCount);
+		float		du = LightningNoise::Fbm2D(x, params.time, params.seed, octaves, gain, lacunarity);
+		float		dv = LightningNoise::Fbm2D(x, params.time, params.seed ^ 0x68bc21ebu, octaves, gain, lacunarity);
+		Vector3f	disp = (swingU * du + swingV * (std::fabs(dv) * planeDistTolerance)) * (params.amplitude * window * swingScale);
+		float		s = arc / ((kinkScale > 1e-5f) ? kinkScale : 1e-5f);
+		float		ku = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x7f4a7c15u, kinkOctaves, gain, lacunarity);
+		float		kv = LightningNoise::Fbm2D(s, params.time, params.seed ^ 0x94d049bbu, kinkOctaves, gain, lacunarity);
+		disp += (swingU * ku + swingV * (std::fabs(kv) * planeDistTolerance)) * (kinkAmplitude * window * swingScale);
+		LightningNode* node = m_nodes.Append();
+		node->position = base + offset + disp;
+		node->width = params.startWidth + (params.endWidth - params.startWidth) * t;
+		if (guide != nullptr) {
+			LightningGuideNode* guideNode = guide->Append();
+			guideNode->location.position = base;
+			guideNode->location.normal = normal;
+			guideNode->location.face = path[k].face;
+			guideNode->tangent = tangent;
+			guideNode->arc = arc;
+		}
+	}
+	m_visibleNodes = segments + 1;
+}
+
 // =================================================================================================
 
 void BaseLightning::SetupCommon(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params)
@@ -479,6 +617,32 @@ bool LightningStrike::Regenerate(int64_t now)
 void LightningStrike::Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t spawnTime)
 {
 	SetupCommon(start, end, params);
+	SetupStrike(params, spawnTime);
+	Generate(spawnTime);
+}
+
+
+void LightningStrike::SetupOnSurface(const AutoArray<LightningPathNode>& path, LightningSurface& surface,
+									 const LightningCreationParams& params, int64_t spawnTime)
+{
+	int32_t pathCount = path.Length();
+	if (pathCount < 2)
+		return;
+	SetupCommon(path[0].position, path[pathCount - 1].position, params);
+	m_swingMode = smSurface;
+	if (params.startWidth <= 0.0f)
+		m_startWidth = PathLength(path) * lightningLook.widthRatio;
+	if (params.endWidth < 0.0f)
+		m_endWidth = m_startWidth * 0.5f;
+	SetupStrike(params, spawnTime);
+	m_surfaceBolts.Clear();
+	AddSurfaceBolt(path, surface, -1, 0, Vector3f::ZERO, m_startWidth, m_endWidth, 0, m_seed);
+	Generate(spawnTime);
+}
+
+
+void LightningStrike::SetupStrike(const LightningCreationParams& params, int64_t spawnTime)
+{
 	m_lifetime = params.lifetime;
 	m_fadeStart = params.fadeStart;
 	m_coreFlashWidth = params.coreFlashWidth;
@@ -494,7 +658,6 @@ void LightningStrike::Setup(const Vector3f& start, const Vector3f& end, const Li
 	m_lastGenerated = spawnTime;
 	m_seed = uint32_t(spawnTime) * 2654435761u + uint32_t(Random::Int(65536));
 	ComputeCounts();
-	Generate(spawnTime);
 }
 
 
@@ -504,13 +667,16 @@ void LightningStrike::Generate(int64_t now)
 	m_refIndex = 0;
 	float time = m_timeOffset +
 		float(now - m_spawnTime) * 0.001f * m_animSpeed; // relative to spawn -> small noise coord (float precision)
-	uint32_t seed = m_seed;
+	uint32_t strokeSeed = 0;
 	if (m_strokeCount > 0) {
 		float strokeStart;
 		m_builtStroke = LatestStroke(float(now - m_spawnTime), strokeStart);
-		seed += uint32_t(m_builtStroke) * 0x9e3779b9u;
+		strokeSeed = uint32_t(m_builtStroke) * 0x9e3779b9u;
 	}
-	AddBolt(m_start, m_end, m_startWidth, m_endWidth, 0, seed, time);
+	if (m_surfaceBolts.Length() > 0)
+		GenerateOnSurface(strokeSeed, time);
+	else
+		AddBolt(m_start, m_end, m_startWidth, m_endWidth, 0, m_seed + strokeSeed, time);
 #if TORTUOSITY
 	if (now == m_spawnTime) // once per strike, not on every animation rebuild
 		MeasureTortuosity(m_bolts);
@@ -719,6 +885,142 @@ void LightningStrike::AddBolt(const Vector3f& start, const Vector3f& end, float 
 		float		widthFactor =
 			   (depth == 0) ? look.firstBranchWidthFactor : look.deepBranchWidthFactor; // secondaries drop hard, deeper ones barely
 		AddBolt(bolt.m_nodes[i].position, branchEnd, bolt.m_nodes[i].width * widthFactor, 0.0f, depth + 1, branchSeed, time);
+	}
+}
+
+
+LightningBoltParams LightningStrike::SurfaceBoltParams(const LightningSurfaceBolt& surfaceBolt, uint32_t seed, float time) const
+{
+	LightningBoltParams boltParams = {
+		.segments = SegmentCount(surfaceBolt.length / m_sampleScale),
+		.waveCount = m_waveCount,
+		.startWidth = surfaceBolt.startWidth,
+		.endWidth = surfaceBolt.endWidth,
+		.amplitude = surfaceBolt.length * m_amplitudeFactor,
+		.seed = seed,
+		.time = time,
+		.basePhase = m_timeOffset,
+		.swingMode = smSurface,
+		.fbm = Fbm()
+	};
+	return boltParams;
+}
+
+
+void LightningStrike::AddSurfaceBolt(const AutoArray<LightningPathNode>& path, LightningSurface& surface, int32_t parent,
+									 int32_t forkNode, const Vector3f& forkPoint, float startWidth, float endWidth, int32_t depth,
+									 uint32_t seed)
+{
+	const LightningLook&	look = lightningLook;
+	float					length = PathLength(path);
+	if (not (length >= 1e-4f))
+		return;
+	int32_t					index = m_surfaceBolts.Length();
+	LightningSurfaceBolt*	surfaceBolt = m_surfaceBolts.Append();
+	surfaceBolt->path = path;
+	surfaceBolt->forkPoint = forkPoint;
+	surfaceBolt->parent = parent;
+	surfaceBolt->forkNode = forkNode;
+	surfaceBolt->length = length;
+	surfaceBolt->startWidth = startWidth;
+	surfaceBolt->endWidth = endWidth;
+	surfaceBolt->seed = seed;
+
+	if (depth >= m_branchDepth)
+		return;
+
+	LightningBolt					refBolt;
+	AutoArray<LightningGuideNode>	guide;
+	refBolt.BuildOnPath(SurfaceBoltParams(*surfaceBolt, seed, m_timeOffset), path, Vector3f::ZERO, &guide);
+	int32_t nodeCount = refBolt.m_nodes.Length();
+	if (nodeCount < 3)
+		return;
+
+	float kinks[MaxSegments + 1];
+	float kinkSum = 0.0f;
+	for (int32_t i = 1; i < nodeCount - 1; i++) {
+		Vector3f	inDir = (refBolt.m_nodes[i].position - refBolt.m_nodes[i - 1].position).Normal();
+		Vector3f	outDir = (refBolt.m_nodes[i + 1].position - refBolt.m_nodes[i].position).Normal();
+		float		d = inDir.Dot(outDir);
+		if (d > 1.0f)
+			d = 1.0f;
+		else if (d < -1.0f)
+			d = -1.0f;
+		kinks[i] = std::acos(d);
+		kinkSum += kinks[i];
+	}
+	float meanKink = kinkSum / float(nodeCount - 2);
+	if (not (meanKink >= 1e-5f))
+		meanKink = 1e-5f;
+
+	float	accumChance = 0.0f;
+	int32_t	skipBranchTests = 0;
+	for (int32_t i = 1; i < nodeCount - 1; i++) {
+		const LightningGuideNode&	guideNode = guide[i];
+		float						remaining = length - guideNode.arc;
+		float branchLength = remaining * (look.branchLengthFactor + float(int32_t(Hash01(seed ^ 0x9e3779b9u, uint32_t(i)) * 4.0f)) * 0.1f);
+		if (branchLength < look.minBranchLength)
+			continue;
+		accumChance += m_branchChance * (kinks[i] / meanKink);
+		if (--skipBranchTests > 0)
+			continue;
+		skipBranchTests = 0;
+		if (Hash01(seed, uint32_t(i) * 3u) >= accumChance)
+			continue;
+		accumChance -= 1.0f;
+		skipBranchTests = int32_t(Hash01(seed, uint32_t(i) * 3u + 1u) * float(m_maxBranchTestSkips)) + 1;
+
+		Vector3f normal = guideNode.location.normal;
+		Vector3f tangent = refBolt.m_nodes[i + 1].position - refBolt.m_nodes[i - 1].position;
+		tangent -= normal * tangent.Dot(normal);
+		float tangentLength = tangent.Length();
+		tangent = (tangentLength > 1e-4f) ? tangent * (1.0f / tangentLength) : guideNode.tangent;
+
+		float u1 = Hash01(seed, uint32_t(i) * 3u + 2u);
+		if (u1 < 1e-6f)
+			u1 = 1e-6f;
+		float u2 = Hash01(seed ^ 0x85ebca6bu, uint32_t(i));
+		float angleDeg = look.branchAngleMean + std::sqrt(-2.0f * std::log(u1)) * std::cos(TwoPi * u2) * look.branchAngleSigma;
+		if (angleDeg < look.minBranchAngle)
+			angleDeg = look.minBranchAngle;
+		else if (angleDeg > look.maxBranchAngle)
+			angleDeg = look.maxBranchAngle;
+		float angle = angleDeg * DegToRad;
+
+		Vector3f	side = normal.Cross(tangent);
+		Vector3f	inDir = (refBolt.m_nodes[i].position - refBolt.m_nodes[i - 1].position).Normal();
+		Vector3f	outDir = (refBolt.m_nodes[i + 1].position - refBolt.m_nodes[i].position).Normal();
+		float		bendSide = (outDir - inDir).Dot(side);
+		float		sideSign;
+		if (std::fabs(bendSide) > 1e-4f)
+			sideSign = (bendSide > 0.0f) ? -1.0f : 1.0f;
+		else
+			sideSign = (Hash01(seed ^ 0xc2b2ae35u, uint32_t(i)) < 0.5f) ? -1.0f : 1.0f;
+		Vector3f branchDir = tangent * std::cos(angle) + side * (sideSign * std::sin(angle));
+
+		AutoArray<LightningPathNode> branchPath;
+		if (not surface.Trace(guideNode.location, branchDir, branchLength, branchPath))
+			continue;
+		if (PathLength(branchPath) < look.minBranchLength)
+			continue;
+		uint32_t	branchSeed = seed * 747796405u + uint32_t(i) * 2891336453u + uint32_t(depth + 1) * 0x9e3779b9u;
+		float		widthFactor = (depth == 0) ? look.firstBranchWidthFactor : look.deepBranchWidthFactor;
+		AddSurfaceBolt(branchPath, surface, index, i, guideNode.location.position, refBolt.m_nodes[i].width * widthFactor, 0.0f,
+					   depth + 1, branchSeed);
+	}
+}
+
+
+void LightningStrike::GenerateOnSurface(uint32_t strokeSeed, float time)
+{
+	for (int32_t i = 0; i < m_surfaceBolts.Length(); i++) {
+		const LightningSurfaceBolt&	surfaceBolt = m_surfaceBolts[i];
+		Vector3f					offset = Vector3f::ZERO;
+		if (surfaceBolt.parent >= 0)
+			offset = m_bolts[surfaceBolt.parent].m_nodes[surfaceBolt.forkNode].position - surfaceBolt.forkPoint;
+		LightningBolt bolt;
+		bolt.BuildOnPath(SurfaceBoltParams(surfaceBolt, surfaceBolt.seed + strokeSeed, time), surfaceBolt.path, offset);
+		m_bolts.Append(bolt);
 	}
 }
 

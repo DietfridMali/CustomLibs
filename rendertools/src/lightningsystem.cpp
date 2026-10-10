@@ -29,6 +29,22 @@ LightningStrike* LightningSystem::AddStrike(const Vector3f& start, const Vector3
 }
 
 
+LightningStrike* LightningSystem::AddStrike(const AutoArray<LightningPathNode>& path, LightningSurface& surface,
+											const LightningCreationParams& params, int64_t now)
+{
+	LightningStrike* strike = new LightningStrike();
+	m_fbm = params.fbm;
+	strike->SetFbm(&m_fbm);
+	strike->SetupOnSurface(path, surface, params, now);
+	if (strike->m_surfaceBolts.Length() < 1) {
+		delete strike;
+		return nullptr;
+	}
+	m_lightnings.Append(strike);
+	return strike;
+}
+
+
 LightningArc* LightningSystem::AddArc(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params)
 {
 	LightningArc* arc = new LightningArc();

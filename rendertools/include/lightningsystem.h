@@ -41,6 +41,9 @@ public:
 
 	LightningStrike* AddStrike(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t now);
 
+	LightningStrike* AddStrike(const AutoArray<LightningPathNode>& path, LightningSurface& surface, const LightningCreationParams& params,
+							   int64_t now);
+
 	LightningArc* AddArc(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params);
 
 	// Attach a time control. The system takes ownership; its ttl becomes the emitter's safety net.

@@ -194,6 +194,27 @@ struct LightningNode {
 };
 
 // -------------------------------------------------------------------------------------------------
+
+struct LightningPathNode {
+	Vector3f	position{ Vector3f::ZERO };
+	Vector3f	normal{ Vector3f::ZERO };
+	int32_t		face{ -1 };
+};
+
+struct LightningGuideNode {
+	LightningPathNode	location;
+	Vector3f			tangent{ Vector3f::ZERO };
+	float				arc{ 0.0f };
+};
+
+class LightningSurface {
+public:
+	virtual ~LightningSurface() = default;
+
+	virtual bool Trace(const LightningPathNode& from, const Vector3f& direction, float length, AutoArray<LightningPathNode>& path) = 0;
+};
+
+// -------------------------------------------------------------------------------------------------
 // Everything LightningBolt::Build needs. The lateral displacement is
 // (swing direction) * |fbm| * amplitude * sin(pi*t) -- a fractal (multi-octave) swing whose peak is
 // `amplitude`. The sin window pins both endpoints (the envelope); `time` is a SECOND, independent noise
@@ -231,6 +252,9 @@ public:
 	int32_t m_visibleNodes{ 0 };
 
 	void Build(const LightningBoltParams& params);
+
+	void BuildOnPath(const LightningBoltParams& params, const AutoArray<LightningPathNode>& path, const Vector3f& offset,
+					 AutoArray<LightningGuideNode>* guide = nullptr);
 
 	void Clear(void);
 
@@ -400,6 +424,17 @@ struct LightningRefBolt {
 	bool				valid{ false };
 };
 
+struct LightningSurfaceBolt {
+	AutoArray<LightningPathNode>	path;
+	Vector3f						forkPoint{ Vector3f::ZERO };
+	int32_t							parent{ -1 };
+	int32_t							forkNode{ 0 };
+	float							length{ 0.0f };
+	float							startWidth{ 0.0f };
+	float							endWidth{ 0.0f };
+	uint32_t						seed{ 0 };
+};
+
 // -------------------------------------------------------------------------------------------------
 
 class LightningStrike : public BaseLightning {
@@ -419,12 +454,16 @@ public:
 	int32_t						m_builtStroke{ 0 };
 	AutoArray<LightningRefBolt>	m_refBolts;
 	int32_t						m_refIndex{ 0 };
+	AutoArray<LightningSurfaceBolt>	m_surfaceBolts;
 
 	LightningStrike()
 		: BaseLightning(ltStrike)
 	{}
 
 	void Setup(const Vector3f& start, const Vector3f& end, const LightningCreationParams& params, int64_t spawnTime);
+
+	void SetupOnSurface(const AutoArray<LightningPathNode>& path, LightningSurface& surface, const LightningCreationParams& params,
+						int64_t spawnTime);
 
 	void Generate(int64_t now) override; // main bolt + branches, built once (with return strokes: once per stroke, new shape each)
 
@@ -451,6 +490,12 @@ public:
 			m_refBolts[i].params.start += offset;
 			m_refBolts[i].params.end += offset;
 		}
+		for (int32_t i = 0; i < m_surfaceBolts.Length(); i++) {
+			LightningSurfaceBolt& surfaceBolt = m_surfaceBolts[i];
+			surfaceBolt.forkPoint += offset;
+			for (int32_t j = 0; j < surfaceBolt.path.Length(); j++)
+				surfaceBolt.path[j].position += offset;
+		}
 	}
 
 	void Transform(const Vector3f& pivot, const Matrix4f& rotation, const Vector3f& newPivot) override
@@ -464,6 +509,14 @@ public:
 			m_refBolts[i].params.end = newPivot + rotation * (m_refBolts[i].params.end - pivot);
 			m_refBolts[i].params.planeNormal = rotation * m_refBolts[i].params.planeNormal;
 		}
+		for (int32_t i = 0; i < m_surfaceBolts.Length(); i++) {
+			LightningSurfaceBolt& surfaceBolt = m_surfaceBolts[i];
+			surfaceBolt.forkPoint = newPivot + rotation * (surfaceBolt.forkPoint - pivot);
+			for (int32_t j = 0; j < surfaceBolt.path.Length(); j++) {
+				surfaceBolt.path[j].position = newPivot + rotation * (surfaceBolt.path[j].position - pivot);
+				surfaceBolt.path[j].normal = rotation * surfaceBolt.path[j].normal;
+			}
+		}
 	}
 
 	bool IsAnimated(void) const override {
@@ -476,6 +529,15 @@ private:
 	// branch structure is a deterministic function of `seed` (stable across frames); only `time` (the noise
 	// time axis) advances, so the strike wabers in place without the branches jumping around.
 	void AddBolt(const Vector3f& start, const Vector3f& end, float startWidth, float endWidth, int32_t depth, uint32_t seed, float time);
+
+	void SetupStrike(const LightningCreationParams& params, int64_t spawnTime);
+
+	LightningBoltParams SurfaceBoltParams(const LightningSurfaceBolt& surfaceBolt, uint32_t seed, float time) const;
+
+	void AddSurfaceBolt(const AutoArray<LightningPathNode>& path, LightningSurface& surface, int32_t parent, int32_t forkNode,
+						const Vector3f& forkPoint, float startWidth, float endWidth, int32_t depth, uint32_t seed);
+
+	void GenerateOnSurface(uint32_t strokeSeed, float time);
 };
 
 // -------------------------------------------------------------------------------------------------
