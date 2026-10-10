@@ -587,7 +587,11 @@ protected:
 class BaseBlueNoiseTexture
 	: public Texture {
 public:
-	bool Create(String noiseFilename = "");
+	bool Create(String noiseFilename);
+
+	bool Create(void) override {
+		return Texture::Create();
+	}
 
 	bool Deploy(int bufferIndex = 0) override = 0;
 	void SetParams(bool enforce = false) override = 0;
