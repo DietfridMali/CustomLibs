@@ -27,8 +27,8 @@ static List<String> skyTextureTypes = { "-bright", "-medium", "-dark" };
 Cubemap* Skybox::LoadTextures(const String& textureFolder, const String& baseName, const String& type, const String& size) {
 	String id = baseName + type;
 	Cubemap* texture = textureHandler.GetCubemap(id);
-    if (not texture)
-        return nullptr;
+	if (not texture)
+		return nullptr;
 
 	List<String> filenames;
 	for (int i = 0; i < skyboxDirections.Length(); i++) 

@@ -163,7 +163,7 @@ bool GLBLoader::Load(const String& filename, bool fixModel) {
         return false;
     if (m_fixModel)
         StitchPrimitives();
-	SaveToFile(filename + String(".bin"));
+    SaveToFile(filename + String(".bin"));
     ReleaseModel();
     return true;
 }

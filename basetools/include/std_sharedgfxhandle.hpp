@@ -160,7 +160,14 @@ public:
     SharedGfxHandle(GLuint handle, glBufferAllocator allocator, glBufferReleaser releaser)
         : SharedHandle<GLuint>(
             handle,
-            [allocator]() { GLuint h; if (allocator == nullptr) h = 0; else allocator(1, &h); return h; },
+            [allocator]() {
+                GLuint h;
+                if (allocator == nullptr)
+                    h = 0;
+                else
+                    allocator(1, &h);
+                return h;
+            },
             [releaser](GLuint h) { if (h and (releaser != nullptr)) releaser(1, &h); }
         )
     {

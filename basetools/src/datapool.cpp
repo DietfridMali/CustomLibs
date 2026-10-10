@@ -71,7 +71,7 @@ void DataPool<KEY_T, ITEM_T>::Destroy(void) {
 ITEM_T* DataPool<KEY_T, ITEM_T>::FindItem(KEY_T& key) {
 	if (!m_usedItems)
 		return nullptr;
-		int i;
+	int i;
 	if (!m_usedItems->Extract(key, i))
 		return nullptr;
 	return m_itemPool + i;
