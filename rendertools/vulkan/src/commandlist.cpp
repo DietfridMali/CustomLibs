@@ -831,6 +831,33 @@ noexcept
 }
 
 
+#if VK_STALL_DIAG
+
+struct VkStallUsedPipeline {
+	VkPipeline	pipeline;
+	PipelineKey	key;
+};
+
+static std::vector<VkStallUsedPipeline> vkStallUsedPipelines;
+
+
+static void VkStallNotePipelineUse(VkPipeline pipeline, const PipelineKey& key)
+noexcept
+{
+	for (const VkStallUsedPipeline& used : vkStallUsedPipelines) {
+		if ((used.pipeline == pipeline) and (std::memcmp(&used.key, &key, sizeof(PipelineKey)) == 0))
+			return;
+	}
+	vkStallUsedPipelines.push_back(VkStallUsedPipeline{ pipeline, key });
+	char detail[256];
+	snprintf(detail, sizeof(detail), "shader '%s', colors %u, blend %d, fill %d, %d pipelines in use",
+			 static_cast<const char*>(key.shader->m_name), key.colorFormatCount, int(key.states.blendEnable[0]),
+			 int(key.states.fillMode), int(vkStallUsedPipelines.size()));
+	VkStallEvent("pipeline first use", VkStallClock(), detail);
+}
+
+#endif
+
 VkPipeline CommandList::GetPipeline(Shader* shader)
 noexcept
 {
@@ -878,6 +905,9 @@ noexcept
 
 	VkPipeline p = pipelineCache.GetOrCreate(key);
 	if (p != VK_NULL_HANDLE) {
+#if VK_STALL_DIAG
+		VkStallNotePipelineUse(p, key);
+#endif
 		SetActivePipeline(p, shader);
 		if (m_isRecording)
 			key.states.SetDynamicStates(GfxList());
