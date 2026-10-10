@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "texture.h"
 #include "shader.h"
 #include "texcoord.h"
@@ -22,6 +24,7 @@ public:
 	String					m_activeShaderId;
 	Texture					m_grayNoise;
 	BaseShaderCode*			m_shaderCode;
+	std::vector<String>		m_unavailableShaders;
 	bool					m_encodeSRGBTextures{ false };
 	bool					m_decodeColors{ false };
 
@@ -219,6 +222,7 @@ public:
 	Shader* SetChromAbParams(Shader* shader, float aberration = 0.1f, int offsetType = 1);
 
 private:
+	void ReportUnavailableShader(const String& shaderId);
 	FloatArray* ComputeGaussKernel1D(int radius); // allokiert -> nicht noexcept
 	void ComputeGaussKernels(void); // allokiert -> nicht noexcept
 };

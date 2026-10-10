@@ -238,20 +238,17 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 	HRESULT compileStatus = E_FAIL;
 	result->GetStatus(&compileStatus);
 
-	ComPtr<IDxcBlobUtf8> errors;
-	if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr))) {
+	ComPtr<IDxcBlobUtf8>	errors;
+	const bool				hasOutput = SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr)) and
+		errors and (errors->GetStringLength() > 0);
 #ifdef _DEBUG
-		if (errors and (errors->GetStringLength() > 0)) {
-#else
-		if (FAILED(compileStatus) and errors and (errors->GetStringLength() > 0)) {
+	if (hasOutput)
+		logHandler.Print("Shader '%s' (%s) compile output:\n%s\n", (const char*)m_name, target, errors->GetStringPointer());
 #endif
-			logHandler.Print("Shader '%s' (%s) compile output:\n%s\n",
-							 (const char*)m_name, target,
-							 errors->GetStringPointer());
-		}
-	}
 
 	if (FAILED(compileStatus)) {
+		logHandler.Print("Shader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
+						 static_cast<const char*>(ShaderErrorSummary(hasOutput ? errors->GetStringPointer() : nullptr)));
 #ifdef _DEBUG
 		PrintShaderSource(hlslCode, target);
 #endif
@@ -261,16 +258,16 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 	ComPtr<IDxcBlob> dxilBlob;
 	if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(dxilBlob.GetAddressOf()), nullptr)) or (not dxilBlob) or
 		(dxilBlob->GetBufferSize() == 0)) {
-#ifdef _DEBUG
 		logHandler.Print("Shader '%s' (%s): no DXIL output\n", (const char*)m_name, target);
-#endif
 		return false;
 	}
 
 	// Wrap DXIL bytes in an ID3DBlob so the rest of the engine (PSO setup, reflection
 	// via blob->GetBufferPointer/GetBufferSize) sees an unchanged interface.
-	if (FAILED(D3DCreateBlob(dxilBlob->GetBufferSize(), &blobOut)))
+	if (FAILED(D3DCreateBlob(dxilBlob->GetBufferSize(), &blobOut))) {
+		logHandler.Print("Shader '%s' (%s): no memory for the compiled code\n", (const char*)m_name, target);
 		return false;
+	}
 	std::memcpy(blobOut->GetBufferPointer(), dxilBlob->GetBufferPointer(), dxilBlob->GetBufferSize());
 	if (useCache)
 		ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(blobOut->GetBufferPointer()),
@@ -485,16 +482,14 @@ noexcept
 
 	ComPtr<ID3DBlob> sig, err;
 	if (FAILED(D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, &sig, &err))) {
-#ifdef _DEBUG
-		if (err)
-			logHandler.Print("Shader '%s': root signature serialization error:\n%s\n",
-							 (const char*)m_name,
-							 static_cast<const char*>(err->GetBufferPointer()));
-#endif
+		logHandler.Print("Shader '%s': root signature could not be serialized - %s\n", (const char*)m_name,
+						 static_cast<const char*>(ShaderErrorSummary(err ? static_cast<const char*>(err->GetBufferPointer()) : nullptr)));
 		return false;
 	}
-	if (FAILED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&s_rootSignature))))
+	if (FAILED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(), IID_PPV_ARGS(&s_rootSignature)))) {
+		logHandler.Print("Shader '%s': root signature could not be created\n", (const char*)m_name);
 		return false;
+	}
 	s_rootSignatureBlob = sig;
 	m_rootSignature = s_rootSignature;
 	m_rootSignatureBlob = s_rootSignatureBlob;
@@ -587,9 +582,7 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 		}
 	}
 	if (tcsCode.IsEmpty() != tesCode.IsEmpty()) {
-#ifdef _DEBUG
 		logHandler.Print("Shader '%s': hull and domain shader must both be present\n", (const char*)m_name);
-#endif
 		return false;
 	}
 	if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsBlob, shaderFolder))

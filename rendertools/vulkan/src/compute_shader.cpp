@@ -9,6 +9,7 @@
 #include "compute_shader.h"
 #include "shader.h"
 #include "shader_compiler.h"
+#include "shadercache.h"
 #include "pipeline_cache.h"
 #include "vkcontext.h"
 #include "cbv_allocator.h"
@@ -430,8 +431,11 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, std::v
 											   shaderFolder,
 											   m_name + String(".") + String(target) +
 												   String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
-		logHandler.Print("ComputeShader '%s': compile failed (entry=%s, target=%s):\n%s\n",
-						 (const char*)m_name, entryPoint, target, (const char*)error);
+		logHandler.Print("ComputeShader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
+						 static_cast<const char*>(ShaderErrorSummary(static_cast<const char*>(error))));
+#ifdef _DEBUG
+		logHandler.Print("%s\n", (const char*)error);
+#endif
 		return false;
 	}
 	return true;
@@ -544,8 +548,10 @@ bool ComputeShader::Create(const String& csCode, const AutoArray<ComputeBindingD
 		return false;
 
 	m_csModule = ShaderCompiler::CreateShaderModule(m_csSpirv);
-	if (m_csModule == VK_NULL_HANDLE)
+	if (m_csModule == VK_NULL_HANDLE) {
+		logHandler.Print("ComputeShader '%s': shader module could not be created\n", (const char*)m_name);
 		return false;
+	}
 
 	m_bindings = bindings;
 

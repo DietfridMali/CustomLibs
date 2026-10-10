@@ -5,6 +5,7 @@
 #include <cwchar>
 #include <fstream>
 #include <filesystem>
+#include <string>
 #include <system_error>
 #include <vector>
 
@@ -125,6 +126,21 @@ inline bool Write(const String& folder, const String& fileName, uint64_t key, ui
 	return WriteFile(folder, fileName, payload, size, &header);
 }
 
+}
+
+// =================================================================================================
+
+inline String ShaderErrorSummary(const char* compilerOutput)
+{
+	if ((compilerOutput == nullptr) or (*compilerOutput == '\0'))
+		return String("no compiler message");
+	const char* line = std::strstr(compilerOutput, "error");
+	if (line == nullptr)
+		line = compilerOutput;
+	while ((line > compilerOutput) and (line[-1] != '\n'))
+		--line;
+	const size_t length = std::strcspn(line, "\r\n");
+	return String(std::string(line, length).c_str());
 }
 
 // =================================================================================================

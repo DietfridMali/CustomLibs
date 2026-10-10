@@ -98,8 +98,10 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
 {
 	if ((not hlslCode) or (not *hlslCode))
 		return false;
-	if (not InitDxc())
+	if (not InitDxc()) {
+		logHandler.Print("ComputeShader '%s': DXC initialization failed\n", (const char*)m_name);
 		return false;
+	}
 
 	DxcBuffer src{};
 	src.Ptr = hlslCode;
@@ -150,25 +152,37 @@ bool ComputeShader::Compile(const char* hlslCode, const char* entryPoint, const 
 
 	ComPtr<IDxcResult>	result;
 	HRESULT				hr = g_dxcCompiler->Compile(&src, args.data(), UINT32(args.size()), nullptr, IID_PPV_ARGS(result.GetAddressOf()));
-	if (FAILED(hr))
+	if (FAILED(hr)) {
+		logHandler.Print("ComputeShader '%s' (%s): DXC Compile call failed (0x%08X)\n", (const char*)m_name, target, (unsigned)hr);
 		return false;
+	}
 
 	ComPtr<IDxcBlobUtf8> errors;
 	result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(errors.GetAddressOf()), nullptr);
-	if (errors and errors->GetStringLength() > 0)
+	const bool hasOutput = errors and (errors->GetStringLength() > 0);
+#ifdef _DEBUG
+	if (hasOutput)
 		logHandler.Print("ComputeShader '%s': %s\n", (const char*)m_name, errors->GetStringPointer());
+#endif
 
 	HRESULT status = E_FAIL;
 	result->GetStatus(&status);
-	if (FAILED(status))
+	if (FAILED(status)) {
+		logHandler.Print("ComputeShader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
+						 static_cast<const char*>(ShaderErrorSummary(hasOutput ? errors->GetStringPointer() : nullptr)));
 		return false;
+	}
 
 	ComPtr<IDxcBlob> obj;
-	if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(obj.GetAddressOf()), nullptr)) or not obj)
+	if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(obj.GetAddressOf()), nullptr)) or not obj) {
+		logHandler.Print("ComputeShader '%s' (%s): no DXIL output\n", (const char*)m_name, target);
 		return false;
+	}
 
-	if (FAILED(D3DCreateBlob(obj->GetBufferSize(), m_csBytecode.GetAddressOf())))
+	if (FAILED(D3DCreateBlob(obj->GetBufferSize(), m_csBytecode.GetAddressOf()))) {
+		logHandler.Print("ComputeShader '%s' (%s): no memory for the compiled code\n", (const char*)m_name, target);
 		return false;
+	}
 	std::memcpy(m_csBytecode->GetBufferPointer(), obj->GetBufferPointer(), obj->GetBufferSize());
 	if (useCache)
 		ShaderCache::Write(shaderFolder, fileName, key, 0, static_cast<const uint8_t*>(m_csBytecode->GetBufferPointer()),
@@ -311,14 +325,17 @@ noexcept
 	ComPtr<ID3DBlob>	sig, err;
 	HRESULT				hr = D3D12SerializeRootSignature(&rsd, D3D_ROOT_SIGNATURE_VERSION_1, sig.GetAddressOf(), err.GetAddressOf());
 	if (FAILED(hr)) {
-		if (err)
-			logHandler.Print("ComputeShader '%s': root sig serialize: %s\n",
-							 (const char*)m_name, (const char*)err->GetBufferPointer());
+		logHandler.Print("ComputeShader '%s': root signature could not be serialized - %s\n", (const char*)m_name,
+						 static_cast<const char*>(ShaderErrorSummary(err ? static_cast<const char*>(err->GetBufferPointer()) : nullptr)));
 		return false;
 	}
 	m_rootSignatureBlob = sig;
-	return SUCCEEDED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(),
-												 IID_PPV_ARGS(m_rootSignature.GetAddressOf())));
+	if (FAILED(device->CreateRootSignature(0, sig->GetBufferPointer(), sig->GetBufferSize(),
+										   IID_PPV_ARGS(m_rootSignature.GetAddressOf())))) {
+		logHandler.Print("ComputeShader '%s': root signature could not be created\n", (const char*)m_name);
+		return false;
+	}
+	return true;
 }
 
 
@@ -336,7 +353,11 @@ noexcept
 	psd.NodeMask = 0;
 	psd.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
-	return PSO::CreateComputePipeline(device, psd, m_name, m_rootSignatureBlob.Get(), m_pipeline);
+	if (not PSO::CreateComputePipeline(device, psd, m_name, m_rootSignatureBlob.Get(), m_pipeline)) {
+		logHandler.Print("ComputeShader '%s': pipeline could not be created\n", (const char*)m_name);
+		return false;
+	}
+	return true;
 }
 
 

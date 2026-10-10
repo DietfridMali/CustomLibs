@@ -9,6 +9,7 @@
 #include "shader.h"
 #include "shader_loading.h"
 #include "shader_compiler.h"
+#include "shadercache.h"
 #include "pipeline_cache.h"
 #include "cbv_allocator.h"
 #include "vkcontext.h"
@@ -718,8 +719,11 @@ bool Shader::Compile(const char* hlslCode, const char* entryPoint, const char* t
 											   shaderFolder,
 											   m_name + String(".") + String(target) +
 												   String(ShaderCompiler::kOptimizationLevel) + String(".spv"))) {
-		logHandler.Print("Shader '%s': compile failed (entry=%s, target=%s):\n%s\n",
-						 (const char*)m_name, entryPoint, target, (const char*)error);
+		logHandler.Print("Shader '%s' (%s): compile failed - %s\n", (const char*)m_name, target,
+						 static_cast<const char*>(ShaderErrorSummary(static_cast<const char*>(error))));
+#ifdef _DEBUG
+		logHandler.Print("%s\n", (const char*)error);
+#endif
 		return false;
 	}
 	return true;
@@ -1071,15 +1075,11 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 		return false;
 	}
 	if (not gsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::GeometryShader)) {
-#ifdef _DEBUG
 		logHandler.Print("Shader '%s': needs geometry shaders, which are not enabled on this device - not created\n", (const char*)m_name);
-#endif
 		return false;
 	}
 	if (not tcsCode.IsEmpty() and not vkContext.HasFeature(GfxFeature::Tessellation)) {
-#ifdef _DEBUG
 		logHandler.Print("Shader '%s': needs tessellation, which is not enabled on this device - not created\n", (const char*)m_name);
-#endif
 		return false;
 	}
 	if (not Compile((const char*)vsCode, "VSMain", "vs_6_0", m_vsSpirv, shaderFolder))
@@ -1104,18 +1104,24 @@ bool Shader::Create(const String& vsCode, const String& fsCode, const String& gs
 
 	m_vsModule = ShaderCompiler::CreateShaderModule(m_vsSpirv);
 	m_fsModule = ShaderCompiler::CreateShaderModule(m_fsSpirv);
-	if ((m_vsModule == VK_NULL_HANDLE) or (m_fsModule == VK_NULL_HANDLE))
+	if ((m_vsModule == VK_NULL_HANDLE) or (m_fsModule == VK_NULL_HANDLE)) {
+		logHandler.Print("Shader '%s': vertex or pixel shader module could not be created\n", (const char*)m_name);
 		return false;
+	}
 	if (not m_gsSpirv.empty()) {
 		m_gsModule = ShaderCompiler::CreateShaderModule(m_gsSpirv);
-		if (m_gsModule == VK_NULL_HANDLE)
+		if (m_gsModule == VK_NULL_HANDLE) {
+			logHandler.Print("Shader '%s': geometry shader module could not be created\n", (const char*)m_name);
 			return false;
+		}
 	}
 	if (not m_hsSpirv.empty()) {
 		m_hsModule = ShaderCompiler::CreateShaderModule(m_hsSpirv);
 		m_dsModule = ShaderCompiler::CreateShaderModule(m_dsSpirv);
-		if ((m_hsModule == VK_NULL_HANDLE) or (m_dsModule == VK_NULL_HANDLE))
+		if ((m_hsModule == VK_NULL_HANDLE) or (m_dsModule == VK_NULL_HANDLE)) {
+			logHandler.Print("Shader '%s': hull or domain shader module could not be created\n", (const char*)m_name);
 			return false;
+		}
 	}
 
 	m_usesAccelStructure = ReflectUsesAccelStructure(m_vsSpirv) or ReflectUsesAccelStructure(m_fsSpirv) or

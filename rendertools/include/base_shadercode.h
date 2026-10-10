@@ -231,6 +231,10 @@ public:
 
 	void CreateShaders(const AutoArray<String>& shaderIds);
 
+	inline bool HasPendingShaders(void) const {
+		return m_shaderSources.Length() > 0;
+	}
+
 	inline Shader* GetShader(const String& shaderId) {
 		Shader** shader = m_shaders.Find(shaderId);
 		return shader ? *shader : nullptr;

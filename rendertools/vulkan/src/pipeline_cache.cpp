@@ -653,7 +653,8 @@ noexcept
 	VkPipeline	library = VK_NULL_HANDLE;
 	VkResult	res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &library);
 	if (res != VK_SUCCESS) {
-		logHandler.Print("PipelineCache::CreateLibrary: vkCreateGraphicsPipelines failed (%d, part 0x%x)\n", (int)res, unsigned(part));
+		logHandler.Print("PipelineCache::CreateLibrary: %s: vkCreateGraphicsPipelines failed (%d, part 0x%x)\n", logHandler.Context(),
+						 (int)res, unsigned(part));
 		return VK_NULL_HANDLE;
 	}
 	return library;
@@ -883,7 +884,7 @@ noexcept
 	VkPipeline		pipeline = VK_NULL_HANDLE;
 	VkResult		res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
 	if (res != VK_SUCCESS) {
-		logHandler.Print("PipelineCache::LinkPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
+		logHandler.Print("PipelineCache::LinkPipeline: %s: vkCreateGraphicsPipelines failed (%d)\n", logHandler.Context(), (int)res);
 		return VK_NULL_HANDLE;
 	}
 	return pipeline;
@@ -979,7 +980,7 @@ noexcept
 	VkPipeline		pipeline = VK_NULL_HANDLE;
 	VkResult		res = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1, &info, nullptr, &pipeline);
 	if (res != VK_SUCCESS) {
-		logHandler.Print("PipelineCache::BuildPipeline: vkCreateGraphicsPipelines failed (%d)\n", (int)res);
+		logHandler.Print("PipelineCache::BuildPipeline: %s: vkCreateGraphicsPipelines failed (%d)\n", logHandler.Context(), (int)res);
 		return VK_NULL_HANDLE;
 	}
 	return pipeline;

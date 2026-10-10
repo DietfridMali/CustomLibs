@@ -101,6 +101,19 @@ Shader* BaseShaderHandler::SelectShader(Texture* texture)
 }
 
 
+void BaseShaderHandler::ReportUnavailableShader(const String& shaderId)
+{
+	if (m_shaderCode->HasPendingShaders())
+		return;
+	for (const String& reportedId : m_unavailableShaders) {
+		if (reportedId == shaderId)
+			return;
+	}
+	m_unavailableShaders.push_back(shaderId);
+	logHandler.Print("Shader '%s' is not available\n", (const char*)shaderId);
+}
+
+
 const String& BaseShaderHandler::DefaultDepthShaderId(void)
 {
 	static const String shaderId("surfaceShadowShader");
@@ -117,12 +130,8 @@ Shader* BaseShaderHandler::SetupRenderShader(const String& shaderId, const Strin
 	Shader*			shader = m_activeShader;
 	if (not isActive) {
 		shader = GetShader(renderShaderId);
-		if (shader == nullptr)
-			return nullptr;
-		if (not shader->IsValid()) {
-#ifdef _DEBUG
-			logHandler.Print("*** shader'%s' is not available\r\n", (const char*)renderShaderId);
-#endif
+		if ((shader == nullptr) or not shader->IsValid()) {
+			ReportUnavailableShader(renderShaderId);
 			return nullptr;
 		}
 		m_activeShader = shader;
