@@ -214,11 +214,12 @@ noexcept
 }
 
 
-bool CommandList::Open(bool saveRenderStates)
+bool CommandList::Open(bool saveRenderStates, bool detached)
 noexcept
 {
 	if (m_isRecording)
 		return true;
+	m_isDetached = detached;
 	UINT frameIndex = UINT(commandListHandler.FrameIndex());
 	if (not m_gfxListPtr or not m_allocators[frameIndex])
 		return false;
@@ -241,7 +242,10 @@ noexcept
 	m_descriptorHeapsBound = false;
 	ResetAppliedBindings();
 	++m_executionCounter;
-	commandListHandler.PushCmdList(this);
+	if (detached)
+		commandListHandler.Register(this);
+	else
+		commandListHandler.PushCmdList(this);
 	m_openQueryCount = commandListHandler.ProfilerQueryCount();
 #if USE_TRACY
 	// GPU timestamp zone for this command list, named after m_name. Begin timestamp is written
@@ -251,6 +255,10 @@ noexcept
 										  (const char*)m_name, size_t(m_name.Length()), m_gfxListPtr.Get(), true);
 	++commandListHandler.m_gpuZonesOpened;
 #endif
+	if (detached) {
+		m_savedRenderStates = false;
+		return true;
+	}
 	m_savedRenderStates = saveRenderStates;
 	if (saveRenderStates)
 		PushRenderStates();
@@ -282,6 +290,10 @@ noexcept
 #if DBG_DIRECTX
 	gfxStates.CheckError();
 #endif
+	if (m_isDetached) {
+		commandListHandler.Register(this);
+		return;
+	}
 	commandListHandler.PopCmdList();
 	commandListHandler.Register(this);
 	if (restoreRenderStates)
@@ -298,8 +310,17 @@ noexcept
 	m_isFlushed = true;
 	Close();
 
-	ID3D12CommandList* lists[] = { GfxList(true) };
-	commandListHandler.GetQueue()->ExecuteCommandLists(1, lists);
+	ID3D12CommandList*	lists[2];
+	UINT				listCount = 0;
+	CommandList*		uploadList = commandListHandler.m_uploadList;
+	if (uploadList and (uploadList != this)) {
+		uploadList->m_isFlushed = true;
+		uploadList->Close();
+		commandListHandler.m_uploadList = nullptr;
+		lists[listCount++] = uploadList->GfxList(true);
+	}
+	lists[listCount++] = GfxList(true);
+	commandListHandler.GetQueue()->ExecuteCommandLists(listCount, lists);
 	HandleDeviceLost("CommandList::Flush");
 
 #if DBG_DIRECTX
@@ -983,6 +1004,7 @@ noexcept
 		else
 			NoteStopped(l);
 	}
+	m_uploadList = nullptr;
 	if (m_pendingLists.IsEmpty())
 		return;
 	AutoArray<ID3D12CommandList*>	execList(m_pendingLists.Length());
@@ -1028,6 +1050,10 @@ void CommandListHandler::ExecutePending(void)
 noexcept
 {
 	ZoneScoped;
+	if (m_uploadList) {
+		m_uploadList->Close();
+		m_uploadList = nullptr;
+	}
 	if (m_pendingLists.IsEmpty())
 		return;
 	AutoArray<ID3D12CommandList*>	execList(m_pendingLists.Length());
@@ -1132,6 +1158,23 @@ noexcept
 	if (not (cl and cl->Open(false)))
 		return nullptr;
 	return cl;
+}
+
+
+CommandList* CommandListHandler::UploadCmdList(void)
+noexcept
+{
+	if (not m_uploadList) {
+		CommandList* cl = CreateCmdList(String("Upload"), true);
+		if (not cl)
+			return nullptr;
+		if (not cl->Open(false, true)) {
+			m_recycledLists.Push(cl);
+			return nullptr;
+		}
+		m_uploadList = cl;
+	}
+	return m_uploadList;
 }
 
 

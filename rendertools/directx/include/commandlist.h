@@ -91,6 +91,7 @@ public:
 	bool								m_isRecording{ false };
 	bool								m_isFlushed{ false };
 	bool								m_isTemporary{ false };
+	bool								m_isDetached{ false };
 	bool								m_savedRenderStates{ false };
 	uint64_t							m_openSerial{ 0 };
 	uint64_t							m_openQueryCount{ 0 };
@@ -125,7 +126,7 @@ public:
 	void Reset(void)
 	noexcept;
 
-	bool Open(bool saveRenderStates = true)
+	bool Open(bool saveRenderStates = true, bool detached = false)
 	noexcept;
 
 	void Close(bool restoreRenderStates = true)
@@ -251,6 +252,7 @@ public:
 	AutoArray<CommandListData>	m_cmdListStack;
 	AutoArray<CommandList*>		m_recordingLists;
 	CommandListData				m_currentListData;
+	CommandList*				m_uploadList{ nullptr };
 	uint64_t					m_cmdListId{ 1 };
 	uint64_t					m_cmdListCount{ 0 };
 	int							m_frameIndex{ 0 };
@@ -463,6 +465,9 @@ public:
 	noexcept;
 
 	CommandList* OpenOrderedCopyList(void)
+	noexcept;
+
+	CommandList* UploadCmdList(void)
 	noexcept;
 
 	uint64_t ProfilerQueryCount(void) const

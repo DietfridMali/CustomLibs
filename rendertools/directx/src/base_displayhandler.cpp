@@ -242,7 +242,9 @@ noexcept
 // - is recorded into a command list, and outside a render target there is none: those bring their own
 // (RenderTarget::Enable ()). The back buffer is the bottom of that stack, so it brings one too.
 // Opening it makes it the current list, so the draws that follow land in it, and ExecuteAll () closes
-// and submits whatever is still open at the end of the frame.
+// and submits whatever is still open at the end of the frame. A render target that becomes the draw
+// buffer closes it (SuspendBackBuffer ()); the render states saved when the first list of a frame was
+// opened are restored by the list that is closed last.
 
 CommandList* BaseDisplayHandler::BackBufferList(void)
 noexcept
@@ -254,11 +256,36 @@ noexcept
 	m_backBufferList = commandListHandler.CreateCmdList(String("backBuffer"), true);
 	if (not m_backBufferList)
 		return nullptr;
-	if (not m_backBufferList->Open()) {
+	if (not m_backBufferList->Open(not m_restoreRenderStates)) {
 		m_backBufferList = nullptr;
 		return nullptr;
 	}
+	if (m_restoreRenderStates) {
+		m_backBufferList->m_savedRenderStates = true;
+		m_restoreRenderStates = false;
+	}
+	m_backBufferExecution = m_backBufferList->GetExecutionCounter();
 	return m_backBufferList;
+}
+
+
+bool BaseDisplayHandler::BackBufferListIsOpen(void) const
+noexcept
+{
+	return m_backBufferList and m_backBufferList->IsRecording() and (m_backBufferList->GetExecutionCounter() == m_backBufferExecution) and
+		   (commandListHandler.CurrentCmdList() == m_backBufferList);
+}
+
+
+void BaseDisplayHandler::SuspendBackBuffer(void)
+noexcept
+{
+	if (not BackBufferListIsOpen())
+		return;
+	m_restoreRenderStates = m_backBufferList->m_savedRenderStates;
+	m_backBufferList->m_savedRenderStates = false;
+	m_backBufferList->Close(false);
+	m_backBufferList = nullptr;
 }
 
 
@@ -300,9 +327,13 @@ void BaseDisplayHandler::CloseBackBufferList(void)
 noexcept
 {
 	DisableBackBuffer();
-	if (m_backBufferList and m_backBufferList->IsRecording() and (commandListHandler.CurrentCmdList() == m_backBufferList))
-		m_backBufferList->Close();
+	if (BackBufferListIsOpen())
+		m_backBufferList->Close(m_backBufferList->m_savedRenderStates);
 	m_backBufferList = nullptr;
+	if (m_restoreRenderStates) {
+		m_restoreRenderStates = false;
+		CommandList::PopRenderStates();
+	}
 }
 
 

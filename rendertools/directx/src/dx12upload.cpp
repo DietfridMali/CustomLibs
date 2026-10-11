@@ -35,14 +35,15 @@ noexcept
 
 // =================================================================================================
 // Where an upload's copies go - the counterpart of the Vulkan backend's BeginUpload ()/EndUpload ()
-// (vkupload.cpp), and the same rule GfxArray::OpenCopyList () goes by:
+// (vkupload.cpp):
 //
-// Inside a frame the copies are recorded into the list that is recording (or the ordered copy list
-// while the draw buffers are suspended), where D3D12 allows a copy at any point - so the texture a
-// draw asks for in the middle of a frame is copied in front of that draw, in the frame's own list,
-// and nothing waits for the GPU. The upload buffers are tracked by GfxResourceHandler
-// (GetUploadResource ()) and go back once the frame is through. Vulkan takes a detached upload list
-// that runs ahead of the frame instead, because there a copy is not allowed inside a rendering scope.
+// Inside a frame - a command list is recording - the copies are recorded on the frame's detached
+// upload list (CommandListHandler::UploadCmdList ()), or on an ordered copy list of their own while
+// the draw buffers are suspended. The upload list is registered when it is opened, ahead of every list
+// that is closed after that, so it runs in front of the draws that read the texture whichever list
+// they are recorded in - a render target's list is closed, and with that executed, before the list
+// that was recording when the target was activated. Nothing waits for the GPU. The upload buffers are
+// tracked by GfxResourceHandler (GetUploadResource ()) and go back once the frame is through.
 //
 // Outside a frame (setup, a level load before the level's first frame is open) the upload is what
 // every path here used to be whichever point of the frame it was called from: a temporary list of its
@@ -67,8 +68,8 @@ noexcept
 	}
 	if (CommandList* current = commandListHandler.CurrentCmdList()) {
 		if (current->IsRecording()) {
-			upload.cl = current;
-			return true;
+			if ((upload.cl = commandListHandler.UploadCmdList()))
+				return true;
 		}
 	}
 	upload.cl = OpenUploadList(name);

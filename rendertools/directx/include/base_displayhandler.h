@@ -49,6 +49,8 @@ public:
 	// own (RenderTarget::Enable ()); the back buffer is the bottom of that stack and needs the same,
 	// or its barrier, its binding and its draws are recorded nowhere at all.
 	CommandList* m_backBufferList{ nullptr };
+	uint64_t m_backBufferExecution{ 0 };
+	bool m_restoreRenderStates{ false };
 
 	AutoArray<SDL_DisplayMode>	m_displayModes;
 	int							m_activeDisplayMode{ 0 };
@@ -125,13 +127,12 @@ public:
 	void DisableBackBuffer(void)
 	noexcept;
 
-	// The counterpart of Vulkan's SuspendBackBuffer (): there, a render target becoming the draw
-	// buffer has to close the back buffer's rendering scope first. DX12 has no such scope - the
-	// target's own OMSetRenderTargets () replaces the binding - so there is nothing to do, and the
-	// resource stays in RENDER_TARGET state for the draws that follow on it.
-	inline void SuspendBackBuffer(void)
-	noexcept
-	{}
+	// The counterpart of Vulkan's SuspendBackBuffer (): a render target becoming the draw buffer closes
+	// the back buffer's own list first. The lists run in the order they are closed in, so what was
+	// recorded before the target was activated - copies, compute passes - runs before the target's
+	// draws. The resource stays in RENDER_TARGET state; the next EnableBackBuffer () opens a new list.
+	void SuspendBackBuffer(void)
+	noexcept;
 
 	// The list everything on the back buffer is recorded into: the current one when there is one,
 	// otherwise the back buffer's own, opened here. Null only when even that fails.
@@ -253,6 +254,9 @@ public:
 	virtual void RequestDisplayChange(int displayMode, bool useFullscreen) {}
 
 private:
+	bool BackBufferListIsOpen(void) const
+	noexcept;
+
 	bool CreateSwapChain(void);
 
 	// Acquires back buffer resources from the swap chain and creates RTVs.
