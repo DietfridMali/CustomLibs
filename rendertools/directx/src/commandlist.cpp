@@ -1165,6 +1165,12 @@ noexcept
 }
 
 
+void GfxDumpConstants(const char* label)
+noexcept
+{
+}
+
+
 bool GfxSampleFrame(uint64_t& frameNumber)
 noexcept
 {

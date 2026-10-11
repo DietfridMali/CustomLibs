@@ -25,12 +25,13 @@ noexcept;
 
 #if VK_STALL_DIAG
 
-static constexpr double kStallFrameMinMs = 20.0;
 static constexpr double kStallFrameFactor = 2.5;
 static constexpr double kStallDetailMinMs = 1.0;
 static constexpr size_t kStallDetailMaxChars = 16384;
 static constexpr uint64_t kSampleFrameInterval = 30;
 static constexpr double kSampleDetailMinMs = 0.1;
+static constexpr uint64_t kStallFollowFrames = 4;
+static constexpr uint32_t kStallRunMax = 120;
 
 struct VkStallEntry {
 	const char*	what;
@@ -43,7 +44,14 @@ struct VkStallRecorder {
 	uint64_t					frameNumber{ 0 };
 	double						frameStartMs{ 0.0 };
 	double						avgFrameMs{ 0.0 };
+	double						avgGpuMs{ 0.0 };
 	uint32_t					stageMarks{ 0 };
+	bool						hasStall{ false };
+	uint64_t					lastStallFrame{ 0 };
+	uint32_t					stallRun{ 0 };
+	uint32_t					gpuStallRun{ 0 };
+	bool						wantsConstants{ false };
+	char						constantsLabel[48]{};
 	std::vector<VkStallEntry>	entries;
 	std::string					details;
 };
@@ -100,9 +108,17 @@ noexcept
 	double now = VkStallClock();
 	if (vkStalls.frameStartMs > 0.0) {
 		double	frameMs = now - vkStalls.frameStartMs;
-		bool	isStall =
-			(vkStalls.avgFrameMs > 0.0) and (frameMs > kStallFrameMinMs) and (frameMs > kStallFrameFactor * vkStalls.avgFrameMs);
+		bool	isStall = (vkStalls.avgFrameMs > 0.0) and (frameMs > kStallFrameFactor * vkStalls.avgFrameMs);
+		if (not isStall)
+			vkStalls.stallRun = 0;
+		else if (++vkStalls.stallRun > kStallRunMax) {
+			vkStalls.avgFrameMs = frameMs;
+			vkStalls.stallRun = 0;
+			isStall = false;
+		}
 		if (isStall) {
+			vkStalls.hasStall = true;
+			vkStalls.lastStallFrame = vkStalls.frameNumber;
 			logHandler.Print("STALL frame %llu: %.2f ms (avg %.2f ms)\n", static_cast<unsigned long long>(vkStalls.frameNumber),
 							 frameMs, vkStalls.avgFrameMs);
 			for (const auto& e : vkStalls.entries)
@@ -130,10 +146,32 @@ noexcept
 		}
 	}
 	vkStalls.stageMarks = 0;
+	vkStalls.wantsConstants = false;
 	vkStalls.entries.clear();
 	vkStalls.details.clear();
 	vkStalls.frameStartMs = now;
 	vkStalls.frameNumber = nextFrame;
+}
+
+
+static bool VkStallWantsConstants(void)
+noexcept
+{
+	if ((vkStalls.frameNumber % kSampleFrameInterval) == 0)
+		return true;
+	return vkStalls.hasStall and (vkStalls.frameNumber >= vkStalls.lastStallFrame) and
+		(vkStalls.frameNumber - vkStalls.lastStallFrame <= kStallFollowFrames);
+}
+
+
+bool VkStallTakeConstantsRequest(char* label, size_t size)
+noexcept
+{
+	if (not vkStalls.wantsConstants)
+		return false;
+	vkStalls.wantsConstants = false;
+	snprintf(label, size, "%s", vkStalls.constantsLabel);
+	return true;
 }
 
 
@@ -903,7 +941,22 @@ noexcept
 	if (timed == 0)
 		return;
 	double	spanMs = double(lastEnd - firstBegin) * vkGpuPassPeriodMs;
-	bool	isStall = (spanMs >= kStallFrameMinMs);
+	bool	isStall = (vkStalls.avgGpuMs > 0.0) and (spanMs > kStallFrameFactor * vkStalls.avgGpuMs);
+	if (not isStall)
+		vkStalls.gpuStallRun = 0;
+	else if (++vkStalls.gpuStallRun > kStallRunMax) {
+		vkStalls.avgGpuMs = spanMs;
+		vkStalls.gpuStallRun = 0;
+		isStall = false;
+	}
+	if (isStall) {
+		if (not vkStalls.hasStall or (vkStalls.lastStallFrame < passFrame)) {
+			vkStalls.hasStall = true;
+			vkStalls.lastStallFrame = passFrame;
+		}
+	}
+	else
+		vkStalls.avgGpuMs = (vkStalls.avgGpuMs > 0.0) ? vkStalls.avgGpuMs * 0.95 + spanMs * 0.05 : spanMs;
 	if (not isStall and not VkGpuPassIsSample(slot, first, count, passFrame))
 		return;
 	double minMs = isStall ? kStallDetailMinMs : kSampleDetailMinMs;
@@ -1034,6 +1087,18 @@ noexcept
 			return;
 		}
 	}
+#endif
+}
+
+
+void GfxDumpConstants(const char* label)
+noexcept
+{
+#if VK_STALL_DIAG
+	if (not VkStallWantsConstants())
+		return;
+	snprintf(vkStalls.constantsLabel, sizeof(vkStalls.constantsLabel), "%s", label);
+	vkStalls.wantsConstants = true;
 #endif
 }
 

@@ -30,11 +30,16 @@
 #include <spirv_reflect.h>
 
 #if VK_STALL_DIAG
+#include <cstdio>
+#include <string>
+
 extern double VkStallClock(void)
 noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail)
 noexcept;
 extern void VkGpuPassNoteDraw(VkCommandBuffer cb, uint32_t frameHash, uint32_t shaderHash)
+noexcept;
+extern bool VkStallTakeConstantsRequest(char* label, size_t size)
 noexcept;
 
 static uint32_t VkGpuHashBytes(uint32_t hash, const void* data, size_t size)
@@ -46,6 +51,41 @@ noexcept
 		hash *= 16777619u;
 	}
 	return hash;
+}
+
+
+static constexpr uint32_t kGpuConstantWords = 8;
+
+static void VkGpuConstantText(std::string& text, const char* name, const uint8_t* data, uint32_t dataSize, uint32_t offset, uint32_t size)
+noexcept
+{
+	char item[64];
+	snprintf(item, sizeof(item), " %s=", name);
+	text += item;
+	if ((offset > dataSize) or (size > dataSize - offset)) {
+		text += "?";
+		return;
+	}
+	uint32_t words = size / 4;
+	for (uint32_t i = 0; (i < words) and (i < kGpuConstantWords); ++i) {
+		uint32_t word = 0;
+		std::memcpy(&word, data + offset + i * 4, sizeof(word));
+		if ((word < 0x00800000u) or (word > 0xFF800000u)) {
+			int32_t value = 0;
+			std::memcpy(&value, &word, sizeof(value));
+			snprintf(item, sizeof(item), "%s%d", i ? "," : "", value);
+		}
+		else {
+			float value = 0.0f;
+			std::memcpy(&value, &word, sizeof(value));
+			snprintf(item, sizeof(item), "%s%g", i ? "," : "", double(value));
+		}
+		text += item;
+	}
+	if (words > kGpuConstantWords) {
+		snprintf(item, sizeof(item), ",.. (%u words, hash %08X)", words, VkGpuHashBytes(2166136261u, data + offset, size));
+		text += item;
+	}
 }
 #endif
 
@@ -1432,6 +1472,20 @@ noexcept
 			shaderHash = VkGpuHashBytes(shaderHash, m_stages[s].staging.data(), m_stages[s].size);
 	}
 	VkGpuPassNoteDraw(cb, VkGpuHashBytes(2166136261u, &m_b0Staging, sizeof(FrameConstants)), shaderHash);
+	char constantsLabel[48];
+	if (VkStallTakeConstantsRequest(constantsLabel, sizeof(constantsLabel))) {
+		std::string text;
+		for (int s = 0; s < kStageCount; ++s) {
+			StageConstants& sc = m_stages[s];
+			if (sc.size == 0)
+				continue;
+			for (auto& kv : sc.fields)
+				VkGpuConstantText(text, static_cast<const char*>(kv.first), sc.staging.data(), sc.size, kv.second.offset, kv.second.size);
+		}
+		logHandler.Print("frame %llu: constants at '%s', shader '%s':%s\n",
+						 static_cast<unsigned long long>(commandListHandler.CmdQueue().FrameNumber()), constantsLabel,
+						 static_cast<const char*>(m_name), text.c_str());
+	}
 #endif
 
 	VkAccelerationStructureKHR accelStructure = commandListHandler.m_boundAccelStructure;
