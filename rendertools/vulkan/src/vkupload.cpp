@@ -295,6 +295,77 @@ noexcept
 	staging.size = 0;
 }
 
+
+static void DestroyStagings(VkStagingBuffer* stagings, uint32_t count)
+noexcept
+{
+	for (uint32_t i = 0; i < count; ++i)
+		stagings[i].Destroy();
+}
+
+// =================================================================================================
+// Where an upload's copy commands go. ONE rule for every upload path in this file:
+//
+// Inside a frame - a gfx command list is open - the copies are recorded on the frame's detached upload
+// list (CommandListHandler::UploadCmdBuffer ()). That list is registered ahead of the frame's own lists
+// and goes out with them at the frame's submit, so everything the frame asked for during its draws
+// reaches the GPU in one batch, in front of the draws that read it - nothing waits for the queue in
+// the middle of a frame any more, and the staging buffers are handed back through the deferred
+// cleanup once the frame's fence has passed. The texture is usable by the frame that asked for it:
+// the GPU runs the upload list first.
+//
+// Outside a frame (setup, a level load before the level's first frame is open) there is no such list,
+// and the upload is what every path here used to be: a one-shot submit that waits for the queue.
+//
+// Before this, only UploadTextureData () took the upload list, and every other path - the mip
+// chains, the block compressed textures, the texture arrays, the 3D textures - submitted one-shot and
+// waited for the whole queue whichever point of the frame it was called from.
+
+struct UploadCommands {
+	OneShotCommandBuffer	oneShot{};
+	VkCommandBuffer			cb{ VK_NULL_HANDLE };
+	bool					batched{ false };
+};
+
+
+static bool BeginUpload(UploadCommands& upload)
+noexcept
+{
+	upload.cb = FrameUploadCmdBuffer();
+	if (upload.cb != VK_NULL_HANDLE) {
+		upload.batched = true;
+#if VK_STALL_DIAG
+		vkOneShotOrigin[0] = '\0'; // the origin the caller named is not a one-shot submit after all
+#endif
+		return true;
+	}
+	upload.batched = false;
+	if (not BeginSingleTimeCommands(upload.oneShot))
+		return false;
+	upload.cb = upload.oneShot.cb;
+	return true;
+}
+
+
+// Ends the upload and hands the staging buffers back: right away once the one-shot submit has waited,
+// through the frame's deferred cleanup when the copies went on the upload list.
+static bool EndUpload(UploadCommands& upload, VkStagingBuffer* stagings, uint32_t count)
+noexcept
+{
+	bool ok = true;
+	if (upload.batched) {
+		for (uint32_t i = 0; i < count; ++i)
+			ReleaseStagingDeferred(stagings[i]);
+	}
+	else {
+		ok = EndSingleTimeCommands(upload.oneShot);
+		DestroyStagings(stagings, count);
+	}
+	upload.cb = VK_NULL_HANDLE;
+	upload.batched = false;
+	return ok;
+}
+
 // =================================================================================================
 // UploadTextureData (high-level, multi-layer)
 
@@ -310,31 +381,15 @@ noexcept
 
 	VkStagingBuffer	stagings[6]{};
 	bool			success = true;
-	VkCommandBuffer	uploadCb = FrameUploadCmdBuffer();
-	if (uploadCb != VK_NULL_HANDLE) {
-		for (int i = 0; i < faceCount; ++i) {
-			if (not UploadSubresource(uploadCb, dstImage, tracker, uint32_t(i), faces[i], width, height, channels, stagings[i],
-									  /*addBarrier=*/false)) {
-				success = false;
-				break;
-			}
-		}
-		if (success)
-			tracker.ToShaderInput(uploadCb);
-		for (int i = 0; i < faceCount; ++i)
-			ReleaseStagingDeferred(stagings[i]);
-		return success;
-	}
-
-	OneShotCommandBuffer cmd{};
+	UploadCommands	upload;
 #if VK_STALL_DIAG
 	VkOneShotOriginF("texture data, %d x %d, %d channels, %d faces", width, height, channels, faceCount);
 #endif
-	if (not BeginSingleTimeCommands(cmd))
+	if (not BeginUpload(upload))
 		return false;
 
 	for (int i = 0; i < faceCount; ++i) {
-		if (not UploadSubresource(cmd.cb, dstImage, tracker, uint32_t(i), faces[i], width, height, channels, stagings[i],
+		if (not UploadSubresource(upload.cb, dstImage, tracker, uint32_t(i), faces[i], width, height, channels, stagings[i],
 								  /*addBarrier=*/false)) {
 			success = false;
 			break;
@@ -342,13 +397,10 @@ noexcept
 	}
 
 	if (success)
-		tracker.ToShaderInput(cmd.cb);
+		tracker.ToShaderInput(upload.cb);
 
-	if (not EndSingleTimeCommands(cmd))
+	if (not EndUpload(upload, stagings, uint32_t(faceCount)))
 		success = false;
-
-	for (int i = 0; i < faceCount; ++i)
-		stagings[i].Destroy();
 
 	return success;
 }
@@ -390,7 +442,8 @@ noexcept
 		return false;
 
 	// CPU-side downsample buffers for levels 1..N-1 (level 0 uploads straight from the caller's
-	// pixels); one staging buffer per level, all kept alive until the one-shot submit has completed.
+	// pixels); one staging buffer per level, all kept alive until the upload has gone through
+	// (EndUpload ()).
 	AutoArray<AutoArray<uint8_t>>	levels;
 	AutoArray<VkStagingBuffer>		stagings;
 	levels.Resize(mipLevels);
@@ -425,38 +478,36 @@ noexcept
 		lvH = std::max(1, lvH / 2);
 	}
 
-	OneShotCommandBuffer cmd{};
+	UploadCommands upload;
+	if (ok) {
 #if VK_STALL_DIAG
-	VkOneShotOriginF("texture with mips, %d x %d, %d channels, %u mips", width, height, channels, unsigned(mipLevels));
+		VkOneShotOriginF("texture with mips, %d x %d, %d channels, %u mips", width, height, channels, unsigned(mipLevels));
 #endif
-	if (ok and BeginSingleTimeCommands(cmd)) {
-		// ToTransferDst barriers all mip levels (subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS).
-		tracker.ToTransferDst(cmd.cb);
-		lvW = width;
-		lvH = height;
-		for (uint32_t lv = 0; lv < mipLevels; ++lv) {
-			VkBufferImageCopy copy{};
-			copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			copy.imageSubresource.mipLevel = lv;
-			copy.imageSubresource.baseArrayLayer = 0;
-			copy.imageSubresource.layerCount = 1;
-			copy.imageOffset = { 0, 0, 0 };
-			copy.imageExtent = { uint32_t(lvW), uint32_t(lvH), 1 };
-			vkCmdCopyBufferToImage(cmd.cb, stagings[lv].buffer, dstImage,
-								   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-			lvW = std::max(1, lvW / 2);
-			lvH = std::max(1, lvH / 2);
-		}
-		tracker.ToShaderInput(cmd.cb);
-		if (not EndSingleTimeCommands(cmd))
-			ok = false;
+		ok = BeginUpload(upload);
 	}
-	else
-		ok = false;
-
-	for (uint32_t lv = 0; lv < mipLevels; ++lv)
-		stagings[lv].Destroy();
-	return ok;
+	if (not ok) {
+		DestroyStagings(stagings.Data(), mipLevels);
+		return false;
+	}
+	// ToTransferDst barriers all mip levels (subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS).
+	tracker.ToTransferDst(upload.cb);
+	lvW = width;
+	lvH = height;
+	for (uint32_t lv = 0; lv < mipLevels; ++lv) {
+		VkBufferImageCopy copy{};
+		copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copy.imageSubresource.mipLevel = lv;
+		copy.imageSubresource.baseArrayLayer = 0;
+		copy.imageSubresource.layerCount = 1;
+		copy.imageOffset = { 0, 0, 0 };
+		copy.imageExtent = { uint32_t(lvW), uint32_t(lvH), 1 };
+		vkCmdCopyBufferToImage(upload.cb, stagings[lv].buffer, dstImage,
+							   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+		lvW = std::max(1, lvW / 2);
+		lvH = std::max(1, lvH / 2);
+	}
+	tracker.ToShaderInput(upload.cb);
+	return EndUpload(upload, stagings.Data(), mipLevels);
 }
 
 // =================================================================================================
@@ -500,41 +551,39 @@ noexcept
 		}
 	}
 
-	OneShotCommandBuffer cmd{};
+	UploadCommands upload;
+	if (ok) {
 #if VK_STALL_DIAG
-	VkOneShotOriginF("texture array, %d x %d, %d channels, %d layers from layer %d, %d mips", width, height, channels, layerCount,
-					 firstLayer, mipCount);
+		VkOneShotOriginF("texture array, %d x %d, %d channels, %d layers from layer %d, %d mips", width, height, channels, layerCount,
+						 firstLayer, mipCount);
 #endif
-	if (ok and BeginSingleTimeCommands(cmd)) {
-		tracker.ToTransferDst(cmd.cb); // barriers all mips + layers (VK_REMAINING_*)
-		idx = 0;
-		for (int layer = 0; layer < layerCount; ++layer) {
-			int w = width, h = height;
-			for (int mip = 0; mip < mipCount; ++mip) {
-				VkBufferImageCopy copy{};
-				copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				copy.imageSubresource.mipLevel = uint32_t(mip);
-				copy.imageSubresource.baseArrayLayer = uint32_t(firstLayer + layer);
-				copy.imageSubresource.layerCount = 1;
-				copy.imageOffset = { 0, 0, 0 };
-				copy.imageExtent = { uint32_t(w), uint32_t(h), 1 };
-				vkCmdCopyBufferToImage(cmd.cb, stagings[idx].buffer, dstImage,
-									   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-				++idx;
-				w = (w > 1) ? (w >> 1) : 1;
-				h = (h > 1) ? (h >> 1) : 1;
-			}
-		}
-		tracker.ToShaderInput(cmd.cb);
-		if (not EndSingleTimeCommands(cmd))
-			ok = false;
+		ok = BeginUpload(upload);
 	}
-	else
-		ok = false;
-
-	for (uint32_t i = 0; i < total; ++i)
-		stagings[i].Destroy();
-	return ok;
+	if (not ok) {
+		DestroyStagings(stagings.Data(), total);
+		return false;
+	}
+	tracker.ToTransferDst(upload.cb); // barriers all mips + layers (VK_REMAINING_*)
+	idx = 0;
+	for (int layer = 0; layer < layerCount; ++layer) {
+		int w = width, h = height;
+		for (int mip = 0; mip < mipCount; ++mip) {
+			VkBufferImageCopy copy{};
+			copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy.imageSubresource.mipLevel = uint32_t(mip);
+			copy.imageSubresource.baseArrayLayer = uint32_t(firstLayer + layer);
+			copy.imageSubresource.layerCount = 1;
+			copy.imageOffset = { 0, 0, 0 };
+			copy.imageExtent = { uint32_t(w), uint32_t(h), 1 };
+			vkCmdCopyBufferToImage(upload.cb, stagings[idx].buffer, dstImage,
+								   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+			++idx;
+			w = (w > 1) ? (w >> 1) : 1;
+			h = (h > 1) ? (h >> 1) : 1;
+		}
+	}
+	tracker.ToShaderInput(upload.cb);
+	return EndUpload(upload, stagings.Data(), total);
 }
 
 
@@ -574,41 +623,39 @@ noexcept
 		}
 	}
 
-	OneShotCommandBuffer cmd{};
+	UploadCommands upload;
+	if (ok) {
 #if VK_STALL_DIAG
-	VkOneShotOriginF("compressed texture, %d x %d, format %d, %d layers from layer %d, %d mips", width, height, int(fmt), faceCount,
-					 firstLayer, mipCount);
+		VkOneShotOriginF("compressed texture, %d x %d, format %d, %d layers from layer %d, %d mips", width, height, int(fmt), faceCount,
+						 firstLayer, mipCount);
 #endif
-	if (ok and BeginSingleTimeCommands(cmd)) {
-		tracker.ToTransferDst(cmd.cb); // barriers all mips + layers (VK_REMAINING_*)
-		idx = 0;
-		for (int face = 0; face < faceCount; ++face) {
-			int w = width, h = height;
-			for (int mip = 0; mip < mipCount; ++mip) {
-				VkBufferImageCopy copy{};
-				copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				copy.imageSubresource.mipLevel = uint32_t(mip);
-				copy.imageSubresource.baseArrayLayer = uint32_t(firstLayer + face);
-				copy.imageSubresource.layerCount = 1;
-				copy.imageOffset = { 0, 0, 0 };
-				copy.imageExtent = { uint32_t(w), uint32_t(h), 1 };
-				vkCmdCopyBufferToImage(cmd.cb, stagings[idx].buffer, dstImage,
-									   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-				++idx;
-				w = (w > 1) ? (w >> 1) : 1;
-				h = (h > 1) ? (h >> 1) : 1;
-			}
-		}
-		tracker.ToShaderInput(cmd.cb);
-		if (not EndSingleTimeCommands(cmd))
-			ok = false;
+		ok = BeginUpload(upload);
 	}
-	else
-		ok = false;
-
-	for (uint32_t i = 0; i < total; ++i)
-		stagings[i].Destroy();
-	return ok;
+	if (not ok) {
+		DestroyStagings(stagings.Data(), total);
+		return false;
+	}
+	tracker.ToTransferDst(upload.cb); // barriers all mips + layers (VK_REMAINING_*)
+	idx = 0;
+	for (int face = 0; face < faceCount; ++face) {
+		int w = width, h = height;
+		for (int mip = 0; mip < mipCount; ++mip) {
+			VkBufferImageCopy copy{};
+			copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			copy.imageSubresource.mipLevel = uint32_t(mip);
+			copy.imageSubresource.baseArrayLayer = uint32_t(firstLayer + face);
+			copy.imageSubresource.layerCount = 1;
+			copy.imageOffset = { 0, 0, 0 };
+			copy.imageExtent = { uint32_t(w), uint32_t(h), 1 };
+			vkCmdCopyBufferToImage(upload.cb, stagings[idx].buffer, dstImage,
+								   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+			++idx;
+			w = (w > 1) ? (w >> 1) : 1;
+			h = (h > 1) ? (h >> 1) : 1;
+		}
+	}
+	tracker.ToShaderInput(upload.cb);
+	return EndUpload(upload, stagings.Data(), total);
 }
 
 // =================================================================================================
@@ -661,11 +708,11 @@ noexcept
 	}
 	std::memcpy(staging.mapped, data, size_t(imageBytes));
 
-	OneShotCommandBuffer cmd{};
+	UploadCommands upload;
 #if VK_STALL_DIAG
 	VkOneShotOriginF("3d texture data, %d x %d x %d, format %d", w, h, d, int(format));
 #endif
-	if (not BeginSingleTimeCommands(cmd)) {
+	if (not BeginUpload(upload)) {
 		staging.Destroy();
 		vmaDestroyImage(allocator, outImage, outAllocation);
 		outImage = VK_NULL_HANDLE;
@@ -673,7 +720,7 @@ noexcept
 		return false;
 	}
 
-	outTracker.ToTransferDst(cmd.cb);
+	outTracker.ToTransferDst(upload.cb);
 
 	VkBufferImageCopy copy{};
 	copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -683,13 +730,12 @@ noexcept
 	copy.imageOffset = { 0, 0, 0 };
 	copy.imageExtent = { uint32_t(w), uint32_t(h), uint32_t(d) };
 
-	vkCmdCopyBufferToImage(cmd.cb, staging.buffer, outImage,
+	vkCmdCopyBufferToImage(upload.cb, staging.buffer, outImage,
 						   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
-	outTracker.ToShaderInput(cmd.cb);
+	outTracker.ToShaderInput(upload.cb);
 
-	bool ok = EndSingleTimeCommands(cmd);
-	staging.Destroy();
+	bool ok = EndUpload(upload, &staging, 1);
 
 	if (not ok) {
 		vmaDestroyImage(allocator, outImage, outAllocation);
@@ -864,7 +910,8 @@ noexcept
 
 	tex.m_layoutTracker.Init(tex.m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_ASPECT_COLOR_BIT);
 
-	// One staging buffer per mip level, all uploads + barriers in a single one-shot command buffer.
+	// One staging buffer per mip level, all uploads + barriers in a single command buffer (the frame's
+	// upload list or a one-shot one, see BeginUpload ()).
 	// When generateMips=false, mipChain is empty — we synthesize a single-entry "chain" pointing
 	// at the original input data for the Mip 0 upload below.
 	AutoArray<VkStagingBuffer> stagings;
@@ -876,27 +923,25 @@ noexcept
 		const void*			mipSrc = generateMips ? mipChain[lv].data.Data() : data;
 		const VkDeviceSize	bytes = VkDeviceSize(mipW) * VkDeviceSize(mipH) * VkDeviceSize(mipD) * VkDeviceSize(stride);
 		if (not CreateStagingBuffer(bytes, stagings[lv])) {
-			for (uint32_t i = 0; i < mipLevels; ++i)
-				stagings[i].Destroy();
+			DestroyStagings(stagings.Data(), mipLevels);
 			DestroyTextureGPUResources(tex);
 			return false;
 		}
 		std::memcpy(stagings[lv].mapped, mipSrc, size_t(bytes));
 	}
 
-	OneShotCommandBuffer cmd{};
+	UploadCommands upload;
 #if VK_STALL_DIAG
 	VkOneShotOriginF("3d texture, %d x %d x %d, %u mips", width, height, depth, unsigned(mipLevels));
 #endif
-	if (not BeginSingleTimeCommands(cmd)) {
-		for (uint32_t i = 0; i < mipLevels; ++i)
-			stagings[i].Destroy();
+	if (not BeginUpload(upload)) {
+		DestroyStagings(stagings.Data(), mipLevels);
 		DestroyTextureGPUResources(tex);
 		return false;
 	}
 
 	// ToTransferDst barriers all mip levels (subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS).
-	tex.m_layoutTracker.ToTransferDst(cmd.cb);
+	tex.m_layoutTracker.ToTransferDst(upload.cb);
 
 	for (uint32_t lv = 0; lv < mipLevels; ++lv) {
 		const int			mipW = generateMips ? mipChain[lv].width : width;
@@ -909,15 +954,13 @@ noexcept
 		copy.imageSubresource.layerCount = 1;
 		copy.imageOffset = { 0, 0, 0 };
 		copy.imageExtent = { uint32_t(mipW), uint32_t(mipH), uint32_t(mipD) };
-		vkCmdCopyBufferToImage(cmd.cb, stagings[lv].buffer, tex.m_image,
+		vkCmdCopyBufferToImage(upload.cb, stagings[lv].buffer, tex.m_image,
 							   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 	}
 
-	tex.m_layoutTracker.ToShaderInput(cmd.cb);
+	tex.m_layoutTracker.ToShaderInput(upload.cb);
 
-	bool ok = EndSingleTimeCommands(cmd);
-	for (uint32_t i = 0; i < mipLevels; ++i)
-		stagings[i].Destroy();
+	bool ok = EndUpload(upload, stagings.Data(), mipLevels);
 
 	if (not ok) {
 		DestroyTextureGPUResources(tex);

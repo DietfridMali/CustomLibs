@@ -219,9 +219,17 @@ void GfxRenderer::SavePipelineCache(void)
 }
 
 
+// Precreate () replays the key records on disk, and then is the moment to WRITE the cache: a level load
+// is where new records have just come together (the lazy links of the level before), the loading
+// screen is up anyway, and Cleanup () - the only other save - is never reached by a run that is killed
+// or crashes. Only when there is something new to write, so a run that found everything on disk does
+// not write it back every time.
+
 void GfxRenderer::PrecreatePipelines(void (*progress)(int, int))
 {
 	pipelineCache.Precreate(progress);
+	if (pipelineCache.NeedsSave())
+		SavePipelineCache();
 }
 
 // =================================================================================================

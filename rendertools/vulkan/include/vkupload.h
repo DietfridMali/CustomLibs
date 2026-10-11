@@ -12,10 +12,12 @@ class Texture;
 // Provides pixel-data upload helpers for VkImage textures: VMA staging buffer creation,
 // vkCmdCopyBufferToImage, and image-layout transitions via ImageLayoutTracker.
 //
-// Submission model (Phase B): each high-level upload allocates a one-shot VkCommandBuffer
-// from an ad-hoc VkCommandPool, submits + waits idle, then frees both. This is simple and
-// works without the Phase-C CommandList infrastructure. When CommandList lands, callers
-// can switch to passing an existing CommandBuffer via the low-level UploadSubresource entry.
+// Submission model: inside a frame every high-level upload records its copies on the frame's
+// detached upload list (CommandListHandler::UploadCmdBuffer ()), which is submitted ahead of the
+// frame's own lists - all of a frame's uploads go to the GPU as one batch at the frame's submit, in
+// front of the draws that read them, and the staging buffers are released through the deferred
+// cleanup. Outside a frame (setup, level load) an upload allocates a one-shot VkCommandBuffer from an
+// ad-hoc VkCommandPool, submits + waits idle, then frees both. See BeginUpload () in vkupload.cpp.
 
 struct VkStagingBuffer {
 	VkBuffer		buffer{ VK_NULL_HANDLE };
@@ -66,8 +68,8 @@ bool UploadSubresource(VkCommandBuffer cb, VkImage dstImage, ImageLayoutTracker&
 noexcept;
 
 // =================================================================================================
-// High-level: opens a one-shot CommandBuffer, uploads faceCount array layers (1 for plain 2D,
-// 6 for cubemaps), transitions to SHADER_READ_ONLY, submits + waits, frees temp resources.
+// High-level: uploads faceCount array layers (1 for plain 2D, 6 for cubemaps) and transitions to
+// SHADER_READ_ONLY - on the frame's upload list inside a frame, one-shot outside (see above).
 
 bool UploadTextureData(VkImage dstImage, ImageLayoutTracker& tracker,
 					   const uint8_t* const* faces, int faceCount,

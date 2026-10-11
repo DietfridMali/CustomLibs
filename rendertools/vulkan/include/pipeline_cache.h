@@ -75,6 +75,7 @@ public:
 	AutoArray<String>			m_recordNames;
 	AutoArray<PipelineRecord>	m_records;
 	bool						m_recordsDirty{ false };
+	bool						m_storedCacheMerged{ false }; // pipelines.vulkan was found and taken in by Load ()
 	bool						m_precreating{ false };
 
 	PipelineCache(void)
@@ -87,6 +88,13 @@ public:
 
 	bool Load(const String& shaderFolder);
 	bool Save(void);
+
+	// Whether the files on disk are behind what this process knows: new key records, or no usable
+	// pipelines.vulkan to begin with. What GfxRenderer::PrecreatePipelines () saves on - a save that
+	// only happens at a clean exit never happens for a run that is killed or crashes.
+	inline bool NeedsSave(void) const noexcept {
+		return m_recordsDirty or not m_storedCacheMerged;
+	}
 
 	// Cache lookup. On miss, builds the pipeline via vkCreateGraphicsPipelines and inserts it.
 	// Returns VK_NULL_HANDLE on shader/build failure.

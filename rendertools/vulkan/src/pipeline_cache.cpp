@@ -307,10 +307,12 @@ bool PipelineCache::Load(const String& shaderFolder)
 	snprintf(detail, sizeof(detail), "pipelinekeys.vulkan: %d records", int(m_records.Length()));
 	VkStallEvent("pipeline cache", VkStallClock(), detail);
 #endif
+	m_storedCacheMerged = false;
 	if (shaderFolder.IsEmpty() or (m_pipelineCache == VK_NULL_HANDLE))
 		return false;
 	size_t		size = 0;
 	const char*	failure = MergeStoredCache(m_device, m_pipelineCache, shaderFolder, size);
+	m_storedCacheMerged = (failure == nullptr);
 #if VK_STALL_DIAG
 	if (failure == nullptr)
 		snprintf(detail, sizeof(detail), "pipelines.vulkan: merged, %zu bytes", size);
@@ -335,7 +337,10 @@ bool PipelineCache::Save(void)
 	std::vector<uint8_t> data(size, 0);
 	if (vkGetPipelineCacheData(m_device, m_pipelineCache, &size, data.data()) != VK_SUCCESS)
 		return false;
-	return ShaderCache::WriteFile(m_folder, String("pipelines.vulkan"), data.data(), size);
+	if (not ShaderCache::WriteFile(m_folder, String("pipelines.vulkan"), data.data(), size))
+		return false;
+	m_storedCacheMerged = true; // what is on disk now is what this process holds
+	return true;
 }
 
 
