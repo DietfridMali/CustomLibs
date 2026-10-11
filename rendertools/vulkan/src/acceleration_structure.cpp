@@ -11,6 +11,11 @@
 #include <cstring>
 #include <vector>
 
+#if VK_STALL_DIAG
+extern void VkOneShotOrigin(const char* origin)
+noexcept;
+#endif
+
 // =================================================================================================
 
 namespace {
@@ -305,6 +310,13 @@ noexcept
 	}
 
 	OneShotCommandBuffer cmd;
+#if VK_STALL_DIAG
+	{
+		char origin[96];
+		snprintf(origin, sizeof(origin), "acceleration structure build, %u structures", unsigned(nPrepared));
+		VkOneShotOrigin(origin);
+	}
+#endif
 	if (not BeginSingleTimeCommands(cmd)) {
 		scratch.Destroy();
 		for (uint32_t i = 0; i < nPrepared; ++i)
@@ -521,6 +533,9 @@ noexcept
 	}
 	else {
 		OneShotCommandBuffer cmd;
+#if VK_STALL_DIAG
+		VkOneShotOrigin("acceleration structure build, immediate");
+#endif
 		if (not BeginSingleTimeCommands(cmd))
 			return false;
 		pfnCmdBuildAccelerationStructures(cmd.cb, 1, &buildInfo, &pRange);

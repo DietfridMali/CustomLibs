@@ -8,6 +8,7 @@
 #include "resource_handler.h"
 #include "loghandler.h"
 
+#include <cstdarg>
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
@@ -20,6 +21,25 @@ extern double VkStallClock(void)
 noexcept;
 extern void VkStallNote(const char* what, double startMs, const char* detail)
 noexcept;
+extern void VkStallEvent(const char* what, double startMs, const char* detail)
+noexcept;
+
+static char vkOneShotOrigin[160] = "";
+
+void VkOneShotOrigin(const char* origin)
+noexcept
+{
+	snprintf(vkOneShotOrigin, sizeof(vkOneShotOrigin), "%s", origin);
+}
+
+static void VkOneShotOriginF(const char* format, ...)
+noexcept
+{
+	va_list args;
+	va_start(args, format);
+	vsnprintf(vkOneShotOrigin, sizeof(vkOneShotOrigin), format, args);
+	va_end(args);
+}
 #endif
 
 // =================================================================================================
@@ -132,7 +152,8 @@ noexcept
 #endif
 	res = vkQueueWaitIdle(queue);
 #if VK_STALL_DIAG
-	VkStallNote("one-shot submit wait idle", stallStart, nullptr);
+	VkStallEvent("one-shot submit wait idle", stallStart, vkOneShotOrigin[0] ? vkOneShotOrigin : "gfx array (immediate upload, readback or staged copy)");
+	vkOneShotOrigin[0] = '\0';
 #endif
 	if (res != VK_SUCCESS) {
 		logHandler.Print("vkupload::EndSingleTimeCommands: vkQueueWaitIdle failed (%d)\n", (int)res);
@@ -259,6 +280,9 @@ noexcept
 		faceCount = 6;
 
 	OneShotCommandBuffer cmd{};
+#if VK_STALL_DIAG
+	VkOneShotOriginF("texture data, %d x %d, %d channels, %d faces", width, height, channels, faceCount);
+#endif
 	if (not BeginSingleTimeCommands(cmd))
 		return false;
 
@@ -357,6 +381,9 @@ noexcept
 	}
 
 	OneShotCommandBuffer cmd{};
+#if VK_STALL_DIAG
+	VkOneShotOriginF("texture with mips, %d x %d, %d channels, %u mips", width, height, channels, unsigned(mipLevels));
+#endif
 	if (ok and BeginSingleTimeCommands(cmd)) {
 		// ToTransferDst barriers all mip levels (subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS).
 		tracker.ToTransferDst(cmd.cb);
@@ -429,6 +456,10 @@ noexcept
 	}
 
 	OneShotCommandBuffer cmd{};
+#if VK_STALL_DIAG
+	VkOneShotOriginF("texture array, %d x %d, %d channels, %d layers from layer %d, %d mips", width, height, channels, layerCount,
+					 firstLayer, mipCount);
+#endif
 	if (ok and BeginSingleTimeCommands(cmd)) {
 		tracker.ToTransferDst(cmd.cb); // barriers all mips + layers (VK_REMAINING_*)
 		idx = 0;
@@ -499,6 +530,10 @@ noexcept
 	}
 
 	OneShotCommandBuffer cmd{};
+#if VK_STALL_DIAG
+	VkOneShotOriginF("compressed texture, %d x %d, format %d, %d layers from layer %d, %d mips", width, height, int(fmt), faceCount,
+					 firstLayer, mipCount);
+#endif
 	if (ok and BeginSingleTimeCommands(cmd)) {
 		tracker.ToTransferDst(cmd.cb); // barriers all mips + layers (VK_REMAINING_*)
 		idx = 0;
@@ -582,6 +617,9 @@ noexcept
 	std::memcpy(staging.mapped, data, size_t(imageBytes));
 
 	OneShotCommandBuffer cmd{};
+#if VK_STALL_DIAG
+	VkOneShotOriginF("3d texture data, %d x %d x %d, format %d", w, h, d, int(format));
+#endif
 	if (not BeginSingleTimeCommands(cmd)) {
 		staging.Destroy();
 		vmaDestroyImage(allocator, outImage, outAllocation);
@@ -802,6 +840,9 @@ noexcept
 	}
 
 	OneShotCommandBuffer cmd{};
+#if VK_STALL_DIAG
+	VkOneShotOriginF("3d texture, %d x %d x %d, %u mips", width, height, depth, unsigned(mipLevels));
+#endif
 	if (not BeginSingleTimeCommands(cmd)) {
 		for (uint32_t i = 0; i < mipLevels; ++i)
 			stagings[i].Destroy();

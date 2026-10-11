@@ -26,6 +26,8 @@ extern double VkStallClock(void)
 noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail)
 noexcept;
+extern void VkOneShotOrigin(const char* origin)
+noexcept;
 #endif
 
 // =================================================================================================
@@ -992,6 +994,14 @@ bool ComputeShader::DispatchOnce(uint32_t groupCountX, uint32_t groupCountY, uin
 		vkUpdateDescriptorSets(device, writeCount, writes, 0, nullptr);
 
 	OneShotCommandBuffer once;
+#if VK_STALL_DIAG
+	{
+		char origin[96];
+		snprintf(origin, sizeof(origin), "compute dispatch, %u x %u x %u groups", unsigned(groupCountX), unsigned(groupCountY),
+				 unsigned(groupCountZ));
+		VkOneShotOrigin(origin);
+	}
+#endif
 	if (not BeginSingleTimeCommands(once))
 		return false;
 
