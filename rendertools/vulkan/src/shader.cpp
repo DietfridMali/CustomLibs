@@ -34,6 +34,19 @@ extern double VkStallClock(void)
 noexcept;
 extern void VkStallEvent(const char* what, double startMs, const char* detail)
 noexcept;
+extern void VkGpuPassNoteDraw(VkCommandBuffer cb, uint32_t frameHash, uint32_t shaderHash)
+noexcept;
+
+static uint32_t VkGpuHashBytes(uint32_t hash, const void* data, size_t size)
+noexcept
+{
+	const uint8_t* bytes = static_cast<const uint8_t*>(data);
+	for (size_t i = 0; i < size; ++i) {
+		hash ^= bytes[i];
+		hash *= 16777619u;
+	}
+	return hash;
+}
 #endif
 
 #if OPTIMIZE_SHADER_LOADING
@@ -1411,6 +1424,15 @@ noexcept
 	VkCommandBuffer cb = commandListHandler.CurrentGfxList();
 	if (cb == VK_NULL_HANDLE or m_pipelineLayout == VK_NULL_HANDLE or m_setLayout == VK_NULL_HANDLE)
 		return false;
+
+#if VK_STALL_DIAG
+	uint32_t shaderHash = 2166136261u;
+	for (int s = 0; s < kStageCount; ++s) {
+		if (m_stages[s].size > 0)
+			shaderHash = VkGpuHashBytes(shaderHash, m_stages[s].staging.data(), m_stages[s].size);
+	}
+	VkGpuPassNoteDraw(cb, VkGpuHashBytes(2166136261u, &m_b0Staging, sizeof(FrameConstants)), shaderHash);
+#endif
 
 	VkAccelerationStructureKHR accelStructure = commandListHandler.m_boundAccelStructure;
 	if (m_usesAccelStructure and (accelStructure == VK_NULL_HANDLE)) {

@@ -508,6 +508,11 @@ struct VkGpuPassRecord {
 	VkCommandBuffer		cb;
 	bool				markIsStage[kGpuMarkMax];
 	char				markNames[kGpuMarkMax][kGpuMarkNameSize];
+	uint32_t			markDraws[kGpuMarkMax];
+	bool				markPipelineMixed[kGpuMarkMax];
+	uint64_t			markPipelines[kGpuMarkMax];
+	uint32_t			markFrameHashes[kGpuMarkMax];
+	uint32_t			markShaderHashes[kGpuMarkMax];
 };
 
 struct VkGpuPassSlot {
@@ -627,8 +632,51 @@ noexcept
 	}
 	snprintf(pass->markNames[pass->markCount], kGpuMarkNameSize, "%s", static_cast<const char*>(shader->m_name));
 	pass->markIsStage[pass->markCount] = false;
+	pass->markDraws[pass->markCount] = 0;
 	vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuPassPool, VkGpuPassQuery(slotIndex, index) + 2 + pass->markCount);
 	++pass->markCount;
+}
+
+
+void VkGpuPassNoteDraw(VkCommandBuffer cb, uint32_t frameHash, uint32_t shaderHash)
+noexcept
+{
+	if (vkGpuPassPool == VK_NULL_HANDLE)
+		return;
+	for (uint32_t slotIndex = 0; slotIndex < CommandQueue::FRAME_COUNT; ++slotIndex) {
+		VkGpuPassSlot& slot = vkGpuPassSlots[slotIndex];
+		for (uint32_t i = slot.count; i > 0; --i) {
+			VkGpuPassRecord& pass = slot.passes[(slot.first + i - 1) % kGpuPassSlotSize];
+			if ((pass.cb != cb) or pass.isEnded)
+				continue;
+			if (pass.markCount == 0)
+				return;
+			uint32_t mark = pass.markCount - 1;
+			for (uint32_t j = pass.markCount; j > 0; --j) {
+				if (pass.markIsStage[j - 1]) {
+					mark = j - 1;
+					break;
+				}
+			}
+			VkPipeline	pipeline = pass.list->m_activePipeline;
+			uint64_t	pipelineId = 0;
+			std::memcpy(&pipelineId, &pipeline, (sizeof(pipeline) < sizeof(pipelineId)) ? sizeof(pipeline) : sizeof(pipelineId));
+			if (pass.markDraws[mark] == 0) {
+				pass.markPipelines[mark] = pipelineId;
+				pass.markPipelineMixed[mark] = false;
+				pass.markFrameHashes[mark] = frameHash;
+				pass.markShaderHashes[mark] = shaderHash;
+			}
+			else {
+				if (pass.markPipelines[mark] != pipelineId)
+					pass.markPipelineMixed[mark] = true;
+				pass.markFrameHashes[mark] = pass.markFrameHashes[mark] * 31u + frameHash;
+				pass.markShaderHashes[mark] = pass.markShaderHashes[mark] * 31u + shaderHash;
+			}
+			++pass.markDraws[mark];
+			return;
+		}
+	}
 }
 
 
@@ -685,6 +733,18 @@ noexcept
 	vkGpuPassText += line;
 	if (vkGpuPassText.size() >= kGpuPassTextFlush)
 		VkGpuPassFlush();
+}
+
+
+static const char* VkGpuPassDrawText(const VkGpuPassRecord& pass, uint32_t mark, char* text, size_t size)
+noexcept
+{
+	text[0] = '\0';
+	if (pass.markDraws[mark] > 0)
+		snprintf(text, size, "  pipeline %012llX%s constants %08X/%08X draws %u", static_cast<unsigned long long>(pass.markPipelines[mark]),
+				 pass.markPipelineMixed[mark] ? " mixed" : "", pass.markFrameHashes[mark], pass.markShaderHashes[mark],
+				 pass.markDraws[mark]);
+	return text;
 }
 
 
@@ -786,14 +846,17 @@ noexcept
 			}
 			if (markEnd < mark[0])
 				continue;
-			double markMs = double(markEnd - mark[0]) * vkGpuPassPeriodMs;
+			double	markMs = double(markEnd - mark[0]) * vkGpuPassPeriodMs;
+			char	drawText[96];
 			if (isStage) {
 				inStage = true;
 				if (isStall or (markMs >= minMs))
-					VkGpuPassLine("         stage %-29s %8.2f ms\n", pass.markNames[j], markMs);
+					VkGpuPassLine("         stage %-29s %8.2f ms%s\n", pass.markNames[j], markMs,
+								  VkGpuPassDrawText(pass, j, drawText, sizeof(drawText)));
 			}
 			else if (markMs >= minMs)
-				VkGpuPassLine("%s shader %-28s %8.2f ms\n", inStage ? "            " : "        ", pass.markNames[j], markMs);
+				VkGpuPassLine("%s shader %-28s %8.2f ms%s\n", inStage ? "            " : "        ", pass.markNames[j], markMs,
+							  VkGpuPassDrawText(pass, j, drawText, sizeof(drawText)));
 		}
 		if (pass.marksDropped > 0)
 			VkGpuPassLine("         %u marks not recorded\n", pass.marksDropped);
@@ -845,6 +908,7 @@ noexcept
 			}
 			snprintf(pass.markNames[pass.markCount], kGpuMarkNameSize, "%s", name);
 			pass.markIsStage[pass.markCount] = true;
+			pass.markDraws[pass.markCount] = 0;
 			vkCmdWriteTimestamp(cb, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vkGpuPassPool, VkGpuPassQuery(slotIndex, index) + 2 + pass.markCount);
 			++pass.markCount;
 			pass.lastShader = nullptr;
