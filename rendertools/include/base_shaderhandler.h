@@ -96,6 +96,13 @@ public:
 		return m_shaderCode->GetShader(shaderId);
 	}
 
+	// A shader that is not on the startup list - see BaseShaderCode::CreateShader (const ShaderSource&).
+	// Returns the shader, created now or earlier under that name, nullptr when it could not be built or
+	// the shader code has not been set up yet (CreateShaders ()).
+	inline Shader* CreateShader(const ShaderSource& source) {
+		return m_shaderCode ? m_shaderCode->CreateShader(source) : nullptr;
+	}
+
 	inline int PendingShaderCount(void) const {
 		return m_shaderCode ? m_shaderCode->PendingShaderCount() : 0;
 	}
