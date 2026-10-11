@@ -704,14 +704,16 @@ noexcept
 			if (leadMs >= kStallDetailMinMs)
 				logHandler.Print("         %-35s %8.2f ms\n", (pass.markCount > 0) ? "before the first shader" : "no shader bound", leadMs);
 		}
+		bool inStage = false;
 		for (uint32_t j = 0; j < pass.markCount; ++j) {
 			const uint64_t*	mark = data + (2 + j) * 2;
 			if (mark[1] == 0)
 				continue;
-			uint64_t markEnd = data[2];
+			bool		isStage = pass.markIsStage[j];
+			uint64_t	markEnd = data[2];
 			for (uint32_t k = j + 1; k < pass.markCount; ++k) {
 				const uint64_t* next = data + (2 + k) * 2;
-				if (next[1] != 0) {
+				if ((next[1] != 0) and (pass.markIsStage[k] or not isStage)) {
 					markEnd = next[0];
 					break;
 				}
@@ -719,8 +721,12 @@ noexcept
 			if (markEnd < mark[0])
 				continue;
 			double markMs = double(markEnd - mark[0]) * vkGpuPassPeriodMs;
-			if (markMs >= kStallDetailMinMs)
-				logHandler.Print("         %s %-28s %8.2f ms\n", pass.markIsStage[j] ? "stage " : "shader", pass.markNames[j], markMs);
+			if (isStage) {
+				inStage = true;
+				logHandler.Print("         stage %-29s %8.2f ms\n", pass.markNames[j], markMs);
+			}
+			else if (markMs >= kStallDetailMinMs)
+				logHandler.Print("%s shader %-28s %8.2f ms\n", inStage ? "            " : "        ", pass.markNames[j], markMs);
 		}
 		if (pass.marksDropped > 0)
 			logHandler.Print("         %u marks not recorded\n", pass.marksDropped);
