@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstring>
 #if VK_STALL_DIAG
+#include <cstdarg>
 #include <chrono>
 #include <string>
 #include <vector>
@@ -28,6 +29,8 @@ static constexpr double kStallFrameMinMs = 20.0;
 static constexpr double kStallFrameFactor = 2.5;
 static constexpr double kStallDetailMinMs = 1.0;
 static constexpr size_t kStallDetailMaxChars = 16384;
+static constexpr uint64_t kSampleFrameInterval = 30;
+static constexpr double kSampleDetailMinMs = 0.1;
 
 struct VkStallEntry {
 	const char*	what;
@@ -40,6 +43,7 @@ struct VkStallRecorder {
 	uint64_t					frameNumber{ 0 };
 	double						frameStartMs{ 0.0 };
 	double						avgFrameMs{ 0.0 };
+	uint32_t					stageMarks{ 0 };
 	std::vector<VkStallEntry>	entries;
 	std::string					details;
 };
@@ -109,7 +113,23 @@ noexcept
 			vkStalls.avgFrameMs = frameMs;
 		else
 			vkStalls.avgFrameMs = vkStalls.avgFrameMs * 0.95 + frameMs * 0.05;
+		if (not isStall and ((vkStalls.frameNumber % kSampleFrameInterval) == 0) and (vkStalls.stageMarks > 0)) {
+			std::string	sample;
+			char		text[128];
+			snprintf(text, sizeof(text), "SAMPLE frame %llu: %.2f ms (avg %.2f ms)", static_cast<unsigned long long>(vkStalls.frameNumber),
+					 frameMs, vkStalls.avgFrameMs);
+			sample = text;
+			for (const auto& e : vkStalls.entries) {
+				if (e.totalMs < kSampleDetailMinMs)
+					continue;
+				snprintf(text, sizeof(text), ", %s %.2f", e.what, e.totalMs);
+				sample += text;
+			}
+			sample += "\n";
+			logHandler.Print("%s", sample.c_str());
+		}
 	}
+	vkStalls.stageMarks = 0;
 	vkStalls.entries.clear();
 	vkStalls.details.clear();
 	vkStalls.frameStartMs = now;
@@ -640,6 +660,50 @@ noexcept
 }
 
 
+static constexpr size_t	kGpuPassTextFlush = 32768;
+static std::string		vkGpuPassText;
+
+
+static void VkGpuPassFlush(void)
+noexcept
+{
+	if (vkGpuPassText.empty())
+		return;
+	logHandler.Print("%s", vkGpuPassText.c_str());
+	vkGpuPassText.clear();
+}
+
+
+static void VkGpuPassLine(const char* format, ...)
+noexcept
+{
+	char	line[256];
+	va_list	args;
+	va_start(args, format);
+	vsnprintf(line, sizeof(line), format, args);
+	va_end(args);
+	vkGpuPassText += line;
+	if (vkGpuPassText.size() >= kGpuPassTextFlush)
+		VkGpuPassFlush();
+}
+
+
+static bool VkGpuPassIsSample(const VkGpuPassSlot& slot, uint32_t first, uint32_t count, uint64_t frameNumber)
+noexcept
+{
+	if ((frameNumber % kSampleFrameInterval) != 0)
+		return false;
+	for (uint32_t i = 0; i < count; ++i) {
+		const VkGpuPassRecord& pass = slot.passes[(first + i) % kGpuPassSlotSize];
+		for (uint32_t j = 0; j < pass.markCount; ++j) {
+			if (pass.markIsStage[j])
+				return true;
+		}
+	}
+	return false;
+}
+
+
 static void VkGpuPassResolve(VkDevice device, uint32_t slotIndex, uint64_t frameNumber)
 noexcept
 {
@@ -680,17 +744,19 @@ noexcept
 	}
 	if (timed == 0)
 		return;
-	double spanMs = double(lastEnd - firstBegin) * vkGpuPassPeriodMs;
-	if (spanMs < kStallFrameMinMs)
+	double	spanMs = double(lastEnd - firstBegin) * vkGpuPassPeriodMs;
+	bool	isStall = (spanMs >= kStallFrameMinMs);
+	if (not isStall and not VkGpuPassIsSample(slot, first, count, passFrame))
 		return;
-	logHandler.Print("GPU frame %llu: span %.2f ms, passes %.2f ms, %u of %u passes timed, %u not recorded\n",
-					 static_cast<unsigned long long>(passFrame), spanMs, totalMs, timed, count, dropped);
+	double minMs = isStall ? kStallDetailMinMs : kSampleDetailMinMs;
+	VkGpuPassLine("GPU %sframe %llu: span %.2f ms, passes %.2f ms, %u of %u passes timed, %u not recorded\n", isStall ? "" : "sample ",
+				  static_cast<unsigned long long>(passFrame), spanMs, totalMs, timed, count, dropped);
 	for (uint32_t i = 0; i < count; ++i) {
-		if (vkGpuPassTimes[i] < kStallDetailMinMs)
+		if (vkGpuPassTimes[i] < minMs)
 			continue;
 		const VkGpuPassRecord&	pass = slot.passes[(first + i) % kGpuPassSlotSize];
 		const uint64_t*			data = vkGpuPassData[i];
-		logHandler.Print("      %-28s %8.2f ms\n", pass.name, vkGpuPassTimes[i]);
+		VkGpuPassLine("      %-28s %8.2f ms\n", pass.name, vkGpuPassTimes[i]);
 		uint64_t firstMark = data[2];
 		for (uint32_t j = 0; j < pass.markCount; ++j) {
 			const uint64_t* mark = data + (2 + j) * 2;
@@ -701,8 +767,8 @@ noexcept
 		}
 		if (firstMark >= data[0]) {
 			double leadMs = double(firstMark - data[0]) * vkGpuPassPeriodMs;
-			if (leadMs >= kStallDetailMinMs)
-				logHandler.Print("         %-35s %8.2f ms\n", (pass.markCount > 0) ? "before the first shader" : "no shader bound", leadMs);
+			if (leadMs >= minMs)
+				VkGpuPassLine("         %-35s %8.2f ms\n", (pass.markCount > 0) ? "before the first shader" : "no shader bound", leadMs);
 		}
 		bool inStage = false;
 		for (uint32_t j = 0; j < pass.markCount; ++j) {
@@ -723,14 +789,16 @@ noexcept
 			double markMs = double(markEnd - mark[0]) * vkGpuPassPeriodMs;
 			if (isStage) {
 				inStage = true;
-				logHandler.Print("         stage %-29s %8.2f ms\n", pass.markNames[j], markMs);
+				if (isStall or (markMs >= minMs))
+					VkGpuPassLine("         stage %-29s %8.2f ms\n", pass.markNames[j], markMs);
 			}
-			else if (markMs >= kStallDetailMinMs)
-				logHandler.Print("%s shader %-28s %8.2f ms\n", inStage ? "            " : "        ", pass.markNames[j], markMs);
+			else if (markMs >= minMs)
+				VkGpuPassLine("%s shader %-28s %8.2f ms\n", inStage ? "            " : "        ", pass.markNames[j], markMs);
 		}
 		if (pass.marksDropped > 0)
-			logHandler.Print("         %u marks not recorded\n", pass.marksDropped);
+			VkGpuPassLine("         %u marks not recorded\n", pass.marksDropped);
 	}
+	VkGpuPassFlush();
 }
 
 
@@ -758,6 +826,7 @@ void GfxStageMark(const char* name)
 noexcept
 {
 #if VK_STALL_DIAG
+	++vkStalls.stageMarks;
 	if (vkGpuPassPool == VK_NULL_HANDLE)
 		return;
 	VkCommandBuffer cb = commandListHandler.CurrentGfxList();
@@ -782,6 +851,18 @@ noexcept
 			return;
 		}
 	}
+#endif
+}
+
+
+bool GfxSampleFrame(uint64_t& frameNumber)
+noexcept
+{
+	frameNumber = commandListHandler.CmdQueue().FrameNumber();
+#if VK_STALL_DIAG
+	return (frameNumber % kSampleFrameInterval) == 0;
+#else
+	return false;
 #endif
 }
 

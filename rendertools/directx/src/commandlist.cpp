@@ -1164,4 +1164,12 @@ noexcept
 {
 }
 
+
+bool GfxSampleFrame(uint64_t& frameNumber)
+noexcept
+{
+	frameNumber = commandListHandler.FrameNumber();
+	return false;
+}
+
 // =================================================================================================
